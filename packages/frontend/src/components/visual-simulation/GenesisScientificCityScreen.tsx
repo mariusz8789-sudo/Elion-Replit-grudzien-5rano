@@ -90,10 +90,12 @@ export function GenesisScientificCityScreen() {
         setObsText('');
         return;
       }
-      const percentLower = intent.rainfallCounterfactualPercent ?? 30;
-      const outcome = sim.runRainfallIntensityCounterfactual(percentLower);
+      const percentMagnitude = intent.rainfallCounterfactualPercent ?? 30;
+      const direction = intent.rainfallCounterfactualDirection ?? 'LOWER';
+      const percentChange = direction === 'HIGHER' ? -percentMagnitude : percentMagnitude;
+      const outcome = sim.runRainfallIntensityCounterfactual(percentChange);
       setObsResult(outcome
-        ? `At ${outcome.adjustedIntensityMmPerHour.toFixed(1)}mm/h (${percentLower}% lower): pump tripped: ${outcome.tripped} (vs ${outcome.baselineTripped} at full intensity). Hospital water service interrupted: ${outcome.hospitalInterrupted} (vs ${outcome.baselineHospitalInterrupted}).`
+        ? `At ${outcome.adjustedIntensityMmPerHour.toFixed(1)}mm/h (${percentMagnitude}% ${direction === 'HIGHER' ? 'higher' : 'lower'}): pump tripped: ${outcome.tripped} (vs ${outcome.baselineTripped} at full intensity). Hospital water service interrupted: ${outcome.hospitalInterrupted} (vs ${outcome.baselineHospitalInterrupted}).`
         : sim.getRainfallCounterfactualGap());
       setObsText('');
       return;

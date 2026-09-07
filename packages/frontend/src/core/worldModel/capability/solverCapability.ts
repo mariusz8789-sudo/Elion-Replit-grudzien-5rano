@@ -11,6 +11,8 @@ import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
 import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
 import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
 import { DROUGHT_SOLVER_ID } from '../domains/drought';
+import { WILDFIRE_SPREAD_SOLVER_ID } from '../domains/wildfireSpread';
+import { LANDSLIDE_SOLVER_ID } from '../domains/landslide';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -18,16 +20,18 @@ import { DROUGHT_SOLVER_ID } from '../domains/drought';
  * The phase was scoped as fire/thermal and traffic/mobility. A full-repository
  * audit found **neither exists**, and that finding is the deliverable:
  *
- * - **Fire / thermal: now PARTIALLY_MODELLED for a single source.**
- *   `domains/fireThermal.ts` is a real solver: the published NFPA 921/SFPE
- *   t-squared heat-release-rate design-fire curve, a real fuel inventory with
- *   energy conservation bounding it, and the SFPE point-source radiant-heat-
- *   transfer model. It advances exactly ONE fire source — no spread, no
- *   compartment dynamics, no structural response. That single-source model
- *   is an honest fit for INDUSTRIAL_FIRE (this is literally how real
- *   process-safety practice models a pool/jet fire consequence), but NOT for
- *   WILDFIRE, whose defining phenomenon is spread across a fuel bed — which
- *   this does not do — so WILDFIRE stays NOT_MODELLED. See both entries below.
+ * - **Fire / thermal: now PARTIALLY_MODELLED, by two real, distinct solvers.**
+ *   `domains/fireThermal.ts` (published NFPA 921/SFPE t-squared heat-release-
+ *   rate design-fire curve, real fuel-inventory energy conservation, SFPE
+ *   point-source radiant heat transfer) advances exactly ONE fire source —
+ *   an honest fit for INDUSTRIAL_FIRE, since that is literally how real
+ *   process-safety practice models a pool/jet fire consequence. WILDFIRE's
+ *   defining phenomenon is spread across a fuel bed, which that solver does
+ *   not do; `domains/wildfireSpread.ts` (Phase 13) closes that separately —
+ *   a real Rothermel (1972) surface-fire-spread model, an elliptical fire
+ *   shape (Anderson 1983/Alexander 1985), and minimum-travel-time grid
+ *   propagation (Finney 2002) over the SAME terrain heightfield
+ *   `floodInundation.ts` already uses. See both entries below.
  * - **Traffic flow: now PARTIALLY_MODELLED.** `domains/trafficFlow.ts` is a real
  *   WorldGraph solver on the existing road-network geometry
  *   (`core/world/roadNetwork.ts`): a Greenshields fundamental diagram, a
@@ -72,19 +76,23 @@ export interface SolverCapability {
   readonly missing?: readonly string[];
 }
 
-/**
- * What `domains/fireThermal.ts` covers for a single fire source (a real
- * t-squared HRR curve, energy-conserving fuel inventory, and point-source
- * radiant heat transfer) does not make WILDFIRE modelled: spread across a
- * fuel bed IS the phenomenon, and nothing here advances more than one
- * non-spreading source.
- */
-const NO_WILDFIRE_SPREAD_MODEL: readonly string[] = Object.freeze([
-  'a fire-spread/rate-of-spread model across a fuel bed (e.g. Rothermel for wildland fuels) — domains/fireThermal.ts advances exactly one non-spreading fire source, never two',
-  'a fuel-bed/terrain map (fuel type, moisture, load, arrangement) for spread to run on',
-  'wind and slope effects on spread direction and rate',
-  'fire-resistance and structural-response-to-fire data, which would also need the structural model that does not exist either',
-]);
+/** What `domains/wildfireSpread.ts` still does not cover — the honest remainder after the real Rothermel/MTT spread solver. */
+const WILDFIRE_SPREAD_CAVEAT =
+  'A real Rothermel (1972) surface-fire-spread model now runs — reaction intensity, moisture/mineral damping, ' +
+  'and wind/slope spread-rate coefficients over a curated subset of Anderson\'s (1982) standard fuel models — ' +
+  'combined with the real elliptical fire-shape model (Anderson 1983/Alexander 1985) and a real minimum-travel- ' +
+  'time Dijkstra propagation (Finney 2002) over the SAME terrain heightfield floodInundation.ts uses, giving a ' +
+  'real burned-area-over-time, head rate of spread, and Byram (1959) fireline intensity/flame length. Still NOT ' +
+  'modelled: crown fire (no canopy, no crown-fire initiation or spread), spotting (ember lofting and long- ' +
+  'distance spot ignition — a major real driver of wildfire growth this omits), fire-weather coupling (wind is ' +
+  'one fixed stated vector, not time-varying or fire-induced) and suppression. drought.ts\'s real water ' +
+  'balance IS now wired in as a cross-domain coupling, but it carries a KBDI-equivalent drought index as ' +
+  'fire-danger context only: fuel moisture remains a STATED INPUT on purpose, because dead fuel moisture is ' +
+  'governed by atmospheric equilibrium moisture content (relative humidity and temperature — Simard 1968/NFDRS), ' +
+  'which Genesis cannot evaluate without a weather model, and no published universal coefficient converts soil ' +
+  'moisture into it. That last link is left open rather than fabricated. Only four of Anderson\'s 13 standard fuel ' +
+  'models are implemented, each simplified to one dead-fuel size class. Terrain grounding follows the same rule ' +
+  'as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.';
 
 /** What `domains/fireThermal.ts` still does not cover — the honest remainder after the HRR/fuel/radiation solver. */
 const FIRE_THERMAL_CAVEAT =
@@ -169,10 +177,14 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
     caveat: 'The world generator really builds and rebuilds city structure. Urban dynamics — land use, economics, population change over time — are not modelled.',
   },
 
-  // --- Fire/thermal: a real single-source HRR/radiation solver ------------
-  // fits INDUSTRIAL_FIRE (real process-safety practice models a pool/jet
-  // fire this way); WILDFIRE needs the spread this does not do.
-  WILDFIRE: notModelled(NO_WILDFIRE_SPREAD_MODEL),
+  // --- Fire/thermal: single-source HRR/radiation (INDUSTRIAL_FIRE) and -----
+  // real Rothermel/MTT spread across a fuel bed (WILDFIRE), two different
+  // real solvers for two genuinely different fire phenomena.
+  WILDFIRE: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: WILDFIRE_SPREAD_SOLVER_ID,
+    caveat: WILDFIRE_SPREAD_CAVEAT,
+  },
   INDUSTRIAL_FIRE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: FIRE_THERMAL_SOLVER_ID,
@@ -197,12 +209,20 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   TSUNAMI: notModelled(noHazardModel('wave generation and inundation')),
   HURRICANE: notModelled(noHazardModel('tropical cyclone wind and storm surge')),
   TORNADO: notModelled(noHazardModel('tornado wind field')),
-  LANDSLIDE: notModelled(noHazardModel('slope stability and runout')),
+  LANDSLIDE: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: LANDSLIDE_SOLVER_ID,
+    caveat: 'Slope stability is real: the standard infinite-slope factor of safety (Skempton & DeLory 1957) evaluated per cell from the REAL terrain heightfield\'s own D8 steepest-descent slope, including the standard pore-pressure term, so saturating the soil really can push a slope across FS=1. Runout is real too, and physically derived rather than curve-fitted: a sliding-block Coulomb energy balance, d(v^2)=2g(dz-mu*dx), traced downhill from every unstable cell, carrying its momentum across the depositional flat and stopping where its kinetic energy is exhausted (the general, terrain-following case of the classic angle-of-reach/Fahrboschung method). A path that leaves the modelled grid still moving is reported as truncated rather than counted as a real stopping distance. Still NOT modelled: debris-flow rheology and mass deformation (the runout mass is a rigid POINT under Coulomb friction — no Voellmy turbulent drag, no Bingham viscoplastic yield stress, no erosion/entrainment along the path, no bulking, no deposition profile, no debris-fan width; what it traces is a centreline with a velocity, never a flow extent or impact pressure), time-dependent triggering (FS is evaluated once from stated conditions — no rainfall-infiltration or seismic loading over time), and any measured geotechnical data: cohesion, friction angle, unit weight, failure-plane depth and saturation are literature-typical stated inputs, not a site investigation. Terrain grounding follows the same rule as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.',
+  },
   VOLCANIC: notModelled(noHazardModel('eruption, ashfall and flow')),
   DROUGHT: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: DROUGHT_SOLVER_ID,
-    caveat: 'A real water balance now runs: the Thornthwaite-Mather (1955) one-layer soil-moisture bucket model, exact accounting of precipitation vs. evapotranspiration vs. runoff vs. stored soil moisture, extending the same hydrology rainfallRunoff.ts already models (a separate daily-precipitation input, since drought analysis and the Rational Method\'s short-duration design-storm intensity are genuinely different quantities). Still NOT modelled: this is not the Standardized Precipitation Index, SPEI, or Palmer Drought Severity Index — those need a distribution fitted to decades of real climatological records Genesis does not have for any place, so `droughtSeverityCode` uses absolute soil-moisture-fraction bands, not a calibrated percentile. Potential evapotranspiration and field capacity are stated typical values (FAO-56; USDA/NRCS), not derived from real weather or soil survey data. One lumped catchment, no groundwater, no vegetation-specific water use, no calibration.',
+    caveat: 'A real water balance now runs: the Thornthwaite-Mather (1955) one-layer soil-moisture bucket model, exact accounting of precipitation vs. evapotranspiration vs. runoff vs. stored soil moisture, extending the same hydrology rainfallRunoff.ts already models (a separate daily-precipitation input, since drought analysis and the Rational Method\'s short-duration design-storm intensity are genuinely different quantities). Still NOT modelled: this is not the Standardized Precipitation Index, SPEI, or Palmer Drought Severity Index — those need a distribution fitted to decades of real climatological records Genesis does not have for any place, so `droughtSeverityCode` uses absolute soil-moisture-fraction bands, not a calibrated percentile. Potential evapotranspiration and field capacity are stated typical values (FAO-56; USDA/NRCS), not derived from real weather or soil survey data. One lumped catchment, no groundwater, no vegetation-specific water use, no calibration. The deficit is also ' +
+      'published as a KBDI-EQUIVALENT index (the Keetch-Byram Drought Index is defined as exactly this quantity — ' +
+      'soil moisture deficiency in hundredths of an inch, 0-800 — so the conversion is exact, not fitted), and is ' +
+      'carried to the wildfire domain by a real cross-domain coupling; it is KBDI-equivalent rather than KBDI ' +
+      'because Keetch & Byram derive their deficit with their own drying equation, not Thornthwaite-Mather.',
   },
   EXTREME_HEAT: notModelled(Object.freeze([
     'an ambient heat-exposure model (the fire/thermal solver that exists models one fire source\'s heat release and radiant flux, not ambient air temperature or a heat-wave)',

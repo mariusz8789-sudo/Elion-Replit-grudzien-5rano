@@ -134,17 +134,6 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
    * with the real reason, instead of a false READY. See
    * `KIND_UNSUPPORTED_REASON` below for the message this produces.
    */
-  PARTICLE_SYSTEM: {
-    binding: 'PARTICLE_WORLD_ADAPTER',
-    units: ['HOUR'],
-    maxSpan: { HOUR: 24 },
-    viewpoints: ['OBSERVER', 'WIDE', 'MACRO'],
-    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
-    notModelled: [
-      'a human-scale world a person can stand in — the world is particle-scale',
-      'continuum or fluid dynamics',
-    ],
-  },
   /**
    * Backed by the real C3 World Model engine — a live WorldGraph advanced by
    * `chemistryKinetics.ts`'s Arrhenius solver, not scenarioEngine/hypothesisLoop.
@@ -217,6 +206,8 @@ const KIND_UNSUPPORTED_REASON: Readonly<Partial<Record<ScenarioKind, string>>> =
     'a real traffic-flow model exists (core/worldModel/domains/trafficFlow.ts — Greenshields fundamental diagram, a Godunov/Cell-Transmission-Model network update, and HCM signalised-intersection capacity, all on the real road-network geometry) but it has no standalone Looking Glass binding to route to yet. Origin-destination demand, route choice/assignment, turning movements and calibration against real counts genuinely remain unmodelled regardless of routing.',
   EVACUATION:
     'the same real traffic-flow model as TRANSPORT_DISRUPTION covers an evacuation surge as an elevated demand multiplier on the network — but there is no standalone Looking Glass binding to it, and no evacuation behaviour model (warning response, departure timing, destination choice under stress) exists at all, regardless of routing.',
+  PARTICLE_SYSTEM:
+    'a real adapter exists (core/world/particleWorldAdapter.ts) projecting an already-executed Newtonian-vs-relativistic kinetic-energy divergence sweep (modelVsModelCompare.ts) into a world — but nothing in the synchronous Looking Glass resolution path runs that sweep or has a DivergenceSweepResult to hand it, so there is no real construction to route to. This kind previously carried a capability-table entry with no session builder actually wired to its declared PARTICLE_WORLD_ADAPTER binding, which meant a request would have silently fallen through to the unrelated cell-culture laboratory session instead of a genuine refusal — corrected here, not routed.',
 };
 
 /**

@@ -136,6 +136,17 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(evacuation.notModelled.join(' ')).toMatch(/same real traffic-flow model/i);
   });
 
+  it('refuses a particle-system request rather than silently serving unrelated cell-culture biology data', () => {
+    // PARTICLE_SYSTEM previously carried a READY SCENARIO_CAPABILITIES entry declaring a
+    // 'PARTICLE_WORLD_ADAPTER' binding that scenarioSession.ts's session builder never actually
+    // handled — so a request would have silently fallen through to the catch-all laboratory
+    // session (biology-logistic cell-culture hypothesis data) instead of a genuine refusal.
+    const resolution = resolveScenarioRequest(parseScenarioRequest('Show me a particle system over 12 hours'));
+    expect(resolution.status).toBe('NOT_MODELLED');
+    expect(resolution.notModelled.join(' ')).toMatch(/particleWorldAdapter\.ts/);
+    expect(resolution.notModelled.join(' ')).toMatch(/silently fallen through to the unrelated cell-culture/i);
+  });
+
   it('refuses a century of urban change, which parses perfectly', () => {
     const resolution = resolveScenarioRequest(parseScenarioRequest('Show this city over the next 100 years from a bench'));
     expect(resolution.status).toBe('NOT_MODELLED');

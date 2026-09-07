@@ -12,6 +12,8 @@ import {
   buildKnowledgeIndex,
   knowledgeExcerptFor,
   AI_UNAVAILABLE_MESSAGE,
+  WORLD_PROPOSAL_TOOL,
+  parseWorldProposalToolResponse,
 } from './lib.mjs';
 
 describe('sanitizeFlat', () => {
@@ -230,5 +232,58 @@ describe('buildKnowledgeIndex / knowledgeExcerptFor (Narrator grounding)', () =>
     const excerpt = knowledgeExcerptFor(index, 'quantum', 100);
     assert.equal(excerpt.length, 100 + '\n…(przycięte)'.length);
     assert.ok(excerpt.endsWith('…(przycięte)'));
+  });
+});
+
+describe('Genesis C3 World Proposal tool (real LLM adapter, pure/network-free)', () => {
+  test('WORLD_PROPOSAL_TOOL only allows Genesis\'s real templates/domains/scales as enum values', () => {
+    assert.equal(WORLD_PROPOSAL_TOOL.name, 'propose_world');
+    const worldTypeEnum = WORLD_PROPOSAL_TOOL.input_schema.properties.worldType.items.enum;
+    assert.deepEqual(worldTypeEnum, ['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE']);
+    const domainEnum = WORLD_PROPOSAL_TOOL.input_schema.properties.scientificDomains.items.properties.domain.enum;
+    assert.deepEqual(domainEnum, ['chemistry', 'epidemiology', 'hydraulics', 'kinematics']);
+  });
+
+  function toolUseResponse(input) {
+    return { content: [{ type: 'tool_use', name: 'propose_world', input }], stop_reason: 'tool_use' };
+  }
+
+  test('accepts a well-formed tool_use response', () => {
+    const input = { worldType: ['CITY', 'WATER_SYSTEM'], rationale: 'A coastal city with water infrastructure.' };
+    const result = parseWorldProposalToolResponse(toolUseResponse(input));
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.input, input);
+  });
+
+  test('rejects a response with no tool_use block at all', () => {
+    const result = parseWorldProposalToolResponse({ content: [{ type: 'text', text: 'I refuse.' }] });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'malformed');
+  });
+
+  test('rejects a tool_use block for the wrong tool name', () => {
+    const result = parseWorldProposalToolResponse({ content: [{ type: 'tool_use', name: 'some_other_tool', input: {} }] });
+    assert.equal(result.ok, false);
+  });
+
+  test('rejects an empty or missing worldType', () => {
+    assert.equal(parseWorldProposalToolResponse(toolUseResponse({ worldType: [], rationale: 'x' })).ok, false);
+    assert.equal(parseWorldProposalToolResponse(toolUseResponse({ rationale: 'x' })).ok, false);
+  });
+
+  test('rejects a worldType containing an invented template name (never trusts the model)', () => {
+    const result = parseWorldProposalToolResponse(toolUseResponse({ worldType: ['CITY', 'MOON_BASE'], rationale: 'x' }));
+    assert.equal(result.ok, false);
+  });
+
+  test('rejects a missing or empty rationale', () => {
+    assert.equal(parseWorldProposalToolResponse(toolUseResponse({ worldType: ['CITY'], rationale: '' })).ok, false);
+    assert.equal(parseWorldProposalToolResponse(toolUseResponse({ worldType: ['CITY'] })).ok, false);
+  });
+
+  test('handles a malformed response object without throwing', () => {
+    assert.equal(parseWorldProposalToolResponse(null).ok, false);
+    assert.equal(parseWorldProposalToolResponse({}).ok, false);
+    assert.equal(parseWorldProposalToolResponse({ content: null }).ok, false);
   });
 });

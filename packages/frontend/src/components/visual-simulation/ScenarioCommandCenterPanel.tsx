@@ -8,12 +8,15 @@ import {
   type ScenarioRun,
 } from '../../core/simulation/scenarioEngine';
 import {
+  openScenarioVariantInWorld,
   replayScenarioCommandCenter,
   runScenarioCommandCenter,
   scenarioUiMetrics,
+  temporalTimelinesFor,
   type ScenarioCommandCenterRun,
   type ScenarioUiMetric,
 } from '../../core/simulation/scenarioCommandCenter';
+import { temporalStateAt } from '../../core/simulation/temporalState';
 
 /**
  * Scenario Command Center visual contract: compact, evidence-first UI over the
@@ -87,7 +90,7 @@ function Traceability({ run, replays }: { run: ScenarioCommandCenterRun; replays
   </div>;
 }
 
-export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
+export function ScenarioCommandCenterPanel({ params, temporalDay = null }: { params: SimParams; temporalDay?: number | null }) {
   const [intervention, setIntervention] = useState<ScenarioId>('ISOLATION');
   const [run, setRun] = useState<ScenarioCommandCenterRun | null>(null);
   const [chartMetric, setChartMetric] = useState<ChartMetric>('infectious');
@@ -100,10 +103,13 @@ export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
     ...Object.entries(definition.cohortOverrides ?? {}),
   ], [definition]);
   const metrics = run ? scenarioUiMetrics(run.baseline, run.intervention) : [];
-  const sample = run?.intervention.series.find((entry) => entry.day === timelineDay) ?? null;
+  // Oba ramiona jako oś czasu: przewijalny dowód, nie tylko wykres jednej serii.
+  const timelines = useMemo(() => (run ? temporalTimelinesFor(run) : null), [run]);
+  const baselineState = timelines ? temporalStateAt(timelines.baseline, timelineDay) : null;
+  const variantState = timelines ? temporalStateAt(timelines.variant, timelineDay) : null;
   const lastDay = run?.intervention.days ?? 0;
   const execute = () => {
-    const next = runScenarioCommandCenter(intervention, params);
+    const next = runScenarioCommandCenter(intervention, params, temporalDay === null ? {} : { variantInterventionStartDay: temporalDay });
     setRun(next); setTimelineDay(0); setReplays(null);
   };
 
@@ -122,7 +128,7 @@ export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
       {parameterEntries.length > 0 ? parameterEntries.map(([key, value]) => <div key={key}><b>{PARAMETER_LABELS[key] ?? key}</b><code>{Array.isArray(value) ? value.join(', ') : String(value)}</code></div>) : <p>Brak nadpisań parametrów modelu.</p>}
     </div>
     {definition.notModeledReason && <p className="scenario-not-modeled">NOT_MODELED — {definition.notModeledReason}</p>}
-    <button className="world-action accent scenario-run-button" onClick={execute}>▶ Uruchom istniejący scenariusz</button>
+    <button className="world-action accent scenario-run-button" onClick={execute}>▶ {temporalDay === null ? 'Uruchom istniejący scenariusz' : `WHAT IF? · od dnia ${temporalDay}`}</button>
 
     {!run && <p className="scenario-empty">NOT_AVAILABLE — uruchom BASELINE i INTERVENTION, aby zobaczyć wyniki.</p>}
     {run && <>
@@ -136,11 +142,33 @@ export function ScenarioCommandCenterPanel({ params }: { params: SimParams }) {
         <div className="scenario-timeline">
           <div><span>TIMELINE</span><b>DAY 0 → DAY {lastDay}</b></div>
           <input type="range" min="0" max={lastDay} step="1" value={timelineDay} onChange={(event) => setTimelineDay(Number(event.target.value))} aria-label="Dzień scenariusza" />
-          {timelineDay === 0 ? <p>DAY 0 — wynik dzienny nie jest zapisywany przez Scenario Engine; widoczne są warunki wejściowe w traceability.</p> : sample ? <p>DAY {sample.day}: I {sample.infectious} · hosp. {sample.hospitalized} · D {sample.deceased} · bez opieki {sample.hospital.unmetCare}</p> : <p>NOT_AVAILABLE — brak próbki dla wybranego dnia.</p>}
+          <div className="scenario-timeline-divergence">
+            {run && run.comparison.status === 'COMPLETED'
+              ? (run.firstDivergentDay === null
+                ? <span>BRAK ROZJAZDU — obie osie identyczne w całym horyzoncie</span>
+                : <span className={timelineDay >= run.firstDivergentDay ? 'scenario-divergence-past' : 'scenario-divergence-future'}>ROZJAZD (mierzony): DZIEŃ {run.firstDivergentDay}</span>)
+              : <span>NOT_AVAILABLE — rozjazd liczony tylko dla porównywalnej pary</span>}
+          </div>
+          <div className="scenario-timeline-branch">
+            <span className="scenario-branch-label baseline">TIMELINE A — BASELINE</span>
+            {baselineState === null ? <p>NOT_AVAILABLE — brak próbki dla wybranego dnia.</p>
+              : baselineState.sample === null ? <p>DAY {baselineState.logicalDay} — {baselineState.observationStatus} — warunki wejściowe, bez próbki dziennej.</p>
+              : <p>DAY {baselineState.sample.day} — {baselineState.observationStatus}: I {baselineState.sample.infectious} · hosp. {baselineState.sample.hospitalized} · D {baselineState.sample.deceased} · bez opieki {baselineState.sample.hospital.unmetCare}</p>}
+          </div>
+          <div className="scenario-timeline-branch">
+            <span className="scenario-branch-label variant">TIMELINE B — INTERVENTION</span>
+            {variantState === null ? <p>NOT_AVAILABLE — brak próbki dla wybranego dnia.</p>
+              : variantState.sample === null ? <p>DAY {variantState.logicalDay} — {variantState.observationStatus} — warunki wejściowe, bez próbki dziennej.</p>
+              : <p>DAY {variantState.sample.day} — {variantState.observationStatus}: I {variantState.sample.infectious} · hosp. {variantState.sample.hospitalized} · D {variantState.sample.deceased} · bez opieki {variantState.sample.hospital.unmetCare}</p>}
+          </div>
         </div>
       </>}
       <Traceability run={run} replays={replays} />
       <button className="world-action scenario-replay-button" onClick={() => setReplays(replayScenarioCommandCenter(run))}>↻ Zweryfikuj replay</button>
+      <button className="world-action scenario-replay-button" disabled={run.intervention.status !== 'COMPLETED'} onClick={() => {
+        const handoffRunId = openScenarioVariantInWorld(run);
+        if (handoffRunId) window.location.hash = '#/city3d';
+      }}>↗ Otwórz wariant w World/3D</button>
     </>}
   </div>;
 }

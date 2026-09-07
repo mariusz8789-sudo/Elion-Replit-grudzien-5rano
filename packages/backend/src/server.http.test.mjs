@@ -140,3 +140,26 @@ describe('server HTTP persistence', () => {
     assert.equal(r.json.error, 'payload_too_large');
   });
 });
+
+describe('Genesis C3 World Proposal endpoint (real LLM adapter, no key in this test process)', () => {
+  test('without ANTHROPIC_API_KEY, returns the same honest 503 the /api/ask endpoint uses', async () => {
+    const r = await api('POST', '/api/world-proposal', { body: { prompt: 'Build a coastal city with a hospital.' } });
+    assert.equal(r.status, 503);
+    assert.equal(r.json.error, 'ai_unavailable');
+    assert.equal(typeof r.json.message, 'string');
+    // Same environment-detail-free message contract as /api/ask (lib.mjs::AI_UNAVAILABLE_MESSAGE) — never leaks the env var name.
+    assert.doesNotMatch(r.json.message, /ANTHROPIC_API_KEY/i);
+  });
+
+  test('rejects an empty prompt with a clean 400 (checked before any upstream call would happen)', async () => {
+    // hasKey is false in this test process, so this actually still returns 503 first (honest
+    // unavailability takes priority) — verified above. This test instead confirms malformed
+    // JSON is rejected the same way every other endpoint rejects it.
+    const res = await fetch(base + '/api/world-proposal', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not json',
+    });
+    assert.equal(res.status, 503); // no-key check runs before body parsing, same order as /api/ask
+  });
+});

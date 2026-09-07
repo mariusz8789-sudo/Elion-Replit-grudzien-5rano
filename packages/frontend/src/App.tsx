@@ -46,12 +46,15 @@ const VisualSimulationScreen = lazy(() => import('./components/visual-simulation
 const City3DWebGLScreen = lazy(() => import('./components/visual-simulation/City3DWebGLScreen').then((m) => ({ default: m.City3DWebGLScreen })));
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
+const GenesisWorldScreen = lazy(() => import('./components/visual-simulation/GenesisWorldScreen').then((m) => ({ default: m.GenesisWorldScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
+const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
+const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -95,8 +98,10 @@ type Route =
   | { kind: 'city3d' }
   | { kind: 'concept' }
   | { kind: 'character' }
+  | { kind: 'genesis-world' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
+  | { kind: 'looking-glass' }
   | { kind: 'investor-demo' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' };
@@ -127,7 +132,9 @@ function parseHash(): Route {
   if (h === '#/city3d') return { kind: 'city3d' };
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
+  if (h === '#/genesis-world') return { kind: 'genesis-world' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
+  if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
@@ -497,6 +504,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'looking-glass') {
+      return (
+        <div className="app">
+          <TopBar title="🔭 Looking Glass" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <LookingGlassChat />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'first-person-lab') {
       return (
         <div className="app">
@@ -568,11 +587,26 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'genesis-world') {
+      return (
+        <div className="app">
+          <TopBar title="🌍 Genesis World Observation — Trinity (C1+C2+C3)" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GenesisWorldScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
           <HeavyRoute>
             <GenesisCommandCenterHero />
+          </HeavyRoute>
+          <HeavyRoute>
+            <GenesisCapabilityShowcase />
           </HeavyRoute>
           <div style={{ position: 'relative' }}>
             <ScaleJourney />

@@ -135,6 +135,18 @@ export const HYPOTHESIS_PROBLEMS: readonly HypothesisProblem[] = [
     sharedLevers: { restMassMeV: 0.511 },
     objective: 'maximize',
   },
+  {
+    problemId: 'problem:cell-population-growth-rate-fastest-to-capacity',
+    statement: 'Który z zadeklarowanych kandydatów wewnętrznego tempa wzrostu r populacji komórek osiąga NAJWYŻSZY modelowany ułamek pojemności środowiska w ustalonym czasie (rzeczywisty graf wzrostu logistycznego)?',
+    domainId: 'biology',
+    modelId: 'biology-logistic',
+    primaryMetric: 'fractionOfCapacity',
+    candidateVariable: 'growthRate',
+    baselineValue: 0.1,
+    candidateValues: [0.3, 0.6],
+    sharedLevers: { carryingCapacity: 1000, initialPopulation: 10, timeElapsed: 10 },
+    objective: 'maximize',
+  },
 ] as const;
 
 export interface PreregisteredHypothesis {

@@ -261,6 +261,23 @@ describe('Kontrfaktyk w Pamięci Naukowej', () => {
     expect(replayAfterReload(rows[0]!.counterfactual).status).toBe('MATCH');
   });
 
+  it('przechodzi z WHAT IF przez Memory do World handoff wyłącznie przy MATCH', async () => {
+    const storage = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    const memory = await import('../core/scienceMemory');
+    const saved = memory.saveScenarioCounterfactualToMemory(runScenarioCounterfactual(SPEC));
+    const { openSavedCounterfactualInWorld } = await import('../core/simulation/scenarioWorldReplay');
+    const result = openSavedCounterfactualInWorld(saved.counterfactual, { recordId: saved.contentHash });
+    const { peekPendingScenarioTimeline, clearScenarioTimelineHandoffs } = await import('../core/experimentFabric/worldHandoff');
+
+    expect(result.replay.status).toBe('MATCH');
+    expect(result.opened).toBe(true);
+    expect(result.handoffRunId).toBe(`replay:counterfactual:${saved.contentHash}`);
+    expect(peekPendingScenarioTimeline()?.origin).toBe('memory-replay');
+    expect(peekPendingScenarioTimeline()?.replayVerdict).toBe('MATCH');
+    clearScenarioTimelineHandoffs();
+  });
+
   it('rekord z uszkodzonym ramieniem nie jest wczytywany z pamięci', async () => {
     const storage = makeFakeStorage();
     vi.stubGlobal('window', { localStorage: storage });

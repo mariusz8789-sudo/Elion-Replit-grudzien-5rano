@@ -9,6 +9,12 @@ import { HEALTH_COLORS, HumanoidAgentVisual, mapSimAgentToHumanoid, type AgentHe
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { createPhiladelphiaLegendVisual, type PhiladelphiaLegendViewMode, type PhiladelphiaLegendVisual } from './philadelphiaLegendVisual';
 import { approvedWorldAssetCount, isWorldAssetApproved, isWorldAssetPathApproved, unverifiedWorldAssetCount } from './assetGovernance';
+import { setupGraphicsPipeline } from './graphics/postProcessing';
+import { createSunLight, createBackgroundFill } from './graphics/lighting';
+import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
+import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
+import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 
 /**
  * Wysokość kamery ulicznej. Ponad najwyższą koroną (4,91 jednostki ≈ 9,8 m),
@@ -173,19 +179,46 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   private readonly hdriEnabled = true;
   private lod1 = new Map<number, HumanoidAgentVisual>();
   private lod2: HighFidelityCrowd | null = null;
+  // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): faint airborne dust/pollen for
+  // street-level depth. Purely a rendering-layer cue — its drift is a fixed constant, never derived
+  // from world/epidemic state. `.points` is also pushed through `addSceneObject`, so
+  // `disposeObject`/the per-`sceneObjects` teardown loop in `dispose()` frees its geometry/material
+  // like any other scene mesh; only the `update(dt)` drift needs its own handle kept here.
+  private streetHaze: DustMotesHandle | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
   private materials: MaterialBundle | null = null;
   /** Elewacje czekające na tekstury — mapy PBR dochodzą po zbudowaniu geometrii. */
-  private facadeMaterials: Array<{ mat: THREE_NS.MeshStandardMaterial; kind: string; w: number; h: number }> = [];
+  private facadeMaterials: Array<{
+    mat: THREE_NS.MeshStandardMaterial; kind: string; w: number; h: number;
+    /** Which base-material texture each cloned slot was last copied from — lets
+     * `refreshFacadeTextures` detect "the base slot changed" (the shared palette's own procedural
+     * fallback swapped for a real loaded governed texture) and re-clone, instead of only ever
+     * checking "is this slot non-null" (which now the procedural fallback already satisfies at
+     * construction time, so that check alone would permanently stick every facade with the
+     * fallback and never pick up the real PBR set once it arrives). */
+    sourceTextures: Partial<Record<'map' | 'normalMap' | 'roughnessMap' | 'aoMap', THREE_NS.Texture | null>>;
+  }> = [];
   private sceneObjects: THREE_NS.Object3D[] = [];
   private readonly urbanAssets = new Map<string, THREE_NS.Object3D>();
   private eventMarkers = new Map<string, EventMarker>();
   private followTarget: THREE_NS.Vector3 | null = null;
+  // Render-loop allocation audit finding: syncScene's two camera.position.lerp(new Vector3(...))
+  // calls each allocated a fresh Vector3 every single frame — .lerp() only reads the target's
+  // x/y/z, so a reused scratch vector is exactly as correct and costs nothing per frame.
+  private scratchCameraTarget: THREE_NS.Vector3 | null = null;
+  // Same audit finding as epidemicCity3D.ts's own syncAnalysis(): a fresh THREE.Color was allocated
+  // per grid cell (HF_ANALYSIS_COLS * HF_ANALYSIS_ROWS = 748) every frame the heatmap overlay is on.
+  private scratchAnalysisColor: THREE_NS.Color | null = null;
+  // Render-loop allocation audit finding: getOrbitCameraDirection() is called every frame by
+  // useThreeLoop.ts's render loop whenever an orbit target with a focus distance is active, and
+  // allocated a fresh THREE.Vector3 on every one of those calls (three branches, all `new
+  // this.THREE.Vector3(...)`) even though the caller immediately copies the result into its own
+  // scratch — see epidemicCity3D.ts's own `scratchOrbitDirection`, the same fix applied here.
+  private scratchOrbitDirection: THREE_NS.Vector3 | null = null;
   private lastTickMs = 0;
   private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
-  private pointerDown: { x: number; y: number } | null = null;
-  private pointerDragged = false;
+  private readonly clickDragTracker = new ClickDragTracker();
   /** Opcjonalna scenografia legendy; nie zawiera World State ani solvera. */
   private readonly philadelphiaLegendMode: PhiladelphiaLegendViewMode | null;
   private philadelphiaLegend: PhiladelphiaLegendVisual | null = null;
@@ -262,6 +295,9 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.camera = camera;
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
+    this.scratchCameraTarget = new THREE.Vector3();
+    this.scratchOrbitDirection = new THREE.Vector3();
+    this.scratchAnalysisColor = new THREE.Color();
     scene.background = new THREE.Color(0xc8d9e7);
     scene.fog = new THREE.FogExp2(0xd7e2e7, 0.016);
     camera.position.set(5.8, 2.8, 8.8);
@@ -281,6 +317,16 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     if ((this.cameraMode === 'agent' || this.cameraMode === 'event') && !this.hero && !this.heroLoadFailed) void this.loadHeroAsset();
   }
 
+  /**
+   * GENESIS GRAPHICS ENGINE — same shared `setupGraphicsPipeline` the lab and epidemiology-city
+   * scenes use, replacing this scene's own bloom-only `EffectComposer` chain. Real upgrade: this
+   * scene already bakes AO into `uv2`/`aoMap` (see `enableAo`) for STATIC per-texel occlusion —
+   * `GTAOPass` (tier-gated to `'high'`) adds real-time, geometry-aware contact occlusion on top of
+   * that (a car under a fire escape, a bench against a facade), which a baked texture map can't
+   * express since it doesn't know what else is nearby. `ambient: { mode: 'none' }` because this
+   * scene runs its OWN atmosphere (`loadHdri`, below — background/backgroundBlurriness/fog specific
+   * to this bright daytime street), which the shared pipeline's generic studio-box IBL would fight.
+   */
   setupPostProcessing(
     modules: PostProcessingModules,
     renderer: THREE_NS.WebGLRenderer,
@@ -289,23 +335,17 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const THREE = this.THREE!;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // HDRI ładuje się asynchronicznie po pierwszym kadrze; podstawą pozostają PBR + światła.
     if (this.hdriEnabled) void this.loadHdri(renderer);
-    // Ekspozycja poniżej 1: ACES ma wtedy zapas w światłach zamiast ścinać je
-    // do bieli. Razem z obniżonym budżetem świateł to jest właśnie ta zmiana,
-    // która przywraca kolor gruntowi i listowiu.
-    renderer.toneMappingExposure = 0.86;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    const composer = new modules.EffectComposer(renderer);
-    composer.addPass(new modules.RenderPass(scene, camera));
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.17, 0.55, 0.92);
-    composer.addPass(bloom);
-    composer.addPass(new modules.OutputPass());
-    return { render: () => composer.render(), setSize: (width, height) => composer.setSize(width, height), dispose: () => composer.dispose() };
+    return setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      // Ekspozycja poniżej 1: ACES ma wtedy zapas w światłach zamiast ścinać je
+      // do bieli. Razem z obniżonym budżetem świateł to jest właśnie ta zmiana,
+      // która przywraca kolor gruntowi i listowiu.
+      toneMappingExposure: 0.86,
+      bloom: { strength: 0.17, radius: 0.55, threshold: 0.92 },
+      ambient: { mode: 'none' },
+    });
   }
 
   update(dt: number, params: SimParams): void {
@@ -315,6 +355,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       return;
     }
     this.lastFrameDt = dt;
+    this.streetHaze?.update(dt);
     const speed = Math.max(0, Number(params.clockSpeed ?? 1)) as ClockSpeed;
     if (speed !== this.clock.speed) this.clock.setSpeed(speed);
     if (this.clock.running) this.timeSeconds += dt;
@@ -333,12 +374,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
-    if (this.philadelphiaLegend && this.THREE) {
-      camera.position.lerp(new this.THREE.Vector3(8.5, 4.1, 10.5), 0.055);
+    if (this.philadelphiaLegend && this.THREE && this.scratchCameraTarget) {
+      camera.position.lerp(this.scratchCameraTarget.set(8.5, 4.1, 10.5), 0.055);
       camera.lookAt(0, 0.65, 0);
       return;
     }
-    if (!this.THREE || !this.scene || !this.lod2) return;
+    if (!this.THREE || !this.scene || !this.lod2 || !this.scratchCameraTarget) return;
     const allStates = this.simulation.agents().map((agent) => this.toVisualState(agent));
     const focus = this.pickFocusState(allStates);
     this.syncHero(focus);
@@ -352,7 +393,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const shot = this.composedShot();
     if (shot) {
       this.followTarget = null;
-      camera.position.lerp(new this.THREE.Vector3(...shot.pos), 0.05);
+      camera.position.lerp(this.scratchCameraTarget.set(...shot.pos), 0.05);
       camera.lookAt(...shot.look);
     }
   }
@@ -426,10 +467,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
-    if (!this.THREE || !this.followTarget) return null;
-    if (this.cameraMode === 'street') return new this.THREE.Vector3(1.35, 0.012, 2.6).normalize();
-    if (this.cameraMode === 'event') return new this.THREE.Vector3(3.2, 0.46, 3.8).normalize();
-    return new this.THREE.Vector3(1.9, 0.75, 2.3).normalize();
+    if (!this.THREE || !this.followTarget || !this.scratchOrbitDirection) return null;
+    if (this.cameraMode === 'street') return this.scratchOrbitDirection.set(1.35, 0.012, 2.6).normalize();
+    if (this.cameraMode === 'event') return this.scratchOrbitDirection.set(3.2, 0.46, 3.8).normalize();
+    return this.scratchOrbitDirection.set(1.9, 0.75, 2.3).normalize();
   }
 
   onResize(w: number, h: number): void { this.viewport = { w, h }; }
@@ -471,23 +512,17 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
-    if (type === 'down') { this.pointerDown = { x, y }; this.pointerDragged = false; return; }
-    if (type === 'move') {
-      if (this.pointerDown && Math.hypot(x - this.pointerDown.x, y - this.pointerDown.y) > 6) this.pointerDragged = true;
+    if (type === 'down' || type === 'move') {
+      this.clickDragTracker.track(x, y, type);
       return;
     }
-    const dragged = this.pointerDragged;
-    this.pointerDown = null;
-    this.pointerDragged = false;
-    if (dragged || !this.THREE || !this.camera || !this.raycaster) return;
-    const ndc = new this.THREE.Vector2((x / this.viewport.w) * 2 - 1, -(y / this.viewport.h) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
+    const dragged = this.clickDragTracker.finish();
+    if (dragged || !this.THREE || !this.camera || !this.raycaster || this.viewport.w <= 0 || this.viewport.h <= 0) return;
     const roots = [...this.lod1.values()].map((visual) => visual.root);
     if (this.hero) roots.push(this.hero);
-    const hit = this.raycaster.intersectObjects(roots, true)[0];
-    let node: THREE_NS.Object3D | null = hit?.object ?? null;
-    while (node && typeof node.userData.agentId !== 'number') node = node.parent;
-    if (node && typeof node.userData.agentId === 'number') this.selectAgent(node.userData.agentId as number);
+    const hit = raycastFromScreenPoint(this.THREE, this.raycaster, this.camera, x, y, this.viewport.w, this.viewport.h, roots)[0];
+    const node = findTaggedAncestor(hit?.object ?? null, (d) => typeof d.agentId === 'number');
+    if (node) this.selectAgent(node.userData.agentId as number);
   }
 
   dispose(): void {
@@ -495,20 +530,43 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     this.lod1.clear();
     this.lod2?.dispose();
     this.lod2 = null;
+    this.streetHaze = null;
     this.heroMixer?.stopAllAction();
     this.heroMixer = null;
+    // Resource-lifecycle audit finding: the loaded GLTF hero character (loadHeroAsset() — a real
+    // network-fetched, GPU-uploaded model, not cheap procedural geometry) was never disposed here
+    // at all, on any scene teardown. It's added directly to `this.scene`, not through
+    // `addSceneObject`/`this.sceneObjects`, so the disposal loop further down never reached it.
+    if (this.hero) disposeSceneResources(this.hero);
+    this.hero = null;
+    this.heroEpidemicMaterial = null;
     this.philadelphiaLegend?.dispose();
     this.philadelphiaLegend = null;
     this.analysisMesh?.geometry.dispose();
     this.analysisMaterial?.dispose();
-    this.materials?.asphalt.dispose();
-    this.materials?.concrete.dispose();
-    this.materials?.ground.dispose();
-    this.materials?.brick.dispose();
+    // Resource-lifecycle audit finding: the previous version of this method only ever disposed 4
+    // of this bundle's 7 materials (asphalt/concrete/ground/brick), never touched any of their own
+    // loaded textures (map/normalMap/roughnessMap/aoMap — real loaded images, not cheap procedural
+    // canvases), and left glass/metal/markings leaking entirely since the per-mesh disposal loop
+    // below deliberately skips anything in this registry. `disposeMaterials` fixes all three at
+    // once — see graphics/lifecycle.ts's own doc comment on this exact bug.
+    if (this.materials) disposeMaterials(Object.values(this.materials));
     for (const object of this.sceneObjects) this.disposeObject(object);
     for (const marker of this.eventMarkers.values()) this.disposeObject(marker.group);
     this.sceneObjects = [];
     this.eventMarkers.clear();
+    // Resource-lifecycle audit finding: the real-human GLTF clones (syncRealHumans) were only ever
+    // disposed when an individual agent walked out of range — never as a group on full scene
+    // teardown, so any clones still tracked at dispose() time leaked. The raw template they're
+    // cloned from (never itself added to the scene, so never GPU-uploaded, but still worth freeing
+    // its CPU-side geometry/material data) was never disposed at all.
+    for (const entry of this.realHumans.values()) {
+      entry.mixer?.stopAllAction();
+      disposeSceneResources(entry.root);
+    }
+    this.realHumans.clear();
+    if (this.humanTemplate) disposeSceneResources(this.humanTemplate);
+    this.humanTemplate = null;
   }
 
   private addLighting(): void {
@@ -523,18 +581,13 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     // Sumaryczny budżet jest tu obniżony ok. 2×, żeby krzywa miała zapas i
     // materiały odzyskały własny kolor. Kierunek i barwa świateł zostają —
     // zmienia się natężenie, nie zamysł.
-    const sky = new THREE.HemisphereLight(0xbcd4ee, 0x6b5a44, 0.42);
-    this.scene!.add(sky);
+    createBackgroundFill(THREE, this.scene!, { skyColor: 0xbcd4ee, groundColor: 0x6b5a44, intensity: 0.42 });
     // GOLDEN HOUR: słońce nisko nad horyzontem daje długie, kierunkowe cienie
     // i ciepłe zamodelowanie brył. Wysokie, białe światło spłaszczało kwartał.
-    const sun = new THREE.DirectionalLight(0xffd9a0, 2.15);
-    sun.position.set(-16, 7.5, 9);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -16; sun.shadow.camera.right = 16; sun.shadow.camera.top = 16; sun.shadow.camera.bottom = -16;
-    sun.shadow.bias = -0.00022;
-    sun.shadow.normalBias = 0.018;
-    this.scene!.add(sun);
+    createSunLight(THREE, this.scene!, {
+      position: [-16, 7.5, 9], color: 0xffd9a0, intensity: 2.15,
+      shadowMapSize: 2048, shadowFrustumHalfExtent: 16, shadowBias: -0.00022, shadowNormalBias: 0.018,
+    });
     const fill = new THREE.DirectionalLight(0x9fc0e0, 0.26);
     fill.position.set(10, 6, -9);
     this.scene!.add(fill);
@@ -647,8 +700,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const base = kind === 'home' ? this.materials!.brick : this.materials!.concrete;
     const mat = base.clone();
     const slots: Array<'map' | 'normalMap' | 'roughnessMap' | 'aoMap'> = ['map', 'normalMap', 'roughnessMap', 'aoMap'];
+    const sourceTextures: Partial<Record<'map' | 'normalMap' | 'roughnessMap' | 'aoMap', THREE_NS.Texture | null>> = {};
     for (const slot of slots) {
       const src = base[slot] as THREE_NS.Texture | null;
+      sourceTextures[slot] = src ?? null;
       if (!src) continue;
       const tex = src.clone();
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -657,7 +712,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       mat[slot] = tex as never;
     }
     mat.needsUpdate = true;
-    this.facadeMaterials.push({ mat, kind, w, h });
+    this.facadeMaterials.push({ mat, kind, w, h, sourceTextures });
     return mat;
   }
 
@@ -665,6 +720,14 @@ export class HighFidelityStreetSlice3D implements Sim3D {
    * Ponowne nałożenie map po asynchronicznym dojściu tekstur. Geometria powstaje
    * natychmiast, a mapy PBR dopiero po pobraniu — klon zrobiony za wcześnie
    * kopiowałby pusty slot i budynek zostawał gładki.
+   *
+   * The shared material palette (`graphics/materials.ts`) now gives CONCRETE/BRICK a procedural
+   * fallback texture at construction time (previously these slots started `null`), so "is this slot
+   * already set" no longer means "already got the real governed texture" — it can mean "still
+   * showing the procedural fallback." This compares against `sourceTextures` (which base texture
+   * REFERENCE a slot was last cloned from) so a real governed texture arriving after the fallback
+   * still triggers a re-clone — and disposes the outgoing clone, since it's this entry's own GPU
+   * resource, not the shared base's.
    */
   private refreshFacadeTextures(): void {
     const THREE = this.THREE;
@@ -674,12 +737,14 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       const base = entry.kind === 'home' ? this.materials.brick : this.materials.concrete;
       for (const slot of slots) {
         const src = base[slot] as THREE_NS.Texture | null;
-        if (!src || entry.mat[slot]) continue;
+        if (!src || entry.sourceTextures[slot] === src) continue;
         const tex = src.clone();
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.repeat.set(Math.max(1, Math.round(entry.w)), Math.max(1, Math.round(entry.h)));
         tex.needsUpdate = true;
+        (entry.mat[slot] as THREE_NS.Texture | null)?.dispose();
         entry.mat[slot] = tex as never;
+        entry.sourceTextures[slot] = src;
         entry.mat.needsUpdate = true;
       }
     }
@@ -703,6 +768,10 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(repeatX, repeatY);
       if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+      // The shared palette (graphics/materials.ts) now seeds this slot with a real procedural
+      // fallback texture at construction time (previously undefined) — dispose it before
+      // overwriting, or every governed-texture load leaks the fallback's WebGL texture.
+      (material[slot] as THREE_NS.Texture | undefined)?.dispose();
       material[slot] = texture as never;
       material.needsUpdate = true;
       this.refreshFacadeTextures();
@@ -727,6 +796,25 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     ground.receiveShadow = true;
     this.enableAo(ground);
     this.addSceneObject(ground);
+
+    // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): faint street-level haze for
+    // depth in the bright daytime slice — deliberately very low opacity, this is a depth cue, not a
+    // fog effect competing with the scene's own tuned `FogExp2`. Quality-gated (quality.ts's
+    // tierAllowsAtmosphereParticles/atmosphereParticleCount): skipped entirely at 'low' tier, scaled
+    // by device tier otherwise.
+    const atmosphereTier = detectRenderTier();
+    if (tierAllowsAtmosphereParticles(atmosphereTier)) {
+      this.streetHaze = createDustMotes(THREE, {
+        bounds: [worldW * 0.5, 1.1, worldH * 0.5],
+        center: [0, 1.1, 0],
+        count: atmosphereParticleCount(200, atmosphereTier),
+        size: 0.045,
+        color: 0xf2ead8,
+        opacity: 0.07,
+        driftSpeed: 0.07,
+      });
+      this.addSceneObject(this.streetHaze.points);
+    }
 
     const roadWidth = 1.35;
     const walkWidth = 1.12;
@@ -1729,7 +1817,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private syncAnalysis(agents: readonly SimAgent[]): void {
-    if (!this.analysisMesh || !this.THREE) return;
+    if (!this.analysisMesh || !this.THREE || !this.scratchAnalysisColor) return;
     if (!this.showHeatmap || this.analysisMode === 'none') { this.analysisMesh.count = 0; return; }
     const field = computeField(agents, this.simulation.worldWidth, this.simulation.worldHeight, this.analysisMode, HF_ANALYSIS_COLS, HF_ANALYSIS_ROWS);
     const cellW = this.simulation.worldWidth / field.cols * HIGH_FIDELITY_WORLD_SCALE;
@@ -1738,6 +1826,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
     const position = new this.THREE.Vector3();
     const scale = new this.THREE.Vector3();
     const rotation = new this.THREE.Quaternion();
+    const color = this.scratchAnalysisColor;
     for (let row = 0; row < field.rows; row++) for (let col = 0; col < field.cols; col++) {
       const index = row * field.cols + col;
       position.set(this.toWorldX((col + 0.5) * this.simulation.worldWidth / field.cols), 0, this.toWorldY((row + 0.5) * this.simulation.worldHeight / field.rows));
@@ -1745,7 +1834,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
       matrix.compose(position, rotation, scale);
       this.analysisMesh.setMatrixAt(index, matrix);
       const [r, g, b] = heatColor(field.values[index]);
-      this.analysisMesh.setColorAt(index, new this.THREE.Color(r, g, b));
+      this.analysisMesh.setColorAt(index, color.setRGB(r, g, b));
     }
     this.analysisMesh.count = field.cols * field.rows;
     this.analysisMesh.instanceMatrix.needsUpdate = true;
@@ -1819,12 +1908,12 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   }
 
   private disposeObject(object: THREE_NS.Object3D): void {
-    object.traverse((node) => {
-      const mesh = node as THREE_NS.Mesh;
-      if (mesh.geometry) mesh.geometry.dispose();
-      const material = mesh.material;
-      if (material && !Array.isArray(material) && !Object.values(this.materials ?? {}).includes(material as never)) material.dispose();
-    });
+    // Delegates to the engine's generic resource-lifecycle utility (graphics/lifecycle.ts) instead
+    // of a hand-rolled traversal — the previous version here only handled a single (non-array)
+    // material and never disposed a mesh's own textures. `this.materials` registry entries are
+    // excluded: they're disposed once, up front, via `disposeMaterials` in `dispose()` above, not
+    // per mesh that happens to reference them.
+    disposeSceneResources(object, { excludeMaterials: Object.values(this.materials ?? {}) });
   }
 
   private async loadHeroAsset(): Promise<void> {

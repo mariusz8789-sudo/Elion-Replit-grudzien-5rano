@@ -11,6 +11,14 @@ import type { EarthquakeCityOverlayProjection } from '../simulationRenderer/eart
 import { resolveSafeFocusDirection, type CameraOccluder } from './cityCameraSafety';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { isWorldAssetApproved, isWorldAssetPathApproved } from './assetGovernance';
+import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
+import { applyShadowPolicy } from './graphics/shadowPolicy';
+import { createPBRMaterial } from './graphics/materials';
+import { createSunLight, createBackgroundFill } from './graphics/lighting';
+import { disposeSceneResources, disposeMaterials } from './graphics/lifecycle';
+import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
+import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
+import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
 import {
   HumanoidAgentVisual,
   InstancedHumanoidCrowd,
@@ -96,8 +104,7 @@ export class EpidemicCity3DSim implements Sim3D {
   /** Cel jest ustawiany wyłącznie podczas odczytu prawdziwego TransmissionEvent. */
   private latestTransmissionTarget: number | null = null;
   private latestTransmissionView: CityTransmissionView | null = null;
-  private pointerDown: { x: number; y: number } | null = null;
-  private pointerDragged = false;
+  private readonly clickDragTracker = new ClickDragTracker();
   private followTarget: THREE_NS.Vector3 | null = null;
   private cameraPreset: CityCameraPreset = 'city';
   private resetCityCameraPending = false;
@@ -106,12 +113,23 @@ export class EpidemicCity3DSim implements Sim3D {
   private cameraTrackId: number | null = null;
   private detailVisuals = new Map<number, HumanoidAgentVisual>();
   private crowd: InstancedHumanoidCrowd | null = null;
+  // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): low ground haze for night-street
+  // depth. Purely a rendering-layer depth cue — never derived from epidemic/world state.
+  private cityHaze: DustMotesHandle | null = null;
   private analysisMesh: THREE_NS.InstancedMesh | null = null;
   private analysisMaterial: THREE_NS.MeshBasicMaterial | null = null;
   private cityMaterials: CityPbrMaterials | null = null;
   private semanticBuildingSlots: Array<{ group: THREE_NS.Group; building: WorldObject }> = [];
   /** Renderer-only visual volumes used to keep agent-focus shots outside building geometry. */
   private cameraOccluders: CameraOccluder[] = [];
+  // Render-loop allocation audit finding: getOrbitCameraDirection() and syncScene's own fallback
+  // each allocated a fresh Vector3 every frame. Safe to reuse — every real consumer
+  // (useThreeLoop.ts's render loop) already .clone()s the returned vector before use.
+  private scratchOrbitDirection: THREE_NS.Vector3 | null = null;
+  // Render-loop allocation audit finding: syncAnalysis() allocated a fresh THREE.Color per grid
+  // cell, every frame the analysis overlay is on — ANALYSIS_COLS * ANALYSIS_ROWS = 864 allocations
+  // every single frame, the single largest per-frame allocation hotspot found in this scene.
+  private scratchAnalysisColor: THREE_NS.Color | null = null;
   private approvedFacadeTemplate: THREE_NS.Object3D | null = null;
   private approvedLampTemplate: THREE_NS.Object3D | null = null;
   private approvedAssetRoots: THREE_NS.Object3D[] = [];
@@ -270,6 +288,8 @@ export class EpidemicCity3DSim implements Sim3D {
     this.camera = camera;
     this.viewport = { w, h };
     this.raycaster = new THREE.Raycaster();
+    this.scratchOrbitDirection = new THREE.Vector3();
+    this.scratchAnalysisColor = new THREE.Color();
     scene.background = new THREE.Color(0x0d1b2a);
     scene.fog = new THREE.Fog(0x0d1b2a, 18, 42);
     camera.fov = 44;
@@ -281,6 +301,14 @@ export class EpidemicCity3DSim implements Sim3D {
     this.addLightsAndGround();
     this.addRoadsAndBuildings();
     this.addStreetAtmosphere();
+    // GENESIS GRAPHICS ENGINE — one shadow-policy pass over the finished scene, superseding every
+    // per-builder castShadow/receiveShadow guess above (see graphics/shadowPolicy.ts's own doc:
+    // that's the intended pattern, not a bug — a single caster budget can't afford every curb,
+    // window pane and bench casting into the one shadow map). Buildings/roads/masses stay casters
+    // (they're well above the size threshold); thin street furniture (curbs, benches, window
+    // instances) stops costing shadow-map time for a shadow no one would see anyway. Run again
+    // after the async approved-asset facades/lamps attach, below, since they arrive later.
+    applyShadowPolicy(THREE, scene);
     void this.loadApprovedCityAssets();
     this.addAnalysisLayer();
     this.worldOverlayGroup = new THREE.Group();
@@ -291,9 +319,42 @@ export class EpidemicCity3DSim implements Sim3D {
     scene.add(this.earthquakeOverlayGroup);
     this.crowd = new InstancedHumanoidCrowd(THREE, MAX_CROWD_HUMANOIDS);
     this.crowd.addTo(scene);
+
+    // GENESIS GRAPHICS ENGINE — atmosphere (graphics/atmosphere.ts): low, warm-tinted ground haze
+    // (streetlamp-lit night air) for street-level atmospheric depth. Generic/reusable primitive —
+    // no city-specific logic lives in atmosphere.ts itself. Quality-gated (quality.ts's
+    // tierAllowsAtmosphereParticles/atmosphereParticleCount): skipped entirely at 'low' tier, scaled
+    // by device tier otherwise, instead of a fixed count regardless of hardware.
+    const atmosphereTier = detectRenderTier();
+    if (tierAllowsAtmosphereParticles(atmosphereTier)) {
+      const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
+      const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
+      this.cityHaze = createDustMotes(THREE, {
+        bounds: [worldW * 0.5, 0.9, worldH * 0.5],
+        center: [0, 0.9, 0],
+        count: atmosphereParticleCount(260, atmosphereTier),
+        size: 0.05,
+        color: 0xd9b57a,
+        opacity: 0.1,
+        driftSpeed: 0.09,
+      });
+      scene.add(this.cityHaze.points);
+    }
   }
 
-  /** Delikatny bloom wzmacnia rzeczywiste światła, okna i epidemiologiczne akcenty bez efektu "neonowej gry". */
+  /**
+   * GENESIS GRAPHICS ENGINE — the same shared `graphics/postProcessing.ts` pipeline the lab scene
+   * uses (`setupGraphicsPipeline`), not a second, independently-maintained bloom-only chain. Real
+   * upgrade over the previous RenderPass→Bloom→Output chain: this tier-gates in `GTAOPass`, which
+   * gives street-level contact shadows (buildings meeting the sidewalk, agents meeting the
+   * street) that a plain directional-light shadow map alone doesn't produce — see
+   * `graphics/PERFORMANCE.md` for the cost this adds at the `'high'` tier only.
+   *
+   * `ambient: { mode: 'none' }` because this scene already runs its OWN environment story
+   * (`loadApprovedHdri`, below) — a specific low `environmentIntensity` tuned for a night city, a
+   * solid background color, and exponential fog for depth — none of which the shared pipeline's
+   * generic "studio box" IBL role knows about or should override.
+   */
   setupPostProcessing(
     modules: PostProcessingModules,
     renderer: THREE_NS.WebGLRenderer,
@@ -302,25 +363,16 @@ export class EpidemicCity3DSim implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    const THREE = this.THREE!;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Odrobinę niższa ekspozycja zachowuje szczegół PBR w jasnych oknach,
-    // a bogatszy IBL/fill poniżej wyciąga materiał fasad z czerni bez neonów.
-    renderer.toneMappingExposure = 1.00;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     void this.loadApprovedHdri(renderer);
-    const composer = new modules.EffectComposer(renderer);
-    composer.addPass(new modules.RenderPass(scene, camera));
-    const bloom = new modules.UnrealBloomPass(new THREE.Vector2(w, h), 0.20, 0.46, 0.90);
-    composer.addPass(bloom);
-    composer.addPass(new modules.OutputPass());
-    return {
-      render: () => composer.render(),
-      setSize: (width, height) => composer.setSize(width, height),
-      dispose: () => composer.dispose(),
-    };
+    const pipeline: GraphicsPipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      // Odrobinę niższa ekspozycja zachowuje szczegół PBR w jasnych oknach,
+      // a bogatszy IBL/fill poniżej wyciąga materiał fasad z czerni bez neonów.
+      toneMappingExposure: 1.00,
+      bloom: { strength: 0.20, radius: 0.46, threshold: 0.90 },
+      ambient: { mode: 'none' },
+    });
+    return pipeline;
   }
 
   update(dt: number, params: SimParams): void {
@@ -340,6 +392,7 @@ export class EpidemicCity3DSim implements Sim3D {
       });
     });
     this.lastTickMs = performance.now() - tickStartedAt;
+    this.cityHaze?.update(dt);
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void {
@@ -373,7 +426,7 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     if (this.followTarget) {
       const focusDistance = this.getOrbitFocusDistance() ?? 4.2;
-      const focusDirection = this.getOrbitCameraDirection() ?? new this.THREE.Vector3(1, 0.72, 1).normalize();
+      const focusDirection = this.getOrbitCameraDirection() ?? this.scratchOrbitDirection?.set(1, 0.72, 1).normalize() ?? new this.THREE.Vector3(1, 0.72, 1).normalize();
       if (this.cameraPreset === 'agent') {
         const safe = resolveSafeFocusDirection(
           this.followTarget,
@@ -404,9 +457,9 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   getOrbitCameraDirection(): THREE_NS.Vector3 | null {
-    if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street') return null;
+    if (!this.THREE || !this.followTarget || this.cameraPreset !== 'street' || !this.scratchOrbitDirection) return null;
     // Niski, stabilny kierunek uliczny: nadal jedna kamera OrbitControls, bez fikcyjnego ruchu lub danych agenta.
-    return new this.THREE.Vector3(1.35, 0.62, 2.6).normalize();
+    return this.scratchOrbitDirection.set(1.35, 0.62, 2.6).normalize();
   }
 
   onResize(w: number, h: number): void {
@@ -460,29 +513,18 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
-    if (type === 'down') {
-      this.pointerDown = { x, y };
-      this.pointerDragged = false;
+    if (type === 'down' || type === 'move') {
+      this.clickDragTracker.track(x, y, type);
       return;
     }
-    if (type === 'move') {
-      if (this.pointerDown && Math.hypot(x - this.pointerDown.x, y - this.pointerDown.y) > 6) this.pointerDragged = true;
-      return;
-    }
-    const wasDrag = this.pointerDragged;
-    this.pointerDown = null;
-    this.pointerDragged = false;
+    const wasDrag = this.clickDragTracker.finish();
     if (wasDrag || !this.THREE || !this.camera || !this.raycaster || this.viewport.w <= 0 || this.viewport.h <= 0) return;
 
-    const ndc = new this.THREE.Vector2((x / this.viewport.w) * 2 - 1, -(y / this.viewport.h) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
-
     const detailedTargets = [...this.detailVisuals.values()].map((visual) => visual.root);
-    const detailedHits = this.raycaster.intersectObjects(detailedTargets, true);
+    const detailedHits = raycastFromScreenPoint(this.THREE, this.raycaster, this.camera, x, y, this.viewport.w, this.viewport.h, detailedTargets);
     if (detailedHits.length) {
-      let node: THREE_NS.Object3D | null = detailedHits[0].object;
-      while (node && typeof node.userData.agentId !== 'number') node = node.parent;
-      if (node && typeof node.userData.agentId === 'number') {
+      const node = findTaggedAncestor(detailedHits[0].object, (d) => typeof d.agentId === 'number');
+      if (node) {
         this.selectAgent(node.userData.agentId as number);
         return;
       }
@@ -500,9 +542,8 @@ export class EpidemicCity3DSim implements Sim3D {
     }
     const worldHits = this.raycaster.intersectObjects([...this.worldInteractive, ...this.buildingMeshes], true);
     if (worldHits.length) {
-      let node: THREE_NS.Object3D | null = worldHits[0].object;
-      while (node && !node.userData.worldSelection) node = node.parent;
-      if (node?.userData.worldSelection) {
+      const node = findTaggedAncestor(worldHits[0].object, (d) => d.worldSelection !== undefined);
+      if (node) {
         this.selectWorld(node.userData.worldSelection as CityWorldSelection);
         return;
       }
@@ -516,56 +557,64 @@ export class EpidemicCity3DSim implements Sim3D {
     this.detailVisuals.clear();
     this.crowd?.dispose();
     this.crowd = null;
+    if (this.cityHaze) {
+      this.scene?.remove(this.cityHaze.points);
+      this.cityHaze.dispose();
+      this.cityHaze = null;
+    }
     this.analysisMesh?.geometry.dispose();
     this.analysisMaterial?.dispose();
     this.analysisMesh = null;
     this.analysisMaterial = null;
-    for (const marker of this.transmissionMarkers.values()) {
-      marker.group.traverse((node) => {
-        const mesh = node as THREE_NS.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const material = mesh.material;
-        if (material && !Array.isArray(material)) material.dispose();
-      });
-    }
+    // Resource-lifecycle audit finding: `this.cityMaterials` (asphalt/concrete/ground/brick, each
+    // carrying real loaded textures — map/normalMap/roughnessMap/aoMap from
+    // `createApprovedCityMaterials`) was never disposed at all — not the materials, not their
+    // textures. Some building/road meshes below reference these same instances directly (not
+    // cloned), so this call and the per-mesh traversal below can both reach the same material;
+    // three.js's `.dispose()` is idempotent, so that's harmless, not a double-free bug.
+    if (this.cityMaterials) disposeMaterials(Object.values(this.cityMaterials));
+    for (const marker of this.transmissionMarkers.values()) disposeSceneResources(marker.group);
     this.transmissionMarkers.clear();
     if (this.worldOverlayGroup) {
-      for (const marker of this.worldOverlayGroup.children) {
-        marker.traverse((node) => {
-          const mesh = node as THREE_NS.Mesh;
-          mesh.geometry?.dispose();
-          const material = mesh.material;
-          if (material && !Array.isArray(material)) material.dispose();
-        });
-      }
+      for (const marker of this.worldOverlayGroup.children) disposeSceneResources(marker);
       this.scene?.remove(this.worldOverlayGroup);
       this.worldOverlayGroup = null;
       this.worldInteractive = [];
     }
-    for (const object of this.buildingMeshes) {
-      object.traverse((node) => {
-        const mesh = node as THREE_NS.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const material = mesh.material;
-        if (material && !Array.isArray(material)) material.dispose();
-      });
-    }
+    for (const object of this.buildingMeshes) disposeSceneResources(object);
     this.buildingMeshes = [];
-    for (const asset of this.approvedAssetRoots) this.scene?.remove(asset);
+    // Resource-lifecycle audit finding: the approved-asset clones (facade/lamp GLTF instances
+    // actually placed in the scene via .clone(true)) were only ever removed from the scene graph
+    // here, never disposed — their geometry/materials/textures leaked on every teardown. The raw
+    // templates they're cloned from (never themselves added to the scene) were never disposed
+    // either.
+    for (const asset of this.approvedAssetRoots) {
+      this.scene?.remove(asset);
+      disposeSceneResources(asset);
+    }
     this.approvedAssetRoots = [];
+    if (this.approvedFacadeTemplate) disposeSceneResources(this.approvedFacadeTemplate);
+    if (this.approvedLampTemplate) disposeSceneResources(this.approvedLampTemplate);
+    this.approvedFacadeTemplate = null;
+    this.approvedLampTemplate = null;
     this.semanticBuildingSlots = [];
     this.cameraOccluders = [];
   }
 
-  /** Materiały są ładowane tylko po przejściu istniejącej bramki Asset Governance. */
+  /**
+   * Bazowe strojenie (kolor/roughness/metalness) pochodzi teraz z GENESIS GRAPHICS ENGINE —
+   * `createPBRMaterial`'s CONCRETE/ASPHALT/BRICK/GROUND kategorie (generalizowane z tych właśnie
+   * wartości) — jedno źródło prawdy zamiast duplikatu w tym pliku. Materiały są ładowane tylko po
+   * przejściu istniejącej bramki Asset Governance.
+   */
   private createApprovedCityMaterials(): void {
     if (!this.THREE) return;
     const THREE = this.THREE;
     this.cityMaterials = {
-      asphalt: new THREE.MeshStandardMaterial({ color: 0x2b3034, roughness: 0.82, metalness: 0.03 }),
-      concrete: new THREE.MeshStandardMaterial({ color: 0x87919a, roughness: 0.88, metalness: 0.02 }),
-      ground: new THREE.MeshStandardMaterial({ color: 0x42534b, roughness: 0.96, metalness: 0.01 }),
-      brick: new THREE.MeshStandardMaterial({ color: 0x835a4b, roughness: 0.80, metalness: 0.01 }),
+      asphalt: createPBRMaterial(THREE, 'ASPHALT') as THREE_NS.MeshStandardMaterial,
+      concrete: createPBRMaterial(THREE, 'CONCRETE') as THREE_NS.MeshStandardMaterial,
+      ground: createPBRMaterial(THREE, 'GROUND') as THREE_NS.MeshStandardMaterial,
+      brick: createPBRMaterial(THREE, 'BRICK') as THREE_NS.MeshStandardMaterial,
     };
     const loader = new THREE.TextureLoader();
     this.loadGovernedTexture(loader, '/assets/genesis-governed-pbr/asphalt-track/diffuse.jpg', this.cityMaterials.asphalt, 'map', true, 5, 2);
@@ -597,6 +646,10 @@ export class EpidemicCity3DSim implements Sim3D {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(repeatX, repeatY);
       if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+      // The shared palette (graphics/materials.ts) now seeds this slot with a real procedural
+      // fallback texture at construction time (previously undefined) — dispose it before
+      // overwriting, or every governed-texture load leaks the fallback's WebGL texture.
+      (material[slot] as THREE_NS.Texture | undefined)?.dispose();
       material[slot] = texture as never;
       material.needsUpdate = true;
     }, undefined, () => undefined);
@@ -643,6 +696,10 @@ export class EpidemicCity3DSim implements Sim3D {
         this.approvedLampTemplate = lamp.scene;
         this.attachApprovedLamps();
       }
+      // These GLTF assets attach after init()'s own shadow-policy pass already ran (they're
+      // loaded async) — re-run it so they get the same size-based cast/receive decision instead
+      // of keeping whatever the loader's own traverse() forced.
+      if (this.THREE && this.scene) applyShadowPolicy(this.THREE, this.scene);
     } catch {
       // Brak pliku lub błąd WebGL nie zastępuje assetu niezweryfikowanym fallbackiem.
     }
@@ -704,18 +761,12 @@ export class EpidemicCity3DSim implements Sim3D {
   private addLightsAndGround(): void {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
-    this.scene.add(new THREE.HemisphereLight(0xa9c8df, 0x20362d, 0.96));
+    createBackgroundFill(THREE, this.scene, { skyColor: 0xa9c8df, groundColor: 0x20362d, intensity: 0.96 });
     this.scene.add(new THREE.AmbientLight(0x486682, 0.20));
-    const key = new THREE.DirectionalLight(0xffcc91, 1.74);
-    key.position.set(9, 16, 10);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.left = -13;
-    key.shadow.camera.right = 13;
-    key.shadow.camera.top = 13;
-    key.shadow.camera.bottom = -13;
-    key.shadow.bias = -0.00035;
-    this.scene.add(key);
+    createSunLight(THREE, this.scene, {
+      position: [9, 16, 10], color: 0xffcc91, intensity: 1.74,
+      shadowMapSize: 1024, shadowFrustumHalfExtent: 13, shadowBias: -0.00035,
+    });
     const rim = new THREE.DirectionalLight(0x87c5f2, 0.94);
     rim.position.set(-9, 9, -8);
     this.scene.add(rim);
@@ -1468,7 +1519,12 @@ export class EpidemicCity3DSim implements Sim3D {
       this.detailVisuals.delete(id);
     }
 
-    this.crowd.update(liveStates.filter((state) => !detailedIds.has(state.id)).slice(0, MAX_CROWD_HUMANOIDS));
+    const crowdStates = liveStates.filter((state) => !detailedIds.has(state.id)).slice(0, MAX_CROWD_HUMANOIDS);
+    // Frustum-only cull (no distance cutoff — this scene's camera standoff varies too much across
+    // presets to guess a safe distance without real-hardware verification; the frustum test itself
+    // is exact regardless of scale, unlike InstancedMesh's own broken per-batch bounding sphere —
+    // see PERFORMANCE.md's "crowd frustum culling is disabled" finding).
+    this.crowd.update(crowdStates, this.camera ? { camera: this.camera } : undefined);
     this.syncFocusOcclusion(selected);
     this.lastDetailCount = this.detailVisuals.size;
     this.lastCrowdCount = Math.min(Math.max(0, liveStates.length - this.lastDetailCount), MAX_CROWD_HUMANOIDS);
@@ -1500,7 +1556,7 @@ export class EpidemicCity3DSim implements Sim3D {
   }
 
   private syncAnalysis(agents: readonly SimAgent[]): void {
-    if (!this.analysisMesh || !this.THREE) return;
+    if (!this.analysisMesh || !this.THREE || !this.scratchAnalysisColor) return;
     if (this.analysisMode === 'none') {
       this.analysisMesh.count = 0;
       return;
@@ -1512,6 +1568,7 @@ export class EpidemicCity3DSim implements Sim3D {
     const position = new this.THREE.Vector3();
     const scale = new this.THREE.Vector3();
     const quaternion = new this.THREE.Quaternion();
+    const color = this.scratchAnalysisColor;
     for (let row = 0; row < field.rows; row++) {
       for (let col = 0; col < field.cols; col++) {
         const index = row * field.cols + col;
@@ -1527,7 +1584,7 @@ export class EpidemicCity3DSim implements Sim3D {
         // Gamma zwiększa czytelność rzeczywistego pola przy małej liczbie przypadków;
         // nie dodaje danych i nie zmienia porządku komórek.
         const [r, g, b] = heatColor(Math.pow(Math.max(0, value), 0.45));
-        this.analysisMesh.setColorAt(index, new this.THREE.Color(r / 255, g / 255, b / 255));
+        this.analysisMesh.setColorAt(index, color.setRGB(r / 255, g / 255, b / 255));
       }
     }
     this.analysisMesh.count = field.cols * field.rows;

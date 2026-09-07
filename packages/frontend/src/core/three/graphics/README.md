@@ -806,19 +806,31 @@ tested against C1's real `buildShotPlan`), interaction (id-resolution + visible 
 highlight), discrete visual-state mapping (`visualState.ts`).
 
 **PARTIAL** (real, tested, generically reusable — but NOT yet adopted by the three production
-benchmark scenes, which still use their own hand-tuned equivalents): `environment.ts` (sky/fog/
-time-of-day), `water.ts`, `vegetation.ts` (`createTreeField`/`createGroundClutter`), `labKit.ts`
-(bench/cabinet/shelf/monitor), `animation.ts` (oscillator/rotator/sway), `assetPipeline.ts`
-(fallback-to-real-asset slot, keyed cache, texture-slot disposal fix — the disposal fix itself IS
-live in `epidemicCity3D.ts`/`highFidelitySlice3D.ts`; the reusable module wrapping it is not).
-Retrofitting these into the hand-tuned city/lab/HF scenes is real, valuable, NOT YET DONE work —
+benchmark scenes, which still use their own hand-tuned equivalents): `environment.ts` directly (still
+PARTIAL as a standalone module, though its composition `sceneEnvironment.ts` IS now live in
+`genesisScientificCitySim.ts` — see §26), `water.ts`, `vegetation.ts` (`createTreeField`/
+`createGroundClutter` — since adopted by `epidemicCity3D.ts`, see §24), `labKit.ts` (bench/cabinet/
+shelf/monitor — since adopted by `labScene3D.ts`, see §24), `animation.ts` (oscillator/rotator/sway).
+Retrofitting what's left into the hand-tuned city/lab/HF scenes is real, valuable, NOT YET DONE work —
 deliberately deferred each time to avoid regressing already-shipped, hand-tuned geometry without a
 dedicated verification pass for that specific scene.
 
-**DEFERRED / NOT_MODELED** (genuinely absent, not disguised as present): a vehicle rendering kit; a
-generalized building/infrastructure kit (city/HF scenes still hand-roll facades/windows/HVAC/
-streetlights); GLTF-loader-specific integration (`assetPipeline.ts` is intentionally loader-agnostic
-architecture, not a working GLTF pipeline); population visual diversity beyond what
+**GENESIS HARDENING 1.0 NOTE**: two claims below are now stale and corrected here rather than rewritten
+in place, so the history stays honest: **`assetPipeline.ts`'s `createAssetSlot` is no longer just
+loader-agnostic architecture** — it has a real, working GLTF integration proven end-to-end in
+`epidemicCity3D.ts` (a procedurally-generated, checksummed, `assetGovernance.ts`-approved
+`ambulance.glb` swaps in for the procedural fallback ambulance via the exact `GLTFLoader` class
+production code uses; see §26 and `epidemicCity3DAmbulanceAssetSwap.test.ts`) — proven for that one
+hero object, not yet generalized to every asset slot in every scene. **A vehicle rendering kit and a
+generalized building/infrastructure kit both now exist** (`vehicleKit.ts`, `buildingKit.ts`,
+`streetKit.ts`, `electricalKit.ts` — see §24 and §26) and are wired into `epidemicCity3D.ts`'s
+production scene; the bullet below predates them.
+
+**DEFERRED / NOT_MODELED** (genuinely absent, not disguised as present — see the note above for two
+items below that are now out of date): ~~a vehicle rendering kit; a generalized building/
+infrastructure kit (city/HF scenes still hand-roll facades/windows/HVAC/streetlights)~~; ~~GLTF-loader-
+specific integration (`assetPipeline.ts` is intentionally loader-agnostic architecture, not a working
+GLTF pipeline)~~; population visual diversity beyond what
 `InstancedHumanoidCrowd`/`characterRig.ts` already had before this pass; any physically-based sky
 model (the sky dome is a tuned gradient, explicitly documented as such); screen-space reflections
 beyond the existing opt-in, unverified-on-real-hardware `SSRPass` wiring; deep validation against
@@ -912,6 +924,56 @@ adapter" — not "write a new renderer." Until then, hydraulic failure, hospital
 NL commands ("fail the pump"), replay/branch comparison of pump state, and rainfall/flood extensions
 are all **NOT_MODELED** — none of it can be built honestly without that real C3 entity existing first,
 and this file will not pretend otherwise.
+
+## 26. Visual World Build 3.0 — shared environment module, signage/electrical kits, asset-pipeline swap proof
+
+**Shared environment module** (`sceneEnvironment.ts`): the one reusable exterior ground/sky/fog/
+lighting baseline, composing `environment.ts`'s time-of-day sky/fog model, `lighting.ts`'s SUN/
+BACKGROUND roles, `atmosphere.ts`'s dust motes, and `quality.ts`'s render-tier gating into a single
+`createSceneEnvironment(THREE, scene, options)` call — not a rewrite of any of those modules. Wired
+into `genesisScientificCitySim.ts`'s `init()` (the one scene that had a bare, tier-blind
+`PlaneGeometry` + two hand-rolled lights before this pass). `sunPosition`/`sunColor`/`sunIntensity`
+overrides exist specifically so a caller can keep the dark-mood fog/sky `hourOfDay` drives while
+supplying its own key-light strength — `environment.ts`'s physically-modeled night intensity floor
+(0.15) is correct for realism but was found, via this scene's own first Chromium screenshot, to leave
+a `DirectionalLight` too dim (and pointed below the horizon) to actually light anything the camera
+could see.
+
+**Signage kit** (`signageKit.ts`): `createPostSign`/`createWallSign`/`createHangingSign`, composed from
+`primitives.ts`'s `createColumn`/`createPipe`. **Electrical/industrial kit** (`electricalKit.ts`):
+`createElectricalCabinet`/`createConduitRun`/`createCondenserUnit` — explicit "no electrical state
+modeled" boundary matching `waterInfrastructure.ts`'s own precedent. Both wired into
+`epidemicCity3D.ts`'s `addCityExtras()`.
+
+**Pedestrian/crowd kit**: audited before building anything new — `humanoidAgentVisual.ts`'s
+`InstancedHumanoidCrowd`/`characterRig.ts` were already mature and instanced; the conclusion was
+"extend, don't duplicate," so no new kit was built here.
+
+**Real density audit, not a claim**: with every kit above composing into the same real
+`epidemicCity3D.ts` scene simultaneously, this pass measured (rather than assumed) draw-call cost —
+see `PERFORMANCE.md`'s own "Visual World Build 1.0-3.0 density audit" section for the real Chromium
+and Node numbers, and the honestly-flagged-but-not-attempted window-instancing optimization.
+
+**Asset pipeline swap proof** (`assetPipeline.ts`'s `createAssetSlot`, proven end to end, not just in
+isolation): `scripts/exportAmbulanceAsset.mjs` builds the ambulance geometry directly against
+`three` and exports it through `three`'s own `GLTFExporter`, producing a real, valid, checksummed
+binary glTF (`public/assets/genesis-procedural/ambulance/ambulance.glb`) — registered in
+`assetGovernance.ts` as `APPROVED` with full provenance (the generating script itself, CC0, a real
+SHA-256, since there is no third-party source to attribute for original in-repo geometry).
+`epidemicCity3D.ts`'s ambulance is wrapped in `createAssetSlot`; a new `loadAmbulanceAsset()` method
+loads the GLB via `GLTFLoader` and calls `slot.replace()` on success, leaving the procedural fallback
+in place on any failure (no gap, no crash). `epidemicCity3DAmbulanceAssetSwap.test.ts` loads the real
+committed file through the exact `GLTFLoader` class production code uses, then calls the real
+`EpidemicCity3DSim.init()` and confirms the async swap happens in the live scene graph at the
+fallback's exact transform — proven for this one hero object, not yet generalized to every
+`createAssetSlot` user in every scene.
+
+**Adapter contract, written up as a standard**: `ADAPTER_CONTRACT.md` extracts
+`waterInfrastructureBridge.ts`'s honest-adapter pattern (the `isReallyModeled()` gate, a known-states
+allowlist, `userData.notModeled` tagging, local-origin geometry, caller-owned materials) into a
+reusable checklist, so the next real C3 domain's adapter (weather/structural/fire/traffic/quantum,
+whatever C3's consolidation audit ships) is built from a written standard instead of re-derived from
+scratch.
 
 ## Example usage
 

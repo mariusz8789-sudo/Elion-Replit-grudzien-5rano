@@ -9,6 +9,7 @@ import { QUANTUM_TUNNELING_SOLVER_ID } from '../domains/quantumTunneling';
 import { FLOOD_INUNDATION_SOLVER_ID } from '../domains/floodInundation';
 import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
 import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
+import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -16,12 +17,16 @@ import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
  * The phase was scoped as fire/thermal and traffic/mobility. A full-repository
  * audit found **neither exists**, and that finding is the deliverable:
  *
- * - **Fire / thermal: NOT_MODELLED.** There is no combustion model, no flame
- *   spread, no heat-transfer solver, no pyrolysis, no smoke transport anywhere
- *   in either package. The only matches for "heat" are a canvas gradient in a
- *   tokamak visual and the word appearing in prose. Nothing was built here,
- *   because building a fire model was not in scope and faking one is worse
- *   than admitting the gap.
+ * - **Fire / thermal: now PARTIALLY_MODELLED for a single source.**
+ *   `domains/fireThermal.ts` is a real solver: the published NFPA 921/SFPE
+ *   t-squared heat-release-rate design-fire curve, a real fuel inventory with
+ *   energy conservation bounding it, and the SFPE point-source radiant-heat-
+ *   transfer model. It advances exactly ONE fire source — no spread, no
+ *   compartment dynamics, no structural response. That single-source model
+ *   is an honest fit for INDUSTRIAL_FIRE (this is literally how real
+ *   process-safety practice models a pool/jet fire consequence), but NOT for
+ *   WILDFIRE, whose defining phenomenon is spread across a fuel bed — which
+ *   this does not do — so WILDFIRE stays NOT_MODELLED. See both entries below.
  * - **Traffic flow: now PARTIALLY_MODELLED.** `domains/trafficFlow.ts` is a real
  *   WorldGraph solver on the existing road-network geometry
  *   (`core/world/roadNetwork.ts`): a Greenshields fundamental diagram, a
@@ -66,12 +71,31 @@ export interface SolverCapability {
   readonly missing?: readonly string[];
 }
 
-const NO_FIRE_MODEL: readonly string[] = Object.freeze([
-  'a combustion or flame-spread model (ignition, heat release rate, spread rate) — none exists in either package',
-  'heat transfer (conduction, convection, radiation) — no solver, and no thermal material properties on any entity',
-  'a fuel/material inventory to burn, and smoke or toxic-product transport',
+/**
+ * What `domains/fireThermal.ts` covers for a single fire source (a real
+ * t-squared HRR curve, energy-conserving fuel inventory, and point-source
+ * radiant heat transfer) does not make WILDFIRE modelled: spread across a
+ * fuel bed IS the phenomenon, and nothing here advances more than one
+ * non-spreading source.
+ */
+const NO_WILDFIRE_SPREAD_MODEL: readonly string[] = Object.freeze([
+  'a fire-spread/rate-of-spread model across a fuel bed (e.g. Rothermel for wildland fuels) — domains/fireThermal.ts advances exactly one non-spreading fire source, never two',
+  'a fuel-bed/terrain map (fuel type, moisture, load, arrangement) for spread to run on',
+  'wind and slope effects on spread direction and rate',
   'fire-resistance and structural-response-to-fire data, which would also need the structural model that does not exist either',
 ]);
+
+/** What `domains/fireThermal.ts` still does not cover — the honest remainder after the HRR/fuel/radiation solver. */
+const FIRE_THERMAL_CAVEAT =
+  'A real NFPA 921/SFPE Handbook t-squared design-fire heat-release-rate curve now runs, with a real fuel ' +
+  'inventory (mass, heat of combustion) whose energy conservation actually bounds the growth/steady/decay ' +
+  'shape, and a real SFPE point-source radiant-heat-flux model to a stated target distance. Still NOT ' +
+  'modelled: fire spread (this advances exactly one fire source, never two, so it cannot answer how far or ' +
+  'fast a fire grows across a fuel bed), compartment fire dynamics (no flashover, no ventilation-limited ' +
+  'combustion, no two-zone model), conduction/convection heat transfer, and structural response (no fire- ' +
+  'resistance rating, no strength loss with temperature, no collapse — that needs the structural model ' +
+  'Genesis does not have anywhere). Growth class, peak heat-release rate and fuel properties are literature- ' +
+  'typical design values, not calibrated to any specific real fire.';
 
 /** What `domains/trafficFlow.ts` still does not cover — the honest remainder after the FD/CTM/capacity solver. */
 const TRAFFIC_MODEL_CAVEAT =
@@ -144,9 +168,15 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
     caveat: 'The world generator really builds and rebuilds city structure. Urban dynamics — land use, economics, population change over time — are not modelled.',
   },
 
-  // --- Fire/thermal was scoped alongside traffic, and remains absent --------
-  WILDFIRE: notModelled(NO_FIRE_MODEL),
-  INDUSTRIAL_FIRE: notModelled(NO_FIRE_MODEL),
+  // --- Fire/thermal: a real single-source HRR/radiation solver ------------
+  // fits INDUSTRIAL_FIRE (real process-safety practice models a pool/jet
+  // fire this way); WILDFIRE needs the spread this does not do.
+  WILDFIRE: notModelled(NO_WILDFIRE_SPREAD_MODEL),
+  INDUSTRIAL_FIRE: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: FIRE_THERMAL_SOLVER_ID,
+    caveat: FIRE_THERMAL_CAVEAT,
+  },
 
   // --- Traffic: a real fundamental-diagram/CTM solver, with real named holes -
   TRANSPORT_DISRUPTION: {
@@ -170,7 +200,7 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   VOLCANIC: notModelled(noHazardModel('eruption, ashfall and flow')),
   DROUGHT: notModelled(noHazardModel('water balance and drought index')),
   EXTREME_HEAT: notModelled(Object.freeze([
-    'a heat-exposure model (no thermal solver exists anywhere — see the fire/thermal finding)',
+    'an ambient heat-exposure model (the fire/thermal solver that exists models one fire source\'s heat release and radiant flux, not ambient air temperature or a heat-wave)',
     'health-effect relationships for heat exposure, and the population vulnerability data behind them',
   ])),
   AVALANCHE: notModelled(noHazardModel('snowpack stability and avalanche runout')),

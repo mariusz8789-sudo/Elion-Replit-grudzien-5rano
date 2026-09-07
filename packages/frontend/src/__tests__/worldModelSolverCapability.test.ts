@@ -23,26 +23,34 @@ import { makeMolecularStructureSolver, MOLECULAR_STRUCTURE_SOLVER_ID } from '../
 import { buildTrafficNetwork, makeTrafficFlowSolver, TRAFFIC_FLOW_SOLVER_ID } from '../core/worldModel/domains/trafficFlow';
 import { buildRoadNetwork } from '../core/world/roadNetwork';
 import { buildCity } from '../core/world/cityWorld';
+import { FIRE_THERMAL_SOLVER_ID, FUEL_PACKAGES, makeFireThermalSolver } from '../core/worldModel/domains/fireThermal';
 
 /**
  * PHASE 7 — FIRE/THERMAL AND TRAFFIC.
  *
- * The audit found neither exists. Fire/thermal still does not; traffic now
- * has a real fundamental-diagram/CTM solver (`domains/trafficFlow.ts`). These
+ * The audit found neither existed. Both now have a real solver for one honest
+ * slice: traffic has a fundamental-diagram/CTM network solver
+ * (`domains/trafficFlow.ts`), and fire/thermal has a single-source
+ * heat-release-rate/radiant-heat solver (`domains/fireThermal.ts`). These
  * tests pin both findings in place: assertions that fail if anyone ever
- * claims a fire capability without building one, or claims traffic is fully
- * modelled without naming what it still is not — and, more importantly, if a
- * recognisable scenario kind is ever left with no capability answer at all.
+ * claims more than what was built, or claims a recognisable scenario kind
+ * with no capability answer at all.
  */
-describe('Fire is absent and traffic is a real, honestly-bounded solver', () => {
-  it('both fire kinds are NOT_MODELLED, with the missing physics named', () => {
-    for (const kind of ['WILDFIRE', 'INDUSTRIAL_FIRE'] as const) {
-      const capability = solverCapabilityFor(kind);
-      expect(capability.capability).toBe(CAPABILITY_CODE.NOT_MODELLED);
-      expect(capability.solverId).toBeUndefined(); // nothing is quietly wired up to answer it
-      expect(capability.missing!.join(' ')).toMatch(/combustion|flame-spread/);
-      expect(capability.missing!.join(' ')).toMatch(/heat transfer/);
-    }
+describe('Fire and traffic are real, honestly-bounded solvers', () => {
+  it('industrial fire is PARTIALLY_MODELLED by the real HRR/radiation solver, with the actual remaining gaps named', () => {
+    const capability = solverCapabilityFor('INDUSTRIAL_FIRE');
+    expect(capability.capability).toBe(CAPABILITY_CODE.PARTIALLY_MODELLED);
+    expect(capability.solverId).toBe(FIRE_THERMAL_SOLVER_ID);
+    expect(capability.caveat).toMatch(/fire spread/);
+    expect(capability.caveat).toMatch(/structural response/);
+  });
+
+  it('wildfire stays NOT_MODELLED — the fire solver never advances more than one non-spreading source', () => {
+    const capability = solverCapabilityFor('WILDFIRE');
+    expect(capability.capability).toBe(CAPABILITY_CODE.NOT_MODELLED);
+    expect(capability.solverId).toBeUndefined(); // nothing is quietly wired up to answer it
+    expect(capability.missing!.join(' ')).toMatch(/spread/);
+    expect(capability.missing!.join(' ')).toMatch(/fuel-bed/);
   });
 
   it('traffic disruption is PARTIALLY_MODELLED by the real CTM solver, with the actual remaining gaps named', () => {
@@ -92,6 +100,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     router.register(CELL_CYCLE_SOLVER_ID, makeCellCycleSolver());
     router.register(MOLECULAR_STRUCTURE_SOLVER_ID, makeMolecularStructureSolver());
     router.register(TRAFFIC_FLOW_SOLVER_ID, makeTrafficFlowSolver(buildTrafficNetwork(buildRoadNetwork(buildCity()))));
+    router.register(FIRE_THERMAL_SOLVER_ID, makeFireThermalSolver({ growthRate: 'MEDIUM', fuel: FUEL_PACKAGES.FLAMMABLE_LIQUID_POOL, peakHRRkW: 5000 }));
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {
       if (!capability.solverId) continue;
@@ -118,14 +127,14 @@ describe('Every recognisable scenario gets an honest answer', () => {
     expect(isModelled('WILDFIRE')).toBe(false);
     const description = describeCapability('WILDFIRE');
     expect(description).toContain('NOT MODELLED');
-    expect(description).toContain('combustion');
+    expect(description).toContain('spread');
   });
 });
 
 describe('The honest inventory is queryable, not buried', () => {
-  it('the not-modelled list is sorted, non-empty, contains the fire kinds, and no longer traffic', () => {
+  it('the not-modelled list is sorted, non-empty, contains wildfire, and no longer industrial fire or traffic', () => {
     expect(NOT_MODELLED_SCENARIO_KINDS).toContain('WILDFIRE');
-    expect(NOT_MODELLED_SCENARIO_KINDS).toContain('INDUSTRIAL_FIRE');
+    expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('INDUSTRIAL_FIRE');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('TRANSPORT_DISRUPTION');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('EVACUATION');
     expect([...NOT_MODELLED_SCENARIO_KINDS]).toEqual([...NOT_MODELLED_SCENARIO_KINDS].sort());
@@ -141,6 +150,7 @@ describe('The honest inventory is queryable, not buried', () => {
     expect(describeCapability('FLOOD')).toMatch(/Still NOT modelled: the hydrograph/);
     expect(describeCapability('EARTHQUAKE')).toMatch(/Structural damage.*still NOT modelled/);
     expect(describeCapability('TRANSPORT_DISRUPTION')).toMatch(/Still NOT modelled: origin-destination/);
+    expect(describeCapability('INDUSTRIAL_FIRE')).toMatch(/Still NOT.*modelled: fire spread/);
   });
 
   it('consequence-vs-design boundaries stay stated where a request could be misread', () => {

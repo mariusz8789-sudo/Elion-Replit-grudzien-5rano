@@ -110,17 +110,59 @@ simplification here: no compressed-texture path exists anywhere in this codebase
 `ThreeRenderMetrics.textureBytesEstimate` (`useThreeLoop.ts`, resampled every ~1 s rather than every
 frame — a full scene walk is not free) and both flagship scenes' `getStats()`/observability panels.
 
-Real measured result, headless Chromium:
+Real measured result, headless Chromium (Sprint F+, at the time §6 was first partly closed):
 
 | Scene | Texture memory (estimate) | vs. 96 MB target |
 |---|---|---|
 | `#/city3d` (flagship epidemic city) | **5.4 MB** | 5.6% of target |
 | `#/scientific-city` | **15.3 MB** | 15.9% of target |
 
-Both scenes sit well under budget — this was genuinely unknown before, not merely unverified against
-a number everyone expected to be fine. The gap named in §6 is closed for these two scenes; other
-scenes (the lab, high-fidelity slice, etc.) can read the same `webgl_texture_bytes_estimate` stat once
-they're worth measuring.
+Both scenes sat well under budget — this was genuinely unknown before, not merely unverified against
+a number everyone expected to be fine. Other scenes (the lab, high-fidelity slice, etc.) can read the
+same `webgl_texture_bytes_estimate` stat once they're worth measuring.
+
+### §3b. Total GPU memory — GRAPHICS V6, the rest of the §6 gap closed
+
+§6 named the remaining piece explicitly: texture memory alone is not "total GPU memory (geometry +
+textures + render targets combined)." `graphics/diagnostics.ts` now also has
+`estimateSceneGeometryMemory` (EXACT bytes — every `BufferGeometry` attribute/index buffer's own real
+`.byteLength`, no assumption at all, deduplicated by `geometry.uuid`; `InstancedMesh`'s own
+`instanceMatrix`/`instanceColor` buffers summed separately since they're never shared even when
+several instanced meshes reuse the same base geometry) and `estimateRenderTargetMemory` (the owning
+`GraphicsPipeline`'s own two `EffectComposer` ping-pong `WebGLRenderTarget`s, at their real
+drawing-buffer size — **deliberately not** each individual `Pass`'s own internal targets; see that
+function's own doc for exactly why reflecting into `UnrealBloomPass`'s 11-target chain etc. was
+judged not worth the version-coupled fragility). `estimateSceneGpuMemory` composes the three into one
+number, exposed as `GraphicsPipeline.getGpuMemoryEstimate()` and both flagship scenes'
+`webgl_geometry_bytes_estimate`/`webgl_gpu_bytes_estimate` stats/observability panels.
+
+Real measured result, headless Chromium, today:
+
+| Scene | Texture (est.) | Geometry (exact) | Render targets (derived: total − texture − geometry) | **Total GPU mem (est.)** | vs. 256 MB target |
+|---|---|---|---|---|---|
+| `#/city3d` (flagship epidemic city) | 31.4 MB | 2.3 MB | 12.8 MB | **46.5 MB** | 18.2% of target |
+| `#/scientific-city` | 15.3 MB | 2.9 MB | 17.6 MB | **35.8 MB** | 14.0% of target |
+
+Both scenes sit well under the §2 total-GPU-memory target — this is the first real combined number
+this document has ever had for that row, not merely inferred from the texture component alone. The
+render-target column is shown for completeness but not independently exposed as its own stat today
+(only the combined total and the geometry component are — see `webgl_gpu_bytes_estimate`/
+`webgl_geometry_bytes_estimate`); it differs between the two scenes because each page's canvas element
+resolves to a different real pixel size (composer render targets are sized off the renderer's actual
+drawing buffer, which is CSS canvas size × device pixel ratio, not a fixed number), not because one
+scene's post-processing pipeline is heavier than the other's. **Honesty note on the delta since Sprint
+F+:** `#/city3d`'s texture estimate has genuinely grown from 5.4 MB to 31.4 MB since that measurement
+— real scene content growth across the sprints since (more building/agent materials), not a
+measurement regression; `#/scientific-city`'s figure is unchanged at 15.3 MB, the same methodology
+reproducing the same number on an unchanged scene, which is itself a sanity check that the `#/city3d`
+growth is real and not a bug in the estimator.
+
+**What §6's "total GPU memory" row still does not cover, stated honestly:** each individual `Pass`'s
+own internal render targets (named, not sized — see `estimateRenderTargetMemory`'s doc) and any
+render target a scene allocates entirely outside `setupGraphicsPipeline` (e.g. `captureRoomEnvironment`'s
+one-time `WebGLCubeRenderTarget` probe, disposed immediately after use so it is not a standing cost).
+The gap is therefore narrowed to a real, bounded, explicitly-named remainder — not reopened as
+"unmeasured."
 
 ## 4. How each sprint reports against this
 
@@ -166,7 +208,11 @@ Stated so their absence is deliberate rather than forgotten:
 - **Network/asset streaming budget.** Only one real GLB ships today
   (`ambulance.glb`, 13.9 kB); a streaming budget becomes meaningful when imported spatial data or
   real assets arrive at volume.
-- ~~Texture memory is currently unmeasured~~ — **closed, GRAPHICS V3.** See §3a: real measured
-  estimates now exist for `#/city3d` (5.4 MB) and `#/scientific-city` (15.3 MB), both well under the
-  §2 target. Total GPU memory (geometry + textures + render targets combined) is still not measured
-  as one number — only the texture component — so that broader §2 row stays unverified.
+- ~~Texture memory is currently unmeasured~~ — **closed, GRAPHICS V3.** See §3a.
+- ~~Total GPU memory (geometry + textures + render targets combined) is still not measured as one
+  number~~ — **closed, GRAPHICS V6.** See §3b: `#/city3d` at 46.5 MB, `#/scientific-city` at 35.8 MB,
+  both well under the §2 256 MB target. The one remaining named sub-gap is each individual
+  post-processing `Pass`'s OWN internal render targets (bloom's downsample chain, GTAO's, SSR's,
+  Bokeh's) — deliberately not sized, for the reason `estimateRenderTargetMemory`'s own doc gives
+  (their internal property names are three.js-addon-version-specific, not part of a stable public
+  contract the way the composer's own two ping-pong targets are).

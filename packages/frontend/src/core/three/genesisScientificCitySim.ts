@@ -1272,6 +1272,10 @@ export class GenesisScientificCitySim implements Sim3D {
       // GRAPHICS V3 — real estimated bytes (see diagnostics.ts's estimateSceneTextureMemory),
       // closing PERFORMANCE_BUDGET.md §6's "texture memory is currently unmeasured" gap.
       webgl_texture_bytes_estimate: this.renderMetrics.textureBytesEstimate,
+      // GRAPHICS V6 — the rest of §6's "total GPU memory" gap: geometry (exact) + this pipeline's
+      // own render targets (see diagnostics.ts's estimateSceneGpuMemory for exactly what's covered).
+      webgl_geometry_bytes_estimate: this.pipeline?.getGpuMemoryEstimate().geometryBytes ?? 0,
+      webgl_gpu_bytes_estimate: this.pipeline?.getGpuMemoryEstimate().totalBytes ?? 0,
     };
   }
 }

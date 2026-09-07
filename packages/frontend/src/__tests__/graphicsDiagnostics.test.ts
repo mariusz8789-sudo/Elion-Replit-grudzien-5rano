@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { readFrameCounters, FrameProfiler, RollingFrameStats, estimateSceneTextureMemory, type FrameSample } from '../core/three/graphics/diagnostics';
+import {
+  readFrameCounters, FrameProfiler, RollingFrameStats, estimateSceneTextureMemory,
+  estimateSceneGeometryMemory, estimateRenderTargetMemory, estimateSceneGpuMemory,
+  type FrameSample,
+} from '../core/three/graphics/diagnostics';
 import type * as THREE_NS from 'three';
 
 function fakeRenderer(overrides: Partial<{ calls: number; triangles: number; points: number; lines: number; geometries: number; textures: number; programCount: number }> = {}) {
@@ -178,5 +182,127 @@ describe('estimateSceneTextureMemory', () => {
     const scene = new THREE.Scene();
     scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000 })));
     expect(estimateSceneTextureMemory(scene)).toEqual({ totalBytes: 0, uniqueTextureCount: 0 });
+  });
+});
+
+/** A minimal geometry with a KNOWN exact byte size (3 vertices × 3 floats × 4 bytes = 36 bytes) —
+ * avoids hand-deriving a real primitive's (e.g. BoxGeometry's) actual vertex count, which is an
+ * implementation detail of three.js, not of the function under test. */
+function tinyGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3));
+  return geometry;
+}
+
+describe('estimateSceneGeometryMemory', () => {
+  it('reports zero for an empty scene', () => {
+    const scene = new THREE.Scene();
+    expect(estimateSceneGeometryMemory(scene)).toEqual({ totalBytes: 0, uniqueGeometryCount: 0 });
+  });
+
+  it('sums exact attribute buffer bytes for one mesh (no assumption, unlike texture memory — real byteLength)', () => {
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(tinyGeometry(), new THREE.MeshStandardMaterial()));
+    const result = estimateSceneGeometryMemory(scene);
+    expect(result.uniqueGeometryCount).toBe(1);
+    expect(result.totalBytes).toBe(9 * 4); // 3 vertices × 3 floats × 4 bytes/float
+  });
+
+  it('includes the index buffer when present', () => {
+    const scene = new THREE.Scene();
+    const geometry = tinyGeometry();
+    geometry.setIndex([0, 1, 2]);
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
+    const result = estimateSceneGeometryMemory(scene);
+    // Uint16Array index for 3 vertices (three.js picks Uint16 under 65536 vertices) = 3 × 2 bytes,
+    // on top of the 36-byte position attribute.
+    expect(result.totalBytes).toBe(9 * 4 + geometry.index!.array.byteLength);
+  });
+
+  it('deduplicates a geometry shared across multiple regular meshes', () => {
+    const scene = new THREE.Scene();
+    const shared = tinyGeometry();
+    scene.add(new THREE.Mesh(shared, new THREE.MeshStandardMaterial()));
+    scene.add(new THREE.Mesh(shared, new THREE.MeshStandardMaterial()));
+    const result = estimateSceneGeometryMemory(scene);
+    expect(result.uniqueGeometryCount).toBe(1);
+    expect(result.totalBytes).toBe(9 * 4);
+  });
+
+  it('an InstancedMesh\'s own instance buffers are counted PER INSTANCED MESH, never deduplicated — even when two share the same base geometry', () => {
+    const scene = new THREE.Scene();
+    const shared = tinyGeometry();
+    const a = new THREE.InstancedMesh(shared, new THREE.MeshStandardMaterial(), 5);
+    const b = new THREE.InstancedMesh(shared, new THREE.MeshStandardMaterial(), 3);
+    scene.add(a, b);
+    const result = estimateSceneGeometryMemory(scene);
+    // Base geometry counted once (36 bytes); each InstancedMesh's own instanceMatrix (16 floats ×
+    // instance count × 4 bytes) is a real, separate GPU allocation neither three.js nor this
+    // function shares between them.
+    expect(result.uniqueGeometryCount).toBe(1);
+    expect(result.totalBytes).toBe(9 * 4 + 16 * 5 * 4 + 16 * 3 * 4);
+  });
+
+  it('includes an InstancedMesh\'s instanceColor buffer when present', () => {
+    const scene = new THREE.Scene();
+    const mesh = new THREE.InstancedMesh(tinyGeometry(), new THREE.MeshStandardMaterial(), 4);
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(4 * 3), 3);
+    scene.add(mesh);
+    const result = estimateSceneGeometryMemory(scene);
+    expect(result.totalBytes).toBe(9 * 4 + 16 * 4 * 4 + 4 * 3 * 4);
+  });
+});
+
+describe('estimateRenderTargetMemory', () => {
+  it('reports zero for no targets', () => {
+    expect(estimateRenderTargetMemory([])).toBe(0);
+  });
+
+  it('estimates RGBA8 color bytes for a target with no depth buffer', () => {
+    const target = new THREE.WebGLRenderTarget(100, 50, { depthBuffer: false });
+    expect(estimateRenderTargetMemory([target])).toBe(100 * 50 * 4);
+  });
+
+  it('adds a packed depth/stencil buffer when depthBuffer is set (the three.js default)', () => {
+    const target = new THREE.WebGLRenderTarget(100, 50);
+    expect(target.depthBuffer).toBe(true); // sanity: this is really the three.js default
+    expect(estimateRenderTargetMemory([target])).toBe(100 * 50 * 4 * 2);
+  });
+
+  it('sums multiple targets (the EffectComposer ping-pong pair)', () => {
+    const a = new THREE.WebGLRenderTarget(64, 64, { depthBuffer: false });
+    const b = new THREE.WebGLRenderTarget(64, 64, { depthBuffer: false });
+    expect(estimateRenderTargetMemory([a, b])).toBe(2 * 64 * 64 * 4);
+  });
+
+  it('multiplies by MSAA sample count when set', () => {
+    const target = new THREE.WebGLRenderTarget(32, 32, { depthBuffer: false, samples: 4 });
+    expect(estimateRenderTargetMemory([target])).toBe(32 * 32 * 4 * 4);
+  });
+});
+
+describe('estimateSceneGpuMemory', () => {
+  it('combines texture + geometry + render-target bytes into one real total, with the breakdown preserved', () => {
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(tinyGeometry(), new THREE.MeshStandardMaterial({ map: fakeTexture(16, 16, false) })));
+    const target = new THREE.WebGLRenderTarget(10, 10, { depthBuffer: false });
+    const result = estimateSceneGpuMemory(scene, [target]);
+    const expectedTexture = 16 * 16 * 4;
+    const expectedGeometry = 9 * 4;
+    const expectedRenderTarget = 10 * 10 * 4;
+    expect(result.textureBytes).toBe(expectedTexture);
+    expect(result.geometryBytes).toBe(expectedGeometry);
+    expect(result.renderTargetBytes).toBe(expectedRenderTarget);
+    expect(result.totalBytes).toBe(expectedTexture + expectedGeometry + expectedRenderTarget);
+    expect(result.uniqueTextureCount).toBe(1);
+    expect(result.uniqueGeometryCount).toBe(1);
+  });
+
+  it('defaults renderTargets to empty — a scene with no post-processing pipeline still gets a real texture+geometry total', () => {
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(tinyGeometry(), new THREE.MeshStandardMaterial()));
+    const result = estimateSceneGpuMemory(scene);
+    expect(result.renderTargetBytes).toBe(0);
+    expect(result.totalBytes).toBe(9 * 4);
   });
 });

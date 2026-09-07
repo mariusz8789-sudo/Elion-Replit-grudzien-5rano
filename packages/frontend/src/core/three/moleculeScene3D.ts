@@ -8,12 +8,12 @@ import {
   MOLECULE_STATE_CODE, moleculeStateLabel,
   type MoleculeGeometrySource,
 } from '../worldModel/domains/molecularStructure';
-import { getFrameState } from '../worldModel/bridge/worldFrameState';
+import { getFrameState, type WorldFrameEntity, type WorldFrameState } from '../worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../worldModel/bridge/graphicsWorldFrameAdapter';
 import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
 import { createMoleculeAdapter, type MoleculeAdapter } from './graphics/moleculeAdapterBridge';
 import { createBond, ELEMENT_STYLE, elementStyleOf } from './graphics/moleculeKit';
-import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/sceneEnvironment';
+import { createHeroLight, createBackgroundFill, type HeroLightHandles } from './graphics/lighting';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { setupGraphicsPipeline } from './graphics/postProcessing';
 
@@ -46,12 +46,51 @@ import { setupGraphicsPipeline } from './graphics/postProcessing';
  * root — not on whether atoms merely exist, since an engine can genuinely materialise atoms with
  * zero bonds (a single ion, or a real "no bond data" response) and that must render as atoms with
  * NO sticks, exactly as `SOLVER_DATA_CONTRACT.md` §C requires.
+ *
+ * GRAPHICS V5 VISUAL POLISH: a molecule viewer is a studio hero-object shot (`lighting.ts`'s own
+ * documented HERO role — "this is the hero apparatus"), not a lit exterior/room, so this composes
+ * `createHeroLight` (KEY+RIM, tuned for a small tabletop-scale subject) + `createBackgroundFill`
+ * directly instead of the generic `sceneEnvironment.ts` sun/fill pair (a `DirectionalLight` "sun"
+ * shadow frustum defaults to room/exterior scale — oversized and the wrong falloff behavior for a
+ * ~1-5 world-unit molecule). Real image-based reflections are on (`setupPostProcessing`'s default
+ * `ambient: 'studio+hdri'`, not `'none'`) — the CPK atom/bond materials set real `metalness`, which
+ * reads as flat plastic with nothing to reflect otherwise. The camera does a ONE-TIME real reframe
+ * once materialisation resolves and the molecule's true extent is known (`reframeCamera`) — it
+ * rescales the camera's CURRENT distance from origin along whatever direction the user/auto-rotate
+ * has already reached, so a bigger or smaller real molecule (a caller-supplied SMILES, not just the
+ * default caffeine) always frames correctly without fighting `OrbitControls`' own free-orbit
+ * interactivity (which re-derives its internal spherical state from `camera.position` on its very
+ * next `update()` call — a direct one-time position write is exactly what it expects). This is
+ * deliberately NOT the generic `Sim3D.getOrbitFocusDistance()` hook: that hook's contract
+ * unconditionally overwrites `camera.position` to a fixed preset direction EVERY frame (see
+ * `useThreeLoop.ts`), which would lock out free dragging/auto-rotate entirely — wrong for a hero
+ * object meant to be looked around, right only for a scripted/locked observation camera.
  */
 
 /** Caffeine — a real, recognizable SMILES exercising all three bond-order cases at once (aromatic
  * imidazole ring, C=O double bonds, C-N/C-H single bonds) plus multiple distinct elements, making it
  * a genuinely useful default demonstration molecule rather than an arbitrarily simple one. */
 const DEFAULT_SMILES = 'Cn1cnc2c1c(=O)n(C)c(=O)n2C';
+
+/**
+ * The real molecule's own extent — the max distance any real atom sits from the local origin
+ * (every atom entity's `ref.kind` starts with `'atom-'`, per `molecularStructure.ts`'s own batch-key
+ * convention). `undefined` when no atoms exist yet (before materialisation, or a blocked/refused
+ * one) — the caller keeps its previous/default radius rather than snapping to zero. The +0.6 padding
+ * is a generous allowance for the outermost atom's own CPK ball radius plus its bond stick length,
+ * so the true edge of the rendered geometry (not just the atom's center point) stays inside frame.
+ */
+function moleculeBoundingRadius(entities: readonly WorldFrameEntity[]): number | undefined {
+  let maxDistSq = 0;
+  let found = false;
+  for (const entity of entities) {
+    if (!entity.ref.kind.startsWith('atom-')) continue;
+    found = true;
+    const { x, y, z } = entity.transform.position;
+    maxDistSq = Math.max(maxDistSq, x * x + y * y + z * z);
+  }
+  return found ? Math.sqrt(maxDistSq) + 0.6 : undefined;
+}
 
 export interface MoleculeScene3DOptions {
   smiles?: string;
@@ -72,7 +111,8 @@ export class MoleculeScene3D implements Sim3D {
   private renderer: WorldFrameRenderer | null = null;
   private adapter: MoleculeAdapter | null = null;
   private atomMaterials = new Map<string, THREE_NS.Material>();
-  private sceneEnvironment: SceneEnvironmentHandle | null = null;
+  private backgroundFill: THREE_NS.HemisphereLight | null = null;
+  private heroLights: HeroLightHandles | null = null;
 
   private bondsGroup: THREE_NS.Group | null = null;
   private bondMaterial: THREE_NS.Material | null = null;
@@ -80,6 +120,10 @@ export class MoleculeScene3D implements Sim3D {
   /** The `bondsMaterialised` count the currently-built `bondsGroup` reflects — rebuild only when
    * this actually changes, not every frame. */
   private lastBondsMaterialised = -1;
+  /** Real bounding radius (world units) of the currently-materialised molecule, from its own real
+   * atom positions — the default is a reasonable guess for the DEFAULT_SMILES caffeine shot before
+   * real data exists, replaced by `reframeCamera`'s real measurement the moment atoms materialise. */
+  private moleculeRadius = 2.2;
 
   private materialising = false;
   private materialiseError: string | null = null;
@@ -98,28 +142,42 @@ export class MoleculeScene3D implements Sim3D {
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, _w: number, _h: number): void {
     this.THREE = THREE;
-    // No ground plane, no sky — a molecule viewer is a studio shot, not a place. `groundSize: 0`
-    // is `sceneEnvironment.ts`'s own documented way to opt out of the shared ground plane entirely.
-    this.sceneEnvironment = createSceneEnvironment(THREE, scene, {
-      mode: 'INDOOR', groundSize: 0, sunIntensity: 2.4, sunPosition: [3, 4, 5], fillIntensity: 0.9, ambientHaze: false,
+    // No ground, no sky, no room — a molecule viewer is a hero-object studio shot. BACKGROUND role
+    // (a weak hemisphere wash, keeps the periphery from reading as pure black) + HERO role (a
+    // coherent, already-tuned KEY+RIM aimed at the molecule's own local origin) instead of the
+    // generic exterior sun/fill pair — see the module doc for exactly why.
+    this.backgroundFill = createBackgroundFill(THREE, scene, { intensity: 0.45 });
+    this.heroLights = createHeroLight(THREE, scene, {
+      target: [0, 0, 0],
+      keyDistance: 5,
+      rimDistance: 2.4,
+      intensity: { key: 36, rim: 8 },
+      // No floor/receiver in a studio molecule shot — a shadow with nothing to fall on is a wasted
+      // shadow-map budget, not a visual improvement.
+      castShadow: false,
     });
 
-    this.bondMaterial = new THREE.MeshStandardMaterial({ color: 0xb8bfc9, roughness: 0.55, metalness: 0.12 });
-    this.aromaticMaterial = new THREE.MeshStandardMaterial({ color: 0x7fd8ff, roughness: 0.4, metalness: 0.18, emissive: 0x1a4a5c, emissiveIntensity: 0.3 });
+    this.bondMaterial = new THREE.MeshStandardMaterial({ color: 0xb8bfc9, roughness: 0.4, metalness: 0.15 });
+    this.aromaticMaterial = new THREE.MeshStandardMaterial({ color: 0x7fd8ff, roughness: 0.3, metalness: 0.2, emissive: 0x1a4a5c, emissiveIntensity: 0.3 });
     this.bondsGroup = new THREE.Group();
     this.bondsGroup.name = 'genesis-molecule-bonds';
     scene.add(this.bondsGroup);
 
     // One shared MeshStandardMaterial per element actually used by ELEMENT_STYLE's own table —
     // `materials.ts`'s "one shared instance per category" convention, not one material per atom.
+    // Roughness lowered from the original flat-plastic tuning now that real IBL reflections are on
+    // (see setupPostProcessing) — a CPK ball reads as a glossy, physically lit sphere instead of a
+    // matte one with nothing to reflect.
     for (const [element, style] of Object.entries(ELEMENT_STYLE)) {
-      this.atomMaterials.set(element, new THREE.MeshStandardMaterial({ color: style.color, roughness: 0.45, metalness: 0.08 }));
+      this.atomMaterials.set(element, new THREE.MeshStandardMaterial({ color: style.color, roughness: 0.32, metalness: 0.1 }));
     }
 
     this.adapter = createMoleculeAdapter(THREE, { atomMaterials: Object.fromEntries(this.atomMaterials) });
     this.renderer = new WorldFrameRenderer(THREE, scene, { resolveVisual: this.adapter.resolveVisual, updateVisual: this.adapter.updateVisual });
 
-    camera.position.set(4, 3, 5);
+    // A reasonable starting shot for the moleculeRadius default above — reframeCamera replaces this
+    // with the real framing the instant real atom positions exist.
+    camera.position.set(this.moleculeRadius * 1.6, this.moleculeRadius * 1.2, this.moleculeRadius * 1.6);
     camera.lookAt(0, 0, 0);
 
     this.materialising = true;
@@ -143,33 +201,46 @@ export class MoleculeScene3D implements Sim3D {
   }
 
   update(_dt: number): void {
-    this.sceneEnvironment?.update(_dt);
+    // No continuous animation of its own — a conformer is a static shot; `useThreeLoop.ts`'s own
+    // `cameraAutoRotateSpeed` handles the "keeps turning until dragged" motion.
   }
 
-  syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
+  syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer || !this.THREE) return;
     const frame = getFrameState(this.engine);
     const graphicsFrame = toGraphicsWorldFrame(frame);
     this.renderer.sync(graphicsFrame);
-    this.syncBonds(frame);
+    const justMaterialised = this.syncBonds(frame);
+    // `!this.materialising` matters: `molecule.scalars.bondsMaterialised` reads as the same `0`
+    // both "not yet materialised" (the key doesn't exist on `domainState` yet) and "materialised
+    // with genuinely zero bonds" — `syncBonds`'s own change-detection gate can't tell those apart
+    // from the number alone. Gating the reframe on `materialising` having already concluded (success
+    // OR an honest block, both flip it false) is what prevents a spurious reframe on the very first
+    // in-flight tick, before real data (or its honest absence) exists.
+    if (justMaterialised && !this.materialising) this.reframeCamera(camera);
   }
 
   /**
    * Real bonds, built directly (per `ADAPTER_CONTRACT.md` rule 4/8), gated on the REAL numeric
    * `bondsMaterialised` scalar — not on prose, not on whether any atom merely exists. Rebuilt only
    * when that count actually changes (materialisation completing is the only time it ever will,
-   * since a conformer is static), never every frame.
+   * since a conformer is static), never every frame. Also updates `moleculeRadius` from the real
+   * atom positions on that same transition, so `reframeCamera` always frames the ACTUAL molecule
+   * that materialised, not a fixed guess. Returns whether a real materialisation transition just
+   * happened (atoms/bonds appeared, or materialisation was honestly blocked) — the signal
+   * `syncScene` uses to trigger the one-time camera reframe.
    */
-  private syncBonds(frame: ReturnType<typeof getFrameState>): void {
+  private syncBonds(frame: WorldFrameState): boolean {
     const THREE = this.THREE!;
     const molecule = frame.entities.find((e) => e.id === this.moleculeId);
     const bondsMaterialised = typeof molecule?.scalars.bondsMaterialised === 'number' ? molecule.scalars.bondsMaterialised : 0;
-    if (bondsMaterialised === this.lastBondsMaterialised) return;
+    if (bondsMaterialised === this.lastBondsMaterialised) return false;
     this.lastBondsMaterialised = bondsMaterialised;
+    this.moleculeRadius = moleculeBoundingRadius(frame.entities) ?? this.moleculeRadius;
 
     disposeSceneResources(this.bondsGroup!);
     this.bondsGroup!.clear();
-    if (bondsMaterialised <= 0) return; // honest: no bond data, no sticks — see SOLVER_DATA_CONTRACT §C
+    if (bondsMaterialised <= 0) return true; // honest: no bond data, no sticks — see SOLVER_DATA_CONTRACT §C
 
     for (const relationship of frame.relationships) {
       const fromObject = this.renderer!.getObjectForEntity(relationship.fromEntityId);
@@ -190,6 +261,25 @@ export class MoleculeScene3D implements Sim3D {
         aromaticMaterial: this.aromaticMaterial!,
       }));
     }
+    return true;
+  }
+
+  /**
+   * A real, ONE-TIME auto-frame the instant the molecule's true extent is known — never a
+   * continuous per-frame override (see the module doc for why `Sim3D.getOrbitFocusDistance()`
+   * would be the wrong tool here). Rescales the camera's CURRENT distance from the origin along
+   * whatever direction it's already at (preserving the user's/auto-rotate's current viewing angle)
+   * so the full ball-and-stick extent fits with margin, then lets `OrbitControls`' own next
+   * `update()` call re-derive its internal state from the new `camera.position` — free dragging and
+   * auto-rotate keep working exactly as before, just re-centered on the real molecule size.
+   */
+  private reframeCamera(camera: THREE_NS.PerspectiveCamera): void {
+    const focusDistance = Math.max(3, this.moleculeRadius * 2.2);
+    const direction = camera.position.clone();
+    if (direction.lengthSq() < 1e-6) direction.set(1, 0.72, 1);
+    direction.normalize();
+    camera.position.copy(direction.multiplyScalar(focusDistance));
+    camera.lookAt(0, 0, 0);
   }
 
   setupPostProcessing(
@@ -204,7 +294,11 @@ export class MoleculeScene3D implements Sim3D {
       scene, camera, width: w, height: h,
       toneMappingExposure: 1.1,
       bloom: { strength: 0.28, radius: 0.45, threshold: 0.85 },
-      ambient: { mode: 'none' },
+      // Real image-based reflections (the default `'studio+hdri'`) — the CPK atom/bond materials
+      // set real `metalness`; without an environment map they read as flat plastic regardless of
+      // that PBR parameter, since metal must have SOMETHING to reflect. `'none'` (the old setting
+      // here) was for a scene running its own environment/atmosphere entirely outside this module,
+      // which this scene never did — it was simply never turned on.
     });
   }
 
@@ -239,8 +333,15 @@ export class MoleculeScene3D implements Sim3D {
   }
 
   dispose(): void {
-    this.sceneEnvironment?.dispose();
-    this.sceneEnvironment = null;
+    if (this.heroLights) {
+      this.heroLights.key.parent?.remove(this.heroLights.key, this.heroLights.key.target);
+      this.heroLights.rim.parent?.remove(this.heroLights.rim);
+      this.heroLights = null;
+    }
+    if (this.backgroundFill) {
+      this.backgroundFill.parent?.remove(this.backgroundFill);
+      this.backgroundFill = null;
+    }
     if (this.bondsGroup) {
       this.bondsGroup.parent?.remove(this.bondsGroup);
       disposeSceneResources(this.bondsGroup);

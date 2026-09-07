@@ -110,11 +110,13 @@ export interface RainfallScenarioOutcome {
   hospitalInterrupted: boolean;
 }
 
-/** The real "what if rainfall were N% lower" answer — see `runRainfallIntensityCounterfactual`'s
+/** The real "what if rainfall were N% lower/higher" answer — see `runRainfallIntensityCounterfactual`'s
  * own doc for how it's computed. `baselineTripped`/`baselineHospitalInterrupted` are copied from
  * the real scenario that already ran, so a caller can report both sides without a second lookup. */
 export interface RainfallCounterfactualOutcome {
-  percentLower: number;
+  /** Signed: positive means lower intensity, negative means higher (matches the caller's own sign
+   * convention, so a caller never has to also track direction separately). */
+  percentChange: number;
   adjustedIntensityMmPerHour: number;
   tripped: boolean;
   hospitalInterrupted: boolean;
@@ -482,14 +484,18 @@ export class GenesisScientificCitySim implements Sim3D {
    *
    * Returns `null` only when no real baseline scenario has run yet — there is nothing to compare a
    * hypothetical intensity against until `triggerRainfallScenario()` has actually fired once.
+   *
+   * `percentChange` is signed: positive lowers intensity, negative raises it (e.g. -30 means "30%
+   * higher") — one parameter, one formula, no separate direction flag to keep in sync with it.
    */
-  runRainfallIntensityCounterfactual(percentLower: number): RainfallCounterfactualOutcome | null {
+  runRainfallIntensityCounterfactual(percentChange: number): RainfallCounterfactualOutcome | null {
     if (!this.rainfallOutcome) return null;
-    if (this.rainfallCounterfactual?.percentLower === percentLower) return this.rainfallCounterfactual;
+    if (this.rainfallCounterfactual?.percentChange === percentChange) return this.rainfallCounterfactual;
 
     const forkTick = this.rainfallOutcome.scheduledAtTick - 1;
-    const adjustedIntensityMmPerHour = FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR * (1 - percentLower / 100);
-    const forked = this.engine.forkBranch(forkTick, `rainfall-${percentLower}pct-lower`, () => {});
+    const adjustedIntensityMmPerHour = FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR * (1 - percentChange / 100);
+    const forkLabel = percentChange >= 0 ? `rainfall-${percentChange}pct-lower` : `rainfall-${-percentChange}pct-higher`;
+    const forked = this.engine.forkBranch(forkTick, forkLabel, () => {});
     const updaterWithRainfall = withCrossDomainCouplings(
       withScheduledEvents(this.city.updater, rainfallSchedule(this.rainfallOutcome.scheduledAtTick, adjustedIntensityMmPerHour)),
       [this.city.couplings[0]],
@@ -500,7 +506,7 @@ export class GenesisScientificCitySim implements Sim3D {
     const pumpEvents = getEventHistoryFor(forked, this.city.pumpPipeId);
     const hospitalEvents = getEventHistoryFor(forked, this.city.hospitalBuildingId);
     this.rainfallCounterfactual = {
-      percentLower,
+      percentChange,
       adjustedIntensityMmPerHour,
       tripped: pumpEvents.some((event) => event.type === PUMP_TRIPPED_EVENT_TYPE),
       hospitalInterrupted: hospitalEvents.some((event) => event.type === HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE),

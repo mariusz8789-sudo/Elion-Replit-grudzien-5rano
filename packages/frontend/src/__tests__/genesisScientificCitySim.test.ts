@@ -283,7 +283,7 @@ describe('GenesisScientificCitySim — rainfall-intensity counterfactual (REAL a
 
     const outcome = sim.runRainfallIntensityCounterfactual(30);
     expect(outcome).not.toBeNull();
-    expect(outcome!.percentLower).toBe(30);
+    expect(outcome!.percentChange).toBe(30);
     expect(outcome!.adjustedIntensityMmPerHour).toBeCloseTo(56, 5); // 80 * 0.7
     expect(outcome!.baselineTripped).toBe(true);
     expect(outcome!.baselineHospitalInterrupted).toBe(true);
@@ -300,6 +300,19 @@ describe('GenesisScientificCitySim — rainfall-intensity counterfactual (REAL a
     expect(outcome!.tripped).toBe(false);
     expect(outcome!.hospitalInterrupted).toBe(false);
     expect(outcome!.baselineTripped).toBe(true); // the real baseline is unaffected by asking a hypothetical
+  });
+
+  it('a negative percentChange genuinely raises intensity — the "what if rainfall is higher" direction', () => {
+    // percentChange is signed: positive lowers intensity, negative raises it. This is the exact
+    // gap the Genesis Urban Resilience Engine audit found -- observationIntent.ts previously had no
+    // way to express "30% higher" at all, only "lower". The sim-level math already supported it.
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const outcome = sim.runRainfallIntensityCounterfactual(-30);
+    expect(outcome).not.toBeNull();
+    expect(outcome!.percentChange).toBe(-30);
+    expect(outcome!.adjustedIntensityMmPerHour).toBeCloseTo(104, 5); // 80 * 1.3
+    expect(outcome!.tripped).toBe(true); // more rain than the already-tripping baseline still trips
   });
 
   it('is idempotent per percentage — asking the same percentage twice returns the cached outcome, not a second fork', () => {

@@ -267,13 +267,54 @@ describe('GenesisScientificCitySim.triggerRainfallScenario — C1 SCIENTIFIC DIR
   });
 });
 
-describe('GenesisScientificCitySim — the honest rainfall-intensity counterfactual refusal (mandatory mission Step 0)', () => {
-  it('names the real, specific gap rather than a generic failure message', () => {
+describe('GenesisScientificCitySim — rainfall-intensity counterfactual (REAL as of C3 Phase 5)', () => {
+  it('before any scenario has run: honestly asks for a baseline first, not a permanent refusal', () => {
     const sim = initializedSim();
+    expect(sim.runRainfallIntensityCounterfactual(30)).toBeNull();
     const gap = sim.getRainfallCounterfactualGap();
-    expect(gap).toContain('NOT_MODELLED');
-    expect(gap.toLowerCase()).toContain('rainfall');
-    expect(gap.toLowerCase()).toContain('parameterized');
+    expect(gap.toLowerCase()).toContain('baseline');
+    expect(gap.toLowerCase()).not.toContain('not_modelled');
+  });
+
+  it('after the real scenario runs: a real, lower-intensity fork can genuinely fail to trip the pump', () => {
+    const sim = initializedSim();
+    const baseline = sim.triggerRainfallScenario();
+    expect(baseline.tripped).toBe(true);
+
+    const outcome = sim.runRainfallIntensityCounterfactual(30);
+    expect(outcome).not.toBeNull();
+    expect(outcome!.percentLower).toBe(30);
+    expect(outcome!.adjustedIntensityMmPerHour).toBeCloseTo(56, 5); // 80 * 0.7
+    expect(outcome!.baselineTripped).toBe(true);
+    expect(outcome!.baselineHospitalInterrupted).toBe(true);
+    // 56mm/h is still well above the ~18.3mm/h trip threshold, so this specific
+    // percentage still trips — the point is that it's REALLY solved, not scripted.
+    expect(outcome!.tripped).toBe(true);
+  });
+
+  it('a low enough intensity genuinely avoids tripping the pump — the real point of this counterfactual', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const outcome = sim.runRainfallIntensityCounterfactual(90); // 80 * 0.1 = 8mm/h, well under the trip threshold
+    expect(outcome).not.toBeNull();
+    expect(outcome!.tripped).toBe(false);
+    expect(outcome!.hospitalInterrupted).toBe(false);
+    expect(outcome!.baselineTripped).toBe(true); // the real baseline is unaffected by asking a hypothetical
+  });
+
+  it('is idempotent per percentage — asking the same percentage twice returns the cached outcome, not a second fork', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const first = sim.runRainfallIntensityCounterfactual(30);
+    const second = sim.runRainfallIntensityCounterfactual(30);
+    expect(second).toEqual(first);
+  });
+
+  it('does not mutate the real baseline outcome', () => {
+    const sim = initializedSim();
+    const baseline = sim.triggerRainfallScenario();
+    sim.runRainfallIntensityCounterfactual(90);
+    expect(sim.describeCurrentState().pumpTripped).toBe(baseline.tripped);
   });
 });
 

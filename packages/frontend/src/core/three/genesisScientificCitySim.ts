@@ -25,7 +25,9 @@ import { applyVisualState, type CanonicalVisualState } from './graphics/visualSt
 import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/sceneEnvironment';
 import { disposeSceneResources } from './graphics/lifecycle';
-import { setupGraphicsPipeline } from './graphics/postProcessing';
+import { setupGraphicsPipeline, configureDOF, type GraphicsPipeline } from './graphics/postProcessing';
+import { captureDryLook, applyWetLook, type DryMaterialLook } from './graphics/water';
+import { configureCinematicCamera, recommendedDofForProfile, FocusPuller, type CinematicCameraProfile } from './graphics/cinematicCamera';
 
 /**
  * GENESIS — CITY INFRASTRUCTURE INTEGRATION 1.0
@@ -108,6 +110,18 @@ export interface RainfallScenarioOutcome {
   hospitalInterrupted: boolean;
 }
 
+/** The real "what if rainfall were N% lower" answer — see `runRainfallIntensityCounterfactual`'s
+ * own doc for how it's computed. `baselineTripped`/`baselineHospitalInterrupted` are copied from
+ * the real scenario that already ran, so a caller can report both sides without a second lookup. */
+export interface RainfallCounterfactualOutcome {
+  percentLower: number;
+  adjustedIntensityMmPerHour: number;
+  tripped: boolean;
+  hospitalInterrupted: boolean;
+  baselineTripped: boolean;
+  baselineHospitalInterrupted: boolean;
+}
+
 export interface CurrentStateSummary {
   tick: number;
   pumpFlow: number;
@@ -119,6 +133,15 @@ export interface CurrentStateSummary {
 export interface ReplayWindow {
   fromTick: number;
   toTick: number;
+}
+
+/** A road/pavement material this scene can flip between its normal ("dry") PBR look and a wetter
+ * one once `RAINFALL_EVENT_TYPE` has actually fired — via `graphics/water.ts`'s own
+ * `captureDryLook`/`applyWetLook` (a real PBR roughness/color response, not a shader trick standing
+ * in for state), reused here rather than re-implemented; see `applyRainfallVisualState`'s own doc. */
+interface WetSurfaceMaterial {
+  material: THREE_NS.MeshStandardMaterial;
+  dry: DryMaterialLook;
 }
 
 function groundingToC2(level: WorldModelEntity['grounding']): EntityGrounding {
@@ -137,6 +160,7 @@ export class GenesisScientificCitySim implements Sim3D {
   private failureBranch: TemporalEngine | null = null;
   private viewingBranch: RenderedCityBranch = 'BASELINE';
   private rainfallOutcome: RainfallScenarioOutcome | null = null;
+  private rainfallCounterfactual: RainfallCounterfactualOutcome | null = null;
   private replay: { fromTick: number; toTick: number; cursor: number } | null = null;
 
   private renderedIds: ReadonlySet<EntityId>;
@@ -154,12 +178,29 @@ export class GenesisScientificCitySim implements Sim3D {
   private contextGroup: THREE_NS.Group | null = null;
   private contextMaterials: THREE_NS.Material[] = [];
   private trees: VegetationFieldHandle | null = null;
+  /** GRAPHICS V2 SPRINT C-2: the road/pavement materials this scene can make read as rain-wet once
+   * the REAL `RAINFALL_EVENT_TYPE` scenario has actually fired (`isRainfallScenarioActive()`) — see
+   * `applyRainfallVisualState`'s own doc for why this is a rendering-only response to a real C3
+   * event, never a second weather system. */
+  private wetSurfaceMaterials: WetSurfaceMaterial[] = [];
+  private rainfallVisualApplied = false;
+  private readonly dryFogDensity = 0.0075;
+  // +40% over baseline — noticeably heavier atmosphere without erasing the skyline the flagship
+  // scene exists to show (found live: 0.0145 read as fog erasing most of the city past ~40m).
+  private readonly rainFogDensity = 0.0105;
+
+  /** GRAPHICS V2 SPRINT D — cinematic lens/focus polish, reusing `cinematicCamera.ts` exactly as
+   * `labScene3D.ts` already does (see `updateCinematicFraming`'s own doc): no second camera system,
+   * just the lens (FOV/DOF) half of the shot this scene wasn't using yet. */
+  private pipeline: GraphicsPipeline | null = null;
+  private appliedCinematicProfile: CinematicCameraProfile | null = null;
+  private focusPuller: FocusPuller | null = null;
   /** Real WebGLRenderer.info counters, fed by useThreeLoop through the existing Sim3D
    * `onRenderMetrics` hook. This scene previously implemented neither the hook nor a readout, so it
    * could not be measured at all — which made the graphics performance budget unenforceable on the
    * one scene that matters most. Same keys epidemicCity3D already publishes, so any tooling that
    * reads one reads the other. */
-  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
+  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0, textureBytesEstimate: 0 };
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
 
   private followTarget: THREE_NS.Vector3 | null = null;
@@ -262,15 +303,24 @@ export class GenesisScientificCitySim implements Sim3D {
     // 0.25m across — see graphics/waterInfrastructure.ts's own createPump dimensions.
     const radius = match.kind === 'pump-pipe-system' ? 0.25 : 5;
     this.lastSelectedId = match.id;
+    this.frameCameraOn([position.x, position.y, position.z], radius, cameraIntent);
+    return { found: true, label: match.label };
+  }
+
+  /** Shared body behind `applyObservationTarget`'s per-entity framing — factored out so SPRINT C-3's
+   * initial subject framing (below, in `init()`) can frame a POINT/RADIUS that isn't tied to a
+   * single named entity (the pump+hospital pair's own midpoint/span) through the exact same real
+   * `resolveCameraFraming` + `followTarget`/`observationStandoff` seam, rather than a second camera
+   * mechanism. */
+  private frameCameraOn(position: THREE_NS.Vector3Tuple, radius: number, cameraIntent: CameraIntent): void {
     if (!this.followTarget && this.THREE) this.followTarget = new this.THREE.Vector3();
-    this.followTarget?.set(position.x, position.y + radius * 0.4, position.z);
+    this.followTarget?.set(position[0], position[1] + radius * 0.4, position[2]);
     if (this.THREE) {
-      const framing = resolveCameraFraming({ intent: cameraIntent, target: [position.x, position.y + radius * 0.4, position.z], targetRadius: radius });
+      const framing = resolveCameraFraming({ intent: cameraIntent, target: [position[0], position[1] + radius * 0.4, position[2]], targetRadius: radius });
       this.observationStandoff = Math.hypot(
         framing.position[0] - framing.lookAt[0], framing.position[1] - framing.lookAt[1], framing.position[2] - framing.lookAt[2],
       );
     }
-    return { found: true, label: match.label };
   }
 
   getOrbitTarget(): THREE_NS.Vector3 | null {
@@ -417,14 +467,54 @@ export class GenesisScientificCitySim implements Sim3D {
     return { tick: engine.tick, pumpFlow, pumpTripped, hospitalInterrupted, narration };
   }
 
-  /** The ONE counterfactual this mission's flagship explicitly asks about, honestly refused — see
-   * `triggerRainfallScenario`'s own doc for the exact gap. */
+  /**
+   * "What if rainfall were N% lower" — REAL as of C3 Phase 5 (previously a hardcoded refusal; the
+   * doc on `triggerRainfallScenario` above already recorded the gap's resolution, this method just
+   * hadn't been updated to match — found during a post-merge Chromium regression pass, not by C3).
+   *
+   * Forks from the tick JUST BEFORE the real scenario's rainfall event fired
+   * (`rainfallOutcome.scheduledAtTick - 1`, via `TemporalEngine.forkBranch`'s own historical-scrub
+   * support — `scrubTo` under the hood) so the fork shares the baseline's pre-rainfall history
+   * exactly, then schedules the SAME real event at the SAME tick with the adjusted intensity — the
+   * identical `withScheduledEvents` + `city.couplings[0]` composition `triggerRainfallScenario`
+   * uses, just applied to a fork instead of the live baseline. Two branches that diverge in exactly
+   * one input (intensity) are then directly comparable. Idempotent per percentage.
+   *
+   * Returns `null` only when no real baseline scenario has run yet — there is nothing to compare a
+   * hypothetical intensity against until `triggerRainfallScenario()` has actually fired once.
+   */
+  runRainfallIntensityCounterfactual(percentLower: number): RainfallCounterfactualOutcome | null {
+    if (!this.rainfallOutcome) return null;
+    if (this.rainfallCounterfactual?.percentLower === percentLower) return this.rainfallCounterfactual;
+
+    const forkTick = this.rainfallOutcome.scheduledAtTick - 1;
+    const adjustedIntensityMmPerHour = FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR * (1 - percentLower / 100);
+    const forked = this.engine.forkBranch(forkTick, `rainfall-${percentLower}pct-lower`, () => {});
+    const updaterWithRainfall = withCrossDomainCouplings(
+      withScheduledEvents(this.city.updater, rainfallSchedule(this.rainfallOutcome.scheduledAtTick, adjustedIntensityMmPerHour)),
+      [this.city.couplings[0]],
+    );
+    forked.advance(GENESIS_CITY_DT_SECONDS, updaterWithRainfall);
+    for (let i = 0; i < FAILURE_ADVANCE_TICKS; i++) forked.advance(GENESIS_CITY_DT_SECONDS, this.city.updater);
+
+    const pumpEvents = getEventHistoryFor(forked, this.city.pumpPipeId);
+    const hospitalEvents = getEventHistoryFor(forked, this.city.hospitalBuildingId);
+    this.rainfallCounterfactual = {
+      percentLower,
+      adjustedIntensityMmPerHour,
+      tripped: pumpEvents.some((event) => event.type === PUMP_TRIPPED_EVENT_TYPE),
+      hospitalInterrupted: hospitalEvents.some((event) => event.type === HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE),
+      baselineTripped: this.rainfallOutcome.tripped,
+      baselineHospitalInterrupted: this.rainfallOutcome.hospitalInterrupted,
+    };
+    return this.rainfallCounterfactual;
+  }
+
+  /** Honest status for the ONE case `runRainfallIntensityCounterfactual` cannot yet answer: no real
+   * baseline scenario has run. Not a permanent refusal — call `triggerRainfallScenario()` first. */
   getRainfallCounterfactualGap(): string {
-    return 'NOT_MODELLED — rainfall intensity is not a real parameterized input in the current '
-      + 'hydraulics model: the scripted "extreme rainfall" event always raises the pump\'s real flow '
-      + 'demand by a fixed multiplier, regardless of any intensity value carried on the event. There '
-      + 'is no honest way to run a "rainfall 30% lower" counterfactual until the rainfall-to-load '
-      + 'coupling is changed to actually read a real intensity parameter.';
+    return 'The rainfall-intensity counterfactual needs a real baseline to compare against first — '
+      + 'trigger the extreme rainfall scenario, then ask again.';
   }
 
   // --- Replay: the ALREADY-COMPUTED real history, not a re-narrated fiction -------------------
@@ -594,6 +684,37 @@ export class GenesisScientificCitySim implements Sim3D {
     // OrbitControls target seam C1's observation flow drives are untouched.
     camera.position.set(midX + 46, 34, midZ + 62);
     camera.lookAt(midX, 4, midZ);
+
+    // SPRINT D — cinematic lens polish. The establishing pose above is a WIDE shot in composition
+    // but was still using the generic 50deg lens `useThreeLoop.ts` constructs every camera with;
+    // `configureCinematicCamera`/`FocusPuller` are `cinematicCamera.ts`'s existing lens/focus
+    // primitives (already proven in `labScene3D.ts`) — reused here, not a second camera system.
+    // The focus pull starts at this establishing shot's own real distance (everything reads sharp
+    // at this range regardless) and eases toward the hero standoff as `updateCinematicFraming`
+    // (called every frame from `syncScene`) detects the SPRINT C-3 push-in has arrived.
+    const establishingDistance = camera.position.distanceTo(new THREE.Vector3(midX, 4, midZ));
+    this.applyCinematicProfile(camera, 'WIDE_ESTABLISHING');
+    this.focusPuller = new FocusPuller(establishingDistance);
+
+    // SPRINT C-3 — subject framing. The wide shot above sets the FIRST frame's static establishing
+    // pose; left alone, it was also the scene's PERMANENT resting camera, and the pump/hospital
+    // pair — the actual subject of this whole scenario — read as two small objects lost in a much
+    // bigger district (found live in Sprint C-1/C-2's own screenshots). This reuses the EXACT SAME
+    // real camera-framing seam C1's "show me the hospital" queries already drive (`frameCameraOn`,
+    // shared with `applyObservationTarget`; `useThreeLoop.ts`'s existing per-frame lerp toward
+    // `getOrbitTarget()`/`getOrbitFocusDistance()` does the rest) to push the camera in from the
+    // wide establish onto the flagship PAIR over the first couple of seconds — a real "establish,
+    // then find your subject" cinematic beat, not a second camera mechanism.
+    //
+    // Framing the pair (not just `applyObservationTarget('hospital', ...)`'s own hardcoded
+    // building-only radius of 5) matters here: found live that a hospital-only radius crops the
+    // pump entirely out of frame, which is exactly the "lost the pump/hospital as the visual
+    // subject" defect this sprint exists to fix. `pairSpan` is the real half-distance between the
+    // two entities plus the hospital's own half-width, so the standoff this produces always
+    // includes both, however far apart a future generated world places them.
+    const pairSpan = Math.max(Math.hypot(hospital[0] - pump[0], hospital[2] - pump[2]) / 2 + 4, 6);
+    this.frameCameraOn([midX, 3, midZ], pairSpan, 'CINEMATIC');
+    if (this.observationStandoff) this.focusPuller?.pullTo(this.observationStandoff);
   }
 
   /**
@@ -640,6 +761,15 @@ export class GenesisScientificCitySim implements Sim3D {
     const carBody = createPBRMaterial(THREE, 'PAINTED_METAL');
     const carGlass = createPBRMaterial(THREE, 'TECH_COMPOSITE', { color: 0x1c2733 });
     this.contextMaterials = [asphalt, concrete, roof, metal, lampGlow, contextWindow, trunk, canopy, carBody, carGlass, kerb, paving, paint, ...facadeMaterials];
+
+    // SPRINT C-2: register the road/pavement surfaces so `applyRainfallVisualState` can make them
+    // read as rain-wet once the real `RAINFALL_EVENT_TYPE` scenario fires — see that method's own
+    // doc. Registered here (not cloned) because these materials are already shared, scene-owned
+    // instances this method is the sole author of.
+    this.wetSurfaceMaterials = ([asphalt, paving, kerb] as THREE_NS.Material[]).map((material) => {
+      const standard = material as THREE_NS.MeshStandardMaterial;
+      return { material: standard, dry: captureDryLook(standard) };
+    });
 
     // Keep-out zones: the real entities' own positions, so context never buries the science.
     const keepOut: { x: number; z: number; r: number }[] = [];
@@ -919,22 +1049,42 @@ export class GenesisScientificCitySim implements Sim3D {
     w: number,
     h: number,
   ): PostProcessor {
-    return setupGraphicsPipeline(this.THREE!, modules, renderer, {
+    const pipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
       scene, camera, width: w, height: h,
       toneMappingExposure: 1.15,
       bloom: { strength: 0.5, radius: 0.6, threshold: 0.68 },
       ambient: { mode: 'none' },
+      // SPRINT D — a subtle rack focus matching the SAME real establish->hero framing SPRINT C-3
+      // already drives: sharp everywhere at the wide establishing distance (`focusPuller`'s seed),
+      // easing toward a shallower hero focus on the pump/hospital pair as `updateCinematicFraming`
+      // (called every frame from `syncScene`) detects the push-in has arrived. `minTier: 'medium'`
+      // matches `recommendedDofForProfile`'s own HERO_CLOSE_UP blur strength (0.35) rather than a
+      // one-off tuned value, so the lens and the DOF pass always agree on how strong the look is.
+      depthOfField: configureDOF({
+        focusDistance: this.focusPuller?.value ?? 60,
+        blurStrength: recommendedDofForProfile('HERO_CLOSE_UP', this.focusPuller?.value ?? 60).blurStrength,
+        minTier: 'medium',
+      }),
     });
+    this.pipeline = pipeline;
+    return pipeline;
   }
 
-  update(_dt: number): void {
+  update(dt: number): void {
     // Time only advances through explicit step()/triggerPumpFailure() calls (deterministic,
     // testable, and matches this world's own real solver cadence) — never a per-frame auto-tick.
     // The shared environment's ambient haze is a pure rendering-layer effect (particle drift), not
     // simulation time, so it still animates every real frame regardless of world-clock state —
     // same split epidemicCity3D.ts's own cityHaze already draws between "world time" and "visual
     // motion that just needs to look alive."
-    this.sceneEnvironment?.update(_dt);
+    this.sceneEnvironment?.update(dt);
+    // SPRINT D — advances the establish->hero rack focus started in `init()`. `update(dt)` (not
+    // `syncScene`) is where this scene actually has a real `dt`; the lens-profile switch itself
+    // lives in `syncScene` (it has the live camera, which this method deliberately does not).
+    if (this.focusPuller) {
+      const distance = this.focusPuller.update(dt);
+      this.pipeline?.setFocusDistance(distance);
+    }
   }
 
   /** Releases this scene's own environment resources. The rest of this file's materials/renderer
@@ -957,10 +1107,91 @@ export class GenesisScientificCitySim implements Sim3D {
     this.contextMaterials = [];
     this.windowMaterial?.dispose();
     this.windowMaterial = null;
+    this.wetSurfaceMaterials = [];
+    this.rainfallVisualApplied = false;
+    // SPRINT D cleanup. The pipeline's own GPU resources are freed by `useThreeLoop.ts`'s separate
+    // `post.dispose()` call on the SAME object this field points at — only the reference itself
+    // needs clearing here so `update()` never calls into a torn-down pipeline afterward.
+    this.pipeline = null;
+    this.appliedCinematicProfile = null;
+    this.focusPuller = null;
+  }
+
+  /**
+   * GRAPHICS V2 SPRINT C-2 — renders the REAL `RAINFALL_EVENT_TYPE` scenario, once it has actually
+   * fired (`isRainfallScenarioActive()`, backed by `this.rainfallOutcome`), as a visible atmosphere
+   * change: denser fog and wetter-looking road/pavement surfaces via `graphics/water.ts`'s own
+   * `captureDryLook`/`applyWetLook` (SPRINT F+: reused, not re-implemented — an earlier version of
+   * this method hand-rolled the same roughness/color response before this file's own audit found
+   * `water.ts` already had it) — lower `roughness` reads as more specular under the same real
+   * lighting, a real PBR response, not a fabricated shader standing in for state.
+   *
+   * HONEST SCOPE, stated up front: this is a RENDERING reaction to a real, already-fired C3 event —
+   * it adds no weather solver, no precipitation model, and no new simulated quantity. Genesis has no
+   * rainfall-intensity parameter (`getRainfallCounterfactualGap()` already documents that gap
+   * explicitly); this method reads only the one real boolean fact C3 actually models — whether the
+   * scripted scenario has begun — and always applies the same fixed visual response, exactly as
+   * honest a mapping as `waterInfrastructureBridge.ts`'s NORMAL/FAILED -> geometry color mapping.
+   *
+   * Idempotent and reversible: it is called every frame from `syncScene` but only touches materials
+   * on the one frame the boolean actually flips, and would restore the dry look if `rainfallOutcome`
+   * were ever cleared (it currently never is — the scenario is one-way — but this does not assume
+   * that either).
+   */
+  private applyRainfallVisualState(scene: THREE_NS.Scene): void {
+    const active = this.isRainfallScenarioActive();
+    if (active === this.rainfallVisualApplied) return;
+    this.rainfallVisualApplied = active;
+
+    if (scene.fog && 'density' in scene.fog) {
+      (scene.fog as THREE_NS.FogExp2).density = active ? this.rainFogDensity : this.dryFogDensity;
+    }
+    for (const surface of this.wetSurfaceMaterials) {
+      applyWetLook(this.THREE!, surface.material, surface.dry, active ? 1 : 0);
+    }
+  }
+
+  /**
+   * Applies a named `cinematicCamera.ts` profile's FOV, then immediately restores THIS scene's own
+   * near/far clip planes. `cinematicCamera.ts`'s profiles (`near`/`far` included) were tuned for
+   * `labScene3D.ts`'s single-room scale (a few metres) — found live that applying its
+   * `WIDE_ESTABLISHING` profile as-is (`far: 100`) clipped most of this city (a ~150-unit road grid
+   * viewed from ~84 units out) into a black screen. Reusing the profile for its FOV/DOF pairing
+   * while overriding near/far for this scene's real spatial scale is the same kind of override
+   * `sceneEnvironment.ts` already grants every caller for its own shared defaults — not a fork of
+   * the module.
+   */
+  private applyCinematicProfile(camera: THREE_NS.PerspectiveCamera, profile: CinematicCameraProfile): void {
+    configureCinematicCamera(camera, profile);
+    camera.near = 0.1;
+    camera.far = 600;
+    camera.updateProjectionMatrix();
+    this.appliedCinematicProfile = profile;
+  }
+
+  /**
+   * GRAPHICS V2 SPRINT D — the lens half of the SPRINT C-3 establish->hero camera move.
+   * `configureCinematicCamera` (`cinematicCamera.ts`, already proven in `labScene3D.ts`) swaps the
+   * live camera's FOV between `WIDE_ESTABLISHING` (68deg, matches the initial wide shot) and
+   * `HERO_CLOSE_UP` (40deg, a real cinematic lens change, not just a position move) once the
+   * per-frame lerp `useThreeLoop.ts` already runs toward `getOrbitTarget()` has actually arrived —
+   * detected here from the LIVE camera-to-target distance, the same real number that lerp is
+   * closing. Applied only on change (`appliedCinematicProfile`), exactly like `labScene3D.ts`'s own
+   * convention, so this never fights `updateProjectionMatrix` every frame for no reason.
+   */
+  private updateCinematicFraming(camera: THREE_NS.PerspectiveCamera): void {
+    if (!this.followTarget || !this.observationStandoff) return;
+    const distance = camera.position.distanceTo(this.followTarget);
+    const desiredProfile: CinematicCameraProfile = distance > this.observationStandoff * 1.4 ? 'WIDE_ESTABLISHING' : 'HERO_CLOSE_UP';
+    if (desiredProfile !== this.appliedCinematicProfile) {
+      this.applyCinematicProfile(camera, desiredProfile);
+    }
   }
 
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer) return;
+    this.applyRainfallVisualState(_scene);
+    this.updateCinematicFraming(_camera);
     // While replaying, render the REAL historical state at the cursor tick — getFrameState's own
     // optional `timestamp` param (bridge/worldFrameState.ts) already does this via the engine's
     // real scrubTo, so replay needs no second history/snapshot mechanism.
@@ -1021,6 +1252,14 @@ export class GenesisScientificCitySim implements Sim3D {
       hospitalInterrupted: hospital?.domainState?.waterServiceInterrupted ?? 0,
       selected: this.lastSelectedId ? 1 : 0,
       rainfallActive: this.rainfallOutcome ? 1 : 0,
+      // SPRINT C-2: distinct from `rainfallActive` (a world-model fact) — this is whether the
+      // RENDERING has actually reacted to it yet (`applyRainfallVisualState`, driven by `syncScene`).
+      rainfallVisualApplied: this.rainfallVisualApplied ? 1 : 0,
+      // SPRINT D — the live rack-focus distance `update()` feeds into `GraphicsPipeline.setFocusDistance`;
+      // exposed for the same observability reason `webgl_*` is (and so a test can verify the pull
+      // actually progresses without a real WebGLRenderer to read DOF uniforms back out of).
+      cinematicFocusDistance: this.focusPuller?.value ?? 0,
+
       replaying: this.replay ? 1 : 0,
       replayTick: this.replay?.cursor ?? -1,
       webgl_fps: this.renderMetrics.fps,
@@ -1030,6 +1269,9 @@ export class GenesisScientificCitySim implements Sim3D {
       webgl_triangles: this.renderMetrics.triangles,
       webgl_geometries: this.renderMetrics.geometries,
       webgl_textures: this.renderMetrics.textures,
+      // GRAPHICS V3 — real estimated bytes (see diagnostics.ts's estimateSceneTextureMemory),
+      // closing PERFORMANCE_BUDGET.md §6's "texture memory is currently unmeasured" gap.
+      webgl_texture_bytes_estimate: this.renderMetrics.textureBytesEstimate,
     };
   }
 }

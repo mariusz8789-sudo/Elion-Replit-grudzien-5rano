@@ -85,14 +85,16 @@ export interface ObservationIntent {
    * world, distinct from `askingWhy` (a cause question) and `askingWhatChanged` (a diff question). */
   readonly askingWhatIsHappening: boolean;
   /**
-   * Names the ONE counterfactual this mission's flagship scenario explicitly asks about and which
-   * C3 does NOT currently support as a real parameterized intervention (rainfall intensity is a
-   * scripted trigger with a fixed effect magnitude, not an adjustable input — see
-   * `genesisScientificCity3.ts`'s own module doc). Detected so a caller can give an honest
-   * NOT_MODELLED refusal instead of either silently ignoring the question or routing it into an
-   * unrelated real intervention and calling that "the same thing".
+   * Names the ONE counterfactual this mission's flagship scenario explicitly asks about. As of
+   * C3 Phase 5, rainfall intensity IS a real parameterized input (rational-method runoff feeding
+   * Darcy-Weisbach — see `genesisScientificCity3.ts`'s own module doc), so this is detected so a
+   * caller can run the REAL counterfactual rather than either ignoring the question or routing it
+   * into an unrelated intervention and calling that "the same thing".
    */
   readonly rainfallCounterfactualQuery: boolean;
+  /** The percentage reduction named in a `rainfallCounterfactualQuery` sentence ("30% lower" -> 30),
+   * or `null` when the query matched but no number could be read out (caller decides the default). */
+  readonly rainfallCounterfactualPercent: number | null;
   /** Everything this parser could not read out of the sentence. A caller must not fill these in with a default. */
   readonly unresolved: readonly UnresolvedObservationAspect[];
 }
@@ -313,6 +315,10 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
   const comparison = (COMPARISON_TRIGGER.test(trimmed) || intervention.requested) && !returningToBaseline;
   const scenarioRequest: ObservationIntent['scenarioRequest'] = EXTREME_RAINFALL_SCENARIO.test(trimmed) ? 'EXTREME_RAINFALL' : null;
   const rainfallCounterfactualQuery = RAINFALL_INTENSITY_QUERY.test(trimmed);
+  // Separate, minimal extraction (not folded into RAINFALL_INTENSITY_QUERY's own alternation) so
+  // changing how the percentage is read never risks the query-detection regex itself.
+  const rainfallCounterfactualPercentMatch = rainfallCounterfactualQuery ? /(\d{1,3})\s?%/.exec(trimmed) : null;
+  const rainfallCounterfactualPercent = rainfallCounterfactualPercentMatch ? Number(rainfallCounterfactualPercentMatch[1]) : null;
 
   const unresolved: UnresolvedObservationAspect[] = [];
   if (
@@ -339,6 +345,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
     scenarioRequest,
     askingWhatIsHappening,
     rainfallCounterfactualQuery,
+    rainfallCounterfactualPercent,
     returningToBaseline,
     unresolved,
   };

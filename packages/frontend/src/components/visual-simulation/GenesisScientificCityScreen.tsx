@@ -78,12 +78,22 @@ export function GenesisScientificCityScreen() {
       return;
     }
 
-    // (0 — mandatory Step 0) The ONE counterfactual C3 does not honestly support. Checked BEFORE
-    // the generic comparison/intervention branches below so this specific, named gap is never
-    // silently absorbed into an unrelated real intervention or a generic "nothing to compare"
-    // message — see sim.getRainfallCounterfactualGap's own doc for exactly why.
+    // (0 — mandatory Step 0) The ONE counterfactual this mission's flagship names explicitly.
+    // REAL as of C3 Phase 5 (rainfall intensity genuinely drives hydraulic load) — checked BEFORE
+    // the generic comparison/intervention branches below so it's never silently absorbed into an
+    // unrelated real intervention. Falls back to the honest "run the scenario first" message only
+    // when there's no real baseline yet to compare against — see sim's own doc for exactly why.
     if (intent.rainfallCounterfactualQuery) {
-      setObsResult(sim.getRainfallCounterfactualGap());
+      if (!sim.isRainfallScenarioActive()) {
+        setObsResult(sim.getRainfallCounterfactualGap());
+        setObsText('');
+        return;
+      }
+      const percentLower = intent.rainfallCounterfactualPercent ?? 30;
+      const outcome = sim.runRainfallIntensityCounterfactual(percentLower);
+      setObsResult(outcome
+        ? `At ${outcome.adjustedIntensityMmPerHour.toFixed(1)}mm/h (${percentLower}% lower): pump tripped: ${outcome.tripped} (vs ${outcome.baselineTripped} at full intensity). Hospital water service interrupted: ${outcome.hospitalInterrupted} (vs ${outcome.baselineHospitalInterrupted}).`
+        : sim.getRainfallCounterfactualGap());
       setObsText('');
       return;
     }
@@ -278,6 +288,7 @@ export function GenesisScientificCityScreen() {
               <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
               <div><span>geometries</span><b>{Math.round(stats.webgl_geometries ?? 0)}</b></div>
               <div><span>textures</span><b>{Math.round(stats.webgl_textures ?? 0)}</b></div>
+              <div><span>tex. mem (est.)</span><b>{(Number(stats.webgl_texture_bytes_estimate ?? 0) / (1024 * 1024)).toFixed(1)} MB</b></div>
               <div><span>render</span><b>{Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</b></div>
             </div>
 

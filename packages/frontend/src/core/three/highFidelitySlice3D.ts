@@ -217,7 +217,7 @@ export class HighFidelityStreetSlice3D implements Sim3D {
   // scratch — see epidemicCity3D.ts's own `scratchOrbitDirection`, the same fix applied here.
   private scratchOrbitDirection: THREE_NS.Vector3 | null = null;
   private lastTickMs = 0;
-  private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
+  private metrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0, textureBytesEstimate: 0 };
   private readonly clickDragTracker = new ClickDragTracker();
   /** Opcjonalna scenografia legendy; nie zawiera World State ani solvera. */
   private readonly philadelphiaLegendMode: PhiladelphiaLegendViewMode | null;

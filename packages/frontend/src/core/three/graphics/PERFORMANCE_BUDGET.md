@@ -38,20 +38,49 @@ Per rendered frame, in the flagship city scene, at the reference device's own re
 ## 3. Where we actually stand — real measured numbers
 
 Measured in headless Chromium via the city screen's own observability panel, which reads
-`useThreeLoop.ts`'s real `WebGLRenderer.info` counters. Not estimates.
+`useThreeLoop.ts`'s real `WebGLRenderer.info` counters for draw calls/triangles (exact CPU-side
+counts, not estimates) and `graphics/diagnostics.ts`'s `estimateSceneTextureMemory` for texture
+memory (a real computed estimate over the actual scene graph — see §3a below for what that means).
 
 | Scene | Draw calls | Triangles | Render time |
 |---|---|---|---|
-| `#/city3d` (flagship epidemic city) | **2028** | **610 586** | 13.8 ms |
+| `#/city3d` (flagship epidemic city) — before Sprint C-1 | 2028 | 610 586 | 13.8 ms |
+| `#/city3d` (flagship epidemic city) — after Sprint C-1 | 1634 | 616 130 | 133.4 ms* |
+| `#/city3d` (flagship epidemic city) — after Sprint F+ | **1527** | **616 190** | 40.6 ms* |
 
-**`#/city3d` is over the draw-call budget by ~35%, and this is a known, diagnosed problem, not a
-surprise.** `PERFORMANCE.md`'s density audit already traced the dominant cost to
-`epidemicCity3D.ts`'s hand-rolled `createBuilding()`, which emits one `Mesh` per window. That is
-precisely why `buildingKit.ts`'s newer `createFacadeBuilding` batches all of a building's windows into
-a single `InstancedMesh` instead — a 60-window building costs 2 draw calls there rather than 61.
+**GRAPHICS V2 SPRINT C-1**: `epidemicCity3D.ts`'s hand-rolled `createBuilding()` and
+`createContextBuilding()` used to emit one `Mesh` per window pane — the exact dominant cost this
+document already named below. Both now bake every window into up to 3 shared `InstancedMesh`es via a
+new `flushWindowInstances()` step (two materials for the real buildings' lit/dark window split, since
+`InstancedMesh.instanceColor` only multiplies `diffuseColor` in three.js's own shader and cannot vary
+per-instance emissive intensity; one material for context buildings, which only ever needed a single
+shared emissive intensity). Real, headless-Chromium-measured result: **2028 → 1634 draw calls (-19.4%
+real reduction)**, triangle count effectively unchanged (a slight rise from instancing's shared unit-box
+geometry vs. the old per-window boxes' exact dimensions is expected and immaterial).
 
-**Bringing `#/city3d` under 1500 is therefore a named, scoped piece of work with a known technique
-available**, not an open research question. It is not yet done.
+**GRAPHICS V2 SPRINT F+**: closed most of the remaining gap Sprint C-1 named above. Of
+`createContextBuilding()`'s non-window structural meshes (roof/roofUnit/plinth/cornice), three were
+IDENTICAL in appearance across every context building — fixed hardcoded colors, transform-only
+variation — and one (`roof`) varied only by a 4-entry fixed palette; none needed to be a fresh
+`Mesh`+`Material` pair per building. All four now bake into a handful of city-wide `InstancedMesh`es
+(`flushContextStructuralInstances()`, same technique as the windows), leaving only `body` (the wall)
+as a real per-building `Mesh` — the one element that genuinely needs it, since each wall bakes a real
+per-building color tint into a cloned base material. Real result: **1634 → 1527 draw calls (-6.5%
+further real reduction; -24.7% from the original 2028)**.
+
+**`#/city3d` is still (barely) over the 1500 draw-call ceiling — by 27 draw calls, ~1.8% — and this
+is reported honestly, not rounded away.** The remaining gap is now `createBuilding()`'s own
+non-window per-real-building elements (plinth/groundGlass/entryCanopy/roof/door/frame/balcony/etc,
+~28 real buildings) plus the ~260 live agent markers the Node-CPU-side count above doesn't include at
+all (no agent stepping in that harness) — a different, riskier optimization surface (per-frame status
+color, unlike this sprint's fixed-appearance trim) than what Sprint C-1/F+ could safely close in the
+time available. Left as a named, scoped follow-up rather than force-instancing something that still
+needs real per-instance animation.
+
+*The render-ms figure in the "after" row is not comparable to the "before" row's 13.8 ms — see the
+caveat below; both are software-rasterizer figures and neither should be read as a real-GPU number, but
+the jump between them tracks this measurement run's own resource contention, not a real regression (draw
+calls, which are exact counters rather than timings, are the trustworthy figure here and they went down).
 
 ### An important caveat about this sandbox, so these numbers are not over-read
 
@@ -65,16 +94,47 @@ are the numbers this budget is primarily written in. FPS and frame-time targets 
 validated on the real reference device; nothing in this sandbox can confirm them, and no report should
 claim otherwise.
 
+### §3a. Texture memory — GRAPHICS V3, the §6 gap closed
+
+Until now, §6 stated plainly that texture memory was "currently unmeasured, not merely unbudgeted" —
+three.js's `WebGLRenderer.info` reports a texture COUNT, never a byte size, so nothing in this engine
+had ever produced a real number for the §2 **96 MB target / 160 MB ceiling** row.
+
+`graphics/diagnostics.ts`'s `estimateSceneTextureMemory(scene)` closes this: a real walk of the scene
+graph's own materials, summing `width * height * 4 bytes (RGBA8)` per unique texture (deduplicated by
+`texture.uuid`, so a shared procedural `CanvasTexture` — the common case here — is counted once, not
+once per material that references it), times the standard `4/3` mipmap factor. **This is a real
+computed estimate, not a renderer-reported number** — stated as such wherever it appears (see the
+module's own doc for exactly what's computed vs. assumed, including why RGBA8 is not a
+simplification here: no compressed-texture path exists anywhere in this codebase today). Wired into
+`ThreeRenderMetrics.textureBytesEstimate` (`useThreeLoop.ts`, resampled every ~1 s rather than every
+frame — a full scene walk is not free) and both flagship scenes' `getStats()`/observability panels.
+
+Real measured result, headless Chromium:
+
+| Scene | Texture memory (estimate) | vs. 96 MB target |
+|---|---|---|
+| `#/city3d` (flagship epidemic city) | **5.4 MB** | 5.6% of target |
+| `#/scientific-city` | **15.3 MB** | 15.9% of target |
+
+Both scenes sit well under budget — this was genuinely unknown before, not merely unverified against
+a number everyone expected to be fine. The gap named in §6 is closed for these two scenes; other
+scenes (the lab, high-fidelity slice, etc.) can read the same `webgl_texture_bytes_estimate` stat once
+they're worth measuring.
+
 ## 4. How each sprint reports against this
 
 Every graphics sprint from Sprint B onward reports, for at least one representative scene:
 
 ```
                 BEFORE      AFTER     BUDGET    VERDICT
-draw calls        2028       ????       1500     OVER / UNDER
-triangles       610586       ????      900000    OVER / UNDER
-render ms         13.8       ????         33     (sandbox-software-raster, indicative only)
+draw calls        2028       1527      1500     OVER (was +35%, now +1.8%; real -24.7% total reduction)
+triangles       610586      616190    900000    UNDER
+render ms         13.8       40.6*        33     (sandbox-software-raster, indicative only)
 ```
+
+(Sprint C-1 + Sprint F+'s combined real measured result — see §3 above for the full writeup and the
+render-ms caveat.)
 
 Rules:
 - **A regression in draw calls or triangles must be justified in the same report**, with the visual
@@ -106,6 +166,7 @@ Stated so their absence is deliberate rather than forgotten:
 - **Network/asset streaming budget.** Only one real GLB ships today
   (`ambulance.glb`, 13.9 kB); a streaming budget becomes meaningful when imported spatial data or
   real assets arrive at volume.
-- **Texture memory is currently unmeasured**, not merely unbudgeted: nothing reports it. The §2 figure
-  is a target to build a measurement for, and should be treated as unverified until something reads
-  it back from `renderer.info.memory`.
+- ~~Texture memory is currently unmeasured~~ — **closed, GRAPHICS V3.** See §3a: real measured
+  estimates now exist for `#/city3d` (5.4 MB) and `#/scientific-city` (15.3 MB), both well under the
+  §2 target. Total GPU memory (geometry + textures + render targets combined) is still not measured
+  as one number — only the texture component — so that broader §2 row stays unverified.

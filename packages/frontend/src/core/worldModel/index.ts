@@ -33,6 +33,7 @@ export * from './domains/rainfallRunoff';
 export * from './domains/seismicShaking';
 export * from './domains/floodInundation';
 export * from './domains/seismicFragility';
+export * from './domains/cellCycle';
 export * from './capability/solverCapability';
 export * from './domains/genesisScientificCity3';
 export * from './domains/genesisScientificCity4';

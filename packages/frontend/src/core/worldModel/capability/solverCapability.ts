@@ -1,4 +1,5 @@
 import type { ScenarioKind } from '../../lookingGlass/scenarioRequest';
+import { CELL_CYCLE_SOLVER_ID } from '../domains/cellCycle';
 import { CHEMISTRY_KINETICS_SOLVER_ID } from '../domains/chemistryKinetics';
 import { ELECTRICAL_GENERATOR_SOLVER_ID } from '../domains/electricalGenerator';
 import { EPIDEMIC_SEIR_SOLVER_ID } from '../domains/epidemicSEIR';
@@ -115,7 +116,8 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   },
   CELL_CULTURE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
-    caveat: 'Exact closed-form logistic growth gives an unstructured population count only. No age structure, cell cycle, division mechanism, stochasticity, or any measured cell line.',
+    solverId: CELL_CYCLE_SOLVER_ID,
+    caveat: 'A real compartmental cell-cycle model (G1/S/G2M, RK4), where growth comes from mitosis turning one cell into two and saturation comes from contact inhibition at the G1/S restriction point — so a confluent culture arrests in G1, as observed. Phase durations are representative mammalian values, not a measured line. Still NOT modelled: chronological age structure (that is a PDE, and cycle-phase structure is not the same thing), phase-duration variability (each compartment implies exponential residence times, so the population doubles somewhat faster than the nominal cycle), gene expression, differentiation, spatial structure, and stochasticity.',
   },
   LAB_EXPERIMENT: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,

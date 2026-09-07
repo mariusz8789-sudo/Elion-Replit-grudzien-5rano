@@ -18,6 +18,7 @@ import { makeQuantumTunnelingSolver, QUANTUM_TUNNELING_SOLVER_ID } from '../core
 import { makeRainfallRunoffSolver, RAINFALL_RUNOFF_SOLVER_ID } from '../core/worldModel/domains/rainfallRunoff';
 import { makeSeismicSourceSolver, SEISMIC_SOURCE_SOLVER_ID } from '../core/worldModel/domains/seismicShaking';
 import { buildSyntheticTerrain, FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver } from '../core/worldModel/domains/floodInundation';
+import { CELL_CYCLE_SOLVER_ID, makeCellCycleSolver } from '../core/worldModel/domains/cellCycle';
 import { makeMolecularStructureSolver, MOLECULAR_STRUCTURE_SOLVER_ID } from '../core/worldModel/domains/molecularStructure';
 
 /**
@@ -81,6 +82,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     router.register(RAINFALL_RUNOFF_SOLVER_ID, makeRainfallRunoffSolver());
     router.register(SEISMIC_SOURCE_SOLVER_ID, makeSeismicSourceSolver());
     router.register(FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver(buildSyntheticTerrain()));
+    router.register(CELL_CYCLE_SOLVER_ID, makeCellCycleSolver());
     router.register(MOLECULAR_STRUCTURE_SOLVER_ID, makeMolecularStructureSolver());
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {

@@ -26,6 +26,7 @@ import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createSceneEnvironment, type SceneEnvironmentHandle } from './graphics/sceneEnvironment';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { setupGraphicsPipeline, configureDOF, type GraphicsPipeline } from './graphics/postProcessing';
+import { captureDryLook, applyWetLook, type DryMaterialLook } from './graphics/water';
 import { configureCinematicCamera, recommendedDofForProfile, FocusPuller, type CinematicCameraProfile } from './graphics/cinematicCamera';
 
 /**
@@ -123,15 +124,12 @@ export interface ReplayWindow {
 }
 
 /** A road/pavement material this scene can flip between its normal ("dry") PBR look and a wetter
- * one (lower roughness reads as more specular/reflective under the same real lighting — a real PBR
- * technique, not a shader trick standing in for state) once `RAINFALL_EVENT_TYPE` has actually
- * fired. Base values are captured at creation so the toggle is reversible and idempotent. */
+ * one once `RAINFALL_EVENT_TYPE` has actually fired — via `graphics/water.ts`'s own
+ * `captureDryLook`/`applyWetLook` (a real PBR roughness/color response, not a shader trick standing
+ * in for state), reused here rather than re-implemented; see `applyRainfallVisualState`'s own doc. */
 interface WetSurfaceMaterial {
   material: THREE_NS.MeshStandardMaterial;
-  dryRoughness: number;
-  dryColor: THREE_NS.Color;
-  wetRoughness: number;
-  wetColor: THREE_NS.Color;
+  dry: DryMaterialLook;
 }
 
 function groundingToC2(level: WorldModelEntity['grounding']): EntityGrounding {
@@ -717,13 +715,7 @@ export class GenesisScientificCitySim implements Sim3D {
     // instances this method is the sole author of.
     this.wetSurfaceMaterials = ([asphalt, paving, kerb] as THREE_NS.Material[]).map((material) => {
       const standard = material as THREE_NS.MeshStandardMaterial;
-      return {
-        material: standard,
-        dryRoughness: standard.roughness,
-        dryColor: standard.color.clone(),
-        wetRoughness: Math.min(standard.roughness, 0.18),
-        wetColor: standard.color.clone().multiplyScalar(0.6),
-      };
+      return { material: standard, dry: captureDryLook(standard) };
     });
 
     // Keep-out zones: the real entities' own positions, so context never buries the science.
@@ -1075,9 +1067,11 @@ export class GenesisScientificCitySim implements Sim3D {
   /**
    * GRAPHICS V2 SPRINT C-2 — renders the REAL `RAINFALL_EVENT_TYPE` scenario, once it has actually
    * fired (`isRainfallScenarioActive()`, backed by `this.rainfallOutcome`), as a visible atmosphere
-   * change: denser fog and wetter-looking road/pavement surfaces (lower `roughness` reads as more
-   * specular under the same real lighting — a real PBR response, not a fabricated shader standing
-   * in for state).
+   * change: denser fog and wetter-looking road/pavement surfaces via `graphics/water.ts`'s own
+   * `captureDryLook`/`applyWetLook` (SPRINT F+: reused, not re-implemented — an earlier version of
+   * this method hand-rolled the same roughness/color response before this file's own audit found
+   * `water.ts` already had it) — lower `roughness` reads as more specular under the same real
+   * lighting, a real PBR response, not a fabricated shader standing in for state.
    *
    * HONEST SCOPE, stated up front: this is a RENDERING reaction to a real, already-fired C3 event —
    * it adds no weather solver, no precipitation model, and no new simulated quantity. Genesis has no
@@ -1100,8 +1094,7 @@ export class GenesisScientificCitySim implements Sim3D {
       (scene.fog as THREE_NS.FogExp2).density = active ? this.rainFogDensity : this.dryFogDensity;
     }
     for (const surface of this.wetSurfaceMaterials) {
-      surface.material.roughness = active ? surface.wetRoughness : surface.dryRoughness;
-      surface.material.color.copy(active ? surface.wetColor : surface.dryColor);
+      applyWetLook(this.THREE!, surface.material, surface.dry, active ? 1 : 0);
     }
   }
 

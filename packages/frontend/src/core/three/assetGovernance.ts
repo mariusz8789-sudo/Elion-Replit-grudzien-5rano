@@ -138,6 +138,21 @@ export const WORLD_ENGINE_ASSET_MANIFEST: readonly WorldAssetRecord[] = Object.f
     },
   },
   {
+    id: 'genesis-procedural-ambulance',
+    runtimePath: '/assets/genesis-procedural/ambulance/ambulance.glb',
+    format: 'GLB',
+    status: 'APPROVED',
+    sourceName: 'Genesis Graphics Engine — procedurally generated in-repo',
+    sourceUrl: 'packages/frontend/scripts/exportAmbulanceAsset.mjs',
+    license: 'CC0-1.0',
+    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+    author: 'Genesis Graphics Engine (procedural export, no external source)',
+    polygonCount: 9 * 12, // 9 simple box/cylinder meshes; see the exporter script's own geometry
+    textureResolution: null, // flat MeshStandardMaterial colors only, no texture maps
+    rationale: 'Original geometry authored in this repo (graphics/vehicleKit.ts\'s ambulance, reproduced by the exporter script), built and dedicated CC0 by the author — not a third-party asset, so the usual external-source review does not apply; provenance is the generating script itself, verifiable by re-running it and comparing the SHA-256 below.',
+    sha256: { 'ambulance.glb': '2f3054bcf6fd9e1be91b9745327ccaf1dc862d2eb5ed9a30aa94709fa1f8eda5' },
+  },
+  {
     id: 'unverified-modular-fire-escape',
     runtimePath: '/assets/genesis-hf-v2/models/modular_fire_escape/modular_fire_escape.gltf',
     format: 'glTF',

@@ -29,6 +29,7 @@ import { createTreeField, createGroundClutter } from './graphics/vegetation';
 import { createPipeNetwork } from './graphics/waterInfrastructure';
 import { createPostSign, createHangingSign } from './graphics/signageKit';
 import { createElectricalCabinet, createCondenserUnit } from './graphics/electricalKit';
+import { createAssetSlot, type AssetSlotHandle } from './graphics/assetPipeline';
 import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
 import type { WorldFrame } from './graphics/worldFrame';
 import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
@@ -863,6 +864,37 @@ export class EpidemicCity3DSim implements Sim3D {
     }
   }
 
+  /**
+   * GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 3.0: asset-pipeline swap proof
+   * (`graphics/assetPipeline.ts`'s `createAssetSlot`), end to end with a real governed asset — not
+   * just the seam in isolation. `/assets/genesis-procedural/ambulance/ambulance.glb` is a REAL,
+   * valid binary glTF (see `scripts/exportAmbulanceAsset.mjs` and its `assetGovernance.ts` manifest
+   * entry for full provenance): if it loads, `slot.replace()` swaps it in at the procedural
+   * fallback's exact transform and disposes the fallback; if it fails to load (network, asset
+   * missing), the procedural `createVehicle` fallback this method was given simply stays exactly as
+   * it already was — never a gap, never a crash.
+   */
+  private async loadAmbulanceAsset(slot: AssetSlotHandle): Promise<void> {
+    const path = '/assets/genesis-procedural/ambulance/ambulance.glb';
+    if (!this.THREE || !isWorldAssetApproved(path)) return;
+    try {
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      const gltf = await new GLTFLoader().loadAsync(path);
+      // The slot may have been disposed (scene torn down) while this async load was in flight —
+      // `AssetSlotHandle.dispose()` detaches `.current` from its parent, so a null parent here means
+      // there is no live scene left to swap into.
+      if (!slot.current.parent) return;
+      const real = gltf.scene;
+      real.traverse((node) => {
+        const mesh = node as THREE_NS.Mesh;
+        if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+      });
+      slot.replace(real);
+    } catch {
+      // Procedural fallback stays in place — no asset, no crash, no silent gap.
+    }
+  }
+
   private attachApprovedFacades(): void {
     if (!this.THREE || !this.approvedFacadeTemplate || !this.scene) return;
     const THREE = this.THREE;
@@ -1525,7 +1557,14 @@ export class EpidemicCity3DSim implements Sim3D {
         state: 'PARKED',
         seed: 3,
       });
-      extras.add(ambulance.group);
+      // GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 3.0: asset-pipeline swap proof
+      // (graphics/assetPipeline.ts's createAssetSlot). The procedural ambulance renders
+      // immediately; if the real, governed GLB asset loads, it swaps in at the exact same
+      // transform, and the procedural fallback is disposed — never both at once, never a gap
+      // where nothing is shown.
+      const ambulanceSlot = createAssetSlot(ambulance.group);
+      extras.add(ambulanceSlot.current);
+      void this.loadAmbulanceAsset(ambulanceSlot);
       // Small service/utility building behind the hospital (opposite the entrance facade) — the
       // "service access" the mission's hospital composition asks for, using the new industrial
       // building kit rather than hand-inlined geometry.

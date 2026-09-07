@@ -75,16 +75,26 @@ describe('EpidemicCity3DSim — Visual World Build 1.0-3.0 performance audit', (
       `total draw-call-equivalents: ${totalDrawCallEquivalent} (${total.mesh} Mesh + ${total.instanced} InstancedMesh) | ` +
       `Visual World Build 1.0-3.0 extras share: ${extrasDrawCallEquivalent} (${((extrasDrawCallEquivalent / totalDrawCallEquivalent) * 100).toFixed(1)}%)`);
 
-    // Real regression guards, not decorative — thresholds set from the actual measured baseline
-    // (~2030 real WebGL draw calls observed live in Chromium for this same default-params scene,
-    // ~85 of which come from this session's own Visual World Build 1.0-3.0 additions) plus real
-    // headroom for legitimate future growth, not padded to always pass.
+    // Real regression guards, not decorative — thresholds set from the actual measured baseline.
+    //
+    // GRAPHICS V2 SPRINT C-1 UPDATE: `createBuilding()`/`createContextBuilding()` used to emit one
+    // individual `Mesh` per window pane — PERFORMANCE.md's own density audit had already identified
+    // this as the scene's single largest draw-call cost (real Chromium measurement: ~2030 draw calls
+    // for this same default-params scene). Both now bake their windows into 3 InstancedMeshes
+    // (`flushWindowInstances()`) instead. That is a REAL fix, not a tuning tweak, and it moved both
+    // numbers below: total draw-call-equivalents dropped from ~1293 to ~865 (Node CPU-side count).
+    //
+    // The extras' OWN share of the total rose as a side effect (from ~12.6% to ~18.8%) purely because
+    // the DENOMINATOR shrank — this session's kit additions (buildings/street/vehicle/water/signage/
+    // electrical) are still the exact same ~163 objects as before, not a growing cost. The threshold
+    // below is recalibrated to that real new baseline, not loosened to hide a regression: it still
+    // fails if extras' absolute contribution grows disproportionately to the (now smaller) total.
     expect(initMs).toBeLessThan(500); // scene construction should stay well under half a second
-    expect(totalDrawCallEquivalent).toBeLessThan(2600);
+    expect(totalDrawCallEquivalent).toBeLessThan(1200);
     // The new kits (buildings/street/vehicle/water/signage/electrical extras) must stay a MINORITY
     // contributor to the scene's total draw-call budget — most of the cost is (and should remain)
     // the pre-existing hand-tuned city/building/street renderer, not this session's additive layer.
-    expect(extrasDrawCallEquivalent / totalDrawCallEquivalent).toBeLessThan(0.15);
+    expect(extrasDrawCallEquivalent / totalDrawCallEquivalent).toBeLessThan(0.25);
   });
 
   it('the tree/ground-clutter vegetation additions stay instanced (2 draw calls per field, not one Mesh per tree)', () => {
@@ -97,5 +107,46 @@ describe('EpidemicCity3DSim — Visual World Build 1.0-3.0 performance audit', (
     let instancedInField = 0;
     treeFields!.traverse((n) => { if ((n as THREE.InstancedMesh).isInstancedMesh) instancedInField++; });
     expect(instancedInField).toBe(2);
+  });
+
+  it('GRAPHICS V2 SPRINT C-1 REGRESSION: every building/context window pane is instanced, never one Mesh per window', () => {
+    const { scene } = buildScene();
+    const windowGroup = scene.getObjectByName('genesis-city-window-instances');
+    expect(windowGroup).toBeDefined();
+
+    // Exactly the 3 InstancedMeshes flushWindowInstances() can produce (real-building lit/dark,
+    // context) — never more, and never a plain Mesh sitting alongside them.
+    let instanced = 0;
+    let plainMesh = 0;
+    windowGroup!.traverse((n) => {
+      if ((n as THREE.InstancedMesh).isInstancedMesh) instanced++;
+      else if ((n as THREE.Mesh).isMesh) plainMesh++;
+    });
+    expect(instanced).toBeGreaterThan(0);
+    expect(instanced).toBeLessThanOrEqual(3);
+    expect(plainMesh).toBe(0);
+
+    // A real city at default density has hundreds of window panes — confirms these are genuinely
+    // batching many windows, not just wrapping a handful in an InstancedMesh for show.
+    let totalWindowInstances = 0;
+    windowGroup!.traverse((n) => {
+      const instanced = n as THREE.InstancedMesh;
+      if (instanced.isInstancedMesh) totalWindowInstances += instanced.count;
+    });
+    expect(totalWindowInstances).toBeGreaterThan(200);
+
+    // No building's own Group carries an individual window Mesh anymore.
+    let strayWindowMeshes = 0;
+    scene.traverse((node) => {
+      if (node === windowGroup || windowGroup!.children.includes(node as THREE.Object3D)) return;
+      const mesh = node as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const geometry = mesh.geometry as THREE.BoxGeometry;
+      const p = geometry.parameters;
+      // The real building windows' distinctive footprint: ~0.115 tall, ~0.024 deep — nothing else in
+      // this scene builds a box at that exact aspect ratio.
+      if (p && Math.abs(p.height - 0.115) < 1e-6 && Math.abs(p.depth - 0.024) < 1e-6) strayWindowMeshes++;
+    });
+    expect(strayWindowMeshes).toBe(0);
   });
 });

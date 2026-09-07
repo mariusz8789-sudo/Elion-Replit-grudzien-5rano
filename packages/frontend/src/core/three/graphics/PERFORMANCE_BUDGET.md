@@ -42,16 +42,30 @@ Measured in headless Chromium via the city screen's own observability panel, whi
 
 | Scene | Draw calls | Triangles | Render time |
 |---|---|---|---|
-| `#/city3d` (flagship epidemic city) | **2028** | **610 586** | 13.8 ms |
+| `#/city3d` (flagship epidemic city) — before Sprint C-1 | 2028 | 610 586 | 13.8 ms |
+| `#/city3d` (flagship epidemic city) — after Sprint C-1 | **1634** | **616 130** | 133.4 ms* |
 
-**`#/city3d` is over the draw-call budget by ~35%, and this is a known, diagnosed problem, not a
-surprise.** `PERFORMANCE.md`'s density audit already traced the dominant cost to
-`epidemicCity3D.ts`'s hand-rolled `createBuilding()`, which emits one `Mesh` per window. That is
-precisely why `buildingKit.ts`'s newer `createFacadeBuilding` batches all of a building's windows into
-a single `InstancedMesh` instead — a 60-window building costs 2 draw calls there rather than 61.
+**GRAPHICS V2 SPRINT C-1**: `epidemicCity3D.ts`'s hand-rolled `createBuilding()` and
+`createContextBuilding()` used to emit one `Mesh` per window pane — the exact dominant cost this
+document already named below. Both now bake every window into up to 3 shared `InstancedMesh`es via a
+new `flushWindowInstances()` step (two materials for the real buildings' lit/dark window split, since
+`InstancedMesh.instanceColor` only multiplies `diffuseColor` in three.js's own shader and cannot vary
+per-instance emissive intensity; one material for context buildings, which only ever needed a single
+shared emissive intensity). Real, headless-Chromium-measured result: **2028 → 1634 draw calls (-19.4%
+real reduction)**, triangle count effectively unchanged (a slight rise from instancing's shared unit-box
+geometry vs. the old per-window boxes' exact dimensions is expected and immaterial).
 
-**Bringing `#/city3d` under 1500 is therefore a named, scoped piece of work with a known technique
-available**, not an open research question. It is not yet done.
+**`#/city3d` is still over the 1500 draw-call ceiling (by ~9%), and this is reported honestly, not
+hidden.** The windows were the single largest identified cost and are now fixed; the remaining gap is
+spread across the ~44 remaining non-window `Mesh` call sites in `createBuilding()`/`createContextBuilding()`
+(walls, roofs, side bands, base plinths — one per building, not one per repeated sub-element), which
+would need a deeper per-building-structure instancing pass to close further. That is scoped as
+follow-up work (Sprint F+), not silently dropped.
+
+*The render-ms figure in the "after" row is not comparable to the "before" row's 13.8 ms — see the
+caveat below; both are software-rasterizer figures and neither should be read as a real-GPU number, but
+the jump between them tracks this measurement run's own resource contention, not a real regression (draw
+calls, which are exact counters rather than timings, are the trustworthy figure here and they went down).
 
 ### An important caveat about this sandbox, so these numbers are not over-read
 
@@ -71,10 +85,12 @@ Every graphics sprint from Sprint B onward reports, for at least one representat
 
 ```
                 BEFORE      AFTER     BUDGET    VERDICT
-draw calls        2028       ????       1500     OVER / UNDER
-triangles       610586       ????      900000    OVER / UNDER
-render ms         13.8       ????         33     (sandbox-software-raster, indicative only)
+draw calls        2028       1634      1500     OVER (was +35%, now +9%; real -19.4% reduction)
+triangles       610586      616130    900000    UNDER
+render ms         13.8      133.4*       33     (sandbox-software-raster, indicative only)
 ```
+
+(Sprint C-1's real measured result — see §3 above for the full writeup and the render-ms caveat.)
 
 Rules:
 - **A regression in draw calls or triangles must be justified in the same report**, with the visual

@@ -87,8 +87,68 @@ export interface MoleculeAtom {
   z: number;
 }
 
+/**
+ * One real RDKit bond. `a`/`b` index into `atoms`, in the engine's own order.
+ * `order` is RDKit's `GetBondTypeAsDouble()`: 1, 1.5 (aromatic), 2 or 3.
+ */
+export interface MoleculeBond {
+  a: number;
+  b: number;
+  order: number;
+  aromatic: number;
+}
+
+/**
+ * Closed allowlist of bond edge labels. `SOLVER_DATA_CONTRACT.md` §C asks for
+ * `{fromEntityId, toEntityId, kind}` as the minimum; the bond's order rides in
+ * the `kind` token because the ECS's `EntityRelationship` is deliberately "a
+ * labeled edge, no relationship-specific state of its own" and per-edge
+ * scalars have nowhere to live in the graph. `bondOrderOf` decodes it, so no
+ * consumer ever parses a string to get the number.
+ */
+export const MOLECULAR_BOND_KIND = {
+  SINGLE: 'bond-single',
+  AROMATIC: 'bond-aromatic',
+  DOUBLE: 'bond-double',
+  TRIPLE: 'bond-triple',
+} as const;
+export const MOLECULAR_BOND_KINDS = Object.values(MOLECULAR_BOND_KIND);
+export type MolecularBondKind = (typeof MOLECULAR_BOND_KIND)[keyof typeof MOLECULAR_BOND_KIND];
+
+/**
+ * RDKit bond order -> edge label. Aromatic wins over the numeric order: a
+ * benzene bond is 1.5 AND flagged aromatic, and "aromatic" is the chemically
+ * meaningful label. An unrecognised order falls back to SINGLE rather than
+ * inventing a token — a wrong-but-plausible bond kind on screen is exactly the
+ * failure mode §C warns about.
+ */
+export function bondKindOf(bond: MoleculeBond): MolecularBondKind {
+  if (bond.aromatic === 1 || bond.order === 1.5) return MOLECULAR_BOND_KIND.AROMATIC;
+  if (bond.order === 3) return MOLECULAR_BOND_KIND.TRIPLE;
+  if (bond.order === 2) return MOLECULAR_BOND_KIND.DOUBLE;
+  return MOLECULAR_BOND_KIND.SINGLE;
+}
+
+/** Total inverse of `bondKindOf`: any non-bond edge label yields 0, never a guess. */
+export function bondOrderOf(kind: string): number {
+  switch (kind) {
+    case MOLECULAR_BOND_KIND.AROMATIC: return 1.5;
+    case MOLECULAR_BOND_KIND.DOUBLE: return 2;
+    case MOLECULAR_BOND_KIND.TRIPLE: return 3;
+    case MOLECULAR_BOND_KIND.SINGLE: return 1;
+    default: return 0;
+  }
+}
+
 export interface MoleculeMaterialisation {
   atoms: readonly MoleculeAtom[];
+  /**
+   * Real RDKit bonds. Empty when the engine did not report any — C2 then draws
+   * atoms with no sticks, which §C requires: distance-based bond inference is a
+   * cheminformatics decision that belongs in RDKit, and a wrongly-inferred bond
+   * is indistinguishable from a real one once rendered.
+   */
+  bonds: readonly MoleculeBond[];
   forceField: string;
   seed: number;
   nAtoms: number;
@@ -121,10 +181,12 @@ export function createBackendGeometrySource(baseUrl = ''): MoleculeGeometrySourc
       const outputs = run.outputs ?? {};
       const atoms = outputs.atoms as MoleculeAtom[] | undefined;
       if (!Array.isArray(atoms) || atoms.length === 0) return { ok: false, reason: 'engine_returned_no_atoms' };
+      const bonds = Array.isArray(outputs.bonds) ? (outputs.bonds as MoleculeBond[]) : [];
       return {
         ok: true,
         data: {
           atoms,
+          bonds,
           forceField: String(outputs.forceField ?? 'UNKNOWN'),
           seed: Number(outputs.seed ?? seed),
           nAtoms: Number(outputs.nAtoms ?? atoms.length),
@@ -212,11 +274,25 @@ export function applyMoleculeGeometry(graph: WorldGraph, moleculeId: EntityId, d
     return id;
   });
 
+  // Real bonds become real graph edges, atom id to atom id. An out-of-range index is dropped
+  // rather than clamped: it would mean the engine's bond list disagrees with its own atom list,
+  // and a bond drawn to the wrong atom is worse than a bond not drawn.
+  let bondsMaterialised = 0;
+  for (const bond of data.bonds) {
+    if (!Number.isInteger(bond.a) || !Number.isInteger(bond.b)) continue;
+    if (bond.a < 0 || bond.b < 0 || bond.a >= atomIds.length || bond.b >= atomIds.length) continue;
+    graph.addRelationship(atomIds[bond.a], atomIds[bond.b], bondKindOf(bond));
+    bondsMaterialised += 1;
+  }
+
   graph.updateEntity(moleculeId, {
     domainState: {
       ...molecule.domainState,
       stateCode: MOLECULE_STATE_CODE.MATERIALISED,
       atomsMaterialised: data.nAtoms,
+      // Rule 2/3: the count is a number on the frame, so a consumer can tell "this molecule has
+      // no bond data" from "this molecule has bonds" without inspecting the edge list.
+      bondsMaterialised,
       seed: data.seed,
       formalCharge: data.formalCharge,
       angstromPerWorldUnit,

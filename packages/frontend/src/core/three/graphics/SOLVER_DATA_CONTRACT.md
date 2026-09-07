@@ -333,7 +333,30 @@ no real backend — RDKit, PySCF, Biopython, or OpenMM — returns per-atom coor
 today, even though OpenMM genuinely computes them server-side. Everything in this section is ready and
 waiting; nothing can use it until coordinates cross the API boundary.
 
-### §C. Bonds and edges — **a real gap: no channel exists today**
+### §C. Bonds and edges — **CLOSED (Phase 8.1). The channel now exists.**
+
+> **Status update.** Everything below described a real gap; it has since been closed and is kept
+> for the reasoning, not as a current limitation. `WorldFrameState` now carries
+> `relationships: readonly WorldFrameRelationship[]` — `{ fromEntityId, toEntityId, kind }`, entity
+> ids exactly as the MINIMUM below requires — and `graphicsWorldFrameAdapter.ts` forwards it to
+> C2's `WorldFrame.relationships` as `{ from, to, kind }`. Only edges whose **both** endpoints are
+> in the same frame are forwarded; containment is deliberately NOT duplicated there, since it
+> already travels as `parentId`.
+>
+> For chemistry the edges are **real RDKit bonds** (`mol.GetBonds()`, now returned by
+> `chem-rdkit-embed3d` and materialised into the graph by `domains/molecularStructure.ts`), never
+> inferred from interatomic distance — the prohibition below still stands and is now enforced by
+> having the real data instead. Bond order rides in `kind` as a closed allowlist
+> (`bond-single` / `bond-aromatic` / `bond-double` / `bond-triple`) with a total decoder
+> `bondOrderOf(kind): number`, because `EntityRelationship` in the ECS is deliberately stateless and
+> a per-edge scalar has no home in the graph — the OPTIONAL numeric field below is satisfied by that
+> decoder rather than by a frame field the world model could not honestly fill.
+>
+> **Still true:** C2's `resolveVisual` still only ever sees one entity, so connector geometry is
+> still built by the scene once both endpoints are known. The frame now tells the scene *which*
+> pairs; it does not draw anything.
+
+**Original text, for the reasoning:**
 
 **C3 already models edges**: `WorldGraph.addRelationship(from, to, kind)` →
 `EntityRelationship { from, to, kind }`, with a `RelationshipCategory` taxonomy

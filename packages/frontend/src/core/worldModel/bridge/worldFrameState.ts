@@ -50,11 +50,50 @@ export interface WorldFrameEntity {
   readonly statusLabel?: string;
 }
 
+/**
+ * One edge between two entities in this frame — the channel
+ * `graphics/SOLVER_DATA_CONTRACT.md` §C names as the MINIMUM needed before C2
+ * can draw a connector, and which did not exist until now. §C's own words:
+ * "Relationships therefore cannot reach C2 through the frame contract at all
+ * today." This closes that.
+ *
+ * Endpoints are **entity ids, never array indices**. §C is explicit about why:
+ * an index breaks the moment frame membership changes, while an id is the
+ * stable key Rule 4 already guarantees.
+ *
+ * `kind` is C3's own edge label, passed through verbatim and never
+ * interpreted here — `'feedsInto'`, `'cools'`, `'shakes'`, and for chemistry
+ * the `MOLECULAR_BOND_KIND` allowlist (`'bond-single'`, `'bond-aromatic'`, …).
+ * A closed token set, exactly like every other relationship kind in the
+ * system; `bondOrderOf` in `domains/molecularStructure.ts` maps the chemistry
+ * tokens to a number for a consumer that wants one, so nothing downstream has
+ * to parse prose.
+ *
+ * NOTE ON WHY THE ORDER IS NOT A FIELD HERE: `EntityRelationship` in the ECS
+ * is deliberately "a labeled edge, no relationship-specific state of its own"
+ * — per-edge scalars have no home in the graph, so inventing one on the frame
+ * would mean the frame carried a number the world model itself does not hold.
+ * The token plus a total decoding function is the honest minimum. §C lists the
+ * numeric order as OPTIONAL for exactly this reason.
+ */
+export interface WorldFrameRelationship {
+  readonly fromEntityId: EntityId;
+  readonly toEntityId: EntityId;
+  readonly kind: string;
+}
+
 export interface WorldFrameState {
   readonly tick: number;
   readonly simulatedTime: number;
   readonly branchId: string;
   readonly entities: readonly WorldFrameEntity[];
+  /**
+   * Non-hierarchical edges (molecular bonds, `feedsInto`, `cools`, …).
+   * Containment is NOT repeated here — that already travels as
+   * `WorldFrameEntity.parentId`, and duplicating it would give a consumer two
+   * sources of truth for the same tree.
+   */
+  readonly relationships: readonly WorldFrameRelationship[];
   /** Events recorded at exactly this tick — the timeline's "what just happened" feed. */
   readonly events: readonly GenesisEvent[];
 }
@@ -103,6 +142,18 @@ function toFrameEntity(entity: WorldModelEntity): WorldFrameEntity {
   };
 }
 
+/**
+ * Edges whose BOTH endpoints are present in this frame. A dangling edge is
+ * dropped rather than forwarded: a consumer that trusted it would look up a
+ * missing entity, and half a connector is worse than none.
+ */
+function toFrameRelationships(graph: WorldGraph): readonly WorldFrameRelationship[] {
+  return graph
+    .listRelationships()
+    .filter((r) => graph.has(r.from) && graph.has(r.to))
+    .map((r) => ({ fromEntityId: r.from, toEntityId: r.to, kind: r.kind }));
+}
+
 function graphAt(engine: TemporalEngine, timestamp?: number): WorldGraph {
   return timestamp === undefined ? engine.graph : engine.scrubTo(timestamp);
 }
@@ -118,7 +169,14 @@ export function getFrameState(engine: TemporalEngine, timestamp?: number): World
   const tick = timestamp ?? engine.tick;
   const graph = graphAt(engine, timestamp);
   const events = engine.journal.allEvents().filter((e) => e.timestamp === tick);
-  return { tick, simulatedTime: simulatedTimeAt(engine, tick), branchId: engine.branchId, entities: graph.listEntities().map(toFrameEntity), events };
+  return {
+    tick,
+    simulatedTime: simulatedTimeAt(engine, tick),
+    branchId: engine.branchId,
+    entities: graph.listEntities().map(toFrameEntity),
+    relationships: toFrameRelationships(graph),
+    events,
+  };
 }
 
 export interface WorldClock {

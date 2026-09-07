@@ -21,6 +21,8 @@ describe('graphicsWorldFrameAdapter: field mapping', () => {
         id: 'pump-pipe-system:pump-pipe-1',
         parentId: 'building:water-system-building',
         ref: { kind: 'pump-pipe-system', id: 'pump-pipe-1' },
+        label: 'Pump-Pipe System',
+        scaleLevel: 'MESO_LAB',
         transform: { position: { x: 1, y: 2, z: 3 }, rotation: { x: 0.1, y: 0.2, z: 0.3 }, scale: { x: 5, y: 5, z: 5 } },
         scalars: { headLoss: 42.5, volumetricFlow: 0.2 },
         statusLabel: 'Pump tripped (overload protection)',
@@ -30,14 +32,17 @@ describe('graphicsWorldFrameAdapter: field mapping', () => {
         id: 'planet:earth',
         parentId: undefined,
         ref: { kind: 'planet', id: 'earth' },
+        label: 'Earth',
+        scaleLevel: 'PLANET',
         transform: { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
         scalars: {},
         statusLabel: undefined,
         grounding: 'UNGROUNDED_APPROXIMATION',
       },
     ],
+    relationships: [{ fromEntityId: 'pump-pipe-system:pump-pipe-1', toEntityId: 'planet:earth', kind: 'feedsInto' }],
     events: [],
-  } as unknown as WorldFrameState;
+  };
 
   it('maps time from simulatedTime, never the raw tick', () => {
     const graphicsFrame = toGraphicsWorldFrame(fixture);

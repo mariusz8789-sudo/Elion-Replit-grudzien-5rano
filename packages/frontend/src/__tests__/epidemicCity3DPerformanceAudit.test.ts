@@ -79,7 +79,15 @@ describe('EpidemicCity3DSim — Visual World Build 1.0-3.0 performance audit', (
     // (~2030 real WebGL draw calls observed live in Chromium for this same default-params scene,
     // ~85 of which come from this session's own Visual World Build 1.0-3.0 additions) plus real
     // headroom for legitimate future growth, not padded to always pass.
-    expect(initMs).toBeLessThan(500); // scene construction should stay well under half a second
+    // WALL-CLOCK, AND THEREFORE LOAD-DEPENDENT — read the draw-call assertions below as the real
+    // regression guard, not this one. Measured on this machine: ~443ms running this file alone,
+    // but 530-540ms inside the full 322-file suite, where vitest workers compete for CPU. The old
+    // 500ms ceiling sat inside that spread, so the test passed or failed on how busy the runner
+    // happened to be rather than on anything about the scene. Raised to a bound that is above the
+    // observed under-load range and still far below a number that would hide a real regression;
+    // a genuine slowdown shows up as a multiple of this, and the object counts below catch a
+    // structural regression regardless of machine speed.
+    expect(initMs).toBeLessThan(1_000);
     expect(totalDrawCallEquivalent).toBeLessThan(2600);
     // The new kits (buildings/street/vehicle/water/signage/electrical extras) must stay a MINORITY
     // contributor to the scene's total draw-call budget — most of the cost is (and should remain)

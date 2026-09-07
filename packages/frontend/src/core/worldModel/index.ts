@@ -30,6 +30,7 @@ export * from './domains/quantumTunneling';
 export * from './domains/relativityGeodesic';
 export * from './domains/molecularStructure';
 export * from './domains/rainfallRunoff';
+export * from './domains/seismicShaking';
 export * from './domains/genesisScientificCity3';
 export * from './domains/genesisScientificCity4';
 export * from './orchestration/createScientificWorld';

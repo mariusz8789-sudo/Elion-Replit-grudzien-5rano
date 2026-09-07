@@ -207,6 +207,12 @@ const FAMILY_GAP: Readonly<Record<ScenarioFamily, string>> = {
 const KIND_UNSUPPORTED_REASON: Readonly<Partial<Record<ScenarioKind, string>>> = {
   CHEMICAL_REACTION:
     'a real model exists (RDKit molecular descriptors) but it runs only as a backend network call, and Looking Glass resolves scenarios synchronously — this specific kind cannot be routed without changing that, not because no model exists',
+  FLOOD:
+    'a real hydrological model exists — rational-method rainfall-to-runoff feeding the same real Darcy-Weisbach hydraulics as HYDRAULIC_SYSTEM (core/worldModel/domains/rainfallRunoff.ts) — but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to; this kind cannot be resolved here without one. Inundation extent, depth and a hydrograph genuinely are not modelled regardless of routing.',
+  EARTHQUAKE:
+    'a real ground-shaking model exists (core/worldModel/domains/seismicShaking.ts — a synthetic, explicitly non-calibrated attenuation, not a GMPE) but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to. Structural damage, collapse and casualties are not modelled at all regardless of routing — see EARTHQUAKE_DAMAGE_REQUIRED_DATA.',
+  BLACKOUT:
+    'a real power-grid model exists (core/worldModel/domains/electricalGenerator.ts) but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to — this is not the same gap as the plume-dispersion and general hydraulic-network gaps the rest of this family has.',
 };
 
 /**

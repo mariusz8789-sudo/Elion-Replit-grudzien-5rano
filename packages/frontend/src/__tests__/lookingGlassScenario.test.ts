@@ -103,11 +103,26 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(resolution.missing).toContain('TIME_SPAN');
   });
 
-  it('names the missing solver for a hazard it understands but cannot run', () => {
+  it('names the real solver Looking Glass still cannot route to for a hazard it understands', () => {
+    // FLOOD has a real hydrological solver (core/worldModel/domains/rainfallRunoff.ts) as of
+    // C3 Phase 5, but only inside the Genesis Scientific City world — Looking Glass's own general
+    // resolver has no binding for it yet, so NOT_MODELLED here means "not routable here", not
+    // "no model exists". The message must say so, not claim the solver is absent.
     const resolution = resolveScenarioRequest(parseScenarioRequest('Pokaż powódź w tym mieście przez 72 godziny'));
     expect(resolution.status).toBe('NOT_MODELLED');
-    expect(resolution.notModelled.join(' ')).toMatch(/hydrological/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/real hydrological model exists/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/no standalone Looking Glass binding/i);
     expect(nearestSupportedAlternative(resolution)).toMatch(/Genesis can currently run/);
+  });
+
+  it('same real-solver-not-routable honesty for earthquake and blackout, not a blanket "nothing exists" claim', () => {
+    const earthquake = resolveScenarioRequest(parseScenarioRequest('Pokaż trzęsienie ziemi w tym mieście przez 24 godziny'));
+    expect(earthquake.status).toBe('NOT_MODELLED');
+    expect(earthquake.notModelled.join(' ')).toMatch(/real ground-shaking model exists/i);
+
+    const blackout = resolveScenarioRequest(parseScenarioRequest('Pokaż blackout w tym mieście przez 24 godziny'));
+    expect(blackout.status).toBe('NOT_MODELLED');
+    expect(blackout.notModelled.join(' ')).toMatch(/real power-grid model exists/i);
   });
 
   it('refuses a century of urban change, which parses perfectly', () => {

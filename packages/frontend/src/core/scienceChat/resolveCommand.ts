@@ -363,6 +363,19 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Molecule Lab (GRAPHICS V4) — realny WorldGraph-backed viewer atomów/wiązań (real RDKit +
+  //     Phase 8.1 bond channel), NIE stary Canvas-2D `registerLab()` „laboratorium chemiczne".
+  //     Przed „otwórz zjawisko" (poniżej), bo „otwórz laboratorium" zawiera „otworz" i mogłoby
+  //     trafić w niezwiązaną fuzzy-dopasowaną receptę z katalogu generatora. ---
+  if (has(norm, 'pokaz molekule', 'pokaz czasteczke', 'otworz laboratorium', 'wejdz do laboratorium', 'molekula 3d', 'lab molekularny', 'lab molekularne', 'struktura molekularna', 'wiazania miedzy atomami', 'atomy i wiazania', 'molecule lab', 'chemical reaction lab')) {
+    return {
+      text: 'Otwieram Genesis Molecule Lab: realna geometria atomów z RDKit i realne wiązania z kanału Phase 8.1 (rząd wiązania, aromatyczność), renderowane tym samym generycznym WorldFrameRenderer co reszta silnika. To realny WorldGraph, nie animacja — kolory CPK i grubości wiązań to konwencja wizualizacji, nie zmierzone dane.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/molecule' },
+    };
+  }
+
   // --- Porównanie modeli (FAZA 1 / PRIORYTET 5) — MUSI być przed „otwórz",
   //     bo „porównaj SIR..." trafiłby w alias 'sir' i otworzył jeden model. ---
   if (has(norm, 'porownaj', 'porownanie', 'porownac', ' vs ', 'dwa modele', 'oba modele', 'model a', 'a vs b')) {

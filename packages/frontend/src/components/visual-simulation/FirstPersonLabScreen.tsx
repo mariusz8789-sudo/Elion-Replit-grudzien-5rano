@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
+import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
+import { directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
+import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
+import { resolveCameraIntent, type ObservationExecutionStatus } from '../../core/lookingGlass/observationExecution';
+import {
+  closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL,
+  type ExperienceState,
+} from '../../core/lookingGlass/experienceMode';
+import { EventInspector } from '../looking-glass/EventInspector';
+import { ComparisonPanel } from '../looking-glass/ComparisonPanel';
 import { LabScene3D } from '../../core/three/labScene3D';
 import type { MoveKey } from '../../core/three/firstPersonController';
 import {
@@ -228,6 +238,45 @@ export function FirstPersonLabScreen() {
     handleRunDiscoveryLoop(lookingGlass.problemId ?? undefined);
   }, [lookingGlass]);
 
+  // THE SAME LOOKING GLASS MACHINERY THE CITY USES, proof that it is a
+  // platform and not an epidemic-shaped one-off: event inspection, the mode
+  // machine, and a real comparison, unmodified from worldDirector.ts /
+  // experienceMode.ts / scenarioComparison.ts. The one thing this world does
+  // NOT do that the city does is move the camera from `direction` — there is
+  // no camera-preset system here to drive (the lab is fully player-walked),
+  // and inventing one would be exactly the kind of engine-shaped hack this
+  // seam is meant to avoid. `direction` is therefore read-only here: an
+  // honest readout of what a future camera rig would receive, not a control.
+  const [lgMode, setLgMode] = useState<ExperienceState>(
+    () => initialExperienceState(0, Boolean(lookingGlass?.autoPlay)),
+  );
+  const inspectableEvents = useMemo(() => lookingGlass?.world?.getInspectableEvents() ?? [], [lookingGlass]);
+  const frozenRef = useRef(false);
+  useEffect(() => { frozenRef.current = timeIsFrozen(lgMode); }, [lgMode]);
+  const cinematic = useMemo(
+    () => (lookingGlass?.experience && lookingGlass.world ? new ExperiencePlayer(lookingGlass.experience) : null),
+    [lookingGlass],
+  );
+  const [direction, setDirection] = useState<WorldDirection | null>(null);
+  useEffect(() => {
+    const world = lookingGlass?.world;
+    if (!cinematic || !world) return;
+    cinematic.play();
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      // Capped at 100 ms — see the identical guard in City3DWebGLScreen: one
+      // slow frame must slow playback, not skip states nobody saw.
+      const delta = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const frame = frozenRef.current ? cinematic.currentFrame : cinematic.advance(delta);
+      if (frame) setDirection(directionForFrame(frame, world, lookingGlass!.viewpoint));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cinematic, lookingGlass]);
+
   const handleRunDiscoveryLoop = (problemId = 'problem:intervention-timing') => {
     try {
       setDiscoveryLoop(runScientificDiscoveryLoop(problemId));
@@ -244,6 +293,51 @@ export function FirstPersonLabScreen() {
   const enterLab = () => {
     sim.returnToFirstPerson();
     canvasRef.current?.requestPointerLock();
+  };
+
+  // LOOKING GLASS 2.1 — LIVE OBSERVATION DIRECTOR (lab). Same intent parser
+  // and CameraIntent resolution as the city (`observationIntent.ts`/
+  // `observationExecution.ts`), dispatched onto THIS lab's own real,
+  // already-tested camera mechanism (`focusScientific`/`returnToFirstPerson`
+  // — see LabScene3D.applyObservationCameraIntent's own doc for why this is
+  // reuse, not a second camera system) and its one real addressable object,
+  // the reaction vessel (`resolveNamedLabTarget`).
+  const [obsText, setObsText] = useState('');
+  const [obsResult, setObsResult] = useState<{ status: ObservationExecutionStatus; narration: string } | null>(null);
+  const askObservation = (sentence: string) => {
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    const intent = parseObservationIntent(trimmed);
+    const namesLab = /\b(lab|laborator|hala)/i.test(trimmed);
+    // The lab has exactly ONE real addressable object, so a bare pronoun
+    // ("show IT from the scientist perspective") unambiguously refers to it —
+    // not a guess among candidates, since there is only ever one candidate.
+    // A city with several real objects must NOT apply this shortcut.
+    const rawQuery = intent.target ?? intent.focus;
+    const query = rawQuery && /^(it|this|that|to)$/i.test(rawQuery) ? 'the reaction vessel' : rawQuery;
+    if (!query && !namesLab) {
+      setObsResult({ status: 'FAILED', narration: 'No target was named — try "the reaction vessel" or "the laboratory".' });
+      setObsText('');
+      return;
+    }
+    if (query && !namesLab && !sim.resolveNamedLabTarget(query)) {
+      setObsResult({ status: 'FAILED', narration: `Nothing in this lab answers to "${query}" — the only real instrument here is the reaction vessel.` });
+      setObsText('');
+      return;
+    }
+    const cameraIntent = resolveCameraIntent(intent);
+    sim.applyObservationCameraIntent(cameraIntent);
+    let timeNote = '';
+    if (intent.time) {
+      if (intent.time.kind === 'ABSOLUTE' && intent.time.unit === 'DAY') {
+        const ok = sim.showDay(intent.time.amount);
+        timeNote = ok ? ` Showing day ${intent.time.amount}.` : ' No experiment has produced a day that far yet.';
+      } else if (intent.time.kind !== 'NOW') {
+        timeNote = ' This lab only shows day-level detail from a completed run — finer time resolution is not modelled here.';
+      }
+    }
+    setObsResult({ status: 'EXECUTED', narration: `Showing ${query ?? 'the laboratory'} — ${cameraIntent}.${timeNote}` });
+    setObsText('');
   };
 
   const canInteract = stats.nearStation === 1 && canInteractInPhase(phase);
@@ -408,6 +502,30 @@ export function FirstPersonLabScreen() {
             {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
             {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
 
+            {!loading && !failed && (
+              <div className="lg-obs-live">
+                <div className="lg-obs">
+                  <span className="lg-obs-title">ASK GENESIS</span>
+                  <form className="lg-obs-form" onSubmit={(event) => { event.preventDefault(); askObservation(obsText); }}>
+                    <input
+                      className="lg-obs-input"
+                      type="text"
+                      value={obsText}
+                      placeholder="np. „Show me the reaction vessel” / „Take me to the laboratory”"
+                      onChange={(event) => setObsText(event.target.value)}
+                    />
+                    <button type="submit" className="lg-obs-send" disabled={obsText.trim().length === 0}>Go</button>
+                  </form>
+                  {obsResult && (
+                    <div className="lg-obs-result">
+                      <span className={`lg-obs-status is-${obsResult.status.toLowerCase()}`}>{obsResult.status}</span>
+                      <p className="lg-obs-narration">{obsResult.narration}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {!locked && !loading && !failed && (
               <div className="fp-lab-enter" role="button" tabIndex={0}
                 onClick={enterLab}
@@ -460,6 +578,60 @@ export function FirstPersonLabScreen() {
             >
               {hudHidden ? 'Pokaż UI' : 'Ukryj UI'}
             </button>
+
+            {/* THE SAME EVENT/EVIDENCE/COMPARE APPARATUS THE CITY USES —
+                proof by reuse rather than by claim that Looking Glass is a
+                platform. Hidden while the player is walking freely and
+                nothing was opened from a sentence, so it never intrudes on
+                the pre-existing, independently-working discovery-loop flow. */}
+            {lookingGlass && inspectableEvents.length > 0 && lgMode.mode !== 'INSPECT' && (
+              <div className="lg-rail">
+                <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
+                <div className="lg-rail-items">
+                  {inspectableEvents.slice(0, 8).map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      className="lg-rail-item"
+                      onClick={() => setLgMode((current) => inspect(current, event, cinematic?.elapsedSeconds ?? null, lookingGlass.world?.clock))}
+                    >
+                      {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {lgMode.selectedEvent && (
+              <EventInspector
+                event={lgMode.selectedEvent}
+                allEvents={inspectableEvents}
+                unit={(lookingGlass?.world?.getTemporalRange().unit ?? 'HOUR').toLowerCase()}
+                onClose={() => setLgMode(closeInspection)}
+                onReplay={() => setLgMode(enterReplay)}
+              />
+            )}
+            {lookingGlass && <span className="lg-mode-badge">{MODE_LABEL[lgMode.mode]}</span>}
+            {lgMode.mode !== 'INSPECT' && lookingGlass?.comparison && (
+              <div className="lg-world-cmp">
+                <ComparisonPanel comparison={lookingGlass.comparison} requestedButMissing={false} />
+              </div>
+            )}
+            {direction && lgMode.mode !== 'INSPECT' && (
+              <div className="lg-world-shot">
+                <div className="lg-world-shot-head">
+                  <span className={`lg-world-shot-kind lg-world-shot-${direction.shotKind.toLowerCase()}`}>{direction.shotKind}</span>
+                  <span className="lg-world-shot-cam">{direction.cameraIntent}</span>
+                </div>
+                <p className="lg-world-shot-reason">{direction.reason}</p>
+                {/* Same platform-parity clock note as the city world: the
+                    clock's own reason, shown only when it says something the
+                    editorial shot reason above does not — a snapped-over gap
+                    or a marker held because it belongs to a different run. */}
+                {(direction.worldTimeSnapped || direction.worldTime === null) && (
+                  <p className="lg-world-shot-clock">{direction.worldTimeReason}</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="gid-stage-footer">

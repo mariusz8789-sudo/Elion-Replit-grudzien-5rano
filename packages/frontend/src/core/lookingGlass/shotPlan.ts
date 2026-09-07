@@ -88,6 +88,14 @@ export interface ShotPlanOptions {
   readonly maxEventShots?: number;
   /** Ticks a held shot covers when the marker is a single instant. Default 8. */
   readonly holdTicks?: number;
+  /**
+   * Whether a REAL comparison was computed for this session — never the
+   * user's mere intent to compare. The RESULT shot's wording depends on
+   * this, not on `plan.comparison`: a sentence containing "compare" that
+   * produced only one run must not close by claiming a comparison that was
+   * never made. Default false.
+   */
+  readonly hasComparison?: boolean;
 }
 
 /**
@@ -97,8 +105,8 @@ export interface ShotPlanOptions {
  * Genesis considers presentation-worthy), then observations, then the rest —
  * and ties break by tick so the result is deterministic.
  */
-function rankMarkers(timeline: WorldCaptureTimeline): readonly { tick: number; id: string; kind: ShotKind; mode: WorldCameraMode; label: string }[] {
-  const ranked: { tick: number; id: string; kind: ShotKind; mode: WorldCameraMode; label: string; weight: number }[] = [];
+function rankMarkers(timeline: WorldCaptureTimeline): readonly { tick: number; id: string; kind: ShotKind; mode: WorldCameraMode; label: string; axis: ShotAxis }[] {
+  const ranked: { tick: number; id: string; kind: ShotKind; mode: WorldCameraMode; label: string; axis: ShotAxis; weight: number }[] = [];
 
   for (const event of timeline.events) {
     const mode = cameraModeForEventType(event.type);
@@ -110,6 +118,11 @@ function rankMarkers(timeline: WorldCaptureTimeline): readonly { tick: number; i
       // is room, but it observes rather than dramatises it.
       mode: mode ?? 'OBSERVER' as WorldCameraMode,
       label: event.type,
+      // A canonical event carries a real TIMESTAMP in the world's own clock,
+      // while an observation is recorded against the state it belongs to. The
+      // two markers therefore live on different axes, and treating an event's
+      // day-72 timestamp as "state 72" pointed at a state that never existed.
+      axis: 'WORLD_TIME',
       weight: mode ? 0 : 2,
     });
   }
@@ -120,6 +133,7 @@ function rankMarkers(timeline: WorldCaptureTimeline): readonly { tick: number; i
       kind: 'OBSERVATION',
       mode: 'SCIENTIFIC',
       label: observation.statement,
+      axis: 'STATE_INDEX',
       weight: 1,
     });
   }
@@ -153,6 +167,7 @@ export function buildShotPlan(
 ): ShotPlan {
   const maxEventShots = options.maxEventShots ?? 6;
   const holdTicks = options.holdTicks ?? 8;
+  const hasComparison = options.hasComparison ?? false;
   const ticks = Math.max(1, plan.ticks);
   const shots: Shot[] = [];
 
@@ -191,14 +206,17 @@ export function buildShotPlan(
     shots.push({
       index: shots.length,
       kind: marker.kind,
-      // Markers come from the adapter's state series, so they are on the
-      // state axis — see `ShotAxis`.
-      axis: 'STATE_INDEX',
+      axis: marker.axis,
       // An anchored sequence keeps the viewer's eye line even on a cut —
       // the whole premise is that they do not move.
       cameraMode: anchored ? plan.viewpoint.cameraMode : marker.mode,
       fromTick: marker.tick,
-      toTick: Math.min(marker.tick + holdTicks, ticks),
+      // NOT clamped to the requested span. A marker belongs to the run that
+      // produced it, and that run need not be the same length as the series
+      // the viewer is scrubbing — the pre-registered loop runs its own
+      // scenarios. Clamping mixed the two clocks and made an event at day 72
+      // count backwards to day 60.
+      toTick: marker.tick + holdTicks,
       reason: marker.kind === 'EVENT' ? `Event ${marker.label}` : `Observation: ${marker.label}`,
       sourceMarkerId: marker.id,
     });
@@ -208,10 +226,10 @@ export function buildShotPlan(
     index: shots.length,
     kind: 'RESULT',
     axis: 'WORLD_TIME',
-    cameraMode: plan.comparison ? 'SCIENTIFIC' : 'WIDE',
+    cameraMode: hasComparison ? 'SCIENTIFIC' : 'WIDE',
     fromTick: ticks,
     toTick: ticks,
-    reason: plan.comparison ? 'Closing on the comparison of the two runs' : 'Closing on the final state of the run',
+    reason: hasComparison ? 'Closing on the comparison of the two runs' : 'Closing on the final state of the run',
     sourceMarkerId: null,
   });
 

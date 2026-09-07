@@ -1,7 +1,14 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openLookingGlass, type LookingGlassSession } from '../../core/lookingGlass/scenarioSession';
 import { nearestSupportedAlternative } from '../../core/lookingGlass/scenarioResolution';
 import { anchoredSequenceDuration, sampleAnchoredSequence, scrubToSeconds } from '../../core/lookingGlass/anchoredTemporal';
+import { ExperiencePlayer, frameAt, type ExperienceFrame } from '../../core/lookingGlass/experienceOrchestrator';
+import type { SavedExperiment } from '../../core/scienceMemory';
+import type { InspectableEvent } from '../../core/lookingGlass/eventInspection';
+import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
+import { resolveObservation, type ObservationResult } from '../../core/lookingGlass/observationDirector';
+import { ComparisonPanel } from './ComparisonPanel';
+import { EventInspector } from './EventInspector';
 
 /**
  * LOOKING GLASS — THE CHAT THAT ANSWERS WITH A WORLD.
@@ -49,14 +56,214 @@ const STATUS_LABEL: Readonly<Record<string, string>> = {
   REFUSED: 'POZA ZAKRESEM',
 };
 
+/**
+ * Plays the experience timeline. Holds a clock and nothing else: what the
+ * clock MEANS at any instant is `frameAt`, so this control, a scrub bar and
+ * an offline capture cannot disagree.
+ */
+function SequencePlayer({ session }: { session: LookingGlassSession }): JSX.Element | null {
+  const player = useMemo(() => new ExperiencePlayer(session.experience), [session]);
+  const [frame, setFrame] = useState<ExperienceFrame | null>(() => frameAt(session.experience, 0));
+  const [, forceStatus] = useState(0);
+
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      // A stalled frame must not teleport the world. Without a cap, one
+      // slow frame — a backgrounded tab, a software renderer, a GC pause —
+      // advances the sequence by however long it took, skipping states the
+      // viewer never saw. Capped at 100 ms, playback simply slows instead.
+      const delta = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      setFrame(player.advance(delta));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [player]);
+
+  if (!frame || session.experience.durationSeconds <= 0) return null;
+  const playing = player.playbackStatus === 'PLAYING';
+
+  return (
+    <div className="lg-seq">
+      <div className="lg-seq-head">
+        <span className={`lg-seq-kind lg-seq-kind-${frame.shot.kind.toLowerCase()}`}>{frame.shot.kind}</span>
+        <span className="lg-seq-cam">{frame.cameraMode}</span>
+        <span className="lg-seq-reason">{frame.shot.reason}</span>
+      </div>
+      <input
+        className="lg-scrub"
+        type="range"
+        min={0}
+        max={1}
+        step={0.001}
+        value={frame.progress}
+        aria-label="Przewiń sekwencję"
+        onChange={(event) => { player.seek(Number(event.target.value)); setFrame(player.currentFrame); forceStatus((n) => n + 1); }}
+      />
+      <div className="lg-seq-controls">
+        <button
+          type="button"
+          className="lg-seq-btn"
+          onClick={() => { player.toggle(); forceStatus((n) => n + 1); }}
+        >
+          {playing ? '❚❚ Pauza' : '▶ Odtwórz'}
+        </button>
+        <button type="button" className="lg-seq-btn" onClick={() => { player.replay(); forceStatus((n) => n + 1); }}>↻ Od nowa</button>
+        {[1, 2, 4, 8].map((speed) => (
+          <button
+            key={speed}
+            type="button"
+            className={`lg-seq-speed${player.playbackSpeed === speed ? ' is-active' : ''}`}
+            onClick={() => { player.setSpeed(speed); forceStatus((n) => n + 1); }}
+          >
+            {speed}×
+          </button>
+        ))}
+        <span className="lg-seq-time">
+          {frame.elapsedSeconds.toFixed(1)} / {session.experience.durationSeconds.toFixed(1)} s
+          {' · '}
+          {/* Only stated where a state index really exists — a world-time
+              marker has none, and inventing one would name a state the run
+              never produced. */}
+          {frame.stateIndex !== null ? `stan ${frame.stateIndex}` : `czas świata ${Math.round(frame.worldTick)}`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The one real write path from a Looking Glass session into Genesis's
+ * durable, replay-verified Scientific Memory — `saveScenarioCounterfactualToMemory`,
+ * the same store the first-person lab and `ScientificMemoryScreen` already
+ * use. Rendered only when `comparison.evidence` says a real counterfactual
+ * artifact exists behind the comparison (see `scenarioComparison.ts`); a
+ * comparison without one — the laboratory's hypothesis ranking — has nothing
+ * honest to persist here, so no button appears at all rather than one that
+ * fails on click.
+ */
+function ComparisonCommit({ session }: { session: LookingGlassSession }): JSX.Element | null {
+  const [saved, setSaved] = useState<SavedExperiment | null>(null);
+  if (session.comparison?.status !== 'READY' || session.comparison.evidence === null) return null;
+  return (
+    <div className="lg-cmp-commit">
+      {saved ? (
+        <p className="lg-cmp-committed">
+          Zapisano w Pamięci Naukowej jako <code>{saved.experimentId}</code> — odtworzenie obu ramion zweryfikowane (MATCH).
+        </p>
+      ) : (
+        <button type="button" className="lg-cmp-commit-btn" onClick={() => setSaved(session.commitComparisonToMemory())}>
+          Zapisz porównanie w Pamięci Naukowej
+        </button>
+      )}
+    </div>
+  );
+}
+
+const OBSERVATION_EXAMPLES: readonly string[] = [
+  'Follow the substance. Why did this change happen?',
+  'Go back 3 hours.',
+  'Compare with the intervention branch.',
+  'Show me this as an operator.',
+];
+
+/**
+ * LOOKING GLASS 2.0 — THE OBSERVATION CONSOLE.
+ *
+ * "User speaks → Genesis understands → Genesis moves to the right moment/
+ * place/state → Genesis explains what is happening." One text field, one
+ * answer — never a dashboard of controls. Everything below is read off
+ * `resolveObservation`, which itself reads only what the session already
+ * computed; this component computes nothing and owns no world state beyond
+ * "which tick am I asking follow-ups relative to right now".
+ */
+function ObservationConsole({ session }: { session: LookingGlassSession }): JSX.Element | null {
+  const [text, setText] = useState('');
+  const [currentTick, setCurrentTick] = useState(0);
+  const [result, setResult] = useState<ObservationResult | null>(null);
+
+  if (!session.world) return null;
+
+  const ask = (sentence: string) => {
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    const intent = parseObservationIntent(trimmed);
+    const resolved = resolveObservation(intent, session, currentTick);
+    setResult(resolved);
+    if (resolved.time?.granted) setCurrentTick(resolved.time.worldTime);
+    setText('');
+  };
+
+  return (
+    <div className="lg-obs">
+      <span className="lg-obs-title">ZAPYTAJ O ŚWIAT</span>
+      <form className="lg-obs-form" onSubmit={(event) => { event.preventDefault(); ask(text); }}>
+        <input
+          className="lg-obs-input"
+          type="text"
+          value={text}
+          placeholder="np. „Follow the substance. Why did this change happen?”"
+          onChange={(event) => setText(event.target.value)}
+        />
+        <button type="submit" className="lg-obs-send" disabled={text.trim().length === 0}>Zapytaj</button>
+      </form>
+      {!result && (
+        <div className="lg-obs-examples">
+          {OBSERVATION_EXAMPLES.map((example) => (
+            <button key={example} type="button" className="lg-obs-example" onClick={() => ask(example)}>{example}</button>
+          ))}
+        </div>
+      )}
+      {result && (
+        <div className={`lg-obs-result lg-obs-${result.status.toLowerCase()}`}>
+          <p className="lg-obs-narration">{result.narration}</p>
+          {result.reasons.length > 0 && (
+            <ul className="lg-obs-reasons">
+              {result.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+            </ul>
+          )}
+          {result.cameraRequest && (
+            <p className="lg-obs-camera">
+              director request → <code>{result.cameraRequest.kind}</code> · <code>{result.cameraRequest.cameraIntent}</code>
+              {result.focusEntity ? <> · target: <code>{result.focusEntity.label}</code></> : null}
+            </p>
+          )}
+          {result.explanation && (
+            <div className="lg-obs-explain">
+              {result.explanation.byHowMuch.length > 0 ? (
+                <ul className="lg-obs-deltas">
+                  {result.explanation.byHowMuch.map((delta) => (
+                    <li key={delta.key}>
+                      {delta.key}: {delta.before.toFixed(2)} → {delta.after.toFixed(2)}{delta.unit ? ` ${delta.unit}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="lg-obs-nodelta">Nic mierzalnego nie zmieniło się w tym momencie.</p>}
+              <p className="lg-obs-cause">przyczyna: {result.explanation.cause ?? 'brak zapisanej przyczyny'}</p>
+              <p className="lg-obs-consequence">skutek: {result.explanation.consequence ?? 'brak zapisanego późniejszego efektu'}</p>
+              <p className="lg-obs-grounding">grounding: <code>{result.explanation.grounding}</code> — wynik modelu, nie obserwacja rzeczywistości.</p>
+            </div>
+          )}
+          {result.comparison && <ComparisonPanel comparison={result.comparison} requestedButMissing={false} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
   const { session } = turn;
   const { request, resolution } = session;
   const [scrub, setScrub] = useState(0);
+  const [selectedEvent, setSelectedEvent] = useState<InspectableEvent | null>(null);
 
   const duration = session.anchored ? anchoredSequenceDuration(session.anchored) : 0;
   const sample = session.anchored ? sampleAnchoredSequence(session.anchored, scrubToSeconds(session.anchored, scrub)) : null;
   const alternative = nearestSupportedAlternative(resolution);
+  const inspectableEvents = useMemo(() => session.world?.getInspectableEvents() ?? [], [session]);
 
   return (
     <div className={`lg-card lg-card-${resolution.status.toLowerCase()}`}>
@@ -111,6 +318,62 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
             </div>
           ) : null}
 
+          {/* THE SEQUENCE, PLAYED. The shot list below says what the director
+              chose; this plays it, so the edit can be judged as an edit
+              rather than read as a table. Every frame is resolved by the
+              orchestrator from the same real markers. */}
+          <SequencePlayer session={session} />
+
+          <ComparisonPanel comparison={session.comparison} requestedButMissing={session.request.comparison} />
+          <ComparisonCommit session={session} />
+
+          {/* THE SAME event rail + inspector the two 3D world screens use
+              (City3DWebGLScreen, FirstPersonLabScreen) — rendered here too,
+              because a domain with no 3D surface yet (chemistry, today)
+              still needs a place to answer "what happened / why / what was
+              it before". One inspector component, three screens. */}
+          {inspectableEvents.length > 0 && (
+            // .lg-rail-inline: the base .lg-rail is `position: absolute`,
+            // pinned to the bottom-left of the two 3D screens' fixed-height
+            // viewport. The chat card is a tall, normal-flow element with
+            // no such viewport — left as position:absolute here, the rail
+            // pinned itself to the CARD's bottom edge and sat on top of the
+            // "Wejdź do świata" button below it (found visually in
+            // Chromium, not by reading the CSS). This override is layout
+            // only; the rail/inspector logic and markup stay identical.
+            <div className="lg-rail lg-rail-inline">
+              <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
+              <div className="lg-rail-items">
+                {inspectableEvents.slice(0, 8).map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className="lg-rail-item"
+                    onClick={() => setSelectedEvent(event)}
+                  >
+                    {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {selectedEvent && (
+            <EventInspector
+              event={selectedEvent}
+              allEvents={inspectableEvents}
+              unit={(session.world?.getTemporalRange().unit ?? 'DAY').toLowerCase()}
+              onClose={() => setSelectedEvent(null)}
+              // The chat has no live world clock to seek — unlike the two 3D
+              // screens, there is nothing here for "replay" to DO, even for a
+              // domain (chemistry) whose replay IS now verified. allowReplay
+              // tells the inspector to say so honestly instead of offering a
+              // button with nothing real behind it.
+              onReplay={() => setSelectedEvent(null)}
+              allowReplay={false}
+              moment={session.describeEntityMoment(selectedEvent.time.tick)}
+            />
+          )}
+
           <ol className="lg-shots">
             {session.shotPlan.shots.map((shot) => (
               <li key={shot.index} className={`lg-shot lg-shot-${shot.kind.toLowerCase()}`}>
@@ -148,6 +411,8 @@ function ScenarioCard({ turn }: { turn: Turn }): JSX.Element {
               {session.shotPlan.markersUsed}/{session.shotPlan.markersAvailable} realnych znaczników użytych w montażu
             </span>
           </div>
+
+          <ObservationConsole session={session} />
         </>
       ) : (
         <div className="lg-refusal">

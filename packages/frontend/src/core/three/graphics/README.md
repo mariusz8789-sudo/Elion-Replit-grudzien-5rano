@@ -47,7 +47,8 @@ never the reverse.
 | LOD / culling | `lod.ts` | `FrustumCuller` (per-instance frustum test, reusable/allocation-free — see its module doc for why this exists instead of `InstancedMesh.frustumCulled`), `PopulationLod` (frustum + distance + projected-size LOD in one per-frame pass over a whole population), `projectedScreenSizePx`, `selectLodTier`. Wired into `InstancedHumanoidCrowd.update()`'s optional `cull` argument — see `PERFORMANCE.md`. |
 | Diagnostics | `diagnostics.ts` | `readFrameCounters`, `FrameProfiler`, `RollingFrameStats` — exact draw-call/triangle/geometry/texture/program counts from `renderer.info` (valid on any GPU, including software rendering) plus frame-time sampling (explicitly NOT a hardware performance claim — see the module doc). Wired into every pipeline as `GraphicsPipeline.getFrameCounters()`. See `PERFORMANCE.md`'s "Measured, not fabricated" section for real numbers this produced. |
 | Picking / interaction (mechanics) | `picking.ts` | `screenToNDC`, `raycastFromScreenPoint`, `findTaggedAncestor`, `ClickDragTracker` — the mechanical half of "what did the user point at" (screen→NDC, click-vs-drag, walking up to a tagged ancestor). Never decides what a pick MEANS — that stays the caller's `selectAgent`/`selectWorld`-shaped logic. Found duplicated byte-for-byte across `epidemicCity3D.ts` and `highFidelitySlice3D.ts`'s own `pointer()` methods before this existed; both now delegate to it. |
-| Interaction (WorldFrame-aware) | `interaction.ts` | `InteractionController` — composes `picking.ts` + `WorldFrameRenderer.resolveEntityId` into hover/select state expressed as WorldFrame entity ids, not raw meshes. `pointerDown`/`pointerMove`/`pointerUp`/`clearHover`, `onHoverChange`/`onSelect` callbacks. No business logic — see §21 below. |
+| Interaction (WorldFrame-aware) | `interaction.ts` | `InteractionController` — composes `picking.ts` + `WorldFrameRenderer.resolveEntityId` into hover/select state expressed as WorldFrame entity ids, not raw meshes. `pointerDown`/`pointerMove`/`pointerUp`/`clearHover`, `onHoverChange`/`onSelect` callbacks. `applyHighlight`/`clearHighlight` turn a resolved id into an actual visible highlight on its `Object3D` (get one via `WorldFrameRenderer.getObjectForEntity`) — the "actual visual interaction," not just id-resolution. No business logic — see §16 below. |
+| Visual state (discrete) | `visualState.ts` | `applyVisualState`, `resolveVisualStatePresentation`, `VISUAL_STATE_PRESETS` — the discrete-state counterpart to `stateVisualization.ts`'s continuous-value scales: 12 canonical named states (`NORMAL`/`WARNING`/`CRITICAL`/`OFFLINE`/`DAMAGED`/`ACTIVE`/`INACTIVE`/`CONTAMINATED`/`INFECTED`/`OVERFLOW`/`FAILURE`/`UNDER_OBSERVATION`) → tuned color/emissive presentation, several marked `pulses: true` for a `stateVisualization.ts` `AttentionPulse`/`animation.ts` oscillator to drive. Never computes the state itself. |
 | Environment (sky/fog/time-of-day) | `environment.ts` | `computeSunState(THREE, hourOfDay)` (pure, testable — sun direction/color/intensity + matching sky/fog tones), `createSkyDome`, `applyEnvironmentPreset(THREE, scene, {mode, hourOfDay?})` — `'OUTDOOR'` adds a sky dome + fog and hands back `SunState` for a caller's own `createSunLight` call; `'INDOOR'` is a deliberate near-no-op. See §17 below. |
 | Water | `water.ts` | `createWaterSurface` (a horizontal plane with real `MeshPhysicalMaterial` transmission + a scrolling ripple normal map reusing `materials.ts`'s `surfaceNormalFactory`), `captureDryLook`/`applyWetLook` (cheaply wets an existing opaque material). See §18 below. |
 | Vegetation | `vegetation.ts` | `createTreeField`, `createGroundClutter` — seeded, instanced (2 draw calls / 1 draw call respectively, any count) scattered nature fields with position/rotation/scale variation. See §19 below. |
@@ -596,6 +597,29 @@ interaction.pointerMove(x, y, viewportWidth, viewportHeight);
 interaction.pointerUp(x, y, viewportWidth, viewportHeight);
 ```
 
+To make a resolved id actually VISIBLE (not just known), pair it with `getObjectForEntity` +
+`applyHighlight`/`clearHighlight`:
+
+```ts
+import { applyHighlight, clearHighlight } from './graphics/interaction';
+
+let highlighted: THREE.Object3D | null = null;
+onHoverChange: (id) => {
+  if (highlighted) clearHighlight(highlighted);
+  highlighted = id ? worldFrameRenderer.getObjectForEntity(id) : null;
+  if (highlighted) applyHighlight(THREE, highlighted, 'hover');
+}
+```
+
+`applyHighlight` boosts `emissive`/`emissiveIntensity` on every emissive-capable material in the
+object's subtree, remembering each one's ORIGINAL values (once) so `clearHighlight` restores them
+exactly — safe to call repeatedly (hover promoted to select never compounds). `getObjectForEntity`
+only returns something for an `'object'`-kind entity; an `'instanced'`-kind entity has no individual
+`Object3D` — highlighting one means `instancing.ts`'s `setInstanceColor` against its batch directly.
+
+See `graphicsWorldEnvironmentExample.test.ts`'s "selecting the sensor makes it visibly highlighted"
+test for this whole pipeline (pointer event → entity id → visible highlight) proven end to end.
+
 `WorldFrameRenderer.resolveEntityId(intersection)` is what makes this work for BOTH entity
 lifecycles: an object-kind hit walks up the intersected mesh's ancestor chain (via `picking.ts`'s
 `findTaggedAncestor`) to the tagged root `resolveVisual` returned; an instanced hit resolves via
@@ -729,6 +753,165 @@ const slot = createAssetSlot(buildProceduralFallback());
 scene.add(slot.current);
 loadRealGltf(url).then((gltf) => slot.replace(gltf.scene)); // fallback disposed automatically
 ```
+
+## 22. The C1 → C2 camera bridge lives OUTSIDE `graphics/` — `core/three/shotPlanPlayer.ts`
+
+`core/lookingGlass/shotPlan.ts` (C1) produces a real, tested `ShotPlan`: an ordered list of shots,
+each with a `WorldCameraMode` and a tick range, motivated by a real event/observation. Before this
+pass, NOTHING in `core/three/` consumed it — C1 could plan a cinematic edit with no way to execute
+it. `shotPlanPlayer.ts` is that bridge, built entirely from already-canonical `CameraRig`/
+`CameraSequence` (no second camera system):
+
+```ts
+import { buildCameraSequenceFromShotPlan } from './shotPlanPlayer'; // core/three/, not graphics/
+
+const sequence = buildCameraSequenceFromShotPlan(cameraRig, shotPlan, {
+  resolveTarget: (shot) => ({ target: resolveWorldPositionFor(shot.sourceMarkerId), targetRadius: 2 }),
+}, { secondsPerWorldTick: 0.5 });
+```
+
+**Why it lives outside `graphics/`**: `graphicsArchitectureBoundary.test.ts` forbids anything under
+`core/three/graphics/` from importing `lookingGlass` (or any simulation/world-domain module) — that
+is exactly what keeps the graphics engine reusable independent of Genesis science. This file is the
+composition point ABOVE that boundary, importing both C1's `ShotPlan` type and C2's canonical camera
+classes, and nothing else — no camera transform math of its own.
+
+**The one real gap, by design**: `ShotPlan` carries no spatial data — a shot says WHEN and WHICH
+camera mode, never WHERE. Resolving "where is the thing this shot's `sourceMarkerId` refers to" is
+real domain knowledge only the world-composition layer has, so it's a required
+`ShotTargetResolver` — the same "domain knowledge enters through exactly one caller-supplied
+function" pattern `WorldFrameRenderer.resolveVisual` already establishes.
+
+**A real bug this bridge's own tests found** (not fixed here — not this file's contract to fix):
+`shotPlan.ts`'s `rankMarkers()` falls back to the literal `'OBSERVER'` (cast `as WorldCameraMode`)
+for an event type its camera policy has no configured opinion about — but `'OBSERVER'` is a member
+of neither `WorldCameraMode` nor `CameraIntent`. `shotPlanPlayer.ts`'s `coerceCameraIntent` guards
+against it (falls back to `'WIDE'`, matching `shotPlan.ts`'s own stated intent for that case), but
+the underlying cast in `shotPlan.ts` is still there and worth a fix on the C1 side.
+
+## 23. Engine 2.0 status — what's DONE, PARTIAL, or DEFERRED
+
+Per this engine's own "no fake completion" rule — everything below is a real, currently-true
+statement, not a target.
+
+**DONE** (built, tested, and either wired into a production scene or proven via a reference
+example/real-C1-integration test): materials (15 categories incl. procedural surface detail),
+lighting roles, shadow policy, post-processing (AO/bloom/DOF/reflections/tone-mapping),
+`CameraRig`/`CameraSequence` (intent-based, scale-aware), LOD/culling (`lod.ts`), instancing
+(`InstanceBatch` + incremental WorldFrame updates), `WorldFrameRenderer` (object + instanced
+lifecycles, hierarchy, honest-boundary placeholders, `resolveEntityId`/`getObjectForEntity`),
+atmosphere (dust/light-shafts, tier-gated), quality tiers + `QualityLevel` presets, resource
+lifecycle (`disposeSceneResources`), the C1→C2 shot-plan camera bridge (`shotPlanPlayer.ts`,
+tested against C1's real `buildShotPlan`), interaction (id-resolution + visible hover/select
+highlight), discrete visual-state mapping (`visualState.ts`).
+
+**PARTIAL** (real, tested, generically reusable — but NOT yet adopted by the three production
+benchmark scenes, which still use their own hand-tuned equivalents): `environment.ts` (sky/fog/
+time-of-day), `water.ts`, `vegetation.ts` (`createTreeField`/`createGroundClutter`), `labKit.ts`
+(bench/cabinet/shelf/monitor), `animation.ts` (oscillator/rotator/sway), `assetPipeline.ts`
+(fallback-to-real-asset slot, keyed cache, texture-slot disposal fix — the disposal fix itself IS
+live in `epidemicCity3D.ts`/`highFidelitySlice3D.ts`; the reusable module wrapping it is not).
+Retrofitting these into the hand-tuned city/lab/HF scenes is real, valuable, NOT YET DONE work —
+deliberately deferred each time to avoid regressing already-shipped, hand-tuned geometry without a
+dedicated verification pass for that specific scene.
+
+**DEFERRED / NOT_MODELED** (genuinely absent, not disguised as present): a vehicle rendering kit; a
+generalized building/infrastructure kit (city/HF scenes still hand-roll facades/windows/HVAC/
+streetlights); GLTF-loader-specific integration (`assetPipeline.ts` is intentionally loader-agnostic
+architecture, not a working GLTF pipeline); population visual diversity beyond what
+`InstancedHumanoidCrowd`/`characterRig.ts` already had before this pass; any physically-based sky
+model (the sky dome is a tuned gradient, explicitly documented as such); screen-space reflections
+beyond the existing opt-in, unverified-on-real-hardware `SSRPass` wiring; deep validation against
+C3's actual scientific solvers (epidemiology/chemistry/hydraulics/Newtonian) — this session's C1
+integration test uses C1's real `buildShotPlan`, but no equivalent real-C3-WorldFrame fixture was
+available to test against beyond this engine's own `worldFrame.ts` stand-in contract.
+
+## 24. Visual World Build 1.0 — engine modules actually wired into production scenes
+
+The explicit quality gate for this pass: **ENGINE MODULE → PRODUCTION SCENE → VISIBLE RESULT**, never
+"ENGINE MODULE → README → DONE." Everything below is wired into `epidemicCity3D.ts` and/or
+`labScene3D.ts` themselves (see each file's `addCityExtras()`/STREFA E furniture block), proven by
+`epidemicCity3DExtras.test.ts` and `labScene3DExtras.test.ts` (which call the real scene `init()` and
+assert the new objects exist in the actual scene graph — not just that the example file compiles).
+
+**New reusable kits, DONE and adopted**: `buildingKit.ts` (`createRooftopEquipment`,
+`createAmbulanceBay`, `createIndustrialBuilding` — additive detail layered onto/next to
+`epidemicCity3D.ts`'s existing hand-tuned `createBuilding`, never replacing it), `streetKit.ts`
+(`createStreetBench`/`createTrashBin`/`createHydrant`/`createPlanter`/`createBollardBarrier`/
+`createUtilityBox`), `vehicleKit.ts` (`createVehicle`: car/van/bus/truck/ambulance, deterministic
+per-instance variation, PARKED/MOVING/STOPPED/EMERGENCY/OFFLINE states via `visualState.ts`),
+`waterInfrastructure.ts` (`createPump`/`createValve`/`createStorageTank`/`createPipeNetwork`,
+NORMAL/WARNING/FAILED/OFFLINE via the same `visualState.ts` vocabulary). `vegetation.ts`'s
+`createTreeField`/`createGroundClutter` — previously PARTIAL (§23) — are now also adopted in
+`epidemicCity3D.ts`'s `addCityExtras()`, closing that gap.
+
+**Production-scene results**: `epidemicCity3D.ts`'s hospital building now gets a real ambulance bay,
+a parked ambulance, rooftop HVAC, a small service building, and frontage trees, all anchored to the
+REAL CityWorld hospital `WorldObject` (not an invented location); sparser rooftop equipment appears
+on ~1/3 of other real buildings; decorative parked cars/vans, hydrants, and utility boxes populate
+the streets; extra ground clutter surrounds the park. `labScene3D.ts`'s STREFA E (the deep background
+bay) gains a real bench/cabinet/shelf/monitor cluster and a pump/valve/pipe-run utility cluster.
+
+**Honest boundary on the water/pump state**: the lab's pump defaults to (and stays at) `NORMAL` —
+this scene has no real pressure/flow/failure feed to back a WARNING/FAILED reading, so it is never
+fabricated (see `waterInfrastructure.ts`'s own module doc and `labScene3DExtras.test.ts`'s explicit
+test for this). A pump tied to a REAL C3 water-system feed is future work gated on that feed existing.
+
+**Decorative vs. real, kept honest**: rooftop equipment on non-hospital buildings, parked vehicles,
+street furniture, and the industrial service building are explicitly decorative population/context
+(`userData.visualOnlyContext = true` / `userData.visualOnlyVehicle` / `userData.visualOnlyInfrastructure`)
+— same documented status as this file's own pre-existing `createContextBuilding`/`addUrbanCadence`
+output. None of it is presented as a WorldFrame/C3 entity, and none of it carries `worldSelection`.
+
+**Still DEFERRED / NOT_MODELED after this pass**: a population-visual-diversity kit (roles/clothing/
+animation states beyond the existing `InstancedHumanoidCrowd`); a `createStreet`/`createCityDistrict`
+world-authoring API generalized beyond `epidemicCity3D.ts`'s own scene-specific `addCityExtras()`;
+`environment.ts`/`water.ts`/`animation.ts`/`assetPipeline.ts` production adoption (still PARTIAL per
+§23 — this pass closed the vehicle/street/building/vegetation gap, not all of §23's list); real C3
+water-system integration (see above); day/sunset/night lighting variants for the city scene (it
+remains a fixed night scene, as before this pass); a `WATER_SYSTEM`/counterfactual-comparison
+reference scene (no such C3 world model exists yet in this codebase to render honestly).
+
+## 25. Visual World Build 2.0 — the water-infrastructure C3 integration seam (`waterInfrastructureBridge.ts`)
+
+**Finding, stated plainly**: there is no real, city-spatial, stateful water/pump entity anywhere in
+C1/C3 today. The only "pump" in this codebase (`core/engineeringGraph/pumpPipe.ts`) is an isolated,
+static engineering-sensitivity demo (Darcy–Weisbach/Swamee–Jain over fixed parameters) with no id, no
+position, no failure state, and no connection to the epidemic city or its hospital. `core/events/
+domains/urbanCascade.ts` (the power→water→hospital cascade a mission brief once assumed existed) is,
+by its own file header, type declarations only — "there are no physical models, solvers, or fake
+simulation here." C1's own `scenarioResolution.ts` says the same thing for its `INDUSTRIAL_
+ENVIRONMENTAL` family: "Genesis has no plume dispersion, hydraulic network or power-grid solver."
+
+Given that, this pass deliberately does NOT invent a pump entity, a failure state, or a cascade rule
+— doing so from C2 would be exactly the fabricated Trinity integration this engine's rules forbid.
+Instead it builds the **seam**: `graphics/waterInfrastructureBridge.ts` is a `WorldFrameRenderer`
+resolver/updater pair that a REAL future C3 water-system WorldFrame producer plugs into directly, with
+one hard rule proven by `graphicsWaterInfrastructureBridge.test.ts` (8 tests): an entity with no real
+grounding/status is rendered as real geometry (via the existing `waterInfrastructure.ts` kit) but
+NEVER shown with a fabricated NORMAL/WARNING/FAILED/OFFLINE reading — it is tagged
+`userData.notModeled = true` instead. A `status` is only ever honored when it is one of
+`waterInfrastructure.ts`'s own four real states AND the entity's `grounding !== 'NOT_MODELED'`.
+
+**Wired into the real production city** (`epidemicCity3D.ts`'s `initWaterInfrastructureSeam()`/
+`syncWaterInfrastructureSeam()`, proven by `epidemicCity3DWaterInfrastructureSeam.test.ts`, 7 tests):
+exactly one placeholder pump renders near the real hospital building through this seam, with no
+`status` supplied — so it looks like a real pump but never drives a state it doesn't have. It
+deliberately carries **no** `userData.worldSelection` and is never added to the click-selectable set:
+it is not a queryable CityWorld location, only a visual placeholder pending a real C3 producer. A
+short decorative pipe run connects it toward the hospital wall, tagged `visualOnlyContext` like this
+file's own `createContextBuilding`/street furniture. `labScene3D.ts`'s own VWB1.0 pump (§24) is now
+also tagged `userData.notModeled = true` for the same reason, machine-checkable rather than only
+documented in prose.
+
+**The integration seam this leaves for C3**, verbatim from the bridge module's own doc: `C3 real pump
+entity → WorldFrame → C2 adapter (waterInfrastructureBridge.ts) → existing waterInfrastructure.ts
+renderer`. The day C3 publishes a real pump/valve/tank entity with a stable id, a real position, and a
+real status, wiring it into a production scene is "route its WorldFrame entities through this
+adapter" — not "write a new renderer." Until then, hydraulic failure, hospital-cascade consequences,
+NL commands ("fail the pump"), replay/branch comparison of pump state, and rainfall/flood extensions
+are all **NOT_MODELED** — none of it can be built honestly without that real C3 entity existing first,
+and this file will not pretend otherwise.
 
 ## Example usage
 

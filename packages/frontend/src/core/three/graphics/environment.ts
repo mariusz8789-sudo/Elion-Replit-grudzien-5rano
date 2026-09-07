@@ -66,7 +66,14 @@ export function computeSunState(THREE: typeof THREE_NS, hourOfDay: number): SunS
   const hour = ((hourOfDay % 24) + 24) % 24;
   const altitudeRad = Math.sin(((hour - 6) / 12) * Math.PI) * (Math.PI / 2);
   const azimuthRad = ((hour - 6) / 24) * Math.PI * 2;
-  const altitude01 = Math.max(0, Math.sin(altitudeRad));
+  // Signed, UNCLAMPED sine of altitude — kept separate from `altitude01` (below) specifically for
+  // the golden-hour weight just below. Real defect found via the first production Chromium
+  // screenshot of this module (Visual World Build 3.0, genesisScientificCitySim.ts): every hour
+  // with the sun below the horizon clamps to the same `altitude01 = 0`, which made the golden-hour
+  // blend collapse to the SAME constant, non-zero warm tint at 9pm as at 3am — an orange sky wash
+  // at every night hour, with no way to tell "just after sunset" from "the middle of the night."
+  const rawAltitudeSin = Math.sin(altitudeRad);
+  const altitude01 = Math.max(0, rawAltitudeSin);
 
   const direction: THREE_NS.Vector3Tuple = [
     Math.cos(altitudeRad) * Math.cos(azimuthRad),
@@ -74,9 +81,12 @@ export function computeSunState(THREE: typeof THREE_NS, hourOfDay: number): SunS
     Math.cos(altitudeRad) * Math.sin(azimuthRad),
   ];
 
-  // Golden-hour blend weight: peaks exactly at the horizon (altitude 0, still above ground) and
-  // fades out both toward full daylight and full night — a triangular window, not a hard cutoff.
-  const goldenWeight = Math.max(0, 1 - Math.abs(altitude01 - 0.12) / 0.22);
+  // Golden-hour blend weight: peaks just above the horizon (a low sun, still technically daylight)
+  // and fades out both toward full daylight and full night — a triangular window, not a hard
+  // cutoff. Using the UNCLAMPED `rawAltitudeSin` (not `altitude01`) is what actually makes it fade
+  // toward night as the sun sinks further below the horizon, rather than sitting at a fixed weight
+  // for every night hour alike (see the fix note above).
+  const goldenWeight = Math.max(0, 1 - Math.abs(rawAltitudeSin - 0.12) / 0.22);
   const nightWeight = Math.max(0, 1 - altitude01 * 2.2 - goldenWeight * 0.4);
   const dayWeight = Math.max(0, 1 - nightWeight - goldenWeight);
   const total = nightWeight + goldenWeight + dayWeight || 1;

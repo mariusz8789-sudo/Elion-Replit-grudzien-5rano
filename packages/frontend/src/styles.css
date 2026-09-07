@@ -2837,6 +2837,10 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   border: 1px solid #24314a; border-left: 3px solid #3d7fbf; border-radius: 0.9rem;
   background: linear-gradient(180deg, #101724 0%, #0c111b 100%); padding: 1rem 1.1rem;
   display: flex; flex-direction: column; gap: 0.85rem;
+  /* Anchors .lg-insp's absolute overlay to this card — the same pattern the
+     two 3D world screens use (.city-3d-stage-wrap/.fp-lab-stage/.gid-stage),
+     so the SAME EventInspector positions itself correctly wherever it renders. */
+  position: relative;
 }
 .lg-card-ready { border-left-color: #4fd18b; }
 .lg-card-needs_input { border-left-color: #f0c542; }
@@ -2941,3 +2945,286 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .lg-shot-src { text-align: left; }
   .lg-ask { max-width: 100%; }
 }
+
+/* Sekwencja kinowa: odtwarzacz montażu wybranego przez Reżysera. */
+.lg-seq {
+  display: flex; flex-direction: column; gap: 0.45rem;
+  padding: 0.7rem 0.8rem; border-radius: 0.6rem;
+  background: #0a0f18; border: 1px solid #1d2739;
+}
+.lg-seq-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.lg-seq-kind {
+  font: 600 0.66rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em; color: #8ecbff;
+}
+.lg-seq-kind-temporal { color: #4fd18b; }
+.lg-seq-kind-event { color: #ffc061; }
+.lg-seq-cam { font: 0.66rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0; }
+.lg-seq-reason { color: #cfe0f2; font-size: 0.82rem; flex: 1 1 12rem; }
+.lg-seq-controls { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.lg-seq-btn {
+  padding: 0.3rem 0.65rem; border-radius: 0.45rem; border: 1px solid #2b3a52;
+  background: #16283c; color: #cfe6ff; font-size: 0.78rem; cursor: pointer;
+}
+.lg-seq-btn:hover { border-color: #3d7fbf; }
+.lg-seq-speed {
+  padding: 0.28rem 0.5rem; border-radius: 0.4rem; border: 1px solid #24314a;
+  background: transparent; color: #7f93ad;
+  font: 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer;
+}
+.lg-seq-speed.is-active { border-color: #4fd18b; color: #b8f2d2; }
+.lg-seq-time {
+  margin-left: auto; font: 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0;
+}
+
+/* Montaż widoczny w świecie: co reżyser wybrał, dlaczego i na jakim dowodzie. */
+.lg-world-shot {
+  /* Top-left, not centred: the comparison panel owns top-right, and a
+     centred overlay collided with it whenever both were showing at once. */
+  position: absolute; left: 1rem; top: 1rem;
+  z-index: 6; max-width: 26rem; min-width: 18rem;
+  padding: 0.6rem 0.75rem; border-radius: 0.55rem;
+  background: rgba(8, 13, 22, 0.86); border: 1px solid #24314a; border-left: 3px solid #4fd18b;
+  backdrop-filter: blur(6px);
+}
+.lg-world-shot-head { display: flex; gap: 0.55rem; align-items: baseline; flex-wrap: wrap; }
+.lg-world-shot-kind {
+  font: 600 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em; color: #8ecbff;
+}
+.lg-world-shot-temporal { color: #4fd18b; }
+.lg-world-shot-event { color: #ffc061; }
+.lg-world-shot-cam, .lg-world-shot-time {
+  font: 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7f93ad;
+}
+.lg-world-shot-time { margin-left: auto; }
+.lg-world-shot-reason { margin: 0.3rem 0 0; color: #cfe0f2; font-size: 0.8rem; line-height: 1.45; }
+.lg-world-shot-clock { margin: 0.25rem 0 0; color: #f0c542; font-size: 0.7rem; line-height: 1.4; }
+.lg-world-shot-evidence { margin: 0.25rem 0 0; display: flex; gap: 0.5rem; align-items: baseline; }
+.lg-world-shot-evid-id {
+  font: 0.64rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #5c6b80; word-break: break-all;
+}
+.lg-world-shot-replay {
+  font: 600 0.6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.15rem 0.35rem; border-radius: 0.25rem; letter-spacing: 0.06em;
+}
+.lg-world-shot-replay.is-match { background: #12291f; color: #7fe3ab; border: 1px solid #2c6b48; }
+.lg-world-shot-replay.is-drift { background: #2c2413; color: #f0c542; border: 1px solid #6b5a2c; }
+.lg-world-shot-replay.is-blocked { background: #2c1616; color: #f28a8a; border: 1px solid #6b2c2c; }
+
+/* Inspekcja zdarzenia: panel NAD światem, nie zamiast świata. */
+.lg-insp {
+  position: absolute; right: 1rem; top: 1rem; z-index: 8; width: min(26rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem); overflow-y: auto;
+  padding: 0.85rem 0.95rem; border-radius: 0.7rem;
+  background: rgba(8, 13, 22, 0.94); border: 1px solid #2b3a52; border-left: 3px solid #8ecbff;
+  backdrop-filter: blur(8px); display: flex; flex-direction: column; gap: 0.4rem;
+}
+.lg-insp-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.lg-insp-kind {
+  font: 600 0.62rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em; color: #8ecbff;
+}
+.lg-insp-kind-anomaly, .lg-insp-kind-failure, .lg-insp-kind-alert { color: #ff9d7a; }
+.lg-insp-kind-intervention { color: #4fd18b; }
+.lg-insp-kind-threshold_crossing { color: #ffc061; }
+.lg-insp-type { font-size: 0.7rem; color: #6f83a0; flex: 1; word-break: break-all; }
+.lg-insp-close {
+  background: transparent; border: none; color: #7f93ad; font-size: 1.2rem;
+  line-height: 1; cursor: pointer; padding: 0 0.2rem;
+}
+.lg-insp-close:hover { color: #e6eefa; }
+.lg-insp-row { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.5rem; align-items: baseline; }
+.lg-insp-label {
+  font: 600 0.6rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em; text-transform: uppercase; color: #64748b;
+}
+.lg-insp-value { color: #cfe0f2; font-size: 0.82rem; }
+.lg-insp-value code { color: #9fd0ff; font-size: 0.76rem; }
+/* Brak danych ma wyglądać jak brak danych — nie jak wartość. */
+.lg-insp-absent { color: #6b7280; font-style: italic; font-size: 0.78rem; }
+.lg-insp-warn { color: #f0c542; font-size: 0.76rem; }
+.lg-insp-entities, .lg-insp-origin { color: #7f93ad; font-size: 0.76rem; }
+.lg-insp-block { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.35rem; }
+.lg-insp-obs { margin: 0; color: #cfe0f2; font-size: 0.8rem; line-height: 1.45; }
+.lg-insp-obs code { color: #9fd0ff; font-size: 0.72rem; word-break: break-all; }
+.lg-insp-replaybadge {
+  margin-left: 0.4rem; padding: 0.1rem 0.3rem; border-radius: 0.25rem;
+  font: 600 0.58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.lg-insp-replaybadge.is-match { background: #12291f; color: #7fe3ab; }
+.lg-insp-replaybadge.is-drift { background: #2c2413; color: #f0c542; }
+.lg-insp-replaybadge.is-blocked { background: #2c1616; color: #f28a8a; }
+.lg-insp-chain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.lg-insp-chain li {
+  display: flex; justify-content: space-between; gap: 0.5rem;
+  font: 0.7rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7f93ad;
+  padding-left: 0.5rem; border-left: 2px solid #24314a;
+}
+.lg-insp-chain li.is-current { color: #cfe6ff; border-left-color: #8ecbff; }
+.lg-insp-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.lg-insp-replay {
+  padding: 0.4rem 0.8rem; border-radius: 0.5rem; border: 1px solid #4fd18b60;
+  background: #12291f; color: #b8f2d2; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.lg-insp-replay:hover { border-color: #4fd18b; }
+.lg-insp-seed { font: 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6f83a0; }
+.lg-insp-noreplay { color: #8b9ab0; font-size: 0.76rem; line-height: 1.4; }
+
+/* Szyna zdarzeń: realne zdarzenia przebiegu, wybieralne. */
+.lg-rail {
+  position: absolute; left: 1rem; bottom: 1rem; z-index: 7; display: flex; flex-direction: column; gap: 0.3rem;
+  max-width: 20rem;
+}
+.lg-rail-title {
+  font: 600 0.6rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em; color: #64748b;
+}
+.lg-rail-items { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.lg-rail-item {
+  padding: 0.25rem 0.5rem; border-radius: 0.35rem; border: 1px solid #24314a;
+  background: rgba(8, 13, 22, 0.86); color: #9fb4cd;
+  font: 0.68rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer;
+}
+.lg-rail-item:hover { border-color: #8ecbff; color: #cfe6ff; }
+.lg-rail-item.is-selected { border-color: #8ecbff; color: #cfe6ff; background: #16283c; }
+/* The chat card is normal document flow, not a fixed-height 3D viewport —
+   the base .lg-rail's absolute bottom-left pin would sit on top of
+   whatever the card renders last (the "Wejdź do świata" action row). */
+.lg-rail-inline { position: static; max-width: none; margin: 0.2rem 0; }
+/* LOOKING GLASS 2.1 — the live observation console overlaid on a 3D world screen (city/lab): same
+   .lg-obs internals as the chat's console, positioned as a HUD panel since these screens are fixed-
+   height viewports, not normal document flow (see .lg-rail-inline's own note above). */
+.lg-obs-live { position: absolute; left: 1rem; top: 1rem; z-index: 8; max-width: 22rem; }
+.lg-obs-live .lg-obs { background: rgba(8, 13, 22, 0.92); backdrop-filter: blur(8px); }
+.lg-obs-status {
+  align-self: flex-start; padding: 0.15rem 0.5rem; border-radius: 999px;
+  font: 600 0.6rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.08em;
+  border: 1px solid #2b3a52; color: #8ecbff;
+}
+.lg-obs-status.is-failed { color: #f28a8a; border-color: #6b2c2c; }
+.lg-obs-status.is-executed { color: #7fe3ab; border-color: #2c6b48; }
+.lg-mode-badge {
+  position: absolute; right: 1rem; bottom: 1rem; z-index: 7;
+  padding: 0.3rem 0.65rem; border-radius: 999px;
+  background: rgba(8, 13, 22, 0.9); border: 1px solid #2b3a52;
+  font: 600 0.62rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.1em; color: #8ecbff;
+}
+
+/* Porównanie: prawdziwe metryki dwóch przebiegów, nigdy samo intencji. */
+.lg-cmp {
+  border: 1px solid #24314a; border-left: 3px solid #8ecbff; border-radius: 0.6rem;
+  padding: 0.7rem 0.85rem; display: flex; flex-direction: column; gap: 0.5rem;
+  background: #0a0f18;
+}
+.lg-cmp-blocked_not_comparable, .lg-cmp-blocked_not_modelled { border-left-color: #f0c542; }
+.lg-cmp-title {
+  font: 600 0.64rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em; color: #7f93ad;
+}
+.lg-cmp-sides { display: flex; align-items: baseline; gap: 0.5rem; color: #cfe6ff; font-size: 0.85rem; }
+.lg-cmp-vs { color: #6f83a0; font-size: 0.72rem; }
+.lg-cmp-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.lg-cmp-table td { padding: 0.2rem 0.4rem 0.2rem 0; color: #cfe0f2; }
+.lg-cmp-table td:first-child { color: #7f93ad; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; }
+.lg-cmp-table td.is-down { color: #7fe3ab; }
+.lg-cmp-table td.is-up { color: #f0a4a4; }
+.lg-cmp-produced { margin: 0; font-size: 0.68rem; color: #5c6b80; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-cmp-blocked { margin: 0; color: #f0c542; font-size: 0.82rem; line-height: 1.5; }
+.lg-cmp-evidence { margin: 0; font-size: 0.74rem; color: #9fb6d4; line-height: 1.5; }
+.lg-cmp-fingerprint { color: #5c6b80; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; }
+
+/* Realny zapis do istniejącej Pamięci Naukowej — nigdy druga pamięć. */
+.lg-cmp-commit { display: flex; }
+.lg-cmp-commit-btn {
+  border: 1px solid #2a3a56; border-radius: 0.4rem; background: #101825; color: #8ecbff;
+  font-size: 0.72rem; padding: 0.35rem 0.7rem; cursor: pointer;
+}
+.lg-cmp-commit-btn:hover { background: #16243a; }
+.lg-cmp-committed { margin: 0; font-size: 0.72rem; color: #7fe3ab; line-height: 1.5; }
+.lg-cmp-committed code { color: #cfe0f2; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Panel porównania osadzony W ŚWIECIE (nie w czacie) — ta sama karta, inna pozycja. */
+.lg-world-cmp {
+  position: absolute; right: 1rem; top: 1rem; z-index: 6; max-width: 24rem;
+  max-height: calc(100% - 2rem); overflow-y: auto;
+}
+.lg-world-cmp .lg-cmp { background: rgba(8, 13, 22, 0.94); backdrop-filter: blur(8px); }
+
+/* Byty dotknięte zdarzeniem: realne wartości z modelu, nie tylko id. */
+.lg-insp-entity { display: flex; flex-direction: column; gap: 0.1rem; margin-bottom: 0.2rem; }
+.lg-insp-entity-label { color: #cfe0f2; font-size: 0.78rem; }
+.lg-insp-entity-props { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lg-insp-prop {
+  font: 0.68rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #9fd0ff;
+  background: #10192840; padding: 0.05rem 0.35rem; border-radius: 0.25rem;
+}
+.lg-insp-hyp-ids { font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #9fb4cd; }
+
+/* Przed / po: dwa realne odczyty z żywego C3 TemporalEngine, nie jedna migawka. */
+.lg-insp-delta { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.15rem; }
+.lg-insp-delta-key { color: #7f93ad; font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-insp-delta-values { color: #cfe0f2; font: 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-insp-delta-values .is-down { color: #7fe3ab; }
+.lg-insp-delta-values .is-up { color: #f0a4a4; }
+
+/* LOOKING GLASS 2.0 — the observation console: one field, one answer. */
+.lg-obs {
+  border: 1px solid #24314a; border-radius: 0.7rem; padding: 0.7rem 0.85rem;
+  display: flex; flex-direction: column; gap: 0.5rem; background: #0a0f18;
+}
+.lg-obs-title {
+  font: 600 0.64rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em; color: #7f93ad;
+}
+.lg-obs-form { display: flex; gap: 0.5rem; }
+.lg-obs-input {
+  flex: 1; background: #0d1420; border: 1px solid #2a3a56; border-radius: 0.4rem;
+  color: #e7edf6; padding: 0.4rem 0.6rem; font-size: 0.82rem;
+}
+.lg-obs-send {
+  border: 1px solid #2a3a56; border-radius: 0.4rem; background: #16243a; color: #8ecbff;
+  padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer;
+}
+.lg-obs-send:disabled { opacity: 0.5; cursor: default; }
+.lg-obs-examples { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lg-obs-example {
+  border: 1px solid #24314a; border-radius: 0.4rem; background: transparent; color: #7f93ad;
+  padding: 0.3rem 0.55rem; font-size: 0.72rem; cursor: pointer; text-align: left;
+}
+.lg-obs-example:hover { border-color: #8ecbff; color: #cfe6ff; }
+.lg-obs-result { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.lg-obs-narration { margin: 0; color: #cfe0f2; font-size: 0.84rem; line-height: 1.5; }
+.lg-obs-reasons { margin: 0; padding-left: 1.1rem; color: #f0c542; font-size: 0.76rem; line-height: 1.5; }
+.lg-obs-camera { margin: 0; color: #6f83a0; font-size: 0.7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lg-obs-camera code { color: #9fd0ff; }
+.lg-obs-explain { display: flex; flex-direction: column; gap: 0.2rem; }
+.lg-obs-deltas { margin: 0; padding-left: 1.1rem; color: #cfe0f2; font-size: 0.78rem; line-height: 1.5; }
+.lg-obs-nodelta { margin: 0; color: #6f83a0; font-size: 0.78rem; font-style: italic; }
+.lg-obs-cause, .lg-obs-consequence, .lg-obs-grounding { margin: 0; color: #9fb4cd; font-size: 0.76rem; }
+.lg-obs-grounding code { color: #f0c542; }
+
+/* CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump/hospital 3D screen. */
+.gsc-stage { position: relative; width: 100%; height: 100vh; background: #0c1420; }
+.gsc-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gsc-panel {
+  position: absolute; right: 1rem; top: 1rem; z-index: 8; max-width: 24rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  border: 1px solid #24314a; border-radius: 0.7rem; padding: 0.7rem 0.85rem;
+  background: rgba(8, 13, 22, 0.92); backdrop-filter: blur(8px); color: #cfe0f2; font-size: 0.82rem;
+}
+.gsc-panel-row { display: flex; gap: 0.5rem; align-items: center; }
+.gsc-panel button { border: 1px solid #2b3a52; background: #16283c; color: #cfe6ff; border-radius: 0.4rem; padding: 0.3rem 0.6rem; cursor: pointer; }
+.gsc-panel button:hover { border-color: #8ecbff; }
+.gsc-panel button:disabled { opacity: 0.5; cursor: default; }
+.gsc-fail-btn { background: #2c1616; border-color: #6b2c2c; color: #f28a8a; }
+.gsc-outcome { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.gsc-branch-toggle { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.gsc-caption { color: #9fb4cd; font-size: 0.76rem; }
+.gsc-causal, .gsc-comparison { border-top: 1px solid #1c2637; padding-top: 0.5rem; }
+.gsc-causal ol { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.gsc-causal li { color: #cfe0f2; font-size: 0.78rem; line-height: 1.5; }
+.gsc-comparison table { width: 100%; border-collapse: collapse; margin-top: 0.3rem; font-size: 0.7rem; }
+.gsc-comparison td { padding: 0.2rem 0.3rem; border-top: 1px solid #1c2637; color: #9fb4cd; word-break: break-all; }
+.gsc-comparison td:first-child { color: #cfe6ff; font-weight: 600; white-space: nowrap; }

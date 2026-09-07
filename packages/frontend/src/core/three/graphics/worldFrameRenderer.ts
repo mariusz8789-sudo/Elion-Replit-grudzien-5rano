@@ -273,6 +273,19 @@ export class WorldFrameRenderer {
   }
 
   /**
+   * Looks up the individual `Object3D` currently tracked for an OBJECT-kind entity id — the
+   * inverse of `resolveEntityId`, for a caller (typically an interaction layer applying a hover/
+   * select highlight) that has an id and needs the object, not a raycast hit to resolve one from.
+   * Returns `null` for an unknown id, a currently-invisible entity, OR an `'instanced'`-kind entity
+   * — the latter has no individual `Object3D` to hand back at all (its visual is one shared instance
+   * slot inside a batched `InstancedMesh`); a caller needing to highlight an instanced entity must
+   * use `instancing.ts`'s `setInstanceColor` against that batch directly instead.
+   */
+  getObjectForEntity(id: WorldFrameEntityId): THREE_NS.Object3D | null {
+    return this.tracked.get(id)?.object ?? null;
+  }
+
+  /**
    * Maps a raw `THREE.Raycaster` hit back to the WorldFrame entity id it belongs to — the one piece
    * of bookkeeping `graphics/interaction.ts`'s `InteractionController` (or any caller doing its own
    * picking) needs to turn "the user clicked here" into "the user clicked entity X," without this

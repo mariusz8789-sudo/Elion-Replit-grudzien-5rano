@@ -1,15 +1,36 @@
-import type { WorldState } from '../world/scientificWorldState';
+import type { ReplayState, WorldState } from '../world/scientificWorldState';
 import { captureWorldTimeline, type WorldCaptureTimeline } from '../world/worldCapture';
 import { projectCellWorldStates } from '../world/cellWorldAdapter';
 import { executePreregisteredHypotheses, preregisterHypotheses, generateCompetingHypotheses, HYPOTHESIS_PROBLEMS } from '../experimentFabric/hypothesisLoop';
-import { runScenario, SCENARIOS, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
+import { DEFAULT_SCENARIO_RUN, runScenario, SCENARIOS, type ScenarioId, type ScenarioRun } from '../simulation/scenarioEngine';
+import { runScenarioCounterfactual, type ScenarioCounterfactual } from '../simulation/scenarioCounterfactual';
+import { saveScenarioCounterfactualToMemory } from '../scienceMemory';
+import type { SavedExperiment } from '../scienceMemory';
 import { registerScenarioTimeline, setPendingScenarioTimeline } from '../experimentFabric/worldHandoff';
 import { projectEpidemiologyWorldStates } from '../world/epidemiologyWorldAdapter';
 import { buildAnchoredSequence, type AnchoredTemporalSequence, type TemporalAnchor } from './anchoredTemporal';
+import type { WorldBounds as ScenarioWorldBounds } from './scenarioWorld';
 import { buildShotPlan, type ShotPlan } from './shotPlan';
+import { compareEpidemicRuns, compareHypothesisRanking, compareWorldModelBranches, type ScenarioComparisonView } from './scenarioComparison';
+import { buildExperienceTimeline, type ExperienceTimeline } from './experienceOrchestrator';
+import { buildScenarioWorld, type PerspectiveOption, type ScenarioWorld } from './scenarioWorld';
+import { PERSPECTIVES, perspectiveRequest, placeCamera, type PerspectiveRequest } from './perspective';
+import { DOMAIN_PERSPECTIVE_SOURCE } from './scenarioResolution';
 import { setPendingLookingGlassExperience } from './sessionHandoff';
 import { parseScenarioRequest, type StructuredScenarioRequest } from './scenarioRequest';
 import { resolveScenarioRequest, type ScenarioResolution, type ScenarioRunPlan } from './scenarioResolution';
+import {
+  buildChemistryExperimentWorld, CHEMISTRY_KINETICS_DOMAIN_ID, CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver,
+} from '../worldModel/domains/chemistryKinetics';
+import {
+  buildHydraulicsWorld, HYDRAULICS_DOMAIN_ID, HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver,
+} from '../worldModel/domains/hydraulicsPumpPipe';
+import { PUMP_PIPE_DEFAULTS } from '../engineeringGraph/pumpPipe';
+import { TemporalBranchRegistry, TemporalEngine } from '../worldModel/temporal/temporalEngine';
+import { SolverRouter, type SolverRouteReport } from '../worldModel/solvers/solverRouter';
+import { compareBranches, projectToWorldState } from '../worldModel/bridge/worldFrameState';
+import { describeMoment, type WorldModelMoment } from './worldModelMoment';
+import { verifiedReplayAt } from './worldModelReplay';
 
 /**
  * LOOKING GLASS — THE VERTICAL SLICE.
@@ -48,10 +69,20 @@ export interface LookingGlassSession {
   readonly shotPlan: ShotPlan;
   /** Present when the viewpoint is one a person occupies. */
   readonly anchored: AnchoredTemporalSequence | null;
+  /**
+   * The shot plan laid out on a real clock — what the viewer sees at any
+   * instant. Empty when the scenario did not resolve.
+   */
+  readonly experience: ExperienceTimeline;
   /** The engine that produced `states`, for provenance in the UI. */
   readonly producedBy: string;
   /** The engine that produced the temporal progression the anchor plays. */
   readonly temporalSource: string;
+  /**
+   * The domain-independent view every layer above this one talks to. Null
+   * only when the scenario did not resolve.
+   */
+  readonly world: ScenarioWorld | null;
   /**
    * Route that renders this world, or null when the scenario resolved but no
    * 3D surface exists for it. A caller must hide the entry affordance rather
@@ -60,28 +91,90 @@ export interface LookingGlassSession {
   readonly worldRoute: string | null;
   /** Arms the world bridge and returns whether a world is now waiting. */
   readonly enterWorld: () => boolean;
+  /**
+   * A REAL comparison, computed by the same engine that computed the rest of
+   * the session — never true merely because the sentence said "compare".
+   * Null whenever no second run or ranking was actually produced, whether
+   * because the user did not ask, or because the engine itself blocked the
+   * comparison (different seed, a tie between candidates, and so on).
+   */
+  readonly comparison: ScenarioComparisonView | null;
+  /**
+   * Persists `comparison` into the existing Scientific Memory — the same
+   * store the first-person lab session and `ScientificMemoryScreen` already
+   * write to and replay from (`saveScenarioCounterfactualToMemory`). This is
+   * the real bridge from a Looking Glass session to Genesis's durable,
+   * replay-verified scientific record: no second memory, no second replay
+   * protocol. Returns `null` when there is no comparison, or when this
+   * domain's comparison has no counterfactual artifact behind it to save
+   * (see `buildLaboratorySession`) — never a fabricated record.
+   */
+  readonly commitComparisonToMemory: () => SavedExperiment | null;
+  /**
+   * The same real comparison mechanism as `comparison`, callable ON DEMAND
+   * for a later "what if"/"compare" observation rather than only at open
+   * time — the exact same fork/ranking each domain already knows how to
+   * make (memoized where computing it is non-trivial), never a second
+   * comparison mechanism built for follow-up questions.
+   */
+  readonly requestComparison: () => ScenarioComparisonView | null;
+  /**
+   * Before/after/why for this session's own focal entity, at a tick on this
+   * session's own clock — powered by the real C3 bridge
+   * (`describeWorldMoment`/`explainEntityChange`, `worldModelMoment.ts`).
+   * Null for every domain that does not run on a live `TemporalEngine`
+   * (epidemic, laboratory) — never approximated from `states` instead.
+   */
+  readonly describeEntityMoment: (atTick: number) => WorldModelMoment | null;
 }
 
-/** Anchors are placement, not science: where a person stands to watch. */
-const ANCHORS: Readonly<Record<string, TemporalAnchor>> = {
-  street: { position: [0, 0, 6], yaw: Math.PI, pitch: -0.05, eyeHeight: 1.7, label: 'street' },
-  bench: { position: [2.5, 0, 7], yaw: Math.PI * 0.85, pitch: -0.08, eyeHeight: 1.25, label: 'bench' },
-  rooftop: { position: [0, 12, 10], yaw: Math.PI, pitch: -0.35, eyeHeight: 1.7, label: 'rooftop' },
-  window: { position: [-4, 3, 8], yaw: Math.PI * 0.9, pitch: -0.15, eyeHeight: 1.6, label: 'window' },
-  coast: { position: [0, 1, 14], yaw: Math.PI, pitch: -0.05, eyeHeight: 1.7, label: 'coast' },
-  room: { position: [0, 0, 3.3], yaw: 0, pitch: 0, eyeHeight: 1.7, label: 'room' },
-};
+/**
+ * Which perspectives this scenario really offers, and why not for the rest.
+ * Read straight off the capability table so a UI cannot advertise a vantage
+ * the world has no place to stand in.
+ */
+function perspectivesFor(kind: Parameters<typeof DOMAIN_PERSPECTIVE_SOURCE>[0]): readonly PerspectiveOption[] {
+  return DOMAIN_PERSPECTIVE_SOURCE(kind);
+}
 
-const DEFAULT_ANCHOR: TemporalAnchor = ANCHORS.room;
+/**
+ * Where the vantage stands, DERIVED rather than looked up. The old table of
+ * hardcoded coordinates per hint string meant each world needed its own
+ * positions and each new vantage meant editing a switch; a placement is now
+ * computed from the perspective definition and the world's real extent, so
+ * the same CITIZEN vantage works in a twelve-metre laboratory and a
+ * sixty-metre city without either knowing it exists.
+ */
+function anchorFor(plan: ScenarioRunPlan, bounds: ScenarioWorldBounds): TemporalAnchor | null {
+  const definition = PERSPECTIVES[plan.viewpoint.kind];
+  if (definition.eyeHeight === null) return null;
 
-function anchorFor(plan: ScenarioRunPlan): TemporalAnchor | null {
-  const embodied = plan.viewpoint.kind === 'ANCHORED_HUMAN'
-    || plan.viewpoint.kind === 'SCIENTIST_POV'
-    || plan.viewpoint.kind === 'OPERATOR_POV'
-    || plan.viewpoint.kind === 'RESPONDER_POV';
-  if (!embodied) return null;
-  const hint = plan.viewpoint.anchorHint;
-  return (hint && ANCHORS[hint]) || DEFAULT_ANCHOR;
+  const target: [number, number, number] = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    bounds.min[1] + definition.eyeHeight,
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  const placement = placeCamera(perspectiveRequest(plan.viewpoint.kind, target, bounds));
+  const [px, , pz] = placement.position;
+  return {
+    position: placement.position,
+    // Face the subject from wherever the placement put us.
+    yaw: Math.atan2(target[0] - px, target[2] - pz),
+    pitch: definition.elevation * -1,
+    eyeHeight: definition.eyeHeight,
+    label: plan.viewpoint.anchorHint ?? definition.label.toLowerCase(),
+  };
+}
+
+/** The request handed to the Graphics Engine camera rig once it exists. */
+export function cameraRequestFor(plan: ScenarioRunPlan, bounds: ScenarioWorldBounds): PerspectiveRequest {
+  const definition = PERSPECTIVES[plan.viewpoint.kind];
+  const target: [number, number, number] = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    bounds.min[1] + (definition.eyeHeight ?? (bounds.max[1] - bounds.min[1]) * 0.4),
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  return perspectiveRequest(plan.viewpoint.kind, target, bounds);
 }
 
 /**
@@ -101,12 +194,38 @@ interface SessionBuild {
   readonly producedBy: string;
   readonly temporalTicks: readonly number[];
   readonly temporalSource: string;
+  /** A REAL comparison, only when one was actually computed. */
+  readonly comparison: ScenarioComparisonView | null;
+  /**
+   * Computes (or re-returns, memoized) the same real comparison — the
+   * on-demand path for a later "what if"/"compare" observation, reusing
+   * the exact fork this domain already knows how to make. For a domain
+   * with no live engine to re-fork (epidemic, laboratory), this can only
+   * ever return what was already computed at open time — never a new one
+   * built outside `buildEpidemicSession`/`buildLaboratorySession`.
+   */
+  readonly requestComparison: () => ScenarioComparisonView | null;
+  /**
+   * The real counterfactual behind `comparison`, when the domain's engine
+   * produces a savable one. Kept out of `ScenarioComparisonView` because that
+   * type is a plain, domain-independent shape — this is the actual engine
+   * artifact underneath it, present only for the epidemic path today.
+   */
+  readonly counterfactual: ScenarioCounterfactual | null;
   /** Registered handoff id, when this run has a 3D world to be entered. */
   readonly handoffRunId: string | null;
   /** Route that renders this world, or null when none exists yet. */
   readonly worldRoute: string | null;
   /** Pre-registered problem behind `states`, so a lab can run the same one. */
   readonly problemId: string | null;
+  /** Extent of the world a perspective can be placed in, in metres. */
+  readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
+  /**
+   * The live C3 engine and its focal entity, present only for a domain built
+   * on `core/worldModel/*` — powers `describeEntityMoment`. Null for
+   * scenarioEngine/hypothesisLoop-backed domains, which have no such engine.
+   */
+  readonly worldModel: { readonly engine: TemporalEngine; readonly focalEntityId: string } | null;
 }
 
 /**
@@ -126,7 +245,38 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
   // means sixty days the model actually computed — not sixty frames drawn
   // over a shorter run.
   const scenarioId: ScenarioId = plan.kind === 'QUARANTINE' ? 'ISOLATION' : 'BASELINE';
-  const run = runScenario(scenarioId, { days: plan.ticks });
+
+  // A real comparison, computed only when the sentence actually asked for
+  // one — never assumed from the word "compare" alone. ISOLATION is the
+  // model's own canonical intervention: comparing it against BASELINE is
+  // "what does isolation change", which is what a bare "compare" without a
+  // named second scenario can honestly mean. Both arms go through the SAME
+  // counterfactual engine `buildLabCounterfactual` uses and Scientific
+  // Memory persists — not a second, Looking-Glass-only pairing of two raw
+  // runs — so the comparison also carries a measured divergence day and a
+  // fingerprint a saved copy can be replayed against.
+  // Extracted as a memoized closure so a LATER "what if"/"compare"
+  // observation can trigger the exact same counterfactual on demand
+  // (`requestComparison`) without a second run when it was already
+  // computed here, and without building a second counterfactual mechanism.
+  let memoizedCounterfactual: ScenarioCounterfactual | null | undefined;
+  const computeCounterfactual = (): ScenarioCounterfactual | null => {
+    if (memoizedCounterfactual !== undefined) return memoizedCounterfactual;
+    return (memoizedCounterfactual = runScenarioCounterfactual({
+      baselineScenarioId: 'BASELINE',
+      variantScenarioId: 'ISOLATION',
+      days: plan.ticks,
+      stepsPerDay: DEFAULT_SCENARIO_RUN.stepsPerDay,
+      baseParams: {},
+    }));
+  };
+  const counterfactual = plan.comparison ? computeCounterfactual() : null;
+  const comparison = counterfactual ? compareEpidemicRuns(counterfactual) : null;
+  // Reuse the counterfactual's own arm instead of running the model a third
+  // time when a comparison was already computed.
+  const run = counterfactual
+    ? (scenarioId === 'ISOLATION' ? counterfactual.variant : counterfactual.baseline)
+    : runScenario(scenarioId, { days: plan.ticks });
 
   // Hand the real day series to the existing world bridge rather than
   // inventing a second channel: `worldHandoff` is already the only road a
@@ -144,6 +294,15 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
     handoffRunId,
     worldRoute: handoffRunId ? '#/city3d' : null,
     problemId: problem.problemId,
+    // The city grid the epidemic runs on, in metres.
+    bounds: { min: [-30, 0, -30], max: [30, 20, 30] },
+    comparison,
+    requestComparison: () => {
+      const cf = computeCounterfactual();
+      return cf ? compareEpidemicRuns(cf) : null;
+    },
+    counterfactual,
+    worldModel: null,
   };
 }
 
@@ -174,12 +333,28 @@ function registerRun(run: ScenarioRun, runId: string): string | null {
  * the states carry genuine epistemic status (SUPPORTED/FALSIFIED/...) rather
  * than a curve drawn for the camera.
  */
-function buildLaboratorySession(): SessionBuild {
+function buildLaboratorySession(plan: ScenarioRunPlan): SessionBuild {
   const problem = HYPOTHESIS_PROBLEMS.find((candidate) => candidate.modelId === 'biology-logistic') ?? HYPOTHESIS_PROBLEMS[0];
   const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
   const states = projectCellWorldStates(result);
+  // The loop already ran every candidate hypothesis — the ranking between
+  // them exists whether or not comparison was requested. It is exposed only
+  // when the sentence actually asked for it, so `session.comparison` stays a
+  // read of intent-matched-to-reality rather than "whatever happened to be
+  // lying around".
+  const comparison = plan.comparison ? compareHypothesisRanking(problem, result.discrimination) : null;
   return {
     states,
+    comparison,
+    // The loop already ran every candidate hypothesis regardless of whether
+    // comparison was requested — a later "what if" observation can read the
+    // SAME ranking on demand, computing nothing new.
+    requestComparison: () => compareHypothesisRanking(problem, result.discrimination),
+    // The hypothesis ranking has no counterfactual-engine artifact behind it
+    // — it is not a saved baseline/variant pair, so there is nothing honest
+    // to commit to Scientific Memory. `commitComparisonToMemory` on the
+    // session reports this domain as unsupported rather than fabricating one.
+    counterfactual: null,
     producedBy: `hypothesisLoop.executePreregisteredHypotheses(${problem.problemId})`,
     // The laboratory world advances per projected state; there is no separate
     // finer series to play through, and inventing one would be fabrication.
@@ -190,6 +365,213 @@ function buildLaboratorySession(): SessionBuild {
     handoffRunId: null,
     worldRoute: '#/first-person-lab',
     problemId: problem.problemId,
+    // The laboratory hall, in metres — see labScene3D's ROOM.
+    bounds: { min: [-6, 0, -13.4], max: [6, 4.6, 4.5] },
+    worldModel: null,
+  };
+}
+
+/**
+ * CHEMISTRY / MOLECULAR KINETICS — the real C3 World Model engine. A live
+ * `WorldGraph` holding one substance is advanced tick by tick by the real
+ * Arrhenius solver (`chemistryKinetics.ts`); each tick's `WorldState` is
+ * `projectToWorldState`'d off the SAME graph the engine owns, so the state
+ * series and the live engine are always looking at one history, never two.
+ * The only thing built here is the wiring: no decay equation, no time
+ * integration, no grounding rule is reimplemented.
+ */
+const CHEMISTRY_INITIAL_TEMPERATURE_K = 750;
+/** How far the forked branch's temperature diverges at the fork point — cooling slows decay, giving a real, non-trivial comparison (see worldModelTrinityIntegration.test.ts's own cooled-branch pattern). */
+const CHEMISTRY_FORK_TEMPERATURE_DELTA_K = -50;
+/** One tick == one real hour, matching this domain's HOUR unit. */
+const CHEMISTRY_DT_SECONDS = 3600;
+
+function buildChemistrySession(plan: ScenarioRunPlan): SessionBuild {
+  const world = buildChemistryExperimentWorld({ initialTemperatureK: CHEMISTRY_INITIAL_TEMPERATURE_K });
+  const registry = new TemporalBranchRegistry();
+  const engine = new TemporalEngine(world.graph, { label: 'baseline', registry });
+  const router = new SolverRouter();
+  router.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
+  const worldId = `chemistry:${plan.kind}`;
+
+  // REPLAY INTEGRITY: an independent second engine, rebuilt from the same
+  // declared construction and re-executed in lockstep. There is no saved
+  // artifact to replay FROM for this engine yet (see commitComparisonToMemory
+  // below) — this is what a genuine replay claim means before one exists:
+  // does re-running the same construction actually reproduce the same
+  // scalars, checked at every tick, not assumed from "the solver has no
+  // randomness". A real DRIFT here would mean a real bug, and would be
+  // reported as one — MATCH is never asserted without the comparison.
+  const verifyWorld = buildChemistryExperimentWorld({ initialTemperatureK: CHEMISTRY_INITIAL_TEMPERATURE_K });
+  const verifyEngine = new TemporalEngine(verifyWorld.graph, { label: 'replay-verify' });
+  const verifyRouter = new SolverRouter();
+  verifyRouter.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
+
+  const replayAt = (tick: number): ReplayState =>
+    verifiedReplayAt(engine, world.substanceId, verifyEngine, verifyWorld.substanceId, tick);
+
+  // Tick 0: the substance before any solver step — nothing has happened yet,
+  // so this state carries no event, honestly. Both engines start from the
+  // same construction, so tick 0's replay check is a real (if trivial)
+  // confirmation that construction itself is reproducible.
+  const states: WorldState[] = [
+    projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, 0, undefined, replayAt(0)),
+  ];
+  for (let hour = 1; hour <= plan.ticks; hour++) {
+    const captured: { report: SolverRouteReport | null } = { report: null };
+    engine.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => {
+      captured.report = router.routeTick(graph, dt, tick);
+      return captured.report;
+    });
+    verifyEngine.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => verifyRouter.routeTick(graph, dt, tick));
+    states.push(projectToWorldState(engine.graph, worldId, CHEMISTRY_KINETICS_DOMAIN_ID, engine.tick, {
+      observations: captured.report?.observations ?? [],
+      events: captured.report?.events ?? [],
+    }, replayAt(engine.tick)));
+  }
+
+  // A real fork/counterfactual: halfway through the run, a second branch
+  // diverges by a genuine temperature intervention (not a relabeled clone),
+  // then both branches run to the same final tick so `compareBranches`
+  // compares like with like. Extracted as a closure — computed eagerly when
+  // the sentence asked for it, and callable again ON DEMAND (memoized) by
+  // `requestComparison`, e.g. from a later "what if" observation — the
+  // SAME fork, never a second one built for the follow-up question.
+  let memoizedComparison: ScenarioComparisonView | null | undefined;
+  const computeComparison = (): ScenarioComparisonView | null => {
+    if (memoizedComparison !== undefined) return memoizedComparison;
+    if (plan.ticks < 2) return (memoizedComparison = null);
+    const forkTick = Math.floor(plan.ticks / 2);
+    const cooled = engine.forkBranch(forkTick, 'cooled', (graph) => {
+      const current = graph.getEntity(world.substanceId);
+      graph.updateEntity(world.substanceId, {
+        physics: { ...current.physics!, temperatureK: (current.physics!.temperatureK ?? CHEMISTRY_INITIAL_TEMPERATURE_K) + CHEMISTRY_FORK_TEMPERATURE_DELTA_K },
+      });
+    });
+    for (let hour = forkTick + 1; hour <= plan.ticks; hour++) {
+      cooled.advance(CHEMISTRY_DT_SECONDS, (graph, dt, tick) => router.routeTick(graph, dt, tick));
+    }
+    const branchComparison = compareBranches(registry, engine.branchId, cooled.branchId, plan.ticks);
+    return (memoizedComparison = compareWorldModelBranches(branchComparison, world.substanceId, {
+      baseline: `${CHEMISTRY_INITIAL_TEMPERATURE_K}K throughout`,
+      variant: `cooled to ${CHEMISTRY_INITIAL_TEMPERATURE_K + CHEMISTRY_FORK_TEMPERATURE_DELTA_K}K at hour ${forkTick}`,
+    }));
+  };
+  const comparison = plan.comparison ? computeComparison() : null;
+
+  return {
+    states,
+    comparison,
+    requestComparison: computeComparison,
+    // No ScenarioCounterfactual/Scientific-Memory artifact exists for this
+    // engine yet — commitComparisonToMemory honestly reports this domain as
+    // unsupported rather than inventing one.
+    counterfactual: null,
+    producedBy: `worldModel.TemporalEngine(${CHEMISTRY_KINETICS_SOLVER_ID}, ${plan.ticks} ticks)`,
+    temporalTicks: states.map((state) => state.tick),
+    temporalSource: `worldModel.TemporalEngine.advance(dt=${CHEMISTRY_DT_SECONDS}s)`,
+    // No 3D rendering surface exists for this domain yet — that is the
+    // Graphics Engine's to build, not Looking Glass's.
+    handoffRunId: null,
+    worldRoute: null,
+    problemId: null,
+    // A small lab-scale placement box — there is no renderer to occupy it
+    // yet, but a perspective still needs SOME real extent to be placed in.
+    bounds: { min: [-1, 0, -1], max: [1, 2, 1] },
+    worldModel: { engine, focalEntityId: world.substanceId },
+  };
+}
+
+/**
+ * HYDRAULICS / PUMP-PIPE — the same real C3 engine family as chemistry, a
+ * different real domain solver (`hydraulicsPumpPipe.ts`, wrapping the
+ * existing Darcy-Weisbach/Swamee-Jain `engineeringGraph/pumpPipe.ts`
+ * model). Genuinely different physics from chemistry: this system is
+ * STEADY-STATE, so a tick with no intervention produces the IDENTICAL
+ * state as the one before it — that flatness is the honest, correct answer
+ * for this domain, not a bug to paper over with an invented demand curve.
+ */
+const HYDRAULICS_DT_SECONDS = 1;
+/** Halves the flow rate at the fork point — a real operational intervention, not a relabeled clone. */
+const HYDRAULICS_FORK_FLOW_FRACTION = 0.5;
+
+function buildHydraulicsSession(plan: ScenarioRunPlan): SessionBuild {
+  const world = buildHydraulicsWorld();
+  const registry = new TemporalBranchRegistry();
+  const engine = new TemporalEngine(world.graph, { label: 'baseline', registry });
+  const router = new SolverRouter();
+  router.register(HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver());
+  const worldId = `hydraulics:${plan.kind}`;
+
+  // REPLAY INTEGRITY — the same real, independent-rebuild-and-compare check
+  // chemistry uses (see worldModelReplay.ts), not a second verification
+  // mechanism.
+  const verifyWorld = buildHydraulicsWorld();
+  const verifyEngine = new TemporalEngine(verifyWorld.graph, { label: 'replay-verify' });
+  const verifyRouter = new SolverRouter();
+  verifyRouter.register(HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver());
+  const replayAt = (tick: number): ReplayState =>
+    verifiedReplayAt(engine, world.pumpPipeId, verifyEngine, verifyWorld.pumpPipeId, tick);
+
+  const states: WorldState[] = [
+    projectToWorldState(engine.graph, worldId, HYDRAULICS_DOMAIN_ID, 0, undefined, replayAt(0)),
+  ];
+  for (let tick = 1; tick <= plan.ticks; tick++) {
+    const captured: { report: SolverRouteReport | null } = { report: null };
+    engine.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => {
+      captured.report = router.routeTick(graph, dt, t);
+      return captured.report;
+    });
+    verifyEngine.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => verifyRouter.routeTick(graph, dt, t));
+    states.push(projectToWorldState(engine.graph, worldId, HYDRAULICS_DOMAIN_ID, engine.tick, {
+      observations: captured.report?.observations ?? [],
+      events: captured.report?.events ?? [],
+    }, replayAt(engine.tick)));
+  }
+
+  // A real fork/intervention: halving the flow rate partway through, then
+  // continuing both branches to the same final tick. Same extract-as-closure
+  // pattern as chemistry, for the same reason: `requestComparison` can call
+  // this again later (memoized) without building a second fork mechanism.
+  let memoizedComparison: ScenarioComparisonView | null | undefined;
+  const computeComparison = (): ScenarioComparisonView | null => {
+    if (memoizedComparison !== undefined) return memoizedComparison;
+    if (plan.ticks < 2) return (memoizedComparison = null);
+    const forkTick = Math.floor(plan.ticks / 2);
+    const reducedFlow = PUMP_PIPE_DEFAULTS.volumetricFlow * HYDRAULICS_FORK_FLOW_FRACTION;
+    const throttled = engine.forkBranch(forkTick, 'throttled', (graph) => {
+      const current = graph.getEntity(world.pumpPipeId);
+      graph.updateEntity(world.pumpPipeId, {
+        domainState: { ...current.domainState, volumetricFlow: reducedFlow },
+      });
+    });
+    for (let tick = forkTick + 1; tick <= plan.ticks; tick++) {
+      throttled.advance(HYDRAULICS_DT_SECONDS, (graph, dt, t) => router.routeTick(graph, dt, t));
+    }
+    const branchComparison = compareBranches(registry, engine.branchId, throttled.branchId, plan.ticks);
+    return (memoizedComparison = compareWorldModelBranches(branchComparison, world.pumpPipeId, {
+      baseline: `${PUMP_PIPE_DEFAULTS.volumetricFlow.toFixed(3)} m³/s throughout`,
+      variant: `throttled to ${reducedFlow.toFixed(3)} m³/s at tick ${forkTick}`,
+    }));
+  };
+  const comparison = plan.comparison ? computeComparison() : null;
+
+  return {
+    states,
+    comparison,
+    requestComparison: computeComparison,
+    // No ScenarioCounterfactual/Scientific-Memory artifact exists for this
+    // engine yet — same honest gap as chemistry, not a fabricated one.
+    counterfactual: null,
+    producedBy: `worldModel.TemporalEngine(${HYDRAULICS_PUMP_PIPE_SOLVER_ID}, ${plan.ticks} ticks)`,
+    temporalTicks: states.map((state) => state.tick),
+    temporalSource: `worldModel.TemporalEngine.advance(dt=${HYDRAULICS_DT_SECONDS}s)`,
+    // No 3D rendering surface exists for this domain yet.
+    handoffRunId: null,
+    worldRoute: null,
+    problemId: null,
+    bounds: { min: [-1, 0, -1], max: [1, 2, 1] },
+    worldModel: { engine, focalEntityId: world.pumpPipeId },
   };
 }
 
@@ -214,21 +596,31 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
       timeline: emptyTimeline,
       shotPlan: { planId: 'sp-none', runId: emptyTimeline.runId, worldId: emptyTimeline.worldId, shots: [], markersUsed: 0, markersAvailable: 0 },
       anchored: null,
+      world: null,
+      comparison: null,
+      experience: { requestId: request.requestId, viewpoint: request.viewpoint.kind, shots: [], durationSeconds: 0, anchored: null },
       producedBy: 'none',
       temporalSource: 'none',
       worldRoute: null,
       enterWorld: () => false,
+      commitComparisonToMemory: () => null,
+      requestComparison: () => null,
+      describeEntityMoment: () => null,
     };
   }
 
   const plan = resolution.plan;
   const built: SessionBuild = plan.binding === 'SCENARIO_ENGINE_EPIDEMIC'
     ? buildEpidemicSession(plan)
-    : buildLaboratorySession();
+    : plan.binding === 'WORLD_MODEL_CHEMISTRY'
+      ? buildChemistrySession(plan)
+      : plan.binding === 'WORLD_MODEL_HYDRAULICS'
+        ? buildHydraulicsSession(plan)
+        : buildLaboratorySession(plan);
 
   const timeline = captureWorldTimeline(null, [...built.states]);
-  const shotPlan = buildShotPlan(timeline, plan);
-  const anchor = anchorFor(plan);
+  const shotPlan = buildShotPlan(timeline, plan, { hasComparison: built.comparison !== null });
+  const anchor = anchorFor(plan, built.bounds);
   const anchored = anchor
     ? buildAnchoredSequence(anchor, built.temporalTicks, plan.unit, {
       // One real second per world step keeps 60 days at roughly a minute —
@@ -238,10 +630,27 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
     })
     : null;
 
+  const experience = buildExperienceTimeline(shotPlan, plan.viewpoint.kind, anchored);
+
+  // The universal contract over what the adapters produced. Every layer
+  // above — orchestrator, director, renderer — reads this and never a domain.
+  const world = buildScenarioWorld({
+    worldId: timeline.worldId,
+    domainId: plan.family,
+    producedBy: built.producedBy,
+    states: built.states,
+    timeline,
+    viewerTicks: built.temporalTicks,
+    unit: plan.unit,
+    perspectives: perspectivesFor(plan.kind),
+    bounds: built.bounds,
+  });
+
   return {
-    request, resolution, states: built.states, timeline, shotPlan, anchored,
+    request, resolution, states: built.states, timeline, shotPlan, anchored, experience, world,
     producedBy: built.producedBy, temporalSource: built.temporalSource,
     worldRoute: built.worldRoute,
+    comparison: built.comparison,
     // Arming is separate from opening so the caller decides when to navigate,
     // and so a world that failed to register cannot be silently entered.
     enterWorld: () => {
@@ -257,8 +666,25 @@ export function openLookingGlass(sourceText: string): LookingGlassSession {
         autoPlay: anchored !== null,
         secondsPerStep: anchored?.secondsPerStep ?? 1,
         problemId: built.problemId,
+        experience,
+        world,
+        comparison: built.comparison,
       });
       return built.handoffRunId ? setPendingScenarioTimeline(built.handoffRunId) : true;
     },
+    // Writes into Scientific Memory only when a real counterfactual artifact
+    // exists behind `comparison` — the same gate `buildSavedScenarioCounterfactual`
+    // itself enforces (COMPLETED comparisons only), so this can never persist
+    // a blocked or fabricated pair.
+    commitComparisonToMemory: () => {
+      if (built.counterfactual === null || built.counterfactual.comparison.status !== 'COMPLETED') return null;
+      return saveScenarioCounterfactualToMemory(built.counterfactual);
+    },
+    requestComparison: built.requestComparison,
+    // Live C3 query, only for a domain that runs on a TemporalEngine. atTick
+    // addresses THIS branch's own clock — never a foreign run's tick.
+    describeEntityMoment: (atTick) => (built.worldModel
+      ? describeMoment(built.worldModel.engine, built.worldModel.focalEntityId, atTick)
+      : null),
   };
 }

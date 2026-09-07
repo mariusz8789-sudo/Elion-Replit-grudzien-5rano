@@ -53,6 +53,7 @@ export default tseslint.config(
         process: 'readonly',
         fetch: 'readonly',
         URL: 'readonly',
+        Buffer: 'readonly',
         // Skrypty e2e (Playwright) używają globali przeglądarki wewnątrz page.evaluate().
         document: 'readonly',
         window: 'readonly',

@@ -4,6 +4,7 @@ import {
   buildWorldState,
   traceWorldChange,
   type Observation,
+  type ReplayState,
   type WorldChangeTrace,
   type WorldEntity,
   type WorldRelation,
@@ -61,7 +62,8 @@ export interface WorldFrameState {
 const ZERO: Vector3 = { x: 0, y: 0, z: 0 };
 const ONE: Vector3 = { x: 1, y: 1, z: 1 };
 
-function collectScalars(entity: WorldModelEntity): Record<string, number> {
+/** Exported for C1: the same flat scalar projection `WorldFrameEntity.scalars` uses, so a before/after comparison across two `describeWorldMoment` calls reads the identical numbers a rendered frame would. */
+export function collectScalars(entity: WorldModelEntity): Record<string, number> {
   const scalars: Record<string, number> = {};
   if (entity.physics) {
     const p = entity.physics;
@@ -271,6 +273,13 @@ export function projectToWorldState(
   domainId: string,
   tick: number,
   journalSlice: { observations: readonly Observation[]; events: readonly GenesisEvent[] } = { observations: [], events: [] },
+  /**
+   * A REAL replay verdict, when the caller actually checked one (e.g. by
+   * independently re-executing this tick and comparing scalars) — never
+   * asserted here. Defaults to null, meaning "no replay claim made" — the
+   * same honest default every other Genesis adapter uses.
+   */
+  replay: ReplayState | null = null,
 ): WorldState {
   const entities = graph.listEntities();
   const worldEntities: WorldEntity[] = entities.map((entity) => ({
@@ -297,7 +306,7 @@ export function projectToWorldState(
     experiment: { experimentId: `${worldId}:${tick}`, status: 'RUNNING', runs: [] },
     epistemic: null,
     evidence: [],
-    replay: null,
+    replay,
     notModeled,
   });
 }

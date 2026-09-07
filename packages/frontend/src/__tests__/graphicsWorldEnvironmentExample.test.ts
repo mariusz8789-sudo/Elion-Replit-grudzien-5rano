@@ -71,6 +71,35 @@ describe('buildExampleEnvironmentWorld — full environment composition proof', 
     expect(handles.interaction.selected).toBe('sensor');
   });
 
+  it('selecting the sensor makes it visibly highlighted (full pointer -> id -> visual pipeline)', () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+    camera.position.set(0, 0.6, 5);
+    camera.lookAt(0, 0.6, 0);
+    camera.updateMatrixWorld(true);
+    const handles = buildExampleEnvironmentWorld(THREE, scene, camera);
+    handles.renderer.sync(handles.buildFrameAt(0));
+    scene.updateMatrixWorld(true);
+
+    const sensorObject = handles.renderer.getObjectForEntity('sensor') as THREE.Mesh;
+    const material = sensorObject.material as THREE.MeshStandardMaterial;
+    const originalEmissiveHex = material.emissive.getHex();
+
+    handles.interaction.pointerDown(50, 50);
+    handles.interaction.pointerUp(50, 50, 100, 100);
+    // Select tints the emissive color toward the highlight accent — a real, visible change
+    // regardless of the sensor's own already-high baseline intensity (see `applyHighlight`'s own
+    // `Math.max(original, preset.minIntensity)`, which can leave intensity unchanged when the
+    // original already exceeds the preset's floor; the color tint always applies).
+    expect(material.emissive.getHex()).not.toBe(originalEmissiveHex);
+
+    // Clicking empty space deselects and clears the highlight back to the exact original color.
+    handles.interaction.pointerDown(0, 0);
+    handles.interaction.pointerUp(0, 0, 100, 100);
+    expect(handles.interaction.selected).toBeNull();
+    expect(material.emissive.getHex()).toBe(originalEmissiveHex);
+  });
+
   it('dispose() removes everything this example added, cleanly', () => {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);

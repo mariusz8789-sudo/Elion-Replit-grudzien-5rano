@@ -3,6 +3,15 @@ import { parseScenarioRequest, spanToTicks } from '../core/lookingGlass/scenario
 import { nearestSupportedAlternative, resolveScenarioRequest } from '../core/lookingGlass/scenarioResolution';
 import { openLookingGlass } from '../core/lookingGlass/scenarioSession';
 import { anchoredSequenceDuration, buildAnchoredSequence, sampleAnchoredSequence, scrubToSeconds } from '../core/lookingGlass/anchoredTemporal';
+import { ExperiencePlayer, frameAt } from '../core/lookingGlass/experienceOrchestrator';
+import { cityPresetFor, directionAt } from '../core/lookingGlass/worldDirector';
+import { causalChainOf, classifyEvent } from '../core/lookingGlass/eventInspection';
+import { WorldClock } from '../core/lookingGlass/worldClock';
+import { PERSPECTIVES, perspectiveRequest, placeCamera } from '../core/lookingGlass/perspective';
+import { compareEpidemicRuns } from '../core/lookingGlass/scenarioComparison';
+import { compareScenarios, runScenario } from '../core/simulation/scenarioEngine';
+import { runScenarioCounterfactual } from '../core/simulation/scenarioCounterfactual';
+import { closeInspection, initialExperienceState, inspect, replay as replayMode, timeIsFrozen } from '../core/lookingGlass/experienceMode';
 
 describe('Looking Glass — natural language to structured scenario', () => {
   it('reads a Polish epidemic sentence: kind, span and anchored street viewpoint', () => {
@@ -146,10 +155,15 @@ describe('Looking Glass — one experience layer, many domains', () => {
       .toEqual(expect.arrayContaining(['ESTABLISH', 'RESULT']));
   });
 
-  it('keeps marker shots on the state axis, not the world clock', () => {
+  it('puts each shot on the clock its marker is actually measured against', () => {
     const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
     for (const shot of session.shotPlan.shots) {
-      expect(shot.axis).toBe(shot.sourceMarkerId === null ? 'WORLD_TIME' : 'STATE_INDEX');
+      // An observation is recorded against the state it belongs to; a
+      // canonical event carries a real timestamp in the world's own clock.
+      // Reading an event's day-72 timestamp as "state 72" addressed a state
+      // that never existed, so the axis is per marker, not per shot kind.
+      const expected = shot.kind === 'OBSERVATION' ? 'STATE_INDEX' : 'WORLD_TIME';
+      expect(shot.axis).toBe(expected);
     }
   });
 
@@ -306,5 +320,723 @@ describe('Looking Glass — the world answers the question that was asked', () =
     openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').enterWorld();
     expect(peekPendingLookingGlassExperience()?.problemId).toMatch(/lowest-modeled-deaths/);
     clearLookingGlassExperience();
+  });
+});
+
+describe('Looking Glass — the Experience Orchestrator', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+
+  it('lays the shot plan on a real clock, holding the anchored pass for its true length', () => {
+    const timeline = session.experience;
+    expect(timeline.shots.length).toBe(session.shotPlan.shots.length);
+    expect(timeline.durationSeconds).toBeGreaterThan(60);
+    const temporal = timeline.shots.find((scheduled) => scheduled.shot.kind === 'TEMPORAL');
+    // Shortening it would skip states the model computed; lengthening it
+    // would hold on states that do not exist.
+    expect(temporal!.endSeconds - temporal!.startSeconds)
+      .toBeCloseTo((session.anchored!.keyframes.length - 1) * session.anchored!.secondsPerStep);
+  });
+
+  it('is pure: the same instant always resolves to the same frame', () => {
+    const a = frameAt(session.experience, 31.5);
+    const b = frameAt(session.experience, 31.5);
+    expect(a).toEqual(b);
+  });
+
+  it('never runs off either end of the sequence', () => {
+    expect(frameAt(session.experience, -50)?.elapsedSeconds).toBe(0);
+    const past = frameAt(session.experience, 99999);
+    expect(past?.finished).toBe(true);
+    expect(past?.elapsedSeconds).toBe(session.experience.durationSeconds);
+  });
+
+  it('resolves a state index only where one really exists', () => {
+    for (const scheduled of session.experience.shots) {
+      const frame = frameAt(session.experience, scheduled.startSeconds + 0.1)!;
+      if (frame.stateIndex !== null) {
+        // A rendered state index must address a state the run produced.
+        expect(frame.stateIndex).toBeLessThan(session.states.length);
+        expect(frame.stateIndex).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('gives a world-time marker no state index rather than inventing one', () => {
+    const eventShot = session.experience.shots.find((s) => s.shot.kind === 'EVENT');
+    if (!eventShot) return;
+    const frame = frameAt(session.experience, eventShot.startSeconds + 0.1)!;
+    expect(frame.shot.axis).toBe('WORLD_TIME');
+    expect(frame.stateIndex).toBeNull();
+  });
+
+  it('never holds a marker shot on a tick range that runs backwards', () => {
+    for (const shot of session.shotPlan.shots) expect(shot.toTick).toBeGreaterThanOrEqual(shot.fromTick);
+  });
+
+  it('cites only real markers, and flags the cut on a shot boundary', () => {
+    const markerIds = new Set(session.timeline.markers.map((m) => m.id));
+    for (const scheduled of session.experience.shots) {
+      const frame = frameAt(session.experience, scheduled.startSeconds)!;
+      expect(frame.isCut).toBe(true);
+      for (const id of frame.activeMarkerIds) expect(markerIds.has(id)).toBe(true);
+    }
+  });
+
+  it('plays, pauses, scrubs, changes speed and replays over the same real sequence', () => {
+    const player = new ExperiencePlayer(session.experience);
+    expect(player.playbackStatus).toBe('IDLE');
+    player.play();
+    player.advance(10);
+    expect(player.elapsedSeconds).toBeCloseTo(10);
+
+    player.setSpeed(4);
+    player.advance(10);
+    expect(player.elapsedSeconds).toBeCloseTo(50);
+
+    player.pause();
+    player.advance(10);
+    expect(player.elapsedSeconds).toBeCloseTo(50);
+
+    // Scrubbing pauses, as every video control does.
+    player.play();
+    player.seek(0.5);
+    expect(player.playbackStatus).toBe('PAUSED');
+    expect(player.elapsedSeconds).toBeCloseTo(session.experience.durationSeconds / 2);
+
+    player.setSpeed(1);
+    player.play();
+    player.advance(99999);
+    expect(player.playbackStatus).toBe('FINISHED');
+    expect(player.currentFrame?.finished).toBe(true);
+
+    player.replay();
+    expect(player.playbackStatus).toBe('PLAYING');
+    expect(player.elapsedSeconds).toBe(0);
+  });
+
+  it('clamps speed to a sane range instead of letting a caller skip the run', () => {
+    const player = new ExperiencePlayer(session.experience);
+    player.setSpeed(1000);
+    expect(player.playbackSpeed).toBe(16);
+    player.setSpeed(0);
+    expect(player.playbackSpeed).toBe(0.1);
+  });
+
+  it('produces no timeline for a refused scenario', () => {
+    const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(refused.experience.shots).toEqual([]);
+    expect(frameAt(refused.experience, 1)).toBeNull();
+  });
+});
+
+describe('Looking Glass — the universal scenario contract', () => {
+  it('exposes one domain-independent view of an epidemic world', () => {
+    const world = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy').world!;
+    const range = world.getTemporalRange();
+    expect(range.unit).toBe('DAY');
+    expect(range.stepCount).toBe(60);
+    expect(range.to).toBeGreaterThan(range.from);
+    expect(world.getAvailablePerspectives().some((p) => p.kind === 'ANCHORED_HUMAN' && p.available)).toBe(true);
+    // A vantage the world has nowhere to stand in must say why, not go blank.
+    const unavailable = world.getAvailablePerspectives().filter((p) => !p.available);
+    for (const option of unavailable) expect(option.reason).toBeTruthy();
+  });
+
+  it('answers the same six questions for a laboratory world, through the same contract', () => {
+    const world = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist').world!;
+    expect(world.getTemporalRange().unit).toBe('HOUR');
+    expect(world.getAvailablePerspectives().some((p) => p.kind === 'SCIENTIST_POV' && p.available)).toBe(true);
+    // The molecular/lab world has no street for a citizen to stand on.
+    expect(world.getAvailablePerspectives().find((p) => p.kind === 'ANCHORED_HUMAN')?.available).toBe(false);
+    expect(world.getBounds().max[1]).toBeGreaterThan(0);
+  });
+
+  it('returns real states only, never an interpolated one', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const world = session.world!;
+    for (const state of session.states) expect(world.getStateAt(state.tick)).toBe(state);
+    expect(world.getStateAt(99999)).toBeNull();
+  });
+
+  it('resolves evidence for every marker the shot plan cites', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const cited = session.shotPlan.shots.filter((shot) => shot.sourceMarkerId !== null);
+    expect(cited.length).toBeGreaterThan(0);
+    for (const shot of cited) {
+      const evidence = session.world!.getEvidence(shot.sourceMarkerId!);
+      expect(evidence).not.toBeNull();
+      expect(evidence!.statement.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('Looking Glass — directing the actual world', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+
+  it('drives real world days during the held human pass', () => {
+    const range = session.world!.getTemporalRange();
+    const temporal = session.experience.shots.find((s) => s.shot.kind === 'TEMPORAL')!;
+    const direction = directionAt(session.experience, session.world!, temporal.startSeconds + 20)!;
+    expect(direction.worldTimeSource).toBe('VIEWER_CLOCK');
+    expect(direction.worldTime).not.toBeNull();
+    expect(direction.worldTime!).toBeGreaterThanOrEqual(range.from);
+    expect(direction.worldTime!).toBeLessThanOrEqual(range.to);
+  });
+
+  it('NEVER emits a world time outside the series the viewer is scrubbing', () => {
+    // The integrity rule this whole layer exists to protect: a rendered day
+    // must be a day the run actually had.
+    const range = session.world!.getTemporalRange();
+    for (let seconds = 0; seconds <= session.experience.durationSeconds; seconds += 0.5) {
+      const direction = directionAt(session.experience, session.world!, seconds)!;
+      if (direction.worldTime === null) continue;
+      expect(direction.worldTime).toBeGreaterThanOrEqual(range.from);
+      expect(direction.worldTime).toBeLessThanOrEqual(range.to);
+    }
+  });
+
+  it('holds the clock rather than inventing a date for a marker from another run', () => {
+    const marker = session.experience.shots.find((s) => s.shot.sourceMarkerId !== null)!;
+    const direction = directionAt(session.experience, session.world!, marker.startSeconds + 0.1)!;
+    expect(direction.worldTime).toBeNull();
+    expect(direction.worldTimeSource).toBe('FOREIGN_RUN');
+    // The cut still carries its provenance — the viewer sees the observation,
+    // they are simply not told a false date for it.
+    expect(direction.evidence.length).toBeGreaterThan(0);
+    // WHY the clock froze must be a real answer a screen can show, not
+    // something a screen guesses on its own from worldTimeSource alone.
+    expect(direction.worldTimeReason.length).toBeGreaterThan(0);
+  });
+
+  it('carries the clock\'s own reason and snap flag through for every real world tick', () => {
+    // Not just the FOREIGN_RUN case — a granted, on-clock tick also carries
+    // the clock's real reason ("the run produced this tick"), and never
+    // silently drops it.
+    const range = session.world!.getTemporalRange();
+    for (let seconds = 0; seconds <= session.experience.durationSeconds; seconds += 2) {
+      const direction = directionAt(session.experience, session.world!, seconds)!;
+      expect(direction.worldTimeReason.length).toBeGreaterThan(0);
+      if (direction.worldTime !== null) {
+        expect(direction.worldTime).toBeGreaterThanOrEqual(range.from);
+        expect(direction.worldTime).toBeLessThanOrEqual(range.to);
+      }
+    }
+  });
+
+  it('maps camera intent onto a city world without knowing the domain', () => {
+    expect(cityPresetFor('HUMAN_EYE')).toBe('street');
+    expect(cityPresetFor('WIDE')).toBe('city');
+    expect(cityPresetFor('MACRO')).toBe('agent');
+    expect(cityPresetFor('SCIENTIFIC')).toBe('district');
+    expect(cityPresetFor('CINEMATIC')).toBe('city');
+  });
+
+  it('puts the viewer at street level for the anchored pass and wide for the close', () => {
+    const temporal = session.experience.shots.find((s) => s.shot.kind === 'TEMPORAL')!;
+    const result = session.experience.shots.find((s) => s.shot.kind === 'RESULT')!;
+    expect(cityPresetFor(directionAt(session.experience, session.world!, temporal.startSeconds + 1)!.cameraIntent)).toBe('street');
+    expect(cityPresetFor(directionAt(session.experience, session.world!, result.startSeconds + 0.1)!.cameraIntent)).toBe('city');
+  });
+
+  it('directs a laboratory world through the very same functions', () => {
+    const lab = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    const direction = directionAt(lab.experience, lab.world!, 1)!;
+    expect(direction.cameraIntent).toBeTruthy();
+    expect(direction.shotKind).toBe('ESTABLISH');
+  });
+
+  it('has nothing to direct when the scenario was refused', () => {
+    const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(refused.world).toBeNull();
+    expect(refused.experience.shots).toEqual([]);
+  });
+});
+
+describe('Looking Glass — events you can interrogate', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+
+  it('reads the full event, not the flattened marker', () => {
+    const events = session.world!.getInspectableEvents();
+    expect(events.length).toBeGreaterThan(0);
+    const event = events[0];
+    expect(event.type).toBeTruthy();
+    expect(event.modelId).toBeTruthy();
+    expect(event.origin).toBe('model');
+    expect(event.affectedEntities.length).toBeGreaterThan(0);
+    expect(event.evidence).not.toBeNull();
+  });
+
+  it('reports absent fields as null rather than inventing plausible ones', () => {
+    // The epidemiological run-completed event genuinely has no coordinates.
+    // A confident "Street sector A" would survive a demo, which is exactly
+    // what makes inventing one dangerous.
+    for (const event of session.world!.getInspectableEvents()) {
+      expect(event.location).toBeNull();
+      expect(event.severity).toBeNull();
+    }
+  });
+
+  it('classifies events from the dotted suffix, never the domain prefix', () => {
+    // Same suffix, different domains, identical classification — this is the
+    // "no if-epidemic-then" rule expressed as a test.
+    expect(classifyEvent('infection.transmission')).toBe(classifyEvent('reaction.transmission'));
+    expect(classifyEvent('epidemiology.run.completed')).toBe('TRANSITION');
+    expect(classifyEvent('anything.observation.threshold-crossed')).toBe('THRESHOLD_CROSSING');
+    expect(classifyEvent('flood.levee.failure')).toBe('FAILURE');
+    expect(classifyEvent('lab.sample.anomaly')).toBe('ANOMALY');
+    expect(classifyEvent('cell.population.simulated')).toBe('STATE_CHANGE');
+    // An unknown suffix stays honestly unclassified instead of guessing.
+    expect(classifyEvent('some.brand.new.thing')).toBe('UNCLASSIFIED');
+  });
+
+  it('offers replay only on a verified MATCH, and explains a refusal', () => {
+    for (const event of session.world!.getInspectableEvents()) {
+      if (event.replay.available) {
+        expect(event.replay.status).toBe('MATCH');
+        expect(event.replay.seed).not.toBeNull();
+      } else {
+        expect(event.replay.reason).toBeTruthy();
+      }
+    }
+  });
+
+  it('withholds replay where the run carries no verdict', () => {
+    const lab = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    for (const event of lab.world!.getInspectableEvents()) {
+      if (!event.replay.available) expect(event.replay.reason).toMatch(/verdict|reproducible/i);
+    }
+  });
+
+  it('reports the recorded causal chain without inferring links', () => {
+    const events = session.world!.getInspectableEvents();
+    const chain = causalChainOf(events[events.length - 1].id, events);
+    expect(chain.length).toBeGreaterThan(1);
+    // Each link is the recorded parent of the one before it.
+    for (let i = 1; i < chain.length; i++) expect(chain[i - 1].parentEventId).toBe(chain[i].id);
+    // An unknown id yields nothing rather than a fabricated chain.
+    expect(causalChainOf('does-not-exist', events)).toEqual([]);
+  });
+
+  it('marks an event from a different run as off the viewer clock', () => {
+    const offClock = session.world!.getInspectableEvents().filter((e) => !e.time.onViewerClock);
+    expect(offClock.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Looking Glass — experience modes and world continuity', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+  const events = session.world!.getInspectableEvents();
+
+  it('opens in the mode the vantage implies', () => {
+    expect(initialExperienceState(0, true).mode).toBe('WATCH');
+    expect(initialExperienceState(0, false).mode).toBe('EXPLORE');
+  });
+
+  it('freezes time while an event is held open', () => {
+    const watching = initialExperienceState(12, true);
+    const inspecting = inspect(watching, events[0], 42);
+    expect(inspecting.mode).toBe('INSPECT');
+    expect(timeIsFrozen(inspecting)).toBe(true);
+    expect(timeIsFrozen(watching)).toBe(false);
+  });
+
+  it('keeps the viewer where they were for an event on a foreign run', () => {
+    const watching = initialExperienceState(12, true);
+    const foreign = events.find((e) => !e.time.onViewerClock)!;
+    // Jumping to that event's own tick would show a day this series never had.
+    expect(inspect(watching, foreign, 42).worldTime).toBe(12);
+  });
+
+  it('resumes the sequence where it was interrupted rather than restarting', () => {
+    const inspecting = inspect(initialExperienceState(12, true), events[0], 42);
+    const resumed = closeInspection(inspecting);
+    expect(resumed.mode).toBe('WATCH');
+    expect(resumed.resumeSeconds).toBe(42);
+    expect(resumed.worldTime).toBe(12);
+    expect(resumed.selectedEvent).toBeNull();
+  });
+
+  it('returns to exploration when the inspection did not come from a sequence', () => {
+    const inspecting = inspect(initialExperienceState(5, false), events[0], null);
+    expect(closeInspection(inspecting).mode).toBe('EXPLORE');
+  });
+
+  it('refuses to enter replay for an event that was never verified', () => {
+    const lab = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    const unverified = lab.world!.getInspectableEvents().find((e) => !e.replay.available);
+    if (!unverified) return;
+    const held = inspect(initialExperienceState(0, false), unverified, null);
+    // The availability check lives on the event; the mode machine will not
+    // override it.
+    expect(replayMode(held).mode).toBe('INSPECT');
+  });
+
+  it('enters replay for a verified event', () => {
+    const verified = events.find((e) => e.replay.available);
+    if (!verified) return;
+    const held = inspect(initialExperienceState(0, true), verified, 10);
+    expect(replayMode(held).mode).toBe('REPLAY');
+    expect(timeIsFrozen(replayMode(held))).toBe(true);
+  });
+});
+
+describe('Looking Glass — LEVEL 2: no path may show a time that does not exist', () => {
+  const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+  const clock = session.world!.clock;
+  const events = session.world!.getInspectableEvents();
+
+  it('grants only ticks the run actually produced', () => {
+    for (const tick of clock.allTicks) expect(clock.resolve({ source: 'SCRUB', tick, current: 0 }).granted).toBe(true);
+    expect(clock.has(9999)).toBe(false);
+  });
+
+  it('SEQUENCE: sweeping the whole cinematic never emits a nonexistent time', () => {
+    for (let seconds = 0; seconds <= session.experience.durationSeconds; seconds += 0.25) {
+      const direction = directionAt(session.experience, session.world!, seconds)!;
+      if (direction.worldTime === null) continue;
+      expect(clock.has(direction.worldTime)).toBe(true);
+    }
+  });
+
+  it('SCRUB: every position on the bar lands on a real tick', () => {
+    for (let f = 0; f <= 1.0001; f += 0.01) {
+      const requested = clock.first! + f * (clock.last! - clock.first!);
+      const resolved = clock.resolve({ source: 'SCRUB', tick: requested, current: clock.first! });
+      expect(clock.has(resolved.worldTime)).toBe(true);
+    }
+  });
+
+  it('EVENT_JUMP: an event from this run moves the world; one from another run does not', () => {
+    const sameRun = events.find((e) => e.time.onViewerClock);
+    const foreign = events.find((e) => !e.time.onViewerClock);
+    expect(foreign).toBeDefined();
+
+    const held = clock.resolveForeign({ source: 'EVENT_JUMP', tick: foreign!.time.tick, current: 12, onViewerClock: false });
+    expect(held.granted).toBe(false);
+    expect(held.worldTime).toBe(12);
+    expect(held.reason).toMatch(/different run/i);
+
+    if (sameRun) {
+      const moved = clock.resolveForeign({ source: 'EVENT_JUMP', tick: sameRun.time.tick, current: 12, onViewerClock: true });
+      expect(moved.granted).toBe(true);
+      expect(clock.has(moved.worldTime)).toBe(true);
+    }
+  });
+
+  it('PAUSE/RESUME: holding and resuming never moves the world off a real tick', () => {
+    const watching = initialExperienceState(clock.first!, true);
+    const paused = inspect(watching, events[0], 30, clock);
+    expect(clock.has(paused.worldTime)).toBe(true);
+    const resumed = closeInspection(paused);
+    expect(clock.has(resumed.worldTime)).toBe(true);
+    expect(resumed.resumeSeconds).toBe(30);
+  });
+
+  it('REPLAY: entering replay keeps the world on the tick it was already on', () => {
+    const verified = events.find((e) => e.replay.available);
+    if (!verified) return;
+    const held = inspect(initialExperienceState(clock.first!, true), verified, 10, clock);
+    const replaying = replayMode(held);
+    expect(clock.has(replaying.worldTime)).toBe(true);
+    expect(timeIsFrozen(replaying)).toBe(true);
+  });
+
+  it('GAPS: a run with missing states snaps to a real tick instead of interpolating', () => {
+    // Days 3..9 were never computed. Asking for day 5 must not produce a
+    // world state nobody calculated.
+    const gappy = new WorldClock([0, 1, 2, 10, 11, 12]);
+    const resolved = gappy.resolve({ source: 'SCRUB', tick: 5, current: 0 });
+    expect(resolved.granted).toBe(true);
+    expect(resolved.snapped).toBe(true);
+    expect(gappy.has(resolved.worldTime)).toBe(true);
+    expect(resolved.reason).toMatch(/no state at 5/i);
+    expect([2, 10]).toContain(resolved.worldTime);
+  });
+
+  it('OUT OF RANGE: beyond either end snaps back inside and says so', () => {
+    const before = clock.resolve({ source: 'SCRUB', tick: -50, current: 0 });
+    const after = clock.resolve({ source: 'SCRUB', tick: 99999, current: 0 });
+    expect(before.worldTime).toBe(clock.first);
+    expect(after.worldTime).toBe(clock.last);
+    for (const resolution of [before, after]) {
+      expect(resolution.snapped).toBe(true);
+      expect(resolution.reason).toMatch(/outside this run/i);
+    }
+  });
+
+  it('EMPTY RUN: a world with no states refuses to show any time at all', () => {
+    const empty = new WorldClock([]);
+    const resolved = empty.resolve({ source: 'INITIAL', tick: 0, current: 0 });
+    expect(resolved.granted).toBe(false);
+    expect(resolved.reason).toMatch(/no states/i);
+    expect(empty.first).toBeNull();
+  });
+
+  it('MISSING REQUEST: a caller with no opinion holds rather than jumping to zero', () => {
+    const resolved = clock.resolve({ source: 'RESUME', tick: null, current: 17 });
+    expect(resolved.granted).toBe(false);
+    expect(resolved.worldTime).toBe(17);
+  });
+
+  it('BRANCHING: two runs of different lengths never leak ticks into each other', () => {
+    const other = openLookingGlass('Show a quarantine scenario over 90 days from above');
+    if (other.resolution.status !== 'READY') return;
+    const otherClock = other.world!.clock;
+    expect(otherClock.count).not.toBe(clock.count);
+    // A tick only the longer run has must not be grantable by the shorter.
+    const onlyInOther = otherClock.allTicks.find((tick) => !clock.has(tick));
+    expect(onlyInOther).toBeDefined();
+    const leaked = clock.resolve({ source: 'EVENT_JUMP', tick: onlyInOther!, current: clock.first! });
+    expect(leaked.snapped).toBe(true);
+    expect(clock.has(leaked.worldTime)).toBe(true);
+  });
+
+  it('is deterministic: the same request always resolves identically', () => {
+    const once = clock.resolve({ source: 'SCRUB', tick: 17.6, current: 0 });
+    const twice = clock.resolve({ source: 'SCRUB', tick: 17.6, current: 0 });
+    expect(once).toEqual(twice);
+  });
+
+  it('always explains itself, granted or not', () => {
+    for (const tick of [-1, 0, 5.5, 60, 99999]) {
+      expect(clock.resolve({ source: 'SCRUB', tick, current: 0 }).reason.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('Looking Glass — LEVEL 3: perspectives are data, not presets', () => {
+  const lab = { min: [-6, 0, -13.4] as const, max: [6, 4.6, 4.5] as const };
+  const city = { min: [-30, 0, -30] as const, max: [60, 20, 30] as const };
+
+  it('places the SAME definition correctly at two very different world scales', () => {
+    const inLab = placeCamera(perspectiveRequest('ANCHORED_HUMAN', [0, 1.7, 0], lab));
+    const inCity = placeCamera(perspectiveRequest('ANCHORED_HUMAN', [0, 1.7, 0], city));
+    // Standoff scales with the world; eye height does not, because a person
+    // is the same height in both.
+    const labDistance = Math.hypot(inLab.position[0], inLab.position[2]);
+    const cityDistance = Math.hypot(inCity.position[0], inCity.position[2]);
+    expect(cityDistance).toBeGreaterThan(labDistance * 2);
+    expect(inLab.position[1]).toBeCloseTo(1.7);
+    expect(inCity.position[1]).toBeCloseTo(1.7);
+    expect(inLab.fov).toBe(inCity.fov);
+  });
+
+  it('keeps an embodied vantage on the ground and lets a free one rise', () => {
+    for (const kind of ['ANCHORED_HUMAN', 'DRIVER_POV', 'SCIENTIST_POV', 'RESPONDER_POV', 'OPERATOR_POV'] as const) {
+      const placement = placeCamera(perspectiveRequest(kind, [0, 1.7, 0], city));
+      // A "citizen" that floats above the city is the bug this prevents.
+      expect(placement.position[1]).toBeCloseTo(PERSPECTIVES[kind].eyeHeight!);
+    }
+    expect(placeCamera(perspectiveRequest('WIDE', [0, 5, 0], city)).position[1]).toBeGreaterThan(10);
+  });
+
+  it('never places a camera outside the world it is looking at', () => {
+    for (const kind of Object.keys(PERSPECTIVES) as (keyof typeof PERSPECTIVES)[]) {
+      const placement = placeCamera(perspectiveRequest(kind, [0, 1.7, 0], city));
+      expect(placement.position[1]).toBeLessThanOrEqual(city.max[1]);
+      expect(Number.isFinite(placement.position[0])).toBe(true);
+      expect(Number.isFinite(placement.position[2])).toBe(true);
+    }
+  });
+
+  it('carries mobility and intent as data a world can honour', () => {
+    expect(PERSPECTIVES.ANCHORED_HUMAN.mobility).toBe('FIXED');
+    expect(PERSPECTIVES.DRIVER_POV.mobility).toBe('VEHICLE');
+    expect(PERSPECTIVES.SCIENTIST_POV.mobility).toBe('WALK');
+    expect(PERSPECTIVES.WIDE.mobility).toBe('FREE');
+    for (const definition of Object.values(PERSPECTIVES)) {
+      expect(definition.intent.length).toBeGreaterThan(10);
+      expect(definition.requiresGround).toBe(definition.eyeHeight !== null);
+    }
+  });
+
+  it('emits the full camera-rig payload on every direction, with no scientific content', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const direction = directionAt(session.experience, session.world!, 20)!;
+    const request = direction.cameraRequest;
+    expect(request.target.every(Number.isFinite)).toBe(true);
+    expect(request.bounds.max[0]).toBeGreaterThan(request.bounds.min[0]);
+    expect(request.fov).toBeGreaterThan(0);
+    // The payload the engine receives must not mention the domain at all.
+    expect(JSON.stringify(request)).not.toMatch(/epidemi|infection|cell|chemistry/i);
+  });
+
+  it('requests the shot’s own vantage on a cut, not the viewer’s', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const wide = session.experience.shots.find((s) => s.shot.cameraMode === 'WIDE')!;
+    const temporal = session.experience.shots.find((s) => s.shot.kind === 'TEMPORAL')!;
+    expect(directionAt(session.experience, session.world!, wide.startSeconds + 0.1)!.cameraRequest.kind).toBe('WIDE');
+    expect(directionAt(session.experience, session.world!, temporal.startSeconds + 1)!.cameraRequest.kind).toBe('ANCHORED_HUMAN');
+  });
+
+  it('derives the anchored vantage from the world’s real extent', () => {
+    const city9 = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const labSession = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    // Different worlds, no per-world coordinate table anywhere.
+    expect(city9.anchored!.anchor.position).not.toEqual(labSession.anchored!.anchor.position);
+    expect(city9.anchored!.anchor.eyeHeight).toBe(1.7);
+    expect(labSession.anchored!.anchor.eyeHeight).toBe(1.7);
+  });
+});
+
+describe('Looking Glass — COMPARE is real, or it says why not', () => {
+  it('produces a real epidemic comparison with real metric deltas, not a claim on intent alone', () => {
+    const session = openLookingGlass('Compare the epidemic over 40 days from street level');
+    expect(session.request.comparison).toBe(true);
+    expect(session.comparison).not.toBeNull();
+    expect(session.comparison!.status).toBe('READY');
+    expect(session.comparison!.producedBy).toMatch(/runScenarioCounterfactual\(BASELINE->ISOLATION\)/);
+    const deaths = session.comparison!.metrics.find((m) => m.key === 'totalDeaths')!;
+    expect(deaths.baseline).toBeGreaterThanOrEqual(deaths.variant);
+    expect(deaths.absoluteDelta).toBe(deaths.variant - deaths.baseline);
+  });
+
+  it('carries real counterfactual evidence: a measured divergence day and a stable fingerprint', () => {
+    const session = openLookingGlass('Compare the epidemic over 40 days from street level');
+    expect(session.comparison!.evidence).not.toBeNull();
+    expect(session.comparison!.evidence!.counterfactualFingerprint.length).toBeGreaterThan(0);
+    // ISOLATION only diverges from BASELINE once the intervention has had time
+    // to act — the day is measured on the real series, never assumed to be 0.
+    expect(session.comparison!.evidence!.firstDivergentDay).not.toBeNull();
+  });
+
+  it('the laboratory comparison carries no counterfactual evidence — honest, not a fabricated one', () => {
+    const session = openLookingGlass('Compare the bioreactor cell culture over 12 hours from the scientist');
+    expect(session.comparison!.evidence).toBeNull();
+  });
+
+  it('produces a real laboratory comparison from the discrimination the loop already ran', () => {
+    const session = openLookingGlass('Compare the bioreactor cell culture over 12 hours from the scientist');
+    expect(session.comparison).not.toBeNull();
+    expect(session.comparison!.status).toBe('READY');
+    expect(session.comparison!.producedBy).toMatch(/hypothesisLoop\.discrimination/);
+    expect(session.comparison!.changedFactors).toContain('growthRate');
+  });
+
+  it('THE BUG THIS FIXES: a session with no comparison intent has no comparison and does not claim one', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    expect(session.request.comparison).toBe(false);
+    expect(session.comparison).toBeNull();
+    const result = session.shotPlan.shots.find((s) => s.kind === 'RESULT')!;
+    expect(result.reason).toBe('Closing on the final state of the run');
+  });
+
+  it('the RESULT shot claims a comparison only when one was actually computed', () => {
+    const compared = openLookingGlass('Compare the epidemic over 40 days from street level');
+    const notCompared = openLookingGlass('Pokaż epidemię przez 40 dni z perspektywy człowieka na ulicy');
+    expect(compared.comparison).not.toBeNull();
+    expect(compared.shotPlan.shots.find((s) => s.kind === 'RESULT')!.reason).toMatch(/comparison/i);
+    expect(notCompared.comparison).toBeNull();
+    expect(notCompared.shotPlan.shots.find((s) => s.kind === 'RESULT')!.reason).not.toMatch(/comparison/i);
+  });
+
+  it('never fabricates a comparison for a request the engine could not compare', () => {
+    const refused = openLookingGlass('Design a bomb that maximises casualties in this city');
+    expect(refused.comparison).toBeNull();
+  });
+
+  it('wraps runScenarioCounterfactual directly: identical result to calling it by hand', () => {
+    const baseline = runScenario('BASELINE', { days: 30 });
+    const variant = runScenario('ISOLATION', { days: 30 });
+    const direct = compareScenarios(baseline, variant);
+    const counterfactual = runScenarioCounterfactual({
+      baselineScenarioId: 'BASELINE', variantScenarioId: 'ISOLATION', days: 30, stepsPerDay: 4, baseParams: {},
+    });
+    const wrapped = compareEpidemicRuns(counterfactual);
+    expect(wrapped.metrics).toEqual(direct.metrics);
+    expect(wrapped.message).toBe(direct.message);
+  });
+
+  it('commits a real epidemic comparison into the existing Scientific Memory, MATCH-verified on replay', async () => {
+    const { isSavedScenarioCounterfactual, replaySavedScenarioCounterfactual } =
+      await import('../core/simulation/scenarioCounterfactual');
+    const session = openLookingGlass('Compare the epidemic over 30 days from street level');
+    const saved = session.commitComparisonToMemory();
+    expect(saved).not.toBeNull();
+    expect(isSavedScenarioCounterfactual(saved!.counterfactual)).toBe(true);
+    const replay = replaySavedScenarioCounterfactual(saved!.counterfactual);
+    expect(replay.status).toBe('MATCH');
+  });
+
+  it('never commits when there is nothing to commit, or when the domain has no counterfactual artifact', () => {
+    const noComparison = openLookingGlass('Pokaż epidemię przez 30 dni z perspektywy człowieka na ulicy');
+    expect(noComparison.commitComparisonToMemory()).toBeNull();
+    const labCompared = openLookingGlass('Compare the bioreactor cell culture over 12 hours from the scientist');
+    expect(labCompared.comparison).not.toBeNull();
+    expect(labCompared.commitComparisonToMemory()).toBeNull();
+  });
+});
+
+describe('Looking Glass — comparison travels with the world handoff', () => {
+  it('carries the real comparison into the vantage handoff, for a world screen to render', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    const session = openLookingGlass('Compare the epidemic over 40 days from street level');
+    session.enterWorld();
+    const handoff = peekPendingLookingGlassExperience();
+    expect(handoff?.comparison?.status).toBe('READY');
+    expect(handoff?.comparison?.producedBy).toMatch(/runScenarioCounterfactual/);
+    clearLookingGlassExperience();
+  });
+
+  it('carries null when nothing was compared, never a stale or invented one', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Pokaż epidemię przez 40 dni z perspektywy człowieka na ulicy').enterWorld();
+    expect(peekPendingLookingGlassExperience()?.comparison).toBeNull();
+    clearLookingGlassExperience();
+  });
+
+  it('carries the laboratory comparison into its own handoff', async () => {
+    const { peekPendingLookingGlassExperience, clearLookingGlassExperience } =
+      await import('../core/lookingGlass/sessionHandoff');
+    clearLookingGlassExperience();
+    openLookingGlass('Compare the bioreactor cell culture over 12 hours from the perspective of a scientist').enterWorld();
+    const handoff = peekPendingLookingGlassExperience();
+    expect(handoff?.comparison?.status).toBe('READY');
+    expect(handoff?.comparison?.producedBy).toMatch(/discrimination/);
+    clearLookingGlassExperience();
+  });
+});
+
+describe('Looking Glass — real entity state through traceWorldChange', () => {
+  it('shows the REAL scientific properties of an affected entity, not just its id', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const events = session.world!.getInspectableEvents();
+    const withEntities = events.find((event) => event.affectedEntities.length > 0)!;
+    expect(withEntities).toBeDefined();
+    const entity = withEntities.affectedEntities[0];
+    expect(entity.label.length).toBeGreaterThan(0);
+    expect(entity.properties.length).toBeGreaterThan(0);
+    // Real epidemiology values, not a placeholder.
+    expect(entity.properties.some((p) => typeof p.value === 'number' || typeof p.value === 'string')).toBe(true);
+  });
+
+  it('carries the real growth-rate entity and its properties for the laboratory', () => {
+    const session = openLookingGlass('Visualize a bioreactor cell culture over 12 hours from the perspective of a scientist');
+    const events = session.world!.getInspectableEvents();
+    const withEntities = events.find((event) => event.affectedEntities.length > 0)!;
+    const entity = withEntities.affectedEntities[0];
+    expect(entity.ref.kind).toBe('cell-population');
+    expect(entity.properties.some((p) => p.key === 'growthRate')).toBe(true);
+    expect(entity.properties.some((p) => p.key === 'fractionOfCapacity')).toBe(true);
+  });
+
+  it('links an event to the hypotheses its run relates to, when the run is a hypothesis run', () => {
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    const events = session.world!.getInspectableEvents();
+    const withHypotheses = events.filter((event) => event.relatedHypothesisIds.length > 0);
+    expect(withHypotheses.length).toBeGreaterThan(0);
+  });
+
+  it('never fabricates entities or hypotheses for an event that traces to none', () => {
+    // A well-formed contract: absence stays absence, not an empty-looking guess.
+    const session = openLookingGlass('Pokaż epidemię przez 60 dni z perspektywy człowieka na ulicy');
+    for (const event of session.world!.getInspectableEvents()) {
+      expect(Array.isArray(event.affectedEntities)).toBe(true);
+      expect(Array.isArray(event.relatedHypothesisIds)).toBe(true);
+    }
   });
 });

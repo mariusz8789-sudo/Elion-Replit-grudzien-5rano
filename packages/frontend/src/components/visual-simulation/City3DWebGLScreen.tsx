@@ -6,6 +6,13 @@ import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock'
 import { EpidemicCity3DSim, type CityCameraPreset, type CityWorldSelection } from '../../core/three/epidemicCity3D';
 import { consumePendingExperimentWorld, consumePendingScenarioTimeline, peekPendingExperimentWorld, peekPendingScenarioTimeline } from '../../core/experimentFabric/worldHandoff';
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
+import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
+import { cityPresetFor, directionForFrame, type WorldDirection } from '../../core/lookingGlass/worldDirector';
+import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
+import { resolveCameraIntent, resolveTransitionKind, type ObservationExecutionStatus } from '../../core/lookingGlass/observationExecution';
+import { closeInspection, initialExperienceState, inspect, replay as enterReplay, timeIsFrozen, MODE_LABEL, type ExperienceState } from '../../core/lookingGlass/experienceMode';
+import { EventInspector } from '../looking-glass/EventInspector';
+import { ComparisonPanel } from '../looking-glass/ComparisonPanel';
 import { saveScenarioCounterfactualToMemory, saveScenarioRunToMemory } from '../../core/scienceMemory';
 import { buildSavedScenarioRunContext } from '../../core/simulation/scenarioMemory';
 import { createTemporalStateBookmark, resolveTemporalStateBookmark, type TemporalStateBookmark } from '../../core/simulation/temporalStateBookmark';
@@ -94,21 +101,6 @@ export function City3DWebGLScreen() {
     consumePendingExperimentWorld();
     consumePendingLookingGlassExperience();
   }, []);
-  // Time moves on its own for an anchored viewpoint. It advances the SAME
-  // `timelineDay` the scrub bar drives, so this is playback of the real
-  // series and not a second clock — and it stops at the last real day rather
-  // than looping, because there is no day 61 in the run.
-  const autoPlay = Boolean(lookingGlass?.autoPlay) && Boolean(scenarioTimeline);
-  useEffect(() => {
-    if (!autoPlay || !scenarioTimeline) return;
-    const lastDay = scenarioTimeline.series.length - 1;
-    const stepMs = Math.max(120, (lookingGlass?.secondsPerStep ?? 1) * 1000);
-    const timer = window.setInterval(() => {
-      setTimelineDay((day) => (day >= lastDay ? lastDay : day + 1));
-    }, stepMs);
-    return () => window.clearInterval(timer);
-  }, [autoPlay, scenarioTimeline, lookingGlass]);
-
   useEffect(() => {
     const applyPendingScenarioTimeline = () => {
       const pending = consumePendingScenarioTimeline();
@@ -145,6 +137,44 @@ export function City3DWebGLScreen() {
   const statsRef = useRef(stats);
   paramsRef.current = params;
   statsRef.current = stats;
+
+  // LOOKING GLASS 2.1 — LIVE OBSERVATION DIRECTOR. Parses a sentence into an
+  // ObservationIntent (reused from the chat console, `observationIntent.ts`),
+  // resolves it onto the real C2 CameraIntent vocabulary (`observationExecution.
+  // ts`, itself composed from the EXISTING mode->vantage and vantage->camera
+  // tables — no new mapping invented), and hands the target NAME to
+  // `sim.applyObservationTarget`, which alone knows the city's real objects
+  // and alone touches the camera (through the existing OrbitControls target/
+  // distance seam every preset already uses). This component never computes
+  // a position or a transform.
+  const [obsText, setObsText] = useState('');
+  const [obsResult, setObsResult] = useState<{ status: ObservationExecutionStatus; narration: string; cameraIntent: string; transition: string } | null>(null);
+  const askObservation = (sentence: string) => {
+    const trimmed = sentence.trim();
+    if (!trimmed) return;
+    const intent = parseObservationIntent(trimmed);
+    const query = intent.target ?? intent.focus;
+    if (!query) {
+      setObsResult({ status: 'FAILED', narration: 'No target was named in that sentence — say what to look at (e.g. "the hospital").', cameraIntent: '', transition: '' });
+      setObsText('');
+      return;
+    }
+    const cameraIntent = resolveCameraIntent(intent);
+    const transition = resolveTransitionKind(intent);
+    const outcome = sim.applyObservationTarget(query, cameraIntent);
+    const timeNote = intent.time && intent.time.kind !== 'NOW'
+      ? ' Time travel for the live city view is not yet supported — showing the current moment.'
+      : '';
+    setObsResult({
+      status: outcome.found ? 'EXECUTED' : 'FAILED',
+      narration: outcome.found
+        ? `Showing ${outcome.label} — ${cameraIntent} · ${transition.toLowerCase()} move.${timeNote}`
+        : `Nothing in this run answers to "${query}" — no such object exists here.`,
+      cameraIntent,
+      transition,
+    });
+    setObsText('');
+  };
 
   const renderParams = useMemo<SimParams>(() => ({ ...params, clockSpeed: running ? speed : 0 }), [params, running, speed]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, renderParams, true, setStats);
@@ -205,6 +235,77 @@ export function City3DWebGLScreen() {
       setCameraPreset('street');
     }
   }, [lookingGlass, sim]);
+
+  // THE CINEMATIC SEQUENCE DRIVES THIS WORLD.
+  //
+  // Previously an interval just incremented the day, which played the series
+  // but ignored the edit entirely: the shot plan chose a camera and a moment
+  // and the world never heard about it. Now the director resolves each
+  // instant and this applies it to the two levers the world actually has —
+  // its day and its camera. It writes the SAME `timelineDay` the scrub bar
+  // writes, so it remains playback of the real series rather than a second
+  // clock, and the user can still grab the scrub bar at any point.
+  //
+  // The day is only moved when the director says the time is on this
+  // viewer's clock. A marker from a run of a different length reports null,
+  // and holding is the honest response — jumping to "day 72" of a 60-day
+  // series would render a day this run never had.
+  const [direction, setDirection] = useState<WorldDirection | null>(null);
+  // Read inside the animation frame, so freezing takes effect without
+  // tearing down and rebuilding the loop on every mode change.
+  const frozenRef = useRef(false);
+  const [experience, setExperience] = useState<ExperienceState>(() => initialExperienceState(0, Boolean(lookingGlass?.autoPlay)));
+  const inspectableEvents = useMemo(() => lookingGlass?.world?.getInspectableEvents() ?? [], [lookingGlass]);
+  useEffect(() => { frozenRef.current = timeIsFrozen(experience); }, [experience]);
+  const cinematic = useMemo(
+    () => (lookingGlass?.experience && lookingGlass.world ? new ExperiencePlayer(lookingGlass.experience) : null),
+    [lookingGlass],
+  );
+  useEffect(() => {
+    const world = lookingGlass?.world;
+    if (!cinematic || !world || !scenarioTimeline) return;
+    cinematic.play();
+    const lastDay = scenarioTimeline.series.length - 1;
+    let raf = 0;
+    let last = performance.now();
+    let appliedPreset: string | null = null;
+    const tick = (now: number) => {
+      // A stalled frame must not teleport the world. Without a cap, one
+      // slow frame — a backgrounded tab, a software renderer, a GC pause —
+      // advances the sequence by however long it took, skipping states the
+      // viewer never saw. Capped at 100 ms, playback simply slows instead.
+      const delta = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      // A moment being interrogated must not move underneath the person
+      // interrogating it, so INSPECT/REPLAY stop the clock rather than
+      // merely hiding it.
+      const frame = frozenRef.current ? cinematic.currentFrame : cinematic.advance(delta);
+      if (frame) {
+        const next = directionForFrame(frame, world, lookingGlass?.viewpoint);
+        setDirection(next);
+        if (next.worldTime !== null) {
+          // No local clamp: the director already resolved this through the
+          // world's clock, which knows which ticks the run really produced.
+          // A second, different rule here is how these paths drifted apart
+          // before. The index is looked up rather than assumed equal to the
+          // day, so a run with gaps still addresses the right sample.
+          const index = world.clock.allTicks.indexOf(next.worldTime);
+          setTimelineDay(index >= 0 ? Math.min(index, lastDay) : Math.min(Math.round(next.worldTime), lastDay));
+        }
+        const preset = cityPresetFor(next.cameraIntent);
+        // Only on an actual change: re-applying a preset every frame would
+        // fight the user's own camera and burn work for no visible result.
+        if (preset !== appliedPreset) {
+          appliedPreset = preset;
+          sim.setCameraPreset(preset);
+          setCameraPreset(preset);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cinematic, lookingGlass, scenarioTimeline, sim]);
 
   const changeCamera = (preset: CityCameraPreset) => {
     sim.setCameraPreset(preset);
@@ -346,6 +447,97 @@ export function City3DWebGLScreen() {
           <div className={`city-3d-stage-wrap city-world-stage${enteredTimelineDay === timelineLogicalDay ? ' temporal-moment-entered' : ''}`} data-temporal-day={timelineLogicalDay} data-temporal-entered={enteredTimelineDay === timelineLogicalDay ? 'true' : 'false'}>
             <canvas ref={canvasRef} className="city-3d-canvas" aria-label="Żywa scena Three.js miasta z humanoidami sterowanymi przez model epidemii" />
             <TemporalWorldHud timeline={scenarioTimeline} day={timelineDay} enteredDay={enteredTimelineDay} />
+            {/* LOOKING GLASS 2.1 — the live observation console: tell Genesis
+                what to look at, in one sentence, and the REAL camera moves. */}
+            <div className="lg-obs-live">
+              <div className="lg-obs">
+                <span className="lg-obs-title">ASK GENESIS</span>
+                <form className="lg-obs-form" onSubmit={(event) => { event.preventDefault(); askObservation(obsText); }}>
+                  <input
+                    className="lg-obs-input"
+                    type="text"
+                    value={obsText}
+                    placeholder="np. „Go to the hospital” / „Focus on the pump”"
+                    onChange={(event) => setObsText(event.target.value)}
+                  />
+                  <button type="submit" className="lg-obs-send" disabled={obsText.trim().length === 0}>Go</button>
+                </form>
+                {obsResult && (
+                  <div className="lg-obs-result">
+                    <span className={`lg-obs-status is-${obsResult.status.toLowerCase()}`}>{obsResult.status}</span>
+                    <p className="lg-obs-narration">{obsResult.narration}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* THE EDIT, VISIBLE IN THE WORLD. What the director chose, why it
+                chose it, and the evidence behind it — so the viewer is never
+                watching a pretty animation with no provenance. The time source
+                is stated plainly: a marker from another run says so instead of
+                showing a day this series never had. */}
+            {/* THE EVENTS OF THIS RUN, SELECTABLE. They are listed rather than
+                clicked in 3D because these events genuinely carry no
+                coordinates — placing a marker somewhere plausible would be
+                inventing a location. When a domain does provide one, the
+                same record drives a spatial marker with no change here. */}
+            {inspectableEvents.length > 0 && experience.mode !== 'INSPECT' && (
+              <div className="lg-rail">
+                <span className="lg-rail-title">zdarzenia przebiegu ({inspectableEvents.length})</span>
+                <div className="lg-rail-items">
+                  {inspectableEvents.slice(0, 8).map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      className="lg-rail-item"
+                      onClick={() => setExperience((current) => inspect(current, event, cinematic?.elapsedSeconds ?? null, lookingGlass?.world?.clock))}
+                    >
+                      {event.semanticKind.replace(/_/g, ' ').toLowerCase()} · {event.time.tick}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {experience.selectedEvent && (
+              <EventInspector
+                event={experience.selectedEvent}
+                allEvents={inspectableEvents}
+                unit={(lookingGlass?.world?.getTemporalRange().unit ?? 'DAY').toLowerCase()}
+                onClose={() => setExperience(closeInspection)}
+                onReplay={() => setExperience(enterReplay)}
+              />
+            )}
+            <span className="lg-mode-badge">{MODE_LABEL[experience.mode]}</span>
+            {experience.mode !== 'INSPECT' && lookingGlass?.comparison && (
+              <div className="lg-world-cmp">
+                <ComparisonPanel comparison={lookingGlass.comparison} requestedButMissing={false} />
+              </div>
+            )}
+            {direction && (
+              <div className="lg-world-shot">
+                <div className="lg-world-shot-head">
+                  <span className={`lg-world-shot-kind lg-world-shot-${direction.shotKind.toLowerCase()}`}>{direction.shotKind}</span>
+                  <span className="lg-world-shot-cam">{direction.cameraIntent}</span>
+                  <span className="lg-world-shot-time">
+                    {direction.worldTime !== null ? `dzień ${Math.round(direction.worldTime)}` : 'czas wstrzymany'}
+                  </span>
+                </div>
+                <p className="lg-world-shot-reason">{direction.reason}</p>
+                {/* The clock's OWN reason for the time shown — not the shot's
+                    editorial reason above. Surfaced only when it says
+                    something the day number alone does not: the clock
+                    snapped over a real gap in the run, or froze because a
+                    marker belongs to a different run's clock entirely. */}
+                {(direction.worldTimeSnapped || direction.worldTime === null) && (
+                  <p className="lg-world-shot-clock">{direction.worldTimeReason}</p>
+                )}
+                {direction.evidence.map((entry) => (
+                  <p key={entry.id} className="lg-world-shot-evidence">
+                    <span className="lg-world-shot-evid-id">{entry.id}</span>
+                    {entry.replayStatus ? <span className={`lg-world-shot-replay is-${entry.replayStatus.toLowerCase()}`}>{entry.replayStatus}</span> : null}
+                  </p>
+                ))}
+              </div>
+            )}
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
             {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
             {scenarioTimeline && timelineSample && (

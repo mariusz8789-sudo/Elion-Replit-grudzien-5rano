@@ -41,7 +41,11 @@ export type ScenarioEngineBinding =
   | 'SCENARIO_ENGINE_EPIDEMIC'
   | 'CELL_WORLD_ADAPTER'
   | 'MOLECULE_WORLD_ADAPTER'
-  | 'PARTICLE_WORLD_ADAPTER';
+  | 'PARTICLE_WORLD_ADAPTER'
+  /** The real C3 World Model engine (core/worldModel/*) — WorldGraph + TemporalEngine + a real domain solver, not scenarioEngine/hypothesisLoop. */
+  | 'WORLD_MODEL_CHEMISTRY'
+  /** Same C3 engine family as WORLD_MODEL_CHEMISTRY, a different real domain solver (hydraulicsPumpPipe.ts). */
+  | 'WORLD_MODEL_HYDRAULICS';
 
 export interface ScenarioCapability {
   readonly binding: ScenarioEngineBinding;
@@ -67,7 +71,7 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     binding: 'SCENARIO_ENGINE_EPIDEMIC',
     units: ['DAY'],
     maxSpan: { DAY: 365 },
-    viewpoints: ['ANCHORED_HUMAN', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE', 'MACRO'],
+    viewpoints: ['ANCHORED_HUMAN', 'DRIVER_POV', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE', 'MACRO'],
     ticksPerUnit: { HOUR: 1, DAY: 1, YEAR: 365 },
     notModelled: [
       'urban transformation — buildings, infrastructure and vegetation do not change over years',
@@ -78,7 +82,7 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     binding: 'SCENARIO_ENGINE_EPIDEMIC',
     units: ['DAY'],
     maxSpan: { DAY: 365 },
-    viewpoints: ['ANCHORED_HUMAN', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE'],
+    viewpoints: ['ANCHORED_HUMAN', 'DRIVER_POV', 'RESPONDER_POV', 'OPERATOR_POV', 'OBSERVER', 'WIDE'],
     ticksPerUnit: { HOUR: 1, DAY: 1, YEAR: 365 },
     notModelled: ['enforcement behaviour and compliance dynamics'],
   },
@@ -101,17 +105,35 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
     notModelled: ['apparatus outside the modelled bioreactor'],
   },
-  CHEMICAL_REACTION: {
-    binding: 'MOLECULE_WORLD_ADAPTER',
-    units: ['HOUR'],
-    maxSpan: { HOUR: 48 },
-    viewpoints: ['SCIENTIST_POV', 'OBSERVER', 'MACRO'],
-    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
-    notModelled: [
-      'a human-scale world a person can stand in — the world is molecular',
-      'reaction kinetics outside the bounded scenario set',
-    ],
-  },
+  /**
+   * CHEMICAL_REACTION is DELIBERATELY ABSENT from this table.
+   *
+   * A real defect lived here: this entry used to claim `binding:
+   * 'MOLECULE_WORLD_ADAPTER'` and resolve READY, but `scenarioSession.ts`
+   * never actually routed that binding — every CHEMICAL_REACTION sentence
+   * silently fell through to the laboratory's biology-logistic session
+   * instead. The capability table promised something the session builder
+   * could not deliver, which is exactly the failure this whole layer exists
+   * to prevent when it is a MODEL that is missing; here the model
+   * (`core/world/moleculeWorldAdapter.ts`, the real RDKit descriptor engine)
+   * genuinely exists — the blocker is architectural, not scientific:
+   *
+   *   - `chem-rdkit-descriptors` is registered `BACKEND_REAL_ENGINE` in
+   *     router.ts — a real network call to a live RDKit backend process.
+   *   - `hypothesisLoop.ts`'s own doc comment on
+   *     `executePreregisteredHypothesesAsync` confirms the SYNC executor
+   *     (`executePreregisteredHypotheses`, the only one `openLookingGlass`
+   *     can call) "can only execute LOCAL models... a BACKEND_REAL_ENGINE
+   *     model... throws inside that path".
+   *
+   * `openLookingGlass` is synchronous end to end — the request id, the shot
+   * plan, the world handoff, all of it assume one synchronous call produces
+   * a session. Making it async to reach one backend-only kind would be
+   * exactly the redesign this layer's own rules forbid trading correctness
+   * for. So the honest fix is not a route: it is admitting NOT_MODELLED,
+   * with the real reason, instead of a false READY. See
+   * `KIND_UNSUPPORTED_REASON` below for the message this produces.
+   */
   PARTICLE_SYSTEM: {
     binding: 'PARTICLE_WORLD_ADAPTER',
     units: ['HOUR'],
@@ -121,6 +143,44 @@ export const SCENARIO_CAPABILITIES: Readonly<Partial<Record<ScenarioKind, Scenar
     notModelled: [
       'a human-scale world a person can stand in — the world is particle-scale',
       'continuum or fluid dynamics',
+    ],
+  },
+  /**
+   * Backed by the real C3 World Model engine — a live WorldGraph advanced by
+   * `chemistryKinetics.ts`'s Arrhenius solver, not scenarioEngine/hypothesisLoop.
+   * Span capped at 24 hours because the solver's demo kinetics parameters
+   * (see DEMO_ACTIVATION_ENERGY_KJ/DEMO_PRE_EXPONENTIAL_LOG10) were tuned to
+   * show a real decay trajectory over exactly that window at 700-800K — a
+   * longer request would either underflow to zero or barely move.
+   */
+  CHEMICAL_KINETICS: {
+    binding: 'WORLD_MODEL_CHEMISTRY',
+    units: ['HOUR'],
+    maxSpan: { HOUR: 24 },
+    viewpoints: ['SCIENTIST_POV', 'OBSERVER', 'MACRO'],
+    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
+    notModelled: [
+      'a human-scale world a person can stand in — no 3D rendering surface exists for this domain yet',
+      'reaction products or multi-step mechanisms — this is single-substance first-order decay only',
+    ],
+  },
+  /**
+   * Backed by the real C3 World Model engine over the existing
+   * engineeringGraph/pumpPipe.ts model — Darcy-Weisbach head loss,
+   * Swamee-Jain friction. Steady-state: a tick re-evaluates the same real
+   * model against current parameters rather than integrating an ODE, so
+   * nothing changes across ticks unless a real intervention is applied
+   * (see buildHydraulicsSession's fork/compare path).
+   */
+  HYDRAULIC_SYSTEM: {
+    binding: 'WORLD_MODEL_HYDRAULICS',
+    units: ['HOUR'],
+    maxSpan: { HOUR: 24 },
+    viewpoints: ['OPERATOR_POV', 'SCIENTIST_POV', 'OBSERVER', 'MACRO'],
+    ticksPerUnit: { HOUR: 1, DAY: 24, YEAR: 8760 },
+    notModelled: [
+      'a human-scale world a person can stand in — no 3D rendering surface exists for this domain yet',
+      'transient/water-hammer behaviour — this model is steady-state only',
     ],
   },
 };
@@ -136,6 +196,41 @@ const FAMILY_GAP: Readonly<Record<ScenarioFamily, string>> = {
   MOLECULAR: 'this molecular scenario has no model behind it yet',
   URBAN_CHANGE: 'Genesis has no urban-development model — buildings, infrastructure and population structure do not evolve',
 };
+
+/**
+ * A specific reason for a kind that has no `SCENARIO_CAPABILITIES` entry,
+ * overriding `FAMILY_GAP`'s generic per-family text when the generic text
+ * would be misleading — e.g. MOLECULAR is no longer accurate to call
+ * wholesale unmodelled once CHEMICAL_KINETICS exists in the same family.
+ * Absent here just means the family-level reason is accurate as is.
+ */
+const KIND_UNSUPPORTED_REASON: Readonly<Partial<Record<ScenarioKind, string>>> = {
+  CHEMICAL_REACTION:
+    'a real model exists (RDKit molecular descriptors) but it runs only as a backend network call, and Looking Glass resolves scenarios synchronously — this specific kind cannot be routed without changing that, not because no model exists',
+};
+
+/**
+ * Every viewpoint the vocabulary knows, answered for one scenario kind: is
+ * there really somewhere to stand, and if not, why. Derived from the same
+ * capability table the resolver refuses with, so a UI listing perspectives
+ * and the resolver rejecting one can never disagree.
+ */
+export function DOMAIN_PERSPECTIVE_SOURCE(kind: ScenarioKind): readonly {
+  kind: ViewpointKind; available: boolean; reason: string | null;
+}[] {
+  const capability = SCENARIO_CAPABILITIES[kind];
+  const all: readonly ViewpointKind[] = [
+    'ANCHORED_HUMAN', 'DRIVER_POV', 'SCIENTIST_POV', 'OPERATOR_POV', 'RESPONDER_POV', 'OBSERVER', 'WIDE', 'MACRO',
+  ];
+  return all.map((viewpoint) => {
+    const available = capability?.viewpoints.includes(viewpoint) ?? false;
+    return {
+      kind: viewpoint,
+      available,
+      reason: available ? null : (capability?.notModelled[0] ?? 'this scenario has no model behind it yet'),
+    };
+  });
+}
 
 export type ResolutionStatus = 'READY' | 'NEEDS_INPUT' | 'NOT_MODELLED' | 'REFUSED';
 
@@ -188,10 +283,11 @@ export function resolveScenarioRequest(request: StructuredScenarioRequest): Scen
 
   const capability = SCENARIO_CAPABILITIES[request.kind];
   if (!capability) {
+    const reason = KIND_UNSUPPORTED_REASON[request.kind] ?? FAMILY_GAP[request.family];
     return {
       ...empty,
       status: 'NOT_MODELLED',
-      notModelled: [`${request.kind.replace(/_/g, ' ').toLowerCase()} is not simulated: ${FAMILY_GAP[request.family]}`],
+      notModelled: [`${request.kind.replace(/_/g, ' ').toLowerCase()} is not simulated: ${reason}`],
     };
   }
 

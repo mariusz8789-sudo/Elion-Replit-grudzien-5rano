@@ -1,5 +1,5 @@
 import type * as THREE_NS from 'three';
-import type { PostProcessingModules, PostProcessor, Sim3D } from './types';
+import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { TemporalEngine, TemporalBranchRegistry } from '../worldModel/temporal/temporalEngine';
 import {
   buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER, rainfallSchedule,
@@ -16,7 +16,7 @@ import type { WorldFrame, WorldFrameEntity as C2Entity, EntityGrounding } from '
 import { createWaterInfrastructureAdapter, type WaterInfrastructureAdapter } from './graphics/waterInfrastructureBridge';
 import { createPipeNetwork, createValve, type WaterInfrastructureState } from './graphics/waterInfrastructure';
 import { createFacadeBuilding, createIndustrialBuilding } from './graphics/buildingKit';
-import { createStreetLight, createHydrant, createUtilityBox, createBollardBarrier } from './graphics/streetKit';
+import { createStreetLight, createHydrant, createUtilityBox, createBollardBarrier, createSidewalk, createRoadMarkings } from './graphics/streetKit';
 import { createTreeField, type VegetationFieldHandle } from './graphics/vegetation';
 import { createVehicle } from './graphics/vehicleKit';
 import { createPostSign } from './graphics/signageKit';
@@ -154,6 +154,12 @@ export class GenesisScientificCitySim implements Sim3D {
   private contextGroup: THREE_NS.Group | null = null;
   private contextMaterials: THREE_NS.Material[] = [];
   private trees: VegetationFieldHandle | null = null;
+  /** Real WebGLRenderer.info counters, fed by useThreeLoop through the existing Sim3D
+   * `onRenderMetrics` hook. This scene previously implemented neither the hook nor a readout, so it
+   * could not be measured at all — which made the graphics performance budget unenforceable on the
+   * one scene that matters most. Same keys epidemicCity3D already publishes, so any tooling that
+   * reads one reads the other. */
+  private renderMetrics: ThreeRenderMetrics = { fps: 0, frameMs: 0, renderMs: 0, drawCalls: 0, triangles: 0, geometries: 0, textures: 0 };
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
 
   private followTarget: THREE_NS.Vector3 | null = null;
@@ -502,7 +508,9 @@ export class GenesisScientificCitySim implements Sim3D {
     this.sceneEnvironment = createSceneEnvironment(THREE, scene, {
       mode: 'OUTDOOR',
       hourOfDay: 21,
-      fogDensity: 0.014,
+      // SPRINT B — atmosphere. 0.014 buried the skyline the district now has; this keeps real
+      // atmospheric depth (near geometry crisp, far towers fading) while letting the horizon read.
+      fogDensity: 0.0075,
       groundMaterial: createPBRMaterial(THREE, 'CONCRETE', { color: 0x1a2332 }),
       // `hourOfDay: 21` (9pm) puts computeSunState's sun direction BELOW the horizon (negative y)
       // AND floors its intensity at a physically-dim 0.15 — both correct for a real night sky, but
@@ -519,9 +527,11 @@ export class GenesisScientificCitySim implements Sim3D {
       // With the city context now filling the frame, that left streets and lower facades reading as
       // muddy near-black. A warmer, stronger hemisphere fill lifts the whole scene into "legible
       // dusk" without touching the fog/sky mood `hourOfDay: 21` drives.
-      fillIntensity: 0.95,
-      fillSkyColor: 0x9fb4d8,
-      fillGroundColor: 0x5b5045,
+      // Cool sky bounce against the warm key above: the warm/cool separation the design target
+      // relies on, and what stops a night scene reading as uniformly grey.
+      fillIntensity: 1.15,
+      fillSkyColor: 0x8fa8d4,
+      fillGroundColor: 0x6b5c49,
     });
 
     this.pumpMaterials = {
@@ -576,8 +586,14 @@ export class GenesisScientificCitySim implements Sim3D {
 
     const midX = (hospital[0] + pump[0]) / 2;
     const midZ = (hospital[2] + pump[2]) / 2;
-    camera.position.set(midX + 18, 16, midZ + 24);
-    camera.lookAt(midX, 1, midZ);
+    // SPRINT B — composition. The old framing was a low, close shot chosen when this scene held three
+    // primitives on an empty plane; with a real district around them it cropped into rooftops and
+    // read as an accident. This is an elevated three-quarter establishing shot: the pump/hospital
+    // pair stay the subject, the street grid gives depth, and the skyline closes the background.
+    // Only the INITIAL framing changes — `applyObservationTarget`/`resolveCameraFraming` and the
+    // OrbitControls target seam C1's observation flow drives are untouched.
+    camera.position.set(midX + 46, 34, midZ + 62);
+    camera.lookAt(midX, 4, midZ);
   }
 
   /**
@@ -600,8 +616,22 @@ export class GenesisScientificCitySim implements Sim3D {
 
     const asphalt = createPBRMaterial(THREE, 'ASPHALT');
     const concrete = createPBRMaterial(THREE, 'CONCRETE');
-    const wall = createPBRMaterial(THREE, 'CONCRETE', { color: 0x6d6f75 });
     const roof = createPBRMaterial(THREE, 'CONCRETE', { color: 0x3a3d44 });
+    // SPRINT B — facade variation. A district where every building shares one wall material reads as
+    // one extruded texture, which is most of what made this look like a technical demo. These are
+    // the SAME `materials.ts` PBR categories already in the palette (each carries its own procedural
+    // surface detail and roughness variation) — a spread of real building surfaces, not a new
+    // material system, and nothing here encodes or implies any scientific value.
+    const facadeMaterials = [
+      createPBRMaterial(THREE, 'CONCRETE', { color: 0x6d6f75 }),   // bare concrete
+      createPBRMaterial(THREE, 'CONCRETE', { color: 0xb8ab97 }),   // pale render/stucco
+      createPBRMaterial(THREE, 'BRICK'),                            // brick
+      createPBRMaterial(THREE, 'CONCRETE', { color: 0x8a9299 }),   // grey-blue panel
+      createPBRMaterial(THREE, 'TECH_COMPOSITE', { color: 0x55606b }), // curtain-wall-ish
+    ];
+    const kerb = createPBRMaterial(THREE, 'CONCRETE', { color: 0x9a9a96 });
+    const paving = createPBRMaterial(THREE, 'CONCRETE', { color: 0x7c7b78 });
+    const paint = new THREE.MeshStandardMaterial({ color: 0xd8d4c4, roughness: 0.85, metalness: 0 });
     const metal = createPBRMaterial(THREE, 'BRUSHED_METAL');
     const lampGlow = new THREE.MeshStandardMaterial({ color: 0xffe6b8, emissive: 0xffd08a, emissiveIntensity: 2.2, roughness: 0.35 });
     const contextWindow = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.05, emissive: 0xffc98a, emissiveIntensity: 0.35 });
@@ -609,7 +639,7 @@ export class GenesisScientificCitySim implements Sim3D {
     const canopy = createPBRMaterial(THREE, 'CONCRETE', { color: 0x2f5d34 });
     const carBody = createPBRMaterial(THREE, 'PAINTED_METAL');
     const carGlass = createPBRMaterial(THREE, 'TECH_COMPOSITE', { color: 0x1c2733 });
-    this.contextMaterials = [asphalt, concrete, wall, roof, metal, lampGlow, contextWindow, trunk, canopy, carBody, carGlass];
+    this.contextMaterials = [asphalt, concrete, roof, metal, lampGlow, contextWindow, trunk, canopy, carBody, carGlass, kerb, paving, paint, ...facadeMaterials];
 
     // Keep-out zones: the real entities' own positions, so context never buries the science.
     const keepOut: { x: number; z: number; r: number }[] = [];
@@ -632,6 +662,33 @@ export class GenesisScientificCitySim implements Sim3D {
       group.add(road);
     }
 
+    // SPRINT B — pavements, kerbs and a painted centreline. This is the change that makes the
+    // carriageway read as a street: a real edge, a height difference for light to catch, and a
+    // scale reference a viewer already knows how to read. Uses streetKit's own new
+    // `createSidewalk`/`createRoadMarkings`; markings are one InstancedMesh per run.
+    const halfRoad = roadWidth / 2;
+    const pavementWidth = 4.5;
+    const runEnd = roadLength / 2;
+    for (const side of [-1, 1] as const) {
+      const offset = side * (halfRoad + pavementWidth / 2);
+      group.add(createSidewalk(THREE, {
+        from: [offset, 0, -runEnd], to: [offset, 0, runEnd],
+        width: pavementWidth, kerbHeight: 0.18, surfaceMaterial: paving, kerbMaterial: kerb,
+      }));
+      group.add(createSidewalk(THREE, {
+        from: [-runEnd, 0, offset], to: [runEnd, 0, offset],
+        width: pavementWidth, kerbHeight: 0.18, surfaceMaterial: paving, kerbMaterial: kerb,
+      }));
+    }
+    group.add(createRoadMarkings(THREE, {
+      from: [0, 0, -runEnd], to: [0, 0, runEnd],
+      dashLength: 3, gapLength: 4.5, width: 0.28, material: paint,
+    }));
+    group.add(createRoadMarkings(THREE, {
+      from: [-runEnd, 0, 0], to: [runEnd, 0, 0],
+      dashLength: 3, gapLength: 4.5, width: 0.28, material: paint,
+    }));
+
     // --- Context buildings on a loose grid, skipping the real entities' plots -----------------
     // Density is what makes a skyline read as a city rather than a diorama (see
     // `graphics/design-target/README.md`, quality 1). Detail falls off with distance instead of the
@@ -651,7 +708,7 @@ export class GenesisScientificCitySim implements Sim3D {
         if ((gx + gz) % 3 === 0 && near) {
           group.add(createIndustrialBuilding(THREE, {
             position: [x, 0, z], width: 12 + (seed % 5), depth: 10 + (seed % 4),
-            seed, wallMaterial: wall, roofMaterial: roof,
+            seed, wallMaterial: facadeMaterials[seed % facadeMaterials.length], roofMaterial: roof,
           }));
         } else {
           group.add(createFacadeBuilding(THREE, {
@@ -659,7 +716,7 @@ export class GenesisScientificCitySim implements Sim3D {
             width: 9 + (seed % 5), depth: 8 + (seed % 4),
             // Taller towards the outskirts so the horizon carries a real skyline silhouette.
             height: 7 + (seed % 13) + ring * 3.5,
-            seed, wallMaterial: wall, windowMaterial: contextWindow.clone(), roofMaterial: near ? roof : undefined,
+            seed, wallMaterial: facadeMaterials[seed % facadeMaterials.length], windowMaterial: contextWindow.clone(), roofMaterial: near ? roof : undefined,
             // Coarser window rows further out: fewer instances per building, same silhouette.
             floorHeight: near ? 1.2 : 2.0,
             litFraction: 0.4,
@@ -864,8 +921,8 @@ export class GenesisScientificCitySim implements Sim3D {
   ): PostProcessor {
     return setupGraphicsPipeline(this.THREE!, modules, renderer, {
       scene, camera, width: w, height: h,
-      toneMappingExposure: 1.05,
-      bloom: { strength: 0.42, radius: 0.55, threshold: 0.72 },
+      toneMappingExposure: 1.15,
+      bloom: { strength: 0.5, radius: 0.6, threshold: 0.68 },
       ambient: { mode: 'none' },
     });
   }
@@ -948,6 +1005,10 @@ export class GenesisScientificCitySim implements Sim3D {
     this.renderer.sync(frame);
   }
 
+  onRenderMetrics(metrics: ThreeRenderMetrics): void {
+    this.renderMetrics = metrics;
+  }
+
   getStats(): Record<string, number> {
     const pump = this.activeEngine.graph.tryGetEntity(this.city.pumpPipeId);
     const hospital = this.activeEngine.graph.tryGetEntity(this.city.hospitalBuildingId);
@@ -962,6 +1023,13 @@ export class GenesisScientificCitySim implements Sim3D {
       rainfallActive: this.rainfallOutcome ? 1 : 0,
       replaying: this.replay ? 1 : 0,
       replayTick: this.replay?.cursor ?? -1,
+      webgl_fps: this.renderMetrics.fps,
+      webgl_frame_ms: this.renderMetrics.frameMs,
+      webgl_render_ms: this.renderMetrics.renderMs,
+      webgl_draw_calls: this.renderMetrics.drawCalls,
+      webgl_triangles: this.renderMetrics.triangles,
+      webgl_geometries: this.renderMetrics.geometries,
+      webgl_textures: this.renderMetrics.textures,
     };
   }
 }

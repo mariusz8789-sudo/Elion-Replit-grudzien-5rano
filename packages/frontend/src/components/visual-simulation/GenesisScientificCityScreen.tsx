@@ -34,8 +34,16 @@ export function GenesisScientificCityScreen() {
   const [replaying, setReplaying] = useState(false);
   const [, forceRender] = useState(0);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Renderer counters refresh every frame; polling once a second is enough to read them and costs
+   * nothing, whereas re-rendering this panel per frame would itself distort what it measures. */
+  const [stats, setStats] = useState<Record<string, number>>({});
 
   useEffect(() => () => { if (replayTimer.current) clearInterval(replayTimer.current); }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setStats(sim.getStats()), 1000);
+    return () => clearInterval(timer);
+  }, [sim]);
 
   /**
    * THE SCIENTIFIC CONTROL LOOP:
@@ -259,6 +267,18 @@ export function GenesisScientificCityScreen() {
                 </form>
                 {obsResult && <p className="lg-obs-narration">{obsResult}</p>}
               </div>
+            </div>
+
+            {/* GRAPHICS V2 — real WebGLRenderer.info counters for the flagship scene, read through
+                the existing Sim3D `onRenderMetrics` hook. Same keys and same purpose as the epidemic
+                city's own observability panel: graphics/PERFORMANCE_BUDGET.md requires every sprint
+                to measure this scene, and until now it could not be measured at all. */}
+            <div className="gsc-panel observability-panel">
+              <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
+              <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
+              <div><span>geometries</span><b>{Math.round(stats.webgl_geometries ?? 0)}</b></div>
+              <div><span>textures</span><b>{Math.round(stats.webgl_textures ?? 0)}</b></div>
+              <div><span>render</span><b>{Number(stats.webgl_render_ms ?? 0).toFixed(2)} ms</b></div>
             </div>
 
             <div className="gsc-panel">

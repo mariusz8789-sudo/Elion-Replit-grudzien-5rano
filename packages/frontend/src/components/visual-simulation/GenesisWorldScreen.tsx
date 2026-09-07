@@ -6,11 +6,23 @@ import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { WorldFrameRenderer, type EntityVisualSpec } from '../../core/three/graphics/worldFrameRenderer';
 import { InteractionController } from '../../core/three/graphics/interaction';
 import type { WorldFrameEntity, WorldFrameEntityId } from '../../core/three/graphics/worldFrame';
+import { buildTerrainFieldMesh, type TerrainFieldMesh } from '../../core/three/graphics/terrainField';
+import { severityColor } from '../../core/three/graphics/stateVisualization';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
+import { buildSyntheticTerrain } from '../../core/worldModel/domains/floodInundation';
+import { buildUniformFuelBed, simulateWildfireSpread, type WildfireSpreadResult, type WindVector } from '../../core/worldModel/domains/wildfireSpread';
 import type { TemporalEngine } from '../../core/worldModel/temporal/temporalEngine';
 import { PUMP_PIPE_DEFAULTS } from '../../core/engineeringGraph/pumpPipe';
+
+export interface WildfireFieldSummary {
+  readonly headRosMS: number;
+  readonly headFirelineIntensityKWm: number;
+  readonly headFlameLengthM: number;
+  readonly reachedCells: number;
+  readonly totalCells: number;
+}
 
 /**
  * GENESIS WORLD OBSERVATION (Trinity browser verification page).
@@ -46,6 +58,7 @@ function colorForVisualHint(hint?: string): number {
 class GenesisWorldSim3D implements Sim3D {
   cameraAutoRotateSpeed = 0;
   private THREE: typeof THREE_NS | null = null;
+  private scene: THREE_NS.Scene | null = null;
   private root: THREE_NS.Group | null = null;
   private renderer: WorldFrameRenderer | null = null;
   private interaction: InteractionController | null = null;
@@ -57,6 +70,18 @@ class GenesisWorldSim3D implements Sim3D {
   showFork = false;
   scrubTick: number | null = null;
   hoveredId: WorldFrameEntityId | null = null;
+
+  /**
+   * Real Rothermel (1972) surface-fire-spread + Finney (2002) minimum-travel-time field
+   * (`wildfireSpread.ts`, already shipped by C3, previously with no visualization anywhere in
+   * `core/three/`), rendered through the new generic `terrainField.ts` kit. Built lazily on first
+   * toggle — the site has nothing to do with `city`'s Alicante slice, it is its own standalone
+   * demonstration terrain (`buildSyntheticTerrain`, `surveyed: false`), so it replaces the entity
+   * view rather than sharing world space with it.
+   */
+  private wildfireField: TerrainFieldMesh | null = null;
+  private wildfireResult: WildfireSpreadResult | null = null;
+  showWildfire = false;
 
   /** Set by the React component to receive selection changes — the ONLY coupling between this Sim3D and React, exactly the pattern `interaction.ts` documents (`onSelect`). */
   onSelect?: (id: WorldFrameEntityId | null) => void;
@@ -71,6 +96,7 @@ class GenesisWorldSim3D implements Sim3D {
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number): void {
     this.THREE = THREE;
+    this.scene = scene;
     this.width = w;
     this.height = h;
     scene.background = new THREE.Color(0x0a0f1a);
@@ -104,7 +130,9 @@ class GenesisWorldSim3D implements Sim3D {
     this.interaction = new InteractionController(THREE, {
       camera,
       resolver: this.renderer,
-      getTargets: () => (this.root ? [this.root] : []),
+      // While the wildfire field is showing, the entity boxes are hidden — excluding `root` from
+      // the raycast targets too, not just from rendering, so a click can't "select" a hidden box.
+      getTargets: () => (this.root && !this.showWildfire ? [this.root] : []),
       onHoverChange: (id) => {
         this.hoveredId = id;
       },
@@ -174,6 +202,73 @@ class GenesisWorldSim3D implements Sim3D {
     this.syncNow();
   }
 
+  /**
+   * Builds the real wildfire demonstration field once, on first use: a small synthetic terrain
+   * (`buildSyntheticTerrain` — a stated, `surveyed: false` bowl, same honesty convention as
+   * `floodInundation.ts`'s own reference terrain), a uniform short-grass fuel bed, and one real
+   * Rothermel/MTT solve for a single ignition point. `arrivalTimeS` is real per-cell solver output;
+   * a cell the fire never reaches (`Infinity`) is passed through as `null` to `terrainField.ts`,
+   * which renders it in a plain "unburned ground" tone — never bent onto the severity scale.
+   */
+  private buildWildfireDemo(): void {
+    if (!this.THREE || this.wildfireField) return;
+    const THREE = this.THREE;
+    const terrain = buildSyntheticTerrain({ cols: 30, rows: 30, cellSizeM: 6, seed: 7, reliefM: 4 });
+    const fuelBed = buildUniformFuelBed(terrain, 'FM1_SHORT_GRASS', 0.06);
+    const wind: WindVector = { speedMph: 15, directionDegrees: 45 };
+    const ignitionIndex = Math.floor(terrain.rows / 2) * terrain.cols + Math.floor(terrain.cols / 2);
+    const result = simulateWildfireSpread(fuelBed, wind, [ignitionIndex]);
+    this.wildfireResult = result;
+
+    let maxFiniteArrivalS = 0;
+    for (const t of result.arrivalTimeS) {
+      if (Number.isFinite(t) && t > maxFiniteArrivalS) maxFiniteArrivalS = t;
+    }
+
+    this.wildfireField = buildTerrainFieldMesh(THREE, terrain, {
+      heightScale: 3,
+      // A muted olive/brown "unburned ground" — visually distinct from severityColor's own
+      // green/amber/red range, so a not-yet-reached cell never reads as a false "low severity" REAL reading.
+      noDataColor: 0x4a3f2a,
+      cellValueOf: (i) => {
+        const t = result.arrivalTimeS[i];
+        return Number.isFinite(t) ? t : null;
+      },
+      // Soonest-to-ignite cells (t=0, at the fire front) read red/hot; the slowest-to-reach real
+      // arrivals fade toward green — an arrival-time heatmap, not a burned/unburned binary.
+      colorOfValue: (T, value) => severityColor(T, maxFiniteArrivalS > 0 ? 1 - value / maxFiniteArrivalS : 0),
+    });
+    this.wildfireField.mesh.position.y = 0.01; // avoid z-fighting with the base ground plane
+  }
+
+  setShowWildfire(show: boolean): void {
+    this.showWildfire = show;
+    if (show) {
+      this.buildWildfireDemo();
+      if (this.root) this.root.visible = false;
+      if (this.wildfireField && this.scene && !this.wildfireField.mesh.parent) {
+        this.scene.add(this.wildfireField.mesh);
+      }
+    } else {
+      if (this.root) this.root.visible = true;
+      if (this.wildfireField?.mesh.parent) this.wildfireField.mesh.parent.remove(this.wildfireField.mesh);
+    }
+  }
+
+  getWildfireSummary(): WildfireFieldSummary | null {
+    if (!this.wildfireResult) return null;
+    const totalCells = this.wildfireResult.arrivalTimeS.length;
+    let reachedCells = 0;
+    for (const t of this.wildfireResult.arrivalTimeS) if (Number.isFinite(t)) reachedCells++;
+    return {
+      headRosMS: this.wildfireResult.headRosMS,
+      headFirelineIntensityKWm: this.wildfireResult.headFirelineIntensityKWm,
+      headFlameLengthM: this.wildfireResult.headFlameLengthM,
+      reachedCells,
+      totalCells,
+    };
+  }
+
   update(): void {
     // Evolution is user-driven (advanceTick()), not continuous — every tick shown is one the
     // observer explicitly asked for, matching this page's role as a verification surface rather
@@ -193,6 +288,7 @@ class GenesisWorldSim3D implements Sim3D {
 
   dispose(): void {
     this.renderer?.dispose();
+    this.wildfireField?.dispose();
   }
 }
 
@@ -208,6 +304,8 @@ export function GenesisWorldScreen() {
   const [scrubValue, setScrubValue] = useState(0);
   const [selected, setSelected] = useState<WorldFrameEntityId | null>(null);
   const [pumpStatus, setPumpStatus] = useState('');
+  const [showWildfire, setShowWildfireState] = useState(false);
+  const [wildfireSummary, setWildfireSummary] = useState<WildfireFieldSummary | null>(null);
 
   useEffect(() => {
     sim.onSelect = (id: WorldFrameEntityId | null) => setSelected(id);
@@ -261,6 +359,12 @@ export function GenesisWorldScreen() {
     sim.setScrubTick(null);
   };
 
+  const handleToggleWildfire = (show: boolean) => {
+    sim.setShowWildfire(show);
+    setShowWildfireState(show);
+    setWildfireSummary(sim.getWildfireSummary());
+  };
+
   return (
     <main id="main-content" tabIndex={-1} className="home genesis-world-screen">
       <div className="honesty-row">
@@ -268,7 +372,8 @@ export function GenesisWorldScreen() {
         <span className="honesty-note">
           Real Genesis Scientific City 4.0, generated through the createScientificWorld Trinity entry point and rendered via the generic
           WorldFrameRenderer (C2). Click an object to select it; use the controls below to advance time, scrub the timeline, and fork a
-          counterfactual (emergency flow-reduction) world for comparison.
+          counterfactual (emergency flow-reduction) world for comparison. The wildfire field toggle shows a real Rothermel/MTT fire-spread
+          solve (C3, `wildfireSpread.ts`) on a separate synthetic demonstration terrain, rendered via the generic terrainField kit (C2).
         </span>
       </div>
 
@@ -309,6 +414,9 @@ export function GenesisWorldScreen() {
         <button className="chip-btn" data-testid="go-live" onClick={handleLive} disabled={!scrubbing}>
           Live
         </button>
+        <button className="chip-btn" data-testid="toggle-wildfire" aria-pressed={showWildfire} onClick={() => handleToggleWildfire(!showWildfire)}>
+          {showWildfire ? 'Hide wildfire field' : 'Show wildfire field (Rothermel/MTT)'}
+        </button>
       </div>
 
       <p className="footer-note" data-testid="genesis-world-status">
@@ -335,6 +443,18 @@ export function GenesisWorldScreen() {
           <>
             {' '}
             · Selected: <span data-testid="selected-entity">{selected}</span>
+          </>
+        )}
+        {showWildfire && wildfireSummary && (
+          <>
+            {' '}
+            · Wildfire: head ROS <span data-testid="wildfire-head-ros">{wildfireSummary.headRosMS.toFixed(3)}</span> m/s · intensity{' '}
+            <span data-testid="wildfire-intensity">{wildfireSummary.headFirelineIntensityKWm.toFixed(0)}</span> kW/m · flame length{' '}
+            <span data-testid="wildfire-flame-length">{wildfireSummary.headFlameLengthM.toFixed(1)}</span> m · reached{' '}
+            <span data-testid="wildfire-reached-cells">
+              {wildfireSummary.reachedCells}/{wildfireSummary.totalCells}
+            </span>{' '}
+            cells (Rothermel 1972 / Finney 2002 MTT, synthetic demo terrain)
           </>
         )}
       </p>

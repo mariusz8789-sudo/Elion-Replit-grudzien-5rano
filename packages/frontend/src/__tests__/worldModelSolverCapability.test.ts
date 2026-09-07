@@ -27,6 +27,7 @@ import { FIRE_THERMAL_SOLVER_ID, FUEL_PACKAGES, makeFireThermalSolver } from '..
 import { DROUGHT_SOLVER_ID, makeDroughtWaterBalanceSolver } from '../core/worldModel/domains/drought';
 import { buildUniformFuelBed, makeWildfireSpreadSolver, WILDFIRE_SPREAD_SOLVER_ID } from '../core/worldModel/domains/wildfireSpread';
 import { DEFAULT_SOIL_PARAMS, LANDSLIDE_SOLVER_ID, makeLandslideSolver } from '../core/worldModel/domains/landslide';
+import { makeWeatherSolver, WEATHER_SOLVER_ID } from '../core/worldModel/domains/weather';
 
 /**
  * PHASE 7 — FIRE/THERMAL AND TRAFFIC.
@@ -108,6 +109,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     const wildfireFuelBed = buildUniformFuelBed(buildSyntheticTerrain({ cols: 10, rows: 10 }), 'FM1_SHORT_GRASS', 0.06);
     router.register(WILDFIRE_SPREAD_SOLVER_ID, makeWildfireSpreadSolver(wildfireFuelBed, { speedMph: 5, directionDegrees: 0 }, [0]));
     router.register(LANDSLIDE_SOLVER_ID, makeLandslideSolver(buildSyntheticTerrain({ cols: 10, rows: 10 }), DEFAULT_SOIL_PARAMS));
+    router.register(WEATHER_SOLVER_ID, makeWeatherSolver());
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {
       if (!capability.solverId) continue;
@@ -147,6 +149,7 @@ describe('The honest inventory is queryable, not buried', () => {
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('EVACUATION');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('DROUGHT');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('LANDSLIDE');
+    expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('EXTREME_HEAT');
     expect([...NOT_MODELLED_SCENARIO_KINDS]).toEqual([...NOT_MODELLED_SCENARIO_KINDS].sort());
   });
 
@@ -165,6 +168,12 @@ describe('The honest inventory is queryable, not buried', () => {
     expect(describeCapability('DROUGHT')).toMatch(/Still NOT modelled: this is not the Standardized Precipitation Index/);
     expect(describeCapability('WILDFIRE')).toMatch(/Still NOT modelled: crown fire/);
     expect(describeCapability('LANDSLIDE')).toMatch(/Still NOT modelled: debris-flow rheology/);
+    // Phase 17: the weather layer is forcing, not forecast, and the caveat must keep saying so.
+    expect(describeCapability('EXTREME_HEAT')).toMatch(/FORCING, NOT FORECAST/);
+    expect(describeCapability('EXTREME_HEAT')).toMatch(/Still NOT modelled: the human consequence side/);
+    // Phase 17 closed the atmospheric half of the fuel-moisture question and must say which half.
+    expect(describeCapability('WILDFIRE')).toMatch(/DEAD FUEL MOISTURE IS NO LONGER A STATED INPUT/);
+    expect(describeCapability('WILDFIRE')).toMatch(/soil moisture is still NOT converted into dead fuel moisture/);
   });
 
   it('consequence-vs-design boundaries stay stated where a request could be misread', () => {

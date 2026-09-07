@@ -5,6 +5,8 @@ import type { WorldGraph } from '../ecs/worldGraph';
 import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
 import { applyInterventionWithEvent } from '../events/worldEventRules';
 import type { TemporalEngine } from '../temporal/temporalEngine';
+import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
+import { WEATHER_STEP_EVENT_TYPE } from './weather';
 
 /**
  * PHASE 5 — ENVIRONMENT / RAINFALL RUNOFF.
@@ -267,4 +269,42 @@ export function applyRainfallIntensity(engine: TemporalEngine, environmentEntity
     { 'domainState.rainfallIntensityMmPerHour': intensityMmPerHour },
     { eventType: RAINFALL_INTENSITY_CHANGED_EVENT_TYPE, cause: 'human-intervention' },
   );
+}
+
+/**
+ * WEATHER -> RAINFALL RUNOFF. The environmental layer's precipitation rate
+ * becomes the Rational Method's design-storm intensity.
+ *
+ * Both are the same physical quantity in the same units (mm/h), so no
+ * conversion is involved — but the ASSUMPTION is real and is stated here
+ * rather than hidden: the Rational Method wants the intensity of a storm
+ * lasting at least the catchment's time of concentration, uniform over the
+ * catchment. Feeding it an instantaneous rate is exactly right while that
+ * rate is sustained, which is the method's own stated assumption, and
+ * increasingly wrong for a brief burst. `rainfallRunoff.ts`'s module doc
+ * already discloses that assumption set; this coupling inherits it whole and
+ * adds nothing to it.
+ */
+export function buildWeatherToRainfallCoupling(): CrossDomainCoupling {
+  return defineCrossDomainCoupling({
+    id: 'weather-to-rainfall-intensity',
+    sourceDomain: 'environment-atmosphere',
+    targetDomain: ENVIRONMENT_DOMAIN_ID,
+    triggerEventType: WEATHER_STEP_EVENT_TYPE,
+    relationshipKind: 'rainsOn',
+    direction: 'from',
+    condition: 'The environmental state reports a precipitation rate over this catchment',
+    effect: 'The precipitation rate becomes the Rational Method rainfall intensity, inheriting that method\'s own uniform-storm assumption (the rate is taken to be sustained for at least the time of concentration) rather than adding a new one',
+    grounding: 'MODEL_ESTIMATE',
+    deriveEffect: (catchment, triggerEvent) => {
+      const precipitationMmPerHour = triggerEvent.parameters.precipitationMmPerHour;
+      if (typeof precipitationMmPerHour !== 'number' || !Number.isFinite(precipitationMmPerHour)) return undefined;
+      if (catchment.domainState?.rainfallIntensityMmPerHour === precipitationMmPerHour) return undefined;
+      return {
+        patch: { domainState: { ...catchment.domainState, rainfallIntensityMmPerHour: precipitationMmPerHour } },
+        eventType: RAINFALL_INTENSITY_CHANGED_EVENT_TYPE,
+        cause: 'atmospheric-precipitation',
+      };
+    },
+  });
 }

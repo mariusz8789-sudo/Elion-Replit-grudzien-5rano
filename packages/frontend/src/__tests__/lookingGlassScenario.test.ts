@@ -115,6 +115,13 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(nearestSupportedAlternative(resolution)).toMatch(/Genesis can currently run/);
   });
 
+  it('same honesty for wildfire now that a real fuel-bed spread solver exists', () => {
+    const resolution = resolveScenarioRequest(parseScenarioRequest('Pokaż pożar lasu w tym mieście przez 24 godziny'));
+    expect(resolution.status).toBe('NOT_MODELLED');
+    expect(resolution.notModelled.join(' ')).toMatch(/real fuel-bed spread model exists/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/no standalone Looking Glass binding/i);
+  });
+
   it('same real-solver-not-routable honesty for earthquake and blackout, not a blanket "nothing exists" claim', () => {
     const earthquake = resolveScenarioRequest(parseScenarioRequest('Pokaż trzęsienie ziemi w tym mieście przez 24 godziny'));
     expect(earthquake.status).toBe('NOT_MODELLED');

@@ -123,6 +123,10 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     const blackout = resolveScenarioRequest(parseScenarioRequest('Pokaż blackout w tym mieście przez 24 godziny'));
     expect(blackout.status).toBe('NOT_MODELLED');
     expect(blackout.notModelled.join(' ')).toMatch(/real power-grid model exists/i);
+
+    const drought = resolveScenarioRequest(parseScenarioRequest('Pokaż susz w tym mieście przez 24 godziny'));
+    expect(drought.status).toBe('NOT_MODELLED');
+    expect(drought.notModelled.join(' ')).toMatch(/real water-balance model exists/i);
   });
 
   it('same honesty for transport disruption and evacuation, now that C3 Phase 10 shipped a real traffic-flow solver', () => {

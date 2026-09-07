@@ -26,6 +26,7 @@ import { buildCity } from '../core/world/cityWorld';
 import { FIRE_THERMAL_SOLVER_ID, FUEL_PACKAGES, makeFireThermalSolver } from '../core/worldModel/domains/fireThermal';
 import { DROUGHT_SOLVER_ID, makeDroughtWaterBalanceSolver } from '../core/worldModel/domains/drought';
 import { buildUniformFuelBed, makeWildfireSpreadSolver, WILDFIRE_SPREAD_SOLVER_ID } from '../core/worldModel/domains/wildfireSpread';
+import { DEFAULT_SOIL_PARAMS, LANDSLIDE_SOLVER_ID, makeLandslideSolver } from '../core/worldModel/domains/landslide';
 
 /**
  * PHASE 7 — FIRE/THERMAL AND TRAFFIC.
@@ -106,6 +107,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     router.register(DROUGHT_SOLVER_ID, makeDroughtWaterBalanceSolver());
     const wildfireFuelBed = buildUniformFuelBed(buildSyntheticTerrain({ cols: 10, rows: 10 }), 'FM1_SHORT_GRASS', 0.06);
     router.register(WILDFIRE_SPREAD_SOLVER_ID, makeWildfireSpreadSolver(wildfireFuelBed, { speedMph: 5, directionDegrees: 0 }, [0]));
+    router.register(LANDSLIDE_SOLVER_ID, makeLandslideSolver(buildSyntheticTerrain({ cols: 10, rows: 10 }), DEFAULT_SOIL_PARAMS));
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {
       if (!capability.solverId) continue;
@@ -144,6 +146,7 @@ describe('The honest inventory is queryable, not buried', () => {
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('TRANSPORT_DISRUPTION');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('EVACUATION');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('DROUGHT');
+    expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('LANDSLIDE');
     expect([...NOT_MODELLED_SCENARIO_KINDS]).toEqual([...NOT_MODELLED_SCENARIO_KINDS].sort());
   });
 
@@ -161,6 +164,7 @@ describe('The honest inventory is queryable, not buried', () => {
     expect(describeCapability('INDUSTRIAL_FIRE')).toMatch(/Still NOT.*modelled: fire spread/);
     expect(describeCapability('DROUGHT')).toMatch(/Still NOT modelled: this is not the Standardized Precipitation Index/);
     expect(describeCapability('WILDFIRE')).toMatch(/Still NOT modelled: crown fire/);
+    expect(describeCapability('LANDSLIDE')).toMatch(/Still NOT modelled: debris-flow rheology/);
   });
 
   it('consequence-vs-design boundaries stay stated where a request could be misread', () => {

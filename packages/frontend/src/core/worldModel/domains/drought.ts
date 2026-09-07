@@ -102,6 +102,63 @@ export function droughtSeverityLabel(code: number): DroughtSeverityState {
   }
 }
 
+// ---------------------------------------------------------------------------
+// KEETCH-BYRAM DROUGHT INDEX EQUIVALENT — an exact unit correspondence, not a
+// fitted coefficient.
+// ---------------------------------------------------------------------------
+
+/**
+ * The Keetch-Byram Drought Index (Keetch & Byram 1968) is DEFINED as
+ * cumulative soil/duff moisture deficiency expressed in hundredths of an
+ * inch of water, on a 0-800 scale whose upper bound is 8 inches of
+ * deficiency (the assumed maximum the represented layer can lose).
+ *
+ * That is the same physical quantity `stepWaterBalance` already tracks in
+ * its soil store: how far the layer sits BELOW saturation, i.e.
+ * `fieldCapacityMm - soilMoistureMm`. Converting that storage shortfall in
+ * mm into KBDI units is an EXACT unit conversion plus KBDI's own stated
+ * cap, with no fitted or invented coefficient anywhere in it.
+ *
+ * Note which deficit this is: KBDI is a STORAGE shortfall (how much water
+ * the layer is short of full), NOT this module's
+ * `cumulativeMoistureDeficitMm`, which is accumulated UNMET EVAPORATIVE
+ * DEMAND (how much evapotranspiration the soil could not supply). Both are
+ * real and both are called "deficit" in the literature; they are different
+ * quantities, and only the first one is what KBDI is defined as. A soil
+ * whose capacity is under 203.2 mm simply cannot reach KBDI 800, and this
+ * reports that honestly rather than rescaling to fill the range.
+ *
+ * The honest caveat, which travels with every use: Keetch & Byram compute
+ * their deficit with their OWN drying equation (a temperature and
+ * annual-rainfall based formulation), while this module computes it with
+ * Thornthwaite-Mather. Both are real water balances measuring the same
+ * quantity; this is therefore a KBDI-EQUIVALENT deficit, not KBDI computed
+ * by Keetch & Byram's equation, and it must be reported as such.
+ */
+export const KBDI_MAX_INDEX = 800;
+export const KBDI_SATURATION_DEFICIT_MM = 8 * 25.4; // 8 inches, KBDI's own assumed maximum deficiency
+
+export function kbdiEquivalentFromDeficitMm(storageDeficitMm: number): number {
+  if (!Number.isFinite(storageDeficitMm) || storageDeficitMm <= 0) return 0;
+  const hundredthsOfAnInch = (storageDeficitMm * 100) / 25.4;
+  return Math.min(KBDI_MAX_INDEX, hundredthsOfAnInch);
+}
+
+/** The soil layer's shortfall below saturation, mm — the quantity KBDI is defined on. */
+export function soilStorageDeficitMm(soilMoistureMm: number, fieldCapacityMm: number): number {
+  return Math.max(0, fieldCapacityMm - soilMoistureMm);
+}
+
+/** Rule 3: a NUMBER. The 200/400/600 cut-offs are the conventional operational KBDI bands, not derived physics — same disclosure style as `floodInundation.ts`'s depth bands. */
+export const KBDI_CLASS_CODE = { LOW: 0, MODERATE: 1, HIGH: 2, EXTREME: 3 } as const;
+
+export function kbdiClassCode(kbdi: number): number {
+  if (!Number.isFinite(kbdi) || kbdi < 200) return KBDI_CLASS_CODE.LOW;
+  if (kbdi < 400) return KBDI_CLASS_CODE.MODERATE;
+  if (kbdi < 600) return KBDI_CLASS_CODE.HIGH;
+  return KBDI_CLASS_CODE.EXTREME;
+}
+
 export interface WaterBalanceParams {
   /** Precipitation, mm/day — a daily accumulation, NOT `rainfallRunoff.ts`'s short-duration design-storm intensity. */
   precipitationMmPerDay: number;
@@ -198,6 +255,8 @@ export function makeDroughtWaterBalanceSolver(): DomainSolver {
     const fullyRecharged = params.fieldCapacityMm > 0 && step.soilMoistureMm >= params.fieldCapacityMm - 1e-9;
     const cumulativeMoistureDeficitMm = fullyRecharged ? 0 : priorDeficitMm + step.deficitMm;
 
+    const kbdiEquivalent = kbdiEquivalentFromDeficitMm(soilStorageDeficitMm(step.soilMoistureMm, params.fieldCapacityMm));
+
     stepCounter += 1;
 
     const observation: Observation = {
@@ -209,6 +268,7 @@ export function makeDroughtWaterBalanceSolver(): DomainSolver {
         { key: 'soilMoistureFractionOfCapacity', value: fractionOfCapacity, tick: ctx.tick, entity: entity.ref, provenance: ['domains/drought.ts#soilMoistureFractionOfCapacity'] },
         { key: 'actualEvapotranspirationMmPerDay', value: step.actualEvapotranspirationMmPerDay, unit: 'mm/day', tick: ctx.tick, entity: entity.ref, provenance: ['domains/drought.ts#stepWaterBalance'] },
         { key: 'cumulativeMoistureDeficitMm', value: cumulativeMoistureDeficitMm, unit: 'mm', tick: ctx.tick, entity: entity.ref, provenance: ['domains/drought.ts#stepWaterBalance'] },
+        { key: 'kbdiEquivalent', value: kbdiEquivalent, tick: ctx.tick, entity: entity.ref, provenance: ['domains/drought.ts#kbdiEquivalentFromDeficitMm', 'keetch-byram-1968-definition'] },
       ],
       provenance: ['domains/drought.ts', 'thornthwaite-mather-1955', 'fao-56-typical-pet'],
     };
@@ -221,7 +281,7 @@ export function makeDroughtWaterBalanceSolver(): DomainSolver {
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'thornthwaite-mather-water-balance-step',
-      parameters: { ...params, soilMoistureMm: step.soilMoistureMm, actualEvapotranspirationMmPerDay: step.actualEvapotranspirationMmPerDay, runoffMm: step.runoffMm, severityCode },
+      parameters: { ...params, soilMoistureMm: step.soilMoistureMm, actualEvapotranspirationMmPerDay: step.actualEvapotranspirationMmPerDay, runoffMm: step.runoffMm, severityCode, kbdiEquivalent, cumulativeMoistureDeficitMm },
       provenance: {
         origin: 'model',
         modelId: DROUGHT_SOLVER_ID,
@@ -238,6 +298,8 @@ export function makeDroughtWaterBalanceSolver(): DomainSolver {
           runoffMm: step.runoffMm,
           deficitMm: step.deficitMm,
           cumulativeMoistureDeficitMm,
+          kbdiEquivalent,
+          kbdiClassCode: kbdiClassCode(kbdiEquivalent),
           soilMoistureFractionOfCapacity: fractionOfCapacity,
           severityCode,
         },
@@ -277,6 +339,8 @@ export function addDroughtCatchment(graph: WorldGraph, options: AddDroughtCatchm
       runoffMm: 0,
       deficitMm: 0,
       cumulativeMoistureDeficitMm: 0,
+      kbdiEquivalent: 0,
+      kbdiClassCode: KBDI_CLASS_CODE.LOW,
       soilMoistureFractionOfCapacity: fractionOfCapacity,
       severityCode,
     },

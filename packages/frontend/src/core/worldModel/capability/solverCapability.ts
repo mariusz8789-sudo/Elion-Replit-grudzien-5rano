@@ -12,6 +12,7 @@ import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
 import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
 import { DROUGHT_SOLVER_ID } from '../domains/drought';
 import { WILDFIRE_SPREAD_SOLVER_ID } from '../domains/wildfireSpread';
+import { LANDSLIDE_SOLVER_ID } from '../domains/landslide';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -84,8 +85,12 @@ const WILDFIRE_SPREAD_CAVEAT =
   'real burned-area-over-time, head rate of spread, and Byram (1959) fireline intensity/flame length. Still NOT ' +
   'modelled: crown fire (no canopy, no crown-fire initiation or spread), spotting (ember lofting and long- ' +
   'distance spot ignition — a major real driver of wildfire growth this omits), fire-weather coupling (wind is ' +
-  'one fixed stated vector, not time-varying or fire-induced), fuel moisture derived from real weather or ' +
-  'drought.ts\'s soil moisture (it is a stated input), and suppression. Only four of Anderson\'s 13 standard fuel ' +
+  'one fixed stated vector, not time-varying or fire-induced) and suppression. drought.ts\'s real water ' +
+  'balance IS now wired in as a cross-domain coupling, but it carries a KBDI-equivalent drought index as ' +
+  'fire-danger context only: fuel moisture remains a STATED INPUT on purpose, because dead fuel moisture is ' +
+  'governed by atmospheric equilibrium moisture content (relative humidity and temperature — Simard 1968/NFDRS), ' +
+  'which Genesis cannot evaluate without a weather model, and no published universal coefficient converts soil ' +
+  'moisture into it. That last link is left open rather than fabricated. Only four of Anderson\'s 13 standard fuel ' +
   'models are implemented, each simplified to one dead-fuel size class. Terrain grounding follows the same rule ' +
   'as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.';
 
@@ -204,12 +209,20 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   TSUNAMI: notModelled(noHazardModel('wave generation and inundation')),
   HURRICANE: notModelled(noHazardModel('tropical cyclone wind and storm surge')),
   TORNADO: notModelled(noHazardModel('tornado wind field')),
-  LANDSLIDE: notModelled(noHazardModel('slope stability and runout')),
+  LANDSLIDE: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: LANDSLIDE_SOLVER_ID,
+    caveat: 'Slope stability is real: the standard infinite-slope factor of safety (Skempton & DeLory 1957) evaluated per cell from the REAL terrain heightfield\'s own D8 steepest-descent slope, including the standard pore-pressure term, so saturating the soil really can push a slope across FS=1. Runout is real too, and physically derived rather than curve-fitted: a sliding-block Coulomb energy balance, d(v^2)=2g(dz-mu*dx), traced downhill from every unstable cell, carrying its momentum across the depositional flat and stopping where its kinetic energy is exhausted (the general, terrain-following case of the classic angle-of-reach/Fahrboschung method). A path that leaves the modelled grid still moving is reported as truncated rather than counted as a real stopping distance. Still NOT modelled: debris-flow rheology and mass deformation (the runout mass is a rigid POINT under Coulomb friction — no Voellmy turbulent drag, no Bingham viscoplastic yield stress, no erosion/entrainment along the path, no bulking, no deposition profile, no debris-fan width; what it traces is a centreline with a velocity, never a flow extent or impact pressure), time-dependent triggering (FS is evaluated once from stated conditions — no rainfall-infiltration or seismic loading over time), and any measured geotechnical data: cohesion, friction angle, unit weight, failure-plane depth and saturation are literature-typical stated inputs, not a site investigation. Terrain grounding follows the same rule as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.',
+  },
   VOLCANIC: notModelled(noHazardModel('eruption, ashfall and flow')),
   DROUGHT: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: DROUGHT_SOLVER_ID,
-    caveat: 'A real water balance now runs: the Thornthwaite-Mather (1955) one-layer soil-moisture bucket model, exact accounting of precipitation vs. evapotranspiration vs. runoff vs. stored soil moisture, extending the same hydrology rainfallRunoff.ts already models (a separate daily-precipitation input, since drought analysis and the Rational Method\'s short-duration design-storm intensity are genuinely different quantities). Still NOT modelled: this is not the Standardized Precipitation Index, SPEI, or Palmer Drought Severity Index — those need a distribution fitted to decades of real climatological records Genesis does not have for any place, so `droughtSeverityCode` uses absolute soil-moisture-fraction bands, not a calibrated percentile. Potential evapotranspiration and field capacity are stated typical values (FAO-56; USDA/NRCS), not derived from real weather or soil survey data. One lumped catchment, no groundwater, no vegetation-specific water use, no calibration.',
+    caveat: 'A real water balance now runs: the Thornthwaite-Mather (1955) one-layer soil-moisture bucket model, exact accounting of precipitation vs. evapotranspiration vs. runoff vs. stored soil moisture, extending the same hydrology rainfallRunoff.ts already models (a separate daily-precipitation input, since drought analysis and the Rational Method\'s short-duration design-storm intensity are genuinely different quantities). Still NOT modelled: this is not the Standardized Precipitation Index, SPEI, or Palmer Drought Severity Index — those need a distribution fitted to decades of real climatological records Genesis does not have for any place, so `droughtSeverityCode` uses absolute soil-moisture-fraction bands, not a calibrated percentile. Potential evapotranspiration and field capacity are stated typical values (FAO-56; USDA/NRCS), not derived from real weather or soil survey data. One lumped catchment, no groundwater, no vegetation-specific water use, no calibration. The deficit is also ' +
+      'published as a KBDI-EQUIVALENT index (the Keetch-Byram Drought Index is defined as exactly this quantity — ' +
+      'soil moisture deficiency in hundredths of an inch, 0-800 — so the conversion is exact, not fitted), and is ' +
+      'carried to the wildfire domain by a real cross-domain coupling; it is KBDI-equivalent rather than KBDI ' +
+      'because Keetch & Byram derive their deficit with their own drying equation, not Thornthwaite-Mather.',
   },
   EXTREME_HEAT: notModelled(Object.freeze([
     'an ambient heat-exposure model (the fire/thermal solver that exists models one fire source\'s heat release and radiant flux, not ambient air temperature or a heat-wave)',

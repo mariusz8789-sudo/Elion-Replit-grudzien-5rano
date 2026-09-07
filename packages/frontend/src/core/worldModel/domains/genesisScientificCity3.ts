@@ -237,7 +237,12 @@ function buildCouplings(): readonly CrossDomainCoupling[] {
   return [rainfallToLoad, tripToHospitalService, serviceToPopulationAccess];
 }
 
-function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
+/** Exported so a caller already running this world's engine (e.g. C1's Scientific Director, on a
+ * "show me the city during extreme rainfall" request) can schedule the SAME real event on a LIVE
+ * engine via `withScheduledEvents(engine's own updater, rainfallSchedule(nextTick))`, rather than
+ * only at world-construction time via `rainfallAtTick` — the identical event, no second scenario
+ * mechanism. */
+export function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
   const environmentRef = { kind: 'environment', id: 'city-environment' };
   return [
     {

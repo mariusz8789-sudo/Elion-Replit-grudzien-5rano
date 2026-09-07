@@ -2,9 +2,11 @@ import type * as THREE_NS from 'three';
 import type { Sim3D } from './types';
 import { TemporalEngine, TemporalBranchRegistry } from '../worldModel/temporal/temporalEngine';
 import {
-  buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER,
-  PUMP_TRIPPED_EVENT_TYPE, HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE, POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
+  buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER, rainfallSchedule,
+  RAINFALL_EVENT_TYPE, PUMP_TRIPPED_EVENT_TYPE, HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE, POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
 } from '../worldModel/domains/genesisScientificCity3';
+import { withScheduledEvents } from '../worldModel/events/worldEventRules';
+import { withCrossDomainCouplings } from '../worldModel/crossDomain/crossDomainCoupling';
 import { getFrameState, compareBranches, type BranchComparison } from '../worldModel/bridge/worldFrameState';
 import { getCausalAncestry, getEventHistoryFor } from '../worldModel/queries/worldQueries';
 import type { EntityId, WorldModelEntity } from '../worldModel/ecs/types';
@@ -93,6 +95,25 @@ export interface InfrastructureComparisonRow {
   equal: boolean;
 }
 
+export interface RainfallScenarioOutcome {
+  scheduledAtTick: number;
+  tripped: boolean;
+  hospitalInterrupted: boolean;
+}
+
+export interface CurrentStateSummary {
+  tick: number;
+  pumpFlow: number;
+  pumpTripped: boolean;
+  hospitalInterrupted: boolean;
+  narration: string;
+}
+
+export interface ReplayWindow {
+  fromTick: number;
+  toTick: number;
+}
+
 function groundingToC2(level: WorldModelEntity['grounding']): EntityGrounding {
   return level === 'GROUNDED_EXACT' ? 'MODELED' : 'DERIVED';
 }
@@ -108,6 +129,8 @@ export class GenesisScientificCitySim implements Sim3D {
   private engine: TemporalEngine = new TemporalEngine(this.city.graph, { label: 'baseline', registry: this.registry });
   private failureBranch: TemporalEngine | null = null;
   private viewingBranch: RenderedCityBranch = 'BASELINE';
+  private rainfallOutcome: RainfallScenarioOutcome | null = null;
+  private replay: { fromTick: number; toTick: number; cursor: number } | null = null;
 
   private renderedIds: ReadonlySet<EntityId>;
 
@@ -276,19 +299,155 @@ export class GenesisScientificCitySim implements Sim3D {
   /**
    * "Why did the hospital lose water service?" — walks the REAL causal chain via
    * `getEventHistoryFor`/`getCausalAncestry` (`worldModel/queries/worldQueries.ts`), never a second
-   * causal engine. Returns the ancestry of the most recent population-access-impaired event on the
-   * failure branch, root-first, or `null` when no failure has been triggered / the cascade never
-   * reached the population.
+   * causal engine. Reads whichever engine is currently active (`activeEngine`) — the SAME real
+   * chain fires whether the pump was tripped by `triggerPumpFailure`'s direct fork or by
+   * `triggerRainfallScenario`'s real scripted rainfall event on the baseline, since both ultimately
+   * raise the pump's real `volumetricFlow` and let the SAME existing cascade run. Returns the
+   * ancestry of the most recent population-access-impaired event, root-first, or `null` when
+   * nothing has failed yet on the currently-viewed engine.
    */
   explainWaterServiceLoss(): readonly CausalStep[] | null {
-    if (!this.failureBranch) return null;
-    const populationEvents = getEventHistoryFor(this.failureBranch, this.city.populationId);
+    const engine = this.activeEngine;
+    const populationEvents = getEventHistoryFor(engine, this.city.populationId);
     const impaired = [...populationEvents].reverse().find((event) => event.type === POPULATION_ACCESS_IMPAIRED_EVENT_TYPE);
     if (!impaired) return null;
-    const ancestry: readonly GenesisEvent[] = getCausalAncestry(this.failureBranch, impaired.id);
+    const ancestry: readonly GenesisEvent[] = getCausalAncestry(engine, impaired.id);
     return [...ancestry].reverse().map((event) => ({
       type: event.type, tick: event.timestamp, cause: event.cause ?? null, parentEventId: event.parentEventId ?? null,
     }));
+  }
+
+  // --- Scientific Director: the flagship "extreme rainfall" scenario --------------------------
+
+  /**
+   * "Pokaż mi miasto podczas ekstremalnego deszczu" / "Show me the city during extreme rainfall" —
+   * schedules C3's OWN real scripted rainfall event (`RAINFALL_EVENT_TYPE`, `rainfallSchedule()`,
+   * both exported from `genesisScientificCity3.ts` for this exact purpose) on the LIVE baseline
+   * engine via the EXISTING `withScheduledEvents` decorator (`worldEventRules.ts`) wrapping this
+   * world's own real updater — the IDENTICAL mechanism `buildGenesisScientificCity3`'s own
+   * `rainfallAtTick` option uses at construction time, invoked here on an already-running engine
+   * instead. This establishes the SCENARIO on the baseline itself (not a counterfactual fork) —
+   * `describeCurrentState`/`explainWaterServiceLoss`/`step` all keep reading this same engine
+   * afterward. Idempotent: calling this again just returns the already-computed real outcome.
+   *
+   * COMPOSITION ORDER, found the hard way (this file's own tests caught it): `city.updater` was
+   * built WITHOUT `rainfallAtTick`, so its own internal rainfall-to-load coupling instance sits
+   * deep inside the chain with nothing ever feeding it a rainfall event — wrapping the WHOLE
+   * already-composed `city.updater` in `withScheduledEvents` from the outside adds the event too
+   * late for that inner coupling to ever see it (`withScheduledEvents`'s own event is appended
+   * AFTER its inner updater — here, the entire rest of the chain — has already run for that tick).
+   * The fix reuses the EXACT SAME coupling object (`city.couplings[0]`, exposed for this purpose)
+   * in a second, live application wrapped OUTSIDE `withScheduledEvents`, so it sees the event the
+   * moment it's added, in the same tick — no new coupling defined, no cascade logic duplicated,
+   * just the correct nesting order for a dynamically-timed (rather than construction-time) trigger.
+   *
+   * HONEST LIMITATION (mandatory Step 0 finding of this mission): the rainfall event's own
+   * `intensityMmPerHour` parameter is recorded for provenance but is NOT read anywhere by the real
+   * rainfall-to-load coupling — `genesisScientificCity3.ts`'s `rainfallToLoad.deriveEffect` applies
+   * a FIXED `RAINFALL_LOAD_MULTIPLIER`, never scaled by any intensity value, even though
+   * `defineCrossDomainCoupling`'s own `deriveEffect` signature is handed the full triggering event
+   * (parameters included) — the capability to read it exists in the framework, this one coupling
+   * simply doesn't use it. This method can therefore trigger the real scripted scenario, but cannot
+   * honestly support "what if rainfall were N% lower" — see the control loop's own explicit refusal
+   * for that request, which does not call this method at all.
+   */
+  triggerRainfallScenario(): RainfallScenarioOutcome {
+    if (this.rainfallOutcome) return this.rainfallOutcome;
+    const scheduledAtTick = this.engine.tick + 1;
+    const updaterWithRainfall = withCrossDomainCouplings(
+      withScheduledEvents(this.city.updater, rainfallSchedule(scheduledAtTick)),
+      [this.city.couplings[0]], // the real rainfall -> hydraulic-load coupling, reused verbatim
+    );
+    this.engine.advance(GENESIS_CITY_DT_SECONDS, updaterWithRainfall);
+    for (let i = 0; i < FAILURE_ADVANCE_TICKS; i++) this.engine.advance(GENESIS_CITY_DT_SECONDS, this.city.updater);
+
+    const pumpEvents = getEventHistoryFor(this.engine, this.city.pumpPipeId);
+    const hospitalEvents = getEventHistoryFor(this.engine, this.city.hospitalBuildingId);
+    this.rainfallOutcome = {
+      scheduledAtTick,
+      tripped: pumpEvents.some((event) => event.type === PUMP_TRIPPED_EVENT_TYPE),
+      hospitalInterrupted: hospitalEvents.some((event) => event.type === HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE),
+    };
+    return this.rainfallOutcome;
+  }
+
+  isRainfallScenarioActive(): boolean {
+    return this.rainfallOutcome !== null;
+  }
+
+  /**
+   * "What's happening?" / "Co się dzieje?" — a grounded status summary read directly from
+   * `activeEngine`'s real solver output, never a fabricated narrative. Real event carries the real
+   * rainfall event type (`RAINFALL_EVENT_TYPE`) as a documented constant so this narration's own
+   * wording stays traceable to the same real event the engine recorded.
+   */
+  describeCurrentState(): CurrentStateSummary {
+    const engine = this.activeEngine;
+    const pump = engine.graph.tryGetEntity(this.city.pumpPipeId);
+    const hospital = engine.graph.tryGetEntity(this.city.hospitalBuildingId);
+    const pumpFlow = pump?.domainState?.volumetricFlow ?? 0;
+    const pumpTripped = pumpFlow === 0;
+    const hospitalInterrupted = hospital?.domainState?.waterServiceInterrupted === 1;
+    const rainfallEvents = getEventHistoryFor(engine, this.city.environmentId);
+    const rainfallOccurred = rainfallEvents.some((event) => event.type === RAINFALL_EVENT_TYPE);
+    const narration = pumpTripped
+      ? `The pump has tripped (real overload-protection threshold exceeded on its own solved headLoss)${hospitalInterrupted ? "; the hospital's water service is interrupted as a direct, real consequence" : ''}.`
+      : rainfallOccurred
+        ? `Extreme rainfall has occurred; the pump is still operating normally at ${pumpFlow.toFixed(3)} m³/s.`
+        : `The pump is operating normally at ${pumpFlow.toFixed(3)} m³/s. No incident has occurred.`;
+    return { tick: engine.tick, pumpFlow, pumpTripped, hospitalInterrupted, narration };
+  }
+
+  /** The ONE counterfactual this mission's flagship explicitly asks about, honestly refused — see
+   * `triggerRainfallScenario`'s own doc for the exact gap. */
+  getRainfallCounterfactualGap(): string {
+    return 'NOT_MODELLED — rainfall intensity is not a real parameterized input in the current '
+      + 'hydraulics model: the scripted "extreme rainfall" event always raises the pump\'s real flow '
+      + 'demand by a fixed multiplier, regardless of any intensity value carried on the event. There '
+      + 'is no honest way to run a "rainfall 30% lower" counterfactual until the rainfall-to-load '
+      + 'coupling is changed to actually read a real intensity parameter.';
+  }
+
+  // --- Replay: the ALREADY-COMPUTED real history, not a re-narrated fiction -------------------
+
+  /**
+   * "Replay what happened" — steps back through the real history of whichever engine is active via
+   * C3's own `getFrameState(engine, timestamp)` (`bridge/worldFrameState.ts`), one real tick at a
+   * time — not a second replay engine. `fromTick` is the engine's own real fork point
+   * (`TemporalEngine.forkedAtTick`) when viewing a fork, or 0 for the baseline. Returns `null` when
+   * there is nothing yet to replay (fewer than one real tick of history).
+   */
+  startReplay(): ReplayWindow | null {
+    const engine = this.activeEngine;
+    const fromTick = engine.forkedAtTick ?? 0;
+    const toTick = engine.tick;
+    if (fromTick >= toTick) return null;
+    this.replay = { fromTick, toTick, cursor: fromTick };
+    return { fromTick, toTick };
+  }
+
+  isReplaying(): boolean {
+    return this.replay !== null;
+  }
+
+  getReplayTick(): number | null {
+    return this.replay?.cursor ?? null;
+  }
+
+  /** Advances the replay cursor by one real tick. Returns `false` once replay reaches the present
+   * (and clears replay mode, handing the view back to the live current state). */
+  advanceReplay(): boolean {
+    if (!this.replay) return false;
+    this.replay.cursor += 1;
+    if (this.replay.cursor >= this.replay.toTick) {
+      this.replay = null;
+      return false;
+    }
+    return true;
+  }
+
+  stopReplay(): void {
+    this.replay = null;
   }
 
   /** WORLD A (pump normal) vs WORLD B (pump failure) — the real `compareBranches` mechanism
@@ -429,7 +588,10 @@ export class GenesisScientificCitySim implements Sim3D {
 
   syncScene(_scene: THREE_NS.Scene, _camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer) return;
-    const state = getFrameState(this.activeEngine);
+    // While replaying, render the REAL historical state at the cursor tick — getFrameState's own
+    // optional `timestamp` param (bridge/worldFrameState.ts) already does this via the engine's
+    // real scrubTo, so replay needs no second history/snapshot mechanism.
+    const state = getFrameState(this.activeEngine, this.replay?.cursor);
     const frame: WorldFrame = {
       time: state.tick,
       entities: state.entities
@@ -472,6 +634,9 @@ export class GenesisScientificCitySim implements Sim3D {
       pumpHeadLoss: pump?.domainState?.headLoss ?? 0,
       hospitalInterrupted: hospital?.domainState?.waterServiceInterrupted ?? 0,
       selected: this.lastSelectedId ? 1 : 0,
+      rainfallActive: this.rainfallOutcome ? 1 : 0,
+      replaying: this.replay ? 1 : 0,
+      replayTick: this.replay?.cursor ?? -1,
     };
   }
 }

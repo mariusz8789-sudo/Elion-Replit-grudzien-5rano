@@ -217,3 +217,104 @@ describe('GenesisScientificCitySim — replay determinism (mission section 11)',
     expect(a).toEqual(b);
   });
 });
+
+describe('GenesisScientificCitySim.triggerRainfallScenario — C1 SCIENTIFIC DIRECTOR: the real scripted event on the LIVE baseline', () => {
+  it('is a no-op status before it is triggered', () => {
+    const sim = initializedSim();
+    expect(sim.isRainfallScenarioActive()).toBe(false);
+    expect(sim.describeCurrentState().pumpTripped).toBe(false);
+  });
+
+  it('schedules the REAL rainfall event and lets the REAL cascade trip the pump, on the baseline (not a fork)', () => {
+    const sim = initializedSim();
+    const outcome = sim.triggerRainfallScenario();
+    expect(outcome.tripped).toBe(true);
+    expect(outcome.hospitalInterrupted).toBe(true);
+    expect(sim.isRainfallScenarioActive()).toBe(true);
+    // Still the baseline branch — this establishes the scenario, it is not a counterfactual fork.
+    expect(sim.getViewingBranch()).toBe('BASELINE');
+    expect(sim.getStats().hasFailureBranch).toBe(0);
+  });
+
+  it('is idempotent — a second call returns the already-computed real outcome, does not re-fork or re-advance', () => {
+    const sim = initializedSim();
+    const first = sim.triggerRainfallScenario();
+    const tickAfterFirst = sim.getStats().tick;
+    const second = sim.triggerRainfallScenario();
+    expect(second).toEqual(first);
+    expect(sim.getStats().tick).toBe(tickAfterFirst);
+  });
+
+  it('explainWaterServiceLoss works on the rainfall-triggered BASELINE — the same real causal chain as the fork-based failure path', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const chain = sim.explainWaterServiceLoss();
+    expect(chain).not.toBeNull();
+    const types = chain!.map((step) => step.type);
+    expect(types).toContain('hydraulics.pumppipe.tripped');
+    expect(types).toContain('building.waterservice.interrupted');
+    expect(types).toContain('population.hospitalaccess.impaired');
+  });
+
+  it('describeCurrentState reports the real tripped/interrupted state, grounded in real solver output', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const summary = sim.describeCurrentState();
+    expect(summary.pumpTripped).toBe(true);
+    expect(summary.pumpFlow).toBe(0);
+    expect(summary.hospitalInterrupted).toBe(true);
+    expect(summary.narration.toLowerCase()).toContain('tripped');
+  });
+});
+
+describe('GenesisScientificCitySim — the honest rainfall-intensity counterfactual refusal (mandatory mission Step 0)', () => {
+  it('names the real, specific gap rather than a generic failure message', () => {
+    const sim = initializedSim();
+    const gap = sim.getRainfallCounterfactualGap();
+    expect(gap).toContain('NOT_MODELLED');
+    expect(gap.toLowerCase()).toContain('rainfall');
+    expect(gap.toLowerCase()).toContain('parameterized');
+  });
+});
+
+describe('GenesisScientificCitySim — replay (real history, via getFrameState\'s own timestamp param)', () => {
+  it('returns null when there is nothing yet to replay', () => {
+    const sim = initializedSim();
+    expect(sim.startReplay()).toBeNull();
+    expect(sim.isReplaying()).toBe(false);
+  });
+
+  it('replays the real interval from the rainfall trigger to the present, one real tick at a time', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    const toTick = sim.getStats().tick;
+    const window = sim.startReplay();
+    expect(window).not.toBeNull();
+    expect(window!.toTick).toBe(toTick);
+    expect(sim.isReplaying()).toBe(true);
+    expect(sim.getReplayTick()).toBe(window!.fromTick);
+
+    let steps = 0;
+    while (sim.advanceReplay()) steps += 1;
+    expect(steps).toBeGreaterThan(0);
+    expect(sim.isReplaying()).toBe(false);
+    expect(sim.getReplayTick()).toBeNull();
+  });
+
+  it('replaying a fork starts from its own real forkedAtTick, not tick 0', () => {
+    const sim = initializedSim();
+    sim.step(5);
+    const forkTick = sim.getStats().tick;
+    sim.triggerPumpFailure();
+    const window = sim.startReplay();
+    expect(window!.fromTick).toBe(forkTick);
+  });
+
+  it('stopReplay hands control back to the live view immediately', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    sim.startReplay();
+    sim.stopReplay();
+    expect(sim.isReplaying()).toBe(false);
+  });
+});

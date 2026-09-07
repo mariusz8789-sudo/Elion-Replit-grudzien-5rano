@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { GenesisScientificCitySim } from '../../core/three/genesisScientificCitySim';
 import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
@@ -29,8 +29,13 @@ export function GenesisScientificCityScreen() {
   const [obsText, setObsText] = useState('');
   const [obsResult, setObsResult] = useState<string | null>(null);
   const [failureOutcome, setFailureOutcome] = useState<ReturnType<GenesisScientificCitySim['triggerPumpFailure']> | null>(null);
+  const [rainfallOutcome, setRainfallOutcome] = useState<ReturnType<GenesisScientificCitySim['triggerRainfallScenario']> | null>(null);
   const [tick, setTick] = useState(0);
+  const [replaying, setReplaying] = useState(false);
   const [, forceRender] = useState(0);
+  const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (replayTimer.current) clearInterval(replayTimer.current); }, []);
 
   /**
    * THE SCIENTIFIC CONTROL LOOP:
@@ -51,6 +56,37 @@ export function GenesisScientificCityScreen() {
     if (!trimmed) return;
     const intent = parseObservationIntent(trimmed);
 
+    // (1) A whole SCENARIO request — "Pokaż mi miasto podczas ekstremalnego deszczu." Establishes
+    // the flagship scenario on the LIVE baseline via C3's own real scripted rainfall event (see
+    // sim.triggerRainfallScenario's own doc) — not a counterfactual fork, not a second scenario
+    // mechanism.
+    if (intent.scenarioRequest === 'EXTREME_RAINFALL') {
+      const outcome = sim.triggerRainfallScenario();
+      if (!rainfallOutcome) setRainfallOutcome(outcome);
+      setObsResult(`Extreme rainfall has occurred. Pump tripped: ${outcome.tripped}. Hospital water service interrupted: ${outcome.hospitalInterrupted}.`);
+      setObsText('');
+      setTick(sim.getStats().tick);
+      forceRender((n) => n + 1);
+      return;
+    }
+
+    // (0 — mandatory Step 0) The ONE counterfactual C3 does not honestly support. Checked BEFORE
+    // the generic comparison/intervention branches below so this specific, named gap is never
+    // silently absorbed into an unrelated real intervention or a generic "nothing to compare"
+    // message — see sim.getRainfallCounterfactualGap's own doc for exactly why.
+    if (intent.rainfallCounterfactualQuery) {
+      setObsResult(sim.getRainfallCounterfactualGap());
+      setObsText('');
+      return;
+    }
+
+    // "What's happening?" / "Co się dzieje?" — a grounded status summary, never a fabricated one.
+    if (intent.askingWhatIsHappening) {
+      setObsResult(sim.describeCurrentState().narration);
+      setObsText('');
+      return;
+    }
+
     // (3) An imperative command ("turn off the pump") or a "what happens if X fails" hypothetical
     // — both authorize the SAME real C3 intervention. Idempotent: asking twice re-shows the
     // already-computed real outcome rather than forking a second time.
@@ -67,37 +103,55 @@ export function GenesisScientificCityScreen() {
       sim.setViewingBranch('FAILURE');
       setObsResult(`Pump tripped: ${outcome.tripped}. Hospital water service interrupted: ${outcome.hospitalInterrupted}. See the causal chain and comparison below.`);
       setObsText('');
+      setTick(sim.getStats().tick);
       forceRender((n) => n + 1);
       return;
     }
 
     // (7) "Cofnij do momentu przed awarią" / "go back to before the failure" / "return to
     // baseline" — reuses the SAME fork's own untouched baseline branch, never a second timeline.
+    // Honest distinction: triggerRainfallScenario mutates the LIVE baseline directly (there is no
+    // separate branch to switch back to) — Replay is the honest way to look at that "before".
     const referencesFailure = intent.event ? /awari|failure|incydent|incident/i.test(intent.event) : false;
     if (intent.returningToBaseline || (intent.time?.kind === 'BEFORE_EVENT' && referencesFailure)) {
-      if (!failureOutcome) {
-        setObsResult('Nothing has failed yet — there is no "before" to return to.');
-      } else {
+      if (failureOutcome) {
         sim.setViewingBranch('BASELINE');
         setObsResult('Showing the baseline — the pump as it was before the failure.');
+      } else if (rainfallOutcome) {
+        setObsResult('The rainfall scenario ran on the live world directly (no separate baseline branch was forked) — try "Replay" to see how it unfolded.');
+      } else {
+        setObsResult('Nothing has failed yet — there is no "before" to return to.');
       }
       setObsText('');
       forceRender((n) => n + 1);
       return;
     }
 
+    // (11) "Replay what happened" / "Powtórz." — steps through the REAL recorded history via
+    // sim.startReplay/advanceReplay (getFrameState's own timestamp param) — no second replay engine.
+    if (/\b(replay|powtórz|powtorz)\b/i.test(trimmed)) {
+      handleStartReplay();
+      setObsText('');
+      return;
+    }
+
     // (4/7) "What changed?" / "show me before and after" / a bare comparison request — the real
-    // branch diff (sim.getComparison), never a guessed delta.
+    // branch diff (sim.getComparison), never a guessed delta. Comparison structurally needs a real
+    // fork (WORLD A vs WORLD B); the rainfall scenario alone (no fork) has no "other world" to
+    // diff against — say so honestly instead of returning an empty table.
     if (intent.askingWhatChanged || intent.mode === 'BEFORE_AFTER' || intent.comparison) {
-      if (!failureOutcome) {
-        setObsResult('Nothing has changed yet — no intervention has been run.');
-      } else {
-        const rows = sim.getComparison();
-        const pump = rows?.find((row) => row.label === 'Pump');
-        const hospital = rows?.find((row) => row.label === 'Hospital');
+      const rows = sim.getComparison();
+      if (rows) {
+        const pump = rows.find((row) => row.label === 'Pump');
+        const hospital = rows.find((row) => row.label === 'Hospital');
         setObsResult(pump
           ? `Pump flow: ${pump.baseline?.volumetricFlow ?? '?'} m³/s -> ${pump.failure?.volumetricFlow ?? '?'} m³/s. Hospital water service interrupted: ${hospital?.failure?.waterServiceInterrupted === 1}.`
           : 'No comparable state found.');
+      } else if (rainfallOutcome) {
+        const current = sim.describeCurrentState();
+        setObsResult(`The rainfall scenario changed the world directly — pump flow is now ${current.pumpFlow.toFixed(3)} m³/s. No separate baseline branch exists to compare against (that needs a real forked counterfactual — try "what happens if the pump fails" for a real WORLD A/B comparison).`);
+      } else {
+        setObsResult('Nothing has changed yet — no intervention has been run.');
       }
       setObsText('');
       return;
@@ -111,6 +165,24 @@ export function GenesisScientificCityScreen() {
         ? `Real cause chain: ${chain.map((step) => step.type).join(' -> ')}.`
         : 'No recorded cause yet — nothing has failed.');
       setObsText('');
+      return;
+    }
+
+    // (5) "Pokaż następne 24 godziny." / "Show me the next 24 hours." — a forward time move,
+    // reusing the sim's own existing sim.step (the SAME method the +1h/+6h buttons call — no
+    // second clock). Checked before the plain-observation fallback below, since a bare "next N
+    // hours" phrase also happens to satisfy the generic TARGET_TRIGGERS grammar (it looks like
+    // "show me the <name>") and must not be misrouted into a failed entity lookup for "next 24
+    // hours" as if that were a place in the city.
+    if (intent.time?.kind === 'RELATIVE' && intent.time.direction === 'FORWARD') {
+      const unit = intent.time.unit ?? 'HOUR';
+      const hoursPerUnit = unit === 'DAY' ? 24 : unit === 'YEAR' ? 24 * 365 : 1;
+      const hours = intent.time.amount * hoursPerUnit;
+      sim.step(hours);
+      setTick(sim.getStats().tick);
+      setObsResult(`Advanced ${intent.time.amount} ${unit.toLowerCase()}${intent.time.amount === 1 ? '' : 's'} (${hours}h). Tick is now ${sim.getStats().tick}h.`);
+      setObsText('');
+      forceRender((n) => n + 1);
       return;
     }
 
@@ -135,7 +207,32 @@ export function GenesisScientificCityScreen() {
     setTick(sim.getStats().tick);
   };
 
-  const causalChain = failureOutcome ? sim.explainWaterServiceLoss() : null;
+  // Reuses sim.startReplay/advanceReplay — the REAL recorded history via getFrameState's own
+  // timestamp param, stepped on an interval. No second replay engine, no fabricated frames.
+  const handleStartReplay = () => {
+    if (replaying) return;
+    const window = sim.startReplay();
+    if (!window) {
+      setObsResult('Nothing has happened yet to replay.');
+      return;
+    }
+    setReplaying(true);
+    setObsResult(`Replaying from tick ${window.fromTick} to tick ${window.toTick}…`);
+    replayTimer.current = setInterval(() => {
+      const more = sim.advanceReplay();
+      forceRender((n) => n + 1);
+      if (!more) {
+        if (replayTimer.current) clearInterval(replayTimer.current);
+        replayTimer.current = null;
+        setReplaying(false);
+        setObsResult('Replay finished — back to the present.');
+      }
+    }, 400);
+  };
+
+  // explainWaterServiceLoss now reads whichever engine is active (fork OR the rainfall-mutated
+  // baseline) — so both real interventions light up the same causal panel, never a second one.
+  const causalChain = (failureOutcome || rainfallOutcome) ? sim.explainWaterServiceLoss() : null;
   const comparison = failureOutcome ? sim.getComparison() : null;
 
   return (
@@ -188,6 +285,27 @@ export function GenesisScientificCityScreen() {
                   <p className="gsc-caption">Now viewing: <b>{sim.getViewingBranch()}</b></p>
                 </div>
               )}
+              <button
+                type="button"
+                className="gsc-rainfall-btn"
+                onClick={() => runScientificControlLoop('Pokaż mi miasto podczas ekstremalnego deszczu.')}
+                disabled={Boolean(rainfallOutcome)}
+              >
+                {rainfallOutcome ? 'Rainfall scenario triggered' : 'Show extreme rainfall scenario'}
+              </button>
+              {rainfallOutcome && (
+                <div className="gsc-outcome">
+                  <p>Rainfall scheduled at tick {rainfallOutcome.scheduledAtTick}. Pump tripped: <b>{String(rainfallOutcome.tripped)}</b>. Hospital water service interrupted: <b>{String(rainfallOutcome.hospitalInterrupted)}</b>.</p>
+                </div>
+              )}
+              <button
+                type="button"
+                className="gsc-replay-btn"
+                onClick={handleStartReplay}
+                disabled={replaying}
+              >
+                {replaying ? `Replaying… tick ${sim.getReplayTick() ?? '?'}` : 'Replay'}
+              </button>
               {causalChain && causalChain.length > 0 && (
                 <div className="gsc-causal">
                   <span className="lg-obs-title">WHY DID THE HOSPITAL LOSE WATER SERVICE?</span>

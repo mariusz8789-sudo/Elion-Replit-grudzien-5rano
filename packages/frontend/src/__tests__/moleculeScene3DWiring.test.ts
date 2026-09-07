@@ -183,3 +183,61 @@ describe('MoleculeScene3D — real atom+bond rendering wiring (GRAPHICS V3 item 
     expect(() => sim.dispose()).not.toThrow();
   });
 });
+
+describe('MoleculeScene3D — GRAPHICS V5 visual polish (hero lighting + real camera auto-frame)', () => {
+  it('composes real HERO (KEY+RIM) and BACKGROUND lights, aimed at the molecule\'s own local origin', () => {
+    const sim = new MoleculeScene3D({ geometrySource: sourceOf(benzene()) });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+    sim.init(THREE, scene, camera, 400, 300);
+    let spot = 0; let point = 0; let hemisphere = 0;
+    scene.traverse((n) => {
+      if (n instanceof THREE.SpotLight) spot++;
+      if (n instanceof THREE.PointLight) point++;
+      if (n instanceof THREE.HemisphereLight) hemisphere++;
+    });
+    // HERO = one SpotLight (KEY) + one PointLight (RIM); BACKGROUND = one HemisphereLight.
+    expect(spot).toBe(1);
+    expect(point).toBe(1);
+    expect(hemisphere).toBe(1);
+  });
+
+  it('once real atom positions are known, the camera does a one-time real reframe scaled to the ACTUAL molecule extent', async () => {
+    const { sim, scene, camera } = await buildInitializedScene(sourceOf(benzene()));
+    sim.syncScene(scene, camera);
+    // Real benzene fixture: atom 7 (the far H) sits at x=7*1.4=9.8, y=0.3, z=-0.2 (Å, 1:1 world
+    // units per molecularStructure.ts's DEFAULT_ANGSTROM_PER_WORLD_UNIT) — the real farthest atom
+    // from local origin, so the real bounding radius (+0.6 CPK/bond padding) is derivable exactly.
+    const realRadius = Math.sqrt(9.8 ** 2 + 0.3 ** 2 + 0.2 ** 2) + 0.6;
+    const expectedFocusDistance = Math.max(3, realRadius * 2.2);
+    expect(camera.position.length()).toBeCloseTo(expectedFocusDistance, 3);
+  });
+
+  it('a molecule with NO real atoms yet (still materialising) never reframes the camera off its initial shot', () => {
+    const sim = new MoleculeScene3D({ geometrySource: sourceOf(benzene()) });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+    sim.init(THREE, scene, camera, 400, 300);
+    const initialPosition = camera.position.clone();
+    sim.syncScene(scene, camera);
+    expect(camera.position.equals(initialPosition)).toBe(true);
+  });
+
+  it('the reframe preserves the camera\'s current viewing DIRECTION (only distance changes)', async () => {
+    const { sim, scene, camera } = await buildInitializedScene(sourceOf(benzene()));
+    const directionBefore = camera.position.clone().normalize();
+    sim.syncScene(scene, camera);
+    const directionAfter = camera.position.clone().normalize();
+    expect(directionAfter.x).toBeCloseTo(directionBefore.x, 5);
+    expect(directionAfter.y).toBeCloseTo(directionBefore.y, 5);
+    expect(directionAfter.z).toBeCloseTo(directionBefore.z, 5);
+  });
+
+  it('dispose() removes the HERO/BACKGROUND lights from the scene, not just bookkeeping', async () => {
+    const { sim, scene } = await buildInitializedScene(sourceOf(benzene()));
+    sim.dispose();
+    let lights = 0;
+    scene.traverse((n) => { if ((n as THREE.Light).isLight) lights++; });
+    expect(lights).toBe(0);
+  });
+});

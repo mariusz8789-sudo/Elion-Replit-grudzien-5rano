@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resolveCommand, type ChatSimSnapshot } from '../core/scienceChat/resolveCommand';
 import { _resetRecipes } from '../core/generator/recipe';
 import { registerCatalog } from '../core/generator/catalog';
+import { registerActiveObservationControl } from '../core/activeObservationControl';
 import type { ParamDef } from '../core/types';
 
 const massDef: ParamDef = { key: 'mass', label: 'Masa', type: 'slider', default: 10, min: 1, max: 100, unit: 'M☉' };
@@ -321,6 +322,47 @@ describe('scienceChat: Traffic flow entry point (GRAPHICS V7)', () => {
   it('działa też z otwartą symulacją w kontekście', () => {
     const r = resolveCommand('pokaż natężenie ruchu', ctx());
     expect(r.action).toEqual({ type: 'openRoute', hash: '#/city3d' });
+  });
+});
+
+describe('scienceChat: World Interaction — camera/time control on an open 3D scene (activeObservationControl)', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  // GENESIS WORLD INTERACTION: gated on `hasActiveObservationControl()`, NOT `ctx` — the
+  // WorldGraph/TemporalEngine scenes this targets (city3d, scientific-city) never register a
+  // `simContext.ts` SimContext (that registry is the older param-slider labs' own), so a `ctx`-based
+  // gate would make this branch permanently dead for exactly the screens it exists for. These tests
+  // register a real (fake) control, exactly like a mounted screen would via
+  // `registerActiveObservationControl`, and unregister it afterward so it never leaks between tests.
+  let unregister: (() => void) | null = null;
+  afterEach(() => { unregister?.(); unregister = null; });
+
+  it('"śledź pompę" with an observation-capable scene open -> forwards to it, never opens a route', () => {
+    unregister = registerActiveObservationControl({ applyObservation: () => ({ found: true, narration: 'ok' }) });
+    const r = resolveCommand('śledź pompę', null);
+    expect(r.action).toEqual({ type: 'observe', sentence: 'śledź pompę' });
+    expect(r.intent).toBe('CONTROL');
+  });
+
+  it('"przejdź o 6 godzin" with an observation-capable scene open -> forwards as an observe action', () => {
+    unregister = registerActiveObservationControl({ applyObservation: () => ({ found: true, narration: 'ok' }) });
+    const r = resolveCommand('przejdź o 6 godzin', null);
+    expect(r.action).toEqual({ type: 'observe', sentence: 'przejdź o 6 godzin' });
+  });
+
+  it('a follow/time phrase with NOTHING observation-capable open falls through — no scene exists to forward to', () => {
+    const r = resolveCommand('śledź pompę', null);
+    expect(r.action?.type).not.toBe('observe');
+  });
+
+  it('REGRESSION GUARD: "pokaż X" (opening a lab by name) is NEVER captured as a camera command, even with an observation-capable scene already open — plain "pokaż"/"show" is not a follow verb', () => {
+    unregister = registerActiveObservationControl({ applyObservation: () => ({ found: true, narration: 'ok' }) });
+    const r1 = resolveCommand('pokaż molekułę', ctx());
+    expect(r1.action).not.toEqual(expect.objectContaining({ type: 'observe' }));
+    const r2 = resolveCommand('pokaż miasto', ctx());
+    expect(r2.action).not.toEqual(expect.objectContaining({ type: 'observe' }));
+    const r3 = resolveCommand('pokaż czarną dziurę', ctx());
+    expect(r3.action).not.toEqual(expect.objectContaining({ type: 'observe' }));
   });
 });
 

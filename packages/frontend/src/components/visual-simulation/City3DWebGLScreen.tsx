@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { registerActiveSimControls } from '../../core/activeSimControls';
+import { registerActiveObservationControl } from '../../core/activeObservationControl';
 import { registerSimContext } from '../../core/simContext';
 import { ANALYSIS_MODES, type AnalysisMode } from '../../core/simulation/analysis';
 import { CLOCK_SPEEDS, type ClockSpeed } from '../../core/simulationClock/clock';
@@ -155,15 +156,16 @@ export function City3DWebGLScreen() {
   // a position or a transform.
   const [obsText, setObsText] = useState('');
   const [obsResult, setObsResult] = useState<{ status: ObservationExecutionStatus; narration: string; cameraIntent: string; transition: string } | null>(null);
-  const askObservation = (sentence: string) => {
+  const askObservation = (sentence: string): { found: boolean; narration: string } => {
     const trimmed = sentence.trim();
-    if (!trimmed) return;
+    if (!trimmed) return { found: false, narration: 'Nothing was said.' };
     const intent = parseObservationIntent(trimmed);
     const query = intent.target ?? intent.focus;
     if (!query) {
-      setObsResult({ status: 'FAILED', narration: 'No target was named in that sentence — say what to look at (e.g. "the hospital").', cameraIntent: '', transition: '' });
+      const narration = 'No target was named in that sentence — say what to look at (e.g. "the hospital").';
+      setObsResult({ status: 'FAILED', narration, cameraIntent: '', transition: '' });
       setObsText('');
-      return;
+      return { found: false, narration };
     }
     const cameraIntent = resolveCameraIntent(intent);
     const transition = resolveTransitionKind(intent);
@@ -171,15 +173,17 @@ export function City3DWebGLScreen() {
     const timeNote = intent.time && intent.time.kind !== 'NOW'
       ? ' Time travel for the live city view is not yet supported — showing the current moment.'
       : '';
+    const narration = outcome.found
+      ? `Showing ${outcome.label} — ${cameraIntent} · ${transition.toLowerCase()} move.${timeNote}`
+      : `Nothing in this run answers to "${query}" — no such object exists here.`;
     setObsResult({
       status: outcome.found ? 'EXECUTED' : 'FAILED',
-      narration: outcome.found
-        ? `Showing ${outcome.label} — ${cameraIntent} · ${transition.toLowerCase()} move.${timeNote}`
-        : `Nothing in this run answers to "${query}" — no such object exists here.`,
+      narration,
       cameraIntent,
       transition,
     });
     setObsText('');
+    return { found: outcome.found, narration };
   };
 
   const renderParams = useMemo<SimParams>(() => ({ ...params, clockSpeed: running ? speed : 0 }), [params, running, speed]);
@@ -320,6 +324,10 @@ export function City3DWebGLScreen() {
   };
 
   useEffect(() => registerActiveSimControls({ toggleRunning: () => setRunning((value) => !value), reset }), [sim]);
+  // GENESIS WORLD INTERACTION — lets the global Science Chat drive this scene's OWN existing
+  // observation vocabulary (askObservation, already used by the in-screen "ASK GENESIS" box above)
+  // via activeObservationControl.ts. No second parser, no second camera path.
+  useEffect(() => registerActiveObservationControl({ applyObservation: askObservation }), [sim]);
   useEffect(() => registerSimContext({
     labId: 'visual-city',
     experimentId: 'epidemic-city-3d',

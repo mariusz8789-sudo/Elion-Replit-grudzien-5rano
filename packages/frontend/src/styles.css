@@ -3332,6 +3332,10 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 /* .observability-panel itself is shared with #/city3d (styles above, ~line 2027) —
    already one definition used by both screens, nothing to retint here. */
 
+/* GENESIS WORLD INTERACTION — the #/scientific-city replay scrubber. */
+.gsc-scrub { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.72rem; color: var(--text-dim); }
+.gsc-scrub input[type='range'] { width: 100%; accent-color: var(--cyan); }
+
 /* =========================================================================
    GENESIS UI UNIFICATION SPRINT — #/city3d: the scene is the hero at every
    viewport, not just >=1100px. The 12 panel blocks that used to sit on

@@ -590,6 +590,36 @@ export class GenesisScientificCitySim implements Sim3D {
     this.replay = null;
   }
 
+  /**
+   * GENESIS WORLD INTERACTION — an interactive drag scrubber, not a second replay mechanism.
+   * Starts replay (via `startReplay`) if it isn't already active, then jumps the cursor straight to
+   * `tick`, clamped to `[fromTick, toTick]` — the exact same bounds `startReplay` already computes
+   * from this branch's own real fork point and current tick. `syncScene`'s existing
+   * `getFrameState(this.activeEngine, this.replay?.cursor)` (this class's one real-state read path,
+   * unchanged) picks up the new cursor on the next frame — scrubbing calls no second rendering path.
+   * Returns `false` (and does nothing) when there is nothing yet to scrub through, the same honest
+   * "not modeled yet" signal `startReplay` already gives for an empty history.
+   */
+  scrubReplayTo(tick: number): boolean {
+    if (!this.replay) {
+      const window = this.startReplay();
+      if (!window) return false;
+    }
+    const replay = this.replay!;
+    replay.cursor = Math.min(replay.toTick, Math.max(replay.fromTick, Math.round(tick)));
+    return true;
+  }
+
+  /** Bounds an interactive scrubber may legally ask `scrubReplayTo` for — `null` when fewer than one
+   * real tick has happened yet (nothing to scrub through). Reflects `activeEngine`'s CURRENT fork/
+   * branch, exactly like `startReplay`, not a value frozen from whenever replay first started. */
+  getReplayBounds(): { fromTick: number; toTick: number } | null {
+    const engine = this.activeEngine;
+    const fromTick = engine.forkedAtTick ?? 0;
+    const toTick = engine.tick;
+    return fromTick >= toTick ? null : { fromTick, toTick };
+  }
+
   /** WORLD A (pump normal) vs WORLD B (pump failure) — the real `compareBranches` mechanism
    * (`bridge/worldFrameState.ts`), the same one `scenarioSession.ts`'s hydraulics fork already uses,
    * read back for the pump/hospital/population trio rather than a single focal entity. */
@@ -1293,6 +1323,8 @@ export class GenesisScientificCitySim implements Sim3D {
 
       replaying: this.replay ? 1 : 0,
       replayTick: this.replay?.cursor ?? -1,
+      replayFromTick: this.getReplayBounds()?.fromTick ?? -1,
+      replayToTick: this.getReplayBounds()?.toTick ?? -1,
       webgl_fps: this.renderMetrics.fps,
       webgl_frame_ms: this.renderMetrics.frameMs,
       webgl_render_ms: this.renderMetrics.renderMs,

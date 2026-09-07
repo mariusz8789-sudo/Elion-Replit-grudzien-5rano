@@ -20,6 +20,12 @@ import { resolveCameraFraming, type CameraIntent } from './graphics/cameraRig';
 import { createDustMotes, type DustMotesHandle } from './graphics/atmosphere';
 import { detectRenderTier, tierAllowsAtmosphereParticles, atmosphereParticleCount } from './quality';
 import { raycastFromScreenPoint, findTaggedAncestor, ClickDragTracker } from './graphics/picking';
+import { InstanceBatch, setInstanceColor } from './graphics/instancing';
+import { severityColor } from './graphics/stateVisualization';
+import {
+  buildTrafficNetwork, stepTrafficNetwork, greenshieldsSpeedMS, DEFAULT_GREENSHIELDS, DEFAULT_TRAFFIC_DEMAND,
+  type TrafficNetwork, type TrafficCell, type TrafficStepSummary,
+} from '../worldModel/domains/trafficFlow';
 // GENESIS GRAPHICS ENGINE — VISUAL WORLD BUILD 1.0: reusable kits, actually wired into this
 // production scene (not just proven in an isolated graphics/examples/*.ts file) via addCityExtras().
 import { createRooftopEquipment, createAmbulanceBay, createIndustrialBuilding } from './graphics/buildingKit';
@@ -43,6 +49,10 @@ import {
 /** Ten sam współczynnik świata używany przez budynki, drogi, agentów i heatmapę. */
 export const CITY_WORLD_SCALE = 0.018;
 const CITY_VELOCITY_SCALE_FACTOR = 0.10;
+/** Scene-space road width — shared between `addRoadsAndBuildings()`'s own road meshes and GRAPHICS
+ * V7's traffic-density overlay so the overlay always lines up with the real pavement, never a
+ * value that could silently drift apart from it. */
+const CITY_ROAD_WIDTH_SCENE = 0.38;
 /** High-fidelity City View: detaliczne rigi są wyjątkami, a nie dominantą kadru miasta. */
 const MAX_DETAILED_HUMANOIDS = 4;
 // InstancedMesh utrzymuje stałą liczbę draw calls; P1 umożliwia uczciwy benchmark do 1000 agentów.
@@ -179,6 +189,27 @@ export class EpidemicCity3DSim implements Sim3D {
   private transmissionMarkers = new Map<string, { group: THREE_NS.Group; born: number; material: THREE_NS.MeshBasicMaterial }>();
   private buildingMeshes: THREE_NS.Object3D[] = [];
   /**
+   * GRAPHICS V7 — the real Greenshields+CTM+HCM traffic-flow solver (`worldModel/domains/
+   * trafficFlow.ts`), built directly from this scene's OWN real road geometry
+   * (`this.simulation.roadNetworkView()` — the exact `CityRoadNetwork` `addRoadsAndBuildings()`
+   * already draws roads from). Called directly rather than through the WorldGraph/TemporalEngine/
+   * SolverRouter ceremony `trafficFlow.ts` also offers (`addTrafficNetworkEntity`/`buildTrafficWorld`):
+   * this scene has no existing WorldGraph to attach an entity to, and the entity that ceremony
+   * produces only ever carries NETWORK-WIDE aggregate scalars (Rule 6 — a `MACRO_CITY` entity is
+   * not disaggregated into per-cell state) — the real per-cell density this visual needs to show
+   * congestion propagation/spillback lives entirely in the closure-held `TrafficNetwork` object
+   * either way, so the WorldGraph wrapper buys nothing for THIS rendering task. `trafficNetwork`
+   * itself is still the exact same real solver state (`stepTrafficNetwork`, real Godunov flux), not
+   * a second implementation.
+   */
+  private readonly trafficNetwork: TrafficNetwork;
+  private trafficMesh: THREE_NS.InstancedMesh | null = null;
+  /** Parallel to `trafficMesh`'s instances — index i's live `TrafficCell` (its `densityVehPerKm`
+   * mutates every `stepTrafficNetwork` call), so `syncTrafficOverlay` can recolor instance i from
+   * cell i's CURRENT real density without re-deriving the mapping every frame. */
+  private trafficCellRefs: TrafficCell[] = [];
+  private lastTrafficSummary: TrafficStepSummary | null = null;
+  /**
    * GRAPHICS V2 SPRINT C-1 — real density audit finding: `createBuilding()`/`createContextBuilding()`
    * used to emit one individual `Mesh` per window pane (see PERFORMANCE.md's "Visual World Build
    * 1.0-3.0 density audit" — already identified there as the scene's single largest draw-call cost,
@@ -223,6 +254,10 @@ export class EpidemicCity3DSim implements Sim3D {
     existingSimulation?: EpidemicCitySimulation,
   ) {
     this.simulation = existingSimulation ?? new EpidemicCitySimulation(params);
+    // GRAPHICS V7 — real geometry-derived traffic network, built once from this exact simulation's
+    // own road network (deterministic, no async wait — unlike moleculeScene3D.ts's backend-fetched
+    // geometry, this solver needs nothing external).
+    this.trafficNetwork = buildTrafficNetwork(this.simulation.roadNetworkView());
     this.eventSeed = this.simulation.getParams().seed as number | undefined;
     this.eventRegistry = new EventRegistry({ modelId: 'epidemic.city', seed: this.eventSeed });
     this.eventStream = new EventStream(this.eventRegistry);
@@ -485,6 +520,7 @@ export class EpidemicCity3DSim implements Sim3D {
     this.createApprovedCityMaterials();
     this.addLightsAndGround();
     this.addRoadsAndBuildings();
+    this.addTrafficOverlay();
     this.addStreetAtmosphere();
     // GENESIS GRAPHICS ENGINE — one shadow-policy pass over the finished scene, superseding every
     // per-builder castShadow/receiveShadow guess above (see graphics/shadowPolicy.ts's own doc:
@@ -581,6 +617,11 @@ export class EpidemicCity3DSim implements Sim3D {
     });
     this.lastTickMs = performance.now() - tickStartedAt;
     this.cityHaze?.update(dt);
+    // GRAPHICS V7 — real dt (seconds), continuous regardless of `clock.running`: traffic is a
+    // real-time physical process (like the haze drift above), not scaled by the epidemic model's
+    // own simulated-days clock. `stepTrafficNetwork` internally sub-steps for its own CFL bound, so
+    // this is stable for whatever real dt useThreeLoop.ts passes.
+    this.lastTrafficSummary = stepTrafficNetwork(this.trafficNetwork, DEFAULT_GREENSHIELDS, dt, DEFAULT_TRAFFIC_DEMAND);
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void {
@@ -600,6 +641,7 @@ export class EpidemicCity3DSim implements Sim3D {
     ));
 
     this.syncHumanoids(states);
+    this.syncTrafficOverlay();
     this.syncAnalysis(agents);
     this.syncTransmissionMarkers();
     this.syncWorldStateVisuals();
@@ -695,6 +737,11 @@ export class EpidemicCity3DSim implements Sim3D {
       webgl_selected_agent: this.selectedId ?? -1,
       sim_clock_days: Math.round(this.clock.time * 100) / 100,
       sim_tick_ms: this.lastTickMs,
+      // GRAPHICS V7 — real Greenshields+CTM+HCM traffic state (worldModel/domains/trafficFlow.ts),
+      // the same numbers driving the road-overlay color.
+      traffic_mean_speed_ms: this.lastTrafficSummary?.meanSpeedMS ?? 0,
+      traffic_mean_density_veh_per_km: this.lastTrafficSummary?.meanDensityVehPerKm ?? 0,
+      traffic_congested_fraction: this.lastTrafficSummary?.congestedCellFraction ?? 0,
       webgl_fps: this.renderMetrics.fps,
       webgl_frame_ms: this.renderMetrics.frameMs,
       webgl_render_ms: this.renderMetrics.renderMs,
@@ -1162,7 +1209,7 @@ export class EpidemicCity3DSim implements Sim3D {
     const sidewalkMat = this.cityMaterials?.concrete ?? new THREE.MeshStandardMaterial({ color: 0x9aaabd, roughness: 0.96, metalness: 0.01 });
     const curbMat = new THREE.MeshStandardMaterial({ color: 0xc7d0d8, roughness: 0.82, metalness: 0.05 });
     const markingMat = new THREE.MeshBasicMaterial({ color: 0xeef4f7, transparent: true, opacity: 0.84 });
-    const roadWidth = 0.38;
+    const roadWidth = CITY_ROAD_WIDTH_SCENE;
     const sidewalkWidth = 0.13;
     const worldW = this.simulation.worldWidth * CITY_WORLD_SCALE;
     const worldH = this.simulation.worldHeight * CITY_WORLD_SCALE;
@@ -1222,6 +1269,93 @@ export class EpidemicCity3DSim implements Sim3D {
     // newly defined visual-only method reaches a freshly constructed City3D instance.
     this.addPerimeterDistrict?.();
     this.addFarCityBackdrop();
+  }
+
+  /**
+   * GRAPHICS V7 — real congestion, painted onto the SAME road geometry `addRoadsAndBuildings()` just
+   * built (same street coordinates, same `CITY_WORLD_SCALE`), not a second road system. One thin
+   * colored slab per real CTM cell (`this.trafficNetwork.links[].cells`), so real spatial phenomena
+   * the Godunov scheme actually produces — a queue forming at a signal, a shockwave propagating back
+   * from it — are visible as real per-cell color variation along a street, not a single per-street
+   * average that would flatten out exactly the behaviour this solver exists to show. One
+   * `InstancedMesh` for every cell across the whole network (one draw call regardless of cell count,
+   * same discipline as this file's `flushWindowInstances`/`analysisMesh`), recolored every frame
+   * from each cell's live `densityVehPerKm` (see `syncTrafficOverlay`) via `setInstanceColor`'s
+   * partial-buffer upload — never rebuilt.
+   *
+   * Cell positions are derived the same way `buildTrafficNetwork` derived the cells themselves: a
+   * link's cell `i` spans real world-units `[i·cellLength, (i+1)·cellLength)` along its street,
+   * starting at that street's own origin (world x=0 for an EW/horizontal street, world y=0 for an
+   * NS/vertical one) — the exact convention `roadNetwork.ts`'s `road:h:${row}`/`road:v:${col}`
+   * segments use, since `this.trafficNetwork` was built from this scene's own real
+   * `roadNetworkView()`.
+   */
+  private addTrafficOverlay(): void {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+    const streets = this.simulation.streets;
+    const worldWidth = this.simulation.worldWidth;
+    const worldHeight = this.simulation.worldHeight;
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 });
+    const batch = new InstanceBatch(THREE, new THREE.BoxGeometry(1, 1, 1), material);
+    const overlayHeight = 0.006;
+    const overlayY = 0.021; // just above the road surface (top ~0.017-0.019) — real geometric separation, not a depthWrite hack.
+    const overlayWidthScene = CITY_ROAD_WIDTH_SCENE * 0.82; // slightly narrower than the road so lane markings/curbs stay visible at the edges.
+
+    this.trafficCellRefs = [];
+    for (const link of this.trafficNetwork.links) {
+      const isEW = link.orientation === 'EW';
+      const crossStreetWorld = isEW ? streets.h[link.streetIndex] : streets.v[link.streetIndex];
+      if (crossStreetWorld === undefined) continue; // defensive: streetIndex always comes from this exact streets array, should not happen.
+      const crossScene = isEW
+        ? (crossStreetWorld - worldHeight / 2) * CITY_WORLD_SCALE
+        : (crossStreetWorld - worldWidth / 2) * CITY_WORLD_SCALE;
+
+      let alongWorld = 0;
+      for (const cell of link.cells) {
+        const midAlongWorld = alongWorld + cell.lengthM / 2;
+        const alongScene = isEW
+          ? (midAlongWorld - worldWidth / 2) * CITY_WORLD_SCALE
+          : (midAlongWorld - worldHeight / 2) * CITY_WORLD_SCALE;
+        const cellLengthScene = cell.lengthM * CITY_WORLD_SCALE;
+        const position: THREE_NS.Vector3Tuple = isEW ? [alongScene, overlayY, crossScene] : [crossScene, overlayY, alongScene];
+        const scale: THREE_NS.Vector3Tuple = isEW
+          ? [cellLengthScene, overlayHeight, overlayWidthScene]
+          : [overlayWidthScene, overlayHeight, cellLengthScene];
+        // Real starting color for zero density — free-flow green, the same convention
+        // syncTrafficOverlay recomputes every frame afterward via severityColor.
+        batch.add(position, [0, 0, 0], scale, 0x3ddc84);
+        this.trafficCellRefs.push(cell);
+        alongWorld += cell.lengthM;
+      }
+    }
+
+    const mesh = batch.build(this.scene, false);
+    if (mesh) {
+      mesh.name = 'genesis-city-traffic-overlay';
+      this.trafficMesh = mesh;
+      this.buildingMeshes.push(mesh);
+    }
+  }
+
+  /**
+   * Recolors every real traffic cell from its CURRENT `densityVehPerKm` — called every frame
+   * (`syncScene`), since unlike the molecule scene's static conformer, traffic genuinely evolves
+   * continuously. Cheap: `setInstanceColor` uploads exactly the touched instances' bytes, and this
+   * network's cell count is tens, not thousands. `t = 1 − speed/freeFlowSpeed` (0 = free-flowing,
+   * 1 = jammed) maps onto `stateVisualization.ts`'s own real green→amber→red severity convention —
+   * the same "how concerning is this real value" language every other state-driven visual in this
+   * engine already uses, not a bespoke traffic-only color ramp.
+   */
+  private syncTrafficOverlay(): void {
+    if (!this.trafficMesh || !this.THREE) return;
+    const THREE = this.THREE;
+    const fd = DEFAULT_GREENSHIELDS;
+    for (let i = 0; i < this.trafficCellRefs.length; i++) {
+      const cell = this.trafficCellRefs[i]!;
+      const speedFraction = greenshieldsSpeedMS(cell.densityVehPerKm, fd) / fd.freeFlowSpeedMS;
+      setInstanceColor(this.trafficMesh, i, severityColor(THREE, 1 - speedFraction));
+    }
   }
 
   /**

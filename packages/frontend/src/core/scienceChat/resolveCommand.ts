@@ -376,6 +376,20 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Traffic flow (GRAPHICS V7) — realny Greenshields+CTM/Godunov+HCM solver
+  //     (worldModel/domains/trafficFlow.ts) na realnej sieci dróg tego samego miasta co żywa
+  //     symulacja epidemii — ten sam #/city3d, ale z osobną, uczciwą narracją o realnym modelu
+  //     ruchu drogowego (nie o agentach epidemii), więc to własny branch, nie alias „żywej
+  //     symulacji miasta" powyżej. ---
+  if (has(norm, 'pokaz ruch', 'pokaz korek', 'ruch uliczny', 'natezenie ruchu', 'korek uliczny', 'korki', 'traffic jam', 'pokaz traffic', 'przeciazenie drog', 'zator drogowy')) {
+    return {
+      text: 'Otwieram żywą scenę miasta z realnym ruchem drogowym: gęstość i prędkość na każdym odcinku pochodzą z realnego solvera (diagram fundamentalny Greenshieldsa, schemat Godunova/CTM Daganzo, przepustowość skrzyżowań wg HCM) — kolor drogi (zielony -> bursztynowy -> czerwony) to realna reakcja na ten stan, nie animacja. Model nie ma jeszcze wyboru trasy ani macierzy OD — jeden strumień popytu na każdym wjeździe do sieci.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/city3d' },
+    };
+  }
+
   // --- Porównanie modeli (FAZA 1 / PRIORYTET 5) — MUSI być przed „otwórz",
   //     bo „porównaj SIR..." trafiłby w alias 'sir' i otworzył jeden model. ---
   if (has(norm, 'porownaj', 'porownanie', 'porownac', ' vs ', 'dwa modele', 'oba modele', 'model a', 'a vs b')) {

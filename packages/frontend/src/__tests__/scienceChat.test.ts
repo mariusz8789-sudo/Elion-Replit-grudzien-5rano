@@ -303,6 +303,27 @@ describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
   });
 });
 
+describe('scienceChat: Traffic flow entry point (GRAPHICS V7)', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('"pokaż ruch" -> otwiera #/city3d z realną narracją o solverze ruchu, nie o epidemii', () => {
+    const r = resolveCommand('pokaż ruch', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/city3d' });
+    expect(r.text).toMatch(/Greenshields/i);
+  });
+
+  it('"pokaż korek" -> ten sam #/city3d', () => {
+    const r = resolveCommand('pokaż korek', null);
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/city3d' });
+  });
+
+  it('działa też z otwartą symulacją w kontekście', () => {
+    const r = resolveCommand('pokaż natężenie ruchu', ctx());
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/city3d' });
+  });
+});
+
 describe('scienceChat: Molecule Lab entry point (GRAPHICS V4)', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 

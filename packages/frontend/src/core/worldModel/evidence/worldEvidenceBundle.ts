@@ -13,6 +13,7 @@ import type { WorldState } from '../../world/scientificWorldState';
 import { collectScalars } from '../bridge/worldFrameState';
 import type { BranchComparison } from '../bridge/worldFrameState';
 import type { GroundingLevel } from '../ecs/types';
+import type { WorldCounterfactualAssessment } from '../discovery/worldCounterfactual';
 import { getCausalAncestry } from '../queries/worldQueries';
 import type { TemporalEngine } from '../temporal/temporalEngine';
 
@@ -260,6 +261,13 @@ export interface WorldEvidenceBundleInput {
   readonly limitations?: readonly string[];
   /** Deterministic seed, when the scenario has one. `null` means the run is deterministic by construction with no seed. */
   readonly seed?: number | null;
+  /**
+   * The verdict of a PREREGISTERED criterion against this comparison, when
+   * the caller declared one before running. Supplied rather than computed
+   * here on purpose: this module assembles evidence and must not be able to
+   * author the criterion its own evidence is judged by.
+   */
+  readonly assessment?: WorldCounterfactualAssessment;
 }
 
 export interface WorldEvidenceBundle {
@@ -282,6 +290,12 @@ export interface WorldEvidenceBundle {
   readonly comparedAtTick: number | null;
   readonly replay: BundleReplay;
   readonly limitations: readonly string[];
+  /**
+   * The preregistered criterion's verdict, or null when the scenario was run
+   * without one. Null is the honest state for an exploratory comparison: a
+   * bundle that shows what changed without claiming a prediction was tested.
+   */
+  readonly assessment: WorldCounterfactualAssessment | null;
   /** Ids the `WorldState` itself declared unmodelled — passed through, never re-derived. */
   readonly notModelled: readonly string[];
   /** Limitations of the EXPORT mechanism itself, as opposed to the scenario's science. Empty when the export has none. */
@@ -325,6 +339,22 @@ function scientificContent(bundle: Omit<WorldEvidenceBundle, 'scientificContentF
     recordedFingerprint: bundle.replay.recordedFingerprint,
     recomputedFingerprint: bundle.replay.recomputedFingerprint,
     limitations: bundle.limitations,
+    // The verdict is scientific content, but the branch-local values it was read
+    // from are already covered by the arm fingerprints above; what matters for
+    // "is this the same science" is the criterion, what it decided, and whether
+    // the difference was attributable.
+    assessment: bundle.assessment
+      ? {
+          questionId: bundle.assessment.questionId,
+          criterion: bundle.assessment.criterion,
+          entityId: bundle.assessment.entityId,
+          verdict: bundle.assessment.assessment,
+          attribution: bundle.assessment.attribution,
+          baseline: bundle.assessment.baseline,
+          intervention: bundle.assessment.intervention,
+          controlStatus: bundle.assessment.controlledDifference.status,
+        }
+      : null,
     notModelled: bundle.notModelled,
   };
 }
@@ -389,6 +419,7 @@ export function buildWorldEvidenceBundle(input: WorldEvidenceBundleInput): World
     comparedAtTick: input.comparison?.tick ?? null,
     replay: buildBundleReplay(input.baseline.engine, input.verifyEngine, input.replayBlockedReason),
     limitations: input.limitations ?? [],
+    assessment: input.assessment ?? null,
     notModelled: input.baseline.worldState.notModeled ?? [],
   } as const;
 
@@ -572,6 +603,33 @@ export function exportWorldEvidenceBundleRoCrate(bundle: WorldEvidenceBundle): G
       'genesis:interventionDescription': bundle.intervention.description,
       'genesis:changedEntityIds': bundle.changedEntityIds,
       'genesis:changedEntityCount': bundle.changedEntityIds.length,
+    });
+  }
+
+  if (bundle.assessment) {
+    const assessment = bundle.assessment;
+    graph.push({
+      // Derived from the comparison, so a reader can see the verdict rests on the
+      // two arms rather than standing as an independent assertion.
+      '@id': `#assessment/${stableId(assessment.questionId)}`,
+      '@type': ['prov:Entity', 'Dataset'],
+      name: `Preregistered criterion assessment for ${bundle.bundleId}`,
+      ...(bundle.intervention ? { 'prov:wasDerivedFrom': [entityRef(comparisonId)] } : {}),
+      'genesis:questionId': assessment.questionId,
+      'genesis:assessment': assessment.assessment,
+      'genesis:attribution': assessment.attribution,
+      'genesis:criterion': assessment.criterion,
+      'genesis:assessedEntityId': assessment.entityId,
+      'genesis:metricKey': assessment.metricKey,
+      'genesis:baselineValue': assessment.baseline,
+      'genesis:interventionValue': assessment.intervention,
+      'genesis:referenceValue': assessment.reference,
+      'genesis:controlledDifference': assessment.controlledDifference,
+      'genesis:replayVerdict': assessment.replayVerdict,
+      'genesis:message': assessment.message,
+      // Travels with the verdict itself, so the RO-Crate cannot be read as a
+      // causal claim about the world even if this node is extracted alone.
+      'genesis:disclaimer': assessment.disclaimer,
     });
   }
 

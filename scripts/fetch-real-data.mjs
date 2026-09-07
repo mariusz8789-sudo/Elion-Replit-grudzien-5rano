@@ -23,9 +23,10 @@
  * następnym buildzie — zero zmian w kodzie aplikacji.
  */
 
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '../packages/frontend/src/data');
@@ -89,6 +90,116 @@ async function fetchCernDimuon() {
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(path.join(DATA_DIR, 'dimuon-real.ts'), out);
   log(`Zapisano ${masses.length} realnych mas do src/data/dimuon-real.ts`);
+}
+
+/* ------------------------------------------------------------------ */
+/* CERN Open Data rekord 5208 — Z→μμ, wersja CHECKSUMOWO ZWERYFIKOWANA */
+/* ------------------------------------------------------------------ */
+/**
+ * Ta sama ścieżka co `cern` powyżej (pisze ten sam plik
+ * src/data/dimuon-real.ts, konsumowany przez ten sam hak
+ * `import.meta.glob` w particle-invmass.ts — ŻADNEGO nowego mechanizmu
+ * wyboru źródła), ale z rekordu, którego pochodzenie da się zweryfikować:
+ *
+ *  - `cern` (rekord 545) ma w tym pliku własną adnotację "DO ZWERYFIKOWANIA":
+ *    numer rekordu, URL i nazwa kolumny masy NIE zostały nigdy sprawdzone na
+ *    żywo, a plik jest brany na słowo — bez sumy kontrolnej.
+ *  - `cern5208` używa dokładnie tego samego zbioru, sumy kontrolnej i wzoru,
+ *    co backendowy worker `packages/backend/src/compute/cms_zmumu_worker.py`:
+ *    SHA-256 jest sprawdzane PRZED zapisem, a schemat 14 kolumn jest wymagany.
+ *    Niezgodność = twardy błąd i BRAK zapisu; nigdy nie podstawiamy danych
+ *    syntetycznych pod nazwą realnych.
+ *
+ * Źródło CSV bierzemy z GENESIS_CERN_OPEN_DATA_DIR (ta sama zmienna, której
+ * używa backendowy worker) jeśli jest ustawiona — dzięki temu działa też bez
+ * dostępu do sieci; w przeciwnym razie pobiera z opendata.cern.ch.
+ */
+const CERN_5208_URL = 'https://opendata.cern.ch/record/5208/files/Zmumu.csv';
+const CERN_5208_RECORD_URL = 'https://opendata.cern.ch/record/5208';
+const CERN_5208_SHA256 = '7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1';
+const CERN_5208_COLUMNS = [
+  'Run', 'Event', 'pt1', 'eta1', 'phi1', 'Q1', 'dxy1', 'iso1',
+  'pt2', 'eta2', 'phi2', 'Q2', 'dxy2', 'iso2',
+];
+
+/**
+ * m² = 2·pT₁·pT₂·(cosh Δη − cos Δφ) — przybliżenie ultrarelatywistyczne dla
+ * pary mionów, IDENTYCZNE ze wzorem w `cms_zmumu_worker.py::invariant_mass`.
+ * Eksportowane, żeby test mógł przypiąć obie implementacje do tych samych
+ * przypadków analitycznych i wykryć rozjechanie się ich w przyszłości.
+ */
+export function invariantMassFromRow(row) {
+  const pt1 = Number(row.pt1);
+  const eta1 = Number(row.eta1);
+  const phi1 = Number(row.phi1);
+  const pt2 = Number(row.pt2);
+  const eta2 = Number(row.eta2);
+  const phi2 = Number(row.phi2);
+  const deltaPhi = Math.atan2(Math.sin(phi1 - phi2), Math.cos(phi1 - phi2));
+  const massSquared = 2 * pt1 * pt2 * (Math.cosh(eta1 - eta2) - Math.cos(deltaPhi));
+  return Math.sqrt(Math.max(0, massSquared));
+}
+
+/** Parsuje CSV rekordu 5208 i wymusza dokładny schemat — ta sama bramka co `load_rows` w workerze. */
+export function parseZmumuCsv(csv) {
+  const lines = csv.trim().split('\n');
+  const header = lines[0].split(',').map((c) => c.trim());
+  if (header.length !== CERN_5208_COLUMNS.length || header.some((c, i) => c !== CERN_5208_COLUMNS[i])) {
+    throw new Error(`Schemat CSV nie zgadza się: oczekiwano ${CERN_5208_COLUMNS.join(',')}, otrzymano ${header.join(',')}`);
+  }
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',');
+    return Object.fromEntries(header.map((col, i) => [col, cells[i]]));
+  });
+}
+
+async function fetchCernZmumu5208() {
+  const localDir = (process.env.GENESIS_CERN_OPEN_DATA_DIR ?? '').trim();
+  let csv;
+  if (localDir) {
+    const localPath = path.join(localDir, 'Zmumu.csv');
+    log(`CERN Open Data 5208: czytanie zweryfikowanego pliku lokalnego ${localPath}…`);
+    csv = await readFile(localPath, 'utf8');
+  } else {
+    log('CERN Open Data 5208: pobieranie Zmumu.csv…');
+    csv = await fetchText(CERN_5208_URL);
+  }
+
+  const actualSha = createHash('sha256').update(csv, 'utf8').digest('hex');
+  if (actualSha !== CERN_5208_SHA256) {
+    throw new Error(
+      `SHA-256 nie zgadza się: oczekiwano ${CERN_5208_SHA256}, otrzymano ${actualSha}. ` +
+        'NIE zapisuję danych — niezweryfikowane źródło nigdy nie trafia do aplikacji jako "realne".',
+    );
+  }
+
+  const rows = parseZmumuCsv(csv);
+  if (rows.length !== 10_000) throw new Error(`Liczba wierszy nie zgadza się: oczekiwano 10000, otrzymano ${rows.length}`);
+  if (new Set(rows.map((r) => `${r.Run}:${r.Event}`)).size !== rows.length) throw new Error('Kontrola unikalności zdarzeń nie powiodła się');
+
+  const masses = rows.map(invariantMassFromRow).filter((m) => Number.isFinite(m) && m > 0);
+  const out =
+    `/**\n * Realne masy niezmiennicze par mionów — CERN Open Data rekord 5208 (CC0).\n` +
+    ` * Źródło: ${CERN_5208_URL}\n * SHA-256 zweryfikowane przed zapisem: ${CERN_5208_SHA256}\n` +
+    ` * Wzór: m² = 2·pT₁·pT₂·(cosh Δη − cos Δφ) (przybliżenie ultrarelatywistyczne)\n` +
+    ` * OGRANICZENIE: próbka jest uprzednio wyselekcjonowana (Z-enriched, 60–120 GeV) —\n` +
+    ` * to statystyka opisowa realnych pomiarów, nie rekonstrukcja detektora ani odkrycie.\n` +
+    ` * Wygenerowane przez scripts/fetch-real-data.mjs — nie edytować ręcznie.\n */\n` +
+    `export const REAL_DIMUON_MASSES: number[] = ${JSON.stringify(masses)};\n\n` +
+    `export const REAL_DIMUON_PROVENANCE = ${JSON.stringify(
+      {
+        label: 'CERN Open Data — CMS Z→μμ 2011 (rekord 5208)',
+        recordUrl: CERN_5208_RECORD_URL,
+        sha256: CERN_5208_SHA256,
+        license: 'CC0-1.0',
+        selection: 'Z-enriched, preselekcja 60–120 GeV',
+      },
+      null,
+      2,
+    )} as const;\n`;
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(path.join(DATA_DIR, 'dimuon-real.ts'), out);
+  log(`Zapisano ${masses.length} zweryfikowanych realnych mas do src/data/dimuon-real.ts`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -188,26 +299,34 @@ async function fetchGaiaStars() {
 
 /* ------------------------------------------------------------------ */
 
-const TASKS = { cern: fetchCernDimuon, jpl: fetchJplHorizons, gaia: fetchGaiaStars };
-const target = process.argv[2];
+const TASKS = { cern: fetchCernDimuon, cern5208: fetchCernZmumu5208, jpl: fetchJplHorizons, gaia: fetchGaiaStars };
 
-if (!target || !['cern', 'jpl', 'gaia', 'all'].includes(target)) {
-  console.log('Użycie: node scripts/fetch-real-data.mjs <cern|jpl|gaia|all>');
-  process.exit(1);
-}
+// Uruchamiamy CLI tylko przy bezpośrednim wywołaniu, żeby test mógł
+// zaimportować `invariantMassFromRow`/`parseZmumuCsv` bez parsowania argv
+// i bez `process.exit`. Zachowanie przy `node scripts/fetch-real-data.mjs …`
+// jest niezmienione.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const target = process.argv[2];
+  const names = Object.keys(TASKS);
 
-const toRun = target === 'all' ? Object.keys(TASKS) : [target];
-let failures = 0;
-for (const name of toRun) {
-  try {
-    await TASKS[name]();
-  } catch (err) {
-    failures++;
-    console.error(`[fetch-real-data] ${name} nie powiódł się: ${err.message}`);
+  if (!target || ![...names, 'all'].includes(target)) {
+    console.log(`Użycie: node scripts/fetch-real-data.mjs <${names.join('|')}|all>`);
+    process.exit(1);
   }
+
+  const toRun = target === 'all' ? names : [target];
+  let failures = 0;
+  for (const name of toRun) {
+    try {
+      await TASKS[name]();
+    } catch (err) {
+      failures++;
+      console.error(`[fetch-real-data] ${name} nie powiódł się: ${err.message}`);
+    }
+  }
+  if (failures > 0) {
+    console.error(`\n${failures}/${toRun.length} źródeł nie powiodło się. Zobacz komentarze "DO ZWERYFIKOWANIA" w tym pliku.`);
+    process.exit(1);
+  }
+  log('Gotowe. Przebuduj aplikację (npm run build) — DataSource wykryje nowe pliki automatycznie.');
 }
-if (failures > 0) {
-  console.error(`\n${failures}/${toRun.length} źródeł nie powiodło się. Zobacz komentarze "DO ZWERYFIKOWANIA" w tym pliku.`);
-  process.exit(1);
-}
-log('Gotowe. Przebuduj aplikację (npm run build) — DataSource wykryje nowe pliki automatycznie.');

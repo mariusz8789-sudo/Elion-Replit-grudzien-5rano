@@ -31,18 +31,40 @@ const BINS = 130;
  * opendata.cern.ch (patrz README.md „Znane ograniczenia") — wtedy
  * automatycznie używamy generatora syntetycznego (masy rezonansów wg PDG).
  */
-const realModules = import.meta.glob<{ REAL_DIMUON_MASSES: number[] }>('../../data/dimuon-real.ts', { eager: true });
+interface RealDimuonProvenance {
+  label: string;
+  recordUrl: string;
+  sha256: string;
+  license: string;
+  selection: string;
+}
+
+const realModules = import.meta.glob<{ REAL_DIMUON_MASSES: number[]; REAL_DIMUON_PROVENANCE?: RealDimuonProvenance }>(
+  '../../data/dimuon-real.ts',
+  { eager: true },
+);
 let realMasses: number[] | null = null;
+let realProvenance: RealDimuonProvenance | null = null;
 for (const mod of Object.values(realModules)) {
-  if (mod.REAL_DIMUON_MASSES?.length) realMasses = mod.REAL_DIMUON_MASSES;
+  if (mod.REAL_DIMUON_MASSES?.length) {
+    realMasses = mod.REAL_DIMUON_MASSES;
+    realProvenance = mod.REAL_DIMUON_PROVENANCE ?? null;
+  }
 }
 
 registerDataSource<number[] | null>({
   id: 'particle.dimuon-masses',
   label: 'Masy niezmiennicze par mionów (histogram rezonansów)',
+  // Cytowanie MUSI opisywać rekord, który faktycznie dostarczył te liczby.
+  // Generator `fetch-real-data.mjs cern5208` zapisuje `REAL_DIMUON_PROVENANCE`
+  // razem z danymi (rekord 5208, suma kontrolna zweryfikowana przed zapisem),
+  // więc czytamy je stąd zamiast trzymać na sztywno jeden numer rekordu —
+  // wpisanie "rekord 545" pod dane z innego rekordu byłoby fałszywym
+  // przypisem, nawet gdyby same liczby były prawdziwe. Gdy realnych danych
+  // nie ma, zostaje ścieżka syntetyczna, jawnie oznaczona `isSynthetic`.
   citation: {
-    label: 'CERN Open Data — CMS DoubleMu (rekord 545)',
-    url: 'https://opendata.cern.ch',
+    label: realProvenance?.label ?? 'CERN Open Data — CMS DoubleMu (rekord 545)',
+    url: realProvenance?.recordUrl ?? 'https://opendata.cern.ch',
     confirmation: realMasses ? 'confirmed' : 'partial',
   },
   isSynthetic: realMasses === null,
@@ -55,7 +77,7 @@ registerDataSource<number[] | null>({
 // prawdziwe dane (plik data/dimuon-real.ts zacznie istnieć), ten sam kod
 // automatycznie przełączy się na drugie zdanie, bez dalszych zmian.
 const dimuonHonestyNote = realMasses
-  ? 'Masy i szerokości rezonansów są prawdziwe (PDG); metoda — histogram masy niezmienniczej par mionów — jest dokładnie tą, którą odkryto J/ψ i Z⁰. Dane zdarzeń w tym wdrożeniu to prawdziwe pomiary CERN Open Data (CMS DoubleMu, licencja CC0), nie symulacja.'
+  ? `Masy i szerokości rezonansów są prawdziwe (PDG); metoda — histogram masy niezmienniczej par mionów — jest dokładnie tą, którą odkryto J/ψ i Z⁰. Dane zdarzeń w tym wdrożeniu to prawdziwe pomiary ${realProvenance?.label ?? 'CERN Open Data (CMS DoubleMu, licencja CC0)'}, nie symulacja.${realProvenance ? ` Suma kontrolna źródła zweryfikowana przed zapisem (SHA-256 ${realProvenance.sha256.slice(0, 12)}…), licencja ${realProvenance.license}. OGRANICZENIE: próbka jest uprzednio wyselekcjonowana (${realProvenance.selection}) — to statystyka opisowa realnych pomiarów, nie rekonstrukcja detektora ani odkrycie.` : ''}`
   : 'Masy i szerokości rezonansów są prawdziwe (PDG); metoda — histogram masy niezmienniczej par mionów — jest dokładnie tą, którą odkryto J/ψ i Z⁰. Dane ZDARZEŃ w tym wdrożeniu są SYNTETYCZNE: generator losuje masy wokół tych rezonansów (rozkład Breit–Wignera) plus tło kombinatoryczne, wzorowane na kształcie widm CMS — to NIE są prawdziwe zderzenia. Punkt podpięcia realnych danych CERN Open Data (CC0, domena publiczna) istnieje w kodzie (`core/dataSource.ts`, `scripts/fetch-real-data.mjs`), ale nie jest dziś aktywny w tym wdrożeniu — sieć budowania nie miała dostępu do opendata.cern.ch (patrz README „Znane ograniczenia").';
 
 class InvMassSim implements Sim {

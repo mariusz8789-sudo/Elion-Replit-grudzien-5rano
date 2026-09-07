@@ -57,6 +57,7 @@ export const RAINFALL_EVENT_TYPE = 'environment.rainfall.extreme';
 export const PUMP_TRIPPED_EVENT_TYPE = 'hydraulics.pumppipe.tripped';
 export const HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE = 'building.waterservice.interrupted';
 export const POPULATION_ACCESS_IMPAIRED_EVENT_TYPE = 'population.hospitalaccess.impaired';
+export const LAB_COOLING_LOST_EVENT_TYPE = 'chemistry.lab.coolinglost';
 
 /**
  * Engineering-judgment threshold (not a measured pipe rating) — the real
@@ -74,6 +75,46 @@ const PUMP_OVERLOAD_HEAD_LOSS_THRESHOLD_M = 100;
  * pump fails" fork (City Infrastructure Integration 1.0) can reuse the EXACT same real load-increase
  * magnitude this file's own scripted rainfall coupling applies, rather than inventing a second one. */
 export const RAINFALL_LOAD_MULTIPLIER = 4;
+
+/**
+ * How much a hospital's loss of water service raises the population's R0
+ * while the outage lasts.
+ *
+ * MECHANISM (real, not invented): loss of a clean-water supply in a
+ * healthcare facility degrades hand hygiene and infection-prevention
+ * practice, which raises transmission — the standard WASH/IPC rationale for
+ * why water service is treated as infection-control infrastructure. What is
+ * REAL here is that the effect is applied to `r0`, an actual parameter of
+ * the actual RK4 SEIR model (`core/epidemic/sir.ts`, β = R0/D_inf), and
+ * every consequence — the whole infection curve — is then computed by that
+ * unmodified real solver, never written in by hand.
+ *
+ * What is a SCRIPTED ASSUMPTION, disclosed as such: the MAGNITUDE. +20% is
+ * an engineering-judgment figure for this reference scenario, not a measured
+ * or fitted epidemiological estimate — exactly the same honesty tier as
+ * `RAINFALL_LOAD_MULTIPLIER` and `PUMP_OVERLOAD_HEAD_LOSS_THRESHOLD_M`
+ * above, hence the coupling's `PROCEDURAL_APPROXIMATION` grounding.
+ */
+export const HOSPITAL_WATER_OUTAGE_R0_MULTIPLIER = 1.2;
+
+/**
+ * How far a lab sample's temperature drifts up when the pump trip cuts the
+ * cooling-water supply the lab's thermal loop depends on.
+ *
+ * MECHANISM (real): the same pump that feeds the hospital also feeds the
+ * lab's cooling loop; losing it means an actively-cooled sample drifts off
+ * its held setpoint. The CONSEQUENCE is then computed entirely by the real
+ * Arrhenius model (`core/modelGraph/chemistryKineticsGraph.ts`,
+ * k = A·exp(−Eₐ/RT)) — this coupling never touches the reaction rate,
+ * half-life, or concentration itself; it only changes the temperature the
+ * real model then solves at.
+ *
+ * SCRIPTED ASSUMPTION, disclosed: the +40 K drift magnitude is engineering
+ * judgment for this reference scenario, not a measured thermal-loop
+ * response — same tier as the constants above, hence
+ * `PROCEDURAL_APPROXIMATION`.
+ */
+export const LAB_LOST_COOLING_TEMPERATURE_RISE_K = 40;
 
 export interface GenesisScientificCity3Options {
   seed?: number;
@@ -117,6 +158,11 @@ export function buildGenesisScientificCity3Specification(options: GenesisScienti
       { from: { kind: 'pump-pipe-system', id: 'pump-pipe-1' }, to: { kind: 'building', id: 'hospital-building' }, kind: 'feedsInto' },
       { from: { kind: 'environment', id: 'city-environment' }, to: { kind: 'pump-pipe-system', id: 'pump-pipe-1' }, kind: 'loads' },
       { from: { kind: 'building', id: 'hospital-building' }, to: { kind: 'population', id: 'city-1' }, kind: 'affects' },
+      // The same city pump also feeds the chemistry lab's cooling loop — the declared edge the
+      // hydraulics -> chemistry coupling travels over. Resolved in `postGenerate` (see
+      // specification/compiler.ts), so it correctly references the substance LABORATORY_TEMPLATE
+      // only attaches after `generateWorld` runs.
+      { from: { kind: 'pump-pipe-system', id: 'pump-pipe-1' }, to: { kind: 'substance', id: 's1' }, kind: 'cools' },
     ],
     provenanceNote: 'Genesis Scientific City 3.0 — canonical Generative Scientific World Model 2.0 reference world.',
   };
@@ -177,7 +223,8 @@ function pumpOverloadTripRule(pumpPipeId: EntityId): CascadeRule {
   };
 }
 
-function buildCouplings(): readonly CrossDomainCoupling[] {
+/** `baseR0` must be the SAME value the registered SEIR solver runs with (`computeEpidemicParamsFor(specification).r0`) — see `serviceToPopulationAccess` below for why the coupling needs it. */
+function buildCouplings(baseR0: number): readonly CrossDomainCoupling[] {
   const rainfallToLoad = defineCrossDomainCoupling({
     id: 'rainfall-to-hydraulic-load',
     sourceDomain: 'environment',
@@ -227,16 +274,60 @@ function buildCouplings(): readonly CrossDomainCoupling[] {
     direction: 'from',
     condition: 'Hospital building water service interrupted',
     effect:
-      'A real, durable EVENT records the population as having impaired hospital access — deliberately NOT a persisted domainState flag on the population entity: its real RK4-SEIR solver overwrites domainState wholesale every tick (see epidemicSEIR.ts), so any flag stored there would be silently erased on the population\'s own very next solved tick, which would be a more subtle dishonesty than not persisting it at all. The real SEIR compartments (S/E/I/R/D) are never altered by this coupling, and neither is anything else on the entity.',
+      "Raises the population's R0 by HOSPITAL_WATER_OUTAGE_R0_MULTIPLIER for as long as the outage lasts (degraded hand hygiene / infection control without a clean-water supply), and records a durable event. The S/E/I/R/D compartments are NEVER written by this coupling: it moves one real MODEL PARAMETER (`r0`, already this solver's own documented intervention lever), and the unmodified RK4 SEIR solver computes every consequence itself on its next tick.",
     grounding: 'PROCEDURAL_APPROXIMATION',
-    deriveEffect: (_population) => ({
-      patch: {},
-      eventType: POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
-      cause: 'hospital-water-service-interrupted',
-    }),
+    deriveEffect: (population) => {
+      const state = population.domainState ?? {};
+      if (state.r0 !== undefined) return undefined; // outage effect already applied — never compound it
+      return {
+        // `baseR0` is the EXACT parameter the registered SEIR solver is running with (both come from
+        // the same `computeEpidemicParamsFor(specification)` call), so the outage multiplies the real
+        // baseline rather than a guess — and recovery restores it by dropping the override key
+        // entirely, letting the solver fall back to that same baseline with zero drift.
+        patch: { domainState: { ...state, r0: baseR0 * HOSPITAL_WATER_OUTAGE_R0_MULTIPLIER } },
+        eventType: POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
+        cause: 'hospital-water-service-interrupted',
+      };
+    },
   });
 
-  return [rainfallToLoad, tripToHospitalService, serviceToPopulationAccess];
+  /**
+   * FOURTH REAL CONSEQUENCE PATH — hydraulics -> chemistry. The pump that
+   * feeds the hospital also cools the lab; losing it raises the sample's
+   * temperature, and the REAL Arrhenius model then re-solves k/half-life
+   * against that temperature on its own next tick, exactly as the real
+   * hydraulics model re-solves headLoss after the rainfall load increase.
+   * The coupling itself computes no chemistry.
+   */
+  const tripToLabCooling = defineCrossDomainCoupling({
+    id: 'pump-trip-to-lab-cooling',
+    sourceDomain: 'hydraulics',
+    targetDomain: 'chemistry-kinetics',
+    triggerEventType: PUMP_TRIPPED_EVENT_TYPE,
+    relationshipKind: 'cools',
+    direction: 'from',
+    condition: 'Pump-pipe system tripped, cutting the lab cooling loop',
+    effect: "Lab sample drifts LAB_LOST_COOLING_TEMPERATURE_RISE_K above the setpoint the cooling loop was holding; the real Arrhenius kinetics model re-solves the rate constant at that temperature on its own next tick",
+    grounding: 'PROCEDURAL_APPROXIMATION',
+    deriveEffect: (substance) => {
+      const state = substance.domainState ?? {};
+      if (state.coolingLost === 1) return undefined; // already lost — do not drift twice
+      const setpointK = substance.physics?.temperatureK ?? 0;
+      return {
+        patch: {
+          physics: { ...substance.physics, massKg: substance.physics?.massKg ?? 0, temperatureK: setpointK + LAB_LOST_COOLING_TEMPERATURE_RISE_K },
+          // The setpoint the loop was holding, kept so recovery restores the EXACT pre-outage
+          // temperature rather than assuming the drift was the only thing that ever moved it.
+          domainState: { ...state, coolingLost: 1, cooledSetpointK: setpointK },
+          statusLabel: 'Cooling lost (upstream pump trip)',
+        },
+        eventType: LAB_COOLING_LOST_EVENT_TYPE,
+        cause: 'upstream-pump-trip',
+      };
+    },
+  });
+
+  return [rainfallToLoad, tripToHospitalService, serviceToPopulationAccess, tripToLabCooling];
 }
 
 /** Exported so a caller already running this world's engine (e.g. C1's Scientific Director, on a
@@ -300,15 +391,17 @@ export function buildGenesisScientificCity3Updater(
   options: Pick<GenesisScientificCity3Options, 'rainfallAtTick'> = {},
   extras: GenesisScientificCity3UpdaterExtras = {},
 ): TemporalUpdater {
-  const router = makeGenesisCityRouter(computeEpidemicParamsFor(specification));
+  const epidemicParams = computeEpidemicParamsFor(specification);
+  const router = makeGenesisCityRouter(epidemicParams);
   for (const { solverId, solver } of extras.extraSolvers ?? []) router.register(solverId, solver);
   let updater: TemporalUpdater = makeGenesisCityUpdater(router);
   if (options.rainfallAtTick !== undefined) updater = withScheduledEvents(updater, rainfallSchedule(options.rainfallAtTick));
-  const couplings = buildCouplings();
+  const couplings = buildCouplings(epidemicParams.r0);
   updater = withCrossDomainCouplings(updater, [couplings[0]]); // rainfall -> hydraulic load
   updater = withCascades(updater, [pumpOverloadTripRule(GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID)]); // real headLoss -> trip
   updater = withCrossDomainCouplings(updater, [couplings[1]]); // trip -> hospital service
-  updater = withCrossDomainCouplings(updater, [couplings[2]]); // hospital service -> population access
+  updater = withCrossDomainCouplings(updater, [couplings[2]]); // hospital service -> population access (real r0 lever)
+  updater = withCrossDomainCouplings(updater, [couplings[3]]); // trip -> lab cooling loss (real Arrhenius input)
   if (extras.extraCascades?.length) updater = withCascades(updater, extras.extraCascades);
   // ONE coupling per `withCrossDomainCouplings` layer, applied in order — matching this function's
   // own three above exactly. `withCascades`' own "one pass" rule means a single layer holding
@@ -336,7 +429,7 @@ export function buildGenesisScientificCity3(options: GenesisScientificCity3Optio
 
   const pumpPipeId = GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID;
   const updater = buildGenesisScientificCity3Updater(specification, options);
-  const couplings = buildCouplings();
+  const couplings = buildCouplings(computeEpidemicParamsFor(specification).r0);
 
   return {
     specification,

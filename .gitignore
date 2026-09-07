@@ -14,3 +14,7 @@ _dock*/
 # Delivery archive and local Chromium capture helpers are generated outside the source review path.
 artifacts/*.zip
 artifacts/*.mjs
+
+# Python bytecode from compute workers (packages/backend/src/compute/*.py)
+__pycache__/
+*.pyc

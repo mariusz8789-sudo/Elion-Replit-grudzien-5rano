@@ -84,17 +84,22 @@ describe('EpidemicCity3DSim — Visual World Build 1.0-3.0 performance audit', (
     // (`flushWindowInstances()`) instead. That is a REAL fix, not a tuning tweak, and it moved both
     // numbers below: total draw-call-equivalents dropped from ~1293 to ~865 (Node CPU-side count).
     //
-    // The extras' OWN share of the total rose as a side effect (from ~12.6% to ~18.8%) purely because
-    // the DENOMINATOR shrank — this session's kit additions (buildings/street/vehicle/water/signage/
-    // electrical) are still the exact same ~163 objects as before, not a growing cost. The threshold
-    // below is recalibrated to that real new baseline, not loosened to hide a regression: it still
-    // fails if extras' absolute contribution grows disproportionately to the (now smaller) total.
+    // GRAPHICS V2 SPRINT F+ UPDATE: `createContextBuilding()`'s remaining roof/roofUnit/plinth/cornice
+    // — identical in appearance across every context building — now also bake into a handful of
+    // InstancedMeshes (`flushContextStructuralInstances()`). Total draw-call-equivalents dropped
+    // again, ~865 to ~809 (Node CPU-side); the real Chromium measurement for `#/city3d` moved
+    // 1634 -> 1527 draw calls (see PERFORMANCE_BUDGET.md §3).
+    //
+    // The extras' OWN share of the total rose again as a side effect (now ~20%) purely because the
+    // DENOMINATOR shrank further — the extras' absolute count is still the same ~163 objects, not a
+    // growing cost. Thresholds recalibrated to the real new baseline, not loosened to hide anything:
+    // both still fail if either number regresses toward the old un-instanced pattern.
     expect(initMs).toBeLessThan(500); // scene construction should stay well under half a second
-    expect(totalDrawCallEquivalent).toBeLessThan(1200);
+    expect(totalDrawCallEquivalent).toBeLessThan(950);
     // The new kits (buildings/street/vehicle/water/signage/electrical extras) must stay a MINORITY
     // contributor to the scene's total draw-call budget — most of the cost is (and should remain)
     // the pre-existing hand-tuned city/building/street renderer, not this session's additive layer.
-    expect(extrasDrawCallEquivalent / totalDrawCallEquivalent).toBeLessThan(0.25);
+    expect(extrasDrawCallEquivalent / totalDrawCallEquivalent).toBeLessThan(0.28);
   });
 
   it('the tree/ground-clutter vegetation additions stay instanced (2 draw calls per field, not one Mesh per tree)', () => {
@@ -148,5 +153,32 @@ describe('EpidemicCity3DSim — Visual World Build 1.0-3.0 performance audit', (
       if (p && Math.abs(p.height - 0.115) < 1e-6 && Math.abs(p.depth - 0.024) < 1e-6) strayWindowMeshes++;
     });
     expect(strayWindowMeshes).toBe(0);
+  });
+
+  it('GRAPHICS V2 SPRINT F+ REGRESSION: context-building roof/roofUnit/plinth/cornice are instanced, never one Mesh set per building', () => {
+    const { scene } = buildScene();
+    const structuralGroup = scene.getObjectByName('genesis-city-context-structural-instances');
+    expect(structuralGroup).toBeDefined();
+
+    // Up to 4 InstancedMeshes (roofs, roof-units, plinths, cornices) — never more, and never a
+    // plain Mesh sitting alongside them (that would mean a building fell back to the old
+    // one-Mesh-per-building-per-element pattern this sprint removed).
+    let instanced = 0;
+    let plainMesh = 0;
+    structuralGroup!.traverse((n) => {
+      if ((n as THREE.InstancedMesh).isInstancedMesh) instanced++;
+      else if ((n as THREE.Mesh).isMesh) plainMesh++;
+    });
+    expect(instanced).toBeGreaterThan(0);
+    expect(instanced).toBeLessThanOrEqual(4);
+    expect(plainMesh).toBe(0);
+
+    // Real density: dozens of context buildings each contribute a roof and a plinth/cornice.
+    let totalStructuralInstances = 0;
+    structuralGroup!.traverse((n) => {
+      const inst = n as THREE.InstancedMesh;
+      if (inst.isInstancedMesh) totalStructuralInstances += inst.count;
+    });
+    expect(totalStructuralInstances).toBeGreaterThanOrEqual(60);
   });
 });

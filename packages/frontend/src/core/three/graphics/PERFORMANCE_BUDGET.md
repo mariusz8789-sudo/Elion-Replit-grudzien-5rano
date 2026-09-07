@@ -43,7 +43,8 @@ Measured in headless Chromium via the city screen's own observability panel, whi
 | Scene | Draw calls | Triangles | Render time |
 |---|---|---|---|
 | `#/city3d` (flagship epidemic city) — before Sprint C-1 | 2028 | 610 586 | 13.8 ms |
-| `#/city3d` (flagship epidemic city) — after Sprint C-1 | **1634** | **616 130** | 133.4 ms* |
+| `#/city3d` (flagship epidemic city) — after Sprint C-1 | 1634 | 616 130 | 133.4 ms* |
+| `#/city3d` (flagship epidemic city) — after Sprint F+ | **1527** | **616 190** | 40.6 ms* |
 
 **GRAPHICS V2 SPRINT C-1**: `epidemicCity3D.ts`'s hand-rolled `createBuilding()` and
 `createContextBuilding()` used to emit one `Mesh` per window pane — the exact dominant cost this
@@ -55,12 +56,24 @@ shared emissive intensity). Real, headless-Chromium-measured result: **2028 → 
 real reduction)**, triangle count effectively unchanged (a slight rise from instancing's shared unit-box
 geometry vs. the old per-window boxes' exact dimensions is expected and immaterial).
 
-**`#/city3d` is still over the 1500 draw-call ceiling (by ~9%), and this is reported honestly, not
-hidden.** The windows were the single largest identified cost and are now fixed; the remaining gap is
-spread across the ~44 remaining non-window `Mesh` call sites in `createBuilding()`/`createContextBuilding()`
-(walls, roofs, side bands, base plinths — one per building, not one per repeated sub-element), which
-would need a deeper per-building-structure instancing pass to close further. That is scoped as
-follow-up work (Sprint F+), not silently dropped.
+**GRAPHICS V2 SPRINT F+**: closed most of the remaining gap Sprint C-1 named above. Of
+`createContextBuilding()`'s non-window structural meshes (roof/roofUnit/plinth/cornice), three were
+IDENTICAL in appearance across every context building — fixed hardcoded colors, transform-only
+variation — and one (`roof`) varied only by a 4-entry fixed palette; none needed to be a fresh
+`Mesh`+`Material` pair per building. All four now bake into a handful of city-wide `InstancedMesh`es
+(`flushContextStructuralInstances()`, same technique as the windows), leaving only `body` (the wall)
+as a real per-building `Mesh` — the one element that genuinely needs it, since each wall bakes a real
+per-building color tint into a cloned base material. Real result: **1634 → 1527 draw calls (-6.5%
+further real reduction; -24.7% from the original 2028)**.
+
+**`#/city3d` is still (barely) over the 1500 draw-call ceiling — by 27 draw calls, ~1.8% — and this
+is reported honestly, not rounded away.** The remaining gap is now `createBuilding()`'s own
+non-window per-real-building elements (plinth/groundGlass/entryCanopy/roof/door/frame/balcony/etc,
+~28 real buildings) plus the ~260 live agent markers the Node-CPU-side count above doesn't include at
+all (no agent stepping in that harness) — a different, riskier optimization surface (per-frame status
+color, unlike this sprint's fixed-appearance trim) than what Sprint C-1/F+ could safely close in the
+time available. Left as a named, scoped follow-up rather than force-instancing something that still
+needs real per-instance animation.
 
 *The render-ms figure in the "after" row is not comparable to the "before" row's 13.8 ms — see the
 caveat below; both are software-rasterizer figures and neither should be read as a real-GPU number, but
@@ -85,12 +98,13 @@ Every graphics sprint from Sprint B onward reports, for at least one representat
 
 ```
                 BEFORE      AFTER     BUDGET    VERDICT
-draw calls        2028       1634      1500     OVER (was +35%, now +9%; real -19.4% reduction)
-triangles       610586      616130    900000    UNDER
-render ms         13.8      133.4*       33     (sandbox-software-raster, indicative only)
+draw calls        2028       1527      1500     OVER (was +35%, now +1.8%; real -24.7% total reduction)
+triangles       610586      616190    900000    UNDER
+render ms         13.8       40.6*        33     (sandbox-software-raster, indicative only)
 ```
 
-(Sprint C-1's real measured result — see §3 above for the full writeup and the render-ms caveat.)
+(Sprint C-1 + Sprint F+'s combined real measured result — see §3 above for the full writeup and the
+render-ms caveat.)
 
 Rules:
 - **A regression in draw calls or triangles must be justified in the same report**, with the visual

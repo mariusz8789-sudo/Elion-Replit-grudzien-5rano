@@ -13,6 +13,7 @@ import type { WorldSpecification } from '../specification/worldSpecification';
 import type { DomainSolver } from '../solvers/solverRouter';
 import type { TemporalUpdater } from '../temporal/temporalEngine';
 import { makeGenesisCityRouter, makeGenesisCityUpdater } from './genesisCityWorld';
+import { bindEnvironmentToRainfallRunoff, rationalMethodPeakRunoffM3S, RAINFALL_CATCHMENT_DEFAULTS } from './rainfallRunoff';
 
 /**
  * GENESIS SCIENTIFIC CITY 3.0 — the canonical Generative Scientific World
@@ -70,11 +71,44 @@ export const LAB_COOLING_LOST_EVENT_TYPE = 'chemistry.lab.coolinglost';
  * the latter (a real trip once rainfall raises the load).
  */
 const PUMP_OVERLOAD_HEAD_LOSS_THRESHOLD_M = 100;
-/** Scripted assumption for how much an "extreme rainfall" scenario raises inflow demand — not
- * derived from any real hydrology model. Exported so a caller driving an on-demand "what if the
- * pump fails" fork (City Infrastructure Integration 1.0) can reuse the EXACT same real load-increase
- * magnitude this file's own scripted rainfall coupling applies, rather than inventing a second one. */
-export const RAINFALL_LOAD_MULTIPLIER = 4;
+/**
+ * The intensity the flagship "extreme rainfall" scenario runs at, in mm/h.
+ *
+ * 80 mm/h is a violent-rain rate (the conventional band starts at 50 mm/h) —
+ * a severe but entirely real short-duration urban storm intensity, not an
+ * arbitrary dial. It is the number the scenario event has always carried in
+ * `parameters.intensityMmPerHour`; as of Phase 5 it is also the number that
+ * actually drives the load, rather than decoration beside a hardcoded ×4.
+ */
+export const FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR = 80;
+
+/**
+ * Total pump inflow under rainfall: baseline demand plus the stormwater runoff
+ * the REAL rational method computes for this city's drainage sub-catchment
+ * (`rainfallRunoff.ts` — Q = C·i·A, with the catchment's own tabulated area and
+ * runoff coefficient).
+ *
+ * This replaces the former `RAINFALL_LOAD_MULTIPLIER = 4`. The difference is not
+ * cosmetic: the multiplier made every storm identical, so the scenario's own
+ * intensity parameter was inert and "what if the rain were lighter" had no
+ * answer. Now intensity propagates into the real Darcy-Weisbach model, and
+ * whether the pump trips is decided by the resulting head loss. It happens to
+ * trip at about 18.3 mm/h for this catchment and this pipe — an emergent
+ * crossing of the overload threshold, not a scripted outcome. At the flagship
+ * 80 mm/h the total is ~0.201 m³/s (≈4× baseline, so the reference cascade is
+ * preserved) and head loss is ~555 m, far above the 100 m trip threshold.
+ *
+ * Exported so a caller driving an on-demand "what if the pump fails" fork
+ * reuses the EXACT same real loading this file's own rainfall coupling applies,
+ * rather than inventing a second one.
+ */
+export function rainfallLoadedPumpFlowM3S(intensityMmPerHour: number, baselineFlowM3S: number = PUMP_PIPE_DEFAULTS.volumetricFlow): number {
+  return baselineFlowM3S + rationalMethodPeakRunoffM3S(
+    intensityMmPerHour,
+    RAINFALL_CATCHMENT_DEFAULTS.catchmentAreaM2,
+    RAINFALL_CATCHMENT_DEFAULTS.runoffCoefficient,
+  );
+}
 
 /**
  * How much a hospital's loss of water service raises the population's R0
@@ -232,13 +266,23 @@ function buildCouplings(baseR0: number): readonly CrossDomainCoupling[] {
     triggerEventType: RAINFALL_EVENT_TYPE,
     relationshipKind: 'loads',
     direction: 'from',
-    condition: 'Scripted extreme-rainfall scenario begins',
-    effect: "Pump-pipe system's volumetric-flow demand rises; the real hydraulics model re-solves headLoss/shaftPower on its own next tick",
-    grounding: 'PROCEDURAL_APPROXIMATION',
-    deriveEffect: (pumpPipe) => {
+    condition: 'Extreme-rainfall scenario begins, at the intensity the event itself carries',
+    effect: "Stormwater runoff computed from that intensity by the rational method (Q = C*i*A) is added to the pump-pipe system's inflow; the real hydraulics model re-solves headLoss/shaftPower on its own next tick",
+    // Upgraded from PROCEDURAL_APPROXIMATION in Phase 5. The load is no longer a
+    // scripted multiplier: it is a standard hydrological method evaluated on the
+    // scenario's real intensity. MODEL_ESTIMATE, not exact — the catchment area
+    // and runoff coefficient are typical tabulated values, not site survey data
+    // (see `rainfallRunoff.ts` for the full limitation list).
+    grounding: 'MODEL_ESTIMATE',
+    deriveEffect: (pumpPipe, triggerEvent) => {
+      // Phase 5: the event's OWN intensity now drives the load. Previously this
+      // read a fixed multiplier and the `intensityMmPerHour` parameter was inert.
+      const intensityMmPerHour = typeof triggerEvent.parameters.intensityMmPerHour === 'number'
+        ? triggerEvent.parameters.intensityMmPerHour
+        : FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR;
       const currentFlow = pumpPipe.domainState?.volumetricFlow ?? PUMP_PIPE_DEFAULTS.volumetricFlow;
       return {
-        patch: { domainState: { ...pumpPipe.domainState, volumetricFlow: currentFlow * RAINFALL_LOAD_MULTIPLIER } },
+        patch: { domainState: { ...pumpPipe.domainState, volumetricFlow: rainfallLoadedPumpFlowM3S(intensityMmPerHour, currentFlow) } },
         eventType: 'hydraulics.pumppipe.loadincrease',
         cause: 'extreme-rainfall-loading',
       };
@@ -361,6 +405,9 @@ export function rainfallSchedule(atTick: number): readonly ScheduledEvent[] {
 /** The `pump-pipe-system:pump-pipe-1` id `WATER_SYSTEM_TEMPLATE` always produces for this specification — independent of the PLANET/REGION wrap, so it's the same id whether a graph came from this module's manual pipeline or the generic `generateSpecifiedWorld` path (see `genesisScientificCity4.ts`). */
 export const GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID: EntityId = 'pump-pipe-system:pump-pipe-1';
 
+/** The `environment:city-environment` id `CITY_TEMPLATE` always produces for this specification — the node Phase 5 binds to the real rational-method runoff solver. Same id on both the manual and the Trinity construction path. */
+export const GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID: EntityId = 'environment:city-environment';
+
 /**
  * Extension point for a CALLER-SPECIFIC layer on top of this scenario's own
  * three couplings — e.g. `genesisScientificCity4.ts`'s real backup-
@@ -420,6 +467,9 @@ export function buildGenesisScientificCity3(options: GenesisScientificCity3Optio
   const wrapped = wrapUnderPlanetAndRegion(compiled.blueprint, 'earth', 'r1');
   const generated = generateWorld(wrapped);
   for (const step of compiled.postGenerate) step(generated.graph);
+  // Phase 5: turn the template's inert environmental-context node into a really-solved
+  // catchment. At construction time, so it is genuine tick-0 state that `scrubTo` replays.
+  bindEnvironmentToRainfallRunoff(generated.graph, GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID);
 
   const invariants = validateWorldInvariants(generated.graph);
   if (!invariants.ok) {
@@ -448,6 +498,6 @@ export function buildGenesisScientificCity3(options: GenesisScientificCity3Optio
     substanceId: 'substance:s1',
     waterSystemBuildingId: 'building:water-system-building',
     pumpPipeId,
-    environmentId: 'environment:city-environment',
+    environmentId: GENESIS_SCIENTIFIC_CITY_ENVIRONMENT_ID,
   };
 }

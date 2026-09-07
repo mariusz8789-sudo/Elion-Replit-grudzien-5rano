@@ -12,6 +12,7 @@ import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
 import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
 import { DROUGHT_SOLVER_ID } from '../domains/drought';
 import { WILDFIRE_SPREAD_SOLVER_ID } from '../domains/wildfireSpread';
+import { LANDSLIDE_SOLVER_ID } from '../domains/landslide';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -204,7 +205,11 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   TSUNAMI: notModelled(noHazardModel('wave generation and inundation')),
   HURRICANE: notModelled(noHazardModel('tropical cyclone wind and storm surge')),
   TORNADO: notModelled(noHazardModel('tornado wind field')),
-  LANDSLIDE: notModelled(noHazardModel('slope stability and runout')),
+  LANDSLIDE: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: LANDSLIDE_SOLVER_ID,
+    caveat: 'Slope stability is real: the standard infinite-slope factor of safety (Skempton & DeLory 1957) evaluated per cell from the REAL terrain heightfield\'s own D8 steepest-descent slope, including the standard pore-pressure term, so saturating the soil really can push a slope across FS=1. Runout is real too, and physically derived rather than curve-fitted: a sliding-block Coulomb energy balance, d(v^2)=2g(dz-mu*dx), traced downhill from every unstable cell, carrying its momentum across the depositional flat and stopping where its kinetic energy is exhausted (the general, terrain-following case of the classic angle-of-reach/Fahrboschung method). A path that leaves the modelled grid still moving is reported as truncated rather than counted as a real stopping distance. Still NOT modelled: debris-flow rheology and mass deformation (the runout mass is a rigid POINT under Coulomb friction — no Voellmy turbulent drag, no Bingham viscoplastic yield stress, no erosion/entrainment along the path, no bulking, no deposition profile, no debris-fan width; what it traces is a centreline with a velocity, never a flow extent or impact pressure), time-dependent triggering (FS is evaluated once from stated conditions — no rainfall-infiltration or seismic loading over time), and any measured geotechnical data: cohesion, friction angle, unit weight, failure-plane depth and saturation are literature-typical stated inputs, not a site investigation. Terrain grounding follows the same rule as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.',
+  },
   VOLCANIC: notModelled(noHazardModel('eruption, ashfall and flow')),
   DROUGHT: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,

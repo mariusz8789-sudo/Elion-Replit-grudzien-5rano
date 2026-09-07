@@ -109,6 +109,9 @@ export class EpidemicCity3DSim implements Sim3D {
   private THREE: typeof THREE_NS | null = null;
   private camera: THREE_NS.PerspectiveCamera | null = null;
   private scene: THREE_NS.Scene | null = null;
+  /** GRAPHICS V6 — kept so `getStats()` can read `getGpuMemoryEstimate()` (`webgl_gpu_bytes_estimate`),
+   * the same convention `genesisScientificCitySim.ts` already established for its own pipeline field. */
+  private pipeline: GraphicsPipeline | null = null;
   private raycaster: THREE_NS.Raycaster | null = null;
   private viewport = { w: 1, h: 1 };
   private timeSeconds = 0;
@@ -556,6 +559,7 @@ export class EpidemicCity3DSim implements Sim3D {
       bloom: { strength: 0.20, radius: 0.46, threshold: 0.90 },
       ambient: { mode: 'none' },
     });
+    this.pipeline = pipeline;
     return pipeline;
   }
 
@@ -701,6 +705,10 @@ export class EpidemicCity3DSim implements Sim3D {
       // GRAPHICS V3 — real estimated bytes (see diagnostics.ts's estimateSceneTextureMemory),
       // closing PERFORMANCE_BUDGET.md §6's "texture memory is currently unmeasured" gap.
       webgl_texture_bytes_estimate: this.renderMetrics.textureBytesEstimate,
+      // GRAPHICS V6 — the rest of §6's "total GPU memory" gap: geometry (exact) + this pipeline's
+      // own render targets (see diagnostics.ts's estimateSceneGpuMemory for exactly what's covered).
+      webgl_geometry_bytes_estimate: this.pipeline?.getGpuMemoryEstimate().geometryBytes ?? 0,
+      webgl_gpu_bytes_estimate: this.pipeline?.getGpuMemoryEstimate().totalBytes ?? 0,
     };
   }
 

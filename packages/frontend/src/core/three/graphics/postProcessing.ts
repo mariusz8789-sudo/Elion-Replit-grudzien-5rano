@@ -2,7 +2,7 @@ import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor } from '../types';
 import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
 import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment, type RoomEnvironmentProbeOptions } from './lighting';
-import { readFrameCounters, type FrameCounters } from './diagnostics';
+import { readFrameCounters, estimateSceneGpuMemory, type FrameCounters, type SceneGpuMemoryEstimate } from './diagnostics';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Screen-Space Reflections (investigation + opt-in pass)
@@ -229,6 +229,16 @@ export interface GraphicsPipeline extends PostProcessor {
    * claim; see `diagnostics.ts`'s own module doc for what is and isn't verified here.
    */
   getFrameCounters(): FrameCounters;
+  /**
+   * GRAPHICS V6 — the combined GPU-memory estimate `PERFORMANCE_BUDGET.md` §2's "Total GPU memory"
+   * row names: texture bytes (GRAPHICS V3) + geometry bytes + this pipeline's OWN two `EffectComposer`
+   * ping-pong render targets. See `diagnostics.ts`'s `estimateRenderTargetMemory` for exactly which
+   * render targets this does and does not cover (each individual `Pass`'s own internal targets —
+   * bloom's downsample chain, GTAO's, SSR's, Bokeh's — are named but deliberately not sized; see that
+   * function's own doc for why). Like `getFrameCounters`, this is a real scene-graph walk, not free —
+   * sample it on an interval (a diagnostics panel), not every frame.
+   */
+  getGpuMemoryEstimate(): SceneGpuMemoryEstimate;
 }
 
 export function setupGraphicsPipeline(
@@ -338,6 +348,7 @@ export function setupGraphicsPipeline(
       if (dof) dof.enabled = enabled;
     },
     getFrameCounters: () => readFrameCounters(renderer),
+    getGpuMemoryEstimate: () => estimateSceneGpuMemory(scene, [composer.renderTarget1, composer.renderTarget2]),
     // Resource-lifecycle audit finding: `EffectComposer.dispose()` only frees its OWN two ping-pong
     // render targets and copy pass — it does not iterate `this.passes` and dispose each one (see
     // three.js's own EffectComposer source). Every pass that owns GPU resources must be disposed

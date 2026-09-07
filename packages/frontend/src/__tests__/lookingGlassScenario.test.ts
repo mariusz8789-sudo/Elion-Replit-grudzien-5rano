@@ -125,6 +125,17 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(blackout.notModelled.join(' ')).toMatch(/real power-grid model exists/i);
   });
 
+  it('same honesty for transport disruption and evacuation, now that C3 Phase 10 shipped a real traffic-flow solver', () => {
+    const transport = resolveScenarioRequest(parseScenarioRequest('Pokaż zakłócenie transportu w tym mieście przez 24 godziny'));
+    expect(transport.status).toBe('NOT_MODELLED');
+    expect(transport.notModelled.join(' ')).toMatch(/real traffic-flow model exists/i);
+    expect(transport.notModelled.join(' ')).toMatch(/no standalone Looking Glass binding/i);
+
+    const evacuation = resolveScenarioRequest(parseScenarioRequest('Pokaż ewakuację w tym mieście przez 24 godziny'));
+    expect(evacuation.status).toBe('NOT_MODELLED');
+    expect(evacuation.notModelled.join(' ')).toMatch(/same real traffic-flow model/i);
+  });
+
   it('refuses a century of urban change, which parses perfectly', () => {
     const resolution = resolveScenarioRequest(parseScenarioRequest('Show this city over the next 100 years from a bench'));
     expect(resolution.status).toBe('NOT_MODELLED');

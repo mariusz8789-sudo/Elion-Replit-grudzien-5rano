@@ -303,6 +303,26 @@ describe('scienceChat: uczciwe TODO dla niegotowych funkcji', () => {
   });
 });
 
+describe('scienceChat: Molecule Lab entry point (GRAPHICS V4)', () => {
+  beforeEach(() => { _resetRecipes(); registerCatalog(); });
+
+  it('"pokaż molekułę" -> otwiera #/molecule, nigdy starego registerLab()', () => {
+    const r = resolveCommand('pokaż molekułę', null);
+    expect(r.intent).toBe('OPEN_SIMULATION');
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/molecule' });
+  });
+
+  it('"otwórz laboratorium" -> #/molecule, nie zostaje pochłonięte przez generyczne "otwórz zjawisko"', () => {
+    const r = resolveCommand('otwórz laboratorium', null);
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/molecule' });
+  });
+
+  it('działa też z otwartą symulacją w kontekście (nie wymaga braku ctx)', () => {
+    const r = resolveCommand('pokaż molekułę 3D', ctx());
+    expect(r.action).toEqual({ type: 'openRoute', hash: '#/molecule' });
+  });
+});
+
 describe('scienceChat: Evidence / Replay entry point', () => {
   beforeEach(() => { _resetRecipes(); registerCatalog(); });
 

@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { runTunnelingScenario } from '../../quantum/tunnelingRunner';
 import type { Observation } from '../../world/scientificWorldState';
@@ -164,7 +164,6 @@ function makeScenarioCache() {
   };
 }
 
-let stepCounter = 0;
 
 /** One reusable solver over the real split-step Fourier integrator. Each entity carries its own experiment parameters in `domainState`. */
 export function makeQuantumTunnelingSolver(): DomainSolver {
@@ -185,7 +184,6 @@ export function makeQuantumTunnelingSolver(): DomainSolver {
     // Rule 3's preferred machine-readable channel: the discrete regime as a number, alongside the
     // continuous `transmission` it is derived from.
     const domainState = { ...nextParams, tunnelingStateCode: QUANTUM_TUNNELING_STATE_CODE[junctionState] };
-    stepCounter += 1;
     const paramsHash = fnv1a(canonicalJson({ energy, barrier, width, frames, entityId: entity.id }));
 
     const observation: Observation = {
@@ -200,15 +198,16 @@ export function makeQuantumTunnelingSolver(): DomainSolver {
       provenance: ['core/quantum/tunnelingRunner.ts', 'split-step-fourier', `finite-evolution-frames:${frames}`],
     };
 
+    const eventParameters = { ...nextParams };
     const stepEvent: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `qtun-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('qtun-evt', entity.id, ctx.tick, eventParameters),
       type: QUANTUM_TUNNELING_STEP_EVENT_TYPE,
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'bounded-tdse-evaluation',
-      parameters: { ...nextParams },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: QUANTUM_TUNNELING_SOLVER_ID, paramsHash },
     };
 

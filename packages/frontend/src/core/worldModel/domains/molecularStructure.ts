@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
@@ -384,7 +384,6 @@ export async function materialiseMoleculeIntoGraph(
   return { ok: true, atomIds: applyMoleculeGeometry(graph, moleculeId, result.data) };
 }
 
-let stepCounter = 0;
 
 /**
  * The SYNCHRONOUS per-tick solver. It publishes what is already known and
@@ -402,7 +401,6 @@ export function makeMolecularStructureSolver(): DomainSolver {
     const stateCode = state.stateCode ?? MOLECULE_STATE_CODE.NOT_MATERIALISED;
     const materialised = stateCode === MOLECULE_STATE_CODE.MATERIALISED;
 
-    stepCounter += 1;
     const observation: Observation = {
       observationId: `mol-obs:${entity.id}:${ctx.tick}`,
       tick: ctx.tick,
@@ -413,15 +411,16 @@ export function makeMolecularStructureSolver(): DomainSolver {
       provenance: ['compute/rdkit_worker.py', 'rdkit-etkdgv3-mmff', `seed:${state.seed ?? 0}`],
     };
 
+    const eventParameters = { ...state };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `mol-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('mol-evt', entity.id, ctx.tick, eventParameters),
       type: 'molecular.structure.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'static-conformer-republish',
-      parameters: { ...state },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: MOLECULAR_STRUCTURE_SOLVER_ID, paramsHash: fnv1a(canonicalJson({ id: entity.id, seed: state.seed })) },
     };
 

@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { SCHWARZSCHILD_CRITICAL_IMPACT, stepSchwarzschildGeodesic } from '../../physics';
 import type { Observation } from '../../world/scientificWorldState';
@@ -165,7 +165,6 @@ export function launchGeodesicState(impactParameterRatio: number): { inverseRadi
   };
 }
 
-let stepCounter = 0;
 
 /**
  * One RK4 step of the real null-geodesic equation per tick. A photon that
@@ -212,7 +211,6 @@ export function makeRelativityGeodesicSolver(): DomainSolver {
     const worldRadius = radiusRs * state.worldUnitsPerSchwarzschildRadius;
     const position = { x: worldRadius * Math.cos(azimuthRad), y: 0, z: worldRadius * Math.sin(azimuthRad) };
 
-    stepCounter += 1;
     const observation: Observation = {
       observationId: `geo-obs:${entity.id}:${ctx.tick}`,
       tick: ctx.tick,
@@ -225,15 +223,16 @@ export function makeRelativityGeodesicSolver(): DomainSolver {
       provenance: ['core/physics.ts', 'schwarzschild-null-geodesic', `test-particle-geometric-units-rs:${SCHWARZSCHILD_RADIUS_INTEGRATOR_UNITS}`],
     };
 
+    const eventParameters = { ...next };
     const stepEvent: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `geo-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('geo-evt', entity.id, ctx.tick, eventParameters),
       type: GEODESIC_STEP_EVENT_TYPE,
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'null-geodesic-rk4-step',
-      parameters: { ...next },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: RELATIVITY_GEODESIC_SOLVER_ID, paramsHash: fnv1a(canonicalJson({ impactParameterRatio: state.impactParameterRatio, entityId: entity.id })) },
     };
 

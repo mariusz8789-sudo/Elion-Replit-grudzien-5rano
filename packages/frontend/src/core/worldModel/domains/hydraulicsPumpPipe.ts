@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { buildPumpPipeModel, PUMP_PIPE_DEFAULTS, type PumpPipeDefaults } from '../../engineeringGraph/pumpPipe';
 import { provenanceRank, type Provenance } from '../../engineeringGraph/provenance';
@@ -49,7 +49,6 @@ function provenanceToGrounding(p: Provenance): GroundingLevel {
   }
 }
 
-let stepCounter = 0;
 
 /**
  * One reusable solver bound to one real `EngineeringModel` instance. Every
@@ -96,7 +95,6 @@ export function makeHydraulicsPumpPipeSolver(): DomainSolver {
       });
     }
 
-    stepCounter += 1;
     const paramsHash = fnv1a(canonicalJson({ params, entityId: entity.id }));
 
     const observation: Observation = {
@@ -107,15 +105,16 @@ export function makeHydraulicsPumpPipeSolver(): DomainSolver {
       provenance: ['core/engineeringGraph/pumpPipe.ts', 'darcy-weisbach', 'swamee-jain'],
     };
 
+    const eventParameters = { ...params, ...outputs };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `hyd-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('hyd-evt', entity.id, ctx.tick, eventParameters),
       type: 'hydraulics.pumppipe.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'steady-state-recompute',
-      parameters: { ...params, ...outputs },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: HYDRAULICS_PUMP_PIPE_SOLVER_ID, paramsHash },
     };
 

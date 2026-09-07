@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { cellAreaM2, type TerrainHeightfield } from './floodInundation';
 import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
@@ -549,7 +549,6 @@ export function groundingForWildfire(terrainSurveyed: number): GroundingLevel {
   return terrainSurveyed === 1 ? 'MODEL_ESTIMATE' : 'PROCEDURAL_APPROXIMATION';
 }
 
-let stepCounter = 0;
 
 /**
  * One solver bound to one precomputed `WildfireSpreadResult` — the MTT
@@ -607,7 +606,6 @@ export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ign
     let burnedCells = 0;
     for (let i = 0; i < result.arrivalTimeS.length; i++) if (result.arrivalTimeS[i] <= elapsedS) burnedCells++;
 
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `wildfire-obs:${entity.id}:${ctx.tick}`,
@@ -622,15 +620,16 @@ export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ign
       provenance: ['domains/wildfireSpread.ts', 'rothermel-1972', 'anderson-1983-elliptical-shape', 'finney-2002-mtt', 'byram-1959', fuelBed.terrain.surveyed ? 'terrain:surveyed' : 'terrain:synthetic'],
     };
 
+    const eventParameters = { elapsedS, burnedAreaM2, burnedCells, headRosMS: result.headRosMS, headFirelineIntensityKWm: result.headFirelineIntensityKWm };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `wildfire-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('wildfire-evt', entity.id, ctx.tick, eventParameters),
       type: 'wildfire.spread.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'minimum-travel-time-level-set-query',
-      parameters: { elapsedS, burnedAreaM2, burnedCells, headRosMS: result.headRosMS, headFirelineIntensityKWm: result.headFirelineIntensityKWm },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: WILDFIRE_SPREAD_SOLVER_ID,

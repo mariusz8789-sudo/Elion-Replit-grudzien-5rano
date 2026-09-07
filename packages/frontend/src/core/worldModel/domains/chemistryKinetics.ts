@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import { canonicalJson, fnv1a } from '../../events/hash';
 import {
   BASELINE_EA_KJ,
@@ -50,7 +50,6 @@ export function describeMolecularState(concentrationFraction: number): string {
   return 'fully decomposed';
 }
 
-let stepCounter = 0;
 
 /**
  * Builds one reusable solver instance backed by one real `ModelGraph`. Every
@@ -80,7 +79,6 @@ export function makeChemistryKineticsSolver(): DomainSolver {
     const nextFraction = previousFraction * Math.exp(-rateConstantPerS * ctx.dt);
     const stateLabel = describeMolecularState(nextFraction);
 
-    stepCounter += 1;
     const paramsHash = fnv1a(canonicalJson({ temperatureK, activationEnergyKJ, preExponentialLog10, dt: ctx.dt, entityId: entity.id }));
 
     const observation: Observation = {
@@ -97,15 +95,16 @@ export function makeChemistryKineticsSolver(): DomainSolver {
       provenance: ['core/modelGraph/chemistryKineticsGraph.ts', 'arrhenius-equation'],
     };
 
+    const eventParameters = { temperatureK, rateConstantPerS, concentrationFraction: nextFraction, dt: ctx.dt };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `chem-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('chem-evt', entity.id, ctx.tick, eventParameters),
       type: 'chemistry.kinetics.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'arrhenius-first-order-decay',
-      parameters: { temperatureK, rateConstantPerS, concentrationFraction: nextFraction, dt: ctx.dt },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: CHEMISTRY_KINETICS_SOLVER_ID, paramsHash },
     };
 

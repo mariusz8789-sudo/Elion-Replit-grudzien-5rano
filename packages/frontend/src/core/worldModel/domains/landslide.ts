@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { cellAreaM2, type TerrainHeightfield } from './floodInundation';
 import { entityId, type EntityId, type GroundingLevel, type WorldModelEntity } from '../ecs/types';
@@ -460,7 +460,6 @@ export function groundingForLandslide(terrainSurveyed: number): GroundingLevel {
   return terrainSurveyed === 1 ? 'MODEL_ESTIMATE' : 'PROCEDURAL_APPROXIMATION';
 }
 
-let stepCounter = 0;
 
 /**
  * One solver bound to one precomputed slope-stability + runout result — like
@@ -483,7 +482,6 @@ export function makeLandslideSolver(terrain: TerrainHeightfield, soil: SoilParam
   const area = runoutAreaM2(runout, terrain, stability);
 
   return (entity, ctx): SolverResult => {
-    stepCounter += 1;
 
     const domainState: LandslideDomainState = {
       unstableCellCount: stability.unstableCellIndices.length,
@@ -510,15 +508,16 @@ export function makeLandslideSolver(terrain: TerrainHeightfield, soil: SoilParam
       provenance: ['domains/landslide.ts', 'skempton-delory-1957-infinite-slope', 'sliding-block-energy-balance', 'd8-steepest-descent', terrain.surveyed ? 'terrain:surveyed' : 'terrain:synthetic'],
     };
 
+    const eventParameters = { ...domainState };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `landslide-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('landslide-evt', entity.id, ctx.tick, eventParameters),
       type: 'landslide.stability.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'infinite-slope-stability-and-sliding-block-runout',
-      parameters: { ...domainState },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: LANDSLIDE_SOLVER_ID,

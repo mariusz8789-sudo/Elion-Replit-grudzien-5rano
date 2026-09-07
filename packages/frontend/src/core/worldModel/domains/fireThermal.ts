@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type GroundingLevel, type WorldModelEntity } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
@@ -418,7 +418,6 @@ function paramsFromState(state: Partial<FireSourceDomainState> | undefined, defa
   return { params, targetDistanceM: state?.targetDistanceM ?? 5 };
 }
 
-let stepCounter = 0;
 
 /**
  * One reusable solver bound to one default fire-source configuration.
@@ -441,7 +440,6 @@ export function makeFireThermalSolver(defaults: FireSourceParams): DomainSolver 
     const fluxKWm2 = pointSourceRadiantFluxKWm2(hrrKW, params.fuel.radiativeFraction, targetDistanceM);
     const phaseCode = firePhaseCode(elapsedS, curve);
 
-    stepCounter += 1;
 
     const domainState: FireSourceDomainState = {
       elapsedS,
@@ -478,15 +476,16 @@ export function makeFireThermalSolver(defaults: FireSourceParams): DomainSolver 
       provenance: ['domains/fireThermal.ts', 'nfpa-921-t-squared-design-fire', 'sfpe-point-source-radiation-model', 'energy-conservation'],
     };
 
+    const eventParameters = { ...domainState };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `fire-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('fire-evt', entity.id, ctx.tick, eventParameters),
       type: 'fire.thermal.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 't-squared-growth-and-point-source-radiation',
-      parameters: { ...domainState },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: FIRE_THERMAL_SOLVER_ID,

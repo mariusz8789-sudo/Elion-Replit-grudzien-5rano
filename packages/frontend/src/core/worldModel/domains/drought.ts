@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
@@ -233,7 +233,6 @@ export function soilMoistureFractionOfCapacity(soilMoistureMm: number, fieldCapa
 
 const SECONDS_PER_DAY = 86400;
 
-let stepCounter = 0;
 
 /**
  * One reusable solver. `dt` is expected in seconds, converted to days
@@ -259,7 +258,6 @@ export function makeDroughtWaterBalanceSolver(): DomainSolver {
 
     const kbdiEquivalent = kbdiEquivalentFromDeficitMm(soilStorageDeficitMm(step.soilMoistureMm, params.fieldCapacityMm));
 
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `drought-obs:${entity.id}:${ctx.tick}`,
@@ -275,15 +273,16 @@ export function makeDroughtWaterBalanceSolver(): DomainSolver {
       provenance: ['domains/drought.ts', 'thornthwaite-mather-1955', 'fao-56-typical-pet'],
     };
 
+    const eventParameters = { ...params, soilMoistureMm: step.soilMoistureMm, actualEvapotranspirationMmPerDay: step.actualEvapotranspirationMmPerDay, runoffMm: step.runoffMm, severityCode, kbdiEquivalent, cumulativeMoistureDeficitMm };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `drought-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('drought-evt', entity.id, ctx.tick, eventParameters),
       type: 'environment.drought.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'thornthwaite-mather-water-balance-step',
-      parameters: { ...params, soilMoistureMm: step.soilMoistureMm, actualEvapotranspirationMmPerDay: step.actualEvapotranspirationMmPerDay, runoffMm: step.runoffMm, severityCode, kbdiEquivalent, cumulativeMoistureDeficitMm },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: DROUGHT_SOLVER_ID,

@@ -76,7 +76,34 @@ describe('Counterfactual branching with real solver execution', () => {
 
     expect(runA.journal.allEvents()).toHaveLength(4);
     expect(runB.journal.allEvents()).toHaveLength(4);
-    // Each branch's own post-fork event is its own — different ids.
-    expect(runA.journal.allEvents()[3].id).not.toBe(runB.journal.allEvents()[3].id);
+    // This fork declared NO divergence (`() => {}`), so both branches ran the same solver over the
+    // same state and produced the same event content. Event ids are content-derived
+    // (`deterministicEventId`), so identical content means identical identity — the two journals
+    // each hold their own event, and those events are equal because they really are the same step.
+    expect(runA.journal.allEvents()[3]).toEqual(runB.journal.allEvents()[3]);
+  });
+
+  it('once a fork actually diverges, its events get different ids — identity follows content, not run order', () => {
+    const world = buildChemistryExperimentWorld({ initialTemperatureK: 800 });
+    const registry = new TemporalBranchRegistry();
+    const runA = new TemporalEngine(world.graph, { registry });
+    const router = new SolverRouter();
+    router.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
+    const step: TemporalUpdater = (g, dt, tick) => router.routeTick(g, dt, tick);
+
+    for (let hour = 0; hour < 3; hour++) runA.advance(3600, step);
+    // A REAL declared divergence: the counterfactual branch runs colder.
+    const runB = runA.forkBranch(3, 'cooled', (g) => {
+      const substance = g.getEntity(world.substanceId);
+      g.updateEntity(world.substanceId, { physics: { ...substance.physics!, temperatureK: 300 } }, 3);
+    });
+
+    runA.advance(3600, step);
+    runB.advance(3600, step);
+
+    const eventA = runA.journal.allEvents()[3];
+    const eventB = runB.journal.allEvents()[3];
+    expect(eventA.id).not.toBe(eventB.id); // different physics, therefore different identity
+    expect(eventA.parameters.temperatureK).not.toBe(eventB.parameters.temperatureK);
   });
 });

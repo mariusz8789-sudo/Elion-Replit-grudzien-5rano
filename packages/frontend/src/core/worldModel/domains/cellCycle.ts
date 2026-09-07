@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
 import type { WorldGraph } from '../ecs/worldGraph';
@@ -175,7 +175,6 @@ export function rk4CellCycleStep(state: Phases, params: CellCycleParams, dtHours
   return { g1: Math.max(0, next.g1), s: Math.max(0, next.s), g2m: Math.max(0, next.g2m) };
 }
 
-let stepCounter = 0;
 
 /**
  * One reusable solver. `dt` arrives in whatever unit the router supplies; this
@@ -198,7 +197,6 @@ export function makeCellCycleSolver(): DomainSolver {
     // The fraction in S phase is what a real BrdU/EdU or flow-cytometry readout reports, and it is
     // the observable an unstructured logistic model simply cannot produce.
     const sPhaseFraction = totalCells > 0 ? after.s / totalCells : 0;
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `cell-obs:${entity.id}:${ctx.tick}`,
@@ -211,15 +209,16 @@ export function makeCellCycleSolver(): DomainSolver {
       provenance: ['domains/cellCycle.ts', 'compartmental-cell-cycle-G1-S-G2M', 'rk4'],
     };
 
+    const eventParameters = { ...params, g1Cells: after.g1, sCells: after.s, g2mCells: after.g2m, totalCells, sPhaseFraction, stateCode };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `cell-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('cell-evt', entity.id, ctx.tick, eventParameters),
       type: 'biology.cellcycle.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'rk4-cell-cycle-step',
-      parameters: { ...params, g1Cells: after.g1, sCells: after.s, g2mCells: after.g2m, totalCells, sPhaseFraction, stateCode },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: CELL_CYCLE_SOLVER_ID,

@@ -224,25 +224,32 @@ describe('The RO-Crate projection is the SAME format the existing exporter emits
     expect(comparisonNode['prov:wasDerivedFrom']).toHaveLength(2);
   });
 
-  it('is deterministic in its SCIENCE, and honest that event ids are not', () => {
-    // Discovered by testing this exporter: Genesis solvers mint event ids from a module-global
-    // step counter, so a second build inside the same process produces different event ids. The
-    // science is identical. Rather than renaming ids at export or pretending the bytes match,
-    // the bundle exposes a fingerprint over everything except those volatile identifiers, and
-    // declares the limitation itself.
+  it('the entire scientific payload — every event id included — now serialises byte-identically', () => {
+    // Previously impossible: solvers minted event ids from a module-global step counter, so a
+    // second build in the same process produced different ids for identical science. Event ids are
+    // now content-derived at source. The ONLY remaining variance is the engine's own branch
+    // labels, which cannot be content-derived without breaking branch-registry uniqueness — so
+    // the bundle names that precisely instead of claiming more than is true.
+    const strip = (json: string) => json.replace(/"branch-\d+"/g, '"branch-N"');
+    const first = serializeWorldEvidenceBundleRoCrate(buildFlagshipBundle({ withVerification: true }));
+    const second = serializeWorldEvidenceBundleRoCrate(buildFlagshipBundle({ withVerification: true }));
+
+    expect(strip(first)).toBe(strip(second));
+    // The events themselves — the part that carries the science — are identical without stripping.
+    const eventsOf = (json: string) => JSON.parse(json)['@graph'].find((n: { '@id': string }) => n['@id'].startsWith('#event-log/'))['genesis:events'];
+    expect(eventsOf(first)).toEqual(eventsOf(second));
+    expect(JSON.parse(first)['@graph'].length).toBeGreaterThan(5);
+
+    // And the residual limitation is declared, with its real reason.
+    expect(buildFlagshipBundle().exportLimitations.join(' ')).toMatch(/instance labels/);
+  });
+
+  it('still reports scientific equivalence separately from byte equality', () => {
     const first = buildFlagshipBundle({ withVerification: true });
     const second = buildFlagshipBundle({ withVerification: true });
-
     expect(first.scientificContentFingerprint).toBe(second.scientificContentFingerprint);
     expect(first.baseline.worldStateFingerprint).toBe(second.baseline.worldStateFingerprint);
-    expect(first.intervention!.worldStateFingerprint).toBe(second.intervention!.worldStateFingerprint);
-    expect(first.changedEntityIds).toEqual(second.changedEntityIds);
     expect(first.replay.verdict).toBe(second.replay.verdict);
-    expect(first.eventLog.map((e) => `${e.type}@${e.timestamp}`)).toEqual(second.eventLog.map((e) => `${e.type}@${e.timestamp}`));
-
-    // The limitation is declared in the bundle rather than left for a consumer to discover.
-    expect(first.exportLimitations.join(' ')).toMatch(/process-global step counter/);
-    expect(JSON.parse(serializeWorldEvidenceBundleRoCrate(first))['@graph'].length).toBeGreaterThan(5);
   });
 
   it('node ids are content-derived, so identical science exports identical @ids despite different branch ids', () => {

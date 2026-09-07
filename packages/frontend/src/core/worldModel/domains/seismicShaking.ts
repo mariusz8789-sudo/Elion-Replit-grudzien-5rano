@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION } from '../../events/genesisEvent';
 import {
   classifySeverity,
   EARTHQUAKE_MODEL_VERSION,
@@ -222,7 +222,6 @@ export function siteShakingG(source: Pick<SeismicSourceParams, 'magnitude' | 'de
   return syntheticPeakGroundAcceleration(source.magnitude, distanceKm) * vulnerabilityMultiplier(vulnerabilityClassOf(site.vulnerabilityClassCode));
 }
 
-let stepCounter = 0;
 
 /**
  * The seismic source. `dt` is irrelevant: this is not a time-evolving fault
@@ -241,7 +240,7 @@ export function makeSeismicSourceSolver(): DomainSolver {
     // The state change comes from outside; the announcement is the solver's.
     const announcing = ruptured && params.ruptureAnnounced !== 1;
     const nextParams: SeismicSourceParams = { ...params, ruptureAnnounced: ruptured ? 1 : 0 };
-    stepCounter += 1;
+    const eventParameters = { ...nextParams };
 
     return {
       patch: { domainState: { ...nextParams }, statusLabel: ruptured ? 'SEISMIC_RUPTURED' : 'SEISMIC_QUIESCENT' },
@@ -249,13 +248,13 @@ export function makeSeismicSourceSolver(): DomainSolver {
       grounding: 'UNGROUNDED_APPROXIMATION',
       event: {
         contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-        id: `seis-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+        id: deterministicEventId('seis-evt', entity.id, ctx.tick, eventParameters),
         type: announcing ? SEISMIC_RUPTURE_EVENT_TYPE : 'hazard.earthquake.sourcestep',
         timestamp: ctx.tick,
         source: entity.ref,
         affectedEntities: [entity.ref],
         cause: announcing ? 'source-ruptured' : 'source-state-republish',
-        parameters: { ...nextParams },
+        parameters: eventParameters,
         provenance: {
           origin: 'model',
           modelId: SEISMIC_SOURCE_SOLVER_ID,
@@ -280,7 +279,6 @@ export function makeStructuralSiteSolver(): DomainSolver {
     const params: StructuralSiteParams = { ...STRUCTURAL_SITE_DEFAULTS, ...state };
     const severity = shakingSeverityCode(params.peakGroundAccelerationG);
     const assessment = structuralDamageAssessment(entity);
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `struct-obs:${entity.id}:${ctx.tick}`,

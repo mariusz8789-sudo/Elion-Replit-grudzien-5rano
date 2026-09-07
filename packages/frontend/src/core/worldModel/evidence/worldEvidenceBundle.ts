@@ -63,28 +63,44 @@ import type { TemporalEngine } from '../temporal/temporalEngine';
 export const WORLD_EVIDENCE_BUNDLE_CONTRACT_VERSION = '1.0.0';
 
 /**
- * A limitation of the EXPORT itself, discovered by testing this exporter and
- * reported rather than hidden. It is kept separate from a scenario's
- * scientific limitations because it is a property of the engine, not of the
- * physics.
+ * `scientificContentFingerprint` is a stable identity over a bundle's
+ * scientific content with volatile identifiers (branch ids) deliberately
+ * excluded, so two exports can be compared for scientific equivalence
+ * independently of how the engine happened to name its branches.
  *
- * Genesis solvers mint event identifiers from a module-global step counter
- * (`chem-evt:substance:s1:1:<n>`), so building the same scenario twice
- * inside one process yields event ids differing in that counter. The
- * SCIENCE is fully deterministic — same scalars, same fingerprints, same
- * event types, timestamps, causes and causal structure — but a byte-for-byte
- * identical re-export requires a fresh process.
- *
- * Rather than renaming ids at export (a provenance document must not rename
- * the things it documents) or silently ignoring it,
- * `scientificContentFingerprint` gives a consumer a stable identity over
- * everything except those volatile identifiers, so two exports can be
- * verified equivalent even when their ids differ.
+ * It was originally introduced to work around a real defect: solvers minted
+ * event ids from a module-global step counter, so re-exporting the same
+ * scenario inside one process produced different event ids for identical
+ * science. That defect is now fixed at source — `deterministicEventId`
+ * derives every event id from the event's own content — so the entire
+ * scientific payload is byte-reproducible. What remains volatile is only the
+ * engine's own branch LABELS; see `BRANCH_LABEL_VOLATILITY_LIMITATION`.
  */
-export const EVENT_ID_VOLATILITY_LIMITATION =
-  'Event identifiers carry a process-global step counter, so re-exporting the same scenario within one process ' +
-  'produces different event ids. All scientific content is deterministic; compare `scientificContentFingerprint` ' +
-  'rather than raw bytes when checking two exports for equivalence.';
+
+/**
+ * The one field that still varies between two exports of the same scenario,
+ * stated precisely rather than glossed.
+ *
+ * `TemporalEngine` names branches from a process-global counter
+ * (`branch-1`, `branch-2`, ...). Unlike event ids, this CANNOT be made
+ * content-derived: `TemporalBranchRegistry` keys engines by `branchId`, so
+ * two identically-constructed engines must receive different ids or one
+ * would silently overwrite the other. It is an instance label — the
+ * engine's equivalent of an object identity — not a scientific fact about
+ * the world.
+ *
+ * The bundle records it anyway, because the engine really did assign it and
+ * a provenance document should not omit what happened. A consumer comparing
+ * two exports for scientific equivalence should use
+ * `scientificContentFingerprint`, which deliberately excludes these labels.
+ */
+export const BRANCH_LABEL_VOLATILITY_LIMITATION =
+  'Branch identifiers (`branch-N`) are process-local instance labels assigned by TemporalEngine, and cannot be ' +
+  'content-derived without breaking TemporalBranchRegistry uniqueness. They are the only fields that differ ' +
+  'between two exports of the same scenario, and they appear only in the declared branchId/parentBranchId/' +
+  'baselineBranchId/interventionBranchId fields — never in node ids or prose. All scientific content, including ' +
+  'every event id, is byte-identical. ' +
+  'Compare `scientificContentFingerprint` for scientific equivalence.';
 
 // ---------------------------------------------------------------------------
 // Per-element scientific classification.
@@ -268,13 +284,12 @@ export interface WorldEvidenceBundle {
   readonly limitations: readonly string[];
   /** Ids the `WorldState` itself declared unmodelled — passed through, never re-derived. */
   readonly notModelled: readonly string[];
-  /** Limitations of the EXPORT mechanism itself, as opposed to the scenario's science. */
+  /** Limitations of the EXPORT mechanism itself, as opposed to the scenario's science. Empty when the export has none. */
   readonly exportLimitations: readonly string[];
   /**
    * A fingerprint over everything scientifically meaningful in this bundle,
-   * EXCLUDING volatile identifiers (event ids, branch ids). Two runs of the
-   * same scenario agree here even when their raw exports differ byte-wise —
-   * see `EVENT_ID_VOLATILITY_LIMITATION`.
+   * excluding volatile identifiers. Answers "is this the same science?"
+   * independently of "are these the same bytes?".
    */
   readonly scientificContentFingerprint: string;
 }
@@ -379,7 +394,7 @@ export function buildWorldEvidenceBundle(input: WorldEvidenceBundleInput): World
 
   return {
     ...core,
-    exportLimitations: [EVENT_ID_VOLATILITY_LIMITATION],
+    exportLimitations: [BRANCH_LABEL_VOLATILITY_LIMITATION],
     scientificContentFingerprint: fnv1a(canonicalJson(scientificContent(core))),
   };
 }
@@ -419,7 +434,11 @@ function armNodes(bundle: WorldEvidenceBundle, arm: BundleArm, protocolId: strin
     {
       '@id': inputId,
       '@type': ['prov:Entity', 'Dataset'],
-      name: `Construction and conditions for ${role} branch ${arm.branchId}`,
+      // Human-readable names name the ARM BY ROLE, never by `branchId`: the label is a
+      // process-local counter value, and putting it inside prose would smear a volatile
+      // instance identifier across the document. It is carried below as data instead, in
+      // the one field that is declared to hold it.
+      name: `Construction and conditions for the ${role} arm`,
       'genesis:branchId': arm.branchId,
       'genesis:parentBranchId': arm.parentBranchId,
       'genesis:forkedAtTick': arm.forkedAtTick,
@@ -431,7 +450,7 @@ function armNodes(bundle: WorldEvidenceBundle, arm: BundleArm, protocolId: strin
     {
       '@id': activityIdValue,
       '@type': 'prov:Activity',
-      name: `Genesis world-model run on branch ${arm.branchId} (${role})`,
+      name: `Genesis world-model run of the ${role} arm`,
       'prov:used': [entityRef(protocolId), entityRef(inputId)],
       'genesis:branchId': arm.branchId,
       'genesis:role': role,
@@ -443,7 +462,7 @@ function armNodes(bundle: WorldEvidenceBundle, arm: BundleArm, protocolId: strin
     {
       '@id': resultId,
       '@type': ['prov:Entity', 'Dataset'],
-      name: `World state at tick ${arm.worldState.tick} on branch ${arm.branchId}`,
+      name: `World state of the ${role} arm at tick ${arm.worldState.tick}`,
       'prov:wasGeneratedBy': entityRef(activityIdValue),
       'genesis:tick': arm.worldState.tick,
       'genesis:worldStateFingerprint': arm.worldStateFingerprint,

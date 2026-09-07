@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import type { CityRoadNetwork } from '../../world/roadNetwork';
 import { entityId, type EntityId, type GroundingLevel, type WorldModelEntity } from '../ecs/types';
@@ -443,7 +443,6 @@ export interface TrafficWorldDomainState extends Record<string, number> {
   intersectionCount: number;
 }
 
-let stepCounter = 0;
 
 /**
  * One reusable solver bound to one real `TrafficNetwork` instance (built by
@@ -463,7 +462,6 @@ export function makeTrafficFlowSolver(network: TrafficNetwork, fd: GreenshieldsP
     };
 
     const summary = stepTrafficNetwork(network, fd, ctx.dt, demand);
-    stepCounter += 1;
 
     const domainState: TrafficWorldDomainState = {
       entryDemandVehPerHour: demand.entryDemandVehPerHour,
@@ -493,15 +491,16 @@ export function makeTrafficFlowSolver(network: TrafficNetwork, fd: GreenshieldsP
       provenance: ['domains/trafficFlow.ts', 'greenshields-1935', 'cell-transmission-model-daganzo-1994', 'godunov-scheme-lebacque-1996', 'hcm-signalized-intersection-capacity'],
     };
 
+    const eventParameters = { ...demand, ...summary };
     const event: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `traffic-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('traffic-evt', entity.id, ctx.tick, eventParameters),
       type: 'traffic.flow.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'ctm-godunov-step',
-      parameters: { ...demand, ...summary },
+      parameters: eventParameters,
       provenance: {
         origin: 'model',
         modelId: TRAFFIC_FLOW_SOLVER_ID,

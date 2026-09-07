@@ -1,4 +1,4 @@
-import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
+import { deterministicEventId, GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/genesisEvent';
 import type { Observation } from '../../world/scientificWorldState';
 import { applyInterventionWithEvent } from '../events/worldEventRules';
 import { entityId, type EntityId, type WorldModelEntity } from '../ecs/types';
@@ -73,7 +73,6 @@ export const GENERATOR_DEFAULTS: GeneratorDefaults = {
   cumulativeRuntimeS: 0,
 };
 
-let stepCounter = 0;
 
 /**
  * One reusable solver: advances a generator's real state machine by `dt`
@@ -105,7 +104,6 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
     }
 
     const nextParams: GeneratorDefaults = { ...params, status, secondsRemaining, fuelRemainingL, loadKw, cumulativeRuntimeS };
-    stepCounter += 1;
 
     const observation: Observation = {
       observationId: `gen-obs:${entity.id}:${ctx.tick}`,
@@ -118,30 +116,32 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
       provenance: ['domains/electricalGenerator.ts', 'linear-diesel-genset-fuel-model'],
     };
 
+    const eventParameters = { ...nextParams };
     const stepEvent: GenesisEvent = {
       contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-      id: `gen-evt:${entity.id}:${ctx.tick}:${stepCounter}`,
+      id: deterministicEventId('gen-evt', entity.id, ctx.tick, eventParameters),
       type: 'electrical.generator.step',
       timestamp: ctx.tick,
       source: entity.ref,
       affectedEntities: [entity.ref],
       cause: 'state-machine-step',
-      parameters: { ...nextParams },
+      parameters: eventParameters,
       provenance: { origin: 'model', modelId: ELECTRICAL_GENERATOR_SOLVER_ID },
     };
 
     if (status !== previousStatus) {
       // A REAL state transition this tick — the one event a cross-domain coupling (RUNNING) or an
       // honest failure disclosure (FUEL_EXHAUSTED) actually reacts to, not the routine step noise.
+      const eventParameters1 = { previousStatus, newStatus: status };
       const transitionEvent: GenesisEvent = {
         contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
-        id: `gen-evt:${entity.id}:${ctx.tick}:${stepCounter}:transition`,
+        id: deterministicEventId('gen-evt:transition', entity.id, ctx.tick, eventParameters1),
         type: GENERATOR_STATUS_CHANGED_EVENT_TYPE,
         timestamp: ctx.tick,
         source: entity.ref,
         affectedEntities: [entity.ref],
         cause: 'state-machine-transition',
-        parameters: { previousStatus, newStatus: status },
+        parameters: eventParameters1,
         parentEventId: stepEvent.id,
         provenance: { origin: 'model', modelId: ELECTRICAL_GENERATOR_SOLVER_ID, notes: `${generatorStatusLabel(previousStatus)} -> ${generatorStatusLabel(status)}` },
       };

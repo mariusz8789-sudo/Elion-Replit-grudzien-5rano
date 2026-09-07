@@ -213,6 +213,10 @@ const KIND_UNSUPPORTED_REASON: Readonly<Partial<Record<ScenarioKind, string>>> =
     'a real ground-shaking model exists (core/worldModel/domains/seismicShaking.ts — a synthetic, explicitly non-calibrated attenuation, not a GMPE) but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to. Structural damage, collapse and casualties are not modelled at all regardless of routing — see EARTHQUAKE_DAMAGE_REQUIRED_DATA.',
   BLACKOUT:
     'a real power-grid model exists (core/worldModel/domains/electricalGenerator.ts) but it runs only inside the Genesis Scientific City world, with no standalone Looking Glass binding to route to — this is not the same gap as the plume-dispersion and general hydraulic-network gaps the rest of this family has.',
+  TRANSPORT_DISRUPTION:
+    'a real traffic-flow model exists (core/worldModel/domains/trafficFlow.ts — Greenshields fundamental diagram, a Godunov/Cell-Transmission-Model network update, and HCM signalised-intersection capacity, all on the real road-network geometry) but it has no standalone Looking Glass binding to route to yet. Origin-destination demand, route choice/assignment, turning movements and calibration against real counts genuinely remain unmodelled regardless of routing.',
+  EVACUATION:
+    'the same real traffic-flow model as TRANSPORT_DISRUPTION covers an evacuation surge as an elevated demand multiplier on the network — but there is no standalone Looking Glass binding to it, and no evacuation behaviour model (warning response, departure timing, destination choice under stress) exists at all, regardless of routing.',
 };
 
 /**

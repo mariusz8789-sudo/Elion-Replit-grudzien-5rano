@@ -20,16 +20,21 @@ import { makeSeismicSourceSolver, SEISMIC_SOURCE_SOLVER_ID } from '../core/world
 import { buildSyntheticTerrain, FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver } from '../core/worldModel/domains/floodInundation';
 import { CELL_CYCLE_SOLVER_ID, makeCellCycleSolver } from '../core/worldModel/domains/cellCycle';
 import { makeMolecularStructureSolver, MOLECULAR_STRUCTURE_SOLVER_ID } from '../core/worldModel/domains/molecularStructure';
+import { buildTrafficNetwork, makeTrafficFlowSolver, TRAFFIC_FLOW_SOLVER_ID } from '../core/worldModel/domains/trafficFlow';
+import { buildRoadNetwork } from '../core/world/roadNetwork';
+import { buildCity } from '../core/world/cityWorld';
 
 /**
  * PHASE 7 — FIRE/THERMAL AND TRAFFIC.
  *
- * The audit found neither exists. These tests pin that finding in place: not
- * as a comment that can rot, but as assertions that fail if anyone ever claims
- * a fire or traffic capability without building one, and — more importantly —
- * if a recognisable scenario kind is ever left with no capability answer at all.
+ * The audit found neither exists. Fire/thermal still does not; traffic now
+ * has a real fundamental-diagram/CTM solver (`domains/trafficFlow.ts`). These
+ * tests pin both findings in place: assertions that fail if anyone ever
+ * claims a fire capability without building one, or claims traffic is fully
+ * modelled without naming what it still is not — and, more importantly, if a
+ * recognisable scenario kind is ever left with no capability answer at all.
  */
-describe('Fire and traffic are absent, and the registry says so rather than approximating', () => {
+describe('Fire is absent and traffic is a real, honestly-bounded solver', () => {
   it('both fire kinds are NOT_MODELLED, with the missing physics named', () => {
     for (const kind of ['WILDFIRE', 'INDUSTRIAL_FIRE'] as const) {
       const capability = solverCapabilityFor(kind);
@@ -40,18 +45,20 @@ describe('Fire and traffic are absent, and the registry says so rather than appr
     }
   });
 
-  it('traffic is NOT_MODELLED, and the reason names the actual code rather than hand-waving', () => {
+  it('traffic disruption is PARTIALLY_MODELLED by the real CTM solver, with the actual remaining gaps named', () => {
     const capability = solverCapabilityFor('TRANSPORT_DISRUPTION');
-    expect(capability.capability).toBe(CAPABILITY_CODE.NOT_MODELLED);
-    // The specific finding: agents exist, but they never interact, so there is no flow.
-    expect(capability.missing!.join(' ')).toMatch(/cityAgent\.ts do not interact/);
-    expect(capability.missing!.join(' ')).toMatch(/fundamental diagram|car-following/);
+    expect(capability.capability).toBe(CAPABILITY_CODE.PARTIALLY_MODELLED);
+    expect(capability.solverId).toBe(TRAFFIC_FLOW_SOLVER_ID);
+    expect(capability.caveat).toMatch(/origin-destination/);
+    expect(capability.caveat).toMatch(/calibration/);
   });
 
-  it('evacuation inherits the traffic gap plus its own, rather than being silently modelled', () => {
+  it('evacuation inherits the traffic caveat plus its own, rather than being silently fully modelled', () => {
     const capability = solverCapabilityFor('EVACUATION');
-    expect(capability.capability).toBe(CAPABILITY_CODE.NOT_MODELLED);
-    expect(capability.missing!.some((m) => m.includes('evacuation behaviour model'))).toBe(true);
+    expect(capability.capability).toBe(CAPABILITY_CODE.PARTIALLY_MODELLED);
+    expect(capability.solverId).toBe(TRAFFIC_FLOW_SOLVER_ID);
+    expect(capability.caveat).toMatch(/origin-destination/);
+    expect(capability.caveat).toMatch(/evacuation behaviour model/);
   });
 });
 
@@ -84,6 +91,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     router.register(FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver(buildSyntheticTerrain()));
     router.register(CELL_CYCLE_SOLVER_ID, makeCellCycleSolver());
     router.register(MOLECULAR_STRUCTURE_SOLVER_ID, makeMolecularStructureSolver());
+    router.register(TRAFFIC_FLOW_SOLVER_ID, makeTrafficFlowSolver(buildTrafficNetwork(buildRoadNetwork(buildCity()))));
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {
       if (!capability.solverId) continue;
@@ -115,10 +123,11 @@ describe('Every recognisable scenario gets an honest answer', () => {
 });
 
 describe('The honest inventory is queryable, not buried', () => {
-  it('the not-modelled list is sorted, non-empty, and contains the fire and traffic kinds', () => {
+  it('the not-modelled list is sorted, non-empty, contains the fire kinds, and no longer traffic', () => {
     expect(NOT_MODELLED_SCENARIO_KINDS).toContain('WILDFIRE');
     expect(NOT_MODELLED_SCENARIO_KINDS).toContain('INDUSTRIAL_FIRE');
-    expect(NOT_MODELLED_SCENARIO_KINDS).toContain('TRANSPORT_DISRUPTION');
+    expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('TRANSPORT_DISRUPTION');
+    expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('EVACUATION');
     expect([...NOT_MODELLED_SCENARIO_KINDS]).toEqual([...NOT_MODELLED_SCENARIO_KINDS].sort());
   });
 
@@ -131,6 +140,7 @@ describe('The honest inventory is queryable, not buried', () => {
     // Phase 8.2 made depth and extent real; the hydrograph is the part that is still absent.
     expect(describeCapability('FLOOD')).toMatch(/Still NOT modelled: the hydrograph/);
     expect(describeCapability('EARTHQUAKE')).toMatch(/Structural damage.*still NOT modelled/);
+    expect(describeCapability('TRANSPORT_DISRUPTION')).toMatch(/Still NOT modelled: origin-destination/);
   });
 
   it('consequence-vs-design boundaries stay stated where a request could be misread', () => {

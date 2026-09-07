@@ -8,6 +8,7 @@ import { MOLECULAR_STRUCTURE_SOLVER_ID } from '../domains/molecularStructure';
 import { QUANTUM_TUNNELING_SOLVER_ID } from '../domains/quantumTunneling';
 import { FLOOD_INUNDATION_SOLVER_ID } from '../domains/floodInundation';
 import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
+import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -21,14 +22,16 @@ import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
  *   tokamak visual and the word appearing in prose. Nothing was built here,
  *   because building a fire model was not in scope and faking one is worse
  *   than admitting the gap.
- * - **Traffic flow: NOT_MODELLED.** No fundamental diagram, no car-following,
- *   no capacity or congestion, no network assignment. `core/agents/cityAgent.ts`
- *   does move agents, but `stepMovement` is constant-speed straight-line travel
- *   toward a goal with **no interaction between agents at all** — that is
- *   kinematics feeding the epidemic contact model, not traffic. It also lives
- *   inside `epidemicCity`'s own simulation loop over a `CityLayout` that is not
- *   a C3 world, so re-hosting it here would mean a second simulation engine
- *   beside the one this architecture exists to keep singular.
+ * - **Traffic flow: now PARTIALLY_MODELLED.** `domains/trafficFlow.ts` is a real
+ *   WorldGraph solver on the existing road-network geometry
+ *   (`core/world/roadNetwork.ts`): a Greenshields fundamental diagram, a
+ *   Cell-Transmission-Model/Godunov update that actually produces congestion
+ *   and shockwaves, and HCM signalised-intersection capacity at every real
+ *   street crossing. `core/agents/cityAgent.ts`'s constant-speed,
+ *   non-interacting agent kinematics remain untouched and unrelated — this is
+ *   a separate, real macroscopic flow solver, not a re-hosting of that loop.
+ *   What that solver still lacks (OD demand, route choice, calibration) is
+ *   named in its own PARTIALLY_MODELLED entries below.
  *
  * WHY THIS FILE EXISTS RATHER THAN A FIRE SOLVER. `lookingGlass/scenarioRequest.ts`
  * classifies 30+ `ScenarioKind`s from a user's sentence — WILDFIRE and
@@ -70,12 +73,14 @@ const NO_FIRE_MODEL: readonly string[] = Object.freeze([
   'fire-resistance and structural-response-to-fire data, which would also need the structural model that does not exist either',
 ]);
 
-const NO_TRAFFIC_MODEL: readonly string[] = Object.freeze([
-  'a traffic-flow relationship (fundamental diagram, or a car-following/cell-transmission model) — agents in cityAgent.ts do not interact at all',
-  'road capacity, saturation flow and intersection control on the road-network geometry that does exist',
-  'origin-destination demand and a route-choice or assignment model',
-  'calibration against real counts or probe data before any congestion or travel-time claim',
-]);
+/** What `domains/trafficFlow.ts` still does not cover — the honest remainder after the FD/CTM/capacity solver. */
+const TRAFFIC_MODEL_CAVEAT =
+  'A real Greenshields fundamental diagram, a Godunov/Cell-Transmission-Model network update, and HCM ' +
+  'signalised-intersection capacity now run on the actual road-network geometry (core/world/roadNetwork.ts), ' +
+  'producing real congestion, shockwaves and capacity-limited throughput. Still NOT modelled: origin-destination ' +
+  'demand and any route-choice/assignment (vehicles enter as one aggregate boundary demand, never assigned a ' +
+  'destination or route), turning movements at intersections, and calibration — free-flow speed, jam density, ' +
+  'saturation flow and signal timing are textbook defaults, not fitted to any measured count or probe data.';
 
 const noHazardModel = (hazard: string): readonly string[] => Object.freeze([
   `a ${hazard} process model — Genesis has none`,
@@ -139,14 +144,23 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
     caveat: 'The world generator really builds and rebuilds city structure. Urban dynamics — land use, economics, population change over time — are not modelled.',
   },
 
-  // --- The two this phase was scoped around, and found absent ---------------
+  // --- Fire/thermal was scoped alongside traffic, and remains absent --------
   WILDFIRE: notModelled(NO_FIRE_MODEL),
   INDUSTRIAL_FIRE: notModelled(NO_FIRE_MODEL),
-  TRANSPORT_DISRUPTION: notModelled(NO_TRAFFIC_MODEL),
-  EVACUATION: notModelled(Object.freeze([
-    ...NO_TRAFFIC_MODEL,
-    'an evacuation behaviour model (warning response, departure timing, destination choice under stress)',
-  ])),
+
+  // --- Traffic: a real fundamental-diagram/CTM solver, with real named holes -
+  TRANSPORT_DISRUPTION: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: TRAFFIC_FLOW_SOLVER_ID,
+    caveat: TRAFFIC_MODEL_CAVEAT,
+  },
+  EVACUATION: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: TRAFFIC_FLOW_SOLVER_ID,
+    caveat: `${TRAFFIC_MODEL_CAVEAT} An evacuation surge is only an elevated demand multiplier on that same ` +
+      'boundary demand: no evacuation behaviour model exists (warning response, departure timing, or ' +
+      'destination choice under stress).',
+  },
 
   // --- Everything else the classifier can recognise but nothing can answer --
   TSUNAMI: notModelled(noHazardModel('wave generation and inundation')),

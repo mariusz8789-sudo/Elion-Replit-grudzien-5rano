@@ -213,3 +213,116 @@ export function createStreetLight(THREE: typeof THREE_NS, options: StreetLightOp
 
   return group;
 }
+
+export interface SidewalkOptions {
+  /** Centreline start/end of the pavement run, at ground level. */
+  from: THREE_NS.Vector3Tuple;
+  to: THREE_NS.Vector3Tuple;
+  /** Pavement width across the run. */
+  width: number;
+  /** Kerb height above the carriageway. Default 2% of `width`, min 0.02. */
+  kerbHeight?: number;
+  surfaceMaterial: THREE_NS.Material;
+  /** Kerb face material — omit to use `surfaceMaterial`. */
+  kerbMaterial?: THREE_NS.Material;
+}
+
+/**
+ * A raised pavement slab with a kerb face along one edge — the single cheapest thing that makes a
+ * road read as a street rather than a grey stripe, because it gives the carriageway an actual edge
+ * and a height difference to catch light.
+ *
+ * COST: 2 meshes per run (slab + kerb), independent of length. Sized entirely from the arguments, so
+ * it works at both world scales this kit serves.
+ */
+export function createSidewalk(THREE: typeof THREE_NS, options: SidewalkOptions): THREE_NS.Group {
+  const group = new THREE.Group();
+  group.name = 'genesis-sidewalk';
+
+  const [x1, , z1] = options.from;
+  const [x2, , z2] = options.to;
+  const dx = x2 - x1;
+  const dz = z2 - z1;
+  const length = Math.hypot(dx, dz);
+  const kerbHeight = options.kerbHeight ?? Math.max(0.02, options.width * 0.02);
+
+  group.position.set((x1 + x2) / 2, 0, (z1 + z2) / 2);
+  group.rotation.y = Math.atan2(dx, dz);
+
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(options.width, kerbHeight, length), options.surfaceMaterial);
+  slab.position.y = kerbHeight / 2;
+  slab.receiveShadow = true;
+  group.add(slab);
+
+  // The kerb face: a thin upstand on the carriageway side, slightly proud of the slab so it reads as
+  // a separate edge under raking light rather than a painted line.
+  const kerb = new THREE.Mesh(
+    new THREE.BoxGeometry(kerbHeight * 0.6, kerbHeight * 1.25, length),
+    options.kerbMaterial ?? options.surfaceMaterial,
+  );
+  kerb.position.set(-options.width / 2 + kerbHeight * 0.3, kerbHeight * 0.62, 0);
+  kerb.receiveShadow = true;
+  group.add(kerb);
+
+  return group;
+}
+
+export interface RoadMarkingsOptions {
+  from: THREE_NS.Vector3Tuple;
+  to: THREE_NS.Vector3Tuple;
+  /** Length of one painted dash. */
+  dashLength: number;
+  /** Unpainted gap between dashes. */
+  gapLength: number;
+  /** Width of the painted line. */
+  width: number;
+  material: THREE_NS.Material;
+  /** Height above the carriageway, to avoid z-fighting. Default 0.02. */
+  height?: number;
+}
+
+/**
+ * A dashed centreline, batched into ONE `InstancedMesh` regardless of how many dashes it contains —
+ * the same instancing discipline `vegetation.ts` and `buildingKit.createFacadeBuilding` follow, and
+ * the reason a marked-up street costs 1 draw call rather than one per dash.
+ *
+ * Returns an empty group when the run is shorter than a single dash, rather than emitting a
+ * degenerate instance.
+ */
+export function createRoadMarkings(THREE: typeof THREE_NS, options: RoadMarkingsOptions): THREE_NS.Group {
+  const group = new THREE.Group();
+  group.name = 'genesis-road-markings';
+
+  const [x1, , z1] = options.from;
+  const [x2, , z2] = options.to;
+  const dx = x2 - x1;
+  const dz = z2 - z1;
+  const length = Math.hypot(dx, dz);
+  const stride = options.dashLength + options.gapLength;
+  const count = Math.floor(length / stride);
+  if (count < 1) return group;
+
+  const height = options.height ?? 0.02;
+  const geometry = new THREE.PlaneGeometry(options.width, options.dashLength);
+  const mesh = new THREE.InstancedMesh(geometry, options.material, count);
+  const dummy = new THREE.Object3D();
+
+  // The run's own placement and heading live on the GROUP (same as `createSidewalk`), and each dash
+  // is laid out in that local frame along +Z. Composing the heading into each instance's Euler angles
+  // instead does NOT work: after the -90° X rotation that lays a plane flat, a further Z rotation is
+  // no longer a world-space yaw, so dashes come out at wrong angles on any run that is not axis
+  // aligned — a real defect this was written to avoid.
+  group.position.set((x1 + x2) / 2, 0, (z1 + z2) / 2);
+  group.rotation.y = Math.atan2(dx, dz);
+
+  for (let i = 0; i < count; i++) {
+    // Centre each dash within its own stride, then centre the whole run on the segment.
+    dummy.position.set(0, height, (i + 0.5) * stride - length / 2);
+    dummy.rotation.set(-Math.PI / 2, 0, 0);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  group.add(mesh);
+  return group;
+}

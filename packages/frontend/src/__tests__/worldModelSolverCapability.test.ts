@@ -24,6 +24,7 @@ import { buildTrafficNetwork, makeTrafficFlowSolver, TRAFFIC_FLOW_SOLVER_ID } fr
 import { buildRoadNetwork } from '../core/world/roadNetwork';
 import { buildCity } from '../core/world/cityWorld';
 import { FIRE_THERMAL_SOLVER_ID, FUEL_PACKAGES, makeFireThermalSolver } from '../core/worldModel/domains/fireThermal';
+import { DROUGHT_SOLVER_ID, makeDroughtWaterBalanceSolver } from '../core/worldModel/domains/drought';
 
 /**
  * PHASE 7 — FIRE/THERMAL AND TRAFFIC.
@@ -101,6 +102,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     router.register(MOLECULAR_STRUCTURE_SOLVER_ID, makeMolecularStructureSolver());
     router.register(TRAFFIC_FLOW_SOLVER_ID, makeTrafficFlowSolver(buildTrafficNetwork(buildRoadNetwork(buildCity()))));
     router.register(FIRE_THERMAL_SOLVER_ID, makeFireThermalSolver({ growthRate: 'MEDIUM', fuel: FUEL_PACKAGES.FLAMMABLE_LIQUID_POOL, peakHRRkW: 5000 }));
+    router.register(DROUGHT_SOLVER_ID, makeDroughtWaterBalanceSolver());
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {
       if (!capability.solverId) continue;
@@ -132,11 +134,12 @@ describe('Every recognisable scenario gets an honest answer', () => {
 });
 
 describe('The honest inventory is queryable, not buried', () => {
-  it('the not-modelled list is sorted, non-empty, contains wildfire, and no longer industrial fire or traffic', () => {
+  it('the not-modelled list is sorted, non-empty, contains wildfire, and no longer industrial fire, traffic, or drought', () => {
     expect(NOT_MODELLED_SCENARIO_KINDS).toContain('WILDFIRE');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('INDUSTRIAL_FIRE');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('TRANSPORT_DISRUPTION');
     expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('EVACUATION');
+    expect(NOT_MODELLED_SCENARIO_KINDS).not.toContain('DROUGHT');
     expect([...NOT_MODELLED_SCENARIO_KINDS]).toEqual([...NOT_MODELLED_SCENARIO_KINDS].sort());
   });
 
@@ -152,6 +155,7 @@ describe('The honest inventory is queryable, not buried', () => {
     expect(describeCapability('EARTHQUAKE')).toMatch(/Structural damage.*still NOT modelled/);
     expect(describeCapability('TRANSPORT_DISRUPTION')).toMatch(/Still NOT modelled: origin-destination/);
     expect(describeCapability('INDUSTRIAL_FIRE')).toMatch(/Still NOT.*modelled: fire spread/);
+    expect(describeCapability('DROUGHT')).toMatch(/Still NOT modelled: this is not the Standardized Precipitation Index/);
   });
 
   it('consequence-vs-design boundaries stay stated where a request could be misread', () => {

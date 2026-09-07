@@ -10,6 +10,7 @@ import { FLOOD_INUNDATION_SOLVER_ID } from '../domains/floodInundation';
 import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
 import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
 import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
+import { DROUGHT_SOLVER_ID } from '../domains/drought';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -198,7 +199,11 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   TORNADO: notModelled(noHazardModel('tornado wind field')),
   LANDSLIDE: notModelled(noHazardModel('slope stability and runout')),
   VOLCANIC: notModelled(noHazardModel('eruption, ashfall and flow')),
-  DROUGHT: notModelled(noHazardModel('water balance and drought index')),
+  DROUGHT: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: DROUGHT_SOLVER_ID,
+    caveat: 'A real water balance now runs: the Thornthwaite-Mather (1955) one-layer soil-moisture bucket model, exact accounting of precipitation vs. evapotranspiration vs. runoff vs. stored soil moisture, extending the same hydrology rainfallRunoff.ts already models (a separate daily-precipitation input, since drought analysis and the Rational Method\'s short-duration design-storm intensity are genuinely different quantities). Still NOT modelled: this is not the Standardized Precipitation Index, SPEI, or Palmer Drought Severity Index — those need a distribution fitted to decades of real climatological records Genesis does not have for any place, so `droughtSeverityCode` uses absolute soil-moisture-fraction bands, not a calibrated percentile. Potential evapotranspiration and field capacity are stated typical values (FAO-56; USDA/NRCS), not derived from real weather or soil survey data. One lumped catchment, no groundwater, no vegetation-specific water use, no calibration.',
+  },
   EXTREME_HEAT: notModelled(Object.freeze([
     'an ambient heat-exposure model (the fire/thermal solver that exists models one fire source\'s heat release and radiant flux, not ambient air temperature or a heat-wave)',
     'health-effect relationships for heat exposure, and the population vulnerability data behind them',

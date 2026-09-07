@@ -16,7 +16,7 @@
  */
 
 import * as core from './core.bundle.mjs';
-import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate } from './rdkitAdapter.mjs';
+import { detect as rdkitDetect, descriptors as rdkitDescriptors, validate as rdkitValidate, embed3d as rdkitEmbed3d } from './rdkitAdapter.mjs';
 import { detect as meepDetect, interfaceTransmission as meepInterfaceTransmission, pecReflection as meepPecReflection } from './meepAdapter.mjs';
 import { detect as pyscfDetect, referenceCase as pyscfReferenceCase, singlePoint as pyscfSinglePoint } from './qmAdapter.mjs';
 import { detect as depmapDetect, senescenceCellCyclePanel } from './depmapAdapter.mjs';
@@ -394,6 +394,67 @@ const MODELS = [
       },
     ),
     // Walidacja: RDKit obecny + poprawny SMILES. Bez RDKit → 'rejected' z jawną przyczyną (nie fałszywy wynik).
+    validate: (v) => {
+      const det = rdkitDetect();
+      if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Skonfiguruj GENESIS_RDKIT_PYTHON do zwalidowanego interpretera RDKit.` };
+      const val = rdkitValidate(v.smiles);
+      return val.ok ? { ok: true } : { ok: false, error: 'invalid_smiles', message: 'Nieprawidłowy SMILES.' };
+    },
+  },
+
+  {
+    ...functionModel(
+      {
+        id: 'chem-rdkit-embed3d', name: 'Geometria 3D molekuły (RDKit ETKDGv3 + MMFF)', domain: 'chemistry', version: '1.0.0',
+        description: 'Realne współrzędne atomowe 3D ze SMILES: dodanie wodorów, osadzenie ETKDGv3 z deterministycznym ziarnem, optymalizacja polem siłowym MMFF (fallback UFF). Zwraca atomy w angstremach.',
+        inputs: [
+          { id: 'smiles', label: 'SMILES', unit: '', type: 'string', maxLength: 500, default: 'CC(=O)Oc1ccccc1C(=O)O' },
+          { id: 'seed', label: 'Ziarno osadzenia', unit: '', min: 0, max: 2_147_483_647, default: 42 },
+        ],
+        outputs: [
+          { id: 'nAtoms', label: 'Liczba atomów (z wodorami)', unit: '' },
+          { id: 'formalCharge', label: 'Ładunek formalny', unit: '' },
+        ],
+        assumptions:
+          'ETKDGv3 generuje JEDEN konformer o niskiej energii, nie strukturę krystaliczną ani zespół konformerów. Optymalizacja MMFF94 (lub UFF, gdy brak parametrów MMFF) — pole siłowe klasyczne, nie obliczenie kwantowe. Ziarno jest jawnym wejściem, więc geometria jest odtwarzalna.',
+        validity: 'Poprawny SMILES ORAZ RDKit dostępny przez skonfigurowany interpreter GENESIS_RDKIT_PYTHON. Wynik to model geometrii, nie pomiar.',
+        provenance: {
+          source: 'RDKit via compute/rdkitAdapter.mjs (cmd embed3d)',
+          formula: 'ETKDGv3 embedding + MMFF94/UFF optimisation',
+          honesty: 'real_external_engine',
+          engine: 'RDKit runtime (version reported per run)',
+          requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON',
+          coordinateUnit: 'angstrom',
+        },
+      },
+      (v) => {
+        // `rdkitAdapter.embed3d` returns its fields at the TOP level ({ok, atoms, forceField,
+        // charge, nAtoms, canonicalSmiles}) — unlike `descriptors`, which nests them under `data`.
+        const r = rdkitEmbed3d(v.smiles, v.seed);
+        if (!r.ok) throw new Error(r.error + (r.reason ? `: ${r.reason}` : ''));
+        return {
+          outputs: {
+            nAtoms: r.nAtoms,
+            formalCharge: r.charge,
+            // Passed through verbatim (engine.mjs does not coerce outputs): one entry per atom,
+            // {element, x, y, z} in angstroms, in RDKit's own atom order — that order is the stable
+            // per-atom identity C3 keys its entities by, so it must never be re-sorted downstream.
+            atoms: r.atoms,
+            forceField: r.forceField,
+            // Echoed from the INPUT: the adapter does not return the seed, and the whole point of
+            // recording it is that the geometry can be regenerated, so it must be the value actually
+            // sent to the embedder.
+            seed: v.seed,
+            canonicalSmiles: r.canonicalSmiles,
+          },
+          warnings: [
+            'COMPUTATIONAL_RESULT: pojedynczy konformer o niskiej energii z pola siłowego — nie struktura eksperymentalna (krystalograficzna/NMR) ani zespół konformerów.',
+          ],
+          provenance: { engine: rdkitDetect().version ?? 'RDKit', requiredEnvironmentVariable: 'GENESIS_RDKIT_PYTHON', coordinateUnit: 'angstrom' },
+        };
+      },
+    ),
+    // Bez RDKit → 'rejected' z jawną przyczyną; nigdy zmyślone współrzędne.
     validate: (v) => {
       const det = rdkitDetect();
       if (!det.available) return { ok: false, error: 'capability_unavailable', message: `RDKit niedostępny (${det.reason}). Skonfiguruj GENESIS_RDKIT_PYTHON do zwalidowanego interpretera RDKit.` };

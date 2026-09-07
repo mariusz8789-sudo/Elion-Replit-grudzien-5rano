@@ -28,6 +28,7 @@ export * from './generation/resolveWorldProposal';
 export * from './domains/electricalGenerator';
 export * from './domains/quantumTunneling';
 export * from './domains/relativityGeodesic';
+export * from './domains/molecularStructure';
 export * from './domains/genesisScientificCity3';
 export * from './domains/genesisScientificCity4';
 export * from './orchestration/createScientificWorld';

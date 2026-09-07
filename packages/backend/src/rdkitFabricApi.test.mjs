@@ -34,7 +34,10 @@ if (runtime.available) {
     assert.equal(response.body.run.modelId, 'chem-rdkit-descriptors');
     assert.equal(response.body.run.outputs.canonicalSmiles, 'CCO');
     assert.ok(Math.abs(response.body.run.outputs.molWt - 46.069) < 0.0001);
-    assert.equal(response.body.run.provenance.engine, 'RDKit 2026.03.5');
+    // The engine string must be the version RDKit itself reports, not a frozen patch
+    // number: pinning one made this test fail on an upgrade while proving nothing more.
+    assert.equal(response.body.run.provenance.engine, `RDKit ${runtime.version}`);
+    assert.match(response.body.run.provenance.engine, /^RDKit \d+\.\d+\.\d+$/);
     assert.equal(response.body.persisted, false);
   });
 } else {

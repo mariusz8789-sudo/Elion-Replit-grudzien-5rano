@@ -2,7 +2,7 @@ import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import { TemporalEngine, TemporalBranchRegistry } from '../worldModel/temporal/temporalEngine';
 import {
-  buildGenesisScientificCity3, RAINFALL_LOAD_MULTIPLIER, rainfallSchedule,
+  buildGenesisScientificCity3, FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR, rainfallLoadedPumpFlowM3S, rainfallSchedule,
   RAINFALL_EVENT_TYPE, PUMP_TRIPPED_EVENT_TYPE, HOSPITAL_SERVICE_INTERRUPTED_EVENT_TYPE, POPULATION_ACCESS_IMPAIRED_EVENT_TYPE,
 } from '../worldModel/domains/genesisScientificCity3';
 import { withScheduledEvents } from '../worldModel/events/worldEventRules';
@@ -286,8 +286,9 @@ export class GenesisScientificCitySim implements Sim3D {
   /**
    * Forks the LIVE baseline at its current tick (same `TemporalEngine.forkBranch` mechanism
    * `scenarioSession.ts`'s hydraulics session already uses for its own fork) and raises the pump's
-   * real volumetric-flow demand by the EXACT same multiplier the scripted rainfall scenario uses
-   * (`RAINFALL_LOAD_MULTIPLIER`, exported from genesisScientificCity3.ts for this purpose) — then
+   * real volumetric-flow demand by the EXACT same real stormwater loading the rainfall scenario
+   * applies (`rainfallLoadedPumpFlowM3S` at the flagship intensity, exported from
+   * genesisScientificCity3.ts for this purpose) — then
    * advances the fork far enough for the REAL hydraulics solver to re-solve headLoss and the
    * EXISTING cascade chain (pump trip -> hospital service interrupted -> population access
    * impaired) to fire on its own, exactly as it would for the scripted scenario. No second failure
@@ -299,7 +300,7 @@ export class GenesisScientificCitySim implements Sim3D {
     const forked = this.engine.forkBranch(forkTick, 'pump-failure', (graph) => {
       const current = graph.getEntity(pumpId);
       const currentFlow = current.domainState?.volumetricFlow ?? 0;
-      graph.updateEntity(pumpId, { domainState: { ...current.domainState, volumetricFlow: currentFlow * RAINFALL_LOAD_MULTIPLIER } });
+      graph.updateEntity(pumpId, { domainState: { ...current.domainState, volumetricFlow: rainfallLoadedPumpFlowM3S(FLAGSHIP_RAINFALL_INTENSITY_MM_PER_HOUR, currentFlow) } });
     });
     for (let i = 0; i < FAILURE_ADVANCE_TICKS; i++) forked.advance(GENESIS_CITY_DT_SECONDS, this.city.updater);
     this.failureBranch = forked;
@@ -360,15 +361,14 @@ export class GenesisScientificCitySim implements Sim3D {
    * moment it's added, in the same tick — no new coupling defined, no cascade logic duplicated,
    * just the correct nesting order for a dynamically-timed (rather than construction-time) trigger.
    *
-   * HONEST LIMITATION (mandatory Step 0 finding of this mission): the rainfall event's own
-   * `intensityMmPerHour` parameter is recorded for provenance but is NOT read anywhere by the real
-   * rainfall-to-load coupling — `genesisScientificCity3.ts`'s `rainfallToLoad.deriveEffect` applies
-   * a FIXED `RAINFALL_LOAD_MULTIPLIER`, never scaled by any intensity value, even though
-   * `defineCrossDomainCoupling`'s own `deriveEffect` signature is handed the full triggering event
-   * (parameters included) — the capability to read it exists in the framework, this one coupling
-   * simply doesn't use it. This method can therefore trigger the real scripted scenario, but cannot
-   * honestly support "what if rainfall were N% lower" — see the control loop's own explicit refusal
-   * for that request, which does not call this method at all.
+   * RESOLVED IN PHASE 5 (this comment previously recorded the opposite as a known limitation): the
+   * rainfall event's `intensityMmPerHour` parameter is now READ by the real rainfall-to-load
+   * coupling, which converts it to stormwater inflow through the rational method
+   * (`domains/rainfallRunoff.ts`, Q = C*i*A) before the real hydraulics model re-solves. A
+   * different intensity therefore produces a different head loss and can genuinely fail to trip
+   * the pump — so "what if the rainfall were lighter" is now a real counterfactual rather than a
+   * refusal. What remains NOT_MODELLED is the weather itself: Genesis computes the runoff response
+   * to an intensity, it does not predict the intensity.
    */
   triggerRainfallScenario(): RainfallScenarioOutcome {
     if (this.rainfallOutcome) return this.rainfallOutcome;

@@ -14,6 +14,7 @@ import {
 } from './chemistryKinetics';
 import { EPIDEMIC_SEIR_SOLVER_ID, addPopulation, makeEpidemicSEIRSolver } from './epidemicSEIR';
 import { HYDRAULICS_PUMP_PIPE_SOLVER_ID, addPumpPipeSystem, makeHydraulicsPumpPipeSolver } from './hydraulicsPumpPipe';
+import { makeRainfallRunoffSolver, RAINFALL_RUNOFF_SOLVER_ID } from './rainfallRunoff';
 
 /**
  * ONE WORLD, THREE REAL SCIENTIFIC SYSTEMS.
@@ -87,6 +88,7 @@ export function makeGenesisCityRouter(epidemicParams: EpidemicParams): SolverRou
   router.register(CHEMISTRY_KINETICS_SOLVER_ID, makeChemistryKineticsSolver());
   router.register(EPIDEMIC_SEIR_SOLVER_ID, makeEpidemicSEIRSolver(epidemicParams));
   router.register(HYDRAULICS_PUMP_PIPE_SOLVER_ID, makeHydraulicsPumpPipeSolver());
+  router.register(RAINFALL_RUNOFF_SOLVER_ID, makeRainfallRunoffSolver());
   return router;
 }
 

@@ -9,6 +9,7 @@ Commands:
   detect                 -> { ok, version }
   descriptors {smiles}   -> { ok, data: {...real descriptors...} }
   validate {smiles}      -> { ok, valid, canonicalSmiles? }
+  similarity {smiles, reference} -> { ok, tanimoto, scaffold* }
 """
 import sys
 import json
@@ -67,6 +68,32 @@ def main():
                 total += 1.0 - DataStructs.TanimotoSimilarity(fps[i], fps[j])
                 pairs += 1
         print(json.dumps({"ok": True, "meanPairwiseDistance": round(total / pairs, 5), "n": len(mols)}))
+        return
+
+    # Porownanie STRUKTURALNE dwoch czasteczek: Tanimoto na Morgan FP (r=2, 2048 bit)
+    # + rzeczywisty szkielet Bemisa-Murcko. Oba pochodza wprost z RDKit; zadna
+    # wartosc nie jest tu szacowana ani interpolowana.
+    if cmd == "similarity":
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+        cand = Chem.MolFromSmiles(req.get("smiles", "")) if isinstance(req.get("smiles"), str) else None
+        ref = Chem.MolFromSmiles(req.get("reference", "")) if isinstance(req.get("reference"), str) else None
+        if cand is None or ref is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        fp_cand = AllChem.GetMorganFingerprintAsBitVect(cand, 2, nBits=2048)
+        fp_ref = AllChem.GetMorganFingerprintAsBitVect(ref, 2, nBits=2048)
+        scaffold_cand = Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(cand))
+        scaffold_ref = Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(ref))
+        print(json.dumps({
+            "ok": True,
+            "tanimoto": round(DataStructs.TanimotoSimilarity(fp_cand, fp_ref), 5),
+            "fingerprint": "morgan_r2_2048",
+            "candidateCanonical": Chem.MolToSmiles(cand),
+            "referenceCanonical": Chem.MolToSmiles(ref),
+            "scaffoldCandidate": scaffold_cand,
+            "scaffoldReference": scaffold_ref,
+            "sameScaffold": scaffold_cand == scaffold_ref,
+        }))
         return
 
     smiles = req.get("smiles", "")
@@ -156,6 +183,13 @@ def main():
             "lipinskiViolations": violations,
             "lipinskiPass": violations <= 1,
         }
+        try:
+            from rdkit.Chem import inchi as rd_inchi
+            data["inchi"] = rd_inchi.MolToInchi(mol) or None
+            data["inchiKey"] = rd_inchi.MolToInchiKey(mol) or None
+        except Exception:  # noqa: BLE001 — brak modulu InChI => brak identyfikatora, nie zmyslony
+            data["inchi"] = None
+            data["inchiKey"] = None
         print(json.dumps({"ok": True, "data": data, "engine": "RDKit " + rdkit.__version__}))
         return
 

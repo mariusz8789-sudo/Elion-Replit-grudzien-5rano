@@ -11,6 +11,7 @@ import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
 import { TRAFFIC_FLOW_SOLVER_ID } from '../domains/trafficFlow';
 import { FIRE_THERMAL_SOLVER_ID } from '../domains/fireThermal';
 import { DROUGHT_SOLVER_ID } from '../domains/drought';
+import { WILDFIRE_SPREAD_SOLVER_ID } from '../domains/wildfireSpread';
 
 /**
  * PHASE 7 — SOLVER CAPABILITY REGISTRY.
@@ -18,16 +19,18 @@ import { DROUGHT_SOLVER_ID } from '../domains/drought';
  * The phase was scoped as fire/thermal and traffic/mobility. A full-repository
  * audit found **neither exists**, and that finding is the deliverable:
  *
- * - **Fire / thermal: now PARTIALLY_MODELLED for a single source.**
- *   `domains/fireThermal.ts` is a real solver: the published NFPA 921/SFPE
- *   t-squared heat-release-rate design-fire curve, a real fuel inventory with
- *   energy conservation bounding it, and the SFPE point-source radiant-heat-
- *   transfer model. It advances exactly ONE fire source — no spread, no
- *   compartment dynamics, no structural response. That single-source model
- *   is an honest fit for INDUSTRIAL_FIRE (this is literally how real
- *   process-safety practice models a pool/jet fire consequence), but NOT for
- *   WILDFIRE, whose defining phenomenon is spread across a fuel bed — which
- *   this does not do — so WILDFIRE stays NOT_MODELLED. See both entries below.
+ * - **Fire / thermal: now PARTIALLY_MODELLED, by two real, distinct solvers.**
+ *   `domains/fireThermal.ts` (published NFPA 921/SFPE t-squared heat-release-
+ *   rate design-fire curve, real fuel-inventory energy conservation, SFPE
+ *   point-source radiant heat transfer) advances exactly ONE fire source —
+ *   an honest fit for INDUSTRIAL_FIRE, since that is literally how real
+ *   process-safety practice models a pool/jet fire consequence. WILDFIRE's
+ *   defining phenomenon is spread across a fuel bed, which that solver does
+ *   not do; `domains/wildfireSpread.ts` (Phase 13) closes that separately —
+ *   a real Rothermel (1972) surface-fire-spread model, an elliptical fire
+ *   shape (Anderson 1983/Alexander 1985), and minimum-travel-time grid
+ *   propagation (Finney 2002) over the SAME terrain heightfield
+ *   `floodInundation.ts` already uses. See both entries below.
  * - **Traffic flow: now PARTIALLY_MODELLED.** `domains/trafficFlow.ts` is a real
  *   WorldGraph solver on the existing road-network geometry
  *   (`core/world/roadNetwork.ts`): a Greenshields fundamental diagram, a
@@ -72,19 +75,19 @@ export interface SolverCapability {
   readonly missing?: readonly string[];
 }
 
-/**
- * What `domains/fireThermal.ts` covers for a single fire source (a real
- * t-squared HRR curve, energy-conserving fuel inventory, and point-source
- * radiant heat transfer) does not make WILDFIRE modelled: spread across a
- * fuel bed IS the phenomenon, and nothing here advances more than one
- * non-spreading source.
- */
-const NO_WILDFIRE_SPREAD_MODEL: readonly string[] = Object.freeze([
-  'a fire-spread/rate-of-spread model across a fuel bed (e.g. Rothermel for wildland fuels) — domains/fireThermal.ts advances exactly one non-spreading fire source, never two',
-  'a fuel-bed/terrain map (fuel type, moisture, load, arrangement) for spread to run on',
-  'wind and slope effects on spread direction and rate',
-  'fire-resistance and structural-response-to-fire data, which would also need the structural model that does not exist either',
-]);
+/** What `domains/wildfireSpread.ts` still does not cover — the honest remainder after the real Rothermel/MTT spread solver. */
+const WILDFIRE_SPREAD_CAVEAT =
+  'A real Rothermel (1972) surface-fire-spread model now runs — reaction intensity, moisture/mineral damping, ' +
+  'and wind/slope spread-rate coefficients over a curated subset of Anderson\'s (1982) standard fuel models — ' +
+  'combined with the real elliptical fire-shape model (Anderson 1983/Alexander 1985) and a real minimum-travel- ' +
+  'time Dijkstra propagation (Finney 2002) over the SAME terrain heightfield floodInundation.ts uses, giving a ' +
+  'real burned-area-over-time, head rate of spread, and Byram (1959) fireline intensity/flame length. Still NOT ' +
+  'modelled: crown fire (no canopy, no crown-fire initiation or spread), spotting (ember lofting and long- ' +
+  'distance spot ignition — a major real driver of wildfire growth this omits), fire-weather coupling (wind is ' +
+  'one fixed stated vector, not time-varying or fire-induced), fuel moisture derived from real weather or ' +
+  'drought.ts\'s soil moisture (it is a stated input), and suppression. Only four of Anderson\'s 13 standard fuel ' +
+  'models are implemented, each simplified to one dead-fuel size class. Terrain grounding follows the same rule ' +
+  'as floodInundation.ts: PROCEDURAL_APPROXIMATION on synthetic terrain, MODEL_ESTIMATE only with real survey elevations.';
 
 /** What `domains/fireThermal.ts` still does not cover — the honest remainder after the HRR/fuel/radiation solver. */
 const FIRE_THERMAL_CAVEAT =
@@ -169,10 +172,14 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
     caveat: 'The world generator really builds and rebuilds city structure. Urban dynamics — land use, economics, population change over time — are not modelled.',
   },
 
-  // --- Fire/thermal: a real single-source HRR/radiation solver ------------
-  // fits INDUSTRIAL_FIRE (real process-safety practice models a pool/jet
-  // fire this way); WILDFIRE needs the spread this does not do.
-  WILDFIRE: notModelled(NO_WILDFIRE_SPREAD_MODEL),
+  // --- Fire/thermal: single-source HRR/radiation (INDUSTRIAL_FIRE) and -----
+  // real Rothermel/MTT spread across a fuel bed (WILDFIRE), two different
+  // real solvers for two genuinely different fire phenomena.
+  WILDFIRE: {
+    capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
+    solverId: WILDFIRE_SPREAD_SOLVER_ID,
+    caveat: WILDFIRE_SPREAD_CAVEAT,
+  },
   INDUSTRIAL_FIRE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
     solverId: FIRE_THERMAL_SOLVER_ID,

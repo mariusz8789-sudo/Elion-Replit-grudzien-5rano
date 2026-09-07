@@ -43,12 +43,32 @@ describe('parseObservationIntent — rainfallCounterfactualQuery (now a real, co
     const intent = parseObservationIntent('Co jeśli deszcz będzie o 30% mniejszy?');
     expect(intent.rainfallCounterfactualQuery).toBe(true);
     expect(intent.rainfallCounterfactualPercent).toBe(30);
+    expect(intent.rainfallCounterfactualDirection).toBe('LOWER');
   });
 
   it('the English equivalent', () => {
     const intent = parseObservationIntent('What if the rainfall were 30% lower?');
     expect(intent.rainfallCounterfactualQuery).toBe(true);
     expect(intent.rainfallCounterfactualPercent).toBe(30);
+    expect(intent.rainfallCounterfactualDirection).toBe('LOWER');
+  });
+
+  it('the HIGHER direction — the Genesis Urban Resilience Engine audit\'s own example sentence, Polish', () => {
+    const intent = parseObservationIntent('Co jeśli deszcz będzie o 30% większy?');
+    expect(intent.rainfallCounterfactualQuery).toBe(true);
+    expect(intent.rainfallCounterfactualPercent).toBe(30);
+    expect(intent.rainfallCounterfactualDirection).toBe('HIGHER');
+  });
+
+  it('the HIGHER direction, English', () => {
+    const intent = parseObservationIntent('What if the rainfall were 30% higher?');
+    expect(intent.rainfallCounterfactualQuery).toBe(true);
+    expect(intent.rainfallCounterfactualPercent).toBe(30);
+    expect(intent.rainfallCounterfactualDirection).toBe('HIGHER');
+  });
+
+  it('direction is null when no counterfactual query matched at all', () => {
+    expect(parseObservationIntent('Compare the two worlds.').rainfallCounterfactualDirection).toBeNull();
   });
 
   it('reads a different percentage, not just the flagship\'s own 30%', () => {

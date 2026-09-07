@@ -17,6 +17,7 @@ import { makeElectricalGeneratorSolver, ELECTRICAL_GENERATOR_SOLVER_ID } from '.
 import { makeQuantumTunnelingSolver, QUANTUM_TUNNELING_SOLVER_ID } from '../core/worldModel/domains/quantumTunneling';
 import { makeRainfallRunoffSolver, RAINFALL_RUNOFF_SOLVER_ID } from '../core/worldModel/domains/rainfallRunoff';
 import { makeSeismicSourceSolver, SEISMIC_SOURCE_SOLVER_ID } from '../core/worldModel/domains/seismicShaking';
+import { buildSyntheticTerrain, FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver } from '../core/worldModel/domains/floodInundation';
 import { makeMolecularStructureSolver, MOLECULAR_STRUCTURE_SOLVER_ID } from '../core/worldModel/domains/molecularStructure';
 
 /**
@@ -79,6 +80,7 @@ describe('Every recognisable scenario gets an honest answer', () => {
     router.register(QUANTUM_TUNNELING_SOLVER_ID, makeQuantumTunnelingSolver());
     router.register(RAINFALL_RUNOFF_SOLVER_ID, makeRainfallRunoffSolver());
     router.register(SEISMIC_SOURCE_SOLVER_ID, makeSeismicSourceSolver());
+    router.register(FLOOD_INUNDATION_SOLVER_ID, makeFloodInundationSolver(buildSyntheticTerrain()));
     router.register(MOLECULAR_STRUCTURE_SOLVER_ID, makeMolecularStructureSolver());
 
     for (const [kind, capability] of Object.entries(SOLVER_CAPABILITY_BY_SCENARIO_KIND)) {
@@ -124,7 +126,8 @@ describe('The honest inventory is queryable, not buried', () => {
   });
 
   it('the partially-modelled kinds state the hole, never only the capability', () => {
-    expect(describeCapability('FLOOD')).toMatch(/Inundation itself is NOT modelled/);
+    // Phase 8.2 made depth and extent real; the hydrograph is the part that is still absent.
+    expect(describeCapability('FLOOD')).toMatch(/Still NOT modelled: the hydrograph/);
     expect(describeCapability('EARTHQUAKE')).toMatch(/Structural damage.*NOT modelled/);
   });
 

@@ -5,7 +5,7 @@ import { EPIDEMIC_SEIR_SOLVER_ID } from '../domains/epidemicSEIR';
 import { HYDRAULICS_PUMP_PIPE_SOLVER_ID } from '../domains/hydraulicsPumpPipe';
 import { MOLECULAR_STRUCTURE_SOLVER_ID } from '../domains/molecularStructure';
 import { QUANTUM_TUNNELING_SOLVER_ID } from '../domains/quantumTunneling';
-import { RAINFALL_RUNOFF_SOLVER_ID } from '../domains/rainfallRunoff';
+import { FLOOD_INUNDATION_SOLVER_ID } from '../domains/floodInundation';
 import { SEISMIC_SOURCE_SOLVER_ID } from '../domains/seismicShaking';
 
 /**
@@ -100,8 +100,8 @@ export const SOLVER_CAPABILITY_BY_SCENARIO_KIND: Readonly<Record<ScenarioKind, S
   // --- Partially modelled: a real solver, with a real hole in it ------------
   FLOOD: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,
-    solverId: RAINFALL_RUNOFF_SOLVER_ID,
-    caveat: 'Rainfall to peak stormwater runoff is real (rational method) and drives the real hydraulics model. Inundation itself is NOT modelled: no terrain, no depth, no flood extent, no hydrograph.',
+    solverId: FLOOD_INUNDATION_SOLVER_ID,
+    caveat: 'Rainfall to peak runoff is real (rational method), it drives the real hydraulics model, and inundation depth and extent are now real too: a volume-conserving, connectivity-constrained planar fill over a terrain heightfield, growing when a pump trip removes drainage. Still NOT modelled: the hydrograph — no routing, no flow velocity, no arrival time, no infiltration. On the reference city the terrain is synthetic, which holds the result at PROCEDURAL_APPROXIMATION until real survey elevations are loaded.',
   },
   EARTHQUAKE: {
     capability: CAPABILITY_CODE.PARTIALLY_MODELLED,

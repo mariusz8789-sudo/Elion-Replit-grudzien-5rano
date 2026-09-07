@@ -207,13 +207,13 @@ describe('The quantum lab is strictly opt-in', () => {
     const city = buildGenesisScientificCity4({ worldId: 'q-optout' });
     expect(city.tunnelJunctionId).toBeUndefined();
     expect(city.base.availableDomains).not.toContain('quantum-mechanics');
-    expect(city.base.availableDomains).toEqual(['chemistry-kinetics', 'electrical-engineering', 'environment-hydrology', 'epidemiology', 'hydraulics-engineering']);
+    expect(city.base.availableDomains).toEqual(['chemistry-kinetics', 'electrical-engineering', 'environment-hydrology', 'epidemiology', 'flood-hydrology', 'hydraulics-engineering']);
   });
 
-  it('opting in adds the quantum domain to the SAME world, alongside the existing five', () => {
+  it('opting in adds the quantum domain to the SAME world, alongside the existing six', () => {
     const city = buildGenesisScientificCity4({ withQuantumLab: true, worldId: 'q-optin' });
     expect(city.tunnelJunctionId).toBe('tunnel-junction:stm-1');
-    expect(city.base.availableDomains).toEqual(['chemistry-kinetics', 'electrical-engineering', 'environment-hydrology', 'epidemiology', 'hydraulics-engineering', 'quantum-mechanics']);
+    expect(city.base.availableDomains).toEqual(['chemistry-kinetics', 'electrical-engineering', 'environment-hydrology', 'epidemiology', 'flood-hydrology', 'hydraulics-engineering', 'quantum-mechanics']);
   });
 
   it('the rainfall cascade still runs identically with the quantum lab enabled', () => {

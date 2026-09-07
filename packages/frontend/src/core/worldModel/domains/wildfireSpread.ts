@@ -2,6 +2,7 @@ import { GENESIS_EVENT_CONTRACT_VERSION, type GenesisEvent } from '../../events/
 import type { Observation } from '../../world/scientificWorldState';
 import { cellAreaM2, type TerrainHeightfield } from './floodInundation';
 import { defineCrossDomainCoupling, type CrossDomainCoupling } from '../crossDomain/crossDomainCoupling';
+import { celsiusToFahrenheit, WEATHER_STEP_EVENT_TYPE } from './weather';
 import { entityId, type EntityId, type GroundingLevel, type WorldModelEntity } from '../ecs/types';
 import { WorldGraph } from '../ecs/worldGraph';
 import type { DomainSolver, SolverResult } from '../solvers/solverRouter';
@@ -165,7 +166,10 @@ export function rothermelBaseRate(fuel: FuelModel, moistureFraction: number): Ro
   const reactionVelocity = maxReactionVelocity * relativePacking ** A * Math.exp(A * (1 - relativePacking));
 
   const rM = Math.min(moistureFraction / fuel.moistureOfExtinction, 1);
-  const moistureDamping = Math.max(0, 1 - 2.59 * rM + 5.11 * rM ** 2 - 3.52 * rM ** 3);
+  // At or above the moisture of extinction the fuel does not carry fire: the damping polynomial is
+  // exactly zero at rM=1 analytically, but evaluating it in floating point leaves ~1e-16, which
+  // would make a dead-out fuel report a non-zero spread rate to any consumer testing `> 0`.
+  const moistureDamping = rM >= 1 ? 0 : Math.max(0, 1 - 2.59 * rM + 5.11 * rM ** 2 - 3.52 * rM ** 3);
   const mineralDamping = 0.174 * FUEL_PARTICLE_EFFECTIVE_MINERAL_CONTENT ** -0.19;
 
   const netFuelLoadLbFt2 = w0 * (1 - FUEL_PARTICLE_TOTAL_MINERAL_CONTENT);
@@ -258,6 +262,57 @@ export function byramFlameLengthM(intensityKWm: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// DEAD FUEL MOISTURE — Simard (1968) equilibrium moisture content + timelag.
+// ---------------------------------------------------------------------------
+
+/**
+ * Equilibrium moisture content of DEAD fuel, percent, from air temperature
+ * and relative humidity — Simard (1968), the equilibrium relationship used
+ * by the US National Fire Danger Rating System and reproduced across the
+ * fire-behaviour literature. Three branches over relative humidity, in the
+ * ORIGINAL published units (RH in %, temperature in °F, EMC in %), for the
+ * same reason `rothermelBaseRate` keeps US customary units: the coefficients
+ * are calibrated in them.
+ *
+ * This is what physically sets dead fuel moisture. Dead fuel is detached
+ * from the soil water system and equilibrates with the AIR — which is why
+ * `buildDroughtToWildfireCoupling` refuses to derive it from soil moisture,
+ * and why this function, given the weather layer, legitimately can.
+ */
+export function simardEquilibriumMoisturePct(airTemperatureC: number, relativeHumidityPct: number): number {
+  const h = Math.max(0, Math.min(100, relativeHumidityPct));
+  const t = celsiusToFahrenheit(airTemperatureC);
+  let emc: number;
+  if (h < 10) {
+    emc = 0.03229 + 0.281073 * h - 0.000578 * h * t;
+  } else if (h <= 50) {
+    emc = 2.22749 + 0.160107 * h - 0.014784 * t;
+  } else {
+    emc = 21.0606 + 0.005565 * h * h - 0.00035 * h * t - 0.483199 * h;
+  }
+  return Math.max(0, emc);
+}
+
+/**
+ * Standard dead-fuel timelag classes, hours. A fuel's timelag is DEFINED as
+ * the time to accomplish 1-1/e (~63%) of the adjustment toward equilibrium,
+ * which makes the relaxation below the definition itself rather than a
+ * fitted curve.
+ */
+export const DEAD_FUEL_TIMELAG_HOURS = Object.freeze({ ONE_HOUR: 1, TEN_HOUR: 10, HUNDRED_HOUR: 100, THOUSAND_HOUR: 1000 });
+
+/**
+ * Relaxes a dead fuel's moisture toward equilibrium over `dtHours` with the
+ * given timelag: m(t+dt) = EMC + (m(t)-EMC)*exp(-dt/tau). Exact given the
+ * timelag definition above; fine fuels track the air closely, heavy fuels
+ * lag it by days.
+ */
+export function relaxDeadFuelMoisturePct(currentPct: number, equilibriumPct: number, dtHours: number, timelagHours: number): number {
+  if (!(timelagHours > 0) || dtHours <= 0) return currentPct;
+  return equilibriumPct + (currentPct - equilibriumPct) * Math.exp(-dtHours / timelagHours);
+}
+
+// ---------------------------------------------------------------------------
 // FUEL BED — reuses `TerrainHeightfield`'s own grid shape; adds fuel model
 // and moisture per cell rather than building a second geometry.
 // ---------------------------------------------------------------------------
@@ -278,6 +333,11 @@ export function buildUniformFuelBed(terrain: TerrainHeightfield, fuelModelKey: s
     fuelModelKeys: new Array(n).fill(fuelModelKey),
     fuelMoistureFraction: new Array(n).fill(fuelMoistureFraction),
   };
+}
+
+/** The same fuel bed with a different uniform dead-fuel moisture — used when a declared coupling changes the moisture and the spread field must be re-solved. */
+export function withUniformFuelMoisture(fuelBed: FuelBed, fuelMoistureFraction: number): FuelBed {
+  return { ...fuelBed, fuelMoistureFraction: new Array(fuelBed.terrain.cols * fuelBed.terrain.rows).fill(fuelMoistureFraction) };
 }
 
 export interface WindVector {
@@ -471,6 +531,10 @@ export interface WildfireDomainState extends Record<string, number> {
   burnedCells: number;
   totalCells: number;
   terrainSurveyed: number;
+  /** Dead-fuel moisture actually in force, as a FRACTION (not %). Written by `buildWeatherToFuelMoistureCoupling` when one is declared; otherwise the fuel bed's own stated value. */
+  fuelMoistureFraction: number;
+  /** Equilibrium moisture content the air implies, %, when a weather coupling is declared. Context alongside `fuelMoistureFraction`, which lags it. */
+  equilibriumMoisturePct: number;
   /**
    * KBDI-equivalent drought index written by `buildDroughtToWildfireCoupling`
    * from `drought.ts`'s real water balance. This is fire-danger CONTEXT that
@@ -495,7 +559,10 @@ let stepCounter = 0;
  * `floodInundation.ts`'s cache-on-input-change pattern.
  */
 export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ignitionCellIndices: readonly number[]): DomainSolver {
-  const result = simulateWildfireSpread(fuelBed, wind, ignitionCellIndices);
+  const baselineMoisture = fuelBed.fuelMoistureFraction[0] ?? 0;
+  let activeFuelBed = fuelBed;
+  let result = simulateWildfireSpread(fuelBed, wind, ignitionCellIndices);
+  let solvedAtMoisture = baselineMoisture;
   const totalCells = fuelBed.terrain.cols * fuelBed.terrain.rows;
 
   return (entity, ctx): SolverResult => {
@@ -503,6 +570,39 @@ export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ign
     const elapsedS = (state?.elapsedS ?? 0) + ctx.dt;
     // Written by the drought coupling, not by this solver — carry it through rather than wiping it.
     const droughtIndexKBDI = state?.droughtIndexKBDI ?? 0;
+
+    /*
+     * Conditions can change under the fire, but ONLY because a DECLARED coupling wrote a new
+     * fuel moisture onto this entity. With no such coupling the entity carries no
+     * `fuelMoistureFraction`, this falls back to the fuel bed's own value, the key never
+     * changes, and the field is never re-solved — byte-identical to the fixed-conditions
+     * behaviour. There is no hidden path by which weather reaches this solver.
+     *
+     * When it DOES change, the field is re-solved from the cells that have ALREADY burned,
+     * with their existing arrival times preserved and new travel times measured from now.
+     * That is the real time-stepped minimum-travel-time technique (re-solve from the current
+     * perimeter), not a restart of the whole fire under new conditions.
+     */
+    const requestedMoisture = state?.fuelMoistureFraction ?? baselineMoisture;
+    if (requestedMoisture !== solvedAtMoisture) {
+      const burnedSoFar: number[] = [];
+      for (let i = 0; i < result.arrivalTimeS.length; i++) if (result.arrivalTimeS[i] <= elapsedS) burnedSoFar.push(i);
+      activeFuelBed = withUniformFuelMoisture(fuelBed, requestedMoisture);
+      if (burnedSoFar.length > 0) {
+        const continued = simulateWildfireSpread(activeFuelBed, wind, burnedSoFar);
+        const merged = new Float64Array(result.arrivalTimeS.length);
+        for (let i = 0; i < merged.length; i++) {
+          merged[i] = result.arrivalTimeS[i] <= elapsedS
+            ? result.arrivalTimeS[i] // already burned: history is history
+            : elapsedS + continued.arrivalTimeS[i]; // still unburned: reached under the NEW conditions
+        }
+        result = { ...continued, arrivalTimeS: merged };
+      } else {
+        result = simulateWildfireSpread(activeFuelBed, wind, ignitionCellIndices);
+      }
+      solvedAtMoisture = requestedMoisture;
+    }
+
     const burnedAreaM2 = burnedAreaM2At(result, fuelBed.terrain, elapsedS);
     let burnedCells = 0;
     for (let i = 0; i < result.arrivalTimeS.length; i++) if (result.arrivalTimeS[i] <= elapsedS) burnedCells++;
@@ -552,6 +652,8 @@ export function makeWildfireSpreadSolver(fuelBed: FuelBed, wind: WindVector, ign
           burnedCells,
           totalCells,
           terrainSurveyed,
+          fuelMoistureFraction: requestedMoisture,
+          equilibriumMoisturePct: state?.equilibriumMoisturePct ?? 0,
           droughtIndexKBDI,
         },
         statusLabel: `${burnedCells}/${totalCells} cells burned`,
@@ -590,6 +692,8 @@ export function addWildfire(graph: WorldGraph, fuelBed: FuelBed, wind: WindVecto
       burnedCells: ignitionCellIndices.length,
       totalCells,
       terrainSurveyed,
+      fuelMoistureFraction: fuelBed.fuelMoistureFraction[0] ?? 0,
+      equilibriumMoisturePct: 0,
       droughtIndexKBDI: 0,
     },
     domainBinding: { solverId: WILDFIRE_SPREAD_SOLVER_ID, domainId: WILDFIRE_DOMAIN_ID },
@@ -706,6 +810,83 @@ export function buildDroughtToWildfireCoupling(droughtStepEventType: string): Cr
         patch: { domainState: { ...wildfire.domainState, droughtIndexKBDI: kbdi } },
         eventType: WILDFIRE_DROUGHT_CONTEXT_EVENT_TYPE,
         cause: 'drought-water-balance-deficit',
+      };
+    },
+  });
+}
+
+export const WILDFIRE_FUEL_MOISTURE_EVENT_TYPE = 'wildfire.fuelmoisture.updated';
+
+/**
+ * WEATHER -> DEAD FUEL MOISTURE -> WILDFIRE BEHAVIOUR. The scientifically
+ * justified half of the drought/fire question, closed properly.
+ *
+ * `buildDroughtToWildfireCoupling` refused to derive fuel moisture from SOIL
+ * moisture, because no published universal relationship supports that link.
+ * This coupling makes the link the literature DOES support: dead fuel is
+ * hygroscopic and equilibrates with the AIR, so given air temperature and
+ * relative humidity — which the weather layer supplies — Simard's (1968)
+ * equilibrium moisture content relationship gives the equilibrium directly,
+ * and the fuel relaxes toward it at its own timelag. The result feeds
+ * Rothermel's moisture-damping coefficient and really does change the rate
+ * of spread.
+ *
+ * The five moisture-ish quantities this system now handles stay STRICTLY
+ * distinct, because conflating them is the exact error this phase exists to
+ * avoid:
+ *
+ * | quantity | what it is | where it comes from |
+ * |---|---|---|
+ * | atmospheric equilibrium moisture (EMC) | the moisture dead fuel would reach in equilibrium with this air | Simard (1968), from T and RH — REAL, here |
+ * | dead fuel moisture | what the fuel actually holds now, lagging EMC | timelag relaxation toward EMC — REAL, here |
+ * | live fuel moisture | water in LIVING vegetation | NOT MODELLED: species- and site-specific, no universal coefficient |
+ * | KBDI / drought index | soil-layer storage deficit | `drought.ts`, carried as context — NOT converted to fuel moisture |
+ * | soil moisture | water in the soil column | `drought.ts`'s water balance |
+ *
+ * `timelagHours` selects which dead-fuel size class is being tracked; the
+ * default 1-hour class is the fine surface fuel that actually carries a
+ * grass or litter fire, which is why it is the one worth coupling.
+ */
+export function buildWeatherToFuelMoistureCoupling(options: { timelagHours?: number } = {}): CrossDomainCoupling {
+  const timelagHours = options.timelagHours ?? DEAD_FUEL_TIMELAG_HOURS.ONE_HOUR;
+  return defineCrossDomainCoupling({
+    id: 'weather-to-dead-fuel-moisture',
+    sourceDomain: 'environment-atmosphere',
+    targetDomain: WILDFIRE_DOMAIN_ID,
+    triggerEventType: WEATHER_STEP_EVENT_TYPE,
+    relationshipKind: 'weathers',
+    direction: 'from',
+    condition: 'The environmental state reports new air temperature and relative humidity over this fuel bed',
+    effect: 'Dead fuel moisture relaxes toward the Simard (1968) equilibrium moisture content the air implies, at the fuel size class timelag, and the wildfire spread field is re-solved from its current perimeter under the new moisture — so drier air really does speed the fire up',
+    // Real published equilibrium relationship over real supplied weather; the weather itself is
+    // only as grounded as its source, which the weather entity discloses separately.
+    grounding: 'MODEL_ESTIMATE',
+    deriveEffect: (wildfire, triggerEvent) => {
+      const airTemperatureC = triggerEvent.parameters.airTemperatureC;
+      const relativeHumidityPct = triggerEvent.parameters.relativeHumidityPct;
+      const elapsedS = triggerEvent.parameters.elapsedS;
+      if (typeof airTemperatureC !== 'number' || typeof relativeHumidityPct !== 'number') return undefined;
+
+      const equilibriumMoisturePct = simardEquilibriumMoisturePct(airTemperatureC, relativeHumidityPct);
+      const currentFraction = wildfire.domainState?.fuelMoistureFraction ?? 0;
+      const previousElapsedS = wildfire.domainState?.weatherElapsedS ?? 0;
+      const dtHours = typeof elapsedS === 'number' ? Math.max(0, (elapsedS - previousElapsedS) / 3600) : 0;
+
+      const relaxedPct = relaxDeadFuelMoisturePct(currentFraction * 100, equilibriumMoisturePct, dtHours, timelagHours);
+      const nextFraction = relaxedPct / 100;
+      if (nextFraction === currentFraction && wildfire.domainState?.equilibriumMoisturePct === equilibriumMoisturePct) return undefined;
+
+      return {
+        patch: {
+          domainState: {
+            ...wildfire.domainState,
+            fuelMoistureFraction: nextFraction,
+            equilibriumMoisturePct,
+            weatherElapsedS: typeof elapsedS === 'number' ? elapsedS : previousElapsedS,
+          },
+        },
+        eventType: WILDFIRE_FUEL_MOISTURE_EVENT_TYPE,
+        cause: 'atmospheric-equilibrium-moisture',
       };
     },
   });

@@ -52,12 +52,26 @@ Read as a checklist rather than a mood board — each of these is a concrete, im
 
 Recorded so progress is measurable rather than asserted:
 
-- Density: current scientific-city context is ~20 buildings on a 150-unit plot. Target is a skyline.
-- Emissive windows: **done** at kit level (`createFacadeBuilding`, instanced).
-- Bloom: available in `postProcessing.ts`; needs per-scene verification that it is actually enabled.
-- Atmospheric perspective: fog exists (`environment.ts`); the depth-graded desaturation of the target
-  is not implemented.
+- Density: current scientific-city context is a ~11x11 block grid on a 150-unit plot (Sprint B), not
+  yet a horizon-spanning skyline. Real progress, still short of the target.
+- Emissive windows: **done** at kit level (`createFacadeBuilding`, instanced) — and, as of Sprint C-1/
+  F+, `epidemicCity3D.ts`'s own windows are instanced too (2028 -> 1527 real draw calls for `#/city3d`,
+  see `PERFORMANCE_BUDGET.md` §3).
+- Bloom: **verified on** for `#/scientific-city` (`toneMappingExposure: 1.15`, tuned strength/radius/
+  threshold — Sprint B/groundwork) and `#/city3d` (pre-existing).
+- Atmospheric perspective: fog exists (`environment.ts`); Sprint C-2 additionally makes it react to a
+  real C3 event (denser fog once `RAINFALL_EVENT_TYPE` fires). The depth-graded DESATURATION the
+  target shows is still not implemented — fog density alone, not a full atmospheric-perspective shader.
 - Hotspot light pools: **not implemented**, and correctly blocked on real C3 state to drive them.
-- Water/reflections: `water.ts` exists but is not wired into any production scene.
-- Vehicle light trails, road markings, kerbs: not implemented.
-- Composed camera: `cameraRig.ts` exists and is used; cinematic framing presets are partial.
+- Water/reflections: `water.ts`'s `createWaterSurface` (an actual reflective/refractive body of
+  water) is still not wired into any production scene — genuinely still a gap. Its smaller
+  `captureDryLook`/`applyWetLook` half (wet-road response, not a water body) IS now wired, into
+  `#/scientific-city`'s Sprint C-2 rainfall response (Sprint F+ dedup fix — an earlier version of
+  that response had duplicated the same idea before this gap note was checked against the real
+  module).
+- Vehicle light trails: not implemented. Road markings/kerbs: **done** for `#/scientific-city`
+  (Sprint B, `createRoadMarkings`/`createSidewalk`).
+- Composed camera: `cameraRig.ts` exists and is used; Sprint C-3/D added a real establish->hero camera
+  move for `#/scientific-city` (wide establishing shot pushes into a lens-matched hero framing on the
+  pump/hospital pair, with a rack focus) — the flagship scene's camera is no longer a single static
+  shot. Still scene-specific hand-tuning, not a general cinematic shot-planning system.

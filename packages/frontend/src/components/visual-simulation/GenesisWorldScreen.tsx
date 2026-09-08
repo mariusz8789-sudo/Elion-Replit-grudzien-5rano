@@ -16,6 +16,7 @@ import { createPBRMaterial, type StaticGenesisMaterialId } from '../../core/thre
 import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/graphics/postProcessing';
 import { createPracticalLight } from '../../core/three/graphics/lighting';
 import { createLightShaft } from '../../core/three/graphics/atmosphere';
+import { createFacadeBuilding } from '../../core/three/graphics/buildingKit';
 import { createWaterSurface, captureDryLook, applyWetLook, type WaterSurfaceHandle } from '../../core/three/graphics/water';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
@@ -198,6 +199,18 @@ function footprintHalfExtent(scale: number): number {
   return Math.max(1.5, 1.5 * scale) / 2;
 }
 
+/** A stable, deterministic seed derived from an entity's own real id — never `Math.random()`, so a
+ * rebuilt scene (replay, branch switch) reproduces the identical building every time, the same
+ * convention `genesisScientificCitySim.ts`'s own `stableSeed` already documents. */
+function stableSeed(id: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash | 0);
+}
+
 /** Builds a square AABB obstacle centered on a real entity position, sized from its own real render scale. */
 function buildingObstacle(position: { x: number; z: number }, scale: number): Obstacle {
   const half = footprintHalfExtent(scale);
@@ -240,6 +253,10 @@ export class GenesisWorldSim3D implements Sim3D {
    * the hydrology solve reports — see `FLOOD_WATER_MIN_VISIBLE_DEPTH_M`'s own doc. ASTRA B4: a real
    * `createWaterSurface` (transmission + scrolling ripple) rather than a static flat-color plane. */
   private floodWater: WaterSurfaceHandle | null = null;
+  /** GAME-GRADE C2 — shared base materials for `createFacadeBuilding`'s output. Cloned per building
+   * (see `resolveBoundaryPlaceholder`'s own doc), created once here so cleanup has one owner. */
+  private buildingWallMaterial: THREE_NS.Material | null = null;
+  private buildingWindowMaterial: THREE_NS.Material | null = null;
 
   /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
@@ -389,6 +406,20 @@ export class GenesisWorldSim3D implements Sim3D {
     this.root = new THREE.Group();
     scene.add(this.root);
 
+    // Declared here (not down with the rest of PRIORITY 2's building setup) because
+    // `resolveBoundaryPlaceholder` below needs it in its closure too, and this is the one canonical
+    // place both consumers read from — no second literal of this id anywhere in this file.
+    const labBuildingId: WorldFrameEntityId = 'building:chemistry-lab-building';
+
+    // GAME-GRADE C2 — same recipe `genesisScientificCitySim.ts` already proved: a plain CONCRETE wall
+    // and a white, warm-emissive window base (InstanceBatch multiplies this by each window's own
+    // lit/unlit vertex color, so white lets that tint show through undistorted; the emissive feeds
+    // the bloom threshold ASTRA B2 already lowered for exactly this kind of light source).
+    this.buildingWallMaterial = createPBRMaterial(THREE, 'CONCRETE');
+    this.buildingWindowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.25, metalness: 0.05, emissive: 0xffc98a, emissiveIntensity: 0.45,
+    });
+
     const resolveVisual = (entity: WorldFrameEntity): EntityVisualSpec => {
       const size = Math.max(1.5, 1.5 * (entity.scale ?? 1));
       const geometry = new THREE.BoxGeometry(size, size, size);
@@ -421,20 +452,62 @@ export class GenesisWorldSim3D implements Sim3D {
     // and the procedural city-grid fillers) is `NOT_MODELED` (no domain binding — nobody solves
     // building architecture), so `WorldFrameRenderer.sync()` never reaches `resolveVisual` for any of
     // them at all: it routes straight to the boundary-placeholder path BEFORE `resolveVisual` is ever
-    // called (confirmed by direct instrumentation, not assumed). Giving them a real windowed facade
-    // material there would be dishonest — claiming detail the model does not have, exactly what the
-    // grounding discipline exists to prevent. The actual, honest fix is a placeholder SHAPED like the
-    // real footprint (`resolveVisual`'s own box-size formula) instead of the default's generic small
-    // sphere, so a building at least reads as a building-shaped gap in the model — still wireframe,
-    // still transparent, still unmistakably "not modeled," just legible. Every other NOT_MODELED kind
-    // keeps the renderer's own default sphere, reproduced verbatim below (not exported to override
+    // called (confirmed by direct instrumentation, not assumed). Every other NOT_MODELED kind still
+    // gets the renderer's own default sphere, reproduced verbatim below (not exported to override
     // selectively).
+    //
+    // GAME-GRADE C2 — B1's first pass gave `building`-kind entities a wireframe box SHAPED like their
+    // real footprint instead of the renderer's generic sphere, reasoning that a real windowed facade
+    // would be dishonest here. Revisited: `createFacadeBuilding` tags its own output
+    // `userData.visualOnlyContext = true` by default specifically for this case — a proven, shipped
+    // building block (`genesisScientificCitySim.ts` already uses it for its own decorative background
+    // buildings under the exact same tag) whose window pattern is deterministic massing, not a claim
+    // about any real occupancy/state data. That is a materially different claim from what B1 was
+    // actually guarding against (a solver-derived reading rendered as if measured); a plausible window
+    // grid on a building whose EXISTENCE and FOOTPRINT are real is no more dishonest than giving the
+    // pump a plausible metal color no solver picked either. `resolveVisual`'s bare `BoxGeometry` (this
+    // scene's single biggest "reads like a debug view" culprit) is why this kit exists in the first
+    // place — see that function's own doc there: "the reason genesisScientificCitySim had to render
+    // its buildings as bare BoxGeometry." This scene had the same reason; wiring it here removes it,
+    // in the ONE place these entities actually render (the placeholder path, not `resolveVisual`).
     const resolveBoundaryPlaceholder = (_THREE: typeof THREE_NS, entity: WorldFrameEntity): THREE_NS.Object3D => {
-      const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x5a6b7a, wireframe: true, transparent: true, opacity: 0.35 });
-      if (entity.visualHint === 'building') {
-        const size = Math.max(1.5, 1.5 * (entity.scale ?? 1));
-        return new THREE.Mesh(new THREE.BoxGeometry(size, size, size), boundaryMaterial);
+      if (entity.visualHint === 'building' && this.buildingWallMaterial && this.buildingWindowMaterial) {
+        const scale = entity.scale ?? 1;
+        const isHospital = entity.id === this.city.hospitalBuildingId;
+        const isLab = entity.id === labBuildingId;
+        // The exact footprint the existing collision obstacle already uses (`footprintHalfExtent`'s
+        // own formula) for the two real, walkable buildings, so the visual silhouette always matches
+        // what actually blocks the player; a plausible default for the water-system building and the
+        // procedural city-grid fillers, which carry no presentation-scale patch (`scale` stays 1) and
+        // have no collision of their own to match.
+        const footprint = isHospital || isLab ? Math.max(1.5, 1.5 * scale) : 4.5;
+        const height = isHospital ? 9 : isLab ? 8 : 6 + (stableSeed(entity.id) % 8);
+        // `WorldFrameRenderer.applyTransform` applies `object.scale.setScalar(entity.scale)` UNIFORMLY
+        // on top of whatever this returns (ADAPTER_CONTRACT.md rule 4, and the exact bug ASTRA B1
+        // already found and fixed for this building's own graph-children). Dividing every dimension by
+        // that same `scale` here cancels it out, so the absolute sizes above are the final on-screen
+        // size, not `scale` squared. A no-op for entities with no presentation-scale patch (`scale===1`).
+        // `floorHeight` (default 1.2) is an ABSOLUTE local-space constant `createFacadeBuilding` uses
+        // to derive window-row count/size — it has no idea its output is about to be rescaled. Dividing
+        // width/depth/height by `scale` without also dividing `floorHeight` by the SAME `scale` breaks
+        // that ratio: for the hospital (scale 7), `height/scale` collapses to about one floor's worth,
+        // so `rows = floor(height/floorHeight)` rounds down to a single giant "window" per facade —
+        // confirmed the hard way via a real Chromium screenshot, not assumed. Scaling `floorHeight` by
+        // the same factor keeps every internal ratio (row count, window proportions) identical to what
+        // it would be at the true absolute size, so the facade reads correctly at any presentation scale.
+        const building = createFacadeBuilding(THREE, {
+          position: [0, 0, 0],
+          width: footprint / scale, depth: footprint / scale, height: height / scale,
+          floorHeight: 1.2 / scale,
+          seed: stableSeed(entity.id),
+          wallMaterial: this.buildingWallMaterial.clone(),
+          windowMaterial: this.buildingWindowMaterial.clone(),
+          roofMaterial: this.buildingWallMaterial.clone(),
+          litFraction: isHospital ? 0.6 : 0.4,
+        });
+        return building;
       }
+      const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x5a6b7a, wireframe: true, transparent: true, opacity: 0.35 });
       const radius = 0.5 * (entity.scale ?? 1);
       return new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), boundaryMaterial);
     };
@@ -484,7 +557,6 @@ export class GenesisWorldSim3D implements Sim3D {
     // real footprints into real collision.
     const hospitalEntity = spawnFrame.entities.find((e) => e.id === this.city.hospitalBuildingId);
     const hospitalPos = hospitalEntity ? hospitalEntity.transform.position : { x: 0, y: 0, z: 0 };
-    const labBuildingId: WorldFrameEntityId = 'building:chemistry-lab-building';
     const labBuildingEntity = spawnFrame.entities.find((e) => e.id === labBuildingId);
     const labBuildingPos = labBuildingEntity ? labBuildingEntity.transform.position : { x: 0, y: 0, z: 0 };
     for (const [id, position, scale] of [
@@ -1217,6 +1289,13 @@ export class GenesisWorldSim3D implements Sim3D {
     this.fireVfx?.dispose();
     this.sceneEnvironment?.dispose();
     this.sceneEnvironment = null;
+    // GAME-GRADE C2 — the renderer's own dispose() above already disposes every tracked object,
+    // which covers every per-building `.clone()` of these; these two are the shared base instances
+    // those clones came from, never themselves added to the scene, so nothing else owns them.
+    this.buildingWallMaterial?.dispose();
+    this.buildingWallMaterial = null;
+    this.buildingWindowMaterial?.dispose();
+    this.buildingWindowMaterial = null;
     // PRIORITY 2 — the hospital interior's own geometry/materials: built once in `init()`, disposed
     // here the same way every other GPU resource in this scene already is.
     if (this.interiorGroup) {

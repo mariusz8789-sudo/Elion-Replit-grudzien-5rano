@@ -124,6 +124,10 @@ export class FirstPersonController {
   private readonly bobAmplitude: number;
 
   private keys: Record<MoveKey, boolean> = { forward: false, back: false, left: false, right: false };
+  /** LIVING WORLD — a runtime walk/run multiplier (default 1, unchanged behavior for every existing
+   * caller). Kept as a multiplier rather than a second `moveSpeed` field so acceleration/deceleration
+   * still ramp toward the SAME feel at either speed, instead of snapping between two disconnected caps. */
+  private speedMultiplier = 1;
   private pendingDx = 0;
   private pendingDy = 0;
   private velocity: Vec2 = { x: 0, z: 0 };
@@ -163,6 +167,13 @@ export class FirstPersonController {
   addMouseDelta(dx: number, dy: number): void {
     this.pendingDx += dx;
     this.pendingDy += dy;
+  }
+
+  /** LIVING WORLD — walk/run toggle. `1` (default) is the original walk speed every existing caller
+   * already tunes `moveSpeed` for; a caller wanting "hold Shift to run" passes e.g. `1.8` while held
+   * and `1` on release. Clamped away from zero/negative rather than allowed to freeze or reverse. */
+  setSpeedMultiplier(multiplier: number): void {
+    this.speedMultiplier = Math.max(0.1, multiplier);
   }
 
   teleport(position: Vec2, yaw?: number): void {
@@ -214,8 +225,9 @@ export class FirstPersonController {
     if (this.keys.left) { dirX -= right.x; dirZ -= right.z; }
     const dirLen = Math.hypot(dirX, dirZ);
     const hasInput = dirLen > 1e-6;
-    const targetX = hasInput ? (dirX / dirLen) * this.moveSpeed : 0;
-    const targetZ = hasInput ? (dirZ / dirLen) * this.moveSpeed : 0;
+    const effectiveSpeed = this.moveSpeed * this.speedMultiplier;
+    const targetX = hasInput ? (dirX / dirLen) * effectiveSpeed : 0;
+    const targetZ = hasInput ? (dirZ / dirLen) * effectiveSpeed : 0;
     const rate = hasInput ? this.acceleration : this.deceleration;
     const moveToward = (current: number, target: number): number => {
       const diff = target - current;
@@ -255,7 +267,7 @@ export class FirstPersonController {
     // prędkością względem docelowej, więc zanika do ~0 w spoczynku zamiast
     // zamrażać się w dowolnej fazie. Nie dotyka `position`.
     const speedNow = Math.hypot(this.velocity.x, this.velocity.z);
-    const speedRatio = this.moveSpeed > 0 ? clamp(speedNow / this.moveSpeed, 0, 1) : 0;
+    const speedRatio = effectiveSpeed > 0 ? clamp(speedNow / effectiveSpeed, 0, 1) : 0;
     this.bobPhase += dt * this.bobFrequency * speedRatio;
     this.bobOffset = Math.sin(this.bobPhase) * this.bobAmplitude * speedRatio;
 

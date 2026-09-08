@@ -3,6 +3,7 @@ import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor, Sim3D } from '../../core/three/types';
 import type { SimParams } from '../../core/types';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
+import { FirstPersonController, type MoveKey } from '../../core/three/firstPersonController';
 import { WorldFrameRenderer, type EntityVisualSpec } from '../../core/three/graphics/worldFrameRenderer';
 import { InteractionController } from '../../core/three/graphics/interaction';
 import type { WorldFrameEntity, WorldFrameEntityId } from '../../core/three/graphics/worldFrame';
@@ -101,8 +102,20 @@ function materialCategoryForVisualHint(hint?: string): StaticGenesisMaterialId {
   return (hint ? VISUAL_HINT_MATERIAL[hint] : undefined) ?? 'CONCRETE';
 }
 
+// LIVING WORLD — same distance+facing-dot proximity gate `labScene3D.ts` already proves in
+// production for its one console (see that file's `INTERACT_MAX_DISTANCE`/`INTERACT_MIN_FACING_DOT`
+// and `nearStation`), tuned for this scene's city scale instead of a room: the pump entity renders as
+// an ~18-unit box (`scale: 12` in `syncNow` below, box size `1.5 * scale`), so the walk-up radius and
+// the facing tolerance are both larger than a tabletop console needs.
+const PUMP_INTERACT_MAX_DISTANCE = 16;
+const PUMP_INTERACT_MIN_FACING_DOT = 0.25;
+
 export class GenesisWorldSim3D implements Sim3D {
   cameraAutoRotateSpeed = 0;
+  // LIVING WORLD — this scene now drives the camera itself (FirstPersonController), the same reason
+  // labScene3D.ts sets this: without it, useThreeLoop.ts's OrbitControls.update() runs every frame
+  // and silently fights any position/orientation this class sets directly on the camera.
+  disableOrbitControls = true;
   private THREE: typeof THREE_NS | null = null;
   private scene: THREE_NS.Scene | null = null;
   private root: THREE_NS.Group | null = null;
@@ -112,6 +125,23 @@ export class GenesisWorldSim3D implements Sim3D {
   private height = 300;
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
   private pipeline: GraphicsPipeline | null = null;
+
+  /**
+   * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
+   * `FirstPersonLabScreen.tsx`/`InvestorDemoScreen.tsx` already drive (pure movement math, no THREE
+   * dependency, real WASD/mouse-look/accel-decel/collision/head-bob, fully tested) — not a second
+   * camera system. Room bounds are the ground plane's own extent (`groundSize` in `init()`), with a
+   * margin so the player can't walk past the visible ground edge into the fog.
+   */
+  private controller: FirstPersonController | null = null;
+  private fpState: ReturnType<FirstPersonController['update']> | null = null;
+  /** The pump's real, current C3 world position — refreshed every `syncNow()` call from the same
+   * frame the renderer already draws from, never re-derived or guessed. */
+  private pumpWorldPosition: readonly [number, number, number] | null = null;
+  /** True once the player is close enough to, and roughly facing, the real pump entity — the one
+   * spatial trigger this scene exposes for creating a real intervention branch. Read by React via
+   * `getStats()`, the same convention `labScene3D.ts`'s own `nearStation` already uses. */
+  nearPump = false;
 
   readonly city: GenesisScientificCity4;
   forkEngine: TemporalEngine | null = null;
@@ -237,10 +267,42 @@ export class GenesisWorldSim3D implements Sim3D {
       },
     });
 
-    camera.position.set(10, 55, 95);
-    camera.lookAt(0, 0, 0);
+    // LIVING WORLD — spawn a short walk from the pump's REAL current position (read straight off a
+    // live frame, not guessed), facing it, so the flagship interaction is reachable within a few
+    // seconds instead of requiring the player to hunt across the whole 400-unit ground plane first.
+    const spawnFrame = getFrameState(this.city.base.engine);
+    const pumpEntity = spawnFrame.entities.find((e) => e.id === this.city.pumpPipeId);
+    const pumpPos = pumpEntity ? pumpEntity.transform.position : { x: 0, y: 0, z: 0 };
+    const spawnPosition = { x: pumpPos.x, z: pumpPos.z + 22 };
+    const dx = pumpPos.x - spawnPosition.x;
+    const dz = pumpPos.z - spawnPosition.z;
+    // Matches this controller's own convention (`getForward()`: `{x:-sin(yaw), z:-cos(yaw)}`).
+    const spawnYaw = Math.atan2(-dx, -dz);
+    const half = 400 / 2 - 10; // groundSize/2, minus a margin so the player can't walk into the fog edge
+    this.controller = new FirstPersonController({
+      room: { minX: -half, maxX: half, minZ: -half, maxZ: half },
+      startPosition: spawnPosition,
+      startYaw: spawnYaw,
+      eyeHeight: 1.7,
+      moveSpeed: 7,
+    });
+    camera.position.set(spawnPosition.x, this.controller.getState().position.y, spawnPosition.z);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.set(0, spawnYaw, 0);
 
     this.syncNow();
+  }
+
+  setMoveKey(key: MoveKey, down: boolean): void {
+    this.controller?.setKey(key, down);
+  }
+
+  setRunning(running: boolean): void {
+    this.controller?.setSpeedMultiplier(running ? 2.2 : 1);
+  }
+
+  addMouseLook(dx: number, dy: number): void {
+    this.controller?.addMouseDelta(dx, dy);
   }
 
   onResize(w: number, h: number): void {
@@ -274,15 +336,17 @@ export class GenesisWorldSim3D implements Sim3D {
     return this.pipeline;
   }
 
-  getOrbitTarget(): THREE_NS.Vector3 | null {
-    return this.THREE ? new this.THREE.Vector3(0, 0, 0) : null;
-  }
-
   private syncNow(): void {
     if (!this.renderer) return;
     const engine = this.activeEngine();
     const frame = getFrameState(engine, this.scrubTick ?? undefined);
-    this.renderer.sync(toGraphicsWorldFrame(frame));
+    const graphicsFrame = toGraphicsWorldFrame(frame);
+    this.renderer.sync(graphicsFrame);
+    // LIVING WORLD — the pump's real, current position, read off the SAME frame the renderer just
+    // drew from (never re-derived or approximated), refreshed on every sync so a fork/branch that
+    // moves the entity (it doesn't today, but nothing here assumes it never will) stays correct.
+    const pump = graphicsFrame.entities.find((e) => e.id === this.city.pumpPipeId);
+    if (pump) this.pumpWorldPosition = pump.position;
   }
 
   /** Advances the base world (and the counterfactual fork, if one exists) by one real tick. */
@@ -501,16 +565,52 @@ export class GenesisWorldSim3D implements Sim3D {
   update(dt: number): void {
     // Evolution is user-driven (advanceTick()), not continuous — every tick shown is one the
     // observer explicitly asked for, matching this page's role as a verification surface rather
-    // than an ambient demo. The fire VFX and the shared environment's ambient haze are the
-    // exceptions, same split `genesisScientificCitySim.ts`'s own `update(dt)` already draws: both
-    // are pure rendering-layer animation (flicker/rise, particle drift), not simulation time, so
-    // they keep moving every real frame regardless of world-clock state.
+    // than an ambient demo. The fire VFX, the shared environment's ambient haze, and (LIVING WORLD)
+    // the player's own movement are the exceptions, same split `genesisScientificCitySim.ts`'s own
+    // `update(dt)` already draws: all three are pure rendering-layer/player-input animation, not
+    // simulation time, so they keep moving every real frame regardless of world-clock state.
     this.sceneEnvironment?.update(dt);
     if (this.showWildfire) this.fireVfx?.update(dt);
+    if (this.controller) this.fpState = this.controller.update(dt);
   }
 
-  syncScene(): void {
+  syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.syncNow();
+    if (this.fpState) {
+      camera.position.set(this.fpState.position.x, this.fpState.position.y + this.fpState.bobOffset, this.fpState.position.z);
+      camera.rotation.set(this.fpState.pitch, this.fpState.yaw, 0);
+    }
+    this.updateNearPump(camera);
+  }
+
+  /**
+   * LIVING WORLD — the ONE spatial trigger this scene exposes today: close enough to, and roughly
+   * facing, the real pump entity. Same distance+facing-dot pattern `labScene3D.ts` already proves in
+   * production for its console (see `PUMP_INTERACT_MAX_DISTANCE`/`PUMP_INTERACT_MIN_FACING_DOT`'s own
+   * doc) — not a generic raycast-based interaction system (that's `graphics/interaction.ts`'s own,
+   * separate, pointer-driven mechanism, orthogonal to first-person proximity).
+   */
+  private updateNearPump(camera: THREE_NS.PerspectiveCamera): void {
+    if (!this.THREE || !this.pumpWorldPosition) {
+      this.nearPump = false;
+      return;
+    }
+    const [px, py, pz] = this.pumpWorldPosition;
+    const dx = px - camera.position.x;
+    const dy = py - camera.position.y;
+    const dz = pz - camera.position.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance > PUMP_INTERACT_MAX_DISTANCE || distance < 1e-6) {
+      this.nearPump = false;
+      return;
+    }
+    const forward = new this.THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const toPump = new this.THREE.Vector3(dx, dy, dz).normalize();
+    this.nearPump = forward.dot(toPump) > PUMP_INTERACT_MIN_FACING_DOT;
+  }
+
+  getStats(): Record<string, number> {
+    return { nearPump: this.nearPump ? 1 : 0, forked: this.forkEngine ? 1 : 0 };
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
@@ -530,10 +630,24 @@ export class GenesisWorldSim3D implements Sim3D {
   }
 }
 
+// LIVING WORLD — the exact same key-code -> MoveKey map `FirstPersonLabScreen.tsx` already uses,
+// so WASD/arrow-key behavior is identical across every Genesis scene that walks.
+const MOVE_KEYS: Record<string, MoveKey> = {
+  KeyW: 'forward', ArrowUp: 'forward',
+  KeyS: 'back', ArrowDown: 'back',
+  KeyA: 'left', ArrowLeft: 'left',
+  KeyD: 'right', ArrowRight: 'right',
+};
+
 export function GenesisWorldScreen() {
   const sim = useMemo(() => new GenesisWorldSim3D(), []);
   const params = useMemo<SimParams>(() => ({}), []);
-  const { canvasRef, loading, failed } = useThreeLoop(sim, params, true);
+
+  const [stats, setStats] = useState({ nearPump: 0, forked: 0 });
+  const onStats = useCallback((s: Record<string, number>) => {
+    setStats((prev) => (prev.nearPump === s.nearPump && prev.forked === s.forked ? prev : { nearPump: s.nearPump!, forked: s.forked! }));
+  }, []);
+  const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
 
   const [tick, setTick] = useState(0);
   const [forkTick, setForkTick] = useState<number | null>(null);
@@ -588,6 +702,102 @@ export function GenesisWorldScreen() {
     setPumpStatus(readPumpStatus(show));
   };
 
+  // LIVING WORLD — pointer lock: entering "mouse-look" mode is an explicit player gesture (browser
+  // requirement), the same click-to-lock pattern `FirstPersonLabScreen.tsx` already proves. `entered`
+  // is deliberately a SEPARATE flag from `locked`: pointer lock is a desktop-mouse concept that a
+  // touch device typically never grants (`pointerlockchange` may simply never fire there), so gating
+  // the crosshair/interact-prompt HUD on `locked` alone would leave a mobile player who dismissed the
+  // "enter world" overlay with no visible interaction feedback ever again. `entered` tracks "the
+  // player has started playing" for HUD purposes; `locked` still gates the actual desktop mouse-look
+  // listener below, where real pointer lock is what makes raw `movementX/Y` deltas meaningful.
+  const [locked, setLocked] = useState(false);
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onClick = () => {
+      setEntered(true);
+      if (document.pointerLockElement !== canvas) canvas.requestPointerLock();
+    };
+    const onLockChange = () => setLocked(document.pointerLockElement === canvas);
+    canvas.addEventListener('click', onClick);
+    document.addEventListener('pointerlockchange', onLockChange);
+    return () => {
+      canvas.removeEventListener('click', onClick);
+      document.removeEventListener('pointerlockchange', onLockChange);
+    };
+  }, [canvasRef]);
+
+  // LIVING WORLD — mobile: single-finger drag on the canvas is the touch equivalent of mouse-look
+  // (unconditional — real pointer lock, which the desktop listener below requires, is a mouse concept
+  // a touch device generally never grants). Movement itself is not gated by `entered`/`locked` at all
+  // (see the D-pad buttons in the render below and the keyboard handler's own move keys), matching
+  // this scene's existing convention that WASD already works before the world is "entered."
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      dragging = true;
+      lastX = e.touches[0]!.clientX;
+      lastY = e.touches[0]!.clientY;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragging || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0]!;
+      sim.addMouseLook(touch.clientX - lastX, touch.clientY - lastY);
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+    };
+    const onTouchEnd = () => { dragging = false; };
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [canvasRef, sim]);
+
+  // LIVING WORLD — movement + look + the one spatial interaction (walk to the pump, press E to
+  // create the real intervention branch `handleFork` already drives from its button). The exact
+  // same keyboard/mouse wiring pattern `FirstPersonLabScreen.tsx` uses for its own console.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const move = MOVE_KEYS[e.code];
+      if (move) { sim.setMoveKey(move, true); return; }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sim.setRunning(true); return; }
+      if (e.code === 'KeyE') {
+        if (stats.nearPump === 1 && forkTick === null) handleFork();
+        return;
+      }
+      if (e.code === 'Escape' && document.pointerLockElement) document.exitPointerLock();
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      const move = MOVE_KEYS[e.code];
+      if (move) { sim.setMoveKey(move, false); return; }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') sim.setRunning(false);
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (document.pointerLockElement) sim.addMouseLook(e.movementX, e.movementY);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+    document.addEventListener('mousemove', onMouseMove);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
+      document.removeEventListener('mousemove', onMouseMove);
+    };
+  }, [sim, stats.nearPump, forkTick]);
+
   const handleScrub = (value: number) => {
     setScrubValue(value);
     setScrubbing(true);
@@ -630,13 +840,69 @@ export function GenesisWorldScreen() {
       </div>
 
       <div className="character-stage">
-        <canvas ref={canvasRef} className="character-canvas" aria-label="Genesis Scientific City 4.0 (Three.js)" />
+        <canvas ref={canvasRef} className="character-canvas" aria-label="Genesis Scientific City 4.0 (Three.js) — walkable first-person view" />
         {loading && (
           <div className="route-loading" role="status">
             Ładowanie silnika 3D…
           </div>
         )}
         {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
+
+        {!entered && !loading && !failed && (
+          <div
+            className="fp-lab-enter"
+            data-testid="genesis-world-enter"
+            role="button"
+            tabIndex={0}
+            onClick={() => { setEntered(true); canvasRef.current?.requestPointerLock(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setEntered(true); canvasRef.current?.requestPointerLock(); } }}
+          >
+            <p className="fp-lab-enter-title">Tap or click to walk into Genesis World</p>
+            <p className="fp-lab-enter-hint">
+              Desktop: WASD — walk · Shift — run · mouse — look · E — interact · Esc — exit.
+              Touch: drag to look · D-pad to walk · tap the prompt to interact.
+            </p>
+          </div>
+        )}
+
+        {entered && <div className="fp-lab-crosshair" aria-hidden="true" />}
+        {/* Desktop-only hint: Esc only does something once real pointer lock (a mouse concept) is
+            active — a touch device never sees this, since `locked` there generally never becomes true. */}
+        {entered && locked && (
+          <p className="fp-lab-enter-hint" style={{ position: 'absolute', left: '1rem', top: '1rem' }}>Esc — exit mouse-look</p>
+        )}
+
+        {entered && stats.nearPump === 1 && forkTick === null && (
+          <button
+            type="button"
+            className="fp-lab-prompt"
+            data-testid="genesis-world-interact-prompt"
+            onClick={handleFork}
+          >
+            E — create intervention branch (reset pump to safe flow)
+          </button>
+        )}
+
+        {entered && (
+          <div className="gx-dpad" aria-label="Walk" data-testid="genesis-world-dpad">
+            <button type="button" className="gx-dpad-btn gx-dpad-up" aria-label="Walk forward"
+              onPointerDown={(e) => { e.preventDefault(); sim.setMoveKey('forward', true); }}
+              onPointerUp={() => sim.setMoveKey('forward', false)}
+              onPointerLeave={() => sim.setMoveKey('forward', false)}>▲</button>
+            <button type="button" className="gx-dpad-btn gx-dpad-left" aria-label="Strafe left"
+              onPointerDown={(e) => { e.preventDefault(); sim.setMoveKey('left', true); }}
+              onPointerUp={() => sim.setMoveKey('left', false)}
+              onPointerLeave={() => sim.setMoveKey('left', false)}>◀</button>
+            <button type="button" className="gx-dpad-btn gx-dpad-right" aria-label="Strafe right"
+              onPointerDown={(e) => { e.preventDefault(); sim.setMoveKey('right', true); }}
+              onPointerUp={() => sim.setMoveKey('right', false)}
+              onPointerLeave={() => sim.setMoveKey('right', false)}>▶</button>
+            <button type="button" className="gx-dpad-btn gx-dpad-down" aria-label="Walk back"
+              onPointerDown={(e) => { e.preventDefault(); sim.setMoveKey('back', true); }}
+              onPointerUp={() => sim.setMoveKey('back', false)}
+              onPointerLeave={() => sim.setMoveKey('back', false)}>▼</button>
+          </div>
+        )}
       </div>
 
       <div className="sim-transport" data-testid="genesis-world-controls">

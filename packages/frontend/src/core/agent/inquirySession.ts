@@ -1,0 +1,133 @@
+import {
+  buildSavedParameterInquiry,
+  listParameterInquiriesForSystem,
+  replaySavedParameterInquiry,
+  saveParameterInquiryToMemory,
+  type SavedExperiment,
+  type SavedParameterInquiry,
+  type SavedParameterInquiryMemoryUse,
+  type SavedParameterInquiryReplay,
+} from '../scienceMemory';
+import { runAutonomousInquiryWithRuns, type InquiryLoopInput, type InquiryLoopResult } from './inquiryLoop';
+
+/**
+ * THE END-TO-END PATH for the autonomous parameter inquiry:
+ *
+ *   Science Memory  ->  hypotheses still worth testing
+ *                   ->  the inquiry (real solver runs, adaptive probes)
+ *                   ->  Science Memory record (with real run provenance)
+ *                   ->  Replay (real re-execution, real verdict)
+ *                   ->  the experiment it proposes next
+ *
+ * Every stage is an existing Genesis mechanism called unchanged: `listExperiments`
+ * behind `listParameterInquiriesForSystem`, `saveExperiment` behind
+ * `saveParameterInquiryToMemory`, and the `ReplayVerdict` vocabulary shared with
+ * every other replay in `scienceMemory.ts`. This module is the wiring, not a
+ * second engine — the same role `worldDiscoverySession.ts` plays for the
+ * world-model loop, and `runInquiry` below is the untouched pure seam for
+ * callers (and tests) that want the engine without touching storage.
+ *
+ * ## What memory is allowed to do here
+ *
+ * Exactly one thing: drop hypotheses an EARLIER inquiry into the SAME system
+ * already falsified, so a second inquiry spends its probes on open questions
+ * instead of re-refuting settled ones. It never carries a SUPPORTED verdict
+ * forward — under parameter degeneracy agreeing with one measurement settles
+ * nothing (see `inquiryLoop.ts`), so an earlier "supported" is not a reason to
+ * stop testing, and treating it as one would quietly convert a survivor into a
+ * conclusion.
+ *
+ * "The same system" is `parameterInquirySystemKey`: same sample, same solver,
+ * same measured quantity, same agreement band, same probe axis. If any of those
+ * differ, an earlier falsification does not transfer and memory correctly
+ * declines to apply it.
+ */
+
+/** The engine alone: no reads, no writes, no storage. */
+export function runInquiry(input: InquiryLoopInput): InquiryLoopResult {
+  return runAutonomousInquiryWithRuns(input).result;
+}
+
+export interface InquirySessionResult {
+  readonly result: InquiryLoopResult;
+  /** The input actually executed — narrowed by memory when memory had something to say. */
+  readonly executedInput: InquiryLoopInput;
+  readonly resumedFromMemory: SavedParameterInquiryMemoryUse | null;
+  readonly saved: SavedExperiment;
+  readonly savedInquiry: SavedParameterInquiry;
+  /** A REAL verdict from a REAL re-execution, not a claim that it would reproduce. */
+  readonly replay: SavedParameterInquiryReplay;
+}
+
+/**
+ * Reads memory for hypotheses this system has already ruled out.
+ *
+ * Returns `null` — meaning "memory had nothing to contribute" — rather than an
+ * empty record, so a caller can tell "no prior inquiry" from "prior inquiries
+ * that settled nothing". Refuses to narrow the set to nothing: if every offered
+ * hypothesis was already falsified, there is no inquiry left to run and the
+ * caller should see that as the result of running it, not as an empty input.
+ */
+export function memoryNarrowedHypotheses(input: InquiryLoopInput): {
+  readonly executedInput: InquiryLoopInput;
+  readonly resumedFromMemory: SavedParameterInquiryMemoryUse | null;
+} {
+  const priors = listParameterInquiriesForSystem(input.system);
+  if (priors.length === 0) return { executedInput: input, resumedFromMemory: null };
+
+  const alreadyFalsified = new Set<string>();
+  for (const prior of priors) for (const id of prior.result.falsifiedHypothesisIds) alreadyFalsified.add(id);
+
+  const offered = input.hypotheses.map((h) => h.hypothesisId);
+  const toSkip = offered.filter((id) => alreadyFalsified.has(id));
+  if (toSkip.length === 0) {
+    return {
+      executedInput: input,
+      resumedFromMemory: {
+        skippedHypothesisIds: [],
+        reason: `${priors.length} wcześniejszych dochodzeń w pamięci dotyczy tego samego układu, ale żadne z nich nie obaliło hipotezy z obecnego zestawu — cały zestaw jest testowany od nowa.`,
+      },
+    };
+  }
+  if (toSkip.length === offered.length) {
+    return {
+      executedInput: input,
+      resumedFromMemory: {
+        skippedHypothesisIds: [],
+        reason: `Pamięć obaliła już wszystkie ${offered.length} zaproponowanych hipotez dla tego układu. Pominięcie ich wszystkich nie zostawiłoby czego badać, więc zestaw jest testowany ponownie w całości, a nie po cichu opróżniany.`,
+      },
+    };
+  }
+  return {
+    executedInput: { ...input, hypotheses: input.hypotheses.filter((h) => !alreadyFalsified.has(h.hypothesisId)) },
+    resumedFromMemory: {
+      skippedHypothesisIds: toSkip,
+      reason: `Pominięto ${toSkip.length} hipotez obalonych we wcześniejszym dochodzeniu na tym samym układzie (${toSkip.join(', ')}); pozostałe ${offered.length - toSkip.length} zostały przebadane realnymi pomiarami.`,
+    },
+  };
+}
+
+/**
+ * The full pipeline. Runs the inquiry, persists it with the real provenance of
+ * the last measurement taken, and immediately replays it by re-execution so the
+ * caller gets a verdict that was earned rather than asserted.
+ */
+export function runInquiryAndRemember(input: InquiryLoopInput): InquirySessionResult {
+  const { executedInput, resumedFromMemory } = memoryNarrowedHypotheses(input);
+  const execution = runAutonomousInquiryWithRuns(executedInput);
+  const savedInquiry = buildSavedParameterInquiry({
+    input: executedInput,
+    result: execution.result,
+    resumedFromMemory,
+  });
+  const lastMeasurement = execution.measurements[execution.measurements.length - 1];
+  const saved = saveParameterInquiryToMemory(savedInquiry, lastMeasurement);
+  return {
+    result: execution.result,
+    executedInput,
+    resumedFromMemory,
+    saved,
+    savedInquiry,
+    replay: replaySavedParameterInquiry(saved),
+  };
+}

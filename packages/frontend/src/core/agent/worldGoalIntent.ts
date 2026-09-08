@@ -61,6 +61,16 @@ export interface WorldLever {
   readonly hypothesis: (metric: string, direction: 'minimize' | 'maximize') => MechanisticHypothesis;
   /** Lower-case phrases, both languages, that name this lever. */
   readonly phrases: readonly string[];
+  /**
+   * LIVING WORLD — the entity this lever's `apply` actually MUTATES, as real data rather than
+   * something a caller has to read out of the `apply` closure's source. Distinct from
+   * `MechanisticHypothesis.entityId` (the entity the CRITERION's metric is read from — for every
+   * lever in this catalog today, the floodplain, even for the pump lever, since peak flood depth is
+   * a floodplain scalar): a spatial "walk up to entity X, what can I do here" system needs the
+   * mutation target, not the metric source, and until this field existed that information only
+   * existed as unintrospectable code inside each lever's own `apply` function.
+   */
+  readonly targetEntityId: string;
 }
 
 export interface WorldLeverCatalog {
@@ -284,6 +294,7 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
   {
     leverId: 'lever:outlet-capacity',
     phrases: ['outlet', 'channel', 'kanał', 'kanal', 'przepust'],
+    targetEntityId: GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:outlet-capacity',
       statement: `Peak flood depth is limited by outlet capacity, so widening the outlet ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
@@ -301,6 +312,7 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
   {
     leverId: 'lever:infiltration',
     phrases: ['infiltration', 'permeable', 'suds', 'infiltracj', 'przepuszczaln'],
+    targetEntityId: GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:infiltration',
       statement: `Peak flood depth is limited by infiltration, so permeable ground ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
@@ -318,6 +330,7 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
   {
     leverId: 'lever:pump-capacity',
     phrases: ['pump', 'pompa', 'pompy', 'przepompowni'],
+    targetEntityId: GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID,
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:pump-capacity',
       statement: `Peak flood depth is limited by pump capacity, so a larger pump ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,

@@ -239,7 +239,26 @@ describe('A verdict requires a criterion declared before the numbers existed', (
     const assessment = assessWorldCounterfactual({ preregistration: prereg, diff, controlledDifference: control, replayVerdict: 'MATCH' });
     expect(assessment.assessment).toBe('INCONCLUSIVE');
     expect(assessment.baseline).toBeNull();
-    expect(assessment.message).toMatch(/not in the preregistered metric|no counterfactual difference/);
+    expect(assessment.metricPresence).toBe('ABSENT');
+    expect(assessment.message).toMatch(/carries no value for the preregistered metric|no counterfactual difference/);
+  });
+
+  it('distinguishes a metric that is absent from one that exists and did not move', () => {
+    // The intervention really changes the floodplain, and `outletWidthM` really is
+    // computed on it — but the storm arm leaves it untouched. Reporting that as a
+    // missing metric would send a caller off to bind a solver that already exists.
+    const prereg = preregisterWorldCounterfactual(
+      question({ criterion: { ...FLOOD_DEPTH_CRITERION, metric: 'outletWidthM' } }),
+    );
+    const assessment = assessWorldCounterfactual({ preregistration: prereg, diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(assessment.assessment).toBe('INCONCLUSIVE');
+    expect(assessment.metricPresence).toBe('PRESENT_BUT_UNMOVED');
+    expect(assessment.message).toMatch(/did not reach it/);
+
+    // And the next-action advice reflects the real finding rather than a missing solver.
+    const next = selectNextWorldExperiment(assessment, diff);
+    expect(next.kind).toBe('METRIC_PRESENT_BUT_UNMOVED');
+    expect(next.why).toMatch(/does not reach that quantity/);
   });
 
   it('reports INCONCLUSIVE for a relation two arms cannot decide', () => {

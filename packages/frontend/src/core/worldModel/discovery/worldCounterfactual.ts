@@ -89,6 +89,14 @@ export interface ChangedEntity {
    * understate the divergence.
    */
   readonly scalarsOnlyOnOneSide: readonly string[];
+  /**
+   * Scalars this entity carries on BOTH arms with the same value. Recorded
+   * because "the metric is not here" and "the metric is here and did not move"
+   * are different findings, and a consumer that only saw the deltas could not
+   * tell them apart — it would report a metric nothing computes when in fact
+   * the intervention simply failed to reach it.
+   */
+  readonly unchangedScalarKeys: readonly string[];
 }
 
 export interface WorldCounterfactualDiff {
@@ -140,6 +148,7 @@ export function diffWorldBranches(comparison: BranchComparison): WorldCounterfac
 
     const entityDeltas: WorldScalarDelta[] = [];
     const oneSided: string[] = [];
+    const unchangedKeys: string[] = [];
     for (const key of [...new Set([...Object.keys(scalarsA), ...Object.keys(scalarsB)])].sort()) {
       const baseline = scalarsA[key];
       const intervention = scalarsB[key];
@@ -147,7 +156,10 @@ export function diffWorldBranches(comparison: BranchComparison): WorldCounterfac
         oneSided.push(key);
         continue;
       }
-      if (baseline === intervention) continue;
+      if (baseline === intervention) {
+        unchangedKeys.push(key);
+        continue;
+      }
       const absoluteDelta = intervention - baseline;
       entityDeltas.push({
         entityId: entityDiff.id,
@@ -162,7 +174,10 @@ export function diffWorldBranches(comparison: BranchComparison): WorldCounterfac
     }
 
     if (entityDeltas.length === 0 && oneSided.length === 0) withoutNumeric.push(entityDiff.id);
-    changed.push({ entityId: entityDiff.id, label, presence, deltas: entityDeltas, scalarsOnlyOnOneSide: oneSided });
+    changed.push({
+      entityId: entityDiff.id, label, presence, deltas: entityDeltas,
+      scalarsOnlyOnOneSide: oneSided, unchangedScalarKeys: unchangedKeys,
+    });
     deltas.push(...entityDeltas);
   }
 
@@ -327,6 +342,16 @@ export function verifyWorldPreregistrationIntact(
 
 export type CounterfactualAttribution = 'ATTRIBUTABLE_WITHIN_MODEL' | 'UNATTRIBUTED';
 
+/**
+ * Whether the declared metric was there to be judged at all.
+ *
+ * `PRESENT_BUT_UNMOVED` is the distinction that matters: an intervention that
+ * changed the world without moving the declared metric has told us something
+ * real about the mechanism, and reporting it as a metric nothing computes
+ * would send a caller off to bind a solver that already exists.
+ */
+export type MetricPresence = 'PRESENT_AND_MOVED' | 'PRESENT_BUT_UNMOVED' | 'ABSENT';
+
 export interface WorldCounterfactualAssessment {
   readonly contractVersion: string;
   readonly questionId: string;
@@ -339,6 +364,7 @@ export interface WorldCounterfactualAssessment {
   readonly baseline: number | null;
   readonly intervention: number | null;
   readonly reference: number | null;
+  readonly metricPresence: MetricPresence;
   readonly controlledDifference: ControlledDifference;
   readonly replayVerdict: ReplayVerdict | null;
   readonly message: string;
@@ -379,6 +405,13 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     replayVerdict,
     disclaimer: COUNTERFACTUAL_DEPENDENCE_DISCLAIMER,
   };
+  const entityInDiff = diff.changed.find((e) => e.entityId === question.entityId);
+  const metricPresence: MetricPresence = readMetric(diff, question.entityId, criterion.metric)
+    ? 'PRESENT_AND_MOVED'
+    : entityInDiff?.unchangedScalarKeys.includes(criterion.metric)
+      ? 'PRESENT_BUT_UNMOVED'
+      : 'ABSENT';
+
   const inconclusive = (message: string, values?: { baseline: number; intervention: number }): WorldCounterfactualAssessment => ({
     ...base,
     assessment: 'INCONCLUSIVE',
@@ -386,6 +419,7 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     baseline: values?.baseline ?? null,
     intervention: values?.intervention ?? null,
     reference: null,
+    metricPresence,
     message,
   });
 
@@ -406,11 +440,12 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
 
   const values = readMetric(diff, question.entityId, criterion.metric);
   if (!values) {
-    const entity = diff.changed.find((e) => e.entityId === question.entityId);
     return inconclusive(
-      entity
-        ? `Entity ${question.entityId} differs between the arms, but not in the preregistered metric "${criterion.metric}", so the criterion has no value to be judged on.`
-        : `Entity ${question.entityId} does not differ between the arms at tick ${diff.atTick}, so the preregistered metric "${criterion.metric}" has no counterfactual difference to assess.`,
+      metricPresence === 'PRESENT_BUT_UNMOVED'
+        ? `The intervention changed entity ${question.entityId}, but left the preregistered metric "${criterion.metric}" at exactly its baseline value. The metric exists and was computed; the intervention did not reach it.`
+        : entityInDiff
+          ? `Entity ${question.entityId} differs between the arms, but carries no value for the preregistered metric "${criterion.metric}", so the criterion has nothing to be judged on.`
+          : `Entity ${question.entityId} does not differ between the arms at tick ${diff.atTick}, so the preregistered metric "${criterion.metric}" has no counterfactual difference to assess.`,
     );
   }
 
@@ -421,6 +456,7 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     ...base,
     assessment: outcome.met ? 'SUPPORTED_WITHIN_PROTOCOL' : 'FALSIFIED_WITHIN_PROTOCOL',
     attribution: 'ATTRIBUTABLE_WITHIN_MODEL',
+    metricPresence,
     baseline: values.baseline,
     intervention: values.intervention,
     reference: outcome.reference,
@@ -443,6 +479,7 @@ export const WORLD_COUNTERFACTUAL_UNCERTAINTIES = [
   'CONTROL_NOT_VERIFIED',
   'REPLAY_NOT_VERIFIED',
   'NO_DIVERGENCE',
+  'METRIC_PRESENT_BUT_UNMOVED',
   'METRIC_ABSENT',
   'RELATION_NEEDS_SERIES',
   'SINGLE_INTERVENTION_POINT',
@@ -512,6 +549,17 @@ export function selectNextWorldExperiment(
       why: `The arms are identical at tick ${diff.atTick}: either the intervention had no modelled effect, or it never reached a solver.`,
       resolves: 'Distinguishes "no modelled effect" from "intervention not wired", which look the same in a diff.',
       rule: 'NO_DIVERGENCE: an unchanged world is as likely to be a wiring fault as a finding.',
+    };
+  }
+
+  if (assessment.metricPresence === 'PRESENT_BUT_UNMOVED') {
+    return {
+      kind: 'METRIC_PRESENT_BUT_UNMOVED',
+      status: 'READY_TO_RUN',
+      action: `Test a different mechanism, or apply this one at a magnitude large enough to reach "${criterion.metric}" on ${assessment.entityId}.`,
+      why: `The intervention changed the world but left "${criterion.metric}" exactly at its baseline: within this model, this lever does not reach that quantity at this magnitude.`,
+      resolves: 'Separates a lever that cannot affect the objective from one applied too weakly to show it.',
+      rule: 'METRIC_PRESENT_BUT_UNMOVED: a metric that exists and did not move is a finding about the mechanism, not a missing solver.',
     };
   }
 

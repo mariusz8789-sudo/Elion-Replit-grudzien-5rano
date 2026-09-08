@@ -424,11 +424,52 @@ CREATE TABLE IF NOT EXISTS worlds (
 CREATE INDEX IF NOT EXISTS idx_worlds_parent ON worlds(parent_world_id);
 `;
 
+// Autonomous Core (Genesis Master Audit, NEXT 2): a real, resumable multi-step agent
+// investigation. `agent_runs` is the run header (goal, domain, status, budget);
+// `agent_run_steps` is APPEND-ONLY, one row per real step (hypothesis tested, tool
+// invoked, observation, falsification verdict, next action) — never rewritten, same
+// discipline as campaign_decisions/campaign_events. A run's steps are its own
+// GENESIS AGENT TRACE; this table carries no reasoning of its own, only the record
+// of reasoning that happened elsewhere (the tool/selector that actually ran).
+const SCHEMA_V12 = `
+CREATE TABLE IF NOT EXISTS agent_runs (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  goal          TEXT NOT NULL,
+  domain        TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'RUNNING',
+  budget_json   TEXT NOT NULL DEFAULT '{}',
+  final_json    TEXT,
+  created_by    TEXT REFERENCES users(id),
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS agent_run_steps (
+  id                          TEXT PRIMARY KEY,
+  agent_run_id                TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+  step_index                  INTEGER NOT NULL,
+  hypothesis_json             TEXT NOT NULL DEFAULT '{}',
+  tool_invoked                TEXT NOT NULL,
+  capability                  TEXT NOT NULL,
+  branch_id                   TEXT,
+  observation_json            TEXT,
+  falsification_verdict_json  TEXT,
+  error                       TEXT,
+  retry_count                 INTEGER NOT NULL DEFAULT 0,
+  next_action_json            TEXT NOT NULL DEFAULT '{}',
+  provenance_event_ids_json   TEXT NOT NULL DEFAULT '[]',
+  created_at                  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_agent_run_steps_run ON agent_run_steps(agent_run_id, step_index);
+`;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
   if (version < 9) db.exec(SCHEMA_V9);
   if (version < 10) db.exec(SCHEMA_V10);
   if (version < 11) db.exec(SCHEMA_V11);
+  if (version < 12) db.exec(SCHEMA_V12);
   // Rekombinacja BRICS ma DWOJE rodziców, więc rodowód potrzebuje drugiej kolumny.
   // Dodatkowo, nie destrukcyjnie: bazy sprzed tej zmiany dostają kolumnę pustą,
   // a kandydaci jednorodzicielscy mają w niej NULL na zawsze — to poprawny stan,
@@ -476,6 +517,7 @@ function migrate(db) {
   if (version < 9) db.exec('PRAGMA user_version = 9');
   if (version < 10) db.exec('PRAGMA user_version = 10');
   if (version < 11) db.exec('PRAGMA user_version = 11');
+  if (version < 12) db.exec('PRAGMA user_version = 12');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */

@@ -92,15 +92,18 @@ describe('GenesisWorldSim3D — LIVING WORLD first-person foundation', () => {
     const { sim: walker, scene: walkScene, camera: walkCamera } = buildInitializedSim();
     // Enough steps for BOTH to actually reach their target speed (acceleration is a shared,
     // constant ramp — too few steps would leave both still accelerating and look identical
-    // regardless of the multiplier, which is a test artifact, not a real-world condition).
+    // regardless of the multiplier, which is a test artifact, not a real-world condition). Walks
+    // BACKWARD (away from the pump's real spawn-facing direction) — PRIORITY 2 gave the pump a real
+    // collision footprint, which a forward walk/run of this duration would now reach and clamp both
+    // to the same distance, a false tie that has nothing to do with the walk/run lever under test.
     const spawn = walkCamera.position.clone().setY(0);
-    walker.setMoveKey('forward', true);
+    walker.setMoveKey('back', true);
     for (let i = 0; i < 80; i++) { walker.update(0.05); walker.syncScene(walkScene, walkCamera); }
     const walkDistance = walkCamera.position.clone().setY(0).distanceTo(spawn);
 
     const { sim: runner, scene: runScene, camera: runCamera } = buildInitializedSim();
     runner.setRunning(true);
-    runner.setMoveKey('forward', true);
+    runner.setMoveKey('back', true);
     for (let i = 0; i < 80; i++) { runner.update(0.05); runner.syncScene(runScene, runCamera); }
     const runDistance = runCamera.position.clone().setY(0).distanceTo(spawn);
 
@@ -192,5 +195,82 @@ describe('GenesisWorldSim3D — GENERIC INTERACTION SYSTEM (not just the pump)',
     }
     expect(sawFloodplain).toBe(true);
     expect(sim.getNearestInteractableId()).not.toBe(sim.city.pumpPipeId);
+  });
+});
+
+describe('GenesisWorldSim3D — PRIORITY 2: REAL WORLD GEOMETRY (collision + hospital entrance/interior)', () => {
+  it('the pump has a real collision footprint — walking straight at it for a long time never reaches its exact center', () => {
+    const { sim, scene, camera } = buildInitializedSim();
+    sim.setMoveKey('forward', true);
+    let minDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.05);
+      sim.syncScene(scene, camera);
+      const frame = getFrameState(sim.city.base.engine);
+      const pump = frame.entities.find((e) => e.id === sim.city.pumpPipeId)!;
+      const d = camera.position.distanceTo(new THREE.Vector3(pump.transform.position.x, camera.position.y, pump.transform.position.z));
+      if (d < minDistance) minDistance = d;
+    }
+    // Real footprint half-extent (PUMP_EQUIPMENT_SCALE=3 -> box 4.5, half 2.25) + collisionRadius(0.4):
+    // a player who could walk straight through would get arbitrarily close to 0.
+    expect(minDistance).toBeGreaterThan(2);
+  });
+
+  it('walking toward the hospital eventually reports its real entrance, and its own real footprint blocks the player before reaching its center', () => {
+    const { sim, scene, camera } = buildInitializedSim();
+    const frame = getFrameState(sim.city.base.engine);
+    const hospital = frame.entities.find((e) => e.id === sim.city.hospitalBuildingId)!;
+    const dx = hospital.transform.position.x - camera.position.x;
+    const dz = hospital.transform.position.z - camera.position.z;
+    const desiredYaw = Math.atan2(-dx, -dz);
+    let deltaYaw = desiredYaw - camera.rotation.y;
+    while (deltaYaw > Math.PI) deltaYaw -= 2 * Math.PI;
+    while (deltaYaw < -Math.PI) deltaYaw += 2 * Math.PI;
+    sim.addMouseLook(-deltaYaw / 0.0022, 0);
+    sim.setMoveKey('forward', true);
+    let sawEntrance = false;
+    let minDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.05);
+      sim.syncScene(scene, camera);
+      if (sim.nearHospitalEntrance) sawEntrance = true;
+      const d = camera.position.distanceTo(new THREE.Vector3(hospital.transform.position.x, camera.position.y, hospital.transform.position.z));
+      if (d < minDistance) minDistance = d;
+    }
+    expect(sawEntrance).toBe(true);
+    // Real footprint half-extent (HOSPITAL_BUILDING_SCALE=7 -> box 10.5, half 5.25) + collisionRadius:
+    // a player who could walk straight through would get arbitrarily close to 0.
+    expect(minDistance).toBeGreaterThan(4);
+  });
+
+  it('enterHospital()/exitHospital(): inside, the SAME real hospitalBuildingId entity is still what gets inspected', () => {
+    const { sim } = buildInitializedSim();
+    expect(sim.insideBuildingId).toBeNull();
+    sim.enterHospital();
+    expect(sim.insideBuildingId).toBe(sim.city.hospitalBuildingId);
+    const inspected = sim.inspect(sim.city.hospitalBuildingId);
+    expect(inspected).not.toBeNull();
+    expect(inspected!.id).toBe(sim.city.hospitalBuildingId);
+    sim.exitHospital();
+    expect(sim.insideBuildingId).toBeNull();
+  });
+
+  it('enterHospital() moves the camera to the interior pocket; exitHospital() resumes the outdoor position unchanged', () => {
+    const { sim, scene, camera } = buildInitializedSim();
+    sim.update(0.05);
+    sim.syncScene(scene, camera);
+    const outdoorPosition = camera.position.clone();
+
+    sim.enterHospital();
+    sim.update(0.05);
+    sim.syncScene(scene, camera);
+    // The interior pocket sits far outside the outdoor room bounds (±190) — see HOSPITAL_INTERIOR_ORIGIN.
+    expect(camera.position.x).toBeGreaterThan(190);
+
+    sim.exitHospital();
+    sim.update(0.05);
+    sim.syncScene(scene, camera);
+    expect(camera.position.x).toBeCloseTo(outdoorPosition.x, 1);
+    expect(camera.position.z).toBeCloseTo(outdoorPosition.z, 1);
   });
 });

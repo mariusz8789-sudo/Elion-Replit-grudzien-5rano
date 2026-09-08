@@ -331,6 +331,9 @@ describe('GenesisWorldSim3D — PRIORITY 4 (most important): connected to the re
     // All 3 real flood levers (outlet, infiltration, pump) are declared with no goal-side restriction.
     expect(comparison.ranking.length).toBeGreaterThanOrEqual(3);
     expect(comparison.bestActionIds.length).toBeGreaterThan(0);
+    // Feedback: the result must say which world it ran in, not just what it found.
+    expect(comparison.worldId).toBe('genesis-scientific-city-3');
+    expect(comparison.domainId).toBe('flood-hydrology');
   });
 
   it('applyComparisonWinner() forks the LIVE engine with the real winning lever\'s own mutation', () => {

@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import type { CrossActionComparison } from '../../core/agent/crossActionComparison';
+import { admitWorldQuestion } from '../../core/agent/discoveryAdmission';
+import type { Admission } from '../../core/agent/discoveryStrategy';
+import type { DiscoveryLoopResult, DiscoveryTraceStep } from '../../core/agent/discoveryLoop';
+import { renderDiscoveryReport } from '../../core/agent/discoveryReport';
 import {
   runWorldDiscoveryAndRemember,
   summariseDiscovery,
@@ -7,10 +11,55 @@ import {
   type WorldDiscoveryMemoryUse,
   type WorldDiscoveryRememberedState,
 } from '../../core/agent/worldDiscoverySession';
-import type { SavedWorldDiscoveryReplay } from '../../core/scienceMemory';
+import {
+  GENESIS_FLOOD_CATALOG,
+  parseWorldDiscoveryGoal,
+  resolveWorldLeverCatalog,
+  WORLD_LEVER_CATALOGS,
+  type WorldGoalIntent,
+  type WorldLeverCatalog,
+} from '../../core/agent/worldGoalIntent';
+import {
+  getExperiment,
+  listExperiments,
+  replaySavedWorldDiscoveryRun,
+  type SavedExperiment,
+  type SavedWorldDiscoveryReplay,
+} from '../../core/scienceMemory';
 
 /** Local UI states the session module has no reason to know about. */
-type PanelState = { kind: 'IDLE' } | { kind: 'RUNNING'; goal: string } | WorldDiscoveryRememberedState;
+type PanelState =
+  | { kind: 'IDLE' }
+  | { kind: 'RUNNING'; goal: string }
+  | { kind: 'NOT_ADMITTED'; goal: string; admission: Admission }
+  | WorldDiscoveryRememberedState;
+
+/** A friendly, honest label for a catalog: the engine's own declared strings, nothing invented. */
+function catalogLabel(catalog: WorldLeverCatalog): string {
+  return `${catalog.domainId} — ${catalog.worldId}`;
+}
+
+/** Every world-discovery run ever saved, newest first — `listExperiments()` covers every kind of
+ * saved experiment in Science Memory, so this filters to the ones this panel's own engine produced. */
+function listWorldDiscoveryHistory(): readonly SavedExperiment[] {
+  return listExperiments().filter((e) => e.worldDiscovery !== undefined);
+}
+
+/** The one-line outcome of a saved run, read from what it actually recorded — never re-derived. */
+function historySummary(exp: SavedExperiment): string {
+  const record = exp.worldDiscovery;
+  if (!record) return '(no discovery record)';
+  if (record.resultKind === 'HYPOTHESIS_LOOP' && record.loopResult) {
+    return summariseDiscovery(record.loopResult);
+  }
+  if (record.resultKind === 'ACTION_COMPARISON' && record.comparisonResult) {
+    const c = record.comparisonResult;
+    if (c.status !== 'RANKED' && c.status !== 'TIED') return `Comparison: ${c.status}.`;
+    const winner = c.ranking.find((a) => c.bestActionIds.includes(a.actionId));
+    return `Compared ${c.ranking.length} actions; best: ${winner?.label ?? '(tied, no single best)'}.`;
+  }
+  return '(no result)';
+}
 
 /**
  * DISCOVERY, IN THE WORLD IT SEARCHES.
@@ -19,8 +68,10 @@ type PanelState = { kind: 'IDLE' } | { kind: 'RUNNING'; goal: string } | WorldDi
  * search actually runs in; a separate page would have shown results detached
  * from the thing they are about.
  *
- * It contains NO discovery logic. It calls `runWorldDiscovery` and renders what
- * comes back. In particular it never decides which mechanism won, never picks a
+ * It contains NO discovery logic. It calls `runWorldDiscoveryAndRemember` (the
+ * one seam — see that function's own doc) and renders what comes back, or reads
+ * an already-saved record straight from Science Memory for the history views
+ * below. In particular it never decides which mechanism won, never picks a
  * fallback when nothing survived, and never rewrites a refusal into a friendlier
  * message — the planner's own words are shown, because a goal Genesis could not
  * read is a fact the user needs, not an error to smooth over.
@@ -33,10 +84,33 @@ type PanelState = { kind: 'IDLE' } | { kind: 'RUNNING'; goal: string } | WorldDi
 export function WorldDiscoveryPanel() {
   const [goal, setGoal] = useState('');
   const [state, setState] = useState<PanelState>({ kind: 'IDLE' });
+  // Every real lever catalog Genesis declares, read from the ONE registry
+  // (`WORLD_LEVER_CATALOGS`) rather than a second hand-written list here — a
+  // list that could drift is exactly what that registry exists to prevent.
+  const [catalogId, setCatalogId] = useState<string>(GENESIS_FLOOD_CATALOG.catalogId);
+  const catalog = resolveWorldLeverCatalog(catalogId) ?? GENESIS_FLOOD_CATALOG;
 
-  const run = (text: string) => {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<readonly string[]>([]);
+  const [replayChecks, setReplayChecks] = useState<Readonly<Record<string, SavedWorldDiscoveryReplay>>>({});
+
+  const run = (text: string, forCatalogId: string) => {
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
+    setViewingId(null);
+    setCompareIds([]);
+    // ADMISSION — asked before anything is searched. A question whose hazard/
+    // process Genesis has no solver for must come back as a NAMED GAP (what the
+    // capability registry actually says is missing), not as a search over
+    // whichever levers this catalog happens to declare. REAL/APPROXIMATION both
+    // proceed — the flood catalog itself is only PARTIALLY_MODELLED and still
+    // a real, admitted search; only NOT_MODELLED/BLOCKED are refused here.
+    const admission = admitWorldQuestion(trimmed);
+    if (admission.status === 'NOT_MODELLED' || admission.status === 'BLOCKED') {
+      setState({ kind: 'NOT_ADMITTED', goal: trimmed, admission });
+      return;
+    }
     setState({ kind: 'RUNNING', goal: trimmed });
     // The search forks and advances a real world, persists it to Science Memory,
     // builds its Evidence Bundle and replays it — several real experiments'
@@ -47,8 +121,36 @@ export function WorldDiscoveryPanel() {
     // call already has to read prior memory before it can decide what to run,
     // so saving afterwards is the other half of the same seam, not a separate
     // side effect the panel would otherwise have to remember to trigger.
-    setTimeout(() => setState(runWorldDiscoveryAndRemember(trimmed)), 0);
+    setTimeout(() => setState(runWorldDiscoveryAndRemember(trimmed, forCatalogId)), 0);
   };
+
+  /** Re-runs a saved goal against the SAME catalog it originally ran in — the one seam again, not a
+   * second copy of it — and switches the picker to match, so the result the user sees matches what ran. */
+  const rerunSaved = (exp: SavedExperiment) => {
+    const record = exp.worldDiscovery;
+    if (!record) return;
+    setCatalogId(record.catalogId);
+    setGoal(record.goal);
+    run(record.goal, record.catalogId);
+  };
+
+  /** On-demand only — never automatic — re-executes a saved run from its stored inputs and compares
+   * fingerprints, exactly what `replaySavedWorldDiscoveryRun` was built to do standalone. */
+  const verifyReplay = (exp: SavedExperiment) => {
+    setReplayChecks((prev) => ({ ...prev, [exp.id]: replaySavedWorldDiscoveryRun(exp) }));
+  };
+
+  const toggleCompare = (id: string) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 2) return [prev[1]!, id];
+      return [...prev, id];
+    });
+  };
+
+  const history = historyOpen ? listWorldDiscoveryHistory() : [];
+  const viewing = viewingId ? getExperiment(viewingId) : undefined;
+  const comparing = compareIds.length === 2 ? compareIds.map((id) => getExperiment(id)).filter((e): e is SavedExperiment => !!e) : [];
 
   return (
     <div className="gsc-panel wd-panel">
@@ -57,15 +159,62 @@ export function WorldDiscoveryPanel() {
         <span className="wd-title">AUTONOMOUS DISCOVERY</span>
       </div>
       <p className="gsc-caption">
-        Give a scientific goal for this city. Genesis tests the mechanisms this world really has, one experiment
+        Give a scientific goal for this world. Genesis tests the mechanisms this world really has, one experiment
         at a time, and reports what survived and what it ruled out.
       </p>
+
+      {/* FEEDBACK #1 — every real catalog Genesis declares, not just the flood city. Listed straight
+          from WORLD_LEVER_CATALOGS so a new domain (like the chemistry kinetics one) is reachable the
+          moment it is registered, with no second place to remember to update. */}
+      <label className="wd-label" htmlFor="wd-catalog">World</label>
+      <select
+        id="wd-catalog"
+        className="lg-obs-input"
+        value={catalogId}
+        onChange={(event) => setCatalogId(event.target.value)}
+        disabled={state.kind === 'RUNNING'}
+      >
+        {Object.values(WORLD_LEVER_CATALOGS).map((c) => (
+          <option key={c.catalogId} value={c.catalogId}>
+            {catalogLabel(c)}
+          </option>
+        ))}
+      </select>
+
+      {/* What this world honestly is BEFORE anything runs — declaredAssumptions/notModelledFactors
+          are not clutter to trim: without them the screen would claim more than the model can support. */}
+      <section className="wd-section wd-world-about">
+        <h4>About this world</h4>
+        <p className="gsc-caption">
+          Domain <code>{catalog.domainId}</code> on world <code>{catalog.worldId}</code>.
+        </p>
+        {catalog.declaredAssumptions.length > 0 && (
+          <>
+            <p className="gsc-caption wd-world-about-label">Declared assumptions:</p>
+            <ul>
+              {catalog.declaredAssumptions.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </>
+        )}
+        {catalog.notModelledFactors.length > 0 && (
+          <>
+            <p className="gsc-caption wd-world-about-label">Not modelled:</p>
+            <ul>
+              {catalog.notModelledFactors.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
 
       <form
         className="lg-obs-form"
         onSubmit={(event) => {
           event.preventDefault();
-          run(goal);
+          run(goal, catalogId);
         }}
       >
         <label className="wd-label" htmlFor="wd-goal">Scientific goal</label>
@@ -88,15 +237,184 @@ export function WorldDiscoveryPanel() {
 
       {state.kind === 'RUNNING' && (
         <p className="wd-running" role="status">
-          Running real experiments on this world — forking the city, advancing each arm, and recording the result
-          to Science Memory.
+          Running real experiments on this world — forking it, advancing each arm, and recording the result to
+          Science Memory.
         </p>
       )}
 
+      {state.kind === 'NOT_ADMITTED' && <AdmissionRefusal admission={state.admission} />}
       {state.kind === 'REFUSED' && <DiscoveryRefusal state={state} />}
-      {state.kind === 'COMPLETE' && <DiscoveryResult state={state} />}
+      {state.kind === 'COMPLETE' && (
+        <DiscoveryResultView
+          goal={state.goal}
+          catalog={catalog}
+          result={state.result}
+          memory={state.memory}
+          evidence={state.evidence}
+          replay={state.replay}
+          intent={state.intent}
+          report={state.report}
+        />
+      )}
       {state.kind === 'COMPARISON' && (
-        <ActionComparisonResult comparison={state.comparison} memory={state.memory} evidence={state.evidence} replay={state.replay} />
+        <ActionComparisonResultView
+          catalog={catalog}
+          comparison={state.comparison}
+          memory={state.memory}
+          evidence={state.evidence}
+          replay={state.replay}
+        />
+      )}
+
+      {/* FEEDBACK #3 — every run is already saved to Science Memory with a full Evidence Bundle and a
+          replay verdict; this is what makes both reachable from the panel instead of only from storage. */}
+      <section className="wd-section wd-history">
+        <button
+          type="button"
+          className="wd-history-toggle"
+          onClick={() => setHistoryOpen((open) => !open)}
+        >
+          {historyOpen ? 'Hide history' : 'Show history'}
+        </button>
+        {historyOpen && (
+          <>
+            {history.length === 0 ? (
+              <p className="wd-none">No saved runs yet.</p>
+            ) : (
+              <ul className="wd-history-list">
+                {history.map((exp) => {
+                  const record = exp.worldDiscovery!;
+                  const historyCatalog = resolveWorldLeverCatalog(record.catalogId);
+                  const check = replayChecks[exp.id];
+                  return (
+                    <li key={exp.id} className="wd-history-row">
+                      <div className="wd-history-meta">
+                        <span className="gsc-caption">{new Date(exp.createdAt).toLocaleString()}</span>
+                        <span className="gsc-caption">{historyCatalog ? catalogLabel(historyCatalog) : record.catalogId}</span>
+                      </div>
+                      <p className="wd-history-goal">“{record.goal}”</p>
+                      <p className="gsc-caption">{historySummary(exp)}</p>
+                      <div className="wd-history-actions">
+                        <button type="button" className="chip-btn tiny" onClick={() => setViewingId(exp.id)}>
+                          View
+                        </button>
+                        <button type="button" className="chip-btn tiny" onClick={() => rerunSaved(exp)} disabled={state.kind === 'RUNNING'}>
+                          Re-run
+                        </button>
+                        <button type="button" className="chip-btn tiny" onClick={() => verifyReplay(exp)}>
+                          Verify replay
+                        </button>
+                        <label className="wd-compare-check">
+                          <input
+                            type="checkbox"
+                            checked={compareIds.includes(exp.id)}
+                            onChange={() => toggleCompare(exp.id)}
+                          />
+                          Compare
+                        </label>
+                      </div>
+                      {check && (
+                        <p className="gsc-caption">
+                          Re-executed just now: <b className={`wd-replay-${check.status}`}>{check.status}</b> — {check.reason}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+      </section>
+
+      {viewing && (
+        <section className="wd-section wd-history-view">
+          <div className="gsc-panel-row">
+            <h4>Viewing saved run — {new Date(viewing.createdAt).toLocaleString()}</h4>
+            <button type="button" className="chip-btn tiny" onClick={() => setViewingId(null)}>
+              Close
+            </button>
+          </div>
+          <SavedRunView experiment={viewing} />
+        </section>
+      )}
+
+      {comparing.length === 2 && (
+        <section className="wd-section wd-compare-view">
+          <div className="gsc-panel-row">
+            <h4>Comparing 2 saved runs</h4>
+            <button type="button" className="chip-btn tiny" onClick={() => setCompareIds([])}>
+              Close
+            </button>
+          </div>
+          <div className="wd-compare-columns">
+            {comparing.map((exp) => (
+              <div key={exp.id} className="wd-compare-column">
+                <p className="gsc-caption">{new Date(exp.createdAt).toLocaleString()}</p>
+                <SavedRunView experiment={exp} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Renders a saved record by reading its own persisted `loopResult`/`comparisonResult` — never by
+ * re-running anything. Regenerates `intent`/`report` for a hypothesis-loop record purely for the
+ * machine-readable disclosure: both are pure, deterministic functions of the stored goal + catalog
+ * (no physics, no world graph), the same class of derivation `summariseDiscovery` already does. */
+function SavedRunView({ experiment }: { experiment: SavedExperiment }) {
+  const record = experiment.worldDiscovery;
+  if (!record) return <p className="wd-none">This saved experiment has no discovery record.</p>;
+  const catalog = resolveWorldLeverCatalog(record.catalogId);
+
+  if (record.resultKind === 'HYPOTHESIS_LOOP' && record.loopResult) {
+    const intent = catalog ? parseWorldDiscoveryGoal(record.goal, catalog) : undefined;
+    return (
+      <DiscoveryResultView
+        goal={record.goal}
+        catalog={catalog}
+        result={record.loopResult}
+        memory={record.resumedFromMemory}
+        evidence={record.evidence}
+        replay={null}
+        intent={intent}
+        report={renderDiscoveryReport(record.loopResult)}
+      />
+    );
+  }
+  if (record.resultKind === 'ACTION_COMPARISON' && record.comparisonResult) {
+    return (
+      <ActionComparisonResultView
+        catalog={catalog}
+        comparison={record.comparisonResult}
+        memory={null}
+        evidence={record.evidence}
+        replay={null}
+      />
+    );
+  }
+  return <p className="wd-none">Saved record is incomplete.</p>;
+}
+
+/**
+ * ADMISSION refusal — Genesis declined BEFORE searching, because the question
+ * classifies to a hazard/process with no solver behind it at all (NOT_MODELLED)
+ * or names a model this runtime cannot execute (BLOCKED). Distinct from
+ * `DiscoveryRefusal` below: that one already ran the catalog's own goal parser
+ * and reports a mismatch against the SELECTED catalog's declared levers; this
+ * one never reached the catalog at all — `admission.missing` is the capability
+ * registry's own words for what Genesis would need, not a re-derived guess.
+ */
+function AdmissionRefusal({ admission }: { admission: Admission }) {
+  return (
+    <div className="wd-refusal" role="status">
+      <p className="wd-refusal-head">Genesis did not search for this — the question was never admitted.</p>
+      <p className="wd-refusal-why">{admission.why}</p>
+      {admission.missing.length > 0 && (
+        <p className="gsc-caption">Would need: {admission.missing.join('; ')}.</p>
       )}
     </div>
   );
@@ -126,10 +444,84 @@ function DiscoveryRefusal({ state }: { state: Extract<PanelState, { kind: 'REFUS
   );
 }
 
-function DiscoveryResult({ state }: { state: Extract<PanelState, { kind: 'COMPLETE' }> }) {
-  const { result } = state;
+/** Groups a flat trace into its rounds, in the order the loop actually produced them — no re-sorting,
+ * no re-deriving which step belongs where; `DiscoveryTraceStep.round`/`stepIndex` already say so. */
+function groupTraceByRound(trace: readonly DiscoveryTraceStep[]): ReadonlyMap<number, readonly DiscoveryTraceStep[]> {
+  const grouped = new Map<number, DiscoveryTraceStep[]>();
+  for (const step of trace) {
+    const bucket = grouped.get(step.round);
+    if (bucket) bucket.push(step);
+    else grouped.set(step.round, [step]);
+  }
+  return grouped;
+}
+
+/** A `Record<string, unknown>` shown compactly — the same key=value join `GenesisWorldScreen.tsx`
+ * already uses for domain state, so an observation/verdict reads the same way everywhere in Genesis. */
+function formatRecord(record: Record<string, unknown> | null): string {
+  if (!record) return '(none)';
+  const entries = Object.entries(record);
+  if (entries.length === 0) return '(empty)';
+  return entries.map(([key, value]) => `${key}=${typeof value === 'number' ? value.toFixed(4) : JSON.stringify(value)}`).join(' · ');
+}
+
+/**
+ * FEEDBACK #2 — the loop's own per-step record (`DiscoveryLoopResult.trace`), rendered round by
+ * round: why this step ran, what it did, which tool, what it observed, and the falsification
+ * verdict it reached — the exact vocabulary the engine already produces, previously reachable only
+ * inside the raw JSON dump. This computes nothing: every field is read straight off the trace.
+ */
+function DiscoveryTraceView({ trace }: { trace: readonly DiscoveryTraceStep[] }) {
+  if (trace.length === 0) return null;
+  const rounds = groupTraceByRound(trace);
+  return (
+    <section className="wd-section wd-trace">
+      <h4>Step by step</h4>
+      {[...rounds.entries()].map(([round, steps]) => (
+        <div key={round} className="wd-trace-round">
+          <p className="wd-trace-round-label">Round {round}</p>
+          {steps.map((step) => (
+            <div key={step.stepIndex} className="wd-trace-step">
+              <p className="wd-trace-why">{step.why}</p>
+              <p className="wd-trace-what">
+                {step.what} — <code>{step.tool}</code>
+              </p>
+              <p className="gsc-caption">observation: {formatRecord(step.observation)}</p>
+              <p className="gsc-caption">verdict: {formatRecord(step.falsificationVerdict)}</p>
+              {step.branchId && (
+                <p className="gsc-caption">
+                  branch: <code>{step.branchId}</code>
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+interface DiscoveryResultViewProps {
+  goal: string;
+  catalog: WorldLeverCatalog | undefined;
+  result: DiscoveryLoopResult;
+  memory: WorldDiscoveryMemoryUse | null;
+  evidence: WorldDiscoveryEvidenceSummary | null;
+  replay: SavedWorldDiscoveryReplay | null;
+  intent?: WorldGoalIntent;
+  report?: string;
+}
+
+function DiscoveryResultView({ catalog, result, memory, evidence, replay, intent, report }: DiscoveryResultViewProps) {
   return (
     <div className="wd-result">
+      {/* FEEDBACK #1 — which world this actually ran in, stated plainly next to the answer, not just
+          selectable before running. */}
+      {catalog && (
+        <p className="gsc-caption">
+          Ran in world <code>{catalog.worldId}</code> ({catalog.domainId}).
+        </p>
+      )}
       <p className="wd-summary">{summariseDiscovery(result)}</p>
 
       <section className="wd-section">
@@ -147,6 +539,8 @@ function DiscoveryResult({ state }: { state: Extract<PanelState, { kind: 'COMPLE
           ))}
         </ol>
       </section>
+
+      <DiscoveryTraceView trace={result.trace} />
 
       <section className="wd-section">
         <h4>What held up</h4>
@@ -204,12 +598,12 @@ function DiscoveryResult({ state }: { state: Extract<PanelState, { kind: 'COMPLE
         </p>
       </section>
 
-      <MemoryAndEvidenceFooter memory={state.memory} evidence={state.evidence} replay={state.replay} />
+      <MemoryAndEvidenceFooter memory={memory} evidence={evidence} replay={replay} />
 
       <details className="wd-machine">
         <summary>Machine-readable record</summary>
-        <pre className="wd-pre">{state.report}</pre>
-        <pre className="wd-pre">{JSON.stringify({ intent: state.intent, result }, null, 2)}</pre>
+        {report !== undefined && <pre className="wd-pre">{report}</pre>}
+        <pre className="wd-pre">{JSON.stringify({ intent, result }, null, 2)}</pre>
       </details>
     </div>
   );
@@ -224,6 +618,9 @@ function DiscoveryResult({ state }: { state: Extract<PanelState, { kind: 'COMPLE
  * and on a run with nothing to resume from (the honest, common first-run
  * case) — rendered as "starting fresh" rather than omitted, so a viewer can
  * tell "memory had nothing to say" from "this panel forgot to check".
+ * `replay` is null when viewing a saved record without an on-demand replay
+ * check yet (see the history list's own "Verify replay" button) — that is
+ * shown as its own honest state, never silently hidden.
  */
 function MemoryAndEvidenceFooter({
   memory,
@@ -231,8 +628,8 @@ function MemoryAndEvidenceFooter({
   replay,
 }: {
   memory: WorldDiscoveryMemoryUse | null;
-  evidence: WorldDiscoveryEvidenceSummary;
-  replay: SavedWorldDiscoveryReplay;
+  evidence: WorldDiscoveryEvidenceSummary | null;
+  replay: SavedWorldDiscoveryReplay | null;
 }) {
   return (
     <section className="wd-section wd-memory">
@@ -240,12 +637,20 @@ function MemoryAndEvidenceFooter({
       <p className="gsc-caption">
         {memory ? memory.reason : 'No earlier run for this objective — starting fresh.'}
       </p>
-      <p className="gsc-caption">
-        Evidence Bundle <code>{evidence.bundleId}</code>: own replay <b>{evidence.replayVerdict}</b>.
-      </p>
-      <p className="gsc-caption">
-        Saved run re-executed and verified: <b className={`wd-replay-${replay.status}`}>{replay.status}</b> — {replay.reason}
-      </p>
+      {evidence ? (
+        <p className="gsc-caption">
+          Evidence Bundle <code>{evidence.bundleId}</code>: own replay <b>{evidence.replayVerdict}</b>.
+        </p>
+      ) : (
+        <p className="gsc-caption">No Evidence Bundle recorded for this run.</p>
+      )}
+      {replay ? (
+        <p className="gsc-caption">
+          Saved run re-executed and verified: <b className={`wd-replay-${replay.status}`}>{replay.status}</b> — {replay.reason}
+        </p>
+      ) : (
+        <p className="gsc-caption">Not re-verified since it was saved — use “Verify replay” in History to check now.</p>
+      )}
     </section>
   );
 }
@@ -259,20 +664,27 @@ function MemoryAndEvidenceFooter({
  * comparison has no winner to show, and manufacturing one from the numbers on
  * screen is exactly the failure the engine's state set exists to prevent.
  */
-function ActionComparisonResult({
+function ActionComparisonResultView({
+  catalog,
   comparison,
   memory,
   evidence,
   replay,
 }: {
+  catalog: WorldLeverCatalog | undefined;
   comparison: CrossActionComparison;
   memory: WorldDiscoveryMemoryUse | null;
-  evidence: WorldDiscoveryEvidenceSummary;
-  replay: SavedWorldDiscoveryReplay;
+  evidence: WorldDiscoveryEvidenceSummary | null;
+  replay: SavedWorldDiscoveryReplay | null;
 }) {
   const ranked = comparison.status === 'RANKED' || comparison.status === 'TIED';
   return (
     <div className="wd-result">
+      {catalog && (
+        <p className="gsc-caption">
+          Ran in world <code>{catalog.worldId}</code> ({catalog.domainId}).
+        </p>
+      )}
       <p className="wd-summary">
         {ranked
           ? `Compared ${comparison.ranking.length} actions against the same control.`

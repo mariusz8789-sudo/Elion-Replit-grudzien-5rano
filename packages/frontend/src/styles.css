@@ -3520,3 +3520,12 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   }
   .wd-pre { max-height: 10rem; }
 }
+
+/* Cross-action comparison rows: rank numbers come from the engine, so the list
+   must show the engine's own rank rather than its DOM position — two tied
+   actions really do share a number. */
+.wd-actions li { margin-bottom: 0.5rem; }
+.wd-dir-IMPROVED { color: #4ade80; }
+.wd-dir-WORSENED { color: #f87171; }
+.wd-dir-NO_CHANGE { color: #94a3b8; }
+.wd-dir-NOT_EVALUABLE { color: #fbbf24; }

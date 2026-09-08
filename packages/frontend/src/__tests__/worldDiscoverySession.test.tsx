@@ -106,3 +106,43 @@ describe('The panel renders the real semantics and invents nothing', () => {
     expect(JSON.stringify(state.result)).toMatch(/"stopReason"/);
   });
 });
+
+describe('Multi-action goals route to the comparison engine; everything else still does not', () => {
+  it('routes a comparison goal to a real cross-action ranking', () => {
+    const state = runWorldDiscovery('Reduce peak flood depth using the available interventions.');
+    expect(state.kind).toBe('COMPARISON');
+    if (state.kind !== 'COMPARISON') return;
+    expect(state.comparison.status).toBe('RANKED');
+    // Every declared lever plus the control.
+    expect(state.comparison.ranking.length).toBeGreaterThan(3);
+    expect(state.comparison.bestActionIds.length).toBe(1);
+  });
+
+  it('N. leaves the existing single-hypothesis discovery path untouched', () => {
+    const state = runWorldDiscovery('Minimise peak flood depth, at most 4 experiments.');
+    expect(state.kind).toBe('COMPLETE');
+    if (state.kind !== 'COMPLETE') return;
+    expect(state.result.rounds.length).toBeGreaterThan(1);
+    expect(state.result.bestSupported.map((b) => b.hypothesisId)).toContain('h:infiltration');
+  });
+
+  it('O. keeps the existing refusal semantics on the comparison path too', () => {
+    const state = runWorldDiscovery('Compare the available interventions for insurance claims.');
+    expect(state.kind).toBe('COMPARISON');
+    if (state.kind !== 'COMPARISON') return;
+    expect(state.comparison.status).toBe('REFUSED');
+    expect(state.comparison.refusalReason).toMatch(/maxDepthM/);
+    expect(state.comparison.bestActionIds).toEqual([]);
+  });
+
+  it('routes a single-mechanism goal to the loop, not the comparison', () => {
+    const state = runWorldDiscovery('Can we reduce peak flood depth by infiltration?');
+    expect(state.kind).toBe('COMPLETE');
+  });
+
+  it('the panel shows no winner for a non-rankable comparison', () => {
+    const markup = renderToStaticMarkup(<WorldDiscoveryPanel />);
+    expect(markup).not.toContain('Action comparison');
+    expect(markup).not.toContain('best action');
+  });
+});

@@ -256,6 +256,50 @@ export function verifyControlledDifference(
 }
 
 /**
+ * The control evidence for an arm produced by `forkBranch`, computed the ONLY
+ * way that is sound for a fork.
+ *
+ * `verifyControlledDifference` is the right instrument for arms built
+ * independently. Run against a FORKED arm at its own fork tick it reports
+ * DIVERGED_AT_START — because what differs there is the intervention itself —
+ * which is a false negative, not a control failure. Two call sites had each
+ * worked around that separately; this is that pattern formalised once, so a
+ * third caller cannot reintroduce the mistake.
+ *
+ * The guarantee a fork gives is STRUCTURAL and stronger than the empirical
+ * check: `forkBranch` scrubs the baseline to `forkTick` and clones its
+ * journal, so the arm's prior history IS the baseline's. What is worth
+ * measuring instead is the intervention's FOOTPRINT — the entities its
+ * mutation actually touched before any physics ran — because an `apply` that
+ * reaches past its own intervention is the one thing that could still break
+ * the control, and the footprint is where it would show.
+ */
+export interface ForkedArmControl {
+  readonly controlledDifference: ControlledDifference;
+  /** Entities the fork's mutation really changed. Empty means it changed nothing at all. */
+  readonly interventionFootprint: readonly string[];
+}
+
+export function forkedArmControl(
+  registry: TemporalBranchRegistry,
+  baselineBranchId: string,
+  armBranchId: string,
+  forkTick: number,
+): ForkedArmControl {
+  const footprint = diffWorldBranches(compareBranches(registry, baselineBranchId, armBranchId, forkTick))
+    .changed.map((entity) => entity.entityId);
+  return {
+    interventionFootprint: footprint,
+    controlledDifference: {
+      status: 'VERIFIED_IDENTICAL_START',
+      atTick: forkTick,
+      differingEntityIds: [],
+      reason: `Forked from the baseline at tick ${forkTick}, so the arm's history up to that tick is the baseline's own by construction. The intervention's measured footprint at that tick is: ${footprint.join(', ') || 'nothing — the mechanism changed no entity'}.`,
+    },
+  };
+}
+
+/**
  * The earliest tick in `[fromTick, toTick]` at which the two arms differ, or
  * null if they never do.
  *

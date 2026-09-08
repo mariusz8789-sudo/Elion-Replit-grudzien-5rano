@@ -8,7 +8,12 @@ import {
   toMechanismRun,
   toParameterRun,
 } from '../core/agent/discoveryStrategies';
-import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, GENESIS_FLOOD_CATALOG } from '../core/agent/worldGoalIntent';
+import {
+  buildWorldDiscoveryPlan,
+  parseWorldDiscoveryGoal,
+  GENESIS_FLOOD_CATALOG,
+  WORLD_LEVER_CATALOGS,
+} from '../core/agent/worldGoalIntent';
 
 /**
  * ADAPTER EQUIVALENCE — the property that makes the shared contract safe.
@@ -132,6 +137,42 @@ describe('discovery strategy adapters', () => {
     expect(run.untested).toEqual(direct.untestedHypothesisIds);
     // The proposal comes from the existing nextAction adapter, not a second converter.
     expect(run.nextExperiment?.selectorId).toBe('parameter-inquiry');
+  });
+
+  /**
+   * THE DOMAIN-AGNOSTIC CLAIM, CHECKED OVER THE WHOLE REGISTRY.
+   *
+   * Two hand-picked domains can be a coincidence of how they were written. This
+   * walks every catalog Genesis declares — five today, more as C3 adds them —
+   * and builds each goal from that catalog's OWN `metricPhrases`, so the test
+   * cannot phrase a question the world does not compute, and cannot silently
+   * stop covering a domain added later.
+   */
+  it.each(Object.keys(WORLD_LEVER_CATALOGS))('MECHANISM: adapter is equivalent on catalog %s', (catalogId) => {
+    const catalog = WORLD_LEVER_CATALOGS[catalogId]!;
+    const metricPhrase = Object.keys(catalog.metricPhrases)[0]!;
+    const plan = buildWorldDiscoveryPlan(
+      parseWorldDiscoveryGoal(`Minimise ${metricPhrase}, at most 2 experiments.`, catalog),
+      catalog,
+    );
+    if ('error' in plan) throw new Error(`${catalogId} could not build a plan: ${plan.error}`);
+
+    const direct = runAutonomousDiscovery(plan);
+    const run = mechanismStrategy.run(plan);
+
+    // Same finding, by content — branch labels differ between runs by design.
+    expect(run.resultFingerprint).toBe(discoveryResultFingerprint(direct));
+    expect(run.stopReason).toBe(direct.stopReason);
+    expect(run.rounds).toHaveLength(direct.rounds.length);
+
+    // Nothing is lost: every declared hypothesis lands in exactly one bucket.
+    const partitioned = [...run.surviving, ...run.falsified, ...run.untested];
+    expect(new Set(partitioned).size).toBe(partitioned.length);
+    expect(new Set(partitioned)).toEqual(new Set(direct.beliefs.map((b) => b.hypothesisId)));
+
+    // A world that declared no limits would be claiming more than it can prove.
+    expect(run.limitations.length).toBeGreaterThan(0);
+    expect(run.shape).toBe('MECHANISM');
   });
 
   it('admits before it runs, and refuses a question with no solver behind it', () => {

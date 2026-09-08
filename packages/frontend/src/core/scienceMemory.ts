@@ -21,8 +21,19 @@ import {
 import type { DiscoveryAnalysis } from './experimentFabric/discovery';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
 import { combineEvidencePackRoCrates, type DomainEvidenceEntry, type GenesisRoCrate } from './experimentFabric/evidencePackRoCrate';
-import type { DiscoveryLoopResult } from './agent/discoveryLoop';
-import { renderDiscoveryReport } from './agent/discoveryReport';
+import type { ReplayVerdict } from './matrixFoundation/replayVerdict';
+import {
+  discoveryResultFingerprint, runAutonomousDiscoveryWithEngines,
+  type DiscoveryLoopExecution, type DiscoveryLoopInput, type DiscoveryLoopResult,
+} from './agent/discoveryLoop';
+import { compareWorldActions, crossActionResultFingerprint, type CrossActionComparison } from './agent/crossActionComparison';
+import {
+  buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, resolveWorldLeverCatalog, type WorldLeverCatalog,
+} from './agent/worldGoalIntent';
+import { buildWorldEvidenceBundle, type WorldEvidenceBundle } from './worldModel/evidence/worldEvidenceBundle';
+import { compareBranches, projectToWorldState } from './worldModel/bridge/worldFrameState';
+import { TemporalEngine, TemporalBranchRegistry } from './worldModel/temporal/temporalEngine';
+
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -193,6 +204,15 @@ export interface SavedExperiment {
    * mechanizmów, tylko je zestawia.
    */
   investigation?: SavedInvestigation;
+  /**
+   * A run of the world-model Autonomous Discovery Loop or Cross-Action
+   * Comparison (`core/agent/discoveryLoop.ts` / `crossActionComparison.ts`).
+   * A different substrate from every other domain above (a `TemporalEngine`
+   * world, not an `ExperimentRun`), so it gets its own field rather than
+   * being squeezed into `hypothesisLoop`/`discoveryLoop` above, which are
+   * specifically the Fabric-router shape.
+   */
+  worldDiscovery?: SavedWorldDiscoveryRun;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -494,6 +514,7 @@ export interface SaveExperimentInput {
   hypothesisLoop?: SavedHypothesisLoop;
   discoveryLoop?: SavedScientificDiscoveryLoop;
   investigation?: SavedInvestigation;
+  worldDiscovery?: SavedWorldDiscoveryRun;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -542,6 +563,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     }
   }
   if (input.investigation !== undefined && !isSavedInvestigation(input.investigation)) throw new Error('Zapis dochodzenia wielodomenowego musi zawierać co najmniej jedną domenę z kompletną pętlą hipotez oraz RO-Crate.');
+  if (input.worldDiscovery !== undefined && !isSavedWorldDiscoveryRun(input.worldDiscovery)) throw new Error('Zapis odkrycia world-model musi zawierać cel, katalog, wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -563,6 +585,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.hypothesisLoop === undefined ? {} : { hypothesisLoop: input.hypothesisLoop }),
     ...(input.discoveryLoop === undefined ? {} : { discoveryLoop: input.discoveryLoop }),
     ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
+    ...(input.worldDiscovery === undefined ? {} : { worldDiscovery: input.worldDiscovery }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -857,45 +880,6 @@ export function saveHypothesisLoopToMemory(result: HypothesisLoopResult): SavedE
     honesty: 'simplified',
     honestyNote: `Model ${loop.problem.modelId}; wynik SIMULATION, nieskalibrowany. ${supported} hipotez wspartych, ${falsified} sfalsyfikowanych w granicach protokolu.`,
     assumptions: [...loop.hypotheses[0]!.assumptions],
-    epistemicStatus: 'SIMULATION',
-  });
-}
-
-/**
- * Zapisuje wynik autonomicznej pętli odkrycia w świecie (`core/agent/discoveryLoop.ts`
- * — sentence-driven search na WorldGraph, nie mylić z `experimentFabric/scientificDiscoveryLoop.ts`
- * powyżej, ani z pętlą hipotez `hypothesisLoop.ts` — trzy różne, realne mechanizmy o
- * podobnej nazwie w tym repo). Zanim ta funkcja powstała, ten jeden mechanizm był
- * jedynym w całym Genesis bez żadnej pamięci: uruchamiał się i znikał. Reużywa
- * istniejący generyczny `saveExperiment` zamiast nowego typu — nie ma tu nic, co
- * zasługiwałoby na dedykowany kształt jak `SavedHypothesisLoop`: treść zapisu to
- * dokładnie ten sam tekst, który `renderDiscoveryReport` już pokazuje w panelu
- * AUTONOMOUS DISCOVERY, więc ekran Pamięci Naukowej i panel odkrycia nigdy nie mogą
- * powiedzieć dwóch różnych rzeczy o tym samym przebiegu. Zapisujemy wyłącznie
- * przebiegi, które faktycznie się wykonały (stopReason !== 'REFUSED') — odmowa nie
- * jest eksperymentem do zapamiętania.
- */
-export function saveWorldDiscoveryLoopToMemory(result: DiscoveryLoopResult): SavedExperiment {
-  const runId = fnv1a(canonicalJson({ worldId: result.worldId, question: result.question, rounds: result.rounds.map((r) => r.branchId) }));
-  return saveExperiment({
-    labId: result.domainId,
-    experimentId: `world-discovery:${result.worldId}:${runId}`,
-    experimentName: `Odkrycie w świecie — ${result.question}`,
-    params: { worldId: result.worldId, domainId: result.domainId, rounds: result.rounds.length },
-    stats: {
-      rounds: result.rounds.length,
-      bestSupported: result.bestSupported.length,
-      failedHypotheses: result.failedHypotheses.length,
-      unresolvedQuestions: result.unresolvedQuestions.length,
-    },
-    analysis: [
-      { title: 'Raport wyszukiwania', body: renderDiscoveryReport(result), kind: 'world-discovery-report' },
-    ],
-    honesty: 'simplified',
-    honestyNote: result.bestSupported.length > 0
-      ? `Zatrzymano: ${result.stopReason}. Przetrwało: ${result.bestSupported.map((b) => b.hypothesisId).join(', ')}.`
-      : `Zatrzymano: ${result.stopReason}. Nic nie przetrwało w granicach tego modelu.`,
-    assumptions: [...result.declaredAssumptions],
     epistemicStatus: 'SIMULATION',
   });
 }
@@ -1262,6 +1246,392 @@ export async function replaySavedInvestigation(saved: SavedInvestigation): Promi
     ? 'BLOCKED'
     : domainReplays.some((entry) => entry.replay.status === 'DRIFT') ? 'DRIFT' : 'MATCH';
   return { status, domains: domainReplays };
+}
+
+
+// ---------------------------------------------------------------------------
+// World-model discovery (Autonomous Discovery Loop / Cross-Action Comparison)
+// ---------------------------------------------------------------------------
+
+/**
+ * Closes the loop the world-model discovery engine did not have: HYPOTHESIS
+ * -> EXPERIMENT -> RESULT -> DECISION -> memory -> EVIDENCE BUNDLE -> REPLAY
+ * -> next experiment. Nothing here re-executes physics or re-derives a
+ * verdict; every field is read from a `DiscoveryLoopResult` or
+ * `CrossActionComparison` that already ran, or from an evidence bundle that
+ * `buildWorldEvidenceBundle` already assembled. The one thing genuinely new
+ * is persistence and the "read prior runs before acting" behaviour — see
+ * `core/agent/worldDiscoveryMemory.ts`, the orchestrator that calls this.
+ *
+ * `resultKind` distinguishes the loop's two real outcomes (testing ONE
+ * mechanism vs. RANKING several) rather than collapsing them into one shape:
+ * a caller reading this record needs to know which question was actually
+ * asked. Exactly one of `loopResult`/`comparisonResult` is ever present.
+ */
+export const WORLD_DISCOVERY_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+export type WorldDiscoveryResultKind = 'HYPOTHESIS_LOOP' | 'ACTION_COMPARISON';
+
+/**
+ * The Evidence Bundle this run produced, identified rather than embedded
+ * whole: the full RO-Crate is large and already serialisable on its own
+ * (`serializeWorldEvidenceBundleRoCrate`), so Science Memory keeps the
+ * fingerprint and replay verdict that make the bundle's identity checkable,
+ * not a second copy of its contents.
+ */
+export interface SavedWorldDiscoveryEvidence {
+  bundleId: string;
+  scientificContentFingerprint: string;
+  replayVerdict: ReplayVerdict;
+  replayMessage: string;
+}
+
+/**
+ * What memory changed about THIS run, stated plainly rather than left
+ * implicit. Null means memory had nothing to contribute (first run for this
+ * catalog, or nothing was previously refuted) — a real, common, honest case.
+ */
+export interface SavedWorldDiscoveryMemoryUse {
+  skippedHypothesisIds: readonly string[];
+  reason: string;
+}
+
+export interface SavedWorldDiscoveryRun {
+  contractVersion: string;
+  resultKind: WorldDiscoveryResultKind;
+  goal: string;
+  catalogId: string;
+  worldId: string;
+  domainId: string;
+  objectiveMetric: string | null;
+  objectiveDirection: 'minimize' | 'maximize' | null;
+  loopResult?: DiscoveryLoopResult;
+  comparisonResult?: CrossActionComparison;
+  evidence: SavedWorldDiscoveryEvidence | null;
+  resumedFromMemory: SavedWorldDiscoveryMemoryUse | null;
+  /** Content fingerprint of `loopResult`/`comparisonResult` — see `discoveryResultFingerprint`/`crossActionResultFingerprint`. */
+  resultFingerprint: string;
+}
+
+export interface BuildSavedWorldDiscoveryRunInput {
+  resultKind: WorldDiscoveryResultKind;
+  goal: string;
+  catalogId: string;
+  worldId: string;
+  domainId: string;
+  objectiveMetric: string | null;
+  objectiveDirection: 'minimize' | 'maximize' | null;
+  loopResult?: DiscoveryLoopResult;
+  comparisonResult?: CrossActionComparison;
+  evidence: SavedWorldDiscoveryEvidence | null;
+  resumedFromMemory: SavedWorldDiscoveryMemoryUse | null;
+}
+
+export function buildSavedWorldDiscoveryRun(input: BuildSavedWorldDiscoveryRunInput): SavedWorldDiscoveryRun {
+  if (input.resultKind === 'HYPOTHESIS_LOOP' && input.loopResult === undefined) {
+    throw new Error('HYPOTHESIS_LOOP musi nieść loopResult.');
+  }
+  if (input.resultKind === 'ACTION_COMPARISON' && input.comparisonResult === undefined) {
+    throw new Error('ACTION_COMPARISON musi nieść comparisonResult.');
+  }
+  const resultFingerprint = input.resultKind === 'HYPOTHESIS_LOOP'
+    ? discoveryResultFingerprint(input.loopResult!)
+    : crossActionResultFingerprint(input.comparisonResult!);
+  return { contractVersion: WORLD_DISCOVERY_MEMORY_CONTRACT_VERSION, ...input, resultFingerprint };
+}
+
+/** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
+export function isSavedWorldDiscoveryRun(value: unknown): value is SavedWorldDiscoveryRun {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string') return false;
+  if (value.resultKind !== 'HYPOTHESIS_LOOP' && value.resultKind !== 'ACTION_COMPARISON') return false;
+  if (!nonEmptyString(value.goal) || !nonEmptyString(value.catalogId)) return false;
+  if (!nonEmptyString(value.worldId) || !nonEmptyString(value.domainId)) return false;
+  if (!nonEmptyString(value.resultFingerprint)) return false;
+  if (value.resultKind === 'HYPOTHESIS_LOOP' && !isRecordLike(value.loopResult)) return false;
+  if (value.resultKind === 'ACTION_COMPARISON' && !isRecordLike(value.comparisonResult)) return false;
+  return true;
+}
+
+function lastRound(loopResult: DiscoveryLoopResult): DiscoveryLoopResult['rounds'][number] | undefined {
+  return loopResult.rounds[loopResult.rounds.length - 1];
+}
+
+/**
+ * The eight things the brief asked Genesis to remember about an experiment,
+ * built from fields the engine already computed — nothing here re-derives a
+ * verdict or invents a next step; the "next experiment" text for a
+ * HYPOTHESIS_LOOP run is literally the dispatcher's own `nextAction` from the
+ * last executed round, read verbatim.
+ */
+function worldDiscoveryAnalysis(saved: SavedWorldDiscoveryRun): SavedExperimentAnalysisBlock[] {
+  if (saved.resultKind === 'HYPOTHESIS_LOOP') {
+    const loop = saved.loopResult!;
+    const decided = loop.beliefs.filter((b) => b.status === 'SUPPORTED' || b.status === 'REFUTED');
+    const final = lastRound(loop);
+    return [
+      { title: 'Pytanie', body: loop.question, kind: 'world-discovery-question' },
+      { title: 'Hipotezy testowane', body: loop.beliefs.map((b) => `${b.hypothesisId}: ${b.status} (${b.confidence})`).join('; ') || 'Żadna hipoteza nie została jeszcze wykonana.', kind: 'world-discovery-hypotheses' },
+      { title: 'Model / świat', body: `worldId=${saved.worldId} domainId=${saved.domainId} catalogId=${saved.catalogId}; ${loop.rounds.length} realnych eksperymentów (fork + advance) wykonanych.`, kind: 'world-discovery-model' },
+      { title: 'Dlaczego wsparta lub odrzucona', body: decided.length > 0 ? decided.map((b) => `${b.hypothesisId}: ${b.reason}`).join(' | ') : 'Żadna hipoteza nie została jeszcze rozstrzygnięta.', kind: 'world-discovery-reasons' },
+      { title: 'Czego jeszcze nie wiemy', body: loop.unresolvedQuestions.join(' | ') || 'Brak nierozwiązanych pytań w tym przebiegu.', kind: 'world-discovery-unresolved' },
+      { title: 'Następny eksperyment', body: final ? `${final.nextAction.selectorId}: ${final.nextAction.action} — ${final.nextAction.why}` : 'Żaden eksperyment jeszcze się nie wykonał.', kind: 'world-discovery-next' },
+      ...(saved.resumedFromMemory ? [{ title: 'Wykorzystanie pamięci', body: saved.resumedFromMemory.reason, kind: 'world-discovery-memory' }] : []),
+    ];
+  }
+  const comparison = saved.comparisonResult!;
+  const ranked = comparison.status === 'RANKED' || comparison.status === 'TIED';
+  const notComparable = comparison.candidates.filter((c) => c.availability !== 'AVAILABLE');
+  return [
+    { title: 'Pytanie', body: comparison.goal, kind: 'world-discovery-question' },
+    { title: 'Akcje porównane', body: comparison.candidates.map((c) => `${c.actionId}[${c.availability}]`).join('; '), kind: 'world-discovery-hypotheses' },
+    { title: 'Model / świat', body: `worldId=${saved.worldId} domainId=${saved.domainId} catalogId=${saved.catalogId}; status=${comparison.status}.`, kind: 'world-discovery-model' },
+    { title: 'Dlaczego wsparta lub odrzucona', body: ranked ? comparison.ranking.map((r) => `${r.actionId}: ${r.explanation}`).join(' | ') : (comparison.refusalReason ?? 'Brak.'), kind: 'world-discovery-reasons' },
+    { title: 'Czego jeszcze nie wiemy', body: [...comparison.notModelledFactors, ...notComparable.map((c) => `${c.actionId}: ${c.reason}`)].join(' | ') || 'Brak.', kind: 'world-discovery-unresolved' },
+    {
+      title: 'Następny eksperyment',
+      body: ranked
+        ? `To porównanie nie proponuje własnego następnego eksperymentu. Aby wzmocnić dowód na "${comparison.bestActionIds.join(', ')}", uruchom pojedynczą pętlę hipotez (Autonomous Discovery Loop) na tym mechanizmie przy innej sile interwencji.`
+        : `Porównanie nie zostało rozstrzygnięte (${comparison.status}): ${comparison.refusalReason ?? 'brak przyczyny.'}`,
+      kind: 'world-discovery-next',
+    },
+  ];
+}
+
+/**
+ * Builds the Evidence Bundle for a hypothesis-loop run, from the LIVE engines
+ * `runAutonomousDiscoveryWithEngines` produced — no re-execution here. The
+ * bundle's own replay verdict is made REAL (not NOT_VERIFIED) by handing it
+ * an independently rebuilt baseline as `verifyEngine`, which is exactly what
+ * `buildWorldEvidenceBundle`/`computeReplayVerdict` already know how to do
+ * with — this module invents no second replay mechanism.
+ *
+ * The intervention arm shown is the LAST executed round: the most decisive
+ * one this run produced (either it triggered consolidation, or the loop ran
+ * out of budget on it). A documented, deterministic choice, not a search for
+ * "the best" round.
+ */
+export function buildWorldDiscoveryEvidenceBundle(
+  catalog: WorldLeverCatalog,
+  execution: DiscoveryLoopExecution,
+  goal: string,
+): WorldEvidenceBundle {
+  const { result, registry, baseline, lastArm } = execution;
+  const baselineWorldState = projectToWorldState(baseline.graph, catalog.worldId, catalog.domainId, baseline.tick, baseline.journal.upToTick(baseline.tick));
+  const final = lastRound(result);
+  const intervention = lastArm && final
+    ? {
+        engine: lastArm,
+        worldState: projectToWorldState(lastArm.graph, catalog.worldId, catalog.domainId, lastArm.tick, lastArm.journal.upToTick(lastArm.tick)),
+        description: `${final.hypothesisId} at strength ${final.strength}`,
+      }
+    : undefined;
+  const comparison = lastArm ? compareBranches(registry, baseline.branchId, lastArm.branchId, baseline.tick) : undefined;
+  const verifyEngine = buildIndependentBaseline(catalog);
+  return buildWorldEvidenceBundle({
+    bundleId: `world-discovery:${catalog.catalogId}:${discoveryResultFingerprint(result)}`,
+    question: goal,
+    worldId: catalog.worldId,
+    domainId: catalog.domainId,
+    baseline: { engine: baseline, worldState: baselineWorldState },
+    intervention,
+    comparison,
+    verifyEngine,
+    assessment: final?.assessment,
+    limitations: [...catalog.declaredAssumptions, ...catalog.notModelledFactors],
+    seed: null,
+  });
+}
+
+/** An independently rebuilt, freshly advanced baseline — the real rebuild `computeReplayVerdict` compares against. */
+function buildIndependentBaseline(catalog: WorldLeverCatalog): TemporalEngine {
+  const world = catalog.buildWorld();
+  const engine = new TemporalEngine(world.graph, { registry: new TemporalBranchRegistry(), label: 'verify' });
+  for (let i = 0; i < catalog.horizonTick; i++) engine.advance(catalog.dt, world.updater);
+  return engine;
+}
+
+/**
+ * Builds the Evidence Bundle for a cross-action comparison. Unlike the loop
+ * path, `compareWorldActions` does not expose its live engines (ranking stays
+ * `evaluateDecision`'s alone), so the winning arm is rebuilt here — a second,
+ * independent fork of the SAME declared lever at the SAME strength
+ * `compareWorldActions` used, which is a deterministic replay of one arm, not
+ * a second ranking mechanism. When the comparison has no single winner (a
+ * tie, a refusal, or "do nothing" itself won), the bundle carries the control
+ * alone rather than guessing which action to feature.
+ */
+export function buildActionComparisonEvidenceBundle(
+  catalog: WorldLeverCatalog,
+  comparison: CrossActionComparison,
+  goal: string,
+): WorldEvidenceBundle {
+  const world = catalog.buildWorld();
+  const registry = new TemporalBranchRegistry();
+  const baseline = new TemporalEngine(world.graph, { registry, label: 'baseline' });
+  for (let i = 0; i < catalog.horizonTick; i++) baseline.advance(catalog.dt, world.updater);
+  const baselineWorldState = projectToWorldState(baseline.graph, catalog.worldId, catalog.domainId, baseline.tick, baseline.journal.upToTick(baseline.tick));
+
+  const rankable = comparison.status === 'RANKED' || comparison.status === 'TIED';
+  const soleWinnerId = rankable && comparison.bestActionIds.length === 1 ? comparison.bestActionIds[0] : null;
+  const winningLever = soleWinnerId ? catalog.levers.find((lever) => lever.leverId === soleWinnerId) : undefined;
+
+  let intervention: { engine: TemporalEngine; worldState: ReturnType<typeof projectToWorldState>; description: string } | undefined;
+  let branchComparison: ReturnType<typeof compareBranches> | undefined;
+  if (winningLever && comparison.objective) {
+    const hypothesis = winningLever.hypothesis(comparison.objective.metric, comparison.objective.direction);
+    const arm = baseline.forkBranch(catalog.decisionAtTick, `${winningLever.leverId}@1`, (graph) => hypothesis.apply(graph, 1));
+    for (let tick = catalog.decisionAtTick; tick < catalog.horizonTick; tick++) arm.advance(catalog.dt, world.updater);
+    intervention = {
+      engine: arm,
+      worldState: projectToWorldState(arm.graph, catalog.worldId, catalog.domainId, arm.tick, arm.journal.upToTick(arm.tick)),
+      description: hypothesis.mechanism,
+    };
+    branchComparison = compareBranches(registry, baseline.branchId, arm.branchId, catalog.horizonTick);
+  }
+
+  return buildWorldEvidenceBundle({
+    bundleId: `action-comparison:${catalog.catalogId}:${crossActionResultFingerprint(comparison)}`,
+    question: goal,
+    worldId: catalog.worldId,
+    domainId: catalog.domainId,
+    baseline: { engine: baseline, worldState: baselineWorldState },
+    intervention,
+    comparison: branchComparison,
+    verifyEngine: buildIndependentBaseline(catalog),
+    decision: comparison.decision ?? undefined,
+    limitations: [...catalog.declaredAssumptions, ...catalog.notModelledFactors],
+    seed: null,
+  });
+}
+
+/**
+ * Persists a REAL executed run of the world-model discovery engine — either
+ * the single-hypothesis loop or the cross-action comparison — as one Science
+ * Memory record, using `saveExperiment` unchanged.
+ */
+export function saveWorldDiscoveryRunToMemory(saved: SavedWorldDiscoveryRun): SavedExperiment {
+  const stats: Record<string, number> = saved.resultKind === 'HYPOTHESIS_LOOP'
+    ? {
+        rounds: saved.loopResult!.rounds.length,
+        supported: saved.loopResult!.bestSupported.length,
+        refuted: saved.loopResult!.failedHypotheses.length,
+        unresolved: saved.loopResult!.unresolvedQuestions.length,
+      }
+    : {
+        actionsCompared: saved.comparisonResult!.ranking.length,
+        candidatesNotModelled: saved.comparisonResult!.candidates.filter((c) => c.availability === 'NOT_MODELLED').length,
+        bestActionCount: saved.comparisonResult!.bestActionIds.length,
+      };
+  return saveExperiment({
+    labId: saved.worldId,
+    experimentId: `world-discovery:${saved.catalogId}:${saved.resultKind}:${saved.resultFingerprint}`,
+    experimentName: saved.resultKind === 'HYPOTHESIS_LOOP' ? `Autonomiczne odkrycie — ${saved.loopResult!.question}` : `Porównanie akcji — ${saved.comparisonResult!.goal}`,
+    params: {
+      catalogId: saved.catalogId,
+      resultKind: saved.resultKind,
+      objectiveMetric: saved.objectiveMetric ?? '',
+      objectiveDirection: saved.objectiveDirection ?? '',
+    },
+    stats,
+    worldDiscovery: saved,
+    ...(saved.evidence ? { evidencePackId: saved.evidence.bundleId } : {}),
+    analysis: worldDiscoveryAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: saved.resultKind === 'HYPOTHESIS_LOOP'
+      ? `${saved.loopResult!.rounds.length} realnych eksperymentów na world-model; werdykty są wewnątrz-modelowe (patrz disclaimer w każdej ocenie), nie odkryciem o świecie.`
+      : `Porównanie ${saved.comparisonResult!.candidates.length} zadeklarowanych akcji względem wspólnej kontroli; to nie jest rekomendacja.`,
+    assumptions: saved.resultKind === 'HYPOTHESIS_LOOP' ? [...saved.loopResult!.declaredAssumptions] : [...saved.comparisonResult!.declaredAssumptions],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export interface SavedWorldDiscoveryReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Replays a saved world-discovery run by RE-EXECUTING it from its stored
+ * inputs (goal + catalogId, looked up via `resolveWorldLeverCatalog`), never
+ * by reading the stored numbers back — the same discipline as every other
+ * replay in this file. Two things are re-verified independently:
+ *
+ *   1. The result itself: same goal, same catalog (and, for a hypothesis
+ *      loop, the SAME memory-driven exclusion that actually ran — replaying
+ *      what memory currently suggests would compare against a moving target)
+ *      must reproduce the same `resultFingerprint`.
+ *   2. The Evidence Bundle: rebuilt fresh from the replayed run and compared
+ *      by `scientificContentFingerprint` to the one recorded at save time.
+ *
+ * A catalog Genesis no longer declares is NOT_REPRODUCIBLE, matching this
+ * codebase's existing vocabulary for "we have nothing to re-execute against"
+ * rather than inventing a fourth synonym for the same idea.
+ */
+export function replaySavedWorldDiscoveryRun(saved: SavedExperiment): SavedWorldDiscoveryReplay {
+  const record = saved.worldDiscovery;
+  if (record === undefined || !isSavedWorldDiscoveryRun(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera przebiegu odkrycia world-model.' };
+  }
+  // Self-consistency FIRST: does the stored payload still match its OWN stored
+  // fingerprint? This catches a field edited after save (`loopResult`/
+  // `comparisonResult` tampered without recomputing `resultFingerprint`)
+  // before any re-execution is even attempted — the same defensive order
+  // `replaySavedScientificDiscoveryLoop` already uses in this file.
+  const selfCheckFingerprint = record.resultKind === 'HYPOTHESIS_LOOP'
+    ? discoveryResultFingerprint(record.loopResult!)
+    : crossActionResultFingerprint(record.comparisonResult!);
+  if (selfCheckFingerprint !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisany przebieg został zmieniony po zapisie: jego treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheckFingerprint}).` };
+  }
+  const catalog = resolveWorldLeverCatalog(record.catalogId);
+  if (!catalog) {
+    return { status: 'NOT_REPRODUCIBLE', reason: `Katalog "${record.catalogId}" nie jest już zadeklarowany w Genesis.` };
+  }
+
+  if (record.resultKind === 'ACTION_COMPARISON') {
+    const fresh = compareWorldActions({ goal: record.goal, catalog });
+    const freshFingerprint = crossActionResultFingerprint(fresh);
+    if (freshFingerprint !== record.resultFingerprint) {
+      return { status: 'DRIFT', reason: `Odtworzone porównanie różni się od zapisanego (${record.resultFingerprint} → ${freshFingerprint}).` };
+    }
+    if (record.evidence) {
+      const freshBundle = buildActionComparisonEvidenceBundle(catalog, fresh, record.goal);
+      if (freshBundle.scientificContentFingerprint !== record.evidence.scientificContentFingerprint) {
+        return { status: 'DRIFT', reason: 'Porównanie odtworzyło się identycznie, ale Evidence Bundle zbudowany od nowa różni się od zapisanego.' };
+      }
+    }
+    return { status: 'MATCH', reason: 'Porównanie akcji odtworzyło się identycznie po realnym ponownym wykonaniu.' };
+  }
+
+  const intent = parseWorldDiscoveryGoal(record.goal, catalog);
+  const plan = buildWorldDiscoveryPlan(intent, catalog);
+  if ('error' in plan) {
+    return { status: 'BLOCKED', reason: `Cel przestał być czytelny dla tego katalogu: ${plan.error}` };
+  }
+  // Re-apply the SAME memory exclusion that actually ran, not whatever memory
+  // would suggest today — replaying today's memory state would compare this
+  // record against a moving target instead of verifying what it recorded.
+  const excluded = new Set(record.resumedFromMemory?.skippedHypothesisIds ?? []);
+  const filteredHypotheses = excluded.size === 0
+    ? plan.hypotheses
+    : plan.hypotheses.filter((h) => !excluded.has(h.hypothesisId));
+  const rerunInput: DiscoveryLoopInput = {
+    ...plan,
+    hypotheses: filteredHypotheses.length > 0 ? filteredHypotheses : plan.hypotheses,
+  };
+  const execution = runAutonomousDiscoveryWithEngines(rerunInput);
+  const freshFingerprint = discoveryResultFingerprint(execution.result);
+  if (freshFingerprint !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Odtworzony przebieg różni się od zapisanego (${record.resultFingerprint} → ${freshFingerprint}).` };
+  }
+  if (record.evidence) {
+    const bundle = buildWorldDiscoveryEvidenceBundle(catalog, execution, record.goal);
+    if (bundle.scientificContentFingerprint !== record.evidence.scientificContentFingerprint) {
+      return { status: 'DRIFT', reason: 'Pętla odkrycia odtworzyła się identycznie, ale Evidence Bundle zbudowany od nowa różni się od zapisanego.' };
+    }
+  }
+  return { status: 'MATCH', reason: 'Pętla odkrycia odtworzyła się identycznie po realnym ponownym wykonaniu.' };
 }
 
 export function listExperiments(): SavedExperiment[] {

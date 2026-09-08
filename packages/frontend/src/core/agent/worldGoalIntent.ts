@@ -64,6 +64,14 @@ export interface WorldLever {
 }
 
 export interface WorldLeverCatalog {
+  /**
+   * Stable, serialisable identity for this catalog. `buildWorld` is a function
+   * and cannot survive a round-trip through storage, so anything that needs to
+   * REBUILD this catalog later (memory replay, chiefly) stores this id and
+   * looks the catalog back up via `resolveWorldLeverCatalog` rather than trying
+   * to serialise the catalog itself.
+   */
+  readonly catalogId: string;
   readonly worldId: string;
   readonly domainId: string;
   readonly buildWorld: () => { graph: WorldGraph; updater: ReturnType<typeof buildGenesisScientificCity3>['updater'] };
@@ -330,7 +338,10 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
   },
 ];
 
+export const GENESIS_FLOOD_CATALOG_ID = 'genesis-flood-city';
+
 export const GENESIS_FLOOD_CATALOG: WorldLeverCatalog = {
+  catalogId: GENESIS_FLOOD_CATALOG_ID,
   worldId: 'genesis-scientific-city-3',
   domainId: 'flood-hydrology',
   buildWorld: () => buildGenesisScientificCity3({ rainfallAtTick: 2 }),
@@ -365,3 +376,17 @@ export const GENESIS_FLOOD_CATALOG: WorldLeverCatalog = {
     'Maintenance, clogging and long-term performance decay',
   ],
 };
+
+/**
+ * Every lever catalog Genesis declares, keyed by `catalogId`. The only
+ * registry of its kind: a caller that needs to rebuild a catalog from a
+ * stored id (memory replay) looks it up here rather than the catalog's
+ * functions being reconstructed some other way.
+ */
+export const WORLD_LEVER_CATALOGS: Readonly<Record<string, WorldLeverCatalog>> = {
+  [GENESIS_FLOOD_CATALOG_ID]: GENESIS_FLOOD_CATALOG,
+};
+
+export function resolveWorldLeverCatalog(catalogId: string): WorldLeverCatalog | undefined {
+  return WORLD_LEVER_CATALOGS[catalogId];
+}

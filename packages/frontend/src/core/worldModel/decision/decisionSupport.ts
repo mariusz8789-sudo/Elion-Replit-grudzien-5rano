@@ -1,6 +1,6 @@
 import type { GenesisEvent } from '../../events/genesisEvent';
 import { collectScalars, compareBranches } from '../bridge/worldFrameState';
-import { diffWorldBranches, findFirstDivergenceTick } from '../discovery/worldCounterfactual';
+import { diffWorldBranches, findFirstDivergenceTick, forkedArmControl } from '../discovery/worldCounterfactual';
 import type { WorldGraph } from '../ecs/worldGraph';
 import type { GroundingLevel } from '../ecs/types';
 import { classifyGrounding, type ElementClassification } from '../evidence/worldEvidenceBundle';
@@ -246,10 +246,9 @@ export function evaluateDecision(input: DecisionEvaluationInput): DecisionReport
     const arm = baseline.forkBranch(decisionAtTick, option.label, option.apply);
     for (let tick = decisionAtTick; tick < horizonTick; tick++) arm.advance(dt, updater);
 
-    // Read at the fork tick, before any physics has run on the arm: what differs there
-    // is exactly what `apply` did.
-    const footprint = diffWorldBranches(compareBranches(registry, baseline.branchId, arm.branchId, decisionAtTick))
-      .changed.map((entity) => entity.entityId);
+    // The fork's control evidence, from the one shared helper that computes it
+    // soundly for a forked arm.
+    const { interventionFootprint: footprint } = forkedArmControl(registry, baseline.branchId, arm.branchId, decisionAtTick);
     const diff = diffWorldBranches(compareBranches(registry, baseline.branchId, arm.branchId, horizonTick));
     const value = objectiveValueAt(arm, objective.entityId, objective.metric, horizonTick);
 

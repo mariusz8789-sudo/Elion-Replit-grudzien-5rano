@@ -67,6 +67,7 @@ const assessTool: AgentTool<WorldCounterfactualAssessmentInput, WorldCounterfact
     { name: 'diff', type: 'object', required: true, description: 'The branch diff to judge.' },
     { name: 'controlledDifference', type: 'object', required: true, description: 'Evidence the arms started identical.' },
     { name: 'replayVerdict', type: 'string', required: false, description: 'MATCH is required before any verdict is issued.' },
+    { name: 'objectiveOverride', type: 'object', required: false, description: 'Two already-reduced arm values, when the criterion declares a reducer other than AT_HORIZON.' },
   ],
   invoke: (input) => assessWorldCounterfactual(input),
 });

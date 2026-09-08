@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { CrossActionComparison } from '../../core/agent/crossActionComparison';
+import { admitWorldQuestion } from '../../core/agent/discoveryAdmission';
+import type { Admission } from '../../core/agent/discoveryStrategy';
 import type { DiscoveryLoopResult, DiscoveryTraceStep } from '../../core/agent/discoveryLoop';
 import { renderDiscoveryReport } from '../../core/agent/discoveryReport';
 import {
@@ -26,7 +28,11 @@ import {
 } from '../../core/scienceMemory';
 
 /** Local UI states the session module has no reason to know about. */
-type PanelState = { kind: 'IDLE' } | { kind: 'RUNNING'; goal: string } | WorldDiscoveryRememberedState;
+type PanelState =
+  | { kind: 'IDLE' }
+  | { kind: 'RUNNING'; goal: string }
+  | { kind: 'NOT_ADMITTED'; goal: string; admission: Admission }
+  | WorldDiscoveryRememberedState;
 
 /** A friendly, honest label for a catalog: the engine's own declared strings, nothing invented. */
 function catalogLabel(catalog: WorldLeverCatalog): string {
@@ -94,6 +100,17 @@ export function WorldDiscoveryPanel() {
     if (trimmed.length === 0) return;
     setViewingId(null);
     setCompareIds([]);
+    // ADMISSION — asked before anything is searched. A question whose hazard/
+    // process Genesis has no solver for must come back as a NAMED GAP (what the
+    // capability registry actually says is missing), not as a search over
+    // whichever levers this catalog happens to declare. REAL/APPROXIMATION both
+    // proceed — the flood catalog itself is only PARTIALLY_MODELLED and still
+    // a real, admitted search; only NOT_MODELLED/BLOCKED are refused here.
+    const admission = admitWorldQuestion(trimmed);
+    if (admission.status === 'NOT_MODELLED' || admission.status === 'BLOCKED') {
+      setState({ kind: 'NOT_ADMITTED', goal: trimmed, admission });
+      return;
+    }
     setState({ kind: 'RUNNING', goal: trimmed });
     // The search forks and advances a real world, persists it to Science Memory,
     // builds its Evidence Bundle and replays it — several real experiments'
@@ -225,6 +242,7 @@ export function WorldDiscoveryPanel() {
         </p>
       )}
 
+      {state.kind === 'NOT_ADMITTED' && <AdmissionRefusal admission={state.admission} />}
       {state.kind === 'REFUSED' && <DiscoveryRefusal state={state} />}
       {state.kind === 'COMPLETE' && (
         <DiscoveryResultView
@@ -379,6 +397,27 @@ function SavedRunView({ experiment }: { experiment: SavedExperiment }) {
     );
   }
   return <p className="wd-none">Saved record is incomplete.</p>;
+}
+
+/**
+ * ADMISSION refusal — Genesis declined BEFORE searching, because the question
+ * classifies to a hazard/process with no solver behind it at all (NOT_MODELLED)
+ * or names a model this runtime cannot execute (BLOCKED). Distinct from
+ * `DiscoveryRefusal` below: that one already ran the catalog's own goal parser
+ * and reports a mismatch against the SELECTED catalog's declared levers; this
+ * one never reached the catalog at all — `admission.missing` is the capability
+ * registry's own words for what Genesis would need, not a re-derived guess.
+ */
+function AdmissionRefusal({ admission }: { admission: Admission }) {
+  return (
+    <div className="wd-refusal" role="status">
+      <p className="wd-refusal-head">Genesis did not search for this — the question was never admitted.</p>
+      <p className="wd-refusal-why">{admission.why}</p>
+      {admission.missing.length > 0 && (
+        <p className="gsc-caption">Would need: {admission.missing.join('; ')}.</p>
+      )}
+    </div>
+  );
 }
 
 /**

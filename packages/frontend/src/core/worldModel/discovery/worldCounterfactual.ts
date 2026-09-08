@@ -1,6 +1,7 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { evaluateTwoArmRelation, SERIES_ONLY_RELATIONS } from '../../experimentFabric/falsificationRelation';
 import type { FalsificationCriterion, HypothesisAssessment } from '../../experimentFabric/scientificDiscovery';
+import { createHypothesis, type Hypothesis } from '../../experimentFabric/beliefRevision';
 import type { ReplayVerdict } from '../../matrixFoundation/replayVerdict';
 import { collectScalars, compareBranches, type BranchComparison } from '../bridge/worldFrameState';
 import type { TemporalBranchRegistry } from '../temporal/temporalEngine';
@@ -88,6 +89,14 @@ export interface ChangedEntity {
    * understate the divergence.
    */
   readonly scalarsOnlyOnOneSide: readonly string[];
+  /**
+   * Scalars this entity carries on BOTH arms with the same value. Recorded
+   * because "the metric is not here" and "the metric is here and did not move"
+   * are different findings, and a consumer that only saw the deltas could not
+   * tell them apart — it would report a metric nothing computes when in fact
+   * the intervention simply failed to reach it.
+   */
+  readonly unchangedScalarKeys: readonly string[];
 }
 
 export interface WorldCounterfactualDiff {
@@ -139,6 +148,7 @@ export function diffWorldBranches(comparison: BranchComparison): WorldCounterfac
 
     const entityDeltas: WorldScalarDelta[] = [];
     const oneSided: string[] = [];
+    const unchangedKeys: string[] = [];
     for (const key of [...new Set([...Object.keys(scalarsA), ...Object.keys(scalarsB)])].sort()) {
       const baseline = scalarsA[key];
       const intervention = scalarsB[key];
@@ -146,7 +156,10 @@ export function diffWorldBranches(comparison: BranchComparison): WorldCounterfac
         oneSided.push(key);
         continue;
       }
-      if (baseline === intervention) continue;
+      if (baseline === intervention) {
+        unchangedKeys.push(key);
+        continue;
+      }
       const absoluteDelta = intervention - baseline;
       entityDeltas.push({
         entityId: entityDiff.id,
@@ -161,7 +174,10 @@ export function diffWorldBranches(comparison: BranchComparison): WorldCounterfac
     }
 
     if (entityDeltas.length === 0 && oneSided.length === 0) withoutNumeric.push(entityDiff.id);
-    changed.push({ entityId: entityDiff.id, label, presence, deltas: entityDeltas, scalarsOnlyOnOneSide: oneSided });
+    changed.push({
+      entityId: entityDiff.id, label, presence, deltas: entityDeltas,
+      scalarsOnlyOnOneSide: oneSided, unchangedScalarKeys: unchangedKeys,
+    });
     deltas.push(...entityDeltas);
   }
 
@@ -326,6 +342,16 @@ export function verifyWorldPreregistrationIntact(
 
 export type CounterfactualAttribution = 'ATTRIBUTABLE_WITHIN_MODEL' | 'UNATTRIBUTED';
 
+/**
+ * Whether the declared metric was there to be judged at all.
+ *
+ * `PRESENT_BUT_UNMOVED` is the distinction that matters: an intervention that
+ * changed the world without moving the declared metric has told us something
+ * real about the mechanism, and reporting it as a metric nothing computes
+ * would send a caller off to bind a solver that already exists.
+ */
+export type MetricPresence = 'PRESENT_AND_MOVED' | 'PRESENT_BUT_UNMOVED' | 'ABSENT';
+
 export interface WorldCounterfactualAssessment {
   readonly contractVersion: string;
   readonly questionId: string;
@@ -338,6 +364,7 @@ export interface WorldCounterfactualAssessment {
   readonly baseline: number | null;
   readonly intervention: number | null;
   readonly reference: number | null;
+  readonly metricPresence: MetricPresence;
   readonly controlledDifference: ControlledDifference;
   readonly replayVerdict: ReplayVerdict | null;
   readonly message: string;
@@ -378,6 +405,13 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     replayVerdict,
     disclaimer: COUNTERFACTUAL_DEPENDENCE_DISCLAIMER,
   };
+  const entityInDiff = diff.changed.find((e) => e.entityId === question.entityId);
+  const metricPresence: MetricPresence = readMetric(diff, question.entityId, criterion.metric)
+    ? 'PRESENT_AND_MOVED'
+    : entityInDiff?.unchangedScalarKeys.includes(criterion.metric)
+      ? 'PRESENT_BUT_UNMOVED'
+      : 'ABSENT';
+
   const inconclusive = (message: string, values?: { baseline: number; intervention: number }): WorldCounterfactualAssessment => ({
     ...base,
     assessment: 'INCONCLUSIVE',
@@ -385,6 +419,7 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     baseline: values?.baseline ?? null,
     intervention: values?.intervention ?? null,
     reference: null,
+    metricPresence,
     message,
   });
 
@@ -405,11 +440,12 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
 
   const values = readMetric(diff, question.entityId, criterion.metric);
   if (!values) {
-    const entity = diff.changed.find((e) => e.entityId === question.entityId);
     return inconclusive(
-      entity
-        ? `Entity ${question.entityId} differs between the arms, but not in the preregistered metric "${criterion.metric}", so the criterion has no value to be judged on.`
-        : `Entity ${question.entityId} does not differ between the arms at tick ${diff.atTick}, so the preregistered metric "${criterion.metric}" has no counterfactual difference to assess.`,
+      metricPresence === 'PRESENT_BUT_UNMOVED'
+        ? `The intervention changed entity ${question.entityId}, but left the preregistered metric "${criterion.metric}" at exactly its baseline value. The metric exists and was computed; the intervention did not reach it.`
+        : entityInDiff
+          ? `Entity ${question.entityId} differs between the arms, but carries no value for the preregistered metric "${criterion.metric}", so the criterion has nothing to be judged on.`
+          : `Entity ${question.entityId} does not differ between the arms at tick ${diff.atTick}, so the preregistered metric "${criterion.metric}" has no counterfactual difference to assess.`,
     );
   }
 
@@ -420,6 +456,7 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     ...base,
     assessment: outcome.met ? 'SUPPORTED_WITHIN_PROTOCOL' : 'FALSIFIED_WITHIN_PROTOCOL',
     attribution: 'ATTRIBUTABLE_WITHIN_MODEL',
+    metricPresence,
     baseline: values.baseline,
     intervention: values.intervention,
     reference: outcome.reference,
@@ -442,6 +479,7 @@ export const WORLD_COUNTERFACTUAL_UNCERTAINTIES = [
   'CONTROL_NOT_VERIFIED',
   'REPLAY_NOT_VERIFIED',
   'NO_DIVERGENCE',
+  'METRIC_PRESENT_BUT_UNMOVED',
   'METRIC_ABSENT',
   'RELATION_NEEDS_SERIES',
   'SINGLE_INTERVENTION_POINT',
@@ -514,6 +552,17 @@ export function selectNextWorldExperiment(
     };
   }
 
+  if (assessment.metricPresence === 'PRESENT_BUT_UNMOVED') {
+    return {
+      kind: 'METRIC_PRESENT_BUT_UNMOVED',
+      status: 'READY_TO_RUN',
+      action: `Test a different mechanism, or apply this one at a magnitude large enough to reach "${criterion.metric}" on ${assessment.entityId}.`,
+      why: `The intervention changed the world but left "${criterion.metric}" exactly at its baseline: within this model, this lever does not reach that quantity at this magnitude.`,
+      resolves: 'Separates a lever that cannot affect the objective from one applied too weakly to show it.',
+      rule: 'METRIC_PRESENT_BUT_UNMOVED: a metric that exists and did not move is a finding about the mechanism, not a missing solver.',
+    };
+  }
+
   if (assessment.baseline === null) {
     return {
       kind: 'METRIC_ABSENT',
@@ -577,4 +626,116 @@ export function selectNextWorldExperiment(
     resolves: 'Separates a dose-dependent modelled effect from a single-point coincidence.',
     rule: 'SINGLE_INTERVENTION_POINT: one point is a result, not a response.',
   };
+}
+
+// ---------------------------------------------------------------------------
+// 6. Belief revision: a falsified criterion generates real, testable
+//    alternatives instead of just reporting the divergence (Reasoning Core).
+// ---------------------------------------------------------------------------
+
+/**
+ * Content fingerprint of a criterion's decidable fields — used to detect that a
+ * "new" alternative is actually one already tried (negative evidence: a
+ * rejected hypothesis must not silently return as if it were new).
+ */
+export function criterionFingerprint(criterion: FalsificationCriterion): string {
+  return `crit_${fnv1a(canonicalJson({
+    metric: criterion.metric, relation: criterion.relation,
+    expectedValue: criterion.expectedValue ?? null, tolerance: criterion.tolerance ?? null,
+  }))}`;
+}
+
+/**
+ * How decisively the REAL measured values confirmed or contradicted the
+ * criterion, 0..1 — the evidence-strength signal `updateConfidence` requires
+ * and never computes itself. Derived only from real assessment fields, never
+ * from the verdict label alone (a criterion that barely missed and one that
+ * missed by an order of magnitude must not move confidence by the same amount).
+ */
+export function evidenceMagnitudeFromAssessment(assessment: WorldCounterfactualAssessment): number {
+  if (assessment.baseline === null || assessment.intervention === null || assessment.reference === null) return 0;
+  if (assessment.criterion.relation === 'equal-within-tolerance' && assessment.criterion.tolerance) {
+    const diff = Math.abs(assessment.intervention - assessment.reference);
+    const ratio = diff / assessment.criterion.tolerance;
+    // Supported: how comfortably within tolerance (ratio near 0 -> strong). Falsified:
+    // how far outside it (ratio near 1 from above -> weak miss, large ratio -> strong).
+    return Math.min(1, Math.abs(1 - ratio));
+  }
+  // Measured against how far the real intervention moved from the real BASELINE, not
+  // from the criterion's reference. When the criterion has no `expectedValue`,
+  // reference already equals baseline (see evaluateTwoArmRelation), so this is
+  // unchanged from a plain baseline-relative measure. When the criterion declares a
+  // FIXED threshold (e.g. "flow > 0"), the reference can legitimately equal the exact
+  // value that constitutes falsification (0), which would make distance-from-reference
+  // degenerately zero even for a maximally decisive result (baseline flow collapsing
+  // to exactly 0) — baseline is always a real, meaningful, nonzero-in-practice scale
+  // for a physical quantity, so it is the denominator here, never the threshold itself.
+  const scale = Math.max(Math.abs(assessment.baseline), Math.abs(assessment.reference), 1e-9);
+  return Math.min(1, Math.abs(assessment.intervention - assessment.baseline) / scale);
+}
+
+/**
+ * Mechanically derives real, testable alternative criteria from a FALSIFIED
+ * assessment — never invented text, never a placeholder. Each mechanism is
+ * grounded directly in the real measured values:
+ *
+ *   RELATION_FLIP — the criterion predicted a direction (greater-than/less-than)
+ *   and the real data moved the other way; the flipped relation is proposed
+ *   because it is what the SAME numbers already support, not a guess.
+ *
+ *   TOLERANCE_WIDENED — an equality criterion just missed; the alternative
+ *   widens the tolerance to EXACTLY what the real observed difference would
+ *   satisfy, no further.
+ *
+ * `rejectedFingerprints` filters out any candidate identical to a criterion
+ * already judged (in either direction) earlier in this same investigation —
+ * negative evidence: a hypothesis this world-model run already falsified (or
+ * already confirmed and moved on from) cannot silently reappear as if new.
+ *
+ * Returns `[]` for anything other than a clean, evaluable falsification — this
+ * is not a general hypothesis generator, and it does not pretend to invent a
+ * hypothesis about a DIFFERENT metric or entity than the one just tested; that
+ * would need real domain knowledge this function does not have.
+ */
+export function generateAlternativeHypotheses(
+  parent: Hypothesis,
+  assessment: WorldCounterfactualAssessment,
+  rejectedFingerprints: ReadonlySet<string> = new Set(),
+  priorConfidence = 0.5,
+): readonly Hypothesis[] {
+  if (assessment.assessment !== 'FALSIFIED_WITHIN_PROTOCOL') return [];
+  if (assessment.baseline === null || assessment.intervention === null || assessment.reference === null) return [];
+  const { criterion } = parent;
+  const alternatives: Hypothesis[] = [];
+  let nextIndex = 0;
+  const nextId = () => `${parent.id}-alt${nextIndex++}`;
+
+  if (criterion.relation === 'greater-than' || criterion.relation === 'less-than') {
+    const flipped: FalsificationCriterion = {
+      ...criterion,
+      relation: criterion.relation === 'greater-than' ? 'less-than' : 'greater-than',
+      rationale: `Mechanically derived from the falsification of "${criterion.rationale}": the real data moved the opposite `
+        + `direction (${assessment.intervention} vs. reference ${assessment.reference}).`,
+    };
+    if (!rejectedFingerprints.has(criterionFingerprint(flipped))) {
+      alternatives.push(createHypothesis(nextId(), flipped, priorConfidence, 'RELATION_FLIP', parent.id));
+    }
+  }
+
+  if (criterion.relation === 'equal-within-tolerance' && criterion.tolerance !== undefined) {
+    const actualDiff = Math.abs(assessment.intervention - assessment.reference);
+    if (actualDiff > criterion.tolerance) {
+      const widened: FalsificationCriterion = {
+        ...criterion,
+        tolerance: actualDiff,
+        rationale: `Mechanically derived from the falsification of "${criterion.rationale}": widened to the tolerance `
+          + `(${actualDiff}) the real observed difference would actually satisfy.`,
+      };
+      if (!rejectedFingerprints.has(criterionFingerprint(widened))) {
+        alternatives.push(createHypothesis(nextId(), widened, priorConfidence, 'TOLERANCE_WIDENED', parent.id));
+      }
+    }
+  }
+
+  return alternatives;
 }

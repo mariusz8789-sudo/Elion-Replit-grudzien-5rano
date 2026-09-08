@@ -4,8 +4,11 @@ import { compareBranches, projectToWorldState } from '../core/worldModel/bridge/
 import {
   assessWorldCounterfactual,
   COUNTERFACTUAL_DEPENDENCE_DISCLAIMER,
+  criterionFingerprint,
   diffWorldBranches,
+  evidenceMagnitudeFromAssessment,
   findFirstDivergenceTick,
+  generateAlternativeHypotheses,
   preregisterWorldCounterfactual,
   readMetric,
   selectNextWorldExperiment,
@@ -17,12 +20,17 @@ import {
 import {
   buildGenesisScientificCity3,
   GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
+  GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID,
+  rainfallSchedule,
 } from '../core/worldModel/domains/genesisScientificCity3';
 import {
   buildWorldEvidenceBundle,
   exportWorldEvidenceBundleRoCrate,
 } from '../core/worldModel/evidence/worldEvidenceBundle';
 import { TemporalBranchRegistry, TemporalEngine } from '../core/worldModel/temporal/temporalEngine';
+import { withScheduledEvents } from '../core/worldModel/events/worldEventRules';
+import { withCrossDomainCouplings } from '../core/worldModel/crossDomain/crossDomainCoupling';
+import { createHypothesis, updateConfidence, rankHypotheses, activeHypotheses } from '../core/experimentFabric/beliefRevision';
 
 /**
  * THE COUNTERFACTUAL BRIDGE, DRIVEN BY THE REAL FLAGSHIP SCENARIO.
@@ -416,5 +424,177 @@ describe('The verdict travels in the evidence bundle, or is honestly absent', ()
     expect(a.scientificContentFingerprint).not.toBe(b.scientificContentFingerprint);
     // The same science with the same verdict still fingerprints identically.
     expect(buildWorldEvidenceBundle(bundleInput(supported)).scientificContentFingerprint).toBe(a.scientificContentFingerprint);
+  });
+});
+
+describe('evidenceMagnitudeFromAssessment — real magnitude, not a fixed step regardless of how decisive the data was', () => {
+  const { registry, baseline, storm, diff } = runArms();
+  const control = verifyControlledDifference(registry, baseline.branchId, storm.branchId, 0);
+
+  it('is 0 when the assessment could not be evaluated (no real baseline/intervention to measure)', () => {
+    const inconclusive = assessWorldCounterfactual({
+      preregistration: preregisterWorldCounterfactual(question({ criterion: { ...FLOOD_DEPTH_CRITERION, metric: 'metricNoSolverWrites' } })),
+      diff, controlledDifference: control, replayVerdict: 'MATCH',
+    });
+    expect(evidenceMagnitudeFromAssessment(inconclusive)).toBe(0);
+  });
+
+  it('a decisive real supported result has a real positive magnitude', () => {
+    const supported = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question()), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(supported.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    expect(evidenceMagnitudeFromAssessment(supported)).toBeGreaterThan(0);
+  });
+});
+
+describe('criterionFingerprint — content-derived, so a genuinely new criterion is never confused with one already tried', () => {
+  it('is identical for two structurally identical criteria and different when any decidable field differs', () => {
+    const a = criterionFingerprint(FLOOD_DEPTH_CRITERION);
+    const b = criterionFingerprint({ ...FLOOD_DEPTH_CRITERION });
+    const flipped = criterionFingerprint({ ...FLOOD_DEPTH_CRITERION, relation: 'less-than' });
+    expect(a).toBe(b);
+    expect(a).not.toBe(flipped);
+  });
+
+  it('ignores the rationale text — two criteria that differ only in prose are the SAME criterion for dedup purposes', () => {
+    const a = criterionFingerprint(FLOOD_DEPTH_CRITERION);
+    const differentProse = criterionFingerprint({ ...FLOOD_DEPTH_CRITERION, rationale: 'a completely different sentence' });
+    expect(a).toBe(differentProse);
+  });
+});
+
+describe('generateAlternativeHypotheses — mechanical, grounded in the real falsifying data, never invented text', () => {
+  const { registry, baseline, storm, diff } = runArms();
+  const control = verifyControlledDifference(registry, baseline.branchId, storm.branchId, 0);
+
+  it('produces nothing for a SUPPORTED assessment — there is nothing to explain away', () => {
+    const supported = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question()), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    const parent = createHypothesis('H1', FLOOD_DEPTH_CRITERION, 0.7);
+    expect(generateAlternativeHypotheses(parent, supported)).toEqual([]);
+  });
+
+  it('RELATION_FLIP: a falsified directional criterion produces the empirically-supported opposite direction', () => {
+    const wrongDirection: FalsificationCriterion = { ...FLOOD_DEPTH_CRITERION, relation: 'less-than', rationale: 'Deliberately wrong direction.' };
+    const falsified = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question({ criterion: wrongDirection })), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(falsified.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
+    const parent = createHypothesis('H1', wrongDirection, 0.7);
+    const alternatives = generateAlternativeHypotheses(parent, falsified);
+    expect(alternatives.length).toBe(1);
+    expect(alternatives[0].criterion.relation).toBe('greater-than'); // the flip of 'less-than'
+    expect(alternatives[0].generatedBy).toBe('RELATION_FLIP');
+    expect(alternatives[0].parentHypothesisId).toBe('H1');
+    expect(alternatives[0].status).toBe('ACTIVE'); // a new candidate, not yet judged
+    // The new criterion is itself real and testable through the SAME pipeline, not a placeholder object.
+    const reassessed = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question({ criterion: alternatives[0].criterion })), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(reassessed.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL'); // grounded in the real data, so it really does hold
+  });
+
+  it('negative evidence: an alternative identical to one already rejected is filtered out, not silently regenerated', () => {
+    const wrongDirection: FalsificationCriterion = { ...FLOOD_DEPTH_CRITERION, relation: 'less-than', rationale: 'Deliberately wrong direction.' };
+    const falsified = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question({ criterion: wrongDirection })), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    const parent = createHypothesis('H1', wrongDirection, 0.7);
+    const alreadyRejected = new Set([criterionFingerprint({ ...FLOOD_DEPTH_CRITERION, relation: 'greater-than' })]);
+    expect(generateAlternativeHypotheses(parent, falsified, alreadyRejected)).toEqual([]);
+  });
+});
+
+/** Real, non-tripping intensity confirmed earlier this session (8 mm/h = 90% below
+ * the flagship's 80 mm/h) and the flagship's own tripping intensity — used here to
+ * build TWO genuinely different real observations, not one diff assessed two ways. */
+function runCityWithIntensity(rainfallAtTick: number, intensityMmPerHour: number, registry: TemporalBranchRegistry) {
+  const city = buildGenesisScientificCity3({});
+  const updater = withCrossDomainCouplings(
+    withScheduledEvents(city.updater, rainfallSchedule(rainfallAtTick, intensityMmPerHour)),
+    [city.couplings[0]],
+  );
+  const engine = new TemporalEngine(city.graph, { registry });
+  for (let i = 0; i < TICKS; i++) engine.advance(1, updater);
+  return engine;
+}
+
+const PUMP_STAYS_OPERATIONAL: FalsificationCriterion = {
+  metric: 'volumetricFlow', relation: 'greater-than', expectedValue: 0,
+  rationale: 'The pump should stay operational (nonzero flow) under the rainfall load.',
+};
+
+describe('THE CRITICAL TEST — same initial hypothesis, two real different observations, genuinely different belief state and next action', () => {
+  it('a mild real storm supports "the pump stays operational"; an extreme real storm falsifies the SAME criterion', () => {
+    const mildRegistry = new TemporalBranchRegistry();
+    const mildBaseline = runCity({}, mildRegistry);
+    const mildStorm = runCityWithIntensity(2, 8, mildRegistry); // 8 mm/h: known not to trip the pump
+    const mildDiff = diffWorldBranches(compareBranches(mildRegistry, mildBaseline.branchId, mildStorm.branchId, TICKS));
+    const mildControl = verifyControlledDifference(mildRegistry, mildBaseline.branchId, mildStorm.branchId, 0);
+    const mildAssessment = assessWorldCounterfactual({
+      preregistration: preregisterWorldCounterfactual(question({ entityId: GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID, criterion: PUMP_STAYS_OPERATIONAL })),
+      diff: mildDiff, controlledDifference: mildControl, replayVerdict: 'MATCH',
+    });
+    expect(mildAssessment.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+
+    const extremeRegistry = new TemporalBranchRegistry();
+    const extremeBaseline = runCity({}, extremeRegistry);
+    const extremeStorm = runCityWithIntensity(2, 80, extremeRegistry); // the flagship's own tripping intensity
+    const extremeDiff = diffWorldBranches(compareBranches(extremeRegistry, extremeBaseline.branchId, extremeStorm.branchId, TICKS));
+    const extremeControl = verifyControlledDifference(extremeRegistry, extremeBaseline.branchId, extremeStorm.branchId, 0);
+    const extremeAssessment = assessWorldCounterfactual({
+      preregistration: preregisterWorldCounterfactual(question({ entityId: GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID, criterion: PUMP_STAYS_OPERATIONAL })),
+      diff: extremeDiff, controlledDifference: extremeControl, replayVerdict: 'MATCH',
+    });
+    expect(extremeAssessment.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
+    expect(extremeAssessment.intervention).toBe(0); // the real trip, not a guessed number
+  });
+
+  it('THE REQUEST\'S OWN WORKED EXAMPLE, made executable: H1 = 0.7, one supporting real observation, one contradicting real observation, different ranking, different next action each time', () => {
+    // --- Setup: the same two real observations from the test above, this time driving belief state. ---
+    const mildRegistry = new TemporalBranchRegistry();
+    const mildBaseline = runCity({}, mildRegistry);
+    const mildStorm = runCityWithIntensity(2, 8, mildRegistry);
+    const mildDiff = diffWorldBranches(compareBranches(mildRegistry, mildBaseline.branchId, mildStorm.branchId, TICKS));
+    const mildControl = verifyControlledDifference(mildRegistry, mildBaseline.branchId, mildStorm.branchId, 0);
+
+    const extremeRegistry = new TemporalBranchRegistry();
+    const extremeBaseline = runCity({}, extremeRegistry);
+    const extremeStorm = runCityWithIntensity(2, 80, extremeRegistry);
+    const extremeDiff = diffWorldBranches(compareBranches(extremeRegistry, extremeBaseline.branchId, extremeStorm.branchId, TICKS));
+    const extremeControl = verifyControlledDifference(extremeRegistry, extremeBaseline.branchId, extremeStorm.branchId, 0);
+
+    function assess(diff: ReturnType<typeof diffWorldBranches>, control: ReturnType<typeof verifyControlledDifference>) {
+      return assessWorldCounterfactual({
+        preregistration: preregisterWorldCounterfactual(question({ entityId: GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID, criterion: PUMP_STAYS_OPERATIONAL })),
+        diff, controlledDifference: control, replayVerdict: 'MATCH',
+      });
+    }
+
+    // === RUN A: starts at confidence 0.7, observes the SUPPORTING (mild) evidence first. ===
+    let h1a = createHypothesis('H1', PUMP_STAYS_OPERATIONAL, 0.7);
+    const initialConfidenceA = h1a.confidence;
+    const assessmentA = assess(mildDiff, mildControl);
+    h1a = updateConfidence(h1a, assessmentA.assessment, evidenceMagnitudeFromAssessment(assessmentA), 'mild real storm: pump stayed operational', 0);
+    expect(h1a.confidence).toBeGreaterThan(initialConfidenceA); // real rise
+    expect(h1a.status).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    const nextActionA = selectNextWorldExperiment(assessmentA, mildDiff);
+
+    // === RUN B: SAME initial hypothesis (same criterion, same prior 0.7) — the ONLY thing that differs
+    // is which real observation it sees first: the CONTRADICTING (extreme) one. ===
+    let h1b = createHypothesis('H1', PUMP_STAYS_OPERATIONAL, 0.7);
+    const initialConfidenceB = h1b.confidence;
+    const assessmentB = assess(extremeDiff, extremeControl);
+    h1b = updateConfidence(h1b, assessmentB.assessment, evidenceMagnitudeFromAssessment(assessmentB), 'extreme real storm: pump tripped', 0);
+    expect(h1b.confidence).toBeLessThan(initialConfidenceB); // real fall
+    expect(h1b.status).toBe('FALSIFIED_WITHIN_PROTOCOL');
+    const nextActionB = selectNextWorldExperiment(assessmentB, extremeDiff);
+
+    // THE ASSERTION THAT MATTERS: same starting hypothesis, different real observation ->
+    // different belief state AND a genuinely different next action. If this ever regresses to
+    // "same kind either way", adaptive reasoning has silently reverted to fixed-sequence orchestration.
+    expect(h1a.confidence).not.toBeCloseTo(h1b.confidence, 1);
+    expect(h1a.status).not.toBe(h1b.status);
+    expect(nextActionA.kind).not.toBe(nextActionB.kind);
+    expect(nextActionB.kind).toBe('HYPOTHESIS_FALSIFIED');
+
+    // === Genesis learns from the falsification: generate a real alternative, rank it against
+    // the original, and confirm it is now the leading (only active) hypothesis. ===
+    const alternatives = generateAlternativeHypotheses(h1b, assessmentB);
+    expect(alternatives.length).toBeGreaterThan(0);
+    const ranked = rankHypotheses([h1b, ...alternatives]);
+    expect(activeHypotheses(ranked).map((h) => h.id)).toEqual(alternatives.map((h) => h.id)); // h1b is closed (falsified), only the new candidate(s) remain in play
   });
 });

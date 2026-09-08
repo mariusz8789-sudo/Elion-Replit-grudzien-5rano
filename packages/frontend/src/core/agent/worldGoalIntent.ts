@@ -4,6 +4,11 @@ import {
   GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID,
   buildGenesisScientificCity3,
 } from '../worldModel/domains/genesisScientificCity3';
+import type { TemporalUpdater } from '../worldModel/temporal/temporalEngine';
+import {
+  GENESIS_CHEMISTRY_KINETICS_CATALOG,
+  GENESIS_CHEMISTRY_KINETICS_CATALOG_ID,
+} from './chemistryLeverCatalog';
 import type { DiscoveryLoopInput, MechanisticHypothesis } from './discoveryLoop';
 
 /**
@@ -84,7 +89,18 @@ export interface WorldLeverCatalog {
   readonly catalogId: string;
   readonly worldId: string;
   readonly domainId: string;
-  readonly buildWorld: () => { graph: WorldGraph; updater: ReturnType<typeof buildGenesisScientificCity3>['updater'] };
+  /**
+   * Generic on purpose: `TemporalUpdater` (the same interface
+   * `DiscoveryLoopInput.buildWorld` and `TemporalEngine.advance` already
+   * declare) rather than a type derived from any one world builder. Deriving
+   * this from `buildGenesisScientificCity3` specifically would tie every
+   * future catalog's type to the flood city's own builder for no reason —
+   * the loop only ever calls `buildWorld()` and hands the result straight to
+   * `TemporalEngine`, so any world that produces a real `{ graph, updater }`
+   * pair belongs here equally, flood or otherwise (see
+   * `chemistryLeverCatalog.ts` for the second one).
+   */
+  readonly buildWorld: () => { graph: WorldGraph; updater: TemporalUpdater };
   /** Metrics this world computes, keyed by the phrases a person uses for them. */
   readonly metricPhrases: Readonly<Record<string, string>>;
   readonly entityIdForMetric: Readonly<Record<string, string>>;
@@ -398,6 +414,7 @@ export const GENESIS_FLOOD_CATALOG: WorldLeverCatalog = {
  */
 export const WORLD_LEVER_CATALOGS: Readonly<Record<string, WorldLeverCatalog>> = {
   [GENESIS_FLOOD_CATALOG_ID]: GENESIS_FLOOD_CATALOG,
+  [GENESIS_CHEMISTRY_KINETICS_CATALOG_ID]: GENESIS_CHEMISTRY_KINETICS_CATALOG,
 };
 
 export function resolveWorldLeverCatalog(catalogId: string): WorldLeverCatalog | undefined {

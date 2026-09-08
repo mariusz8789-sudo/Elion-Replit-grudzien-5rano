@@ -1,0 +1,61 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "semver": {
+      "name": "semver",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1096466,
+          "name": "semver",
+          "dependency": "semver",
+          "title": "semver vulnerable to Regular Expression Denial of Service",
+          "url": "https://github.com/advisories/GHSA-c2qf-rxjj-qqgw",
+          "severity": "moderate",
+          "cwe": ["CWE-1333"],
+          "range": "<5.7.2"
+        }
+      ],
+      "effects": ["some-transitive-consumer"],
+      "range": "<5.7.2",
+      "nodes": ["node_modules/semver"],
+      "fixAvailable": true
+    },
+    "left-pad": {
+      "name": "left-pad",
+      "severity": "critical",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 9999999,
+          "name": "left-pad",
+          "dependency": "left-pad",
+          "title": "Example critical advisory with no available fix",
+          "url": "https://github.com/advisories/GHSA-example-0000",
+          "severity": "critical",
+          "cwe": ["CWE-000"],
+          "range": "<1.0.0"
+        }
+      ],
+      "effects": [],
+      "range": "<1.0.0",
+      "nodes": ["node_modules/left-pad"],
+      "fixAvailable": false
+    },
+    "example-major-bump": {
+      "name": "example-major-bump",
+      "severity": "high",
+      "isDirect": true,
+      "via": ["some-transitive-package"],
+      "effects": [],
+      "range": "<2.0.0",
+      "nodes": ["node_modules/example-major-bump"],
+      "fixAvailable": { "name": "example-major-bump", "version": "3.0.0", "isSemVerMajor": true }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": { "info": 0, "low": 0, "moderate": 1, "high": 1, "critical": 1, "total": 3 },
+    "dependencies": { "prod": 10, "dev": 20, "optional": 0, "peer": 0, "peerOptional": 0, "total": 30 }
+  }
+}

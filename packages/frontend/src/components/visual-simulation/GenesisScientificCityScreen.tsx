@@ -25,7 +25,15 @@ import { registerActiveObservationControl } from '../../core/activeObservationCo
 export function GenesisScientificCityScreen() {
   const sim = useMemo(() => new GenesisScientificCitySim(), []);
   const params = useMemo(() => ({}), []);
-  const { canvasRef, loading, failed } = useThreeLoop(sim, params, false, undefined);
+  // C2 FULL VISUAL TAKEOVER — was `false`. World TIME still only advances through explicit
+  // step()/triggerPumpFailure() calls (`sim.update()`'s own body never touches the world tick), but
+  // `useThreeLoop.ts` gates its ENTIRE call to `sim.update(dt, ...)` behind this flag — so `false`
+  // here was silently freezing `sim.update()`'s two real per-frame effects: the shared environment's
+  // ambient dust-haze drift, and SPRINT D's establish->hero rack focus (`FocusPuller.update`/
+  // `pipeline.setFocusDistance`), both of which that method's own doc comment already says "must
+  // animate every real frame regardless of world-clock state." `true` makes the actual behavior
+  // match what was already documented, not a new one.
+  const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, undefined);
 
   const [obsText, setObsText] = useState('');
   const [obsResult, setObsResult] = useState<string | null>(null);

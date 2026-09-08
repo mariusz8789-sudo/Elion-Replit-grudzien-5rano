@@ -1,5 +1,7 @@
 import type { GenesisEvent } from '../../events/genesisEvent';
-import { collectScalars, compareBranches } from '../bridge/worldFrameState';
+import { AT_HORIZON, type ObjectiveReducer } from '../../experimentFabric/objectiveReducer';
+import { reduceObjectiveTrajectory } from '../discovery/objectiveTrajectory';
+import { compareBranches } from '../bridge/worldFrameState';
 import { diffWorldBranches, findFirstDivergenceTick, forkedArmControl } from '../discovery/worldCounterfactual';
 import type { WorldGraph } from '../ecs/worldGraph';
 import type { GroundingLevel } from '../ecs/types';
@@ -74,6 +76,16 @@ export interface DecisionObjective {
   readonly entityId: string;
   readonly direction: 'minimize' | 'maximize';
   readonly rationale: string;
+  /**
+   * HOW the metric is measured across the run. Omitted means `AT_HORIZON` —
+   * the value at the horizon tick, which is what this module has always read,
+   * so an existing caller ranks identically down to the last bit.
+   *
+   * This exists because ranking has exactly the same gap the falsification
+   * path had: an option that halves the PEAK and converges by the horizon
+   * ranked level with doing nothing, because only the horizon was ever read.
+   */
+  readonly reducer?: ObjectiveReducer;
 }
 
 export interface DecisionOption {
@@ -205,15 +217,42 @@ export interface DecisionEvaluationInput {
   readonly dt?: number;
 }
 
-/** Reads one scalar off one arm at one tick, or null if it is not there. */
-function objectiveValueAt(engine: TemporalEngine, entityId: string, metric: string, tick: number): number | null {
-  // `tryGetEntity`, not `getEntity`: an objective naming an entity this world does not
-  // contain is a question the caller may legitimately ask, and it must come back as
-  // "not rankable" rather than as a thrown error from inside the evaluation.
-  const entity = engine.scrubTo(tick).tryGetEntity(entityId);
-  if (!entity) return null;
-  const value = collectScalars(entity)[metric];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+/**
+ * How the ranking measured its objective, in words, so a reader is never left
+ * to assume "at the horizon" when the ranking used a peak or a total.
+ */
+function measuredAs(question: { objective: DecisionObjective; horizonTick: number; decisionAtTick: number }): string {
+  const reducer = question.objective.reducer;
+  if (!reducer || reducer.kind === 'AT_HORIZON') return `at tick ${question.horizonTick}`;
+  if (reducer.kind === 'FIRST_CROSSING') {
+    return `as the first tick it crossed ${reducer.threshold} from ${reducer.direction === 'above' ? 'below' : 'above'}, over ticks ${question.decisionAtTick}-${question.horizonTick}`;
+  }
+  return `as its ${reducer.kind} over ticks ${question.decisionAtTick}-${question.horizonTick}`;
+}
+
+/**
+ * Reduces one arm's own trajectory to the number this option is ranked on.
+ *
+ * Delegates to the one shared reducer rather than reading a scalar here: the
+ * hand-rolled single-tick read this replaced was a second copy of
+ * `discoveryLoop.ts`'s, and the two agreed only because both hardcoded the
+ * horizon. A missing entity or metric still comes back as null — "not
+ * rankable" — rather than throwing from inside the evaluation.
+ */
+function objectiveValueAt(
+  engine: TemporalEngine,
+  objective: DecisionObjective,
+  fromTick: number,
+  toTick: number,
+): number | null {
+  return reduceObjectiveTrajectory(
+    engine,
+    objective.entityId,
+    objective.metric,
+    objective.reducer ?? AT_HORIZON,
+    fromTick,
+    toTick,
+  ).value;
 }
 
 function groundingOf(engine: TemporalEngine, entityId: string, tick: number): GroundingLevel | null {
@@ -236,7 +275,7 @@ export function evaluateDecision(input: DecisionEvaluationInput): DecisionReport
   const dt = input.dt ?? 1;
   const { objective, decisionAtTick, horizonTick } = question;
 
-  const baselineValue = objectiveValueAt(baseline, objective.entityId, objective.metric, horizonTick);
+  const baselineValue = objectiveValueAt(baseline, objective, decisionAtTick, horizonTick);
   const grounding = groundingOf(baseline, objective.entityId, horizonTick);
   const classification = grounding ? classifyGrounding(grounding) : null;
 
@@ -250,7 +289,7 @@ export function evaluateDecision(input: DecisionEvaluationInput): DecisionReport
     // soundly for a forked arm.
     const { interventionFootprint: footprint } = forkedArmControl(registry, baseline.branchId, arm.branchId, decisionAtTick);
     const diff = diffWorldBranches(compareBranches(registry, baseline.branchId, arm.branchId, horizonTick));
-    const value = objectiveValueAt(arm, objective.entityId, objective.metric, horizonTick);
+    const value = objectiveValueAt(arm, objective, decisionAtTick, horizonTick);
 
     const shared = {
       optionId: option.optionId,
@@ -395,7 +434,7 @@ function rankOptions(
   return {
     ranking,
     rankingStatus: 'RANKED',
-    rankingReason: `Ordered by "${question.objective.metric}" (${question.objective.direction}) at tick ${question.horizonTick}, with taking no action included as an option.${omitted}${approximate}`,
+    rankingReason: `Ordered by "${question.objective.metric}" (${question.objective.direction}) ${measuredAs(question)}, with taking no action included as an option.${omitted}${approximate}`,
     bestModelledOptionIds: best.map((r) => r.optionId),
   };
 }

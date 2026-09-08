@@ -1,5 +1,6 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { evaluateTwoArmRelation, SERIES_ONLY_RELATIONS } from '../../experimentFabric/falsificationRelation';
+import type { ObjectiveReducerKind } from '../../experimentFabric/objectiveReducer';
 import type { FalsificationCriterion, HypothesisAssessment } from '../../experimentFabric/scientificDiscovery';
 import {
   createHypothesis, evidenceMagnitudeWithinTolerance,
@@ -399,6 +400,30 @@ export type CounterfactualAttribution = 'ATTRIBUTABLE_WITHIN_MODEL' | 'UNATTRIBU
  */
 export type MetricPresence = 'PRESENT_AND_MOVED' | 'PRESENT_BUT_UNMOVED' | 'ABSENT';
 
+/**
+ * Two already-reduced arm values, supplied by a caller that scanned each arm's
+ * own trajectory (`objectiveTrajectory.ts`) because the criterion declared a
+ * reducer other than AT_HORIZON.
+ *
+ * WHY THE CALLER COMPUTES THESE AND NOT THIS MODULE. Reducing needs a live
+ * `TemporalEngine` per arm; this module is handed a finished `diff` and has no
+ * engines. The alternative — making the diff trajectory-aware — would break
+ * `compareBranches` for the controlled-difference check, which legitimately
+ * compares two branches at the FORK tick, not over a range.
+ *
+ * A null on either side is not an error: it is "the reducer found nothing to
+ * report", and it routes to the same INCONCLUSIVE path an absent metric
+ * already takes, carrying `reason` verbatim so the caller's explanation is the
+ * one the reader sees.
+ */
+export interface ObjectiveOverride {
+  readonly reducerKind: ObjectiveReducerKind;
+  readonly baseline: number | null;
+  readonly intervention: number | null;
+  /** Why a value is null, when it is. */
+  readonly reason: string | null;
+}
+
 export interface WorldCounterfactualAssessment {
   readonly contractVersion: string;
   readonly questionId: string;
@@ -412,6 +437,12 @@ export interface WorldCounterfactualAssessment {
   readonly intervention: number | null;
   readonly reference: number | null;
   readonly metricPresence: MetricPresence;
+  /**
+   * Which reducer produced `baseline`/`intervention`, or null when they came
+   * from the branch diff at the horizon (the historical path). Recorded so
+   * evidence and replay carry HOW the outcome was measured, not just what it was.
+   */
+  readonly objectiveReducerKind: ObjectiveReducerKind | null;
   readonly controlledDifference: ControlledDifference;
   readonly replayVerdict: ReplayVerdict | null;
   readonly message: string;
@@ -427,6 +458,12 @@ export interface WorldCounterfactualAssessmentInput {
    * cannot support a verdict, so null and DRIFT both end INCONCLUSIVE.
    */
   readonly replayVerdict?: ReplayVerdict | null;
+  /**
+   * Supplied only when the criterion declares a reducer other than AT_HORIZON.
+   * Absent means the criterion's value is read from the diff exactly as it
+   * always was — the default path is untouched.
+   */
+  readonly objectiveOverride?: ObjectiveOverride | null;
 }
 
 /**
@@ -441,6 +478,7 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
   const { question } = preregistration;
   const criterion = question.criterion;
   const replayVerdict = input.replayVerdict ?? null;
+  const override = input.objectiveOverride ?? null;
 
   const base = {
     contractVersion: WORLD_COUNTERFACTUAL_CONTRACT_VERSION,
@@ -448,16 +486,39 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     criterion,
     entityId: question.entityId,
     metricKey: criterion.metric,
+    objectiveReducerKind: override?.reducerKind ?? null,
     controlledDifference,
     replayVerdict,
     disclaimer: COUNTERFACTUAL_DEPENDENCE_DISCLAIMER,
   };
   const entityInDiff = diff.changed.find((e) => e.entityId === question.entityId);
-  const metricPresence: MetricPresence = readMetric(diff, question.entityId, criterion.metric)
-    ? 'PRESENT_AND_MOVED'
-    : entityInDiff?.unchangedScalarKeys.includes(criterion.metric)
-      ? 'PRESENT_BUT_UNMOVED'
-      : 'ABSENT';
+
+  /**
+   * The two numbers the criterion is judged on, and whether the metric was
+   * there to be judged at all.
+   *
+   * When a reducer supplied them, presence is derived from THOSE numbers, not
+   * from the horizon-tick diff — otherwise the two could contradict each other:
+   * a peak that genuinely diverged would be reported ABSENT because the arms
+   * happened to converge by the horizon, which is exactly the failure this
+   * whole contract exists to fix.
+   */
+  const overrideValues =
+    override && override.baseline !== null && override.intervention !== null
+      ? { baseline: override.baseline, intervention: override.intervention }
+      : null;
+  const values = override ? overrideValues : readMetric(diff, question.entityId, criterion.metric);
+  const metricPresence: MetricPresence = override
+    ? overrideValues === null
+      ? 'ABSENT'
+      : overrideValues.baseline === overrideValues.intervention
+        ? 'PRESENT_BUT_UNMOVED'
+        : 'PRESENT_AND_MOVED'
+    : readMetric(diff, question.entityId, criterion.metric)
+      ? 'PRESENT_AND_MOVED'
+      : entityInDiff?.unchangedScalarKeys.includes(criterion.metric)
+        ? 'PRESENT_BUT_UNMOVED'
+        : 'ABSENT';
 
   const inconclusive = (message: string, values?: { baseline: number; intervention: number }): WorldCounterfactualAssessment => ({
     ...base,
@@ -485,8 +546,13 @@ export function assessWorldCounterfactual(input: WorldCounterfactualAssessmentIn
     );
   }
 
-  const values = readMetric(diff, question.entityId, criterion.metric);
   if (!values) {
+    if (override) {
+      return inconclusive(
+        override.reason ??
+          `The ${override.reducerKind} reducer produced no value for "${criterion.metric}" on ${question.entityId}, so the criterion has nothing to be judged on.`,
+      );
+    }
     return inconclusive(
       metricPresence === 'PRESENT_BUT_UNMOVED'
         ? `The intervention changed entity ${question.entityId}, but left the preregistered metric "${criterion.metric}" at exactly its baseline value. The metric exists and was computed; the intervention did not reach it.`

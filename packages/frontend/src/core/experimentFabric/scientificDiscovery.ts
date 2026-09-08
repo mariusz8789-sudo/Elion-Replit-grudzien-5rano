@@ -1,4 +1,5 @@
 import type { KnowledgeCorpusFile } from '../knowledge/registry';
+import type { ObjectiveReducer } from './objectiveReducer';
 import type { ExperimentOutputValue, ExperimentRun, ExperimentValue, StructuredExperimentRequest } from './types';
 
 export const SCIENTIFIC_DISCOVERY_VERSION = '1.0.0';
@@ -14,6 +15,24 @@ export interface FalsificationCriterion {
   expectedValue?: number;
   tolerance?: number;
   rationale: string;
+  /**
+   * HOW the metric is measured over a run, as opposed to WHAT relation must
+   * hold — a sibling of `relation`/`expectedValue`/`tolerance`, not a new
+   * control-flow concept. Omitted means `AT_HORIZON`: the value at the last
+   * tick, which is what every objective in Genesis has always meant, so an
+   * existing criterion behaves identically down to the last bit.
+   *
+   * It sits on the criterion, and therefore inside the preregistered question,
+   * so `worldCounterfactualQuestionFingerprint` already covers it: a reducer
+   * cannot be chosen after seeing the result any more than a relation can.
+   *
+   * Only the WorldGraph substrate executes it today
+   * (`worldModel/discovery/objectiveTrajectory.ts`). A Fabric criterion may
+   * declare one, and the Fabric path ignores it rather than pretending to
+   * honour it — an unexecuted declaration is visible in the fingerprint,
+   * which is better than a silent second meaning.
+   */
+  reducer?: ObjectiveReducer;
 }
 
 export interface ScientificHypothesis {

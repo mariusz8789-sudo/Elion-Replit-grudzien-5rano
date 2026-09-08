@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { SimParams } from '../types';
 import type { PostProcessor, Sim3D } from './types';
 import { detectRenderTier, tierDpr } from './quality';
@@ -45,6 +46,11 @@ export function useThreeLoop(
     let raf = 0;
     let renderer: import('three').WebGLRenderer | undefined;
     let controls: { update: () => void; dispose: () => void } | undefined;
+    // Declared separately from `controls` above: the render loop's orbit-follow blocks below need
+    // `.target`, which that minimal structural type doesn't expose. `undefined` whenever
+    // `sim.disableOrbitControls` skips construction entirely (see that block's own doc) — both
+    // orbit-follow blocks already guard on this via `orbitControls?.target`.
+    let orbitControls: OrbitControls | undefined;
     let post: PostProcessor | undefined;
 
     setLoading(true);
@@ -74,28 +80,46 @@ export function useThreeLoop(
         renderer.info.autoReset = false;
         renderer.setClearColor(0x02030a, 1);
 
-        const orbitControls = new OrbitControls(camera, canvas);
-        controls = orbitControls;
-        orbitControls.enableDamping = true;
-        orbitControls.dampingFactor = 0.08;
-
-        // Kinowy auto-obrót wokół celu, dopóki użytkownik nie zacznie
-        // przeciągać — wbudowana funkcja OrbitControls, więc nie "walczy"
-        // z jej własną obsługą gestów (patrz Sim3D.cameraAutoRotateSpeed).
+        // LIVING WORLD — a Sim3D that drives its own camera (`disableOrbitControls: true`, e.g. a
+        // first-person walk controller) previously still got a fully-constructed OrbitControls
+        // attached to the canvas, its `update()` call just skipped below. OrbitControls' own
+        // pointerdown handler still fires and calls `canvas.setPointerCapture(event.pointerId)`
+        // regardless — found via a real touch-emulated Chromium check of GenesisWorldScreen.tsx's
+        // new walkable mode, where a second, unrelated touch listener on the same canvas (this
+        // scene's own touch-look) left OrbitControls' internal pointer bookkeeping out of sync with
+        // the browser's actual pointer lifecycle, throwing an uncaught
+        // `InvalidStateError: Failed to execute 'setPointerCapture'`. Nothing outside this hook ever
+        // reads `controls` (`disableOrbitControls` has exactly one consumer: the `.update()` gate a
+        // few lines below), so skipping construction entirely is a pure subtraction, not a behavior
+        // change for any scene that still wants OrbitControls.
         const tier = detectRenderTier();
-        let idleResume: ReturnType<typeof setTimeout> | undefined;
-        if (sim.cameraAutoRotateSpeed && !getSettings().reducedMotion) {
-          orbitControls.autoRotate = true;
-          orbitControls.autoRotateSpeed = sim.cameraAutoRotateSpeed;
-          orbitControls.addEventListener('start', () => {
-            orbitControls.autoRotate = false;
-            if (idleResume) clearTimeout(idleResume);
-          });
-          orbitControls.addEventListener('end', () => {
-            idleResume = setTimeout(() => {
-              orbitControls.autoRotate = true;
-            }, 2500);
-          });
+        if (!sim.disableOrbitControls) {
+          // A local, definitely-assigned const for the closures below — TS can't narrow the outer
+          // `orbitControls` (declared `| undefined` for the render loop's own use further down)
+          // across a callback boundary, even though it's only ever set once, right here.
+          const oc = new OrbitControls(camera, canvas);
+          orbitControls = oc;
+          controls = oc;
+          oc.enableDamping = true;
+          oc.dampingFactor = 0.08;
+
+          // Kinowy auto-obrót wokół celu, dopóki użytkownik nie zacznie
+          // przeciągać — wbudowana funkcja OrbitControls, więc nie "walczy"
+          // z jej własną obsługą gestów (patrz Sim3D.cameraAutoRotateSpeed).
+          let idleResume: ReturnType<typeof setTimeout> | undefined;
+          if (sim.cameraAutoRotateSpeed && !getSettings().reducedMotion) {
+            oc.autoRotate = true;
+            oc.autoRotateSpeed = sim.cameraAutoRotateSpeed;
+            oc.addEventListener('start', () => {
+              oc.autoRotate = false;
+              if (idleResume) clearTimeout(idleResume);
+            });
+            oc.addEventListener('end', () => {
+              idleResume = setTimeout(() => {
+                oc.autoRotate = true;
+              }, 2500);
+            });
+          }
         }
 
         let w = 0;
@@ -150,7 +174,11 @@ export function useThreeLoop(
           last = now;
           if (runningRef.current) sim.update(dt, paramsRef.current);
           sim.syncScene(scene, camera);
-          if (sim.getOrbitTarget) {
+          // Guarded on `orbitControls` too (not just `sim.getOrbitTarget`): this block's entire job
+          // is moving OrbitControls' own `.target`, so it's meaningless — and, since `disableOrbitControls`
+          // now skips constructing OrbitControls at all (see that block's own doc), unsafe to run —
+          // for any scene driving its own camera instead.
+          if (sim.getOrbitTarget && orbitControls) {
             const target = sim.getOrbitTarget();
             if (target) {
               const focusDistance = sim.getOrbitFocusDistance?.();

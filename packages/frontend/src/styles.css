@@ -1895,6 +1895,24 @@ kbd {
 .fp-lab-crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); pointer-events: none; }
 .fp-lab-prompt { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); padding: 0.35rem 0.8rem; border-radius: 999px; background: rgba(10, 16, 28, 0.85); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font: 600 0.78rem/1 var(--font-mono); pointer-events: none; }
 .fp-lab-camera-badge { position: absolute; top: 0.8rem; left: 50%; transform: translateX(-50%); padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(240, 90, 60, 0.18); border: 1px solid rgba(245, 148, 63, 0.55); color: #ffd8b0; font: 700 0.72rem/1 var(--font-mono); letter-spacing: 0.04em; pointer-events: none; animation: fp-lab-fade-in 0.25s ease; }
+/* LIVING WORLD — Genesis World's own interact prompt is a real <button> (tappable on touch, where
+   there is no keyboard "E" to press), unlike `.fp-lab-prompt`'s original inert overlay label. */
+/* z-index above `.topbar`'s sticky z-index:20 — this page's `.character-stage` (unlike
+   `.fp-lab-stage`'s own dedicated full-bleed layout) sits in normal document flow under a visible
+   header/description block, so without this the prompt can end up stacked behind the sticky header
+   on a short viewport, making it untappable even though it renders in the right visual spot. */
+button.fp-lab-prompt { pointer-events: auto; cursor: pointer; appearance: none; z-index: 25; }
+/* LIVING WORLD — a minimal, always-visible-once-`entered` touch D-pad: the mobile equivalent of
+   WASD, since a touch device has no physical keys for `MOVE_KEYS` to map from. Bottom-left, out of
+   the way of the crosshair/prompt (center) and the existing sim-transport controls (below the stage).
+   `touch-action: none` stops the browser's own scroll/zoom gestures from competing with a press. */
+.gx-dpad { position: absolute; left: 1rem; bottom: 1rem; width: 8.4rem; height: 8.4rem; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 0.3rem; }
+.gx-dpad-btn { touch-action: none; user-select: none; border-radius: 0.5rem; background: rgba(10, 16, 28, 0.72); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font-size: 1.1rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.gx-dpad-btn:active { background: rgba(126, 179, 255, 0.35); }
+.gx-dpad-up { grid-column: 2; grid-row: 1; }
+.gx-dpad-left { grid-column: 1; grid-row: 2; }
+.gx-dpad-right { grid-column: 3; grid-row: 2; }
+.gx-dpad-down { grid-column: 2; grid-row: 3; }
 /* Jedna aktualna linia (napis dolny-trzeci) zamiast rosnącej listy — świat ma dominować ekran. */
 .fp-lab-caption { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%); max-width: min(34rem, 90%); padding: 0.5rem 0.9rem; border-radius: 0.6rem; background: rgba(8, 13, 23, 0.72); backdrop-filter: blur(2px); color: #eaf1ff; font-size: 0.82rem; line-height: 1.4; text-align: center; pointer-events: none; animation: fp-lab-fade-in 0.2s ease; }
 .fp-lab-caption strong { color: #7eb3ff; margin-right: 0.3rem; }

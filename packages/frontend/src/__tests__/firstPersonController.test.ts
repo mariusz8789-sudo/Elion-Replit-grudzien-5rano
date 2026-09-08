@@ -115,4 +115,28 @@ describe('FirstPersonController — pure headless movement math', () => {
     expect(s.speed).toBeCloseTo(0, 3);
     expect(Math.abs(s.bobOffset)).toBeCloseTo(0, 3);
   });
+
+  it('12. LIVING WORLD: setSpeedMultiplier scales top speed (walk/run), defaulting to unchanged behavior', () => {
+    const walk = new FirstPersonController({ room: ROOM, startPosition: { x: 0, z: 0 }, moveSpeed: 2, acceleration: 1000 });
+    walk.setKey('forward', true);
+    let walkState = walk.update(0.1);
+    for (let i = 0; i < 20; i++) walkState = walk.update(0.1);
+    expect(walkState.speed).toBeCloseTo(2, 1);
+
+    const run = new FirstPersonController({ room: ROOM, startPosition: { x: 0, z: 0 }, moveSpeed: 2, acceleration: 1000 });
+    run.setSpeedMultiplier(2);
+    run.setKey('forward', true);
+    let runState = run.update(0.1);
+    for (let i = 0; i < 20; i++) runState = run.update(0.1);
+    expect(runState.speed).toBeCloseTo(4, 1);
+  });
+
+  it('13. LIVING WORLD: setSpeedMultiplier clamps away from zero/negative instead of freezing or reversing', () => {
+    const c = new FirstPersonController({ room: ROOM, startPosition: { x: 0, z: 0 }, moveSpeed: 2, acceleration: 1000 });
+    c.setSpeedMultiplier(-5);
+    c.setKey('forward', true);
+    let s = c.update(0.1);
+    for (let i = 0; i < 20; i++) s = c.update(0.1);
+    expect(s.speed).toBeGreaterThan(0);
+  });
 });

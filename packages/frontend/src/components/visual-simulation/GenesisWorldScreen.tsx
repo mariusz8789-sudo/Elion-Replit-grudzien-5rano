@@ -14,6 +14,9 @@ import { createSceneEnvironment, type SceneEnvironmentHandle } from '../../core/
 import { computeSunState } from '../../core/three/graphics/environment';
 import { createPBRMaterial, type StaticGenesisMaterialId } from '../../core/three/graphics/materials';
 import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/graphics/postProcessing';
+import { createPracticalLight } from '../../core/three/graphics/lighting';
+import { createLightShaft } from '../../core/three/graphics/atmosphere';
+import { createWaterSurface, captureDryLook, applyWetLook, type WaterSurfaceHandle } from '../../core/three/graphics/water';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
@@ -87,7 +90,9 @@ function colorForVisualHint(hint?: string): number {
  * `materials.ts` PBR category — the same procedural-texture system every other production scene
  * already composes with — gives this scene actual material variety for free, without inventing any
  * new visual language: metal infrastructure reads as metal, roads read as asphalt, buildings read as
- * a painted facade. The tint (`colorForVisualHint`, and `updateVisual`'s tripped/interrupted override)
+ * a real windowed facade (`BUILDING_FACADE`, see `materials.ts`'s own `makeBuildingFacadeSurface`
+ * doc — floor-clustered lit/unlit windows with real frames, not a flat box). The tint
+ * (`colorForVisualHint`, and `updateVisual`'s tripped/interrupted override)
  * still layers on top via `PBRMaterialOverrides.color` — status coloring is unchanged.
  */
 const VISUAL_HINT_MATERIAL: Readonly<Record<string, StaticGenesisMaterialId>> = {
@@ -96,7 +101,7 @@ const VISUAL_HINT_MATERIAL: Readonly<Record<string, StaticGenesisMaterialId>> = 
   city: 'CONCRETE',
   district: 'BRICK',
   road: 'ASPHALT',
-  building: 'PAINTED_METAL',
+  building: 'BUILDING_FACADE',
   'pump-pipe-system': 'BRUSHED_METAL',
   population: 'TECH_COMPOSITE',
   lab: 'CERAMIC',
@@ -160,6 +165,17 @@ const GENESIS_WORLD_BASE_HOUR_OF_DAY = 21;
 const FLOOD_WATER_MIN_VISIBLE_DEPTH_M = 0.03;
 
 /**
+ * ASTRA B4 — the floodplain's own box (its `visualHint: 'floodplain'` → `GROUND` material) darkens
+ * and smooths toward a wet-look as `waterLevelM` rises, via the same `applyWetLook` every other
+ * Genesis rain/wet surface uses. Scoped to the floodplain entity itself, not the whole 400-unit
+ * ground plane: the solver models one basin, not city-wide rainfall, so claiming the entire ground
+ * got wet would visually assert more than the model does. 1.5 m is a presentation choice (not a
+ * scientific claim) — roughly the top of the range this catalog's own experiments explore — past
+ * which the surface is already at its wettest visual state.
+ */
+const FLOOD_GROUND_WETNESS_REFERENCE_M = 1.5;
+
+/**
  * PRIORITY 2 — REAL WORLD GEOMETRY. Like the floodplain above, every entity here also renders at the
  * SAME placeholder `scale: 1` (a 1.5-unit cube — confirmed by actually reading `getFrameState()`'s own
  * output, not assumed) regardless of what it represents: a hospital and a pump box the same size. Real
@@ -221,8 +237,9 @@ export class GenesisWorldSim3D implements Sim3D {
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
   private pipeline: GraphicsPipeline | null = null;
   /** PRIORITY 3 — the floodplain's REAL standing water, a literal surface at the real `waterLevelM`
-   * the hydrology solve reports — see `FLOOD_WATER_MIN_VISIBLE_DEPTH_M`'s own doc. */
-  private floodWaterMesh: THREE_NS.Mesh | null = null;
+   * the hydrology solve reports — see `FLOOD_WATER_MIN_VISIBLE_DEPTH_M`'s own doc. ASTRA B4: a real
+   * `createWaterSurface` (transmission + scrolling ripple) rather than a static flat-color plane. */
+  private floodWater: WaterSurfaceHandle | null = null;
 
   /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
@@ -360,6 +377,13 @@ export class GenesisWorldSim3D implements Sim3D {
       fillIntensity: 2,
       fillSkyColor: 0xbcd2ff,
       fillGroundColor: 0x3a3a46,
+      // ASTRA B3 — `createSceneEnvironment`'s ambient haze was reaching this scene only as an
+      // unopinionated default (warm 0xd9b57a "dust" tan, tuned for an indoor/desert palette elsewhere)
+      // rather than a deliberate choice; made explicit here and re-tinted cool blue-grey to match this
+      // scene's own night palette (`fillSkyColor`/`groundMaterial` above), so it reads as night haze
+      // giving the empty air over the 400-unit ground real depth, not a color mismatch nobody chose.
+      ambientHaze: true,
+      ambientHazeOptions: { color: 0x9fb3d9, opacity: 0.07 },
     });
 
     this.root = new THREE.Group();
@@ -382,6 +406,15 @@ export class GenesisWorldSim3D implements Sim3D {
       const tripped = entity.visualHint === 'pump-pipe-system' && entity.scalars?.volumetricFlow === 0;
       const interrupted = typeof entity.status === 'string' && entity.status.toLowerCase().includes('interrupted');
       material.color.set(tripped ? 0xff3333 : interrupted ? 0xff8800 : colorForVisualHint(entity.visualHint));
+      // ASTRA B4 — the floodplain's own ground box gets visibly wetter as the REAL waterLevelM scalar
+      // rises, via the shared wet-look helper every rain-reactive surface in Genesis already uses.
+      // `captureDryLook` right after the color line above (not once at creation) so this reads the
+      // color this exact call just set, never accumulating darkness/roughness across repeated syncs.
+      if (entity.visualHint === 'floodplain' && !tripped && !interrupted) {
+        const waterLevelM = typeof entity.scalars?.waterLevelM === 'number' ? entity.scalars.waterLevelM : 0;
+        const wetness = Math.max(0, Math.min(1, waterLevelM / FLOOD_GROUND_WETNESS_REFERENCE_M));
+        applyWetLook(THREE, material, captureDryLook(material), wetness);
+      }
     };
 
     this.renderer = new WorldFrameRenderer(THREE, this.root, { resolveVisual, updateVisual });
@@ -476,6 +509,7 @@ export class GenesisWorldSim3D implements Sim3D {
     camera.rotation.set(0, spawnYaw, 0);
 
     this.buildHospitalInterior(THREE, scene);
+    this.buildLandmarkLighting(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
 
     this.syncNow();
   }
@@ -488,15 +522,42 @@ export class GenesisWorldSim3D implements Sim3D {
    */
   private buildFloodWaterMesh(THREE: typeof THREE_NS, scene: THREE_NS.Scene, floodplainPos: { x: number; y: number; z: number }): void {
     const size = Math.max(1.5, 1.5 * FLOODPLAIN_RENDER_SCALE);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x1a5ea8, transparent: true, opacity: 0.6, roughness: 0.15, metalness: 0.1,
+    // ASTRA B4 — real transmission + a scrolling ripple normal map (`graphics/water.ts`'s own shared
+    // module, the same one every other Genesis water surface composes with) instead of a static flat
+    // `MeshStandardMaterial` plane. Same base color (0x1a5ea8) as before, preserved for both visual
+    // continuity and the existing scene test that locates this mesh by that exact color.
+    const water = createWaterSurface(THREE, {
+      width: size, depth: size, color: 0x1a5ea8, roughness: 0.12, thicknessMeters: 1.2,
     });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), material);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(floodplainPos.x, floodplainPos.y, floodplainPos.z);
-    mesh.visible = false;
-    scene.add(mesh);
-    this.floodWaterMesh = mesh;
+    water.mesh.position.set(floodplainPos.x, floodplainPos.y, floodplainPos.z);
+    water.mesh.visible = false;
+    scene.add(water.mesh);
+    this.floodWater = water;
+  }
+
+  /**
+   * ASTRA B2 — the flagship's night has no real light sources outside the hospital interior at all:
+   * `streetKit.ts`'s lamp is honestly documented as emissive geometry only (see that file's own
+   * "HONEST SCOPE" note), never wired here anyway, so nothing outdoors actually illuminates anything.
+   * There is no street network in this scene to line with lamps (entities are scattered landmarks, not
+   * a road grid), so this places one warm, non-shadow-casting `createPracticalLight` at each real
+   * landmark instead — reads as a lit entrance/fixture, not decoration, and gives the lowered bloom
+   * threshold (`setupPostProcessing`) real light to catch alongside the facade windows' own emissive.
+   */
+  private buildLandmarkLighting(
+    THREE: typeof THREE_NS,
+    scene: THREE_NS.Scene,
+    positions: readonly { x: number; y: number; z: number }[],
+  ): void {
+    for (const pos of positions) {
+      createPracticalLight(THREE, scene, {
+        position: [pos.x, 4, pos.z],
+        color: 0xffc38a,
+        intensity: 6,
+        distance: 26,
+        decay: 2,
+      });
+    }
   }
 
   /**
@@ -549,6 +610,21 @@ export class GenesisWorldSim3D implements Sim3D {
     const light = new THREE.PointLight(0xdfe8ff, 12, h * 4, 2);
     light.position.set(ox, wallHeight - 0.3, oz);
     group.add(light);
+
+    // ASTRA B3 — a real interior is exactly what `atmosphere.ts`'s light shaft was built for (see
+    // `labScene3D.ts`'s own use of it for a skylight beam), unlike the outdoor city where there is no
+    // comparable single aperture. Streams in through the doorway gap in the south wall (see the wall
+    // layout above), angled down and inward, so the entrance itself reads as a source of light rather
+    // than a plain dark gap in the wall.
+    const doorShaft = createLightShaft(THREE, {
+      origin: [ox, wallHeight - 0.2, oz + h],
+      direction: [0, -1, -0.6],
+      length: h * 1.6,
+      width: 2.2,
+      color: 0xfff3d6,
+      opacity: 0.3,
+    });
+    group.add(doorShaft);
 
     scene.add(group);
     this.interiorGroup = group;
@@ -633,8 +709,21 @@ export class GenesisWorldSim3D implements Sim3D {
   ): PostProcessor {
     this.pipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
       scene, camera, width: w, height: h,
-      bloom: { strength: 0.35, radius: 0.5, threshold: 0.85 },
+      // ASTRA B2 — exposure matches `genesisScientificCitySim.ts`'s own night tuning (1.15, up from
+      // this scene's un-boosted 1.05 default) rather than a bigger jump: the sun/fill intensities above
+      // are deliberately kept high for legibility (this is a walkable, not a moody establishing shot),
+      // so mood comes from the new landmark lights + facade windows actually being visible to bloom,
+      // not from darkening the whole scene. Threshold dropped from 0.85 (needed near-white/emissive to
+      // trigger at all — with no real outdoor lights, almost nothing ever crossed it) to 0.65, so the
+      // new `createPracticalLight` fixtures and `BUILDING_FACADE`'s lit windows actually bloom.
+      toneMappingExposure: 1.15,
+      bloom: { strength: 0.35, radius: 0.5, threshold: 0.65 },
       ambient: { mode: 'none' },
+      // ASTRA B5 — this scene never opted into SSR at all (the 'cinematic' default tier gate was never
+      // even reached), unlike its sibling `genesisScientificCitySim.ts` which already proved these exact
+      // values safe at 'high' after a headless-Chromium check. Same numbers, same reasoning: wet streets
+      // and metal infrastructure reflecting the scene around them, without requiring the top tier.
+      reflections: { enabled: true, minTier: 'high', strength: 0.4, maxDistance: 45 },
     });
     return this.pipeline;
   }
@@ -679,11 +768,11 @@ export class GenesisWorldSim3D implements Sim3D {
       );
       if (this.scene?.fog) (this.scene.fog as THREE_NS.FogExp2).color.setHex(sunState.fogColor);
     }
-    if (this.floodWaterMesh) {
+    if (this.floodWater) {
       const floodplain = graphicsFrame.entities.find((e) => e.id === GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
       const waterLevelM = floodplain?.scalars?.waterLevelM ?? 0;
-      this.floodWaterMesh.visible = waterLevelM > FLOOD_WATER_MIN_VISIBLE_DEPTH_M;
-      this.floodWaterMesh.position.y = waterLevelM;
+      this.floodWater.mesh.visible = waterLevelM > FLOOD_WATER_MIN_VISIBLE_DEPTH_M;
+      this.floodWater.mesh.position.y = waterLevelM;
     }
   }
 
@@ -909,6 +998,7 @@ export class GenesisWorldSim3D implements Sim3D {
     // simulation time, so they keep moving every real frame regardless of world-clock state.
     this.sceneEnvironment?.update(dt);
     if (this.showWildfire) this.fireVfx?.update(dt);
+    if (this.floodWater?.mesh.visible) this.floodWater.update(dt); // ripple only scrolls while there's water to see it on
     const active = this.activeController();
     if (active) this.fpState = active.update(dt);
   }
@@ -1092,11 +1182,10 @@ export class GenesisWorldSim3D implements Sim3D {
       });
       this.interiorGroup = null;
     }
-    if (this.floodWaterMesh) {
-      this.floodWaterMesh.parent?.remove(this.floodWaterMesh);
-      this.floodWaterMesh.geometry.dispose();
-      (this.floodWaterMesh.material as THREE_NS.Material).dispose();
-      this.floodWaterMesh = null;
+    if (this.floodWater) {
+      this.floodWater.mesh.parent?.remove(this.floodWater.mesh);
+      this.floodWater.dispose();
+      this.floodWater = null;
     }
   }
 }

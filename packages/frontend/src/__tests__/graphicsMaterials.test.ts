@@ -49,16 +49,17 @@ import {
   createEmissiveInstrumentMaterial,
   createScreenMaterial,
   makeReadoutSurface,
+  makeBuildingFacadeSurface,
   type GenesisMaterialId,
 } from '../core/three/graphics/materials';
 
 const STATIC_PALETTE_IDS: readonly Exclude<GenesisMaterialId, 'SCREEN' | 'EMISSIVE_INSTRUMENT'>[] = [
   'SCIENCE_GLASS', 'BRUSHED_METAL', 'POLISHED_METAL', 'TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL',
-  'CONCRETE', 'ASPHALT', 'BRICK', 'GROUND',
+  'CONCRETE', 'ASPHALT', 'BRICK', 'GROUND', 'BUILDING_FACADE',
 ];
 
 describe('createGenesisMaterialPalette', () => {
-  it('builds all 13 statically-shareable categories as real three.js materials', () => {
+  it('builds all 14 statically-shareable categories as real three.js materials', () => {
     const palette = createGenesisMaterialPalette(THREE);
     for (const id of STATIC_PALETTE_IDS) {
       expect(palette[id]).toBeInstanceOf(THREE.Material);
@@ -84,7 +85,7 @@ describe('createGenesisMaterialPalette', () => {
 
   it('keeps non-metals at (near-)zero metalness', () => {
     const palette = createGenesisMaterialPalette(THREE);
-    for (const id of ['TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL', 'CONCRETE', 'ASPHALT', 'BRICK', 'GROUND'] as const) {
+    for (const id of ['TECH_COMPOSITE', 'RUBBER', 'CERAMIC', 'PAINTED_METAL', 'LAB_FLOOR', 'LAB_WALL', 'CONCRETE', 'ASPHALT', 'BRICK', 'GROUND', 'BUILDING_FACADE'] as const) {
       const material = palette[id] as THREE.MeshStandardMaterial;
       expect(material.metalness).toBeLessThan(0.35);
     }
@@ -251,5 +252,28 @@ describe('createScreenMaterial', () => {
     const screen = createScreenMaterial(THREE, texture);
     expect(screen.map).toBe(texture);
     expect(screen.emissiveMap).toBe(texture);
+  });
+});
+
+describe('makeBuildingFacadeSurface / BUILDING_FACADE', () => {
+  it('returns a distinct albedo and emissive texture (windows glow independently of the wall)', () => {
+    const facade = makeBuildingFacadeSurface(THREE, { baseColor: 0x8b8f96, seed: 71 });
+    expect(facade.map).toBeInstanceOf(THREE.Texture);
+    expect(facade.emissiveMap).toBeInstanceOf(THREE.Texture);
+    expect(facade.map).not.toBe(facade.emissiveMap);
+  });
+
+  it('BUILDING_FACADE is real (near-)dielectric paint, not metal, and carries a non-black emissive so lit windows actually glow', () => {
+    const facade = createPBRMaterial(THREE, 'BUILDING_FACADE') as THREE.MeshStandardMaterial;
+    expect(facade.metalness).toBeLessThan(0.35);
+    expect(facade.map).toBeInstanceOf(THREE.Texture);
+    expect(facade.emissiveMap).toBeInstanceOf(THREE.Texture);
+    expect(facade.emissive.getHex()).toBeGreaterThan(0); // 0xffffff — lets emissiveMap supply the real color
+    expect(facade.emissiveIntensity).toBeGreaterThan(0);
+  });
+
+  it('supports the same color-override convention as CONCRETE/ASPHALT/BRICK/GROUND', () => {
+    const custom = createPBRMaterial(THREE, 'BUILDING_FACADE', { color: 0x112233 }) as THREE.MeshStandardMaterial;
+    expect(custom.color.getHex()).toBe(0x112233);
   });
 });

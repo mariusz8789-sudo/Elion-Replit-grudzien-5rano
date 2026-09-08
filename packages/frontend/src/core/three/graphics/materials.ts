@@ -226,6 +226,135 @@ export function makeWornSurface(
   return { map, roughnessMap };
 }
 
+export interface BuildingFacadeOptions {
+  /** Base wall paint color, sRGB. `overrides.color` still multiplies on top, same convention as CONCRETE/ASPHALT/BRICK. */
+  baseColor: number;
+  seed: number;
+  columns?: number;
+  rows?: number;
+  /** Fraction of windows lit, before row-clustering biases individual windows away from it. */
+  litFraction?: number;
+}
+
+/**
+ * A window grid that reads as a facade, not a checkerboard.
+ *
+ * The failure mode this replaces: a uniform grid of same-size cells, each
+ * independently lit or unlit with no spatial correlation and no frame — every
+ * cell has equal visual weight, so the eye reads rows/columns instead of
+ * architecture. Three things break that: (1) each window gets a real frame —
+ * a darker inset border drawn before the glass, giving it depth instead of a
+ * flat color swap; (2) "lit" is decided per ROW first (a floor is more likely
+ * lit or dark as a whole — real buildings light up floor by floor, not
+ * window by window) and only then perturbed per-window, so lit windows
+ * cluster instead of scattering independently; (3) neither state is flat —
+ * unlit glass gets a faint vertical sky-reflection gradient instead of pure
+ * dark, lit glass varies in warmth and brightness window to window instead of
+ * one repeated amber.
+ *
+ * Returns a matched pair: `map` is the full albedo (wall + frames + glass,
+ * lit or not), `emissiveMap` is black everywhere except the lit panes in
+ * their own warm color — assign both, plus a non-black `emissive` (see the
+ * `BUILDING_FACADE` category below), so lit windows actually glow and can
+ * feed bloom, the same way a real lit window is the brightest thing on a
+ * night facade.
+ */
+export function makeBuildingFacadeSurface(
+  THREE: typeof THREE_NS,
+  options: BuildingFacadeOptions,
+): { map: THREE_NS.Texture; emissiveMap: THREE_NS.Texture } {
+  const size = 256;
+  const columns = options.columns ?? 4;
+  const rows = options.rows ?? 6;
+  const litFraction = options.litFraction ?? 0.4;
+  const rand = mulberry32(options.seed);
+
+  const wallCanvas = document.createElement('canvas');
+  wallCanvas.width = size;
+  wallCanvas.height = size;
+  const wallCtx = wallCanvas.getContext('2d')!;
+  const emissiveCanvas = document.createElement('canvas');
+  emissiveCanvas.width = size;
+  emissiveCanvas.height = size;
+  const emissiveCtx = emissiveCanvas.getContext('2d')!;
+
+  const r = (options.baseColor >> 16) & 0xff;
+  const g = (options.baseColor >> 8) & 0xff;
+  const b = options.baseColor & 0xff;
+  wallCtx.fillStyle = `rgb(${r},${g},${b})`;
+  wallCtx.fillRect(0, 0, size, size);
+  emissiveCtx.fillStyle = '#000000';
+  emissiveCtx.fillRect(0, 0, size, size);
+
+  // Subtle panel seams — vertical divisions between window columns read as real
+  // construction joints even where there is no window, breaking up flat wall.
+  wallCtx.strokeStyle = `rgba(0,0,0,0.12)`;
+  wallCtx.lineWidth = 1;
+  for (let c = 1; c < columns; c++) {
+    const x = (c / columns) * size;
+    wallCtx.beginPath();
+    wallCtx.moveTo(x, 0);
+    wallCtx.lineTo(x, size);
+    wallCtx.stroke();
+  }
+
+  const cellW = size / columns;
+  const cellH = size / rows;
+  const windowW = cellW * 0.62;
+  const windowH = cellH * 0.55;
+  const frameInset = Math.max(1, windowW * 0.08);
+
+  for (let row = 0; row < rows; row++) {
+    // Per-floor bias: some floors mostly dark, some mostly lit, most mixed —
+    // this is what makes lit windows cluster into believable "someone's home"
+    // patches instead of an even scatter.
+    const rowBias = litFraction * (0.35 + rand() * 1.3);
+    for (let col = 0; col < columns; col++) {
+      const cx = (col + 0.5) * cellW;
+      const cy = (row + 0.5) * cellH;
+      const lit = rand() < rowBias;
+
+      // Frame: a darker inset rect drawn first, so the glass sits visibly
+      // recessed within a border instead of floating as a flat color swap.
+      const frameShade = Math.max(0, Math.min(255, (r + g + b) / 3 - 45));
+      wallCtx.fillStyle = `rgba(${frameShade},${frameShade},${frameShade},0.9)`;
+      wallCtx.fillRect(cx - windowW / 2 - frameInset, cy - windowH / 2 - frameInset, windowW + frameInset * 2, windowH + frameInset * 2);
+
+      if (lit) {
+        // Warm, but not one repeated amber — each pane gets its own hue/brightness.
+        const warmth = 0.55 + rand() * 0.45;
+        const hue = 32 + rand() * 20; // amber-to-warm-white range
+        const gradient = wallCtx.createLinearGradient(0, cy - windowH / 2, 0, cy + windowH / 2);
+        gradient.addColorStop(0, `hsla(${hue}, 70%, ${60 * warmth}%, 1)`);
+        gradient.addColorStop(1, `hsla(${hue}, 80%, ${38 * warmth}%, 1)`);
+        wallCtx.fillStyle = gradient;
+        wallCtx.fillRect(cx - windowW / 2, cy - windowH / 2, windowW, windowH);
+        emissiveCtx.fillStyle = `hsla(${hue}, 75%, ${50 * warmth}%, 1)`;
+        emissiveCtx.fillRect(cx - windowW / 2, cy - windowH / 2, windowW, windowH);
+      } else {
+        // Unlit glass is not flat black — a faint vertical sky-reflection gradient,
+        // brightness varying slightly pane to pane so dark windows read as glass.
+        const dark = 0.7 + rand() * 0.5;
+        const gradient = wallCtx.createLinearGradient(0, cy - windowH / 2, 0, cy + windowH / 2);
+        gradient.addColorStop(0, `rgba(${58 * dark},${68 * dark},${86 * dark},1)`);
+        gradient.addColorStop(1, `rgba(${22 * dark},${27 * dark},${36 * dark},1)`);
+        wallCtx.fillStyle = gradient;
+        wallCtx.fillRect(cx - windowW / 2, cy - windowH / 2, windowW, windowH);
+      }
+    }
+  }
+
+  const map = new THREE.CanvasTexture(wallCanvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  const emissiveMap = new THREE.CanvasTexture(emissiveCanvas);
+  emissiveMap.colorSpace = THREE.SRGBColorSpace;
+  emissiveMap.wrapS = THREE.RepeatWrapping;
+  emissiveMap.wrapT = THREE.RepeatWrapping;
+  return { map, emissiveMap };
+}
+
 /**
  * Proceduralna mapa normalnych: drobna, nieregularna falistość powierzchni.
  * Płaskie materiały PBR o stałym roughness czytają się jak plastik, bo światło
@@ -387,7 +516,7 @@ export function createFacilityGeometry(THREE: typeof THREE_NS): FacilityGeometry
 export type GenesisMaterialId =
   | 'SCIENCE_GLASS' | 'BRUSHED_METAL' | 'POLISHED_METAL' | 'TECH_COMPOSITE'
   | 'RUBBER' | 'CERAMIC' | 'PAINTED_METAL' | 'EMISSIVE_INSTRUMENT' | 'LAB_FLOOR' | 'LAB_WALL'
-  | 'CONCRETE' | 'ASPHALT' | 'BRICK' | 'GROUND' | 'SCREEN';
+  | 'CONCRETE' | 'ASPHALT' | 'BRICK' | 'GROUND' | 'BUILDING_FACADE' | 'SCREEN';
 
 /** The statically-shareable categories — everything in `GenesisMaterialId` except `SCREEN` and
  * `EMISSIVE_INSTRUMENT` (both per-instance factories; see `createScreenMaterial`/
@@ -504,6 +633,18 @@ const MATERIAL_BUILDERS: {
     return new THREE.MeshStandardMaterial({
       color: overrides.color ?? 0xffffff, map: worn.map, roughnessMap: worn.roughnessMap, metalness: 0.01,
       normalMap: surfaceNormalFactory(THREE)(4, 4), normalScale: new THREE.Vector2(0.35, 0.35),
+    });
+  },
+  // A real window grid instead of a flat painted box — see `makeBuildingFacadeSurface`'s own doc for
+  // why this reads as architecture rather than a checkerboard. `emissive: 0xffffff` is deliberate: it
+  // lets `emissiveMap` supply the actual per-window color at full strength (emissive = emissiveColor
+  // × emissiveMap), so lit panes carry their own warm tone rather than being tinted by a fixed light.
+  BUILDING_FACADE: (THREE, overrides) => {
+    const facade = makeBuildingFacadeSurface(THREE, { baseColor: 0x8b8f96, seed: 71 });
+    return new THREE.MeshStandardMaterial({
+      color: overrides.color ?? 0xffffff, map: facade.map, metalness: 0.05, roughness: 0.65,
+      normalMap: surfaceNormalFactory(THREE)(1, 1), normalScale: new THREE.Vector2(0.15, 0.15),
+      emissive: 0xffffff, emissiveMap: facade.emissiveMap, emissiveIntensity: 1.1,
     });
   },
 };

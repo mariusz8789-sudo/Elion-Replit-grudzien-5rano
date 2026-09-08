@@ -1,7 +1,10 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { evaluateTwoArmRelation, SERIES_ONLY_RELATIONS } from '../../experimentFabric/falsificationRelation';
 import type { FalsificationCriterion, HypothesisAssessment } from '../../experimentFabric/scientificDiscovery';
-import { createHypothesis, evidenceMagnitudeWithinTolerance, type Hypothesis } from '../../experimentFabric/beliefRevision';
+import {
+  createHypothesis, evidenceMagnitudeWithinTolerance,
+  type Hypothesis, type HypothesisGenerationMechanism,
+} from '../../experimentFabric/beliefRevision';
 import type { ReplayVerdict } from '../../matrixFoundation/replayVerdict';
 import { collectScalars, compareBranches, type BranchComparison } from '../bridge/worldFrameState';
 import type { TemporalBranchRegistry } from '../temporal/temporalEngine';
@@ -716,10 +719,30 @@ export function evidenceMagnitudeFromAssessment(assessment: WorldCounterfactualA
   return Math.min(1, Math.abs(assessment.intervention - assessment.baseline) / scale);
 }
 
+/** One mechanically derived alternative, in the ONE representation both belief models can consume: a criterion. */
+export interface AlternativeCriterion {
+  readonly criterion: FalsificationCriterion;
+  readonly generatedBy: HypothesisGenerationMechanism;
+}
+
 /**
- * Mechanically derives real, testable alternative criteria from a FALSIFIED
- * assessment — never invented text, never a placeholder. Each mechanism is
- * grounded directly in the real measured values:
+ * THE REUSABLE CORE, deliberately free of any belief representation.
+ *
+ * Genesis has two belief models and neither is going away: `discoveryLoop` uses
+ * the ORDINAL `HypothesisBelief` (a ladder, because that loop refuses to attach
+ * numeric credences it cannot justify), and `inquiryLoop` uses the NUMERIC
+ * `Hypothesis` from `beliefRevision.ts` (log-odds, because discriminating
+ * competing parameter values needs graded confidence to rank on). Each carries
+ * something the other does not.
+ *
+ * Deriving an alternative criterion needs NEITHER. It is arithmetic over a
+ * criterion and two real measured numbers, so it lives here, in the
+ * representation both models can consume, and neither loop has to import the
+ * other's belief type to use it. That separation is why this function exists
+ * apart from `generateAlternativeHypotheses` below — see that function's note
+ * for what was actually wrong.
+ *
+ * Grounded directly in the real measured values, never invented text:
  *
  *   RELATION_FLIP — the criterion predicted a direction (greater-than/less-than)
  *   and the real data moved the other way; the flipped relation is proposed
@@ -739,18 +762,14 @@ export function evidenceMagnitudeFromAssessment(assessment: WorldCounterfactualA
  * hypothesis about a DIFFERENT metric or entity than the one just tested; that
  * would need real domain knowledge this function does not have.
  */
-export function generateAlternativeHypotheses(
-  parent: Hypothesis,
+export function deriveAlternativeCriteria(
+  criterion: FalsificationCriterion,
   assessment: WorldCounterfactualAssessment,
   rejectedFingerprints: ReadonlySet<string> = new Set(),
-  priorConfidence = 0.5,
-): readonly Hypothesis[] {
+): readonly AlternativeCriterion[] {
   if (assessment.assessment !== 'FALSIFIED_WITHIN_PROTOCOL') return [];
   if (assessment.baseline === null || assessment.intervention === null || assessment.reference === null) return [];
-  const { criterion } = parent;
-  const alternatives: Hypothesis[] = [];
-  let nextIndex = 0;
-  const nextId = () => `${parent.id}-alt${nextIndex++}`;
+  const alternatives: AlternativeCriterion[] = [];
 
   if (criterion.relation === 'greater-than' || criterion.relation === 'less-than') {
     const flipped: FalsificationCriterion = {
@@ -760,7 +779,7 @@ export function generateAlternativeHypotheses(
         + `direction (${assessment.intervention} vs. reference ${assessment.reference}).`,
     };
     if (!rejectedFingerprints.has(criterionFingerprint(flipped))) {
-      alternatives.push(createHypothesis(nextId(), flipped, priorConfidence, 'RELATION_FLIP', parent.id));
+      alternatives.push({ criterion: flipped, generatedBy: 'RELATION_FLIP' });
     }
   }
 
@@ -774,10 +793,69 @@ export function generateAlternativeHypotheses(
           + `(${actualDiff}) the real observed difference would actually satisfy.`,
       };
       if (!rejectedFingerprints.has(criterionFingerprint(widened))) {
-        alternatives.push(createHypothesis(nextId(), widened, priorConfidence, 'TOLERANCE_WIDENED', parent.id));
+        alternatives.push({ criterion: widened, generatedBy: 'TOLERANCE_WIDENED' });
       }
     }
   }
 
   return alternatives;
+}
+
+/**
+ * The NUMERIC-PATH wrapper around `deriveAlternativeCriteria`: the same real
+ * derivation, packaged as `beliefRevision.ts`'s `Hypothesis`.
+ *
+ * ## Read this before looking for the caller — there isn't one, and why
+ *
+ * Nothing in `agent/discoveryLoop.ts` calls this, and that is not an oversight
+ * anybody forgot to fix. `discoveryLoop` reasons in the ORDINAL
+ * `HypothesisBelief` and does not import `beliefRevision.ts` at all, so a
+ * `Hypothesis` is not a thing it can hold. The capability was written against
+ * the numeric representation and there is no numeric-representation loop on
+ * THIS substrate.
+ *
+ * The obvious repair — hand it to `inquiryLoop`, which IS the numeric loop —
+ * does not work either, for two reasons that are about the science and not the
+ * types:
+ *
+ *   1. An `inquiryLoop` hypothesis is a PARAMETER ASSIGNMENT, not a criterion.
+ *      Its criterion is regenerated every round from that hypothesis's own
+ *      model prediction, so a hypothesis whose content is "the same claim with
+ *      a different relation" has nowhere to live.
+ *   2. `TOLERANCE_WIDENED` cannot even be represented there: the agreement band
+ *      is a property of the SYSTEM (`SystemUnderStudy.agreementTolerance`),
+ *      shared by every hypothesis, not something one hypothesis can widen.
+ *
+ * And `deriveAlternativeCriteria` takes a `WorldCounterfactualAssessment`,
+ * which only the WorldGraph substrate produces. So the derivation belongs to
+ * the WORLD substrate while its packaging belongs to the NUMERIC loop, and
+ * those two are on opposite sides of the substrate boundary. That is the real
+ * defect, and it is why the reusable half was split out above rather than the
+ * two belief models being forced together — see
+ * `docs/TWO_AUTONOMOUS_LOOPS_DECISION.md` §8.
+ *
+ * ## What connecting it would take, stated so nobody has to rediscover it
+ *
+ * `discoveryLoop` would consume `deriveAlternativeCriteria` directly, in its
+ * own ordinal representation, pairing each derived criterion with the PARENT'S
+ * OWN `apply` — a flipped criterion is a claim about the same mechanism, so no
+ * new mechanism has to be invented. It must then be tested at a DIFFERENT
+ * magnitude from the one that falsified the parent: re-testing "the pump raises
+ * flood depth" against the very measurement that produced it is circular by
+ * construction, whereas confirming it at half strength is real dose-dependent
+ * evidence. That is a change to what the loop EMITS, so it is left to whoever
+ * owns the orchestrator's contract rather than taken unilaterally here.
+ *
+ * This function is kept, tested and exported meanwhile because the derivation
+ * is real and correct; only its packaging is stranded.
+ */
+export function generateAlternativeHypotheses(
+  parent: Hypothesis,
+  assessment: WorldCounterfactualAssessment,
+  rejectedFingerprints: ReadonlySet<string> = new Set(),
+  priorConfidence = 0.5,
+): readonly Hypothesis[] {
+  return deriveAlternativeCriteria(parent.criterion, assessment, rejectedFingerprints).map((alternative, index) =>
+    createHypothesis(`${parent.id}-alt${index}`, alternative.criterion, priorConfidence, alternative.generatedBy, parent.id),
+  );
 }

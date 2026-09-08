@@ -11,6 +11,7 @@ import { buildTerrainFieldMesh, type TerrainFieldMesh } from '../../core/three/g
 import { severityColor } from '../../core/three/graphics/stateVisualization';
 import { createFireVfx, type FireVfxHandle } from '../../core/three/graphics/fireVfx';
 import { createSceneEnvironment, type SceneEnvironmentHandle } from '../../core/three/graphics/sceneEnvironment';
+import { computeSunState } from '../../core/three/graphics/environment';
 import { createPBRMaterial, type StaticGenesisMaterialId } from '../../core/three/graphics/materials';
 import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/graphics/postProcessing';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
@@ -134,6 +135,30 @@ const FLOODPLAIN_OFFSET_FROM_PUMP = { x: 42, y: 0, z: -10 } as const;
 const FLOODPLAIN_RENDER_SCALE = 16;
 
 /**
+ * PRIORITY 3 — LIVING LAYER, tied to real world state (never pure decoration).
+ *
+ * Day/night: `createSceneEnvironment` baked a fixed `hourOfDay: 21` at construction with no way to
+ * animate it — this scene's own sun/fog now instead track the REAL `WorldFrameState.simulatedTime`
+ * (`TemporalEngine`'s own clock, already advanced by every real tick/fork this scene already drives),
+ * re-deriving the day's sun state via `environment.ts`'s own pure `computeSunState` on every
+ * `syncNow()` — never a decorative clock running on its own. `GENESIS_WORLD_BASE_HOUR_OF_DAY` is the
+ * hour the world STARTS at (tick 0), matching the mood the scene already had; from there time only
+ * ever moves because the real model did. Documented simplification: the sky dome's own gradient stays
+ * fixed at its initial bake (recomputing its per-vertex color buffer every sync would cost real GPU
+ * upload bandwidth for a background element) — the sun light and fog, the two cues that actually read
+ * as "day vs night" at ground level, do move with real time.
+ */
+const GENESIS_WORLD_BASE_HOUR_OF_DAY = 21;
+
+/**
+ * Real standing water on the floodplain: `waterLevelM` is the SAME real hydrology scalar the status
+ * line and the floodplain's own inspect panel already read (`floodInundation.ts`'s own solve) — this
+ * is that number given an actual literal water surface, not a second estimate. Below this depth
+ * (a few centimetres) the plane is hidden rather than drawn as a barely-visible sliver.
+ */
+const FLOOD_WATER_MIN_VISIBLE_DEPTH_M = 0.03;
+
+/**
  * PRIORITY 2 — REAL WORLD GEOMETRY. Like the floodplain above, every entity here also renders at the
  * SAME placeholder `scale: 1` (a 1.5-unit cube — confirmed by actually reading `getFrameState()`'s own
  * output, not assumed) regardless of what it represents: a hospital and a pump box the same size. Real
@@ -194,6 +219,9 @@ export class GenesisWorldSim3D implements Sim3D {
   private height = 300;
   private sceneEnvironment: SceneEnvironmentHandle | null = null;
   private pipeline: GraphicsPipeline | null = null;
+  /** PRIORITY 3 — the floodplain's REAL standing water, a literal surface at the real `waterLevelM`
+   * the hydrology solve reports — see `FLOOD_WATER_MIN_VISIBLE_DEPTH_M`'s own doc. */
+  private floodWaterMesh: THREE_NS.Mesh | null = null;
 
   /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
@@ -316,7 +344,7 @@ export class GenesisWorldSim3D implements Sim3D {
     // leaves geometry "nearly unlit and floating in fog").
     this.sceneEnvironment = createSceneEnvironment(THREE, scene, {
       mode: 'OUTDOOR',
-      hourOfDay: 21,
+      hourOfDay: GENESIS_WORLD_BASE_HOUR_OF_DAY,
       fogDensity: 0.0022,
       groundSize: 400,
       // A legible slate tone, not a physically-dim night ground: this is an OBSERVATION surface
@@ -380,16 +408,18 @@ export class GenesisWorldSim3D implements Sim3D {
     // GENERIC INTERACTION SYSTEM — site the floodplain (see `FLOODPLAIN_OFFSET_FROM_PUMP`'s own doc)
     // once, on the live base engine, via the correct live-mutation API (`applyExternalPatch`, not a
     // direct `graph.updateEntity`) so `scrubTo` replays this placement instead of losing it.
+    const floodplainPos = {
+      x: pumpPos.x + FLOODPLAIN_OFFSET_FROM_PUMP.x,
+      y: pumpPos.y + FLOODPLAIN_OFFSET_FROM_PUMP.y,
+      z: pumpPos.z + FLOODPLAIN_OFFSET_FROM_PUMP.z,
+    };
     this.city.base.engine.applyExternalPatch(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID, {
       spatial: {
-        position: {
-          x: pumpPos.x + FLOODPLAIN_OFFSET_FROM_PUMP.x,
-          y: pumpPos.y + FLOODPLAIN_OFFSET_FROM_PUMP.y,
-          z: pumpPos.z + FLOODPLAIN_OFFSET_FROM_PUMP.z,
-        },
+        position: floodplainPos,
         scale: { x: FLOODPLAIN_RENDER_SCALE, y: FLOODPLAIN_RENDER_SCALE, z: FLOODPLAIN_RENDER_SCALE },
       },
     });
+    this.buildFloodWaterMesh(THREE, scene, floodplainPos);
 
     // PRIORITY 2 — REAL WORLD GEOMETRY. Give the hospital, lab building, and pump a real, walkable
     // footprint (see the constants' own doc for why the water-system building is deliberately skipped),
@@ -447,6 +477,25 @@ export class GenesisWorldSim3D implements Sim3D {
     this.buildHospitalInterior(THREE, scene);
 
     this.syncNow();
+  }
+
+  /**
+   * PRIORITY 3 — a real water surface over the floodplain's own real footprint, built once (a plain
+   * transparent blue plane); `syncNow()` moves its height and toggles its visibility from the SAME
+   * real `waterLevelM` scalar the status line/inspect panel already read, every sync — never a
+   * decorative animation of its own.
+   */
+  private buildFloodWaterMesh(THREE: typeof THREE_NS, scene: THREE_NS.Scene, floodplainPos: { x: number; y: number; z: number }): void {
+    const size = Math.max(1.5, 1.5 * FLOODPLAIN_RENDER_SCALE);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x1a5ea8, transparent: true, opacity: 0.6, roughness: 0.15, metalness: 0.1,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(floodplainPos.x, floodplainPos.y, floodplainPos.z);
+    mesh.visible = false;
+    scene.add(mesh);
+    this.floodWaterMesh = mesh;
   }
 
   /**
@@ -612,6 +661,28 @@ export class GenesisWorldSim3D implements Sim3D {
         1,
         HOSPITAL_INTERIOR_DESK_POSITION.z,
       ]);
+    }
+
+    // PRIORITY 3 — LIVING LAYER. Real day/night from the real simulated clock (see
+    // `GENESIS_WORLD_BASE_HOUR_OF_DAY`'s own doc) and real standing water from the floodplain's own
+    // real `waterLevelM` scalar — both re-derived from THIS frame, never advanced on their own.
+    if (this.THREE && this.sceneEnvironment) {
+      const hourOfDay = (GENESIS_WORLD_BASE_HOUR_OF_DAY + frame.simulatedTime / 3600) % 24;
+      const sunState = computeSunState(this.THREE, hourOfDay);
+      this.sceneEnvironment.sun.color.setHex(sunState.color);
+      this.sceneEnvironment.sun.intensity = sunState.intensity;
+      this.sceneEnvironment.sun.position.set(
+        sunState.direction[0] * 60,
+        sunState.direction[1] * 60,
+        sunState.direction[2] * 60,
+      );
+      if (this.scene?.fog) (this.scene.fog as THREE_NS.FogExp2).color.setHex(sunState.fogColor);
+    }
+    if (this.floodWaterMesh) {
+      const floodplain = graphicsFrame.entities.find((e) => e.id === GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+      const waterLevelM = floodplain?.scalars?.waterLevelM ?? 0;
+      this.floodWaterMesh.visible = waterLevelM > FLOOD_WATER_MIN_VISIBLE_DEPTH_M;
+      this.floodWaterMesh.position.y = waterLevelM;
     }
   }
 
@@ -982,6 +1053,12 @@ export class GenesisWorldSim3D implements Sim3D {
         for (const m of Array.isArray(material) ? material : [material]) m.dispose();
       });
       this.interiorGroup = null;
+    }
+    if (this.floodWaterMesh) {
+      this.floodWaterMesh.parent?.remove(this.floodWaterMesh);
+      this.floodWaterMesh.geometry.dispose();
+      (this.floodWaterMesh.material as THREE_NS.Material).dispose();
+      this.floodWaterMesh = null;
     }
   }
 }

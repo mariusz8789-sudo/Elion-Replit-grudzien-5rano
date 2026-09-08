@@ -274,3 +274,50 @@ describe('GenesisWorldSim3D — PRIORITY 2: REAL WORLD GEOMETRY (collision + hos
     expect(camera.position.z).toBeCloseTo(outdoorPosition.z, 1);
   });
 });
+
+describe('GenesisWorldSim3D — PRIORITY 3: LIVING LAYER tied to real world state', () => {
+  it('day/night tracks the real simulated clock — the real sun light changes as simulated time advances', () => {
+    const { sim, scene } = buildInitializedSim();
+    const findSun = () => scene.children.find((o) => (o as unknown as { isDirectionalLight?: boolean }).isDirectionalLight) as THREE.DirectionalLight | undefined;
+    const sunBefore = findSun()!;
+    expect(sunBefore).toBeDefined();
+    const colorBefore = sunBefore.color.getHex();
+    const intensityBefore = sunBefore.intensity;
+    const positionBefore = sunBefore.position.clone();
+
+    // ~5.5 real simulated hours — enough to move the sun state from GENESIS_WORLD_BASE_HOUR_OF_DAY (21)
+    // to well past midnight, a genuinely different point on the real day/night curve.
+    sim.city.base.engine.advance(20000, sim.city.updater);
+    sim.setScrubTick(null); // resyncs without otherwise changing anything (already live, not scrubbing)
+
+    const sunAfter = findSun()!;
+    const changed =
+      sunAfter.color.getHex() !== colorBefore ||
+      sunAfter.intensity !== intensityBefore ||
+      !sunAfter.position.equals(positionBefore);
+    expect(changed).toBe(true);
+  });
+
+  it('the floodplain\'s real waterLevelM drives a real, visible standing-water surface — hidden when dry', () => {
+    const { sim, scene } = buildInitializedSim();
+    const findWaterMesh = () =>
+      scene.children.find(
+        (o) => o instanceof THREE.Mesh && (o.material as THREE.MeshStandardMaterial).color?.getHex?.() === 0x1a5ea8,
+      ) as THREE.Mesh | undefined;
+
+    const waterMeshInitial = findWaterMesh();
+    expect(waterMeshInitial).toBeDefined();
+    // The scenario's own scripted rainfall starts at tick 2 — freshly initialized, the floodplain is dry.
+    expect(waterMeshInitial!.visible).toBe(false);
+
+    const floodplain = sim.city.base.engine.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+    sim.city.base.engine.applyExternalPatch(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID, {
+      domainState: { ...floodplain.domainState, waterLevelM: 0.5 },
+    });
+    sim.setScrubTick(null);
+
+    const waterMesh = findWaterMesh()!;
+    expect(waterMesh.visible).toBe(true);
+    expect(waterMesh.position.y).toBeCloseTo(0.5, 5);
+  });
+});

@@ -1143,6 +1143,13 @@ export class GenesisScientificCitySim implements Sim3D {
       // (called every frame from `syncScene`) detects the push-in has arrived. `minTier: 'medium'`
       // matches `recommendedDofForProfile`'s own HERO_CLOSE_UP blur strength (0.35) rather than a
       // one-off tuned value, so the lens and the DOF pass always agree on how strong the look is.
+      //
+      // `enabled` stays unconditionally true here on purpose — `setupGraphicsPipeline` only ever
+      // CREATES the Bokeh pass when `depthOfField.enabled` is true at this call (see postProcessing.ts:
+      // `if (dofSettings?.enabled && tierAtLeast(...))`), so passing anything else here would mean
+      // `setDepthOfFieldEnabled()` below has no pass to toggle, ever. The wide-establishing/hero-close-up
+      // ON/OFF split happens ENTIRELY at runtime via that toggle (see the line right after this call,
+      // and `applyCinematicProfile`'s own doc for the bug this closes).
       depthOfField: configureDOF({
         focusDistance: this.focusPuller?.value ?? 60,
         blurStrength: recommendedDofForProfile('HERO_CLOSE_UP', this.focusPuller?.value ?? 60).blurStrength,
@@ -1162,6 +1169,10 @@ export class GenesisScientificCitySim implements Sim3D {
       reflections: { enabled: true, minTier: 'high', strength: 0.4, maxDistance: 45 },
     });
     this.pipeline = pipeline;
+    // `applyCinematicProfile` ran once already, during `init()` (before this pipeline existed), so
+    // its own `setDepthOfFieldEnabled` call there was a silent no-op — sync the just-built pass to
+    // whatever profile is ALREADY live now that there is a pass to toggle.
+    pipeline.setDepthOfFieldEnabled(this.appliedCinematicProfile === 'HERO_CLOSE_UP');
     return pipeline;
   }
 
@@ -1262,6 +1273,16 @@ export class GenesisScientificCitySim implements Sim3D {
     camera.far = 600;
     camera.updateProjectionMatrix();
     this.appliedCinematicProfile = profile;
+    // FULL VISUAL TAKEOVER — `recommendedDofForProfile` already says `WIDE_ESTABLISHING` has "no DOF
+    // opinion" (cinematicCamera.ts's own doc: sharp end-to-end, since blurring a wide establishing
+    // shot fights its purpose), and `postProcessing.ts` ships exactly this per-shot on/off hook
+    // (`setDepthOfFieldEnabled`) for that reason — but this scene never called it, so the Bokeh pass
+    // (built with a constant HERO_CLOSE_UP blur strength, see setupPostProcessing below) stayed on
+    // through the ENTIRE wide establishing shot, blurring a ~150-unit-wide city relative to a single
+    // ~83-unit focus plane the whole time it was supposed to be sharp. Toggling it here — the one
+    // place this scene already detects a real profile change — fixes that without a second DOF
+    // config or a per-frame check.
+    this.pipeline?.setDepthOfFieldEnabled(profile === 'HERO_CLOSE_UP');
   }
 
   /**

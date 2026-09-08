@@ -26,7 +26,7 @@ import { GenesisScientificCitySim } from '../core/three/genesisScientificCitySim
 import { detectRenderTier } from '../core/three/quality';
 import type { PostProcessingModules } from '../core/three/types';
 
-type PassLabel = 'RenderPass' | 'GTAOPass' | 'SSRPass' | 'UnrealBloomPass' | 'BokehPass' | 'OutputPass';
+type PassLabel = 'RenderPass' | 'GTAOPass' | 'SSRPass' | 'UnrealBloomPass' | 'BokehPass' | 'OutputPass' | 'SMAAPass';
 
 function fakeModules() {
   const addedPasses: PassLabel[] = [];
@@ -73,7 +73,12 @@ function fakeModules() {
     }
   }
 
-  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass } as unknown as PostProcessingModules;
+  class SMAAPass {
+    dispose = vi.fn();
+    constructor() { addedPasses.push('SMAAPass'); }
+  }
+
+  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass, SMAAPass } as unknown as PostProcessingModules;
   return { modules, addedPasses, ssrInstances };
 }
 
@@ -130,6 +135,6 @@ describe('GenesisScientificCitySim.setupPostProcessing — flagship flood scene 
     const sim = initializedSim();
     const { modules, addedPasses } = fakeModules();
     sim.setupPostProcessing(modules, fakeRenderer(), {} as import('three').Scene, {} as import('three').PerspectiveCamera, 800, 600);
-    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'BokehPass', 'OutputPass']);
+    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'BokehPass', 'OutputPass', 'SMAAPass']);
   });
 });

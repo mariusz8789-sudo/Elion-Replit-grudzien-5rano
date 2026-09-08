@@ -85,6 +85,20 @@ export function tierAllowsAO(tier: RenderTier): boolean {
 }
 
 /**
+ * TIER1.2 — `WebGLRenderer({antialias:true})` only affects the DEFAULT framebuffer; every scene
+ * that runs post-processing (see `graphics/postProcessing.ts`) renders into `EffectComposer`'s own
+ * non-multisampled render targets instead, silently discarding that flag for its entire pipeline —
+ * the canvas-level `antialias:true` was never reaching the pixels the user actually sees on any of
+ * the 5 scenes using this pipeline. `SMAAPass` (post-process edge-detection AA) is cheap enough to
+ * share bloom's `'medium'`+ floor rather than AO/DOF's pricier `'high'` floor — it's one extra
+ * fullscreen pass with two small render targets, nowhere near GTAO/DOF's per-pixel depth/normal
+ * pre-pass cost.
+ */
+export function tierAllowsAntiAliasing(tier: RenderTier): boolean {
+  return tierAtLeast(tier, 'medium');
+}
+
+/**
  * Recommended shadow-map resolution per tier — the single biggest per-shadow-caster GPU/memory
  * cost lever (cost scales with the square of this number). `'low'` returns 0 as a signal to skip
  * shadow-casting entirely at that tier rather than allocate a map too small to look right.
@@ -130,6 +144,8 @@ export interface GraphicsQualityProfile {
    * `tierAllowsAtmosphereParticles`. `false` at `'low'`: skip creating the effect entirely, not
    * create-it-but-tiny. */
   allowsAtmosphereParticles: boolean;
+  /** Whether `setupGraphicsPipeline`'s SMAA pass should run — see `tierAllowsAntiAliasing`. */
+  allowsAntiAliasing: boolean;
 }
 
 /**
@@ -155,6 +171,7 @@ export function configureGraphicsQuality(tier: RenderTier): GraphicsQualityProfi
     allowsAO: tierAllowsAO(tier),
     allowsDof: tierAllowsAO(tier),
     allowsAtmosphereParticles: tierAllowsAtmosphereParticles(tier),
+    allowsAntiAliasing: tierAllowsAntiAliasing(tier),
   };
 }
 

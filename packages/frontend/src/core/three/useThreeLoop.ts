@@ -4,6 +4,7 @@ import type { PostProcessor, Sim3D } from './types';
 import { detectRenderTier, tierDpr } from './quality';
 import { getSettings } from '../settings';
 import { estimateSceneTextureMemory } from './graphics/diagnostics';
+import { lerp, orbitFollowDesiredPosition } from './orbitFollow';
 
 /**
  * Pętla symulacji 3D — lustro core/useSimLoop.ts (DPR, resize, rAF, pauza w
@@ -60,8 +61,9 @@ export function useThreeLoop(
       import('three/examples/jsm/postprocessing/GTAOPass.js'),
       import('three/examples/jsm/postprocessing/BokehPass.js'),
       import('three/examples/jsm/postprocessing/SSRPass.js'),
+      import('three/examples/jsm/postprocessing/SMAAPass.js'),
     ])
-      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { ShaderPass }, { UnrealBloomPass }, { OutputPass }, { GTAOPass }, { BokehPass }, { SSRPass }]) => {
+      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { ShaderPass }, { UnrealBloomPass }, { OutputPass }, { GTAOPass }, { BokehPass }, { SSRPass }, { SMAAPass }]) => {
         if (disposed) return;
         setLoading(false);
 
@@ -114,7 +116,7 @@ export function useThreeLoop(
 
         sim.init(THREE, scene, camera, canvas.clientWidth || 300, canvas.clientHeight || 300);
         post = sim.setupPostProcessing?.(
-          { EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, OutputPass, GTAOPass, BokehPass, SSRPass },
+          { EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, OutputPass, GTAOPass, BokehPass, SSRPass, SMAAPass },
           renderer,
           scene,
           camera,
@@ -136,11 +138,6 @@ export function useThreeLoop(
         canvas.addEventListener('pointermove', move);
         canvas.addEventListener('pointerup', up);
 
-        // Render-loop allocation audit finding: the default orbit-focus direction below used to
-        // allocate a fresh Vector3 every single frame for any Sim3D with an orbit target but no
-        // getOrbitCameraDirection() opinion — reused here instead, matching the scratch-vector
-        // pattern already applied to labScene3D.ts's own per-frame math.
-        const scratchDefaultOrbitDirection = new THREE.Vector3();
         let last = performance.now();
         let statsAt = 0;
         // GRAPHICS V3 — `estimateSceneTextureMemory` walks the whole scene graph, so it is sampled
@@ -170,15 +167,32 @@ export function useThreeLoop(
           if (!sim.disableOrbitControls) controls?.update();
           // OrbitControls aktualizuje pozycję w swojej pętli; finalny focus jest nakładany
           // po update, aby wybrany obiekt rzeczywiście otrzymał drugi poziom kamery.
+          //
+          // C2 FULL VISUAL TAKEOVER — this used to be a HARD `camera.position.copy(...)` snap, run
+          // unconditionally every frame. Since `getOrbitTarget`/`getOrbitFocusDistance` stay populated
+          // for the entire lifetime of any scene that ever sets them (not just the frame a NEW target
+          // is chosen), that snap fired on literally every frame from the moment a target existed —
+          // discarding the lerp the block above computes and reaching the final framing in ~1-2
+          // frames (imperceptible, ~16-33ms) regardless of how far away the camera started. Every
+          // documented "establish -> push in over a couple seconds" / "smooth follow" cinematic beat
+          // in this engine (genesisScientificCitySim.ts's SPRINT C-3/D, moleculeScene3D.ts's atom
+          // follow, epidemicCity3D.ts's/highFidelitySlice3D.ts's observation focus) rode on this exact
+          // path, so all of them were cutting instantly instead of moving smoothly — a real, shared,
+          // cross-scene bug, not a per-scene one. Lerping here (same 0.09 factor as the block above,
+          // for one consistent easing feel) keeps this block's actual job — a GUARANTEED fixed
+          // viewing angle/distance, not preserving whatever direction the user last orbited to, which
+          // is what makes this block different from the one above — while finally making the approach
+          // gradual.
           if (sim.getOrbitTarget) {
             const target = sim.getOrbitTarget();
             const focusDistance = sim.getOrbitFocusDistance?.();
             if (target && focusDistance && focusDistance > 0) {
-              const presetDirection = sim.getOrbitCameraDirection?.();
-              const direction = presetDirection
-                ? scratchDefaultOrbitDirection.copy(presetDirection).normalize()
-                : scratchDefaultOrbitDirection.set(1, 0.72, 1).normalize();
-              camera.position.copy(target).addScaledVector(direction, focusDistance);
+              const desired = orbitFollowDesiredPosition(target, sim.getOrbitCameraDirection?.() ?? undefined, focusDistance);
+              camera.position.set(
+                lerp(camera.position.x, desired.x, 0.09),
+                lerp(camera.position.y, desired.y, 0.09),
+                lerp(camera.position.z, desired.z, 0.09),
+              );
               camera.lookAt(target);
             }
           }

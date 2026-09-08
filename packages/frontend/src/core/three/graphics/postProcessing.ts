@@ -1,6 +1,6 @@
 import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor } from '../types';
-import { detectRenderTier, tierAllowsAO, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
+import { detectRenderTier, tierAllowsAO, tierAllowsAntiAliasing, tierAllowsBloom, tierAtLeast, type RenderTier } from '../quality';
 import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment, type RoomEnvironmentProbeOptions } from './lighting';
 import { readFrameCounters, estimateSceneGpuMemory, type FrameCounters, type SceneGpuMemoryEstimate } from './diagnostics';
 
@@ -184,6 +184,22 @@ export interface AmbientEnvironmentSettings {
   probe?: RoomEnvironmentProbeOptions;
 }
 
+/**
+ * TIER1.2 — edge-antialiasing for the composited image. `WebGLRenderer({antialias:true})` only
+ * multisamples the DEFAULT framebuffer; every scene that runs through this pipeline renders into
+ * `EffectComposer`'s own non-multisampled render targets instead, so that renderer flag never
+ * reaches the pixels actually shown once ANY post-processing is active. `SMAAPass` (post-process
+ * edge detection, no extra depth/normal pre-pass) restores real edge smoothing cheaply — opt-out,
+ * on by default at the same `'medium'`+ floor as bloom (see `tierAllowsAntiAliasing`), since unlike
+ * AO/DOF it has no per-pixel geometry pre-pass to justify a pricier floor.
+ */
+export interface AntiAliasingSettings {
+  /** Default true. `false` skips the pass entirely regardless of tier. */
+  enabled?: boolean;
+  /** Tier floor for the pass. Default `'medium'` — see `tierAllowsAntiAliasing`. */
+  minTier?: RenderTier;
+}
+
 export interface GraphicsPipelineOptions {
   scene: THREE_NS.Scene;
   camera: THREE_NS.PerspectiveCamera;
@@ -199,6 +215,9 @@ export interface GraphicsPipelineOptions {
   ambient?: AmbientEnvironmentSettings;
   /** Screen-space reflections — see the module doc above. Opt-in, off by default. */
   reflections?: ScreenSpaceReflectionSettings;
+  /** Edge antialiasing (SMAA) — see `AntiAliasingSettings`. Omit for the default: enabled,
+   * `'medium'` floor. */
+  antiAliasing?: AntiAliasingSettings;
   /**
    * Forces a specific quality tier instead of `detectRenderTier()`'s device heuristic — the hook
    * a screenshot/video capture pathway uses to request `'cinematic'` quality regardless of what
@@ -336,6 +355,19 @@ export function setupGraphicsPipeline(
   const outputPass = new modules.OutputPass();
   composer.addPass(outputPass);
 
+  // TIER1.2 — SMAA runs LAST, after tone-mapping/color-space conversion: it detects edges by
+  // luminance contrast, and the display-referred (sRGB, tone-mapped) image IS the one the user
+  // actually sees jagged, so smoothing that final image is what "fixes the pipeline's missing
+  // antialiasing" means in practice, not smoothing an intermediate linear-HDR buffer whose edges
+  // may still shift once tone-mapped. See `AntiAliasingSettings`/`tierAllowsAntiAliasing` above.
+  let smaa: InstanceType<typeof modules.SMAAPass> | null = null;
+  const aa = opts.antiAliasing;
+  const aaAllowed = aa?.minTier ? tierAtLeast(tier, aa.minTier) : tierAllowsAntiAliasing(tier);
+  if ((aa?.enabled ?? true) && aaAllowed) {
+    smaa = new modules.SMAAPass(width, height);
+    composer.addPass(smaa);
+  }
+
   let roomProbeCaptured = false;
   return {
     render: () => composer.render(),
@@ -366,6 +398,7 @@ export function setupGraphicsPipeline(
       ssr?.dispose();
       bloom?.dispose();
       dof?.dispose();
+      smaa?.dispose();
       outputPass.dispose();
       composer.dispose();
       // Resource-lifecycle audit finding: this pipeline's own AMBIENT/IBL environment texture

@@ -3424,3 +3424,85 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
    "ogranicz ilość tekstu" fix, not a positioning patch over a rule that no
    longer has a reason to exist. */
 .city-world-layout-v2 .city-scene-readout { display: none; }
+
+/* ---------------------------------------------------------------------------
+   AUTONOMOUS DISCOVERY panel (Genesis Scientific City).
+   Reuses the existing .gsc-panel / .lg-obs-* system rather than introducing a
+   second visual language; only what is genuinely new to this panel is here.
+   --------------------------------------------------------------------------- */
+/* Every .gsc-panel is an absolutely-positioned overlay pinned to the same top-right
+   corner, so a new one would stack on the existing controls and swallow their clicks.
+   Discovery takes the opposite side of the stage and scrolls within the viewport,
+   because its output is long and must not push the scene controls out of reach. */
+.wd-panel {
+  left: 1rem;
+  right: auto;
+  top: 1rem;
+  max-width: 26rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  z-index: 9;
+}
+.wd-title { font-weight: 700; letter-spacing: 0.06em; }
+.wd-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin-bottom: 0.25rem;
+}
+.wd-running { font-size: 0.85rem; opacity: 0.85; margin: 0.5rem 0 0; }
+.wd-summary { font-size: 0.95rem; font-weight: 600; margin: 0.6rem 0; }
+.wd-section { margin-top: 0.75rem; }
+.wd-section h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.wd-section ul,
+.wd-section ol { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; line-height: 1.45; }
+.wd-rounds li { margin-bottom: 0.4rem; }
+.wd-reason { display: block; font-size: 0.75rem; opacity: 0.7; }
+.wd-effect { opacity: 0.85; }
+.wd-none { font-size: 0.85rem; opacity: 0.85; margin: 0; }
+.wd-verdict { font-weight: 700; }
+.wd-SUPPORTED_WITHIN_PROTOCOL { color: #4ade80; }
+.wd-FALSIFIED_WITHIN_PROTOCOL { color: #f87171; }
+.wd-INCONCLUSIVE { color: #fbbf24; }
+.wd-refusal {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-left: 3px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border-radius: 0.25rem;
+}
+.wd-refusal-head { margin: 0 0 0.25rem; font-weight: 700; font-size: 0.85rem; }
+.wd-refusal-why { margin: 0 0 0.25rem; font-size: 0.85rem; }
+.wd-limits { opacity: 0.9; }
+.wd-machine { margin-top: 0.8rem; font-size: 0.75rem; }
+.wd-machine summary { cursor: pointer; opacity: 0.8; }
+.wd-pre {
+  max-height: 14rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+}
+@media (max-width: 640px) {
+  /* On a phone the stage is too narrow for a side panel: span it and cap the height so
+     the 3D scene and the other controls stay reachable underneath. */
+  .wd-panel {
+    left: 0.5rem;
+    right: 0.5rem;
+    max-width: none;
+    max-height: 62vh;
+  }
+  .wd-pre { max-height: 10rem; }
+}

@@ -17,7 +17,7 @@ import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/g
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
-import { GENESIS_FLOOD_CATALOG, GENESIS_FLOOD_LEVERS, type WorldLever } from '../../core/agent/worldGoalIntent';
+import { GENESIS_FLOOD_CATALOG, type WorldLever } from '../../core/agent/worldGoalIntent';
 import { compareWorldActions, type CrossActionComparison } from '../../core/agent/crossActionComparison';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
@@ -1050,7 +1050,7 @@ export class GenesisWorldSim3D implements Sim3D {
     if (!this.lastComparison || this.forkEngine) return;
     const winningId = this.lastComparison.bestActionIds[0];
     if (!winningId) return;
-    const lever = GENESIS_FLOOD_LEVERS.find((l) => l.leverId === winningId);
+    const lever = GENESIS_FLOOD_CATALOG.levers.find((l) => l.leverId === winningId);
     if (!lever) return;
     this.applyLever(lever, `experiment-winner:${lever.leverId}`);
     this.lastComparison = null;
@@ -1501,6 +1501,9 @@ export function GenesisWorldScreen() {
             )}
             {comparison && (
               <div className="gx-experiment-result" data-testid="experiment-result">
+                <span className="gx-experiment-world" data-testid="experiment-world">
+                  Ran in world <code>{comparison.worldId}</code> ({comparison.domainId})
+                </span>
                 <span>
                   {comparison.status === 'REFUSED' || comparison.status === 'BLOCKED' || comparison.status === 'NOT_MODELLED'
                     ? `Experiment could not run: ${comparison.refusalReason ?? comparison.status}`

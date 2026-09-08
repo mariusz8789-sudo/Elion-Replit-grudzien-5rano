@@ -1914,6 +1914,8 @@ button.fp-lab-prompt { pointer-events: auto; cursor: pointer; appearance: none; 
    "apply winner" / "dismiss" actions. */
 .gx-experiment-result { display: flex; flex-direction: column; gap: 0.3rem; max-width: 100%; }
 .gx-experiment-result > div { text-align: left; }
+.gx-experiment-world { font-size: 0.72rem; opacity: 0.75; letter-spacing: 0.02em; }
+.gx-experiment-world code { opacity: 0.9; }
 /* LIVING WORLD — a minimal, always-visible-once-`entered` touch D-pad: the mobile equivalent of
    WASD, since a touch device has no physical keys for `MOVE_KEYS` to map from. Bottom-left, out of
    the way of the crosshair/prompt (center) and the existing sim-transport controls (below the stage).
@@ -3567,3 +3569,62 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .wd-replay-MATCH { color: #4ade80; }
 .wd-replay-DRIFT { color: #f87171; }
 .wd-replay-BLOCKED, .wd-replay-NOT_REPRODUCIBLE { color: #fbbf24; }
+
+/* "About this world": declaredAssumptions/notModelledFactors shown before anything runs,
+   so the world picker's claim is scoped honestly from the first frame, not just in a
+   result the user has to run a search to see. */
+.wd-world-about { font-size: 0.85rem; }
+.wd-world-about-label { margin: 0.4rem 0 0.15rem; font-weight: 600; opacity: 0.85; }
+
+/* Step-by-step trace: one block per round, matching the "What I tried" rounds list
+   directly above it so the two read as the same account at different resolutions. */
+.wd-trace-round { margin-top: 0.5rem; }
+.wd-trace-round-label {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.wd-trace-step {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 2px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.06);
+  border-radius: 0.2rem;
+}
+.wd-trace-step p { margin: 0.15rem 0; font-size: 0.78rem; line-height: 1.4; }
+.wd-trace-why { opacity: 0.9; }
+.wd-trace-what { font-weight: 600; }
+.wd-trace-what code { font-weight: 400; opacity: 0.8; }
+
+/* History: saved runs list, plus the read-only "viewing"/"comparing" sections below it —
+   all reachable from the same panel a live search renders into. */
+.wd-history-toggle {
+  font-size: 0.75rem;
+  background: none;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.wd-history-toggle:hover { opacity: 1; }
+.wd-history-list { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+.wd-history-row {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.3rem;
+}
+.wd-history-meta { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.72rem; }
+.wd-history-goal { margin: 0.2rem 0; font-size: 0.85rem; font-style: italic; }
+.wd-history-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.3rem; }
+.wd-compare-check { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; opacity: 0.85; }
+.wd-history-view,
+.wd-compare-view { border-top: 1px solid rgba(148, 163, 184, 0.25); padding-top: 0.6rem; }
+.wd-compare-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.wd-compare-column { min-width: 0; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 0.3rem; padding: 0.5rem; }
+@media (max-width: 640px) {
+  .wd-compare-columns { grid-template-columns: 1fr; }
+}

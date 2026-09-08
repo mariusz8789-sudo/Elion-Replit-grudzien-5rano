@@ -21,6 +21,8 @@ import {
 import type { DiscoveryAnalysis } from './experimentFabric/discovery';
 import { buildSavedScenarioCounterfactual, isSavedScenarioCounterfactual, type SavedScenarioCounterfactual, type ScenarioCounterfactual } from './simulation/scenarioCounterfactual';
 import { combineEvidencePackRoCrates, type DomainEvidenceEntry, type GenesisRoCrate } from './experimentFabric/evidencePackRoCrate';
+import type { DiscoveryLoopResult } from './agent/discoveryLoop';
+import { renderDiscoveryReport } from './agent/discoveryReport';
 
 /**
  * Scientific Memory (sekcja O dyrektywy CTO) — trwały, lokalny zapis
@@ -855,6 +857,45 @@ export function saveHypothesisLoopToMemory(result: HypothesisLoopResult): SavedE
     honesty: 'simplified',
     honestyNote: `Model ${loop.problem.modelId}; wynik SIMULATION, nieskalibrowany. ${supported} hipotez wspartych, ${falsified} sfalsyfikowanych w granicach protokolu.`,
     assumptions: [...loop.hypotheses[0]!.assumptions],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+/**
+ * Zapisuje wynik autonomicznej pętli odkrycia w świecie (`core/agent/discoveryLoop.ts`
+ * — sentence-driven search na WorldGraph, nie mylić z `experimentFabric/scientificDiscoveryLoop.ts`
+ * powyżej, ani z pętlą hipotez `hypothesisLoop.ts` — trzy różne, realne mechanizmy o
+ * podobnej nazwie w tym repo). Zanim ta funkcja powstała, ten jeden mechanizm był
+ * jedynym w całym Genesis bez żadnej pamięci: uruchamiał się i znikał. Reużywa
+ * istniejący generyczny `saveExperiment` zamiast nowego typu — nie ma tu nic, co
+ * zasługiwałoby na dedykowany kształt jak `SavedHypothesisLoop`: treść zapisu to
+ * dokładnie ten sam tekst, który `renderDiscoveryReport` już pokazuje w panelu
+ * AUTONOMOUS DISCOVERY, więc ekran Pamięci Naukowej i panel odkrycia nigdy nie mogą
+ * powiedzieć dwóch różnych rzeczy o tym samym przebiegu. Zapisujemy wyłącznie
+ * przebiegi, które faktycznie się wykonały (stopReason !== 'REFUSED') — odmowa nie
+ * jest eksperymentem do zapamiętania.
+ */
+export function saveWorldDiscoveryLoopToMemory(result: DiscoveryLoopResult): SavedExperiment {
+  const runId = fnv1a(canonicalJson({ worldId: result.worldId, question: result.question, rounds: result.rounds.map((r) => r.branchId) }));
+  return saveExperiment({
+    labId: result.domainId,
+    experimentId: `world-discovery:${result.worldId}:${runId}`,
+    experimentName: `Odkrycie w świecie — ${result.question}`,
+    params: { worldId: result.worldId, domainId: result.domainId, rounds: result.rounds.length },
+    stats: {
+      rounds: result.rounds.length,
+      bestSupported: result.bestSupported.length,
+      failedHypotheses: result.failedHypotheses.length,
+      unresolvedQuestions: result.unresolvedQuestions.length,
+    },
+    analysis: [
+      { title: 'Raport wyszukiwania', body: renderDiscoveryReport(result), kind: 'world-discovery-report' },
+    ],
+    honesty: 'simplified',
+    honestyNote: result.bestSupported.length > 0
+      ? `Zatrzymano: ${result.stopReason}. Przetrwało: ${result.bestSupported.map((b) => b.hypothesisId).join(', ')}.`
+      : `Zatrzymano: ${result.stopReason}. Nic nie przetrwało w granicach tego modelu.`,
+    assumptions: [...result.declaredAssumptions],
     epistemicStatus: 'SIMULATION',
   });
 }

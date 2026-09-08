@@ -5,6 +5,7 @@ import {
   summariseDiscovery,
   type WorldDiscoveryState,
 } from '../../core/agent/worldDiscoverySession';
+import { saveWorldDiscoveryLoopToMemory } from '../../core/scienceMemory';
 
 /**
  * DISCOVERY, IN THE WORLD IT SEARCHES.
@@ -35,7 +36,22 @@ export function WorldDiscoveryPanel() {
     // The search forks and advances a real world in-process, which takes long
     // enough to drop a frame. Yielding first lets the RUNNING state paint, so the
     // panel reports that it is working rather than appearing to hang.
-    setTimeout(() => setState(runWorldDiscovery(trimmed)), 0);
+    setTimeout(() => {
+      const next = runWorldDiscovery(trimmed);
+      setState(next);
+      // A completed search is remembered the same way every other real experiment
+      // in Genesis already is — this loop was the one mechanism with no memory at
+      // all. A refusal or a comparison is not a completed search, so neither is saved
+      // here; this side effect lives at the UI boundary, not inside the pure session
+      // seam, so runWorldDiscovery itself stays trivially testable without a DOM.
+      if (next.kind === 'COMPLETE') {
+        try {
+          saveWorldDiscoveryLoopToMemory(next.result);
+        } catch (err) {
+          console.error('Failed to save world discovery run to Scientific Memory:', err);
+        }
+      }
+    }, 0);
   };
 
   return (

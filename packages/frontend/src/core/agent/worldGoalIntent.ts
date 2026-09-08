@@ -6,9 +6,14 @@ import {
   buildGenesisScientificCity3,
 } from '../worldModel/domains/genesisScientificCity3';
 import type { DiscoveryLoopInput, MechanisticHypothesis } from './discoveryLoop';
-// Value import, but not a cycle: `chemistryLeverCatalog.ts` imports only TYPES
-// from this file, which are erased at runtime.
+// Value imports, but not a cycle: every lever catalogue imports only TYPES back
+// from this file, which are erased at runtime. The one thing they share as a
+// VALUE — `relationFor` — lives in `leverCriterion.ts` precisely so importing it
+// cannot reintroduce one.
+import { GENESIS_CELL_CULTURE_CATALOG, GENESIS_CELL_CULTURE_CATALOG_ID } from './cellCultureLeverCatalog';
 import { GENESIS_CHEMISTRY_CATALOG, GENESIS_CHEMISTRY_CATALOG_ID } from './chemistryLeverCatalog';
+import { GENESIS_EPIDEMIC_CATALOG, GENESIS_EPIDEMIC_CATALOG_ID } from './epidemicLeverCatalog';
+import { relationFor } from './leverCriterion';
 
 /**
  * A GOAL SENTENCE, TURNED INTO A RUNNABLE SEARCH — WITHOUT INVENTING PHYSICS.
@@ -291,11 +296,6 @@ function floodplainLever(key: string, fullValue: number, baseValue: number) {
   };
 }
 
-/** The relation a criterion needs to express "move this metric in the wanted direction". */
-function relationFor(direction: 'minimize' | 'maximize'): 'less-than' | 'greater-than' {
-  return direction === 'minimize' ? 'less-than' : 'greater-than';
-}
-
 /**
  * The levers the flood city actually has. Declared here, once, so the loop's
  * tests and any caller driving it from a sentence search the same real
@@ -410,6 +410,8 @@ export const GENESIS_FLOOD_CATALOG: WorldLeverCatalog = {
 export const WORLD_LEVER_CATALOGS: Readonly<Record<string, WorldLeverCatalog>> = {
   [GENESIS_FLOOD_CATALOG_ID]: GENESIS_FLOOD_CATALOG,
   [GENESIS_CHEMISTRY_CATALOG_ID]: GENESIS_CHEMISTRY_CATALOG,
+  [GENESIS_EPIDEMIC_CATALOG_ID]: GENESIS_EPIDEMIC_CATALOG,
+  [GENESIS_CELL_CULTURE_CATALOG_ID]: GENESIS_CELL_CULTURE_CATALOG,
 };
 
 export function resolveWorldLeverCatalog(catalogId: string): WorldLeverCatalog | undefined {

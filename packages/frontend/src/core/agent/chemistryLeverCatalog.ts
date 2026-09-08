@@ -8,6 +8,7 @@ import {
   DEMO_ACTIVATION_ENERGY_KJ,
   makeChemistryKineticsSolver,
 } from '../worldModel/domains/chemistryKinetics';
+import { relationFor } from './leverCriterion';
 import type { WorldLever, WorldLeverCatalog } from './worldGoalIntent';
 
 /**
@@ -96,11 +97,6 @@ function substanceScalarLever(
       [component]: { ...current, [key]: baseValue + (fullValue - baseValue) * strength },
     });
   };
-}
-
-/** The relation a criterion needs to express "move this metric in the wanted direction". */
-function relationFor(direction: 'minimize' | 'maximize'): 'less-than' | 'greater-than' {
-  return direction === 'minimize' ? 'less-than' : 'greater-than';
 }
 
 /**

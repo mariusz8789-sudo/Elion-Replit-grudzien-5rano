@@ -1,3 +1,4 @@
+import { compareWorldActions, type CrossActionComparison } from './crossActionComparison';
 import { runAutonomousDiscovery, type DiscoveryLoopInput, type DiscoveryLoopResult } from './discoveryLoop';
 import { renderDiscoveryReport } from './discoveryReport';
 import {
@@ -30,6 +31,46 @@ export const WORLD_DISCOVERY_SESSION_CONTRACT_VERSION = '1.0.0';
  * a refusal is a real outcome with its own shape, not a `COMPLETE` with empty
  * fields, so a caller cannot render one as the other by forgetting a check.
  */
+/**
+ * Phrases that ask "which of these should we do", rather than "does this work".
+ *
+ * The two questions want different engines: a comparison ranks every declared
+ * action against one control, while the discovery loop tests mechanisms one at
+ * a time and can abandon or consolidate them. Routing on the goal's own wording
+ * is deliberate and narrow — an unrecognised sentence goes to the loop, which
+ * is the conservative default because it never claims an ordering.
+ */
+const COMPARISON_PHRASES: readonly string[] = [
+  'available intervention',
+  'available action',
+  'available option',
+  'available lever',
+  'all interventions',
+  'all actions',
+  'every intervention',
+  'which intervention',
+  'which action',
+  'compare',
+  'best intervention',
+  'best action',
+  'rank',
+  'dostępnych interwencji',
+  'dostepnych interwencji',
+  'dostępne interwencje',
+  'dostepne interwencje',
+  'wszystkie interwencje',
+  'porównaj',
+  'porownaj',
+  'która interwencja',
+  'ktora interwencja',
+];
+
+/** True when the goal asks to compare actions rather than to test one mechanism. */
+export function goalAsksForComparison(goal: string): boolean {
+  const text = goal.toLowerCase();
+  return COMPARISON_PHRASES.some((phrase) => text.includes(phrase));
+}
+
 export type WorldDiscoveryState =
   | { readonly kind: 'IDLE' }
   | { readonly kind: 'RUNNING'; readonly goal: string }
@@ -47,6 +88,17 @@ export type WorldDiscoveryState =
       readonly result: DiscoveryLoopResult;
       /** The existing renderer's text, kept alongside the structured result. */
       readonly report: string;
+    }
+  | {
+      /**
+       * A cross-action comparison. A separate state rather than a field on
+       * COMPLETE, because it answers a different question and carries a
+       * different result shape — merging them would let a caller render a
+       * ranking as a hypothesis search or the reverse.
+       */
+      readonly kind: 'COMPARISON';
+      readonly goal: string;
+      readonly comparison: CrossActionComparison;
     };
 
 function isPlanError(value: DiscoveryLoopInput | { readonly error: string }): value is { readonly error: string } {
@@ -63,7 +115,14 @@ function isPlanError(value: DiscoveryLoopInput | { readonly error: string }): va
 export function runWorldDiscovery(
   goal: string,
   catalog: WorldLeverCatalog = GENESIS_FLOOD_CATALOG,
-): Extract<WorldDiscoveryState, { kind: 'REFUSED' | 'COMPLETE' }> {
+): Extract<WorldDiscoveryState, { kind: 'REFUSED' | 'COMPLETE' | 'COMPARISON' }> {
+  // A goal asking which action to take is answered by the comparison engine;
+  // anything else goes to the single-mechanism loop, which is the conservative
+  // default because it never publishes an ordering.
+  if (goalAsksForComparison(goal)) {
+    return { kind: 'COMPARISON', goal, comparison: compareWorldActions({ goal, catalog }) };
+  }
+
   const intent = parseWorldDiscoveryGoal(goal, catalog);
   const plan = buildWorldDiscoveryPlan(intent, catalog);
   if (isPlanError(plan)) {

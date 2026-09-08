@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CrossActionComparison } from '../../core/agent/crossActionComparison';
 import {
   runWorldDiscovery,
   summariseDiscovery,
@@ -81,6 +82,7 @@ export function WorldDiscoveryPanel() {
 
       {state.kind === 'REFUSED' && <DiscoveryRefusal state={state} />}
       {state.kind === 'COMPLETE' && <DiscoveryResult state={state} />}
+      {state.kind === 'COMPARISON' && <ActionComparisonResult comparison={state.comparison} />}
     </div>
   );
 }
@@ -191,6 +193,91 @@ function DiscoveryResult({ state }: { state: Extract<WorldDiscoveryState, { kind
         <summary>Machine-readable record</summary>
         <pre className="wd-pre">{state.report}</pre>
         <pre className="wd-pre">{JSON.stringify({ intent: state.intent, result }, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * A ranked comparison of every declared action against one control.
+ *
+ * The ordering, the deltas and the explanations all come from the engine. This
+ * renders them; it computes nothing. In particular it shows a best action ONLY
+ * when the engine actually ranked one — a NOT_RANKABLE, REFUSED or NOT_MODELLED
+ * comparison has no winner to show, and manufacturing one from the numbers on
+ * screen is exactly the failure the engine's state set exists to prevent.
+ */
+function ActionComparisonResult({ comparison }: { comparison: CrossActionComparison }) {
+  const ranked = comparison.status === 'RANKED' || comparison.status === 'TIED';
+  return (
+    <div className="wd-result">
+      <p className="wd-summary">
+        {ranked
+          ? `Compared ${comparison.ranking.length} actions against the same control.`
+          : 'Genesis did not rank these actions.'}
+      </p>
+
+      {!ranked && (
+        <div className="wd-refusal" role="status">
+          <p className="wd-refusal-head">{comparison.status}</p>
+          <p className="wd-refusal-why">{comparison.refusalReason}</p>
+        </div>
+      )}
+
+      {ranked && (
+        <section className="wd-section">
+          <h4>Action comparison</h4>
+          <ol className="wd-rounds wd-actions">
+            {comparison.ranking.map((action) => (
+              <li key={action.actionId} value={action.rank ?? undefined}>
+                <b>{action.label}</b>{' '}
+                <span className={`wd-verdict wd-dir-${action.directionVerdict}`}>{action.directionVerdict}</span>
+                <span className="wd-effect">
+                  {action.absoluteDelta === null
+                    ? ' (no reading)'
+                    : ` ${action.absoluteDelta.toFixed(4)} ${
+                        action.relativeDeltaPercent === null ? '' : `(${action.relativeDeltaPercent.toFixed(1)}%)`
+                      }`}
+                </span>
+                <span className="gsc-caption wd-reason">{action.explanation}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="gsc-caption">
+            Objective: {comparison.objective!.direction} “{comparison.objective!.metric}”. Control value:{' '}
+            {comparison.baselineMetric}.
+          </p>
+        </section>
+      )}
+
+      {comparison.candidates.some((c) => c.availability !== 'AVAILABLE') && (
+        <section className="wd-section">
+          <h4>Not tested</h4>
+          <ul>
+            {comparison.candidates
+              .filter((c) => c.availability !== 'AVAILABLE')
+              .map((c) => (
+                <li key={c.actionId}>
+                  <b>{c.label}</b> — {c.availability}. {c.reason}
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="wd-section wd-limits">
+        <h4>This comparison did not model</h4>
+        <ul>
+          {comparison.notModelledFactors.map((factor) => (
+            <li key={factor}>{factor}</li>
+          ))}
+        </ul>
+        <p className="gsc-caption">{comparison.disclaimer}</p>
+      </section>
+
+      <details className="wd-machine">
+        <summary>Machine-readable record</summary>
+        <pre className="wd-pre">{JSON.stringify(comparison, null, 2)}</pre>
       </details>
     </div>
   );

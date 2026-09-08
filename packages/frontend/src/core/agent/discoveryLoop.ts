@@ -3,8 +3,8 @@ import { compareBranches } from '../worldModel/bridge/worldFrameState';
 import { collectScalars } from '../worldModel/bridge/worldFrameState';
 import { CAPABILITY_CODE, type SolverCapability } from '../worldModel/capability/solverCapability';
 import {
+  forkedArmControl,
   preregisterWorldCounterfactual,
-  type ControlledDifference,
   type WorldCounterfactualAssessment,
   type WorldCounterfactualDiff,
 } from '../worldModel/discovery/worldCounterfactual';
@@ -412,24 +412,11 @@ export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoop
       criterion: hypothesis.criterion,
       declaredAssumptions: input.declaredAssumptions,
     });
-    // The control here is STRUCTURAL, and saying so is the honest form.
-    // `verifyControlledDifference` is the right instrument for arms built
-    // independently; run against a FORKED arm at its own fork tick it reports
-    // DIVERGED_AT_START, because what differs there is the intervention itself.
-    // Reporting that as a control failure would be wrong, and quietly passing
-    // its result off as an empirical pass would be worse. So the guarantee is
-    // named for what it is — `forkBranch` scrubs the baseline to this tick and
-    // clones its journal, so the arm's prior history IS the baseline's — and
-    // the intervention's real footprint is measured and carried alongside it.
-    const footprint = GENESIS_TOOLS.diffTool
-      .invoke(compareBranches(registry, baseline.branchId, arm.branchId, input.decisionAtTick))
-      .changed.map((entity) => entity.entityId);
-    const controlledDifference: ControlledDifference = {
-      status: 'VERIFIED_IDENTICAL_START',
-      atTick: input.decisionAtTick,
-      differingEntityIds: [],
-      reason: `Forked from the baseline at tick ${input.decisionAtTick}, so the arm's history up to that tick is the baseline's own by construction. The intervention's measured footprint at that tick is: ${footprint.join(', ') || 'nothing — the mechanism changed no entity'}.`,
-    };
+    // The fork's control evidence, from the one shared helper. See `forkedArmControl`
+    // for why the empirical check is the wrong instrument on a forked arm.
+    const { controlledDifference, interventionFootprint: footprint } = forkedArmControl(
+      registry, baseline.branchId, arm.branchId, input.decisionAtTick,
+    );
 
     const assessment = GENESIS_TOOLS.assessTool.invoke({
       preregistration,

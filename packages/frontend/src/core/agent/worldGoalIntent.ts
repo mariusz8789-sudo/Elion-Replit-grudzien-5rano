@@ -93,6 +93,57 @@ const MAX_ROUNDS = /\b(?:up to|max(?:imum)?|at most)\s*(\d+)\s*(?:rounds?|experi
  */
 const LEVER_CANDIDATE = /\b(?:by|via|using|through|przez|za pomocą|za pomoca)\s+([a-ząćęłńóśźż\s-]{3,40})/gi;
 
+/**
+ * Phrases that ask for EVERY declared lever rather than naming one.
+ *
+ * "using the available interventions" is a quantifier over the catalogue, not a
+ * mechanism, and reporting it as an unmodelled mechanism would invent a gap the
+ * sentence never claimed — the sentence is in fact asking for exactly what the
+ * world does declare.
+ */
+const ALL_LEVERS_PHRASES: readonly string[] = [
+  'available intervention',
+  'available action',
+  'available option',
+  'available lever',
+  'all interventions',
+  'all actions',
+  'every intervention',
+  'any intervention',
+  'dostępnych interwencji',
+  'dostepnych interwencji',
+  'dostępne interwencje',
+  'dostepne interwencje',
+  'wszystkich interwencji',
+  'wszystkie interwencje',
+];
+
+/**
+ * Removes catalogue quantifiers from the text before lever scanning.
+ *
+ * Stripping rather than skipping the match: one regex match can span a
+ * quantifier AND a real named mechanism ("using the available interventions or
+ * by relocating residents"), so discarding the whole match would swallow the
+ * genuine gap. Same approach as the budget clause above, for the same reason.
+ */
+function stripCatalogueQuantifiers(text: string): string {
+  let stripped = text;
+  for (const generic of ALL_LEVERS_PHRASES) {
+    // Optional trailing plural: the list is written in the singular, and leaving
+    // the "s" behind turns "the available interventions" into the fragment "the s",
+    // which would then be reported as an unmodelled mechanism.
+    stripped = stripped.replace(new RegExp(`${generic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?`, 'gi'), ' ');
+  }
+  return stripped;
+}
+
+/**
+ * A captured phrase only names a mechanism if it carries a real word. Articles
+ * and stripping residue ("the s") are not mechanisms, and reporting them as
+ * unmodelled would manufacture gaps out of grammar.
+ */
+const MEANINGFUL_TOKEN = /[a-ząćęłńóśźż]{4,}/i;
+
 export function parseWorldDiscoveryGoal(sourceText: string, catalog: WorldLeverCatalog): WorldGoalIntent {
   const text = sourceText.toLowerCase();
   const unresolved: WorldGoalUnresolved[] = [];
@@ -122,7 +173,7 @@ export function parseWorldDiscoveryGoal(sourceText: string, catalog: WorldLeverC
   // The budget clause is removed before scanning for levers: "using at most 3
   // experiments" is a budget, and reading "at most" as an unmodelled mechanism
   // would report a gap that the sentence never claimed.
-  const leverScanText = rounds ? text.replace(rounds[0], ' ') : text;
+  const leverScanText = stripCatalogueQuantifiers(rounds ? text.replace(rounds[0], ' ') : text);
   for (const lever of catalog.levers) {
     if (lever.phrases.some((phrase) => text.includes(phrase))) requestedLeverIds.push(lever.leverId);
   }
@@ -130,8 +181,9 @@ export function parseWorldDiscoveryGoal(sourceText: string, catalog: WorldLeverC
   // than silently searching only the levers that happen to exist.
   for (const match of leverScanText.matchAll(LEVER_CANDIDATE)) {
     const phrase = match[1].trim();
+    if (!MEANINGFUL_TOKEN.test(phrase)) continue;
     const known = catalog.levers.some((lever) => lever.phrases.some((p) => phrase.includes(p) || p.includes(phrase)));
-    if (!known && phrase.length > 3) unknownLeverPhrases.push(phrase);
+    if (!known && phrase.length > 3) unknownLeverPhrases.push(phrase.replace(/\s+/g, ' ').trim());
   }
   if (unknownLeverPhrases.length > 0) unresolved.push('NAMED_LEVER_NOT_IN_WORLD');
 

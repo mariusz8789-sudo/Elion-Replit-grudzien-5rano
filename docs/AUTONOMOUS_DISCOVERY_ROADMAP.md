@@ -1,0 +1,225 @@
+# Roadmap — from adaptive experimental reasoning to autonomous scientific discovery
+
+**Status:** architecture and plan. No implementation follows from this document by itself.
+**Owner:** C1 (architecture/integration).
+**Measure of progress:** not the solver count. *How much of a scientific investigation Genesis performs without being handed the hypotheses.*
+
+---
+
+## 0. The finding that reframes this
+
+The capability this roadmap is named after — *"that hypothesis does not explain
+the observation, so derive the next testable one"* — **is already built, already
+tested, and has zero production call sites.**
+
+`worldCounterfactual.ts::deriveAlternativeCriteria(criterion, assessment, rejectedFingerprints)`:
+
+- derives an alternative **from the real measured numbers** of the falsification
+  it is reacting to — `RELATION_FLIP` when the data moved the opposite way,
+  `TOLERANCE_WIDENED` to exactly the tolerance the observed difference would
+  satisfy, and no further;
+- refuses to generate anything from a run that was not a clean, evaluable
+  falsification (returns `[]`);
+- filters candidates against `rejectedFingerprints`, so a criterion this
+  investigation already judged cannot silently reappear as new;
+- carries no belief representation at all, so **both** loops can consume it —
+  the ordinal `HypothesisBelief` ladder and the numeric `Hypothesis` alike.
+
+Grep confirms: referenced only by `worldCounterfactual.test.ts`. Nothing in
+`discoveryLoop.ts` calls it.
+
+So the honest summary of where Genesis stands is not "autonomous hypothesis
+generation must be built". It is: **the first real increment of it exists and is
+one call site away from being live**, and the work ahead is wiring, then
+widening — not a new subsystem.
+
+---
+
+## 1. A — what Genesis already does
+
+| Capability | Where | Real? |
+|---|---|---|
+| Refuse a question with no solver behind it | `discoveryAdmission.ts` + `solverCapability.ts` (34 scenario kinds, compiler-exhaustive) | yes — this is point 5 of the brief, already shipped |
+| Investigate a MECHANISM question | `discoveryLoop.ts` — fork, intervene, compare arms | yes, on 5 domains |
+| Investigate a PARAMETER question | `inquiryLoop.ts` — predict, measure, discriminate under degeneracy | yes |
+| One reporting contract over both | `discoveryStrategy.ts` + `discoveryStrategies.ts` adapters | yes, equivalence-tested over the whole catalog registry |
+| Falsify against a criterion fixed before the run | `preregisterWorldCounterfactual` + `verifyWorldPreregistrationIntact` | yes — fingerprint mismatch ends the assessment |
+| Measure an outcome as peak/argmax/total/first-crossing, not only at the horizon | `objectiveReducer.ts` + `objectiveTrajectory.ts` | yes (C1 layer landed; `discoveryLoop` wiring is C3's) |
+| Derive the next criterion after a falsification | `deriveAlternativeCriteria` | **built and tested, not wired** |
+| Graded belief with full history | `beliefRevision.ts` — log-odds, `ConfidenceUpdateRecord[]` | yes |
+| Provenance of a generated hypothesis | `Hypothesis.generatedBy` / `parentHypothesisId` | yes |
+| Evidence bundle + independent replay | `worldEvidenceBundle.ts`, `buildBundleReplay` | yes |
+| Persist and replay a whole investigation | Science Memory | yes |
+
+## 2. B — partially there
+
+- **Hypothesis record.** `Hypothesis` carries id, criterion, confidence, status,
+  `generatedBy`, `parentHypothesisId`, history; `criterionFingerprint` exists.
+  Missing from the record: **declared assumptions** and **required capabilities**
+  (point 10). Both are additive fields, not a redesign.
+- **Two hypothesis kinds, not five.** `MechanisticHypothesis` (a lever with an
+  `apply`) and `ParameterHypothesis` (a claimed assignment) are real and in use.
+  The other three the brief names — relationship, competing-model, emergent —
+  have no real experiment behind them yet, and per the standing rule are **not**
+  to be added as enum values in advance.
+- **Next-experiment selection.** Four selectors already exist
+  (`hypothesisLoop`, `experimentGraph`, `discoveryFollowUp`, `whyNextExperiment`),
+  all lexicographic cascades over declared uncertainty, none scoring. A
+  generation layer must reuse this discipline rather than introduce ranking.
+- **Orchestrator.** Not built. Deliberately deferred until the adapters proved
+  both engines report into one contract without information loss — which they now do.
+
+## 3. C — genuinely missing
+
+1. **A generation stage anywhere in the control flow.** No loop ever asks for a
+   new hypothesis; both consume the set they were handed.
+2. **A search space a generator may draw from, per domain.** The lever catalogs
+   declare mechanisms, but nothing declares *"these are the candidate criteria a
+   generator may propose over this metric"*.
+3. **Model insufficiency as a reportable outcome.** When every declared
+   hypothesis is falsified and no alternative can be derived, Genesis has no way
+   to say *"the declared space does not explain this observation"*. Today the run
+   simply ends with everything refuted, which reads as a weaker claim than it is.
+4. **Model-class proposal and a discriminating experiment between models**
+   (point 8). Nothing exists. This is the genuinely hard part and it is last.
+
+---
+
+## 4. Architecture — a stage, not a third loop
+
+**Decision: hypothesis generation, model selection and experiment proposal are a
+layer ABOVE the two strategies, and there is no third investigation loop.**
+
+The strategies answer *"given hypotheses H, investigate"*. The layer above
+answers *"what is H, and which strategy should hold it"*. Investigation itself
+never moves.
+
+```
+                broad question
+                      |
+              [ ADMISSION ]  discoveryAdmission.ts  ── "no model for this" ──► stop, honestly
+                      |
+              [ GENERATION ]  candidate hypotheses, each with a criterion,
+                      |        an origin, and the capabilities it needs
+                      |
+              [ SHAPE + ROUTING ]  QuestionShape → mechanismStrategy | parameterStrategy
+                      |
+              [ EXISTING STRATEGY RUNS ]  ← untouched: discoveryLoop / inquiryLoop
+                      |
+              [ RESULT → StrategyRun ]  ← untouched contract
+                      |
+              [ REGENERATION ]  deriveAlternativeCriteria on each falsification,
+                      |          filtered by fingerprints already judged
+                      |
+              ── new candidates? ──► loop back to ROUTING
+                      |
+                   none left
+                      |
+              [ INSUFFICIENCY ]  "the declared space does not explain this"
+                      |
+              Evidence + Replay  ← untouched
+```
+
+Two properties make this a stage and not a loop: it owns **no experiment
+execution** and **no belief representation**. It produces criteria and consumes
+`StrategyRun`s. Everything scientific stays where it already is.
+
+### The honesty boundary this layer must state and never cross
+
+Genesis generates hypotheses **within a declared search space** — the levers a
+world declares, the candidate values an inquiry declares, and the mechanical
+derivations `deriveAlternativeCriteria` supports. **It cannot invent a mechanism
+the world does not model**, and it must never appear to. When the space is
+exhausted, the correct output is *model insufficiency*, which is a real
+scientific result — not a failure to be papered over with a generated-sounding
+hypothesis nobody can test.
+
+---
+
+## 5. Guardrails (brief point 9)
+
+| Risk | Guard | Status |
+|---|---|---|
+| HARKing | Every criterion is fingerprinted at preregistration and re-verified before assessment; the reducer is inside the criterion, so *how it is measured* is covered too | exists |
+| Post-hoc fitting | A generated criterion is preregistered **before** its own run, exactly like a declared one — a generator gets no privileged path | must be enforced in the new layer |
+| Circular reasoning | A derived criterion is filtered against `rejectedFingerprints`; a hypothesis already judged cannot return as new | exists in `deriveAlternativeCriteria`, must be threaded across rounds |
+| Tautological objectives | Only metrics a solver **computes** may be objectives; inputs it merely reads are refused | rule documented and enforced per catalog; the generator must inherit it |
+| Hidden-parameter leakage | `ObservableSystem = Omit<SystemUnderStudy, 'hiddenParameters'>` — compiler-enforced | exists; generation must run on the observable projection only |
+| Fake discovery | A generated hypothesis with no capability behind it is refused by admission before it can be "tested" | exists; must be applied per generated hypothesis, not once per question |
+
+## 6. The hypothesis record (brief point 10)
+
+Additive to `Hypothesis`, not a new type:
+
+| Field | Have it? |
+|---|---|
+| identifier | yes (`id`) |
+| origin | yes (`generatedBy`, `parentHypothesisId`) |
+| falsification | yes (`criterion`) |
+| status | yes |
+| provenance / fingerprint | yes (`criterionFingerprint`, evidence bundle) |
+| predictions | partially — real in `inquiryLoop` (`HypothesisOutcome.predicted`), absent in the mechanism path, which asserts a direction rather than a value |
+| declared assumptions | **missing** |
+| required capabilities | **missing** |
+
+## 7. Priorities
+
+| | Item | Depends on | Note |
+|---|---|---|---|
+| **P1** | Discovery Orchestrator | adapters (done) | The routing/regeneration host. Everything below plugs into it. |
+| **P2** | ObjectiveReducer verdict pipeline | — | C1 layer landed; `discoveryLoop` wiring outstanding (C3). |
+| **P3** | Wire `deriveAlternativeCriteria` into the round loop | P1, P2 | **Smallest real step to autonomy in the whole roadmap.** The code exists; it needs a call site, cross-round fingerprint accumulation, and preregistration of the derived criterion. |
+| **P4** | Declared generation space per domain + capability-gated candidate admission | P3 | Lets a generator propose beyond relation-flip without inventing anything. |
+| **P5** | Model insufficiency as a first-class outcome | P3, P4 | "The declared space does not explain this" — a result, not a failure. |
+| **P6** | Model-class proposal + discriminating experiment between models | P5 | The genuinely hard part. Do not start early. |
+| **P7** | World ↔ inquiry calibration (the composition named in `TWO_AUTONOMOUS_LOOPS_DECISION.md` §5) | P1 | Unlocks parameter identification *on a stateful world*. |
+
+P3 is deliberately placed before P4: it converts an existing, tested, unused
+capability into live behaviour at the cost of one call site, and it will teach us
+what a wider generator actually needs before we design one.
+
+## 8. Test strategy
+
+Non-negotiable, and the same discipline the adapters were held to:
+
+1. **Real substrates only.** Epidemiology, chemistry, flood, cell biology,
+   generator, quantum inquiry. No synthetic hypothesis objects.
+2. **Measure before asserting.** Probe the trajectory, read the numbers, then
+   write the assertion. Delete the probe.
+3. **The regeneration property, on a real falsification:** a hypothesis the loop
+   really refuted yields a derived alternative whose criterion is *not* fingerprint-
+   identical to anything already judged in that run — asserted across rounds, not
+   within one call.
+4. **The anti-HARKing property:** a derived criterion's fingerprint is registered
+   before its run and verified after; a test must show that mutating it
+   mid-flight produces INCONCLUSIVE, not a verdict.
+5. **The insufficiency property:** a world whose declared levers genuinely cannot
+   move the objective ends with a named insufficiency, not with a generated
+   hypothesis. Chemistry's mass lever and epidemiology's treatment lever are real
+   `REFUTED_BY_NO_EFFECT` cases already available for this.
+6. **Equivalence, again:** the orchestrator running a single-strategy question
+   must produce the same `StrategyRun` as calling that strategy directly.
+7. **No regression gate:** full suite green with byte-identical results for every
+   path that does not opt into generation.
+
+## 9. First demonstrable version — on domains that already exist
+
+**Epidemiology, `lever:treatment`.** It is a real, measured
+`REFUTED_BY_NO_EFFECT`: `derivatives` computes S, E and I without reading `ifr`,
+so treatment cannot move the infected count — while the same lever cuts deaths
+from 155.4 to 31.2. A first autonomous demonstration:
+
+1. question: *"what reduces the infected count?"*
+2. admission passes (epidemiology is modelled)
+3. treatment is tested and genuinely refuted — no effect on `I`
+4. regeneration correctly derives **nothing** from a no-effect refutation
+   (`deriveAlternativeCriteria` returns `[]` for anything that is not a clean
+   evaluable falsification) — so the system must move to the next declared lever
+   rather than invent one
+5. distancing is tested and, **with the P2 reducer measuring the peak**,
+   supported
+6. the run ends with a real finding, a real negative result, and an Evidence
+   bundle that replays
+
+That sequence uses no new domain, no new solver, and no fabricated state — and it
+is a genuine autonomous investigation of a question nobody handed hypotheses for.

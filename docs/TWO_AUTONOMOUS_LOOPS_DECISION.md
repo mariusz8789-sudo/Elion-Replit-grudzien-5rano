@@ -358,3 +358,68 @@ is a change to `domains/quantumTunneling.ts`, whose module doc currently states
 that `frames` is "a real, explicit parameter of the experiment, never a hidden
 constant". That is a decision about the domain, not about the catalogue, so it
 is left to C1 rather than taken unilaterally.
+
+---
+
+## 8. `generateAlternativeHypotheses` — why it was dead, and what was done
+
+C1 found that `generateAlternativeHypotheses` in `worldCounterfactual.ts` has no
+caller outside its own tests, and diagnosed it correctly: it produces the
+NUMERIC `Hypothesis` from `beliefRevision.ts`, while `discoveryLoop` reasons in
+the ORDINAL `HypothesisBelief` and does not import `beliefRevision.ts` at all.
+
+**The suggested repair — hand it to `inquiryLoop`, which is the numeric loop —
+does not work either**, and the reasons are about the science rather than the
+types:
+
+1. An `inquiryLoop` hypothesis is a **parameter assignment**, not a criterion.
+   Its criterion is regenerated every round from that hypothesis's own model
+   prediction (`criterionForPrediction`), so "the same claim with a different
+   relation" has nowhere to live.
+2. `TOLERANCE_WIDENED` cannot be represented there at all: the agreement band is
+   a property of the **system** (`SystemUnderStudy.agreementTolerance`), shared
+   by every hypothesis, not something one hypothesis can widen for itself.
+3. `RELATION_FLIP` is inert there too, because the only relation `inquiryLoop`
+   ever uses is `equal-within-tolerance`.
+
+And the function's input is a `WorldCounterfactualAssessment`, which only the
+WorldGraph substrate produces. So **the derivation belongs to the world
+substrate while its packaging belongs to the numeric loop, and those sit on
+opposite sides of the substrate boundary.** That is the actual defect — not a
+missing call.
+
+**What was done.** The belief representations were NOT merged; each carries
+something the other does not, and §1 is the reason. Instead the function was
+split at the line where the two halves genuinely differ:
+
+- `deriveAlternativeCriteria(criterion, assessment, rejected)` — the real
+  derivation, returning `{criterion, generatedBy}` and carrying **no belief
+  representation at all**. Both loops can consume it in their own model without
+  importing the other's. A test asserts the returned objects have exactly the
+  keys `criterion` and `generatedBy` — no confidence, no status, no history.
+- `generateAlternativeHypotheses(...)` — kept, unchanged in behaviour, now only
+  the numeric packaging of the above. Its existing tests pass untouched, and new
+  ones hold the two forms to producing identical criteria, mechanisms and order.
+
+The function now carries a doc block saying plainly that it has no caller, why
+`inquiryLoop` is not the answer, and what connecting it would require, so the
+next person reads the reason instead of hunting for the bug.
+
+**What was deliberately NOT done, and why it is C1's call.** Wiring
+`deriveAlternativeCriteria` into `discoveryLoop` is the genuinely right next
+step: a flipped criterion is a claim about the **same mechanism**, so the
+parent's own `apply` is reused and no mechanism has to be invented. Two real
+measured cases in this repo would fire it immediately — the flood pump (peak
+depth 1.4495 m → 1.4664 m, i.e. worse) and the cell-culture cytotoxic lever
+(268 524 → 54 094 cells). Both are `REFUTED_BY_CRITERION` today and stop there,
+where "the opposite claim is now the live one" is a real, testable follow-up.
+
+The one non-negotiable condition: **the derived alternative must be tested at a
+DIFFERENT magnitude from the one that falsified its parent.** Re-testing "the
+pump raises flood depth" against the very measurement that produced that
+hypothesis is circular by construction — mechanised HARKing. Confirming it at
+half strength is real dose-dependent evidence, and `discoveryLoop` already
+re-tests at `replicationStrength`, so the machinery is there.
+
+It is left undone because it changes what the loop EMITS while adapters are
+being written against that output. It is a contract decision, not a bug fix.

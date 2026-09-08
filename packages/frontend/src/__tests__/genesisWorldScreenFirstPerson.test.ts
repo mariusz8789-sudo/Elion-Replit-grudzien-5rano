@@ -92,15 +92,18 @@ describe('GenesisWorldSim3D — LIVING WORLD first-person foundation', () => {
     const { sim: walker, scene: walkScene, camera: walkCamera } = buildInitializedSim();
     // Enough steps for BOTH to actually reach their target speed (acceleration is a shared,
     // constant ramp — too few steps would leave both still accelerating and look identical
-    // regardless of the multiplier, which is a test artifact, not a real-world condition).
+    // regardless of the multiplier, which is a test artifact, not a real-world condition). Walks
+    // BACKWARD (away from the pump's real spawn-facing direction) — PRIORITY 2 gave the pump a real
+    // collision footprint, which a forward walk/run of this duration would now reach and clamp both
+    // to the same distance, a false tie that has nothing to do with the walk/run lever under test.
     const spawn = walkCamera.position.clone().setY(0);
-    walker.setMoveKey('forward', true);
+    walker.setMoveKey('back', true);
     for (let i = 0; i < 80; i++) { walker.update(0.05); walker.syncScene(walkScene, walkCamera); }
     const walkDistance = walkCamera.position.clone().setY(0).distanceTo(spawn);
 
     const { sim: runner, scene: runScene, camera: runCamera } = buildInitializedSim();
     runner.setRunning(true);
-    runner.setMoveKey('forward', true);
+    runner.setMoveKey('back', true);
     for (let i = 0; i < 80; i++) { runner.update(0.05); runner.syncScene(runScene, runCamera); }
     const runDistance = runCamera.position.clone().setY(0).distanceTo(spawn);
 
@@ -192,5 +195,186 @@ describe('GenesisWorldSim3D — GENERIC INTERACTION SYSTEM (not just the pump)',
     }
     expect(sawFloodplain).toBe(true);
     expect(sim.getNearestInteractableId()).not.toBe(sim.city.pumpPipeId);
+  });
+});
+
+describe('GenesisWorldSim3D — PRIORITY 2: REAL WORLD GEOMETRY (collision + hospital entrance/interior)', () => {
+  it('the pump has a real collision footprint — walking straight at it for a long time never reaches its exact center', () => {
+    const { sim, scene, camera } = buildInitializedSim();
+    sim.setMoveKey('forward', true);
+    let minDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.05);
+      sim.syncScene(scene, camera);
+      const frame = getFrameState(sim.city.base.engine);
+      const pump = frame.entities.find((e) => e.id === sim.city.pumpPipeId)!;
+      const d = camera.position.distanceTo(new THREE.Vector3(pump.transform.position.x, camera.position.y, pump.transform.position.z));
+      if (d < minDistance) minDistance = d;
+    }
+    // Real footprint half-extent (PUMP_EQUIPMENT_SCALE=3 -> box 4.5, half 2.25) + collisionRadius(0.4):
+    // a player who could walk straight through would get arbitrarily close to 0.
+    expect(minDistance).toBeGreaterThan(2);
+  });
+
+  it('walking toward the hospital eventually reports its real entrance, and its own real footprint blocks the player before reaching its center', () => {
+    const { sim, scene, camera } = buildInitializedSim();
+    const frame = getFrameState(sim.city.base.engine);
+    const hospital = frame.entities.find((e) => e.id === sim.city.hospitalBuildingId)!;
+    const dx = hospital.transform.position.x - camera.position.x;
+    const dz = hospital.transform.position.z - camera.position.z;
+    const desiredYaw = Math.atan2(-dx, -dz);
+    let deltaYaw = desiredYaw - camera.rotation.y;
+    while (deltaYaw > Math.PI) deltaYaw -= 2 * Math.PI;
+    while (deltaYaw < -Math.PI) deltaYaw += 2 * Math.PI;
+    sim.addMouseLook(-deltaYaw / 0.0022, 0);
+    sim.setMoveKey('forward', true);
+    let sawEntrance = false;
+    let minDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 300; i++) {
+      sim.update(0.05);
+      sim.syncScene(scene, camera);
+      if (sim.nearHospitalEntrance) sawEntrance = true;
+      const d = camera.position.distanceTo(new THREE.Vector3(hospital.transform.position.x, camera.position.y, hospital.transform.position.z));
+      if (d < minDistance) minDistance = d;
+    }
+    expect(sawEntrance).toBe(true);
+    // Real footprint half-extent (HOSPITAL_BUILDING_SCALE=7 -> box 10.5, half 5.25) + collisionRadius:
+    // a player who could walk straight through would get arbitrarily close to 0.
+    expect(minDistance).toBeGreaterThan(4);
+  });
+
+  it('enterHospital()/exitHospital(): inside, the SAME real hospitalBuildingId entity is still what gets inspected', () => {
+    const { sim } = buildInitializedSim();
+    expect(sim.insideBuildingId).toBeNull();
+    sim.enterHospital();
+    expect(sim.insideBuildingId).toBe(sim.city.hospitalBuildingId);
+    const inspected = sim.inspect(sim.city.hospitalBuildingId);
+    expect(inspected).not.toBeNull();
+    expect(inspected!.id).toBe(sim.city.hospitalBuildingId);
+    sim.exitHospital();
+    expect(sim.insideBuildingId).toBeNull();
+  });
+
+  it('enterHospital() moves the camera to the interior pocket; exitHospital() resumes the outdoor position unchanged', () => {
+    const { sim, scene, camera } = buildInitializedSim();
+    sim.update(0.05);
+    sim.syncScene(scene, camera);
+    const outdoorPosition = camera.position.clone();
+
+    sim.enterHospital();
+    sim.update(0.05);
+    sim.syncScene(scene, camera);
+    // The interior pocket sits far outside the outdoor room bounds (±190) — see HOSPITAL_INTERIOR_ORIGIN.
+    expect(camera.position.x).toBeGreaterThan(190);
+
+    sim.exitHospital();
+    sim.update(0.05);
+    sim.syncScene(scene, camera);
+    expect(camera.position.x).toBeCloseTo(outdoorPosition.x, 1);
+    expect(camera.position.z).toBeCloseTo(outdoorPosition.z, 1);
+  });
+});
+
+describe('GenesisWorldSim3D — PRIORITY 3: LIVING LAYER tied to real world state', () => {
+  it('day/night tracks the real simulated clock — the real sun light changes as simulated time advances', () => {
+    const { sim, scene } = buildInitializedSim();
+    const findSun = () => scene.children.find((o) => (o as unknown as { isDirectionalLight?: boolean }).isDirectionalLight) as THREE.DirectionalLight | undefined;
+    const sunBefore = findSun()!;
+    expect(sunBefore).toBeDefined();
+    const colorBefore = sunBefore.color.getHex();
+    const intensityBefore = sunBefore.intensity;
+    const positionBefore = sunBefore.position.clone();
+
+    // ~5.5 real simulated hours — enough to move the sun state from GENESIS_WORLD_BASE_HOUR_OF_DAY (21)
+    // to well past midnight, a genuinely different point on the real day/night curve.
+    sim.city.base.engine.advance(20000, sim.city.updater);
+    sim.setScrubTick(null); // resyncs without otherwise changing anything (already live, not scrubbing)
+
+    const sunAfter = findSun()!;
+    const changed =
+      sunAfter.color.getHex() !== colorBefore ||
+      sunAfter.intensity !== intensityBefore ||
+      !sunAfter.position.equals(positionBefore);
+    expect(changed).toBe(true);
+  });
+
+  it('the floodplain\'s real waterLevelM drives a real, visible standing-water surface — hidden when dry', () => {
+    const { sim, scene } = buildInitializedSim();
+    const findWaterMesh = () =>
+      scene.children.find(
+        (o) => o instanceof THREE.Mesh && (o.material as THREE.MeshStandardMaterial).color?.getHex?.() === 0x1a5ea8,
+      ) as THREE.Mesh | undefined;
+
+    const waterMeshInitial = findWaterMesh();
+    expect(waterMeshInitial).toBeDefined();
+    // The scenario's own scripted rainfall starts at tick 2 — freshly initialized, the floodplain is dry.
+    expect(waterMeshInitial!.visible).toBe(false);
+
+    const floodplain = sim.city.base.engine.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+    sim.city.base.engine.applyExternalPatch(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID, {
+      domainState: { ...floodplain.domainState, waterLevelM: 0.5 },
+    });
+    sim.setScrubTick(null);
+
+    const waterMesh = findWaterMesh()!;
+    expect(waterMesh.visible).toBe(true);
+    expect(waterMesh.position.y).toBeCloseTo(0.5, 5);
+  });
+});
+
+describe('GenesisWorldSim3D — PRIORITY 4 (most important): connected to the real Discovery Engine', () => {
+  it('runExperiment() runs the real compareWorldActions comparison — a real ranking over every declared lever', () => {
+    const { sim } = buildInitializedSim();
+    const comparison = sim.runExperiment();
+    expect(sim.lastComparison).toBe(comparison);
+    expect(['RANKED', 'TIED']).toContain(comparison.status);
+    // All 3 real flood levers (outlet, infiltration, pump) are declared with no goal-side restriction.
+    expect(comparison.ranking.length).toBeGreaterThanOrEqual(3);
+    expect(comparison.bestActionIds.length).toBeGreaterThan(0);
+  });
+
+  it('applyComparisonWinner() forks the LIVE engine with the real winning lever\'s own mutation', () => {
+    const { sim } = buildInitializedSim();
+    const comparison = sim.runExperiment();
+    const winningId = comparison.bestActionIds[0]!;
+    expect(sim.forkEngine).toBeNull();
+
+    sim.applyComparisonWinner();
+
+    expect(sim.forkEngine).not.toBeNull();
+    expect(sim.showFork).toBe(true);
+    expect(sim.lastComparison).toBeNull(); // consumed
+    // The fork is a REAL fork of the player's own live engine (base.engine), not the comparison's own
+    // disconnected reference world — verified by checking the winning lever's declared target entity
+    // actually changed, on THIS engine.
+    if (winningId === 'lever:outlet-capacity') {
+      const floodplain = sim.forkEngine!.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+      expect(floodplain.domainState?.outletWidthM).toBeCloseTo(40, 5);
+    } else if (winningId === 'lever:infiltration') {
+      const floodplain = sim.forkEngine!.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+      expect(floodplain.domainState?.infiltrationRateMPerS).toBeCloseTo(1.0e-4, 8);
+    } else if (winningId === 'lever:pump-capacity') {
+      const pump = sim.forkEngine!.graph.getEntity(sim.city.pumpPipeId);
+      const baselinePump = sim.city.base.engine.graph.getEntity(sim.city.pumpPipeId);
+      expect(pump.domainState?.volumetricFlow).toBeGreaterThan(baselinePump.domainState?.volumetricFlow as number);
+    } else {
+      throw new Error(`unexpected winning lever id: ${winningId}`);
+    }
+  });
+
+  it('applyComparisonWinner() without a prior experiment is a no-op', () => {
+    const { sim } = buildInitializedSim();
+    expect(sim.lastComparison).toBeNull();
+    sim.applyComparisonWinner();
+    expect(sim.forkEngine).toBeNull();
+  });
+
+  it('applyComparisonWinner() is a no-op once a fork already exists — single-shot, like applyLever()', () => {
+    const { sim } = buildInitializedSim();
+    sim.applyLever(sim.leversFor(sim.city.pumpPipeId)[0]!, 'first');
+    const forkAfterFirst = sim.forkEngine;
+    sim.runExperiment();
+    sim.applyComparisonWinner();
+    expect(sim.forkEngine).toBe(forkAfterFirst);
   });
 });

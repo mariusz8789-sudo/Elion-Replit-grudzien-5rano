@@ -8,6 +8,7 @@ import {
   type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification, type ScientificComputeReport,
 } from '../core/backend/client';
 import { AccountPanel } from './AccountPanel';
+import { parseDiscoveryGoal, buildCampaignRequest } from '../core/discovery/discoveryGoalIntent';
 
 /**
  * Scientific Acceleration UI (P12) — jeden warsztat Kampanii Naukowej. Każdy
@@ -66,6 +67,9 @@ function CampaignWorkspace() {
   const [objective, setObjective] = useState('MPO benchmark: crippenLogP≈2.5, molWt≈350 (walidacja oprogramowania)');
   const [seeds, setSeeds] = useState(DEFAULT_SEEDS);
   const [maxGen, setMaxGen] = useState(4);
+
+  const [goalSentence, setGoalSentence] = useState('');
+  const [goalError, setGoalError] = useState<string | null>(null);
 
   const pollRef = useRef<number | null>(null);
 
@@ -137,6 +141,34 @@ function CampaignWorkspace() {
     const r = await createCampaign(token, projectId, { objective, startingSmiles, budget: { maxGenerations: maxGen } });
     setBusy(false);
     if (!r.ok) { setError(r.message); return; }
+    await reloadCampaigns();
+    await loadDetail(r.data.id);
+  }
+
+  /**
+   * Tworzy kampanię wprost ze zdania celu (`discoveryGoalIntent.ts`) zamiast z
+   * pól strukturalnych powyżej — osobna ścieżka, nie wspólny stan z `onCreate`,
+   * żeby nie było niejasności co realnie zostanie wysłane: albo zdanie zostaje
+   * uczciwie odrzucone (np. brak molekuły startowej), albo dokładnie to, co
+   * `buildCampaignRequest` zwróciło, trafia do backendu — nic pomiędzy.
+   */
+  async function onCreateFromGoal() {
+    const token = getToken();
+    if (!token || !projectId) return;
+    setGoalError(null);
+    const intent = parseDiscoveryGoal(goalSentence);
+    const built = buildCampaignRequest(intent);
+    if ('error' in built) { setGoalError(built.error); return; }
+    setBusy(true);
+    const r = await createCampaign(token, projectId, {
+      objective: built.objective,
+      startingSmiles: built.startingSmiles,
+      objectives: built.objectives,
+      constraints: built.constraints,
+      budget: built.budget,
+    });
+    setBusy(false);
+    if (!r.ok) { setGoalError(r.message); return; }
     await reloadCampaigns();
     await loadDetail(r.data.id);
   }
@@ -230,7 +262,34 @@ function CampaignWorkspace() {
         )}
       </section>
 
-      {/* Tworzenie kampanii */}
+      {/* Tworzenie kampanii ze zdania celu */}
+      <section className="settings-section">
+        <h3>Nowa kampania — z opisu celu</h3>
+        {projects.length === 0 ? (
+          <p className="settings-hint">Najpierw utwórz projekt w „☁ Projekty", aby prowadzić kampanie.</p>
+        ) : (
+          <div className="form-grid">
+            <label>Opisz cel jednym zdaniem
+              <input
+                value={goalSentence}
+                placeholder='np. "starting from CCO with logP around 2 and molecular weight under 400, up to 3 generations"'
+                onChange={(e) => setGoalSentence(e.target.value)}
+              />
+            </label>
+            <button className="primary-btn" disabled={busy || goalSentence.trim().length === 0} onClick={() => void onCreateFromGoal()}>
+              Utwórz z opisu
+            </button>
+          </div>
+        )}
+        {goalError && <p className="error-text">{goalError}</p>}
+        <p className="settings-hint">
+          Zdanie musi nazwać co najmniej jedną realną molekułę startową („starting from CCO" / „zaczynając od CCO") —
+          Genesis nie zgaduje molekuły. Cel bez wartości docelowej (logP, masa) nadal jest ważny: stosuje się
+          domyślny profil kampanii, dokładnie jak przy tworzeniu ręcznym poniżej.
+        </p>
+      </section>
+
+      {/* Tworzenie kampanii — pola strukturalne */}
       <section className="settings-section">
         <h3>Nowa kampania (Drug Discovery — walidacja)</h3>
         {projects.length === 0 ? (

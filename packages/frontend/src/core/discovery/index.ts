@@ -47,6 +47,21 @@ export {
 export { bandMetricsOf, contactMetricsOf, cohortLimitations, DISCOVERY_BAND_METRIC_KEYS, DISCOVERY_CONTACT_METRIC_KEYS } from './discoveryExecution';
 
 /**
+ * The NL front door onto the unrelated chemistry Discovery Engine
+ * (`packages/backend/src/campaign/*`, wired into `CampaignScreen.tsx`) — a
+ * different "discovery" than the epidemiological `DiscoveryCase` family
+ * exported above. Re-exported here so this barrel is the one real place to
+ * find every NL-goal parser this layer owns, not because the two systems
+ * share any logic.
+ */
+export {
+  parseDiscoveryGoal, buildCampaignRequest,
+  type DiscoveryGoalIntent, type DiscoveryGoalUnresolved,
+  type DiscoveryCampaignRequest, type DiscoveryCampaignObjective, type DiscoveryCampaignConstraint,
+} from './discoveryGoalIntent';
+export { parseCampaignWhyQuestion, type CampaignWhyIntent, type CampaignWhyKind, type CampaignWhyUnresolved } from './campaignWhyIntent';
+
+/**
  * Warstwa kontaktów. Typ kontaktu, gospodarstwa i ogniska pochodzą z realnych
  * zdarzeń transmisji; konsument dostaje je razem z deklaracją, czego model nie
  * potrafi rozpoznać.

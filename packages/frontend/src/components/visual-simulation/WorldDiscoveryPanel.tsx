@@ -42,7 +42,11 @@ export function WorldDiscoveryPanel() {
     // builds its Evidence Bundle and replays it — several real experiments'
     // worth of work, which takes long enough to drop a frame. Yielding first
     // lets the RUNNING state paint, so the panel reports that it is working
-    // rather than appearing to hang.
+    // rather than appearing to hang. Persistence lives INSIDE
+    // `runWorldDiscoveryAndRemember` (not here at the UI boundary): the same
+    // call already has to read prior memory before it can decide what to run,
+    // so saving afterwards is the other half of the same seam, not a separate
+    // side effect the panel would otherwise have to remember to trigger.
     setTimeout(() => setState(runWorldDiscoveryAndRemember(trimmed)), 0);
   };
 

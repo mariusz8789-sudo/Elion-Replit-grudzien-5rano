@@ -204,6 +204,32 @@ describe('GenesisScientificCitySim — TRINITY INTEGRATION 3.0: the pump renders
 
 });
 
+describe('GenesisScientificCitySim — TIER1.4: grounding actually reaches non-pump entity appearance', () => {
+  it('a MODELED entity (real C3 grounding, correctly mapped) renders fully opaque', () => {
+    const sim = initializedSim();
+    const entity: WorldFrameEntity = {
+      id: sim.getIds().populationId, position: [0, 0, 0], grounding: 'MODELED', visualHint: 'population',
+    };
+    const spec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(entity);
+    const object = spec.kind === 'object' ? spec.object : null;
+    const material = object && 'material' in object ? (object as THREE.Mesh).material as THREE.MeshStandardMaterial : null;
+    expect(material?.transparent).toBe(false);
+    expect(material?.opacity).toBe(1);
+  });
+
+  it('a DERIVED entity (a real model estimate, not an exact reading) gets a visibly different, less opaque treatment', () => {
+    const sim = initializedSim();
+    const entity: WorldFrameEntity = {
+      id: sim.getIds().populationId, position: [0, 0, 0], grounding: 'DERIVED', visualHint: 'population',
+    };
+    const spec = (sim as unknown as { resolveVisual(entity: WorldFrameEntity): EntityVisualSpec }).resolveVisual(entity);
+    const object = spec.kind === 'object' ? spec.object : null;
+    const material = object && 'material' in object ? (object as THREE.Mesh).material as THREE.MeshStandardMaterial : null;
+    expect(material?.transparent).toBe(true);
+    expect(material?.opacity).toBeLessThan(1);
+  });
+});
+
 describe('GenesisScientificCitySim — replay determinism (mission section 11)', () => {
   it('the same seed and the same intervention produce the same hydraulic result and the same causal chain', () => {
     const run = () => {

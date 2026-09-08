@@ -8,6 +8,7 @@ import {
 import { withScheduledEvents } from '../worldModel/events/worldEventRules';
 import { withCrossDomainCouplings } from '../worldModel/crossDomain/crossDomainCoupling';
 import { getFrameState, compareBranches, type BranchComparison } from '../worldModel/bridge/worldFrameState';
+import { toGraphicsGrounding } from '../worldModel/bridge/graphicsWorldFrameAdapter';
 import { getCausalAncestry, getEventHistoryFor } from '../worldModel/queries/worldQueries';
 import type { EntityId, WorldModelEntity } from '../worldModel/ecs/types';
 import type { GenesisEvent } from '../events/genesisEvent';
@@ -146,8 +147,33 @@ interface WetSurfaceMaterial {
   dry: DryMaterialLook;
 }
 
+/**
+ * TIER1.4 — this used to be a local, lossy mapping (`GROUNDED_EXACT ? MODELED : DERIVED`) that
+ * silently downgraded real C3 `MODEL_ESTIMATE` output to the exact same bucket as pure procedural
+ * decoration. Empirically (see the entity-grounding audit that found this), `pump-pipe-1` and
+ * `population:city-1` — two of the four ids this scene actually renders (`renderedIds`) — really are
+ * `MODEL_ESTIMATE`: a real hydrology/epidemiology model output, honestly caveated as an estimate, not
+ * an exact reading. The old mapping mislabeled both as `DERIVED`, indistinguishable from decoration.
+ * Delegates to the canonical `toGraphicsGrounding` (`graphicsWorldFrameAdapter.ts` — the same
+ * function C3->C2 Trinity integration uses everywhere else) instead of re-deriving the mapping here.
+ *
+ * One narrow, deliberate exception: `toGraphicsGrounding` maps `UNGROUNDED_APPROXIMATION` to
+ * `NOT_MODELED`, which `worldFrameRenderer.ts` renders as a tiny wireframe honest-boundary
+ * placeholder INSTEAD of ever calling this scene's own `resolveVisual` — a convention designed for a
+ * single decorative stand-in a user might otherwise mistake for something real (see
+ * `epidemicCity3D.ts`'s own NOT_MODELED pump). `hospitalBuildingId`/`labBuildingId` carry that raw
+ * grounding today (their PHYSICAL placement is procedural city-massing, not surveyed), but this scene
+ * builds them as real, detailed, load-bearing narrative subjects via `resolveVisual`'s dedicated
+ * `'building'` branch (the hospital's status band shows its REAL `waterServiceInterrupted` scalar) —
+ * wireframing them would hide the one building the whole pump-failure scenario is about, and would
+ * not communicate any honesty gap a viewer actually needs: nothing about their appearance claims to
+ * BE modeled data in the first place (only the status band does, and that already reads its real
+ * scalar directly). So a `NOT_MODELED` result is clamped to `DERIVED` here — every entity that DOES
+ * carry real C3-computed grounding (the pump, the population) still gets it correctly.
+ */
 function groundingToC2(level: WorldModelEntity['grounding']): EntityGrounding {
-  return level === 'GROUNDED_EXACT' ? 'MODELED' : 'DERIVED';
+  const grounding = toGraphicsGrounding(level);
+  return grounding === 'NOT_MODELED' ? 'DERIVED' : grounding;
 }
 
 /** Which of this scenario's own entities actually get a rendered object — see the module doc's
@@ -1068,7 +1094,18 @@ export class GenesisScientificCitySim implements Sim3D {
       building.add(band);
       return { kind: 'object', object: building };
     }
-    const fallback = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), (this.landmarkMaterial ?? new THREE.MeshStandardMaterial()).clone());
+    const fallbackMaterial = (this.landmarkMaterial ?? new THREE.MeshStandardMaterial()).clone();
+    // TIER1.4 — the one real, visible cue tying `entity.grounding` to a non-pump entity's
+    // appearance: `population:city-1` (the other entity `groundingToC2` now correctly reports as
+    // `MODELED` instead of the old mislabeled `DERIVED`) lands here. A `DERIVED` reading (a real
+    // model output, just not an exact one) gets a faint, real transparency cue instead of the fully
+    // opaque `MODELED` look — a presentation difference, not a fabricated value; a viewer who never
+    // reads documentation can still see "this one is a little less certain" at a glance.
+    if (entity.grounding === 'DERIVED' && 'opacity' in fallbackMaterial) {
+      (fallbackMaterial as THREE_NS.MeshStandardMaterial).transparent = true;
+      (fallbackMaterial as THREE_NS.MeshStandardMaterial).opacity = 0.7;
+    }
+    const fallback = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), fallbackMaterial);
     return { kind: 'object', object: fallback };
   }
 

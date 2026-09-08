@@ -1148,6 +1148,18 @@ export class GenesisScientificCitySim implements Sim3D {
         blurStrength: recommendedDofForProfile('HERO_CLOSE_UP', this.focusPuller?.value ?? 60).blurStrength,
         minTier: 'medium',
       }),
+      // WOW SPRINT — turns on `postProcessing.ts`'s SSR pass here, the first scene to actually use
+      // it (see that module's own doc for why it previously shipped opt-in/off — no real GPU in the
+      // authoring sandbox to judge its artifact behavior). This is the flagship flood scenario:
+      // wet asphalt and the pump/hospital's glazing are exactly the flat-ish reflective surfaces SSR
+      // targets, and a real-world "streets reflect the city lights" cue reads as directly on-theme
+      // for a flood scene, not decoration. `minTier: 'high'` matches GTAO's own bar (SSR's cost is
+      // in the same range) rather than loosening a new floor unverified. `maxDistance: 45` and a
+      // moderated `strength` (default 0.6 read as too strong/noisy at this city's ~150-unit scale
+      // in a headless-Chromium visual check) are tuned for this scene's real camera distance
+      // (`camera.position.set` above sits ~60-90 units from the road grid), not the room-scale
+      // default this settings shape was designed around.
+      reflections: { enabled: true, minTier: 'high', strength: 0.4, maxDistance: 45 },
     });
     this.pipeline = pipeline;
     return pipeline;

@@ -1,3 +1,4 @@
+import { evaluateTwoArmRelation } from '../experimentFabric/falsificationRelation';
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
 import type {
   DiscoveryCase,
@@ -22,9 +23,12 @@ import type {
  * zawsze „w granicach protokołu i modelu", nigdy odkryciem o świecie.
  */
 
-/** Relacje sensowne dopiero przy serii punktów, nie przy dwóch ramionach. */
-const SERIES_ONLY_RELATIONS: readonly FalsificationCriterion['relation'][] = ['monotonic-increase', 'monotonic-decrease'];
-
+/**
+ * Rozstrzygnięcie relacji należy do `experimentFabric/falsificationRelation.ts`
+ * — tego samego, jedynego miejsca, z którego korzysta warstwa kontrfaktyków
+ * world-model. Tutaj zostaje wyłącznie to, co jest specyficzne dla tego
+ * porównania: odnalezienie metryki i kształt `DiscoveryCriterionCheck`.
+ */
 function checkCriterion(criterion: FalsificationCriterion, comparison: DiscoveryComparison): DiscoveryCriterionCheck {
   const metric = comparison.metrics.find((m) => m.key === criterion.metric);
   const base = {
@@ -36,42 +40,8 @@ function checkCriterion(criterion: FalsificationCriterion, comparison: Discovery
   if (!metric) {
     return { ...base, met: false, explanation: `Metryka „${criterion.metric}" nie występuje w tym porównaniu.` };
   }
-  if (SERIES_ONLY_RELATIONS.includes(criterion.relation)) {
-    return {
-      ...base,
-      met: false,
-      explanation: `Relacja „${criterion.relation}" wymaga serii punktów (sweepu), a nie porównania dwóch ramion.`,
-    };
-  }
-  const reference = criterion.expectedValue ?? metric.baseline;
-  const referenceLabel = criterion.expectedValue === undefined ? 'wartości bazowej' : String(criterion.expectedValue);
-  switch (criterion.relation) {
-    case 'greater-than':
-      return {
-        ...base,
-        met: metric.variant > reference,
-        explanation: `Wariant ${metric.variant} wobec ${referenceLabel} (${reference}): oczekiwano większej wartości.`,
-      };
-    case 'less-than':
-      return {
-        ...base,
-        met: metric.variant < reference,
-        explanation: `Wariant ${metric.variant} wobec ${referenceLabel} (${reference}): oczekiwano mniejszej wartości.`,
-      };
-    case 'equal-within-tolerance': {
-      if (criterion.tolerance === undefined) {
-        return { ...base, met: false, explanation: 'Kryterium równości wymaga prerejestrowanej tolerancji.' };
-      }
-      const diff = Math.abs(metric.variant - reference);
-      return {
-        ...base,
-        met: diff <= criterion.tolerance,
-        explanation: `|${metric.variant} − ${reference}| = ${diff}; tolerancja ${criterion.tolerance}.`,
-      };
-    }
-    default:
-      return { ...base, met: false, explanation: `Nieobsługiwana relacja „${criterion.relation}".` };
-  }
+  const outcome = evaluateTwoArmRelation(criterion, metric.baseline, metric.variant);
+  return { ...base, met: outcome.applicable && outcome.met, explanation: outcome.explanation };
 }
 
 function insufficient(reason: string, limitations: readonly string[]): DiscoveryConclusion {

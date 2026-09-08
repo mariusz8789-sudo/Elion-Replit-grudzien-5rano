@@ -135,3 +135,29 @@ describe('parseObservationIntent — askingForLimitations (Genesis Urban Resilie
     expect(parseObservationIntent('Show me the pump.').askingForLimitations).toBe(false);
   });
 });
+
+describe('parseObservationIntent — challengingResult ("Challenge this result", Layered World Dashboard)', () => {
+  it('English phrasing', () => {
+    expect(parseObservationIntent('Challenge this result.').challengingResult).toBe(true);
+    expect(parseObservationIntent('Challenge this.').challengingResult).toBe(true);
+    expect(parseObservationIntent('Run another what-if.').challengingResult).toBe(true);
+  });
+
+  it('Polish phrasing', () => {
+    expect(parseObservationIntent('Zakwestionuj ten wynik.').challengingResult).toBe(true);
+    expect(parseObservationIntent('Sprawdź to inaczej.').challengingResult).toBe(true);
+  });
+
+  it('is distinct from askingForLimitations — a request to run an experiment, not a grounding question', () => {
+    const intent = parseObservationIntent('Challenge this result.');
+    expect(intent.askingForLimitations).toBe(false);
+  });
+
+  it('never flags TARGET as unresolved for this phrasing', () => {
+    expect(parseObservationIntent('Challenge this result.').unresolved).not.toContain('TARGET');
+  });
+
+  it('is false for an unrelated sentence', () => {
+    expect(parseObservationIntent('Show me the pump.').challengingResult).toBe(false);
+  });
+});

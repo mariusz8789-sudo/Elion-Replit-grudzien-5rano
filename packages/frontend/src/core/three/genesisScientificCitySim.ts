@@ -548,6 +548,28 @@ export class GenesisScientificCitySim implements Sim3D {
       + 'trigger the extreme rainfall scenario, then ask again.';
   }
 
+  /**
+   * "Challenge this result" — the Layered World Dashboard's own button/phrase. Names the ONE next
+   * real counterfactual this scoped flood MVP still has queued, in the order the brief's own MVP
+   * lists them (rainfall-intensity counterfactual — its own worked example, "opad większy o 30%" —
+   * then the pump-failure fork): never a menu of every possible experiment, since this scoped MVP
+   * covers exactly the one flood scenario. A caller (C1's NL branch, or C2's dashboard button) runs
+   * whichever `kind` this returns through the SAME real methods already used elsewhere in this
+   * class (`runRainfallIntensityCounterfactual`, `triggerPumpFailure`) — this method decides WHICH
+   * experiment is next, it does not run anything itself. Returns `null` once both are exhausted, or
+   * before any baseline scenario has run at all.
+   */
+  getChallengeAction(): { kind: 'RAINFALL_HIGHER_30'; label: string } | { kind: 'PUMP_FAILURE_FORK'; label: string } | null {
+    if (!this.rainfallOutcome) return null;
+    if (!this.rainfallCounterfactual || this.rainfallCounterfactual.percentChange !== -30) {
+      return { kind: 'RAINFALL_HIGHER_30', label: 'What if rainfall were 30% higher?' };
+    }
+    if (!this.failureBranch) {
+      return { kind: 'PUMP_FAILURE_FORK', label: 'What if the pump fails outright?' };
+    }
+    return null;
+  }
+
   // --- Replay: the ALREADY-COMPUTED real history, not a re-narrated fiction -------------------
 
   /**

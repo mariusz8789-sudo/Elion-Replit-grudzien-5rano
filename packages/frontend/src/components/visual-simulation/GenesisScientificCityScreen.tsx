@@ -119,6 +119,37 @@ export function GenesisScientificCityScreen() {
       return;
     }
 
+    // "Challenge this result" — the Layered World Dashboard's own button/phrase. Runs whichever real
+    // counterfactual sim.getChallengeAction() names next, through the EXACT SAME real methods the
+    // rainfallCounterfactualQuery and interventionRequested branches above already call — never a
+    // third execution path.
+    if (intent.challengingResult) {
+      const action = sim.getChallengeAction();
+      if (!action) {
+        setObsResult(sim.isRainfallScenarioActive()
+          ? 'Nothing further to challenge in this scoped flood scenario — every real counterfactual it names has already run.'
+          : 'Nothing to challenge yet — trigger the extreme rainfall scenario first.');
+        setObsText('');
+        return;
+      }
+      if (action.kind === 'RAINFALL_HIGHER_30') {
+        const outcome = sim.runRainfallIntensityCounterfactual(-30);
+        setObsResult(outcome
+          ? `Challenge: ${action.label} At ${outcome.adjustedIntensityMmPerHour.toFixed(1)}mm/h (30% higher): pump tripped: ${outcome.tripped} (vs ${outcome.baselineTripped} at full intensity). Hospital water service interrupted: ${outcome.hospitalInterrupted} (vs ${outcome.baselineHospitalInterrupted}).`
+          : sim.getRainfallCounterfactualGap());
+        setObsText('');
+        return;
+      }
+      const outcome = failureOutcome ?? sim.triggerPumpFailure();
+      if (!failureOutcome) setFailureOutcome(outcome);
+      sim.setViewingBranch('FAILURE');
+      setObsResult(`Challenge: ${action.label} Pump tripped: ${outcome.tripped}. Hospital water service interrupted: ${outcome.hospitalInterrupted}. See the causal chain and comparison below.`);
+      setObsText('');
+      setTick(sim.getStats().tick);
+      forceRender((n) => n + 1);
+      return;
+    }
+
     // (3) An imperative command ("turn off the pump") or a "what happens if X fails" hypothetical
     // — both authorize the SAME real C3 intervention. Idempotent: asking twice re-shows the
     // already-computed real outcome rather than forking a second time.

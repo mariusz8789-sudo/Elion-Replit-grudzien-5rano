@@ -423,3 +423,100 @@ re-tests at `replicationStrength`, so the machinery is there.
 
 It is left undone because it changes what the loop EMITS while adapters are
 being written against that output. It is a contract decision, not a bug fix.
+
+---
+
+## 9. Task 0 answered: no third `QuestionShape`, and how deep the real gap goes
+
+### 9.1 The answer
+
+**`MECHANISM | PARAMETER` is sufficient. Do not add a third value. Build the
+adapters on two.**
+
+Every question worth asking in the five domains built so far lands in one of the
+two. `discoveryStrategy.ts`'s own rule settles the case C1 raised, and it is the
+right rule: *"a third shape must arrive with a third real loop that answers it."*
+
+**"When will the peak occur" has no third loop, because it does not need one.**
+It has no hypothesis, no competing alternatives, nothing to falsify and no next
+experiment. It is a **read of one baseline trajectory** — run the world once and
+scan the series. Genesis already does exactly that in several places
+(`simulateEpidemic` returns `peakInfected` and `peakDay`; `scenarioEngine`
+returns full series). Admitting it to `QuestionShape` would route a
+non-investigation into an investigation router, and whichever loop received it
+would have to answer a question it has no machinery for. That is the failure
+mode C1 named, arriving from the other direction.
+
+**The question that IS worth asking is a MECHANISM question.** Nobody
+investigating an epidemic wants "when is the peak" on its own; they want *"does
+distancing push the peak later?"* or *"does distancing lower the peak?"* Those
+are one lever, two arms, one criterion — MECHANISM, unambiguously. What is
+different is not the shape of the question but **which number the criterion is
+handed**: a peak level, a peak time, a cumulative total, rather than a value at
+one instant.
+
+So the gap is real, C1 was right to smell it, and it is **one layer below
+`QuestionShape`**. Naming it there would have been the wrong fix in a way that
+looked like the right one.
+
+### 9.2 How deep it actually goes — measured, by trying it
+
+This was not left as an argument. An `ObjectiveReducer`
+(`AT_HORIZON | MAX | MIN | ARGMAX | ARGMIN | SUM`) was implemented in
+`discoveryLoop`, run against the real SEIRD epidemic, and then **reverted**,
+because the measurement showed a half-capability that would have shipped
+contradictory results.
+
+What the run showed, on `Minimise infected by distancing`, real numbers:
+
+| horizon | reducer | baseline | intervention | verdict |
+|---|---|---|---|---|
+| day 60 | AT_HORIZON | 10 194.51 | 28.50 | SUPPORTED |
+| day 200 | AT_HORIZON | **0.57** | **26.39** | **FALSIFIED** |
+| day 200 | MAX (peak) | 16 156.55 | 28.71 | **FALSIFIED** ← wrong |
+| day 200 | ARGMAX (peak day) | 73 | 19 | **FALSIFIED** ← wrong |
+| day 200 | SUM (final size) | 624 779.65 | 5 455.22 | **FALSIFIED** ← wrong |
+
+The day-200 `AT_HORIZON` row is the inversion the epidemiology catalogue already
+warns about: the unmitigated epidemic has burnt out, the flattened one is still
+running, so "infected at the horizon" really is higher for the intervention.
+
+The three rows below it are the defect. Peak, peak-day and final size all say the
+intervention worked, by four orders of magnitude — and the verdict still came
+back FALSIFIED. **Because `objectiveBaseline`/`objectiveObserved` on
+`DiscoveryRound` are reporting only. They never reach the criterion.**
+
+The verdict comes from `assessWorldCounterfactual`, which reads
+`readMetric(diff, entityId, metric)` — a `diffWorldBranches` over a
+`compareBranches(..., horizonTick)`, i.e. two branch states at ONE tick. Change
+the reported objective without changing that, and a result's numbers and its
+verdict disagree. That is worse than the limitation it was meant to fix, so it
+was not shipped.
+
+### 9.3 What a real fix has to touch — three places, not one
+
+1. **`discoveryLoop.objectiveAt`** — one scalar at `horizonTick`. The easy one,
+   and the only one that looks like the whole problem.
+2. **`assessWorldCounterfactual`** — the verdict itself, from a two-branch diff
+   at one tick. `compareBranches` compares branch STATES and has no notion of a
+   window, so this cannot be fixed by passing a different tick.
+3. **`metricPresence`** — the `PRESENT_AND_MOVED` / `PRESENT_BUT_UNMOVED` /
+   `ABSENT` test, also horizon-tick only. A metric that differs hugely mid-run
+   and coincides at the horizon reads as `PRESENT_BUT_UNMOVED` and short-circuits
+   to INCONCLUSIVE before any reduced value is looked at.
+
+All three are shared with `crossActionComparison`, `genesisAgentTools` and the
+world evidence bundle. **This is a contract change, not a local one**, which is
+why it is reported rather than taken while adapters are being written against
+those types.
+
+### 9.4 Recommendation
+
+- Ship `QuestionShape` at two values now. Nothing here blocks the adapters.
+- Track the objective reducer as its own item. It is not urgent — five domains
+  ship without it — but it is the reason `epidemicLeverCatalog.ts` carries a
+  horizon caveat that better machinery would make unnecessary, and it is the
+  only reason "peak timing" looked like a third shape.
+- When it is done, the honest order is bottom-up: window-aware metric presence
+  and verdict first, reported objective last. Doing the visible half first is
+  exactly the mistake this section is a record of.

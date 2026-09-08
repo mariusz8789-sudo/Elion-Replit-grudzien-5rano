@@ -7,6 +7,17 @@ import {
   type DecisionOption,
   type DecisionQuestion,
 } from '../core/worldModel/decision/decisionSupport';
+import { compareBranches } from '../core/worldModel/bridge/worldFrameState';
+import { projectToWorldState } from '../core/worldModel/bridge/worldFrameState';
+import {
+  assessWorldCounterfactual,
+  diffWorldBranches,
+  preregisterWorldCounterfactual,
+} from '../core/worldModel/discovery/worldCounterfactual';
+import {
+  buildWorldEvidenceBundle,
+  exportWorldEvidenceBundleRoCrate,
+} from '../core/worldModel/evidence/worldEvidenceBundle';
 import {
   buildGenesisScientificCity3,
   GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
@@ -25,6 +36,10 @@ import { TemporalBranchRegistry, TemporalEngine } from '../core/worldModel/tempo
  * gives them — the point of these tests is that the module reports what the
  * world does, including when the answer is "these options are the same".
  */
+
+function worldStateOf(engine: TemporalEngine) {
+  return projectToWorldState(engine.graph, 'genesis-scientific-city-3', 'flood-hydrology', engine.tick, engine.journal.upToTick(engine.tick));
+}
 
 const DECISION_TICK = 1;
 const HORIZON_TICK = 24;
@@ -323,5 +338,109 @@ describe('The evaluation is reproducible and traceable to real events', () => {
     // Content-addressed ids: an event unique to this arm reflects different physics,
     // not merely a different run order.
     expect(unique.every((event) => event.timestamp >= DECISION_TICK)).toBe(true);
+  });
+});
+
+describe('The decision report travels in the evidence bundle', () => {
+  const { baseline, storm, comparison, diff } = (() => {
+    const { registry: reg, baseline: base, updater } = baselineCity();
+    const storm = base.forkBranch(DECISION_TICK, PERMEABLE.label, PERMEABLE.apply);
+    for (let tick = DECISION_TICK; tick < HORIZON_TICK; tick++) storm.advance(DT_S, updater);
+    const cmp = compareBranches(reg, base.branchId, storm.branchId, HORIZON_TICK);
+    return { baseline: base, storm, comparison: cmp, diff: diffWorldBranches(cmp) };
+  })();
+
+  const report = evaluate();
+
+  const bundleOf = (decision?: typeof report) =>
+    buildWorldEvidenceBundle({
+      bundleId: 'genesis-urban-resilience-decision-001',
+      question: question().question,
+      worldId: 'genesis-scientific-city-3',
+      domainId: 'flood-hydrology',
+      baseline: { engine: baseline, worldState: worldStateOf(baseline) },
+      intervention: { engine: storm, worldState: worldStateOf(storm), description: PERMEABLE.description },
+      comparison,
+      seed: null,
+      ...(decision ? { decision } : {}),
+    });
+
+  it('carries the ranking, what it omits, and the not-a-recommendation statement into the RO-Crate', () => {
+    const bundle = bundleOf(report);
+    expect(bundle.decision!.decisionId).toBe(report.decisionId);
+    expect(bundle.decision!.bestModelledOptionIds).toEqual([PERMEABLE.optionId]);
+
+    const node = exportWorldEvidenceBundleRoCrate(bundle)['@graph'].find(
+      (n) => typeof n['@id'] === 'string' && n['@id'].startsWith('#decision/'),
+    )!;
+    expect(node).toBeDefined();
+    expect(node['genesis:rankingStatus']).toBe('RANKED');
+    expect(node['genesis:bestModelledOptionIds']).toEqual([PERMEABLE.optionId]);
+    // Extracting this node alone must not lose the caveats.
+    expect(String(node['genesis:disclaimer'])).toMatch(/not a recommendation/);
+    expect(JSON.stringify(node['genesis:notModelledFactors'])).toMatch(/cost/i);
+  });
+
+  it('reports no decision — rather than an empty one — when none was evaluated', () => {
+    const bundle = bundleOf();
+    expect(bundle.decision).toBeNull();
+    const nodes = exportWorldEvidenceBundleRoCrate(bundle)['@graph'].filter(
+      (n) => typeof n['@id'] === 'string' && n['@id'].startsWith('#decision/'),
+    );
+    expect(nodes).toEqual([]);
+  });
+
+  it('fingerprints two bundles differently when the same options are ranked under a different objective', () => {
+    const minimised = bundleOf(report);
+    const maximised = bundleOf(
+      evaluate({ objective: { ...question().objective, direction: 'maximize', rationale: 'Opposite objective.' } }),
+    );
+    // Same world, same options, opposite objective: a different scientific result.
+    expect(maximised.scientificContentFingerprint).not.toBe(minimised.scientificContentFingerprint);
+    expect(bundleOf(report).scientificContentFingerprint).toBe(minimised.scientificContentFingerprint);
+  });
+
+  it('a bundle can carry both a preregistered verdict and a decision at once', () => {
+    const assessment = assessWorldCounterfactual({
+      preregistration: preregisterWorldCounterfactual({
+        questionId: 'wcf:permeable-reduces-depth',
+        question: 'Do permeable surfaces reduce peak flood depth?',
+        worldId: 'genesis-scientific-city-3',
+        entityId: GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
+        interventionDescription: PERMEABLE.description,
+        criterion: {
+          metric: 'maxDepthM',
+          relation: 'less-than',
+          rationale: 'Infiltration removes water, so peak depth should fall.',
+        },
+        declaredAssumptions: ['Synthetic terrain'],
+      }),
+      diff,
+      controlledDifference: {
+        status: 'VERIFIED_IDENTICAL_START',
+        atTick: DECISION_TICK,
+        differingEntityIds: [],
+        reason: 'Forked from the baseline at the decision tick.',
+      },
+      replayVerdict: 'MATCH',
+    });
+    const bundle = buildWorldEvidenceBundle({
+      bundleId: 'genesis-urban-resilience-decision-002',
+      question: question().question,
+      worldId: 'genesis-scientific-city-3',
+      domainId: 'flood-hydrology',
+      baseline: { engine: baseline, worldState: worldStateOf(baseline) },
+      intervention: { engine: storm, worldState: worldStateOf(storm), description: PERMEABLE.description },
+      comparison,
+      seed: null,
+      assessment,
+      decision: report,
+    });
+    // The prediction really was borne out by the same arms the decision ranked.
+    expect(bundle.assessment!.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    expect(bundle.decision!.rankingStatus).toBe('RANKED');
+    const ids = exportWorldEvidenceBundleRoCrate(bundle)['@graph'].map((n) => String(n['@id']));
+    expect(ids.some((id) => id.startsWith('#assessment/'))).toBe(true);
+    expect(ids.some((id) => id.startsWith('#decision/'))).toBe(true);
   });
 });

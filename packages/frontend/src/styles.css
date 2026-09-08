@@ -3554,3 +3554,11 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .wd-dir-WORSENED { color: #f87171; }
 .wd-dir-NO_CHANGE { color: #94a3b8; }
 .wd-dir-NOT_EVALUABLE { color: #fbbf24; }
+
+/* Memory & replay footer: informational, deliberately quiet — it should read
+   as provenance, not as another verdict competing with the ranking above it. */
+.wd-memory { opacity: 0.9; }
+.wd-memory code { font-size: 0.75rem; opacity: 0.85; }
+.wd-replay-MATCH { color: #4ade80; }
+.wd-replay-DRIFT { color: #f87171; }
+.wd-replay-BLOCKED, .wd-replay-NOT_REPRODUCIBLE { color: #fbbf24; }

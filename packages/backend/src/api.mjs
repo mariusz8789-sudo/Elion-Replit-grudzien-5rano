@@ -709,14 +709,65 @@ function createCampaignHandler(db, user, role, projectId, body) {
   const tx = availableTransformations();
   const weights = tx.map((t) => [t, 1]);
 
+  // Opcjonalny własny profil docelowy (P-NL-0): jeśli caller (np. parser języka
+  // naturalnego) poda realne objectives/constraints, są one persystowane i
+  // orchestrator.mjs użyje ich zamiast adapter.DEFAULT_OBJECTIVES/DEFAULT_CONSTRAINTS
+  // (patrz orchestrator.mjs:68-69 — już czyta campaign.objectiveVector/constraints
+  // z fallbackiem na domyślne). Ten handler wcześniej odrzucał je po cichu, nigdy
+  // ich nie czytając z body — jedyna zmiana tutaj to faktyczne ich przekazanie,
+  // z tą samą dyscypliną walidacji co reszta tego handlera: źle ukształtowane wejście
+  // to 400, nigdy ciche odgadnięcie.
+  const objectives = sanitizeObjectives(body.objectives);
+  if (objectives === INVALID) return err(400, 'invalid_objectives', 'Nieprawidłowy format objectives — oczekiwano [{id, targetProperty, target}].');
+  const constraints = sanitizeConstraints(body.constraints);
+  if (constraints === INVALID) return err(400, 'invalid_constraints', 'Nieprawidłowy format constraints — oczekiwano [{id, property, op, value}].');
+
   const campaign = campaignStore.createCampaign(db, {
     projectId, objective, domain,
+    objectiveVector: objectives,
+    constraints,
     budget: { maxGenerations, maxGeneratedCandidates },
     stopping: { patience: 2, minImprovement: 1e-3, diversityFloor: 0.12 },
     strategy: { startingSmiles: starting, transformationWeights: Object.fromEntries(weights), parentSelection: 'pareto' },
     createdBy: user.id,
   });
   return ok({ campaign }, 201);
+}
+
+const INVALID = Symbol('invalid');
+
+/** [] when omitted (caller gets adapter.DEFAULT_OBJECTIVES via orchestrator.mjs's own fallback), INVALID when malformed, else the sanitized real array. */
+function sanitizeObjectives(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 8) return INVALID;
+  const out = [];
+  for (const o of raw) {
+    if (!o || typeof o !== 'object') return INVALID;
+    const id = String(o.id ?? '').trim();
+    const targetProperty = String(o.targetProperty ?? '').trim();
+    const target = Number(o.target);
+    if (!id || !targetProperty || !Number.isFinite(target)) return INVALID;
+    const scale = Number.isFinite(Number(o.scale)) && Number(o.scale) > 0 ? Number(o.scale) : 1;
+    out.push({ id, label: String(o.label ?? id), targetProperty, target, scale });
+  }
+  return out;
+}
+
+/** Same contract as sanitizeObjectives. */
+function sanitizeConstraints(raw) {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > 8) return INVALID;
+  const out = [];
+  for (const c of raw) {
+    if (!c || typeof c !== 'object') return INVALID;
+    const id = String(c.id ?? '').trim();
+    const property = String(c.property ?? '').trim();
+    const op = c.op === 'lte' || c.op === 'gte' ? c.op : null;
+    const value = Number(c.value);
+    if (!id || !property || !op || !Number.isFinite(value)) return INVALID;
+    out.push({ id, property, op, value });
+  }
+  return out;
 }
 
 function clampInt(v, lo, hi, dflt) {

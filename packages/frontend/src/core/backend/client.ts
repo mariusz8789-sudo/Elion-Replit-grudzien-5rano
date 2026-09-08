@@ -668,7 +668,13 @@ export async function listCampaigns(token: string, projectId: string): Promise<A
 
 export async function createCampaign(
   token: string, projectId: string,
-  body: { objective: string; startingSmiles: string[]; budget?: { maxGenerations?: number; maxGeneratedCandidates?: number } },
+  body: {
+    objective: string; startingSmiles: string[]; budget?: { maxGenerations?: number; maxGeneratedCandidates?: number };
+    /** Real objective/constraint override (see `core/discovery/discoveryGoalIntent.ts`) — omitted means the
+     * backend's own `DEFAULT_OBJECTIVES`/`DEFAULT_CONSTRAINTS` apply, identical to today's behavior. */
+    objectives?: { id: string; targetProperty: string; target: number; scale?: number }[];
+    constraints?: { id: string; property: string; op: 'lte' | 'gte'; value: number }[];
+  },
 ): Promise<ApiResult<Campaign>> {
   const r = await request<{ campaign: Campaign }>('POST', `/projects/${projectId}/campaigns`, { token, body });
   return r.ok ? { ok: true, data: r.data.campaign } : r;

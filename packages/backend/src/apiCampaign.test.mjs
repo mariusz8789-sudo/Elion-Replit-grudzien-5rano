@@ -90,6 +90,54 @@ describe('campaign CRUD + RBAC + resource limits', () => {
     assert.equal(insp.body.campaign.stats.retained, 0);
   });
 
+  test('create accepts a real custom objective/constraint profile and persists it (P-NL-0)', () => {
+    const owner = register('owner-nl0@lab.org');
+    const project = makeProject(owner.token);
+
+    // Real, well-shaped profile: created and persisted, orchestrator.mjs's own
+    // fallback (adapter.DEFAULT_OBJECTIVES) is never engaged for this campaign.
+    const created = call('POST', `/api/projects/${project.id}/campaigns`, {
+      token: owner.token,
+      body: {
+        objective: 'low logP, low MW',
+        startingSmiles: ['c1ccccc1'],
+        objectives: [{ id: 'logp-distance', targetProperty: 'crippenLogP', target: 1.0, scale: 1 }],
+        constraints: [{ id: 'mw-max', property: 'molWt', op: 'lte', value: 200 }],
+      },
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(created.body.campaign.objectiveVector, [
+      { id: 'logp-distance', label: 'logp-distance', targetProperty: 'crippenLogP', target: 1.0, scale: 1 },
+    ]);
+    assert.deepEqual(created.body.campaign.constraints, [
+      { id: 'mw-max', property: 'molWt', op: 'lte', value: 200 },
+    ]);
+  });
+
+  test('create rejects a malformed objectives/constraints shape as 400, never silently drops or guesses it', () => {
+    const owner = register('owner-nl0b@lab.org');
+    const project = makeProject(owner.token);
+    const base = { objective: 'x', startingSmiles: ['c1ccccc1'] };
+
+    assert.equal(call('POST', `/api/projects/${project.id}/campaigns`, {
+      token: owner.token, body: { ...base, objectives: [{ id: 'x' }] }, // missing targetProperty/target
+    }).status, 400);
+    assert.equal(call('POST', `/api/projects/${project.id}/campaigns`, {
+      token: owner.token, body: { ...base, constraints: [{ id: 'x', property: 'molWt', op: 'between', value: 1 }] }, // invalid op
+    }).status, 400);
+  });
+
+  test('omitting objectives/constraints entirely still falls back to the real default MPO profile (unchanged behavior)', () => {
+    const owner = register('owner-nl0c@lab.org');
+    const project = makeProject(owner.token);
+    const created = call('POST', `/api/projects/${project.id}/campaigns`, {
+      token: owner.token, body: { objective: 'x', startingSmiles: ['c1ccccc1'] },
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(created.body.campaign.objectiveVector, []);
+    assert.deepEqual(created.body.campaign.constraints, []);
+  });
+
   test('viewer cannot create or start a campaign (RBAC)', () => {
     const owner = register('owner2@lab.org');
     const viewer = register('viewer2@lab.org');

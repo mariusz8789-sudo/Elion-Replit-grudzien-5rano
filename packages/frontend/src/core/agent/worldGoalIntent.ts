@@ -12,6 +12,7 @@ import type { DiscoveryLoopInput, MechanisticHypothesis } from './discoveryLoop'
 // cannot reintroduce one.
 import { GENESIS_CELL_CULTURE_CATALOG, GENESIS_CELL_CULTURE_CATALOG_ID } from './cellCultureLeverCatalog';
 import { GENESIS_CHEMISTRY_CATALOG, GENESIS_CHEMISTRY_CATALOG_ID } from './chemistryLeverCatalog';
+import { GENESIS_GENERATOR_CATALOG, GENESIS_GENERATOR_CATALOG_ID } from './electricalGeneratorLeverCatalog';
 import { GENESIS_EPIDEMIC_CATALOG, GENESIS_EPIDEMIC_CATALOG_ID } from './epidemicLeverCatalog';
 import { relationFor } from './leverCriterion';
 
@@ -412,6 +413,7 @@ export const WORLD_LEVER_CATALOGS: Readonly<Record<string, WorldLeverCatalog>> =
   [GENESIS_CHEMISTRY_CATALOG_ID]: GENESIS_CHEMISTRY_CATALOG,
   [GENESIS_EPIDEMIC_CATALOG_ID]: GENESIS_EPIDEMIC_CATALOG,
   [GENESIS_CELL_CULTURE_CATALOG_ID]: GENESIS_CELL_CULTURE_CATALOG,
+  [GENESIS_GENERATOR_CATALOG_ID]: GENESIS_GENERATOR_CATALOG,
 };
 
 export function resolveWorldLeverCatalog(catalogId: string): WorldLeverCatalog | undefined {

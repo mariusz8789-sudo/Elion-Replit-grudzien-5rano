@@ -247,3 +247,114 @@ What that domain has instead is the other kind of real negative:
 the direction the criterion ruled out. Both are genuine refutations of genuine
 hypotheses; only one of them requires the effect to be exactly zero, and a
 domain that cannot produce that shape should say so rather than manufacture it.
+
+---
+
+## 7. First real test of the checklist — two findings for ADR-001
+
+§4's checklist was written from two domains. It has now been run against four
+new ones (epidemiology, cell biology, electrical engineering, quantum
+tunnelling). It held for three and **rejected one**, which is what a useful
+checklist does. Both findings below are measurements, not opinions.
+
+### 7.1 `QuestionShape` is sufficient — but the gap C1 sensed is real, one level down
+
+**Answer to the direct question: yes, `MECHANISM | PARAMETER` covers every
+domain built so far, and no third enum is needed.** All five WorldGraph
+catalogues ask MECHANISM questions; the Fabric inquiries ask PARAMETER
+questions. Nothing had to be squeezed.
+
+**On C1's specific suspicion — "when will the peak occur":** that is not a third
+*question* shape, and routing it to a discovery orchestrator would be a category
+error. It has no hypothesis, no competing alternatives, nothing to falsify and
+no next experiment. It is a **query against one baseline trajectory** —
+`TemporalEngine.scrubTo` already answers it, and a discovery strategy that
+accepted it would be doing a `for` loop's job.
+
+**But there is a real limitation, and it is not in `QuestionShape` — it is in
+`discoveryLoop`'s objective.** `objectiveAt` (`discoveryLoop.ts:225`) is:
+
+```ts
+const value = collectScalars(entity)[metric];   // one scalar
+// ...called only at input.horizonTick
+```
+
+So an objective is always **"the value of scalar X at tick H"**. That makes all
+of these inexpressible today:
+
+| Objective a scientist would actually state | Expressible? |
+|---|---|
+| infected at day 60 | yes |
+| **peak** infected over the run | no — needs a max over ticks |
+| **when** the peak occurs | no — needs an argmax over ticks |
+| **total** infected (final size / area under the curve) | no — needs an integral |
+| time until fuel drops below 20 L | no — needs a first-crossing time |
+
+This is an **objective shape** gap, not a question shape gap: every row above is
+still `MECHANISM` ("does distancing move it?"). The fix is a reducer on the
+objective — `AT_HORIZON | MAX | MIN | ARGMAX | SUM | FIRST_CROSSING` — inside
+`discoveryLoop`, not a third member of `QuestionShape`. That keeps the
+orchestrator's routing contract at two shapes, which is where C1 wanted it.
+
+**This already bit, and the evidence is in the repo.** `epidemicLeverCatalog.ts`
+had to pick horizon day 60 and document that past day ~100 the sign of the
+contact-reduction result **inverts** — a flattened curve is still climbing when
+the unmitigated one has burnt out. That inversion is entirely an artefact of
+being forced to score a POINT on the curve. With `MAX` (peak infected) or `SUM`
+(final size) the result is monotone in the intervention and no horizon warning
+would be needed at all. The epidemiology catalogue is honest about its horizon
+precisely because it could not state the objective it wanted.
+
+Recommendation: keep `QuestionShape` at two. Open a separate item for the
+objective reducer. It is not blocking — three domains ship without it — but it
+is the reason one of them carries a caveat it should not need.
+
+### 7.2 Quantum tunnelling fails the substrate checklist — measured, not argued
+
+`domains/quantumTunneling.ts` was named for the WorldGraph substrate. **It does
+not belong there, and the reason is in its own module doc:** `runScenario` is
+"a pure, deterministic function of four plain numbers", and the solver caches it
+because it returns "a result that cannot have changed".
+
+Measured on a real `TemporalEngine`, 40 ticks, default junction:
+
+```
+t=1   T=0.01780433287670135
+t=2   T=0.01780433287670135
+t=3   T=0.01780433287670135
+t=10  T=0.01780433287670135
+t=40  T=0.01780433287670135      bit-identical at every tick
+```
+
+Forking at tick 5 and narrowing the barrier (width 3 → 1.5) gives one step and
+then a flat line forever: `T=0.0178` at t=5, `T=0.1886` at t=6, and the same
+`0.1886` at t=10, 20 and 40.
+
+Against §4's checklist: **no** at line 1 (nothing evolves — tick N does not feed
+tick N+1), **no** at line 3 (one entity, no cascades), **yes** at line 6 (a pure
+function of its inputs, whole answer in its declared outputs). That is a Fabric
+domain, and the Fabric already declares it: `quantum-tunneling-1d`, parameters
+`energy`, `barrier`, `width`.
+
+A WorldGraph catalogue for it would run, and would produce correct numbers, and
+would be a lie of structure: `decisionAtTick` and `horizonTick` would be
+meaningless, the baseline "advanced to the horizon" would be identical to the
+baseline at tick 1, and every round would spend thirty cached solver calls
+proving it. That is exactly the "a domain pretending to be a mechanism because
+there was no other option" that ADR-001 asks us to catch, so it was not built.
+
+**What was built instead:** `quantumTunnelingInquiry.ts`, the junction as a
+`SystemUnderStudy` for `inquiryLoop` on the Fabric's own
+`quantum-tunneling-1d` — a PARAMETER question ("what barrier width does this
+junction have?"), which is what it actually is. Physics on WorldGraph is
+delivered by `electricalGeneratorLeverCatalog.ts` instead, which is a genuine
+state machine with a genuine trajectory.
+
+**If C1 does want tunnelling on WorldGraph**, there is one honest route and it
+is not a catalogue: make `frames` advance with the tick, so the junction really
+integrates the wave packet forward as world time passes. The packet genuinely
+does cross over time, so this is real physics rather than a workaround — but it
+is a change to `domains/quantumTunneling.ts`, whose module doc currently states
+that `frames` is "a real, explicit parameter of the experiment, never a hidden
+constant". That is a decision about the domain, not about the catalogue, so it
+is left to C1 rather than taken unilaterally.

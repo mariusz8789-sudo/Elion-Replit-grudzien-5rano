@@ -450,7 +450,7 @@ export const WORLD_COUNTERFACTUAL_UNCERTAINTIES = [
 export type WorldCounterfactualUncertainty = (typeof WORLD_COUNTERFACTUAL_UNCERTAINTIES)[number];
 
 export interface NextWorldExperiment {
-  readonly kind: WorldCounterfactualUncertainty | 'NONE';
+  readonly kind: WorldCounterfactualUncertainty | 'HYPOTHESIS_FALSIFIED' | 'NONE';
   readonly status: 'READY_TO_RUN' | 'BLOCKED' | 'RESOLVED';
   /** What to change, concretely enough to act on. Never executed from here. */
   readonly action: string;
@@ -533,6 +533,39 @@ export function selectNextWorldExperiment(
       why: `Relation "${criterion.relation}" is a statement about a series; two arms give it nothing to be monotone along.`,
       resolves: 'Makes the declared relation decidable at all.',
       rule: 'RELATION_NEEDS_SERIES: monotonicity needs three or more points.',
+    };
+  }
+
+  /**
+   * The one branch that makes a contradiction change the plan rather than repeat it.
+   *
+   * Every case above this one is a reason the EVIDENCE is not yet good enough to
+   * decide anything — preregistration, control, replay, a missing metric, an
+   * undecidable relation. This case is the opposite: the evidence WAS good enough,
+   * and it decided against the criterion. Falling through to SINGLE_INTERVENTION_POINT
+   * here (the pre-existing behavior) would ask the caller to re-run the SAME falsified
+   * premise at a second magnitude, exactly the "always the same sequence regardless of
+   * the result" failure this module exists to avoid. It is placed after every
+   * evidence-quality gate and before SINGLE_INTERVENTION_POINT on purpose: a decisive
+   * contradiction is more informative than "was this checked at a second setting", so
+   * it takes priority.
+   *
+   * This does NOT propose a replacement hypothesis — no mechanism in this codebase
+   * generates one, and inventing text that looks like a new hypothesis without a real
+   * generator behind it would be exactly the fabricated reasoning this project refuses
+   * to ship. What it DOES do, honestly: hand back the real measured divergence (the
+   * actual baseline/intervention values, not the falsified prediction) as the concrete
+   * evidence any replacement hypothesis has to explain — a real difference in the plan,
+   * not a relabeled repeat of the last one.
+   */
+  if (assessment.assessment === 'FALSIFIED_WITHIN_PROTOCOL') {
+    return {
+      kind: 'HYPOTHESIS_FALSIFIED',
+      status: 'RESOLVED',
+      action: `Preregister a new question against the real measured divergence — ${assessment.entityId}'s "${assessment.metricKey}" moved from ${assessment.baseline} to ${assessment.intervention} — rather than re-testing the falsified criterion.`,
+      why: `The preregistered criterion did not hold: ${assessment.message}`,
+      resolves: 'Turns a failed prediction into the evidence a replacement hypothesis must fit, instead of repeating the falsified premise.',
+      rule: 'HYPOTHESIS_FALSIFIED: a controlled, reproduced, decisive contradiction closes this question — the next step explains what actually happened, not re-tests what already failed.',
     };
   }
 

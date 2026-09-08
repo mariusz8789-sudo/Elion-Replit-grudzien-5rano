@@ -70,6 +70,84 @@ def main():
         print(json.dumps({"ok": True, "meanPairwiseDistance": round(total / pairs, 5), "n": len(mols)}))
         return
 
+    # REKOMBINACJA FRAGMENTOW BRICS — realny, deterministyczny sposob na wyjscie
+    # POZA staly, wyliczony zbior transformacji jednorodzicielskich powyzej.
+    #
+    # BRICS (Degen i in. 2008) to opublikowany zbior regul rozbioru czasteczki na
+    # fragmenty po wiazaniach syntetycznie dostepnych. RDKit implementuje go w
+    # `rdkit.Chem.BRICS`: BRICSDecompose rozklada, BRICSBuild sklada ponownie,
+    # laczac fragmenty WYLACZNIE tam, gdzie typy punktow przylaczenia pasuja do
+    # siebie wedlug tych regul. Dzieki temu produkt zlozony z fragmentow DWOCH
+    # roznych rodzicow jest chemia, nie sklejaniem tekstu.
+    #
+    # Determinizm: scrambleReagents=False wylacza losowa kolejnosc reagentow —
+    # ta sama pula fragmentow daje ta sama sekwencje produktow w kazdym procesie.
+    # To jest sprawdzane w tescie, nie zalozone.
+    #
+    # To NIE jest generatywne projektowanie de novo: nie ma tu modelu proponujacego
+    # nowe rusztowania. To szersze, ale wciaz kombinatoryczne przeszukiwanie —
+    # ograniczone do fragmentow obecnych w rodzicach i regul laczenia BRICS.
+    if cmd == "brics":
+        from rdkit.Chem import BRICS
+        smiles_in = req.get("smiles", [])
+        if not isinstance(smiles_in, list) or len(smiles_in) < 1:
+            print(json.dumps({"ok": False, "error": "brics_needs_smiles_list"}))
+            return
+        max_products = int(req.get("maxProducts", 8))
+        max_depth = int(req.get("maxDepth", 2))
+        parents = []
+        fragments_by_parent = {}
+        pool = set()
+        for s in smiles_in:
+            if not isinstance(s, str):
+                continue
+            m = Chem.MolFromSmiles(s)
+            if m is None:
+                print(json.dumps({"ok": False, "error": "invalid_smiles: %s" % s}))
+                return
+            canonical = Chem.MolToSmiles(m)
+            parents.append(canonical)
+            frags = sorted(BRICS.BRICSDecompose(m))
+            fragments_by_parent[canonical] = frags
+            pool.update(frags)
+        # Jeden fragment na rodzica = czasteczka nierozkladalna wedlug regul BRICS;
+        # nie ma z czego rekombinowac i mowimy to wprost zamiast zwracac rodzicow.
+        if len(pool) < 2:
+            print(json.dumps({"ok": True, "products": [], "fragmentsByParent": fragments_by_parent,
+                              "reason": "not_decomposable", "engine": "RDKit " + rdkit.__version__}))
+            return
+        frag_mols = [Chem.MolFromSmiles(f) for f in sorted(pool)]
+        frag_mols = [m for m in frag_mols if m is not None]
+        parent_set = set(parents)
+        products = []
+        seen = set()
+        # Twardy limit pobran z generatora: BRICSBuild jest nieskonczony dla wiekszych
+        # pul, a adapter ma 10 s budzetu. Limit jest deterministyczny, nie losowy.
+        max_draws = max_products * 20
+        try:
+            builder = BRICS.BRICSBuild(frag_mols, onlyCompleteMols=True,
+                                       scrambleReagents=False, maxDepth=max_depth)
+            for i, prod in enumerate(builder):
+                if i >= max_draws or len(products) >= max_products:
+                    break
+                try:
+                    prod.UpdatePropertyCache(strict=False)
+                    Chem.SanitizeMol(prod)
+                    smi = Chem.MolToSmiles(prod)
+                except Exception:  # noqa: BLE001 — produkt niesanityzowalny odrzucamy, nie naprawiamy
+                    continue
+                # Odtworzony rodzic nie jest nowym kandydatem.
+                if smi in parent_set or smi in seen:
+                    continue
+                seen.add(smi)
+                products.append(smi)
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "brics_build_failed: %s" % e}))
+            return
+        print(json.dumps({"ok": True, "products": products, "fragmentsByParent": fragments_by_parent,
+                          "engine": "RDKit " + rdkit.__version__}))
+        return
+
     # Porownanie STRUKTURALNE dwoch czasteczek: Tanimoto na Morgan FP (r=2, 2048 bit)
     # + rzeczywisty szkielet Bemisa-Murcko. Oba pochodza wprost z RDKit; zadna
     # wartosc nie jest tu szacowana ani interpolowana.

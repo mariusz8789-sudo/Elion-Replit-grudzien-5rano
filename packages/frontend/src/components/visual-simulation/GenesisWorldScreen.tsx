@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor, Sim3D } from '../../core/three/types';
 import type { SimParams } from '../../core/types';
@@ -17,7 +17,8 @@ import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/g
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
-import { GENESIS_FLOOD_CATALOG, type WorldLever } from '../../core/agent/worldGoalIntent';
+import { GENESIS_FLOOD_CATALOG, GENESIS_FLOOD_LEVERS, type WorldLever } from '../../core/agent/worldGoalIntent';
+import { compareWorldActions, type CrossActionComparison } from '../../core/agent/crossActionComparison';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
@@ -1018,6 +1019,43 @@ export class GenesisWorldSim3D implements Sim3D {
     this.syncNow();
   }
 
+  /** The most recent real experiment's result — read by React to render the comparison panel. */
+  lastComparison: CrossActionComparison | null = null;
+
+  /**
+   * PRIORITY 4 (most important) — connects the walk-up interaction system to Genesis' own real
+   * Discovery Engine: `crossActionComparison.ts`'s `compareWorldActions`, the SAME engine
+   * `WorldDiscoveryPanel.tsx` already uses elsewhere in this app. Every real lever this world
+   * declares is forked from one shared control and measured against the same real objective — a
+   * genuine "what happens if we change things here", not a guess, and not a second ranking engine:
+   * this calls the real one, unmodified.
+   *
+   * Runs on the catalog's OWN reference world (`catalog.buildWorld()`), not the player's live walked
+   * city — the same architecture every Discovery Engine surface in this app already uses (`discoveryLoop.ts`'s
+   * own multi-round search does the same). A comparison needs one controlled, reproducible baseline
+   * every arm forks from; the player's own world — already mid-scenario, maybe already forked by an
+   * earlier walk-up intervention — cannot promise to still be that. `applyComparisonWinner()` below is
+   * what turns the experiment's real answer into a change the player actually SEES: it applies the
+   * SAME winning lever object to the player's own live engine, reusing `applyLever()` verbatim.
+   */
+  runExperiment(): CrossActionComparison {
+    this.lastComparison = compareWorldActions({ goal: 'minimize peak flood depth', catalog: GENESIS_FLOOD_CATALOG });
+    return this.lastComparison;
+  }
+
+  /** Applies the last experiment's real winning lever to the LIVE world. A no-op if no comparison has
+   * run, no lever won (a refusal, a tie with no single best, or a genuinely unrankable result — see
+   * `CrossActionComparison.status`), or a fork already exists (single-shot, matching `applyLever()`). */
+  applyComparisonWinner(): void {
+    if (!this.lastComparison || this.forkEngine) return;
+    const winningId = this.lastComparison.bestActionIds[0];
+    if (!winningId) return;
+    const lever = GENESIS_FLOOD_LEVERS.find((l) => l.leverId === winningId);
+    if (!lever) return;
+    this.applyLever(lever, `experiment-winner:${lever.leverId}`);
+    this.lastComparison = null;
+  }
+
   getStats(): Record<string, number> {
     return {
       nearInteractable: this.nearestInteractableId !== null ? 1 : 0,
@@ -1089,8 +1127,16 @@ export function GenesisWorldScreen() {
   // boolean fits `Record<string, number>` fine, unlike an entity id).
   const [nearHospitalEntrance, setNearHospitalEntrance] = useState(false);
   const [insideHospital, setInsideHospital] = useState(false);
+  // PRIORITY 4 — the last real experiment's result (`compareWorldActions`, Genesis' own Discovery
+  // Engine), cleared whenever the player walks away from the entity that triggered it.
+  const [comparison, setComparison] = useState<CrossActionComparison | null>(null);
+  const lastNearestIdRef = useRef<WorldFrameEntityId | null>(null);
   const onStats = useCallback((s: Record<string, number>) => {
     const id = sim.getNearestInteractableId();
+    if (lastNearestIdRef.current !== id) {
+      lastNearestIdRef.current = id;
+      setComparison(null);
+    }
     setNearestId(id);
     setInspection(id ? sim.inspect(id) : null);
     setAvailableLevers(id ? sim.leversFor(id) : []);
@@ -1153,6 +1199,20 @@ export function GenesisWorldScreen() {
   // fork engine) shows the REAL consequence — never a second, separately-computed "preview".
   const handleApplyLever = (lever: WorldLever) => {
     sim.applyLever(lever, `walk-up:${lever.leverId}`);
+    setForkTick(sim.forkEngine?.tick ?? null);
+    setShowFork(true);
+    setPumpStatus(readPumpStatus(true));
+  };
+
+  // PRIORITY 4 (most important) — "check what happens if we change things here", answered by
+  // Genesis' own real Discovery Engine (`compareWorldActions`), not a guess: every real lever this
+  // world declares, forked from one shared control and measured against the same real objective.
+  const handleRunExperiment = () => {
+    setComparison(sim.runExperiment());
+  };
+  const handleApplyWinner = () => {
+    sim.applyComparisonWinner();
+    setComparison(null);
     setForkTick(sim.forkEngine?.tick ?? null);
     setShowFork(true);
     setPumpStatus(readPumpStatus(true));
@@ -1270,6 +1330,14 @@ export function GenesisWorldScreen() {
         else if (nearHospitalEntrance) handleEnterHospital();
         return;
       }
+      if (e.code === 'KeyR' && forkTick === null && availableLevers.length > 0) {
+        handleRunExperiment();
+        return;
+      }
+      if (e.code === 'Enter' && forkTick === null && comparison && comparison.bestActionIds.length > 0) {
+        handleApplyWinner();
+        return;
+      }
       if (e.code === 'Escape' && document.pointerLockElement) document.exitPointerLock();
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -1288,7 +1356,7 @@ export function GenesisWorldScreen() {
       document.removeEventListener('keyup', onKeyUp);
       document.removeEventListener('mousemove', onMouseMove);
     };
-  }, [sim, availableLevers, forkTick, insideHospital, nearHospitalEntrance]);
+  }, [sim, availableLevers, forkTick, insideHospital, nearHospitalEntrance, comparison]);
 
   const handleScrub = (value: number) => {
     setScrubValue(value);
@@ -1417,6 +1485,45 @@ export function GenesisWorldScreen() {
               </div>
             ) : (
               <span data-testid="interact-panel-inspect-only">Inspect only — no real intervention modelled for this entity yet.</span>
+            )}
+
+            {/* PRIORITY 4 (most important) — "check what happens if we change things here", answered
+                by Genesis' own real Discovery Engine (compareWorldActions), the SAME engine
+                WorldDiscoveryPanel.tsx already runs elsewhere in this app: every real lever this world
+                declares, forked from one shared control and measured against the same real objective.
+                Runs on the catalog's own reference world (never the player's live city — see
+                `runExperiment()`'s own doc for why), so applying the real winner is a separate,
+                explicit second step that changes the world the player is actually standing in. */}
+            {availableLevers.length > 0 && !comparison && (
+              <button type="button" className="chip-btn" data-testid="run-experiment-btn" onClick={handleRunExperiment}>
+                R — run real experiment (compare every option)
+              </button>
+            )}
+            {comparison && (
+              <div className="gx-experiment-result" data-testid="experiment-result">
+                <span>
+                  {comparison.status === 'REFUSED' || comparison.status === 'BLOCKED' || comparison.status === 'NOT_MODELLED'
+                    ? `Experiment could not run: ${comparison.refusalReason ?? comparison.status}`
+                    : `Real comparison (${comparison.status.toLowerCase()}), objective: ${comparison.objective?.metric ?? '?'}`}
+                </span>
+                {comparison.ranking.map((evidence) => (
+                  <div key={evidence.actionId} data-testid={`experiment-rank-${evidence.actionId}`}>
+                    {comparison.bestActionIds.includes(evidence.actionId) ? '★ ' : ''}
+                    {evidence.label}: {evidence.directionVerdict.toLowerCase()}
+                    {evidence.absoluteDelta !== null ? ` (Δ${evidence.absoluteDelta.toFixed(4)})` : ''}
+                  </div>
+                ))}
+                <div className="gx-interact-panel-levers">
+                  {comparison.bestActionIds.length > 0 && (
+                    <button type="button" className="chip-btn" data-testid="apply-experiment-winner-btn" onClick={handleApplyWinner}>
+                      Enter — apply winning option to this world
+                    </button>
+                  )}
+                  <button type="button" className="chip-btn" data-testid="dismiss-experiment-btn" onClick={() => setComparison(null)}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}

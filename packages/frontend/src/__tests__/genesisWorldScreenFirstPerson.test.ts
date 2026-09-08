@@ -321,3 +321,60 @@ describe('GenesisWorldSim3D — PRIORITY 3: LIVING LAYER tied to real world stat
     expect(waterMesh.position.y).toBeCloseTo(0.5, 5);
   });
 });
+
+describe('GenesisWorldSim3D — PRIORITY 4 (most important): connected to the real Discovery Engine', () => {
+  it('runExperiment() runs the real compareWorldActions comparison — a real ranking over every declared lever', () => {
+    const { sim } = buildInitializedSim();
+    const comparison = sim.runExperiment();
+    expect(sim.lastComparison).toBe(comparison);
+    expect(['RANKED', 'TIED']).toContain(comparison.status);
+    // All 3 real flood levers (outlet, infiltration, pump) are declared with no goal-side restriction.
+    expect(comparison.ranking.length).toBeGreaterThanOrEqual(3);
+    expect(comparison.bestActionIds.length).toBeGreaterThan(0);
+  });
+
+  it('applyComparisonWinner() forks the LIVE engine with the real winning lever\'s own mutation', () => {
+    const { sim } = buildInitializedSim();
+    const comparison = sim.runExperiment();
+    const winningId = comparison.bestActionIds[0]!;
+    expect(sim.forkEngine).toBeNull();
+
+    sim.applyComparisonWinner();
+
+    expect(sim.forkEngine).not.toBeNull();
+    expect(sim.showFork).toBe(true);
+    expect(sim.lastComparison).toBeNull(); // consumed
+    // The fork is a REAL fork of the player's own live engine (base.engine), not the comparison's own
+    // disconnected reference world — verified by checking the winning lever's declared target entity
+    // actually changed, on THIS engine.
+    if (winningId === 'lever:outlet-capacity') {
+      const floodplain = sim.forkEngine!.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+      expect(floodplain.domainState?.outletWidthM).toBeCloseTo(40, 5);
+    } else if (winningId === 'lever:infiltration') {
+      const floodplain = sim.forkEngine!.graph.getEntity(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID);
+      expect(floodplain.domainState?.infiltrationRateMPerS).toBeCloseTo(1.0e-4, 8);
+    } else if (winningId === 'lever:pump-capacity') {
+      const pump = sim.forkEngine!.graph.getEntity(sim.city.pumpPipeId);
+      const baselinePump = sim.city.base.engine.graph.getEntity(sim.city.pumpPipeId);
+      expect(pump.domainState?.volumetricFlow).toBeGreaterThan(baselinePump.domainState?.volumetricFlow as number);
+    } else {
+      throw new Error(`unexpected winning lever id: ${winningId}`);
+    }
+  });
+
+  it('applyComparisonWinner() without a prior experiment is a no-op', () => {
+    const { sim } = buildInitializedSim();
+    expect(sim.lastComparison).toBeNull();
+    sim.applyComparisonWinner();
+    expect(sim.forkEngine).toBeNull();
+  });
+
+  it('applyComparisonWinner() is a no-op once a fork already exists — single-shot, like applyLever()', () => {
+    const { sim } = buildInitializedSim();
+    sim.applyLever(sim.leversFor(sim.city.pumpPipeId)[0]!, 'first');
+    const forkAfterFirst = sim.forkEngine;
+    sim.runExperiment();
+    sim.applyComparisonWinner();
+    expect(sim.forkEngine).toBe(forkAfterFirst);
+  });
+});

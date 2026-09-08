@@ -1,3 +1,4 @@
+import { canonicalJson, fnv1a } from '../events/hash';
 import {
   BASELINE_OPTION_ID,
   evaluateDecision,
@@ -425,4 +426,36 @@ export function compareWorldActions(input: CrossActionInput): CrossActionCompari
     declaredAssumptions: decision.declaredAssumptions,
     disclaimer: CROSS_ACTION_DISCLAIMER,
   };
+}
+
+/**
+ * A content fingerprint over what a comparison actually found, excluding
+ * branch ids — same reasoning as `discoveryResultFingerprint`: branch ids are
+ * a process-local instance label, not a scientific fact, and two runs of the
+ * same catalogue with identical physics must agree on this fingerprint even
+ * when their branch ids differ.
+ */
+export function crossActionResultFingerprint(comparison: CrossActionComparison): string {
+  const content = {
+    goal: comparison.goal,
+    worldId: comparison.worldId,
+    domainId: comparison.domainId,
+    status: comparison.status,
+    objective: comparison.objective,
+    refusalReason: comparison.refusalReason,
+    candidates: comparison.candidates.map((c) => ({ actionId: c.actionId, availability: c.availability, reason: c.reason })),
+    ranking: comparison.ranking.map((row) => ({
+      actionId: row.actionId,
+      rank: row.rank,
+      baselineMetric: row.baselineMetric,
+      interventionMetric: row.interventionMetric,
+      absoluteDelta: row.absoluteDelta,
+      directionVerdict: row.directionVerdict,
+      outcomeStatus: row.outcomeStatus,
+    })),
+    bestActionIds: comparison.bestActionIds,
+    baselineMetric: comparison.baselineMetric,
+    notModelledFactors: comparison.notModelledFactors,
+  };
+  return `xaf_${fnv1a(canonicalJson(content))}`;
 }

@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import type { CrossActionComparison } from '../../core/agent/crossActionComparison';
 import {
-  runWorldDiscovery,
+  runWorldDiscoveryAndRemember,
   summariseDiscovery,
-  type WorldDiscoveryState,
+  type WorldDiscoveryEvidenceSummary,
+  type WorldDiscoveryMemoryUse,
+  type WorldDiscoveryRememberedState,
 } from '../../core/agent/worldDiscoverySession';
+import type { SavedWorldDiscoveryReplay } from '../../core/scienceMemory';
+
+/** Local UI states the session module has no reason to know about. */
+type PanelState = { kind: 'IDLE' } | { kind: 'RUNNING'; goal: string } | WorldDiscoveryRememberedState;
 
 /**
  * DISCOVERY, IN THE WORLD IT SEARCHES.
@@ -26,16 +32,18 @@ import {
  */
 export function WorldDiscoveryPanel() {
   const [goal, setGoal] = useState('');
-  const [state, setState] = useState<WorldDiscoveryState>({ kind: 'IDLE' });
+  const [state, setState] = useState<PanelState>({ kind: 'IDLE' });
 
   const run = (text: string) => {
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
     setState({ kind: 'RUNNING', goal: trimmed });
-    // The search forks and advances a real world in-process, which takes long
-    // enough to drop a frame. Yielding first lets the RUNNING state paint, so the
-    // panel reports that it is working rather than appearing to hang.
-    setTimeout(() => setState(runWorldDiscovery(trimmed)), 0);
+    // The search forks and advances a real world, persists it to Science Memory,
+    // builds its Evidence Bundle and replays it — several real experiments'
+    // worth of work, which takes long enough to drop a frame. Yielding first
+    // lets the RUNNING state paint, so the panel reports that it is working
+    // rather than appearing to hang.
+    setTimeout(() => setState(runWorldDiscoveryAndRemember(trimmed)), 0);
   };
 
   return (
@@ -76,13 +84,16 @@ export function WorldDiscoveryPanel() {
 
       {state.kind === 'RUNNING' && (
         <p className="wd-running" role="status">
-          Running real experiments on this world — forking the city and advancing each arm.
+          Running real experiments on this world — forking the city, advancing each arm, and recording the result
+          to Science Memory.
         </p>
       )}
 
       {state.kind === 'REFUSED' && <DiscoveryRefusal state={state} />}
       {state.kind === 'COMPLETE' && <DiscoveryResult state={state} />}
-      {state.kind === 'COMPARISON' && <ActionComparisonResult comparison={state.comparison} />}
+      {state.kind === 'COMPARISON' && (
+        <ActionComparisonResult comparison={state.comparison} memory={state.memory} evidence={state.evidence} replay={state.replay} />
+      )}
     </div>
   );
 }
@@ -92,7 +103,7 @@ export function WorldDiscoveryPanel() {
  * to search something it cannot mean is the honest answer, and the reason names
  * what it would need instead.
  */
-function DiscoveryRefusal({ state }: { state: Extract<WorldDiscoveryState, { kind: 'REFUSED' }> }) {
+function DiscoveryRefusal({ state }: { state: Extract<PanelState, { kind: 'REFUSED' }> }) {
   return (
     <div className="wd-refusal" role="status">
       <p className="wd-refusal-head">Genesis did not run this search.</p>
@@ -111,7 +122,7 @@ function DiscoveryRefusal({ state }: { state: Extract<WorldDiscoveryState, { kin
   );
 }
 
-function DiscoveryResult({ state }: { state: Extract<WorldDiscoveryState, { kind: 'COMPLETE' }> }) {
+function DiscoveryResult({ state }: { state: Extract<PanelState, { kind: 'COMPLETE' }> }) {
   const { result } = state;
   return (
     <div className="wd-result">
@@ -189,12 +200,49 @@ function DiscoveryResult({ state }: { state: Extract<WorldDiscoveryState, { kind
         </p>
       </section>
 
+      <MemoryAndEvidenceFooter memory={state.memory} evidence={state.evidence} replay={state.replay} />
+
       <details className="wd-machine">
         <summary>Machine-readable record</summary>
         <pre className="wd-pre">{state.report}</pre>
         <pre className="wd-pre">{JSON.stringify({ intent: state.intent, result }, null, 2)}</pre>
       </details>
     </div>
+  );
+}
+
+/**
+ * What memory contributed to THIS run, and the real Evidence Bundle + Replay
+ * this run produced. Shown on both result kinds because both now go through
+ * the same persist-and-replay pipeline (`runWorldDiscoveryAndRemember`).
+ *
+ * `memory` is null on a comparison (every declared action always competes)
+ * and on a run with nothing to resume from (the honest, common first-run
+ * case) — rendered as "starting fresh" rather than omitted, so a viewer can
+ * tell "memory had nothing to say" from "this panel forgot to check".
+ */
+function MemoryAndEvidenceFooter({
+  memory,
+  evidence,
+  replay,
+}: {
+  memory: WorldDiscoveryMemoryUse | null;
+  evidence: WorldDiscoveryEvidenceSummary;
+  replay: SavedWorldDiscoveryReplay;
+}) {
+  return (
+    <section className="wd-section wd-memory">
+      <h4>Memory &amp; replay</h4>
+      <p className="gsc-caption">
+        {memory ? memory.reason : 'No earlier run for this objective — starting fresh.'}
+      </p>
+      <p className="gsc-caption">
+        Evidence Bundle <code>{evidence.bundleId}</code>: own replay <b>{evidence.replayVerdict}</b>.
+      </p>
+      <p className="gsc-caption">
+        Saved run re-executed and verified: <b className={`wd-replay-${replay.status}`}>{replay.status}</b> — {replay.reason}
+      </p>
+    </section>
   );
 }
 
@@ -207,7 +255,17 @@ function DiscoveryResult({ state }: { state: Extract<WorldDiscoveryState, { kind
  * comparison has no winner to show, and manufacturing one from the numbers on
  * screen is exactly the failure the engine's state set exists to prevent.
  */
-function ActionComparisonResult({ comparison }: { comparison: CrossActionComparison }) {
+function ActionComparisonResult({
+  comparison,
+  memory,
+  evidence,
+  replay,
+}: {
+  comparison: CrossActionComparison;
+  memory: WorldDiscoveryMemoryUse | null;
+  evidence: WorldDiscoveryEvidenceSummary;
+  replay: SavedWorldDiscoveryReplay;
+}) {
   const ranked = comparison.status === 'RANKED' || comparison.status === 'TIED';
   return (
     <div className="wd-result">
@@ -274,6 +332,8 @@ function ActionComparisonResult({ comparison }: { comparison: CrossActionCompari
         </ul>
         <p className="gsc-caption">{comparison.disclaimer}</p>
       </section>
+
+      <MemoryAndEvidenceFooter memory={memory} evidence={evidence} replay={replay} />
 
       <details className="wd-machine">
         <summary>Machine-readable record</summary>

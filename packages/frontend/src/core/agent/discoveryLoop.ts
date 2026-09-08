@@ -1,3 +1,4 @@
+import { canonicalJson, fnv1a } from '../events/hash';
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
 import { compareBranches } from '../worldModel/bridge/worldFrameState';
 import { collectScalars } from '../worldModel/bridge/worldFrameState';
@@ -362,15 +363,36 @@ function selectNext(
 }
 
 /**
- * Runs the loop. Deterministic: the same world and the same declared
- * hypotheses produce the same rounds, the same beliefs and the same trace.
+ * The live engines behind one run, for a caller that needs to build something
+ * FROM the run afterwards (an Evidence Bundle, say) without re-executing it.
+ *
+ * Not part of `DiscoveryLoopResult` itself: that type is read and serialised
+ * everywhere (memory, the UI's machine-readable dump, tests), and a
+ * `TemporalEngine` is neither JSON-safe nor meaningful once serialised. This
+ * is the escape hatch for the one caller — the memory/evidence integration —
+ * that legitimately needs the live world, kept separate so nothing else can
+ * accidentally start depending on non-serialisable state.
  */
-export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoopResult {
+export interface DiscoveryLoopExecution {
+  readonly result: DiscoveryLoopResult;
+  readonly registry: TemporalBranchRegistry;
+  readonly baseline: TemporalEngine;
+  /** The arm of the LAST executed round — the most decisive one this run produced. Null if no round ran. */
+  readonly lastArm: TemporalEngine | null;
+}
+
+/**
+ * Runs the loop and returns the live engines alongside the result.
+ * Deterministic: the same world and the same declared hypotheses produce the
+ * same rounds, the same beliefs and the same trace.
+ */
+export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): DiscoveryLoopExecution {
   const replicationStrength = input.replicationStrength ?? 0.5;
   const world = input.buildWorld();
   const registry = new TemporalBranchRegistry();
   const baseline = new TemporalEngine(world.graph, { registry, label: 'baseline' });
   for (let i = 0; i < input.horizonTick; i++) baseline.advance(input.dt, world.updater);
+  let lastArm: TemporalEngine | null = null;
 
   const beliefs = new Map<string, HypothesisBelief>(
     input.hypotheses.map((h) => [h.hypothesisId, initialBelief(h)]),
@@ -392,6 +414,7 @@ export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoop
       hypothesis.apply(graph, strength),
     );
     for (let tick = input.decisionAtTick; tick < input.horizonTick; tick++) arm.advance(input.dt, world.updater);
+    lastArm = arm;
 
     // --- Observation: the declared tools, so capability travels with it -----
     const comparison = compareBranches(registry, baseline.branchId, arm.branchId, input.horizonTick);
@@ -493,7 +516,7 @@ export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoop
   }
 
   const all = [...beliefs.values()];
-  return {
+  const result: DiscoveryLoopResult = {
     contractVersion: DISCOVERY_LOOP_CONTRACT_VERSION,
     question: input.question,
     worldId: input.worldId,
@@ -513,6 +536,52 @@ export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoop
     declaredAssumptions: input.declaredAssumptions,
     notModelledFactors: input.notModelledFactors,
   };
+  return { result, registry, baseline, lastArm };
+}
+
+/** The result alone, for every caller that does not need the live engines. */
+export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoopResult {
+  return runAutonomousDiscoveryWithEngines(input).result;
+}
+
+/**
+ * A content fingerprint over what a run actually found, excluding branch ids.
+ *
+ * `TemporalEngine` names branches from a process-global counter, so the same
+ * inputs re-executed in a fresh process assign different branch ids to
+ * identical science — the same fact `worldEvidenceBundle.ts` documents as
+ * `BRANCH_LABEL_VOLATILITY_LIMITATION`. A caller that wants to know "did this
+ * replay produce the SAME FINDING" (memory, replay verification) needs a
+ * fingerprint that agrees on two runs with identical physics, so branch ids —
+ * and the trace's per-step `branchId` — are left out; everything that was
+ * actually measured or concluded is left in.
+ */
+export function discoveryResultFingerprint(result: DiscoveryLoopResult): string {
+  const content = {
+    question: result.question,
+    worldId: result.worldId,
+    domainId: result.domainId,
+    stopReason: result.stopReason,
+    rounds: result.rounds.map((round) => ({
+      hypothesisId: round.hypothesisId,
+      strength: round.strength,
+      objectiveBaseline: round.objectiveBaseline,
+      objectiveObserved: round.objectiveObserved,
+      effect: round.effect,
+      assessment: round.assessment.assessment,
+      attribution: round.assessment.attribution,
+      selectionReason: round.selectionReason,
+    })),
+    beliefs: result.beliefs.map((belief) => ({
+      hypothesisId: belief.hypothesisId,
+      status: belief.status,
+      confidence: belief.confidence,
+      reason: belief.reason,
+      observedEffects: belief.observedEffects,
+    })),
+    unresolvedQuestions: result.unresolvedQuestions,
+  };
+  return `dlf_${fnv1a(canonicalJson(content))}`;
 }
 
 /** The capability label carried on every step, read from the tool's own declaration. */

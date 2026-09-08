@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type * as THREE_NS from 'three';
-import type { Sim3D } from '../../core/three/types';
+import type { PostProcessingModules, PostProcessor, Sim3D } from '../../core/three/types';
 import type { SimParams } from '../../core/types';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { WorldFrameRenderer, type EntityVisualSpec } from '../../core/three/graphics/worldFrameRenderer';
@@ -9,6 +9,9 @@ import type { WorldFrameEntity, WorldFrameEntityId } from '../../core/three/grap
 import { buildTerrainFieldMesh, type TerrainFieldMesh } from '../../core/three/graphics/terrainField';
 import { severityColor } from '../../core/three/graphics/stateVisualization';
 import { createFireVfx, type FireVfxHandle } from '../../core/three/graphics/fireVfx';
+import { createSceneEnvironment, type SceneEnvironmentHandle } from '../../core/three/graphics/sceneEnvironment';
+import { createPBRMaterial, type StaticGenesisMaterialId } from '../../core/three/graphics/materials';
+import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/graphics/postProcessing';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
@@ -70,7 +73,35 @@ function colorForVisualHint(hint?: string): number {
   return (hint ? VISUAL_HINT_COLOR[hint] : undefined) ?? 0x8899aa;
 }
 
-class GenesisWorldSim3D implements Sim3D {
+/**
+ * TIER1.3 — every entity box used to be a flat `MeshStandardMaterial({color, roughness:0.6})`, the
+ * one hand-rolled placeholder material the audit found on this scene (no texture, no roughness/
+ * metalness differentiation between a pump and a building). Mapping each `visualHint` onto a real
+ * `materials.ts` PBR category — the same procedural-texture system every other production scene
+ * already composes with — gives this scene actual material variety for free, without inventing any
+ * new visual language: metal infrastructure reads as metal, roads read as asphalt, buildings read as
+ * a painted facade. The tint (`colorForVisualHint`, and `updateVisual`'s tripped/interrupted override)
+ * still layers on top via `PBRMaterialOverrides.color` — status coloring is unchanged.
+ */
+const VISUAL_HINT_MATERIAL: Readonly<Record<string, StaticGenesisMaterialId>> = {
+  planet: 'CONCRETE',
+  region: 'CONCRETE',
+  city: 'CONCRETE',
+  district: 'BRICK',
+  road: 'ASPHALT',
+  building: 'PAINTED_METAL',
+  'pump-pipe-system': 'BRUSHED_METAL',
+  population: 'TECH_COMPOSITE',
+  lab: 'CERAMIC',
+  substance: 'TECH_COMPOSITE',
+  environment: 'TECH_COMPOSITE',
+};
+
+function materialCategoryForVisualHint(hint?: string): StaticGenesisMaterialId {
+  return (hint ? VISUAL_HINT_MATERIAL[hint] : undefined) ?? 'CONCRETE';
+}
+
+export class GenesisWorldSim3D implements Sim3D {
   cameraAutoRotateSpeed = 0;
   private THREE: typeof THREE_NS | null = null;
   private scene: THREE_NS.Scene | null = null;
@@ -79,6 +110,8 @@ class GenesisWorldSim3D implements Sim3D {
   private interaction: InteractionController | null = null;
   private width = 300;
   private height = 300;
+  private sceneEnvironment: SceneEnvironmentHandle | null = null;
+  private pipeline: GraphicsPipeline | null = null;
 
   readonly city: GenesisScientificCity4;
   forkEngine: TemporalEngine | null = null;
@@ -139,15 +172,33 @@ class GenesisWorldSim3D implements Sim3D {
     this.scene = scene;
     this.width = w;
     this.height = h;
-    scene.background = new THREE.Color(0x0a0f1a);
-    scene.add(new THREE.HemisphereLight(0xbcd2ff, 0x30303a, 0.9));
-    const key = new THREE.DirectionalLight(0xffffff, 1.1);
-    key.position.set(60, 100, 40);
-    scene.add(key);
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x141c2b, roughness: 1 }));
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
+    // TIER1.3 — this scene used to hand-roll its own background color, a single hemisphere+directional
+    // light pair, and a flat unlit-looking ground plane, independently of the shared exterior baseline
+    // every other outdoor scene composes with (see `sceneEnvironment.ts`'s own module doc — this scene
+    // was one of the very hand-rolled cases it names). Mirrors `genesisScientificCitySim.ts`'s own
+    // night-preset call: `hourOfDay: 21` drives the dark sky/fog mood this scene already had (was a flat
+    // `0x0a0f1a` background), while the sun/fill overrides keep the world actually lit and legible
+    // rather than physically-dim-night-dark (see that scene's own comment on why the raw preset alone
+    // leaves geometry "nearly unlit and floating in fog").
+    this.sceneEnvironment = createSceneEnvironment(THREE, scene, {
+      mode: 'OUTDOOR',
+      hourOfDay: 21,
+      fogDensity: 0.0022,
+      groundSize: 400,
+      // A legible slate tone, not a physically-dim night ground: this is an OBSERVATION surface
+      // (command-center view of the whole scientific city, entities scattered across it), not a
+      // moody establishing shot — the audit's own "Genesis World reads as empty/void" finding was
+      // largely this ground rendering near-black under the originally much darker tint+lighting,
+      // worsened by the camera's steep top-down angle exposing most of the frame to that dark plane.
+      groundMaterial: createPBRMaterial(THREE, 'CONCRETE', { color: 0x4a5c78 }),
+      sunPosition: [60, 100, 40],
+      sunColor: 0xdfe8ff,
+      sunIntensity: 2.6,
+      fillIntensity: 2,
+      fillSkyColor: 0xbcd2ff,
+      fillGroundColor: 0x3a3a46,
+    });
 
     this.root = new THREE.Group();
     scene.add(this.root);
@@ -155,8 +206,13 @@ class GenesisWorldSim3D implements Sim3D {
     const resolveVisual = (entity: WorldFrameEntity): EntityVisualSpec => {
       const size = Math.max(1.5, 1.5 * (entity.scale ?? 1));
       const geometry = new THREE.BoxGeometry(size, size, size);
-      const material = new THREE.MeshStandardMaterial({ color: colorForVisualHint(entity.visualHint), roughness: 0.6 });
-      return { kind: 'object', object: new THREE.Mesh(geometry, material) };
+      const material = createPBRMaterial(THREE, materialCategoryForVisualHint(entity.visualHint), {
+        color: colorForVisualHint(entity.visualHint),
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return { kind: 'object', object: mesh };
     };
     const updateVisual = (entity: WorldFrameEntity, object: THREE_NS.Object3D): void => {
       const mesh = object as THREE_NS.Mesh;
@@ -190,6 +246,32 @@ class GenesisWorldSim3D implements Sim3D {
   onResize(w: number, h: number): void {
     this.width = w;
     this.height = h;
+  }
+
+  /**
+   * TIER1.3 — this scene had no `setupPostProcessing` at all, meaning `useThreeLoop.ts` never ran
+   * `setupGraphicsPipeline` for it: no ACES tone mapping (the same filmic response every other
+   * production scene renders with), no shadow-map configuration (`createSceneEnvironment`'s sun light
+   * above requests `castShadow` per-tier, but nothing ever turned `renderer.shadowMap.enabled` on),
+   * and no bloom/antialiasing pass. `ambient: { mode: 'none' }` matches `genesisScientificCitySim.ts`'s
+   * own choice for the same reason: `createSceneEnvironment` already owns this scene's sky/fog/lighting
+   * mood, so a second generic IBL box would fight it rather than help metal entities (pump-pipe-system,
+   * building) reflect something.
+   */
+  setupPostProcessing(
+    modules: PostProcessingModules,
+    renderer: THREE_NS.WebGLRenderer,
+    scene: THREE_NS.Scene,
+    camera: THREE_NS.PerspectiveCamera,
+    w: number,
+    h: number,
+  ): PostProcessor {
+    this.pipeline = setupGraphicsPipeline(this.THREE!, modules, renderer, {
+      scene, camera, width: w, height: h,
+      bloom: { strength: 0.35, radius: 0.5, threshold: 0.85 },
+      ambient: { mode: 'none' },
+    });
+    return this.pipeline;
   }
 
   getOrbitTarget(): THREE_NS.Vector3 | null {
@@ -419,9 +501,11 @@ class GenesisWorldSim3D implements Sim3D {
   update(dt: number): void {
     // Evolution is user-driven (advanceTick()), not continuous — every tick shown is one the
     // observer explicitly asked for, matching this page's role as a verification surface rather
-    // than an ambient demo. The fire VFX is the one exception, same split
-    // `genesisScientificCitySim.ts`'s own ambient haze already draws: it is a pure rendering-layer
-    // animation (flicker/rise), not simulation time, so it keeps moving every real frame while shown.
+    // than an ambient demo. The fire VFX and the shared environment's ambient haze are the
+    // exceptions, same split `genesisScientificCitySim.ts`'s own `update(dt)` already draws: both
+    // are pure rendering-layer animation (flicker/rise, particle drift), not simulation time, so
+    // they keep moving every real frame regardless of world-clock state.
+    this.sceneEnvironment?.update(dt);
     if (this.showWildfire) this.fireVfx?.update(dt);
   }
 
@@ -441,6 +525,8 @@ class GenesisWorldSim3D implements Sim3D {
     this.wildfireField?.dispose();
     this.landslideField?.dispose();
     this.fireVfx?.dispose();
+    this.sceneEnvironment?.dispose();
+    this.sceneEnvironment = null;
   }
 }
 

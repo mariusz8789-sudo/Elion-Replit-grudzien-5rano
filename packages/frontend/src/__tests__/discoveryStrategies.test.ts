@@ -46,7 +46,7 @@ function inquiryInput(): InquiryLoopInput {
     system: {
       systemId: 'sample-under-test',
       label: 'Unknown kinetics sample',
-      modelId: 'chem-arrhenius',
+      modelId: 'chemistry-arrhenius',
       hiddenParameters: { activationEnergyKJ: 60 },
       probeParameterId: 'temperatureK',
       candidateProbeValues: [400, 450, 800],
@@ -112,6 +112,17 @@ describe('discovery strategy adapters', () => {
     expect(run.rounds.length).toBeGreaterThan(0);
     // Same adapter, same shape, genuinely different science underneath.
     expect(run.strategyId).toBe(mechanismStrategy.run(floodPlan()).strategyId);
+  });
+
+  it('PARAMETER: the declared model is one the router really carries', () => {
+    // This guard exists because it caught a real defect in this file: an earlier
+    // version named a model id from memory that the router does not carry, so
+    // `runAutonomousInquiry` produced a run in which NO measurement ever
+    // executed. The equivalence assertions below still passed — the adapter
+    // faithfully preserved a degenerate result — while the file claimed to be
+    // exercising real Arrhenius discrimination. Asserting admission here makes a
+    // wrong id fail loudly instead of quietly hollowing out every test under it.
+    expect(parameterStrategy.admit(inquiryInput()).status).toBe('REAL');
   });
 
   it('PARAMETER: native is exactly what calling the inquiry loop directly returns', () => {

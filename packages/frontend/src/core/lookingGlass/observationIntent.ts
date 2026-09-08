@@ -88,6 +88,11 @@ export interface ObservationIntent {
    * real, event-sourced grounding notes (see `describeScenarioLimitations()`), never a canned
    * disclaimer. Distinct from `askingWhatIsHappening`: a status question, not a grounding question. */
   readonly askingForLimitations: boolean;
+  /** "Challenge this result" / "Zakwestionuj ten wynik" — the Layered World Dashboard's own button
+   * phrase. Asks the director to run whichever real counterfactual this scenario has queued next
+   * (see `GenesisScientificCitySim.getChallengeAction()`), never a specific one named here — this
+   * parser only recognises the REQUEST, the director decides which real experiment answers it. */
+  readonly challengingResult: boolean;
   /**
    * Names the ONE counterfactual this mission's flagship scenario explicitly asks about. As of
    * C3 Phase 5, rainfall intensity IS a real parameterized input (rational-method runoff feeding
@@ -155,6 +160,10 @@ const WHAT_IS_HAPPENING_QUESTION = /\b(what'?s happening|what is happening|what 
 // `describeScenarioLimitations()`'s real event provenance, not a canned disclaimer, so this is
 // matched as its own question rather than folded into WHAT_IS_HAPPENING_QUESTION.
 const LIMITATIONS_QUESTION = /\b(what (are|were) the (assumptions|limits|limitations)|show (me )?(the )?(assumptions|limits|limitations)|jakie (są|sa) (założenia|zalozenia|ograniczenia)|pokaż (założenia|zalozenia|ograniczenia)|pokaz (założenia|zalozenia|ograniczenia))\b/i;
+// "Challenge this result" — the Layered World Dashboard's own button/phrase (GENESIS URBAN
+// RESILIENCE dashboard reorg). A REQUEST to run the scenario's next real counterfactual, not a
+// specific one named in the sentence itself — see `challengingResult`'s own doc.
+const CHALLENGE_RESULT_QUESTION = /\b(challenge (this|the) result|challenge this|run (a |another )?what-if|test (this|the) result)\b|\b(zakwestionuj (ten )?wynik|sprawdź (to |ten wynik )?inaczej|sprawdz (to |ten wynik )?inaczej|sprawdź inny wariant|sprawdz inny wariant)\b/i;
 
 // Scenario-opening requests — a whole world/situation to establish, not a follow-up observation.
 // Only one flagship scenario is recognised today (Scientific Director mission's own scope rule).
@@ -339,6 +348,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
   const askingWhatChanged = WHAT_CHANGED_QUESTION.test(trimmed);
   const askingWhatIsHappening = WHAT_IS_HAPPENING_QUESTION.test(trimmed);
   const askingForLimitations = LIMITATIONS_QUESTION.test(trimmed);
+  const challengingResult = CHALLENGE_RESULT_QUESTION.test(trimmed);
   const returningToBaseline = RETURN_BASELINE.test(trimmed);
   const comparison = (COMPARISON_TRIGGER.test(trimmed) || intervention.requested) && !returningToBaseline;
   const scenarioRequest: ObservationIntent['scenarioRequest'] = EXTREME_RAINFALL_SCENARIO.test(trimmed) ? 'EXTREME_RAINFALL' : null;
@@ -354,7 +364,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
 
   const unresolved: UnresolvedObservationAspect[] = [];
   if (
-    !target && !askingWhy && !askingWhatChanged && !askingWhatIsHappening && !askingForLimitations && !comparison
+    !target && !askingWhy && !askingWhatChanged && !askingWhatIsHappening && !askingForLimitations && !challengingResult && !comparison
     && !returningToBaseline && !time && !mode && !scenarioRequest && !rainfallCounterfactualQuery
   ) unresolved.push('TARGET');
   if ((BEFORE_EVENT.test(trimmed) || AFTER_EVENT.test(trimmed)) && !event) unresolved.push('EVENT');
@@ -377,6 +387,7 @@ export function parseObservationIntent(sourceText: string): ObservationIntent {
     scenarioRequest,
     askingWhatIsHappening,
     askingForLimitations,
+    challengingResult,
     rainfallCounterfactualQuery,
     rainfallCounterfactualPercent,
     rainfallCounterfactualDirection,

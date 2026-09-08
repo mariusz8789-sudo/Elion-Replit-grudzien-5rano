@@ -356,6 +356,41 @@ describe('GenesisScientificCitySim — rainfall-intensity counterfactual (REAL a
   });
 });
 
+describe('GenesisScientificCitySim.getChallengeAction — "Challenge this result" (Layered World Dashboard)', () => {
+  it('is null before any baseline scenario has run — nothing to challenge yet', () => {
+    const sim = initializedSim();
+    expect(sim.getChallengeAction()).toBeNull();
+  });
+
+  it('names the rainfall-higher-30% counterfactual first, right after the baseline runs', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    expect(sim.getChallengeAction()).toEqual({ kind: 'RAINFALL_HIGHER_30', label: 'What if rainfall were 30% higher?' });
+  });
+
+  it('names the pump-failure fork next, once the rainfall-higher-30% counterfactual has run', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    sim.runRainfallIntensityCounterfactual(-30);
+    expect(sim.getChallengeAction()).toEqual({ kind: 'PUMP_FAILURE_FORK', label: 'What if the pump fails outright?' });
+  });
+
+  it('is null once both real counterfactuals this scoped MVP names have run', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    sim.runRainfallIntensityCounterfactual(-30);
+    sim.triggerPumpFailure();
+    expect(sim.getChallengeAction()).toBeNull();
+  });
+
+  it('does not treat a DIFFERENT percentage counterfactual as satisfying the named 30%-higher challenge', () => {
+    const sim = initializedSim();
+    sim.triggerRainfallScenario();
+    sim.runRainfallIntensityCounterfactual(30); // 30% LOWER, not the +30 (higher) this challenge names
+    expect(sim.getChallengeAction()).toEqual({ kind: 'RAINFALL_HIGHER_30', label: 'What if rainfall were 30% higher?' });
+  });
+});
+
 describe('GenesisScientificCitySim — replay (real history, via getFrameState\'s own timestamp param)', () => {
   it('returns null when there is nothing yet to replay', () => {
     const sim = initializedSim();

@@ -8,6 +8,7 @@ import { InteractionController } from '../../core/three/graphics/interaction';
 import type { WorldFrameEntity, WorldFrameEntityId } from '../../core/three/graphics/worldFrame';
 import { buildTerrainFieldMesh, type TerrainFieldMesh } from '../../core/three/graphics/terrainField';
 import { severityColor } from '../../core/three/graphics/stateVisualization';
+import { createFireVfx, type FireVfxHandle } from '../../core/three/graphics/fireVfx';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
@@ -95,6 +96,16 @@ class GenesisWorldSim3D implements Sim3D {
    */
   private wildfireField: TerrainFieldMesh | null = null;
   private wildfireResult: WildfireSpreadResult | null = null;
+  /**
+   * WOW SPRINT — a real flame+smoke effect at the fire's actual ignition point (read off the built
+   * terrain mesh's own vertex position, not re-derived by hand), scaled by the SAME real
+   * `headFlameLengthM`/`headFirelineIntensityKWm` the status line already shows. Closes the "fire is
+   * modelled scientifically but has zero flame/smoke visually" gap on the EXISTING wildfire toggle —
+   * no new UI surface. `null` whenever the real solve produced no flame (`headFlameLengthM <= 0`):
+   * `createFireVfx` refuses a non-positive height, and inventing a positive one to show SOMETHING
+   * would be exactly the fabrication this engine's honesty rule forbids.
+   */
+  private fireVfx: FireVfxHandle | null = null;
   showWildfire = false;
 
   /**
@@ -268,10 +279,39 @@ class GenesisWorldSim3D implements Sim3D {
       colorOfValue: (T, value) => severityColor(T, maxFiniteArrivalS > 0 ? 1 - value / maxFiniteArrivalS : 0),
     });
     this.wildfireField.mesh.position.y = 0.01; // avoid z-fighting with the base ground plane
+
+    // The real ignition point's WORLD position, read directly off the mesh `terrainField.ts` just
+    // built (vertex `ignitionIndex`, plus the mesh's own y offset above) — not re-derived from the
+    // grid math by hand, so it can never drift out of sync with where the terrain mesh actually put it.
+    const positions = this.wildfireField.mesh.geometry.getAttribute('position') as THREE_NS.BufferAttribute;
+    const ignitionWorld = new THREE.Vector3(
+      positions.getX(ignitionIndex),
+      positions.getY(ignitionIndex),
+      positions.getZ(ignitionIndex),
+    ).add(this.wildfireField.mesh.position);
+
+    if (result.headFlameLengthM > 0) {
+      this.fireVfx = createFireVfx(THREE, {
+        origin: [ignitionWorld.x, ignitionWorld.y, ignitionWorld.z],
+        // The real Byram flame length this same solve already reports in the status line — the
+        // effect's actual height, not a fabricated visual constant.
+        flameHeightM: result.headFlameLengthM,
+        // A rendering SATURATION reference, not a scientific classification: 5000 kW/m sits solidly
+        // in the "extreme" fireline-intensity range fire-behaviour operations guidance describes, so
+        // a real intensity at or above it reads as fully "hot" rather than scaling the brightness
+        // linearly to an arbitrarily large number. This scales particle brightness/flicker only —
+        // it is never displayed as its own number/badge alongside the real kW/m reading.
+        intensity: Math.min(1, result.headFirelineIntensityKWm / 5000),
+      });
+    }
   }
 
   private removeOverlayMesh(field: TerrainFieldMesh | null): void {
     if (field?.mesh.parent) field.mesh.parent.remove(field.mesh);
+  }
+
+  private removeFireVfx(): void {
+    if (this.fireVfx?.group.parent) this.fireVfx.group.parent.remove(this.fireVfx.group);
   }
 
   setShowWildfire(show: boolean): void {
@@ -284,9 +324,13 @@ class GenesisWorldSim3D implements Sim3D {
       if (this.wildfireField && this.scene && !this.wildfireField.mesh.parent) {
         this.scene.add(this.wildfireField.mesh);
       }
+      if (this.fireVfx && this.scene && !this.fireVfx.group.parent) {
+        this.scene.add(this.fireVfx.group);
+      }
     } else {
       if (this.root) this.root.visible = true;
       this.removeOverlayMesh(this.wildfireField);
+      this.removeFireVfx();
     }
   }
 
@@ -344,6 +388,7 @@ class GenesisWorldSim3D implements Sim3D {
     if (show) {
       this.showWildfire = false;
       this.removeOverlayMesh(this.wildfireField);
+      this.removeFireVfx();
       this.buildLandslideDemo();
       if (this.root) this.root.visible = false;
       if (this.landslideField && this.scene && !this.landslideField.mesh.parent) {
@@ -371,10 +416,13 @@ class GenesisWorldSim3D implements Sim3D {
     };
   }
 
-  update(): void {
+  update(dt: number): void {
     // Evolution is user-driven (advanceTick()), not continuous — every tick shown is one the
     // observer explicitly asked for, matching this page's role as a verification surface rather
-    // than an ambient demo.
+    // than an ambient demo. The fire VFX is the one exception, same split
+    // `genesisScientificCitySim.ts`'s own ambient haze already draws: it is a pure rendering-layer
+    // animation (flicker/rise), not simulation time, so it keeps moving every real frame while shown.
+    if (this.showWildfire) this.fireVfx?.update(dt);
   }
 
   syncScene(): void {
@@ -392,6 +440,7 @@ class GenesisWorldSim3D implements Sim3D {
     this.renderer?.dispose();
     this.wildfireField?.dispose();
     this.landslideField?.dispose();
+    this.fireVfx?.dispose();
   }
 }
 

@@ -18,16 +18,22 @@ import { readFrameCounters, estimateSceneGpuMemory, type FrameCounters, type Sce
  *
  * What SSR adds ON TOP of that: reflections of OTHER SCENE OBJECTS on flat-
  * ish opaque surfaces — a polished floor showing the reactor's silhouette,
- * a metal panel catching a neighboring light. That's a real, visible
- * upgrade for "deep laboratory environments" (task priority #6), but it
- * costs its own normal+depth+metalness pre-passes and a blur pass — a
- * similar order of cost to GTAO, on top of GTAO. Given no real GPU is
- * available in this sandbox to verify SSR's actual visual quality/artifact
- * behavior (it is known to show noise/streaking on some hardware/angles),
- * this is wired as OPT-IN, OFF BY DEFAULT, and gated to the `'cinematic'`
- * tier — a deliberate choice to make the capability available without
- * claiming it's production-verified. Test on real hardware before shipping
- * it enabled anywhere.
+ * a metal panel catching a neighboring light, wet asphalt catching the city
+ * lights above it. That's a real, visible upgrade for "deep laboratory
+ * environments" (task priority #6) and for an outdoor flood scene alike, but
+ * it costs its own normal+depth+metalness pre-passes and a blur pass — a
+ * similar order of cost to GTAO, on top of GTAO. This module's own default
+ * (`enabled: false` unless a caller opts in, `minTier: 'cinematic'` unless a
+ * caller loosens it) stays conservative for exactly that reason: nothing
+ * about a device heuristic alone should turn on a second expensive
+ * screen-space pass. `genesisScientificCitySim.ts` is the first caller to
+ * actually opt in (`{ enabled: true, minTier: 'high', ... }`), after a
+ * headless-Chromium visual check ruled out gross streaking/noise at that
+ * scene's real camera distance and tuned `strength`/`maxDistance` to it —
+ * that check used software rendering, not a real discrete GPU, so it
+ * confirms "doesn't look broken," not a performance profile on real
+ * hardware. Any other caller opting in should do the same visual check
+ * against its own scene rather than assume these settings transfer.
  */
 export interface ScreenSpaceReflectionSettings {
   enabled: boolean;

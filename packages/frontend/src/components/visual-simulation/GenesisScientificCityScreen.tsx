@@ -4,6 +4,7 @@ import { GenesisScientificCitySim } from '../../core/three/genesisScientificCity
 import { parseObservationIntent } from '../../core/lookingGlass/observationIntent';
 import { resolveCameraIntent } from '../../core/lookingGlass/observationExecution';
 import { registerActiveObservationControl } from '../../core/activeObservationControl';
+import { WorldDiscoveryPanel } from './WorldDiscoveryPanel';
 
 /**
  * GENESIS — C1 SCIENTIFIC CONTROL LOOP
@@ -338,6 +339,13 @@ export function GenesisScientificCityScreen() {
         <canvas ref={canvasRef} className="gsc-canvas" aria-label="Genesis Scientific City — real cross-domain pump/hospital scene" />
         {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
         {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
+
+        {/* The autonomous search runs on THIS world, so it lives on this world's screen rather
+            than a page of its own. Mounted OUTSIDE the renderer gate on purpose: the search
+            forks and advances the world model and needs no WebGL at all, so gating it behind
+            the 3D scene would make it unreachable on exactly the devices that cannot render
+            the city — and it is the part of this screen that still works there. */}
+        <WorldDiscoveryPanel />
 
         {!loading && !failed && (
           <>

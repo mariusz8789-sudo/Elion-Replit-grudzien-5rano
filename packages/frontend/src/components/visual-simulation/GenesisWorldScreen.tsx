@@ -15,7 +15,10 @@ import { createPBRMaterial, type StaticGenesisMaterialId } from '../../core/thre
 import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/graphics/postProcessing';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
+import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
+import { GENESIS_FLOOD_CATALOG, type WorldLever } from '../../core/agent/worldGoalIntent';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
+import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
 import { buildUniformFuelBed, simulateWildfireSpread, type WildfireSpreadResult, type WindVector } from '../../core/worldModel/domains/wildfireSpread';
 import {
@@ -68,6 +71,7 @@ const VISUAL_HINT_COLOR: Readonly<Record<string, number>> = {
   lab: 0x33ccaa,
   substance: 0xcc66ff,
   environment: 0x66ddff,
+  floodplain: 0x2266aa,
 };
 
 function colorForVisualHint(hint?: string): number {
@@ -96,19 +100,38 @@ const VISUAL_HINT_MATERIAL: Readonly<Record<string, StaticGenesisMaterialId>> = 
   lab: 'CERAMIC',
   substance: 'TECH_COMPOSITE',
   environment: 'TECH_COMPOSITE',
+  floodplain: 'GROUND',
 };
 
 function materialCategoryForVisualHint(hint?: string): StaticGenesisMaterialId {
   return (hint ? VISUAL_HINT_MATERIAL[hint] : undefined) ?? 'CONCRETE';
 }
 
-// LIVING WORLD — same distance+facing-dot proximity gate `labScene3D.ts` already proves in
-// production for its one console (see that file's `INTERACT_MAX_DISTANCE`/`INTERACT_MIN_FACING_DOT`
-// and `nearStation`), tuned for this scene's city scale instead of a room: the pump entity renders as
-// an ~18-unit box (`scale: 12` in `syncNow` below, box size `1.5 * scale`), so the walk-up radius and
-// the facing tolerance are both larger than a tabletop console needs.
-const PUMP_INTERACT_MAX_DISTANCE = 16;
-const PUMP_INTERACT_MIN_FACING_DOT = 0.25;
+// GENERIC INTERACTION SYSTEM — same distance+facing-dot proximity gate `labScene3D.ts` already
+// proves in production for its one console (see that file's `INTERACT_MAX_DISTANCE`/
+// `INTERACT_MIN_FACING_DOT`/`nearStation`), generalized here over EVERY entity the player can walk up
+// to rather than one hardcoded point: `INTERACT_OVERRIDES` lets a specific entity (e.g. the
+// city-scale floodplain, much bigger than a single box) declare its own trigger volume, while
+// everything else uses these defaults, tuned for this scene's city scale instead of a room.
+const INTERACT_DEFAULT_MAX_DISTANCE = 16;
+const INTERACT_DEFAULT_MIN_FACING_DOT = 0.25;
+const INTERACT_OVERRIDES: Readonly<Record<string, { maxDistance?: number; minFacingDot?: number }>> = {
+  [GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID]: { maxDistance: 30 },
+};
+
+/**
+ * GENERIC INTERACTION SYSTEM — the real, city-wide floodplain entity `addGenesisScientificCityFloodplain`
+ * adds to this exact world (see `genesisScientificCity4.ts`) carries no spatial component of its own
+ * today (`floodInundation.ts::addFloodplain` hardcodes `{x:0,y:0,z:0}`, since C3 has never needed a
+ * position for a scalar it only ever consumed numerically) — a real, honestly-scoped gap, not a
+ * fabrication: siting it is a presentation decision, not a scientific one, so it is made here, once, on
+ * the C2 side, via `TemporalEngine.applyExternalPatch` (never a direct `graph.updateEntity`, so `scrubTo`
+ * replays it correctly). Placed a fixed offset from the pump it drains into (the one real spatial
+ * relationship the graph already declares between them), at a scale large enough to read as a
+ * city-scale basin next to the pump's much smaller mechanical footprint.
+ */
+const FLOODPLAIN_OFFSET_FROM_PUMP = { x: 42, y: 0, z: -10 } as const;
+const FLOODPLAIN_RENDER_SCALE = 16;
 
 export class GenesisWorldSim3D implements Sim3D {
   cameraAutoRotateSpeed = 0;
@@ -135,13 +158,22 @@ export class GenesisWorldSim3D implements Sim3D {
    */
   private controller: FirstPersonController | null = null;
   private fpState: ReturnType<FirstPersonController['update']> | null = null;
-  /** The pump's real, current C3 world position — refreshed every `syncNow()` call from the same
-   * frame the renderer already draws from, never re-derived or guessed. */
-  private pumpWorldPosition: readonly [number, number, number] | null = null;
-  /** True once the player is close enough to, and roughly facing, the real pump entity — the one
-   * spatial trigger this scene exposes for creating a real intervention branch. Read by React via
-   * `getStats()`, the same convention `labScene3D.ts`'s own `nearStation` already uses. */
-  nearPump = false;
+
+  /**
+   * GENERIC INTERACTION SYSTEM — every entity the player can walk up to and act on, not just the
+   * pump. Populated once in the constructor (needs only `this.city`'s own real ids, no THREE
+   * dependency), positions refreshed every `syncNow()` from the same frame the renderer already
+   * draws from (never re-derived or guessed). Hospital/lab/population have no real lever in
+   * `GENESIS_FLOOD_LEVERS` today — they are honestly INSPECT-only (see `leversForEntity`), not
+   * excluded, so a player can still walk up and see their real state.
+   */
+  private readonly interactableIds: readonly WorldFrameEntityId[];
+  private interactablePositions = new Map<WorldFrameEntityId, readonly [number, number, number]>();
+  /** The nearest interactable entity the player is close enough to, and roughly facing — the one
+   * spatial trigger this scene exposes, generalized from the pump-only version. `null` when none is
+   * in range. Read by React via `getNearestInteractableId()` (not `getStats()`: an entity id is not a
+   * number, and `Sim3D.getStats()`'s shared contract is `Record<string, number>` for every scene). */
+  nearestInteractableId: WorldFrameEntityId | null = null;
 
   readonly city: GenesisScientificCity4;
   forkEngine: TemporalEngine | null = null;
@@ -191,6 +223,13 @@ export class GenesisWorldSim3D implements Sim3D {
 
   constructor() {
     this.city = buildGenesisScientificCity4({ rainfallAtTick: 2, populationCount: 5000 });
+    this.interactableIds = [
+      this.city.pumpPipeId,
+      GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
+      this.city.hospitalBuildingId,
+      this.city.labId,
+      this.city.populationId,
+    ];
   }
 
   private activeEngine(): TemporalEngine {
@@ -273,6 +312,21 @@ export class GenesisWorldSim3D implements Sim3D {
     const spawnFrame = getFrameState(this.city.base.engine);
     const pumpEntity = spawnFrame.entities.find((e) => e.id === this.city.pumpPipeId);
     const pumpPos = pumpEntity ? pumpEntity.transform.position : { x: 0, y: 0, z: 0 };
+
+    // GENERIC INTERACTION SYSTEM — site the floodplain (see `FLOODPLAIN_OFFSET_FROM_PUMP`'s own doc)
+    // once, on the live base engine, via the correct live-mutation API (`applyExternalPatch`, not a
+    // direct `graph.updateEntity`) so `scrubTo` replays this placement instead of losing it.
+    this.city.base.engine.applyExternalPatch(GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID, {
+      spatial: {
+        position: {
+          x: pumpPos.x + FLOODPLAIN_OFFSET_FROM_PUMP.x,
+          y: pumpPos.y + FLOODPLAIN_OFFSET_FROM_PUMP.y,
+          z: pumpPos.z + FLOODPLAIN_OFFSET_FROM_PUMP.z,
+        },
+        scale: { x: FLOODPLAIN_RENDER_SCALE, y: FLOODPLAIN_RENDER_SCALE, z: FLOODPLAIN_RENDER_SCALE },
+      },
+    });
+
     const spawnPosition = { x: pumpPos.x, z: pumpPos.z + 22 };
     const dx = pumpPos.x - spawnPosition.x;
     const dz = pumpPos.z - spawnPosition.z;
@@ -342,11 +396,13 @@ export class GenesisWorldSim3D implements Sim3D {
     const frame = getFrameState(engine, this.scrubTick ?? undefined);
     const graphicsFrame = toGraphicsWorldFrame(frame);
     this.renderer.sync(graphicsFrame);
-    // LIVING WORLD — the pump's real, current position, read off the SAME frame the renderer just
-    // drew from (never re-derived or approximated), refreshed on every sync so a fork/branch that
-    // moves the entity (it doesn't today, but nothing here assumes it never will) stays correct.
-    const pump = graphicsFrame.entities.find((e) => e.id === this.city.pumpPipeId);
-    if (pump) this.pumpWorldPosition = pump.position;
+    // GENERIC INTERACTION SYSTEM — every interactable entity's real, current position, read off the
+    // SAME frame the renderer just drew from (never re-derived or approximated), refreshed on every
+    // sync so a fork/branch that moves an entity stays correct.
+    for (const id of this.interactableIds) {
+      const entity = graphicsFrame.entities.find((e) => e.id === id);
+      if (entity) this.interactablePositions.set(id, entity.position);
+    }
   }
 
   /** Advances the base world (and the counterfactual fork, if one exists) by one real tick. */
@@ -580,37 +636,81 @@ export class GenesisWorldSim3D implements Sim3D {
       camera.position.set(this.fpState.position.x, this.fpState.position.y + this.fpState.bobOffset, this.fpState.position.z);
       camera.rotation.set(this.fpState.pitch, this.fpState.yaw, 0);
     }
-    this.updateNearPump(camera);
+    this.updateNearestInteractable(camera);
   }
 
   /**
-   * LIVING WORLD — the ONE spatial trigger this scene exposes today: close enough to, and roughly
-   * facing, the real pump entity. Same distance+facing-dot pattern `labScene3D.ts` already proves in
-   * production for its console (see `PUMP_INTERACT_MAX_DISTANCE`/`PUMP_INTERACT_MIN_FACING_DOT`'s own
-   * doc) — not a generic raycast-based interaction system (that's `graphics/interaction.ts`'s own,
-   * separate, pointer-driven mechanism, orthogonal to first-person proximity).
+   * GENERIC INTERACTION SYSTEM — the same distance+facing-dot pattern `labScene3D.ts` proves in
+   * production for its one console, generalized over every entity in `interactableIds`: the nearest
+   * one that is both close enough AND roughly faced wins (never the raw-nearest regardless of facing —
+   * a player standing between two entities but looking at neither should trigger nothing). Still not
+   * a generic raycast-based interaction system (that's `graphics/interaction.ts`'s own, separate,
+   * pointer-driven mechanism, orthogonal to this first-person proximity trigger).
    */
-  private updateNearPump(camera: THREE_NS.PerspectiveCamera): void {
-    if (!this.THREE || !this.pumpWorldPosition) {
-      this.nearPump = false;
-      return;
-    }
-    const [px, py, pz] = this.pumpWorldPosition;
-    const dx = px - camera.position.x;
-    const dy = py - camera.position.y;
-    const dz = pz - camera.position.z;
-    const distance = Math.hypot(dx, dy, dz);
-    if (distance > PUMP_INTERACT_MAX_DISTANCE || distance < 1e-6) {
-      this.nearPump = false;
+  private updateNearestInteractable(camera: THREE_NS.PerspectiveCamera): void {
+    if (!this.THREE) {
+      this.nearestInteractableId = null;
       return;
     }
     const forward = new this.THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const toPump = new this.THREE.Vector3(dx, dy, dz).normalize();
-    this.nearPump = forward.dot(toPump) > PUMP_INTERACT_MIN_FACING_DOT;
+    let bestId: WorldFrameEntityId | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const id of this.interactableIds) {
+      const position = this.interactablePositions.get(id);
+      if (!position) continue;
+      const [px, py, pz] = position;
+      const dx = px - camera.position.x;
+      const dy = py - camera.position.y;
+      const dz = pz - camera.position.z;
+      const distance = Math.hypot(dx, dy, dz);
+      const override = INTERACT_OVERRIDES[id];
+      const maxDistance = override?.maxDistance ?? INTERACT_DEFAULT_MAX_DISTANCE;
+      const minFacingDot = override?.minFacingDot ?? INTERACT_DEFAULT_MIN_FACING_DOT;
+      if (distance > maxDistance || distance < 1e-6 || distance >= bestDistance) continue;
+      const toEntity = new this.THREE.Vector3(dx, dy, dz).normalize();
+      if (forward.dot(toEntity) > minFacingDot) {
+        bestId = id;
+        bestDistance = distance;
+      }
+    }
+    this.nearestInteractableId = bestId;
+  }
+
+  getNearestInteractableId(): WorldFrameEntityId | null {
+    return this.nearestInteractableId;
+  }
+
+  /** Real, current state of any entity — the INSPECT half of walk→inspect→change→experiment→fork. */
+  inspect(entityId: WorldFrameEntityId): EntityInspection | null {
+    return inspectEntity(this.activeEngine().graph, entityId);
+  }
+
+  /** The real, declared levers (if any) that target this exact entity — empty for an honestly inspect-only entity. */
+  leversFor(entityId: WorldFrameEntityId): readonly WorldLever[] {
+    return leversForEntity(GENESIS_FLOOD_CATALOG, entityId);
+  }
+
+  /**
+   * Runs ONE real lever on the BASE engine (never the currently-viewed fork — an intervention forks
+   * from the live world, matching `createFork()`'s own convention) and switches the view to it, the
+   * same single-shot pattern `createFork()` already used for the pump alone, now generic over any
+   * entity with a real lever.
+   */
+  applyLever(lever: WorldLever, label: string): void {
+    if (this.forkEngine) return;
+    this.forkEngine = applyLeverIntervention(
+      this.city.base.engine,
+      lever,
+      GENESIS_FLOOD_CATALOG.metricPhrases['peak flood depth']!,
+      'minimize',
+      label,
+    );
+    this.showFork = true;
+    this.syncNow();
   }
 
   getStats(): Record<string, number> {
-    return { nearPump: this.nearPump ? 1 : 0, forked: this.forkEngine ? 1 : 0 };
+    return { nearInteractable: this.nearestInteractableId !== null ? 1 : 0, forked: this.forkEngine ? 1 : 0 };
   }
 
   pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
@@ -643,10 +743,20 @@ export function GenesisWorldScreen() {
   const sim = useMemo(() => new GenesisWorldSim3D(), []);
   const params = useMemo<SimParams>(() => ({}), []);
 
-  const [stats, setStats] = useState({ nearPump: 0, forked: 0 });
-  const onStats = useCallback((s: Record<string, number>) => {
-    setStats((prev) => (prev.nearPump === s.nearPump && prev.forked === s.forked ? prev : { nearPump: s.nearPump!, forked: s.forked! }));
-  }, []);
+  // GENERIC INTERACTION SYSTEM — the nearest walkable entity's id + real state + real available
+  // levers, refreshed on the same ~250ms cadence `getStats()` already drives (see `useThreeLoop.ts`),
+  // piggy-backing on that existing throttle rather than adding a second polling loop. `getStats()`'s
+  // own numeric return isn't rendered directly (an entity id isn't a number — see `getNearestInteractableId()`'s
+  // own doc), only used to trigger this callback at all.
+  const [nearestId, setNearestId] = useState<WorldFrameEntityId | null>(null);
+  const [inspection, setInspection] = useState<EntityInspection | null>(null);
+  const [availableLevers, setAvailableLevers] = useState<readonly WorldLever[]>([]);
+  const onStats = useCallback(() => {
+    const id = sim.getNearestInteractableId();
+    setNearestId(id);
+    setInspection(id ? sim.inspect(id) : null);
+    setAvailableLevers(id ? sim.leversFor(id) : []);
+  }, [sim]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
 
   const [tick, setTick] = useState(0);
@@ -691,6 +801,18 @@ export function GenesisWorldScreen() {
 
   const handleFork = () => {
     sim.createFork();
+    setForkTick(sim.forkEngine?.tick ?? null);
+    setShowFork(true);
+    setPumpStatus(readPumpStatus(true));
+  };
+
+  // GENERIC INTERACTION SYSTEM — the generalized "press E / click a lever button" action: any real
+  // lever on the entity the player is currently near, not just the pump's own hardcoded reset. Runs
+  // the real `apply()` mutation via `entityInteractionBridge.ts` and switches the view to the new
+  // fork, so the panel's own `inspection` (refreshed on the next stats tick, reading the now-active
+  // fork engine) shows the REAL consequence — never a second, separately-computed "preview".
+  const handleApplyLever = (lever: WorldLever) => {
+    sim.applyLever(lever, `walk-up:${lever.leverId}`);
     setForkTick(sim.forkEngine?.tick ?? null);
     setShowFork(true);
     setPumpStatus(readPumpStatus(true));
@@ -766,16 +888,28 @@ export function GenesisWorldScreen() {
     };
   }, [canvasRef, sim]);
 
-  // LIVING WORLD — movement + look + the one spatial interaction (walk to the pump, press E to
-  // create the real intervention branch `handleFork` already drives from its button). The exact
-  // same keyboard/mouse wiring pattern `FirstPersonLabScreen.tsx` uses for its own console.
+  // LIVING WORLD / GENERIC INTERACTION SYSTEM — movement + look + the spatial interaction. `E` runs
+  // the sole lever when exactly one exists (the pump's own original flow); an entity with SEVERAL
+  // real levers (the floodplain's outlet/infiltration pair) uses number keys `1`.."9" instead, one per
+  // `availableLevers` slot. Deliberately keyboard-only, never relying on clicking the panel's own
+  // buttons: real browser Pointer Lock routes ALL mouse events to the LOCKED element (this scene's own
+  // canvas, per the Pointer Lock spec) regardless of where the cursor visually is, so a click on any
+  // other on-screen element while locked never reaches it — confirmed the hard way via a real
+  // Chromium walkthrough, not assumed. The panel's buttons stay real `<button onClick>`s purely for
+  // touch/mouse use when NOT locked (mobile never locks; desktop can `Esc` first), matching the
+  // existing D-pad/enter-overlay convention of never requiring pointer lock for anything.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const move = MOVE_KEYS[e.code];
       if (move) { sim.setMoveKey(move, true); return; }
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { sim.setRunning(true); return; }
-      if (e.code === 'KeyE') {
-        if (stats.nearPump === 1 && forkTick === null) handleFork();
+      if (forkTick === null && availableLevers.length === 1 && e.code === 'KeyE') {
+        handleApplyLever(availableLevers[0]!);
+        return;
+      }
+      if (forkTick === null && availableLevers.length > 1 && /^Digit[1-9]$/.test(e.code)) {
+        const index = Number(e.code.slice(5)) - 1;
+        if (index < availableLevers.length) handleApplyLever(availableLevers[index]!);
         return;
       }
       if (e.code === 'Escape' && document.pointerLockElement) document.exitPointerLock();
@@ -796,7 +930,7 @@ export function GenesisWorldScreen() {
       document.removeEventListener('keyup', onKeyUp);
       document.removeEventListener('mousemove', onMouseMove);
     };
-  }, [sim, stats.nearPump, forkTick]);
+  }, [sim, availableLevers, forkTick]);
 
   const handleScrub = (value: number) => {
     setScrubValue(value);
@@ -872,15 +1006,45 @@ export function GenesisWorldScreen() {
           <p className="fp-lab-enter-hint" style={{ position: 'absolute', left: '1rem', top: '1rem' }}>Esc — exit mouse-look</p>
         )}
 
-        {entered && stats.nearPump === 1 && forkTick === null && (
-          <button
-            type="button"
-            className="fp-lab-prompt"
-            data-testid="genesis-world-interact-prompt"
-            onClick={handleFork}
-          >
-            E — create intervention branch (reset pump to safe flow)
-          </button>
+        {/* GENERIC INTERACTION SYSTEM — walk up to ANY of `interactableIds`, not just the pump: shows
+            the entity's real, current state (`inspectEntity`) and, when the world declares a real
+            lever targeting it (`leversForEntity`), a button per lever that runs the real intervention
+            (`applyLeverIntervention`) and forks the world. An entity with no declared lever (hospital,
+            lab, population today) is shown honestly as inspect-only, never a fake "nothing to see". */}
+        {entered && nearestId && forkTick === null && inspection && (
+          <div className="gx-interact-panel" data-testid="genesis-world-interact-panel">
+            <strong data-testid="interact-panel-label">{inspection.label}</strong>
+            <span data-testid="interact-panel-state">
+              {Object.entries(inspection.domainState ?? {})
+                .slice(0, 4)
+                .map(([key, value]) => `${key}=${typeof value === 'number' ? value.toFixed(3) : String(value)}`)
+                .join(' · ') || 'no domain state'}
+              {inspection.statusLabel ? ` · ${inspection.statusLabel}` : ''}
+            </span>
+            {availableLevers.length > 0 ? (
+              <div className="gx-interact-panel-levers">
+                {/* Keyboard hotkey shown alongside every button: `E` for the sole-lever case, `1`.."9"
+                    when there is a real choice to make — mouse-look pointer lock (a real desktop
+                    concept) routes clicks to the canvas, not to this button, so the hotkey is the
+                    actual desktop affordance; the button itself still works normally on touch, or on
+                    desktop after `Esc`. */}
+                {availableLevers.map((lever, index) => (
+                  <button
+                    key={lever.leverId}
+                    type="button"
+                    className="chip-btn"
+                    data-testid={`lever-btn-${lever.leverId}`}
+                    onClick={() => handleApplyLever(lever)}
+                  >
+                    {availableLevers.length === 1 ? 'E — ' : `${index + 1} — `}
+                    {lever.leverId.replace('lever:', '').replace(/-/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span data-testid="interact-panel-inspect-only">Inspect only — no real intervention modelled for this entity yet.</span>
+            )}
+          </div>
         )}
 
         {entered && (

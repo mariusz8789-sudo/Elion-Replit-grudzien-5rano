@@ -136,6 +136,18 @@ describe('Looking Glass — resolution refuses rather than fabricates', () => {
     expect(drought.notModelled.join(' ')).toMatch(/real water-balance model exists/i);
   });
 
+  it('same real-solver-not-routable honesty for landslide, not the stale blanket NATURAL_HAZARD gap text', () => {
+    // LANDSLIDE used to fall through to FAMILY_GAP.NATURAL_HAZARD's generic "no hydrological,
+    // seismic or atmospheric solver" text, which stopped being true once landslide.ts (infinite-slope
+    // stability + sliding-block runout) shipped — it needs its own KIND_UNSUPPORTED_REASON entry,
+    // exactly like FLOOD/WILDFIRE/EARTHQUAKE/DROUGHT already have.
+    const resolution = resolveScenarioRequest(parseScenarioRequest('Pokaż osuwisko w tym mieście przez 24 godziny'));
+    expect(resolution.status).toBe('NOT_MODELLED');
+    expect(resolution.notModelled.join(' ')).toMatch(/real slope-stability and runout model exists/i);
+    expect(resolution.notModelled.join(' ')).toMatch(/no standalone Looking Glass binding/i);
+    expect(resolution.notModelled.join(' ')).not.toMatch(/no hydrological, seismic or atmospheric solver/i);
+  });
+
   it('same honesty for transport disruption and evacuation, now that C3 Phase 10 shipped a real traffic-flow solver', () => {
     const transport = resolveScenarioRequest(parseScenarioRequest('Pokaż zakłócenie transportu w tym mieście przez 24 godziny'));
     expect(transport.status).toBe('NOT_MODELLED');

@@ -518,8 +518,10 @@ export function runAutonomousDiscovery(input: DiscoveryLoopInput): DiscoveryLoop
     failedHypotheses: all.filter((b) => b.status === 'REFUTED'),
     bestSupported: all.filter((b) => b.status === 'SUPPORTED'),
     unresolvedQuestions: [
-      ...all.filter((b) => b.status === 'UNTESTED').map((b) => `Never tested: ${b.statement}`),
-      ...all.filter((b) => b.status === 'UNRESOLVED').map((b) => `Unresolved: ${b.statement} — ${b.reason}`),
+      // The id travels with the sentence: a reader who wants to run the missing
+      // experiment needs to know which declared hypothesis it was.
+      ...all.filter((b) => b.status === 'UNTESTED').map((b) => `Never tested: ${b.hypothesisId} — ${b.statement}`),
+      ...all.filter((b) => b.status === 'UNRESOLVED').map((b) => `Unresolved: ${b.hypothesisId} — ${b.statement} (${b.reason})`),
     ],
     declaredAssumptions: input.declaredAssumptions,
     notModelledFactors: input.notModelledFactors,

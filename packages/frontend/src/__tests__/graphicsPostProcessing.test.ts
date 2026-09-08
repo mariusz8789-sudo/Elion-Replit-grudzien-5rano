@@ -30,7 +30,7 @@ import { applyAmbientIBL, applyStudioEnvironment, captureRoomEnvironment } from 
 import { detectRenderTier } from '../core/three/quality';
 import type { PostProcessingModules } from '../core/three/types';
 
-type PassLabel = 'RenderPass' | 'GTAOPass' | 'SSRPass' | 'UnrealBloomPass' | 'BokehPass' | 'OutputPass';
+type PassLabel = 'RenderPass' | 'GTAOPass' | 'SSRPass' | 'UnrealBloomPass' | 'BokehPass' | 'OutputPass' | 'SMAAPass';
 
 function fakeThree() {
   class Vector2 { constructor(public x: number, public y: number) {} }
@@ -103,8 +103,17 @@ function fakeModules() {
     }
   }
 
-  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass } as unknown as PostProcessingModules;
-  return { modules, addedPasses, gtaoInstances, bokehInstances, bloomInstances, outputPassInstances, ssrInstances, composerCalls };
+  const smaaInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  class SMAAPass {
+    dispose = vi.fn();
+    constructor(public width: number, public height: number) {
+      addedPasses.push('SMAAPass');
+      smaaInstances.push(this);
+    }
+  }
+
+  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass, SMAAPass } as unknown as PostProcessingModules;
+  return { modules, addedPasses, gtaoInstances, bokehInstances, bloomInstances, outputPassInstances, ssrInstances, smaaInstances, composerCalls };
 }
 
 function fakeRenderer() {
@@ -158,12 +167,16 @@ describe('setupGraphicsPipeline — renderer configuration', () => {
 });
 
 describe('setupGraphicsPipeline — canonical pass order', () => {
-  it('always renders RenderPass first and OutputPass last, with tone mapping/color-space work living only in OutputPass territory', () => {
+  it('always renders RenderPass first and OutputPass right before the final SMAA pass, with tone mapping/color-space work living only in OutputPass territory', () => {
     const { modules, addedPasses } = fakeModules();
     setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
 
     expect(addedPasses[0]).toBe('RenderPass');
-    expect(addedPasses[addedPasses.length - 1]).toBe('OutputPass');
+    // TIER1.2 — SMAA is now the true last pass (see its own describe block below): it needs the
+    // display-referred image OutputPass produces to detect edges correctly, so it must run after
+    // tone mapping/color-space conversion, not before.
+    expect(addedPasses[addedPasses.length - 1]).toBe('SMAAPass');
+    expect(addedPasses[addedPasses.length - 2]).toBe('OutputPass');
     // AO must run before bloom: it darkens occluded creases in the same linear-HDR buffer bloom
     // then blooms from — running it after bloom would occlude already-bloomed light, not the
     // scene's actual geometry.
@@ -179,7 +192,7 @@ describe('setupGraphicsPipeline — canonical pass order', () => {
     const depthOfField: DepthOfFieldSettings = { enabled: true, focusDistance: 2.5 };
     setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, depthOfField });
 
-    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'UnrealBloomPass', 'BokehPass', 'OutputPass']);
+    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'UnrealBloomPass', 'BokehPass', 'OutputPass', 'SMAAPass']);
   });
 });
 
@@ -437,7 +450,49 @@ describe('setupGraphicsPipeline — screen-space reflections (opt-in, off by def
   it('is placed after AO and before bloom in the pass order', () => {
     const { modules, addedPasses } = fakeModules();
     setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, qualityTier: 'cinematic', reflections: { enabled: true } });
-    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'OutputPass']);
+    expect(addedPasses).toEqual(['RenderPass', 'GTAOPass', 'SSRPass', 'UnrealBloomPass', 'OutputPass', 'SMAAPass']);
+  });
+});
+
+describe('setupGraphicsPipeline — anti-aliasing (SMAA, opt-out, on by default)', () => {
+  it('adds SMAAPass, last in the chain, at the default "medium"+ gate', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(addedPasses[addedPasses.length - 1]).toBe('SMAAPass');
+  });
+
+  it('still runs at the "medium" tier, unlike AO/DOF which need "high"', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('medium');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(addedPasses).toContain('SMAAPass');
+  });
+
+  it('drops out at the "low" tier, same floor as bloom', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('low');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    expect(addedPasses).not.toContain('SMAAPass');
+  });
+
+  it('can be explicitly disabled regardless of tier', () => {
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, antiAliasing: { enabled: false } });
+    expect(addedPasses).not.toContain('SMAAPass');
+  });
+
+  it('a caller can tighten the gate via minTier', () => {
+    vi.mocked(detectRenderTier).mockReturnValue('medium');
+    const { modules, addedPasses } = fakeModules();
+    setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), { ...baseOpts, antiAliasing: { minTier: 'high' } });
+    expect(addedPasses).not.toContain('SMAAPass');
+  });
+
+  it('is disposed on pipeline teardown', () => {
+    const { modules, smaaInstances } = fakeModules();
+    const pipeline = setupGraphicsPipeline(fakeThree(), modules, fakeRenderer(), baseOpts);
+    pipeline.dispose?.();
+    expect(smaaInstances[0]!.dispose).toHaveBeenCalledOnce();
   });
 });
 

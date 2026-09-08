@@ -63,7 +63,8 @@ function fakeModules() {
     }
   }
   class OutputPass { dispose = vi.fn(); constructor() {} }
-  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass } as unknown as PostProcessingModules;
+  class SMAAPass { dispose = vi.fn(); constructor() {} }
+  const modules = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, BokehPass, OutputPass, SSRPass, SMAAPass } as unknown as PostProcessingModules;
   return { modules, bokehInstances };
 }
 

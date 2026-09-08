@@ -7,6 +7,7 @@ import type { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js
 import type { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import type { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import type { SSRPass } from 'three/examples/jsm/postprocessing/SSRPass.js';
+import type { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import type { SimParams } from '../types';
 
 /**
@@ -27,6 +28,7 @@ export interface PostProcessingModules {
   GTAOPass: typeof GTAOPass;
   BokehPass: typeof BokehPass;
   SSRPass: typeof SSRPass;
+  SMAAPass: typeof SMAAPass;
 }
 
 /** Zwracane przez Sim3D.setupPostProcessing — cienki interfejs nad EffectComposer. */

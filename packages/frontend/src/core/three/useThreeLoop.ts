@@ -61,8 +61,9 @@ export function useThreeLoop(
       import('three/examples/jsm/postprocessing/GTAOPass.js'),
       import('three/examples/jsm/postprocessing/BokehPass.js'),
       import('three/examples/jsm/postprocessing/SSRPass.js'),
+      import('three/examples/jsm/postprocessing/SMAAPass.js'),
     ])
-      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { ShaderPass }, { UnrealBloomPass }, { OutputPass }, { GTAOPass }, { BokehPass }, { SSRPass }]) => {
+      .then(([THREE, { OrbitControls }, { EffectComposer }, { RenderPass }, { ShaderPass }, { UnrealBloomPass }, { OutputPass }, { GTAOPass }, { BokehPass }, { SSRPass }, { SMAAPass }]) => {
         if (disposed) return;
         setLoading(false);
 
@@ -115,7 +116,7 @@ export function useThreeLoop(
 
         sim.init(THREE, scene, camera, canvas.clientWidth || 300, canvas.clientHeight || 300);
         post = sim.setupPostProcessing?.(
-          { EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, OutputPass, GTAOPass, BokehPass, SSRPass },
+          { EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, OutputPass, GTAOPass, BokehPass, SSRPass, SMAAPass },
           renderer,
           scene,
           camera,

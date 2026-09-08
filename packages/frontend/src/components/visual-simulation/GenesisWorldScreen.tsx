@@ -11,8 +11,12 @@ import { severityColor } from '../../core/three/graphics/stateVisualization';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
-import { buildSyntheticTerrain } from '../../core/worldModel/domains/floodInundation';
+import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
 import { buildUniformFuelBed, simulateWildfireSpread, type WildfireSpreadResult, type WindVector } from '../../core/worldModel/domains/wildfireSpread';
+import {
+  buildSlopeStabilityField, simulateLandslideRunout, runoutAreaM2, DEFAULT_SOIL_PARAMS,
+  type SlopeStabilityField, type RunoutField,
+} from '../../core/worldModel/domains/landslide';
 import type { TemporalEngine } from '../../core/worldModel/temporal/temporalEngine';
 import { PUMP_PIPE_DEFAULTS } from '../../core/engineeringGraph/pumpPipe';
 
@@ -22,6 +26,16 @@ export interface WildfireFieldSummary {
   readonly headFlameLengthM: number;
   readonly reachedCells: number;
   readonly totalCells: number;
+}
+
+export interface LandslideFieldSummary {
+  readonly minFactorOfSafety: number;
+  readonly unstableCells: number;
+  readonly totalCells: number;
+  readonly maxVelocityAnywhereMS: number;
+  readonly longestRunoutDistanceM: number;
+  readonly runoutAreaM2: number;
+  readonly pathsLeavingModelledArea: number;
 }
 
 /**
@@ -83,6 +97,21 @@ class GenesisWorldSim3D implements Sim3D {
   private wildfireResult: WildfireSpreadResult | null = null;
   showWildfire = false;
 
+  /**
+   * Real infinite-slope stability + sliding-block runout field (`landslide.ts`, also already
+   * shipped by C3 with no visualization anywhere), on its own standalone demonstration terrain —
+   * the same `terrainField.ts` kit's second real application, proving the "one shared piece, not
+   * three one-off terrain meshes" the kit's own module doc argues for. Mutually exclusive with the
+   * wildfire field (`setShowWildfire`/`setShowLandslide` each hide the other): both replace the
+   * entity view with one full-screen terrain mesh, so showing both at once would just overdraw one
+   * with the other for no benefit.
+   */
+  private landslideField: TerrainFieldMesh | null = null;
+  private landslideTerrain: TerrainHeightfield | null = null;
+  private landslideStability: SlopeStabilityField | null = null;
+  private landslideRunout: RunoutField | null = null;
+  showLandslide = false;
+
   /** Set by the React component to receive selection changes — the ONLY coupling between this Sim3D and React, exactly the pattern `interaction.ts` documents (`onSelect`). */
   onSelect?: (id: WorldFrameEntityId | null) => void;
 
@@ -130,9 +159,9 @@ class GenesisWorldSim3D implements Sim3D {
     this.interaction = new InteractionController(THREE, {
       camera,
       resolver: this.renderer,
-      // While the wildfire field is showing, the entity boxes are hidden — excluding `root` from
-      // the raycast targets too, not just from rendering, so a click can't "select" a hidden box.
-      getTargets: () => (this.root && !this.showWildfire ? [this.root] : []),
+      // While a terrain field overlay is showing, the entity boxes are hidden — excluding `root`
+      // from the raycast targets too, not just from rendering, so a click can't "select" a hidden box.
+      getTargets: () => (this.root && !this.showWildfire && !this.showLandslide ? [this.root] : []),
       onHoverChange: (id) => {
         this.hoveredId = id;
       },
@@ -241,9 +270,15 @@ class GenesisWorldSim3D implements Sim3D {
     this.wildfireField.mesh.position.y = 0.01; // avoid z-fighting with the base ground plane
   }
 
+  private removeOverlayMesh(field: TerrainFieldMesh | null): void {
+    if (field?.mesh.parent) field.mesh.parent.remove(field.mesh);
+  }
+
   setShowWildfire(show: boolean): void {
     this.showWildfire = show;
     if (show) {
+      this.showLandslide = false;
+      this.removeOverlayMesh(this.landslideField);
       this.buildWildfireDemo();
       if (this.root) this.root.visible = false;
       if (this.wildfireField && this.scene && !this.wildfireField.mesh.parent) {
@@ -251,7 +286,7 @@ class GenesisWorldSim3D implements Sim3D {
       }
     } else {
       if (this.root) this.root.visible = true;
-      if (this.wildfireField?.mesh.parent) this.wildfireField.mesh.parent.remove(this.wildfireField.mesh);
+      this.removeOverlayMesh(this.wildfireField);
     }
   }
 
@@ -266,6 +301,73 @@ class GenesisWorldSim3D implements Sim3D {
       headFlameLengthM: this.wildfireResult.headFlameLengthM,
       reachedCells,
       totalCells,
+    };
+  }
+
+  /**
+   * Builds the real landslide demonstration field once, on first use: a steeper synthetic terrain
+   * (more relief than the wildfire demo's — infinite-slope stability needs real steep ground to
+   * produce any unstable cells at all), `DEFAULT_SOIL_PARAMS` (literature-typical, not a survey —
+   * same honesty convention as `wildfireSpread.ts`'s stated fuel moisture), a real per-cell factor
+   * of safety (`buildSlopeStabilityField`), and a real sliding-block runout trace from every
+   * unstable cell (`simulateLandslideRunout`). Factor of safety is defined for every cell — there is
+   * no "unreached" concept here the way wildfire has unburned cells — so every cell gets a real
+   * color, never `terrainField.ts`'s `noDataColor` fallback.
+   */
+  private buildLandslideDemo(): void {
+    if (!this.THREE || this.landslideField) return;
+    const THREE = this.THREE;
+    // reliefM=40 (steeper than the wildfire demo's own bowl) actually produces a real mix of
+    // stable/marginal/unstable cells with DEFAULT_SOIL_PARAMS — verified numerically before picking
+    // this value, since a too-gentle synthetic bowl would honestly compute zero unstable cells and
+    // make the runout half of this demo untestable in the browser.
+    const terrain = buildSyntheticTerrain({ cols: 30, rows: 30, cellSizeM: 6, seed: 11, reliefM: 40 });
+    const stability = buildSlopeStabilityField(terrain, DEFAULT_SOIL_PARAMS);
+    const runout = simulateLandslideRunout(terrain, DEFAULT_SOIL_PARAMS, stability);
+    this.landslideTerrain = terrain;
+    this.landslideStability = stability;
+    this.landslideRunout = runout;
+
+    this.landslideField = buildTerrainFieldMesh(THREE, terrain, {
+      heightScale: 3,
+      cellValueOf: (i) => stability.factorOfSafety[i],
+      // FS=0 (driving stress dominates) reads red/unstable; FS>=2 (twice the conventional
+      // UNSTABLE/STABLE threshold of 1.0) reads green/stable — severityColor's own clamping
+      // handles the FS_SAFETY_CAP=100 case on near-flat ground without a special case here.
+      colorOfValue: (T, value) => severityColor(T, 1 - value / 2),
+    });
+    this.landslideField.mesh.position.y = 0.01; // avoid z-fighting with the base ground plane
+  }
+
+  setShowLandslide(show: boolean): void {
+    this.showLandslide = show;
+    if (show) {
+      this.showWildfire = false;
+      this.removeOverlayMesh(this.wildfireField);
+      this.buildLandslideDemo();
+      if (this.root) this.root.visible = false;
+      if (this.landslideField && this.scene && !this.landslideField.mesh.parent) {
+        this.scene.add(this.landslideField.mesh);
+      }
+    } else {
+      if (this.root) this.root.visible = true;
+      this.removeOverlayMesh(this.landslideField);
+    }
+  }
+
+  getLandslideSummary(): LandslideFieldSummary | null {
+    if (!this.landslideTerrain || !this.landslideStability || !this.landslideRunout) return null;
+    const totalCells = this.landslideStability.factorOfSafety.length;
+    let minFactorOfSafety = Number.POSITIVE_INFINITY;
+    for (const fs of this.landslideStability.factorOfSafety) if (fs < minFactorOfSafety) minFactorOfSafety = fs;
+    return {
+      minFactorOfSafety,
+      unstableCells: this.landslideStability.unstableCellIndices.length,
+      totalCells,
+      maxVelocityAnywhereMS: this.landslideRunout.maxVelocityAnywhereMS,
+      longestRunoutDistanceM: this.landslideRunout.longestRunoutDistanceM,
+      runoutAreaM2: runoutAreaM2(this.landslideRunout, this.landslideTerrain, this.landslideStability),
+      pathsLeavingModelledArea: this.landslideRunout.pathsLeavingModelledArea,
     };
   }
 
@@ -289,6 +391,7 @@ class GenesisWorldSim3D implements Sim3D {
   dispose(): void {
     this.renderer?.dispose();
     this.wildfireField?.dispose();
+    this.landslideField?.dispose();
   }
 }
 
@@ -306,6 +409,8 @@ export function GenesisWorldScreen() {
   const [pumpStatus, setPumpStatus] = useState('');
   const [showWildfire, setShowWildfireState] = useState(false);
   const [wildfireSummary, setWildfireSummary] = useState<WildfireFieldSummary | null>(null);
+  const [showLandslide, setShowLandslideState] = useState(false);
+  const [landslideSummary, setLandslideSummary] = useState<LandslideFieldSummary | null>(null);
 
   useEffect(() => {
     sim.onSelect = (id: WorldFrameEntityId | null) => setSelected(id);
@@ -363,6 +468,16 @@ export function GenesisWorldScreen() {
     sim.setShowWildfire(show);
     setShowWildfireState(show);
     setWildfireSummary(sim.getWildfireSummary());
+    // The two terrain fields are mutually exclusive in the scene (sim.setShowWildfire already
+    // hides the landslide mesh) — mirror that in React state so the status line never shows both.
+    if (show) setShowLandslideState(false);
+  };
+
+  const handleToggleLandslide = (show: boolean) => {
+    sim.setShowLandslide(show);
+    setShowLandslideState(show);
+    setLandslideSummary(sim.getLandslideSummary());
+    if (show) setShowWildfireState(false);
   };
 
   return (
@@ -374,6 +489,8 @@ export function GenesisWorldScreen() {
           WorldFrameRenderer (C2). Click an object to select it; use the controls below to advance time, scrub the timeline, and fork a
           counterfactual (emergency flow-reduction) world for comparison. The wildfire field toggle shows a real Rothermel/MTT fire-spread
           solve (C3, `wildfireSpread.ts`) on a separate synthetic demonstration terrain, rendered via the generic terrainField kit (C2).
+          The landslide field toggle shows a real infinite-slope stability + sliding-block runout solve (C3, `landslide.ts`) the same way,
+          on its own steeper demonstration terrain.
         </span>
       </div>
 
@@ -417,6 +534,9 @@ export function GenesisWorldScreen() {
         <button className="chip-btn" data-testid="toggle-wildfire" aria-pressed={showWildfire} onClick={() => handleToggleWildfire(!showWildfire)}>
           {showWildfire ? 'Hide wildfire field' : 'Show wildfire field (Rothermel/MTT)'}
         </button>
+        <button className="chip-btn" data-testid="toggle-landslide" aria-pressed={showLandslide} onClick={() => handleToggleLandslide(!showLandslide)}>
+          {showLandslide ? 'Hide landslide field' : 'Show landslide field (FS + runout)'}
+        </button>
       </div>
 
       <p className="footer-note" data-testid="genesis-world-status">
@@ -455,6 +575,25 @@ export function GenesisWorldScreen() {
               {wildfireSummary.reachedCells}/{wildfireSummary.totalCells}
             </span>{' '}
             cells (Rothermel 1972 / Finney 2002 MTT, synthetic demo terrain)
+          </>
+        )}
+        {showLandslide && landslideSummary && (
+          <>
+            {' '}
+            · Landslide: min FS <span data-testid="landslide-min-fs">{landslideSummary.minFactorOfSafety.toFixed(2)}</span> · unstable{' '}
+            <span data-testid="landslide-unstable-cells">
+              {landslideSummary.unstableCells}/{landslideSummary.totalCells}
+            </span>{' '}
+            cells · max runout velocity <span data-testid="landslide-max-velocity">{landslideSummary.maxVelocityAnywhereMS.toFixed(2)}</span> m/s ·
+            longest runout <span data-testid="landslide-longest-runout">{landslideSummary.longestRunoutDistanceM.toFixed(0)}</span> m
+            {landslideSummary.pathsLeavingModelledArea > 0 && (
+              <>
+                {' '}
+                (<span data-testid="landslide-paths-left-area">{landslideSummary.pathsLeavingModelledArea}</span> path
+                {landslideSummary.pathsLeavingModelledArea === 1 ? '' : 's'} left the modelled area still moving — a lower bound)
+              </>
+            )}{' '}
+            (Skempton & DeLory 1957 infinite-slope stability, sliding-block runout, synthetic demo terrain)
           </>
         )}
       </p>

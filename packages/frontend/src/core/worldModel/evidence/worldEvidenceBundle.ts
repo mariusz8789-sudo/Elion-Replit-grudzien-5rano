@@ -13,6 +13,7 @@ import type { WorldState } from '../../world/scientificWorldState';
 import { collectScalars } from '../bridge/worldFrameState';
 import type { BranchComparison } from '../bridge/worldFrameState';
 import type { GroundingLevel } from '../ecs/types';
+import type { DecisionReport } from '../decision/decisionSupport';
 import type { WorldCounterfactualAssessment } from '../discovery/worldCounterfactual';
 import { getCausalAncestry } from '../queries/worldQueries';
 import type { TemporalEngine } from '../temporal/temporalEngine';
@@ -268,6 +269,13 @@ export interface WorldEvidenceBundleInput {
    * author the criterion its own evidence is judged by.
    */
   readonly assessment?: WorldCounterfactualAssessment;
+  /**
+   * The ranked modelled outcomes of declared options, when the scenario was
+   * run as a decision rather than only as a comparison. Supplied, never
+   * computed here: the bundle records what was decided and on what basis, and
+   * must not be able to author the objective its own evidence is ranked by.
+   */
+  readonly decision?: DecisionReport;
 }
 
 export interface WorldEvidenceBundle {
@@ -296,6 +304,12 @@ export interface WorldEvidenceBundle {
    * bundle that shows what changed without claiming a prediction was tested.
    */
   readonly assessment: WorldCounterfactualAssessment | null;
+  /**
+   * The decision report, or null when no options were evaluated. A bundle
+   * carrying one is answering "which of these should we do, in the model";
+   * a bundle without one is answering "what happened".
+   */
+  readonly decision: DecisionReport | null;
   /** Ids the `WorldState` itself declared unmodelled — passed through, never re-derived. */
   readonly notModelled: readonly string[];
   /** Limitations of the EXPORT mechanism itself, as opposed to the scenario's science. Empty when the export has none. */
@@ -353,6 +367,27 @@ function scientificContent(bundle: Omit<WorldEvidenceBundle, 'scientificContentF
           baseline: bundle.assessment.baseline,
           intervention: bundle.assessment.intervention,
           controlStatus: bundle.assessment.controlledDifference.status,
+        }
+      : null,
+    // The ranking is scientific content: the same world with the same options
+    // under a different objective is a different result, and must not
+    // fingerprint as the same science.
+    decision: bundle.decision
+      ? {
+          decisionId: bundle.decision.decisionId,
+          objective: bundle.decision.objective,
+          horizonTick: bundle.decision.horizonTick,
+          baselineValue: bundle.decision.baselineValue,
+          rankingStatus: bundle.decision.rankingStatus,
+          ranking: bundle.decision.ranking,
+          bestModelledOptionIds: bundle.decision.bestModelledOptionIds,
+          outcomes: bundle.decision.outcomes.map((o) => ({
+            optionId: o.optionId,
+            status: o.status,
+            objectiveValue: o.objectiveValue,
+            deltaVsBaseline: o.deltaVsBaseline,
+          })),
+          notModelledFactors: bundle.decision.notModelledFactors,
         }
       : null,
     notModelled: bundle.notModelled,
@@ -420,6 +455,7 @@ export function buildWorldEvidenceBundle(input: WorldEvidenceBundleInput): World
     replay: buildBundleReplay(input.baseline.engine, input.verifyEngine, input.replayBlockedReason),
     limitations: input.limitations ?? [],
     assessment: input.assessment ?? null,
+    decision: input.decision ?? null,
     notModelled: input.baseline.worldState.notModeled ?? [],
   } as const;
 
@@ -630,6 +666,35 @@ export function exportWorldEvidenceBundleRoCrate(bundle: WorldEvidenceBundle): G
       // Travels with the verdict itself, so the RO-Crate cannot be read as a
       // causal claim about the world even if this node is extracted alone.
       'genesis:disclaimer': assessment.disclaimer,
+    });
+  }
+
+  if (bundle.decision) {
+    const decision = bundle.decision;
+    graph.push({
+      '@id': `#decision/${stableId(decision.decisionId)}`,
+      '@type': ['prov:Entity', 'Dataset'],
+      name: `Decision support report for ${bundle.bundleId}`,
+      ...(bundle.intervention ? { 'prov:wasDerivedFrom': [entityRef(comparisonId)] } : {}),
+      'genesis:decisionId': decision.decisionId,
+      'genesis:decisionQuestion': decision.question,
+      'genesis:objective': decision.objective,
+      'genesis:decisionAtTick': decision.decisionAtTick,
+      'genesis:horizonTick': decision.horizonTick,
+      'genesis:baselineValue': decision.baselineValue,
+      'genesis:rankingStatus': decision.rankingStatus,
+      'genesis:rankingReason': decision.rankingReason,
+      'genesis:ranking': decision.ranking,
+      'genesis:bestModelledOptionIds': decision.bestModelledOptionIds,
+      'genesis:optionOutcomes': decision.outcomes,
+      'genesis:objectiveGrounding': decision.objectiveGrounding,
+      'genesis:objectiveClassification': decision.objectiveClassification,
+      // Both travel WITH the ranking rather than beside it: a consumer that
+      // lifts this node out of the crate still gets what the ranking omits and
+      // the statement that it is not a recommendation.
+      'genesis:notModelledFactors': decision.notModelledFactors,
+      'genesis:declaredAssumptions': decision.declaredAssumptions,
+      'genesis:disclaimer': decision.disclaimer,
     });
   }
 

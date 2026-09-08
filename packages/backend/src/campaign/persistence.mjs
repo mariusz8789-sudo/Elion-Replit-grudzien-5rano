@@ -63,10 +63,10 @@ export function updateCampaign(db, id, patch) {
 export function addCandidate(db, c) {
   const id = newId();
   db.prepare(
-    `INSERT INTO campaign_candidates (id, campaign_id, generation, parent_id, parent_smiles, transformation, canonical_smiles, valid, descriptors_json, objective_vector_json, constraint_violations_json, pareto, status, rejected_reason, run_ids_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO campaign_candidates (id, campaign_id, generation, parent_id, parent_smiles, co_parent_smiles, transformation, canonical_smiles, valid, descriptors_json, objective_vector_json, constraint_violations_json, pareto, status, rejected_reason, run_ids_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
-    id, c.campaignId, c.generation, c.parentId ?? null, c.parentSmiles ?? null, c.transformation ?? null,
+    id, c.campaignId, c.generation, c.parentId ?? null, c.parentSmiles ?? null, c.coParentSmiles ?? null, c.transformation ?? null,
     c.canonicalSmiles, c.valid === false ? 0 : 1, J(c.descriptors ?? {}), J(c.objectiveVector ?? {}),
     J(c.constraintViolations ?? []), c.pareto ? 1 : 0, c.status ?? 'retained', c.rejectedReason ?? null,
     J(c.runIds ?? []), Date.now(),
@@ -77,7 +77,7 @@ export function addCandidate(db, c) {
 function toCandidate(r) {
   return {
     id: r.id, campaignId: r.campaign_id, generation: r.generation, parentId: r.parent_id ?? null,
-    parentSmiles: r.parent_smiles ?? null, transformation: r.transformation ?? null,
+    parentSmiles: r.parent_smiles ?? null, coParentSmiles: r.co_parent_smiles ?? null, transformation: r.transformation ?? null,
     canonicalSmiles: r.canonical_smiles, valid: r.valid === 1, descriptors: P(r.descriptors_json, {}),
     objectiveVector: P(r.objective_vector_json, {}), constraintViolations: P(r.constraint_violations_json, []),
     pareto: r.pareto === 1, status: r.status, rejectedReason: r.rejected_reason ?? null,

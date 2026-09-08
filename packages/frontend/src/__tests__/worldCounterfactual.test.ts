@@ -8,6 +8,7 @@ import {
   diffWorldBranches,
   evidenceMagnitudeFromAssessment,
   findFirstDivergenceTick,
+  deriveAlternativeCriteria,
   generateAlternativeHypotheses,
   preregisterWorldCounterfactual,
   readMetric,
@@ -513,6 +514,41 @@ describe('generateAlternativeHypotheses — mechanical, grounded in the real fal
     const parent = createHypothesis('H1', wrongDirection, 0.7);
     const alreadyRejected = new Set([criterionFingerprint({ ...FLOOD_DEPTH_CRITERION, relation: 'greater-than' })]);
     expect(generateAlternativeHypotheses(parent, falsified, alreadyRejected)).toEqual([]);
+  });
+  /**
+   * THE SPLIT, checked rather than asserted.
+   *
+   * `deriveAlternativeCriteria` is the half that carries no belief
+   * representation, so BOTH loops can consume it — `discoveryLoop` in its
+   * ordinal `HypothesisBelief` and `inquiryLoop` in its numeric `Hypothesis` —
+   * without either importing the other's model. `generateAlternativeHypotheses`
+   * is now only the numeric packaging of exactly that, which these tests hold it
+   * to: same criteria, same mechanisms, same order.
+   */
+  it('derives the same criteria without any belief representation at all', () => {
+    const wrongDirection: FalsificationCriterion = { ...FLOOD_DEPTH_CRITERION, relation: 'less-than', rationale: 'Deliberately wrong direction.' };
+    const falsified = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question({ criterion: wrongDirection })), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+
+    const bare = deriveAlternativeCriteria(wrongDirection, falsified);
+    const wrapped = generateAlternativeHypotheses(createHypothesis('H1', wrongDirection, 0.7), falsified);
+
+    expect(bare.map((a) => a.criterion)).toEqual(wrapped.map((h) => h.criterion));
+    expect(bare.map((a) => a.generatedBy)).toEqual(wrapped.map((h) => h.generatedBy));
+    // And the bare form really carries nothing from `beliefRevision.ts`: no
+    // confidence, no status, no history, no parent id.
+    for (const alternative of bare) expect(Object.keys(alternative).sort()).toEqual(['criterion', 'generatedBy']);
+  });
+
+  it('honours the rejected-criteria filter identically in both forms', () => {
+    const wrongDirection: FalsificationCriterion = { ...FLOOD_DEPTH_CRITERION, relation: 'less-than', rationale: 'Deliberately wrong direction.' };
+    const falsified = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question({ criterion: wrongDirection })), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    const alreadyRejected = new Set([criterionFingerprint({ ...FLOOD_DEPTH_CRITERION, relation: 'greater-than' })]);
+    expect(deriveAlternativeCriteria(wrongDirection, falsified, alreadyRejected)).toEqual([]);
+  });
+
+  it('produces nothing from a SUPPORTED assessment in the bare form either', () => {
+    const supported = assessWorldCounterfactual({ preregistration: preregisterWorldCounterfactual(question()), diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(deriveAlternativeCriteria(FLOOD_DEPTH_CRITERION, supported)).toEqual([]);
   });
 });
 

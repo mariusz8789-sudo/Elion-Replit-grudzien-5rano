@@ -296,6 +296,45 @@ describe('The next experiment names the most blocking uncertainty', () => {
     expect(next.why).toMatch(/exactly one intervention magnitude/);
   });
 
+  it('a falsified criterion asks for a NEW question against the real divergence — never repeats the failed one', () => {
+    const prereg = preregisterWorldCounterfactual(
+      question({ criterion: { ...FLOOD_DEPTH_CRITERION, relation: 'less-than', rationale: 'Deliberately wrong direction.' } }),
+    );
+    const assessment = assess({ preregistration: prereg, diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(assessment.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
+    const next = selectNextWorldExperiment(assessment, diff);
+    expect(next.kind).toBe('HYPOTHESIS_FALSIFIED');
+    expect(next.status).toBe('RESOLVED');
+    // The action names the REAL measured values, not a vague "try again".
+    expect(next.action).toContain(String(assessment.baseline));
+    expect(next.action).toContain(String(assessment.intervention));
+    expect(next.action).toMatch(/new question/);
+  });
+
+  it('the critical test: identical setup, only the outcome differs — confirmation and contradiction plan DIFFERENT next steps', () => {
+    // Same diff, same controlled/replayed evidence quality on both sides — the ONLY
+    // thing that differs is which direction the criterion predicted, i.e. whether the
+    // real result confirmed or contradicted it. If Genesis always proposed the same
+    // next step regardless of the answer, this would not be reasoning — see the
+    // module's own doc for exactly why HYPOTHESIS_FALSIFIED exists.
+    const confirmingPrereg = preregisterWorldCounterfactual(question());
+    const contradictingPrereg = preregisterWorldCounterfactual(
+      question({ criterion: { ...FLOOD_DEPTH_CRITERION, relation: 'less-than', rationale: 'Deliberately wrong direction.' } }),
+    );
+    const confirmed = assess({ preregistration: confirmingPrereg, diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    const contradicted = assess({ preregistration: contradictingPrereg, diff, controlledDifference: control, replayVerdict: 'MATCH' });
+    expect(confirmed.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    expect(contradicted.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
+
+    const nextAfterConfirm = selectNextWorldExperiment(confirmed, diff);
+    const nextAfterContradiction = selectNextWorldExperiment(contradicted, diff);
+
+    expect(nextAfterConfirm.kind).not.toBe(nextAfterContradiction.kind);
+    expect(nextAfterConfirm.kind).toBe('SINGLE_INTERVENTION_POINT'); // confirmed: check it scales
+    expect(nextAfterContradiction.kind).toBe('HYPOTHESIS_FALSIFIED'); // contradicted: stop, explain the real data instead
+    expect(nextAfterConfirm.action).not.toBe(nextAfterContradiction.action);
+  });
+
   it('flags a non-diverging pair as a possible wiring fault, not as a finding', () => {
     const twin = new TemporalBranchRegistry();
     const a = runCity({}, twin);

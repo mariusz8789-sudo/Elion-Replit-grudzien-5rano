@@ -15,6 +15,15 @@ export function whyCandidate(db, candidateId) {
   if (c.generation === 0) {
     return { ok: true, answer: `Molekuła startowa (${c.canonicalSmiles}) podana w definicji kampanii.`, evidence: { generation: 0, runIds: c.runIds } };
   }
+  // Kandydat z rekombinacji ma DWOJE rodziców i nazwanie jednego z nich „rodzicem",
+  // a drugiego pomijanie, byłoby fałszywym rodowodem — dlatego osobne zdanie.
+  if (c.coParentSmiles) {
+    return {
+      ok: true,
+      answer: `Wygenerowany w generacji ${c.generation} przez rekombinację fragmentów BRICS DWOJGA rodziców: „${c.parentSmiles}" i „${c.coParentSmiles}". Fragmenty i ich połączenie pochodzą z reguł BRICS w RDKit, nie z edycji tekstu SMILES. Deskryptory policzone realnym RDKit (Scientific Run).`,
+      evidence: { parentSmiles: c.parentSmiles, coParentSmiles: c.coParentSmiles, parentId: c.parentId, transformation: c.transformation, runIds: c.runIds },
+    };
+  }
   return {
     ok: true,
     answer: `Wygenerowany w generacji ${c.generation} z rodzica „${c.parentSmiles}" transformacją „${c.transformation}". Deskryptory policzone realnym RDKit (Scientific Run).`,

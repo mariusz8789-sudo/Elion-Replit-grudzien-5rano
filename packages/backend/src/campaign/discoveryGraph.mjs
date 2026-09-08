@@ -15,6 +15,11 @@ export function buildDiscoveryGraph(db, campaignId) {
   const nodes = [];
   const edges = [];
   const seenTransform = new Set();
+  // Rodowód rekombinacji wskazuje drugiego rodzica po KANONICZNYM SMILES: w obrębie
+  // kampanii jest on unikalny (deduplikacja kanoniczna w orkiestratorze), więc
+  // odwzorowanie na id kandydata jest jednoznaczne i nie wymaga drugiej kolumny id.
+  const idByCanonical = new Map();
+  for (const c of candidates) if (!idByCanonical.has(c.canonicalSmiles)) idByCanonical.set(c.canonicalSmiles, c.id);
 
   nodes.push({ id: `objective:${campaignId}`, type: 'OBJECTIVE', label: campaign.objective });
 
@@ -25,6 +30,11 @@ export function buildDiscoveryGraph(db, campaignId) {
     });
     // GENERATED_FROM (rodowód)
     if (c.parentId) edges.push({ from: `cand:${c.parentId}`, to: `cand:${c.id}`, type: 'GENERATED_FROM' });
+    // Drugi rodzic rekombinatu — bez tej krawędzi graf pokazywałby rodowód jednorodzicielski,
+    // którego nie było.
+    if (c.coParentSmiles && idByCanonical.has(c.coParentSmiles)) {
+      edges.push({ from: `cand:${idByCanonical.get(c.coParentSmiles)}`, to: `cand:${c.id}`, type: 'GENERATED_FROM' });
+    }
     // TRANSFORMED_BY (transformacja)
     if (c.transformation) {
       const tid = `transform:${c.transformation}`;

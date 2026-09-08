@@ -246,6 +246,7 @@ CREATE TABLE IF NOT EXISTS campaign_candidates (
   generation         INTEGER NOT NULL,
   parent_id          TEXT,
   parent_smiles      TEXT,
+  co_parent_smiles   TEXT,
   transformation     TEXT,
   canonical_smiles   TEXT NOT NULL,
   valid              INTEGER NOT NULL DEFAULT 1,
@@ -428,6 +429,16 @@ function migrate(db) {
   if (version < 9) db.exec(SCHEMA_V9);
   if (version < 10) db.exec(SCHEMA_V10);
   if (version < 11) db.exec(SCHEMA_V11);
+  // Rekombinacja BRICS ma DWOJE rodziców, więc rodowód potrzebuje drugiej kolumny.
+  // Dodatkowo, nie destrukcyjnie: bazy sprzed tej zmiany dostają kolumnę pustą,
+  // a kandydaci jednorodzicielscy mają w niej NULL na zawsze — to poprawny stan,
+  // nie brak danych.
+  {
+    const cols = db.prepare('PRAGMA table_info(campaign_candidates)').all();
+    if (cols.length > 0 && !cols.some((c) => c.name === 'co_parent_smiles')) {
+      db.exec('ALTER TABLE campaign_candidates ADD COLUMN co_parent_smiles TEXT');
+    }
+  }
   if (version < 7) db.exec(SCHEMA_V7);
   if (version < 8) {
     db.exec(SCHEMA_V8);

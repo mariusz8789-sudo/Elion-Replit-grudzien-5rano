@@ -71,7 +71,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
   const stopping = { patience: 2, minImprovement: 1e-3, diversityFloor: 0.15, ...campaign.stopping };
   let strategy = campaign.strategy && campaign.strategy.transformationWeights
     ? campaign.strategy
-    : { transformationWeights: Object.fromEntries(adapter.availableTransformations().map((t) => [t, 1])), parentSelection: 'pareto' };
+    : { transformationWeights: Object.fromEntries(adapter.availableProposalSources().map((t) => [t, 1])), parentSelection: 'pareto' };
 
   // Molekuły startowe żyją w strategii (nextExperiment robi `{...strategy}`, więc przetrwają).
   const startingSmiles = Array.isArray(strategy.startingSmiles) ? strategy.startingSmiles : [];
@@ -125,7 +125,12 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
 
     const { proposals, attempts, successes } = adapter.generateProposals(parentSmiles, strategy.transformationWeights, { maxPerTransform: 2 });
     const transformationStats = {};
-    for (const t of Object.keys(strategy.transformationWeights)) transformationStats[t] = { attempts: attempts[t] ?? 0, successes: successes[t] ?? 0, paretoContrib: 0 };
+    // Suma kluczy strategii i tych, o których adapter faktycznie zaraportował próby:
+    // kampania utworzona przed dodaniem nowego źródła propozycji ma je w bazie w
+    // starej strategii, a bez tej sumy wkład do Pareto poniżej trafiałby w undefined.
+    for (const t of new Set([...Object.keys(strategy.transformationWeights), ...Object.keys(attempts)])) {
+      transformationStats[t] = { attempts: attempts[t] ?? 0, successes: successes[t] ?? 0, paretoContrib: 0 };
+    }
     const rejections = {};
     const genRetained = [];
 
@@ -134,7 +139,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
       // Dedup kanoniczny (usuwanie duplikatów).
       if (seenCanonical.has(prop.canonicalSmiles)) {
         rejections.duplicate = (rejections.duplicate ?? 0) + 1;
-        store.addCandidate(db, { campaignId, generation, parentSmiles: prop.parentSmiles, transformation: prop.transformation, canonicalSmiles: prop.canonicalSmiles, valid: true, status: 'rejected', rejectedReason: 'duplicate', descriptors: {}, objectiveVector: {}, constraintViolations: [], runIds: [] });
+        store.addCandidate(db, { campaignId, generation, parentSmiles: prop.parentSmiles, coParentSmiles: prop.coParentSmiles ?? null, transformation: prop.transformation, canonicalSmiles: prop.canonicalSmiles, valid: true, status: 'rejected', rejectedReason: 'duplicate', descriptors: {}, objectiveVector: {}, constraintViolations: [], runIds: [] });
         continue;
       }
       seenCanonical.add(prop.canonicalSmiles);
@@ -143,6 +148,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
       totalGenerated++;
       const id = store.addCandidate(db, {
         campaignId, generation, parentId: parent?.id ?? null, parentSmiles: prop.parentSmiles,
+        coParentSmiles: prop.coParentSmiles ?? null,
         transformation: prop.transformation, canonicalSmiles: prop.canonicalSmiles, ...rec,
       });
       if (rec.status === 'retained') {

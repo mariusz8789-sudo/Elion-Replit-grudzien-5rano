@@ -144,3 +144,39 @@ export function diversity(smilesList) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }
 }
+
+/**
+ * Rekombinacja fragmentów BRICS — kandydaci, których żadna pojedyncza
+ * transformacja z `listTransformations()` nie jest w stanie osiągnąć.
+ *
+ * Reguły BRICS (Degen i in. 2008) rozkładają rodziców na fragmenty po
+ * wiązaniach syntetycznie dostępnych i łączą je z powrotem tylko tam, gdzie
+ * typy punktów przyłączenia do siebie pasują. Dla DWÓCH rodziców daje to
+ * produkty hybrydowe — realną chemię, nie sklejanie napisów.
+ *
+ * Deterministyczne (`scrambleReagents=False`) i twardo ograniczone liczbą
+ * produktów oraz głębokością składania, bo generator BRICSBuild jest dla
+ * większych pul praktycznie nieskończony.
+ *
+ * To NIE jest generatywne projektowanie de novo — nie ma tu modelu
+ * proponującego nowe rusztowania. Przeszukiwanie jest szersze niż lista
+ * transformacji, ale nadal kombinatoryczne i ograniczone do fragmentów
+ * obecnych w rodzicach.
+ */
+export function bricsRecombine(smilesList, { maxProducts = 8, maxDepth = 2 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({
+      cmd: 'brics',
+      smiles: Array.isArray(smilesList) ? smilesList.map(String) : [],
+      maxProducts,
+      maxDepth,
+    });
+    return r.ok
+      ? { ok: true, products: r.products, fragmentsByParent: r.fragmentsByParent, reason: r.reason ?? null, engine: r.engine }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}

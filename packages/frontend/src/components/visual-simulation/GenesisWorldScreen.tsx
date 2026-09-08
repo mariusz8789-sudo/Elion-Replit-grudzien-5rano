@@ -417,7 +417,29 @@ export class GenesisWorldSim3D implements Sim3D {
       }
     };
 
-    this.renderer = new WorldFrameRenderer(THREE, this.root, { resolveVisual, updateVisual });
+    // ASTRA B1 — every `building`-kind entity in this world (hospital, chemistry lab, water-system,
+    // and the procedural city-grid fillers) is `NOT_MODELED` (no domain binding — nobody solves
+    // building architecture), so `WorldFrameRenderer.sync()` never reaches `resolveVisual` for any of
+    // them at all: it routes straight to the boundary-placeholder path BEFORE `resolveVisual` is ever
+    // called (confirmed by direct instrumentation, not assumed). Giving them a real windowed facade
+    // material there would be dishonest — claiming detail the model does not have, exactly what the
+    // grounding discipline exists to prevent. The actual, honest fix is a placeholder SHAPED like the
+    // real footprint (`resolveVisual`'s own box-size formula) instead of the default's generic small
+    // sphere, so a building at least reads as a building-shaped gap in the model — still wireframe,
+    // still transparent, still unmistakably "not modeled," just legible. Every other NOT_MODELED kind
+    // keeps the renderer's own default sphere, reproduced verbatim below (not exported to override
+    // selectively).
+    const resolveBoundaryPlaceholder = (_THREE: typeof THREE_NS, entity: WorldFrameEntity): THREE_NS.Object3D => {
+      const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x5a6b7a, wireframe: true, transparent: true, opacity: 0.35 });
+      if (entity.visualHint === 'building') {
+        const size = Math.max(1.5, 1.5 * (entity.scale ?? 1));
+        return new THREE.Mesh(new THREE.BoxGeometry(size, size, size), boundaryMaterial);
+      }
+      const radius = 0.5 * (entity.scale ?? 1);
+      return new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), boundaryMaterial);
+    };
+
+    this.renderer = new WorldFrameRenderer(THREE, this.root, { resolveVisual, updateVisual, resolveBoundaryPlaceholder });
     this.interaction = new InteractionController(THREE, {
       camera,
       resolver: this.renderer,
@@ -472,6 +494,32 @@ export class GenesisWorldSim3D implements Sim3D {
     ] as const) {
       this.city.base.engine.applyExternalPatch(id, {
         spatial: { position, scale: { x: scale, y: scale, z: scale } },
+      });
+    }
+
+    // ASTRA B1 — a real bug this session's own Chromium check caught, not present in any unit test:
+    // `WorldFrameRenderer` parents a graph CHILD's mesh under its WorldModel parent's own mesh
+    // (`ensureParented`), and Three.js scale is multiplicative down that hierarchy. The hospital/lab
+    // resize above is presentation-only (a footprint choice, not a scientific one — see that block's
+    // own doc), but it silently ALSO multiplies the render size of every entity parented to those
+    // buildings in the graph: `population:city-1` (a real child of the hospital) rendered at
+    // `HOSPITAL_BUILDING_SCALE`× its own size, filling the screen as a giant flat-colored box that
+    // looked exactly like a broken "building" — because it effectively was one, just not the one
+    // anybody meant to resize. Counter-scaling each DIRECT child by the inverse of its parent's
+    // presentation scale cancels the inherited multiplication, restoring the size it would have
+    // rendered at before the building was ever resized — this changes no science (population's own
+    // declared scale was never 7 to begin with; this repairs an accidental side effect of a rendering
+    // choice, not the model). Only DIRECT children need correcting: `substance:s1` is a child of
+    // `lab:lab1`, not of the lab building itself, so fixing `lab1`'s own scale already cancels the
+    // whole chain for its descendant too — patching `substance` as well would double-correct it.
+    for (const [id, parentScale] of [
+      [this.city.populationId, HOSPITAL_BUILDING_SCALE],
+      [this.city.labId, LAB_BUILDING_SCALE],
+    ] as const) {
+      const inverse = 1 / parentScale;
+      const ownPosition = spawnFrame.entities.find((e) => e.id === id)?.transform.position ?? { x: 0, y: 0, z: 0 };
+      this.city.base.engine.applyExternalPatch(id, {
+        spatial: { position: ownPosition, scale: { x: inverse, y: inverse, z: inverse } },
       });
     }
 

@@ -1,6 +1,7 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { evaluateTwoArmRelation, SERIES_ONLY_RELATIONS } from '../../experimentFabric/falsificationRelation';
 import type { FalsificationCriterion, HypothesisAssessment } from '../../experimentFabric/scientificDiscovery';
+import { createHypothesis, type Hypothesis } from '../../experimentFabric/beliefRevision';
 import type { ReplayVerdict } from '../../matrixFoundation/replayVerdict';
 import { collectScalars, compareBranches, type BranchComparison } from '../bridge/worldFrameState';
 import type { TemporalBranchRegistry } from '../temporal/temporalEngine';
@@ -625,4 +626,116 @@ export function selectNextWorldExperiment(
     resolves: 'Separates a dose-dependent modelled effect from a single-point coincidence.',
     rule: 'SINGLE_INTERVENTION_POINT: one point is a result, not a response.',
   };
+}
+
+// ---------------------------------------------------------------------------
+// 6. Belief revision: a falsified criterion generates real, testable
+//    alternatives instead of just reporting the divergence (Reasoning Core).
+// ---------------------------------------------------------------------------
+
+/**
+ * Content fingerprint of a criterion's decidable fields — used to detect that a
+ * "new" alternative is actually one already tried (negative evidence: a
+ * rejected hypothesis must not silently return as if it were new).
+ */
+export function criterionFingerprint(criterion: FalsificationCriterion): string {
+  return `crit_${fnv1a(canonicalJson({
+    metric: criterion.metric, relation: criterion.relation,
+    expectedValue: criterion.expectedValue ?? null, tolerance: criterion.tolerance ?? null,
+  }))}`;
+}
+
+/**
+ * How decisively the REAL measured values confirmed or contradicted the
+ * criterion, 0..1 — the evidence-strength signal `updateConfidence` requires
+ * and never computes itself. Derived only from real assessment fields, never
+ * from the verdict label alone (a criterion that barely missed and one that
+ * missed by an order of magnitude must not move confidence by the same amount).
+ */
+export function evidenceMagnitudeFromAssessment(assessment: WorldCounterfactualAssessment): number {
+  if (assessment.baseline === null || assessment.intervention === null || assessment.reference === null) return 0;
+  if (assessment.criterion.relation === 'equal-within-tolerance' && assessment.criterion.tolerance) {
+    const diff = Math.abs(assessment.intervention - assessment.reference);
+    const ratio = diff / assessment.criterion.tolerance;
+    // Supported: how comfortably within tolerance (ratio near 0 -> strong). Falsified:
+    // how far outside it (ratio near 1 from above -> weak miss, large ratio -> strong).
+    return Math.min(1, Math.abs(1 - ratio));
+  }
+  // Measured against how far the real intervention moved from the real BASELINE, not
+  // from the criterion's reference. When the criterion has no `expectedValue`,
+  // reference already equals baseline (see evaluateTwoArmRelation), so this is
+  // unchanged from a plain baseline-relative measure. When the criterion declares a
+  // FIXED threshold (e.g. "flow > 0"), the reference can legitimately equal the exact
+  // value that constitutes falsification (0), which would make distance-from-reference
+  // degenerately zero even for a maximally decisive result (baseline flow collapsing
+  // to exactly 0) — baseline is always a real, meaningful, nonzero-in-practice scale
+  // for a physical quantity, so it is the denominator here, never the threshold itself.
+  const scale = Math.max(Math.abs(assessment.baseline), Math.abs(assessment.reference), 1e-9);
+  return Math.min(1, Math.abs(assessment.intervention - assessment.baseline) / scale);
+}
+
+/**
+ * Mechanically derives real, testable alternative criteria from a FALSIFIED
+ * assessment — never invented text, never a placeholder. Each mechanism is
+ * grounded directly in the real measured values:
+ *
+ *   RELATION_FLIP — the criterion predicted a direction (greater-than/less-than)
+ *   and the real data moved the other way; the flipped relation is proposed
+ *   because it is what the SAME numbers already support, not a guess.
+ *
+ *   TOLERANCE_WIDENED — an equality criterion just missed; the alternative
+ *   widens the tolerance to EXACTLY what the real observed difference would
+ *   satisfy, no further.
+ *
+ * `rejectedFingerprints` filters out any candidate identical to a criterion
+ * already judged (in either direction) earlier in this same investigation —
+ * negative evidence: a hypothesis this world-model run already falsified (or
+ * already confirmed and moved on from) cannot silently reappear as if new.
+ *
+ * Returns `[]` for anything other than a clean, evaluable falsification — this
+ * is not a general hypothesis generator, and it does not pretend to invent a
+ * hypothesis about a DIFFERENT metric or entity than the one just tested; that
+ * would need real domain knowledge this function does not have.
+ */
+export function generateAlternativeHypotheses(
+  parent: Hypothesis,
+  assessment: WorldCounterfactualAssessment,
+  rejectedFingerprints: ReadonlySet<string> = new Set(),
+  priorConfidence = 0.5,
+): readonly Hypothesis[] {
+  if (assessment.assessment !== 'FALSIFIED_WITHIN_PROTOCOL') return [];
+  if (assessment.baseline === null || assessment.intervention === null || assessment.reference === null) return [];
+  const { criterion } = parent;
+  const alternatives: Hypothesis[] = [];
+  let nextIndex = 0;
+  const nextId = () => `${parent.id}-alt${nextIndex++}`;
+
+  if (criterion.relation === 'greater-than' || criterion.relation === 'less-than') {
+    const flipped: FalsificationCriterion = {
+      ...criterion,
+      relation: criterion.relation === 'greater-than' ? 'less-than' : 'greater-than',
+      rationale: `Mechanically derived from the falsification of "${criterion.rationale}": the real data moved the opposite `
+        + `direction (${assessment.intervention} vs. reference ${assessment.reference}).`,
+    };
+    if (!rejectedFingerprints.has(criterionFingerprint(flipped))) {
+      alternatives.push(createHypothesis(nextId(), flipped, priorConfidence, 'RELATION_FLIP', parent.id));
+    }
+  }
+
+  if (criterion.relation === 'equal-within-tolerance' && criterion.tolerance !== undefined) {
+    const actualDiff = Math.abs(assessment.intervention - assessment.reference);
+    if (actualDiff > criterion.tolerance) {
+      const widened: FalsificationCriterion = {
+        ...criterion,
+        tolerance: actualDiff,
+        rationale: `Mechanically derived from the falsification of "${criterion.rationale}": widened to the tolerance `
+          + `(${actualDiff}) the real observed difference would actually satisfy.`,
+      };
+      if (!rejectedFingerprints.has(criterionFingerprint(widened))) {
+        alternatives.push(createHypothesis(nextId(), widened, priorConfidence, 'TOLERANCE_WIDENED', parent.id));
+      }
+    }
+  }
+
+  return alternatives;
 }

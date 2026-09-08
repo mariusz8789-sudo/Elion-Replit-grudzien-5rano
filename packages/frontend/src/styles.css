@@ -3187,20 +3187,23 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
    .lg-obs internals as the chat's console, positioned as a HUD panel since these screens are fixed-
    height viewports, not normal document flow (see .lg-rail-inline's own note above). */
 .lg-obs-live { position: absolute; left: 1rem; top: 1rem; z-index: 8; max-width: 22rem; }
-.lg-obs-live .lg-obs { background: rgba(8, 13, 22, 0.92); backdrop-filter: blur(8px); }
+.lg-obs-live .lg-obs {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+}
 .lg-obs-status {
   align-self: flex-start; padding: 0.15rem 0.5rem; border-radius: 999px;
-  font: 600 0.6rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.08em;
-  border: 1px solid #2b3a52; color: #8ecbff;
+  font: 600 0.6rem/1.4 var(--font-mono); letter-spacing: 0.08em;
+  border: 1px solid var(--glass-border); color: var(--cyan);
 }
-.lg-obs-status.is-failed { color: #f28a8a; border-color: #6b2c2c; }
-.lg-obs-status.is-executed { color: #7fe3ab; border-color: #2c6b48; }
+.lg-obs-status.is-failed { color: var(--red); border-color: rgba(244, 124, 124, 0.4); }
+.lg-obs-status.is-executed { color: var(--green); border-color: rgba(110, 231, 160, 0.4); }
 .lg-mode-badge {
   position: absolute; right: 1rem; bottom: 1rem; z-index: 7;
   padding: 0.3rem 0.65rem; border-radius: 999px;
-  background: rgba(8, 13, 22, 0.9); border: 1px solid #2b3a52;
-  font: 600 0.62rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.1em; color: #8ecbff;
+  background: var(--glass-strong); border: 1px solid var(--glass-border);
+  font: 600 0.62rem/1.4 var(--font-mono);
+  letter-spacing: 0.1em; color: var(--cyan);
 }
 
 /* Porównanie: prawdziwe metryki dwóch przebiegów, nigdy samo intencji. */
@@ -3260,41 +3263,52 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .lg-insp-delta-values .is-down { color: #7fe3ab; }
 .lg-insp-delta-values .is-up { color: #f0a4a4; }
 
-/* LOOKING GLASS 2.0 — the observation console: one field, one answer. */
+/* LOOKING GLASS 2.0 — the observation console: one field, one answer.
+   GENESIS C2 WOW SPRINT — retinted onto the shared .gx- tokens (var(--glass-strong)/--glass-border/
+   --glass-blur/--text/--cyan/--font-mono/--r-md), the same "token swap only, no layout change"
+   treatment the UI Unification Sprint already gave `.gsc-panel` — this shell was the one piece of
+   chrome UI Sprint P3 left on the pre-unification hardcoded palette, visible as a jarring flat-navy
+   box next to the rest of the flagship scene's glass panels. Shared by #/city3d, #/scientific-city,
+   FirstPersonLabScreen and LookingGlassChat's inline console, so this one retint reaches all four. */
 .lg-obs {
-  border: 1px solid #24314a; border-radius: 0.7rem; padding: 0.7rem 0.85rem;
-  display: flex; flex-direction: column; gap: 0.5rem; background: #0a0f18;
+  border: 1px solid var(--glass-border); border-radius: var(--r-md); padding: 0.7rem 0.85rem;
+  display: flex; flex-direction: column; gap: 0.5rem; background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-md);
 }
 .lg-obs-title {
-  font: 600 0.64rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.12em; color: #7f93ad;
+  font: 600 0.64rem/1 var(--font-mono);
+  letter-spacing: 0.12em; color: var(--text-dim);
 }
 .lg-obs-form { display: flex; gap: 0.5rem; }
 .lg-obs-input {
-  flex: 1; background: #0d1420; border: 1px solid #2a3a56; border-radius: 0.4rem;
-  color: #e7edf6; padding: 0.4rem 0.6rem; font-size: 0.82rem;
+  flex: 1; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 0.4rem;
+  color: var(--text); padding: 0.4rem 0.6rem; font-size: 0.82rem;
 }
 .lg-obs-send {
-  border: 1px solid #2a3a56; border-radius: 0.4rem; background: #16243a; color: #8ecbff;
+  border: 1px solid var(--glass-border); border-radius: 0.4rem; background: var(--glass); color: var(--cyan);
   padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer;
+  transition: border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
 }
+.lg-obs-send:hover { border-color: var(--border-strong); background: var(--glass-strong); }
 .lg-obs-send:disabled { opacity: 0.5; cursor: default; }
 .lg-obs-examples { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .lg-obs-example {
-  border: 1px solid #24314a; border-radius: 0.4rem; background: transparent; color: #7f93ad;
+  border: 1px solid var(--glass-border); border-radius: 0.4rem; background: transparent; color: var(--text-dim);
   padding: 0.3rem 0.55rem; font-size: 0.72rem; cursor: pointer; text-align: left;
+  transition: border-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
 }
-.lg-obs-example:hover { border-color: #8ecbff; color: #cfe6ff; }
-.lg-obs-result { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid #1c2637; padding-top: 0.5rem; }
-.lg-obs-narration { margin: 0; color: #cfe0f2; font-size: 0.84rem; line-height: 1.5; }
-.lg-obs-reasons { margin: 0; padding-left: 1.1rem; color: #f0c542; font-size: 0.76rem; line-height: 1.5; }
-.lg-obs-camera { margin: 0; color: #6f83a0; font-size: 0.7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.lg-obs-camera code { color: #9fd0ff; }
+.lg-obs-example:hover { border-color: var(--cyan); color: var(--text); }
+.lg-obs-result { display: flex; flex-direction: column; gap: 0.4rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.lg-obs-narration { margin: 0; color: var(--text); font-size: 0.84rem; line-height: 1.5; }
+.lg-obs-reasons { margin: 0; padding-left: 1.1rem; color: var(--gold); font-size: 0.76rem; line-height: 1.5; }
+.lg-obs-camera { margin: 0; color: var(--text-faint); font-size: 0.7rem; font-family: var(--font-mono); }
+.lg-obs-camera code { color: var(--cyan); }
 .lg-obs-explain { display: flex; flex-direction: column; gap: 0.2rem; }
-.lg-obs-deltas { margin: 0; padding-left: 1.1rem; color: #cfe0f2; font-size: 0.78rem; line-height: 1.5; }
-.lg-obs-nodelta { margin: 0; color: #6f83a0; font-size: 0.78rem; font-style: italic; }
-.lg-obs-cause, .lg-obs-consequence, .lg-obs-grounding { margin: 0; color: #9fb4cd; font-size: 0.76rem; }
-.lg-obs-grounding code { color: #f0c542; }
+.lg-obs-deltas { margin: 0; padding-left: 1.1rem; color: var(--text); font-size: 0.78rem; line-height: 1.5; }
+.lg-obs-nodelta { margin: 0; color: var(--text-faint); font-size: 0.78rem; font-style: italic; }
+.lg-obs-cause, .lg-obs-consequence, .lg-obs-grounding { margin: 0; color: var(--text-dim); font-size: 0.76rem; }
+.lg-obs-grounding code { color: var(--gold); }
 
 /* CITY INFRASTRUCTURE INTEGRATION 1.0 — the real pump/hospital 3D screen.
    GENESIS UI UNIFICATION SPRINT (P3): retinted onto the shared .gx- tokens

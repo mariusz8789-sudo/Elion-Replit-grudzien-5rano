@@ -275,6 +275,71 @@ export function makeCampaignNextAction(deps: CampaignSelectorDeps): NextActionSe
 
 // ---------------------------------------------------------------------------
 // The registry.
+
+// ---------------------------------------------------------------------------
+// 6. Autonomous parameter inquiry — the one selector whose proposal was
+//    written by the PREVIOUS measurement.
+// ---------------------------------------------------------------------------
+
+import { getRouterModel } from '../experimentFabric/router';
+import { buildStructuredRequestFromModel } from '../experimentFabric/structuredRequestBuilder';
+import type { InquiryLoopResult, SystemUnderStudy } from './inquiryLoop';
+
+export const PARAMETER_INQUIRY_SELECTOR_ID = 'parameter-inquiry';
+
+export interface InquiryNextActionState {
+  readonly result: InquiryLoopResult;
+  /** The system the inquiry ran on, which the result itself does not carry — needed to make the proposal executable. */
+  readonly system: SystemUnderStudy;
+}
+
+/**
+ * Wraps `runAutonomousInquiry`'s own `nextExperiment`. Pure indirection: the
+ * choice was made inside the loop, from the beliefs the last observation wrote,
+ * and this adapter neither re-ranks nor re-decides anything.
+ *
+ * It does build the executable `request`, because it can do so without
+ * inventing anything: the probe value is the loop's own choice and every other
+ * parameter is the system the caller declared. When the loop declined to
+ * propose a probe, `request` stays null — the contract's rule that a request is
+ * never fabricated is exactly the case here, since there is no experiment to
+ * describe.
+ */
+export const parameterInquiryNextAction: NextActionSelector<InquiryNextActionState> = (state) => {
+  const native = state.result.nextExperiment;
+  const status: NextActionStatus = native.probeValue === null
+    // Both refusals are RESOLVED in the sense this contract uses it: there is
+    // nothing further to run. They are still distinguished by `rule`, because
+    // "one hypothesis left standing" and "several left but nothing separates
+    // them" are very different scientific situations.
+    ? 'RESOLVED'
+    : 'READY_TO_RUN';
+  const model = native.probeValue === null ? undefined : getRouterModel(state.system.modelId);
+  const request = model === undefined || native.probeValue === null
+    ? null
+    : buildStructuredRequestFromModel(
+        model,
+        { ...state.system.fixedParameters, ...state.system.hiddenParameters, [state.system.probeParameterId]: native.probeValue },
+        { sourceText: `Next measurement of ${state.system.systemId}: ${state.system.probeParameterId}=${native.probeValue}.` },
+      );
+  return nextAction({
+    selectorId: PARAMETER_INQUIRY_SELECTOR_ID,
+    domain: state.result.domainId,
+    status,
+    action: native.probeValue === null
+      ? `No further measurement proposed (${native.rule}).`
+      : `Measure ${state.system.observedMetric} at ${state.system.probeParameterId}=${native.probeValue}.`,
+    why: native.why,
+    resolves: native.betweenHypothesisIds.length === 2
+      ? `Which of "${native.betweenHypothesisIds[0]}" and "${native.betweenHypothesisIds[1]}" this system actually matches.`
+      : null,
+    rule: native.rule,
+    request,
+    about: native.betweenHypothesisIds,
+    native,
+  });
+};
+
 // ---------------------------------------------------------------------------
 
 export interface RegisteredSelector {
@@ -315,5 +380,10 @@ export const NEXT_ACTION_SELECTORS: readonly RegisteredSelector[] = [
     selectorId: CAMPAIGN_SELECTOR_ID,
     answersFor: 'A running chemistry campaign generation, deciding how the next generation differs.',
     requiresState: 'Campaign generation context (backend-injected)',
+  },
+  {
+    selectorId: PARAMETER_INQUIRY_SELECTOR_ID,
+    answersFor: 'An executed parameter inquiry whose next probe was chosen from what the last measurement showed.',
+    requiresState: 'InquiryLoopResult + SystemUnderStudy',
   },
 ];

@@ -1,7 +1,7 @@
 import { canonicalJson, fnv1a } from '../../events/hash';
 import { evaluateTwoArmRelation, SERIES_ONLY_RELATIONS } from '../../experimentFabric/falsificationRelation';
 import type { FalsificationCriterion, HypothesisAssessment } from '../../experimentFabric/scientificDiscovery';
-import { createHypothesis, type Hypothesis } from '../../experimentFabric/beliefRevision';
+import { createHypothesis, evidenceMagnitudeWithinTolerance, type Hypothesis } from '../../experimentFabric/beliefRevision';
 import type { ReplayVerdict } from '../../matrixFoundation/replayVerdict';
 import { collectScalars, compareBranches, type BranchComparison } from '../bridge/worldFrameState';
 import type { TemporalBranchRegistry } from '../temporal/temporalEngine';
@@ -699,11 +699,9 @@ export function criterionFingerprint(criterion: FalsificationCriterion): string 
 export function evidenceMagnitudeFromAssessment(assessment: WorldCounterfactualAssessment): number {
   if (assessment.baseline === null || assessment.intervention === null || assessment.reference === null) return 0;
   if (assessment.criterion.relation === 'equal-within-tolerance' && assessment.criterion.tolerance) {
-    const diff = Math.abs(assessment.intervention - assessment.reference);
-    const ratio = diff / assessment.criterion.tolerance;
-    // Supported: how comfortably within tolerance (ratio near 0 -> strong). Falsified:
-    // how far outside it (ratio near 1 from above -> weak miss, large ratio -> strong).
-    return Math.min(1, Math.abs(1 - ratio));
+    // Delegated to the one shared definition of "how decisive was this?", so the
+    // world-model layer and the fabric inquiry loop cannot drift apart on it.
+    return evidenceMagnitudeWithinTolerance(assessment.intervention, assessment.reference, assessment.criterion.tolerance);
   }
   // Measured against how far the real intervention moved from the real BASELINE, not
   // from the criterion's reference. When the criterion has no `expectedValue`,

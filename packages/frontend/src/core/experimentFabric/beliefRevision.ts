@@ -121,6 +121,28 @@ export function updateConfidence(
   };
 }
 
+/**
+ * How decisively a real measurement confirmed or contradicted a tolerance-band
+ * prediction, on the 0..1 scale `updateConfidence` consumes.
+ *
+ * Lives here rather than in any one domain because the arithmetic is the same
+ * wherever a hypothesis predicts a value and a real run produces one:
+ * `worldCounterfactual.ts`'s `evidenceMagnitudeFromAssessment` delegates its
+ * tolerance branch to this, so the two cannot drift into disagreeing about
+ * what "decisive" means.
+ *
+ * Ratio near 0 (bang on the prediction) and ratio far above 1 (badly outside
+ * the band) are both DECISIVE and score high; a result sitting right on the
+ * tolerance edge (ratio 1) is the genuinely uninformative case and scores 0.
+ * A non-positive tolerance is not a band at all, so it yields 0 rather than a
+ * division by zero dressed up as certainty.
+ */
+export function evidenceMagnitudeWithinTolerance(observed: number, expected: number, tolerance: number): number {
+  if (!(tolerance > 0) || !Number.isFinite(observed) || !Number.isFinite(expected)) return 0;
+  const ratio = Math.abs(observed - expected) / tolerance;
+  return Math.min(1, Math.abs(1 - ratio));
+}
+
 /** Highest confidence first. Ties keep their relative input order (stable sort). */
 export function rankHypotheses(hypotheses: readonly Hypothesis[]): readonly Hypothesis[] {
   return [...hypotheses]

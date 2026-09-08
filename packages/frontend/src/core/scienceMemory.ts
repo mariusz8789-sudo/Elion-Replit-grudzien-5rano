@@ -30,6 +30,10 @@ import { compareWorldActions, crossActionResultFingerprint, type CrossActionComp
 import {
   buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, resolveWorldLeverCatalog, type WorldLeverCatalog,
 } from './agent/worldGoalIntent';
+import {
+  inquiryResultFingerprint, runAutonomousInquiry,
+  type InquiryLoopInput, type InquiryLoopResult,
+} from './agent/inquiryLoop';
 import { buildWorldEvidenceBundle, type WorldEvidenceBundle } from './worldModel/evidence/worldEvidenceBundle';
 import { compareBranches, projectToWorldState } from './worldModel/bridge/worldFrameState';
 import { TemporalEngine, TemporalBranchRegistry } from './worldModel/temporal/temporalEngine';
@@ -213,6 +217,15 @@ export interface SavedExperiment {
    * specifically the Fabric-router shape.
    */
   worldDiscovery?: SavedWorldDiscoveryRun;
+  /**
+   * A run of the autonomous parameter inquiry (`core/agent/inquiryLoop.ts`).
+   * A third shape again: many competing quantitative hypotheses about the SAME
+   * system, judged over several adaptively chosen probes. `hypothesisLoop` is a
+   * preregistered fixed set and `worldDiscovery` is a `TemporalEngine` world,
+   * so neither can carry this without losing what makes it what it is — the
+   * fact that probe N+1 was chosen because of what probe N measured.
+   */
+  parameterInquiry?: SavedParameterInquiry;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -515,6 +528,7 @@ export interface SaveExperimentInput {
   discoveryLoop?: SavedScientificDiscoveryLoop;
   investigation?: SavedInvestigation;
   worldDiscovery?: SavedWorldDiscoveryRun;
+  parameterInquiry?: SavedParameterInquiry;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -564,6 +578,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   }
   if (input.investigation !== undefined && !isSavedInvestigation(input.investigation)) throw new Error('Zapis dochodzenia wielodomenowego musi zawierać co najmniej jedną domenę z kompletną pętlą hipotez oraz RO-Crate.');
   if (input.worldDiscovery !== undefined && !isSavedWorldDiscoveryRun(input.worldDiscovery)) throw new Error('Zapis odkrycia world-model musi zawierać cel, katalog, wynik i odcisk treści.');
+  if (input.parameterInquiry !== undefined && !isSavedParameterInquiry(input.parameterInquiry)) throw new Error('Zapis dochodzenia parametrycznego musi zawierać wejścia, wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -586,6 +601,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.discoveryLoop === undefined ? {} : { discoveryLoop: input.discoveryLoop }),
     ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
     ...(input.worldDiscovery === undefined ? {} : { worldDiscovery: input.worldDiscovery }),
+    ...(input.parameterInquiry === undefined ? {} : { parameterInquiry: input.parameterInquiry }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -1632,6 +1648,259 @@ export function replaySavedWorldDiscoveryRun(saved: SavedExperiment): SavedWorld
     }
   }
   return { status: 'MATCH', reason: 'Pętla odkrycia odtworzyła się identycznie po realnym ponownym wykonaniu.' };
+}
+
+// ---------------------------------------------------------------------------
+// Autonomous parameter inquiry (`core/agent/inquiryLoop.ts`).
+// ---------------------------------------------------------------------------
+
+export const PARAMETER_INQUIRY_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+/**
+ * What memory contributed to THIS inquiry, stated plainly. Null means memory
+ * had nothing to offer — the first inquiry into this system, or no earlier
+ * inquiry falsified anything — which is a real and common case, not a failure.
+ */
+export interface SavedParameterInquiryMemoryUse {
+  /** Hypotheses an EARLIER inquiry into the same system already falsified. */
+  skippedHypothesisIds: readonly string[];
+  reason: string;
+}
+
+/**
+ * One executed inquiry. Carries the complete INPUT (system, hypotheses,
+ * opening probe, round budget) so replay can re-execute it, plus the result
+ * and its content fingerprint so replay can check that the re-execution
+ * agrees. The stored numbers are never read back as an answer.
+ */
+export interface SavedParameterInquiry {
+  contractVersion: string;
+  /** Everything needed to run the inquiry again, verbatim. */
+  input: InquiryLoopInput;
+  result: InquiryLoopResult;
+  resumedFromMemory: SavedParameterInquiryMemoryUse | null;
+  resultFingerprint: string;
+}
+
+/**
+ * The identity of the SYSTEM an inquiry was about, independent of which
+ * hypotheses happened to be offered. Two inquiries share a key exactly when a
+ * hypothesis falsified in one is genuinely falsified in the other: same
+ * sample, same solver, same measured quantity, same agreement band, same probe
+ * axis. Change any of those and an earlier falsification no longer transfers,
+ * so the key changes and memory correctly declines to carry it over.
+ */
+export function parameterInquirySystemKey(system: InquiryLoopInput['system']): string {
+  return `inquiry-system_${fnv1a(canonicalJson({
+    systemId: system.systemId,
+    modelId: system.modelId,
+    probeParameterId: system.probeParameterId,
+    observedMetric: system.observedMetric,
+    agreementTolerance: system.agreementTolerance,
+    fixedParameters: system.fixedParameters,
+    hiddenParameters: system.hiddenParameters,
+  }))}`;
+}
+
+export interface BuildSavedParameterInquiryInput {
+  input: InquiryLoopInput;
+  result: InquiryLoopResult;
+  resumedFromMemory: SavedParameterInquiryMemoryUse | null;
+}
+
+export function buildSavedParameterInquiry(build: BuildSavedParameterInquiryInput): SavedParameterInquiry {
+  if (build.input.system.systemId !== build.result.systemId) {
+    throw new Error('Zapis dochodzenia musi dotyczyć tego samego systemu, który został zbadany.');
+  }
+  return {
+    contractVersion: PARAMETER_INQUIRY_MEMORY_CONTRACT_VERSION,
+    input: build.input,
+    result: build.result,
+    resumedFromMemory: build.resumedFromMemory,
+    resultFingerprint: inquiryResultFingerprint(build.result),
+  };
+}
+
+/** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
+export function isSavedParameterInquiry(value: unknown): value is SavedParameterInquiry {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string') return false;
+  if (!nonEmptyString(value.resultFingerprint)) return false;
+  if (!isRecordLike(value.input) || !isRecordLike(value.result)) return false;
+  const input = value.input as unknown as InquiryLoopInput;
+  if (!nonEmptyString(input.question) || !isRecordLike(input.system)) return false;
+  if (!nonEmptyString(input.system.systemId) || !nonEmptyString(input.system.modelId)) return false;
+  if (!Array.isArray(input.hypotheses) || input.hypotheses.length === 0) return false;
+  if (typeof input.openingProbeValue !== 'number' || typeof input.maxRounds !== 'number') return false;
+  return true;
+}
+
+/**
+ * The eight things the brief asked Genesis to remember, every one of them read
+ * from a field the loop already computed. Nothing here re-derives a verdict,
+ * and the "next experiment" block is the loop's own `nextExperiment`, verbatim.
+ */
+function parameterInquiryAnalysis(saved: SavedParameterInquiry): SavedExperimentAnalysisBlock[] {
+  const { input, result } = saved;
+  const decided = result.rounds.flatMap((round) => round.outcomes.filter((o) => o.assessment !== 'INCONCLUSIVE'));
+  const lastRoundRun = result.rounds[result.rounds.length - 1];
+  return [
+    { title: 'Pytanie', body: result.question, kind: 'parameter-inquiry-question' },
+    {
+      title: 'Hipotezy testowane',
+      body: input.hypotheses.map((h) => `${h.hypothesisId}: ${h.statement}`).join('; '),
+      kind: 'parameter-inquiry-hypotheses',
+    },
+    {
+      title: 'Model / solver',
+      body: `modelId=${result.modelId} domainId=${result.domainId} engine=${lastRoundRun?.engine ?? 'nie wykonano'}; `
+        + `${result.rounds.length} realnych pomiarów na ${input.system.label}.`,
+      kind: 'parameter-inquiry-model',
+    },
+    {
+      title: 'Parametry',
+      body: `Sonda ${input.system.probeParameterId} kolejno na ${result.rounds.map((r) => r.probeValue).join(', ') || '(brak)'}; `
+        + `mierzona wielkość ${input.system.observedMetric}; pasmo zgodności ±${input.system.agreementTolerance * 100}%.`,
+      kind: 'parameter-inquiry-parameters',
+    },
+    {
+      title: 'Wynik',
+      body: result.rounds.map((r) => `${input.system.probeParameterId}=${r.probeValue} → ${input.system.observedMetric}=${r.observed}`).join('; ')
+        || 'Nie wykonano żadnego pomiaru.',
+      kind: 'parameter-inquiry-result',
+    },
+    {
+      title: 'Dlaczego wsparta lub odrzucona',
+      body: decided.length > 0
+        ? decided.map((o) => `${o.hypothesisId} [${o.assessment}]: ${o.reason}`).join(' | ')
+        : 'Żadna hipoteza nie została rozstrzygnięta.',
+      kind: 'parameter-inquiry-reasons',
+    },
+    {
+      title: 'Czego jeszcze nie wiemy',
+      body: [...result.openQuestions, ...result.limitations].join(' | '),
+      kind: 'parameter-inquiry-unresolved',
+    },
+    {
+      title: 'Następny eksperyment',
+      body: result.nextExperiment.probeValue === null
+        ? `Brak: ${result.nextExperiment.rule} — ${result.nextExperiment.why}`
+        : `${input.system.probeParameterId}=${result.nextExperiment.probeValue} (${result.nextExperiment.rule}) — ${result.nextExperiment.why}`,
+      kind: 'parameter-inquiry-next',
+    },
+    ...(saved.resumedFromMemory
+      ? [{ title: 'Wykorzystanie pamięci', body: saved.resumedFromMemory.reason, kind: 'parameter-inquiry-memory' }]
+      : []),
+  ];
+}
+
+/**
+ * Persists a REAL executed inquiry as one Science Memory record, through
+ * `saveExperiment` unchanged.
+ *
+ * `execution` carries the provenance of the LAST measurement actually taken —
+ * a real `ExperimentRun` from the Fabric executor, with its own runId and
+ * fingerprint. It is attached only when that run really completed on a real
+ * engine, so `validExecution`'s "completed implies real-engine" rule holds by
+ * construction rather than by assertion.
+ *
+ * HONESTY, stated here rather than left to be noticed: this record is NOT a
+ * `ScientificEvidencePack`. That pack projects a preregistered TWO-ARM design
+ * with ONE falsification criterion (`createScientificEvidencePack`), and an
+ * inquiry is N hypotheses judged against N criteria over several adaptively
+ * chosen probes. Packaging it as a pack would require inventing a chain the
+ * executor never produced, so the run's real per-round provenance is recorded
+ * instead and the gap is named in the honesty note.
+ */
+export function saveParameterInquiryToMemory(saved: SavedParameterInquiry, measurement?: ExperimentRun): SavedExperiment {
+  const { input, result } = saved;
+  const execution: SavedExperimentExecution | undefined = measurement && measurement.provenance.resultOrigin === 'real-engine'
+    ? {
+        status: measurement.result.status,
+        runId: measurement.runId,
+        runFingerprint: measurement.provenance.runFingerprint,
+        resultOrigin: measurement.provenance.resultOrigin,
+        summary: measurement.result.summary,
+        modelId: measurement.provenance.modelId,
+        ...(measurement.provenance.engine === null ? {} : { engine: measurement.provenance.engine }),
+        modelVersion: measurement.provenance.modelVersion,
+      }
+    : undefined;
+  return saveExperiment({
+    labId: result.domainId,
+    experimentId: `parameter-inquiry:${input.system.systemId}:${saved.resultFingerprint}`,
+    experimentName: `Autonomiczne dochodzenie — ${result.question}`,
+    params: {
+      systemId: input.system.systemId,
+      modelId: result.modelId,
+      probeParameterId: input.system.probeParameterId,
+      observedMetric: input.system.observedMetric,
+      openingProbeValue: input.openingProbeValue,
+      agreementTolerance: input.system.agreementTolerance,
+    },
+    stats: {
+      rounds: result.rounds.length,
+      hypothesesOffered: input.hypotheses.length,
+      surviving: result.survivingHypothesisIds.length,
+      falsified: result.falsifiedHypothesisIds.length,
+      untested: result.untestedHypothesisIds.length,
+    },
+    ...(execution === undefined ? {} : { execution }),
+    parameterInquiry: saved,
+    analysis: parameterInquiryAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: `${result.rounds.length} realnych przebiegów ${result.modelId}; werdykty dotyczą hipotez wobec TEGO modelu, nie prawdy o realnej substancji. `
+      + 'Ten zapis nie jest Evidence Packiem: pack rzutuje prerejestrowany projekt dwuramienny z jednym kryterium, a dochodzenie testuje wiele hipotez wieloma kryteriami na kolejno wybieranych sondach.',
+    assumptions: [...result.limitations],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export interface SavedParameterInquiryReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Replays a saved inquiry by RE-EXECUTING it from its stored input — the same
+ * discipline as every other replay in this file, never reading the stored
+ * numbers back as the answer.
+ *
+ * Self-consistency is checked FIRST (does the stored result still match its
+ * own stored fingerprint), so a payload edited after save is reported as DRIFT
+ * before any re-execution is attempted. A model Genesis no longer declares is
+ * NOT_REPRODUCIBLE: there is nothing left to re-execute against.
+ */
+export function replaySavedParameterInquiry(saved: SavedExperiment): SavedParameterInquiryReplay {
+  const record = saved.parameterInquiry;
+  if (record === undefined || !isSavedParameterInquiry(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera dochodzenia parametrycznego.' };
+  }
+  const selfCheck = inquiryResultFingerprint(record.result);
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisane dochodzenie zostało zmienione po zapisie: jego treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  const fresh = runAutonomousInquiry(record.input);
+  if (fresh.rounds.length === 0 && fresh.stopReason === 'MEASUREMENT_FAILED') {
+    return { status: 'NOT_REPRODUCIBLE', reason: `Model "${record.input.system.modelId}" nie jest już wykonywalny w tym Genesis, więc nie ma czego odtworzyć.` };
+  }
+  const freshFingerprint = inquiryResultFingerprint(fresh);
+  if (freshFingerprint !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Odtworzone dochodzenie różni się od zapisanego (${record.resultFingerprint} → ${freshFingerprint}).` };
+  }
+  return { status: 'MATCH', reason: `Dochodzenie odtworzyło się identycznie po realnym ponownym wykonaniu ${fresh.rounds.length} pomiarów.` };
+}
+
+/**
+ * Every earlier inquiry in memory that was about the SAME system — the input
+ * a new inquiry reads before deciding what is still worth testing.
+ */
+export function listParameterInquiriesForSystem(system: InquiryLoopInput['system']): readonly SavedParameterInquiry[] {
+  const key = parameterInquirySystemKey(system);
+  return listExperiments()
+    .map((entry) => entry.parameterInquiry)
+    .filter((record): record is SavedParameterInquiry => record !== undefined && isSavedParameterInquiry(record))
+    .filter((record) => parameterInquirySystemKey(record.input.system) === key);
 }
 
 export function listExperiments(): SavedExperiment[] {

@@ -21,10 +21,13 @@ import {
   makeCampaignNextAction,
   NEXT_ACTION_CONTRACT_VERSION,
   NEXT_ACTION_SELECTORS,
+  PARAMETER_INQUIRY_SELECTOR_ID,
+  parameterInquiryNextAction,
   WORLD_COUNTERFACTUAL_SELECTOR_ID,
   worldCounterfactualNextAction,
   type NextAction,
 } from '../core/agent/nextAction';
+import { runAutonomousInquiry } from '../core/agent/inquiryLoop';
 import { compareBranches } from '../core/worldModel/bridge/worldFrameState';
 import {
   assessWorldCounterfactual,
@@ -251,13 +254,74 @@ describe('The shared shape is honest about what each selector does not report', 
     expect(selector({}).request).toBeNull();
   });
 
-  it('registers all five real selectors, each naming the state it needs', () => {
-    expect(NEXT_ACTION_SELECTORS).toHaveLength(5);
+  it('registers all six real selectors, each naming the state it needs', () => {
+    expect(NEXT_ACTION_SELECTORS).toHaveLength(6);
     const ids = NEXT_ACTION_SELECTORS.map((s) => s.selectorId);
-    expect(new Set(ids).size).toBe(5);
+    expect(new Set(ids).size).toBe(6);
     for (const selector of NEXT_ACTION_SELECTORS) {
       expect(selector.answersFor).toBeTruthy();
       expect(selector.requiresState).toBeTruthy();
     }
+  });
+});
+
+/**
+ * The sixth selector, added when the autonomous parameter inquiry was built.
+ * It is held to the same rule as the other five: it must DELEGATE, and it must
+ * not decide anything the wrapped engine did not already decide.
+ */
+describe('The parameter-inquiry adapter delegates and does not re-decide', () => {
+  const SYSTEM = {
+    systemId: 'sample-Ea60',
+    label: 'Unmeasured kinetic sample',
+    modelId: 'chemistry-arrhenius',
+    hiddenParameters: { activationEnergyKJ: 60, preExponentialLog10: 11.0 },
+    probeParameterId: 'temperatureK',
+    candidateProbeValues: [350, 400, 450, 500, 600, 800],
+    fixedParameters: {},
+    observedMetric: 'rateConstant',
+    agreementTolerance: 0.25,
+  } as const;
+
+  const HYPOTHESES = [
+    { hypothesisId: 'h:A-Ea60', statement: 'Ea 60', claimedValues: { activationEnergyKJ: 60, preExponentialLog10: 11.0 }, priorConfidence: 0.5 },
+    { hypothesisId: 'h:C-Ea62', statement: 'Ea 62', claimedValues: { activationEnergyKJ: 62, preExponentialLog10: 11.2985 }, priorConfidence: 0.5 },
+    { hypothesisId: 'h:B-Ea66', statement: 'Ea 66', claimedValues: { activationEnergyKJ: 66, preExponentialLog10: 11.8956 }, priorConfidence: 0.5 },
+    { hypothesisId: 'h:D-Ea70', statement: 'Ea 70', claimedValues: { activationEnergyKJ: 70, preExponentialLog10: 12.4926 }, priorConfidence: 0.5 },
+  ];
+
+  function inquiry(maxRounds: number) {
+    return runAutonomousInquiry({
+      question: 'Which activation energy does this sample have?',
+      system: SYSTEM,
+      hypotheses: HYPOTHESES,
+      openingProbeValue: 400,
+      maxRounds,
+    });
+  }
+
+  it('reports the loop\'s own proposal verbatim, and makes it executable', () => {
+    const result = inquiry(1);
+    const action = parameterInquiryNextAction({ result, system: SYSTEM });
+    expect(action.selectorId).toBe(PARAMETER_INQUIRY_SELECTOR_ID);
+    expect(action.domain).toBe('chemistry');
+    expect(action.status).toBe('READY_TO_RUN');
+    expect(action.native).toBe(result.nextExperiment);            // verbatim, not a copy
+    expect(action.why).toBe(result.nextExperiment.why);
+    expect(action.rule).toBe(result.nextExperiment.rule);
+    expect(action.about).toEqual(result.nextExperiment.betweenHypothesisIds);
+    // The request is the loop's own choice, runnable as-is.
+    expect(action.request).not.toBeNull();
+    expect(action.request!.parameters.temperatureK).toBe(result.nextExperiment.probeValue);
+    expect(action.request!.modelId).toBe('chemistry-arrhenius');
+  });
+
+  it('produces no request when the loop proposed no experiment', () => {
+    const result = inquiry(4);                                     // runs to a conclusion
+    expect(result.nextExperiment.probeValue).toBeNull();
+    const action = parameterInquiryNextAction({ result, system: SYSTEM });
+    expect(action.status).toBe('RESOLVED');
+    expect(action.request).toBeNull();
+    expect(action.rule).toBe('NO_CONTENDERS_LEFT');
   });
 });

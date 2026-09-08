@@ -1,10 +1,14 @@
 import type { WorldGraph } from '../worldModel/ecs/worldGraph';
+import type { TemporalUpdater } from '../worldModel/temporal/temporalEngine';
 import {
   GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
   GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID,
   buildGenesisScientificCity3,
 } from '../worldModel/domains/genesisScientificCity3';
 import type { DiscoveryLoopInput, MechanisticHypothesis } from './discoveryLoop';
+// Value import, but not a cycle: `chemistryLeverCatalog.ts` imports only TYPES
+// from this file, which are erased at runtime.
+import { GENESIS_CHEMISTRY_CATALOG, GENESIS_CHEMISTRY_CATALOG_ID } from './chemistryLeverCatalog';
 
 /**
  * A GOAL SENTENCE, TURNED INTO A RUNNABLE SEARCH — WITHOUT INVENTING PHYSICS.
@@ -84,7 +88,14 @@ export interface WorldLeverCatalog {
   readonly catalogId: string;
   readonly worldId: string;
   readonly domainId: string;
-  readonly buildWorld: () => { graph: WorldGraph; updater: ReturnType<typeof buildGenesisScientificCity3>['updater'] };
+  /**
+   * Builds a fresh world for this catalog's domain. Deliberately typed against
+   * the generic `TemporalUpdater` (the same type `DiscoveryLoopInput.buildWorld`
+   * already uses), not against any one domain's own builder return type — a
+   * catalog for a different domain (chemistry, biology, ...) must be able to
+   * satisfy this shape without depending on `genesisScientificCity3.ts` at all.
+   */
+  readonly buildWorld: () => { graph: WorldGraph; updater: TemporalUpdater };
   /** Metrics this world computes, keyed by the phrases a person uses for them. */
   readonly metricPhrases: Readonly<Record<string, string>>;
   readonly entityIdForMetric: Readonly<Record<string, string>>;
@@ -398,6 +409,7 @@ export const GENESIS_FLOOD_CATALOG: WorldLeverCatalog = {
  */
 export const WORLD_LEVER_CATALOGS: Readonly<Record<string, WorldLeverCatalog>> = {
   [GENESIS_FLOOD_CATALOG_ID]: GENESIS_FLOOD_CATALOG,
+  [GENESIS_CHEMISTRY_CATALOG_ID]: GENESIS_CHEMISTRY_CATALOG,
 };
 
 export function resolveWorldLeverCatalog(catalogId: string): WorldLeverCatalog | undefined {

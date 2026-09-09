@@ -2,15 +2,37 @@ import { entityId } from '../worldModel/ecs/types';
 import { WorldGraph } from '../worldModel/ecs/worldGraph';
 import {
   addBackupGenerator,
+  ELECTRICAL_GENERATOR_AFFINE_SOLVER_ID,
   ELECTRICAL_GENERATOR_SOLVER_ID,
   GENERATOR_DEFAULTS,
   GENERATOR_STATUS,
+  makeAffineElectricalGeneratorSolver,
   makeElectricalGeneratorSolver,
 } from '../worldModel/domains/electricalGenerator';
 import { SolverRouter } from '../worldModel/solvers/solverRouter';
 import type { TemporalUpdater } from '../worldModel/temporal/temporalEngine';
 import { relationFor } from './leverCriterion';
+import type { MechanisticHypothesis } from './discoveryLoop';
+import { GENESIS_STRUCTURAL_ALTERNATIVES } from './structuralAlternative';
 import type { WorldLever, WorldLeverCatalog } from './worldGoalIntent';
+
+/**
+ * THE STRUCTURAL ALTERNATIVE TO THE LINEAR FUEL MODEL, registered once at
+ * module load. Purely additive: nothing binds an entity to
+ * `ELECTRICAL_GENERATOR_AFFINE_SOLVER_ID` by default (see
+ * `buildGeneratorDiscoveryWorld` below), so every existing generator result
+ * is unaffected by its mere existence in this registry. It is only ever
+ * bound at runtime by `discoveryLoop.ts`'s own regeneration step, after a
+ * clean falsification under the linear model — see
+ * `buildDeepLoadSheddingHypothesis` for the demonstration.
+ */
+GENESIS_STRUCTURAL_ALTERNATIVES.register({
+  incumbentSolverId: ELECTRICAL_GENERATOR_SOLVER_ID,
+  alternativeSolverId: ELECTRICAL_GENERATOR_AFFINE_SOLVER_ID,
+  alternativeSolver: makeAffineElectricalGeneratorSolver(),
+  statement: 'the generator keeps burning idle fuel even at near-zero electrical load, not just fuel proportional to load',
+  citation: 'Representative no-load fuel consumption for this class of mid-size diesel genset, commonly cited around 10-15% of full-load fuel flow — see electricalGenerator.ts#AFFINE_IDLE_FUEL_L_PER_HR',
+});
 
 /**
  * THE DISCOVERY ENGINE ON ELECTRICAL ENGINEERING — the fifth domain on the
@@ -78,6 +100,8 @@ const SHED_LOAD_KW = 30;
 const LARGER_TANK_L = 400;
 /** 50 -> 30 kW nameplate. A real declared field — see the lever for why it is nonetheless inert. */
 const SMALLER_RATED_POWER_KW = 30;
+/** 50 -> 2 kW. Near-zero but not literally zero — an operator sheds down to essential control/safety loads only, not off. See `buildDeepLoadSheddingHypothesis`. */
+const DEEP_SHED_LOAD_KW = 2;
 
 /**
  * Builds a fresh generator world plus the updater that advances it.
@@ -94,6 +118,12 @@ export function buildGeneratorDiscoveryWorld(): { graph: WorldGraph; updater: Te
   });
   const router = new SolverRouter();
   router.register(ELECTRICAL_GENERATOR_SOLVER_ID, makeElectricalGeneratorSolver());
+  // Additive only: the generator is still bound to the linear solver above by
+  // `addBackupGenerator`'s default `domainBinding`, so registering the
+  // structural alternative here changes no existing result. It exists so a
+  // runtime rebind (`discoveryLoop.ts`'s regeneration step) has a real solver
+  // to find under this id when it looks one up.
+  router.register(ELECTRICAL_GENERATOR_AFFINE_SOLVER_ID, makeAffineElectricalGeneratorSolver());
   const updater: TemporalUpdater = (g, dtSeconds, tick) => router.routeTick(g, dtSeconds, tick);
   return { graph, updater };
 }
@@ -260,3 +290,36 @@ export const GENESIS_GENERATOR_CATALOG: WorldLeverCatalog = {
 
 /** The metric this world's goals are normally about. Exported so a caller need not hardcode the key. */
 export const GENESIS_GENERATOR_OBJECTIVE_METRIC = 'fuelRemainingL';
+
+/**
+ * THE MODEL-UPDATE DEMONSTRATION HYPOTHESIS — deliberately NOT one of the
+ * four `GENESIS_GENERATOR_LEVERS` above and deliberately not phrase-matched
+ * into the goal-intent catalogue. Its purpose is narrower and different: a
+ * real, deliberately designed refutation under the linear fuel model, to
+ * exercise `discoveryLoop.ts`'s structural-model-update step end to end.
+ *
+ * Under the linear model bound by default, shedding load down to
+ * `DEEP_SHED_LOAD_KW` makes burn nearly zero (burn is proportional to load
+ * alone), so fuel remaining stays close to its value at the shed tick —
+ * refuting the claim below. `discoveryLoop.ts`'s regeneration step then
+ * looks up `GENESIS_STRUCTURAL_ALTERNATIVES` for the entity's bound solver,
+ * finds the affine idle-burn alternative registered above, and re-tests the
+ * SAME claim after rebinding the entity to it — a run that genuinely
+ * supports it, because that model keeps burning fuel at near-zero load.
+ */
+export function buildDeepLoadSheddingHypothesis(fuelThresholdL: number): MechanisticHypothesis {
+  return {
+    hypothesisId: 'h:deep-load-shedding-idle-burn',
+    statement: `Even after shedding load down to ${DEEP_SHED_LOAD_KW} kW, the generator keeps drawing idle fuel, so fuel remaining at the horizon will fall below ${fuelThresholdL} L.`,
+    mechanism: `shedding load down to ${DEEP_SHED_LOAD_KW} kW while idle fuel burn continues regardless`,
+    entityId: GENESIS_GENERATOR_ID,
+    criterion: {
+      metric: GENESIS_GENERATOR_OBJECTIVE_METRIC,
+      relation: 'less-than',
+      expectedValue: fuelThresholdL,
+      rationale: 'A real diesel genset keeps burning fuel at near-zero load; a model that shows fuel remaining essentially flat after a deep shed has no idle-burn term.',
+    },
+    apply: generatorParamLever('loadKw', DEEP_SHED_LOAD_KW, GENERATOR_DEFAULTS.ratedPowerKw),
+    rationale: 'A genuine test of whether the bound fuel model captures idle consumption, not just load-proportional consumption — not one of the declared catalogue levers, built to exercise the structural-model-update step on a real refutation.',
+  };
+}

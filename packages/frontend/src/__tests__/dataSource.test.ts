@@ -7,12 +7,12 @@ describe('data source registry', () => {
       id: 'test-source-a',
       label: 'Testowe źródło A',
       citation: { label: 'Test Institute', confirmation: 'confirmed' },
-      isSynthetic: false,
+      provenance: 'REFERENCE',
       load: () => [1, 2, 3],
     });
     const src = getDataSource<number[]>('test-source-a');
     expect(src?.load()).toEqual([1, 2, 3]);
-    expect(src?.isSynthetic).toBe(false);
+    expect(src?.provenance).toBe('REFERENCE');
   });
 
   it('refuses to register a duplicate id', () => {
@@ -20,7 +20,7 @@ describe('data source registry', () => {
       id: 'test-source-b',
       label: 'B',
       citation: { label: 'X', confirmation: 'speculation' },
-      isSynthetic: true,
+      provenance: 'SIMULATED',
       load: () => null,
     });
     expect(() =>
@@ -28,7 +28,7 @@ describe('data source registry', () => {
         id: 'test-source-b',
         label: 'B2',
         citation: { label: 'Y', confirmation: 'confirmed' },
-        isSynthetic: false,
+        provenance: 'REFERENCE',
         load: () => null,
       }),
     ).toThrow(/już zarejestrowane/);
@@ -43,7 +43,7 @@ describe('data source registry', () => {
       id: 'test-source-c',
       label: 'C',
       citation: { label: 'Z', confirmation: 'hypothesis' },
-      isSynthetic: true,
+      provenance: 'SIMULATED',
       load: () => null,
     });
     const ids = getDataSources().map((s) => s.id);

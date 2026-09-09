@@ -51,6 +51,9 @@ export interface CounterfactualEvidence {
   variantRunFingerprint: string;
   baselineResultOrigin: ExperimentRun['provenance']['resultOrigin'];
   variantResultOrigin: ExperimentRun['provenance']['resultOrigin'];
+  /** Separate axis from `resultOrigin` — see `core/dataProvenance.ts`. */
+  baselineDataProvenance?: ExperimentRun['provenance']['dataProvenance'];
+  variantDataProvenance?: ExperimentRun['provenance']['dataProvenance'];
 }
 
 /**
@@ -197,6 +200,8 @@ export function compareCounterfactual(input: CounterfactualComparisonInput): Cou
     variantRunFingerprint: variant.provenance.runFingerprint,
     baselineResultOrigin: baseline.provenance.resultOrigin,
     variantResultOrigin: variant.provenance.resultOrigin,
+    ...(baseline.provenance.dataProvenance === undefined ? {} : { baselineDataProvenance: baseline.provenance.dataProvenance }),
+    ...(variant.provenance.dataProvenance === undefined ? {} : { variantDataProvenance: variant.provenance.dataProvenance }),
   };
   const bothCompleted = baseline.result.status === 'completed' && variant.result.status === 'completed';
   const metrics = bothCompleted ? sharedNumericMetricsFor(baseline, variant) : [];

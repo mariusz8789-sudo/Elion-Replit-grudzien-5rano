@@ -432,6 +432,7 @@ export function ScienceChat() {
               runId: run.runId,
               runFingerprint: run.provenance.runFingerprint,
               resultOrigin: run.provenance.resultOrigin,
+              ...(run.provenance.dataProvenance === undefined ? {} : { dataProvenance: run.provenance.dataProvenance }),
               summary: run.result.summary,
               ...(run.request.modelId === undefined ? {} : { modelId: run.request.modelId }),
               ...(run.provenance.engine === null ? {} : { engine: run.provenance.engine }),

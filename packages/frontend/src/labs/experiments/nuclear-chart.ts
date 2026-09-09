@@ -44,7 +44,7 @@ registerDataSource<KnownNuclide[]>({
     url: 'https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html',
     confirmation: 'confirmed',
   },
-  isSynthetic: false,
+  provenance: 'REFERENCE',
   load: () => KNOWN_NUCLIDES,
 });
 

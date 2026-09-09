@@ -61,6 +61,14 @@ export interface SavedExperimentExecution {
   runId: string;
   runFingerprint: string;
   resultOrigin: string;
+  /**
+   * A SEPARATE axis from `resultOrigin` — see `core/dataProvenance.ts`: is
+   * this output Genesis's own model/solver, an external reference source, or
+   * a real laboratory measurement. Optional because it is undefined exactly
+   * when the underlying run produced no output to have a provenance
+   * (`capability-seam`/`engine-not-available`), never silently dropped.
+   */
+  dataProvenance?: string;
   summary: string;
   modelId?: string;
   engine?: string;
@@ -667,6 +675,7 @@ export function saveExperimentRunToMemory(run: ExperimentRun): SavedExperiment {
       runId: run.runId,
       runFingerprint: run.provenance.runFingerprint,
       resultOrigin: run.provenance.resultOrigin,
+      ...(run.provenance.dataProvenance === undefined ? {} : { dataProvenance: run.provenance.dataProvenance }),
       summary: run.result.summary,
       modelId: run.request.modelId,
       engine: run.plan.engine ?? undefined,
@@ -718,6 +727,7 @@ export function saveScientificEvidencePackToMemory(pack: ScientificEvidencePack)
       runId: firstRun.runId,
       runFingerprint: firstRun.provenance.runFingerprint,
       resultOrigin: firstRun.provenance.resultOrigin,
+      ...(firstRun.provenance.dataProvenance === undefined ? {} : { dataProvenance: firstRun.provenance.dataProvenance }),
       summary: firstRun.result.summary,
       modelId: firstRun.modelId,
       engine: firstRun.engine ?? undefined,
@@ -1853,6 +1863,7 @@ export function saveParameterInquiryToMemory(saved: SavedParameterInquiry, measu
         runId: measurement.runId,
         runFingerprint: measurement.provenance.runFingerprint,
         resultOrigin: measurement.provenance.resultOrigin,
+        ...(measurement.provenance.dataProvenance === undefined ? {} : { dataProvenance: measurement.provenance.dataProvenance }),
         summary: measurement.result.summary,
         modelId: measurement.provenance.modelId,
         ...(measurement.provenance.engine === null ? {} : { engine: measurement.provenance.engine }),

@@ -79,6 +79,8 @@ export interface EvidenceGuidedExperimentCapsule {
   runId: string;
   runFingerprint: string;
   resultOrigin: ExperimentRun['provenance']['resultOrigin'];
+  /** Separate axis from `resultOrigin` — see `core/dataProvenance.ts`. */
+  dataProvenance?: ExperimentRun['provenance']['dataProvenance'];
   backendExecution?: ExperimentRun['provenance']['backendExecution'];
   route: ExperimentRun['result']['route'];
   outputs: ExperimentRun['result']['outputs'];
@@ -177,6 +179,7 @@ export function capsuleFromConfirmedExperiment(confirmed: ConfirmedEvidenceGuide
     parameters: plan.disclosure.requestedParameters,
     ...(plan.disclosure.seed === undefined ? {} : { seed: plan.disclosure.seed }),
     runId: run.runId, runFingerprint: run.provenance.runFingerprint, resultOrigin: run.provenance.resultOrigin,
+    ...(run.provenance.dataProvenance === undefined ? {} : { dataProvenance: run.provenance.dataProvenance }),
     ...(run.provenance.backendExecution === undefined ? {} : { backendExecution: run.provenance.backendExecution }),
     route: run.result.route, outputs: run.result.outputs, units: run.result.units,
     limitations: plan.disclosure.limitations, evidencePack: handoff.evidencePack, counterfactual: handoff.counterfactual,

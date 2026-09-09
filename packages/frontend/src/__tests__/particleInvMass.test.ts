@@ -10,15 +10,15 @@ import { getDataSource } from '../core/dataSource';
  * odzwierciedlać, bez fałszywych/przestarzałych obietnic ("plan Etapu 2").
  */
 describe('Particle Lab → Odkryj cząstkę: przejrzystość danych syntetycznych vs realnych', () => {
-  it('rejestruje źródło danych dimionowych z jawną flagą isSynthetic', () => {
+  it('rejestruje źródło danych dimionowych z jawną prowieniencją', () => {
     const src = getDataSource<number[] | null>('particle.dimuon-masses');
     expect(src).toBeDefined();
-    expect(typeof src?.isSynthetic).toBe('boolean');
+    expect(['SIMULATED', 'REFERENCE', 'REAL_EXPERIMENTAL']).toContain(src?.provenance);
   });
 
-  it('honestyNote jest spójna ze stanem isSynthetic tego źródła (jedno źródło prawdy)', () => {
+  it('honestyNote jest spójna ze stanem provenance tego źródła (jedno źródło prawdy)', () => {
     const src = getDataSource<number[] | null>('particle.dimuon-masses');
-    if (src?.isSynthetic) {
+    if (src?.provenance === 'SIMULATED') {
       expect(particleInvMass.honestyNote).toMatch(/SYNTETYCZNE|syntetyczne/);
       expect(particleInvMass.honestyNote).not.toMatch(/prawdziwe pomiary CERN Open Data/);
     } else {

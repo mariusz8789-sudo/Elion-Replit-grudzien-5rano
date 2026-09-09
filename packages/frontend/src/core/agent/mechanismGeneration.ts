@@ -1,5 +1,7 @@
+import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import { assessCompetingModels } from './competingModels';
-import { toMechanismRun } from './discoveryStrategies';
+import { MECHANISM_STRATEGY_ID, toMechanismRun } from './discoveryStrategies';
+import { DISCOVERY_STRATEGY_CONTRACT_VERSION, type StrategyRun } from './discoveryStrategy';
 import {
   runAutonomousDiscoveryWithEngines,
   type DiscoveryLoopInput,
@@ -112,6 +114,88 @@ export interface MechanismWithGenerationResult {
   /** Null whenever nothing was generated — `noGenerationReason` always says why. */
   readonly generated: JointMechanismContinuation | null;
   readonly noGenerationReason: string | null;
+}
+
+/**
+ * The joint arm as a `StrategyRun`, so the front door can report it as a SECOND
+ * run beside the first exactly as the PARAMETER path already does.
+ *
+ * ## Why this maps onto the shared contract without straining it
+ *
+ * A `StrategyRound` is "what was done, what was predicted, what was observed,
+ * and the verdict". The joint arm has all four, and they are not manufactured:
+ *
+ *   what      — apply both declared levers in one fork, at one strength
+ *   predicted — `naiveAdditivePrediction`, the composed hypothesis's OWN claim
+ *   observed  — the real reading off the joint branch
+ *   reference — the shared baseline, exactly as `mechanismRounds` carries it
+ *
+ * `predicted` being non-null is the one place this differs from an ordinary
+ * MECHANISM round, and the difference is real rather than a liberty: a normal
+ * MECHANISM hypothesis asserts a DIRECTION against a control and predicts no
+ * value (see `StrategyRound.predicted`'s own note), while a composed hypothesis
+ * asserts that the two effects SUM — which is a number, and the number the
+ * verdict is decided against.
+ *
+ * The verdict uses the shared vocabulary with no new word: additive within the
+ * declared band is `SUPPORTED_WITHIN_PROTOCOL`, sub- or super-additive is
+ * `FALSIFIED_WITHIN_PROTOCOL`, and a case with no combined effect to judge is
+ * `INCONCLUSIVE`.
+ */
+export function toJointMechanismRun(
+  first: DiscoveryLoopResult,
+  continuation: JointMechanismContinuation,
+): StrategyRun {
+  const { derived, assessment } = continuation;
+  const verdict: HypothesisAssessment =
+    assessment.interaction === 'ADDITIVE'
+      ? 'SUPPORTED_WITHIN_PROTOCOL'
+      : assessment.interaction === 'INCONCLUSIVE'
+        ? 'INCONCLUSIVE'
+        : 'FALSIFIED_WITHIN_PROTOCOL';
+
+  return {
+    contractVersion: DISCOVERY_STRATEGY_CONTRACT_VERSION,
+    strategyId: MECHANISM_STRATEGY_ID,
+    shape: 'MECHANISM',
+    question: derived.statement,
+    domainId: first.domainId,
+    rounds: [
+      {
+        round: 1,
+        what: `apply ${derived.parentHypothesisIds.join(' and ')} together at strength ${derived.strength}`,
+        why: derived.why,
+        observed: assessment.jointObserved,
+        reference: assessment.baseline,
+        verdicts: [
+          {
+            hypothesisId: derived.hypothesisId,
+            assessment: verdict,
+            predicted: assessment.naiveAdditivePrediction,
+          },
+        ],
+      },
+    ],
+    surviving: verdict === 'SUPPORTED_WITHIN_PROTOCOL' ? [derived.hypothesisId] : [],
+    falsified: verdict === 'FALSIFIED_WITHIN_PROTOCOL' ? [derived.hypothesisId] : [],
+    untested: [],
+    stopReason: 'JOINT_ARM_MEASURED',
+    // One arm settles the additivity question it was run to settle; proposing a
+    // further experiment here would be a decision this module did not take.
+    nextExperiment: null,
+    openQuestions:
+      verdict === 'FALSIFIED_WITHIN_PROTOCOL'
+        ? [
+            `The two mechanisms do not compose independently (${assessment.interaction}). By how much the ` +
+              'interaction varies with strength is not settled: this was measured at one magnitude.',
+          ]
+        : [],
+    limitations: [...first.declaredAssumptions, ...first.notModelledFactors],
+    // The joint arm's own numbers, so a reader can recompute the verdict rather
+    // than trust it.
+    resultFingerprint: `joint_${derived.hypothesisId}@${derived.strength}_${assessment.jointObserved}`,
+    native: continuation,
+  };
 }
 
 /** The measured effect of one hypothesis at one strength, off the run's own rounds. */
@@ -284,9 +368,15 @@ export function runDiscoveryWithJointGeneration(
     strength,
     metric: a.criterion.metric,
     entityId: a.entityId,
+    // The TESTABLE claim, stated as what the joint arm actually judges: that
+    // the two mechanisms compose independently. `naiveAdditivePrediction` is
+    // its prediction and the joint arm is the measurement, so this hypothesis
+    // is refuted exactly when the interaction is not additive. Stating it any
+    // more loosely ("moves the metric differently from either alone") would not
+    // be decidable by the measurement that is actually taken.
     statement:
       `Applying "${a.mechanism}" and "${b.mechanism}" together at strength ${strength} moves ` +
-      `${a.entityId}.${a.criterion.metric} differently from either alone.`,
+      `${a.entityId}.${a.criterion.metric} by the SUM of their separate effects — they compose independently.`,
     why:
       `Both "${a.hypothesisId}" (${byId.get(a.hypothesisId)?.confidence ?? 'supported'}) and "${b.hypothesisId}" ` +
       `(${byId.get(b.hypothesisId)?.confidence ?? 'supported'}) survived independently, so the run could not settle ` +

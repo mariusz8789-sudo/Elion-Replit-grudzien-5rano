@@ -63,6 +63,7 @@ describe('the autonomous discovery chain, end to end', () => {
 
     // ---- E is generated, unprompted, and tested on fresh evidence ----------
     const generated = step1.outcome.generated!;
+    if (generated.kind !== 'DERIVED_PARAMETER_VALUE') throw new Error('expected a derived value');
     expect(generated.derived.value).toBe(0.5);
     expect(generated.derived.hypothesisId).toBe('h:derived-temperature-0.5');
     expect(generated.run.rounds.length).toBeGreaterThan(0);

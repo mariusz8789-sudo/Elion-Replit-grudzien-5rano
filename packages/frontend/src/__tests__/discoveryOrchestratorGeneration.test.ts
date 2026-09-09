@@ -34,6 +34,7 @@ describe('runDiscovery — the declared space runs out and Genesis continues by 
     expect(outcome.noGenerationReason).toBeNull();
     expect(outcome.generated).not.toBeNull();
     const generated = outcome.generated!;
+    if (generated.kind !== 'DERIVED_PARAMETER_VALUE') throw new Error('expected a derived value');
     expect(generated.derived.value).toBe(0.5);
     expect(generated.derived.hypothesisId).toBe('h:derived-temperature-0.5');
 
@@ -78,20 +79,20 @@ describe('runDiscovery — the declared space runs out and Genesis continues by 
     expect(outcome.noGenerationReason).toContain('still standing');
   });
 
-  it('MECHANISM reports that THIS DOOR does not route generation — not that none exists', async () => {
+  it('MECHANISM routes generation too, and refuses honestly when one explanation survived', async () => {
     const { GENESIS_FLOOD_CATALOG } = await import('../core/agent/worldGoalIntent');
     const outcome = runDiscovery({
       shape: 'MECHANISM',
-      goal: 'Minimise peak flood depth, at most 4 experiments.',
+      goal: 'Minimise peak flood depth, at most 8 experiments.',
       catalog: GENESIS_FLOOD_CATALOG,
     });
     if (outcome.status !== 'RAN') throw new Error('expected RAN');
+    // The flood run settles on one lever, and one survivor is an answer — there
+    // is nothing to combine it with. The refusal is about THIS run's state, not
+    // about MECHANISM lacking a generation path.
+    expect(outcome.run.surviving).toEqual(['h:infiltration']);
     expect(outcome.generated).toBeNull();
-    // `mechanismGeneration.ts` composes a lever nobody declared and really runs
-    // it, so claiming MECHANISM "has no generation path" would be false. The
-    // honest statement is about ROUTING: this door does not carry it yet.
-    expect(outcome.noGenerationReason).toContain('does not route this question shape');
-    expect(outcome.noGenerationReason).toContain('mechanismGeneration.ts');
+    expect(outcome.noGenerationReason).toContain('SINGLE_EXPLANATION');
   });
 });
 
@@ -114,6 +115,7 @@ describe('a surviving derived value is reported as an interval, never as an iden
       const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(hidden) });
       if (outcome.status !== 'RAN') throw new Error('expected RAN');
       const generated = outcome.generated!;
+      if (generated.kind !== 'DERIVED_PARAMETER_VALUE') throw new Error('expected a derived value');
       expect(generated.derived.value, `hidden=${hidden}`).toBe(0.5);
       expect(generated.survived, `hidden=${hidden}`).toBe(false);
       expect(generated.standing.standing, `hidden=${hidden}`).toBe('REFUTED');
@@ -125,6 +127,7 @@ describe('a surviving derived value is reported as an interval, never as an iden
       const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(hidden) });
       if (outcome.status !== 'RAN') throw new Error('expected RAN');
       const generated = outcome.generated!;
+      if (generated.kind !== 'DERIVED_PARAMETER_VALUE') throw new Error('expected a derived value');
       expect(generated.derived.value, `hidden=${hidden}`).toBe(0.5);
       expect(generated.survived, `hidden=${hidden}`).toBe(true);
       // 0.5 is right at 0.50 and wrong at 0.55, and the verdict is identical.
@@ -139,6 +142,7 @@ describe('a surviving derived value is reported as an interval, never as an iden
     const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(0.55) });
     if (outcome.status !== 'RAN') throw new Error('expected RAN');
     const generated = outcome.generated!;
+    if (generated.kind !== 'DERIVED_PARAMETER_VALUE') throw new Error('expected a derived value');
 
     expect(generated.survived).toBe(true);
     expect(generated.standing.standing).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');

@@ -149,7 +149,11 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     }
 
     const next = selection.nextExecutable;
-    if (next.kind !== 'NARROW_A_DERIVED_INTERVAL' || outcome.generated === null) {
+    if (
+      next.kind !== 'NARROW_A_DERIVED_INTERVAL' ||
+      outcome.generated === null ||
+      outcome.generated.kind !== 'DERIVED_PARAMETER_VALUE'
+    ) {
       stoppedBecause = `Step ${step} proposed "${next.kind}", which this chain has no actuator for yet: ${next.question}`;
       break;
     }
@@ -219,7 +223,7 @@ function remember(outcome: DiscoveryOutcome, input: InquiryLoopInput): readonly 
       }),
     ),
   ];
-  if (outcome.generated !== null) {
+  if (outcome.generated !== null && outcome.generated.kind === 'DERIVED_PARAMETER_VALUE') {
     saved.push(
       saveParameterInquiryToMemory(
         buildSavedParameterInquiry({

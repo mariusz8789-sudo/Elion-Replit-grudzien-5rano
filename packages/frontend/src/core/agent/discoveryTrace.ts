@@ -140,16 +140,28 @@ export function traceResearchChain(chain: ResearchChainResult): readonly TraceEn
         step,
         kind: 'GENERATION',
         what: `${generated.derived.hypothesisId} derived: ${generated.derived.why}`,
-        source: `${at}.outcome.generated.derived.value`,
-        value: generated.derived.value,
+        source: `${at}.outcome.generated.derived.hypothesisId`,
+        value: generated.derived.hypothesisId,
       });
-      entries.push({
-        step,
-        kind: 'ASSESSMENT',
-        what: `the derived value stands as: ${generated.standing.why}`,
-        source: `${at}.outcome.generated.standing.standing`,
-        value: generated.standing.standing,
-      });
+      // The two generations are assessed by different real quantities, so the
+      // trace reports each one's own rather than a shared summary word.
+      if (generated.kind === 'DERIVED_PARAMETER_VALUE') {
+        entries.push({
+          step,
+          kind: 'ASSESSMENT',
+          what: `the derived value stands as: ${generated.standing.why}`,
+          source: `${at}.outcome.generated.standing.standing`,
+          value: generated.standing.standing,
+        });
+      } else {
+        entries.push({
+          step,
+          kind: 'ASSESSMENT',
+          what: `the composed mechanism is ${generated.assessment.interaction}: ${generated.assessment.reason}`,
+          source: `${at}.outcome.generated.assessment.interaction`,
+          value: generated.assessment.interaction,
+        });
+      }
     }
 
     if (run.nextExperiment !== null) {

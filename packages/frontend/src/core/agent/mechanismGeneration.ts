@@ -4,6 +4,7 @@ import { MECHANISM_STRATEGY_ID, toMechanismRun } from './discoveryStrategies';
 import { DISCOVERY_STRATEGY_CONTRACT_VERSION, type StrategyRun } from './discoveryStrategy';
 import {
   runAutonomousDiscoveryWithEngines,
+  type DiscoveryLoopExecution,
   type DiscoveryLoopInput,
   type DiscoveryLoopResult,
   type MechanisticHypothesis,
@@ -111,6 +112,15 @@ export interface JointMechanismContinuation {
 
 export interface MechanismWithGenerationResult {
   readonly first: DiscoveryLoopResult;
+  /**
+   * The full execution behind `first` — registry, baseline and last-arm world
+   * state, not only its lean `.result`. Carried so a caller building a real
+   * Evidence Bundle (`buildWorldDiscoveryEvidenceBundle` in `scienceMemory.ts`,
+   * the same function `worldDiscoverySession.ts::runWorldDiscoveryAndRemember`
+   * already uses) never has to re-run the investigation to get it — the WorldGraph
+   * state is real branch/journal data, not something a fingerprint can stand in for.
+   */
+  readonly firstExecution: DiscoveryLoopExecution;
   /** Null whenever nothing was generated — `noGenerationReason` always says why. */
   readonly generated: JointMechanismContinuation | null;
   readonly noGenerationReason: string | null;
@@ -255,18 +265,23 @@ function commonMeasuredArms(
  * to build an Evidence Bundle — is not forced to run it a second time to get
  * generation too. `runJointIntervention` builds its own fresh world via
  * `input.buildWorld()` regardless of which engines produced `first`, so this
- * function needs nothing from the first run except its RESULT.
+ * function needs nothing from the first run except its RESULT and the full
+ * `DiscoveryLoopExecution` behind it — carried through as `firstExecution` on
+ * `MechanismWithGenerationResult` rather than re-derived, so a caller
+ * persisting an Evidence Bundle (`discoveryOrchestrator.ts::runMechanismDiscoveryAndRemember`)
+ * never has to run the investigation a third time to get it.
  *
  * `tolerance` is the declared additivity band, playing the same role
  * `agreementTolerance` plays throughout this codebase — a declared band, not a
  * statistical test this repository has no methodology to justify.
  */
 export function generateJointMechanismFrom(
-  first: DiscoveryLoopResult,
+  firstExecution: DiscoveryLoopExecution,
   input: DiscoveryLoopInput,
   options: { readonly tolerance?: number } = {},
 ): MechanismWithGenerationResult {
   const tolerance = options.tolerance ?? 0.02;
+  const first = firstExecution.result;
 
   // Refusal 1 — nothing to combine. One survivor is an answer, zero is
   // `modelSufficiency.ts`'s finding to report, not this module's.
@@ -274,6 +289,7 @@ export function generateJointMechanismFrom(
   if (competing.status !== 'COMPETING_MODELS_UNRESOLVED') {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `No joint mechanism was proposed: the run ended ${competing.status}, and combining requires two or more ` +
@@ -293,6 +309,7 @@ export function generateJointMechanismFrom(
   if (survivors.length < 2) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `${competing.competingHypothesisIds.length} hypotheses survived, but fewer than two of them are declared ` +
@@ -309,6 +326,7 @@ export function generateJointMechanismFrom(
   if (a.entityId !== b.entityId || a.criterion.metric !== b.criterion.metric) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `"${a.hypothesisId}" and "${b.hypothesisId}" are judged on different objectives ` +
@@ -322,6 +340,7 @@ export function generateJointMechanismFrom(
   if (arms === null) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `"${a.hypothesisId}" and "${b.hypothesisId}" were never both measured at the same magnitude with a usable ` +
@@ -349,6 +368,7 @@ export function generateJointMechanismFrom(
   if (joint.baseline === null || joint.jointObserved === null) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         'The joint arm ran but produced no readable objective, so there is nothing to judge additivity against.',
@@ -397,7 +417,7 @@ export function generateJointMechanismFrom(
       'answered by arithmetic over their separate effects and has to be run.',
   };
 
-  return { first, generated: { derived, assessment, betterThanBestSingle }, noGenerationReason: null };
+  return { first, firstExecution, generated: { derived, assessment, betterThanBestSingle }, noGenerationReason: null };
 }
 
 /**
@@ -415,8 +435,7 @@ export function runDiscoveryWithJointGeneration(
   input: DiscoveryLoopInput,
   options: { readonly tolerance?: number } = {},
 ): MechanismWithGenerationResult {
-  const first = runAutonomousDiscoveryWithEngines(input).result;
-  return generateJointMechanismFrom(first, input, options);
+  return generateJointMechanismFrom(runAutonomousDiscoveryWithEngines(input), input, options);
 }
 
 /**

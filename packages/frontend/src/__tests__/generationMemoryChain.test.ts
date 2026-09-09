@@ -139,4 +139,69 @@ describe('generation reaches memory, and memory carries it into the next selecti
     const tested = outcome.run.rounds.flatMap((r) => r.verdicts.map((v) => v.hypothesisId));
     expect(tested).toContain('h:cold');
   });
+
+  /**
+   * THE FULL DEFINITION-OF-DONE CHAIN IN ONE TEST — the property the other
+   * tests in this file each prove PART of, but never together:
+   *
+   *   bare start -> falsify -> derive -> bank (both investigations)
+   *     -> EACH banked record independently REPLAYS to MATCH
+   *     -> [restart]
+   *     -> the NEXT investigation reads that memory, tests only what is
+   *        still open, and its OWN record ALSO replays to MATCH
+   *
+   * Every earlier test proves the memory-narrowing half or the persistence
+   * half; this is the one place both halves and the replay check on BOTH
+   * generations of records sit in a single, ordered story.
+   */
+  it('THE FULL CHAIN: falsify -> bank -> replay -> [restart] -> next experiment uses it -> replay again', async () => {
+    const storage = makeFakeStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+
+    const round1Module = await import('../core/agent/inquirySession');
+    const memory1 = await import('../core/scienceMemory');
+    const fixture1 = await import('../core/agent/proteinFoldingInquiry');
+    const round1 = round1Module.runInquiryWithGenerationAndRemember(fixture1.proteinFoldingInquiry(TRUE_HIDDEN_TEMPERATURE));
+
+    // Bare start really falsified the whole declared space.
+    expect(round1.generation.first.falsifiedHypothesisIds).toHaveLength(4);
+    expect(round1.generation.generated).not.toBeNull();
+    expect(round1.savedFollowUp).not.toBeNull();
+
+    // EVERY banked record from round 1 independently replays to MATCH — not
+    // asserted, RE-EXECUTED. This is the audit trail a real next decision
+    // would be built on, proven reproducible before it is trusted.
+    const firstReplay = memory1.replaySavedParameterInquiry(round1.savedFirst);
+    expect(firstReplay.status).toBe('MATCH');
+    const followUpReplay = memory1.replaySavedParameterInquiry(round1.savedFollowUp!);
+    expect(followUpReplay.status).toBe('MATCH');
+
+    // ---- restart: a genuinely separate process reads what round 1 banked ----
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: storage });
+    const round2Module = await import('../core/agent/inquirySession');
+    const memory2 = await import('../core/scienceMemory');
+    const paramAlt = await import('../core/agent/parameterAlternative');
+    const fixture2 = await import('../core/agent/proteinFoldingInquiry');
+
+    const derived = round1.generation.generated!.derived;
+    const base = fixture2.proteinFoldingInquiry(TRUE_HIDDEN_TEMPERATURE);
+    // THE NEXT QUESTION / NEXT EXPERIMENT: offers the four declared values
+    // (already refuted) alongside the one Genesis derived for itself — the
+    // same shape a real follow-on investigation would construct, not a
+    // hand-picked shortcut.
+    const round2 = round2Module.runInquiryWithGenerationAndRemember({
+      ...base,
+      hypotheses: [...base.hypotheses, paramAlt.asParameterHypothesis(derived)],
+    });
+
+    // Memory drove the selection: only the derived hypothesis was still open.
+    expect(round2.generation.executedInput.hypotheses.map((h) => h.hypothesisId)).toEqual([derived.hypothesisId]);
+
+    // The NEXT experiment's own record ALSO replays to MATCH — provenance and
+    // reproducibility do not stop at the record that changed the decision;
+    // they hold for the record the decision produced, too.
+    const round2Replay = memory2.replaySavedParameterInquiry(round2.savedFirst);
+    expect(round2Replay.status).toBe('MATCH');
+  });
 });

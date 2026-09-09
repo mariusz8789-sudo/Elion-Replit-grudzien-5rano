@@ -21,6 +21,10 @@ import {
 import { WorldDiscoveryPanel, type PanelState } from './WorldDiscoveryPanel';
 import { ProvenanceBadge } from './provenance';
 import { RealExperimentPipeline } from './RealExperimentPipeline';
+import { DiscoveryLadder, ConclusionContent, EvidenceContent, ReplayContent, type LadderStep } from './DiscoveryLadder';
+import { conclusionFor, nextExperimentFor } from './discoveryNarrative';
+import type { WorldDiscoveryEvidenceSummary } from '../../core/agent/worldDiscoverySession';
+import type { SavedWorldDiscoveryReplay } from '../../core/scienceMemory';
 
 /**
  * VIRTUAL CELL LAB — Control vs Treatment (P0, GENESIS C2 next-sprint directive).
@@ -337,28 +341,77 @@ const DEMO_DURATION_MS = 55_000;
  * visibly grows within the walkthrough's time budget instead of needing to run for real minutes. */
 const DEMO_SPEED = 4;
 
-/** Real per-treatment hypothesis id the Discovery Loop already uses (`h:${leverId's own suffix}`) —
- * reused verbatim so CONCLUSION reads the SAME verdict the search actually reached, never a second
- * one computed here. */
-export function conclusionFor(result: PanelState | null, treatmentId: TreatmentId): { verdict: 'SUPPORTED' | 'FALSIFIED'; text: string } | null {
-  if (!result || result.kind !== 'COMPLETE') return null;
-  const hypothesisId = `h:${treatmentId}`;
-  const supported = result.result.bestSupported.find((b) => b.hypothesisId === hypothesisId);
-  if (supported) return { verdict: 'SUPPORTED', text: `${supported.confidence}. ${supported.reason}` };
-  const falsified = result.result.failedHypotheses.find((b) => b.hypothesisId === hypothesisId);
-  if (falsified) return { verdict: 'FALSIFIED', text: `${falsified.confidence}. ${falsified.reason}` };
-  return null;
-}
-
-/** The real "what remains unknown" the search itself reported, when one exists — never a fabricated
- * next step. Only falls back to a UI affordance (try another substance) when Genesis's own search
- * left nothing outstanding to name. */
-export function nextExperimentFor(result: PanelState | null): string {
-  if (!result || result.kind !== 'COMPLETE') {
-    return 'Run a Discovery search (left panel) to let Genesis choose a real next experiment.';
-  }
-  if (result.result.unresolvedQuestions.length > 0) return result.result.unresolvedQuestions[0]!;
-  return 'Try a different substance or dose above, then run Discovery again to test another mechanism.';
+/** Builds this screen's six `LadderStep`s for the reusable `DiscoveryLadder` shell — the only
+ * Cell-Lab-specific piece of the narrative; the shell itself computes nothing. */
+function cellLabLadderSteps(args: {
+  stats: Record<string, number>;
+  diff: number;
+  conclusion: ReturnType<typeof conclusionFor>;
+  nextExperiment: string;
+  evidence: WorldDiscoveryEvidenceSummary | null;
+  replay: SavedWorldDiscoveryReplay | null;
+}): LadderStep[] {
+  const { stats, diff, conclusion, nextExperiment, evidence, replay } = args;
+  return [
+    {
+      key: 'control',
+      label: 'CONTROL',
+      color: CONTROL_COLOR,
+      content: <p>{sci(stats.controlTotal ?? 0)} cells · S-phase {((stats.controlSPhase ?? 0) * 100).toFixed(1)}%</p>,
+    },
+    {
+      key: 'treatment',
+      label: 'TREATMENT',
+      color: TREATMENT_COLOR,
+      content: <p>{sci(stats.treatmentTotal ?? 0)} cells · S-phase {((stats.treatmentSPhase ?? 0) * 100).toFixed(1)}%</p>,
+    },
+    {
+      key: 'observation',
+      label: 'OBSERVATION',
+      content: (
+        <p>
+          At t={Math.round(stats.hoursElapsed ?? 0)}h, the treatment culture holds {sci(stats.treatmentTotal ?? 0)} cells
+          versus {sci(stats.controlTotal ?? 0)} in control.
+        </p>
+      ),
+    },
+    {
+      key: 'difference',
+      label: 'DIFFERENCE',
+      content: <p>{diff >= 0 ? '+' : ''}{diff.toFixed(1)}% vs control</p>,
+    },
+    {
+      key: 'conclusion',
+      label: 'CONCLUSION',
+      content: <ConclusionContent conclusion={conclusion} pendingText="Run a Discovery search (left panel) to reach a real conclusion for this substance." />,
+    },
+    {
+      key: 'next-experiment',
+      label: 'NEXT EXPERIMENT',
+      content: <p>{nextExperiment}</p>,
+    },
+    {
+      key: 'evidence',
+      label: 'EVIDENCE',
+      content: (
+        <EvidenceContent
+          evidence={evidence}
+          provenance="SIMULATED"
+          pendingText="Run a Discovery search (left panel) to produce a real Evidence Bundle for this culture."
+        />
+      ),
+    },
+    {
+      key: 'replay',
+      label: 'REPLAY',
+      content: (
+        <ReplayContent
+          replay={replay}
+          pendingText="Available once a search has run — Genesis re-executes its own result from the same recorded inputs and checks it still matches."
+        />
+      ),
+    },
+  ];
 }
 
 export function CellLabScreen() {
@@ -394,11 +447,13 @@ export function CellLabScreen() {
   };
 
   const diff = stats.differencePct ?? 0;
-  const conclusion = conclusionFor(discoveryResult, treatmentId);
+  const conclusion = conclusionFor(discoveryResult, `h:${treatmentId}`);
   const nextExperiment = nextExperimentFor(discoveryResult);
   const currentLever = GENESIS_CELL_CULTURE_LEVERS.find((l) => l.leverId === `lever:${treatmentId}`)!;
   const currentHypothesis = currentLever.hypothesis('totalCells', 'maximize');
-  const evidenceBundleId = discoveryResult?.kind === 'COMPLETE' ? (discoveryResult.evidence?.bundleId ?? null) : null;
+  const evidence = discoveryResult?.kind === 'COMPLETE' ? discoveryResult.evidence : null;
+  const replay = discoveryResult?.kind === 'COMPLETE' ? discoveryResult.replay : null;
+  const evidenceBundleId = evidence?.bundleId ?? null;
   const comparisonNote = `control ${sci(stats.controlTotal ?? 0)} cells vs treatment ${sci(stats.treatmentTotal ?? 0)} cells (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)`;
   const demoStatusText = discoveryResult?.kind === 'COMPLETE'
     ? 'Real search complete — see CONCLUSION below.'
@@ -472,45 +527,14 @@ export function CellLabScreen() {
           <span>t = {Math.round(stats.hoursElapsed ?? 0)} h{demoMode ? ` (${DEMO_SPEED}x)` : ''}</span>
         </div>
 
-        {/* P0 — FLAGSHIP NARRATIVE: CONTROL -> TREATMENT -> OBSERVATION -> DIFFERENCE -> CONCLUSION ->
-            NEXT EXPERIMENT, every value read from the live solver or from the real Discovery Loop
-            result above (via `onResult`) — never a second, independently-computed verdict. */}
-        <ol className="cell-lab-narrative" data-testid="cell-lab-narrative">
-          <li className="cln-step" data-testid="narrative-control">
-            <span className="cln-label" style={{ color: CONTROL_COLOR }}>CONTROL</span>
-            <p>{sci(stats.controlTotal ?? 0)} cells · S-phase {((stats.controlSPhase ?? 0) * 100).toFixed(1)}%</p>
-          </li>
-          <li className="cln-step" data-testid="narrative-treatment">
-            <span className="cln-label" style={{ color: TREATMENT_COLOR }}>TREATMENT</span>
-            <p>{sci(stats.treatmentTotal ?? 0)} cells · S-phase {((stats.treatmentSPhase ?? 0) * 100).toFixed(1)}%</p>
-          </li>
-          <li className="cln-step" data-testid="narrative-observation">
-            <span className="cln-label">OBSERVATION</span>
-            <p>
-              At t={Math.round(stats.hoursElapsed ?? 0)}h, the treatment culture holds {sci(stats.treatmentTotal ?? 0)} cells
-              versus {sci(stats.controlTotal ?? 0)} in control.
-            </p>
-          </li>
-          <li className="cln-step" data-testid="narrative-difference">
-            <span className="cln-label">DIFFERENCE</span>
-            <p>{diff >= 0 ? '+' : ''}{diff.toFixed(1)}% vs control</p>
-          </li>
-          <li className="cln-step" data-testid="narrative-conclusion">
-            <span className="cln-label">CONCLUSION</span>
-            {conclusion ? (
-              <p>
-                <b className={conclusion.verdict === 'SUPPORTED' ? 'cln-supported' : 'cln-falsified'}>{conclusion.verdict}</b>
-                {' — '}{conclusion.text}
-              </p>
-            ) : (
-              <p className="gsc-caption">Run a Discovery search (left panel) to reach a real conclusion for this substance.</p>
-            )}
-          </li>
-          <li className="cln-step" data-testid="narrative-next-experiment">
-            <span className="cln-label">NEXT EXPERIMENT</span>
-            <p>{nextExperiment}</p>
-          </li>
-        </ol>
+        {/* P0/P1 — FLAGSHIP NARRATIVE: QUESTION -> HYPOTHESIS (below, in the Discovery panel) ->
+            EXPERIMENT (CONTROL/TREATMENT) -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT
+            EXPERIMENT -> EVIDENCE -> REPLAY, every value read from the live solver or from the real
+            Discovery Loop result (via `onResult`) — never a second, independently-computed verdict,
+            and never a second Evidence Bundle or replay check (both already come from the SAME
+            `runWorldDiscoveryAndRemember` call the Discovery panel itself made). `DiscoveryLadder`
+            is the reusable shell; only the step content below is Cell-Lab-specific. */}
+        <DiscoveryLadder testId="cell-lab-narrative" steps={cellLabLadderSteps({ stats, diff, conclusion, nextExperiment, evidence, replay })} />
 
         {/* P1 — REAL EXPERIMENT INTERFACE, UI only. Every stage past Prediction is honestly refused;
             see RealExperimentPipeline.tsx's own doc for why. */}

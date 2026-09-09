@@ -7,28 +7,38 @@ import {
   replaySavedWorldDiscoveryRun,
   type SavedExperiment,
 } from '../../core/scienceMemory';
+import { getScientificEvidencePack, getStoredEvidencePackReplayVerdict } from '../../core/experimentFabric';
 import type { ReplayVerdict } from '../../core/matrixFoundation/replayVerdict';
 import type { DataProvenance } from '../../core/dataProvenance';
 
 /**
- * EVIDENCE & REPLAY CASE STUDY — a read-only, audit-facing shaping of a `SavedExperiment` already
- * in Scientific Memory, for `EvidenceCaseStudyScreen.tsx`. This module computes NOTHING scientific:
- * every value below is read verbatim from a record `scienceMemory.ts`/`predictionVerification.ts`
- * already produced, or from a replay verdict `replaySavedRealExperimentVerification`/
- * `replaySavedWorldDiscoveryRun` already knows how to compute — no second judge, no new tolerance,
- * no fabricated step. This is the one-page "pytanie -> hipoteza -> kryterium -> dane -> werdykt ->
- * provenance -> replay" audit chain the C2 "EVIDENCE & REPLAY AS PRODUCT" directive asks for, built
- * ENTIRELY from the two investigation shapes that already carry that whole chain:
+ * EVIDENCE & REPLAY SHOWCASE — a read-only, audit-facing shaping of a `SavedExperiment` already in
+ * Scientific Memory, for `EvidenceShowcaseScreen.tsx`. This module computes NOTHING scientific: every
+ * value below is read verbatim from a record `scienceMemory.ts`/`predictionVerification.ts`/
+ * `evidencePackStore.ts` already produced, or from a replay verdict one of those modules already knows
+ * how to compute — no second judge, no new tolerance, no fabricated step. This is the one-page
+ * "pytanie -> hipoteza -> kryterium -> dane -> werdykt -> provenance -> replay" audit chain the C2
+ * "EVIDENCE & REPLAY SHOWCASE" directive asks for, built ENTIRELY from the three investigation shapes
+ * that already carry that whole chain:
  *
  *   - `realExperimentVerification` (C1's Real Experiment E2E): a REAL, physical measurement judged
- *     against a frozen SIMULATED prediction. The richer case — both provenances appear side by side.
+ *     against a frozen SIMULATED prediction. The richest case — both provenances appear side by side,
+ *     and replay genuinely RE-EXECUTES the simulated half live, in the browser.
  *   - `worldDiscovery` with a non-null `evidence`: a completed, fully SIMULATED Discovery search with
- *     its own real Evidence Bundle. Shown honestly as SIMULATED end to end — never upgraded to imply
- *     a real measurement that does not exist.
+ *     its own real Evidence Bundle. Shown honestly as SIMULATED end to end. Replay also re-executes live.
+ *   - `evidencePackId` (the older Fabric-router `ScientificEvidencePack`, `ExperimentPilotScreen.tsx`'s
+ *     own investigation shape): also real, real-engine-executed runs, but its own store
+ *     (`evidencePackStore.ts`) only knows how to report the verdict it computed AT SAVE TIME
+ *     (`getStoredEvidencePackReplayVerdict`'s own doc comment: "a snapshot disclosure, not proof of a
+ *     fresh replay") — never silently presented as freshly recomputed, hence `CaseStudyReplay.computedLive`.
  *
- * Only these two shapes qualify (`isCaseStudyCandidate`): every other saved shape either has no
- * Evidence Bundle of its own (e.g. a bare `scenario` run) or belongs to the older Fabric-router
- * pilot flow already presented by `ExperimentPilotScreen.tsx` — not duplicated here.
+ * Priority where a record could technically carry more than one shape: `realExperimentVerification` >
+ * `worldDiscovery` > `evidencePackId`, consistently across `isCaseStudyCandidate`, `buildCaseStudy`,
+ * `replayCaseStudy` and the sort order below — the same three-way priority everywhere, never decided
+ * differently in two places.
+ *
+ * Every other saved shape (e.g. a bare `scenario` run with no Evidence Bundle of its own) is not a
+ * candidate — no placeholder or fixture is ever substituted for a real bundle.
  */
 
 export interface CaseStudyStep {
@@ -40,10 +50,13 @@ export interface CaseStudyStep {
 export interface CaseStudyReplay {
   readonly status: ReplayVerdict;
   readonly reason: string;
+  /** false for `evidencePackId` records: their store only ever reports the verdict computed at save
+   * time, never a fresh in-browser re-execution — the screen must say so, not imply otherwise. */
+  readonly computedLive: boolean;
 }
 
 export interface CaseStudy {
-  readonly kind: 'REAL_VERIFICATION' | 'SIMULATED_DISCOVERY';
+  readonly kind: 'REAL_VERIFICATION' | 'SIMULATED_DISCOVERY' | 'LEGACY_EVIDENCE_PACK';
   readonly experimentId: string;
   readonly title: string;
   readonly createdAt: string;
@@ -53,20 +66,30 @@ export interface CaseStudy {
   readonly steps: readonly CaseStudyStep[];
 }
 
+function hasResolvableEvidencePack(saved: SavedExperiment): boolean {
+  return saved.evidencePackId !== undefined && getScientificEvidencePack(saved.evidencePackId) !== undefined;
+}
+
 export function isCaseStudyCandidate(saved: SavedExperiment): boolean {
   if (saved.realExperimentVerification !== undefined && isSavedRealExperimentVerification(saved.realExperimentVerification)) return true;
   if (saved.worldDiscovery !== undefined && isSavedWorldDiscoveryRun(saved.worldDiscovery) && saved.worldDiscovery.evidence !== null) return true;
+  if (hasResolvableEvidencePack(saved)) return true;
   return false;
 }
 
-/** Newest first, matching `listExperiments`'s own order; real physical verifications sort before simulated-only bundles so the strongest case study is the default selection. */
+function candidateRank(saved: SavedExperiment): number {
+  if (saved.realExperimentVerification !== undefined) return 2;
+  if (saved.worldDiscovery !== undefined) return 1;
+  return 0;
+}
+
+/** Newest first, matching `listExperiments`'s own order; the three-way priority documented above breaks ties so the strongest case study is the default selection. */
 export function listCaseStudyCandidates(): readonly SavedExperiment[] {
   return listExperiments()
     .filter(isCaseStudyCandidate)
     .sort((a, b) => {
-      const aReal = a.realExperimentVerification !== undefined ? 1 : 0;
-      const bReal = b.realExperimentVerification !== undefined ? 1 : 0;
-      if (aReal !== bReal) return bReal - aReal;
+      const rankDiff = candidateRank(b) - candidateRank(a);
+      if (rankDiff !== 0) return rankDiff;
       return b.createdAt.localeCompare(a.createdAt);
     });
 }
@@ -201,19 +224,93 @@ function simulatedDiscoveryCaseStudy(saved: SavedExperiment): CaseStudy | null {
   };
 }
 
-/** Prefers the real-experiment shape when present — the same priority `listCaseStudyCandidates` sorts by. */
+function legacyEvidencePackCaseStudy(saved: SavedExperiment): CaseStudy | null {
+  if (saved.evidencePackId === undefined) return null;
+  const stored = getScientificEvidencePack(saved.evidencePackId);
+  if (stored === undefined) return null;
+  const { pack } = stored;
+  const hypothesis = pack.protocol.hypothesis;
+  const assessment = pack.hypothesisAssessment;
+
+  const steps: CaseStudyStep[] = [
+    { key: 'question', label: 'Question', lines: [hypothesis.statement] },
+    { key: 'hypothesis', label: 'Hypothesis', lines: [`${hypothesis.hypothesisId} — model ${hypothesis.modelId}, domain ${hypothesis.domainId}`] },
+    {
+      key: 'criterion',
+      label: 'Falsification Criterion',
+      lines: [
+        `Metric: ${assessment.criterion.metric}`,
+        `Relation: ${assessment.criterion.relation}${assessment.criterion.tolerance !== undefined ? ` (tolerance ${assessment.criterion.tolerance})` : ''}`,
+        assessment.criterion.rationale,
+      ],
+    },
+    {
+      key: 'data',
+      label: 'Data',
+      lines: [
+        `${pack.runCount} real-engine run(s) executed under protocol ${pack.protocol.protocolFingerprint}.`,
+        ...pack.runs.map((run) => `${run.runId}: ${run.status}`),
+      ],
+    },
+    { key: 'verdict', label: 'Verdict', lines: [assessment.assessment, assessment.message] },
+    {
+      key: 'evidence-bundle',
+      label: 'Evidence Bundle',
+      lines: [
+        `Pack ${pack.evidencePackId} (chain ${pack.evidenceChainId})`,
+        pack.reproducibility.allArmsMatched
+          ? 'Reproducibility at save time: every arm matched.'
+          : `Reproducibility at save time: drift in ${pack.reproducibility.armsWithDrift.join(', ') || '(unspecified arm)'}${pack.reproducibility.armsNotExecuted.length > 0 ? `; not executed: ${pack.reproducibility.armsNotExecuted.join(', ')}` : ''}.`,
+      ],
+    },
+  ];
+
+  return {
+    kind: 'LEGACY_EVIDENCE_PACK',
+    experimentId: saved.id,
+    title: saved.experimentName,
+    createdAt: saved.createdAt,
+    recordProvenance: 'SIMULATED',
+    honestyNote: saved.honestyNote,
+    steps,
+  };
+}
+
+/** Prefers the real-experiment shape when present, then SIMULATED discovery, then a legacy Evidence Pack — the same priority `listCaseStudyCandidates` sorts by. */
 export function buildCaseStudy(saved: SavedExperiment): CaseStudy | null {
-  return realVerificationCaseStudy(saved) ?? simulatedDiscoveryCaseStudy(saved);
+  return realVerificationCaseStudy(saved) ?? simulatedDiscoveryCaseStudy(saved) ?? legacyEvidencePackCaseStudy(saved);
 }
 
 /**
- * Replays the case study LIVE, through whichever of the two existing replay functions matches its
- * shape — never a third replay mechanism invented for this screen. `NOT_REPRODUCIBLE` and `DRIFT`
- * are rendered exactly as returned, never hidden or softened.
+ * Replays the case study through whichever of the three existing replay mechanisms matches its shape
+ * — never a fourth invented for this screen. `NOT_REPRODUCIBLE`, `DRIFT` and `BLOCKED` are rendered
+ * exactly as returned, never hidden or softened. Only the first two kinds genuinely re-execute live,
+ * in the browser, right now; the legacy Evidence Pack kind can only disclose the verdict its own store
+ * already computed at save time — `computedLive` tells the caller which happened.
  */
 export function replayCaseStudy(saved: SavedExperiment): CaseStudyReplay {
   if (saved.realExperimentVerification !== undefined && isSavedRealExperimentVerification(saved.realExperimentVerification)) {
-    return replaySavedRealExperimentVerification(saved);
+    return { ...replaySavedRealExperimentVerification(saved), computedLive: true };
   }
-  return replaySavedWorldDiscoveryRun(saved);
+  if (saved.worldDiscovery !== undefined && isSavedWorldDiscoveryRun(saved.worldDiscovery)) {
+    return { ...replaySavedWorldDiscoveryRun(saved), computedLive: true };
+  }
+  if (saved.evidencePackId !== undefined) {
+    const stored = getScientificEvidencePack(saved.evidencePackId);
+    if (stored === undefined) {
+      return {
+        status: 'NOT_REPRODUCIBLE',
+        reason: `Evidence Pack "${saved.evidencePackId}" is no longer in this browser's memory — nothing to check against.`,
+        computedLive: false,
+      };
+    }
+    const verdict = getStoredEvidencePackReplayVerdict(stored.pack);
+    const reason = verdict === 'MATCH'
+      ? "Recorded at save time: every arm's run fingerprint matched, no drift, nothing left not-executed."
+      : verdict === 'DRIFT'
+        ? 'Recorded at save time: at least one arm, or the external-observation comparison, drifted from its expected fingerprint.'
+        : 'Recorded at save time: at least one arm did not execute, or the pack failed its own validity check.';
+    return { status: verdict, reason, computedLive: false };
+  }
+  return { status: 'BLOCKED', reason: 'This record carries no recognised Evidence Bundle to replay.', computedLive: false };
 }

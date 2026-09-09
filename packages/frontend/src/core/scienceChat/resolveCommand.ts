@@ -436,18 +436,19 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
-  // --- Evidence & Replay Case Study (C2 "Evidence & Replay as Product") — jeden kompletny, realny
-  //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`), pokazany jako
-  //     jednostronicowy raport audytowy: pytanie -> hipoteza -> kryterium -> dane -> werdykt ->
-  //     provenance -> replay. Nic tu się nie liczy na nowo — ekran tylko odczytuje i odtwarza
-  //     (`replaySavedRealExperimentVerification`/`replaySavedWorldDiscoveryRun`), tak jak każdy inny
+  // --- Evidence & Replay Showcase (C2 "Evidence & Replay as Product") — jeden kompletny, realny
+  //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`) albo w starszym
+  //     `evidencePackStore.ts`, pokazany jako jednostronicowy raport audytowy: pytanie -> hipoteza ->
+  //     kryterium -> dane -> werdykt -> provenance -> replay. Nic tu się nie liczy na nowo — ekran
+  //     tylko odczytuje i odtwarza (`replaySavedRealExperimentVerification`/
+  //     `replaySavedWorldDiscoveryRun`/`getStoredEvidencePackReplayVerdict`), tak jak każdy inny
   //     replay w tym kodzie. ---
-  if (has(norm, 'evidence bundle', 'dowod naukowy', 'raport dowodowy', 'case study', 'pokaz dowod', 'pokaz evidence', 'evidence and replay', 'evidence & replay', 'audytowalny dowod', 'sledztwo dowodowe')) {
+  if (has(norm, 'evidence bundle', 'dowod naukowy', 'raport dowodowy', 'case study', 'pokaz dowod', 'pokaz evidence', 'evidence and replay', 'evidence & replay', 'audytowalny dowod', 'sledztwo dowodowe', 'evidence showcase')) {
     return {
-      text: 'Otwieram jeden kompletny Evidence Bundle z pamięci naukowej Genesis jako jednostronicowy raport: pytanie, hipoteza, preregistered kryterium falsyfikacji, dane, werdykt, proweniencja (SIMULATED/REAL_EXPERIMENTAL) i werdykt odtworzenia (replay) — liczony na żywo, w tej chwili, nie odczytany z zapisu.',
+      text: 'Otwieram jeden kompletny Evidence Bundle z pamięci naukowej Genesis jako jednostronicowy raport: pytanie, hipoteza, preregistered kryterium falsyfikacji, dane, werdykt, proweniencja (SIMULATED/REAL_EXPERIMENTAL) i werdykt odtworzenia (replay) — dla większości zapisów liczony na żywo, w tej chwili; dla starszych paczek dowodowych ekran uczciwie mówi, że to zapisany werdykt, nie świeże odtworzenie.',
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
-      action: { type: 'openRoute', hash: '#/evidence' },
+      action: { type: 'openRoute', hash: '#/evidence-showcase' },
     };
   }
 

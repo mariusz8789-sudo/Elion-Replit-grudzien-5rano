@@ -78,7 +78,7 @@ describe('runDiscovery — the declared space runs out and Genesis continues by 
     expect(outcome.noGenerationReason).toContain('still standing');
   });
 
-  it('MECHANISM reports no generation path rather than a fabricated one', async () => {
+  it('MECHANISM reports that THIS DOOR does not route generation — not that none exists', async () => {
     const { GENESIS_FLOOD_CATALOG } = await import('../core/agent/worldGoalIntent');
     const outcome = runDiscovery({
       shape: 'MECHANISM',
@@ -87,7 +87,11 @@ describe('runDiscovery — the declared space runs out and Genesis continues by 
     });
     if (outcome.status !== 'RAN') throw new Error('expected RAN');
     expect(outcome.generated).toBeNull();
-    expect(outcome.noGenerationReason).toContain('no generation path');
+    // `mechanismGeneration.ts` composes a lever nobody declared and really runs
+    // it, so claiming MECHANISM "has no generation path" would be false. The
+    // honest statement is about ROUTING: this door does not carry it yet.
+    expect(outcome.noGenerationReason).toContain('does not route this question shape');
+    expect(outcome.noGenerationReason).toContain('mechanismGeneration.ts');
   });
 });
 

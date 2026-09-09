@@ -1,6 +1,6 @@
 import type { ReplayVerdict } from '../matrixFoundation/replayVerdict';
 import type { WorldEvidenceBundle } from '../worldModel/evidence/worldEvidenceBundle';
-import type { DiscoveryOutcome, PriorInvestigationWarning } from './discoveryOrchestrator';
+import type { DiscoveryOutcome, PriorInvestigationDecision } from './discoveryOrchestrator';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import type { AdmissionStatus, QuestionShape } from './discoveryStrategy';
 import { assessModelSufficiency, type ModelSufficiencyVerdict } from './modelSufficiency';
@@ -111,13 +111,12 @@ export interface GenesisMatrixView {
    */
   readonly sufficiency: ModelSufficiencyVerdict | null;
   /**
-   * MEMORY WARNING — read, not obeyed: whether an earlier investigation of the
-   * same world/system already refuted part of what THIS run declared. Never
-   * changes what ran; see `discoveryOrchestrator.ts`'s own doc on
-   * `PriorInvestigationWarning` for why a narrowing decision does not belong
-   * at this front door. Null for a REFUSED outcome: nothing was investigated.
+   * MEMORY → SELECTION (P1) — whether, and why, an earlier investigation of
+   * the same world/system already narrowed what THIS run tested. See
+   * `discoveryOrchestrator.ts`'s own doc on `PriorInvestigationDecision`.
+   * Null for a REFUSED outcome: nothing was investigated.
    */
-  readonly priorInvestigation: PriorInvestigationWarning | null;
+  readonly priorInvestigation: PriorInvestigationDecision | null;
 }
 
 /**

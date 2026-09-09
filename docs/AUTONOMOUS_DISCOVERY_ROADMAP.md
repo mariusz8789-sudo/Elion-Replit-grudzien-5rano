@@ -3,6 +3,27 @@
 **Status:** architecture and plan. No implementation follows from this document by itself.
 **Owner:** C1 (architecture/integration).
 **Measure of progress:** not the solver count. *How much of a scientific investigation Genesis performs without being handed the hypotheses.*
+**Destination:** `GENESIS_NORTH_STAR.md` — this document is P1–P7 of that
+destination's reasoning layer (its §5, "Scientific Reasoning"). Read that
+document for why the layer stops where it stops (§4's honesty boundary on
+real-world I/O) and for the full 15-capability checklist this roadmap is
+walking through.
+
+**P1–P5 status as of the memory→selection landing (`b6634b1`):**
+
+| | Item | Status |
+|---|---|---|
+| P1 | Discovery Orchestrator | **done** |
+| P2 | ObjectiveReducer verdict pipeline | **done** |
+| P3 | `deriveAlternativeCriteria` wired into the round loop | **done** |
+| P4/P5 | Model insufficiency as a first-class outcome | **done** (`modelSufficiency.ts`) |
+| P1 (memory) | Scientific Memory → Selection — narrowing, not just a warning | **done** (`discoveryOrchestrator.ts`'s `PriorInvestigationDecision`) |
+| **P6** | **Model-class proposal + discriminating experiment between models ("Competing Models")** | **next — unblocked, not started** |
+| P7 | World ↔ inquiry calibration | **done** (`CALIBRATION` `QuestionShape`, see `TWO_AUTONOMOUS_LOOPS_DECISION.md` §12) |
+
+P6 is the next real priority: every earlier item it depended on is done, and
+it is the one row of the North Star's §3 table ("generate competing models")
+still missing.
 
 ---
 

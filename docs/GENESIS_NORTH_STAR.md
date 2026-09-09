@@ -281,3 +281,85 @@ before it becomes urgent. Priority 3 is **many steps** and depends on a real
 catalog. So the order is not just importance — it is also that the first two
 are cheap and the third is not, and doing them first makes the third honest
 when it comes.
+
+### Priority 4 — Virtual Bio / Cell Lab
+
+Standing direction alongside the three above: Genesis should be able to run
+virtual cell-level biological experiments, explicitly virtual, with a later
+path to connecting real measurements. **First a virtual wet lab, never hardware
+first** — and never a simulation labelled as a real biological experiment.
+
+Measured against the code, this priority does not start from zero. A real
+cell-biology substrate already exists and already respects the honesty
+boundary:
+
+- `worldModel/domains/cellCycle.ts` — a real compartmental G1/S/G2M model
+  integrated with RK4: growth is mitosis turning one G2/M cell into two G1
+  cells, saturation is contact inhibition at the G1/S restriction point.
+- `core/agent/cellCultureLeverCatalog.ts` — the Discovery Engine's fourth
+  WorldGraph domain, with levers that already cover the brief's list: a
+  substance's effect (`lever:mitogen`, `lever:s-phase-inhibitor`,
+  `lever:cytotoxic`/apoptosis), the vessel's capacity, and time as the axis a
+  fork evolves along. Cell state, growth/division/death, and observation are
+  the model's own variables.
+- The capability registry declares it `PARTIALLY_MODELLED`, and the catalog's
+  own doc states plainly what it does NOT model: no measured cell line, no gene
+  expression, differentiation, spatial structure or stochasticity, and **no
+  claim about any drug's effect in an organism**. That is exactly the "don't
+  pretend it's a real biological experiment" the brief demands, already in
+  place.
+
+So the killer demo — *"Genesis, investigate the effect of X on cells"* — maps
+directly onto this catalog: `parseWorldDiscoveryGoal` against the cell-culture
+`metricPhrases`, competing mechanistic hypotheses over those levers,
+Information Gain to pick the next fork, and now (Priority 1's machinery)
+generation of an alternative when the declared levers are exhausted. The
+scientific loop the brief wants is reachable on a substrate that exists today.
+
+**What is genuinely missing, and it is the same two gaps as Priority 1 and 2,
+not a new subsystem:**
+
+1. **Dose as a continuous axis.** The levers move a model parameter (e.g. a
+   death rate), but "effect of X at concentration c" as a swept, bracketable
+   dimension is closer to the PARAMETER path than the MECHANISM fork. Whether
+   the cell substrate can pose a genuine dose-response PARAMETER question — and
+   therefore reuse Priority 1's bracketed generation — is a real, answerable
+   audit question, not an assumption. C3's substrate check should measure it.
+2. **The real-experiment interface.** Identical to Priority 2: today the cell
+   world is SIMULATED data. A real cell measurement would be REAL EXPERIMENTAL
+   data, and the boolean `isSynthetic` cannot tell them apart. The provenance
+   widening Priority 2 names is the same prerequisite here — biology does not
+   need its own version of it.
+
+**Ordering:** this is a strategic direction, not the next commit. It rides on
+Priority 1 (autonomous generation, now closing) and Priority 2 (provenance
+distinction) being done first — build those, and "Virtual Cell Lab" becomes
+mostly catalog depth and one honest interface, rather than a new engine. Every
+larger feature is now also judged on whether it helps reach it.
+
+---
+
+## 8. GOV / Cyber — deferred, and defensive by construction
+
+A separate strategic track (world-scale experiments, a government/cyber
+vertical, possibly with access-tiered stages) is noted for the future. Its
+status is unchanged and deliberate:
+
+- **It stays OFF `main`** until explicitly re-scoped, per the standing decision
+  that the Cyber slice — though itself judged technically safe — remains on its
+  own branch so it does not dilute the Scientific Discovery Engine work.
+- **The security boundary set in `GENESIS_GOV_ARCHITECTURE_ASSESSMENT.md`
+  holds: defensive only.** Genesis is a scientific-discovery engine; a
+  government/cyber vertical means defensive analysis (self-scanning, dependency
+  audit, understanding a system's own exposure), NOT offensive tooling. Any
+  "stronger" capability that would function as an attack tool is out of scope
+  regardless of vertical, and nothing of that kind is built here.
+- **Access-tiered stages** are a product/authorization design for later, not a
+  reason to build offensive capability now. When that track is genuinely
+  opened, it is opened as a scoped, authorized engagement with the defensive
+  boundary intact — the same way the real-experiment interface (Priority 2/4)
+  is opened as an admitted capability rather than a silent fallback.
+
+This section exists so the direction is recorded without any offensive work
+being implied or started. The four scientific priorities above are the active
+roadmap.

@@ -436,6 +436,21 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Evidence & Replay Case Study (C2 "Evidence & Replay as Product") — jeden kompletny, realny
+  //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`), pokazany jako
+  //     jednostronicowy raport audytowy: pytanie -> hipoteza -> kryterium -> dane -> werdykt ->
+  //     provenance -> replay. Nic tu się nie liczy na nowo — ekran tylko odczytuje i odtwarza
+  //     (`replaySavedRealExperimentVerification`/`replaySavedWorldDiscoveryRun`), tak jak każdy inny
+  //     replay w tym kodzie. ---
+  if (has(norm, 'evidence bundle', 'dowod naukowy', 'raport dowodowy', 'case study', 'pokaz dowod', 'pokaz evidence', 'evidence and replay', 'evidence & replay', 'audytowalny dowod', 'sledztwo dowodowe')) {
+    return {
+      text: 'Otwieram jeden kompletny Evidence Bundle z pamięci naukowej Genesis jako jednostronicowy raport: pytanie, hipoteza, preregistered kryterium falsyfikacji, dane, werdykt, proweniencja (SIMULATED/REAL_EXPERIMENTAL) i werdykt odtworzenia (replay) — liczony na żywo, w tej chwili, nie odczytany z zapisu.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/evidence' },
+    };
+  }
+
   // --- Traffic flow (GRAPHICS V7) — realny Greenshields+CTM/Godunov+HCM solver
   //     (worldModel/domains/trafficFlow.ts) na realnej sieci dróg tego samego miasta co żywa
   //     symulacja epidemii — ten sam #/city3d, ale z osobną, uczciwą narracją o realnym modelu

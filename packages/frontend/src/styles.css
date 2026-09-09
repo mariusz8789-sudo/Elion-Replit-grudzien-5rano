@@ -3714,6 +3714,61 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .gx-provenance-reference { background: rgba(240, 179, 92, 0.16); border-color: rgba(240, 179, 92, 0.4); color: var(--gold); }
 .gx-provenance-real_experimental { background: rgba(110, 231, 160, 0.16); border-color: rgba(110, 231, 160, 0.4); color: var(--green); }
 
+/* EVIDENCE & REPLAY CASE STUDY (EvidenceCaseStudyScreen.tsx) — a standalone, one-page audit report,
+   independent of the 3D `.gsc-stage`. Deliberately plain, document-shaped: this screen's audience is
+   a person reading a report, not a live instrument panel. */
+.ecs-screen {
+  min-height: 100vh; background: var(--bg); color: var(--text);
+  padding: 1.25rem 1rem 3rem; display: flex; flex-direction: column; align-items: center; gap: 1rem;
+}
+.ecs-controls {
+  width: 100%; max-width: 46rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+}
+.ecs-controls button {
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 0.35rem; padding: 0.4rem 0.75rem; font-size: 0.8rem; cursor: pointer;
+}
+.ecs-controls button:hover { border-color: var(--cyan); }
+.ecs-picker {
+  flex: 1; min-width: 12rem; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 0.35rem; padding: 0.4rem 0.5rem; font-size: 0.8rem;
+}
+.ecs-empty {
+  width: 100%; max-width: 32rem; text-align: center; padding: 2.5rem 1.5rem;
+  border: 1px dashed var(--border-strong); border-radius: 0.5rem;
+}
+.ecs-print {
+  width: 100%; max-width: 46rem; background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 0.6rem; padding: 1.75rem 2rem 2rem; display: flex; flex-direction: column; gap: 1.25rem;
+}
+.ecs-header { display: flex; flex-direction: column; gap: 0.35rem; }
+.ecs-header h1 { margin: 0; font-size: 1.3rem; }
+/* Record ids and bundle/run ids below are long, colon-separated, space-free strings — without this
+   they overflow the page horizontally on a narrow phone instead of wrapping. */
+.ecs-header p, .ecs-step-body p { overflow-wrap: anywhere; }
+.ecs-chain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.9rem; }
+.ecs-step { border-top: 1px solid var(--border); padding-top: 0.7rem; }
+.ecs-step-body p { margin: 0.2rem 0 0; font-size: 0.88rem; line-height: 1.5; }
+.ecs-section { border-top: 1px solid var(--border-strong); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.ecs-replay-line { font-size: 0.95rem; margin: 0.2rem 0; }
+.ecs-footer { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+
+@media (max-width: 640px) {
+  .ecs-screen { padding: 1rem 0.6rem 2.5rem; }
+  .ecs-print { padding: 1.25rem 1.1rem 1.5rem; }
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .ecs-print, .ecs-print * { visibility: visible; }
+  .ecs-print {
+    position: absolute; top: 0; left: 0; width: 100%; max-width: none;
+    border: none; background: #fff; color: #111; box-shadow: none; padding: 0;
+  }
+  .ecs-step { break-inside: avoid; }
+  .ecs-section { break-inside: avoid; }
+}
+
 @media (max-width: 640px) {
   /* .wd-panel already goes full-width and pins top:1rem on a phone (see its own mobile rule
      above), so stacking .cell-lab-panel at the same top would hide it completely underneath

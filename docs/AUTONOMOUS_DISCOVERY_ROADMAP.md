@@ -715,3 +715,63 @@ between rounds is not yet detected.
 that an inquiry should automatically continue with the derived candidate is a
 control-flow change to a live loop, and gets its own pass — exactly the
 sequencing P3 followed.
+
+### 10.7 The bridge closed — generation now fires by itself
+
+10.6 left one thing open, and it was the whole difference between a capability
+and a behaviour: Genesis COULD derive a value nobody declared, but nothing asked
+it to. `runInquiryWithGeneration` (`inquirySession.ts`) is that call site — the
+same sequencing P3 followed, pure derivation first, wiring second, once the
+derivation had been measured on a real fixture.
+
+The flow, unprompted, one call:
+
+```
+declared hypotheses → inquiry → every one falsified
+  → DECLARED_SPACE_INSUFFICIENT        (modelSufficiency.ts)
+  → derive a bracketed value            (parameterAlternative.ts)
+  → a FRESH inquiry, opened on a setting the derivation never saw
+  → a real verdict on the derived hypothesis
+```
+
+**Why `inquirySession.ts` and not the loop itself.** That module already
+describes itself as "the wiring, not a second engine", which is exactly this
+job. Putting it inside `inquiryLoop.ts` would also have created a real import
+cycle (`inquiryLoop` → `parameterAlternative` → `discoveryStrategies` →
+`inquiryLoop`), and would have meant rewriting a live loop's control flow to
+get a behaviour that composes cleanly outside it.
+
+**Why a FRESH inquiry rather than more rounds of the first.** The derived value
+is a different claim from the ones the first inquiry was handed, and it has to
+be judged on evidence that inquiry did not already spend. Continuing the
+original run would judge it partly on the measurements that produced it.
+
+**Anti-HARKing is now ENFORCED, not merely reported.** 10.6 returned
+`excludedProbeValues` and trusted the caller. This is the caller, and it honours
+the exclusion by construction: the follow-up opens at the first candidate
+setting that is BOTH untried in the first inquiry AND not excluded — strictly
+stronger than the contract requires.
+
+**Measured, unprompted, on the real fixture** (`inquiryGenerationLoop.test.ts`):
+a fold at temperature 0.5 falsifies all four declared candidates; Genesis
+derives `h:derived-temperature-0.5` on its own; a second investigation opens at
+a step count neither the first inquiry nor the derivation used; the derived
+hypothesis is the **sole survivor**, and `h:cold`/`h:cool` are refuted again.
+`A ❌ B ❌ C ❌ D ❌ → E → TEST → E ✅`, with nobody asking for E.
+
+**One new refusal, and it matters.** When a value IS derivable but every
+candidate setting was already spent by the inquiry that produced it, this
+declines to continue and reports the candidate as an untested proposal —
+rather than confirming it on the data that authored it. Asserted on a real
+case (the same fixture with its probe list cut to the two settings the first
+inquiry actually uses).
+
+**Deliberately untouched:** `runDiscovery`'s contract. It returns ONE
+`StrategyRun`, and representing "two runs, the second derived from the first"
+through it is a contract decision worth taking on its own.
+
+**Next gap, named while implementing this** (and unchanged by it): bracketing
+uses only the LAST round that brackets. It does not intersect the intervals
+several rounds imply, and does not detect a contradiction between them — which
+would itself be a real signal that the metric is not monotonic in the parameter,
+the one assumption bracketing rests on.

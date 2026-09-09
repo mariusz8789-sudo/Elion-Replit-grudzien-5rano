@@ -1247,3 +1247,53 @@ a domain must declare a second REAL, CITED structure for a quantity it already
 computes. Writing one purely so that there are two would be fabricating physics
 to have something to discriminate, which is why that document stops at the
 contract.
+
+### 10.18 Data provenance — reconciled with C1, and the one hop their chain missed
+
+C1 and C3 designed the provenance axis independently in the same window and
+arrived at the same three values (`SIMULATED | REFERENCE | REAL_EXPERIMENTAL`)
+and the same reasoning about why it is separate from `ConfirmationLevel` and
+`resultOrigin`. C1's went further — it is IMPLEMENTED, not just designed:
+`core/dataProvenance.ts`, `dataProvenanceForResultOrigin` on every Fabric run,
+propagation into `scienceMemory.ts`, plus `createRealExperimentRun` as a working
+seam and UI to show it.
+
+**C1's is canonical.** C3's parallel `measurementProvenance.ts` and its
+`REAL_EXPERIMENT_CONTRACT.md` were deleted rather than left beside it — two
+provenance axes would have been exactly the duplicated subsystem the rules
+forbid, and the more complete one wins.
+
+What survives from the C3 side is the audit finding C1's chain does not cover.
+Their documented path is
+`ExperimentFabric → ExperimentRun → Evidence → Memory → UI/Replay`, and
+**`StrategyRun` is not on it.** That matters more than its absence suggests:
+`StrategyRun` is the contract every discovery consumer actually reads — the
+Matrix, narration, `competingModels.ts`, `modelSufficiency.ts`, `nextQuestion.ts`
+and the orchestrator's own front door all take a `StrategyRun` and never an
+`ExperimentRun`. Confirmed by grep after the merge: `dataProvenance` appeared
+nowhere under `core/agent/`. So a real laboratory result would still have become
+indistinguishable from a simulation the moment a finding was reported through
+that contract.
+
+Closed by projecting C1's axis onto a whole investigation rather than declaring
+a second one — `StrategyRunProvenance` imports `DataProvenance` and adds only
+what a single value cannot express: an investigation takes MANY measurements and
+they need not share an origin, so a mixed run reports `origin: null` with every
+origin listed. Required on `StrategyRun`, not optional, because an optional
+provenance field is one every adapter is free to forget — which is how it was
+lost here. Making it required caught both remaining construction sites at
+compile time.
+
+Two smaller findings from the same audit, both recorded rather than acted on:
+
+- **`isSynthetic` could not have been extended into this**, contrary to the
+  master doc's framing. `core/dataSource.ts:32` is a property of a loaded
+  DATASET, has zero branch points in production code, is never persisted, and
+  never touches an `ExperimentRun`. Replacing that boolean would have fixed
+  nothing because nothing downstream reads it — which is presumably why both
+  sessions independently introduced the axis where measurements actually flow.
+- **An unstated origin is left unstated.** `dataProvenanceForResultOrigin`
+  returns undefined exactly where the origin is not established, and the
+  investigation summary refuses to name a single origin when any run is
+  unstated, rather than defaulting it to `SIMULATED`. Defaulting would be the
+  fabrication the axis exists to prevent.

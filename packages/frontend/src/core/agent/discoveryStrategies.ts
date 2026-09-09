@@ -17,7 +17,6 @@ import {
   type WorldParameterCalibrationResult,
 } from './worldParameterCalibration';
 import { parameterInquiryNextAction, worldCalibrationNextAction } from './nextAction';
-import { worldGraphMeasurementOrigin } from '../measurementProvenance';
 import { admitParameterInquiry, admitWorldCalibration, admitWorldQuestion } from './discoveryAdmission';
 import {
   DISCOVERY_STRATEGY_CONTRACT_VERSION,
@@ -25,6 +24,7 @@ import {
   type DiscoveryStrategy,
   type StrategyRound,
   type StrategyRun,
+  type StrategyRunProvenance,
 } from './discoveryStrategy';
 
 /**
@@ -41,6 +41,20 @@ import {
  * for, the adapter leaves it null or derives it ONLY from what the loop already
  * decided. Nothing here re-ranks, re-judges or invents a proposal.
  */
+
+/**
+ * WorldGraph investigations take no `ExperimentRun` at all: every arm is a
+ * `TemporalEngine` advanced through `SolverRouter`, and the objective is read
+ * off that trajectory. So this is derived from the code path rather than from a
+ * field, and names the path instead of asserting a label.
+ */
+const WORLDGRAPH_PROVENANCE: StrategyRunProvenance = {
+  origin: 'SIMULATED',
+  origins: ['SIMULATED'],
+  derivedFrom: 'TemporalEngine.advance via SolverRouter.routeTick',
+  why:
+    'Every arm of a WorldGraph investigation is a simulated trajectory: entities are advanced by registered domain solvers, or by the procedural fallback where none is registered. No branch of that path reads an instrument.',
+};
 
 export const MECHANISM_STRATEGY_ID = 'worldgraph-mechanism';
 export const PARAMETER_STRATEGY_ID = 'fabric-parameter';
@@ -103,10 +117,7 @@ export function toMechanismRun(result: DiscoveryLoopResult): StrategyRun {
     // contract carries them together because a reader needs both to know what
     // the run does not cover.
     limitations: [...result.declaredAssumptions, ...result.notModelledFactors],
-    // WorldGraph arms are simulated trajectories by construction — every one is
-    // a TemporalEngine advanced through SolverRouter. Derived from that path
-    // rather than assumed.
-    measurementProvenance: worldGraphMeasurementOrigin(),
+    dataProvenance: WORLDGRAPH_PROVENANCE,
     resultFingerprint: discoveryResultFingerprint(result),
     native: result,
   };
@@ -176,8 +187,8 @@ export function toParameterRun(result: InquiryLoopResult, input: InquiryLoopInpu
     nextExperiment: parameterInquiryNextAction({ result, system: input.system }),
     openQuestions: result.openQuestions,
     limitations: result.limitations,
-    // Carried from the loop, which derived it from the real ExperimentRuns it took.
-    measurementProvenance: result.measurementProvenance,
+    // Carried from the loop, which read it off the real ExperimentRuns it took.
+    dataProvenance: result.dataProvenance,
     resultFingerprint: inquiryResultFingerprint(result),
     native: result,
   };
@@ -250,8 +261,7 @@ export function toCalibrationRun(result: WorldParameterCalibrationResult, input:
     nextExperiment: worldCalibrationNextAction({ result, system: input.system }),
     openQuestions: result.openQuestions,
     limitations: result.limitations,
-    // Same substrate as MECHANISM: independently built worlds, advanced by solvers.
-    measurementProvenance: worldGraphMeasurementOrigin(),
+    dataProvenance: WORLDGRAPH_PROVENANCE,
     resultFingerprint: worldCalibrationResultFingerprint(result),
     native: result,
   };

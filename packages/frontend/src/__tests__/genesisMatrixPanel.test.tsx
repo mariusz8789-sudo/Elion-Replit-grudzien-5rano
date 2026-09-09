@@ -47,8 +47,7 @@ const baseView: GenesisMatrixView = {
 
 const baseRun: StrategyRun = {
   contractVersion: '1.0.0',
-  measurementProvenance: {
-    contractVersion: '1.0.0',
+  dataProvenance: {
     origin: 'SIMULATED',
     origins: ['SIMULATED'],
     derivedFrom: 'test fixture, hand-built',

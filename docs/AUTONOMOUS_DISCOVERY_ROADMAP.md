@@ -205,6 +205,103 @@ widening — not a new subsystem.
 
 ---
 
+## 0bis. Information Gain / Experiment Planner — audit, not implementation yet
+
+The user's third named priority, after Memory→Selection and Competing Models.
+**"Information gain" cannot mean a numeric utility function here** — nothing
+in this codebase justifies weighting one uncertainty above another
+numerically (§5's existing four next-experiment selectors are lexicographic
+cascades for exactly this reason, and `checkDiscriminability` itself is a
+deterministic yes/no band check, never a score). Inventing one now would be
+the overclaim this repository refuses everywhere else. The honest reading:
+**prefer any experiment PROVEN to change the belief state over one proven not
+to**, using machinery that already exists.
+
+### What already IS an information-gain planner, found by reading
+
+`inquiryLoop.ts`'s `selectNextProbe` and `worldParameterCalibration.ts`'s own
+copy of it already do real discriminating-experiment selection — LIVE,
+mid-run — but only between the **top two** contenders by confidence rank
+(`rankHypotheses`, then `[first, second]`). When `competingModels.ts` reports
+`COMPETING_MODELS_UNRESOLVED` with **more than two** survivors, this is
+incomplete: a probe that cannot separate the top two might still separate a
+THIRD contender from either of them, at an untried candidate value — real
+progress (one fewer live rival) that today's `NO_DISCRIMINATING_PROBE` gives
+up on without checking.
+
+### The minimal honest increment — designed, not yet built
+
+**Widen the search from "the top-two pair" to "every pair among the current
+contenders", only as a fallback AFTER the existing top-two check fails.**
+Still the exact same deterministic `checkDiscriminability` band check, no new
+ranking invented — just applied to more pairs before giving up. A new
+`ProbeSelectionRule` value (e.g. `DISCRIMINATES_OTHER_PAIR`) reports honestly
+that this measurement narrows the field WITHOUT settling the top-ranked
+disagreement, rather than reusing `DISCRIMINATES_TOP_TWO`'s wording for a
+different, weaker claim.
+
+**Why this is not implemented in this pass.** `selectNextProbe` and its
+`worldParameterCalibration.ts` twin are live, tested, in-production loops —
+`NO_DISCRIMINATING_PROBE` is asserted by name in at least 12 files across the
+test suite. A fallback that only activates when the existing check already
+failed cannot change a test where EVERY pair is genuinely indistinguishable,
+and three of the real fixtures checked are exactly that (safe, confirmed by
+reading, not assumed):
+
+- Arrhenius compensation-line (`inquiryLoop.test.ts`): exactly one candidate
+  probe, already tried — nothing left to widen into.
+- `h:a`/`h:b`/`h:c` tightly-spaced CALIBRATION fixture
+  (`discoveryOrchestrator.test.ts`, `discoveryStrategies.test.ts`,
+  `epidemicInfectiousDaysCalibration.test.ts`): documented "never separate
+  beyond the declared ±12% band at any of the six candidate ticks — MEASURED,
+  not assumed" for all three pairs, not just the top two.
+
+**One real fixture is NOT safe, and this is now MEASURED, not open.**
+`proteinFoldingInquiry.test.ts`'s WARM case ends with THREE survivors
+(`h:cool`, `h:hot`, `h:warm` — only `h:cold` falsified) and
+`NO_DISCRIMINATING_PROBE` after 2 rounds (probes 200, 5000 tried; candidates
+are `[200, 1000, 5000, 20000, 50000]` steps). Checked by actually running the
+real solver at every candidate (temporary probe script, deleted after — not
+guessed):
+
+- Confidence after round 2: `h:warm` 0.953, `h:hot` 0.897, `h:cool` 0.873 — so
+  the loop's real top-two is warm/hot, and at EVERY untried step count
+  (1000/20000/50000) their predicted `acceptanceRate` differs by only
+  2.3%–10.1%, under the declared ±15% band — confirms the module doc's claim,
+  this pair genuinely never separates.
+- But `h:cool` vs. either of them, at steps=20000: cool predicts 0.29865,
+  warm 0.36675 (18.6% apart), hot 0.40795 (26.8% apart) — BOTH exceed the 15%
+  band. A widened search checking pairs beyond top-two WOULD select
+  steps=20000 (the first untried candidate where any pair separates) and
+  eliminate `h:cool`, changing this fixture from "3 survive, stop after 2
+  rounds" to "2 survive (`h:warm`/`h:hot`), stop after 3 rounds" — a real,
+  correct, MORE complete answer than what ships today, not a regression.
+
+This is exactly the worked example an implementation should build and test
+against first: it proves the widening is not just risk-free elsewhere but
+genuinely finds a real separation this fixture's current behaviour misses.
+The three-pair check, the exact new round, and the updated
+`survivingHypothesisIds`/`rounds.length` assertions this test needs are
+already known from this measurement — implementing needs no further
+guessing, only doing it and re-verifying the other 11 dependent files stay
+green.
+
+**MECHANISM has no equivalent at all**, live or dead — this is the same gap
+P6 §"open second increment" names. Designing what a discriminating
+intervention would even mean on a forked `WorldGraph` (a different strength?
+a different lever, run in parallel?) is real, substrate-specific work —
+answered above, under **"P6, live discrimination for MECHANISM — architecture
+(C3, not implemented)"**, grounded in the real `genesis-backup-generator`
+fixture measured in the section right before it rather than designed in the
+abstract: MECHANISM's two survivors there are not rivals to discriminate
+between the way PARAMETER's are (two different, independently-true levers,
+not one hidden value with competing claims on it), so the answer is not a
+strength-axis port of `checkDiscriminability` but a JOINT ARM — fork one
+branch applying both currently-`SUPPORTED` mechanisms together and check the
+combined effect against the sum of the two already measured individually.
+
+---
+
 ## 1. A — what Genesis already does
 
 | Capability | Where | Real? |

@@ -31,7 +31,7 @@ registerDataSource<PlanetData[]>({
     url: 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/',
     confirmation: 'confirmed',
   },
-  isSynthetic: false,
+  provenance: 'REFERENCE',
   load: () => PLANETS,
 });
 

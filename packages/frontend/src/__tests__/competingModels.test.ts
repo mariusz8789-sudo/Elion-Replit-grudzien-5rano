@@ -151,7 +151,21 @@ describe('competingModels — MECHANISM shape, a real domain that reaches 2+ sim
     // really what the module doc above claims.
     expect(run.stopReason).toBe('ALL_HYPOTHESES_RESOLVED');
     expect(run.surviving).toEqual(['h:fuel-efficiency~RELATION_FLIP', 'h:load-shedding~RELATION_FLIP']);
-    expect(run.falsified).toEqual(['h:fuel-efficiency', 'h:load-shedding', 'h:generator-rating', 'h:larger-tank']);
+    // `h:fuel-efficiency` and `h:load-shedding` are ALSO re-tested against the
+    // registered affine (idle-burn) structural alternative once falsified —
+    // `discoveryLoop.ts`'s own model-update step, real for every MECHANISM
+    // run on this catalog now, not special-cased for this fixture. Both stay
+    // falsified there too: the affine structure only adds a constant idle
+    // term, it does not flip the SIGN of either lever's effect, so it cannot
+    // rescue a criterion whose expected DIRECTION the solver contradicts.
+    expect(run.falsified).toEqual([
+      'h:fuel-efficiency',
+      'h:load-shedding',
+      'h:generator-rating',
+      'h:larger-tank',
+      'h:fuel-efficiency~STRUCTURAL_ALTERNATIVE:electrical-backup-generator-model-affine-idle-burn',
+      'h:load-shedding~STRUCTURAL_ALTERNATIVE:electrical-backup-generator-model-affine-idle-burn',
+    ]);
   });
 
   it('COMPETING_MODELS_UNRESOLVED: MECHANISM can reach 2+ simultaneous survivors WITHOUT LEADER_CONFIRMED_AT_TWO_MAGNITUDES ever firing', () => {

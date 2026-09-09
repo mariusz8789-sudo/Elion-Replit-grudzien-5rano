@@ -75,12 +75,18 @@ export const GENERATOR_DEFAULTS: GeneratorDefaults = {
 
 
 /**
- * One reusable solver: advances a generator's real state machine by `dt`
- * seconds. `OFF` never advances on its own — it only ever leaves `OFF` via
- * a real intervention (`applyGeneratorStartCommand`), same discipline as
- * a pump never un-tripping itself.
+ * ONE STRUCTURE, PARAMETERIZED BY ITS FUEL-BURN FORMULA — so a genuine
+ * structural alternative (a different equation for `fuelBurnedL`, not just a
+ * different parameter value) is a second call to this factory, never a
+ * hand-copied second state machine that could silently drift from the first.
+ * Everything except the burn formula and its identity/label is shared: the
+ * same STARTING/RUNNING/FUEL_EXHAUSTED transitions, the same event shapes.
  */
-export function makeElectricalGeneratorSolver(): DomainSolver {
+function makeGeneratorSolverWithFuelModel(
+  solverId: string,
+  fuelModelLabel: string,
+  fuelBurnedLThisTick: (loadKw: number, params: GeneratorDefaults, dt: number) => number,
+): DomainSolver {
   return (entity, ctx): SolverResult => {
     const state = entity.domainState as Partial<GeneratorDefaults> | undefined;
     const params: GeneratorDefaults = { ...GENERATOR_DEFAULTS, ...state };
@@ -94,7 +100,7 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
         loadKw = status === GENERATOR_STATUS.RUNNING ? params.ratedPowerKw : 0;
       }
     } else if (status === GENERATOR_STATUS.RUNNING) {
-      const fuelBurnedL = (loadKw * params.specificFuelConsumptionLPerKwh / 3600) * ctx.dt; // real linear diesel-genset fuel model
+      const fuelBurnedL = fuelBurnedLThisTick(loadKw, params, ctx.dt);
       fuelRemainingL = Math.max(0, fuelRemainingL - fuelBurnedL);
       cumulativeRuntimeS += ctx.dt;
       if (fuelRemainingL <= 0) {
@@ -111,9 +117,9 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
       statement: `${entity.label}: ${generatorStatusLabel(status)}, load=${loadKw.toFixed(1)}kW, fuel=${fuelRemainingL.toFixed(1)}L`,
       measurements: [
         { key: 'loadKw', value: loadKw, tick: ctx.tick, entity: entity.ref, provenance: ['domains/electricalGenerator.ts#loadKw'] },
-        { key: 'fuelRemainingL', value: fuelRemainingL, tick: ctx.tick, entity: entity.ref, provenance: ['domains/electricalGenerator.ts#fuelRemainingL', 'linear-diesel-genset-fuel-model'] },
+        { key: 'fuelRemainingL', value: fuelRemainingL, tick: ctx.tick, entity: entity.ref, provenance: ['domains/electricalGenerator.ts#fuelRemainingL', fuelModelLabel] },
       ],
-      provenance: ['domains/electricalGenerator.ts', 'linear-diesel-genset-fuel-model'],
+      provenance: ['domains/electricalGenerator.ts', fuelModelLabel],
     };
 
     const eventParameters = { ...nextParams };
@@ -126,7 +132,7 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
       affectedEntities: [entity.ref],
       cause: 'state-machine-step',
       parameters: eventParameters,
-      provenance: { origin: 'model', modelId: ELECTRICAL_GENERATOR_SOLVER_ID },
+      provenance: { origin: 'model', modelId: solverId },
     };
 
     if (status !== previousStatus) {
@@ -143,7 +149,7 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
         cause: 'state-machine-transition',
         parameters: eventParameters1,
         parentEventId: stepEvent.id,
-        provenance: { origin: 'model', modelId: ELECTRICAL_GENERATOR_SOLVER_ID, notes: `${generatorStatusLabel(previousStatus)} -> ${generatorStatusLabel(status)}` },
+        provenance: { origin: 'model', modelId: solverId, notes: `${generatorStatusLabel(previousStatus)} -> ${generatorStatusLabel(status)}` },
       };
       return {
         patch: { domainState: { ...nextParams }, statusLabel: generatorStatusLabel(status) },
@@ -160,6 +166,50 @@ export function makeElectricalGeneratorSolver(): DomainSolver {
       event: stepEvent,
     };
   };
+}
+
+/**
+ * One reusable solver: advances a generator's real state machine by `dt`
+ * seconds. `OFF` never advances on its own — it only ever leaves `OFF` via
+ * a real intervention (`applyGeneratorStartCommand`), same discipline as
+ * a pump never un-tripping itself.
+ */
+export function makeElectricalGeneratorSolver(): DomainSolver {
+  return makeGeneratorSolverWithFuelModel(
+    ELECTRICAL_GENERATOR_SOLVER_ID,
+    'linear-diesel-genset-fuel-model',
+    (loadKw, params, dt) => (loadKw * params.specificFuelConsumptionLPerKwh / 3600) * dt, // real linear diesel-genset fuel model
+  );
+}
+
+export const ELECTRICAL_GENERATOR_AFFINE_SOLVER_ID = 'electrical-backup-generator-model-affine-idle-burn';
+
+/**
+ * Idle fuel burn: a real diesel genset keeps consuming fuel just to keep the
+ * engine turning even at zero electrical load (parasitic/friction losses),
+ * which the linear model above — fuel proportional to load only — does not
+ * capture. Representative rule-of-thumb figure from generator-sizing
+ * guidance: no-load consumption is commonly cited around 10-15% of a unit's
+ * full-load fuel flow. At this class's rated 50 kW / 0.32 L/kWh baseline
+ * that flow is 16 L/h, so 15% is 2.4 L/h — a figure for the CLASS, not a
+ * measurement of any named unit, same honesty tier as `GENERATOR_DEFAULTS`.
+ */
+const AFFINE_IDLE_FUEL_L_PER_HR = 2.4;
+
+/**
+ * STRUCTURAL ALTERNATIVE to the linear fuel model above: same state machine,
+ * same declared parameters, a DIFFERENT equation for `fuelBurnedL` — burn is
+ * `idle + load x specific consumption`, not `load x specific consumption`
+ * alone. Registered ADDITIONALLY alongside the linear solver (see
+ * `structuralAlternative.ts`); nothing binds an entity to it by default, so
+ * its existence changes no existing result.
+ */
+export function makeAffineElectricalGeneratorSolver(): DomainSolver {
+  return makeGeneratorSolverWithFuelModel(
+    ELECTRICAL_GENERATOR_AFFINE_SOLVER_ID,
+    'affine-diesel-genset-fuel-model-with-idle-burn',
+    (loadKw, params, dt) => ((AFFINE_IDLE_FUEL_L_PER_HR + loadKw * params.specificFuelConsumptionLPerKwh) / 3600) * dt,
+  );
 }
 
 export interface AddBackupGeneratorOptions {

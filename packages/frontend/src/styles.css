@@ -3658,3 +3658,31 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 @media (max-width: 640px) {
   .wd-compare-columns { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------------------
+   VIRTUAL CELL LAB (#/cell-lab) — Control vs Treatment. Reuses .gsc-panel
+   (top-right, opposite .wd-panel's top-left) and .gsc-caption, so only what is
+   genuinely new to this screen's own readout/honesty layout is here.
+   --------------------------------------------------------------------------- */
+.cell-lab-panel select,
+.cell-lab-panel input[type='range'] { flex: 1; min-width: 0; }
+.cell-lab-panel select {
+  border: 1px solid var(--glass-border); background: var(--glass); color: var(--text);
+  border-radius: 0.3rem; padding: 0.3rem 0.4rem; font-size: 0.78rem;
+}
+.cell-lab-panel input[type='range'] { accent-color: var(--cyan); }
+.cell-lab-readout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.2rem; }
+.cell-lab-arm { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.cell-lab-arm-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; }
+.cell-lab-honesty { margin-top: 0.4rem; font-size: 0.75rem; }
+.cell-lab-honesty summary { cursor: pointer; opacity: 0.8; }
+@media (max-width: 640px) {
+  /* .wd-panel already goes full-width and pins top:1rem on a phone (see its own mobile rule
+     above), so stacking .cell-lab-panel at the same top would hide it completely underneath
+     the Discovery panel's higher z-index. Placing it below that panel's own 62vh budget keeps
+     both reachable without either covering the other. */
+  .cell-lab-panel {
+    left: 0.5rem; right: 0.5rem; max-width: none;
+    top: calc(62vh + 1rem); max-height: calc(38vh - 2rem); overflow-y: auto;
+  }
+}

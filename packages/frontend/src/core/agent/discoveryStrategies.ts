@@ -51,7 +51,12 @@ function mechanismRounds(result: DiscoveryLoopResult): readonly StrategyRound[] 
     // The loop decides this BEFORE the round runs and stores it; carried verbatim.
     why: round.selectionReason,
     observed: round.objectiveObserved,
-    verdicts: [{ hypothesisId: round.hypothesisId, assessment: round.assessment.assessment }],
+    // The control arm's own reading, so a reader can judge the observation
+    // rather than being handed a bare number.
+    reference: round.objectiveBaseline,
+    // No prediction: this loop's hypotheses assert a direction against that
+    // control, never a value. See the contract's own note.
+    verdicts: [{ hypothesisId: round.hypothesisId, assessment: round.assessment.assessment, predicted: null }],
   }));
 }
 
@@ -118,10 +123,16 @@ function parameterRounds(result: InquiryLoopResult, probeParameterId: string): r
     // previous observation. Carried verbatim.
     why: round.selection.why,
     observed: round.observed,
+    // Null on purpose: this loop's reference is per-hypothesis, and it is
+    // carried on each verdict below rather than collapsed to one number.
+    reference: null,
     // This loop judges EVERY surviving hypothesis each round, not one.
     verdicts: round.outcomes.map((outcome) => ({
       hypothesisId: outcome.hypothesisId,
       assessment: outcome.assessment,
+      // A real solver run at this probe setting, under the same code path as
+      // the measurement it is judged against — carried, not recomputed.
+      predicted: outcome.predicted,
     })),
   }));
 }

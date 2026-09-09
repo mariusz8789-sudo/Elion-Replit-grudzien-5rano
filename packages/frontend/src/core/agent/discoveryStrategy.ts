@@ -41,7 +41,13 @@ import type { NextAction } from './nextAction';
  * trusted to be.
  */
 
-export const DISCOVERY_STRATEGY_CONTRACT_VERSION = '1.0.0';
+/**
+ * 1.1.0 added `StrategyRound.reference` and the per-verdict `predicted`.
+ * Additive for a consumer — a reader of 1.0.0 data simply had less — and the
+ * two fields exist because a bare `observed` is not interpretable without what
+ * it was judged against.
+ */
+export const DISCOVERY_STRATEGY_CONTRACT_VERSION = '1.1.0';
 
 /**
  * The shape of the question, which is what decides the strategy — NOT the
@@ -91,7 +97,38 @@ export interface StrategyRound {
   readonly why: string;
   /** The objective reading this round produced. Null when the round produced no usable number. */
   readonly observed: number | null;
-  readonly verdicts: readonly { readonly hypothesisId: string; readonly assessment: HypothesisAssessment }[];
+  /**
+   * What `observed` was judged AGAINST, when the round has one shared reference.
+   *
+   * An observation with nothing to compare it to is not interpretable: "28.5"
+   * says nothing until a reader knows the control read 10194.5. The MECHANISM
+   * loop has exactly one such number per round — the baseline arm's objective —
+   * so it is carried here.
+   *
+   * The PARAMETER loop has none, and this is null there rather than invented:
+   * that loop judges the observation against EACH hypothesis's own prediction,
+   * so its reference is per-hypothesis and lives on the verdict below. Forcing
+   * both substrates onto one field would have to drop one of the two, which is
+   * the same reason `surviving` carries ids rather than belief objects.
+   */
+  readonly reference: number | null;
+  readonly verdicts: readonly {
+    readonly hypothesisId: string;
+    readonly assessment: HypothesisAssessment;
+    /**
+     * What THIS hypothesis predicted for this round, when it predicted anything.
+     *
+     * Real on the PARAMETER path: the hypothesis's own claimed values are run
+     * through the same model, under the same code path as the measurement they
+     * are judged against, so this is a solver output and not arithmetic done here.
+     *
+     * Null on the MECHANISM path, and deliberately so. That loop's hypotheses
+     * assert a DIRECTION relative to a control ("this lever lowers the peak"),
+     * never a value, so there is no prediction to report and manufacturing one
+     * would be inventing a claim the hypothesis never made.
+     */
+    readonly predicted: number | null;
+  }[];
 }
 
 /**

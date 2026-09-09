@@ -186,6 +186,46 @@ describe('discovery strategy adapters', () => {
     expect(run.shape).toBe('MECHANISM');
   });
 
+  /**
+   * THE REPORTING PIPELINE, RENDERABLE FROM THE CONTRACT ALONE.
+   *
+   * A reader (a screen, a report) must be able to show
+   * question -> hypotheses -> prediction -> observation -> result -> next
+   * without reaching into `native` and branching on which loop ran. These two
+   * tests hold that: whatever each substrate genuinely produces reaches the
+   * shared shape, and whatever it does not is null rather than manufactured.
+   */
+  it('PARAMETER: carries each hypothesis\'s real predicted value, not just the verdict', () => {
+    const input = inquiryInput();
+    const direct = runAutonomousInquiry(input);
+    const run = parameterStrategy.run(input);
+
+    const predicted = run.rounds.flatMap((r) => r.verdicts.map((v) => v.predicted)).filter((p) => p !== null);
+    // Real solver output, not arithmetic done in the adapter.
+    expect(predicted.length).toBeGreaterThan(0);
+    for (const [i, round] of run.rounds.entries()) {
+      for (const [j, verdict] of round.verdicts.entries()) {
+        expect(verdict.predicted).toBe(direct.rounds[i]!.outcomes[j]!.predicted);
+      }
+      // This loop's reference is per-hypothesis, so the round-level one stays null.
+      expect(round.reference).toBeNull();
+    }
+  });
+
+  it('MECHANISM: carries the control reading the observation was judged against', () => {
+    const plan = floodPlan();
+    const direct = runAutonomousDiscovery(plan);
+    const run = mechanismStrategy.run(plan);
+
+    for (const [i, round] of run.rounds.entries()) {
+      expect(round.reference).toBe(direct.rounds[i]!.objectiveBaseline);
+      // No prediction: these hypotheses assert a direction, never a value.
+      for (const verdict of round.verdicts) expect(verdict.predicted).toBeNull();
+    }
+    // An observation with no reference is a number a reader cannot judge.
+    expect(run.rounds.every((r) => r.reference !== null)).toBe(true);
+  });
+
   it('admits before it runs, and refuses a question with no solver behind it', () => {
     // A real capability check, not a formality: this is the gap neither loop
     // checked before the admission layer existed.

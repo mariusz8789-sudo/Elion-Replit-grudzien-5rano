@@ -1,7 +1,13 @@
 import { admitWorldQuestion } from './discoveryAdmission';
-import { calibrationStrategy, mechanismStrategy, parameterStrategy, toParameterRun } from './discoveryStrategies';
+import { calibrationStrategy, parameterStrategy, toMechanismRun, toParameterRun } from './discoveryStrategies';
 import type { Admission, QuestionShape, StrategyRun } from './discoveryStrategy';
 import { memoryNarrowedHypotheses, runInquiryWithGeneration } from './inquirySession';
+import type { JointInterventionAssessment } from './mechanismInteraction';
+import {
+  runDiscoveryWithJointGeneration,
+  toJointMechanismRun,
+  type DerivedJointMechanism,
+} from './mechanismGeneration';
 import { derivedValueStanding, type DerivedParameterHypothesis, type DerivedValueAssessment } from './parameterAlternative';
 import type { InquiryLoopInput } from './inquiryLoop';
 import { priorRefutedHypothesisIds } from './worldDiscoverySession';
@@ -82,13 +88,25 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * It still hands no strategy a hypothesis of its own invention: all three are
  * given the hypotheses their caller declared, and routing never edits a claim.
  *
- * What changed is what happens AFTER a strategy exhausts those claims. On the
- * PARAMETER path this front door now runs the generation continuation
- * (`GeneratedInvestigation` below): when every declared value is refuted,
- * Genesis derives one nobody proposed and tests it, without a caller asking.
- * MECHANISM's own generation primitive (`deriveAlternativeCriteria`) has no
- * equivalent continuation yet, so `generated` is null there and says so — a
- * real asymmetry, reported rather than smoothed over.
+ * What changed is what happens AFTER a strategy exhausts those claims. BOTH
+ * investigative shapes now run their generation continuation here, and each is
+ * reported as a SECOND `StrategyRun` beside the first rather than merged into
+ * it (`GeneratedInvestigation` below):
+ *
+ *   PARAMETER — every declared value refuted, so Genesis derives one nobody
+ *     proposed and tests it on evidence that value did not author.
+ *   MECHANISM — rival mechanisms both survived, so Genesis composes a lever
+ *     nobody declared (both at once, one fork) and measures whether they
+ *     compose. That question cannot be computed from their separate effects:
+ *     it is measurably sub-additive on the generator fixture.
+ *
+ * The two are a discriminated union rather than one shape, because a derived
+ * VALUE and a composed MECHANISM are genuinely different findings — see
+ * `GeneratedInvestigation`.
+ *
+ * CALIBRATION has no generation primitive at all, so `generated` is null there
+ * and `noGenerationReason` says which case applies. That remaining asymmetry is
+ * real and is reported rather than smoothed over.
  */
 
 /**
@@ -101,8 +119,16 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * for the same request — the same first inquiry, projected by the same
  * adapter — so a 1.1.0 reader is not merely compatible, it sees an unchanged
  * finding. What it never sees is the second investigation.
+ *
+ * 1.3.0 routed MECHANISM's generation through here too, which turned
+ * `GeneratedInvestigation` from one shape into a discriminated union on `kind`.
+ * `run` is still byte-for-byte the direct strategy call for every shape, so the
+ * FINDING a 1.2.0 reader sees is unchanged; a 1.2.0 reader that reached into
+ * `generated` without checking `kind` is the one break, and it is a compile-time
+ * one rather than a silent change of meaning — which is why the discriminant
+ * exists rather than optional fields.
  */
-export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.2.0';
+export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.3.0';
 
 /** A mechanism question: a goal, against a world that declares its own levers. */
 export interface MechanismRequest {
@@ -228,7 +254,12 @@ export interface PriorInvestigationDecision {
  * `runInquiryWithGenerationAndRemember` is the storage-wired composition, the
  * same split `runInquiry`/`runInquiryAndRemember` already established.
  */
-export interface GeneratedInvestigation {
+/**
+ * A value nobody declared, derived from the numbers that refuted everyone who
+ * did, and then tested.
+ */
+export interface ParameterGeneration {
+  readonly kind: 'DERIVED_PARAMETER_VALUE';
   /** The value nobody declared, with the bracket and the round that produced it. */
   readonly derived: DerivedParameterHypothesis;
   /** The follow-up investigation, in the same shared shape as any other run. */
@@ -244,13 +275,42 @@ export interface GeneratedInvestigation {
   readonly survived: boolean;
   /**
    * What that survival actually earned. Carried BESIDE `survived` and never
-   * instead of it, because the boolean alone overclaims: measured on the real
-   * fold, the identical `survived: true` comes back for four different true
-   * temperatures (see `derivedValueStanding`). A consumer that reports the
-   * boolean without this is reporting a point value the run never established.
+   * instead of it, because the boolean alone overclaims: two different true
+   * temperatures leave the same derived value standing (see
+   * `derivedValueStanding`). A consumer that reports the boolean without this
+   * is reporting a point value the run never established.
    */
   readonly standing: DerivedValueAssessment;
 }
+
+/**
+ * A mechanism nobody declared — two declared levers applied together — and the
+ * real forked arm that measured whether they compose.
+ */
+export interface MechanismGeneration {
+  readonly kind: 'COMPOSED_MECHANISM';
+  readonly derived: DerivedJointMechanism;
+  /** The joint arm, in the same shared shape as any other run. */
+  readonly run: StrategyRun;
+  /** The full interaction classification, with every number the verdict rests on. */
+  readonly assessment: JointInterventionAssessment;
+  /**
+   * Whether doing both beats doing the better one alone — a SEPARATE question
+   * from additivity, and one a caller needs: sub-additive does not mean not
+   * worth doing.
+   */
+  readonly betterThanBestSingle: boolean;
+}
+
+/**
+ * The two generations are a discriminated union rather than one shape, for the
+ * reason `StrategyRun` itself gives about belief representations: they are
+ * genuinely different findings and each carries something the other does not.
+ * A derived VALUE has a bracket, an interval and a standing; a composed
+ * MECHANISM has an interaction classification and a comparison against its own
+ * parents. Flattening them would mean dropping one of the two.
+ */
+export type GeneratedInvestigation = ParameterGeneration | MechanismGeneration;
 
 export interface DiscoveryRan {
   readonly status: 'RAN';
@@ -344,6 +404,7 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
       generation.generated === null
         ? null
         : {
+            kind: 'DERIVED_PARAMETER_VALUE',
             derived: generation.generated.derived,
             run: toParameterRun(generation.generated.followUpResult, generation.generated.followUpInput),
             input: generation.generated.followUpInput,
@@ -415,5 +476,31 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     }
   }
 
-  return ran('MECHANISM', admission, mechanismStrategy.run({ ...plan, hypotheses: hypothesesToRun }), priorInvestigation);
+  // GENERATION IS PART OF ANSWERING HERE TOO, and by the same rule as PARAMETER:
+  // `runDiscoveryWithJointGeneration` runs the SAME investigation
+  // `mechanismStrategy.run` would have run — `runAutonomousDiscoveryWithEngines`
+  // on the same input — so `run` below is identical to a direct strategy call.
+  // The continuation only exists when that run ended with rival survivors, which
+  // is the state where "which one is right?" is the wrong question and "do they
+  // compose?" is the informative one.
+  const mechanismGeneration = runDiscoveryWithJointGeneration({ ...plan, hypotheses: hypothesesToRun });
+  const composed: GeneratedInvestigation | null =
+    mechanismGeneration.generated === null
+      ? null
+      : {
+          kind: 'COMPOSED_MECHANISM',
+          derived: mechanismGeneration.generated.derived,
+          run: toJointMechanismRun(mechanismGeneration.first, mechanismGeneration.generated),
+          assessment: mechanismGeneration.generated.assessment,
+          betterThanBestSingle: mechanismGeneration.generated.betterThanBestSingle,
+        };
+
+  return ran(
+    'MECHANISM',
+    admission,
+    toMechanismRun(mechanismGeneration.first),
+    priorInvestigation,
+    composed,
+    mechanismGeneration.noGenerationReason,
+  );
 }

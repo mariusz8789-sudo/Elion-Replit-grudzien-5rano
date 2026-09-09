@@ -91,7 +91,11 @@ describe('discovery soundness, swept across hidden values', () => {
         if (step.outcome.status !== 'RAN') continue;
 
         const generated = step.outcome.generated;
-        if (generated !== null && generated.standing.standing !== 'REFUTED') {
+        if (
+          generated !== null &&
+          generated.kind === 'DERIVED_PARAMETER_VALUE' &&
+          generated.standing.standing !== 'REFUTED'
+        ) {
           intervalsSeen++;
           const [lo, hi] = generated.standing.interval;
           if (!(truth > lo && truth < hi)) {
@@ -125,7 +129,7 @@ describe('discovery soundness, swept across hidden values', () => {
       const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(truth) });
       if (outcome.status !== 'RAN') throw new Error('expected RAN');
       const generated = outcome.generated;
-      if (generated === null || !generated.survived) continue;
+      if (generated === null || generated.kind !== 'DERIVED_PARAMETER_VALUE' || !generated.survived) continue;
 
       // A survivor is an interval claim, never a point one — whatever the truth is.
       expect(generated.standing.standing, `T=${truth}`).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');

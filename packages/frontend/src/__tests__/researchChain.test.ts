@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { runResearchChain } from '../core/agent/researchChain';
+import type { GeneratedInvestigation, ParameterGeneration } from '../core/agent/discoveryOrchestrator';
 import { proteinFoldingInquiry } from '../core/agent/proteinFoldingInquiry';
 
 /**
@@ -10,6 +11,14 @@ import { proteinFoldingInquiry } from '../core/agent/proteinFoldingInquiry';
  * `nextQuestion.ts` ranked highest among the questions the previous run itself
  * raised. Real seeded HP-lattice solver throughout.
  */
+
+/** Narrows the generation union to the PARAMETER side, failing loudly otherwise. */
+function asParameter(generated: GeneratedInvestigation | null): ParameterGeneration {
+  if (generated === null || generated.kind !== 'DERIVED_PARAMETER_VALUE') {
+    throw new Error(`expected a derived parameter value, got ${generated?.kind ?? 'nothing'}`);
+  }
+  return generated;
+}
 
 describe('runResearchChain — the loop continues without being told to', () => {
   it('THE DEFINING BEHAVIOUR: derived value, then a self-chosen step that narrows the interval', () => {
@@ -24,8 +33,8 @@ describe('runResearchChain — the loop continues without being told to', () => 
     expect(first.kind).toBe('INITIAL');
     if (first.outcome.status !== 'RAN') throw new Error('expected RAN');
     expect(first.outcome.run.surviving).toEqual([]);
-    expect(first.outcome.generated!.standing.standing).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');
-    expect(first.outcome.generated!.standing.interval).toEqual([0.3, 0.7]);
+    expect(asParameter(first.outcome.generated).standing.standing).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');
+    expect(asParameter(first.outcome.generated).standing.interval).toEqual([0.3, 0.7]);
 
     // Step 2 was chosen by the question selector, not by this test and not by
     // a person.
@@ -71,9 +80,9 @@ describe('runResearchChain — the loop continues without being told to', () => 
 
     const first = chain.steps[0]!;
     if (first.outcome.status !== 'RAN') throw new Error('expected RAN');
-    expect(first.outcome.generated!.derived.value).toBe(0.5);
-    expect(first.outcome.generated!.survived).toBe(false);
-    expect(first.outcome.generated!.standing.standing).toBe('REFUTED');
+    expect(asParameter(first.outcome.generated).derived.value).toBe(0.5);
+    expect(asParameter(first.outcome.generated).survived).toBe(false);
+    expect(asParameter(first.outcome.generated).standing.standing).toBe('REFUTED');
 
     expect(chain.steps).toHaveLength(1);
     expect(chain.selfChosenSteps).toBe(0);

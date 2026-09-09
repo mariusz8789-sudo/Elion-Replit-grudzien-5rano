@@ -202,7 +202,11 @@ export function selectNextResearchQuestion(outcome: DiscoveryOutcome): NextQuest
     }
   }
 
-  if (generated !== null && generated.standing.standing === 'SUPPORTED_INTERVAL_NOT_IDENTIFIED') {
+  if (
+    generated !== null &&
+    generated.kind === 'DERIVED_PARAMETER_VALUE' &&
+    generated.standing.standing === 'SUPPORTED_INTERVAL_NOT_IDENTIFIED'
+  ) {
     const [lo, hi] = generated.standing.interval;
     candidates.push({
       kind: 'NARROW_A_DERIVED_INTERVAL',

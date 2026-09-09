@@ -10,6 +10,7 @@ import {
 import { evaluateTwoArmRelation } from '../experimentFabric/falsificationRelation';
 import { AT_HORIZON } from '../experimentFabric/objectiveReducer';
 import type { FalsificationCriterion, HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import type { ScenarioKind } from '../lookingGlass/scenarioRequest';
 import type { WorldGraph } from '../worldModel/ecs/worldGraph';
 import { reduceObjectiveTrajectory } from '../worldModel/discovery/objectiveTrajectory';
 import { TemporalBranchRegistry, TemporalEngine, type TemporalUpdater } from '../worldModel/temporal/temporalEngine';
@@ -68,6 +69,18 @@ import { TemporalBranchRegistry, TemporalEngine, type TemporalUpdater } from '..
  * "always read at the end" strategy would misread this domain; choosing the
  * tick adaptively, from real predictions, is not a refinement here, it is
  * what keeps the answer correct at all.
+ *
+ * ## Routed through `discoveryOrchestrator.ts` as `CALIBRATION` (§11.4, closed)
+ *
+ * `TWO_AUTONOMOUS_LOOPS_DECISION.md` §11.4 left orchestrator wiring open,
+ * pending a caller that actually needed it through that entry point rather
+ * than directly. §12 closes it: `QuestionShape` gained its third value,
+ * `CALIBRATION`, exactly as this module's own header anticipated a genuine
+ * third loop would need to (`discoveryStrategy.ts` says so explicitly). This
+ * file itself did not change to support that — `scenarioKind` on
+ * `WorldParameterSystem` is the only new surface, added purely for
+ * `discoveryAdmission.ts` to classify a request the same way MECHANISM
+ * already does, never read by `runAutonomousWorldCalibration` itself.
  */
 
 export const WORLD_PARAMETER_CALIBRATION_CONTRACT_VERSION = '1.0.0';
@@ -88,6 +101,15 @@ export interface WorldParameterSystem {
   readonly label: string;
   readonly worldId: string;
   readonly domainId: string;
+  /**
+   * Which `ScenarioKind` this world answers for — the SAME classification
+   * `admitWorldQuestion` uses for MECHANISM, read here by
+   * `discoveryAdmission.ts`'s `admitWorldCalibration` against the SAME
+   * `solverCapabilityFor` registry, so admitting a calibration and admitting a
+   * MECHANISM question about the same world cannot disagree. Declared by the
+   * domain, never guessed from `domainId`'s free-text label.
+   */
+  readonly scenarioKind: ScenarioKind;
   /** Name of the unknown constant, for reporting only — never used to read it back out of a built world. */
   readonly parameterId: string;
   /** This world's real, unmeasured value. Passed to `buildWorldAt` exactly once, to build the hidden world a candidate is judged against. */

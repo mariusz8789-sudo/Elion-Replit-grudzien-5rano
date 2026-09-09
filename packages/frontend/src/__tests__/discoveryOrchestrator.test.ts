@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { GENESIS_CHEMISTRY_CATALOG } from '../core/agent/chemistryLeverCatalog';
 import { discoveryResultFingerprint } from '../core/agent/discoveryLoop';
 import { runDiscovery, type DiscoveryRan } from '../core/agent/discoveryOrchestrator';
-import { mechanismStrategy, parameterStrategy } from '../core/agent/discoveryStrategies';
+import { calibrationStrategy, mechanismStrategy, parameterStrategy } from '../core/agent/discoveryStrategies';
+import {
+  epidemicInfectiousDaysCalibration,
+  epidemicInfectiousDaysSystem,
+  EPIDEMIC_INFECTIOUS_DAYS_OPENING_TICK,
+} from '../core/agent/epidemicInfectiousDaysCalibration';
 import { runAutonomousInquiry, type InquiryLoopInput } from '../core/agent/inquiryLoop';
+import { runAutonomousWorldCalibration, type WorldParameterCalibrationInput } from '../core/agent/worldParameterCalibration';
 import {
   buildWorldDiscoveryPlan,
   parseWorldDiscoveryGoal,
@@ -91,6 +97,52 @@ describe('discovery orchestrator — routing changes nothing about the finding',
     expect(routed.run.rounds.length).toBeGreaterThan(0);
   });
 
+  it('CALIBRATION: routing produces the same finding as calling the strategy directly', () => {
+    // P6's real domain, routed through the SAME general-purpose entry point
+    // MECHANISM and PARAMETER already go through — see
+    // `TWO_AUTONOMOUS_LOOPS_DECISION.md` §11-§12 for why this composition
+    // earned a third `QuestionShape` instead of overloading PARAMETER.
+    const input = epidemicInfectiousDaysCalibration(7);
+    const direct = calibrationStrategy.run(input);
+    const routed = expectRan(runDiscovery({ shape: 'CALIBRATION', input }));
+
+    expect(routed.run.native).toEqual(runAutonomousWorldCalibration(input));
+    expect(routed.run.resultFingerprint).toBe(direct.resultFingerprint);
+    expect(routed.run.strategyId).toBe(direct.strategyId);
+    expect(routed.run.surviving).toEqual(direct.surviving);
+    expect(routed.run.falsified).toEqual(direct.falsified);
+    expect(routed.run.stopReason).toBe(direct.stopReason);
+    expect(routed.run.nextExperiment?.selectorId).toBe('world-parameter-calibration');
+    expect(routed.shape).toBe('CALIBRATION');
+    expect(routed.admission.status).toBe('REAL');
+  });
+
+  it('CALIBRATION: an honest tie (NO_DISCRIMINATING_PROBE) survives routing unchanged', () => {
+    // Same tightly-spaced control case from `epidemicInfectiousDaysCalibration.test.ts`:
+    // three candidates 0.1 day apart never separate within the declared ±12%
+    // band. Routing through the orchestrator must not paper over that with a
+    // guess, or rename the stop reason to something friendlier.
+    const closeHypotheses = [
+      { hypothesisId: 'h:a', statement: 'a', claimedValue: 6.9, priorConfidence: 0.5 },
+      { hypothesisId: 'h:b', statement: 'b', claimedValue: 7.0, priorConfidence: 0.5 },
+      { hypothesisId: 'h:c', statement: 'c', claimedValue: 7.1, priorConfidence: 0.5 },
+    ];
+    const input: WorldParameterCalibrationInput = {
+      question: "What is this outbreak's real mean infectious period?",
+      system: epidemicInfectiousDaysSystem(7.0, 'orchestrator-tie-test'),
+      hypotheses: closeHypotheses,
+      openingProbeTick: EPIDEMIC_INFECTIOUS_DAYS_OPENING_TICK,
+      maxRounds: 6,
+    };
+
+    const outcome = expectRan(runDiscovery({ shape: 'CALIBRATION', input }));
+    expect(outcome.run.stopReason).toBe('NO_DISCRIMINATING_PROBE');
+    expect(outcome.run.nextExperiment?.status).toBe('RESOLVED');
+    expect(outcome.run.nextExperiment?.rule).toBe('NO_DISCRIMINATING_PROBE');
+    expect(outcome.run.surviving).toEqual(['h:a', 'h:b', 'h:c']);
+    expect(outcome.run.falsified).toHaveLength(0);
+  });
+
   it('MECHANISM: equivalence holds on every catalog in the registry, not two hand-picked ones', () => {
     // Same discipline as the adapter suite: the goal for each world is built
     // from that world's OWN declared metric phrases, so this cannot ask a
@@ -154,6 +206,26 @@ describe('discovery orchestrator — refusal is a result, not an exception', () 
     if (outcome.status !== 'REFUSED') return;
     expect(outcome.stage).toBe('ADMISSION');
     expect(outcome.admission.status).toBe('BLOCKED');
+  });
+
+  it('refuses a calibration whose scenario kind Genesis has no solver for', () => {
+    // Same `solverCapabilityFor` registry MECHANISM's admission already reads
+    // (`discoveryAdmission.ts`'s `admitWorldCalibration`), consulted with a
+    // `ScenarioKind` this registry reports NOT_MODELLED for. The system is
+    // otherwise a real, buildable epidemic world — only `scenarioKind` is
+    // wrong, which is exactly the fact this refusal is supposed to catch
+    // before anything runs.
+    const input: WorldParameterCalibrationInput = {
+      ...epidemicInfectiousDaysCalibration(7),
+      system: { ...epidemicInfectiousDaysSystem(7), scenarioKind: 'TSUNAMI' },
+    };
+    const outcome = runDiscovery({ shape: 'CALIBRATION', input });
+
+    expect(outcome.status).toBe('REFUSED');
+    if (outcome.status !== 'REFUSED') return;
+    expect(outcome.stage).toBe('ADMISSION');
+    expect(outcome.admission.status).toBe('NOT_MODELLED');
+    expect(outcome.admission.missing.length).toBeGreaterThan(0);
   });
 
   it('invents no new refusal vocabulary for the planning stage', () => {

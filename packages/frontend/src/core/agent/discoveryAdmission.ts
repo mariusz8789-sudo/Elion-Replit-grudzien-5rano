@@ -1,7 +1,8 @@
-import { parseScenarioRequest } from '../lookingGlass/scenarioRequest';
+import { parseScenarioRequest, type ScenarioKind } from '../lookingGlass/scenarioRequest';
 import {
   CAPABILITY_CODE,
   solverCapabilityFor,
+  type SolverCapability,
 } from '../worldModel/capability/solverCapability';
 import { getRouterModel } from '../experimentFabric/router';
 import type { Admission } from './discoveryStrategy';
@@ -59,13 +60,22 @@ export function admitWorldQuestion(sourceText: string): Admission {
       caveat: null,
     };
   }
+  return admissionFromCapability(request.kind, solverCapabilityFor(request.kind));
+}
 
-  const capability = solverCapabilityFor(request.kind);
+/**
+ * Converts one `SolverCapability` registry entry into the shared `Admission`
+ * vocabulary. Factored out of `admitWorldQuestion` so `admitWorldCalibration`
+ * (below) consults the exact same registry the exact same way — a question
+ * and a calibration about the same `ScenarioKind` cannot disagree about
+ * whether Genesis can answer at all, because both call this one conversion.
+ */
+function admissionFromCapability(kind: ScenarioKind, capability: SolverCapability): Admission {
   switch (capability.capability) {
     case CAPABILITY_CODE.MODELLED:
       return {
         status: 'REAL',
-        why: `${request.kind} is modelled by ${capability.solverId}.`,
+        why: `${kind} is modelled by ${capability.solverId}.`,
         missing: [],
         caveat: null,
       };
@@ -74,14 +84,14 @@ export function admitWorldQuestion(sourceText: string): Admission {
         status: 'APPROXIMATION',
         // The registry's own caveat, verbatim — a paraphrase here would be a
         // second, drifting statement of what the model does not cover.
-        why: `${request.kind} is partially modelled${capability.solverId ? ` by ${capability.solverId}` : ''}.`,
+        why: `${kind} is partially modelled${capability.solverId ? ` by ${capability.solverId}` : ''}.`,
         missing: [],
         caveat: capability.caveat ?? null,
       };
     default:
       return {
         status: 'NOT_MODELLED',
-        why: `${request.kind} has no solver in Genesis.`,
+        why: `${kind} has no solver in Genesis.`,
         missing: capability.missing ?? [],
         caveat: null,
       };
@@ -113,4 +123,20 @@ export function admitParameterInquiry(modelId: string): Admission {
     // The model's own stated bounds, carried rather than restated.
     caveat: model.rationale,
   };
+}
+
+/**
+ * Admits a world-parameter calibration against the SAME WorldGraph capability
+ * registry `admitWorldQuestion` reads — no new registry, per this module's
+ * own header.
+ *
+ * `system.scenarioKind` is declared by the domain (e.g. `epidemicInfectiousDaysCalibration.ts`
+ * declares `'EPIDEMIC'`), never parsed from free text: a calibration's caller
+ * already knows exactly which world it built, so classifying it the way
+ * `admitWorldQuestion` classifies a sentence would be re-deriving a fact this
+ * caller already has, the same reason `parameterStrategy.admit` reads
+ * `input.system.modelId` directly instead of parsing a question about it.
+ */
+export function admitWorldCalibration(scenarioKind: ScenarioKind): Admission {
+  return admissionFromCapability(scenarioKind, solverCapabilityFor(scenarioKind));
 }

@@ -4,8 +4,9 @@ import type { NextAction } from './nextAction';
 /**
  * ONE SHAPE FOR "GENESIS INVESTIGATED SOMETHING", ACROSS SUBSTRATES.
  *
- * Genesis has two real, genuinely different investigation loops, and this
- * module is the contract that lets a caller drive either without knowing which:
+ * Genesis has three real, genuinely different investigation loops, and this
+ * module is the contract that lets a caller drive any of them without knowing
+ * which:
  *
  *   `agent/discoveryLoop.ts`  — MECHANISM: "does lever X move metric M?"
  *                               Forks a live `WorldGraph`, advances two arms,
@@ -15,26 +16,38 @@ import type { NextAction } from './nextAction';
  *                               hypothesis's claimed values and at the system's
  *                               real ones, and picks the probe that separates
  *                               the survivors.
+ *   `agent/worldParameterCalibration.ts` — CALIBRATION: "which value does
+ *                               THIS WorldGraph world have?" Builds one
+ *                               independent world per hypothesis from tick
+ *                               zero, and picks which TICK to read that
+ *                               separates the survivors — see
+ *                               `TWO_AUTONOMOUS_LOOPS_DECISION.md` §11-§12
+ *                               for why this is a genuinely third shape, not
+ *                               PARAMETER run on a different substrate with
+ *                               the same reasoning.
  *
- * ## Why this is a contract and not a third loop
+ * ## Why this is a contract and not a fourth loop
  *
- * The two differ in how they OBTAIN numbers, not in how they REASON about them.
- * Both already share the reasoning primitives — `falsificationRelation.ts`
- * decides a criterion against two numbers for both, and
- * `scientificDiscovery.ts` supplies the verdict vocabulary for both. Merging
- * their loop bodies would mean a substrate `if` in every step: fork/compare
- * needs a mutable branching world, predict/discriminate needs a solver you can
- * evaluate at values the system does not have. That is a domain hack wearing a
- * uniform, so the loops stay separate and only their REPORTING is unified here.
+ * The three differ in how they OBTAIN numbers, not in how they REASON about
+ * them. All three already share the reasoning primitives —
+ * `falsificationRelation.ts` decides a criterion against two numbers for all
+ * three, and `scientificDiscovery.ts` supplies the verdict vocabulary for all
+ * three. Merging their loop bodies would mean a substrate `if` in every step:
+ * fork/compare needs a mutable branching world, predict/discriminate-by-setting
+ * needs a solver you can evaluate at values the system does not have,
+ * predict/discriminate-by-tick needs N independent worlds advanced over time.
+ * That is a domain hack wearing a uniform, so the loops stay separate and only
+ * their REPORTING is unified here.
  *
- * ## Every field below is something both loops already produce
+ * ## Every field below is something at least one loop already produces
  *
  * This is the test this contract had to pass to exist at all: nothing here was
  * invented so the shapes would match. Checked against the real
- * `DiscoveryLoopResult` and `InquiryLoopResult` field by field. Where one loop
- * genuinely does not produce something, the field is nullable and the adapter
- * leaves it null rather than deriving a value the loop never decided — the same
- * discipline `nextAction.ts` already established for its own six selectors.
+ * `DiscoveryLoopResult`, `InquiryLoopResult` and `WorldParameterCalibrationResult`
+ * field by field. Where a loop genuinely does not produce something, the field
+ * is nullable and the adapter leaves it null rather than deriving a value the
+ * loop never decided — the same discipline `nextAction.ts` already established
+ * for its own selectors.
  *
  * `native` carries each loop's own untouched result, so normalisation is purely
  * additive and an adapter can be proven equivalent to a direct call rather than
@@ -46,21 +59,41 @@ import type { NextAction } from './nextAction';
  * Additive for a consumer — a reader of 1.0.0 data simply had less — and the
  * two fields exist because a bare `observed` is not interpretable without what
  * it was judged against.
+ *
+ * 1.2.0 added the `CALIBRATION` shape. Also additive: every existing field
+ * keeps its meaning for MECHANISM and PARAMETER runs exactly as before, and a
+ * reader that only knew 1.1.0's two shapes simply never sees the third.
  */
-export const DISCOVERY_STRATEGY_CONTRACT_VERSION = '1.1.0';
+export const DISCOVERY_STRATEGY_CONTRACT_VERSION = '1.2.0';
 
 /**
  * The shape of the question, which is what decides the strategy — NOT the
- * scientific domain. Chemistry can be asked either kind: "does heating reduce
- * the remaining fraction" is MECHANISM, "which activation energy does this
- * sample have" is PARAMETER.
+ * scientific domain. Chemistry can be asked any of the three: "does heating
+ * reduce the remaining fraction" is MECHANISM, "which activation energy does
+ * THIS Fabric sample have" is PARAMETER, "which infectious period does THIS
+ * WorldGraph outbreak have" is CALIBRATION.
  *
- * Deliberately only two values, because exactly two real loops exist. A third
- * shape must arrive with a third real loop that answers it — adding a value
- * here to make a domain fit would put a question in a loop that cannot answer
- * it, which is worse than admitting the gap.
+ * Deliberately held to exactly the number of real loops that exist — this
+ * type's own history is the enforcement: it stayed at two values for as long
+ * as two loops existed, and did not gain a third until
+ * `worldParameterCalibration.ts` was audited into existence as a genuine
+ * third composition (`TWO_AUTONOMOUS_LOOPS_DECISION.md` §11-§12) rather than
+ * added to make some domain fit. A future value needs the same standing: a
+ * real capability behind it, checked, not a label added so a question has
+ * somewhere to go.
+ *
+ * - `MECHANISM`   — `discoveryLoop.ts`. WorldGraph, forks one world at a
+ *   decision tick, compares an intervention arm against a shared baseline.
+ * - `PARAMETER`   — `inquiryLoop.ts`. Experiment Fabric, holds the model
+ *   fixed and varies a SETTING to probe it — one call per measurement, no
+ *   time evolution.
+ * - `CALIBRATION` — `worldParameterCalibration.ts`. WorldGraph, no
+ *   intervention and no shared baseline: each hypothesis gets its OWN world
+ *   built from tick zero with its own claimed value for an unknown solver
+ *   constant, and the probe is WHICH TICK to read a trajectory at, not a
+ *   setting to vary.
  */
-export type QuestionShape = 'MECHANISM' | 'PARAMETER';
+export type QuestionShape = 'MECHANISM' | 'PARAMETER' | 'CALIBRATION';
 
 /**
  * Whether Genesis can answer at all, and on what standing.
@@ -110,6 +143,9 @@ export interface StrategyRound {
    * so its reference is per-hypothesis and lives on the verdict below. Forcing
    * both substrates onto one field would have to drop one of the two, which is
    * the same reason `surviving` carries ids rather than belief objects.
+   * CALIBRATION has the identical shape for the identical reason — each
+   * hypothesis is judged against its OWN independently-built world's reading,
+   * never a shared baseline — so it is null there too.
    */
   readonly reference: number | null;
   readonly verdicts: readonly {
@@ -121,6 +157,9 @@ export interface StrategyRound {
      * Real on the PARAMETER path: the hypothesis's own claimed values are run
      * through the same model, under the same code path as the measurement they
      * are judged against, so this is a solver output and not arithmetic done here.
+     * Real on the CALIBRATION path for the same reason: the hypothesis's own
+     * claimed value built an independent world, and the reading at this round's
+     * probe tick came off that world's own trajectory.
      *
      * Null on the MECHANISM path, and deliberately so. That loop's hypotheses
      * assert a DIRECTION relative to a control ("this lever lowers the peak"),

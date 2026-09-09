@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { GENESIS_CHEMISTRY_CATALOG } from '../core/agent/chemistryLeverCatalog';
 import { discoveryResultFingerprint, runAutonomousDiscovery } from '../core/agent/discoveryLoop';
+import {
+  epidemicInfectiousDaysCalibration,
+  epidemicInfectiousDaysSystem,
+} from '../core/agent/epidemicInfectiousDaysCalibration';
 import { inquiryResultFingerprint, runAutonomousInquiry, type InquiryLoopInput } from '../core/agent/inquiryLoop';
 import {
+  calibrationStrategy,
   mechanismStrategy,
   parameterStrategy,
+  toCalibrationRun,
   toMechanismRun,
   toParameterRun,
 } from '../core/agent/discoveryStrategies';
+import { runAutonomousWorldCalibration, worldCalibrationResultFingerprint } from '../core/agent/worldParameterCalibration';
 import {
   buildWorldDiscoveryPlan,
   parseWorldDiscoveryGoal,
@@ -224,6 +231,80 @@ describe('discovery strategy adapters', () => {
     }
     // An observation with no reference is a number a reader cannot judge.
     expect(run.rounds.every((r) => r.reference !== null)).toBe(true);
+  });
+
+  it('CALIBRATION: native carries the composition result untouched', () => {
+    const input = epidemicInfectiousDaysCalibration(7);
+    const direct = runAutonomousWorldCalibration(input);
+    expect(toCalibrationRun(direct, input).native).toBe(direct);
+  });
+
+  it('CALIBRATION: wrapping changes nothing about what the composition decided', () => {
+    const input = epidemicInfectiousDaysCalibration(7);
+    const direct = runAutonomousWorldCalibration(input);
+    const viaStrategy = calibrationStrategy.run(input);
+
+    expect(viaStrategy.native).toEqual(direct);
+    expect(viaStrategy.resultFingerprint).toBe(worldCalibrationResultFingerprint(direct));
+    expect(viaStrategy.shape).toBe('CALIBRATION');
+    expect(viaStrategy.stopReason).toBe(direct.stopReason);
+    expect(viaStrategy.surviving).toEqual(direct.survivingHypothesisIds);
+    expect(viaStrategy.falsified).toEqual(direct.falsifiedHypothesisIds);
+    expect(viaStrategy.untested).toEqual(direct.untestedHypothesisIds);
+    // The proposal comes from the existing nextAction adapter, not a second converter.
+    expect(viaStrategy.nextExperiment?.selectorId).toBe('world-parameter-calibration');
+  });
+
+  it('CALIBRATION: carries each hypothesis\'s real predicted reading, not just the verdict', () => {
+    const input = epidemicInfectiousDaysCalibration(7);
+    const direct = runAutonomousWorldCalibration(input);
+    const run = calibrationStrategy.run(input);
+
+    const predicted = run.rounds.flatMap((r) => r.verdicts.map((v) => v.predicted)).filter((p) => p !== null);
+    // A real reading off an independently-built world, not arithmetic done in the adapter.
+    expect(predicted.length).toBeGreaterThan(0);
+    for (const [i, round] of run.rounds.entries()) {
+      for (const [j, verdict] of round.verdicts.entries()) {
+        expect(verdict.predicted).toBe(direct.rounds[i]!.outcomes[j]!.predicted);
+      }
+      // Same reason as PARAMETER: each hypothesis is judged against its OWN
+      // world, so there is no one shared reference at round level.
+      expect(round.reference).toBeNull();
+    }
+  });
+
+  it('CALIBRATION: admits before it runs, against the same WorldGraph capability registry MECHANISM uses', () => {
+    const input = epidemicInfectiousDaysCalibration(7);
+    expect(calibrationStrategy.admit(input).status).toBe('REAL');
+
+    const notModelled = {
+      ...input,
+      system: { ...epidemicInfectiousDaysSystem(7), scenarioKind: 'TSUNAMI' as const },
+    };
+    const refused = calibrationStrategy.admit(notModelled);
+    expect(refused.status).toBe('NOT_MODELLED');
+    expect(refused.missing.length).toBeGreaterThan(0);
+  });
+
+  it('CALIBRATION: preserves NO_DISCRIMINATING_PROBE — the honesty stop reason travels through unrenamed', () => {
+    const closeHypotheses = [
+      { hypothesisId: 'h:a', statement: 'a', claimedValue: 6.9, priorConfidence: 0.5 },
+      { hypothesisId: 'h:b', statement: 'b', claimedValue: 7.0, priorConfidence: 0.5 },
+      { hypothesisId: 'h:c', statement: 'c', claimedValue: 7.1, priorConfidence: 0.5 },
+    ];
+    const input = {
+      question: "What is this outbreak's real mean infectious period?",
+      system: epidemicInfectiousDaysSystem(7.0, 'strategy-tie-test'),
+      hypotheses: closeHypotheses,
+      openingProbeTick: 2,
+      maxRounds: 6,
+    };
+    const direct = runAutonomousWorldCalibration(input);
+    const run = calibrationStrategy.run(input);
+
+    expect(direct.stopReason).toBe('NO_DISCRIMINATING_PROBE');
+    expect(run.stopReason).toBe('NO_DISCRIMINATING_PROBE');
+    expect(run.nextExperiment?.status).toBe('RESOLVED');
   });
 
   it('admits before it runs, and refuses a question with no solver behind it', () => {

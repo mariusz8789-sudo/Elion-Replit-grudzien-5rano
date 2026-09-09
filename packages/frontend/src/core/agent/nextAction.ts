@@ -341,6 +341,60 @@ export const parameterInquiryNextAction: NextActionSelector<InquiryNextActionSta
 };
 
 // ---------------------------------------------------------------------------
+// 7. World-parameter calibration — the seventh selector, and the second whose
+//    proposal was written by the PREVIOUS measurement (see selector 6).
+// ---------------------------------------------------------------------------
+
+import type { WorldParameterCalibrationResult, WorldParameterSystem } from './worldParameterCalibration';
+
+export const WORLD_CALIBRATION_SELECTOR_ID = 'world-parameter-calibration';
+
+export interface WorldCalibrationNextActionState {
+  readonly result: WorldParameterCalibrationResult;
+  /** The system the calibration ran on — needed for the metric/world names `nextExperiment` itself does not carry. */
+  readonly system: WorldParameterSystem;
+}
+
+/**
+ * Wraps `runAutonomousWorldCalibration`'s own `nextExperiment`. Pure
+ * indirection, same discipline as selector 6: the probe tick was chosen
+ * inside the composition, from the beliefs the last reading wrote, and this
+ * adapter neither re-ranks nor re-decides anything.
+ *
+ * `request` stays null, the same choice `worldCounterfactualNextAction`
+ * (selector 2) already makes for its own WorldGraph substrate: there is no
+ * `StructuredExperimentRequest` equivalent for "rebuild this world and read
+ * it at a different tick" — that is a code call
+ * (`system.buildWorldAt(value)` + `TemporalEngine.advance`), not a
+ * serialisable router request, so describing one here would be inventing a
+ * shape this substrate does not have.
+ */
+export const worldCalibrationNextAction: NextActionSelector<WorldCalibrationNextActionState> = (state) => {
+  const native = state.result.nextExperiment;
+  const status: NextActionStatus = native.probeTick === null
+    // Both refusals are RESOLVED in the sense this contract uses it — see
+    // selector 6's identical note. `rule` still distinguishes them.
+    ? 'RESOLVED'
+    : 'READY_TO_RUN';
+  return nextAction({
+    selectorId: WORLD_CALIBRATION_SELECTOR_ID,
+    domain: state.result.domainId,
+    status,
+    action: native.probeTick === null
+      ? `No further measurement proposed (${native.rule}).`
+      : `Read ${state.system.observedMetric} at tick=${native.probeTick} in ${state.system.worldId}.`,
+    why: native.why,
+    resolves: native.betweenHypothesisIds.length === 2
+      ? `Which of "${native.betweenHypothesisIds[0]}" and "${native.betweenHypothesisIds[1]}" this world's real "${state.system.parameterId}" actually matches.`
+      : null,
+    rule: native.rule,
+    request: null,
+    about: native.betweenHypothesisIds,
+    native,
+  });
+};
+
+// ---------------------------------------------------------------------------
 
 export interface RegisteredSelector {
   readonly selectorId: string;
@@ -385,5 +439,10 @@ export const NEXT_ACTION_SELECTORS: readonly RegisteredSelector[] = [
     selectorId: PARAMETER_INQUIRY_SELECTOR_ID,
     answersFor: 'An executed parameter inquiry whose next probe was chosen from what the last measurement showed.',
     requiresState: 'InquiryLoopResult + SystemUnderStudy',
+  },
+  {
+    selectorId: WORLD_CALIBRATION_SELECTOR_ID,
+    answersFor: 'An executed world-parameter calibration whose next probe TICK was chosen from what the last reading showed.',
+    requiresState: 'WorldParameterCalibrationResult + WorldParameterSystem',
   },
 ];

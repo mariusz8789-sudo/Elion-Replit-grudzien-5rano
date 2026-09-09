@@ -125,6 +125,19 @@ describe('server HTTP persistence', () => {
     assert.equal(r.status, 401);
   });
 
+  test('/api/security/dependency-audit is actually reachable over HTTP, not swallowed by the URL whitelist', async () => {
+    // Regression: handleApi() has the route, but server.mjs only forwards to it for a
+    // hardcoded set of URL prefixes (auth/projects/compute/worlds) — a route added ONLY
+    // in api.mjs silently 404s here even though api.test.mjs (which calls handleApi
+    // directly) sees it. This is the one test that would have caught that.
+    const reg = await api('POST', '/api/auth/register', { body: { email: 'sec-http@lab.org', password: 'password123' } });
+    assert.equal(reg.status, 201);
+    const r = await api('GET', '/api/security/dependency-audit', { token: reg.json.token });
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json.findings));
+    assert.equal(await api('GET', '/api/security/dependency-audit', {}).then((x) => x.status), 401);
+  });
+
   test('malformed JSON body is a clean 400', async () => {
     const res = await fetch(base + '/api/auth/login', {
       method: 'POST',

@@ -1,4 +1,5 @@
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import { worldGraphMeasurementOrigin } from '../measurementProvenance';
 import { assessCompetingModels } from './competingModels';
 import { MECHANISM_STRATEGY_ID, toMechanismRun } from './discoveryStrategies';
 import { DISCOVERY_STRATEGY_CONTRACT_VERSION, type StrategyRun } from './discoveryStrategy';
@@ -191,6 +192,9 @@ export function toJointMechanismRun(
           ]
         : [],
     limitations: [...first.declaredAssumptions, ...first.notModelledFactors],
+    // The joint arm is a WorldGraph fork like any other, so its provenance is
+    // the same code path's.
+    measurementProvenance: worldGraphMeasurementOrigin(),
     // The joint arm's own numbers, so a reader can recompute the verdict rather
     // than trust it.
     resultFingerprint: `joint_${derived.hypothesisId}@${derived.strength}_${assessment.jointObserved}`,

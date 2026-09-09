@@ -263,7 +263,7 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toMatch(/available once a search has run/i);
   });
 
-  it('renders the Real Experiment Interface pipeline with Prediction real and every later stage honestly refused', () => {
+  it('renders the Real Experiment Interface pipeline with Prediction real and every later stage honestly refused before a search has run', () => {
     const markup = renderToStaticMarkup(<CellLabScreen />);
     expect(markup).toContain('data-testid="real-experiment-pipeline"');
     expect(markup).toContain('data-testid="rex-stage-prediction"');
@@ -272,7 +272,13 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toContain('data-testid="rex-stage-data"');
     expect(markup).toContain('AVAILABLE');
     expect(markup).toContain('NOT YET AVAILABLE');
-    expect(markup).toMatch(/createRealExperimentRun/);
+    // No discovery search has run yet, so there is no completed prediction to
+    // measure a real reading against — the form only appears once one exists.
+    expect(markup).toMatch(/run a discovery search on the left first/i);
+    expect(markup).not.toContain('data-testid="rex-entry-form"');
+    // Product/demo copy: the "not yet" reason is plain language for a demo audience, not an
+    // engineering changelog — no internal function names on screen.
+    expect(markup).not.toContain('createRealExperimentRun');
   });
 
   it('exposes a Demo Mode toggle', () => {

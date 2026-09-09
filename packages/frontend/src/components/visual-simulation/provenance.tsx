@@ -6,11 +6,11 @@
  * The `SIMULATED`/`REFERENCE`/`REAL_EXPERIMENTAL` type itself now lives in `core/dataProvenance.ts`
  * (C1's widening of `dataSource.ts`'s old `isSynthetic: boolean`, landed the same sprint this badge
  * was built) and is re-exported here rather than redeclared, so there is exactly one definition —
- * this file only gives the UI layer a badge to render it. Every caller in this codebase today passes
- * `'SIMULATED'` because that is the only true value that exists yet: no screen may pass
- * `'REAL_EXPERIMENTAL'` until a real measurement genuinely produced the number next to it (see
- * `docs/GENESIS_NORTH_STAR.md` §4 — labelling simulated output as real is the exact failure mode
- * that document exists to prevent).
+ * this file only gives the UI layer a badge to render it. No screen may pass `'REAL_EXPERIMENTAL'`
+ * until a real measurement genuinely produced the number next to it (see `docs/GENESIS_NORTH_STAR.md`
+ * §4 — labelling simulated output as real is the exact failure mode that document exists to prevent).
+ * `RealExperimentPipeline.tsx` is the first caller that genuinely earns this badge, once a person has
+ * entered a real reading through `createRealExperimentRun`.
  */
 
 import type { DataProvenance } from '../../core/dataProvenance';

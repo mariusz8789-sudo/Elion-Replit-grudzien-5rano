@@ -13,6 +13,7 @@ import {
 import {
   BLOCKED_S_DURATION_H,
   CYTOTOXIC_DEATH_RATE_PER_HOUR,
+  GENESIS_CELL_CULTURE_CATALOG,
   GENESIS_CELL_CULTURE_CATALOG_ID,
   GENESIS_CELL_CULTURE_LEVERS,
   LARGER_CAPACITY_CELLS,
@@ -20,7 +21,7 @@ import {
 } from '../../core/agent/cellCultureLeverCatalog';
 import { WorldDiscoveryPanel, type PanelState } from './WorldDiscoveryPanel';
 import { ProvenanceBadge } from './provenance';
-import { RealExperimentPipeline } from './RealExperimentPipeline';
+import { RealExperimentPipeline, type RealExperimentPredictionContext } from './RealExperimentPipeline';
 import { DiscoveryLadder, ConclusionContent, EvidenceContent, ReplayContent, type LadderStep } from './DiscoveryLadder';
 import { conclusionFor, nextExperimentFor } from './discoveryNarrative';
 import type { WorldDiscoveryEvidenceSummary } from '../../core/agent/worldDiscoverySession';
@@ -454,6 +455,15 @@ export function CellLabScreen() {
   const evidence = discoveryResult?.kind === 'COMPLETE' ? discoveryResult.evidence : null;
   const replay = discoveryResult?.kind === 'COMPLETE' ? discoveryResult.replay : null;
   const evidenceBundleId = evidence?.bundleId ?? null;
+  const realExperimentPrediction: RealExperimentPredictionContext | null =
+    discoveryResult?.kind === 'COMPLETE' && discoveryResult.intent.objectiveMetric
+      ? {
+          predictionSourceExperimentId: discoveryResult.savedExperimentId,
+          loopResult: discoveryResult.result,
+          domainId: GENESIS_CELL_CULTURE_CATALOG.domainId,
+          metric: discoveryResult.intent.objectiveMetric,
+        }
+      : null;
   const comparisonNote = `control ${sci(stats.controlTotal ?? 0)} cells vs treatment ${sci(stats.treatmentTotal ?? 0)} cells (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)`;
   const demoStatusText = discoveryResult?.kind === 'COMPLETE'
     ? 'Real search complete — see CONCLUSION below.'
@@ -543,6 +553,7 @@ export function CellLabScreen() {
           predictionRationale={currentHypothesis.rationale}
           comparisonNote={comparisonNote}
           evidenceBundleId={evidenceBundleId}
+          prediction={realExperimentPrediction}
         />
 
         <details className="cell-lab-honesty" data-testid="cell-lab-honesty">

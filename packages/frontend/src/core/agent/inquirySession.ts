@@ -172,11 +172,22 @@ export function runInquiryAndRemember(input: InquiryLoopInput): InquirySessionRe
  *
  * `DerivedParameterHypothesis` reports `excludedProbeValues` so a caller cannot
  * unknowingly reuse the measurement that generated the candidate. This is that
- * caller, and it honours the exclusion by construction: the follow-up opens at
- * the first candidate setting that is BOTH untried in the first inquiry AND not
- * excluded. When no such setting exists it refuses to continue rather than
- * testing the candidate on the data that authored it — an honest stop, and the
- * same shape as every other refusal in this path.
+ * caller, and it enforces the exclusion two ways, because one was not enough:
+ * the follow-up OPENS at a setting that is both untried and not excluded, and
+ * the excluded settings are REMOVED from the candidate list it runs against.
+ *
+ * The second half was missing at first, and the gap was real rather than
+ * theoretical. Guarding only the opening probe left `selectNextProbe` free to
+ * choose an excluded setting on a later round, and it did: on the fold at 0.5
+ * the follow-up opened at steps=1000 and then measured at steps=5000 — the
+ * exact round the value was bracketed from — recording the derived hypothesis
+ * as SUPPORTED there. Since bracketing picks a midpoint precisely because it
+ * sits between two predictions straddling that observation, confirming it at
+ * that setting is close to circular.
+ *
+ * When no admissible setting exists it refuses to continue rather than testing
+ * the candidate on the data that authored it — an honest stop, and the same
+ * shape as every other refusal in this path.
  *
  * ## What it deliberately does not do
  *
@@ -262,7 +273,20 @@ export function runInquiryWithGeneration(input: InquiryLoopInput): InquiryWithGe
   );
   const followUpInput: InquiryLoopInput = {
     question: `Does ${derived.parameterId}=${derived.value}, derived after every declared value was refuted, hold up?`,
-    system: input.system,
+    // THE EXCLUSION HAS TO BIND THE WHOLE RUN, not just its first round.
+    // Choosing an honest opening probe and then handing the loop the full
+    // candidate list let `selectNextProbe` pick the deriving probe again on a
+    // later round — and it did: measured on the fold at 0.5, the follow-up
+    // opened at steps=1000 and its SECOND round ran at steps=5000, the exact
+    // measurement the value was derived from, where the derived hypothesis was
+    // recorded SUPPORTED. Bracketing guarantees the midpoint predicts close to
+    // the observation at that setting, so confirming it there is very nearly
+    // circular. Removing the excluded settings from the candidate list is the
+    // whole fix: the loop cannot select what it is not offered.
+    system: {
+      ...input.system,
+      candidateProbeValues: input.system.candidateProbeValues.filter((p) => !excluded.has(p)),
+    },
     hypotheses: [asParameterHypothesis(derived), ...bracketParents],
     openingProbeValue,
     maxRounds: input.maxRounds,

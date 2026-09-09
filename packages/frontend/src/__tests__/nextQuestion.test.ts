@@ -40,21 +40,22 @@ describe('selectNextResearchQuestion — derived from the run, never invented', 
     expect(selection.blockedOnHuman).toBe(false);
   });
 
-  it('THE GAP THIS MAKES VISIBLE: after its own generation succeeds, Genesis cannot narrow further', () => {
+  it('after its own generation succeeds, the open question is the interval — and it is runnable', () => {
     // Every declared temperature refuted, 0.5 derived and it survives. The
-    // honest next question is where in [0.3, 0.7] the truth actually lies —
-    // and nothing in Genesis can pose it, because the one thing that derives a
-    // value nobody declared only fires on a space where everything was
-    // refuted, and here the derived value survived.
+    // honest next question is where in [0.3, 0.7] the truth actually lies.
+    //
+    // This question came back `answerableNow: false` when this module was
+    // first written — nothing could propose a value from a SURVIVING state,
+    // because generation is gated on an exhausted one. `intervalNarrowing.ts`
+    // was built for exactly that gap, which is why it is runnable now.
     const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(0.5) });
     const selection = selectNextResearchQuestion(outcome);
 
     expect(selection.selected?.kind).toBe('NARROW_A_DERIVED_INTERVAL');
     expect(selection.selected!.question).toContain('[0.3, 0.7]');
-    expect(selection.selected!.answerableNow).toBe(false);
-    expect(selection.blockedOnHuman).toBe(true);
-    expect(selection.nextExecutable).toBeNull();
-    expect(selection.selected!.why).toContain('only when every declared value was refuted');
+    expect(selection.selected!.answerableNow).toBe(true);
+    expect(selection.nextExecutable?.kind).toBe('NARROW_A_DERIVED_INTERVAL');
+    expect(selection.blockedOnHuman).toBe(false);
   });
 
   it('a blocked top question does not dead-end the loop when something else is runnable', () => {

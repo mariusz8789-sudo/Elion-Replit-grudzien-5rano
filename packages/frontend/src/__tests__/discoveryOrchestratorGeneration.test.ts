@@ -96,37 +96,47 @@ describe('runDiscovery — the declared space runs out and Genesis continues by 
 });
 
 /**
- * THE OVERCLAIM THIS SPRINT FOUND, PINNED SO IT CANNOT COME BACK.
+ * SURVIVAL IS NOT IDENTIFICATION — pinned so it cannot come back.
  *
- * `survived: true` is not "the value was found". Measured on the real solver:
- * four different true temperatures all produce the identical surviving derived
- * value 0.5, because the declared ±15% agreement band cannot separate them at
- * the settings the loop chose. At a true 0.65 the follow-up ends
- * `NO_CONTENDERS_LEFT` with no open questions over a value wrong by 23%.
+ * These expectations are the CORRECTED ones. They first recorded all four of
+ * 0.40 / 0.50 / 0.55 / 0.65 producing `survived: true`, which turned out to be
+ * a symptom: the follow-up was re-measuring at the very setting the value had
+ * been bracketed from, where a midpoint agrees with the observation by
+ * construction (see `inquirySession.ts::runInquiryWithGeneration`). With that
+ * leak closed the follow-up refutes a wrong derived value by itself.
  *
- * Nothing in the loop lies — every round is judged honestly against a declared
- * band. The overclaim was in the SUMMARY, and `standing` is the correction.
+ * What remains is real degeneracy, not a bug: 0.50 and 0.55 are not separable
+ * by this instrument at a declared ±15% band, so both leave 0.5 standing.
  */
 describe('a surviving derived value is reported as an interval, never as an identification', () => {
-  it('the same derived value survives four different truths — so survival cannot mean identification', () => {
-    const survivingAt = [0.4, 0.5, 0.55, 0.65].map((hidden) => {
+  it('a WRONG derived value is refuted by its own follow-up, on evidence it did not author', () => {
+    for (const hidden of [0.4, 0.65]) {
       const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(hidden) });
       if (outcome.status !== 'RAN') throw new Error('expected RAN');
-      return { hidden, generated: outcome.generated };
-    });
+      const generated = outcome.generated!;
+      expect(generated.derived.value, `hidden=${hidden}`).toBe(0.5);
+      expect(generated.survived, `hidden=${hidden}`).toBe(false);
+      expect(generated.standing.standing, `hidden=${hidden}`).toBe('REFUTED');
+    }
+  });
 
-    for (const { hidden, generated } of survivingAt) {
-      expect(generated, `expected generation at hidden=${hidden}`).not.toBeNull();
-      expect(generated!.derived.value, `hidden=${hidden}`).toBe(0.5);
-      expect(generated!.survived, `hidden=${hidden}`).toBe(true);
+  it('two different truths still leave the same value standing — so survival cannot mean identification', () => {
+    for (const hidden of [0.5, 0.55]) {
+      const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(hidden) });
+      if (outcome.status !== 'RAN') throw new Error('expected RAN');
+      const generated = outcome.generated!;
+      expect(generated.derived.value, `hidden=${hidden}`).toBe(0.5);
+      expect(generated.survived, `hidden=${hidden}`).toBe(true);
+      // 0.5 is right at 0.50 and wrong at 0.55, and the verdict is identical.
+      expect(generated.standing.standing, `hidden=${hidden}`).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');
     }
   });
 
   it('standing states the earned INTERVAL and refuses the point claim', () => {
-    // True 0.65: the derived 0.5 survives and is wrong. The honest reading is
+    // True 0.55: the derived 0.5 survives and is wrong. The honest reading is
     // the interval its two refuted bracket parents drew — which does contain
     // the truth, while the point value does not equal it.
-    const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(0.65) });
+    const outcome = runDiscovery({ shape: 'PARAMETER', input: proteinFoldingInquiry(0.55) });
     if (outcome.status !== 'RAN') throw new Error('expected RAN');
     const generated = outcome.generated!;
 
@@ -139,10 +149,10 @@ describe('a surviving derived value is reported as an interval, never as an iden
 
     // The truth is inside the interval the evidence supports...
     const [lo, hi] = generated.standing.interval;
-    expect(0.65).toBeGreaterThan(lo);
-    expect(0.65).toBeLessThan(hi);
+    expect(0.55).toBeGreaterThan(lo);
+    expect(0.55).toBeLessThan(hi);
     // ...and is NOT the point value that survived. The report must not conflate them.
-    expect(generated.derived.value).not.toBe(0.65);
+    expect(generated.derived.value).not.toBe(0.55);
     expect(generated.standing.why).toContain('not the same as being identified');
   });
 });

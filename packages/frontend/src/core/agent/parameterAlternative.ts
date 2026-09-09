@@ -85,7 +85,13 @@ import { assessModelSufficiency } from './modelSufficiency';
  * the test cannot silently reuse it.
  */
 
-export const PARAMETER_ALTERNATIVE_CONTRACT_VERSION = '1.0.0';
+/**
+ * 1.1.0 added `bracketLowValue`/`bracketHighValue` and `derivedValueStanding`.
+ * Additive, and added for a measured reason — see `derivedValueStanding`'s own
+ * doc: a surviving derived value was being reported as a bare `true`, which
+ * overclaims.
+ */
+export const PARAMETER_ALTERNATIVE_CONTRACT_VERSION = '1.1.0';
 
 export interface DerivedParameterHypothesis {
   readonly contractVersion: string;
@@ -99,6 +105,14 @@ export interface DerivedParameterHypothesis {
   /** The two declared hypotheses whose predictions straddled the observation. */
   readonly bracketLowHypothesisId: string;
   readonly bracketHighHypothesisId: string;
+  /**
+   * Their two CLAIMED values — the ends of the interval this derivation is
+   * actually evidence about. Carried as numbers, not only inside `why`, because
+   * `derivedValueStanding` needs the interval and a caller should not have to
+   * parse a sentence to get it.
+   */
+  readonly bracketLowValue: number;
+  readonly bracketHighValue: number;
   /**
    * Probes this candidate must NOT be judged at: the one that derived it.
    * See this module's anti-HARKing note.
@@ -173,6 +187,8 @@ export function deriveAlternativeParameterValue(
       derivedFromProbeValue: round.probeValue,
       bracketLowHypothesisId: low.id,
       bracketHighHypothesisId: high.id,
+      bracketLowValue: low.claimed,
+      bracketHighValue: high.claimed,
       excludedProbeValues: [round.probeValue],
       why:
         `Every declared value was refuted, so the answer is outside the declared space. At ` +
@@ -184,6 +200,122 @@ export function deriveAlternativeParameterValue(
     };
   }
   return null;
+}
+
+/**
+ * WHAT A SURVIVING DERIVED VALUE ACTUALLY EARNED — the correction to a bare
+ * `survived: true`.
+ *
+ * ## The overclaim this exists to stop, measured on the real substrate
+ *
+ * The follow-up investigation was reporting one boolean, and that boolean is
+ * not the finding. Measured on the seeded HP-lattice fold, `steps` probe,
+ * declared ±15% band, with the true hidden temperature varied and everything
+ * else identical:
+ *
+ *     true T = 0.40  ->  derived 0.5 survives, h:cold and h:cool refuted
+ *     true T = 0.50  ->  derived 0.5 survives, h:cold and h:cool refuted
+ *     true T = 0.55  ->  derived 0.5 survives, h:cold and h:cool refuted
+ *     true T = 0.65  ->  derived 0.5 survives, h:cold and h:cool refuted
+ *
+ * Four different truths, one identical verdict. At T=0.65 the follow-up ended
+ * `NO_CONTENDERS_LEFT` with `openQuestions: []` over a value that is wrong by
+ * 23%. Nothing lied: at 5000 steps the derived value predicts 0.2576 against an
+ * observation of 0.2772, a 7.1% gap that the declared ±15% band cannot call a
+ * refutation. The run is honest round by round and the SUMMARY still overclaims,
+ * because "the only survivor" reads as "the answer" when the space it survived
+ * was three values Genesis chose itself.
+ *
+ * ## What the evidence does support
+ *
+ * Both bracket parents WERE refuted, and that is real: the value is not 0.3 and
+ * not 0.7. So the earned finding is the open interval between them — evidence
+ * about an INTERVAL, reported as one, with the midpoint named as the point
+ * inside it that the derivation proposed rather than as the value that was
+ * found. Narrowing that interval is a further experiment, not a further
+ * sentence.
+ *
+ * ## Why this is a reader and not a change to the loop
+ *
+ * `inquiryLoop.ts` is correct as it stands — it reports per-round verdicts
+ * against a declared band and never claims identification. The overclaim was in
+ * how a CALLER summarised it. So the fix belongs at the caller, as a pure
+ * reading of a finished run, in the same shape as every other reader here.
+ */
+export type DerivedValueStanding =
+  /** The follow-up refuted it: the derived value is out, and that is a real result. */
+  | 'REFUTED'
+  /**
+   * It was not refuted, and both bracket parents were — the interval between
+   * them is supported, the point inside it is not identified.
+   */
+  | 'SUPPORTED_INTERVAL_NOT_IDENTIFIED'
+  /**
+   * It was not refuted, but neither was at least one bracket parent — so the
+   * follow-up did not even narrow to the interval. Weaker still.
+   */
+  | 'SUPPORTED_NOTHING_NARROWED';
+
+export interface DerivedValueAssessment {
+  readonly standing: DerivedValueStanding;
+  /** The ends of the interval, ordered. Both were refuted only in the `..._NOT_IDENTIFIED` case. */
+  readonly interval: readonly [number, number];
+  /** Bracket parents the follow-up actually refuted — what makes the interval earned rather than assumed. */
+  readonly refutedBracketEnds: readonly string[];
+  /** Plain statement of what was and was not established. Never asserts identification. */
+  readonly why: string;
+}
+
+/**
+ * Reads a finished follow-up and states what the derived value earned.
+ *
+ * Takes the follow-up's own `InquiryLoopResult` — the run that judged the
+ * derived hypothesis — and nothing else, so it cannot consult the answer.
+ */
+export function derivedValueStanding(
+  derived: DerivedParameterHypothesis,
+  followUp: InquiryLoopResult,
+): DerivedValueAssessment {
+  const lo = Math.min(derived.bracketLowValue, derived.bracketHighValue);
+  const hi = Math.max(derived.bracketLowValue, derived.bracketHighValue);
+  const interval: readonly [number, number] = [lo, hi];
+  const ends = [derived.bracketLowHypothesisId, derived.bracketHighHypothesisId];
+  const refutedBracketEnds = ends.filter((id) => followUp.falsifiedHypothesisIds.includes(id));
+
+  if (followUp.falsifiedHypothesisIds.includes(derived.hypothesisId)) {
+    return {
+      standing: 'REFUTED',
+      interval,
+      refutedBracketEnds,
+      why:
+        `The derived value ${derived.parameterId}=${derived.value} was refuted by evidence it did not author. ` +
+        'That is a real result: the value proposed after the declared space ran out is also out.',
+    };
+  }
+
+  if (refutedBracketEnds.length === ends.length) {
+    return {
+      standing: 'SUPPORTED_INTERVAL_NOT_IDENTIFIED',
+      interval,
+      refutedBracketEnds,
+      why:
+        `Both bracket ends were refuted, so ${derived.parameterId} lies between ${lo} and ${hi}. That interval is ` +
+        `what the evidence supports. ${derived.value} is the point the derivation proposed inside it and was not ` +
+        'refuted there — which is not the same as being identified: any value in this interval that predicts within ' +
+        'the declared agreement band at the settings actually tried would have survived the same way. Narrowing ' +
+        'this is another experiment, not another sentence.',
+    };
+  }
+
+  return {
+    standing: 'SUPPORTED_NOTHING_NARROWED',
+    interval,
+    refutedBracketEnds,
+    why:
+      `${derived.parameterId}=${derived.value} was not refuted, but neither was ` +
+      `${ends.filter((id) => !refutedBracketEnds.includes(id)).join(' and ')}. The follow-up did not separate the ` +
+      'derived value from the claims it was derived between, so nothing was narrowed and no interval was earned.',
+  };
 }
 
 /** The candidate as a testable hypothesis, ready to be handed to a new inquiry. */

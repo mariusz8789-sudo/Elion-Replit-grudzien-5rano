@@ -4,6 +4,7 @@ import { getCounters, clearAnalytics, type AnalyticsEvent } from '../core/analyt
 import { getVisitedCount, getLogState, ACHIEVEMENTS } from '../core/discoveryLog';
 import { clearAll } from '../core/storage';
 import { AccountPanel } from './AccountPanel';
+import { SecurityAuditPanel } from './SecurityAuditPanel';
 
 const EVENT_LABELS: Record<AnalyticsEvent, string> = {
   experiment_open: 'Otwarte eksperymenty',
@@ -60,6 +61,15 @@ export function SettingsScreen({ onReplayOnboarding }: { onReplayOnboarding?: ()
           zobacz zakładkę „Projekty" na ekranie głównym. Bez logowania Genesis OS działa w pełni lokalnie (offline).
         </p>
         <AccountPanel />
+      </section>
+
+      <section className="settings-section">
+        <h2>Bezpieczeństwo</h2>
+        <p className="settings-hint">
+          Realny audyt podatności zależności tego wdrożenia (npm audit) — pierwsza, uczciwa warstwa badań
+          bezpieczeństwa w Genesis. Zero symulowanych ataków, zero wymyślonych wyników.
+        </p>
+        <SecurityAuditPanel />
       </section>
 
       <section className="settings-section">

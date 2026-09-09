@@ -92,7 +92,11 @@ import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs'
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
+import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
 const TRIAL_STATUSES = new Set(['baseline', 'draft', 'promising', 'failed']);
@@ -192,6 +196,16 @@ export function handleApi(db, ctx) {
   // ---- Od tego miejsca wymagany ważny token ----
   const user = getUserByToken(db, ctx.token);
   if (!user) return err(401, 'unauthorized', 'Zaloguj się, aby korzystać z trwałych projektów.');
+
+  // ---- Bezpieczeństwo: audyt podatności realnych zależności repo (pierwsza uczciwa
+  // warstwa "Genesis Cyber" — zob. security/dependencyAudit.mjs). Bez zakresu projektu:
+  // dotyczy wdrożenia jako całości, nie danych żadnego konkretnego projektu. Wymaga
+  // zalogowania (nie jest publiczne jak /compute/environment), bo ujawnia realne,
+  // podatne wersje zależności działającego serwera.
+  if (seg[0] === 'security') {
+    if (seg[1] === 'dependency-audit' && seg.length === 2 && method === 'GET') return dependencyAuditHandler();
+    return err(404, 'not_found');
+  }
 
   if (seg[0] === 'projects') {
     // /api/projects
@@ -887,6 +901,27 @@ function environmentHandler(db) {
   const stale = !last || Date.now() - last.createdAt > 3_600_000;
   const audit = stale ? saveEnvAudit(db, { runtime: probe.runtime, engines: probe.engines }) : last;
   return ok({ environment: { runtime: probe.runtime, engines: probe.engines }, auditId: audit.id, auditedAt: audit.createdAt });
+}
+
+/**
+ * GET /api/security/dependency-audit — realny `npm audit --json` na tym repo
+ * (security/dependencyAudit.mjs), zmapowany na SUSPECTED-only findings. `npm
+ * audit` to realny, powolny (sekundy) proces sieciowy, więc wynik jest
+ * cache'owany w pamięci procesu na 5 minut — bez osobnej tabeli: to nie jest
+ * trwała, audytowalna próba naukowa (Evidence/Replay), tylko odświeżalny
+ * odczyt bieżącego stanu zależności.
+ */
+let dependencyAuditCache = null; // { at: number, body: object }
+const DEPENDENCY_AUDIT_CACHE_MS = 5 * 60 * 1000;
+function dependencyAuditHandler() {
+  if (dependencyAuditCache && Date.now() - dependencyAuditCache.at < DEPENDENCY_AUDIT_CACHE_MS) {
+    return ok(dependencyAuditCache.body);
+  }
+  const result = runDependencyAudit({ cwd: REPO_ROOT });
+  if (!result.ok) return err(503, 'dependency_audit_unavailable', result.error);
+  const body = { findings: result.findings, summary: summarizeFindings(result.findings), auditedAt: Date.now() };
+  dependencyAuditCache = { at: Date.now(), body };
+  return ok(body);
 }
 
 /* ---------------- Handler backendowego silnika obliczeniowego ---------------- */

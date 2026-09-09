@@ -207,11 +207,13 @@ widening — not a new subsystem.
 
 ## 0bis. Information Gain / Experiment Planner — DONE for PARAMETER and CALIBRATION
 
-**Status: implemented.** The design below was built exactly as audited, and the
-worked example at the end of this section is now a passing test. What follows
-is kept as the reasoning record — including the measurement that decided it —
-because the "why not a score" argument governs anything built on top of this.
-MECHANISM is still open; see the end of the section.
+**Status: implemented** (`228b19c`). The design below was built exactly as
+audited, and the worked example at the end of this section is now a passing
+test. What follows is kept as the reasoning record — including the measurement
+that decided it — because the "why not a score" argument governs anything built
+on top of this. MECHANISM is still open, and C3's two sections directly above
+are why: its hypotheses make no prediction about a shared observable, so the
+pairwise machinery widened here has nothing to widen over there.
 
 The user's third named priority, after Memory→Selection and Competing Models.
 **"Information gain" cannot mean a numeric utility function here** — nothing
@@ -534,3 +536,123 @@ from 155.4 to 31.2. A first autonomous demonstration:
 
 That sequence uses no new domain, no new solver, and no fabricated state — and it
 is a genuine autonomous investigation of a question nobody handed hypotheses for.
+
+---
+
+## 10. The learning loop, traced end to end — measured, not argued
+
+Asked after Information Gain landed: *does Genesis now LEARN from a result and
+change its next decision, or has it only got a smarter ranking?* Answered by
+running real fixtures and reading what came back, not by reading this document.
+Every number below is from a temporary probe script (deleted; the behaviours it
+measured are asserted by the permanent tests named).
+
+### 10.1 Does the RESULT change the NEXT decision? — YES, measured
+
+One fixture, four real hidden folds (`proteinFoldingInquiry`). Round 1 is
+identical in all four (probe=200; the acceptance rate has a real algorithmic
+floor there, 0.13 for every candidate). Round 2 is the SAME chosen experiment
+in all four (probe=5000, selected to separate `h:cold`/`h:cool`). It returns
+four DIFFERENT observations — and from there nothing is shared:
+
+| hidden | observed @5000 | ruled out | what it chose NEXT |
+|---|---|---|---|
+| `h:cold` | 0.1728 | cool, warm, hot | nothing — `NO_CONTENDERS_LEFT`, stop |
+| `h:cool` | 0.3428 | cold, hot | probe=20000, `DISCRIMINATES_TOP_TWO`, pair (cool, warm) |
+| `h:warm` | 0.3796 | cold | probe=20000, `DISCRIMINATES_OTHER_PAIR`, pair (warm, cool) |
+| `h:hot`  | 0.4140 | cold, cool | nothing — `NO_DISCRIMINATING_PROBE`, stop |
+
+The `cool` and `warm` rows are the sharp ones: **the same probe value, chosen
+under a different rule, for a different reason.** For `cool` the top two really
+are (cool, warm) and 20000 separates them. For `warm` the top two are
+(warm, hot) and nothing separates them, so the widened search picks 20000 to
+rule out `cool` instead. The observation writes the belief state; the belief
+state picks the rule; the rule picks the experiment. No branch of that is
+scripted.
+
+### 10.2 Is memory KNOWLEDGE or just HISTORY? — knowledge, measured
+
+Memory's product is a narrowed hypothesis set. The question is whether a
+narrowed set changes WHICH EXPERIMENT RUNS, or only which verdicts get
+reported. Same hidden fold (`h:warm`), full set vs. the set memory would hand
+over if `h:cold` had been refuted in an earlier session:
+
+| set | round 2 | pair | rounds | outcome |
+|---|---|---|---|---|
+| all four | probe=**5000** | (cold, cool) | 3 | warm, hot survive |
+| without `h:cold` | probe=**20000** | (cool, warm) | 2 | warm, hot survive |
+
+Dropping one remembered-refuted hypothesis changes the next experiment from
+5000 to 20000 and saves a whole round. Memory is not a log being replayed —
+it reaches the selector through `rankHypotheses`, and the selector runs a
+different experiment because of it. Execution path, all real:
+`scienceMemory` → `memoryNarrowedHypotheses` → `executedInput.hypotheses` →
+`inContention` → `rankHypotheses` → pair choice → probe choice.
+
+### 10.3 Model UPDATE vs. model ELIMINATION — the paths differ, and this is the finding
+
+**MECHANISM revises.** Measured on the flood catalog: declared
+`[h:pump-capacity]`, and after the run the belief set contains
+`[h:pump-capacity, h:pump-capacity~RELATION_FLIP]`. That second id was
+**created during the run**, from the real measured direction of the
+falsification (P3's `deriveAlternativeCriteria`). C3's generator audit
+(§ above) carries this further: on `genesis-backup-generator` both declared
+hypotheses are falsified, both derive flipped alternatives, and both
+alternatives are then genuinely SUPPORTED. That is `A ❌ → create C`, running
+today, on a real substrate.
+
+**PARAMETER does not.** Measured across every fold including total failure
+(hidden T=0.5 falsifies all four candidates): the set of hypothesis ids that
+ever appears is exactly the set declared. **Novel ids created: none, ever.**
+When everything is falsified the loop reports
+*"the system's real value is not among the values anyone proposed"* — correct,
+honest, and terminal. It cannot propose a value.
+
+So the honest answer to "can Genesis modify a model, or only discard one":
+**it depends which loop is asking.** MECHANISM modifies. PARAMETER only
+eliminates. That asymmetry is the single most important gap this trace found,
+and it is bigger than anything left in the planner.
+
+### 10.4 The DISCOVERY THRESHOLD exists — as a sensor with no actuator
+
+`modelSufficiency.ts` already computes exactly the transition asked about:
+`DECLARED_SPACE_INSUFFICIENT` means *"none of the declared mechanisms explains
+this; a next step must go outside the declared space."* Grep for who consumes
+it:
+
+- `genesisMatrix.ts` — puts it in a projection.
+- `genesisNarration.ts` — reads it aloud.
+
+**That is all.** No loop, no orchestrator, no next-experiment selector reads it.
+Genesis can SAY "my models are insufficient" and cannot ACT on having said it.
+The threshold is detected and then dropped.
+
+### 10.5 First missing element, and the next best step
+
+Not the planner. The first missing element is that **the PARAMETER path has no
+generation primitive at all**, and the one component that knows generation is
+needed (10.4) is wired to nothing that could do it.
+
+The minimal primitive — deliberately NOT implemented here, because it is a new
+generation capability on a live loop and needs the same care P3 got:
+a PARAMETER-side analogue of `deriveAlternativeCriteria` that proposes a new
+claimed VALUE derived from the real measured numbers (the obvious honest
+derivation: bracket between the two nearest falsified predictions, since the
+measurement lies between them by construction). Two constraints are
+non-negotiable and both already have precedent:
+
+1. **Anti-HARKing, exactly as P3 handles it.** A value derived from the
+   measurement that falsified everything cannot be judged against that same
+   measurement. It must be preregistered and tested at an untried probe —
+   which is precisely what `excludedStrengths` does on the MECHANISM side.
+2. **It must refuse when it cannot derive.** `deriveAlternativeCriteria`
+   returns `[]` from a no-effect refutation rather than inventing something.
+   The PARAMETER analogue must return nothing when the falsified predictions
+   do not bracket the observation — a value nobody can justify is worse than
+   an honest stop.
+
+Wiring 10.4's verdict into that primitive is what turns "I know my space is
+insufficient" into "so here is the hypothesis that isn't in it" — and that,
+not a better ranking, is the step that makes the loop
+*experiment → knowledge → model change → next experiment* rather than
+*experiment → knowledge → next experiment*.

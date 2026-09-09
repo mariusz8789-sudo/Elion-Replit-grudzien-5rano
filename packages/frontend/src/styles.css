@@ -1921,6 +1921,16 @@ button.fp-lab-prompt { pointer-events: auto; cursor: pointer; appearance: none; 
 .gx-experiment-result > div { text-align: left; }
 .gx-experiment-world { font-size: 0.72rem; opacity: 0.75; letter-spacing: 0.02em; }
 .gx-experiment-world code { opacity: 0.9; }
+/* MATRIX UI — the whole Theory→Prediction→Simulation→Evidence→Falsification loop, one labelled
+   stage per real GenesisMatrixView field group (genesisMatrix.ts/genesisNarration.ts). */
+.gx-matrix-panel { display: flex; flex-direction: column; gap: 0.45rem; max-width: 100%; text-align: left; margin-top: 0.3rem; padding-top: 0.4rem; border-top: 1px solid rgba(126, 179, 255, 0.25); }
+.gx-matrix-stage { display: flex; flex-direction: column; gap: 0.1rem; }
+.gx-matrix-stage-label { font-size: 0.62rem; letter-spacing: 0.08em; opacity: 0.6; color: #9fd0ff; }
+.gx-matrix-caveat { color: #ffcf7a; font-size: 0.76rem; }
+.gx-matrix-empty { color: var(--text-dim); font-size: 0.72rem; font-style: italic; opacity: 0.7; }
+.gx-matrix-competing { margin-top: 0.15rem; padding: 0.35rem 0.5rem; border-radius: 0.4rem; background: rgba(255, 140, 60, 0.12); border: 1px solid rgba(255, 140, 60, 0.35); }
+.gx-matrix-competing strong { display: block; font-size: 0.74rem; color: #ffb877; margin-bottom: 0.2rem; }
+.gx-matrix-competing ul { margin: 0; padding-left: 1.1rem; font-size: 0.72rem; }
 /* LIVING WORLD — a minimal, always-visible-once-`entered` touch D-pad: the mobile equivalent of
    WASD, since a touch device has no physical keys for `MOVE_KEYS` to map from. Bottom-left, out of
    the way of the crosshair/prompt (center) and the existing sim-transport controls (below the stage).

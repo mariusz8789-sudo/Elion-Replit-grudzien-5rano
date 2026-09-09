@@ -448,6 +448,82 @@ describe('GenesisWorldSim3D — PLAY A LIVE EXPERIMENT ROUND (StrategyRun.rounds
 });
 
 /**
+ * MATRIX UI — `getMatrixView()` exposes the exact `GenesisMatrixView` Voice Guide already narrates
+ * from, so the React layer can render it. These tests assert the WIRING (built on a real run, null
+ * before/after) — the view's own field-by-field correctness is `genesisMatrix.test.ts`'s job, not
+ * this file's, since this class does not compute any of those fields itself.
+ */
+describe('GenesisWorldSim3D — MATRIX UI (getMatrixView exposes the real GenesisMatrixView)', () => {
+  it('getMatrixView() is null before any run has been played', () => {
+    const { sim } = buildInitializedSim();
+    expect(sim.getMatrixView()).toBeNull();
+  });
+
+  it('runStrategyDiscovery() builds a real GenesisMatrixView with one entry per round', () => {
+    const { sim } = buildInitializedSim();
+    const run = sim.runStrategyDiscovery()!;
+    const view = sim.getMatrixView();
+    expect(view).not.toBeNull();
+    expect(view!.entries.length).toBe(run.rounds.length);
+    expect(view!.question).toBe(run.question);
+    // Cross-cutting fields — never null on a RAN (non-refused) outcome, see genesisMatrix.ts's doc.
+    expect(view!.sufficiency).not.toBeNull();
+    expect(view!.competingModels).not.toBeNull();
+  });
+
+  it('dismissStrategyRun() clears the matrix view along with the run', () => {
+    const { sim } = buildInitializedSim();
+    sim.runStrategyDiscovery();
+    expect(sim.getMatrixView()).not.toBeNull();
+    sim.dismissStrategyRun();
+    expect(sim.getMatrixView()).toBeNull();
+  });
+});
+
+/**
+ * WOW MOMENTS — the observer scientist standing beside the round-stage beacon. These tests assert
+ * the WIRING (built once, hidden until a round with a real beacon is staged, hidden again on
+ * dismiss) — its pose/facing logic is exercised indirectly here (no throw across every real round a
+ * real flood search produces, several of which are the SUPPORTED/COMPETING states this reacts to);
+ * `humanoidAgentVisual.ts`'s own tests cover `sync()`'s pose/ring behaviour in isolation.
+ */
+describe('GenesisWorldSim3D — WOW MOMENTS (observer scientist reacts to the real round verdict)', () => {
+  const OBSERVER_NAME = 'humanoid-agent-999999';
+
+  it('is built once at init(), hidden until a round with a real beacon is staged', () => {
+    const { sim, scene } = buildInitializedSim();
+    const observer = scene.children.find((c) => c.name === OBSERVER_NAME);
+    expect(observer).toBeDefined();
+    expect(observer!.visible).toBe(false);
+
+    sim.runStrategyDiscovery();
+    // Only visible once `stageRound()` actually found a real lever/target for round 1 — the same
+    // honest "beacon simply does not appear" condition this class already documents.
+    if (scene.children.some((c) => c.visible && c.name.startsWith('round-stage-'))) {
+      expect(observer!.visible).toBe(true);
+    }
+  });
+
+  it('dismissStrategyRun() hides the observer again, never leaving it stranded on screen', () => {
+    const { sim, scene } = buildInitializedSim();
+    sim.runStrategyDiscovery();
+    sim.dismissStrategyRun();
+    const observer = scene.children.find((c) => c.name === OBSERVER_NAME);
+    expect(observer!.visible).toBe(false);
+  });
+
+  it('stepping through every real round never throws, whatever verdict/competing-models state it lands on', () => {
+    const { sim } = buildInitializedSim();
+    const run = sim.runStrategyDiscovery();
+    if (!run) return; // this goal admitted no run this pass — nothing to step through
+    for (let i = 0; i < run.rounds.length; i++) {
+      expect(() => sim.stageRound(i)).not.toThrow();
+      expect(() => sim.update(0.1)).not.toThrow();
+    }
+  });
+});
+
+/**
  * VOICE GUIDE — `speechSynthesis`/`SpeechSynthesisUtterance` are real browser APIs with no
  * meaningful behaviour in this (Node, no jsdom) test environment: every other test file in this repo
  * simply never sets `window` at all, and `speakNarration()`'s own `typeof window === 'undefined'`

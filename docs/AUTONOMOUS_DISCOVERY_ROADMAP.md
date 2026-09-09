@@ -681,67 +681,151 @@ not a better ranking, is the step that makes the loop
 *experiment → knowledge → model change → next experiment* rather than
 *experiment → knowledge → next experiment*.
 
-### 10.6 The PARAMETER-side primitive — measured and built standalone (C3, next 10h pass)
+### 10.6 The gap in 10.5, closed — `parameterAlternative.ts`
 
-The minimal generation primitive named in §10.5 is built and tested:
-`parameterRegeneration.ts`'s `deriveInterpolatedParameterValue`. It takes the
-FALSIFIED hypotheses' own real predictions at one shared observation and, when
-two of them bracket the real observed value, linearly interpolates a new
-CLAIMED VALUE between their two claimed values — a mechanical reading of
-already-measured numbers, the same restraint `deriveAlternativeCriteria`
-already holds on the MECHANISM side (`RELATION_FLIP`/`TOLERANCE_WIDENED` are
-arithmetic on real numbers, never a guess at the mechanism).
+Built exactly as 10.5 specified, and no larger. `deriveAlternativeParameterValue`
+is a pure derivation over a finished inquiry — the same shape as its MECHANISM
+sibling `deriveAlternativeCriteria`, which was likewise a pure function long
+before P3 gave it a call site. It runs no solver and touches no loop.
 
-**Measured on the real `epidemicInfectiousDaysCalibration` fixture** (P6/P7),
-hidden value 6.75 days — not among the five declared candidates (6, 6.5, 7,
-7.5, 8): at tick=30 three candidates are falsified against one shared real
-observation (488.62), and `h:extended` (claimed 7.5, predicted 396.50) and
-`h:short` (claimed 6, predicted 622.73) bracket it. Interpolating recovers
-**6.889** — 0.14 days from the real 6.75, not exact (the epidemic model is not
-linear in `infectiousDays`) but a genuinely useful proposal, not a guess.
+**It is also the first ACTUATOR on the insufficiency sensor.** 10.4 found
+`DECLARED_SPACE_INSUFFICIENT` being computed, announced by narration, and acted
+on by nothing. It is now the precondition for deriving at all: "my declared
+space is insufficient" finally leads somewhere.
 
-**The refusal is equally load-bearing and equally measured.** For a hidden
-value far outside the declared range (20 days), every candidate's prediction
-lies on the SAME side of the real observation — nothing brackets it — and the
-function correctly returns `null` rather than extrapolate. Extrapolating past
-a declared range with one linear step has no honest error bound, and this
-primitive does not manufacture one.
+**How the value is derived — bracketing.** At a probe where the measurement came
+back, every hypothesis has a real prediction from a real solver run. If one
+prediction sits below the observation and another above it, a value between
+those two claims is what the data points at. Nothing is fitted, searched or
+randomised.
 
-**Anti-HARK guard needs no new field here**, unlike MECHANISM's
-`excludedStrengths`: `inquiryLoop.ts`'s `triedProbes` and
-`worldParameterCalibration.ts`'s `tried` ticks are GLOBAL, not per-hypothesis
-— once a setting is measured, `selectNextProbe` never offers it to ANY
-hypothesis again, declared or derived. A derived candidate's first test is
-therefore structurally guaranteed to land on an untried setting by the loop's
-own existing bookkeeping.
+**Measured, on the real fixture 10.5 asked for.** A fold at temperature 0.5 is
+one nobody declared (candidates: 0.3, 0.7, 1.2, 2.0). A real run refutes all
+four — `DECLARED_SPACE_INSUFFICIENT`, `openQuestions` carrying *"not among the
+values anyone proposed"*. At 5000 steps the observed acceptance rate 0.2576
+sits between `h:cold`'s 0.1728 (T=0.3) and `h:cool`'s 0.3428 (T=0.7). Midpoint:
+**0.5 — the true hidden value, derived from the failure rather than guessed.**
 
-**Scope stated, not faked:** declared and tested for the single-scalar case
-only (`WorldParameterCalibration.claimedValue: number`, or a Fabric
-`ParameterHypothesis.claimedValues` with exactly one key). Arrhenius-style
-multi-dimensional claimed values (`activationEnergyKJ` AND
-`preExponentialLog10` at once) have no well-defined single interpolated point
-from a 1-D bracket, and this module does not invent one to look more complete.
+**And it survives being tested.** The derived hypothesis was run in a genuinely
+new inquiry against the two claims that bracketed it, opened at 20000 steps —
+untried in the first inquiry, and NOT the 5000 that produced the derivation.
+Result: `h:derived-temperature-0.5` is the sole survivor; `h:cold` and `h:cool`
+are refuted again, on measurements neither the derivation nor the original run
+had seen. That is `A ❌ B ❌ C ❌ D ❌ → derive E → test E on evidence it did not
+author → E stands`.
 
-**Deliberately NOT wired into `inquiryLoop.ts`'s or
-`worldParameterCalibration.ts`'s round loop**, for the identical reason
-§10.5 itself gave for not building this eagerly: it is a new generation
-capability on a LIVE loop, and deciding WHEN to trigger it (only on total
-falsification? every round?), how many derived candidates to allow, and how
-it interacts with the round budget is a real control-flow decision for
-whoever owns those loops — not decided by this measurement. Tested in
-`parameterRegeneration.test.ts` against the real fixture above plus pure
-classifier-boundary cases (degenerate equal-prediction pair, bracket order
-independence, fewer than two points).
+**Anti-HARKing is carried, not trusted.** The probe that produced the
+derivation is returned as `excludedProbeValues`, so a caller scheduling the
+test cannot silently reuse it — the same failure mode `excludedStrengths`
+guards against on the MECHANISM side.
 
-### 10.7 The OUTER loop, confirmed independently — no multi-investigation autonomy exists anywhere
+**Three refusals, each asserted on a real case:** something still survives (the
+space is not exhausted, and testing between survivors is the loop's own job);
+hypotheses claim two coupled parameters rather than one scalar (a 1-D bracket
+cannot locate a point in the Arrhenius compensation plane, so it refuses rather
+than approximates); and no bracket exists (at 200 steps every candidate
+predicts the identical 0.13 — a real algorithmic floor — and extrapolating past
+the declared range would be inventing, so it declines).
+
+**Honest limits, stated rather than implied.** Bracketing assumes the metric
+moves monotonically with the parameter between the two bracketing claims; that
+is not verified, and does not need to be, because the candidate faces a real
+experiment before it is believed — the same measurement shows the midpoint
+landing well away from the truth on other folds. When several rounds bracket,
+only the last is used; intervals are not intersected and a contradiction
+between rounds is not yet detected.
+
+**Not yet wired into a loop.** Deriving is now possible and proven; deciding
+that an inquiry should automatically continue with the derived candidate is a
+control-flow change to a live loop, and gets its own pass — exactly the
+sequencing P3 followed.
+
+### 10.7 The bridge closed — generation now fires by itself
+
+10.6 left one thing open, and it was the whole difference between a capability
+and a behaviour: Genesis COULD derive a value nobody declared, but nothing asked
+it to. `runInquiryWithGeneration` (`inquirySession.ts`) is that call site — the
+same sequencing P3 followed, pure derivation first, wiring second, once the
+derivation had been measured on a real fixture.
+
+The flow, unprompted, one call:
+
+```
+declared hypotheses → inquiry → every one falsified
+  → DECLARED_SPACE_INSUFFICIENT        (modelSufficiency.ts)
+  → derive a bracketed value            (parameterAlternative.ts)
+  → a FRESH inquiry, opened on a setting the derivation never saw
+  → a real verdict on the derived hypothesis
+```
+
+**Why `inquirySession.ts` and not the loop itself.** That module already
+describes itself as "the wiring, not a second engine", which is exactly this
+job. Putting it inside `inquiryLoop.ts` would also have created a real import
+cycle (`inquiryLoop` → `parameterAlternative` → `discoveryStrategies` →
+`inquiryLoop`), and would have meant rewriting a live loop's control flow to
+get a behaviour that composes cleanly outside it.
+
+**Why a FRESH inquiry rather than more rounds of the first.** The derived value
+is a different claim from the ones the first inquiry was handed, and it has to
+be judged on evidence that inquiry did not already spend. Continuing the
+original run would judge it partly on the measurements that produced it.
+
+**Anti-HARKing is now ENFORCED, not merely reported.** 10.6 returned
+`excludedProbeValues` and trusted the caller. This is the caller, and it honours
+the exclusion by construction: the follow-up opens at the first candidate
+setting that is BOTH untried in the first inquiry AND not excluded — strictly
+stronger than the contract requires.
+
+**Measured, unprompted, on the real fixture** (`inquiryGenerationLoop.test.ts`):
+a fold at temperature 0.5 falsifies all four declared candidates; Genesis
+derives `h:derived-temperature-0.5` on its own; a second investigation opens at
+a step count neither the first inquiry nor the derivation used; the derived
+hypothesis is the **sole survivor**, and `h:cold`/`h:cool` are refuted again.
+`A ❌ B ❌ C ❌ D ❌ → E → TEST → E ✅`, with nobody asking for E.
+
+**One new refusal, and it matters.** When a value IS derivable but every
+candidate setting was already spent by the inquiry that produced it, this
+declines to continue and reports the candidate as an untested proposal —
+rather than confirming it on the data that authored it. Asserted on a real
+case (the same fixture with its probe list cut to the two settings the first
+inquiry actually uses).
+
+**Deliberately untouched:** `runDiscovery`'s contract. It returns ONE
+`StrategyRun`, and representing "two runs, the second derived from the first"
+through it is a contract decision worth taking on its own.
+
+**Next gap, named while implementing this** (and unchanged by it): bracketing
+uses only the LAST round that brackets. It does not intersect the intervals
+several rounds imply, and does not detect a contradiction between them — which
+would itself be a real signal that the metric is not monotonic in the parameter,
+the one assumption bracketing rests on.
+### 10.8 The OUTER loop, confirmed independently — then one narrow exception landed
 
 §10.1–10.2 measured that the loop is genuinely adaptive ROUND to ROUND, within
 one investigation. A separate question — does anything decide WHICH question
 to investigate NEXT, once one run ends? — was checked directly (C3, this
-pass, read-only trace, not inferred from this document): grepped every call
-site of `runDiscovery`, `runAutonomousDiscovery`, `runAutonomousInquiry`,
-`runWorldDiscoveryAndRemember`, `runInquiryAndRemember`. **None is ever called
-more than once in a loop where run N's output feeds run N+1's input.**
+pass, read-only trace, not inferred from this document, and BEFORE §10.6-10.7
+landed): grepped every call site of `runDiscovery`, `runAutonomousDiscovery`,
+`runAutonomousInquiry`, `runWorldDiscoveryAndRemember`, `runInquiryAndRemember`.
+At that moment, none was ever called more than once in a loop where run N's
+output fed run N+1's input.
+
+**§10.6-10.7 is now a real, if narrow, exception, and this section is revised
+to say so rather than stand as overtaken.** `runInquiryWithGeneration` DOES
+call `runAutonomousInquiryWithRuns` twice, with the second call's hypotheses
+and opening probe DERIVED from the first call's result
+(`deriveAlternativeParameterValue`) — output N genuinely feeding input N+1,
+autonomously, on a real fixture, with the derived hypothesis surviving
+evidence neither run had seen. So "no exception found anywhere" no longer
+holds as stated. What still holds, checked again after that landing: the
+exception is BOUNDED to one single generate-and-retest cycle triggered by one
+specific verdict (`DECLARED_SPACE_INSUFFICIENT` on a single-scalar PARAMETER
+space) — it does not choose a domain, a catalog, or a goal, and
+`runInquiryWithGeneration` is not yet called from `discoveryOrchestrator.ts`
+or any UI path (`grep` confirms zero call sites outside `inquirySession.ts`
+and its own test), so today's actual front doors
+(`WorldDiscoveryPanel.tsx`, `discoveryOrchestrator.runDiscovery`) still stop
+at one investigation per human-supplied question.
 
 - `hypothesisLoop.ts`'s five next-experiment selectors (unified in
   `nextAction.ts`) are pure functions that PROPOSE a next experiment for a
@@ -762,16 +846,19 @@ more than once in a loop where run N's output feeds run N+1's input.**
 
 So the honest, complete answer to "is autonomous discovery really
 autonomous": **within one investigation, yes — genuinely, measured in §10.1–
-10.2. Across investigations, no — every new question, at every level (a
-`goal` string, a `SystemUnderStudy`, a `WorldParameterCalibrationInput`, a
-lever catalog) is supplied by a human or a test fixture, with no exception
-found anywhere in the codebase.** This is not a bug to fix quietly; it is the
-honest current boundary of "autonomous" in "autonomous discovery," and it is
-larger than any single missing primitive named in §10.4–10.6 — even a fully
-wired PARAMETER/MECHANISM generation primitive would still stop at the edge
-of ONE investigation, never choosing to start a different one.
+10.2. Choosing to run a SECOND investigation from the first one's result: yes,
+in the one narrow case §10.6-10.7 built and proved. Choosing WHAT to
+investigate in any open-ended sense — a new domain, a new goal nobody
+phrased, a new catalog — no exception found anywhere, still.** The honest
+boundary moved rather than dissolved: it used to sit at the edge of every
+investigation; it now sits at the edge of every investigation UNLESS a
+PARAMETER run's declared space is exhausted, in which case it sits one
+generate-and-retest cycle later. Extending that boundary further (MECHANISM's
+own generation loop, or wiring `runInquiryWithGeneration` into
+`discoveryOrchestrator.ts` so it is reachable from the actual front door) is
+real, well-scoped next work — not decided here.
 
-### 10.8 Competing-models UI fidelity, checked against real code — no eureka-on-unresolved found
+### 10.9 Competing-models UI fidelity, checked against real code — no eureka-on-unresolved found
 
 Checked directly (C3, this pass) against the specific failure mode named for
 this audit: does the Matrix/narration UI ever show a confident "eureka" for a

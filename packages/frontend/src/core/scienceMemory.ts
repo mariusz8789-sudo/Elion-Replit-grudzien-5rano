@@ -26,6 +26,11 @@ import {
   discoveryResultFingerprint, runAutonomousDiscoveryWithEngines,
   type DiscoveryLoopExecution, type DiscoveryLoopInput, type DiscoveryLoopResult,
 } from './agent/discoveryLoop';
+import {
+  generateJointMechanismFrom, jointMechanismResultFingerprint,
+  type DerivedJointMechanism,
+} from './agent/mechanismGeneration';
+import type { JointInterventionAssessment } from './agent/mechanismInteraction';
 import { compareWorldActions, crossActionResultFingerprint, type CrossActionComparison } from './agent/crossActionComparison';
 import {
   buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, resolveWorldLeverCatalog, type WorldLeverCatalog,
@@ -234,6 +239,13 @@ export interface SavedExperiment {
    * fact that probe N+1 was chosen because of what probe N measured.
    */
   parameterInquiry?: SavedParameterInquiry;
+  /**
+   * A joint-arm finding from `core/agent/mechanismGeneration.ts`: two declared
+   * MECHANISM hypotheses combined into one fork because both survived
+   * independently. A fourth shape again — see `SavedMechanismComposition`'s
+   * own doc for why it fits none of the three above.
+   */
+  mechanismComposition?: SavedMechanismComposition;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -537,6 +549,7 @@ export interface SaveExperimentInput {
   investigation?: SavedInvestigation;
   worldDiscovery?: SavedWorldDiscoveryRun;
   parameterInquiry?: SavedParameterInquiry;
+  mechanismComposition?: SavedMechanismComposition;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -587,6 +600,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.investigation !== undefined && !isSavedInvestigation(input.investigation)) throw new Error('Zapis dochodzenia wielodomenowego musi zawierać co najmniej jedną domenę z kompletną pętlą hipotez oraz RO-Crate.');
   if (input.worldDiscovery !== undefined && !isSavedWorldDiscoveryRun(input.worldDiscovery)) throw new Error('Zapis odkrycia world-model musi zawierać cel, katalog, wynik i odcisk treści.');
   if (input.parameterInquiry !== undefined && !isSavedParameterInquiry(input.parameterInquiry)) throw new Error('Zapis dochodzenia parametrycznego musi zawierać wejścia, wynik i odcisk treści.');
+  if (input.mechanismComposition !== undefined && !isSavedMechanismComposition(input.mechanismComposition)) throw new Error('Zapis kompozycji mechanizmów musi zawierać katalog, cel, wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -610,6 +624,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
     ...(input.worldDiscovery === undefined ? {} : { worldDiscovery: input.worldDiscovery }),
     ...(input.parameterInquiry === undefined ? {} : { parameterInquiry: input.parameterInquiry }),
+    ...(input.mechanismComposition === undefined ? {} : { mechanismComposition: input.mechanismComposition }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -1945,6 +1960,197 @@ export function listParameterInquiriesForSystem(system: InquiryLoopInput['system
     .map((entry) => entry.parameterInquiry)
     .filter((record): record is SavedParameterInquiry => record !== undefined && isSavedParameterInquiry(record))
     .filter((record) => parameterInquirySystemKey(record.input.system) === key);
+}
+
+// ---------------------------------------------------------------------------
+// MECHANISM COMPOSITION — the joint-arm finding, remembered.
+// ---------------------------------------------------------------------------
+
+/**
+ * A COMPOSED MECHANISM — two declared levers Genesis combined into one fork,
+ * because both survived independently and composing them is the informative
+ * next experiment (`mechanismGeneration.ts`), remembered.
+ *
+ * A fourth investigation shape, alongside `hypothesisLoop`, `worldDiscovery`
+ * and `parameterInquiry`: it is neither a preregistered fixed pair (one arm
+ * per hypothesis) nor an adaptively-probed inquiry, but a SINGLE fork applying
+ * TWO declared hypotheses' `apply` functions together, judged against their
+ * own naive-additive sum. That is a genuinely different shape and gets its own
+ * field for the same reason `worldDiscovery` and `parameterInquiry` do: fitting
+ * it into either would lose what makes it what it is.
+ *
+ * `catalogId`/`goal` — not the raw `DiscoveryLoopInput` — are what is stored,
+ * the same choice `SavedWorldDiscoveryRun` already makes: `buildWorld` is a
+ * closure and cannot survive `localStorage`, so identity plus the parser this
+ * catalog already has is what makes replay possible.
+ */
+export interface SavedMechanismComposition {
+  contractVersion: string;
+  catalogId: string;
+  goal: string;
+  worldId: string;
+  domainId: string;
+  /** The SAME memory-exclusion record the base run actually used — replay re-applies it, never today's memory. */
+  resumedFromMemory: SavedWorldDiscoveryMemoryUse | null;
+  derived: DerivedJointMechanism;
+  assessment: JointInterventionAssessment;
+  betterThanBestSingle: boolean;
+  resultFingerprint: string;
+}
+
+export const MECHANISM_COMPOSITION_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+export interface BuildSavedMechanismCompositionInput {
+  catalogId: string;
+  goal: string;
+  worldId: string;
+  domainId: string;
+  resumedFromMemory: SavedWorldDiscoveryMemoryUse | null;
+  derived: DerivedJointMechanism;
+  assessment: JointInterventionAssessment;
+  betterThanBestSingle: boolean;
+}
+
+export function buildSavedMechanismComposition(input: BuildSavedMechanismCompositionInput): SavedMechanismComposition {
+  return {
+    contractVersion: MECHANISM_COMPOSITION_MEMORY_CONTRACT_VERSION,
+    ...input,
+    resultFingerprint: jointMechanismResultFingerprint(input.derived, input.assessment),
+  };
+}
+
+export function isSavedMechanismComposition(value: unknown): value is SavedMechanismComposition {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string') return false;
+  if (!nonEmptyString(value.catalogId) || !nonEmptyString(value.goal)) return false;
+  if (!nonEmptyString(value.worldId) || !nonEmptyString(value.domainId)) return false;
+  if (!nonEmptyString(value.resultFingerprint)) return false;
+  if (!isRecordLike(value.derived) || !nonEmptyString(value.derived.hypothesisId)) return false;
+  if (!isRecordLike(value.assessment) || typeof value.assessment.jointObserved !== 'number') return false;
+  return true;
+}
+
+function mechanismCompositionAnalysis(saved: SavedMechanismComposition): SavedExperimentAnalysisBlock[] {
+  const { derived, assessment } = saved;
+  return [
+    { title: 'Pytanie', body: derived.statement, kind: 'mechanism-composition-question' },
+    {
+      title: 'Dlaczego skomponowane',
+      body: derived.why,
+      kind: 'mechanism-composition-why',
+    },
+    {
+      title: 'Wynik',
+      body: `baseline=${assessment.baseline}, effect A=${assessment.effectA}, effect B=${assessment.effectB}, ` +
+        `suma naiwna=${assessment.naiveAdditivePrediction}, zmierzono wspólnie=${assessment.jointObserved} ` +
+        `(${assessment.interaction}, odchylenie ${(assessment.relativeDeviation ?? 0) * 100}%).`,
+      kind: 'mechanism-composition-result',
+    },
+    {
+      title: 'Czy warto robić oba naraz',
+      body: saved.betterThanBestSingle
+        ? 'Tak: wspólny wynik przewyższa lepszą z pojedynczych dźwigni, niezależnie od tego, czy się addytywnie sumują.'
+        : 'Nie: wspólny wynik nie przewyższa lepszej z pojedynczych dźwigni.',
+      kind: 'mechanism-composition-worth-it',
+    },
+    ...(saved.resumedFromMemory
+      ? [{ title: 'Wykorzystanie pamięci', body: saved.resumedFromMemory.reason, kind: 'mechanism-composition-memory' }]
+      : []),
+  ];
+}
+
+/**
+ * Persists a REAL joint-arm finding as one Science Memory record, through
+ * `saveExperiment` unchanged — the same seam `saveParameterInquiryToMemory`
+ * and `saveWorldDiscoveryRunToMemory` already use.
+ *
+ * No `execution`/`ExperimentRun` is attached: the joint arm is a WorldGraph
+ * fork, not a Fabric run, the same substrate `worldDiscovery` records already
+ * report without one.
+ */
+export function saveMechanismCompositionToMemory(saved: SavedMechanismComposition): SavedExperiment {
+  const { derived, assessment } = saved;
+  return saveExperiment({
+    labId: saved.domainId,
+    experimentId: `mechanism-composition:${saved.catalogId}:${saved.resultFingerprint}`,
+    experimentName: `Kompozycja mechanizmów — ${derived.hypothesisId}`,
+    params: {
+      catalogId: saved.catalogId,
+      goal: saved.goal,
+      parentA: derived.parentHypothesisIds[0],
+      parentB: derived.parentHypothesisIds[1],
+      strength: derived.strength,
+      metric: derived.metric,
+    },
+    stats: {
+      baseline: assessment.baseline,
+      effectA: assessment.effectA,
+      effectB: assessment.effectB,
+      naiveAdditivePrediction: assessment.naiveAdditivePrediction,
+      jointObserved: assessment.jointObserved,
+      deviation: assessment.deviation,
+    },
+    mechanismComposition: saved,
+    analysis: mechanismCompositionAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: `Realny fork WorldGraph łączący dwa zadeklarowane dźwignie (${derived.parentHypothesisIds.join(', ')}); ` +
+      `werdykt (${assessment.interaction}) dotyczy TEGO modelu i tego jednego wypróbowanego natężenia (${derived.strength}), nie ogólnego prawa fizycznego.`,
+    assumptions: [],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export interface SavedMechanismCompositionReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Replays a saved composition by RE-EXECUTING the base investigation and the
+ * joint arm from stored identity — the same discipline as every other replay
+ * in this file, never reading the stored numbers back as the answer.
+ *
+ * Re-applies the SAME `resumedFromMemory` exclusion the original run used
+ * (`replaySavedWorldDiscoveryRun`'s own precedent), so this compares the
+ * record against what actually produced it rather than against today's memory
+ * state, which may have narrowed further since.
+ */
+export function replaySavedMechanismComposition(saved: SavedExperiment): SavedMechanismCompositionReplay {
+  const record = saved.mechanismComposition;
+  if (record === undefined || !isSavedMechanismComposition(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera kompozycji mechanizmów.' };
+  }
+  const selfCheck = jointMechanismResultFingerprint(record.derived, record.assessment);
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisana kompozycja została zmieniona po zapisie: jej treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  const catalog = resolveWorldLeverCatalog(record.catalogId);
+  if (!catalog) {
+    return { status: 'NOT_REPRODUCIBLE', reason: `Katalog "${record.catalogId}" nie jest już zadeklarowany w Genesis.` };
+  }
+  const intent = parseWorldDiscoveryGoal(record.goal, catalog);
+  const plan = buildWorldDiscoveryPlan(intent, catalog);
+  if ('error' in plan) {
+    return { status: 'BLOCKED', reason: `Cel przestał być czytelny dla tego katalogu: ${plan.error}` };
+  }
+  const excluded = new Set(record.resumedFromMemory?.skippedHypothesisIds ?? []);
+  const filteredHypotheses = excluded.size === 0
+    ? plan.hypotheses
+    : plan.hypotheses.filter((h) => !excluded.has(h.hypothesisId));
+  const rerunInput: DiscoveryLoopInput = {
+    ...plan,
+    hypotheses: filteredHypotheses.length > 0 ? filteredHypotheses : plan.hypotheses,
+  };
+  const first = runAutonomousDiscoveryWithEngines(rerunInput).result;
+  const fresh = generateJointMechanismFrom(first, rerunInput);
+  if (fresh.generated === null) {
+    return { status: 'NOT_REPRODUCIBLE', reason: `Ponowne wykonanie nie odtworzyło kompozycji: ${fresh.noGenerationReason}` };
+  }
+  const freshFingerprint = jointMechanismResultFingerprint(fresh.generated.derived, fresh.generated.assessment);
+  if (freshFingerprint !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Odtworzona kompozycja różni się od zapisanej (${record.resultFingerprint} → ${freshFingerprint}).` };
+  }
+  return { status: 'MATCH', reason: 'Kompozycja mechanizmów odtworzyła się identycznie po realnym ponownym wykonaniu obu ramion.' };
 }
 
 export function listExperiments(): SavedExperiment[] {

@@ -110,6 +110,11 @@ export interface SupportedInterval {
  * chain a next experiment to design from a run that generated nothing, not
  * because it localises anything.
  *
+ * `alsoRefutedHypothesisIds` carries refutations that are real but not in THIS
+ * run — the ones memory skipped re-testing. See the note at the call site
+ * below: leaving them out made a remembered run raise fewer questions than the
+ * same run with no memory at all.
+ *
  * Refuses when there is no survivor (nothing to bound), when the hypotheses do
  * not share one scalar parameter (nothing to bound it IN), or when either side
  * is unbounded — a region open at one end gives no next experiment to design.
@@ -121,6 +126,7 @@ export interface SupportedInterval {
 export function supportedIntervalOf(
   result: InquiryLoopResult,
   input: InquiryLoopInput,
+  alsoRefutedHypothesisIds: readonly string[] = [],
 ): SupportedInterval | null {
   const parameterId = sharedScalarParameter(input.hypotheses);
   if (parameterId === null) return null;
@@ -130,7 +136,13 @@ export function supportedIntervalOf(
     ids.map((id) => valueById.get(id)).filter((v): v is number => v !== undefined);
 
   const survivingValues = valuesOf(result.survivingHypothesisIds).sort((a, b) => a - b);
-  const refutedValues = valuesOf(result.falsifiedHypothesisIds);
+  // Refutations this run made, PLUS refutations memory already held. A
+  // hypothesis memory skipped was refuted by a real earlier measurement on this
+  // same system; it simply is not in THIS run's falsified list because it was
+  // never re-tested. Without it, remembering makes Genesis reason worse: the
+  // run looks like it refuted nothing, so no region is bounded and the question
+  // this evidence supports disappears.
+  const refutedValues = valuesOf([...result.falsifiedHypothesisIds, ...alsoRefutedHypothesisIds]);
   if (survivingValues.length === 0) return null;
 
   const below = refutedValues.filter((v) => v < survivingValues[0]!);

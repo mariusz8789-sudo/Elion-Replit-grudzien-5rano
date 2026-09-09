@@ -29,6 +29,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * replay, already real) and `nextQuestion.ts` (already real) — the actuator
  * work is entirely in how the chain reads and terminates on what those two
  * already report.
+ *
+ * ## A genuine SECOND, self-chosen step on the SAME domain
+ *
+ * At a tighter, still real, declared experiment budget (5 rather than 12),
+ * step 1's own round budget runs out one lever short:
+ * `h:generator-rating` gets refuted, `h:larger-tank` never gets a turn.
+ * `nextQuestion.ts` — unchanged, reading only what this step itself left
+ * open — ranks `TEST_UNTESTED_HYPOTHESIS` as the next real, answerable
+ * question. Re-issuing the IDENTICAL request is Genesis's own choice here,
+ * not a hardcoded second goal, and it is not a no-op: `priorRefutedHypothesisIds`
+ * now excludes the lever step 1 just refuted, which frees the SAME 5-experiment
+ * budget to reach the one step 1 could not afford — real memory changing what
+ * the second, self-chosen investigation actually tests.
  */
 
 function makeFakeStorage() {
@@ -111,6 +124,55 @@ describe('THE KILLER CASE: one continuous MECHANISM research chain on the genera
     expect(replaySavedMechanismComposition(compositionRecords[0]!).status).toBe('MATCH');
   });
 
+  it('a genuine SECOND, self-chosen step: a tighter budget leaves one lever untested, and Genesis retries with memory doing real work', async () => {
+    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+    const { runMechanismResearchChain } = await import('../core/agent/researchChain');
+    const { GENESIS_GENERATOR_CATALOG } = await import('../core/agent/electricalGeneratorLeverCatalog');
+    const { listExperiments } = await import('../core/scienceMemory');
+
+    const TIGHT_GOAL = 'Maximise remaining fuel, at most 5 experiments.';
+    const chain = runMechanismResearchChain(
+      { shape: 'MECHANISM', goal: TIGHT_GOAL, catalog: GENESIS_GENERATOR_CATALOG },
+      4,
+    );
+
+    // Two real steps, the second genuinely chosen by Genesis — never a
+    // hardcoded Q2 written into this test.
+    expect(chain.steps).toHaveLength(2);
+    expect(chain.selfChosenSteps).toBe(1);
+    expect(chain.steps[0]!.kind).toBe('INITIAL');
+    expect(chain.steps[1]!.kind).toBe('TEST_UNTESTED_HYPOTHESIS');
+    expect(chain.steps[1]!.why.length).toBeGreaterThan(0);
+
+    const [first, second] = chain.steps;
+    if (first!.outcome.status !== 'RAN' || second!.outcome.status !== 'RAN') throw new Error('expected RAN');
+
+    // Step 1's own round budget runs out one lever short: a real refutation,
+    // and a real hypothesis genuinely left untested — not staged for the test.
+    expect(first!.outcome.run.falsified).toEqual(['h:generator-rating']);
+    expect(first!.outcome.run.untested).toEqual(['h:larger-tank']);
+
+    // Step 2 re-issues the IDENTICAL request. Memory now excludes
+    // `h:generator-rating` — real evidence, not the test re-declaring
+    // anything — which is what frees the SAME 5-experiment budget to reach
+    // `h:larger-tank` this time.
+    expect(second!.outcome.priorInvestigation?.skippedHypothesisIds).toEqual(['h:generator-rating']);
+    expect(second!.outcome.run.untested).toEqual([]);
+    expect(second!.outcome.run.falsified).toEqual(['h:larger-tank']);
+    expect([...second!.outcome.run.surviving].sort()).toEqual(['h:fuel-efficiency', 'h:load-shedding']);
+
+    // The chain still finds and closes the same composition, and still
+    // settles honestly rather than hitting the step budget (4).
+    expect(second!.outcome.generated?.kind).toBe('COMPOSED_MECHANISM');
+    expect(chain.terminalStatus).toBe('SETTLED');
+    expect(chain.stoppedBecause).toContain('settled');
+
+    // Both real investigations banked to Memory — this is two real
+    // experiments accumulating, not one run inspected twice.
+    const worldDiscoveryRecords = listExperiments().filter((e) => e.worldDiscovery !== undefined);
+    expect(worldDiscoveryRecords).toHaveLength(2);
+  });
+
   it('a SECOND, later session reads that banked memory and skips re-testing what it already refuted', async () => {
     const storage = makeFakeStorage();
     vi.stubGlobal('window', { localStorage: storage });
@@ -148,6 +210,26 @@ describe('THE KILLER CASE: one continuous MECHANISM research chain on the genera
     // Still settles honestly, and still finds and closes the same composition.
     expect(secondChain.terminalStatus).toBe('SETTLED');
     expect(secondStep.outcome.generated?.kind).toBe('COMPOSED_MECHANISM');
+  });
+
+  it('BLOCKED: a retry that refutes nothing new stops rather than silently spending the whole step budget', async () => {
+    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+    const { runMechanismResearchChain } = await import('../core/agent/researchChain');
+    const { GENESIS_GENERATOR_CATALOG } = await import('../core/agent/electricalGeneratorLeverCatalog');
+
+    // At this budget, round 1 alone consumes the whole 2-experiment budget
+    // replicating `h:fuel-efficiency` — nothing is ever refuted, so a retry
+    // of the identical request reproduces the identical untested set forever.
+    const TOO_TIGHT_GOAL = 'Maximise remaining fuel, at most 2 experiments.';
+    const chain = runMechanismResearchChain(
+      { shape: 'MECHANISM', goal: TOO_TIGHT_GOAL, catalog: GENESIS_GENERATOR_CATALOG },
+      6,
+    );
+
+    expect(chain.terminalStatus).toBe('BLOCKED');
+    expect(chain.stoppedBecause).toContain('no fewer than before this retry');
+    // Stopped honestly after detecting no progress, not by burning the whole budget of 6.
+    expect(chain.steps.length).toBeLessThan(6);
   });
 
   it('BLOCKED: no capability behind the question at all, on step 1', async () => {

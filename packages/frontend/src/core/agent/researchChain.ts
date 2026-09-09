@@ -361,32 +361,41 @@ export interface MechanismResearchChainResult {
  * no second replay mechanism, and no narrowing concept for MECHANISM to
  * reimplement here.
  *
- * ## Stated plainly: this genuinely never exceeds one step today
+ * ## `TEST_UNTESTED_HYPOTHESIS` DOES have a real actuator: re-issue the SAME request
  *
- * `maxSteps` exists for the same reason it exists on the PARAMETER chain
- * above, and is honoured identically, but no MECHANISM candidate
- * `nextQuestion.ts` can raise has a real actuator that continues this loop —
- * `TEST_WHETHER_MECHANISMS_COMPOSE` cannot be (see above), and
- * `TEST_UNTESTED_HYPOTHESIS` would need re-issuing the SAME `MechanismRequest`
- * with a higher experiment budget, which this thin (goal, catalog) shape has
- * no way to express without parsing and rewriting the goal's own declared
- * text — a second, fragile mechanism this file will not build to manufacture
- * a longer chain. So every real run through here settles, blocks, or reports
- * itself inconclusive on step 1. That is not a bug in this loop; it is an
- * honest report of where MECHANISM's actuators currently stand.
+ * Every step already runs `prepareMechanismInvestigation`'s own
+ * `priorRefutedHypothesisIds` narrowing, which excludes whatever an earlier
+ * step on this exact (catalog, objective) REFUTED — not merely left
+ * untested. So when a step's round budget is spent before every declared
+ * lever gets a turn, re-issuing the IDENTICAL `MechanismRequest` is not a
+ * no-op replay: memory now excludes what just got refuted, which frees the
+ * SAME declared budget to reach a lever it could not afford before. That is
+ * real, evidence-driven progress on a genuinely different question ("does
+ * the lever nobody had budget for hold?"), through the existing narrowing
+ * seam, never a second mechanism.
+ *
+ * This is not guaranteed to make progress — if a step refutes NOTHING
+ * (everything left standing either survived or was never reached), memory
+ * excludes nothing new and a retry reproduces the identical state. That
+ * case is detected (the untested count stops shrinking) and reported as
+ * `BLOCKED`, honestly: this thin (goal, catalog) request has no way to ask
+ * for a larger round budget, and this file will not parse and rewrite the
+ * goal's own declared text to manufacture one.
  */
 export function runMechanismResearchChain(request: MechanismRequest, maxSteps = 4): MechanismResearchChainResult {
   const steps: MechanismResearchStep[] = [];
 
-  // Always `INITIAL`/the caller's own question: unlike the PARAMETER chain
-  // above, no MECHANISM candidate here has a real actuator that continues
-  // the loop, so every iteration re-issues the SAME request and either stops
-  // or runs out of budget — there is no second, self-chosen question to
-  // label. See the loop body for exactly why each candidate stops here.
-  const kind: ResearchQuestionKind | 'INITIAL' = 'INITIAL';
-  const why = 'The question the caller asked.';
+  // `INITIAL` for the caller's own question; `TEST_UNTESTED_HYPOTHESIS` for
+  // every self-chosen retry after it — the only MECHANISM candidate with a
+  // real actuator here (see above).
+  let kind: ResearchQuestionKind | 'INITIAL' = 'INITIAL';
+  let why = 'The question the caller asked.';
   let stoppedBecause = `Step budget of ${maxSteps} reached.`;
   let terminalStatus: ResearchChainTerminalStatus = 'OPEN';
+  // Set the first time a retry is considered; compared against the NEXT
+  // step's own untested count to detect whether the retry actually shrank
+  // the untested set, rather than merely repeating the same stuck state.
+  let untestedBeforeRetry: number | null = null;
 
   for (let step = 1; step <= maxSteps; step++) {
     const remembered = runMechanismDiscoveryAndRemember(request);
@@ -395,6 +404,15 @@ export function runMechanismResearchChain(request: MechanismRequest, maxSteps = 
 
     if (outcome.status !== 'RAN') {
       stoppedBecause = `Step ${step} was refused: ${outcome.admission.why}`;
+      terminalStatus = 'BLOCKED';
+      break;
+    }
+
+    if (untestedBeforeRetry !== null && outcome.run.untested.length >= untestedBeforeRetry) {
+      stoppedBecause =
+        `Step ${step} still leaves ${outcome.run.untested.length} hypothes(es) untested (${outcome.run.untested.join(', ')}), ` +
+        'no fewer than before this retry: nothing new was refuted for memory to exclude, so this request\'s declared ' +
+        'experiment budget cannot reach them, and this chain has no way to ask for a larger one.';
       terminalStatus = 'BLOCKED';
       break;
     }
@@ -426,14 +444,15 @@ export function runMechanismResearchChain(request: MechanismRequest, maxSteps = 
       break;
     }
 
-    // No MECHANISM candidate has a real actuator here yet. `TEST_UNTESTED_HYPOTHESIS`
-    // is reported runnable by `nextQuestion.ts` (re-running the same
-    // investigation needs no new capability in principle), but `MechanismRequest`'s
-    // thin (goal, catalog) shape carries no way to ask for just the untested
-    // subset, and re-running the IDENTICAL request reproduces the identical
-    // result — the PARAMETER chain above does not actuate this kind either,
-    // for the same reason it would be a no-op there too.
     const next = selection.nextExecutable;
+    if (next.kind === 'TEST_UNTESTED_HYPOTHESIS') {
+      untestedBeforeRetry = outcome.run.untested.length;
+      kind = next.kind;
+      why = selection.why;
+      continue;
+    }
+
+    // No actuator for any OTHER MECHANISM candidate yet.
     stoppedBecause = `Step ${step} proposed "${next.kind}", which this chain has no actuator for yet: ${next.question}`;
     terminalStatus = 'BLOCKED';
     break;

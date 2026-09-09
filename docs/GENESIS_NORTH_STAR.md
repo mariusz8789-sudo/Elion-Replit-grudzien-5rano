@@ -310,32 +310,74 @@ boundary:
   place.
 
 So the killer demo — *"Genesis, investigate the effect of X on cells"* — maps
-directly onto this catalog: `parseWorldDiscoveryGoal` against the cell-culture
-`metricPhrases`, competing mechanistic hypotheses over those levers,
-Information Gain to pick the next fork, and now (Priority 1's machinery)
-generation of an alternative when the declared levers are exhausted. The
-scientific loop the brief wants is reachable on a substrate that exists today.
+directly onto this catalog, and this is measured rather than hoped: run
+`cellCultureDiscovery.test.ts` and the mitogen and S-phase-inhibitor
+hypotheses come back genuinely `SUPPORTED`; the cytotoxic hypothesis is
+genuinely `FALSIFIED_WITHIN_PROTOCOL` (it moves the count, just the wrong
+direction), and — the strongest evidence available — Priority 1's own P3
+regeneration ALREADY fires on this exact substrate: `h:cytotoxic` refuted →
+`h:cytotoxic~RELATION_FLIP` derived from the real falsifying numbers → tested
+at an untried strength → genuinely `SUPPORTED`. Falsification → generation →
+test → support, unprompted, on cell biology, already shipped. The MECHANISM
+half of the scientific loop is not "reachable" here — it is running.
 
-**What is genuinely missing, and it is the same two gaps as Priority 1 and 2,
-not a new subsystem:**
+### Audit, measured — the two things checked rather than assumed
 
-1. **Dose as a continuous axis.** The levers move a model parameter (e.g. a
-   death rate), but "effect of X at concentration c" as a swept, bracketable
-   dimension is closer to the PARAMETER path than the MECHANISM fork. Whether
-   the cell substrate can pose a genuine dose-response PARAMETER question — and
-   therefore reuse Priority 1's bracketed generation — is a real, answerable
-   audit question, not an assumption. C3's substrate check should measure it.
-2. **The real-experiment interface.** Identical to Priority 2: today the cell
-   world is SIMULATED data. A real cell measurement would be REAL EXPERIMENTAL
-   data, and the boolean `isSynthetic` cannot tell them apart. The provenance
-   widening Priority 2 names is the same prerequisite here — biology does not
-   need its own version of it.
+**1. Does a PARAMETER-shape (Information Gain, Competing Models, bracketed
+generation) path exist for cell biology? No — checked, not assumed.**
+`core/experimentFabric/router.ts` has no cell-biology entry at all: every
+PARAMETER-shape inquiry (`inquiryLoop.ts`) runs through a `RouterModel`
+registered there (`chemistry-arrhenius`, `biology-protein-folding-hp`, …), and
+none exists for `cellCycle.ts`. So Priority 1's whole PARAMETER-side apparatus
+— Competing Models, Information Gain's all-pairs widening, and the bracketed
+generation just wired into `inquirySession.ts` — is currently unreachable on
+cell biology. Not because it does not fit; because nothing has wired it.
 
-**Ordering:** this is a strategic direction, not the next commit. It rides on
-Priority 1 (autonomous generation, now closing) and Priority 2 (provenance
-distinction) being done first — build those, and "Virtual Cell Lab" becomes
-mostly catalog depth and one honest interface, rather than a new engine. Every
-larger feature is now also judged on whether it helps reach it.
+**What fixes it, and it is small.** The pattern for wiring an existing solver
+into Experiment Fabric is already established twice
+(`biology-protein-folding-hp`, `chemistry-arrhenius` in
+`executor.ts`'s dispatch switch): a `RouterModel` entry naming its real
+parameters, plus one `case` that calls the EXISTING solver function and returns
+its EXISTING outputs. For cell biology that means calling `rk4CellCycleStep`
+— exported, untouched, the exact function `cellCultureLeverCatalog.ts` already
+calls — in a loop from t=0 to the requested time, with ONE declared parameter
+held as the unknown under test (the natural choice: `deathRatePerHour`, since
+it is the model's own dose-shaped axis — zero by default, a real first-order
+loss, and already the mechanism `lever:cytotoxic` moves). No new biology, no
+second solver: the same math, called by a loop instead of by a WorldGraph
+entity tick.
+
+**Why this is worth doing before a bigger Virtual Cell Lab push.** It is the
+one missing wire, not a subsystem, and it is what would let a REAL
+dose-response question — *"what death rate does this culture actually have
+under treatment X"* — run through the exact same Competing Models →
+Information Gain → generation loop already proven on protein folding. That is
+a stronger, more literal reading of "effect of X on cells" than the MECHANISM
+fork alone: a scalar answer with a confidence, not just a direction.
+
+**2. The real-experiment interface.** Identical to Priority 2: today the cell
+world is SIMULATED data. A real cell measurement would be REAL EXPERIMENTAL
+data, and the boolean `isSynthetic` cannot tell them apart. The provenance
+widening Priority 2 names is the same prerequisite here — biology does not
+need its own version of it.
+
+**Recommendation, from this audit, not from the original brief's suggestion:**
+the single highest-leverage next step for Priority 4 is the Experiment Fabric
+wire named above — small, reuses `rk4CellCycleStep` verbatim, and its payoff
+is immediate: cell biology gains Competing Models, Information Gain, and
+generation-after-falsification on the PARAMETER side, the same day it ships,
+with zero new biology and zero new subsystem. It does not need to wait on
+Priority 2's provenance widening — that only matters once a REAL measurement
+exists to mislabel, which is still a later step. It also does not need a
+better use-case than "effect of a substance on cells": that use-case is
+already real and already partly working (MECHANISM), and this wire is what
+completes it rather than a reason to look elsewhere.
+
+**Ordering:** a virtual wet lab first, real hardware never assumed. The
+Experiment Fabric wire above is ready to build now. The real-experiment
+interface (shared with Priority 2) comes after, once a concrete domain for an
+outside measurement is chosen. Every larger feature is now also judged on
+whether it helps reach this.
 
 ---
 

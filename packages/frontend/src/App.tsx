@@ -50,6 +50,7 @@ const CharacterLabScreen = lazy(() => import('./components/visual-simulation/Cha
 const GenesisWorldScreen = lazy(() => import('./components/visual-simulation/GenesisWorldScreen').then((m) => ({ default: m.GenesisWorldScreen })));
 const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/MoleculeLabScreen').then((m) => ({ default: m.MoleculeLabScreen })));
 const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
+const EvidenceCaseStudyScreen = lazy(() => import('./components/visual-simulation/EvidenceCaseStudyScreen').then((m) => ({ default: m.EvidenceCaseStudyScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
@@ -105,6 +106,7 @@ type Route =
   | { kind: 'genesis-world' }
   | { kind: 'molecule' }
   | { kind: 'cell-lab' }
+  | { kind: 'evidence-case-study' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
   | { kind: 'looking-glass' }
@@ -145,6 +147,7 @@ function parseHash(): Route {
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
   if (h === '#/molecule') return { kind: 'molecule' };
   if (h === '#/cell-lab') return { kind: 'cell-lab' };
+  if (h === '#/evidence' || h === '#/evidence-case-study' || h === '#/case-study') return { kind: 'evidence-case-study' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
@@ -641,6 +644,18 @@ export default function App() {
           <TopBar title="🧫 Genesis Virtual Cell Lab — Control vs Treatment" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <CellLabScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'evidence-case-study') {
+      return (
+        <div className="app">
+          <TopBar title="📋 Evidence & Replay — Case Study" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <EvidenceCaseStudyScreen />
           </HeavyRoute>
           {overlays}
         </div>

@@ -1,7 +1,9 @@
 import { admitWorldQuestion } from './discoveryAdmission';
 import { mechanismStrategy, parameterStrategy } from './discoveryStrategies';
 import type { Admission, QuestionShape, StrategyRun } from './discoveryStrategy';
+import { memoryNarrowedHypotheses } from './inquirySession';
 import type { InquiryLoopInput } from './inquiryLoop';
+import { priorRefutedHypothesisIds } from './worldDiscoverySession';
 import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalog } from './worldGoalIntent';
 
 /**
@@ -104,6 +106,30 @@ export interface DiscoveryRefused {
   readonly admission: Admission;
 }
 
+/**
+ * MEMORY, CONSULTED BUT NOT OBEYED — a warning, not a narrowing.
+ *
+ * `worldDiscoverySession.ts`/`inquirySession.ts` already have a STRONGER
+ * mechanism: they drop hypotheses an earlier run in the SAME world/system
+ * already falsified before executing. This orchestrator deliberately does
+ * NOT do that — it is Genesis's one front door, and a caller asking a
+ * declared question should get exactly that question answered in full, never
+ * a silently smaller one. What it DOES do is read the same memory those
+ * sessions already narrow on (`priorRefutedHypothesisIds`,
+ * `memoryNarrowedHypotheses` — reused, not reimplemented) and report what it
+ * found, so a caller — the Matrix, the Voice Guide — can say "Genesis already
+ * ruled this out once" without the run itself being any different for it.
+ *
+ * Whether `runDiscovery` should also narrow, matching the legacy sessions, is
+ * a real product question — same question, different behaviour depending on
+ * which entry point answers it, is not something to decide unilaterally here.
+ */
+export interface PriorInvestigationWarning {
+  /** Hypotheses in THIS request already refuted by an earlier investigation of the same world/system. */
+  readonly skippedHypothesisIds: readonly string[];
+  readonly reason: string;
+}
+
 export interface DiscoveryRan {
   readonly status: 'RAN';
   readonly contractVersion: string;
@@ -111,6 +137,8 @@ export interface DiscoveryRan {
   /** Carried on success too: a finding is worth what the capability behind it is worth. */
   readonly admission: Admission;
   readonly run: StrategyRun;
+  /** Null when memory has nothing to say — no prior investigation, or none of it applies here. */
+  readonly priorInvestigation: PriorInvestigationWarning | null;
 }
 
 export type DiscoveryOutcome = DiscoveryRan | DiscoveryRefused;
@@ -124,8 +152,13 @@ function refused(shape: QuestionShape, stage: RefusalStage, admission: Admission
   return { status: 'REFUSED', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, stage, admission };
 }
 
-function ran(shape: QuestionShape, admission: Admission, run: StrategyRun): DiscoveryRan {
-  return { status: 'RAN', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, admission, run };
+function ran(
+  shape: QuestionShape,
+  admission: Admission,
+  run: StrategyRun,
+  priorInvestigation: PriorInvestigationWarning | null,
+): DiscoveryRan {
+  return { status: 'RAN', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, admission, run, priorInvestigation };
 }
 
 /**
@@ -140,13 +173,23 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
   if (request.shape === 'PARAMETER') {
     const admission = parameterStrategy.admit(request.input);
     if (!admits(admission)) return refused('PARAMETER', 'ADMISSION', admission);
-    return ran('PARAMETER', admission, parameterStrategy.run(request.input));
+
+    // Reads the same match rule `inquirySession.ts` narrows on
+    // (`parameterInquirySystemKey`) but the returned `executedInput` is
+    // discarded on purpose — this front door runs the request as declared.
+    const { resumedFromMemory } = memoryNarrowedHypotheses(request.input);
+    const priorInvestigation: PriorInvestigationWarning | null = resumedFromMemory
+      ? { skippedHypothesisIds: resumedFromMemory.skippedHypothesisIds, reason: resumedFromMemory.reason }
+      : null;
+
+    return ran('PARAMETER', admission, parameterStrategy.run(request.input), priorInvestigation);
   }
 
   const admission = admitWorldQuestion(request.goal);
   if (!admits(admission)) return refused('MECHANISM', 'ADMISSION', admission);
 
-  const plan = buildWorldDiscoveryPlan(parseWorldDiscoveryGoal(request.goal, request.catalog), request.catalog);
+  const intent = parseWorldDiscoveryGoal(request.goal, request.catalog);
+  const plan = buildWorldDiscoveryPlan(intent, request.catalog);
   if ('error' in plan) {
     // The capability exists; this world could not be ASKED this. Reported in the
     // same vocabulary rather than a second one, with the planner's own sentence
@@ -159,5 +202,17 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     });
   }
 
-  return ran('MECHANISM', admission, mechanismStrategy.run(plan));
+  // `intent.objectiveMetric`/`intent.direction` are non-null here — `plan`
+  // only builds once the planner has resolved both.
+  const refuted = priorRefutedHypothesisIds(request.catalog.catalogId, intent.objectiveMetric!, intent.direction!);
+  const alreadyRefuted = plan.hypotheses.map((h) => h.hypothesisId).filter((id) => refuted.has(id));
+  const priorInvestigation: PriorInvestigationWarning | null =
+    alreadyRefuted.length > 0
+      ? {
+          skippedHypothesisIds: alreadyRefuted,
+          reason: `${alreadyRefuted.join(', ')} already refuted for "${intent.direction} ${intent.objectiveMetric}" in an earlier run on this world.`,
+        }
+      : null;
+
+  return ran('MECHANISM', admission, mechanismStrategy.run(plan), priorInvestigation);
 }

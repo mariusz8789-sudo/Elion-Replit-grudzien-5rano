@@ -1534,6 +1534,10 @@ export class GenesisWorldSim3D implements Sim3D {
       shape: 'MECHANISM',
       admission: admitWorldQuestion(goalText),
       run,
+      // The real narrowing decision `runWorldDiscoveryAndRemember` already made
+      // for THIS run (`WorldDiscoveryMemoryUse`/`PriorInvestigationWarning` are
+      // the same shape) — not a re-derived guess.
+      priorInvestigation: state.memory,
     };
     this.lastMatrixView = buildGenesisMatrixView(outcome);
     this.narratedLineCount = 0;

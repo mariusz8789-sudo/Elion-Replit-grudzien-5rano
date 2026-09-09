@@ -61,6 +61,12 @@ export function narrateIntro(view: GenesisMatrixView): readonly NarrationLine[] 
     return lines;
   }
   if (view.admissionCaveat) lines.push({ phase: 'CAVEAT', text: view.admissionCaveat });
+  // Memory is consulted but never obeyed here — spoken as context before the
+  // run's own findings, never as a reason to skip anything. See
+  // `discoveryOrchestrator.ts`'s `PriorInvestigationWarning` for why. Spoken
+  // whenever memory had anything to say, even an empty skip list: "N earlier
+  // investigations found nothing to rule out" is real context too.
+  if (view.priorInvestigation) lines.push({ phase: 'CAVEAT', text: view.priorInvestigation.reason });
   return lines;
 }
 

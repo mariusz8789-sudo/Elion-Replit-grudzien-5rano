@@ -237,8 +237,12 @@ export type WorldDiscoveryRememberedState =
  * prior Science Memory records — never from the run currently executing.
  * Scoped to the SAME (catalog, metric, direction): a mechanism refuted for
  * "minimise peak depth" says nothing about "maximise flooded area".
+ *
+ * Exported so `discoveryOrchestrator.ts` can consult the SAME memory this
+ * session already narrows on, without a second implementation of the match
+ * rule drifting from this one.
  */
-function priorRefutedHypothesisIds(
+export function priorRefutedHypothesisIds(
   catalogId: string,
   metric: string,
   direction: 'minimize' | 'maximize',

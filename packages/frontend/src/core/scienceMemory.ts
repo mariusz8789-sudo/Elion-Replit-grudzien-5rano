@@ -1661,10 +1661,43 @@ export const PARAMETER_INQUIRY_MEMORY_CONTRACT_VERSION = '1.0.0';
  * had nothing to offer — the first inquiry into this system, or no earlier
  * inquiry falsified anything — which is a real and common case, not a failure.
  */
+/**
+ * The evidence behind ONE skip, recovered from the stored inquiry that produced
+ * it rather than restated.
+ *
+ * Memory has always held this — a `SavedParameterInquiry` carries the whole
+ * `InquiryLoopResult`, so every round's observation and every hypothesis's own
+ * prediction and reason are in the record. Nothing read them. The narrowing
+ * step took `falsifiedHypothesisIds` and dropped the rest, which made memory a
+ * list of names when it was already a body of evidence.
+ *
+ * Carrying the grounds is what lets a later reader ask the question that
+ * matters — "was it refuted because it genuinely disagreed, and by how much?"
+ * — without re-running anything, and it is the minimum a context-aware reuse
+ * would need.
+ */
+export interface ParameterSkipGrounds {
+  hypothesisId: string;
+  /** The setting the refuting measurement was taken at. */
+  probeValue: number;
+  /** What this hypothesis's own claimed values predicted there, through the same solver. */
+  predicted: number | null;
+  /** What the system actually measured there. */
+  observed: number | null;
+  /** The loop's own sentence for the verdict, verbatim. */
+  reason: string;
+}
+
 export interface SavedParameterInquiryMemoryUse {
   /** Hypotheses an EARLIER inquiry into the same system already falsified. */
   skippedHypothesisIds: readonly string[];
   reason: string;
+  /**
+   * Why each skipped hypothesis was refuted, from the stored inquiry itself.
+   * Optional because records written before this existed do not have it — an
+   * absent field is "this record predates the grounds", never "there were none".
+   */
+  grounds?: readonly ParameterSkipGrounds[];
 }
 
 /**

@@ -520,3 +520,128 @@ those types.
 - When it is done, the honest order is bottom-up: window-aware metric presence
   and verdict first, reported objective last. Doing the visible half first is
   exactly the mistake this section is a record of.
+
+---
+
+## 10. Molecular scale — one real system declared, and an honest ladder gap
+
+The owner's brief named a real gap: Genesis has no PARAMETER inquiry at
+molecular scale. Five already-registered router models were suggested as
+candidates. **None of the five has the shape `inquiryLoop.ts` requires.**
+Checked against the code, not memory (`router.ts`, `structuredRequestBuilder.ts`):
+
+| Model | Parameters | Why it fails |
+|---|---|---|
+| `chem-rdkit-descriptors` | `smiles` (text) | Zero numeric parameters. A pure function of molecular identity, no hidden axis at all. |
+| `biology-depmap-crispr-senescence-panel` | none | Zero parameters of any kind. |
+| `biology-hiv-10e8-pdb-structural-comparison` | `referencePdb`, `mobilePdb` (both text) | Zero numeric parameters. |
+| `biology-openmm-md-1vii-reference` | `steps` (numeric) | Exactly ONE numeric axis — a convergence control, not a second physical unknown. |
+| `quantum-chemistry-pyscf-h2-rhf` | `bondLengthAngstrom` (numeric), `basis` (text) | Exactly ONE numeric axis; `basis` is text and cannot be searched. |
+
+`SystemUnderStudy` needs TWO independent numeric axes — `hiddenParameters` and
+`probeParameterId` — because `runAt` builds every request as
+`{...fixed, ...hidden, [probeParameterId]: probeValue}`: the probe value always
+overwrites the same key in the hidden map, so one numeric knob cannot be both
+"a fact I don't know" and "a setting I dial" at once. `hiddenParameters` and
+`fixedParameters` are also `Record<string, number>` — a text parameter can
+never be searched, only left at its declared default (`biology-dna-helix`
+fails for the same reason: `sequence` text + `temperatureC` numeric is again
+only one numeric axis). Every one of the five fails on this structural point
+before any question of scientific interest is even asked — exactly the "atrapa
+eksperymentu" (fake experiment) the brief warned against manufacturing.
+
+### What was declared instead: `proteinFoldingInquiry.ts`
+
+`biology-protein-folding-hp` — the HP lattice protein-folding model (Dill
+1985), already registered, already real, and genuinely molecular scale (a
+folding polymer, not an atom or a population) — has THREE numeric parameters:
+`temperature`, `steps`, `seed`. That is room for a real hidden axis
+(`temperature`, a fact about an unmeasured fold) and a real, different probe
+axis (`steps`, how long the agent watches before reading out a measurement).
+
+The observable chosen is `acceptanceRate`, not the more obvious `bestEnergy`:
+measured first, `bestEnergy` is a small integer dominated by which local
+minimum ONE seeded trajectory happens to fall into (genuinely noisy between
+candidates), while `acceptanceRate` is a frequency accumulated over the whole
+run and is far better behaved. MEASURED, fixed seed and sequence:
+
+```
+steps=200                    every candidate temperature reads 0.1300 — IDENTICAL
+steps=50000  T=0.3:0.116  T=0.7:0.298  T=1.2:0.382  T=2.0:0.398
+```
+
+The opening degeneracy is a real algorithmic floor (at few steps, every
+proposed move from a straight starting chain is downhill or neutral, and the
+Metropolis rule accepts those unconditionally regardless of temperature), not
+a coincidence — the molecular counterpart of the compensation line
+`chemistry-arrhenius` already uses this loop for.
+
+**Checked and disclosed rather than hidden:** this signal comes from ONE
+realised Monte Carlo trajectory. Re-measured across six seeds, the ORDERING
+(0.3 < 0.7 < 1.2 < 2.0) held every time, but the 1.2-vs-2.0 gap stayed small
+(0.01–0.06) in every seed — a real saturation of this observable at higher
+temperature, not a fluke of the one pinned seed. The test suite
+(`proteinFoldingInquiry.test.ts`) proves the loop reports that saturation
+honestly: cold and cool converge to a single survivor; warm and hot correctly
+end in `NO_DISCRIMINATING_PROBE` rather than a manufactured preference. `seed`
+itself was checked as a possible second probe axis and rejected: it selects
+which stochastic trajectory is realised, not a physically meaningful
+measurement setting, so it is held fixed rather than searched.
+
+Wired through the orchestrator with no new plumbing: `runDiscovery({shape:
+'PARAMETER', input: proteinFoldingInquiry(...)})` — untouched
+`discoveryOrchestrator.ts`, untouched `parameterStrategy` — produces the exact
+`StrategyRun` calling `parameterStrategy.run` directly does, and it runs
+through the existing Science Memory / Replay pipeline unchanged.
+
+### 10.1 The scale ladder — checked, and the honest answer is no bridge exists
+
+The owner's target is a ladder: DNA → molecule → cell → organism → population
+→ environment. Genesis has cells (`cellCycle.ts`, WorldGraph) and now has a
+real molecular PARAMETER inquiry (this section, Experiment Fabric). **Is there
+a real "molecular change → cellular effect" rung connecting them? No — checked
+by code, not asserted.**
+
+`grep` for every file that declares a `CrossDomainCoupling`
+(`crossDomainCoupling.ts`, `wildfireSpread.ts`, `rainfallRunoff.ts`,
+`seismicShaking.ts`, `genesisScientificCity3/4.ts`, `quantumTunneling.ts`,
+`drought.ts`, `floodInundation.ts`) turns up **zero** mentions of `cellCycle`
+or `cell-biology` anywhere. `cascadeRules.ts` has none either. This is not "the
+bridge is weak" — it is structural: `CrossDomainCoupling` fires on a
+`triggerEventType`, a `GenesisEvent` that only a `TemporalEngine` tick emits.
+The Fabric substrate (`runExperiment`) is a one-shot, stateless computation
+with no `WorldGraph` entity and no event stream — there is no mechanism by
+which a Fabric result could trigger a coupling even in principle, and no
+WorldGraph-side molecular domain (`chemistryKinetics.ts` included) is coupled
+to `cellCycle.ts` either.
+
+**Building this bridge now would mean inventing new glue** — reading a
+Fabric number and hand-feeding it into a WorldGraph entity's construction
+parameters — which is exactly the kind of invented rung the brief said to name
+rather than build. So it is named here, not built: **the ladder has a real gap
+between the molecular rung and the cellular rung**, and closing it is a real
+design decision (a new coupling mechanism able to span both substrates, or a
+convention for one substrate handing a value to the other at world-build time)
+that belongs to whoever owns that call, not something to improvise inside a
+single inquiry declaration.
+
+### 10.2 The negative-result finding, and why this domain's shape doesn't have one to give
+
+Every MECHANISM catalogue built this session carries a real inert-or-limited
+lever found by comparing several declared mechanisms against ONE objective
+(chemistry's mass, epidemiology's IFR, the generator's nameplate and tank).
+**A PARAMETER inquiry has no equivalent slot for that comparison, and this is
+structural, not an oversight:** `SystemUnderStudy` declares exactly ONE hidden
+axis and ONE probe axis by construction — there is no second, alternative
+"lever" being tested against a fixed objective to find inert.
+
+The nearest analogue that WAS found and IS reported: `seed`, a real declared
+numeric parameter of this very model, checked directly (§10 above) and shown
+to carry no discriminating information about the hidden temperature — not
+because it has literally zero effect on the observed metric (it does shift
+sampled values, see the six-seed table), but because that effect is
+*undirected noise* rather than a *systematic, discriminable relationship*,
+which is the property a probe axis actually needs. It is declared as a fixed
+nuisance parameter rather than searched, and the module doc says why, in place
+of a fabricated "this domain also has an inert lever" that would not be true
+in the same sense the others are.

@@ -257,7 +257,8 @@ export function priorRefutedHypothesisIds(
   return refuted;
 }
 
-function evidenceSummary(bundle: { bundleId: string; scientificContentFingerprint: string; replay: { verdict: ReplayVerdict; message: string } }): WorldDiscoveryEvidenceSummary {
+/** Exported so `discoveryOrchestrator.ts`'s own "AndRemember" persistence reuses this projection rather than a second one. */
+export function evidenceSummary(bundle: { bundleId: string; scientificContentFingerprint: string; replay: { verdict: ReplayVerdict; message: string } }): WorldDiscoveryEvidenceSummary {
   return {
     bundleId: bundle.bundleId,
     scientificContentFingerprint: bundle.scientificContentFingerprint,

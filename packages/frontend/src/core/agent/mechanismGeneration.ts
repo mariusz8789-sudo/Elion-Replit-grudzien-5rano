@@ -4,6 +4,7 @@ import { MECHANISM_STRATEGY_ID, toMechanismRun } from './discoveryStrategies';
 import { DISCOVERY_STRATEGY_CONTRACT_VERSION, type StrategyRun } from './discoveryStrategy';
 import {
   runAutonomousDiscoveryWithEngines,
+  type DiscoveryLoopExecution,
   type DiscoveryLoopInput,
   type DiscoveryLoopResult,
   type MechanisticHypothesis,
@@ -111,6 +112,15 @@ export interface JointMechanismContinuation {
 
 export interface MechanismWithGenerationResult {
   readonly first: DiscoveryLoopResult;
+  /**
+   * The full execution behind `first` — registry, baseline and last-arm world
+   * state, not only its lean `.result`. Carried so a caller building a real
+   * Evidence Bundle (`buildWorldDiscoveryEvidenceBundle` in `scienceMemory.ts`,
+   * the same function `worldDiscoverySession.ts::runWorldDiscoveryAndRemember`
+   * already uses) never has to re-run the investigation to get it — the WorldGraph
+   * state is real branch/journal data, not something a fingerprint can stand in for.
+   */
+  readonly firstExecution: DiscoveryLoopExecution;
   /** Null whenever nothing was generated — `noGenerationReason` always says why. */
   readonly generated: JointMechanismContinuation | null;
   readonly noGenerationReason: string | null;
@@ -257,7 +267,8 @@ export function runDiscoveryWithJointGeneration(
   options: { readonly tolerance?: number } = {},
 ): MechanismWithGenerationResult {
   const tolerance = options.tolerance ?? 0.02;
-  const first = runAutonomousDiscoveryWithEngines(input).result;
+  const firstExecution = runAutonomousDiscoveryWithEngines(input);
+  const first = firstExecution.result;
 
   // Refusal 1 — nothing to combine. One survivor is an answer, zero is
   // `modelSufficiency.ts`'s finding to report, not this module's.
@@ -265,6 +276,7 @@ export function runDiscoveryWithJointGeneration(
   if (competing.status !== 'COMPETING_MODELS_UNRESOLVED') {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `No joint mechanism was proposed: the run ended ${competing.status}, and combining requires two or more ` +
@@ -284,6 +296,7 @@ export function runDiscoveryWithJointGeneration(
   if (survivors.length < 2) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `${competing.competingHypothesisIds.length} hypotheses survived, but fewer than two of them are declared ` +
@@ -300,6 +313,7 @@ export function runDiscoveryWithJointGeneration(
   if (a.entityId !== b.entityId || a.criterion.metric !== b.criterion.metric) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `"${a.hypothesisId}" and "${b.hypothesisId}" are judged on different objectives ` +
@@ -313,6 +327,7 @@ export function runDiscoveryWithJointGeneration(
   if (arms === null) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         `"${a.hypothesisId}" and "${b.hypothesisId}" were never both measured at the same magnitude with a usable ` +
@@ -340,6 +355,7 @@ export function runDiscoveryWithJointGeneration(
   if (joint.baseline === null || joint.jointObserved === null) {
     return {
       first,
+      firstExecution,
       generated: null,
       noGenerationReason:
         'The joint arm ran but produced no readable objective, so there is nothing to judge additivity against.',
@@ -388,5 +404,5 @@ export function runDiscoveryWithJointGeneration(
       'answered by arithmetic over their separate effects and has to be run.',
   };
 
-  return { first, generated: { derived, assessment, betterThanBestSingle }, noGenerationReason: null };
+  return { first, firstExecution, generated: { derived, assessment, betterThanBestSingle }, noGenerationReason: null };
 }

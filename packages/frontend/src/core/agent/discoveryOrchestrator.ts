@@ -7,12 +7,20 @@ import {
   runDiscoveryWithJointGeneration,
   toJointMechanismRun,
   type DerivedJointMechanism,
+  type MechanismWithGenerationResult,
 } from './mechanismGeneration';
 import { derivedValueStanding, type DerivedParameterHypothesis, type DerivedValueAssessment } from './parameterAlternative';
 import type { InquiryLoopInput } from './inquiryLoop';
-import { priorRefutedHypothesisIds } from './worldDiscoverySession';
+import { evidenceSummary, priorRefutedHypothesisIds } from './worldDiscoverySession';
 import type { WorldParameterCalibrationInput } from './worldParameterCalibration';
-import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalog } from './worldGoalIntent';
+import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldGoalIntent, type WorldLeverCatalog } from './worldGoalIntent';
+import {
+  buildSavedWorldDiscoveryRun,
+  buildWorldDiscoveryEvidenceBundle,
+  replaySavedWorldDiscoveryRun,
+  saveWorldDiscoveryRunToMemory,
+  type SavedWorldDiscoveryReplay,
+} from '../scienceMemory';
 
 /**
  * DISCOVERY ORCHESTRATOR — one entry point, and the place a question is refused.
@@ -327,13 +335,12 @@ export interface DiscoveryRan {
    * declared space. Null whenever nothing was generated, which is the normal
    * case — `noGenerationReason` then says why.
    *
-   * Always null for MECHANISM and CALIBRATION today, for two DIFFERENT reasons
-   * that must not be collapsed. CALIBRATION has no generation primitive at all.
-   * MECHANISM does — `mechanismGeneration.ts` composes two declared levers into
-   * one nobody declared and really runs it — but it returns its own result
-   * shape rather than a second `StrategyRun`, so routing it through here is a
-   * contract decision still to be taken. Saying "MECHANISM has no generation
-   * path" would now be false.
+   * PARAMETER derives a value nobody declared; MECHANISM composes two declared
+   * levers nobody declared together (`mechanismGeneration.ts`) and reports it
+   * as a second `StrategyRun` beside the first (`toJointMechanismRun`), the
+   * same shape PARAMETER uses. Always null for CALIBRATION, which has no
+   * generation primitive at all — a different reason from "not routed yet",
+   * which no longer applies to either PARAMETER or MECHANISM.
    */
   readonly generated: GeneratedInvestigation | null;
   /** Why no continuation was started. Null exactly when `generated` is non-null. */
@@ -357,7 +364,9 @@ function ran(
   run: StrategyRun,
   priorInvestigation: PriorInvestigationDecision | null,
   generated: GeneratedInvestigation | null = null,
-  noGenerationReason: string | null = 'This front door does not route this question shape to a generation path yet. PARAMETER derives a value nobody declared (parameterAlternative.ts) and runs it here; MECHANISM can compose a lever nobody declared (mechanismGeneration.ts) but is not routed through this function yet, so a run through here reports none rather than implying none exists.',
+  // Only CALIBRATION ever falls through to this default — PARAMETER and
+  // MECHANISM both always pass their own real `noGenerationReason`.
+  noGenerationReason: string | null = 'CALIBRATION has no generation primitive: no existing mechanism derives a world-parameter calibration value nobody declared, so there is nothing this front door could route to yet.',
 ): DiscoveryRan {
   return {
     status: 'RAN',
@@ -432,8 +441,31 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     return ran('CALIBRATION', admission, calibrationStrategy.run(request.input), null);
   }
 
+  const prepared = prepareMechanismInvestigation(request);
+  return prepared.outcome;
+}
+
+/**
+ * The MECHANISM branch's own logic, factored out so `runDiscovery` and
+ * `runMechanismDiscoveryAndRemember` (below) share exactly one computation of
+ * it rather than each re-deriving admission/plan/generation their own way.
+ * `runDiscovery`'s equivalence guarantee is unaffected: this returns the
+ * identical `DiscoveryOutcome` `runDiscovery`'s MECHANISM branch always
+ * computed, just also hands back the full `mechanismGeneration` (including
+ * `firstExecution`, the real WorldGraph state `StrategyRun` deliberately
+ * does not carry) for a caller that needs to persist it.
+ */
+function prepareMechanismInvestigation(request: MechanismRequest): {
+  readonly outcome: DiscoveryOutcome;
+  /** Non-null exactly when `outcome.status === 'RAN'`. */
+  readonly mechanismGeneration: MechanismWithGenerationResult | null;
+  /** Non-null exactly when `outcome.status === 'RAN'` — the resolved goal a persisting caller needs, computed once. */
+  readonly intent: WorldGoalIntent | null;
+} {
   const admission = admitWorldQuestion(request.goal);
-  if (!admits(admission)) return refused('MECHANISM', 'ADMISSION', admission);
+  if (!admits(admission)) {
+    return { outcome: refused('MECHANISM', 'ADMISSION', admission), mechanismGeneration: null, intent: null };
+  }
 
   const intent = parseWorldDiscoveryGoal(request.goal, request.catalog);
   const plan = buildWorldDiscoveryPlan(intent, request.catalog);
@@ -441,12 +473,16 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     // The capability exists; this world could not be ASKED this. Reported in the
     // same vocabulary rather than a second one, with the planner's own sentence
     // as the reason — it already names which quantities this world computes.
-    return refused('MECHANISM', 'PLAN', {
-      status: 'NOT_MODELLED',
-      why: plan.error,
-      missing: ['a goal naming one quantity this world computes, and a direction to move it'],
-      caveat: null,
-    });
+    return {
+      outcome: refused('MECHANISM', 'PLAN', {
+        status: 'NOT_MODELLED',
+        why: plan.error,
+        missing: ['a goal naming one quantity this world computes, and a direction to move it'],
+        caveat: null,
+      }),
+      mechanismGeneration: null,
+      intent: null,
+    };
   }
 
   // `intent.objectiveMetric`/`intent.direction` are non-null here — `plan`
@@ -495,12 +531,86 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
           betterThanBestSingle: mechanismGeneration.generated.betterThanBestSingle,
         };
 
-  return ran(
-    'MECHANISM',
-    admission,
-    toMechanismRun(mechanismGeneration.first),
-    priorInvestigation,
-    composed,
-    mechanismGeneration.noGenerationReason,
-  );
+  return {
+    outcome: ran(
+      'MECHANISM',
+      admission,
+      toMechanismRun(mechanismGeneration.first),
+      priorInvestigation,
+      composed,
+      mechanismGeneration.noGenerationReason,
+    ),
+    mechanismGeneration,
+    intent,
+  };
+}
+
+/**
+ * MECHANISM PERSISTENCE — the gap this front door had after generation
+ * landed: a MECHANISM investigation run through `runDiscovery` produced a real
+ * `StrategyRun` (and, since `mechanismGeneration.ts` landed, a real composed
+ * second one) but nothing persisted it. `runInquiryWithGeneration` had the
+ * same gap on the PARAMETER side and closed it via `runInquiryWithGenerationAndRemember`
+ * (`inquirySession.ts`); this is that same closure for MECHANISM.
+ *
+ * ## Why this reuses `worldDiscoverySession.ts`'s machinery rather than
+ * building a second one
+ *
+ * `worldDiscoverySession.ts::runWorldDiscoveryAndRemember` already does
+ * admission → plan → memory-narrow → run → Evidence Bundle → save → replay
+ * for the SAME underlying `runAutonomousDiscoveryWithEngines` engine this
+ * front door calls (confirmed: `discoveryStrategies.ts::toMechanismRun` wraps
+ * a `DiscoveryLoopResult` produced by that identical function). The two
+ * front doors had diverged only in the first four steps, where this one now
+ * additionally derives a joint-mechanism generation. So this function
+ * factors the routing through the shared `prepareMechanismInvestigation`
+ * above, then hands the SAME real `DiscoveryLoopExecution`
+ * (`mechanismGeneration.firstExecution`, added for exactly this purpose) to
+ * the EXISTING `buildWorldDiscoveryEvidenceBundle`/`buildSavedWorldDiscoveryRun`/
+ * `saveWorldDiscoveryRunToMemory`/`replaySavedWorldDiscoveryRun` — the identical
+ * functions `runWorldDiscoveryAndRemember` already calls. No second Evidence
+ * mechanism, no second Memory schema, no second replay verdict vocabulary.
+ *
+ * ## What is deliberately NOT persisted here
+ *
+ * The composed joint-arm generation (`outcome.generated`, when present) is
+ * reported in the returned `DiscoveryOutcome` exactly as `runDiscovery`
+ * already reports it, but only the FIRST run — `mechanismGeneration.first`/
+ * `.firstExecution` — is banked to Memory. Persisting the joint arm as its
+ * own record (the way PARAMETER's generated follow-up gets its own
+ * `SavedExperiment`) is real future work, not done here: the joint arm's
+ * `DiscoveryLoopExecution` is not currently returned by `mechanismGeneration.ts`
+ * (only its lean `StrategyRun` projection is), and widening that too is a
+ * second, separate change — naming it rather than doing it silently.
+ */
+export interface MechanismDiscoveryRemembered {
+  readonly outcome: DiscoveryOutcome;
+  /** Null exactly when `outcome.status !== 'RAN'` — nothing ran, so nothing to persist. */
+  readonly savedExperimentId: string | null;
+  readonly replay: SavedWorldDiscoveryReplay | null;
+}
+
+export function runMechanismDiscoveryAndRemember(request: MechanismRequest): MechanismDiscoveryRemembered {
+  const prepared = prepareMechanismInvestigation(request);
+  if (prepared.outcome.status !== 'RAN' || prepared.mechanismGeneration === null || prepared.intent === null) {
+    return { outcome: prepared.outcome, savedExperimentId: null, replay: null };
+  }
+
+  const { mechanismGeneration, intent } = prepared;
+  const bundle = buildWorldDiscoveryEvidenceBundle(request.catalog, mechanismGeneration.firstExecution, request.goal);
+  const saved = buildSavedWorldDiscoveryRun({
+    resultKind: 'HYPOTHESIS_LOOP',
+    goal: request.goal,
+    catalogId: request.catalog.catalogId,
+    worldId: request.catalog.worldId,
+    domainId: request.catalog.domainId,
+    objectiveMetric: intent.objectiveMetric,
+    objectiveDirection: intent.direction,
+    loopResult: mechanismGeneration.first,
+    evidence: evidenceSummary(bundle),
+    resumedFromMemory: prepared.outcome.priorInvestigation,
+  });
+  const savedExperiment = saveWorldDiscoveryRunToMemory(saved);
+  const replay = replaySavedWorldDiscoveryRun(savedExperiment);
+  return { outcome: prepared.outcome, savedExperimentId: savedExperiment.id, replay };
 }

@@ -63,6 +63,7 @@ describe('the autonomous discovery chain, end to end', () => {
 
     // ---- E is generated, unprompted, and tested on fresh evidence ----------
     const generated = step1.outcome.generated!;
+    if (generated.kind !== 'DERIVED_PARAMETER_VALUE') throw new Error('expected a derived value');
     expect(generated.derived.value).toBe(0.5);
     expect(generated.derived.hypothesisId).toBe('h:derived-temperature-0.5');
     expect(generated.run.rounds.length).toBeGreaterThan(0);
@@ -162,8 +163,13 @@ describe('the autonomous discovery chain, end to end', () => {
     const { proteinFoldingInquiry } = await import('../core/agent/proteinFoldingInquiry');
 
     const chain = runResearchChain(proteinFoldingInquiry(TRUE_HIDDEN_TEMPERATURE), 4);
+    // Every stop reason names the state that ended the chain, in terms of
+    // questions and evidence rather than rounds. Running out of untried
+    // settings is one of them, and it is the honest one here: the chain wanted
+    // to narrow again and had no measurement left that the earlier steps had
+    // not already used.
     expect(chain.stoppedBecause).toMatch(
-      /settled its question|none of which Genesis can run|no actuator for|Step budget/,
+      /settled its question|none of which Genesis can run|no actuator for|every candidate setting|Step budget/,
     );
   });
 });

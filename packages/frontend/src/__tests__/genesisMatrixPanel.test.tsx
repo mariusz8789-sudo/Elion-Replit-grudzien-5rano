@@ -47,6 +47,12 @@ const baseView: GenesisMatrixView = {
 
 const baseRun: StrategyRun = {
   contractVersion: '1.0.0',
+  dataProvenance: {
+    origin: 'SIMULATED',
+    origins: ['SIMULATED'],
+    derivedFrom: 'test fixture, hand-built',
+    why: 'A hand-built fixture: no measurement was taken.',
+  },
   strategyId: 'flood-mechanism-strategy',
   shape: 'MECHANISM',
   question: 'minimize peak flood depth',

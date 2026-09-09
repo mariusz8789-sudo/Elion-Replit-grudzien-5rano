@@ -9,10 +9,12 @@ import {
 } from '../experimentFabric/beliefRevision';
 import { runExperiment } from '../experimentFabric/executor';
 import { evaluateTwoArmRelation } from '../experimentFabric/falsificationRelation';
+import type { DataProvenance } from '../dataProvenance';
 import { getRouterModel } from '../experimentFabric/router';
 import type { FalsificationCriterion, HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import { buildStructuredRequestFromModel } from '../experimentFabric/structuredRequestBuilder';
 import type { ExperimentRun } from '../experimentFabric/types';
+import type { StrategyRunProvenance } from './discoveryStrategy';
 
 /**
  * AUTONOMOUS PARAMETER INQUIRY — the experiment Genesis runs next is chosen
@@ -74,6 +76,40 @@ import type { ExperimentRun } from '../experimentFabric/types';
  */
 
 export const INQUIRY_LOOP_CONTRACT_VERSION = '1.0.0';
+
+/**
+ * The origins of the measurements one inquiry actually took, read off each
+ * run's own `provenance.dataProvenance`.
+ *
+ * A run whose `dataProvenance` is undefined is NOT defaulted to `SIMULATED`.
+ * `dataProvenanceForResultOrigin` leaves it undefined exactly where the origin
+ * is not established, and inventing one here would be the fabrication this axis
+ * exists to prevent — so such a run contributes nothing and the count says how
+ * many did.
+ */
+function summariseRunProvenance(
+  runs: readonly ExperimentRun[],
+  derivedFrom: string,
+): StrategyRunProvenance {
+  const stated = runs
+    .map((run) => run.provenance.dataProvenance)
+    .filter((p): p is DataProvenance => p !== undefined);
+  const origins = [...new Set(stated)];
+  const unstated = runs.length - stated.length;
+  return {
+    origin: origins.length === 1 && unstated === 0 ? origins[0]! : null,
+    origins,
+    derivedFrom,
+    why:
+      runs.length === 0
+        ? 'This inquiry took no measurement, so there is no origin to report.'
+        : unstated > 0
+          ? `${unstated} of ${runs.length} run(s) state no data provenance, so no single origin describes this inquiry. An unstated origin is left unstated rather than assumed to be a simulation.`
+          : origins.length === 1
+            ? `Every measurement in this inquiry was ${origins[0]}.`
+            : `This inquiry MIXED origins (${origins.join(', ')}). A finding drawn across them is worth what its weakest source is worth, and no single label describes it.`,
+  };
+}
 
 /**
  * The system Genesis probes. `hiddenParameters` are properties of this
@@ -239,6 +275,16 @@ export interface InquiryLoopResult {
   readonly systemId: string;
   readonly modelId: string;
   readonly domainId: string;
+  /**
+   * WHERE THESE NUMBERS CAME FROM — computed, looked up, or measured.
+   *
+   * Read off the real `ExperimentRun`s this inquiry took — each already carries
+   * `provenance.dataProvenance` (`dataProvenance.ts`) — and never asserted here.
+   * It lives on the result rather than beside it so everything downstream
+   * (`StrategyRun`, Science Memory, replay, the UI) carries it without anyone
+   * having to remember to thread it through.
+   */
+  readonly dataProvenance: StrategyRunProvenance;
   readonly rounds: readonly InquiryRound[];
   readonly finalBeliefs: readonly BeliefSnapshot[];
   readonly stopReason: InquiryStopReason;
@@ -679,6 +725,10 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
       ...untested.map((h) => `Never tested: ${h.id}.`),
     ],
     nextExperiment: selection,
+    dataProvenance: summariseRunProvenance(
+      measurements,
+      `${measurements.length} ExperimentRun(s) taken by this inquiry`,
+    ),
     limitations: [
       `Every number here comes from ${system.modelId} (${model?.engine ?? 'unknown engine'}), a model. A hypothesis surviving this inquiry has survived contact with that model, which is not the same as being true of any real substance, organism or apparatus.`,
       `Only the parameter assignments the caller declared were ever in contention; the inquiry cannot find a value nobody proposed.`,

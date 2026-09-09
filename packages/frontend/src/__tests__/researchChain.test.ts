@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { runResearchChain } from '../core/agent/researchChain';
+import type { GeneratedInvestigation, ParameterGeneration } from '../core/agent/discoveryOrchestrator';
 import { proteinFoldingInquiry } from '../core/agent/proteinFoldingInquiry';
 
 /**
@@ -10,6 +11,14 @@ import { proteinFoldingInquiry } from '../core/agent/proteinFoldingInquiry';
  * `nextQuestion.ts` ranked highest among the questions the previous run itself
  * raised. Real seeded HP-lattice solver throughout.
  */
+
+/** Narrows the generation union to the PARAMETER side, failing loudly otherwise. */
+function asParameter(generated: GeneratedInvestigation | null): ParameterGeneration {
+  if (generated === null || generated.kind !== 'DERIVED_PARAMETER_VALUE') {
+    throw new Error(`expected a derived parameter value, got ${generated?.kind ?? 'nothing'}`);
+  }
+  return generated;
+}
 
 describe('runResearchChain — the loop continues without being told to', () => {
   it('THE DEFINING BEHAVIOUR: derived value, then a self-chosen step that narrows the interval', () => {
@@ -24,8 +33,8 @@ describe('runResearchChain — the loop continues without being told to', () => 
     expect(first.kind).toBe('INITIAL');
     if (first.outcome.status !== 'RAN') throw new Error('expected RAN');
     expect(first.outcome.run.surviving).toEqual([]);
-    expect(first.outcome.generated!.standing.standing).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');
-    expect(first.outcome.generated!.standing.interval).toEqual([0.3, 0.7]);
+    expect(asParameter(first.outcome.generated).standing.standing).toBe('SUPPORTED_INTERVAL_NOT_IDENTIFIED');
+    expect(asParameter(first.outcome.generated).standing.interval).toEqual([0.3, 0.7]);
 
     // Step 2 was chosen by the question selector, not by this test and not by
     // a person.
@@ -71,9 +80,9 @@ describe('runResearchChain — the loop continues without being told to', () => 
 
     const first = chain.steps[0]!;
     if (first.outcome.status !== 'RAN') throw new Error('expected RAN');
-    expect(first.outcome.generated!.derived.value).toBe(0.5);
-    expect(first.outcome.generated!.survived).toBe(false);
-    expect(first.outcome.generated!.standing.standing).toBe('REFUTED');
+    expect(asParameter(first.outcome.generated).derived.value).toBe(0.5);
+    expect(asParameter(first.outcome.generated).survived).toBe(false);
+    expect(asParameter(first.outcome.generated).standing.standing).toBe('REFUTED');
 
     expect(chain.steps).toHaveLength(1);
     expect(chain.selfChosenSteps).toBe(0);
@@ -89,10 +98,27 @@ describe('runResearchChain — the loop continues without being told to', () => 
   });
 
   it('a settled question ends the chain after one step, without manufacturing work', () => {
-    // A fold at 1.0 leaves h:warm standing, so nothing is open.
-    const chain = runResearchChain(proteinFoldingInquiry(1.0), 4);
+    // A fold at 0.65 has its derived value refuted at step 1 and leaves nothing
+    // else open, so there is genuinely no next question.
+    const chain = runResearchChain(proteinFoldingInquiry(0.65), 4);
     expect(chain.steps).toHaveLength(1);
     expect(chain.selfChosenSteps).toBe(0);
     expect(chain.stoppedBecause).toContain('raised no new one');
+  });
+
+  it('a survivor bracketed by refutations now raises a narrowing question with no generation at all', () => {
+    // A fold at 1.0 leaves h:warm standing between refuted h:cool and h:hot.
+    // Nothing was generated here — the interval comes from the run's own
+    // surviving/refuted split, which is the reading that lets narrowing recur.
+    const chain = runResearchChain(proteinFoldingInquiry(1.0), 4);
+    expect(chain.steps).toHaveLength(2);
+    expect(chain.steps[1]!.kind).toBe('NARROW_A_DERIVED_INTERVAL');
+
+    const first = chain.steps[0]!;
+    if (first.outcome.status !== 'RAN') throw new Error('expected RAN');
+    expect(first.outcome.generated).toBeNull();
+
+    // And it is labelled a search region, not a localisation.
+    expect(chain.steps[1]!.narrowing!.basis).toBe('SURVIVOR_NEIGHBOURS');
   });
 });

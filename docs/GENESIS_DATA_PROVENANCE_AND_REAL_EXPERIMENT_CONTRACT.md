@@ -176,6 +176,23 @@ conclusion holds and is not being overridden: **not implementing a
 `ModelUpdate` contract now**, per the standing instruction not to
 force-build onto a substrate that does not exist.
 
+**Update, same day**: C3 correctly refined this after the above was
+written (`docs/RUNTIME_CONFIGURABLE_MODEL_CONTRACT.md`, folded into
+`AUTONOMOUS_DISCOVERY_ROADMAP.md`) — §10.15 was half right, not fully. This
+audit (and the one it verified) correctly found no place where a NEW
+structure could be invented as data. It missed that `SolverRouter`'s
+`Map<string, DomainSolver>` plus `domainBinding.solverId` already makes
+CHOOSING between two already-written, already-registered solver variants
+for the same quantity a genuine runtime rebind — no Fabric change needed
+for that narrower move. What still does not exist, and is the harder half
+of "Model Update," is inventing a structure nobody wrote; that part of this
+section's conclusion stands. C3's contract stops short of implementing
+either, for the right reason: no domain today registers two real, cited
+structures for the same quantity, so there is nothing yet to choose
+between — writing a second solver just to have one to discriminate would
+be fabricating physics, the exact failure mode this whole document exists
+to avoid.
+
 ## P2 — ARCHITECTURE GUARD (audited, all clean)
 
 Independent duplication audit, all four checks CLEAN:

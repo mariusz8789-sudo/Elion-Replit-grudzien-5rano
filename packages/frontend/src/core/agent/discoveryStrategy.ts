@@ -1,4 +1,5 @@
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import type { DataProvenance } from '../dataProvenance';
 import type { NextAction } from './nextAction';
 
 /**
@@ -64,7 +65,12 @@ import type { NextAction } from './nextAction';
  * keeps its meaning for MECHANISM and PARAMETER runs exactly as before, and a
  * reader that only knew 1.1.0's two shapes simply never sees the third.
  */
-export const DISCOVERY_STRATEGY_CONTRACT_VERSION = '1.2.0';
+/**
+ * 1.3.0 added `StrategyRun.dataProvenance`. Required rather than optional: an
+ * optional provenance field is one every adapter is free to forget, which is
+ * how the axis was lost at this hop in the first place.
+ */
+export const DISCOVERY_STRATEGY_CONTRACT_VERSION = '1.3.0';
 
 /**
  * The shape of the question, which is what decides the strategy — NOT the
@@ -122,6 +128,28 @@ export interface Admission {
 }
 
 /** One round of investigation, in the terms both loops genuinely report. */
+/**
+ * WHERE A RUN'S NUMBERS CAME FROM, in `dataProvenance.ts`'s vocabulary.
+ *
+ * Not a second axis — `DataProvenance` is imported, not redeclared. This is the
+ * projection of that axis onto a whole investigation, which needs one thing a
+ * single value cannot express: an investigation takes MANY measurements, and
+ * they need not share an origin.
+ */
+export interface StrategyRunProvenance {
+  /**
+   * The single origin every measurement shared, or null when they did not share
+   * one. A run that mixed a simulation with a real measurement is a real state,
+   * and collapsing it to one word is the exact loss this axis exists to prevent.
+   */
+  readonly origin: DataProvenance | null;
+  /** Every distinct origin present, so a mixed run can be inspected and not merely detected. */
+  readonly origins: readonly DataProvenance[];
+  /** The field or code path this was read from — never a guess. */
+  readonly derivedFrom: string;
+  readonly why: string;
+}
+
 export interface StrategyRound {
   readonly round: number;
   /** What was actually done this round, in the loop's own words. */
@@ -203,6 +231,22 @@ export interface StrategyRun {
   readonly openQuestions: readonly string[];
   /** Assumptions declared before the run plus what it did not model, as the loop stated them. */
   readonly limitations: readonly string[];
+  /**
+   * WHERE THIS RUN'S NUMBERS CAME FROM — computed, looked up, or measured.
+   *
+   * This hop is where the axis used to disappear. `ExperimentRun.provenance`
+   * survives Fabric → Run → Evidence, and then `StrategyRun` carried nothing:
+   * every consumer downstream of a strategy — Science Memory, replay, the
+   * Matrix, narration — saw findings with no record of what produced them, and
+   * a real laboratory result arriving later would have been indistinguishable
+   * from a simulation the moment it reached this contract.
+   *
+   * Derived by each adapter from what its loop actually did, never asserted
+   * here. See `measurementProvenance.ts` for why this is a different question
+   * from `resultOrigin`, `ConfirmationLevel`, `GroundingLevel` and
+   * `HonestyLevel`, all of which already exist and none of which answers it.
+   */
+  readonly dataProvenance: StrategyRunProvenance;
   /** Content fingerprint from the loop's own fingerprint function — never recomputed here. */
   readonly resultFingerprint: string;
   /** The loop's own result, untouched. */

@@ -52,12 +52,14 @@ import { assessModelSufficiency } from './modelSufficiency';
  *
  * **A candidate is not a finding.** The same measurement shows the midpoint
  * landing well away from the truth on other folds, which is exactly why this
- * returns a hypothesis TO BE TESTED and never a conclusion. Bracketing assumes
- * the metric moves monotonically with the parameter between those two claims;
- * that assumption is not verified here and does not need to be, because the
- * candidate faces a real experiment before it is believed.
+ * returns a hypothesis TO BE TESTED and never a conclusion.
  *
- * ## The three refusals, each a real case
+ * Bracketing assumes the metric moves monotonically with the parameter between
+ * those two claims. That assumption used to be stated here and left unchecked;
+ * it is now checked (Refusal 4), because the run's own data can contradict it
+ * and on this very solver sometimes does — see `bracketMonotonicity`.
+ *
+ * ## The four refusals, each a real case
  *
  * 1. **Something survived.** Generation is for an EXHAUSTED space. If any
  *    declared hypothesis is still standing, the honest next step is to test
@@ -74,6 +76,12 @@ import { assessModelSufficiency } from './modelSufficiency';
  *    instead of inventing something. This is a live case, not a theoretical
  *    one: at 200 steps every candidate predicts the identical 0.13 (a real
  *    algorithmic floor), and nothing can be derived from that round.
+ * 4. **The round contradicts monotonicity.** A straddle localises the truth
+ *    between two claims only if the metric moves monotonically with the
+ *    parameter across them. Also a live case on this same solver: judged by
+ *    `bestEnergy` at 1000 steps, temperatures 0.3/0.7/1.2/2.0 predict
+ *    -3/-2/-3/-3, so a straddle there would be coincidence, not localisation.
+ *    Refused, and an earlier round is tried instead.
  *
  * ## Anti-HARKing, carried in the result rather than trusted to the caller
  *
@@ -118,7 +126,51 @@ export interface DerivedParameterHypothesis {
    * See this module's anti-HARKing note.
    */
   readonly excludedProbeValues: readonly number[];
+  /**
+   * Whether the bracketing round's own predictions actually moved monotonically
+   * with the claimed values — the assumption the midpoint rests on, now checked
+   * rather than assumed. Never `VIOLATED` here: a violated round is refused, so
+   * this records `MONOTONIC` (confirmed on 3+ points) or `TOO_FEW_POINTS` (only
+   * two contenders left, so a violation is undetectable rather than absent).
+   */
+  readonly monotonicity: 'MONOTONIC' | 'TOO_FEW_POINTS';
   readonly why: string;
+}
+
+/**
+ * Whether this round's own data supports the assumption bracketing rests on.
+ *
+ * Bracketing says: one claim predicts below the observation, another above, so
+ * the truth lies between those two claims. That inference is only valid if the
+ * metric moves monotonically with the parameter across them. If it does not,
+ * two predictions straddling the observation is a coincidence rather than a
+ * localisation, and the midpoint means nothing.
+ *
+ * The check is free, because the round already ran every candidate through the
+ * solver: sort the claims by value and see whether their predictions come out
+ * sorted too. Measured on the real HP-lattice solver, this is not hypothetical
+ * — with `acceptanceRate` at 5000 steps the predictions rise monotonically with
+ * temperature (0.1728, 0.3428, 0.3796, 0.4140) and bracketing is sound, while
+ * with `bestEnergy` at 1000 steps the same four temperatures predict -3, -2, -3
+ * and -3, which is plainly not monotonic. Same solver, same seed, same
+ * temperatures; only the metric differs.
+ */
+type BracketMonotonicity = 'MONOTONIC' | 'VIOLATED' | 'TOO_FEW_POINTS';
+
+function bracketMonotonicity(
+  points: readonly { readonly claimed: number; readonly predicted: number }[],
+): BracketMonotonicity {
+  // Two points are monotonic by construction, so a violation is undetectable
+  // rather than absent. Reported as its own value instead of a false pass.
+  if (points.length < 3) return 'TOO_FEW_POINTS';
+  const sorted = [...points].sort((a, b) => a.claimed - b.claimed);
+  let nonDecreasing = true;
+  let nonIncreasing = true;
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i]!.predicted < sorted[i - 1]!.predicted) nonDecreasing = false;
+    if (sorted[i]!.predicted > sorted[i - 1]!.predicted) nonIncreasing = false;
+  }
+  return nonDecreasing || nonIncreasing ? 'MONOTONIC' : 'VIOLATED';
 }
 
 /** The single scalar parameter every hypothesis claims, or null when they do not share exactly one. */
@@ -164,9 +216,11 @@ export function deriveAlternativeParameterValue(
 
     let low: { id: string; predicted: number; claimed: number } | null = null;
     let high: { id: string; predicted: number; claimed: number } | null = null;
+    const points: { claimed: number; predicted: number }[] = [];
     for (const outcome of round.outcomes) {
       const claimed = claimedById.get(outcome.hypothesisId);
       if (outcome.predicted === null || claimed === undefined) continue;
+      points.push({ claimed, predicted: outcome.predicted });
       if (outcome.predicted < observed && (low === null || outcome.predicted > low.predicted)) {
         low = { id: outcome.hypothesisId, predicted: outcome.predicted, claimed };
       }
@@ -176,6 +230,14 @@ export function deriveAlternativeParameterValue(
     }
     // Refusal 3 — no bracket at this round; try an earlier one.
     if (low === null || high === null) continue;
+
+    // Refusal 4 — the round's own data contradicts the assumption bracketing
+    // rests on. A straddle is only a localisation when the metric moves
+    // monotonically with the parameter; where it does not, the midpoint is
+    // arithmetic on unrelated numbers. Try an earlier round rather than
+    // deriving something this run's own measurements do not support.
+    const monotonicity = bracketMonotonicity(points);
+    if (monotonicity === 'VIOLATED') continue;
 
     const value = (low.claimed + high.claimed) / 2;
     return {
@@ -190,6 +252,7 @@ export function deriveAlternativeParameterValue(
       bracketLowValue: low.claimed,
       bracketHighValue: high.claimed,
       excludedProbeValues: [round.probeValue],
+      monotonicity,
       why:
         `Every declared value was refuted, so the answer is outside the declared space. At ` +
         `${input.system.probeParameterId}=${round.probeValue} the measurement was ${observed}, which sits between ` +

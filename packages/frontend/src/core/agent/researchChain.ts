@@ -1,3 +1,8 @@
+import {
+  buildSavedParameterInquiry,
+  saveParameterInquiryToMemory,
+  type SavedExperiment,
+} from '../scienceMemory';
 import { runDiscovery, type DiscoveryOutcome } from './discoveryOrchestrator';
 import type { InquiryLoopInput, InquiryLoopResult } from './inquiryLoop';
 import {
@@ -64,6 +69,16 @@ export interface ResearchStep {
   readonly outcome: DiscoveryOutcome;
   /** Present only on a narrowing step: what the interval became. */
   readonly narrowing: NarrowingOutcome | null;
+  /**
+   * This step's Science Memory records — the first investigation, plus the
+   * generation follow-up when there was one. Empty on a refused step.
+   *
+   * Persisting HERE rather than leaving it to the caller is what makes the
+   * chain's own steps available to whatever runs next: a chain that reasons its
+   * way to a second and third question and then forgets all of it has not
+   * accumulated anything.
+   */
+  readonly remembered: readonly SavedExperiment[];
 }
 
 export interface ResearchChainResult {
@@ -103,7 +118,15 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
       pending !== null && outcome.status === 'RAN'
         ? assessNarrowing(pending.proposal, pending.input, outcome.run.native as InquiryLoopResult)
         : null;
-    steps.push({ step, question: current.question, kind, why, outcome, narrowing });
+    steps.push({
+      step,
+      question: current.question,
+      kind,
+      why,
+      outcome,
+      narrowing,
+      remembered: remember(outcome, current),
+    });
     // `pending` is consumed above and every path below either breaks out or
     // sets it again for the next iteration, so it is never read stale.
 
@@ -161,6 +184,53 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     selfChosenSteps: Math.max(0, steps.length - 1),
     stoppedBecause,
   };
+}
+
+/**
+ * Banks this step in Science Memory, through the same functions every other
+ * remembered inquiry uses.
+ *
+ * ## The provenance this deliberately does not claim
+ *
+ * `saveParameterInquiryToMemory` takes an optional last `ExperimentRun`, and
+ * records the engine's own run id and fingerprint when it gets one. It is not
+ * passed here, because `runDiscovery` returns findings and not solver payloads
+ * — `StrategyRun` is explicitly a reporting contract, not an execution one. So
+ * these records carry the complete input, result and result fingerprint (and
+ * therefore replay by RE-EXECUTION still works, which is what
+ * `replaySavedParameterInquiry` does), but not the original run's engine
+ * provenance. `runInquiryWithGenerationAndRemember` does carry it, for a caller
+ * that needs it. Recording the weaker thing and saying so beats attaching a
+ * provenance this path never saw.
+ */
+function remember(outcome: DiscoveryOutcome, input: InquiryLoopInput): readonly SavedExperiment[] {
+  if (outcome.status !== 'RAN') return [];
+  const saved: SavedExperiment[] = [
+    saveParameterInquiryToMemory(
+      buildSavedParameterInquiry({
+        input,
+        result: outcome.run.native as InquiryLoopResult,
+        resumedFromMemory: outcome.priorInvestigation
+          ? {
+              skippedHypothesisIds: outcome.priorInvestigation.skippedHypothesisIds,
+              reason: outcome.priorInvestigation.reason,
+            }
+          : null,
+      }),
+    ),
+  ];
+  if (outcome.generated !== null) {
+    saved.push(
+      saveParameterInquiryToMemory(
+        buildSavedParameterInquiry({
+          input: outcome.generated.input,
+          result: outcome.generated.run.native as InquiryLoopResult,
+          resumedFromMemory: { skippedHypothesisIds: [], reason: outcome.generated.derived.why },
+        }),
+      ),
+    );
+  }
+  return saved;
 }
 
 /** Every setting this outcome measured at, so a later step cannot reuse one. */

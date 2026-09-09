@@ -1,11 +1,13 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import { AT_HORIZON } from '../experimentFabric/objectiveReducer';
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
 import { compareBranches } from '../worldModel/bridge/worldFrameState';
-import { collectScalars } from '../worldModel/bridge/worldFrameState';
 import { CAPABILITY_CODE, type SolverCapability } from '../worldModel/capability/solverCapability';
+import { reduceObjectiveTrajectory } from '../worldModel/discovery/objectiveTrajectory';
 import {
   forkedArmControl,
   preregisterWorldCounterfactual,
+  type ObjectiveOverride,
   type WorldCounterfactualAssessment,
   type WorldCounterfactualDiff,
 } from '../worldModel/discovery/worldCounterfactual';
@@ -222,13 +224,6 @@ export interface DiscoveryLoopResult {
 // Execution.
 // ---------------------------------------------------------------------------
 
-function objectiveAt(engine: TemporalEngine, entityId: string, metric: string, tick: number): number | null {
-  const entity = engine.scrubTo(tick).tryGetEntity(entityId);
-  if (!entity) return null;
-  const value = collectScalars(entity)[metric];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 function initialBelief(hypothesis: MechanisticHypothesis): HypothesisBelief {
   return {
     hypothesisId: hypothesis.hypothesisId,
@@ -419,8 +414,22 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
     // --- Observation: the declared tools, so capability travels with it -----
     const comparison = compareBranches(registry, baseline.branchId, arm.branchId, input.horizonTick);
     const diff = GENESIS_TOOLS.diffTool.invoke(comparison);
-    const objectiveBaseline = objectiveAt(baseline, hypothesis.entityId, hypothesis.criterion.metric, input.horizonTick);
-    const objectiveObserved = objectiveAt(arm, hypothesis.entityId, hypothesis.criterion.metric, input.horizonTick);
+    const reducer = hypothesis.criterion.reducer ?? AT_HORIZON;
+    const baselineReduction = reduceObjectiveTrajectory(
+      baseline, hypothesis.entityId, hypothesis.criterion.metric, reducer, input.decisionAtTick, input.horizonTick,
+    );
+    const armReduction = reduceObjectiveTrajectory(
+      arm, hypothesis.entityId, hypothesis.criterion.metric, reducer, input.decisionAtTick, input.horizonTick,
+    );
+    const objectiveBaseline = baselineReduction.value;
+    const objectiveObserved = armReduction.value;
+    // Only a declared reducer overrides the criterion's own read off the diff.
+    // At AT_HORIZON the historical path stays exactly as it was.
+    const objectiveOverride: ObjectiveOverride | undefined =
+      reducer.kind === 'AT_HORIZON'
+        ? undefined
+        : { reducerKind: reducer.kind, baseline: objectiveBaseline, intervention: objectiveObserved,
+            reason: baselineReduction.reason ?? armReduction.reason };
     const effect =
       objectiveBaseline === null || objectiveObserved === null ? null : objectiveObserved - objectiveBaseline;
     const metricMoved = effect !== null && effect !== 0;
@@ -448,6 +457,7 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
       // The arm is a deterministic re-run of the baseline's own construction plus
       // one declared mutation, which is what MATCH asserts here.
       replayVerdict: 'MATCH',
+      objectiveOverride,
     });
 
     // --- Belief update from the real observation ---------------------------

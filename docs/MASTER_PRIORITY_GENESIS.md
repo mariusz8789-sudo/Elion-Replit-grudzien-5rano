@@ -103,3 +103,96 @@ niż budować opakowanie wcześniej.
 - Każda zmiana: tests + tsc + eslint + build + odpowiedni live verification,
   potem commit.
 - Cyber/GOV pozostaje OFF `main` — bez zmian.
+
+---
+
+## UPDATE — 2026-09-09, wieczorny sprint: co jest zamknięte, nowy podział
+
+Wszystko powyżej od P0 do "domknięcie autonomous research chain" jest
+**zrobione i realnie zweryfikowane** (nie tylko w izolowanych testach):
+MECHANISM routing przez `discoveryOrchestrator.ts` jako drugi `StrategyRun`,
+`runMechanismDiscoveryAndRemember` zamykający persystencję/replay dla
+MECHANISM (C1+C3, po ręcznym pogodzeniu równoległych zmian w
+`mechanismGeneration.ts` — patrz `docs/GENESIS_MECHANISM_PERSISTENCE_AND_E2E_CHAIN.md`),
+proweniencja SIMULATED/REFERENCE/REAL_EXPERIMENTAL propagująca się przez
+cały łańcuch (C1, `docs/GENESIS_DATA_PROVENANCE_AND_REAL_EXPERIMENT_CONTRACT.md`),
+Virtual Cell Lab jako prawdziwy flagship demo z 8-krokową drabiną
+GOAL→...→EVIDENCE→REPLAY (C2). **Także zamknięte, szybciej niż zakładano**:
+solver-structure choice — wcześniej uznane za CONTRACT-ONLY — C3 zbudował
+`StructuralAlternativeRegistry` z realnym, cytowanym drugim modelem
+(affine idle-fuel-burn kontra liniowy dla generatora) i realnym rebindem
+`domainBinding.solverId` napędzanym przez falsyfikację, dokładnie tak jak
+`RUNTIME_CONFIGURABLE_MODEL_CONTRACT.md` sam to proponował jako uczciwy
+przykład — nie fabrykacja fizyki.
+
+**Nowy podział, na trzy równoległe ścieżki bez nadpisywania się:**
+
+### C1 — główna implementacja: Real Experiment E2E
+
+Domknąć pierwszy prawdziwy most:
+`Prediction → ExperimentRequest → RealExperimentRun → ręczne wprowadzenie
+realnych danych → DerivedData → Comparison → EvidencePackage → Memory → Replay`.
+
+Kontrakt (`core/experimentFabric/realExperiment.ts`, `createRealExperimentRun`)
+już istnieje i jest przetestowany, ale kompletnie niewpięty — zero referencji
+poza własnym testem. Braki do zamknięcia: seam do admission
+(`discoveryAdmission.ts`), UI do ręcznego wprowadzania danych (reuse
+`RealExperimentPipeline.tsx`, nie budować drugiego ekranu), realny replay
+guard dla `REAL_EXPERIMENTAL` (fizyczny pomiar nie da się "odtworzyć"
+uruchomieniem solvera ponownie — musi zwracać `NOT_REPRODUCIBLE`, nigdy
+cicho wywoływać symulatora), oraz znana luka w `reproductionVerdict`
+(wymaga bit-identycznego fingerprintu przy powtórzeniach — dwa niezależne
+pomiary fizyczne nigdy się tak nie zgodzą).
+
+### C3 — druga ścieżka: Mechanism Composition / researchChain actuator
+
+`mechanismGeneration.ts`'s złożony mechanizm (`COMPOSED_MECHANISM`) jest
+realny i live-wired przez `discoveryOrchestrator.ts`, ale
+`researchChain.ts` nie ma dla niego aktuatora —
+`TEST_WHETHER_MECHANISMS_COMPOSE` nigdy nie jest konsumowany do wyboru
+KOLEJNEGO eksperymentu (w przeciwieństwie do strony PARAMETER, gdzie
+`NARROW_A_DERIVED_INTERVAL` już to robi). Zamknąć tę ostatnią asymetrię —
+ten sam wzorzec co `SEPARATE_SURVIVORS`/`NARROW_A_DERIVED_INTERVAL`, nie
+nowa logika.
+
+### QN (Qwen/Kimi) — równoległy recon + przygotowanie gruntu dla C1
+
+**NIE koduje równolegle z C1** — wyłącznie audyt, przygotowanie, i tylko
+izolowane, bezkonfliktowe drobne poprawki jeśli są bezpieczne. Dokładny
+prompt do wklejenia:
+
+> GENESIS — PARALLEL ACCELERATION AUDIT
+>
+> Do NOT implement the Real Experiment feature yet and do NOT modify
+> architecture unnecessarily.
+>
+> Your task is to perform a fast repository audit to accelerate C1.
+>
+> Focus ONLY on:
+> 1. Existing Real Experiment contracts/types/functions.
+> 2. Current admission/routing path.
+> 3. Current UI surfaces where REAL_EXPERIMENTAL data could be entered.
+> 4. Existing Prediction → Comparison → Evidence → Memory → Replay infrastructure.
+> 5. Provenance propagation and any possible SIMULATED/REAL_EXPERIMENTAL leakage.
+> 6. Existing tests that can be reused.
+>
+> Determine the MINIMUM missing implementation required for:
+> Prediction → ExperimentRequest → RealExperimentRun → manual real data entry
+> → DerivedData → Comparison → EvidencePackage → Memory → Replay
+>
+> Do not invent new parallel abstractions if existing ones can be reused.
+>
+> Produce: exact files involved, existing functions/types to reuse, exact
+> missing pieces, recommended implementation order, E2E test scenario,
+> risks/edge cases, any fake-data/provenance risks.
+>
+> If a small isolated preparation change can safely be implemented without
+> conflicting with C1, implement it. Otherwise report it only.
+>
+> Finish with: READY FOR C1: [exact implementation checklist]
+>
+> Run relevant tests/typecheck after any changes.
+
+Start reading punkty: `docs/GENESIS_DATA_PROVENANCE_AND_REAL_EXPERIMENT_CONTRACT.md`,
+`docs/GENESIS_MECHANISM_PERSISTENCE_AND_E2E_CHAIN.md`, `core/experimentFabric/realExperiment.ts`,
+`core/agent/discoveryAdmission.ts`, `components/visual-simulation/RealExperimentPipeline.tsx`.

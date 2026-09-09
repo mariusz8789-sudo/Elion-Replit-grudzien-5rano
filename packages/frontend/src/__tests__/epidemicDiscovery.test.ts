@@ -153,8 +153,15 @@ describe('discovery engine on epidemiology (third domain)', () => {
     // compartments, because a live intervention has to survive the tick. Two of
     // the three levers set them. Offering one as an objective would build an
     // experiment whose intervention IS its own criterion.
+    //
+    // `I_PEAK` is a third offered metric (added when `ObjectiveReducer` was
+    // wired into `discoveryLoop.ts`) and passes the same guard for a different
+    // reason: it is not a `domainState` key at all — `parseWorldDiscoveryGoal`
+    // never sees `I_PEAK` reach a solver, because every lever's hypothesis
+    // translates it back to the real `I` field plus the MAX reducer before a
+    // criterion is ever built. See `objectiveField` in `epidemicLeverCatalog.ts`.
     const offered = new Set(Object.values(GENESIS_EPIDEMIC_CATALOG.metricPhrases));
-    expect([...offered].sort()).toEqual(['D', 'I']);
+    expect([...offered].sort()).toEqual(['D', 'I', 'I_PEAK']);
     for (const readOnly of ['r0', 'ifr', 'infectiousDays', 'incubationDays', 'interventionDay', 'interventionEffect', 'beta', 't']) {
       expect(offered.has(readOnly)).toBe(false);
     }

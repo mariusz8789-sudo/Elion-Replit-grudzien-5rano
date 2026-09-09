@@ -51,7 +51,169 @@ P6 is the next real priority: every earlier item it depended on is done, and
 it is the one row of the North Star's §3 table ("generate competing models")
 still missing.
 
-## 0bis. Information Gain / Experiment Planner — audit, not implementation yet
+### P6, MECHANISM-shape audit (C3) — measured, not assumed
+
+`competingModels.test.ts` had zero MECHANISM-shape coverage until this audit,
+named as an open gap in that module's own doc. The question: can a REAL lever
+catalog (flood, epidemiology, chemistry, generator, cell-culture) reach
+`bestSupported.length > 1` under `discoveryLoop.ts`'s current `selectNext`,
+and if so, does that happen before or instead of
+`LEADER_CONFIRMED_AT_TWO_MAGNITUDES`?
+
+**Measured on all five, under a generic all-levers goal:** four of five never
+reach it — `selectNext`'s consolidation-first rule (a `SUPPORTED_ONCE`
+hypothesis is ALWAYS retested before the loop explores a new one) serialises
+the search onto one hypothesis at a time, so two DECLARED hypotheses can never
+be simultaneously mid-consolidation without help. `genesis-backup-generator`
+is the exception, and the mechanism is P3 regeneration, not plain declared
+competition:
+
+- `h:fuel-efficiency` and `h:load-shedding` are both declared with a criterion
+  whose expected direction the real solver contradicts at strength=1
+  (baseline 40.0 L fuel remaining; observed 85.83 and 98.67 — the metric moves
+  a lot, just the opposite way the criterion expected) — genuine
+  `FALSIFIED_WITHIN_PROTOCOL`, not a no-effect result.
+- Each derives a `RELATION_FLIP` alternative, excluding strength=1 (its
+  parent's falsifying strength) from ever being retested.
+- Both flipped alternatives are tested at strength=0.5 and are genuinely
+  `SUPPORTED` there (62.92 and 69.33 — a real, dose-proportional effect:
+  22.92 ≈ 45.83/2 and 29.33 ≈ 58.67/2, not noise).
+- **Neither can ever reach `SUPPORTED_AT_TWO_MAGNITUDES`**, because their one
+  remaining untested magnitude (1) is the one excluded. So
+  `LEADER_CONFIRMED_AT_TWO_MAGNITUDES` never fires at all in this run — the
+  loop instead runs out of testable hypotheses honestly
+  (`ALL_HYPOTHESES_RESOLVED`) with **two permanently-unconsolidated
+  survivors**, both reported in `bestSupported`.
+
+Test added: `competingModels.test.ts`'s `"MECHANISM shape, a real domain that
+reaches 2+ simultaneous survivors"` describe block, against this exact fixture
+— `assessCompetingModels` correctly reports `COMPETING_MODELS_UNRESOLVED` with
+both hypothesis ids and `stopReason: 'ALL_HYPOTHESES_RESOLVED'` carried
+verbatim (not generalised into PARAMETER's `NO_DISCRIMINATING_PROBE`
+vocabulary, per this module's own rule on why `stopReason` travels
+unedited).
+
+**A conceptual point this measurement surfaces, worth carrying into the next
+section:** `h:fuel-efficiency~RELATION_FLIP` and `h:load-shedding~RELATION_FLIP`
+are not RIVAL explanations of one phenomenon the way four Arrhenius
+`(Ea, log A)` pairs are — they are claims about two DIFFERENT levers, and both
+can be true at once (both really do move fuel remaining). Two survivors here
+is not necessarily "Genesis is confused between two stories"; it may
+legitimately be "two real, independent effects are both confirmed." Designing
+what a live discriminator should DO with this state needs that distinction —
+see the next section.
+
+### P6, live discrimination for MECHANISM — architecture (C3, not implemented)
+
+`inquiryLoop.ts`'s `checkDiscriminability`/`selectMostDiscriminatingExperiment`
+(`beliefRevision.ts`) work because every PARAMETER hypothesis makes a
+**prediction about the same shared observable** at a candidate probe setting —
+so one measurement can be checked against every rival's own prediction, and a
+setting where two predictions disagree is directly a discriminating
+experiment. `discoveryLoop.ts` has no equivalent because a MECHANISM
+hypothesis does not predict a value at a shared probe; it names an
+**intervention**, and each hypothesis is judged against its OWN fork from a
+shared baseline. There is no single number two rival mechanisms both make a
+claim about the way two Arrhenius pairs both predict a rate constant at 400 K.
+
+**Why porting `checkDiscriminability` verbatim would misdiagnose the real
+case.** The measured generator fixture above is the concrete example: are
+`h:fuel-efficiency~RELATION_FLIP` and `h:load-shedding~RELATION_FLIP` rivals to
+discriminate between, or two independent findings to report together? They are
+the latter — different levers, both genuinely effective, not two competing
+stories about the same lever. A discriminator built on the PARAMETER
+assumption ("exactly one of these is true") would be answering a question this
+domain shape does not ask. The two situations MECHANISM can actually reach
+need two different next experiments:
+
+1. **Two DIFFERENT levers, both independently `SUPPORTED`** (the generator
+   case, measured above). These are not mutually exclusive, so "discriminating
+   between them" is the wrong operation. The informative next experiment is a
+   **JOINT ARM**: fork one branch that applies BOTH hypotheses' `apply`
+   functions together (`forkBranch`'s mutation callback already accepts
+   arbitrary graph mutations — applying two levers in sequence inside one
+   callback needs no new primitive), and compare the combined effect against
+   the SUM of the two effects already measured individually. Worked example
+   from the real numbers above: `h:fuel-efficiency~RELATION_FLIP` alone
+   contributes +22.92 at strength 0.5, `h:load-shedding~RELATION_FLIP` alone
+   contributes +29.33; if the two mechanisms are independent, a joint arm at
+   the same two strengths should read close to `40.0 + 22.92 + 29.33 ≈ 92.25`.
+   A joint reading that matches names both levers as independent contributors
+   (the honest report: "two real findings," not "a discrimination"). A joint
+   reading that differs materially is itself a new, real finding — an
+   interaction between two declared levers neither single-lever test could
+   reveal — and is worth its own criterion and its own name (`INTERACTION_DETECTED`,
+   say), not silently averaged away. This is a genuinely new capability
+   (`discoveryLoop.ts` never runs a multi-mechanism arm today), reuses every
+   existing primitive (`forkBranch`, `compareBranches`,
+   `reduceObjectiveTrajectory`), and needs no new solver, no scoring function,
+   and no probability model — it is arithmetic on already-measured effects,
+   checked against a fresh, real third measurement.
+2. **Two hypotheses that really do claim the SAME lever, at the SAME time**
+   (not observed in any real catalog today — see the audit above: a lever's
+   original criterion and its own `RELATION_FLIP` alternative can never both
+   be `SUPPORTED` simultaneously, because deriving the alternative requires the
+   original to already be `REFUTED`). If a future catalog ever declares two
+   independent hypotheses that are genuinely mutually exclusive claims about
+   ONE mechanism (rather than two different levers), THAT case is the real
+   `checkDiscriminability` analog, and the natural probe axis is `strength`
+   itself: `selectMostDiscriminatingExperiment`'s candidate-list scan already
+   generalises directly — feed it the untested strengths in
+   `MechanisticHypothesis`'s own declared range (a lever already has a natural
+   strength axis: 0 to 1, sampled today only at `{1, replicationStrength}`) and
+   ask which untested strength would make the two hypotheses' criteria
+   disagree. No real fixture demonstrates this today; it is named here so C1
+   can verify the shape rather than have it invented at implementation time.
+
+**What this section deliberately does not do.** No code changes. No scoring
+function, no scalar utility, no scheduling change to `selectNext` — those
+would be exactly the invented methodology `discoveryLoop.ts`'s own module doc
+and `AUTONOMOUS_DISCOVERY_ROADMAP.md` §5 already refuse elsewhere.
+Implementing option 1 (the joint arm) is the smaller, well-grounded next
+step — it has a real fixture ready to test against today (the generator
+catalog above) — and should be scoped as its own P6 increment once C1
+confirms the design.
+
+---
+
+## 0. The finding that reframes this
+
+The capability this roadmap is named after — *"that hypothesis does not explain
+the observation, so derive the next testable one"* — **is already built, already
+tested, and has zero production call sites.**
+
+`worldCounterfactual.ts::deriveAlternativeCriteria(criterion, assessment, rejectedFingerprints)`:
+
+- derives an alternative **from the real measured numbers** of the falsification
+  it is reacting to — `RELATION_FLIP` when the data moved the opposite way,
+  `TOLERANCE_WIDENED` to exactly the tolerance the observed difference would
+  satisfy, and no further;
+- refuses to generate anything from a run that was not a clean, evaluable
+  falsification (returns `[]`);
+- filters candidates against `rejectedFingerprints`, so a criterion this
+  investigation already judged cannot silently reappear as new;
+- carries no belief representation at all, so **both** loops can consume it —
+  the ordinal `HypothesisBelief` ladder and the numeric `Hypothesis` alike.
+
+Grep confirms: referenced only by `worldCounterfactual.test.ts`. Nothing in
+`discoveryLoop.ts` calls it.
+
+So the honest summary of where Genesis stands is not "autonomous hypothesis
+generation must be built". It is: **the first real increment of it exists and is
+one call site away from being live**, and the work ahead is wiring, then
+widening — not a new subsystem.
+
+---
+
+## 0bis. Information Gain / Experiment Planner — DONE for PARAMETER and CALIBRATION
+
+**Status: implemented** (`228b19c`). The design below was built exactly as
+audited, and the worked example at the end of this section is now a passing
+test. What follows is kept as the reasoning record — including the measurement
+that decided it — because the "why not a score" argument governs anything built
+on top of this. MECHANISM is still open, and C3's two sections directly above
+are why: its hypotheses make no prediction about a shared observable, so the
+pairwise machinery widened here has nothing to widen over there.
 
 The user's third named priority, after Memory→Selection and Competing Models.
 **"Information gain" cannot mean a numeric utility function here** — nothing
@@ -75,7 +237,7 @@ THIRD contender from either of them, at an untried candidate value — real
 progress (one fewer live rival) that today's `NO_DISCRIMINATING_PROBE` gives
 up on without checking.
 
-### The minimal honest increment — designed, not yet built
+### The minimal honest increment — built
 
 **Widen the search from "the top-two pair" to "every pair among the current
 contenders", only as a fallback AFTER the existing top-two check fails.**
@@ -86,13 +248,13 @@ that this measurement narrows the field WITHOUT settling the top-ranked
 disagreement, rather than reusing `DISCRIMINATES_TOP_TWO`'s wording for a
 different, weaker claim.
 
-**Why this is not implemented in this pass.** `selectNextProbe` and its
+**Why it was audited before being written.** `selectNextProbe` and its
 `worldParameterCalibration.ts` twin are live, tested, in-production loops —
 `NO_DISCRIMINATING_PROBE` is asserted by name in at least 12 files across the
 test suite. A fallback that only activates when the existing check already
 failed cannot change a test where EVERY pair is genuinely indistinguishable,
 and three of the real fixtures checked are exactly that (safe, confirmed by
-reading, not assumed):
+reading, not assumed — and all still green after the change):
 
 - Arrhenius compensation-line (`inquiryLoop.test.ts`): exactly one candidate
   probe, already tried — nothing left to widen into.
@@ -123,50 +285,38 @@ guessed):
   rounds" to "2 survive (`h:warm`/`h:hot`), stop after 3 rounds" — a real,
   correct, MORE complete answer than what ships today, not a regression.
 
-This is exactly the worked example an implementation should build and test
-against first: it proves the widening is not just risk-free elsewhere but
-genuinely finds a real separation this fixture's current behaviour misses.
-The three-pair check, the exact new round, and the updated
-`survivingHypothesisIds`/`rounds.length` assertions this test needs are
-already known from this measurement — implementing needs no further
-guessing, only doing it and re-verifying the other 11 dependent files stay
-green.
+This is exactly the worked example the implementation was built against, and
+it is now the `INFORMATION GAIN: runs the experiment that narrows the field
+when none settles the top two` test in `proteinFoldingInquiry.test.ts`: round
+3 exists, runs at steps=20000 under `DISCRIMINATES_OTHER_PAIR`, and moves
+`h:cool` from standing to `FALSIFIED_WITHIN_PROTOCOL`. The fixture's other
+assertions were updated to the REAL new result (falsified `h:cold`+`h:cool`,
+surviving `h:warm`+`h:hot`) — no fixture or solver was touched to make
+anything pass. All 11 other dependent files stayed green.
+
+**One cost note, since it is load-bearing.** The widened search puts the same
+hypothesis in several pairs, and successive rounds re-scan the same untried
+settings; on the protein-folding solver that was enough to blow the default
+5s timeout of the determinism test. The fix is a prediction cache keyed by
+(hypothesis, setting), shared across rounds — behaviour-neutral, because a
+prediction depends only on the hypothesis's claimed values and the setting
+(neither moves as beliefs update), and because those runs, unlike
+measurements, are never collected. With it, the file is faster than before
+the change. The timeout was never raised.
 
 **MECHANISM has no equivalent at all**, live or dead — this is the same gap
 P6 §"open second increment" names. Designing what a discriminating
 intervention would even mean on a forked `WorldGraph` (a different strength?
-a different lever, run in parallel?) is real, substrate-specific work — see
-the C3 prompt asking for exactly this, grounded in real declared catalogs
-rather than designed in the abstract.
-
----
-
-## 0. The finding that reframes this
-
-The capability this roadmap is named after — *"that hypothesis does not explain
-the observation, so derive the next testable one"* — **is already built, already
-tested, and has zero production call sites.**
-
-`worldCounterfactual.ts::deriveAlternativeCriteria(criterion, assessment, rejectedFingerprints)`:
-
-- derives an alternative **from the real measured numbers** of the falsification
-  it is reacting to — `RELATION_FLIP` when the data moved the opposite way,
-  `TOLERANCE_WIDENED` to exactly the tolerance the observed difference would
-  satisfy, and no further;
-- refuses to generate anything from a run that was not a clean, evaluable
-  falsification (returns `[]`);
-- filters candidates against `rejectedFingerprints`, so a criterion this
-  investigation already judged cannot silently reappear as new;
-- carries no belief representation at all, so **both** loops can consume it —
-  the ordinal `HypothesisBelief` ladder and the numeric `Hypothesis` alike.
-
-Grep confirms: referenced only by `worldCounterfactual.test.ts`. Nothing in
-`discoveryLoop.ts` calls it.
-
-So the honest summary of where Genesis stands is not "autonomous hypothesis
-generation must be built". It is: **the first real increment of it exists and is
-one call site away from being live**, and the work ahead is wiring, then
-widening — not a new subsystem.
+a different lever, run in parallel?) is real, substrate-specific work —
+answered above, under **"P6, live discrimination for MECHANISM — architecture
+(C3, not implemented)"**, grounded in the real `genesis-backup-generator`
+fixture measured in the section right before it rather than designed in the
+abstract: MECHANISM's two survivors there are not rivals to discriminate
+between the way PARAMETER's are (two different, independently-true levers,
+not one hidden value with competing claims on it), so the answer is not a
+strength-axis port of `checkDiscriminability` but a JOINT ARM — fork one
+branch applying both currently-`SUPPORTED` mechanisms together and check the
+combined effect against the sum of the two already measured individually.
 
 ---
 
@@ -386,3 +536,123 @@ from 155.4 to 31.2. A first autonomous demonstration:
 
 That sequence uses no new domain, no new solver, and no fabricated state — and it
 is a genuine autonomous investigation of a question nobody handed hypotheses for.
+
+---
+
+## 10. The learning loop, traced end to end — measured, not argued
+
+Asked after Information Gain landed: *does Genesis now LEARN from a result and
+change its next decision, or has it only got a smarter ranking?* Answered by
+running real fixtures and reading what came back, not by reading this document.
+Every number below is from a temporary probe script (deleted; the behaviours it
+measured are asserted by the permanent tests named).
+
+### 10.1 Does the RESULT change the NEXT decision? — YES, measured
+
+One fixture, four real hidden folds (`proteinFoldingInquiry`). Round 1 is
+identical in all four (probe=200; the acceptance rate has a real algorithmic
+floor there, 0.13 for every candidate). Round 2 is the SAME chosen experiment
+in all four (probe=5000, selected to separate `h:cold`/`h:cool`). It returns
+four DIFFERENT observations — and from there nothing is shared:
+
+| hidden | observed @5000 | ruled out | what it chose NEXT |
+|---|---|---|---|
+| `h:cold` | 0.1728 | cool, warm, hot | nothing — `NO_CONTENDERS_LEFT`, stop |
+| `h:cool` | 0.3428 | cold, hot | probe=20000, `DISCRIMINATES_TOP_TWO`, pair (cool, warm) |
+| `h:warm` | 0.3796 | cold | probe=20000, `DISCRIMINATES_OTHER_PAIR`, pair (warm, cool) |
+| `h:hot`  | 0.4140 | cold, cool | nothing — `NO_DISCRIMINATING_PROBE`, stop |
+
+The `cool` and `warm` rows are the sharp ones: **the same probe value, chosen
+under a different rule, for a different reason.** For `cool` the top two really
+are (cool, warm) and 20000 separates them. For `warm` the top two are
+(warm, hot) and nothing separates them, so the widened search picks 20000 to
+rule out `cool` instead. The observation writes the belief state; the belief
+state picks the rule; the rule picks the experiment. No branch of that is
+scripted.
+
+### 10.2 Is memory KNOWLEDGE or just HISTORY? — knowledge, measured
+
+Memory's product is a narrowed hypothesis set. The question is whether a
+narrowed set changes WHICH EXPERIMENT RUNS, or only which verdicts get
+reported. Same hidden fold (`h:warm`), full set vs. the set memory would hand
+over if `h:cold` had been refuted in an earlier session:
+
+| set | round 2 | pair | rounds | outcome |
+|---|---|---|---|---|
+| all four | probe=**5000** | (cold, cool) | 3 | warm, hot survive |
+| without `h:cold` | probe=**20000** | (cool, warm) | 2 | warm, hot survive |
+
+Dropping one remembered-refuted hypothesis changes the next experiment from
+5000 to 20000 and saves a whole round. Memory is not a log being replayed —
+it reaches the selector through `rankHypotheses`, and the selector runs a
+different experiment because of it. Execution path, all real:
+`scienceMemory` → `memoryNarrowedHypotheses` → `executedInput.hypotheses` →
+`inContention` → `rankHypotheses` → pair choice → probe choice.
+
+### 10.3 Model UPDATE vs. model ELIMINATION — the paths differ, and this is the finding
+
+**MECHANISM revises.** Measured on the flood catalog: declared
+`[h:pump-capacity]`, and after the run the belief set contains
+`[h:pump-capacity, h:pump-capacity~RELATION_FLIP]`. That second id was
+**created during the run**, from the real measured direction of the
+falsification (P3's `deriveAlternativeCriteria`). C3's generator audit
+(§ above) carries this further: on `genesis-backup-generator` both declared
+hypotheses are falsified, both derive flipped alternatives, and both
+alternatives are then genuinely SUPPORTED. That is `A ❌ → create C`, running
+today, on a real substrate.
+
+**PARAMETER does not.** Measured across every fold including total failure
+(hidden T=0.5 falsifies all four candidates): the set of hypothesis ids that
+ever appears is exactly the set declared. **Novel ids created: none, ever.**
+When everything is falsified the loop reports
+*"the system's real value is not among the values anyone proposed"* — correct,
+honest, and terminal. It cannot propose a value.
+
+So the honest answer to "can Genesis modify a model, or only discard one":
+**it depends which loop is asking.** MECHANISM modifies. PARAMETER only
+eliminates. That asymmetry is the single most important gap this trace found,
+and it is bigger than anything left in the planner.
+
+### 10.4 The DISCOVERY THRESHOLD exists — as a sensor with no actuator
+
+`modelSufficiency.ts` already computes exactly the transition asked about:
+`DECLARED_SPACE_INSUFFICIENT` means *"none of the declared mechanisms explains
+this; a next step must go outside the declared space."* Grep for who consumes
+it:
+
+- `genesisMatrix.ts` — puts it in a projection.
+- `genesisNarration.ts` — reads it aloud.
+
+**That is all.** No loop, no orchestrator, no next-experiment selector reads it.
+Genesis can SAY "my models are insufficient" and cannot ACT on having said it.
+The threshold is detected and then dropped.
+
+### 10.5 First missing element, and the next best step
+
+Not the planner. The first missing element is that **the PARAMETER path has no
+generation primitive at all**, and the one component that knows generation is
+needed (10.4) is wired to nothing that could do it.
+
+The minimal primitive — deliberately NOT implemented here, because it is a new
+generation capability on a live loop and needs the same care P3 got:
+a PARAMETER-side analogue of `deriveAlternativeCriteria` that proposes a new
+claimed VALUE derived from the real measured numbers (the obvious honest
+derivation: bracket between the two nearest falsified predictions, since the
+measurement lies between them by construction). Two constraints are
+non-negotiable and both already have precedent:
+
+1. **Anti-HARKing, exactly as P3 handles it.** A value derived from the
+   measurement that falsified everything cannot be judged against that same
+   measurement. It must be preregistered and tested at an untried probe —
+   which is precisely what `excludedStrengths` does on the MECHANISM side.
+2. **It must refuse when it cannot derive.** `deriveAlternativeCriteria`
+   returns `[]` from a no-effect refutation rather than inventing something.
+   The PARAMETER analogue must return nothing when the falsified predictions
+   do not bracket the observation — a value nobody can justify is worse than
+   an honest stop.
+
+Wiring 10.4's verdict into that primitive is what turns "I know my space is
+insufficient" into "so here is the hypothesis that isn't in it" — and that,
+not a better ranking, is the step that makes the loop
+*experiment → knowledge → model change → next experiment* rather than
+*experiment → knowledge → next experiment*.

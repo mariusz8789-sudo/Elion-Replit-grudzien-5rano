@@ -120,9 +120,13 @@ describe('protein-folding inquiry — PROOF OF AUTONOMY: the observation decides
   it('rules out a different set of hypotheses depending on which fold is real', () => {
     expect([...run(COLD).falsifiedHypothesisIds].sort()).toEqual(['h:cool', 'h:hot', 'h:warm']);
     expect([...run(COOL).falsifiedHypothesisIds].sort()).toEqual(['h:cold', 'h:hot', 'h:warm']);
-    // Warm's own real measurement only rules out cold — a genuinely different,
-    // weaker result than cold's or cool's own measurement produced.
-    expect(run(WARM).falsifiedHypothesisIds).toEqual(['h:cold']);
+    // Warm's own measurements rule out cold and cool, but never separate warm
+    // from hot — a genuinely different, weaker result than cold's or cool's own
+    // measurement produced. `h:cool` is ruled out by the information-gain
+    // widening in `selectNextProbe`: no setting separates the top two
+    // (warm/hot), so it runs the one that separates a lower-ranked pair
+    // instead. See that function's doc for the measured numbers.
+    expect([...run(WARM).falsifiedHypothesisIds].sort()).toEqual(['h:cold', 'h:cool']);
     expect([...run(HOT).falsifiedHypothesisIds].sort()).toEqual(['h:cold', 'h:cool']);
   });
 
@@ -147,11 +151,33 @@ describe('protein-folding inquiry — honesty when the candidates genuinely will
     const warm = run(WARM);
     expect(warm.stopReason).toBe('NO_DISCRIMINATING_PROBE');
     expect(warm.nextExperiment.probeValue).toBeNull();
-    expect([...warm.survivingHypothesisIds].sort()).toEqual(['h:cool', 'h:hot', 'h:warm']);
+    // The tie it refuses to break is warm-vs-hot, and ONLY that: `h:cool` was
+    // ruled out first by the information-gain widening (round 3 at 20000
+    // steps), so what is left standing is the pair the physics genuinely
+    // cannot separate — not a field the selection simply never got around to
+    // narrowing.
+    expect([...warm.survivingHypothesisIds].sort()).toEqual(['h:hot', 'h:warm']);
 
     const hot = run(HOT);
     expect(hot.stopReason).toBe('NO_DISCRIMINATING_PROBE');
     expect([...hot.survivingHypothesisIds].sort()).toEqual(['h:hot', 'h:warm']);
+  });
+
+  it('INFORMATION GAIN: runs the experiment that narrows the field when none settles the top two', () => {
+    const warm = run(WARM);
+    // Round 3 exists at all only because of the widening: rounds 1-2 leave
+    // warm/hot tied at every remaining step count, and the old selection
+    // stopped there with all three still standing.
+    expect(warm.rounds).toHaveLength(3);
+    const third = warm.rounds[2]!;
+    expect(third.probeValue).toBe(20000);
+    expect(third.selection.rule).toBe('DISCRIMINATES_OTHER_PAIR');
+    // It says plainly which pair it separates — and that it is NOT the top two.
+    expect(third.selection.betweenHypothesisIds).toContain('h:cool');
+    expect(third.selection.why).toContain('does not settle the strongest disagreement');
+    // And the round actually decided something: cool goes from standing to ruled out.
+    expect(warm.rounds[1]!.beliefsAfter.find((b) => b.hypothesisId === 'h:cool')!.status).not.toBe('FALSIFIED_WITHIN_PROTOCOL');
+    expect(third.beliefsAfter.find((b) => b.hypothesisId === 'h:cool')!.status).toBe('FALSIFIED_WITHIN_PROTOCOL');
   });
 
   it('says every candidate was wrong rather than crowning a least-wrong one', () => {

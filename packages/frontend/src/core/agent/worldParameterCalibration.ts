@@ -159,6 +159,8 @@ export interface WorldCalibrationBeliefSnapshot {
 export type CalibrationProbeRule =
   | 'OPENING_PROBE_DECLARED'
   | 'DISCRIMINATES_TOP_TWO'
+  /** See `inquiryLoop.ts`'s `ProbeSelectionRule` for why this is a separate, weaker claim than DISCRIMINATES_TOP_TWO. */
+  | 'DISCRIMINATES_OTHER_PAIR'
   | 'NO_DISCRIMINATING_PROBE'
   | 'NO_CONTENDERS_LEFT';
 
@@ -238,12 +240,47 @@ function snapshot(beliefs: ReadonlyMap<string, Hypothesis>): readonly WorldCalib
 }
 
 /**
+ * Would ONE untried tick separate TWO specific hypotheses? Checked in BOTH
+ * directions for the same reason `inquiryLoop.ts`'s `separatesAt` is: each
+ * agreement band is relative to its own hypothesis's prediction, so a
+ * one-direction check would depend on which hypothesis happened to be passed
+ * first. Null when the pair is not separated here, or when either reading
+ * could not be produced.
+ */
+function separatesAtTick(
+  system: WorldParameterSystem,
+  a: Hypothesis,
+  aPrediction: number,
+  b: Hypothesis,
+  bPrediction: number,
+): { readonly why: string } | null {
+  const aRulesOutB = checkDiscriminability(
+    { ...a, criterion: criterionForPrediction(system, aPrediction) },
+    { ...b, criterion: criterionForPrediction(system, bPrediction) },
+    aPrediction,
+    aPrediction,
+  );
+  const bRulesOutA = checkDiscriminability(
+    { ...b, criterion: criterionForPrediction(system, bPrediction) },
+    { ...a, criterion: criterionForPrediction(system, aPrediction) },
+    bPrediction,
+    bPrediction,
+  );
+  if (!aRulesOutB.discriminates || !bRulesOutA.discriminates) return null;
+  return { why: aRulesOutB.why };
+}
+
+/**
  * Chooses the next probe tick from the current belief state, over the already
  * pre-advanced candidate engines — exactly `inquiryLoop.ts`'s `selectNextProbe`,
  * ported to reading a tick off a trajectory instead of running a solver at a
- * setting. Checked in BOTH directions for the same reason: each agreement band
- * is relative to its own hypothesis's prediction, so a one-direction check
- * would depend on which hypothesis happened to be passed first.
+ * setting. That includes its information-gain widening: pairs are searched in
+ * rank order with the TOP TWO first, so a calibration that can settle the
+ * strongest disagreement still does exactly that, and only when no untried tick
+ * separates them does this widen to the other pairs still in contention rather
+ * than stopping with the whole field standing. See `inquiryLoop.ts`'s own doc
+ * for why this introduces no score, ranking function or expected-information
+ * number.
  */
 function selectNextProbe(
   system: WorldParameterSystem,
@@ -263,42 +300,36 @@ function selectNextProbe(
     };
   }
   const [first, second] = contenders;
-  const firstEngine = enginesById.get(first.id)!;
-  const secondEngine = enginesById.get(second.id)!;
 
-  for (const tick of system.candidateProbeTicks) {
-    if (triedTicks.has(tick)) continue;
-    const firstPrediction = readAt(firstEngine, system.entityId, system.observedMetric, tick);
-    const secondPrediction = readAt(secondEngine, system.entityId, system.observedMetric, tick);
-    if (firstPrediction === null || secondPrediction === null) continue;
-    const firstRulesOutSecond = checkDiscriminability(
-      { ...first, criterion: criterionForPrediction(system, firstPrediction) },
-      { ...second, criterion: criterionForPrediction(system, secondPrediction) },
-      firstPrediction,
-      firstPrediction,
-    );
-    const secondRulesOutFirst = checkDiscriminability(
-      { ...second, criterion: criterionForPrediction(system, secondPrediction) },
-      { ...first, criterion: criterionForPrediction(system, firstPrediction) },
-      secondPrediction,
-      secondPrediction,
-    );
-    const check = firstRulesOutSecond.discriminates && secondRulesOutFirst.discriminates
-      ? firstRulesOutSecond
-      : { discriminates: false, why: `${firstRulesOutSecond.why} ${secondRulesOutFirst.why}` };
-    if (check.discriminates) {
-      return {
-        probeTick: tick,
-        rule: 'DISCRIMINATES_TOP_TWO',
-        why: `At tick=${tick} the two strongest surviving hypotheses predict ${firstPrediction} ("${first.id}") and ${secondPrediction} ("${second.id}") for ${system.observedMetric} — far enough apart that one reading decides between them. ${check.why}`,
-        betweenHypothesisIds: [first.id, second.id],
-      };
+  for (let i = 0; i < contenders.length - 1; i++) {
+    for (let j = i + 1; j < contenders.length; j++) {
+      const a = contenders[i];
+      const b = contenders[j];
+      const isTopTwo = i === 0 && j === 1;
+      for (const tick of system.candidateProbeTicks) {
+        if (triedTicks.has(tick)) continue;
+        const aPrediction = readAt(enginesById.get(a.id)!, system.entityId, system.observedMetric, tick);
+        const bPrediction = readAt(enginesById.get(b.id)!, system.entityId, system.observedMetric, tick);
+        if (aPrediction === null || bPrediction === null) continue;
+        const separation = separatesAtTick(system, a, aPrediction, b, bPrediction);
+        if (separation === null) continue;
+        return {
+          probeTick: tick,
+          rule: isTopTwo ? 'DISCRIMINATES_TOP_TWO' : 'DISCRIMINATES_OTHER_PAIR',
+          why: isTopTwo
+            ? `At tick=${tick} the two strongest surviving hypotheses predict ${aPrediction} ("${a.id}") and ${bPrediction} ("${b.id}") for ${system.observedMetric} — far enough apart that one reading decides between them. ${separation.why}`
+            : `No untried tick separates the two strongest survivors ("${first.id}" and "${second.id}"), so this reading narrows the field instead: at tick=${tick} "${a.id}" predicts ${aPrediction} and "${b.id}" predicts ${bPrediction} for ${system.observedMetric} — far enough apart that it rules one of THEM out. It does not settle the strongest disagreement. ${separation.why}`,
+          betweenHypothesisIds: [a.id, b.id],
+        };
+      }
     }
   }
   return {
     probeTick: null,
     rule: 'NO_DISCRIMINATING_PROBE',
-    why: `No untried tick separates "${first.id}" from "${second.id}": at every candidate tick their predictions for ${system.observedMetric} agree inside the declared ±${system.agreementTolerance * 100}% band, so no further reading from this list could decide between them.`,
+    why: contenders.length === 2
+      ? `No untried tick separates "${first.id}" from "${second.id}": at every candidate tick their predictions for ${system.observedMetric} agree inside the declared ±${system.agreementTolerance * 100}% band, so no further reading from this list could decide between them.`
+      : `No untried tick separates any pair among the ${contenders.length} hypotheses still in contention (${contenders.map((h) => `"${h.id}"`).join(', ')}): at every candidate tick, every pair's predictions for ${system.observedMetric} agree inside the declared ±${system.agreementTolerance * 100}% band, so no further reading from this list could decide between any of them.`,
     betweenHypothesisIds: [first.id, second.id],
   };
 }

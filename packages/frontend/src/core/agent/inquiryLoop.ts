@@ -157,7 +157,18 @@ export type ProbeSelectionRule =
   | 'OPENING_PROBE_DECLARED'
   /** A setting at which the two strongest surviving hypotheses predict measurably different results. */
   | 'DISCRIMINATES_TOP_TWO'
-  /** No untried setting separates the survivors; the inquiry stops rather than running an uninformative experiment. */
+  /**
+   * No untried setting separates the two strongest survivors, but one separates
+   * some OTHER pair still in contention — so the inquiry runs it and rules one
+   * of them out instead of stopping with the whole field intact.
+   *
+   * A deliberately weaker claim than `DISCRIMINATES_TOP_TWO`, and named
+   * separately for that reason: this measurement narrows the field without
+   * settling the strongest disagreement. Reporting it under the top-two rule
+   * would overstate what the experiment decides.
+   */
+  | 'DISCRIMINATES_OTHER_PAIR'
+  /** No untried setting separates ANY pair still in contention; the inquiry stops rather than running an uninformative experiment. */
   | 'NO_DISCRIMINATING_PROBE'
   /** Fewer than two hypotheses are still in contention, so there is nothing left to separate. */
   | 'NO_CONTENDERS_LEFT';
@@ -300,16 +311,81 @@ function snapshot(beliefs: ReadonlyMap<string, Hypothesis>): readonly BeliefSnap
 }
 
 /**
+ * Would a setting at which these two hypotheses make THESE two real predictions
+ * separate them? A pure judgement over `checkDiscriminability` — the caller
+ * supplies predictions that came from real runs, so this runs no model itself.
+ *
+ * Asked in BOTH directions, and both must hold. Each hypothesis's agreement
+ * band is relative to its OWN prediction, so the bands are asymmetric: a
+ * single-direction check would call a probe decisive or not depending on which
+ * hypothesis happened to be passed first, which is an artefact of argument
+ * order rather than a fact about the experiment. Requiring both is also the
+ * scientifically conservative reading: whichever of the two is actually true,
+ * this measurement rules the other one out.
+ *
+ * Null when the pair is not separated — the caller moves on rather than guessing.
+ */
+function separatesAt(
+  system: ObservableSystem,
+  a: Hypothesis,
+  aPrediction: number,
+  b: Hypothesis,
+  bPrediction: number,
+): { readonly why: string } | null {
+  const aRulesOutB = checkDiscriminability(
+    { ...a, criterion: criterionForPrediction(system, aPrediction) },
+    { ...b, criterion: criterionForPrediction(system, bPrediction) },
+    aPrediction,
+    aPrediction,
+  );
+  const bRulesOutA = checkDiscriminability(
+    { ...b, criterion: criterionForPrediction(system, bPrediction) },
+    { ...a, criterion: criterionForPrediction(system, aPrediction) },
+    bPrediction,
+    bPrediction,
+  );
+  if (!aRulesOutB.discriminates || !bRulesOutA.discriminates) return null;
+  return { why: aRulesOutB.why };
+}
+
+/**
  * Chooses the next probe from the CURRENT belief state.
  *
  * Every input is downstream of the last observation: `inContention` drops
  * whatever that observation falsified, and `rankHypotheses` orders what is left
- * by confidence the observation just moved. The chosen setting is the first
- * untried candidate at which the top two survivors predict results far enough
- * apart to tell them apart — `checkDiscriminability`'s judgement, on real
- * predictions from real runs, not a heuristic invented here.
+ * by confidence the observation just moved. The chosen setting is a real
+ * `checkDiscriminability` judgement on real predictions from real runs, not a
+ * heuristic invented here.
  *
- * Refusing is a real outcome: when nothing separates the survivors, this says
+ * ## Information gain: every pair, not only the top two
+ *
+ * Pairs are searched in rank order, and the TOP TWO come first — so a run that
+ * can settle the strongest disagreement still does exactly that, unchanged.
+ * Only when no untried setting separates the top two does this widen to the
+ * other pairs still in contention.
+ *
+ * That widening is the whole point, and it is a real one rather than a
+ * refinement: before it, an inquiry that could not settle its top two STOPPED,
+ * with the entire field still standing — even when an untried setting would
+ * have ruled a third hypothesis out. Measured on the real protein-folding
+ * fixture: `h:warm` and `h:hot` sit in a saturating region of the Metropolis
+ * acceptance rate and genuinely never separate (2.3–10.1% apart at every
+ * untried step count, inside the ±15% band), yet at steps=20000 `h:cool`
+ * predicts 0.29865 against `h:warm`'s 0.36675 — 18.6% apart, decisively
+ * outside it. Ruling `h:cool` out is a real result the old selection threw
+ * away.
+ *
+ * ## What is NOT introduced here
+ *
+ * No score, no ranking function, no expected-information number. "Information
+ * gain" here means only: PREFER AN EXPERIMENT PROVEN TO CHANGE THE BELIEF
+ * STATE OVER ONE PROVEN NOT TO. The comparison is the same deterministic
+ * band check that already existed, applied to more pairs before giving up, and
+ * the order is the confidence order `rankHypotheses` already establishes.
+ * Nothing in this codebase justifies weighting one uncertainty above another
+ * numerically, and this does not start.
+ *
+ * Refusing is still a real outcome: when nothing separates ANY pair, this says
  * so instead of running another experiment that could not change anything.
  */
 function selectNextProbe(
@@ -317,6 +393,7 @@ function selectNextProbe(
   beliefs: ReadonlyMap<string, Hypothesis>,
   claimedValuesById: ReadonlyMap<string, Readonly<Record<string, number>>>,
   triedProbes: ReadonlySet<number>,
+  predictions: Map<string, number | null>,
 ): ProbeSelection {
   const contenders = rankHypotheses(inContention(beliefs));
   if (contenders.length < 2) {
@@ -330,49 +407,57 @@ function selectNextProbe(
     };
   }
   const [first, second] = contenders;
-  const firstValues = claimedValuesById.get(first.id)!;
-  const secondValues = claimedValuesById.get(second.id)!;
 
-  for (const probe of system.candidateProbeValues) {
-    if (triedProbes.has(probe)) continue;
-    const firstPrediction = readMetric(runAt(system, firstValues, probe, `Prediction for ${first.id}`), system.observedMetric);
-    const secondPrediction = readMetric(runAt(system, secondValues, probe, `Prediction for ${second.id}`), system.observedMetric);
-    if (firstPrediction === null || secondPrediction === null) continue;
-    // Asked in BOTH directions, and both must hold. Each hypothesis's agreement
-    // band is relative to its OWN prediction, so the bands are asymmetric: a
-    // single-direction check would call a probe decisive or not depending on
-    // which hypothesis happened to be passed first, which is an artefact of
-    // argument order rather than a fact about the experiment. Requiring both is
-    // also the scientifically conservative reading: whichever of the two is
-    // actually true, this measurement rules the other one out.
-    const firstRulesOutSecond = checkDiscriminability(
-      { ...first, criterion: criterionForPrediction(system, firstPrediction) },
-      { ...second, criterion: criterionForPrediction(system, secondPrediction) },
-      firstPrediction,
-      firstPrediction,
-    );
-    const secondRulesOutFirst = checkDiscriminability(
-      { ...second, criterion: criterionForPrediction(system, secondPrediction) },
-      { ...first, criterion: criterionForPrediction(system, firstPrediction) },
-      secondPrediction,
-      secondPrediction,
-    );
-    const check = firstRulesOutSecond.discriminates && secondRulesOutFirst.discriminates
-      ? firstRulesOutSecond
-      : { discriminates: false, why: `${firstRulesOutSecond.why} ${secondRulesOutFirst.why}` };
-    if (check.discriminates) {
-      return {
-        probeValue: probe,
-        rule: 'DISCRIMINATES_TOP_TWO',
-        why: `At ${system.probeParameterId}=${probe} the two strongest surviving hypotheses predict ${firstPrediction} ("${first.id}") and ${secondPrediction} ("${second.id}") — far enough apart that one measurement decides between them. ${check.why}`,
-        betweenHypothesisIds: [first.id, second.id],
-      };
+  // One prediction per (hypothesis, setting), however many pairs ask for it and
+  // however many rounds re-ask. Purely a cost guard — a prediction is a real
+  // model run, the widened search puts the same hypothesis in several pairs,
+  // and successive rounds re-scan the same untried settings. Safe on both
+  // counts: a prediction depends only on the hypothesis's claimed values and
+  // the setting (neither changes as beliefs move), and unlike measurements
+  // these runs are never collected — `runAutonomousInquiryWithRuns` gathers
+  // only what it actually measured.
+  const predictionFor = (h: Hypothesis, probe: number): number | null => {
+    const key = `${h.id}@${probe}`;
+    const cached = predictions.get(key);
+    if (cached !== undefined) return cached;
+    const value = readMetric(runAt(system, claimedValuesById.get(h.id)!, probe, `Prediction for ${h.id}`), system.observedMetric);
+    predictions.set(key, value);
+    return value;
+  };
+
+  for (let i = 0; i < contenders.length - 1; i++) {
+    for (let j = i + 1; j < contenders.length; j++) {
+      const a = contenders[i];
+      const b = contenders[j];
+      // (0,1) is the top two — checked first, over every untried setting,
+      // before any weaker pair is considered.
+      const isTopTwo = i === 0 && j === 1;
+      for (const probe of system.candidateProbeValues) {
+        if (triedProbes.has(probe)) continue;
+        const aPrediction = predictionFor(a, probe);
+        const bPrediction = predictionFor(b, probe);
+        if (aPrediction === null || bPrediction === null) continue;
+        const separation = separatesAt(system, a, aPrediction, b, bPrediction);
+        if (separation === null) continue;
+        return {
+          probeValue: probe,
+          rule: isTopTwo ? 'DISCRIMINATES_TOP_TWO' : 'DISCRIMINATES_OTHER_PAIR',
+          why: isTopTwo
+            ? `At ${system.probeParameterId}=${probe} the two strongest surviving hypotheses predict ${aPrediction} ("${a.id}") and ${bPrediction} ("${b.id}") — far enough apart that one measurement decides between them. ${separation.why}`
+            : `No untried setting of ${system.probeParameterId} separates the two strongest survivors ("${first.id}" and "${second.id}"), so this measurement narrows the field instead: at ${system.probeParameterId}=${probe} "${a.id}" predicts ${aPrediction} and "${b.id}" predicts ${bPrediction} — far enough apart that it rules one of THEM out. It does not settle the strongest disagreement. ${separation.why}`,
+          betweenHypothesisIds: [a.id, b.id],
+        };
+      }
     }
   }
   return {
     probeValue: null,
     rule: 'NO_DISCRIMINATING_PROBE',
-    why: `No untried setting of ${system.probeParameterId} separates "${first.id}" from "${second.id}": at every candidate their predictions agree inside the declared ±${system.agreementTolerance * 100}% band, so no further experiment from this list could decide between them.`,
+    why: contenders.length === 2
+      ? `No untried setting of ${system.probeParameterId} separates "${first.id}" from "${second.id}": at every candidate their predictions agree inside the declared ±${system.agreementTolerance * 100}% band, so no further experiment from this list could decide between them.`
+      : `No untried setting of ${system.probeParameterId} separates any pair among the ${contenders.length} hypotheses still in contention (${contenders.map((h) => `"${h.id}"`).join(', ')}): at every candidate, every pair's predictions agree inside the declared ±${system.agreementTolerance * 100}% band, so no further experiment from this list could decide between any of them.`,
+    // The top two remain the pair the run could not settle — the honest
+    // headline even when more than two are left standing.
     betweenHypothesisIds: [first.id, second.id],
   };
 }
@@ -427,6 +512,8 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
   const rounds: InquiryRound[] = [];
   const measurements: ExperimentRun[] = [];
   const tried = new Set<number>();
+  /** Shared across rounds — see `selectNextProbe`'s `predictionFor` for why that is sound. */
+  const predictionCache = new Map<string, number | null>();
   let stopReason: InquiryStopReason = 'ROUND_BUDGET_EXHAUSTED';
   let selection: ProbeSelection = {
     probeValue: input.openingProbeValue,
@@ -501,7 +588,7 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
     }
 
     // --- The next probe, chosen from the belief state this round wrote ----
-    const nextSelection = selectNextProbe(observable, beliefs, claimedValuesById, tried);
+    const nextSelection = selectNextProbe(observable, beliefs, claimedValuesById, tried, predictionCache);
 
     rounds.push({
       round,

@@ -269,7 +269,8 @@ export function priorRefutedHypothesisIds(
   return refuted;
 }
 
-function evidenceSummary(bundle: { bundleId: string; scientificContentFingerprint: string; replay: { verdict: ReplayVerdict; message: string } }): WorldDiscoveryEvidenceSummary {
+/** Exported so `discoveryOrchestrator.ts`'s own "AndRemember" persistence reuses this projection rather than a second one. */
+export function evidenceSummary(bundle: { bundleId: string; scientificContentFingerprint: string; replay: { verdict: ReplayVerdict; message: string } }): WorldDiscoveryEvidenceSummary {
   return {
     bundleId: bundle.bundleId,
     scientificContentFingerprint: bundle.scientificContentFingerprint,
@@ -359,12 +360,12 @@ export function runWorldDiscoveryAndRemember(
   // door and never through the door anything actually uses.
   //
   // `generateJointMechanismFrom` (not `runDiscoveryWithJointGeneration`) is
-  // used deliberately: `execution.result` is ALREADY the base investigation
-  // this function just ran for its own Evidence Bundle, so calling the
+  // used deliberately: `execution` is ALREADY the base investigation this
+  // function just ran for its own Evidence Bundle, so calling the
   // execute-and-generate wrapper here would run the identical WorldGraph
   // search a second time for no new information — the fork it forgoes reusing
   // is exactly the live-engine one `execution` already produced.
-  const mechanismGeneration = generateJointMechanismFrom(execution.result, { ...plan, hypotheses: hypothesesToRun });
+  const mechanismGeneration = generateJointMechanismFrom(execution, { ...plan, hypotheses: hypothesesToRun });
   let mechanismComposition: SavedMechanismComposition | null = null;
   if (mechanismGeneration.generated !== null) {
     const savedComposition = buildSavedMechanismComposition({

@@ -15,10 +15,18 @@
  * rule this component exists to obey: a `RealExperimentInterface` is a CAPABILITY, admitted or
  * refused exactly like every solver capability already is (`discoveryAdmission.ts`'s
  * `AdmissionStatus`: `'REAL' | 'APPROXIMATION' | 'NOT_MODELLED' | 'BLOCKED'`) — never a stub that
- * silently falls back to relabelling simulated output as real. Confirmed by direct repo search: zero
- * code references to `REAL_EXPERIMENTAL`/`RealExperimentInterface` exist anywhere yet, only in these
- * two docs — so every stage past "Prediction" below is honestly `NOT_MODELLED`, reusing that exact
- * status word rather than inventing a new one.
+ * silently falls back to relabelling simulated output as real.
+ *
+ * **Updated after C1 landed the Real Experiment Contract** (`core/experimentFabric/realExperiment.ts`,
+ * `docs/GENESIS_DATA_PROVENANCE_AND_REAL_EXPERIMENT_CONTRACT.md`): the CONTRACT now exists —
+ * `createRealExperimentRun()` assembles already-obtained `RawMeasurement`/`DerivedMeasurement`
+ * values into a valid `ExperimentRun` tagged `dataProvenance: 'REAL_EXPERIMENTAL'`, which already
+ * flows correctly into Evidence/Memory/Replay (verified by that report's own `realExperiment.test.ts`).
+ * What still does NOT exist, confirmed by that same report's own "NEXT GAP" list, is (1) any UI
+ * surface for a person to enter a real measurement through that contract, (2) an `ExperimentRoute`
+ * kind for a physical experiment, and (3) any actual apparatus/sensor/lab connection — so every
+ * stage below "Prediction" is still honestly `NOT_MODELLED` from THIS screen's point of view, but the
+ * wording now cites the real contract by name instead of claiming nothing exists at all.
  *
  * "Comparison" and "Evidence" are each split into what is real TODAY (a real Evidence Bundle for a
  * SIMULATED run, and the real fork-and-compare machinery `worldCounterfactual.ts` already runs
@@ -67,19 +75,19 @@ function buildStages({ predictionMechanism, predictionRationale, comparisonNote,
       key: 'request',
       label: 'Real Experiment Request',
       status: 'not-modelled',
-      note: 'No RealExperimentInterface is registered in this codebase — Genesis refuses this step rather than fabricating a request. See GENESIS_NORTH_STAR.md §4.',
+      note: 'The contract exists (createRealExperimentRun in core/experimentFabric/realExperiment.ts) but only as something a developer calls by hand from already-obtained measurements — no screen lets you submit one from here yet, so Genesis refuses this step rather than fabricating a request.',
     },
     {
       key: 'waiting',
       label: 'Waiting for Laboratory',
       status: 'not-modelled',
-      note: 'Depends on a Real Experiment Request existing first — not reachable while that stage is refused.',
+      note: 'No ExperimentRoute kind exists for a physical experiment yet, and no apparatus/lab is connected — not reachable while the Request stage above has no UI to populate it.',
     },
     {
       key: 'data',
       label: 'Real Experimental Data',
       status: 'not-modelled',
-      note: 'No apparatus, sensor, or laboratory connection exists anywhere in this codebase yet.',
+      note: 'The measurement shape exists (RawMeasurement/DerivedMeasurement) and would flow correctly into Evidence and Memory if entered — but no apparatus, sensor, or laboratory connection exists anywhere in this codebase, and no UI lets a person type in a real reading yet.',
     },
     {
       key: 'comparison',
@@ -92,8 +100,8 @@ function buildStages({ predictionMechanism, predictionRationale, comparisonNote,
       label: 'Evidence',
       status: evidenceBundleId ? 'approximation' : 'not-modelled',
       note: evidenceBundleId
-        ? `A real Evidence Bundle (${evidenceBundleId}) was recorded for this simulated run — run a Discovery search on the left to produce your own. A real-experimental Evidence Bundle does not exist yet.`
-        : 'No Evidence Bundle recorded yet for this session — run a Discovery search on the left to produce one (simulated only; real-experimental evidence does not exist yet).',
+        ? `A real Evidence Bundle (${evidenceBundleId}) was recorded for this simulated run — run a Discovery search on the left to produce your own. The provenance field a real-experimental Evidence Bundle would need (dataProvenance: REAL_EXPERIMENTAL) already exists and propagates correctly; only a real measurement to carry it does not exist yet.`
+        : 'No Evidence Bundle recorded yet for this session — run a Discovery search on the left to produce one (simulated only; a real-experimental Evidence Bundle needs a real measurement, which does not exist yet).',
     },
   ];
 }

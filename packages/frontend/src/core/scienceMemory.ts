@@ -2141,8 +2141,7 @@ export function replaySavedMechanismComposition(saved: SavedExperiment): SavedMe
     ...plan,
     hypotheses: filteredHypotheses.length > 0 ? filteredHypotheses : plan.hypotheses,
   };
-  const first = runAutonomousDiscoveryWithEngines(rerunInput).result;
-  const fresh = generateJointMechanismFrom(first, rerunInput);
+  const fresh = generateJointMechanismFrom(runAutonomousDiscoveryWithEngines(rerunInput), rerunInput);
   if (fresh.generated === null) {
     return { status: 'NOT_REPRODUCIBLE', reason: `Ponowne wykonanie nie odtworzyło kompozycji: ${fresh.noGenerationReason}` };
   }

@@ -3671,11 +3671,41 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   border-radius: 0.3rem; padding: 0.3rem 0.4rem; font-size: 0.78rem;
 }
 .cell-lab-panel input[type='range'] { accent-color: var(--cyan); }
-.cell-lab-readout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.2rem; }
-.cell-lab-arm { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.cell-lab-arm-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; }
 .cell-lab-honesty { margin-top: 0.4rem; font-size: 0.75rem; }
 .cell-lab-honesty summary { cursor: pointer; opacity: 0.8; }
+
+/* C2 MASTER — flagship narrative ladder: CONTROL -> TREATMENT -> OBSERVATION -> DIFFERENCE ->
+   CONCLUSION -> NEXT EXPERIMENT. A plain ordered list, one real fact per row. */
+.cell-lab-narrative {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  border-top: 1px solid var(--border); padding-top: 0.5rem; margin: 0.2rem 0 0; list-style: none;
+}
+.cln-step p { margin: 0.1rem 0 0; font-size: 0.82rem; line-height: 1.4; }
+.cln-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; opacity: 0.85; }
+.cln-supported { color: var(--green); }
+.cln-falsified { color: var(--red); }
+
+.cell-lab-demo-banner {
+  border: 1px solid rgba(126, 179, 255, 0.4); background: rgba(126, 179, 255, 0.1);
+  border-radius: 0.3rem; padding: 0.4rem 0.6rem; font-size: 0.78rem; color: #9fd0ff;
+}
+
+/* Real Experiment Interface — a status ladder, one row per pipeline stage, reusing .gx-status
+   exactly as every other capability-admission badge in Genesis already does. */
+.rex-pipeline {
+  display: flex; flex-direction: column; gap: 0.45rem;
+  border-top: 1px solid var(--border); padding-top: 0.5rem; margin: 0.2rem 0 0; list-style: none;
+}
+.rex-stage-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.rex-stage-label { font-size: 0.78rem; font-weight: 600; }
+.rex-stage p { margin: 0.15rem 0 0; }
+
+/* Data provenance — a fixed hue per value so SIMULATED/REFERENCE/REAL_EXPERIMENTAL read apart
+   from each other at a glance, not just from their text. */
+.gx-provenance-simulated { background: rgba(126, 179, 255, 0.16); border-color: rgba(126, 179, 255, 0.4); color: #9fd0ff; }
+.gx-provenance-reference { background: rgba(240, 179, 92, 0.16); border-color: rgba(240, 179, 92, 0.4); color: var(--gold); }
+.gx-provenance-real_experimental { background: rgba(110, 231, 160, 0.16); border-color: rgba(110, 231, 160, 0.4); color: var(--green); }
+
 @media (max-width: 640px) {
   /* .wd-panel already goes full-width and pins top:1rem on a phone (see its own mobile rule
      above), so stacking .cell-lab-panel at the same top would hide it completely underneath

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CrossActionComparison } from '../../core/agent/crossActionComparison';
 import { admitWorldQuestion } from '../../core/agent/discoveryAdmission';
 import type { Admission } from '../../core/agent/discoveryStrategy';
@@ -27,8 +27,10 @@ import {
   type SavedWorldDiscoveryReplay,
 } from '../../core/scienceMemory';
 
-/** Local UI states the session module has no reason to know about. */
-type PanelState =
+/** Local UI states the session module has no reason to know about. Exported so an embedding screen
+ * (Demo Mode, a flagship narrative strip) can type an `onResult` callback against the real shape
+ * this panel actually produces, instead of re-deriving its own verdict from the same run. */
+export type PanelState =
   | { kind: 'IDLE' }
   | { kind: 'RUNNING'; goal: string }
   | { kind: 'NOT_ADMITTED'; goal: string; admission: Admission }
@@ -81,7 +83,21 @@ function historySummary(exp: SavedExperiment): string {
  * report and JSON sit underneath in a disclosure, so nothing shown to a person
  * is a paraphrase of something different from what a tool would read.
  */
-export function WorldDiscoveryPanel({ defaultCatalogId }: { defaultCatalogId?: string } = {}) {
+export function WorldDiscoveryPanel({
+  defaultCatalogId,
+  initialGoal,
+  onResult,
+}: {
+  defaultCatalogId?: string;
+  /** DEMO MODE — if given, this exact goal runs ONCE on mount, through the same `run()` a typed
+   * submission would call: not a second, demo-only execution path, only an automatic first keystroke. */
+  initialGoal?: string;
+  /** Fires with every state this panel reaches that carries a real outcome (NOT_ADMITTED, REFUSED,
+   * COMPLETE, COMPARISON) — never for IDLE/RUNNING. Lets an embedding screen (e.g. the Virtual Cell
+   * Lab's own CONCLUSION/NEXT EXPERIMENT narrative) read the SAME real result this panel already
+   * computed, instead of re-deriving a second verdict from the same run. */
+  onResult?: (state: PanelState) => void;
+} = {}) {
   const [goal, setGoal] = useState('');
   const [state, setState] = useState<PanelState>({ kind: 'IDLE' });
   // Every real lever catalog Genesis declares, read from the ONE registry
@@ -98,6 +114,13 @@ export function WorldDiscoveryPanel({ defaultCatalogId }: { defaultCatalogId?: s
   const [compareIds, setCompareIds] = useState<readonly string[]>([]);
   const [replayChecks, setReplayChecks] = useState<Readonly<Record<string, SavedWorldDiscoveryReplay>>>({});
 
+  /** Sets state AND, when this run reached a real outcome (not IDLE/RUNNING), reports it upward —
+   * the one place both effects happen, so no caller of `run()` below has to remember both. */
+  const finish = (next: PanelState) => {
+    setState(next);
+    onResult?.(next);
+  };
+
   const run = (text: string, forCatalogId: string) => {
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
@@ -111,7 +134,7 @@ export function WorldDiscoveryPanel({ defaultCatalogId }: { defaultCatalogId?: s
     // a real, admitted search; only NOT_MODELLED/BLOCKED are refused here.
     const admission = admitWorldQuestion(trimmed);
     if (admission.status === 'NOT_MODELLED' || admission.status === 'BLOCKED') {
-      setState({ kind: 'NOT_ADMITTED', goal: trimmed, admission });
+      finish({ kind: 'NOT_ADMITTED', goal: trimmed, admission });
       return;
     }
     setState({ kind: 'RUNNING', goal: trimmed });
@@ -124,8 +147,19 @@ export function WorldDiscoveryPanel({ defaultCatalogId }: { defaultCatalogId?: s
     // call already has to read prior memory before it can decide what to run,
     // so saving afterwards is the other half of the same seam, not a separate
     // side effect the panel would otherwise have to remember to trigger.
-    setTimeout(() => setState(runWorldDiscoveryAndRemember(trimmed, forCatalogId)), 0);
+    setTimeout(() => finish(runWorldDiscoveryAndRemember(trimmed, forCatalogId)), 0);
   };
+
+  // DEMO MODE — runs exactly once per mount, through the same `run()` above, never a second
+  // execution path. Deliberately an empty dependency array: `initialGoal` is a one-shot instruction
+  // ("run this on arrival"), not a value this effect should re-fire for on every parent re-render.
+  useEffect(() => {
+    if (initialGoal && initialGoal.trim().length > 0) {
+      setGoal(initialGoal);
+      run(initialGoal, defaultCatalogId ?? catalogId);
+    }
+    // Runs once per mount only — see the doc above. Not exhaustive on `catalogId`/`run` on purpose.
+  }, []);
 
   /** Re-runs a saved goal against the SAME catalog it originally ran in — the one seam again, not a
    * second copy of it — and switches the picker to match, so the result the user sees matches what ran. */

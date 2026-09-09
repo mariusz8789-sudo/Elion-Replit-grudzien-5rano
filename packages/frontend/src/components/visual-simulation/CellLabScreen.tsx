@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { sci, useSimLoop } from '../../core/useSimLoop';
 import type { Sim, SimParams } from '../../core/types';
 import {
@@ -14,10 +14,13 @@ import {
   BLOCKED_S_DURATION_H,
   CYTOTOXIC_DEATH_RATE_PER_HOUR,
   GENESIS_CELL_CULTURE_CATALOG_ID,
+  GENESIS_CELL_CULTURE_LEVERS,
   LARGER_CAPACITY_CELLS,
   MITOGEN_G1_DURATION_H,
 } from '../../core/agent/cellCultureLeverCatalog';
-import { WorldDiscoveryPanel } from './WorldDiscoveryPanel';
+import { WorldDiscoveryPanel, type PanelState } from './WorldDiscoveryPanel';
+import { ProvenanceBadge } from './provenance';
+import { RealExperimentPipeline } from './RealExperimentPipeline';
 
 /**
  * VIRTUAL CELL LAB — Control vs Treatment (P0, GENESIS C2 next-sprint directive).
@@ -187,7 +190,10 @@ export class CellCultureLabSim implements Sim {
       this.relaunch(TREATMENTS[treatmentId] ? treatmentId : 'mitogen', dose);
     }
     if (this.control.hoursElapsed >= MAX_HOURS) return;
-    const hours = Math.min(dt * HOURS_PER_REAL_SECOND, MAX_HOURS - this.control.hoursElapsed);
+    // DEMO MODE fast-forward — a pacing control on how many real solver hours one real second
+    // covers, not a second timeline: every hour still comes from `advanceArm`'s own RK4 steps.
+    const speed = Number(params.speed ?? 1);
+    const hours = Math.min(dt * HOURS_PER_REAL_SECOND * speed, MAX_HOURS - this.control.hoursElapsed);
     this.advanceArm(this.control, hours);
     this.advanceArm(this.treatment, hours);
   }
@@ -319,16 +325,86 @@ export class CellCultureLabSim implements Sim {
   }
 }
 
+/** The real search Demo Mode submits — same admission + `runWorldDiscoveryAndRemember` path a typed
+ * goal would hit, matching this catalogue's own declared `metricPhrases` ("cell count") and the
+ * MAXIMIZE keyword `worldGoalIntent.ts` parses ("increase"), so it genuinely admits and runs. */
+const DEMO_GOAL = 'Increase cell count using a substance, at most 2 experiments.';
+/** Real wall-clock budget for one guided walkthrough — the pacing item 17 of the product directive
+ * asked for; the search itself typically resolves in well under a second (no network I/O). */
+const DEMO_DURATION_MS = 55_000;
+/** Fast-forward multiplier on `HOURS_PER_REAL_SECOND` while Demo Mode is active — the growth curve
+ * still advances through the same real RK4 steps, just more of them per real second, so the culture
+ * visibly grows within the walkthrough's time budget instead of needing to run for real minutes. */
+const DEMO_SPEED = 4;
+
+/** Real per-treatment hypothesis id the Discovery Loop already uses (`h:${leverId's own suffix}`) —
+ * reused verbatim so CONCLUSION reads the SAME verdict the search actually reached, never a second
+ * one computed here. */
+export function conclusionFor(result: PanelState | null, treatmentId: TreatmentId): { verdict: 'SUPPORTED' | 'FALSIFIED'; text: string } | null {
+  if (!result || result.kind !== 'COMPLETE') return null;
+  const hypothesisId = `h:${treatmentId}`;
+  const supported = result.result.bestSupported.find((b) => b.hypothesisId === hypothesisId);
+  if (supported) return { verdict: 'SUPPORTED', text: `${supported.confidence}. ${supported.reason}` };
+  const falsified = result.result.failedHypotheses.find((b) => b.hypothesisId === hypothesisId);
+  if (falsified) return { verdict: 'FALSIFIED', text: `${falsified.confidence}. ${falsified.reason}` };
+  return null;
+}
+
+/** The real "what remains unknown" the search itself reported, when one exists — never a fabricated
+ * next step. Only falls back to a UI affordance (try another substance) when Genesis's own search
+ * left nothing outstanding to name. */
+export function nextExperimentFor(result: PanelState | null): string {
+  if (!result || result.kind !== 'COMPLETE') {
+    return 'Run a Discovery search (left panel) to let Genesis choose a real next experiment.';
+  }
+  if (result.result.unresolvedQuestions.length > 0) return result.result.unresolvedQuestions[0]!;
+  return 'Try a different substance or dose above, then run Discovery again to test another mechanism.';
+}
+
 export function CellLabScreen() {
   const sim = useMemo(() => new CellCultureLabSim(), []);
   const [treatmentId, setTreatmentId] = useState<TreatmentId>('mitogen');
   const [dose, setDose] = useState(1);
   const [running, setRunning] = useState(true);
   const [stats, setStats] = useState<Record<string, number>>({});
-  const params = useMemo<SimParams>(() => ({ treatment: treatmentId, dose }), [treatmentId, dose]);
+  const [discoveryResult, setDiscoveryResult] = useState<PanelState | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoKey, setDemoKey] = useState(0);
+  const demoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const params = useMemo<SimParams>(() => ({ treatment: treatmentId, dose, speed: demoMode ? DEMO_SPEED : 1 }), [treatmentId, dose, demoMode]);
   const canvasRef = useSimLoop(sim, params, running, setStats);
 
+  useEffect(() => () => { if (demoTimerRef.current) clearTimeout(demoTimerRef.current); }, []);
+
+  const startDemo = () => {
+    if (demoTimerRef.current) clearTimeout(demoTimerRef.current);
+    setTreatmentId('mitogen');
+    setDose(1);
+    sim.reset?.();
+    setDiscoveryResult(null);
+    setRunning(true);
+    setDemoKey((k) => k + 1); // remounts WorldDiscoveryPanel so its mount-effect re-runs initialGoal
+    setDemoMode(true);
+    demoTimerRef.current = setTimeout(() => setDemoMode(false), DEMO_DURATION_MS);
+  };
+  const stopDemo = () => {
+    if (demoTimerRef.current) clearTimeout(demoTimerRef.current);
+    setDemoMode(false);
+  };
+
   const diff = stats.differencePct ?? 0;
+  const conclusion = conclusionFor(discoveryResult, treatmentId);
+  const nextExperiment = nextExperimentFor(discoveryResult);
+  const currentLever = GENESIS_CELL_CULTURE_LEVERS.find((l) => l.leverId === `lever:${treatmentId}`)!;
+  const currentHypothesis = currentLever.hypothesis('totalCells', 'maximize');
+  const evidenceBundleId = discoveryResult?.kind === 'COMPLETE' ? (discoveryResult.evidence?.bundleId ?? null) : null;
+  const comparisonNote = `control ${sci(stats.controlTotal ?? 0)} cells vs treatment ${sci(stats.treatmentTotal ?? 0)} cells (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)`;
+  const demoStatusText = discoveryResult?.kind === 'COMPLETE'
+    ? 'Real search complete — see CONCLUSION below.'
+    : discoveryResult?.kind === 'REFUSED' || discoveryResult?.kind === 'NOT_ADMITTED'
+      ? 'Genesis declined this search — see the Discovery panel on the left for why.'
+      : 'Running a real Discovery search on this world (left panel)…';
 
   return (
     <div className="gsc-stage">
@@ -339,14 +415,30 @@ export function CellLabScreen() {
       />
 
       {/* Same generic Discovery Loop UI as flood/epidemic/chemistry, pre-selected onto this domain —
-          this is P1 (Question -> Hypotheses -> Experiment -> Observation -> Falsification -> Next). */}
-      <WorldDiscoveryPanel defaultCatalogId={GENESIS_CELL_CULTURE_CATALOG_ID} />
+          this is P1 (Question -> Hypotheses -> Experiment -> Observation -> Falsification -> Next).
+          `key={demoKey}` forces a fresh mount when Demo Mode starts, so its mount-effect re-fires
+          `initialGoal` through the exact same `run()` a typed submission would call. */}
+      <WorldDiscoveryPanel
+        key={demoKey}
+        defaultCatalogId={GENESIS_CELL_CULTURE_CATALOG_ID}
+        initialGoal={demoMode ? DEMO_GOAL : undefined}
+        onResult={setDiscoveryResult}
+      />
 
       <div className="gsc-panel cell-lab-panel" data-testid="cell-lab-panel">
         <div className="gsc-panel-row">
-          <span className="gx-matrix-badge" data-testid="cell-lab-provenance-badge">SIMULATION</span>
+          <ProvenanceBadge provenance="SIMULATED" testId="cell-lab-provenance-badge" />
           <span className="gx-status approximation">MODEL_ESTIMATE</span>
+          <button type="button" onClick={demoMode ? stopDemo : startDemo} data-testid="cell-lab-demo-toggle">
+            {demoMode ? 'Stop Demo' : '▶ Demo Mode'}
+          </button>
         </div>
+
+        {demoMode && (
+          <div className="cell-lab-demo-banner" data-testid="cell-lab-demo-banner" role="status">
+            <b>DEMO MODE</b> — {demoStatusText}
+          </div>
+        )}
 
         <div className="gsc-panel-row">
           <label htmlFor="cell-lab-treatment">Substance</label>
@@ -377,24 +469,57 @@ export function CellLabScreen() {
         <div className="gsc-panel-row">
           <button type="button" onClick={() => setRunning((r) => !r)}>{running ? 'Pause' : 'Run'}</button>
           <button type="button" onClick={() => { sim.reset?.(); setStats(sim.getStats?.() ?? {}); }}>Reset</button>
-          <span>t = {Math.round(stats.hoursElapsed ?? 0)} h</span>
+          <span>t = {Math.round(stats.hoursElapsed ?? 0)} h{demoMode ? ` (${DEMO_SPEED}x)` : ''}</span>
         </div>
 
-        <div className="cell-lab-readout" data-testid="cell-lab-readout">
-          <div className="cell-lab-arm" data-testid="cell-lab-control">
-            <span className="cell-lab-arm-title" style={{ color: CONTROL_COLOR }}>CONTROL</span>
-            <span>{sci(stats.controlTotal ?? 0)} cells</span>
-            <span className="gsc-caption">S-phase {((stats.controlSPhase ?? 0) * 100).toFixed(1)}%</span>
-          </div>
-          <div className="cell-lab-arm" data-testid="cell-lab-treatment-arm">
-            <span className="cell-lab-arm-title" style={{ color: TREATMENT_COLOR }}>TREATMENT</span>
-            <span>{sci(stats.treatmentTotal ?? 0)} cells</span>
-            <span className="gsc-caption">S-phase {((stats.treatmentSPhase ?? 0) * 100).toFixed(1)}%</span>
-          </div>
-        </div>
-        <p className="gsc-caption" data-testid="cell-lab-difference">
-          Difference vs control: {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
-        </p>
+        {/* P0 — FLAGSHIP NARRATIVE: CONTROL -> TREATMENT -> OBSERVATION -> DIFFERENCE -> CONCLUSION ->
+            NEXT EXPERIMENT, every value read from the live solver or from the real Discovery Loop
+            result above (via `onResult`) — never a second, independently-computed verdict. */}
+        <ol className="cell-lab-narrative" data-testid="cell-lab-narrative">
+          <li className="cln-step" data-testid="narrative-control">
+            <span className="cln-label" style={{ color: CONTROL_COLOR }}>CONTROL</span>
+            <p>{sci(stats.controlTotal ?? 0)} cells · S-phase {((stats.controlSPhase ?? 0) * 100).toFixed(1)}%</p>
+          </li>
+          <li className="cln-step" data-testid="narrative-treatment">
+            <span className="cln-label" style={{ color: TREATMENT_COLOR }}>TREATMENT</span>
+            <p>{sci(stats.treatmentTotal ?? 0)} cells · S-phase {((stats.treatmentSPhase ?? 0) * 100).toFixed(1)}%</p>
+          </li>
+          <li className="cln-step" data-testid="narrative-observation">
+            <span className="cln-label">OBSERVATION</span>
+            <p>
+              At t={Math.round(stats.hoursElapsed ?? 0)}h, the treatment culture holds {sci(stats.treatmentTotal ?? 0)} cells
+              versus {sci(stats.controlTotal ?? 0)} in control.
+            </p>
+          </li>
+          <li className="cln-step" data-testid="narrative-difference">
+            <span className="cln-label">DIFFERENCE</span>
+            <p>{diff >= 0 ? '+' : ''}{diff.toFixed(1)}% vs control</p>
+          </li>
+          <li className="cln-step" data-testid="narrative-conclusion">
+            <span className="cln-label">CONCLUSION</span>
+            {conclusion ? (
+              <p>
+                <b className={conclusion.verdict === 'SUPPORTED' ? 'cln-supported' : 'cln-falsified'}>{conclusion.verdict}</b>
+                {' — '}{conclusion.text}
+              </p>
+            ) : (
+              <p className="gsc-caption">Run a Discovery search (left panel) to reach a real conclusion for this substance.</p>
+            )}
+          </li>
+          <li className="cln-step" data-testid="narrative-next-experiment">
+            <span className="cln-label">NEXT EXPERIMENT</span>
+            <p>{nextExperiment}</p>
+          </li>
+        </ol>
+
+        {/* P1 — REAL EXPERIMENT INTERFACE, UI only. Every stage past Prediction is honestly refused;
+            see RealExperimentPipeline.tsx's own doc for why. */}
+        <RealExperimentPipeline
+          predictionMechanism={currentHypothesis.mechanism}
+          predictionRationale={currentHypothesis.rationale}
+          comparisonNote={comparisonNote}
+          evidenceBundleId={evidenceBundleId}
+        />
 
         <details className="cell-lab-honesty" data-testid="cell-lab-honesty">
           <summary>What this model does and doesn't claim</summary>
@@ -405,7 +530,10 @@ export function CellLabScreen() {
             named cell line. The dose here is applied from t=0 for a legible Control vs Treatment view;
             the Discovery Loop instead applies its lever 12h into a running culture — same declared
             magnitude, different application time, stated here rather than hidden. No chronological
-            age structure, no stochasticity, no specific drug identity or pharmacokinetics.
+            age structure, no stochasticity, no specific drug identity or pharmacokinetics. Demo Mode
+            submits the real goal “{DEMO_GOAL}” through this same Discovery panel and fast-forwards the
+            solver's own pacing ({DEMO_SPEED}×  simulated hours per real second) — it never substitutes
+            a precomputed result.
           </p>
         </details>
       </div>

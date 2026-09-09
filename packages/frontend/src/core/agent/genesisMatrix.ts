@@ -3,6 +3,7 @@ import type { WorldEvidenceBundle } from '../worldModel/evidence/worldEvidenceBu
 import type { DiscoveryOutcome } from './discoveryOrchestrator';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import type { AdmissionStatus, QuestionShape } from './discoveryStrategy';
+import { assessModelSufficiency, type ModelSufficiencyVerdict } from './modelSufficiency';
 import type { NextAction } from './nextAction';
 
 /**
@@ -102,6 +103,13 @@ export interface GenesisMatrixView {
   // EVIDENCE + REPLAY — one bundle per run, not per round, so it sits here
   // rather than being repeated on every entry.
   readonly evidence: { readonly bundleId: string; readonly replayVerdict: ReplayVerdict } | null;
+  /**
+   * MODEL SUFFICIENCY (P4) — did the declared search space explain the
+   * observation at all? A cross-cutting read over the whole run, so it belongs
+   * on the join rather than on any single round. Null for a REFUSED outcome:
+   * nothing ran, so there is no space to judge.
+   */
+  readonly sufficiency: ModelSufficiencyVerdict | null;
 }
 
 /**
@@ -135,6 +143,7 @@ export function buildGenesisMatrixView(
       openQuestions: [],
       nextExperiment: null,
       evidence: evidenceView,
+      sufficiency: null,
     };
   }
 
@@ -163,5 +172,6 @@ export function buildGenesisMatrixView(
     openQuestions: run.openQuestions,
     nextExperiment: run.nextExperiment,
     evidence: evidenceView,
+    sufficiency: assessModelSufficiency(run),
   };
 }

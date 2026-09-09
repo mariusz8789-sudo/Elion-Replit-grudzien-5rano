@@ -96,15 +96,37 @@ export function narrateRound(entry: GenesisMatrixEntry): readonly NarrationLine[
   return lines;
 }
 
-/** Once, after the last round: what Genesis does next, or why it stopped. */
+/**
+ * Once, after the last round: whether the declared model explained the
+ * observation (P4), then what Genesis does next or why it stopped.
+ *
+ * The insufficiency line comes first because it reframes everything after it:
+ * "none of these mechanisms explains it" is the finding, and the stop reason is
+ * just how the loop reached it. Voiced only when the run really ended
+ * insufficient — a supported or unsettled run narrates no such line.
+ */
 export function narrateNext(view: GenesisMatrixView): readonly NarrationLine[] {
+  const lines: NarrationLine[] = [];
+
+  if (view.sufficiency && view.sufficiency.status === 'DECLARED_SPACE_INSUFFICIENT') {
+    lines.push({
+      phase: 'VERDICT',
+      text: view.sufficiency.everyTestedMechanismInert
+        ? `None of the ${view.sufficiency.declaredMechanismCount} mechanisms tested moves the result at all. The declared model does not explain this.`
+        : `None of the ${view.sufficiency.declaredMechanismCount} mechanisms tested explains this. The declared model is not enough.`,
+    });
+    // The honest boundary is spoken too, not just recorded: a wider set of
+    // mechanisms, or a different model, might still explain it.
+    if (view.sufficiency.nextStep) lines.push({ phase: 'NEXT', text: view.sufficiency.nextStep });
+    return lines;
+  }
+
   if (view.nextExperiment) {
-    return [{ phase: 'NEXT', text: `Preparing the next experiment: ${view.nextExperiment.action}` }];
+    lines.push({ phase: 'NEXT', text: `Preparing the next experiment: ${view.nextExperiment.action}` });
+  } else if (view.stopReason) {
+    lines.push({ phase: 'NEXT', text: `Investigation finished: ${view.stopReason}.` });
   }
-  if (view.stopReason) {
-    return [{ phase: 'NEXT', text: `Investigation finished: ${view.stopReason}.` }];
-  }
-  return [];
+  return lines;
 }
 
 /**

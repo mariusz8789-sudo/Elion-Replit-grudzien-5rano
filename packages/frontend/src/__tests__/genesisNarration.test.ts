@@ -46,7 +46,15 @@ describe('genesis narration — real fields, never filler', () => {
   });
 
   it('narrates a real next-experiment or a real stop reason, never both, never neither at the end', () => {
-    const view = pumpView();
+    // A run that FOUND support: its closing is a single next line. (An
+    // insufficient run narrates its insufficiency instead — covered in
+    // modelSufficiency.test.ts, which is why this uses the full catalog where
+    // infiltration survives rather than the pump-only run.)
+    const outcome = runDiscovery({ shape: 'MECHANISM', goal: 'Minimise peak flood depth, at most 6 experiments.', catalog: GENESIS_FLOOD_CATALOG });
+    if (outcome.status !== 'RAN') throw new Error('expected RAN');
+    const view = buildGenesisMatrixView(outcome);
+    expect(view.sufficiency?.status).toBe('SUPPORTED_MECHANISM_FOUND');
+
     const lines = narrateNext(view);
     expect(lines).toHaveLength(1);
     if (view.nextExperiment) {

@@ -239,7 +239,16 @@ export function selectNextResearchQuestion(
         }
       : executedInput !== undefined && run.shape === 'PARAMETER'
         ? (() => {
-            const supported = supportedIntervalOf(run.native as InquiryLoopResult, executedInput);
+            // Memory's refutations count. A run that skipped re-testing three
+            // already-refuted values has an empty `falsified` list and would
+            // otherwise look like it established nothing — which measurably
+            // made a remembered run raise NO question where the same run
+            // without memory raised a narrowing one.
+            const supported = supportedIntervalOf(
+              run.native as InquiryLoopResult,
+              executedInput,
+              outcome.priorInvestigation?.skippedHypothesisIds ?? [],
+            );
             if (supported === null || supported.survivingValues.length !== 1) return null;
             return {
               bounds: supported.interval,
@@ -248,7 +257,7 @@ export function selectNextResearchQuestion(
               groundedIn: [
                 `survived ${run.surviving.join(', ')}`,
                 `interval [${supported.interval[0]}, ${supported.interval[1]}]`,
-                `refuted ${run.falsified.join(', ')}`,
+                `refuted ${[...run.falsified, ...(outcome.priorInvestigation?.skippedHypothesisIds ?? [])].join(', ')}`,
               ],
             };
           })()

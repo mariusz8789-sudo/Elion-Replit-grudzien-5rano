@@ -24,8 +24,11 @@ import { configureCinematicCamera } from '../../core/three/graphics/cinematicCam
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
-import { GENESIS_FLOOD_CATALOG, type WorldLever } from '../../core/agent/worldGoalIntent';
+import { GENESIS_FLOOD_CATALOG, type WorldLever, type LeverSceneKind } from '../../core/agent/worldGoalIntent';
 import { compareWorldActions, type CrossActionComparison } from '../../core/agent/crossActionComparison';
+import { toMechanismRun } from '../../core/agent/discoveryStrategies';
+import type { StrategyRun, StrategyRound } from '../../core/agent/discoveryStrategy';
+import { runWorldDiscoveryAndRemember } from '../../core/agent/worldDiscoverySession';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
@@ -275,6 +278,24 @@ export class GenesisWorldSim3D implements Sim3D {
   private ambientVehicleLoopRadius = { x: 0, z: 0 };
   private ambientPedestrianLoopRadius = { x: 0, z: 0 };
   private ambientTimeSeconds = 0;
+
+  /**
+   * PLAY A LIVE EXPERIMENT ROUND — the real `StrategyRun` (`discoveryStrategy.ts`'s own contract,
+   * projected from an ALREADY-COMPLETED `DiscoveryLoopResult` via `toMechanismRun`, never a second
+   * search engine) the player is currently stepping through round by round. `null` when no run has
+   * been played yet or the player dismissed it. Neither `discoveryLoop.ts` nor `inquiryLoop.ts` is
+   * touched or reimplemented anywhere in this feature — `runStrategyDiscovery()` below calls the
+   * SAME `runWorldDiscoveryAndRemember` seam `WorldDiscoveryPanel.tsx` already uses.
+   */
+  lastStrategyRun: StrategyRun | null = null;
+  stagedRoundIndex = -1;
+  /** Decorative-only beacon marking the lever the currently staged round pulled — see `stageRound()`'s
+   * own doc for why this animates the lever's OWN declared `sceneForm` rather than guessing one from
+   * its id, and why it is a separately-owned object rather than a mutation of the target entity's own
+   * (state-driven, `updateVisual`-owned) material. */
+  private roundStageBeacon: THREE_NS.Mesh | null = null;
+  private roundStageKind: LeverSceneKind | null = null;
+  private roundStageElapsed = 0;
 
   /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
@@ -1284,8 +1305,27 @@ export class GenesisWorldSim3D implements Sim3D {
     if (this.showWildfire) this.fireVfx?.update(dt);
     if (this.floodWater?.mesh.visible) this.floodWater.update(dt); // ripple only scrolls while there's water to see it on
     this.updateAmbientLife(dt);
+    this.updateRoundStageBeacon(dt);
     const active = this.activeController();
     if (active) this.fpState = active.update(dt);
+  }
+
+  /** Pure rendering-layer animation for the round-stage beacon — timing is artistic (a smooth loop
+   * so "an action is happening here" reads clearly), but its EXISTENCE, position and kind are all
+   * decided in `stageRound()` from real data; nothing here invents a value. */
+  private updateRoundStageBeacon(dt: number): void {
+    if (!this.roundStageBeacon || !this.roundStageKind) return;
+    this.roundStageElapsed += dt;
+    const t = this.roundStageElapsed;
+    if (this.roundStageKind === 'VALVE_TURN') {
+      this.roundStageBeacon.rotation.z += dt * 2.4;
+    } else if (this.roundStageKind === 'GATE_SLIDE') {
+      this.roundStageBeacon.scale.x = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(t * 1.6));
+    } else {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2);
+      this.roundStageBeacon.scale.setScalar(0.85 + pulse * 0.3);
+      (this.roundStageBeacon.material as THREE_NS.MeshBasicMaterial).opacity = 0.4 + pulse * 0.4;
+    }
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
@@ -1431,6 +1471,171 @@ export class GenesisWorldSim3D implements Sim3D {
     this.lastComparison = null;
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // PLAY A LIVE EXPERIMENT ROUND — StrategyRun.rounds staged live: why -> what -> reference ->
+  // predicted -> observed -> assessment -> nextExperiment, with a declared (never guessed) scenic
+  // form for whichever real lever the round pulled. See the field docs above for the contract.
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Runs the SAME real search `WorldDiscoveryPanel.tsx` already runs (`runWorldDiscoveryAndRemember`
+   * — the one seam; `discoveryLoop.ts` itself is neither touched nor called a second way here), then
+   * projects its already-computed, real `DiscoveryLoopResult` into the shared `StrategyRun` contract
+   * (`toMechanismRun`) and stages round 1. Returns `null` for a refused or comparison-shaped goal
+   * (nothing to play round-by-round) rather than fabricating rounds a search never produced.
+   */
+  runStrategyDiscovery(goalText = 'minimize peak flood depth'): StrategyRun | null {
+    const state = runWorldDiscoveryAndRemember(goalText, GENESIS_FLOOD_CATALOG.catalogId);
+    if (state.kind !== 'COMPLETE') {
+      this.lastStrategyRun = null;
+      this.clearRoundStage();
+      return null;
+    }
+    const run = toMechanismRun(state.result);
+    this.lastStrategyRun = run;
+    if (run.rounds.length > 0) this.stageRound(0);
+    else this.clearRoundStage();
+    return run;
+  }
+
+  /**
+   * Finds the real lever this round actually pulled, by the SAME `hypothesisId` both this round's
+   * verdict and the lever's own `hypothesis()` factory agree on — never a second, parallel mapping
+   * that could drift from the one the loop actually used. Calling `lever.hypothesis(...)` here is
+   * side-effect-free: it only builds and returns a plain `MechanisticHypothesis` object, the same
+   * pure read `applyLeverIntervention` itself does before ever touching `apply`.
+   */
+  private leverForRound(round: StrategyRound): WorldLever | undefined {
+    const hypothesisId = round.verdicts[0]?.hypothesisId;
+    if (!hypothesisId) return undefined;
+    return GENESIS_FLOOD_CATALOG.levers.find((l) => l.hypothesis('placeholder', 'minimize').hypothesisId === hypothesisId);
+  }
+
+  /**
+   * Stages one round: focuses the round-stage beacon on the real lever's own `targetEntityId` (its
+   * CURRENT live position, read off the tracked mesh — never a stored/stale one) and plays that
+   * lever's own DECLARED `sceneForm` (see `worldGoalIntent.ts`'s own doc for why this reads a
+   * declaration rather than pattern-matching `leverId`). A round whose lever declares no `sceneForm`,
+   * or whose hypothesis matches no lever in this catalog at all, still stages honestly: the beacon
+   * simply does not appear, and the round's real why/what/reference/predicted/observed/assessment
+   * text is unaffected — the animation is decoration on top of the real data, never a condition for it.
+   */
+  stageRound(index: number): void {
+    if (!this.lastStrategyRun || index < 0 || index >= this.lastStrategyRun.rounds.length) return;
+    this.stagedRoundIndex = index;
+    this.roundStageElapsed = 0;
+    this.clearRoundStageBeacon();
+    if (!this.THREE || !this.scene || !this.renderer) return;
+    const round = this.lastStrategyRun.rounds[index]!;
+    const lever = this.leverForRound(round);
+    const sceneForm = lever?.sceneForm;
+    if (!lever || !sceneForm) return;
+    const target = this.renderer.getObjectForEntity(lever.targetEntityId);
+    if (!target) return;
+    const THREE = this.THREE;
+    const position = target.getWorldPosition(new THREE.Vector3());
+    this.roundStageKind = sceneForm.kind;
+    this.roundStageBeacon = this.buildRoundStageBeacon(THREE, sceneForm.kind);
+    this.roundStageBeacon.position.set(position.x, position.y + 2.2, position.z);
+    this.scene.add(this.roundStageBeacon);
+  }
+
+  /** Three distinct, declared treatments — never a generic "something is happening here" blob — so
+   * the SAME beacon slot genuinely reads differently for a valve, a gate, and a ground treatment. */
+  private buildRoundStageBeacon(THREE: typeof THREE_NS, kind: LeverSceneKind): THREE_NS.Mesh {
+    const material = new THREE.MeshBasicMaterial({ color: 0x38e0ff, transparent: true, opacity: 0.85, depthWrite: false });
+    if (kind === 'VALVE_TURN') {
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.09, 8, 20), material);
+      mesh.name = 'round-stage-valve';
+      return mesh;
+    }
+    if (kind === 'GATE_SLIDE') {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 0.12), material);
+      mesh.name = 'round-stage-gate';
+      return mesh;
+    }
+    const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24), material);
+    mesh.name = 'round-stage-ground-treatment';
+    mesh.rotation.x = -Math.PI / 2;
+    return mesh;
+  }
+
+  private clearRoundStageBeacon(): void {
+    if (!this.roundStageBeacon) return;
+    this.roundStageBeacon.parent?.remove(this.roundStageBeacon);
+    this.roundStageBeacon.geometry.dispose();
+    (this.roundStageBeacon.material as THREE_NS.Material).dispose();
+    this.roundStageBeacon = null;
+    this.roundStageKind = null;
+  }
+
+  /** Clears just the staged round/beacon, keeping `lastStrategyRun` itself (used when a round index
+   * turns out invalid); `dismissStrategyRun()` below is the full "player closed the panel" reset. */
+  clearRoundStage(): void {
+    this.stagedRoundIndex = -1;
+    this.clearRoundStageBeacon();
+  }
+
+  dismissStrategyRun(): void {
+    this.lastStrategyRun = null;
+    this.clearRoundStage();
+  }
+
+  /** Steps to the next/previous round of the currently staged run — a no-op past either end, so a
+   * caller never has to compute or clamp the index itself. */
+  nextRound(): void {
+    if (!this.lastStrategyRun) return;
+    this.stageRound(Math.min(this.stagedRoundIndex + 1, this.lastStrategyRun.rounds.length - 1));
+  }
+
+  prevRound(): void {
+    if (!this.lastStrategyRun) return;
+    this.stageRound(Math.max(this.stagedRoundIndex - 1, 0));
+  }
+
+  /**
+   * A plain, serialisable projection of the currently staged round for React — the exact
+   * why/what/reference/predicted/observed/assessment/nextExperiment vocabulary, read straight off
+   * `StrategyRun`/`StrategyRound`, nothing computed or re-derived here.
+   */
+  getCurrentRoundView(): {
+    readonly roundNumber: number;
+    readonly totalRounds: number;
+    readonly why: string;
+    readonly what: string;
+    readonly actionLabel: string | null;
+    readonly reference: number | null;
+    readonly predicted: number | null;
+    readonly observed: number | null;
+    readonly assessment: string | null;
+    readonly nextExperimentAction: string | null;
+  } | null {
+    if (!this.lastStrategyRun || this.stagedRoundIndex < 0) return null;
+    const round = this.lastStrategyRun.rounds[this.stagedRoundIndex];
+    if (!round) return null;
+    const verdict = round.verdicts[0] ?? null;
+    const isLastRound = this.stagedRoundIndex === this.lastStrategyRun.rounds.length - 1;
+    return {
+      roundNumber: round.round,
+      totalRounds: this.lastStrategyRun.rounds.length,
+      why: round.why,
+      what: round.what,
+      actionLabel: this.leverForRound(round)?.sceneForm?.actionLabel ?? null,
+      // `reference` lives on the round itself (what `observed` was judged against); `predicted` is
+      // per-hypothesis on the verdict — see `discoveryStrategy.ts`'s own doc for why the two live at
+      // different levels (a MECHANISM round always carries exactly one verdict, so reading `[0]` here
+      // loses nothing; a PARAMETER round's several verdicts each get their own real prediction, and
+      // this view shows the one for the hypothesis this round actually tested).
+      reference: round.reference,
+      predicted: verdict?.predicted ?? null,
+      observed: round.observed,
+      assessment: verdict?.assessment ?? null,
+      // The loop's own proposal is only meaningful once the search is actually finished — mid-run it
+      // would be the wrong round's proposal read early, so it is shown only from the last round.
+      nextExperimentAction: isLastRound ? (this.lastStrategyRun.nextExperiment?.action ?? null) : null,
+    };
+  }
+
   getStats(): Record<string, number> {
     return {
       nearInteractable: this.nearestInteractableId !== null ? 1 : 0,
@@ -1493,6 +1698,7 @@ export class GenesisWorldSim3D implements Sim3D {
       p.visual.dispose();
     }
     this.ambientPedestrians = [];
+    this.clearRoundStageBeacon();
   }
 }
 
@@ -1525,6 +1731,13 @@ export function GenesisWorldScreen() {
   // PRIORITY 4 — the last real experiment's result (`compareWorldActions`, Genesis' own Discovery
   // Engine), cleared whenever the player walks away from the entity that triggered it.
   const [comparison, setComparison] = useState<CrossActionComparison | null>(null);
+  // PLAY A LIVE EXPERIMENT ROUND — the currently staged round, read straight off
+  // `sim.getCurrentRoundView()` on the same poll cadence everything else here already uses, rather
+  // than a second timer. `strategyRun` (the whole search) and `roundView` (just the staged round) are
+  // separate pieces of state because "a search finished" and "which round is on screen right now" are
+  // genuinely different facts — advancing the round must not re-run the search.
+  const [strategyRun, setStrategyRun] = useState<StrategyRun | null>(null);
+  const [roundView, setRoundView] = useState<ReturnType<GenesisWorldSim3D['getCurrentRoundView']>>(null);
   const lastNearestIdRef = useRef<WorldFrameEntityId | null>(null);
   const onStats = useCallback((s: Record<string, number>) => {
     const id = sim.getNearestInteractableId();
@@ -1537,6 +1750,7 @@ export function GenesisWorldScreen() {
     setAvailableLevers(id ? sim.leversFor(id) : []);
     setNearHospitalEntrance(s.nearHospitalEntrance === 1);
     setInsideHospital(s.insideHospital === 1);
+    setRoundView(sim.getCurrentRoundView());
   }, [sim]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
 
@@ -1617,6 +1831,30 @@ export function GenesisWorldScreen() {
     sim.setShowFork(show);
     setShowFork(show);
     setPumpStatus(readPumpStatus(show));
+  };
+
+  // PLAY A LIVE EXPERIMENT ROUND — the real, multi-round search (`discoveryLoop.ts`, via the SAME
+  // `runWorldDiscoveryAndRemember` seam `WorldDiscoveryPanel.tsx` already uses), staged round by
+  // round: why -> what -> reference -> predicted -> observed -> assessment -> nextExperiment. Distinct
+  // from `handleRunExperiment` above: that answers "which single option wins" in one shot;  this plays
+  // back the search itself as it actually happened, one real round at a time.
+  const handlePlayStrategyRound = () => {
+    const run = sim.runStrategyDiscovery();
+    setStrategyRun(run);
+    setRoundView(sim.getCurrentRoundView());
+  };
+  const handleNextRound = () => {
+    sim.nextRound();
+    setRoundView(sim.getCurrentRoundView());
+  };
+  const handlePrevRound = () => {
+    sim.prevRound();
+    setRoundView(sim.getCurrentRoundView());
+  };
+  const handleDismissStrategyRun = () => {
+    sim.dismissStrategyRun();
+    setStrategyRun(null);
+    setRoundView(null);
   };
 
   // PRIORITY 2 — REAL WORLD GEOMETRY: step through the hospital's real entrance. Movement/look input
@@ -1733,6 +1971,10 @@ export function GenesisWorldScreen() {
         handleApplyWinner();
         return;
       }
+      if (e.code === 'KeyP' && !comparison && !strategyRun && availableLevers.length > 0) {
+        handlePlayStrategyRound();
+        return;
+      }
       if (e.code === 'Escape' && document.pointerLockElement) document.exitPointerLock();
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -1751,7 +1993,7 @@ export function GenesisWorldScreen() {
       document.removeEventListener('keyup', onKeyUp);
       document.removeEventListener('mousemove', onMouseMove);
     };
-  }, [sim, availableLevers, forkTick, insideHospital, nearHospitalEntrance, comparison]);
+  }, [sim, availableLevers, forkTick, insideHospital, nearHospitalEntrance, comparison, strategyRun]);
 
   const handleScrub = (value: number) => {
     setScrubValue(value);
@@ -1918,6 +2160,71 @@ export function GenesisWorldScreen() {
                     </button>
                   )}
                   <button type="button" className="chip-btn" data-testid="dismiss-experiment-btn" onClick={() => setComparison(null)}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PLAY A LIVE EXPERIMENT ROUND — the real multi-round search (`discoveryLoop.ts`, the same
+                one `WorldDiscoveryPanel.tsx` runs elsewhere), staged round by round: why -> what ->
+                reference -> predicted -> observed -> assessment -> nextExperiment, every value read
+                straight off the loop's own real result (`StrategyRound`/`StrategyVerdict` —
+                `discoveryStrategy.ts`), never fabricated. The round-stage beacon in the 3D scene (see
+                `stageRound()`'s own doc) plays whichever real lever this round pulled, using that
+                lever's own DECLARED `sceneForm` — never a guess made here from its id. */}
+            {availableLevers.length > 0 && !comparison && !strategyRun && (
+              <button type="button" className="chip-btn" data-testid="play-strategy-round-btn" onClick={handlePlayStrategyRound}>
+                P — play a live experiment round
+              </button>
+            )}
+            {strategyRun && roundView && (
+              <div className="gx-round-stage" data-testid="strategy-round-stage">
+                <span className="gx-experiment-world" data-testid="round-stage-domain">
+                  Live search in <code>{strategyRun.domainId}</code> — round {roundView.roundNumber} / {roundView.totalRounds}
+                </span>
+                {roundView.actionLabel && (
+                  <p className="wd-trace-what" data-testid="round-stage-action">
+                    {roundView.actionLabel}
+                  </p>
+                )}
+                <p className="wd-trace-why" data-testid="round-stage-why">{roundView.why}</p>
+                <p className="wd-trace-what" data-testid="round-stage-what">{roundView.what}</p>
+                <p className="gsc-caption" data-testid="round-stage-numbers">
+                  reference: {roundView.reference === null ? '—' : roundView.reference.toFixed(4)} · predicted:{' '}
+                  {roundView.predicted === null ? '—' : roundView.predicted.toFixed(4)} · observed:{' '}
+                  {roundView.observed === null ? '—' : roundView.observed.toFixed(4)}
+                </p>
+                {roundView.assessment && (
+                  <span className={`wd-verdict wd-${roundView.assessment}`} data-testid="round-stage-assessment">
+                    {roundView.assessment}
+                  </span>
+                )}
+                {roundView.nextExperimentAction && (
+                  <p className="gsc-caption" data-testid="round-stage-next-experiment">
+                    Next experiment: {roundView.nextExperimentAction}
+                  </p>
+                )}
+                <div className="gx-interact-panel-levers">
+                  <button
+                    type="button"
+                    className="chip-btn"
+                    data-testid="round-prev-btn"
+                    onClick={handlePrevRound}
+                    disabled={roundView.roundNumber <= 1}
+                  >
+                    ◀ prev round
+                  </button>
+                  <button
+                    type="button"
+                    className="chip-btn"
+                    data-testid="round-next-btn"
+                    onClick={handleNextRound}
+                    disabled={roundView.roundNumber >= roundView.totalRounds}
+                  >
+                    next round ▶
+                  </button>
+                  <button type="button" className="chip-btn" data-testid="dismiss-round-stage-btn" onClick={handleDismissStrategyRun}>
                     Dismiss
                   </button>
                 </div>

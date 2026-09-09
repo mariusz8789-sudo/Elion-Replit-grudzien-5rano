@@ -4,6 +4,7 @@ import { renderDiscoveryReport } from '../core/agent/discoveryReport';
 import {
   buildWorldDiscoveryPlan,
   GENESIS_FLOOD_CATALOG,
+  GENESIS_FLOOD_LEVERS,
   parseWorldDiscoveryGoal,
 } from '../core/agent/worldGoalIntent';
 
@@ -107,5 +108,20 @@ describe('A sentence really drives the loop, end to end', () => {
     const narrowResult = runAutonomousDiscovery(narrow);
     expect(narrowResult.bestSupported).toEqual([]);
     expect(renderDiscoveryReport(narrowResult)).toMatch(/SURVIVED: nothing/);
+  });
+});
+
+describe('a lever declares its own scenic form, rather than a scene guessing one from its id', () => {
+  it('every real flood lever declares a real, distinct scenic form', () => {
+    // Real declaration, not a fallback default: a scene reads `sceneForm` straight off the lever
+    // that ran, never derives it by pattern-matching `leverId`.
+    for (const lever of GENESIS_FLOOD_LEVERS) {
+      expect(lever.sceneForm).toBeDefined();
+      expect(lever.sceneForm!.actionLabel.length).toBeGreaterThan(0);
+    }
+    // Three real, different mechanisms; a scene that played the same animation for all three would
+    // not actually be reading each lever's own declaration.
+    const kinds = new Set(GENESIS_FLOOD_LEVERS.map((l) => l.sceneForm!.kind));
+    expect(kinds.size).toBe(GENESIS_FLOOD_LEVERS.length);
   });
 });

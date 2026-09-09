@@ -381,3 +381,68 @@ describe('GenesisWorldSim3D — PRIORITY 4 (most important): connected to the re
     expect(sim.forkEngine).toBe(forkAfterFirst);
   });
 });
+
+const ROUND_STAGE_BEACON_NAMES = ['round-stage-valve', 'round-stage-gate', 'round-stage-ground-treatment'];
+
+describe('GenesisWorldSim3D — PLAY A LIVE EXPERIMENT ROUND (StrategyRun.rounds staged live)', () => {
+  it('runStrategyDiscovery() runs the real multi-round search and stages round 1', () => {
+    const { sim, scene } = buildInitializedSim();
+    const run = sim.runStrategyDiscovery();
+    expect(run).not.toBeNull();
+    expect(run!.rounds.length).toBeGreaterThan(0);
+    expect(sim.lastStrategyRun).toBe(run);
+    expect(sim.stagedRoundIndex).toBe(0);
+
+    const view = sim.getCurrentRoundView();
+    expect(view).not.toBeNull();
+    expect(view!.roundNumber).toBe(1);
+    expect(view!.totalRounds).toBe(run!.rounds.length);
+    expect(view!.why.length).toBeGreaterThan(0);
+    expect(view!.what.length).toBeGreaterThan(0);
+    // Real values only, never fabricated: every flood lever declares a `sceneForm`, so its own
+    // `actionLabel` is real text read off the lever that actually ran this round, not guessed.
+    expect(view!.actionLabel).not.toBeNull();
+
+    // The round-stage beacon: a real, distinct scenic form for whichever real lever this round
+    // pulled — added directly under `scene` (decorative, not a WorldFrame entity).
+    expect(scene.children.some((child) => ROUND_STAGE_BEACON_NAMES.includes(child.name))).toBe(true);
+  });
+
+  it('nextRound()/prevRound() step through the real rounds and clamp at both ends', () => {
+    const { sim } = buildInitializedSim();
+    const run = sim.runStrategyDiscovery()!;
+    expect(run.rounds.length).toBeGreaterThanOrEqual(1);
+
+    sim.prevRound(); // already at round 1 — clamps, does not go negative
+    expect(sim.getCurrentRoundView()!.roundNumber).toBe(1);
+
+    if (run.rounds.length > 1) {
+      sim.nextRound();
+      expect(sim.getCurrentRoundView()!.roundNumber).toBe(2);
+      sim.prevRound();
+      expect(sim.getCurrentRoundView()!.roundNumber).toBe(1);
+    }
+
+    // Clamps at the last round too, rather than running off the end of the array.
+    for (let i = 0; i < run.rounds.length + 2; i++) sim.nextRound();
+    expect(sim.getCurrentRoundView()!.roundNumber).toBe(run.rounds.length);
+  });
+
+  it('dismissStrategyRun() clears the run, the staged round, and the beacon', () => {
+    const { sim, scene } = buildInitializedSim();
+    sim.runStrategyDiscovery();
+    expect(sim.lastStrategyRun).not.toBeNull();
+
+    sim.dismissStrategyRun();
+
+    expect(sim.lastStrategyRun).toBeNull();
+    expect(sim.stagedRoundIndex).toBe(-1);
+    expect(sim.getCurrentRoundView()).toBeNull();
+    expect(scene.children.some((child) => ROUND_STAGE_BEACON_NAMES.includes(child.name))).toBe(false);
+  });
+
+  it('getCurrentRoundView() is null before any run has been played', () => {
+    const { sim } = buildInitializedSim();
+    expect(sim.getCurrentRoundView()).toBeNull();
+  });
+});

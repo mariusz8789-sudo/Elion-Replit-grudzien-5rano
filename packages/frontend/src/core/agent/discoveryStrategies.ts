@@ -51,7 +51,17 @@ function mechanismRounds(result: DiscoveryLoopResult): readonly StrategyRound[] 
     // The loop decides this BEFORE the round runs and stores it; carried verbatim.
     why: round.selectionReason,
     observed: round.objectiveObserved,
-    verdicts: [{ hypothesisId: round.hypothesisId, assessment: round.assessment.assessment }],
+    verdicts: [{
+      hypothesisId: round.hypothesisId,
+      assessment: round.assessment.assessment,
+      // The real "no intervention" reading this exact round's arm was forked from — the loop's own
+      // `objectiveBaseline`, not re-derived.
+      reference: round.objectiveBaseline,
+      // The preregistered criterion's own declared comparison value, decided before the round ran —
+      // `assessWorldCounterfactual`'s own `reference` field (see that function's doc: "the value the
+      // variant was actually compared against").
+      predicted: round.assessment.reference,
+    }],
   }));
 }
 
@@ -122,6 +132,14 @@ function parameterRounds(result: InquiryLoopResult, probeParameterId: string): r
     verdicts: round.outcomes.map((outcome) => ({
       hypothesisId: outcome.hypothesisId,
       assessment: outcome.assessment,
+      // This loop probes ONE system rather than comparing a with/without pair, so it has no
+      // "before this round" reading to report — left null rather than reusing `observed` from a
+      // different round, which would misrepresent it as this round's own baseline.
+      reference: null,
+      // The loop's own real prediction: `HypothesisOutcome.predicted`, from actually running the
+      // solver at this hypothesis's claimed parameter values (see `inquiryLoop.ts`'s own doc: "a
+      // prediction is a real model run, not a formula transcribed here").
+      predicted: outcome.predicted,
     })),
   }));
 }

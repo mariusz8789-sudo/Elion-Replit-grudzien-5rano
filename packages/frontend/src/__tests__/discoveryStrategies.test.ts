@@ -98,6 +98,10 @@ describe('discovery strategy adapters', () => {
       expect(round.why).toBe(source.selectionReason);
       expect(round.observed).toBe(source.objectiveObserved);
       expect(round.verdicts[0]!.assessment).toBe(source.assessment.assessment);
+      // The two numbers a live-round playback stages: the real "before" reading this round's arm
+      // forked from, and the preregistered criterion's own declared comparison value.
+      expect(round.verdicts[0]!.reference).toBe(source.objectiveBaseline);
+      expect(round.verdicts[0]!.predicted).toBe(source.assessment.reference);
     }
   });
 
@@ -137,6 +141,18 @@ describe('discovery strategy adapters', () => {
     expect(run.untested).toEqual(direct.untestedHypothesisIds);
     // The proposal comes from the existing nextAction adapter, not a second converter.
     expect(run.nextExperiment?.selectorId).toBe('parameter-inquiry');
+
+    // This loop has no "before this round" arm (it probes one system, never a with/without pair),
+    // so `reference` is honestly null rather than reusing a number that would misrepresent it —
+    // `predicted` is real, per-hypothesis, from the loop's own solver run at its claimed values.
+    for (const [i, round] of run.rounds.entries()) {
+      const source = direct.rounds[i]!;
+      expect(round.verdicts).toHaveLength(source.outcomes.length);
+      for (const [j, verdict] of round.verdicts.entries()) {
+        expect(verdict.reference).toBeNull();
+        expect(verdict.predicted).toBe(source.outcomes[j]!.predicted);
+      }
+    }
   });
 
   /**

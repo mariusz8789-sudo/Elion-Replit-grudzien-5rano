@@ -82,6 +82,37 @@ export interface Admission {
   readonly caveat: string | null;
 }
 
+/**
+ * One hypothesis's verdict within a round, plus the two numbers it was judged on — both real,
+ * already-computed values from the loop that ran this round, never derived here.
+ *
+ * `reference` and `predicted` are declared PER VERDICT, not per round: the PARAMETER loop can judge
+ * several hypotheses in the same round, each against its OWN predicted value (a different number per
+ * hypothesis, since each ran the real solver at its own claimed parameters) — a single round-level
+ * number would silently pick one and hide the rest. The MECHANISM loop tests exactly one hypothesis
+ * per round, so its round always carries exactly one verdict; the fields are just as real there, only
+ * less numerous.
+ */
+export interface StrategyVerdict {
+  readonly hypothesisId: string;
+  readonly assessment: HypothesisAssessment;
+  /**
+   * The world's own reading BEFORE this round's action — the MECHANISM loop's real
+   * `objectiveBaseline` (a counterfactual arm with no intervention). Null for the PARAMETER loop,
+   * which probes one system rather than comparing two arms and so has no "before" reading to report —
+   * left null rather than invented.
+   */
+  readonly reference: number | null;
+  /**
+   * What this hypothesis predicted BEFORE the observation: the MECHANISM loop's own preregistered
+   * criterion value (`WorldCounterfactualAssessment.reference` — literally the value the outcome was
+   * declared to be judged against before the round ran), or the PARAMETER loop's own real predicted
+   * reading (`HypothesisOutcome.predicted`, from actually running the solver at this hypothesis's
+   * claimed values). Null only when the loop itself could not produce a prediction.
+   */
+  readonly predicted: number | null;
+}
+
 /** One round of investigation, in the terms both loops genuinely report. */
 export interface StrategyRound {
   readonly round: number;
@@ -91,7 +122,7 @@ export interface StrategyRound {
   readonly why: string;
   /** The objective reading this round produced. Null when the round produced no usable number. */
   readonly observed: number | null;
-  readonly verdicts: readonly { readonly hypothesisId: string; readonly assessment: HypothesisAssessment }[];
+  readonly verdicts: readonly StrategyVerdict[];
 }
 
 /**

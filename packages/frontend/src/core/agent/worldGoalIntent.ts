@@ -62,6 +62,23 @@ export interface WorldGoalIntent {
 }
 
 /**
+ * How a lever's own action reads on screen when a scene stages it — a small, fixed vocabulary of
+ * REAL mechanism shapes (turning a valve, sliding a gate, treating ground), not a free-form string a
+ * renderer would have to interpret. Declared here (next to the lever's own real mechanism), not
+ * inferred by a scene from `leverId` — a renderer that pattern-matched `leverId.includes('pump')` to
+ * pick an animation would silently break the moment a lever was renamed, and would have no answer at
+ * all for a lever this file has never seen. Whoever declares a lever's real mechanism is also the one
+ * place that knows what it should look like when applied.
+ */
+export type LeverSceneKind = 'VALVE_TURN' | 'GATE_SLIDE' | 'GROUND_TREATMENT';
+
+export interface LeverSceneForm {
+  readonly kind: LeverSceneKind;
+  /** Plain-language caption for the on-screen "what's happening" line, e.g. "Widening the outlet". */
+  readonly actionLabel: string;
+}
+
+/**
  * A lever the world really has: a declared mechanism plus the words a person
  * might use for it. Declared next to the world, because only the world knows
  * what it can actually do.
@@ -71,6 +88,12 @@ export interface WorldLever {
   readonly hypothesis: (metric: string, direction: 'minimize' | 'maximize') => MechanisticHypothesis;
   /** Lower-case phrases, both languages, that name this lever. */
   readonly phrases: readonly string[];
+  /**
+   * How this lever's action should stage in a scene that chooses to play it out. Optional: a lever
+   * declared without one gets a scene's own generic fallback treatment rather than a fabricated form —
+   * see `LeverSceneForm`'s own doc for why this is declared here rather than guessed from `leverId`.
+   */
+  readonly sceneForm?: LeverSceneForm;
   /**
    * LIVING WORLD — the entity this lever's `apply` actually MUTATES, as real data rather than
    * something a caller has to read out of the `apply` closure's source. Distinct from
@@ -307,6 +330,7 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
     leverId: 'lever:outlet-capacity',
     phrases: ['outlet', 'channel', 'kanał', 'kanal', 'przepust'],
     targetEntityId: GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
+    sceneForm: { kind: 'GATE_SLIDE', actionLabel: 'Widening the floodplain outlet' },
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:outlet-capacity',
       statement: `Peak flood depth is limited by outlet capacity, so widening the outlet ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
@@ -325,6 +349,7 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
     leverId: 'lever:infiltration',
     phrases: ['infiltration', 'permeable', 'suds', 'infiltracj', 'przepuszczaln'],
     targetEntityId: GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
+    sceneForm: { kind: 'GROUND_TREATMENT', actionLabel: 'Raising ground infiltration' },
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:infiltration',
       statement: `Peak flood depth is limited by infiltration, so permeable ground ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
@@ -343,6 +368,7 @@ export const GENESIS_FLOOD_LEVERS: readonly WorldLever[] = [
     leverId: 'lever:pump-capacity',
     phrases: ['pump', 'pompa', 'pompy', 'przepompowni'],
     targetEntityId: GENESIS_SCIENTIFIC_CITY_PUMP_PIPE_ID,
+    sceneForm: { kind: 'VALVE_TURN', actionLabel: 'Opening the pump valve' },
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:pump-capacity',
       statement: `Peak flood depth is limited by pump capacity, so a larger pump ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,

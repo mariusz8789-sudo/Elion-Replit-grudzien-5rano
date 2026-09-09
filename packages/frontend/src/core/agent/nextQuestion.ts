@@ -108,10 +108,13 @@ export interface CandidateResearchQuestion {
   /** The exact facts from the run this question is derived from — ids, values, stop reasons. Never prose alone. */
   readonly groundedIn: readonly string[];
   /**
-   * Whether Genesis can pose this to machinery that already exists, with what
-   * the finished run already carries. False is not a defect — it is the honest
-   * report that a real question has no runnable form yet, and `why` says what
-   * is missing.
+   * Whether Genesis has a mechanism that answers this KIND of question at all.
+   * False is not a defect — it is the honest report that a real question has no
+   * runnable form yet, and `why` says what is missing.
+   *
+   * True is a statement about capability, not a guarantee of success: a
+   * mechanism may still refuse on the specifics (no untried setting left, say).
+   * Those refusals are the mechanism's own to make and to explain.
    */
   readonly answerableNow: boolean;
   readonly why: string;
@@ -209,11 +212,16 @@ export function selectNextResearchQuestion(outcome: DiscoveryOutcome): NextQuest
         `interval [${lo}, ${hi}]`,
         `refuted ends ${generated.standing.refutedBracketEnds.join(', ')}`,
       ],
-      // Generation is gated on an EXHAUSTED space, and this space has a
-      // survivor — so the one mechanism that could propose a new value inside
-      // the interval will not fire here. A real, named gap.
-      answerableNow: false,
-      why: 'Narrowing needs new candidate values inside the interval, and the only thing that derives a value nobody declared fires only when every declared value was refuted. Here one survived, so it will not fire. Nothing proposes a value from a surviving state.',
+      // `intervalNarrowing.ts` exists precisely because this question came back
+      // unanswerable when this module first ran: generation is gated on an
+      // EXHAUSTED space and this space has a survivor, so nothing could propose
+      // a second value. Narrowing is the mechanism for the surviving state.
+      answerableNow: true,
+      why:
+        `Both ends of [${lo}, ${hi}] were really refuted, so the interval is earned and candidates inside it are ` +
+        'the obvious experiment. `intervalNarrowing.ts` proposes them and runs the investigation. It can still ' +
+        'refuse for want of an untried setting to judge them on, which is a fact about this system\'s remaining ' +
+        'probes rather than about whether the question can be posed.',
     });
   }
 

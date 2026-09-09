@@ -276,18 +276,27 @@ export function deriveAlternativeParameterValue(
  * declared ±15% band, with the true hidden temperature varied and everything
  * else identical:
  *
- *     true T = 0.40  ->  derived 0.5 survives, h:cold and h:cool refuted
- *     true T = 0.50  ->  derived 0.5 survives, h:cold and h:cool refuted
- *     true T = 0.55  ->  derived 0.5 survives, h:cold and h:cool refuted
- *     true T = 0.65  ->  derived 0.5 survives, h:cold and h:cool refuted
+ *     true T = 0.40  ->  derived 0.5 REFUTED
+ *     true T = 0.50  ->  derived 0.5 survives
+ *     true T = 0.55  ->  derived 0.5 survives
+ *     true T = 0.65  ->  derived 0.5 REFUTED
  *
- * Four different truths, one identical verdict. At T=0.65 the follow-up ended
- * `NO_CONTENDERS_LEFT` with `openQuestions: []` over a value that is wrong by
- * 23%. Nothing lied: at 5000 steps the derived value predicts 0.2576 against an
- * observation of 0.2772, a 7.1% gap that the declared ±15% band cannot call a
- * refutation. The run is honest round by round and the SUMMARY still overclaims,
- * because "the only survivor" reads as "the answer" when the space it survived
- * was three values Genesis chose itself.
+ * Two different truths, one identical verdict. 0.5 is right at T=0.50 and wrong
+ * at T=0.55, and the follow-up cannot tell them apart, because the two predict
+ * within the declared band of each other at every setting it can use. Nothing
+ * lies round by round; the SUMMARY overclaims, because "the only survivor"
+ * reads as "the answer" when the space it survived was three values Genesis
+ * chose itself.
+ *
+ * These numbers are the CORRECTED ones. Before the anti-HARKing leak in
+ * `inquirySession.ts::runInquiryWithGeneration` was closed, all four truths
+ * produced `survived: true` — the follow-up was re-measuring at the very
+ * setting the value had been bracketed from, where a midpoint predicts close to
+ * the observation by construction. Closing that leak made the follow-up refute
+ * a wrong derived value on its own, which is most of what this qualifier was
+ * compensating for. It is kept because the residual degeneracy above is real
+ * and is not a bug to be fixed: 0.50 and 0.55 genuinely are not separable by
+ * this instrument at this tolerance.
  *
  * ## What the evidence does support
  *

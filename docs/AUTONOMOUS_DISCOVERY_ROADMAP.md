@@ -985,3 +985,223 @@ declared levers into one forked run: on the real solver, fuel-efficiency alone
 but the real joint arm measures 126.17 L — SUB_ADDITIVE by 17.5%, because
 `fuelRateLPerHr` multiplies the two factors. Doing both still beats either
 alone, and the loop reports both facts rather than collapsing them.
+
+### 10.12 §10.11's headline number was itself a symptom — the anti-HARKing leak behind it
+
+**Correction first.** §10.11 records that four different true temperatures
+(0.40, 0.50, 0.55, 0.65) all left the derived 0.5 standing. That measurement
+was real, and its cause was not degeneracy. It was a leak.
+
+`runInquiryWithGeneration` enforced `excludedProbeValues` on the follow-up's
+OPENING probe and then handed the loop the full candidate list. `selectNextProbe`
+was therefore free to choose the excluded setting on a later round — and it did.
+Measured on the fold at 0.5: the follow-up opened at `steps=1000` and its SECOND
+round ran at `steps=5000`, the exact measurement the value had been bracketed
+from, recording the derived hypothesis SUPPORTED there. Bracketing picks a
+midpoint *precisely because* it lies between two predictions straddling that
+observation, so confirming it at that setting is very nearly circular. Guarding
+the opening probe is not guarding the run.
+
+The fix is one line of intent: remove the excluded settings from the candidate
+list the follow-up runs against. The loop cannot select what it is not offered.
+
+Corrected measurements, same solver, same seed:
+
+| true T | before the fix | after |
+| --- | --- | --- |
+| 0.40 | 0.5 survives | 0.5 **REFUTED** |
+| 0.50 | 0.5 survives | 0.5 survives |
+| 0.55 | 0.5 survives | 0.5 survives |
+| 0.65 | 0.5 survives | 0.5 **REFUTED** |
+
+So a wrong derived value now gets refuted by its own follow-up. What remains —
+0.50 and 0.55 both leaving 0.5 standing — is genuine degeneracy and not a bug:
+those two are not separable by this instrument at a declared ±15% band.
+`derivedValueStanding` is kept for exactly that residue, and its recorded
+numbers were updated rather than left stale.
+
+The general lesson is worth more than the fix: an exclusion that is *carried*
+in a result and *checked once at the boundary* is not enforced. Genesis has
+several such guards. Each is worth re-reading with the question "what stops
+this being violated on round two?"
+
+### 10.13 Two more defects at the loop's termini, and one that was left as a finding
+
+Audited every way a PARAMETER investigation can end, asking whether Genesis has
+a correct next action there or simply stops.
+
+**A failed measurement was reported as a ready-to-run repeat of itself.** When
+the solver returned nothing, `inquiryLoop.ts` broke out while `selection` still
+held the selection that had CHOSEN the failed probe, so `nextExperiment` came
+out `READY_TO_RUN` with an executable request to re-run the measurement that
+had just failed — and `openQuestions` said nothing about the failure, leaving
+four bare "Never tested" lines with no reason attached. Reproduced with no
+mocking by probing `steps=999999`, outside the HP runner's validated
+[1, 50000]: zero rounds, and "Measure acceptanceRate at steps=999999" proposed
+as ready to run. A consumer routing on that status retries forever. Now a
+`MEASUREMENT_FAILED` probe rule with `probeValue: null`, so the shared contract
+reports RESOLVED with `request: null` exactly as the other two refusals do, and
+the failure is named as an open question about the apparatus.
+
+**Bracketing assumed monotonicity and never checked it.** The midpoint
+localises the truth only if the metric moves monotonically with the parameter
+across the two claims. `parameterAlternative.ts` said so and left it unverified.
+The check is free — the round already ran every candidate through the solver —
+and the assumption is really violated on this substrate: same solver, same seed,
+same four temperatures, judged by `bestEnergy` at 1000 steps they predict
+-3, -2, -3, -3. Now a fourth refusal, recording `MONOTONIC` (confirmed on 3+
+points) or `TOO_FEW_POINTS` (two contenders, so a violation is undetectable
+rather than absent — said rather than silently passed).
+
+**Reported, not fixed — the answer is readable from the run's own output.**
+`nextAction.ts:322` spreads `system.hiddenParameters` into the executable
+request, so `StrategyRun.nextExperiment.request.parameters` carries the very
+value the inquiry is trying to determine: a run seeking temperature 0.5 emits
+`temperature: 0.5` in its own proposed next experiment. The request must contain
+them to be executable against the solver, and `ObservableSystem` still keeps the
+value out of every reasoning path, so this is a design trade-off rather than an
+obvious bug. But `StrategyRun` is serialised into Science Memory and rendered in
+the UI, and any benchmark requiring that the answer not be readable from the
+run's own output is defeated by it today. Whoever owns the benchmark should
+decide; C3 did not change it unilaterally.
+
+### 10.14 Question selection, and the first chain Genesis drives itself
+
+Genesis had five next-EXPERIMENT selectors and no next-QUESTION selector. Every
+one of them answers "how do I best answer THIS question?"; none ever asks
+whether this investigation is still the right one to be running. Conflating the
+two is how a discovery engine becomes one large `selectNext()` — excellent at
+finishing whatever it was pointed at, incapable of noticing it should be
+pointed elsewhere. `EXPERIMENT SELECTION` and `QUESTION SELECTION` are now
+separate in the architecture, not just in prose.
+
+`nextQuestion.ts` is a pure reader over a finished `DiscoveryOutcome`. It
+proposes only questions the run ITSELF raised, ranked by the declared
+lexicographic cascade this codebase already uses everywhere (no scoring). It
+reports two answers because they are two different facts: `selected` is the most
+important question, `nextExecutable` the most important one Genesis can actually
+run. They differ exactly where the science says one thing and the machinery
+cannot do it — measured on a failed-measurement run, the top question is the
+apparatus (not runnable) while four untested hypotheses remain (runnable), so
+the loop still has a move instead of dead-ending.
+
+Running it immediately produced an uncomfortable answer, which is the point of
+building it: after Genesis's own generation SUCCEEDS, it was blocked.
+`blockedOnHuman: true`. Generation is gated on an EXHAUSTED space, and after a
+successful generation the space has a survivor — so the one mechanism that can
+propose a value nobody declared could never propose a second one. Genesis had
+just invented a hypothesis and had nowhere to go with it.
+
+`intervalNarrowing.ts` closes that. What licenses it is not "0.5 is probably
+about right" but that the follow-up REFUTED both bracket ends: the interval is
+earned while the point inside it is not. Two interior candidates, one either
+side of the survivor. `researchChain.ts` then asks `nextQuestion.ts` what to do
+and does it — question selection had been a reader nobody read, the same shape
+as `DECLARED_SPACE_INSUFFICIENT` before `parameterAlternative.ts` gave it an
+actuator, and the same fix.
+
+`autonomousDiscoveryChain.test.ts` is the whole loop as one executable test on
+the real solver at a true 0.5: A/B/C/D refuted → `DECLARED_SPACE_INSUFFICIENT`
+→ E derived → E tested on evidence it did not author (asserted against its own
+`excludedProbeValues`) → E survives as an INTERVAL → all of it remembered →
+next research question chosen by the selector → run → [0.3, 0.7] narrowed to
+[0.4, 0.6], truth still inside. **No step after the first is named by the test.**
+
+Two honest limits, both load-bearing:
+
+1. This is not open-ended research. The chain runs only question kinds it has an
+   actuator for and NAMES the kind that stopped it — that name is the next thing
+   worth building. It never changes domain and never invents a subject.
+2. Support is not always an interval. At a true 0.55 the narrowing step refutes
+   the derived 0.5 while 0.4 and 0.6 both survive: the supported set has a hole
+   in the middle and no interval describes it. `assessNarrowing` first reported
+   that as "nothing new was refuted" — an honesty bug in the new code, found by
+   running it rather than by inspection — and now names the disconnection
+   explicitly while still refusing to report a narrower range, because there
+   isn't one.
+
+### 10.15 MODEL UPDATE — audited, and deliberately NOT built as a contract
+
+The brief asked for a minimal formal `Model Update` contract:
+`prediction ≠ observation → hypothesis falsified → model update candidate →
+new model → test`. Audited against the substrate, and the honest answer is that
+three of those five arrows exist and the fourth cannot.
+
+What Genesis really updates after a falsification:
+
+| level | can it revise? | how |
+| --- | --- | --- |
+| belief in a hypothesis | yes | `updateConfidence` / `HypothesisBelief`, both loops |
+| a parameter VALUE | yes | `parameterAlternative.ts` derives one nobody declared |
+| that value's PRECISION | yes | `intervalNarrowing.ts` shrinks an earned interval |
+| a mechanism's CRITERION | yes | `deriveAlternativeCriteria` → `~RELATION_FLIP` |
+| which MECHANISM to apply | yes, since this sprint | `mechanismGeneration.ts` composes two declared levers |
+| the MODEL itself | **no** | — |
+
+The last row is the whole finding. A "model" here is a registered router model
+(`biology-protein-folding-hp`, `chemistry-arrhenius`, …) or a WorldGraph domain
+updater — compiled code with a fixed structural form. Genesis can vary what it
+*claims about* a model's parameters and levers; it cannot change the model's
+equations, add a term, or propose a different functional form. There is no
+representation in this repository in which a structural change to a model is a
+value that could be produced, tested, or stored.
+
+So a `ModelUpdate` contract would be a type with no substrate behind it — the
+exact "fake abstraction" the brief's own rule 4 rules out. Writing one would
+also do real damage: `modelSufficiency.ts` is careful to say that an exhausted
+declared space is insufficiency *of the declared space*, **never** proof that
+the model is wrong, and a `ModelUpdate` type sitting next to
+`DECLARED_SPACE_INSUFFICIENT` would quietly invite exactly the inference that
+verdict exists to refuse.
+
+What would be needed, stated so the gap is actionable rather than vague: a model
+would have to be a VALUE — a declared structure (terms, couplings, functional
+form) that a solver can be built FROM at runtime — before "propose a different
+model" could be a step Genesis takes rather than a sentence it prints. That is a
+substrate change to the Experiment Fabric, not an agent feature, and it is the
+honest prerequisite for structural discovery. Until then the reachable frontier
+is what the table above already shows: richer hypotheses over fixed models.
+
+### 10.16 INFORMATION GAIN AT THE QUESTION LEVEL — measured as not yet computable
+
+The brief asked whether Genesis could rank several candidate research questions
+by how much each would reduce uncertainty ("Q1: is the pump the mechanism?
+Q2: does pipe length matter? Q3: does population change the result?"), and
+explicitly asked for a fixture and a measurement before any planner.
+
+Measured on the real candidates `nextQuestion.ts` actually produces. The
+question kinds a finished run raises are:
+
+| kind | its uncertainty, concretely | unit |
+| --- | --- | --- |
+| `TEST_UNTESTED_HYPOTHESIS` | how many declared hypotheses were never measured | a count |
+| `SEPARATE_SURVIVORS` | how many rivals remain consistent | a count |
+| `NARROW_A_DERIVED_INTERVAL` | the width of the earned interval | the parameter's own units |
+| `RESOLVE_APPARATUS_FAILURE` | whether the instrument works at all | not a quantity |
+| `GO_OUTSIDE_THE_DECLARED_SPACE` | unbounded — the space is by definition not enumerated | none |
+
+These do not share a scale. "An interval 0.4 wide" and "two unseparated rivals"
+and "the instrument returned nothing" cannot be ordered by a common measure of
+information without declaring an exchange rate between them, and this repository
+has no methodology that would justify one — the same reason every existing
+selector here is a declared lexicographic cascade and none of them scores
+(`worldCounterfactual.ts` says so in as many words). Inventing a score to rank
+them would be the overclaim, not the feature.
+
+Two things ARE computable today, and both are already used:
+
+1. **Within the PARAMETER experiment level**, information gain is real and
+   implemented: `selectNextProbe` checks which untried settings actually
+   separate contenders, using real solver predictions, and widens past the top
+   two when they cannot be separated (`§0bis`). That is discriminability, not a
+   score, and it is genuine.
+2. **Within one question kind**, comparison is meaningful because the unit is
+   shared: of two intervals the wider one is more uncertain; of two untested
+   sets the larger one has more to settle. `nextQuestion.ts` does not need this
+   yet because a finished run raises at most one question of each kind.
+
+So the honest state is: question-level ranking exists and is a declared cascade
+with each position justified; question-level *information gain* is not
+computable and will not be until candidate questions carry a declared
+uncertainty measure with units. Recording that as a measured negative rather
+than shipping a scorer that looks quantitative.

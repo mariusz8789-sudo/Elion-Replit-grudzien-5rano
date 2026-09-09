@@ -233,6 +233,13 @@ export interface GeneratedInvestigation {
   readonly derived: DerivedParameterHypothesis;
   /** The follow-up investigation, in the same shared shape as any other run. */
   readonly run: StrategyRun;
+  /**
+   * The input the follow-up actually executed. Carried because `StrategyRun` is
+   * a reporting contract and does not include the system under study, so a
+   * caller that wants to PERSIST this second investigation — or re-execute it —
+   * would otherwise have to reconstruct an input Genesis built itself.
+   */
+  readonly input: InquiryLoopInput;
   /** Did the derived value survive evidence it did not author? */
   readonly survived: boolean;
   /**
@@ -339,6 +346,7 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
         : {
             derived: generation.generated.derived,
             run: toParameterRun(generation.generated.followUpResult, generation.generated.followUpInput),
+            input: generation.generated.followUpInput,
             survived: generation.generated.survived,
             standing: derivedValueStanding(generation.generated.derived, generation.generated.followUpResult),
           };

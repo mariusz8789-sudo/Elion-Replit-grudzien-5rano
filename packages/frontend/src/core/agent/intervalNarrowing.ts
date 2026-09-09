@@ -208,6 +208,14 @@ export function assessNarrowing(
   const hi = Math.min(priorHi, ...refutedValues.filter((v) => v > highestSurvivor));
   const narrowed = lo > priorLo || hi < priorHi;
 
+  // A refuted value BETWEEN two survivors is a real and separate finding: the
+  // supported set is not connected, so no interval describes it honestly.
+  // Measured on the fold at 0.55, where the narrowing step refutes the derived
+  // 0.5 while 0.4 and 0.6 both survive. Saying "nothing was refuted" there —
+  // which an interval-only reading amounts to — would drop the one thing this
+  // experiment actually established.
+  const refutedBetweenSurvivors = refutedValues.filter((v) => v > lowestSurvivor && v < highestSurvivor);
+
   return {
     contractVersion: INTERVAL_NARROWING_CONTRACT_VERSION,
     priorInterval: [priorLo, priorHi],
@@ -219,8 +227,13 @@ export function assessNarrowing(
       ? `${refutedValues.join(', ')} were refuted on evidence the earlier investigations did not supply, so the ` +
         `supported range shrinks from [${priorLo}, ${priorHi}] to [${lo}, ${hi}]. What survives inside it ` +
         `(${survivingValues.join(', ')}) is still not identified — the same limit as before, on a smaller interval.`
-      : `Nothing new was refuted: ${survivingValues.join(', ')} all remained consistent at the settings tried, so ` +
-        `the interval stays [${priorLo}, ${priorHi}]. Reporting a narrower one would claim a separation this ` +
-        'experiment did not achieve.',
+      : refutedBetweenSurvivors.length > 0
+        ? `${refutedBetweenSurvivors.join(', ')} was refuted while ${survivingValues.join(' and ')} both survived, ` +
+          `so what this experiment supports is NOT an interval: the refuted value sits between the survivors and ` +
+          `the supported set is disconnected. The range stays [${priorLo}, ${priorHi}] because no interval can ` +
+          'describe that shape, and reporting a narrower one would hide the hole in the middle of it.'
+        : `Nothing new was refuted: ${survivingValues.join(', ')} all remained consistent at the settings tried, so ` +
+          `the interval stays [${priorLo}, ${priorHi}]. Reporting a narrower one would claim a separation this ` +
+          'experiment did not achieve.',
   };
 }

@@ -272,7 +272,10 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toContain('data-testid="rex-stage-data"');
     expect(markup).toContain('AVAILABLE');
     expect(markup).toContain('NOT YET AVAILABLE');
-    expect(markup).toMatch(/createRealExperimentRun/);
+    // Product/demo copy: the "not yet" reason is plain language for a demo audience, not an
+    // engineering changelog — no internal function names on screen.
+    expect(markup).not.toContain('createRealExperimentRun');
+    expect(markup).toMatch(/no way (yet )?for someone to submit|no way to enter one/i);
   });
 
   it('exposes a Demo Mode toggle', () => {

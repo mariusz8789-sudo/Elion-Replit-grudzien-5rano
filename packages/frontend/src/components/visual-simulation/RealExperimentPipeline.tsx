@@ -33,6 +33,13 @@
  * between two simulated arms) versus what stays absent (comparing against REAL lab data) — stated
  * as `APPROXIMATION` per the same `AdmissionStatus` vocabulary, not as a fabricated "partial real"
  * status invented for this component.
+ *
+ * **Product/demo readiness pass**: the rendered `note` text below is written for the person looking
+ * at the live app (a demo audience, a scientist), not for an engineer reading this file — no source
+ * paths or function names in the on-screen copy. The engineering detail (exact contract name, its
+ * location, what it can and cannot do yet) stays in this doc comment, where the next implementer of
+ * the admission seam / real-data-entry UI (see `docs/MASTER_PRIORITY_GENESIS.md`'s "Real Experiment
+ * E2E" split) will actually look for it.
  */
 
 export type PipelineStatus = 'real' | 'approximation' | 'not-modelled';
@@ -75,33 +82,33 @@ function buildStages({ predictionMechanism, predictionRationale, comparisonNote,
       key: 'request',
       label: 'Real Experiment Request',
       status: 'not-modelled',
-      note: 'The contract exists (createRealExperimentRun in core/experimentFabric/realExperiment.ts) but only as something a developer calls by hand from already-obtained measurements — no screen lets you submit one from here yet, so Genesis refuses this step rather than fabricating a request.',
+      note: 'Genesis already has the internal machinery to record a real laboratory measurement honestly, but there is no way yet for someone to submit one from this screen — so this step stays marked unavailable rather than faking a request.',
     },
     {
       key: 'waiting',
       label: 'Waiting for Laboratory',
       status: 'not-modelled',
-      note: 'No ExperimentRoute kind exists for a physical experiment yet, and no apparatus/lab is connected — not reachable while the Request stage above has no UI to populate it.',
+      note: 'No laboratory, instrument, or sensor is connected to Genesis yet, so this step cannot run — nothing is waiting because nothing has been requested.',
     },
     {
       key: 'data',
       label: 'Real Experimental Data',
       status: 'not-modelled',
-      note: 'The measurement shape exists (RawMeasurement/DerivedMeasurement) and would flow correctly into Evidence and Memory if entered — but no apparatus, sensor, or laboratory connection exists anywhere in this codebase, and no UI lets a person type in a real reading yet.',
+      note: 'A real reading, once entered, would flow correctly into Evidence and Memory — but there is no way to enter one on this screen yet, and none has been.',
     },
     {
       key: 'comparison',
       label: 'Comparison',
       status: 'approximation',
-      note: `The fork-and-compare machinery already runs today, simulated arm vs simulated arm: ${comparisonNote}. Comparing against a REAL measurement is not available — there is no real measurement yet to compare against.`,
+      note: `Right now Genesis can only compare two simulated arms: ${comparisonNote}. Comparing against a real measurement isn't possible without one to compare against.`,
     },
     {
       key: 'evidence',
       label: 'Evidence',
       status: evidenceBundleId ? 'approximation' : 'not-modelled',
       note: evidenceBundleId
-        ? `A real Evidence Bundle (${evidenceBundleId}) was recorded for this simulated run — run a Discovery search on the left to produce your own. The provenance field a real-experimental Evidence Bundle would need (dataProvenance: REAL_EXPERIMENTAL) already exists and propagates correctly; only a real measurement to carry it does not exist yet.`
-        : 'No Evidence Bundle recorded yet for this session — run a Discovery search on the left to produce one (simulated only; a real-experimental Evidence Bundle needs a real measurement, which does not exist yet).',
+        ? `A real Evidence Bundle (${evidenceBundleId}) was recorded for this simulated run — run a Discovery search on the left to produce your own. Genesis already knows how to mark a bundle as real-experimental; it just doesn't have a real measurement yet to mark one with.`
+        : 'No Evidence Bundle recorded yet for this session — run a Discovery search on the left to produce one. It will be simulated; a real-experimental bundle needs a real measurement, which does not exist yet.',
     },
   ];
 }

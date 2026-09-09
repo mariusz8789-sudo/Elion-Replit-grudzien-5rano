@@ -266,3 +266,51 @@ Real Experiment E2E jest teraz GOTOWE jako baza dla P2 ("pierwszy
 eksperyment na prawdziwych komórkach") — kolejny krok to podłączenie
 realnego źródła danych (lab partner) do tego samego kontraktu, nie nowa
 architektura.
+
+---
+
+## UPDATE — 2026-09-09, strategiczna ocena zewnętrzna (Qwen) — co bierzemy, co odkładamy
+
+Zewnętrzny model (Qwen, bez dostępu do repo — recenzja na podstawie
+Knowledge Pack) dał uczciwą, w większości trafną ocenę. Punkt po punkcie,
+co robimy z tym realnie:
+
+**Trafne i już się dzieje (nie trzeba nowej decyzji):**
+- GAP 3 (Model Update) jako priorytet — ZGADZA SIĘ z tym, co C3 już
+  zrobił DZIŚ (`StructuralAlternativeRegistry`, realny rebind
+  `domainBinding.solverId` napędzany falsyfikacją — patrz update wyżej).
+  Recenzja tego nie widziała (audyt bez repo), ale kierunek był już słuszny
+  przed jej przeczytaniem.
+- "Jeden killer case zamiast rozproszenia" — real Experiment E2E (ten
+  update) to PIERWSZY krok w tę stronę: most Prediction→Real
+  Data→Comparison→Evidence→Memory→Replay jest teraz architektonicznie
+  gotowy na PIERWSZY prawdziwy przypadek z realnym partnerem/danymi, nie
+  kolejną domenę symulacyjną.
+
+**Trafne, wymaga decyzji NIE-inżynierskiej (biznes/partnerstwo)** — poza
+zakresem tego, co C1/C2/C3 mogą rozstrzygnąć w kodzie:
+- "Evidence & Replay Platform jako pierwszy produkt" (B2B, nie "AI
+  Scientist") — pozycjonowanie produktowe, decyzja użytkownika/zarządu.
+- "Partnerstwo z istniejącym labem zamiast budowy własnego" — biznes
+  development, poza tym repo.
+- Te dwa punkty ZOSTAJĄ przy użytkowniku do decyzji; architektura (ten
+  update + Real Experiment Contract) już nie blokuje żadnej z tych ścieżek
+  — `RealExperimentRequest`/`physicalProtocolRef` jest zaprojektowany tak,
+  by przyjąć DOWOLNY realny protokół pomiarowy bez przebudowy.
+
+**Trafne, świadomie odłożone teraz, przekazane QN (Qwen) jako izolowane
+zadanie budowlane** (patrz sesja czatu z użytkownikiem — QN nie ma
+dostępu do repo, więc dostaje samodzielną specyfikację modułu, nie audyt):
+- GAP 7 (Literature intelligence & novelty detection) — jedyna luka z
+  listy Qwen, która NIE koliduje z aktywną pracą C1 (Real Experiment,
+  zamknięte) ani C3 (Mechanism Composition/researchChain, w toku), więc
+  jest bezpieczna do przekazania równoległemu agentowi bez ryzyka
+  konfliktu (patrz precedens kolizji C1/C2 na `RealExperimentPipeline.tsx`
+  wyżej — trzymamy się od tego z daleka).
+
+**Zasada dla wyniku QN, zanim trafi z powrotem do repo**: żadnego
+fabrykowanego cytowania, żadnej fałszywej "noveltyScore" bez jawnej
+formuły, honest `NOT_MODELLED`/capability-seam tam gdzie QN nie ma
+realnego dostępu do API literatury — dokładnie ta sama dyscyplina co
+Real Experiment Contract. C1 audytuje i wpina wynik dopiero po weryfikacji
+zgodności z tą zasadą, nigdy automatycznie.

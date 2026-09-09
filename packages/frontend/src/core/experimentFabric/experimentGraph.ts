@@ -55,6 +55,8 @@ export interface ExperimentGraphNode {
   modelId?: string;
   modelVersion?: string;
   resultOrigin?: string;
+  /** Separate axis from `resultOrigin` — see `core/dataProvenance.ts`. */
+  dataProvenance?: string;
 }
 
 export interface ExperimentGraphEdge {
@@ -390,6 +392,7 @@ export function buildExperimentGraph(input: ExperimentGraphInput): ExperimentGra
       runId: run.runId, runFingerprint: run.provenance.runFingerprint,
       engine: run.plan.engine ?? undefined, modelId,
       modelVersion: run.provenance.modelVersion, resultOrigin: run.provenance.resultOrigin,
+      dataProvenance: run.provenance.dataProvenance,
     });
   }
 

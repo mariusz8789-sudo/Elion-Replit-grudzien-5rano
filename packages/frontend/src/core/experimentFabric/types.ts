@@ -1,4 +1,5 @@
 import type { BiologicalEvidence, BiologicalTarget } from '../biotechDiscoveryContract';
+import type { DataProvenance } from '../dataProvenance';
 import type { KnowledgeCapability, KnowledgeCorpusFile, KnowledgeVisualization } from '../knowledge/registry';
 
 /** Public contract version for the Genesis Experiment Fabric. */
@@ -103,6 +104,17 @@ export interface ExperimentProvenance {
   deterministic: boolean;
   /** The source of all numeric output: real engine, never parser or LLM. */
   resultOrigin: 'real-engine' | 'hypothetical-visualization' | 'knowledge-only' | 'capability-seam' | 'engine-not-available';
+  /**
+   * A SEPARATE axis from `resultOrigin` (see `dataProvenance.ts`): whether this
+   * output is Genesis's own model/solver, an external reference/literature
+   * source, or a real laboratory measurement. Present exactly when a numeric
+   * output was actually produced — undefined for `capability-seam`/
+   * `engine-not-available`, where nothing was computed to have a provenance.
+   * `createExperimentProvenance` derives this for every solver-executed run;
+   * a future Real Experiment run (see `realExperiment.ts`) is the only path
+   * that may set it to `REAL_EXPERIMENTAL`.
+   */
+  dataProvenance?: DataProvenance;
   /** Present only when this canonical run was executed by the existing backend Fabric endpoint. */
   backendExecution?: {
     backendRunId: string;

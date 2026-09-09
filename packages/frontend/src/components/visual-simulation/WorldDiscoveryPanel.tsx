@@ -81,13 +81,16 @@ function historySummary(exp: SavedExperiment): string {
  * report and JSON sit underneath in a disclosure, so nothing shown to a person
  * is a paraphrase of something different from what a tool would read.
  */
-export function WorldDiscoveryPanel() {
+export function WorldDiscoveryPanel({ defaultCatalogId }: { defaultCatalogId?: string } = {}) {
   const [goal, setGoal] = useState('');
   const [state, setState] = useState<PanelState>({ kind: 'IDLE' });
   // Every real lever catalog Genesis declares, read from the ONE registry
   // (`WORLD_LEVER_CATALOGS`) rather than a second hand-written list here — a
   // list that could drift is exactly what that registry exists to prevent.
-  const [catalogId, setCatalogId] = useState<string>(GENESIS_FLOOD_CATALOG.catalogId);
+  // `defaultCatalogId` lets an embedding screen (e.g. the Virtual Cell Lab) open this SAME generic
+  // panel already pointed at its own world, instead of a second bespoke discovery UI — falls back to
+  // the flood catalog (this panel's original, still-only caller's default) when omitted.
+  const [catalogId, setCatalogId] = useState<string>(defaultCatalogId ?? GENESIS_FLOOD_CATALOG.catalogId);
   const catalog = resolveWorldLeverCatalog(catalogId) ?? GENESIS_FLOOD_CATALOG;
 
   const [historyOpen, setHistoryOpen] = useState(false);

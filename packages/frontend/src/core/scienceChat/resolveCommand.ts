@@ -421,6 +421,21 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Virtual Cell Lab (C2 NEXT SPRINT P1 WOW) — realny solwer G1/S/G2M
+  //     (worldModel/domains/cellCycle.ts, RK4) prowadzony w DWÓCH hodowlach na żywo (kontrolna vs
+  //     traktowana substancją), plus ta sama generyczna pętla Discovery (Question -> Hypotheses ->
+  //     Experiment -> Observation) na tej samej domenie. Frazy celowo NIE zawierają „otworz
+  //     laboratorium"/„lab" same w sobie — ten ogólny fragment jest już zajęty przez Molecule Lab
+  //     powyżej, więc to musi być rozpoznawalne po własnych, specyficznych słowach kluczowych. ---
+  if (has(norm, 'hodowla komorkowa', 'hodowli komorkowej', 'wplyw substancji', 'zbadaj substancj', 'wzrost komorek', 'podzial komorek', 'smierc komorek', 'komorki w hodowli', 'virtual cell lab', 'cell lab', 'cell culture lab', 'control vs treatment', 'kontrola vs leczenie', 'kontrola kontra leczenie')) {
+    return {
+      text: 'Otwieram Genesis Virtual Cell Lab: dwie hodowle komórkowe na żywo, kontrolna i traktowana wybraną substancją, obie napędzane tym samym realnym solwerem G1/S/G2M (RK4, domains/cellCycle.ts) co panel Discovery Loop obok. Wykres wzrostu i podział na fazy cyklu to bezpośredni odczyt stanu solwera, nie osobna animacja.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/cell-lab' },
+    };
+  }
+
   // --- Traffic flow (GRAPHICS V7) — realny Greenshields+CTM/Godunov+HCM solver
   //     (worldModel/domains/trafficFlow.ts) na realnej sieci dróg tego samego miasta co żywa
   //     symulacja epidemii — ten sam #/city3d, ale z osobną, uczciwą narracją o realnym modelu

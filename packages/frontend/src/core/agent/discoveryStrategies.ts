@@ -10,8 +10,14 @@ import {
   type InquiryLoopInput,
   type InquiryLoopResult,
 } from './inquiryLoop';
-import { parameterInquiryNextAction } from './nextAction';
-import { admitParameterInquiry, admitWorldQuestion } from './discoveryAdmission';
+import {
+  runAutonomousWorldCalibration,
+  worldCalibrationResultFingerprint,
+  type WorldParameterCalibrationInput,
+  type WorldParameterCalibrationResult,
+} from './worldParameterCalibration';
+import { parameterInquiryNextAction, worldCalibrationNextAction } from './nextAction';
+import { admitParameterInquiry, admitWorldCalibration, admitWorldQuestion } from './discoveryAdmission';
 import {
   DISCOVERY_STRATEGY_CONTRACT_VERSION,
   type Admission,
@@ -21,14 +27,14 @@ import {
 } from './discoveryStrategy';
 
 /**
- * THE TWO ADAPTERS. Indirection only — no science happens in this file.
+ * THE THREE ADAPTERS. Indirection only — no science happens in this file.
  *
  * Each wraps one real loop and reports it in the shared `StrategyRun` shape.
- * Neither loop imports this module, neither is modified, and neither knows an
- * orchestrator exists. The test that keeps this honest is the one that asserts
- * `run(...).native` is exactly what calling the loop directly returns — the
- * same equivalence discipline `nextAction.ts` established for its six
- * selectors.
+ * None of the three loops imports this module, none is modified, and none
+ * knows an orchestrator exists. The test that keeps this honest is the one
+ * that asserts `run(...).native` is exactly what calling the loop directly
+ * returns — the same equivalence discipline `nextAction.ts` established for
+ * its own selectors.
  *
  * Where a loop genuinely does not produce something the contract has a slot
  * for, the adapter leaves it null or derives it ONLY from what the loop already
@@ -37,6 +43,7 @@ import {
 
 export const MECHANISM_STRATEGY_ID = 'worldgraph-mechanism';
 export const PARAMETER_STRATEGY_ID = 'fabric-parameter';
+export const CALIBRATION_STRATEGY_ID = 'worldgraph-calibration';
 
 // ---------------------------------------------------------------------------
 // MECHANISM — the WorldGraph loop.
@@ -177,4 +184,73 @@ export const parameterStrategy: DiscoveryStrategy<InquiryLoopInput> = {
   // `ExperimentRun[]` left behind because the shared shape reports findings,
   // not solver payloads. `native` still carries the loop's whole result.
   run: (input): StrategyRun => toParameterRun(runAutonomousInquiryWithRuns(input).result, input),
+};
+
+// ---------------------------------------------------------------------------
+// CALIBRATION — the WorldGraph parameter-calibration composition.
+// ---------------------------------------------------------------------------
+
+function calibrationRounds(result: WorldParameterCalibrationResult, worldId: string): readonly StrategyRound[] {
+  return result.rounds.map((round) => ({
+    round: round.round,
+    what: `read at tick=${round.probeTick} in ${worldId}`,
+    // The composition decides this BEFORE the round runs, from what the
+    // previous reading showed — carried verbatim, same as the PARAMETER path.
+    why: round.selection.why,
+    observed: round.observed,
+    // Null on purpose, the identical reason PARAMETER's is null: this
+    // composition judges the observation against EACH hypothesis's own
+    // independently-built world, not one shared baseline.
+    reference: null,
+    verdicts: round.outcomes.map((outcome) => ({
+      hypothesisId: outcome.hypothesisId,
+      assessment: outcome.assessment,
+      // A real reading off this hypothesis's own advanced `TemporalEngine`,
+      // under the same `reduceObjectiveTrajectory` call the measurement it is
+      // judged against used — carried, not recomputed.
+      predicted: outcome.predicted,
+    })),
+  }));
+}
+
+/**
+ * Projects a result the CALIBRATION composition already produced.
+ *
+ * Takes the input as well for the same reason `toParameterRun` does: the
+ * contract reports what each round DID, and the world id it read from lives
+ * on the system under study rather than on the round.
+ *
+ * `nextExperiment` delegates to `worldCalibrationNextAction` rather than
+ * converting `CalibrationProbeSelection` here — same discipline as
+ * `toParameterRun`'s use of `parameterInquiryNextAction`: that conversion
+ * already exists, is already tested, and a second one here would be free to
+ * disagree with it. `NO_DISCRIMINATING_PROBE` and `NO_CONTENDERS_LEFT` both
+ * travel through unchanged as `result.stopReason`, exactly as the loop
+ * reported them — this adapter neither renames nor reinterprets a stop reason.
+ */
+export function toCalibrationRun(result: WorldParameterCalibrationResult, input: WorldParameterCalibrationInput): StrategyRun {
+  return {
+    contractVersion: DISCOVERY_STRATEGY_CONTRACT_VERSION,
+    strategyId: CALIBRATION_STRATEGY_ID,
+    shape: 'CALIBRATION',
+    question: result.question,
+    domainId: result.domainId,
+    rounds: calibrationRounds(result, result.worldId),
+    surviving: result.survivingHypothesisIds,
+    falsified: result.falsifiedHypothesisIds,
+    untested: result.untestedHypothesisIds,
+    stopReason: result.stopReason,
+    nextExperiment: worldCalibrationNextAction({ result, system: input.system }),
+    openQuestions: result.openQuestions,
+    limitations: result.limitations,
+    resultFingerprint: worldCalibrationResultFingerprint(result),
+    native: result,
+  };
+}
+
+export const calibrationStrategy: DiscoveryStrategy<WorldParameterCalibrationInput> = {
+  id: CALIBRATION_STRATEGY_ID,
+  handles: 'CALIBRATION',
+  admit: (input): Admission => admitWorldCalibration(input.system.scenarioKind),
+  run: (input): StrategyRun => toCalibrationRun(runAutonomousWorldCalibration(input), input),
 };

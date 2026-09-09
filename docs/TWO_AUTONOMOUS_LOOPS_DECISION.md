@@ -752,3 +752,94 @@ variant of `PARAMETER` that branches on substrate — is a real design decision
 for whoever first needs to call this from the orchestrator rather than
 directly, the same kind of call §5 itself deferred. Left open here rather than
 guessed at.
+
+---
+
+## 12. §11.4 closed — `CALIBRATION`, the third `QuestionShape`
+
+§11.4 left the orchestrator question open because nothing yet needed to call
+`worldParameterCalibration.ts` through the general-purpose entry point rather
+than directly. C1 asked for exactly that call: route P6 through
+`discoveryOrchestrator.ts` like MECHANISM and PARAMETER, but only if a code
+audit shows it is genuinely the right place — not forced.
+
+### 12.1 The audit, and why the answer is yes
+
+`discoveryStrategy.ts`'s own `QuestionShape` doc, written before this
+composition existed, already states the exact criterion for extending it:
+*"Deliberately only two values, because exactly two real loops exist. A third
+shape must arrive with a third real loop that answers it."* §11 is precisely
+that: `worldParameterCalibration.ts` is a genuinely third loop (a composition
+over shared primitives, but a distinct code path with its own round shape,
+its own probe axis — a tick, not a setting or a lever strength — and its own
+`WorldParameterCalibrationResult`), audited into existence rather than added
+to make a domain fit. It satisfies the type's own stated bar, so the answer is
+yes, and adding a `CALIBRATION` `QuestionShape` is following a rule the
+codebase already wrote for this exact situation, not inventing a new one.
+
+### 12.2 What changed, and what did not
+
+**New value, not a new mechanism:** `QuestionShape` gained `'CALIBRATION'`
+(`discoveryStrategy.ts`, contract 1.1.0 → 1.2.0, additive — MECHANISM and
+PARAMETER runs are unaffected). `discoveryOrchestrator.ts` gained a
+`CalibrationRequest` variant and a third `if` branch in `runDiscovery`,
+mirroring the existing PARAMETER branch exactly (admit the caller's fully
+declared input directly, no planning step, same as PARAMETER and for the same
+reason — see the module doc's now-updated asymmetry section).
+`discoveryStrategies.ts` gained `calibrationStrategy`, a third thin adapter
+built the identical way `mechanismStrategy` and `parameterStrategy` are:
+`admit` delegates to a real capability check, `run` calls the real
+composition and projects its result, `native` carries the untouched result.
+`nextAction.ts` gained a seventh selector, `worldCalibrationNextAction`,
+mirroring `parameterInquiryNextAction` (indirection only, `request` left null
+because there is no `StructuredExperimentRequest` equivalent for "rebuild
+this world and read a different tick" — the identical reason
+`worldCounterfactualNextAction`, selector 2, already leaves its own `request`
+null).
+
+**New admission path, reusing the existing registry:** `discoveryAdmission.ts`
+gained `admitWorldCalibration(scenarioKind)`, which calls the SAME
+`solverCapabilityFor` registry `admitWorldQuestion` already reads — no new
+registry, per that module's own header. The capability→`Admission` conversion
+that used to live inline inside `admitWorldQuestion` was factored out into
+`admissionFromCapability` so both callers consult the exact same logic; a
+question and a calibration about the same `ScenarioKind` cannot disagree about
+whether Genesis can answer at all, because both now call one function.
+`WorldParameterSystem` gained one field for this, `scenarioKind: ScenarioKind`
+— metadata only, declared by the domain (`epidemicInfectiousDaysCalibration.ts`
+sets `'EPIDEMIC'`), never read by `runAutonomousWorldCalibration` itself, so
+the composition's own behavior is unchanged.
+
+**Untouched, confirmed by reading the code before editing, not by assumption:**
+`discoveryLoop.ts`, `inquiryLoop.ts`, `objectiveReducer.ts`,
+`objectiveTrajectory.ts`, and the core of `worldParameterCalibration.ts`
+itself — `runAutonomousWorldCalibration`'s round loop, `selectNextProbe`'s
+double-direction discriminability check, and every stop reason including
+`NO_DISCRIMINATING_PROBE` are byte-for-byte what §11 built. The one addition
+to that file is the `scenarioKind` field, which the algorithm never consults.
+
+### 12.3 Proof this is routing, not a rewrite
+
+The same equivalence discipline every other adapter in this codebase is held
+to: `calibrationStrategy.run(input)` called directly and
+`runDiscovery({shape:'CALIBRATION', input})` called through the orchestrator
+produce identical `resultFingerprint`s, identical `stopReason`s (including
+`NO_DISCRIMINATING_PROBE` on the same tightly-spaced tie case §11.3 measured),
+and identical survivor/falsified partitions
+(`discoveryOrchestrator.test.ts`, `discoveryStrategies.test.ts`,
+`nextActionSelectors.test.ts`). The honesty stop reason travels through
+unrenamed at every layer — the composition, the adapter, and the
+orchestrator all report the exact same string.
+
+### 12.4 What was deliberately not done
+
+No change to how `worldParameterCalibration.ts` chooses a probe tick, judges a
+hypothesis, or reports a stop reason — this section is purely additive
+plumbing on top of §11's finished science. No second `WorldParameterSystem`
+domain was declared to exercise the wiring; `epidemicInfectiousDaysCalibration.ts`
+is exercised through the new path exactly as it already was through the direct
+path. No attempt was made to unify `ParameterRequest` and `CalibrationRequest`
+into one shape with a substrate flag — `discoveryOrchestrator.ts`'s own
+asymmetry section already explains why forcing PARAMETER and MECHANISM into
+one shape would have to fabricate something, and the identical argument holds
+one level down between PARAMETER and CALIBRATION.

@@ -1,7 +1,8 @@
 import { admitWorldQuestion } from './discoveryAdmission';
-import { mechanismStrategy, parameterStrategy } from './discoveryStrategies';
+import { calibrationStrategy, mechanismStrategy, parameterStrategy } from './discoveryStrategies';
 import type { Admission, QuestionShape, StrategyRun } from './discoveryStrategy';
 import type { InquiryLoopInput } from './inquiryLoop';
+import type { WorldParameterCalibrationInput } from './worldParameterCalibration';
 import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalog } from './worldGoalIntent';
 
 /**
@@ -35,7 +36,7 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * capability is worth exactly what that capability is worth, and a consumer that
  * only ever sees `run` would have no way to know.
  *
- * ## Why admission runs before planning, and why the two shapes differ there
+ * ## Why admission runs before planning, and why MECHANISM is the odd one out
  *
  * `DiscoveryStrategy.admit` takes the strategy's own input, which for MECHANISM
  * exists only AFTER a plan is built. Building one first would produce a worse
@@ -45,8 +46,10 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * volcano solver. So MECHANISM is admitted on the raw goal via
  * `admitWorldQuestion`, which is precisely the function `mechanismStrategy.admit`
  * delegates to — the same admission, asked where the information exists, not a
- * second copy of it. PARAMETER's input is fully declared by its caller, so
- * `parameterStrategy.admit` is used directly.
+ * second copy of it. PARAMETER's and CALIBRATION's inputs are both fully
+ * declared by their caller, so `parameterStrategy.admit` /
+ * `calibrationStrategy.admit` are used directly on `request.input`, no planning
+ * step involved for either.
  *
  * ## Why the request shapes are asymmetric, and why that is honest
  *
@@ -60,19 +63,27 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * configured, and its `hiddenParameters` ARE the answer being sought. An
  * orchestrator that manufactured one from a sentence would be inventing the
  * result it is supposed to measure — which is the exact failure
- * `ObservableSystem` exists to make impossible at compile time. The asymmetry is
- * a fact about the two substrates, and it is stated rather than papered over
- * with a symmetry that would have to fabricate something.
+ * `ObservableSystem` exists to make impossible at compile time.
+ *
+ * A CALIBRATION request carries its `WorldParameterCalibrationInput` whole for
+ * the identical reason, one level down: `WorldParameterSystem.hiddenValue` and
+ * `buildWorldAt` together ARE the world the calibration is trying to identify,
+ * so there is nothing here for an orchestrator to derive from a sentence
+ * either — `system.scenarioKind` is the one thing it reads, purely to admit,
+ * never to build anything. The asymmetry across all three is a fact about the
+ * substrates, not a shortcut, and it is stated rather than papered over with a
+ * symmetry that would have to fabricate something.
  *
  * ## What this deliberately does not do
  *
- * It does not generate hypotheses. Both strategies are handed the hypotheses
- * they investigate, and turning falsifications into new candidates is P3
- * (`deriveAlternativeCriteria`, built and tested and not yet wired) — a separate
- * change, on top of this one, once this stands on its own.
+ * It does not generate hypotheses. All three strategies are handed the
+ * hypotheses they investigate, and turning falsifications into new candidates
+ * is P3 (`deriveAlternativeCriteria`, built and tested and not yet wired) — a
+ * separate change, on top of this one, once this stands on its own.
  */
 
-export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.0.0';
+/** 1.1.0 added the `CALIBRATION` shape and `CalibrationRequest`. Additive: `DiscoveryOutcome`'s own shape is unchanged, `shape` simply carries a third real value now. */
+export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.1.0';
 
 /** A mechanism question: a goal, against a world that declares its own levers. */
 export interface MechanismRequest {
@@ -87,7 +98,20 @@ export interface ParameterRequest {
   readonly input: InquiryLoopInput;
 }
 
-export type DiscoveryRequest = MechanismRequest | ParameterRequest;
+/**
+ * A calibration question: a fully declared world-parameter calibration. Same
+ * asymmetry rationale as `ParameterRequest`, one level down: a
+ * `WorldParameterSystem`'s `hiddenValue` and `buildWorldAt` ARE the answer
+ * being sought and the world that produces it, so this carries the whole
+ * `WorldParameterCalibrationInput` rather than a goal an orchestrator would
+ * have to guess a `ScenarioKind` and a solver constant out of.
+ */
+export interface CalibrationRequest {
+  readonly shape: 'CALIBRATION';
+  readonly input: WorldParameterCalibrationInput;
+}
+
+export type DiscoveryRequest = MechanismRequest | ParameterRequest | CalibrationRequest;
 
 /** Where a question stopped. Both are real refusals; they are not the same fact. */
 export type RefusalStage =
@@ -141,6 +165,12 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     const admission = parameterStrategy.admit(request.input);
     if (!admits(admission)) return refused('PARAMETER', 'ADMISSION', admission);
     return ran('PARAMETER', admission, parameterStrategy.run(request.input));
+  }
+
+  if (request.shape === 'CALIBRATION') {
+    const admission = calibrationStrategy.admit(request.input);
+    if (!admits(admission)) return refused('CALIBRATION', 'ADMISSION', admission);
+    return ran('CALIBRATION', admission, calibrationStrategy.run(request.input));
   }
 
   const admission = admitWorldQuestion(request.goal);

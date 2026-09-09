@@ -206,7 +206,7 @@ export function toJointMechanismRun(
     dataProvenance: toMechanismRun(first).dataProvenance,
     // The joint arm's own numbers, so a reader can recompute the verdict rather
     // than trust it.
-    resultFingerprint: `joint_${derived.hypothesisId}@${derived.strength}_${assessment.jointObserved}`,
+    resultFingerprint: jointMechanismResultFingerprint(derived, assessment),
     native: continuation,
   };
 }
@@ -254,20 +254,33 @@ function commonMeasuredArms(
 }
 
 /**
- * Runs the MECHANISM investigation and, when it ends with rival survivors,
- * proposes and really tests the one mechanism nobody declared: both of them at
- * once.
+ * The pure half: given an ALREADY-COMPUTED base investigation, proposes and
+ * really tests the one mechanism nobody declared, when the base run ended with
+ * rival survivors.
+ *
+ * Split out from `runDiscoveryWithJointGeneration` so a caller that has
+ * already run the base investigation for its own reasons — `discoveryLoop.ts`
+ * needs no engine change, but `worldDiscoverySession.ts`'s memory-writing seam
+ * needs the LIVE engines from its own `runAutonomousDiscoveryWithEngines` call
+ * to build an Evidence Bundle — is not forced to run it a second time to get
+ * generation too. `runJointIntervention` builds its own fresh world via
+ * `input.buildWorld()` regardless of which engines produced `first`, so this
+ * function needs nothing from the first run except its RESULT and the full
+ * `DiscoveryLoopExecution` behind it — carried through as `firstExecution` on
+ * `MechanismWithGenerationResult` rather than re-derived, so a caller
+ * persisting an Evidence Bundle (`discoveryOrchestrator.ts::runMechanismDiscoveryAndRemember`)
+ * never has to run the investigation a third time to get it.
  *
  * `tolerance` is the declared additivity band, playing the same role
  * `agreementTolerance` plays throughout this codebase — a declared band, not a
  * statistical test this repository has no methodology to justify.
  */
-export function runDiscoveryWithJointGeneration(
+export function generateJointMechanismFrom(
+  firstExecution: DiscoveryLoopExecution,
   input: DiscoveryLoopInput,
   options: { readonly tolerance?: number } = {},
 ): MechanismWithGenerationResult {
   const tolerance = options.tolerance ?? 0.02;
-  const firstExecution = runAutonomousDiscoveryWithEngines(input);
   const first = firstExecution.result;
 
   // Refusal 1 — nothing to combine. One survivor is an answer, zero is
@@ -405,4 +418,34 @@ export function runDiscoveryWithJointGeneration(
   };
 
   return { first, firstExecution, generated: { derived, assessment, betterThanBestSingle }, noGenerationReason: null };
+}
+
+/**
+ * Runs the MECHANISM investigation and, when it ends with rival survivors,
+ * proposes and really tests the one mechanism nobody declared: both of them at
+ * once.
+ *
+ * A thin wrapper — `runAutonomousDiscoveryWithEngines` plus
+ * `generateJointMechanismFrom` on its result. Callers that already have a
+ * finished `DiscoveryLoopResult` for their own reasons should call
+ * `generateJointMechanismFrom` directly rather than re-running the base
+ * investigation through here.
+ */
+export function runDiscoveryWithJointGeneration(
+  input: DiscoveryLoopInput,
+  options: { readonly tolerance?: number } = {},
+): MechanismWithGenerationResult {
+  return generateJointMechanismFrom(runAutonomousDiscoveryWithEngines(input), input, options);
+}
+
+/**
+ * The same content fingerprint `toJointMechanismRun` computes, exported so a
+ * caller persisting a composed mechanism to memory can check a re-derivation
+ * against the SAME formula rather than a second one that could drift from it.
+ */
+export function jointMechanismResultFingerprint(
+  derived: DerivedJointMechanism,
+  assessment: JointInterventionAssessment,
+): string {
+  return `joint_${derived.hypothesisId}@${derived.strength}_${assessment.jointObserved}`;
 }

@@ -1,11 +1,14 @@
 import type { ReplayVerdict } from '../matrixFoundation/replayVerdict';
 import {
   buildActionComparisonEvidenceBundle,
+  buildSavedMechanismComposition,
   buildSavedWorldDiscoveryRun,
   buildWorldDiscoveryEvidenceBundle,
   listExperiments,
   replaySavedWorldDiscoveryRun,
+  saveMechanismCompositionToMemory,
   saveWorldDiscoveryRunToMemory,
+  type SavedMechanismComposition,
   type SavedWorldDiscoveryReplay,
 } from '../scienceMemory';
 import { compareWorldActions, type CrossActionComparison } from './crossActionComparison';
@@ -15,6 +18,7 @@ import {
   type DiscoveryLoopInput,
   type DiscoveryLoopResult,
 } from './discoveryLoop';
+import { generateJointMechanismFrom } from './mechanismGeneration';
 import { renderDiscoveryReport } from './discoveryReport';
 import {
   buildWorldDiscoveryPlan,
@@ -223,6 +227,14 @@ export type WorldDiscoveryRememberedState =
       readonly evidence: WorldDiscoveryEvidenceSummary;
       readonly replay: SavedWorldDiscoveryReplay;
       readonly savedExperimentId: string;
+      /**
+       * The composed mechanism this run produced and remembered, when the base
+       * search ended with rival survivors — null otherwise, which is the normal
+       * case. See `runWorldDiscoveryAndRemember`'s own note on why this is
+       * `generateJointMechanismFrom` reusing `result` rather than a second
+       * WorldGraph search.
+       */
+      readonly mechanismComposition: SavedMechanismComposition | null;
     })
   | (Extract<WorldDiscoveryState, { kind: 'COMPARISON' }> & {
       /** Comparisons always run every declared action against the control, so memory never excludes a candidate here. */
@@ -338,6 +350,38 @@ export function runWorldDiscoveryAndRemember(
   });
   const savedExperiment = saveWorldDiscoveryRunToMemory(saved);
   const replay = replaySavedWorldDiscoveryRun(savedExperiment);
+
+  // GENERATION REACHES THIS SEAM TOO — the one production entry point every
+  // MECHANISM screen (`WorldDiscoveryPanel.tsx`, `GenesisWorldScreen.tsx`,
+  // `CellLabScreen.tsx`) actually calls. `discoveryOrchestrator.ts` already
+  // wires `generateJointMechanismFrom` into `runDiscovery`, but nothing routed
+  // through THIS function — the real one a UI calls — ever reached it, so a
+  // composed mechanism could be produced through the orchestrator's own front
+  // door and never through the door anything actually uses.
+  //
+  // `generateJointMechanismFrom` (not `runDiscoveryWithJointGeneration`) is
+  // used deliberately: `execution` is ALREADY the base investigation this
+  // function just ran for its own Evidence Bundle, so calling the
+  // execute-and-generate wrapper here would run the identical WorldGraph
+  // search a second time for no new information — the fork it forgoes reusing
+  // is exactly the live-engine one `execution` already produced.
+  const mechanismGeneration = generateJointMechanismFrom(execution, { ...plan, hypotheses: hypothesesToRun });
+  let mechanismComposition: SavedMechanismComposition | null = null;
+  if (mechanismGeneration.generated !== null) {
+    const savedComposition = buildSavedMechanismComposition({
+      catalogId: catalog.catalogId,
+      goal,
+      worldId: catalog.worldId,
+      domainId: catalog.domainId,
+      resumedFromMemory,
+      derived: mechanismGeneration.generated.derived,
+      assessment: mechanismGeneration.generated.assessment,
+      betterThanBestSingle: mechanismGeneration.generated.betterThanBestSingle,
+    });
+    saveMechanismCompositionToMemory(savedComposition);
+    mechanismComposition = savedComposition;
+  }
+
   return {
     kind: 'COMPLETE',
     goal,
@@ -348,5 +392,6 @@ export function runWorldDiscoveryAndRemember(
     evidence,
     replay,
     savedExperimentId: savedExperiment.id,
+    mechanismComposition,
   };
 }

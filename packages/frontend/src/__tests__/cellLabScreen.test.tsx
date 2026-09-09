@@ -174,6 +174,7 @@ function completeStateFixture(bestSupported: HypothesisBelief[], failedHypothese
     evidence: { bundleId: 'bundle-1', scientificContentFingerprint: 'fp-1', replayVerdict: 'MATCH', replayMessage: 'ok' },
     replay: { status: 'MATCH', reason: 'matches' },
     savedExperimentId: 'exp-1',
+    mechanismComposition: null,
   };
 }
 

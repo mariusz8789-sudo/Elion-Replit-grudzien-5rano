@@ -42,6 +42,11 @@ import {
 import { buildWorldEvidenceBundle, type WorldEvidenceBundle } from './worldModel/evidence/worldEvidenceBundle';
 import { compareBranches, projectToWorldState } from './worldModel/bridge/worldFrameState';
 import { TemporalEngine, TemporalBranchRegistry } from './worldModel/temporal/temporalEngine';
+import type { RealExperimentRequest } from './experimentFabric/realExperiment';
+import type { FalsificationCriterion } from './experimentFabric/scientificDiscovery';
+import {
+  verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
+} from './agent/predictionVerification';
 
 
 /**
@@ -246,6 +251,15 @@ export interface SavedExperiment {
    * own doc for why it fits none of the three above.
    */
   mechanismComposition?: SavedMechanismComposition;
+  /**
+   * A real, physical measurement judged against a WorldGraph prediction —
+   * the fifth investigation shape. Neither `worldDiscovery` (the SIMULATED
+   * prediction itself, referenced by id rather than duplicated) nor any
+   * Fabric shape above fits it: this record's whole reason to exist is a
+   * REAL_EXPERIMENTAL `ExperimentRun`, judged against a frozen prediction
+   * from a completed `worldDiscovery` run. See `SavedRealExperimentVerification`.
+   */
+  realExperimentVerification?: SavedRealExperimentVerification;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -550,6 +564,7 @@ export interface SaveExperimentInput {
   worldDiscovery?: SavedWorldDiscoveryRun;
   parameterInquiry?: SavedParameterInquiry;
   mechanismComposition?: SavedMechanismComposition;
+  realExperimentVerification?: SavedRealExperimentVerification;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -601,6 +616,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.worldDiscovery !== undefined && !isSavedWorldDiscoveryRun(input.worldDiscovery)) throw new Error('Zapis odkrycia world-model musi zawierać cel, katalog, wynik i odcisk treści.');
   if (input.parameterInquiry !== undefined && !isSavedParameterInquiry(input.parameterInquiry)) throw new Error('Zapis dochodzenia parametrycznego musi zawierać wejścia, wynik i odcisk treści.');
   if (input.mechanismComposition !== undefined && !isSavedMechanismComposition(input.mechanismComposition)) throw new Error('Zapis kompozycji mechanizmów musi zawierać katalog, cel, wynik i odcisk treści.');
+  if (input.realExperimentVerification !== undefined && !isSavedRealExperimentVerification(input.realExperimentVerification)) throw new Error('Zapis weryfikacji realnym eksperymentem musi zawierać źródło predykcji, request, realny przebieg REAL_EXPERIMENTAL i wynik porównania.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -625,6 +641,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.worldDiscovery === undefined ? {} : { worldDiscovery: input.worldDiscovery }),
     ...(input.parameterInquiry === undefined ? {} : { parameterInquiry: input.parameterInquiry }),
     ...(input.mechanismComposition === undefined ? {} : { mechanismComposition: input.mechanismComposition }),
+    ...(input.realExperimentVerification === undefined ? {} : { realExperimentVerification: input.realExperimentVerification }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -2150,6 +2167,239 @@ export function replaySavedMechanismComposition(saved: SavedExperiment): SavedMe
     return { status: 'DRIFT', reason: `Odtworzona kompozycja różni się od zapisanej (${record.resultFingerprint} → ${freshFingerprint}).` };
   }
   return { status: 'MATCH', reason: 'Kompozycja mechanizmów odtworzyła się identycznie po realnym ponownym wykonaniu obu ramion.' };
+}
+
+// ---------------------------------------------------------------------------
+// REAL EXPERIMENT VERIFICATION — a real, physical measurement judged against
+// a WorldGraph prediction Genesis already produced and saved.
+// ---------------------------------------------------------------------------
+
+export const REAL_EXPERIMENT_VERIFICATION_CONTRACT_VERSION = '1.0.0';
+
+/**
+ * A REAL_EXPERIMENTAL measurement, judged against a WorldGraph prediction —
+ * the fifth investigation shape, alongside `hypothesisLoop`, `worldDiscovery`,
+ * `parameterInquiry` and `mechanismComposition`.
+ *
+ * The prediction itself is NOT duplicated here: `predictionSourceExperimentId`
+ * links back to the existing `SavedWorldDiscoveryRun` (saved through the
+ * unmodified `saveWorldDiscoveryRunToMemory`) that produced it, the same
+ * choice `mechanismComposition` already makes for `resumedFromMemory`.
+ * `predictedRoundIndex` is always that run's LAST executed round — the same
+ * "decisive round" convention `worldDiscoveryAnalysis`/
+ * `buildWorldDiscoveryEvidenceBundle` already use — so replay can relocate it
+ * deterministically without guessing which round the prediction came from.
+ *
+ * `realRun` is frozen exactly as entered: nothing in this file, including
+ * replay, ever re-executes or edits it. Only the prediction side is ever
+ * re-run.
+ */
+export interface SavedRealExperimentVerification {
+  contractVersion: string;
+  predictionSourceExperimentId: string;
+  predictedRoundIndex: number;
+  hypothesisId: string;
+  request: RealExperimentRequest;
+  realRun: ExperimentRun;
+  verification: PredictionVerification;
+  resultFingerprint: string;
+}
+
+export interface BuildSavedRealExperimentVerificationInput {
+  predictionSourceExperimentId: string;
+  loopResult: DiscoveryLoopResult;
+  /**
+   * PREREGISTERED SEPARATELY from the original hypothesis's own criterion,
+   * and declared BEFORE the real measurement is entered. The original
+   * hypothesis's `criterion` judges baseline-vs-intervention WITHIN the
+   * simulation — a different question from "does the real measurement match
+   * what was predicted." Reusing it here would silently ask the wrong
+   * question. This criterion is instead supplied explicitly by whoever
+   * requests the real experiment — typically `equal-within-tolerance` with a
+   * human-declared `tolerance`, reusing the SAME `FalsificationCriterion` /
+   * `evaluateTwoArmRelation` machinery every other protocol in this codebase
+   * already uses, never a fabricated universal threshold invented here.
+   */
+  verificationCriterion: FalsificationCriterion;
+  request: RealExperimentRequest;
+  realRun: ExperimentRun;
+}
+
+/**
+ * Builds a verification from an ALREADY-COMPLETED WorldGraph prediction (the
+ * loop's own last round) and an already-assembled real measurement
+ * (`createRealExperimentRun`, called by the caller — this function executes
+ * nothing). The comparison itself is `verifyPredictionAgainstRealExperiment`,
+ * unchanged.
+ */
+export function buildSavedRealExperimentVerification(input: BuildSavedRealExperimentVerificationInput): SavedRealExperimentVerification {
+  const { loopResult } = input;
+  const predictedRoundIndex = loopResult.rounds.length - 1;
+  const round = loopResult.rounds[predictedRoundIndex];
+  if (round === undefined) throw new Error('Cannot verify a prediction against a discovery run with zero executed rounds.');
+  if (round.objectiveObserved === null) throw new Error('The predicted round has no numeric objectiveObserved to compare a real measurement against.');
+  const verification = verifyPredictionAgainstRealExperiment({
+    predictedValue: round.objectiveObserved,
+    criterion: input.verificationCriterion,
+    realRun: input.realRun,
+  });
+  return {
+    contractVersion: REAL_EXPERIMENT_VERIFICATION_CONTRACT_VERSION,
+    predictionSourceExperimentId: input.predictionSourceExperimentId,
+    predictedRoundIndex,
+    hypothesisId: round.hypothesisId,
+    request: input.request,
+    realRun: input.realRun,
+    verification,
+    resultFingerprint: predictionVerificationFingerprint(verification),
+  };
+}
+
+/** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
+export function isSavedRealExperimentVerification(value: unknown): value is SavedRealExperimentVerification {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string') return false;
+  if (!nonEmptyString(value.predictionSourceExperimentId)) return false;
+  if (typeof value.predictedRoundIndex !== 'number' || !Number.isInteger(value.predictedRoundIndex) || value.predictedRoundIndex < 0) return false;
+  if (!nonEmptyString(value.hypothesisId)) return false;
+  if (!nonEmptyString(value.resultFingerprint)) return false;
+  if (!isRecordLike(value.request) || !nonEmptyString(value.request.physicalProtocolRef)) return false;
+  if (!isRecordLike(value.realRun)) return false;
+  const provenance = value.realRun.provenance;
+  if (!isRecordLike(provenance) || provenance.dataProvenance !== 'REAL_EXPERIMENTAL') return false;
+  if (!isRecordLike(value.verification) || typeof value.verification.predictedValue !== 'number' || typeof value.verification.assessment !== 'string') return false;
+  return true;
+}
+
+function realExperimentVerificationAnalysis(saved: SavedRealExperimentVerification): SavedExperimentAnalysisBlock[] {
+  const { verification, request } = saved;
+  return [
+    {
+      title: 'Protokół',
+      body: `${request.physicalProtocolRef}${request.hypothesisId ? ` (hipoteza ${request.hypothesisId})` : ''}`,
+      kind: 'real-experiment-protocol',
+    },
+    {
+      title: 'Predykcja vs realny pomiar',
+      body: `Genesis przewidział ${verification.predictedValue} dla "${verification.criterion.metric}"; realny pomiar dał ${verification.observedValue ?? 'brak wartości liczbowej dla tej metryki'}.`,
+      kind: 'real-experiment-comparison',
+    },
+    { title: 'Werdykt', body: verification.message, kind: 'real-experiment-verdict' },
+  ];
+}
+
+/**
+ * Persists a REAL comparison between a WorldGraph prediction and a real,
+ * physical measurement, through `saveExperiment` unchanged — the same seam
+ * every other investigation shape in this file already uses.
+ */
+export function saveRealExperimentVerificationToMemory(saved: SavedRealExperimentVerification): SavedExperiment {
+  const { verification, request } = saved;
+  return saveExperiment({
+    labId: 'real-experiment',
+    experimentId: `real-experiment-verification:${saved.predictionSourceExperimentId}:${saved.resultFingerprint}`,
+    experimentName: `Weryfikacja realnym pomiarem — ${saved.hypothesisId}`,
+    params: {
+      predictionSourceExperimentId: saved.predictionSourceExperimentId,
+      predictedRoundIndex: saved.predictedRoundIndex,
+      hypothesisId: saved.hypothesisId,
+      physicalProtocolRef: request.physicalProtocolRef,
+      metric: verification.criterion.metric,
+    },
+    stats: {
+      predictedValue: verification.predictedValue,
+      ...(verification.observedValue === null ? {} : { observedValue: verification.observedValue }),
+    },
+    realExperimentVerification: saved,
+    analysis: realExperimentVerificationAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: `Realny pomiar fizyczny (protokół ${request.physicalProtocolRef}) porównany z predykcją Genesis dla "${verification.criterion.metric}"; `
+      + `werdykt (${verification.assessment}) dotyczy TEGO jednego pomiaru i TEGO modelu, nie ogólnej prawdy o świecie.`,
+    assumptions: [],
+    epistemicStatus: 'REAL_EXPERIMENTAL',
+  });
+}
+
+export interface SavedRealExperimentVerificationReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Replays a saved Real Experiment verification WITHOUT ever re-executing the
+ * physical measurement — `record.realRun` is reused exactly as stored,
+ * everywhere below. Only the SIMULATED half (the WorldGraph prediction this
+ * verification was originally checked against) is genuinely re-run, through
+ * the same `runAutonomousDiscoveryWithEngines` every other WorldGraph replay
+ * in this file already uses — no second replay mechanism invented for real
+ * data.
+ *
+ * Self-consistency is checked FIRST (own stored fingerprint), then the
+ * prediction's OWN reproducibility (does the base discovery run still
+ * reproduce the fingerprint it was saved with — a prediction that does not
+ * even reproduce itself cannot support a verification), and only then is the
+ * comparison recomputed against the frozen real measurement.
+ */
+export function replaySavedRealExperimentVerification(saved: SavedExperiment): SavedRealExperimentVerificationReplay {
+  const record = saved.realExperimentVerification;
+  if (record === undefined || !isSavedRealExperimentVerification(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera weryfikacji realnym eksperymentem.' };
+  }
+  const selfCheck = predictionVerificationFingerprint(record.verification);
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisana weryfikacja została zmieniona po zapisie: jej treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  if (record.realRun.provenance.dataProvenance !== 'REAL_EXPERIMENTAL') {
+    return { status: 'BLOCKED', reason: 'Zapisany realny przebieg nie jest oznaczony REAL_EXPERIMENTAL — odtworzenie odmawia potraktowania go jako realnego pomiaru.' };
+  }
+  const source = getExperiment(record.predictionSourceExperimentId);
+  const sourceRecord = source?.worldDiscovery;
+  if (source === undefined || sourceRecord === undefined || !isSavedWorldDiscoveryRun(sourceRecord)) {
+    return { status: 'NOT_REPRODUCIBLE', reason: `Źródłowy przebieg predykcji "${record.predictionSourceExperimentId}" nie jest już dostępny w pamięci.` };
+  }
+  if (sourceRecord.resultKind !== 'HYPOTHESIS_LOOP' || sourceRecord.loopResult === undefined) {
+    return { status: 'BLOCKED', reason: 'Źródłowy przebieg predykcji nie jest pętlą hipotez world-model.' };
+  }
+  const catalog = resolveWorldLeverCatalog(sourceRecord.catalogId);
+  if (!catalog) {
+    return { status: 'NOT_REPRODUCIBLE', reason: `Katalog "${sourceRecord.catalogId}" nie jest już zadeklarowany w Genesis.` };
+  }
+  const intent = parseWorldDiscoveryGoal(sourceRecord.goal, catalog);
+  const plan = buildWorldDiscoveryPlan(intent, catalog);
+  if ('error' in plan) {
+    return { status: 'BLOCKED', reason: `Cel przestał być czytelny dla tego katalogu: ${plan.error}` };
+  }
+  const excluded = new Set(sourceRecord.resumedFromMemory?.skippedHypothesisIds ?? []);
+  const filteredHypotheses = excluded.size === 0
+    ? plan.hypotheses
+    : plan.hypotheses.filter((h) => !excluded.has(h.hypothesisId));
+  const rerunInput: DiscoveryLoopInput = {
+    ...plan,
+    hypotheses: filteredHypotheses.length > 0 ? filteredHypotheses : plan.hypotheses,
+  };
+  const freshResult = runAutonomousDiscoveryWithEngines(rerunInput).result;
+  const freshResultFingerprint = discoveryResultFingerprint(freshResult);
+  if (freshResultFingerprint !== sourceRecord.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Predykcja bazowa nie odtworzyła się identycznie (${sourceRecord.resultFingerprint} → ${freshResultFingerprint}) — weryfikacja realnym pomiarem opierałaby się na predykcji, która się nie odtwarza.` };
+  }
+  const freshRound = freshResult.rounds[record.predictedRoundIndex];
+  if (freshRound === undefined || freshRound.objectiveObserved === null) {
+    return { status: 'NOT_REPRODUCIBLE', reason: 'Odtworzona pętla nie ma już rundy o tym indeksie z liczbową wartością przewidzianą.' };
+  }
+  // NEVER re-executed: the same stored `record.realRun`, unchanged, is what the
+  // fresh prediction is compared against below — and the SAME preregistered
+  // `record.verification.criterion`, never re-derived from anything that
+  // could have changed since save.
+  const freshVerification = verifyPredictionAgainstRealExperiment({
+    predictedValue: freshRound.objectiveObserved,
+    criterion: record.verification.criterion,
+    realRun: record.realRun,
+  });
+  const freshFingerprint = predictionVerificationFingerprint(freshVerification);
+  if (freshFingerprint !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Odtworzona weryfikacja różni się od zapisanej (${record.resultFingerprint} → ${freshFingerprint}): ${freshVerification.message}` };
+  }
+  return { status: 'MATCH', reason: 'Predykcja odtworzyła się identycznie, a porównanie z tym samym, nietkniętym realnym pomiarem dało ten sam werdykt.' };
 }
 
 export function listExperiments(): SavedExperiment[] {

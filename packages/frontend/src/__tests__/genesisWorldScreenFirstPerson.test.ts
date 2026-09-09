@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { GenesisWorldSim3D } from '../components/visual-simulation/GenesisWorldScreen';
 import { getFrameState } from '../core/worldModel/bridge/worldFrameState';
@@ -444,5 +444,100 @@ describe('GenesisWorldSim3D — PLAY A LIVE EXPERIMENT ROUND (StrategyRun.rounds
   it('getCurrentRoundView() is null before any run has been played', () => {
     const { sim } = buildInitializedSim();
     expect(sim.getCurrentRoundView()).toBeNull();
+  });
+});
+
+/**
+ * VOICE GUIDE — `speechSynthesis`/`SpeechSynthesisUtterance` are real browser APIs with no
+ * meaningful behaviour in this (Node, no jsdom) test environment: every other test file in this repo
+ * simply never sets `window` at all, and `speakNarration()`'s own `typeof window === 'undefined'`
+ * guard makes that a clean, silent no-op — see that method's own doc. These tests stub a minimal
+ * `window.speechSynthesis`/`SpeechSynthesisUtterance` (the same class of test double
+ * `genesisNarration.test.ts` and this file's own `beforeAll` already use for `document`) so the
+ * WIRING — what text gets composed, when it speaks, when it stays silent, when it cancels — is
+ * asserted against real `GenesisMatrixView`/`narrateInvestigation` output, not against the real audio
+ * API itself (which no test anywhere in this repo exercises, by `genesisNarration.ts`'s own design).
+ */
+describe('GenesisWorldSim3D — VOICE GUIDE (speechSynthesis narration on stageRound)', () => {
+  let spoken: string[] = [];
+  let cancelCalls = 0;
+
+  beforeEach(() => {
+    spoken = [];
+    cancelCalls = 0;
+    (globalThis as { window?: unknown }).window = {
+      speechSynthesis: {
+        cancel: () => { cancelCalls += 1; },
+        speak: (utterance: { text: string }) => { spoken.push(utterance.text); },
+      },
+    };
+    (globalThis as { SpeechSynthesisUtterance?: unknown }).SpeechSynthesisUtterance = class {
+      readonly text: string;
+      constructor(text: string) { this.text = text; }
+    };
+  });
+
+  afterEach(() => {
+    delete (globalThis as { window?: unknown }).window;
+    delete (globalThis as { SpeechSynthesisUtterance?: unknown }).SpeechSynthesisUtterance;
+  });
+
+  it('speaks the lever\'s real declared action label plus the real round narration, and nothing before a run exists', () => {
+    const { sim } = buildInitializedSim();
+    expect(spoken).toHaveLength(0);
+
+    const run = sim.runStrategyDiscovery();
+    expect(run).not.toBeNull();
+    expect(spoken.length).toBeGreaterThan(0);
+
+    const view = sim.getCurrentRoundView();
+    // The physical half — the real lever's own `sceneForm.actionLabel`, never generated here.
+    expect(spoken[0]).toContain(view!.actionLabel);
+    // The scientific half — the real round's own `why`, from `narrateRound()`'s own text.
+    expect(spoken[0]).toContain(view!.why);
+  });
+
+  it('nextRound() speaks only the NEW lines — never repeats what an earlier round already said', () => {
+    const { sim } = buildInitializedSim();
+    const run = sim.runStrategyDiscovery()!;
+    if (run.rounds.length < 2) return; // only meaningful once there are 2+ real rounds to diff between
+    const afterRound1Count = spoken.length;
+    const round1Utterance = spoken[spoken.length - 1];
+
+    sim.nextRound();
+
+    expect(spoken.length).toBeGreaterThan(afterRound1Count);
+    expect(spoken[spoken.length - 1]).not.toBe(round1Utterance);
+  });
+
+  it('prevRound() back to an already-narrated round stays silent — nothing new to say', () => {
+    const { sim } = buildInitializedSim();
+    const run = sim.runStrategyDiscovery()!;
+    if (run.rounds.length < 2) return;
+    sim.nextRound();
+    const afterRound2Count = spoken.length;
+
+    sim.prevRound();
+
+    expect(spoken.length).toBe(afterRound2Count);
+  });
+
+  it('dismissStrategyRun() cancels any pending speech', () => {
+    const { sim } = buildInitializedSim();
+    sim.runStrategyDiscovery();
+
+    sim.dismissStrategyRun();
+
+    expect(cancelCalls).toBeGreaterThan(0);
+  });
+
+  it('never throws when speechSynthesis/SpeechSynthesisUtterance are absent — the headless/no-audio case', () => {
+    delete (globalThis as { window?: unknown }).window;
+    delete (globalThis as { SpeechSynthesisUtterance?: unknown }).SpeechSynthesisUtterance;
+    const { sim } = buildInitializedSim();
+
+    expect(() => sim.runStrategyDiscovery()).not.toThrow();
+    expect(() => sim.nextRound()).not.toThrow();
+    expect(() => sim.dismissStrategyRun()).not.toThrow();
   });
 });

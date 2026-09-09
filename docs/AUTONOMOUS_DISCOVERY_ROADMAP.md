@@ -170,7 +170,7 @@ Additive to `Hypothesis`, not a new type:
 | **P2** | ObjectiveReducer verdict pipeline | — | C1 layer landed; `discoveryLoop` wiring outstanding (C3). |
 | **P3** | Wire `deriveAlternativeCriteria` into the round loop | P1, P2 | **Smallest real step to autonomy in the whole roadmap.** The code exists; it needs a call site, cross-round fingerprint accumulation, and preregistration of the derived criterion. |
 | **P4** | Declared generation space per domain + capability-gated candidate admission | P3 | Lets a generator propose beyond relation-flip without inventing anything. |
-| **P5** | Model insufficiency as a first-class outcome | P3, P4 | "The declared space does not explain this" — a result, not a failure. |
+| **P5** | Model insufficiency as a first-class outcome | P3, P4 | **DONE** (`modelSufficiency.ts`) — `DECLARED_SPACE_INSUFFICIENT`, with the declared-space-not-the-model caveat; threaded through the Matrix and voiced by narration. Note: the user's numbering calls this "P4"; it is the same capability. |
 | **P6** | Model-class proposal + discriminating experiment between models | P5 | The genuinely hard part. Do not start early. |
 | **P7** | World ↔ inquiry calibration (the composition named in `TWO_AUTONOMOUS_LOOPS_DECISION.md` §5) | P1 | Unlocks parameter identification *on a stateful world*. |
 

@@ -1931,6 +1931,21 @@ button.fp-lab-prompt { pointer-events: auto; cursor: pointer; appearance: none; 
 .gx-matrix-competing { margin-top: 0.15rem; padding: 0.35rem 0.5rem; border-radius: 0.4rem; background: rgba(255, 140, 60, 0.12); border: 1px solid rgba(255, 140, 60, 0.35); }
 .gx-matrix-competing strong { display: block; font-size: 0.74rem; color: #ffb877; margin-bottom: 0.2rem; }
 .gx-matrix-competing ul { margin: 0; padding-left: 1.1rem; font-size: 0.72rem; }
+.gx-matrix-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.gx-matrix-badge { flex-shrink: 0; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; padding: 0.12rem 0.4rem; border-radius: 0.25rem; background: rgba(126, 179, 255, 0.16); border: 1px solid rgba(126, 179, 255, 0.4); color: #9fd0ff; }
+.gx-matrix-hyp-list { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.15rem 0 0; padding: 0; list-style: none; }
+.gx-matrix-hyp { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.2rem 0.45rem; border-radius: 0.3rem; font-size: 0.72rem; }
+.gx-matrix-hyp code { opacity: 0.85; }
+.gx-matrix-hyp span { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; }
+.gx-matrix-hyp-supported { background: rgba(110, 231, 160, 0.1); border: 1px solid rgba(110, 231, 160, 0.35); }
+.gx-matrix-hyp-supported span { color: #6ee7a0; }
+.gx-matrix-hyp-falsified { background: rgba(244, 124, 124, 0.1); border: 1px solid rgba(244, 124, 124, 0.35); }
+.gx-matrix-hyp-falsified span { color: #f47c7c; }
+.gx-matrix-hyp-untested { background: rgba(141, 151, 180, 0.08); border: 1px solid rgba(141, 151, 180, 0.3); }
+.gx-matrix-hyp-untested span { color: #8d97b4; }
+.gx-matrix-insufficient { margin-top: 0.15rem; padding: 0.35rem 0.5rem; border-radius: 0.4rem; background: rgba(126, 179, 255, 0.1); border: 1px solid rgba(126, 179, 255, 0.35); }
+.gx-matrix-insufficient strong { display: block; font-size: 0.74rem; color: #9fd0ff; margin-bottom: 0.2rem; }
+.gx-matrix-decided { font-weight: 700; font-size: 0.78rem; color: #e6eaf5; }
 /* LIVING WORLD — a minimal, always-visible-once-`entered` touch D-pad: the mobile equivalent of
    WASD, since a touch device has no physical keys for `MOVE_KEYS` to map from. Bottom-left, out of
    the way of the crosshair/prompt (center) and the existing sim-transport controls (below the stage).

@@ -181,3 +181,103 @@ that the Genesis run itself is a simulation, not the cited experiment.
 Conclusion: the §4 boundary holds today. Nothing to fix. Re-run this grep
 whenever a new domain, evidence field, or admission status is added — it is
 cheap and the one boundary this whole document exists to protect.
+
+---
+
+## 7. The three standing priorities — and where each actually stands
+
+Every new feature is now judged against these three. The rule, applied before
+starting anything: **does this move Genesis closer to autonomous discovery, real
+validation, or product readiness?** If not, it does not outrank them.
+
+What follows is not a restatement of the brief — it is what each priority looks
+like measured against the code as it stands, because a priority list is only
+useful if it names the *next* missing thing rather than the whole mountain.
+
+### Priority 1 — Autonomous scientific discovery
+
+Success is defined as: `A ❌ B ❌ C ❌ → Genesis creates D → D is automatically
+tested → D ✅/❌ → the result changes the next choice.`
+
+Measured against `2ec96dd`, link by link:
+
+| link | status |
+|---|---|
+| detects its own space is insufficient | **done** — `DECLARED_SPACE_INSUFFICIENT` is now a precondition, not a report |
+| generates a new explanation | **done** — MECHANISM (`~RELATION_FLIP`) and PARAMETER (bracketed value) |
+| runs the test itself | **done** — `runInquiryWithGeneration`, unprompted, on evidence the derivation never saw |
+| judges the result | **done** — a real verdict from a real second inquiry |
+| **updates memory** | **MISSING** |
+| **the result changes the next choice** | **MISSING, because of the line above** |
+
+The gap is small, specific, and mine: `runInquiryWithGeneration` calls
+`runAutonomousInquiryWithRuns` for both the first inquiry and the follow-up —
+not `runInquiryAndRemember`. So the derived hypothesis's verdict is never
+persisted. A later inquiry into the same system starts blind to it, and
+`memoryNarrowedHypotheses` cannot narrow on a discovery Genesis itself made.
+The loop currently *generates and tests* without *learning*.
+
+A second, untested branch, worth naming before it is assumed: every fixture so
+far ends `D ✅`. What happens when the derived value is ALSO falsified —
+does a second derivation follow, and does it refuse to loop forever? The
+success definition says `D ✅/❌`, so both outcomes have to be real.
+
+**Next step, and it is one focused change:** persist the generated
+investigation through the path that already exists, so a discovery Genesis made
+becomes something Genesis remembers. That closes the last two rows above.
+
+### Priority 2 — Real-world validation
+
+The three-way distinction the brief asks for — SIMULATED vs REFERENCE vs REAL
+EXPERIMENTAL — is **already necessary today, not once hardware exists**, and
+the place it belongs already exists.
+
+`core/dataSource.ts` declares provenance per dataset, but with a boolean:
+`isSynthetic: true | false`. Two real labs already declare `isSynthetic: false`
+(`universe-solar-system`, `nuclear-chart`), carrying published values. So
+REFERENCE DATA is in the repository right now, and the type system cannot
+distinguish it from a measurement Genesis commissioned to test its own
+prediction — because that third kind does not exist yet. The moment it does,
+the boolean silently conflates them, which is exactly the failure §4 forbids.
+
+Note also that `ConfirmationLevel` (`core/citation.ts`) does NOT cover this: it
+grades how well-established the *science* is (`confirmed` … `fiction`), not
+where a *number* came from. Two orthogonal axes; merging them would lose both.
+
+**Minimal first step, and it is not hardware:** widen that boolean into a named
+provenance — simulated / reference / real-experimental — BEFORE any real
+experimental data can arrive, so the category cannot be conflated by default.
+Cheap, safe, and it makes the honesty boundary structural rather than
+documentary. The prediction → real measurement → compare → update pipeline is
+the step after, and needs a domain chosen for whether an outside measurement is
+genuinely obtainable.
+
+### Priority 3 — Product / funding readiness
+
+The flagship ask — *"Genesis, build a Digital Twin of Dubai and investigate a
+potential epidemic"* — is honestly further away than the other two, and the
+reason is precise rather than vague.
+
+Natural-language → experiment already exists and is real:
+`parseWorldDiscoveryGoal` turns a stated goal into an objective metric,
+direction and hypothesis set. But it works by phrase-matching against a
+**declared lever catalog** — `catalog.metricPhrases`. It cannot recognise a
+metric or a mechanism no catalog declares, and it must not be made to: that is
+the same refusal that keeps admission honest. So "Dubai" is not a parser
+problem. It is a *catalog* problem: a city-scale world with declared levers,
+metrics and a solver behind each.
+
+**The honest framing for a demo:** the pipeline NL → intent → investigation →
+competing models → information gain → evidence → replay is real end to end
+today on the domains that have catalogs. A demo should be built on one of
+those, extended to the depth an investor question needs — not on a new city
+promised before its catalog exists.
+
+### The ordering this implies
+
+Priority 1's remaining gap is **one focused change** (persist the generated
+investigation). Priority 2's first step is **one small type change** made
+before it becomes urgent. Priority 3 is **many steps** and depends on a real
+catalog. So the order is not just importance — it is also that the first two
+are cheap and the third is not, and doing them first makes the third honest
+when it comes.

@@ -1,7 +1,10 @@
 import {
   buildSavedParameterInquiry,
+  buildSavedResearchChainManifest,
   saveParameterInquiryToMemory,
+  saveResearchChainManifestToMemory,
   type SavedExperiment,
+  type SavedResearchChainStep,
 } from '../scienceMemory';
 import {
   runDiscovery,
@@ -311,13 +314,22 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     why = selection.why;
   }
 
-  return {
+  const result: ResearchChainResult = {
     contractVersion: RESEARCH_CHAIN_CONTRACT_VERSION,
     steps,
     selfChosenSteps: Math.max(0, steps.length - 1),
     stoppedBecause,
     terminalStatus,
   };
+  bankResearchChainManifest('PARAMETER', steps.map((s) => ({
+    step: s.step,
+    question: s.question,
+    kind: s.kind,
+    why: s.why,
+    ranSuccessfully: s.outcome.status === 'RAN',
+    savedExperimentIds: s.remembered.map((e) => e.id),
+  })), result.selfChosenSteps, result.stoppedBecause, result.terminalStatus);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -439,13 +451,43 @@ export function runMechanismResearchChain(request: MechanismRequest, maxSteps = 
     break;
   }
 
-  return {
+  const result: MechanismResearchChainResult = {
     contractVersion: RESEARCH_CHAIN_CONTRACT_VERSION,
     steps,
     selfChosenSteps: Math.max(0, steps.length - 1),
     stoppedBecause,
     terminalStatus,
   };
+  bankResearchChainManifest('MECHANISM', steps.map((s) => ({
+    step: s.step,
+    question: s.question,
+    kind: s.kind,
+    why: s.why,
+    ranSuccessfully: s.outcome.status === 'RAN',
+    savedExperimentIds: s.remembered.savedExperimentId === null ? [] : [s.remembered.savedExperimentId],
+  })), result.selfChosenSteps, result.stoppedBecause, result.terminalStatus);
+  return result;
+}
+
+/**
+ * Banks the completed chain itself as one `SavedResearchChainManifest`
+ * (`scienceMemory.ts`) — the one place "Genesis chose this step itself,
+ * because of what the previous step left open" survives a page reload. A
+ * chain that never ran a step successfully (refused on step 1) has nothing
+ * worth banking as a chain — its own step is already the whole story via
+ * `remembered`, so this only banks when at least one step really ran.
+ */
+function bankResearchChainManifest(
+  chainShape: 'PARAMETER' | 'MECHANISM',
+  steps: readonly SavedResearchChainStep[],
+  selfChosenSteps: number,
+  stoppedBecause: string,
+  terminalStatus: ResearchChainTerminalStatus,
+): void {
+  if (!steps.some((s) => s.ranSuccessfully)) return;
+  saveResearchChainManifestToMemory(
+    buildSavedResearchChainManifest({ chainShape, steps, selfChosenSteps, stoppedBecause, terminalStatus }),
+  );
 }
 
 /**

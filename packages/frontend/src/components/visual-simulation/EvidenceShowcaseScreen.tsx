@@ -51,6 +51,8 @@ function ReplayVerdictBlock({ replay }: { replay: CaseStudyReplay }) {
 
 function provenanceExplanation(caseStudy: Pick<CaseStudy, 'kind' | 'recordProvenance'>): string {
   switch (caseStudy.kind) {
+    case 'RESEARCH_CHAIN':
+      return ' Every step above, including which question came next, is SIMULATED — no external measurement exists for this record. What makes this case study different is not its provenance but its shape: the STEPS themselves were chosen by Genesis, one at a time, from what the previous step left open.';
     case 'REAL_VERIFICATION': {
       const sourceLabel = caseStudy.recordProvenance === 'REFERENCE'
         ? 'REFERENCE (a cited, published figure — not a fresh physical reading)'

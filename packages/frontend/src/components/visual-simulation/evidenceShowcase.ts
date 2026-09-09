@@ -2,8 +2,10 @@ import {
   getExperiment,
   listExperiments,
   isSavedRealExperimentVerification,
+  isSavedResearchChainManifest,
   isSavedWorldDiscoveryRun,
   replaySavedRealExperimentVerification,
+  replaySavedResearchChainManifest,
   replaySavedWorldDiscoveryRun,
   type SavedExperiment,
 } from '../../core/scienceMemory';
@@ -18,12 +20,17 @@ import type { DataProvenance } from '../../core/dataProvenance';
  * `evidencePackStore.ts` already produced, or from a replay verdict one of those modules already knows
  * how to compute — no second judge, no new tolerance, no fabricated step. This is the one-page
  * "pytanie -> hipoteza -> kryterium -> dane -> werdykt -> provenance -> replay" audit chain the C2
- * "EVIDENCE & REPLAY SHOWCASE" directive asks for, built ENTIRELY from the three investigation shapes
+ * "EVIDENCE & REPLAY SHOWCASE" directive asks for, built ENTIRELY from the four investigation shapes
  * that already carry that whole chain:
  *
+ *   - `researchChain` (`core/agent/researchChain.ts`'s banked `SavedResearchChainManifest`): Genesis
+ *     choosing its own next step, more than once, and why — the only shape whose "steps" ARE the case
+ *     study rather than one fixed question/hypothesis/criterion/data/verdict shape. Each step's own
+ *     underlying record already carries its own full science; this shape's whole job is showing that
+ *     the STEPS WERE CHOSEN, not just that they happened.
  *   - `realExperimentVerification` (C1's Real Experiment E2E): a REAL, physical measurement judged
- *     against a frozen SIMULATED prediction. The richest case — both provenances appear side by side,
- *     and replay genuinely RE-EXECUTES the simulated half live, in the browser.
+ *     against a frozen SIMULATED prediction. The richest single-step case — both provenances appear
+ *     side by side, and replay genuinely RE-EXECUTES the simulated half live, in the browser.
  *   - `worldDiscovery` with a non-null `evidence`: a completed, fully SIMULATED Discovery search with
  *     its own real Evidence Bundle. Shown honestly as SIMULATED end to end. Replay also re-executes live.
  *   - `evidencePackId` (the older Fabric-router `ScientificEvidencePack`, `ExperimentPilotScreen.tsx`'s
@@ -32,10 +39,13 @@ import type { DataProvenance } from '../../core/dataProvenance';
  *     (`getStoredEvidencePackReplayVerdict`'s own doc comment: "a snapshot disclosure, not proof of a
  *     fresh replay") — never silently presented as freshly recomputed, hence `CaseStudyReplay.computedLive`.
  *
- * Priority where a record could technically carry more than one shape: `realExperimentVerification` >
- * `worldDiscovery` > `evidencePackId`, consistently across `isCaseStudyCandidate`, `buildCaseStudy`,
- * `replayCaseStudy` and the sort order below — the same three-way priority everywhere, never decided
- * differently in two places.
+ * Priority where a record could technically carry more than one shape: `researchChain` >
+ * `realExperimentVerification` > `worldDiscovery` > `evidencePackId`, consistently across
+ * `isCaseStudyCandidate`, `buildCaseStudy`, `replayCaseStudy` and the sort order below — the same
+ * four-way priority everywhere, never decided differently in two places. In practice a chain manifest
+ * is always saved as its OWN record (never combined with the other three on one `SavedExperiment`), so
+ * this priority only ever decides which CANDIDATE is the default selection, not which shape a single
+ * record renders as.
  *
  * Every other saved shape (e.g. a bare `scenario` run with no Evidence Bundle of its own) is not a
  * candidate — no placeholder or fixture is ever substituted for a real bundle.
@@ -56,7 +66,7 @@ export interface CaseStudyReplay {
 }
 
 export interface CaseStudy {
-  readonly kind: 'REAL_VERIFICATION' | 'SIMULATED_DISCOVERY' | 'LEGACY_EVIDENCE_PACK';
+  readonly kind: 'RESEARCH_CHAIN' | 'REAL_VERIFICATION' | 'SIMULATED_DISCOVERY' | 'LEGACY_EVIDENCE_PACK';
   readonly experimentId: string;
   readonly title: string;
   readonly createdAt: string;
@@ -71,6 +81,7 @@ function hasResolvableEvidencePack(saved: SavedExperiment): boolean {
 }
 
 export function isCaseStudyCandidate(saved: SavedExperiment): boolean {
+  if (saved.researchChain !== undefined && isSavedResearchChainManifest(saved.researchChain)) return true;
   if (saved.realExperimentVerification !== undefined && isSavedRealExperimentVerification(saved.realExperimentVerification)) return true;
   if (saved.worldDiscovery !== undefined && isSavedWorldDiscoveryRun(saved.worldDiscovery) && saved.worldDiscovery.evidence !== null) return true;
   if (hasResolvableEvidencePack(saved)) return true;
@@ -78,6 +89,7 @@ export function isCaseStudyCandidate(saved: SavedExperiment): boolean {
 }
 
 function candidateRank(saved: SavedExperiment): number {
+  if (saved.researchChain !== undefined) return 3;
   if (saved.realExperimentVerification !== undefined) return 2;
   if (saved.worldDiscovery !== undefined) return 1;
   return 0;
@@ -92,6 +104,52 @@ export function listCaseStudyCandidates(): readonly SavedExperiment[] {
       if (rankDiff !== 0) return rankDiff;
       return b.createdAt.localeCompare(a.createdAt);
     });
+}
+
+/**
+ * The one shape whose "steps" ARE the case study: each entry below is one
+ * research-chain step, in the order Genesis actually ran them, ending with
+ * the terminal verdict. Every step's OWN science (hypotheses tested, data,
+ * falsification) already has its own full case study, reachable through
+ * this same screen as its own candidate record — this rendering does not
+ * repeat any of that, only the fact that the step was CHOSEN and why.
+ */
+function researchChainCaseStudy(saved: SavedExperiment): CaseStudy | null {
+  const record = saved.researchChain;
+  if (record === undefined || !isSavedResearchChainManifest(record)) return null;
+
+  const steps: CaseStudyStep[] = record.steps.map((step) => ({
+    key: `chain-step-${step.step}`,
+    label: step.step === 1 ? 'Question' : `Step ${step.step} — Genesis's own choice`,
+    lines: [
+      step.question,
+      step.step === 1 ? 'The question the caller asked.' : `Why this step: ${step.why}`,
+      step.ranSuccessfully ? `Ran (${step.kind}).` : `Refused (${step.kind}).`,
+      step.savedExperimentIds.length > 0
+        ? `Own Science Memory record(s): ${step.savedExperimentIds.join(', ')} — each replayable on its own.`
+        : 'No Science Memory record for this step.',
+    ],
+  }));
+
+  steps.push({
+    key: 'verdict',
+    label: 'Verdict',
+    lines: [
+      record.terminalStatus,
+      record.stoppedBecause,
+      `${record.selfChosenSteps} of ${record.steps.length} step(s) chosen by Genesis itself, from what the previous step left open — never the caller's.`,
+    ],
+  });
+
+  return {
+    kind: 'RESEARCH_CHAIN',
+    experimentId: saved.id,
+    title: saved.experimentName,
+    createdAt: saved.createdAt,
+    recordProvenance: 'SIMULATED',
+    honestyNote: saved.honestyNote,
+    steps,
+  };
 }
 
 function realVerificationCaseStudy(saved: SavedExperiment): CaseStudy | null {
@@ -279,9 +337,9 @@ function legacyEvidencePackCaseStudy(saved: SavedExperiment): CaseStudy | null {
   };
 }
 
-/** Prefers the real-experiment shape when present, then SIMULATED discovery, then a legacy Evidence Pack — the same priority `listCaseStudyCandidates` sorts by. */
+/** Prefers a research chain manifest when present, then the real-experiment shape, then SIMULATED discovery, then a legacy Evidence Pack — the same priority `listCaseStudyCandidates` sorts by. */
 export function buildCaseStudy(saved: SavedExperiment): CaseStudy | null {
-  return realVerificationCaseStudy(saved) ?? simulatedDiscoveryCaseStudy(saved) ?? legacyEvidencePackCaseStudy(saved);
+  return researchChainCaseStudy(saved) ?? realVerificationCaseStudy(saved) ?? simulatedDiscoveryCaseStudy(saved) ?? legacyEvidencePackCaseStudy(saved);
 }
 
 /**
@@ -292,6 +350,9 @@ export function buildCaseStudy(saved: SavedExperiment): CaseStudy | null {
  * already computed at save time — `computedLive` tells the caller which happened.
  */
 export function replayCaseStudy(saved: SavedExperiment): CaseStudyReplay {
+  if (saved.researchChain !== undefined && isSavedResearchChainManifest(saved.researchChain)) {
+    return { ...replaySavedResearchChainManifest(saved), computedLive: true };
+  }
   if (saved.realExperimentVerification !== undefined && isSavedRealExperimentVerification(saved.realExperimentVerification)) {
     return { ...replaySavedRealExperimentVerification(saved), computedLive: true };
   }

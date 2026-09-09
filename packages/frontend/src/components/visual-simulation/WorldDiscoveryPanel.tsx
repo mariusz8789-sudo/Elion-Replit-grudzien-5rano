@@ -11,6 +11,7 @@ import {
   type WorldDiscoveryMemoryUse,
   type WorldDiscoveryRememberedState,
 } from '../../core/agent/worldDiscoverySession';
+import { runMechanismResearchChain, type MechanismResearchChainResult } from '../../core/agent/researchChain';
 import {
   GENESIS_FLOOD_CATALOG,
   parseWorldDiscoveryGoal,
@@ -113,6 +114,13 @@ export function WorldDiscoveryPanel({
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<readonly string[]>([]);
   const [replayChecks, setReplayChecks] = useState<Readonly<Record<string, SavedWorldDiscoveryReplay>>>({});
+  // A CHAIN run is a separate mode from the single-shot `state` above, not a
+  // third value folded into it: `runMechanismResearchChain` already calls
+  // `runMechanismDiscoveryAndRemember` (the same real save/evidence/replay
+  // seam `run()` uses) once per step internally, so this holds only the
+  // chain's OWN result — no second discovery engine, no second persistence.
+  const [chainResult, setChainResult] = useState<MechanismResearchChainResult | null>(null);
+  const [chainRunning, setChainRunning] = useState(false);
 
   /** Sets state AND, when this run reached a real outcome (not IDLE/RUNNING), reports it upward —
    * the one place both effects happen, so no caller of `run()` below has to remember both. */
@@ -148,6 +156,28 @@ export function WorldDiscoveryPanel({
     // so saving afterwards is the other half of the same seam, not a separate
     // side effect the panel would otherwise have to remember to trigger.
     setTimeout(() => finish(runWorldDiscoveryAndRemember(trimmed, forCatalogId)), 0);
+  };
+
+  /**
+   * Runs the SAME goal as a continuing chain instead of a single search: Genesis
+   * keeps asking its own next question — chosen from what the previous step left
+   * open, never a hardcoded second goal — until it settles, gets blocked, runs out
+   * of a runnable next question, or spends the step budget. No admission pre-check
+   * here: `runMechanismResearchChain` already runs one internally, per step, and
+   * reports a refusal as `terminalStatus: 'BLOCKED'` with the exact reason, the
+   * same honest-refusal discipline `AdmissionRefusal`/`DiscoveryRefusal` already
+   * render for the single-shot path above.
+   */
+  const runChain = (text: string, forCatalog: WorldLeverCatalog) => {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return;
+    setChainRunning(true);
+    setChainResult(null);
+    setTimeout(() => {
+      const result = runMechanismResearchChain({ shape: 'MECHANISM', goal: trimmed, catalog: forCatalog }, 4);
+      setChainResult(result);
+      setChainRunning(false);
+    }, 0);
   };
 
   // DEMO MODE — runs exactly once per mount, through the same `run()` above, never a second
@@ -270,7 +300,29 @@ export function WorldDiscoveryPanel({
         >
           {state.kind === 'RUNNING' ? 'Searching…' : 'Search'}
         </button>
+        <button
+          type="button"
+          className="chip-btn"
+          disabled={goal.trim().length === 0 || state.kind === 'RUNNING' || chainRunning}
+          onClick={() => runChain(goal, catalog)}
+          data-testid="wd-run-chain"
+        >
+          {chainRunning ? 'Genesis is continuing…' : 'Run as chain (Genesis picks what’s next)'}
+        </button>
       </form>
+      <p className="gsc-caption">
+        A chain runs this goal, then lets Genesis choose its own next question from what that step left
+        open — up to 4 steps — instead of stopping after one search.
+      </p>
+
+      {chainRunning && (
+        <p className="wd-running" role="status">
+          Running a continuing chain — each step is a real experiment, saved to Science Memory as it runs.
+        </p>
+      )}
+      {chainResult && (
+        <ResearchChainResultView result={chainResult} onView={(id) => setViewingId(id)} />
+      )}
 
       {state.kind === 'RUNNING' && (
         <p className="wd-running" role="status">
@@ -689,6 +741,57 @@ function MemoryAndEvidenceFooter({
         <p className="gsc-caption">Not re-verified since it was saved — use “Verify replay” in History to check now.</p>
       )}
     </section>
+  );
+}
+
+/**
+ * Renders a completed `MechanismResearchChainResult` step by step: which
+ * question ran, whether it was the caller's own (step 1) or Genesis's own
+ * choice, why, and how it ended. Computes nothing — `terminalStatus`/
+ * `stoppedBecause`/`why` are read verbatim from the chain, the same
+ * discipline `DiscoveryResultView` already holds for a single search.
+ * "View" opens a step's own saved record through the SAME history-viewer
+ * (`viewingId`/`SavedRunView`) the panel's history list already uses below
+ * — not a second record viewer for chain steps specifically.
+ */
+function ResearchChainResultView({
+  result,
+  onView,
+}: {
+  result: MechanismResearchChainResult;
+  onView: (savedExperimentId: string) => void;
+}) {
+  return (
+    <div className="wd-result wd-chain-result" data-testid="wd-chain-result">
+      <p className="wd-summary">
+        {result.selfChosenSteps} of {result.steps.length} step(s) chosen by Genesis itself — stopped as{' '}
+        <b className={`wd-verdict wd-${result.terminalStatus}`}>{result.terminalStatus}</b>.
+      </p>
+      <ol className="wd-rounds">
+        {result.steps.map((step) => {
+          const savedId = step.remembered.savedExperimentId;
+          return (
+            <li key={step.step}>
+              <b>Step {step.step}</b> ({step.kind}) — “{step.question}”
+              <span className="gsc-caption wd-reason"> {step.why}</span>
+              <span className="wd-effect">
+                {step.outcome.status === 'RAN' ? ' ran.' : ` refused: ${step.outcome.admission.why}`}
+              </span>
+              {savedId && (
+                <button type="button" className="chip-btn tiny" onClick={() => onView(savedId)}>
+                  View this step
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="gsc-caption">Stopped because: {result.stoppedBecause}</p>
+      <details className="wd-machine">
+        <summary>Machine-readable record</summary>
+        <pre className="wd-pre">{JSON.stringify(result, null, 2)}</pre>
+      </details>
+    </div>
   );
 }
 

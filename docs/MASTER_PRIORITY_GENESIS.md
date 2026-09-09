@@ -314,3 +314,27 @@ formuły, honest `NOT_MODELLED`/capability-seam tam gdzie QN nie ma
 realnego dostępu do API literatury — dokładnie ta sama dyscyplina co
 Real Experiment Contract. C1 audytuje i wpina wynik dopiero po weryfikacji
 zgodności z tą zasadą, nigdy automatycznie.
+
+### ⚠️ UWAGA — wynik QN (Multi-Model Tournament) trafił przypadkowo bezpośrednio do C3
+
+Użytkownik przez pomyłkę wkleił output Qwena (moduł Multi-Model
+Tournament, zadanie zlecone przez C1 w sesji czatu) bezpośrednio do C3,
+z pominięciem audytu C1. **C3: jeśli budujesz/commitujesz cokolwiek na
+podstawie tego outputu, PRZED commitem sprawdź samodzielnie dokładnie te
+same warunki, które C1 zlecił Qwenowi audytować:**
+- żaden "confidence score"/"tournament rating" bez jawnie zapisanej
+  formuły (zero Elo, zero wag znikąd),
+- cykl w relacji zgody (A zgadza się z B, B z C, A NIE zgadza się z C)
+  musi dać `INCONCLUSIVE_CYCLE`, nigdy wymuszonego zwycięzcy — sprawdź
+  testem na fixture, który realnie konstruuje taki cykl,
+- < 2 ukończone porównania → zawsze `INCONCLUSIVE_INSUFFICIENT_DATA`,
+- reuse WYŁĄCZNIE istniejącego kontraktu `ModelVsModelComparison`/
+  `ModelAgreementVerdict`/`verdictOf` z `core/experimentFabric/
+  modelVsModelCompare.ts` — zero nowego równoległego enuma/typu.
+
+Jeśli C3 już to zcommitował PRZED przeczytaniem tej notatki: C1 i tak
+przejdzie przez to przy najbliższej synchronizacji gałęzi (standardowa
+dyscyplina tej sesji — każdy commit z drugiej gałęzi jest inspekcjonowany
+`git show --stat` + bezpieczeństwo cyber/gov PRZED cherry-pickiem do
+`main`), więc nic nie wejdzie do `main` bez tego audytu — ale lepiej
+zamknąć to świadomie niż czekać na przypadkowe złapanie.

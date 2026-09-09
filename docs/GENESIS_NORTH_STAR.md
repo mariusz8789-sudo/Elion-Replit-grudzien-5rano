@@ -181,3 +181,185 @@ that the Genesis run itself is a simulation, not the cited experiment.
 Conclusion: the §4 boundary holds today. Nothing to fix. Re-run this grep
 whenever a new domain, evidence field, or admission status is added — it is
 cheap and the one boundary this whole document exists to protect.
+
+---
+
+## 7. The three standing priorities — and where each actually stands
+
+Every new feature is now judged against these three. The rule, applied before
+starting anything: **does this move Genesis closer to autonomous discovery, real
+validation, or product readiness?** If not, it does not outrank them.
+
+What follows is not a restatement of the brief — it is what each priority looks
+like measured against the code as it stands, because a priority list is only
+useful if it names the *next* missing thing rather than the whole mountain.
+
+### Priority 1 — Autonomous scientific discovery
+
+Success is defined as: `A ❌ B ❌ C ❌ → Genesis creates D → D is automatically
+tested → D ✅/❌ → the result changes the next choice.`
+
+Measured against `2ec96dd`, link by link:
+
+| link | status |
+|---|---|
+| detects its own space is insufficient | **done** — `DECLARED_SPACE_INSUFFICIENT` is now a precondition, not a report |
+| generates a new explanation | **done** — MECHANISM (`~RELATION_FLIP`) and PARAMETER (bracketed value) |
+| runs the test itself | **done** — `runInquiryWithGeneration`, unprompted, on evidence the derivation never saw |
+| judges the result | **done** — a real verdict from a real second inquiry |
+| **updates memory** | **MISSING** |
+| **the result changes the next choice** | **MISSING, because of the line above** |
+
+The gap is small, specific, and mine: `runInquiryWithGeneration` calls
+`runAutonomousInquiryWithRuns` for both the first inquiry and the follow-up —
+not `runInquiryAndRemember`. So the derived hypothesis's verdict is never
+persisted. A later inquiry into the same system starts blind to it, and
+`memoryNarrowedHypotheses` cannot narrow on a discovery Genesis itself made.
+The loop currently *generates and tests* without *learning*.
+
+A second, untested branch, worth naming before it is assumed: every fixture so
+far ends `D ✅`. What happens when the derived value is ALSO falsified —
+does a second derivation follow, and does it refuse to loop forever? The
+success definition says `D ✅/❌`, so both outcomes have to be real.
+
+**Next step, and it is one focused change:** persist the generated
+investigation through the path that already exists, so a discovery Genesis made
+becomes something Genesis remembers. That closes the last two rows above.
+
+### Priority 2 — Real-world validation
+
+The three-way distinction the brief asks for — SIMULATED vs REFERENCE vs REAL
+EXPERIMENTAL — is **already necessary today, not once hardware exists**, and
+the place it belongs already exists.
+
+`core/dataSource.ts` declares provenance per dataset, but with a boolean:
+`isSynthetic: true | false`. Two real labs already declare `isSynthetic: false`
+(`universe-solar-system`, `nuclear-chart`), carrying published values. So
+REFERENCE DATA is in the repository right now, and the type system cannot
+distinguish it from a measurement Genesis commissioned to test its own
+prediction — because that third kind does not exist yet. The moment it does,
+the boolean silently conflates them, which is exactly the failure §4 forbids.
+
+Note also that `ConfirmationLevel` (`core/citation.ts`) does NOT cover this: it
+grades how well-established the *science* is (`confirmed` … `fiction`), not
+where a *number* came from. Two orthogonal axes; merging them would lose both.
+
+**Minimal first step, and it is not hardware:** widen that boolean into a named
+provenance — simulated / reference / real-experimental — BEFORE any real
+experimental data can arrive, so the category cannot be conflated by default.
+Cheap, safe, and it makes the honesty boundary structural rather than
+documentary. The prediction → real measurement → compare → update pipeline is
+the step after, and needs a domain chosen for whether an outside measurement is
+genuinely obtainable.
+
+### Priority 3 — Product / funding readiness
+
+The flagship ask — *"Genesis, build a Digital Twin of Dubai and investigate a
+potential epidemic"* — is honestly further away than the other two, and the
+reason is precise rather than vague.
+
+Natural-language → experiment already exists and is real:
+`parseWorldDiscoveryGoal` turns a stated goal into an objective metric,
+direction and hypothesis set. But it works by phrase-matching against a
+**declared lever catalog** — `catalog.metricPhrases`. It cannot recognise a
+metric or a mechanism no catalog declares, and it must not be made to: that is
+the same refusal that keeps admission honest. So "Dubai" is not a parser
+problem. It is a *catalog* problem: a city-scale world with declared levers,
+metrics and a solver behind each.
+
+**The honest framing for a demo:** the pipeline NL → intent → investigation →
+competing models → information gain → evidence → replay is real end to end
+today on the domains that have catalogs. A demo should be built on one of
+those, extended to the depth an investor question needs — not on a new city
+promised before its catalog exists.
+
+### The ordering this implies
+
+Priority 1's remaining gap is **one focused change** (persist the generated
+investigation). Priority 2's first step is **one small type change** made
+before it becomes urgent. Priority 3 is **many steps** and depends on a real
+catalog. So the order is not just importance — it is also that the first two
+are cheap and the third is not, and doing them first makes the third honest
+when it comes.
+
+### Priority 4 — Virtual Bio / Cell Lab
+
+Standing direction alongside the three above: Genesis should be able to run
+virtual cell-level biological experiments, explicitly virtual, with a later
+path to connecting real measurements. **First a virtual wet lab, never hardware
+first** — and never a simulation labelled as a real biological experiment.
+
+Measured against the code, this priority does not start from zero. A real
+cell-biology substrate already exists and already respects the honesty
+boundary:
+
+- `worldModel/domains/cellCycle.ts` — a real compartmental G1/S/G2M model
+  integrated with RK4: growth is mitosis turning one G2/M cell into two G1
+  cells, saturation is contact inhibition at the G1/S restriction point.
+- `core/agent/cellCultureLeverCatalog.ts` — the Discovery Engine's fourth
+  WorldGraph domain, with levers that already cover the brief's list: a
+  substance's effect (`lever:mitogen`, `lever:s-phase-inhibitor`,
+  `lever:cytotoxic`/apoptosis), the vessel's capacity, and time as the axis a
+  fork evolves along. Cell state, growth/division/death, and observation are
+  the model's own variables.
+- The capability registry declares it `PARTIALLY_MODELLED`, and the catalog's
+  own doc states plainly what it does NOT model: no measured cell line, no gene
+  expression, differentiation, spatial structure or stochasticity, and **no
+  claim about any drug's effect in an organism**. That is exactly the "don't
+  pretend it's a real biological experiment" the brief demands, already in
+  place.
+
+So the killer demo — *"Genesis, investigate the effect of X on cells"* — maps
+directly onto this catalog: `parseWorldDiscoveryGoal` against the cell-culture
+`metricPhrases`, competing mechanistic hypotheses over those levers,
+Information Gain to pick the next fork, and now (Priority 1's machinery)
+generation of an alternative when the declared levers are exhausted. The
+scientific loop the brief wants is reachable on a substrate that exists today.
+
+**What is genuinely missing, and it is the same two gaps as Priority 1 and 2,
+not a new subsystem:**
+
+1. **Dose as a continuous axis.** The levers move a model parameter (e.g. a
+   death rate), but "effect of X at concentration c" as a swept, bracketable
+   dimension is closer to the PARAMETER path than the MECHANISM fork. Whether
+   the cell substrate can pose a genuine dose-response PARAMETER question — and
+   therefore reuse Priority 1's bracketed generation — is a real, answerable
+   audit question, not an assumption. C3's substrate check should measure it.
+2. **The real-experiment interface.** Identical to Priority 2: today the cell
+   world is SIMULATED data. A real cell measurement would be REAL EXPERIMENTAL
+   data, and the boolean `isSynthetic` cannot tell them apart. The provenance
+   widening Priority 2 names is the same prerequisite here — biology does not
+   need its own version of it.
+
+**Ordering:** this is a strategic direction, not the next commit. It rides on
+Priority 1 (autonomous generation, now closing) and Priority 2 (provenance
+distinction) being done first — build those, and "Virtual Cell Lab" becomes
+mostly catalog depth and one honest interface, rather than a new engine. Every
+larger feature is now also judged on whether it helps reach it.
+
+---
+
+## 8. GOV / Cyber — deferred, and defensive by construction
+
+A separate strategic track (world-scale experiments, a government/cyber
+vertical, possibly with access-tiered stages) is noted for the future. Its
+status is unchanged and deliberate:
+
+- **It stays OFF `main`** until explicitly re-scoped, per the standing decision
+  that the Cyber slice — though itself judged technically safe — remains on its
+  own branch so it does not dilute the Scientific Discovery Engine work.
+- **The security boundary set in `GENESIS_GOV_ARCHITECTURE_ASSESSMENT.md`
+  holds: defensive only.** Genesis is a scientific-discovery engine; a
+  government/cyber vertical means defensive analysis (self-scanning, dependency
+  audit, understanding a system's own exposure), NOT offensive tooling. Any
+  "stronger" capability that would function as an attack tool is out of scope
+  regardless of vertical, and nothing of that kind is built here.
+- **Access-tiered stages** are a product/authorization design for later, not a
+  reason to build offensive capability now. When that track is genuinely
+  opened, it is opened as a scoped, authorized engagement with the defensive
+  boundary intact — the same way the real-experiment interface (Priority 2/4)
+  is opened as an admitted capability rather than a silent fallback.
+
+This section exists so the direction is recorded without any offensive work
+being implied or started. The four scientific priorities above are the active
+roadmap.

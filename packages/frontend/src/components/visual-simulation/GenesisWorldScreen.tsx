@@ -29,6 +29,11 @@ import { compareWorldActions, type CrossActionComparison } from '../../core/agen
 import { toMechanismRun } from '../../core/agent/discoveryStrategies';
 import type { StrategyRun, StrategyRound } from '../../core/agent/discoveryStrategy';
 import { runWorldDiscoveryAndRemember } from '../../core/agent/worldDiscoverySession';
+import { admitWorldQuestion } from '../../core/agent/discoveryAdmission';
+import { DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, type DiscoveryRan } from '../../core/agent/discoveryOrchestrator';
+import { buildGenesisMatrixView, type GenesisMatrixView } from '../../core/agent/genesisMatrix';
+import { narrateInvestigation } from '../../core/agent/genesisNarration';
+import { detectRenderTier, type InteractiveRenderTier } from '../../core/three/quality';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
@@ -298,6 +303,26 @@ export class GenesisWorldSim3D implements Sim3D {
   private roundStageElapsed = 0;
 
   /**
+   * VOICE GUIDE — the joined Genesis Matrix view (`genesisMatrix.ts`) for the currently staged run,
+   * built once when the run completes, never per round: it is a projection of the WHOLE `StrategyRun`,
+   * not one round of it. `narrateStagedRound()` reads this, bounded at the staged round index, so the
+   * voice never describes a round the player has not reached yet.
+   */
+  private lastMatrixView: GenesisMatrixView | null = null;
+  /**
+   * How many of `narrateInvestigation`'s lines have already been spoken — the high-water mark that
+   * makes each `stageRound()` speak only what is NEW since the last staged round, never replaying the
+   * whole investigation from the top. Stepping backward (`prevRound()`) naturally stays silent rather
+   * than re-speaking old lines: `narrateInvestigation` at a smaller index produces a script no longer
+   * than this mark, so there is nothing past it to slice out.
+   */
+  private narratedLineCount = 0;
+  /** Device capability tier (`quality.ts`) — read once in `init()`. Used only to decide how carefully
+   * the Voice Guide manages the `speechSynthesis` queue (see `speakNarration()`'s own doc); it never
+   * gates whether narration plays at all. */
+  private renderTier: InteractiveRenderTier = 'medium';
+
+  /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
    * `FirstPersonLabScreen.tsx`/`InvestorDemoScreen.tsx` already drive (pure movement math, no THREE
    * dependency, real WASD/mouse-look/accel-decel/collision/head-bob, fully tested) — not a second
@@ -407,6 +432,9 @@ export class GenesisWorldSim3D implements Sim3D {
     this.scene = scene;
     this.width = w;
     this.height = h;
+    // VOICE GUIDE — read once; only decides how carefully `speakNarration()` manages the
+    // `speechSynthesis` queue, never whether narration plays (see that method's own doc).
+    this.renderTier = detectRenderTier();
 
     // C2-3 — this scene's camera is ALWAYS first-person (the outdoor `controller` or the hospital's
     // own `interiorController`; unlike `labScene3D.ts` there is no establishing shot or hero close-up
@@ -1488,11 +1516,28 @@ export class GenesisWorldSim3D implements Sim3D {
     const state = runWorldDiscoveryAndRemember(goalText, GENESIS_FLOOD_CATALOG.catalogId);
     if (state.kind !== 'COMPLETE') {
       this.lastStrategyRun = null;
+      this.lastMatrixView = null;
       this.clearRoundStage();
       return null;
     }
     const run = toMechanismRun(state.result);
     this.lastStrategyRun = run;
+    // VOICE GUIDE — the joined view `narrateStagedRound()` reads from. Built from a real `DiscoveryRan`
+    // outcome: `run` is the same real `StrategyRun` just computed, and `admitWorldQuestion(goalText)` is
+    // the exact same pure, side-effect-free admission check `runWorldDiscoveryAndRemember` already ran
+    // internally to reach this COMPLETE state — recomputing it here reads the same real value rather
+    // than fabricating one, since `WorldDiscoveryRememberedState` does not carry the `Admission` object
+    // itself back out.
+    const outcome: DiscoveryRan = {
+      status: 'RAN',
+      contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION,
+      shape: 'MECHANISM',
+      admission: admitWorldQuestion(goalText),
+      run,
+    };
+    this.lastMatrixView = buildGenesisMatrixView(outcome);
+    this.narratedLineCount = 0;
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
     if (run.rounds.length > 0) this.stageRound(0);
     else this.clearRoundStage();
     return run;
@@ -1525,6 +1570,7 @@ export class GenesisWorldSim3D implements Sim3D {
     this.stagedRoundIndex = index;
     this.roundStageElapsed = 0;
     this.clearRoundStageBeacon();
+    this.narrateStagedRound(index);
     if (!this.THREE || !this.scene || !this.renderer) return;
     const round = this.lastStrategyRun.rounds[index]!;
     const lever = this.leverForRound(round);
@@ -1538,6 +1584,64 @@ export class GenesisWorldSim3D implements Sim3D {
     this.roundStageBeacon = this.buildRoundStageBeacon(THREE, sceneForm.kind);
     this.roundStageBeacon.position.set(position.x, position.y + 2.2, position.z);
     this.scene.add(this.roundStageBeacon);
+  }
+
+  /**
+   * VOICE GUIDE — one spoken utterance per staged round, composed from exactly the two sources the
+   * brief names: the lever's own declared `sceneForm.actionLabel` (what the world shows — never
+   * generated here; `genesisNarration.ts`'s own doc explains why that module deliberately says
+   * nothing about the physical scene) and the lines `narrateInvestigation` produces once bounded at
+   * this round (what the science means).
+   *
+   * `narrateInvestigation(view, index)` is what keeps the voice from ever getting ahead of the
+   * screen: its script is a strict, deterministic function of `index` (intro, then one
+   * `narrateRound()` per round up to and including it, then the closing line only once `index` is the
+   * last round) — never a version of the run the player has not reached yet. Re-computing it here and
+   * slicing off everything already spoken (`narratedLineCount`, the high-water mark) is exactly "the
+   * new lines for this round," never a re-derivation of what `narrateRound` itself decided.
+   */
+  private narrateStagedRound(index: number): void {
+    if (!this.lastMatrixView || !this.lastStrategyRun) return;
+    const round = this.lastStrategyRun.rounds[index];
+    if (!round) return;
+    const lever = this.leverForRound(round);
+    const script = narrateInvestigation(this.lastMatrixView, index);
+    const newLines = script.slice(this.narratedLineCount);
+    this.narratedLineCount = script.length;
+    // Nothing new to say — stepping backward to an already-narrated round, most commonly. Stay
+    // silent rather than re-announcing just the action label with no science attached to it: an
+    // utterance with nothing new is not "one utterance," it's noise.
+    if (newLines.length === 0) return;
+    const parts: string[] = [];
+    if (lever?.sceneForm?.actionLabel) parts.push(lever.sceneForm.actionLabel);
+    for (const line of newLines) parts.push(line.text);
+    this.speakNarration(parts.join(' '));
+  }
+
+  /**
+   * VOICE GUIDE — the one place `speechSynthesis`/`SpeechSynthesisUtterance` is used in this repo.
+   * Thin on purpose: `narrateStagedRound()` above already produced the exact words from real
+   * `GenesisMatrixView` data; this only has to get them read aloud without ever breaking the scene.
+   *
+   * Tier-respecting, never tier-gated: narration always attempts to play, on every device — a weaker
+   * device gets a plainer, less carefully-managed queue, never silence. `cancel()`-before-`speak()`
+   * keeps a fast-clicking desktop player's audio in sync with the round on screen; skipped at `'low'`
+   * tier because repeatedly cancelling mid-utterance is a known source of a stuck/silent
+   * `speechSynthesis` queue on weaker mobile browsers, and a queued line lagging slightly behind is a
+   * far better failure mode there than losing audio entirely — matching the brief's own "doesn't have
+   * to be perfect where the player is looking more than listening."
+   */
+  private speakNarration(text: string): void {
+    if (typeof window === 'undefined') return;
+    const synth = window.speechSynthesis;
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+    try {
+      if (this.renderTier !== 'low') synth.cancel();
+      synth.speak(new SpeechSynthesisUtterance(text));
+    } catch {
+      // Narration is decoration on the real visual staging, never a requirement for it — a
+      // browser/platform speech failure must never break the scene.
+    }
   }
 
   /** Three distinct, declared treatments — never a generic "something is happening here" blob — so
@@ -1578,6 +1682,9 @@ export class GenesisWorldSim3D implements Sim3D {
 
   dismissStrategyRun(): void {
     this.lastStrategyRun = null;
+    this.lastMatrixView = null;
+    this.narratedLineCount = 0;
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
     this.clearRoundStage();
   }
 
@@ -1699,6 +1806,9 @@ export class GenesisWorldSim3D implements Sim3D {
     }
     this.ambientPedestrians = [];
     this.clearRoundStageBeacon();
+    // VOICE GUIDE — stop any pending line rather than leaving a scene the player has already left
+    // still talking.
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   }
 }
 

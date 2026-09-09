@@ -195,14 +195,46 @@ export function selectNextResearchQuestion(
   const competing = assessCompetingModels(run);
   if (competing.status === 'COMPETING_MODELS_UNRESOLVED') {
     if (run.shape === 'MECHANISM') {
-      candidates.push({
-        kind: 'TEST_WHETHER_MECHANISMS_COMPOSE',
-        question: `Do "${run.surviving.join('" and "')}" compose, or does applying them together behave differently from the sum of each alone?`,
-        groundedIn: run.surviving.map((id) => `survived ${id}`),
-        // `mechanismGeneration.ts` runs exactly this, on the real solver.
-        answerableNow: true,
-        why: 'Two mechanisms surviving is not a tie to be broken — both levers really work. Whether they compose cannot be computed from their separate effects (measured sub-additive on the generator fixture), so it has to be run, and mechanismGeneration.ts runs it.',
-      });
+      // discoveryOrchestrator ALREADY runs the joint arm inside this same
+      // outcome whenever composition applies — `generated` here is that
+      // result, not a proposal waiting to be acted on. Proposing to "run" a
+      // composition that already ran, with a `why` claiming it still has to be
+      // run, would present an answered question as an open one. So this reads
+      // what actually happened rather than assuming the trigger alone means
+      // the work is still ahead.
+      if (generated !== null && generated.kind === 'COMPOSED_MECHANISM') {
+        // INCONCLUSIVE is the one outcome that settles nothing: both effects
+        // were exactly zero, so there was no combined effect size to judge
+        // additivity against at all. Real and open, and nothing here proposes
+        // a retry at a different magnitude — mechanismGeneration.ts has no
+        // such mechanism, so this is reported honestly as unanswerable rather
+        // than silently re-offered as runnable.
+        if (generated.assessment.interaction === 'INCONCLUSIVE') {
+          candidates.push({
+            kind: 'TEST_WHETHER_MECHANISMS_COMPOSE',
+            question: `Do "${run.surviving.join('" and "')}" compose? The joint arm ran but settled nothing.`,
+            groundedIn: [...run.surviving.map((id) => `survived ${id}`), `interaction ${generated.assessment.interaction}`],
+            answerableNow: false,
+            why: `${generated.assessment.reason} mechanismGeneration.ts has no mechanism to retry this at a different magnitude, so nothing here can answer it further.`,
+          });
+        }
+        // ADDITIVE / SUB_ADDITIVE / SUPER_ADDITIVE: the question is answered
+        // — the joint arm was measured and classified — so nothing further is
+        // raised for it, the same way a REFUTED derived value raises no
+        // narrowing candidate on the PARAMETER side.
+      } else {
+        // Composition did not run in this outcome — generation refused for a
+        // real reason (different objectives, no shared measured magnitude,
+        // fewer than two declared survivors). Reported with the refusal's own
+        // words rather than a fabricated "it will run".
+        candidates.push({
+          kind: 'TEST_WHETHER_MECHANISMS_COMPOSE',
+          question: `Do "${run.surviving.join('" and "')}" compose, or does applying them together behave differently from the sum of each alone?`,
+          groundedIn: run.surviving.map((id) => `survived ${id}`),
+          answerableNow: false,
+          why: outcome.noGenerationReason ?? 'Composition was not run for this pair, and no reason was recorded.',
+        });
+      }
     } else {
       const discriminable = run.nextExperiment?.status === 'READY_TO_RUN';
       candidates.push({

@@ -1,5 +1,5 @@
 import type { InquiryLoopInput, InquiryLoopResult, ParameterHypothesis } from './inquiryLoop';
-import type { DerivedParameterHypothesis, DerivedValueAssessment } from './parameterAlternative';
+import { sharedScalarParameter, type DerivedParameterHypothesis, type DerivedValueAssessment } from './parameterAlternative';
 
 /**
  * NARROWING AN INTERVAL GENESIS ALREADY EARNED.
@@ -38,16 +38,112 @@ import type { DerivedParameterHypothesis, DerivedValueAssessment } from './param
  * BOTH ends in one investigation. Nothing is fitted and nothing is optimised —
  * the same discipline as the original bracket midpoint, one level down.
  *
- * ## The narrowed interval is read the same way the first one was
+ * ## The narrowed range, and what it may be READ as
  *
  * `narrowedInterval` is bounded by the nearest REFUTED value on each side of
- * whatever survived — exactly the bracketing rule that produced the first
- * interval, applied to the new evidence. When nothing new is refuted, the
- * interval is returned UNCHANGED and `narrowed` is false, rather than reported
- * as progress that did not happen.
+ * whatever survived. When nothing new is refuted the range is returned
+ * UNCHANGED and `narrowed` is false, rather than reported as progress that did
+ * not happen.
+ *
+ * What that range MEANS depends entirely on `basis`, and the two meanings are
+ * not interchangeable — see `IntervalBasis`. Shrinking an interval the
+ * generation bracketed is a localisation. Bounding survivors by their refuted
+ * neighbours is a search region and can exclude the truth; that is measured,
+ * not feared. Every consumer is handed `basis` for exactly this reason.
  */
 
-export const INTERVAL_NARROWING_CONTRACT_VERSION = '1.0.0';
+/**
+ * 1.1.0 added `supportedIntervalOf`, which reads the same interval from ANY
+ * finished parameter inquiry rather than only from a generation follow-up. That
+ * is what makes narrowing recursive: a narrowing run leaves exactly the same
+ * shape of evidence it consumed — one survivor with refutations either side —
+ * so the next question after narrowing is another narrowing, until the settings
+ * run out or nothing new is refuted.
+ */
+export const INTERVAL_NARROWING_CONTRACT_VERSION = '1.1.0';
+
+/**
+ * WHERE AN INTERVAL COMES FROM, because the two provenances are worth very
+ * different things and conflating them produces a false claim.
+ *
+ * `BRACKETED_PREDICTIONS` — two PREDICTIONS straddle one observation, so under a
+ *   checked monotonicity assumption the truth lies between the two claims that
+ *   produced them. This is a localisation, and it survives the soundness sweep:
+ *   across every hidden value tested, the truth is inside.
+ *
+ * `SURVIVOR_NEIGHBOURS` — a value survived and other values either side were
+ *   refuted. This looks like the same thing and is NOT. Refuting a value says
+ *   the system does not have THAT value; it says nothing about which side of it
+ *   the truth lies on. Measured counterexample on the real solver: at a true
+ *   temperature of 0.45 with nine observation lengths declared, 0.5 is refuted
+ *   while 0.7 and 0.95 both survive — the instrument saturates at long runs, so
+ *   distant claims agree with each other while a nearer one does not. Reading
+ *   the survivors' refuted neighbours as bounds gives [0.5, 1.2], which
+ *   EXCLUDES the truth.
+ *
+ * So a `SURVIVOR_NEIGHBOURS` region is a place to look next, never a statement
+ * about where the answer is, and everything downstream is required to keep that
+ * distinction.
+ */
+export type IntervalBasis = 'BRACKETED_PREDICTIONS' | 'SURVIVOR_NEIGHBOURS';
+
+/** A region a finished inquiry points at, and what survived inside it. */
+export interface SupportedInterval {
+  readonly parameterId: string;
+  /** Bounded by the nearest REFUTED claim either side of the surviving set. */
+  readonly interval: readonly [number, number];
+  readonly survivingValues: readonly number[];
+  /** Always `SURVIVOR_NEIGHBOURS` here — see `IntervalBasis` for why that matters. */
+  readonly basis: IntervalBasis;
+}
+
+/**
+ * Reads the interval a finished inquiry supports, or refuses.
+ *
+ * ## Why this generalises the first bracket rather than repeating it
+ *
+ * `parameterAlternative.ts` draws its bracket from PREDICTIONS straddling one
+ * observation. This reads something weaker and differently shaped: the refuted
+ * claims either side of whatever survived. It looks like the same inference and
+ * is not — refuting a value says the system does not have THAT value, never
+ * which side of it the answer lies on. It earns its place because it gives the
+ * chain a next experiment to design from a run that generated nothing, not
+ * because it localises anything.
+ *
+ * Refuses when there is no survivor (nothing to bound), when the hypotheses do
+ * not share one scalar parameter (nothing to bound it IN), or when either side
+ * is unbounded — a region open at one end gives no next experiment to design.
+ *
+ * What it returns is `SURVIVOR_NEIGHBOURS`: a search region, NOT a localisation.
+ * See `IntervalBasis` for the measured counterexample that forced that
+ * distinction.
+ */
+export function supportedIntervalOf(
+  result: InquiryLoopResult,
+  input: InquiryLoopInput,
+): SupportedInterval | null {
+  const parameterId = sharedScalarParameter(input.hypotheses);
+  if (parameterId === null) return null;
+
+  const valueById = new Map(input.hypotheses.map((h) => [h.hypothesisId, h.claimedValues[parameterId]!]));
+  const valuesOf = (ids: readonly string[]) =>
+    ids.map((id) => valueById.get(id)).filter((v): v is number => v !== undefined);
+
+  const survivingValues = valuesOf(result.survivingHypothesisIds).sort((a, b) => a - b);
+  const refutedValues = valuesOf(result.falsifiedHypothesisIds);
+  if (survivingValues.length === 0) return null;
+
+  const below = refutedValues.filter((v) => v < survivingValues[0]!);
+  const above = refutedValues.filter((v) => v > survivingValues[survivingValues.length - 1]!);
+  if (below.length === 0 || above.length === 0) return null;
+
+  return {
+    parameterId,
+    interval: [Math.max(...below), Math.min(...above)],
+    survivingValues,
+    basis: 'SURVIVOR_NEIGHBOURS',
+  };
+}
 
 export interface InteriorProposal {
   readonly parameterId: string;
@@ -55,6 +151,8 @@ export interface InteriorProposal {
   readonly values: readonly number[];
   /** The interval they are meant to shrink. */
   readonly interval: readonly [number, number];
+  /** Where that interval came from — and therefore what shrinking it can claim. */
+  readonly basis: IntervalBasis;
   readonly why: string;
 }
 
@@ -71,25 +169,51 @@ export function proposeInteriorCandidates(
   standing: DerivedValueAssessment,
 ): InteriorProposal | null {
   if (standing.standing !== 'SUPPORTED_INTERVAL_NOT_IDENTIFIED') return null;
-  const [lo, hi] = standing.interval;
-  const v = derived.value;
-  if (!(lo < v && v < hi)) return null;
+  // The generation's interval came from predictions straddling an observation,
+  // with monotonicity checked at derivation time — a real localisation.
+  return proposeAround(derived.parameterId, standing.interval, derived.value, 'BRACKETED_PREDICTIONS');
+}
 
-  const low = (lo + v) / 2;
-  const high = (v + hi) / 2;
-  // Strictness matters: a candidate equal to an interval end is a claim the
-  // follow-up already refuted, and one equal to `v` adds no contender.
-  const values = [low, high].filter((x) => x > lo && x < hi && x !== v);
+/**
+ * The same proposal from a `SupportedInterval` — the reading that applies from
+ * the second investigation onward, once something has survived.
+ *
+ * Refuses on more than one survivor rather than guessing: two survivors inside
+ * one interval is a different experimental design (which of them, and where
+ * between them?), and quartering around a set is not that design. Saying so is
+ * better than producing candidates whose relationship to the survivors nobody
+ * could state.
+ */
+export function proposeInteriorCandidatesFrom(supported: SupportedInterval): InteriorProposal | null {
+  if (supported.survivingValues.length !== 1) return null;
+  return proposeAround(supported.parameterId, supported.interval, supported.survivingValues[0]!, supported.basis);
+}
+
+function proposeAround(
+  parameterId: string,
+  interval: readonly [number, number],
+  incumbent: number,
+  basis: IntervalBasis,
+): InteriorProposal | null {
+  const [lo, hi] = interval;
+  if (!(lo < incumbent && incumbent < hi)) return null;
+
+  const low = (lo + incumbent) / 2;
+  const high = (incumbent + hi) / 2;
+  // Strictness matters: a candidate equal to an interval end is a claim already
+  // refuted, and one equal to the incumbent adds no contender.
+  const values = [low, high].filter((x) => x > lo && x < hi && x !== incumbent);
   if (values.length < 2) return null;
 
   return {
-    parameterId: derived.parameterId,
+    parameterId,
     values,
     interval: [lo, hi],
+    basis,
     why:
-      `Both ends of [${lo}, ${hi}] were refuted, so ${derived.parameterId} lies inside it, but ${v} survived only in ` +
+      `Both ends of [${lo}, ${hi}] were refuted, so ${parameterId} lies inside it, but ${incumbent} survived only in ` +
       `the sense that nothing separated it from its neighbours. Testing ${values.join(' and ')} — one either side of ` +
-      `${v} — is the smallest experiment that can shrink the interval from both ends at once.`,
+      `${incumbent} — is the smallest experiment that can shrink the interval from both ends at once.`,
   };
 }
 
@@ -114,18 +238,18 @@ function interiorHypothesis(parameterId: string, value: number): ParameterHypoth
  */
 export function buildNarrowingInquiry(
   original: InquiryLoopInput,
-  derived: DerivedParameterHypothesis,
+  incumbent: { readonly hypothesisId: string; readonly value: number; readonly excludedProbeValues: readonly number[] },
   proposal: InteriorProposal,
   alreadyTriedProbeValues: readonly number[],
 ): InquiryLoopInput | null {
-  const spent = new Set([...alreadyTriedProbeValues, ...derived.excludedProbeValues]);
+  const spent = new Set([...alreadyTriedProbeValues, ...incumbent.excludedProbeValues]);
   const openingProbeValue = original.system.candidateProbeValues.find((p) => !spent.has(p));
   if (openingProbeValue === undefined) return null;
 
   return {
     question:
       `Where in [${proposal.interval[0]}, ${proposal.interval[1]}] does ${proposal.parameterId} lie? ` +
-      `${derived.value} survived, but so would its neighbours.`,
+      `${incumbent.value} survived, but so would its neighbours.`,
     // Every spent setting is removed from the candidate list, not merely
     // avoided when picking the opening probe. The interval these candidates sit
     // inside was drawn by those earlier measurements, so judging the candidates
@@ -141,7 +265,7 @@ export function buildNarrowingInquiry(
       interiorHypothesis(proposal.parameterId, proposal.values[0]!),
       // The incumbent stays in contention: narrowing must be able to refute it
       // rather than only refine around it.
-      { ...interiorHypothesis(proposal.parameterId, derived.value), hypothesisId: derived.hypothesisId },
+      { ...interiorHypothesis(proposal.parameterId, incumbent.value), hypothesisId: incumbent.hypothesisId },
       interiorHypothesis(proposal.parameterId, proposal.values[1]!),
     ],
     openingProbeValue,
@@ -151,6 +275,13 @@ export function buildNarrowingInquiry(
 
 export interface NarrowingOutcome {
   readonly contractVersion: string;
+  /**
+   * What the narrowed range may be read as. `BRACKETED_PREDICTIONS` is a
+   * localisation and the truth is inside it; `SURVIVOR_NEIGHBOURS` is a search
+   * region only, and a measured counterexample shows it CAN exclude the truth.
+   * Carried so no consumer can read the second as the first.
+   */
+  readonly basis: IntervalBasis;
   /** The interval before this investigation. */
   readonly priorInterval: readonly [number, number];
   /** After it. Identical to `priorInterval` when nothing new was refuted. */
@@ -190,6 +321,7 @@ export function assessNarrowing(
   if (survivingValues.length === 0) {
     return {
       contractVersion: INTERVAL_NARROWING_CONTRACT_VERSION,
+      basis: proposal.basis,
       priorInterval: [priorLo, priorHi],
       narrowedInterval: [priorLo, priorHi],
       narrowed: false,
@@ -218,6 +350,7 @@ export function assessNarrowing(
 
   return {
     contractVersion: INTERVAL_NARROWING_CONTRACT_VERSION,
+    basis: proposal.basis,
     priorInterval: [priorLo, priorHi],
     narrowedInterval: [lo, hi],
     narrowed,

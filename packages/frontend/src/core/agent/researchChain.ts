@@ -9,6 +9,8 @@ import {
   assessNarrowing,
   buildNarrowingInquiry,
   proposeInteriorCandidates,
+  proposeInteriorCandidatesFrom,
+  supportedIntervalOf,
   type InteriorProposal,
   type NarrowingOutcome,
 } from './intervalNarrowing';
@@ -67,6 +69,13 @@ export interface ResearchStep {
   /** Why this step, decided BEFORE it ran, by the question selector. */
   readonly why: string;
   readonly outcome: DiscoveryOutcome;
+  /**
+   * The input this step actually executed. Step 1's is the caller's; every
+   * later one was built by the chain, so a reader that wants to re-derive what
+   * the selector saw — or re-execute the step — would otherwise have to
+   * reconstruct an input Genesis wrote itself.
+   */
+  readonly executedInput: InquiryLoopInput;
   /** Present only on a narrowing step: what the interval became. */
   readonly narrowing: NarrowingOutcome | null;
   /**
@@ -124,6 +133,7 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
       kind,
       why,
       outcome,
+      executedInput: current,
       narrowing,
       remembered: remember(outcome, current),
     });
@@ -136,7 +146,7 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     }
     rememberProbes(outcome, triedProbeValues);
 
-    const selection = selectNextResearchQuestion(outcome);
+    const selection = selectNextResearchQuestion(outcome, current);
     if (selection.selected === null) {
       stoppedBecause = `Step ${step} settled its question and raised no new one.`;
       break;
@@ -149,26 +159,79 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     }
 
     const next = selection.nextExecutable;
-    if (
-      next.kind !== 'NARROW_A_DERIVED_INTERVAL' ||
-      outcome.generated === null ||
-      outcome.generated.kind !== 'DERIVED_PARAMETER_VALUE'
-    ) {
+
+    // SEPARATE_SURVIVORS has an actuator that takes no new decision: the run
+    // ITSELF proposed a discriminating setting and then ran out of rounds. This
+    // simply runs it, over the hypotheses that are still standing. Nothing here
+    // chooses the probe — `selectNextProbe` already did, from the beliefs the
+    // last observation wrote.
+    if (next.kind === 'SEPARATE_SURVIVORS') {
+      const native = outcome.run.native as InquiryLoopResult;
+      const proposed = native.nextExperiment.probeValue;
+      if (proposed === null || triedProbeValues.has(proposed)) {
+        stoppedBecause =
+          `Step ${step} proposed separating ${outcome.run.surviving.join(' and ')}, but the setting its own ` +
+          'selector named is either absent or already spent, so there is no untried measurement to run.';
+        break;
+      }
+      const survivors = current.hypotheses.filter((h) => outcome.run.surviving.includes(h.hypothesisId));
+      if (survivors.length < 2) {
+        stoppedBecause = `Step ${step} proposed separating survivors, but fewer than two of them are declared hypotheses.`;
+        break;
+      }
+      pending = null;
+      current = {
+        question: `Which of ${outcome.run.surviving.join(', ')} is right? The previous run ran out of rounds before separating them.`,
+        system: current.system,
+        hypotheses: survivors,
+        openingProbeValue: proposed,
+        maxRounds: current.maxRounds,
+      };
+      kind = next.kind;
+      why = selection.why;
+      continue;
+    }
+
+    if (next.kind !== 'NARROW_A_DERIVED_INTERVAL') {
       stoppedBecause = `Step ${step} proposed "${next.kind}", which this chain has no actuator for yet: ${next.question}`;
       break;
     }
 
-    const proposal = proposeInteriorCandidates(outcome.generated.derived, outcome.generated.standing);
+    // The interval comes from the generation when there was one, and from the
+    // run's own surviving/refuted split when there was not. The second case is
+    // what a NARROWING step leaves behind, and reading it is what lets the chain
+    // narrow more than once.
+    const generatedValue =
+      outcome.generated !== null && outcome.generated.kind === 'DERIVED_PARAMETER_VALUE'
+        ? outcome.generated
+        : null;
+    const supported = supportedIntervalOf(outcome.run.native as InquiryLoopResult, current);
+    const proposal =
+      generatedValue !== null
+        ? proposeInteriorCandidates(generatedValue.derived, generatedValue.standing)
+        : supported === null
+          ? null
+          : proposeInteriorCandidatesFrom(supported);
     if (proposal === null) {
       stoppedBecause = `Step ${step} proposed narrowing, but the interval could not produce interior candidates.`;
       break;
     }
-    const narrowingInput = buildNarrowingInquiry(
-      current,
-      outcome.generated.derived,
-      proposal,
-      [...triedProbeValues],
-    );
+
+    const incumbent =
+      generatedValue !== null
+        ? {
+            hypothesisId: generatedValue.derived.hypothesisId,
+            value: generatedValue.derived.value,
+            excludedProbeValues: generatedValue.derived.excludedProbeValues,
+          }
+        : {
+            hypothesisId: outcome.run.surviving[0]!,
+            value: supported!.survivingValues[0]!,
+            // Every setting spent so far is already excluded via triedProbeValues.
+            excludedProbeValues: [] as readonly number[],
+          };
+
+    const narrowingInput = buildNarrowingInquiry(current, incumbent, proposal, [...triedProbeValues]);
     if (narrowingInput === null) {
       stoppedBecause =
         `Step ${step} proposed narrowing, but every candidate setting of ${current.system.probeParameterId} was ` +

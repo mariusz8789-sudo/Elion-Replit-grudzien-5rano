@@ -50,6 +50,13 @@ describe('genesis matrix — the cross-cutting join', () => {
 
     expect(view.resultFingerprint).toBe(outcome.run.resultFingerprint);
     expect(view.stopReason).toBe(outcome.run.stopReason);
+
+    // COMPETING MODELS (P6) is wired: this run's OWN `surviving` list decides
+    // the verdict, not a value invented in the join — see
+    // `competingModels.test.ts` for the full behaviour matrix this join only
+    // has to expose, not re-derive.
+    expect(view.competingModels).not.toBeNull();
+    expect(view.competingModels!.competingHypothesisIds).toEqual(outcome.run.surviving.length > 1 ? outcome.run.surviving : []);
   });
 
   it('carries a REAL Evidence Bundle and its own Replay verdict, not a second replay mechanism', () => {
@@ -88,6 +95,7 @@ describe('genesis matrix — the cross-cutting join', () => {
     expect(view.admission).toBe('NOT_MODELLED');
     expect(view.refusalReason).toBeTruthy();
     expect(view.nextExperiment).toBeNull();
+    expect(view.competingModels).toBeNull();
   });
 
   it('PARAMETER predictions reach the view, real solver output not arithmetic done here', () => {

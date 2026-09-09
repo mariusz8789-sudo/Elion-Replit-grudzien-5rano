@@ -18,8 +18,34 @@ walking through.
 | P3 | `deriveAlternativeCriteria` wired into the round loop | **done** |
 | P4/P5 | Model insufficiency as a first-class outcome | **done** (`modelSufficiency.ts`) |
 | P1 (memory) | Scientific Memory → Selection — narrowing, not just a warning | **done** (`discoveryOrchestrator.ts`'s `PriorInvestigationDecision`) |
-| **P6** | **Model-class proposal + discriminating experiment between models ("Competing Models")** | **next — unblocked, not started** |
+| **P6** | **Model-class proposal + discriminating experiment between models ("Competing Models")** | **first increment done** (`competingModels.ts` — see below); the harder second increment is open |
 | P7 | World ↔ inquiry calibration | **done** (`CALIBRATION` `QuestionShape`, see `TWO_AUTONOMOUS_LOOPS_DECISION.md` §12) |
+
+**P6, first increment — `competingModels.ts`.** A pure `StrategyRun` reader,
+same discipline as `modelSufficiency.ts`: when a run ends with more than one
+surviving hypothesis, that state now has a name
+(`COMPETING_MODELS_UNRESOLVED`), is joined into the Matrix
+(`GenesisMatrixView.competingModels`), and is voiced by narration — instead of
+being buried in `inquiryLoop.ts`'s own `openQuestions` prose (PARAMETER only)
+or entirely unreported (MECHANISM/CALIBRATION). Grounded in a real degeneracy
+already proven elsewhere in the suite: four Arrhenius kinetics hypotheses on
+the same compensation line, genuinely indistinguishable at the one probe
+offered (`inquiryLoop.test.ts`'s `NO_DISCRIMINATING_PROBE` fixture, reused
+rather than re-derived in `competingModels.test.ts`).
+
+**What it deliberately does not do yet — the open second increment.** It does
+not propose a new hypothesis, a new model class, or design a NEW
+discriminating experiment. `inquiryLoop.ts` already designs a discriminating
+probe LIVE, mid-run, for the top two contenders
+(`checkDiscriminability`/`DISCRIMINATES_TOP_TWO`); `COMPETING_MODELS_UNRESOLVED`
+only fires for what survives AFTER that already failed or was never
+attempted (MECHANISM has no equivalent live-discrimination step at all — it
+stops the instant any ONE hypothesis reaches
+`SUPPORTED_AT_TWO_MAGNITUDES`, so it never tries to separate two independently-
+supported ones). Designing that — a probe/strength/tick outside what the run
+already tried, specifically chosen to separate the NAMED survivors this
+verdict lists — is the genuinely hard part the roadmap always meant by P6, and
+remains open.
 
 P6 is the next real priority: every earlier item it depended on is done, and
 it is the one row of the North Star's §3 table ("generate competing models")

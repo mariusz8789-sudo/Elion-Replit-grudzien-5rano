@@ -4,6 +4,7 @@ import type { DiscoveryOutcome, PriorInvestigationDecision } from './discoveryOr
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import type { AdmissionStatus, QuestionShape } from './discoveryStrategy';
 import { assessModelSufficiency, type ModelSufficiencyVerdict } from './modelSufficiency';
+import { assessCompetingModels, type CompetingModelsVerdict } from './competingModels';
 import type { NextAction } from './nextAction';
 
 /**
@@ -111,6 +112,14 @@ export interface GenesisMatrixView {
    */
   readonly sufficiency: ModelSufficiencyVerdict | null;
   /**
+   * COMPETING MODELS (P6, first increment) — did this run settle on one
+   * explanation, or does the evidence still support several at once? See
+   * `competingModels.ts`'s own doc for why this is orthogonal to
+   * `sufficiency` above rather than a replacement for it. Null for a
+   * REFUSED outcome: nothing was investigated.
+   */
+  readonly competingModels: CompetingModelsVerdict | null;
+  /**
    * MEMORY → SELECTION (P1) — whether, and why, an earlier investigation of
    * the same world/system already narrowed what THIS run tested. See
    * `discoveryOrchestrator.ts`'s own doc on `PriorInvestigationDecision`.
@@ -151,6 +160,7 @@ export function buildGenesisMatrixView(
       nextExperiment: null,
       evidence: evidenceView,
       sufficiency: null,
+      competingModels: null,
       priorInvestigation: null,
     };
   }
@@ -181,6 +191,7 @@ export function buildGenesisMatrixView(
     nextExperiment: run.nextExperiment,
     evidence: evidenceView,
     sufficiency: assessModelSufficiency(run),
+    competingModels: assessCompetingModels(run),
     priorInvestigation: outcome.priorInvestigation,
   };
 }

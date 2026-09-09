@@ -877,3 +877,111 @@ hypothesis list (`{view.competingModels.competingHypothesisIds.map((id) =>
 placeholder text. `genesisMatrix.ts` wires `competingModels:
 assessCompetingModels(run)` directly — no UI-layer reimplementation of the
 verdict. No violation found.
+
+### 10.10 §10.7's own gap, closed — generation now LEARNS, not just fires
+
+Found while auditing Priority 5 in `GENESIS_NORTH_STAR.md`, by re-reading
+§10.7's own code rather than trusting its "bridge closed" title: both calls
+inside `runInquiryWithGeneration` went through the bare
+`runAutonomousInquiryWithRuns`, not `runInquiryAndRemember`. So the function
+generated a hypothesis nobody declared and tested it — real, proven — but
+never narrowed against prior memory, and never left anything behind for a
+LATER inquiry into the same system to narrow against. Genesis generated and
+tested without learning; the loop's last link (§10.5's own
+`experiment → knowledge → model change → NEXT experiment`) was still open.
+
+**The fix reuses the existing session pipeline verbatim, no second memory
+store.** Both the first inquiry and the generated follow-up now go through
+`runInquiryAndRemember` — the same function every other PARAMETER caller
+already uses. `InquiryWithGenerationResult` and `GeneratedContinuation` gained
+the fields that pipeline already produces (`firstResumedFromMemory`,
+`firstSaved`, `firstReplay`, `followUpSaved`, `followUpReplay`) rather than
+inventing new bookkeeping.
+
+**Measured, two ways, on the real exhausted-space fixture** (a fold at
+temperature 0.5 that falsifies all four declared candidates,
+`inquirySession.test.ts`):
+
+1. Calling the SAME full four-candidate request a second time (fresh modules,
+   same persisted storage — a real process restart) now returns
+   `firstResumedFromMemory` non-null with the honest "would leave nothing to
+   test" reason and the full set re-tested — the same never-narrow-to-empty
+   fallback `runInquiryAndRemember` already holds for every other caller,
+   now reachable here because a record finally exists to trigger it.
+2. A genuinely partial declared set — one already-falsified candidate
+   (`h:cold`) alongside round 1's OWN generated hypothesis
+   (`h:derived-temperature-0.5`, which survived and so is never carried
+   forward as settled, per the existing "never carries a SUPPORTED verdict
+   forward" rule) — shows real, executable narrowing: `h:cold` is skipped,
+   the generated hypothesis is not. The generated hypothesis behaves exactly
+   like any declared one under memory's own rules, because it now goes
+   through the identical path.
+
+The generated follow-up is also independently confirmed as a real, queryable
+Science Memory record (`getExperiment` returns it, `followUpReplay.status`
+is `MATCH` from a real re-execution) — not merely returned to the caller and
+discarded.
+
+This closes the last open item §10.7 itself named ("Not yet wired into a
+loop" no longer applies to persistence — deciding whether an inquiry should
+COMBINE the first and generated runs into one caller-visible investigation,
+versus reporting two, remains the deliberate `runDiscovery`-contract decision
+§10.7 always deferred, and still is).
+
+### 10.11 C3 closed the same gap independently, with a better shape — reconciled, not duplicated
+
+C3 reached the identical finding from the Priority-5 audit side by side with
+this one, in the same working window, and built a genuinely better fix: rather
+than mutating `runInquiryWithGeneration` in place (10.10's approach), it left
+that function pure — no storage, same signature, same seam for callers and
+tests that want the engine alone — and added a separate
+`runInquiryWithGenerationAndRemember` that banks both investigations. Cleaner
+separation of concerns, and it does something 10.10 did not attempt: it
+answers the `runDiscovery`-contract deferral 10.10 explicitly left open. The
+PARAMETER path in `discoveryOrchestrator.ts` now runs the generation
+continuation itself and reports it as a SECOND `StrategyRun` beside the first
+— never merged into it, since a flattened run cannot express "these later
+rounds tested a value derived from the earlier ones, at a setting the earlier
+run never used," and that provenance is the entire reason a derived value is
+worth reporting. `run` stays byte-for-byte what a direct strategy call
+produces (`DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION` 1.2.0, additive over
+1.1.0), so an existing reader sees an unchanged finding and only a caller that
+looks for `generated` sees the second one.
+
+Reconciling the two on merge into `main`: C3's `inquirySession.ts` was taken
+as authoritative (commit `fcc2032`) over 10.10's in-place mutation, since it
+is the strict superset — same memory fix, plus the front-door wiring, plus an
+honesty fix 10.10's version did not have (see below). The two new tests 10.10
+added directly against `runInquiryWithGeneration` were removed as redundant:
+`generationMemoryChain.test.ts` (C3) proves the same restart-survives-memory
+chain more thoroughly, through `runInquiryWithGenerationAndRemember` and the
+real `runDiscovery` front door, including a cross-system non-leak case 10.10
+did not cover.
+
+**The honesty fix, found by C3 while measuring, not by inspection:**
+`survived: true` was overclaiming. On the real seeded HP-lattice fold, four
+different true temperatures (0.40, 0.50, 0.55, 0.65) all produce the identical
+surviving derived value 0.5 — at a true 0.65 the follow-up ends
+`NO_CONTENDERS_LEFT` with no open questions left over a value that is wrong by
+23%, because the declared ±15% agreement band cannot separate them at the
+settings tried. Nothing in the loop lied; the summary did. This is exactly the
+kind of gap 10.10's own fixture (T=0.5 only) was not built to surface — one
+honest measurement is not enough to catch a claim that is only false at a
+DIFFERENT true value, which is the same lesson §10.2 draws about a single
+supporting measurement settling nothing.
+
+C3's paired MECHANISM-side finding, cherry-picked alongside this one (commit
+`1c079ad`): `discoveryLoop.ts` stopped the whole investigation on the FIRST
+lever to reach `SUPPORTED_AT_TWO_MAGNITUDES`, not the best one — measured on
+the generator catalog, it ran 2 of a 12-round budget, tested 1 of 4 declared
+levers, and reported the weaker one (85.83 L) while a stronger untested lever
+(`h:load-shedding`, 98.67 L) sat unexamined.
+`LEADER_CONFIRMED_AT_TWO_MAGNITUDES` now means every testable mechanism was
+tested AND one replicated at two magnitudes — strictly stronger than before.
+This is what makes `COMPETING_MODELS_UNRESOLVED` reachable at all, which is
+what `mechanismGeneration.ts` (also cherry-picked) needed to compose two
+declared levers into one forked run: on the real solver, fuel-efficiency alone
++45.83 L and load-shedding alone +58.67 L predict 144.5 L under independence,
+but the real joint arm measures 126.17 L — SUB_ADDITIVE by 17.5%, because
+`fuelRateLPerHr` multiplies the two factors. Doing both still beats either
+alone, and the loop reports both facts rather than collapsing them.

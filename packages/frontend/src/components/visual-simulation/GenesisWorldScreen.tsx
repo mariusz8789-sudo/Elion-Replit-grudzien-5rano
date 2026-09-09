@@ -20,6 +20,7 @@ import { createFacadeBuilding } from '../../core/three/graphics/buildingKit';
 import { createWaterSurface, captureDryLook, applyWetLook, type WaterSurfaceHandle } from '../../core/three/graphics/water';
 import { createVehicle, type VehicleHandle, type VehicleKind } from '../../core/three/graphics/vehicleKit';
 import { HumanoidAgentVisual, type HumanoidAgentState } from '../../core/three/humanoidAgentVisual';
+import { configureCinematicCamera } from '../../core/three/graphics/cinematicCamera';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
@@ -385,6 +386,30 @@ export class GenesisWorldSim3D implements Sim3D {
     this.scene = scene;
     this.width = w;
     this.height = h;
+
+    // C2-3 — this scene's camera is ALWAYS first-person (the outdoor `controller` or the hospital's
+    // own `interiorController`; unlike `labScene3D.ts` there is no establishing shot or hero close-up
+    // to cut to), so `SCIENTIST_POV` is not one cinematic phase among several here — it's the one lens
+    // this whole scene ever needs, applied once. `useThreeLoop.ts` hands every scene a generic
+    // `PerspectiveCamera(50, 1, 0.01, 2000)`; the wider 68deg FOV genuinely reads as "occupying the
+    // space" rather than looking through a narrow tube (the same reasoning `labScene3D.ts`'s own
+    // FREE-phase choice already documents), and SCIENTIST_POV has no DOF opinion, correctly: a
+    // scientist's own vision isn't selectively blurred (nothing in `setupPostProcessing` below passes
+    // `depthOfField`, so this was already true here — this just makes the lens match on purpose).
+    //
+    // The profile's own `far: 100` is NOT adopted: it's tuned for `labScene3D.ts`'s single-room set,
+    // not this scene's real 400-unit ground (`groundSize: 400` below) with a deliberately low
+    // `fogDensity: 0.0022` so the whole city stays legible at a distance (at that density, fog barely
+    // fades even at 400 units — nothing like the profile's small-room assumption). A hard far-plane
+    // clip at 100 would cut real, intended-to-be-visible geometry well before fog ever meaningfully
+    // dims it — a visible regression, not an improvement. Keeping this scene's own far plane and
+    // adopting only the profile's FOV/near is the same class of honest, explained deviation as
+    // `resolveBoundaryPlaceholder`'s own (wiring the real code path instead of the directive's literal
+    // line) and `buildAmbientLife`'s own (a loop instead of a road network that doesn't exist here).
+    const previousFar = camera.far;
+    configureCinematicCamera(camera, 'SCIENTIST_POV');
+    camera.far = previousFar;
+    camera.updateProjectionMatrix();
 
     // TIER1.3 — this scene used to hand-roll its own background color, a single hemisphere+directional
     // light pair, and a flat unlit-looking ground plane, independently of the shared exterior baseline

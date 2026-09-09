@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react';
 import type { NarrativeConclusion } from './discoveryNarrative';
+import { ProvenanceBadge, type DataProvenance } from './provenance';
+import type { WorldDiscoveryEvidenceSummary } from '../../core/agent/worldDiscoverySession';
+import type { SavedWorldDiscoveryReplay } from '../../core/scienceMemory';
 
 /**
- * REUSABLE DISCOVERY LADDER — a plain, domain-agnostic list shell for the GOAL -> HYPOTHESIS ->
- * EXPERIMENT -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT EXPERIMENT narrative the C2
- * scientific-proof-and-product-UX directive asks every flagship screen to tell. This component
- * renders whatever `steps` it is given and computes nothing; the caller supplies real content per
- * step (built from its own live solver state and its own `WorldDiscoveryPanel` result). Reused
- * as-is by `CellLabScreen.tsx` today; a future domain screen embeds the same component unchanged.
+ * REUSABLE DISCOVERY LADDER — a plain, domain-agnostic list shell for the QUESTION -> HYPOTHESIS ->
+ * EXPERIMENT -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT EXPERIMENT -> EVIDENCE -> REPLAY
+ * narrative the C2 scientific-proof-and-product-UX directive asks every flagship screen to tell.
+ * This component renders whatever `steps` it is given and computes nothing; the caller supplies
+ * real content per step (built from its own live solver state and its own `WorldDiscoveryPanel`
+ * result). Reused as-is by `CellLabScreen.tsx` today; a future domain screen embeds the same
+ * component unchanged.
  */
 
 export interface LadderStep {
@@ -42,6 +46,45 @@ export function ConclusionContent({ conclusion, pendingText }: { conclusion: Nar
     <p>
       <b className={conclusion.verdict === 'SUPPORTED' ? 'dl-supported' : 'dl-falsified'}>{conclusion.verdict}</b>
       {' — '}{conclusion.text}
+    </p>
+  );
+}
+
+/**
+ * Shared EVIDENCE rendering: the real Evidence Bundle a completed Discovery run already produced
+ * (`runWorldDiscoveryAndRemember` builds and persists this — never computed a second time here),
+ * tagged with the same `ProvenanceBadge` every other screen uses, or the honest "not yet" state.
+ */
+export function EvidenceContent({
+  evidence,
+  provenance,
+  pendingText,
+}: {
+  evidence: WorldDiscoveryEvidenceSummary | null;
+  provenance: DataProvenance;
+  pendingText: string;
+}) {
+  if (!evidence) return <p className="gsc-caption">{pendingText}</p>;
+  return (
+    <p>
+      Evidence Bundle <code>{evidence.bundleId}</code> <ProvenanceBadge provenance={provenance} /> — own replay{' '}
+      <b className={`wd-replay-${evidence.replayVerdict}`}>{evidence.replayVerdict}</b>.
+    </p>
+  );
+}
+
+/**
+ * Shared REPLAY rendering: the real re-execution verdict a completed Discovery run already
+ * computed against its own recorded inputs (`MATCH`/`DRIFT`/`BLOCKED`/`NOT_REPRODUCIBLE`), reusing
+ * the exact `.wd-replay-*` styling `WorldDiscoveryPanel.tsx` already gives this same verdict —
+ * one visual convention for "was this result reproduced," not a second one invented here.
+ */
+export function ReplayContent({ replay, pendingText }: { replay: SavedWorldDiscoveryReplay | null; pendingText: string }) {
+  if (!replay) return <p className="gsc-caption">{pendingText}</p>;
+  return (
+    <p>
+      <b className={`wd-replay-${replay.status}`}>{replay.status}</b>
+      {' — '}{replay.reason}
     </p>
   );
 }

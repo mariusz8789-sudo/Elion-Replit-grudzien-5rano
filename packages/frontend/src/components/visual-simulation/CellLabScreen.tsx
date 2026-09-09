@@ -21,8 +21,10 @@ import {
 import { WorldDiscoveryPanel, type PanelState } from './WorldDiscoveryPanel';
 import { ProvenanceBadge } from './provenance';
 import { RealExperimentPipeline } from './RealExperimentPipeline';
-import { DiscoveryLadder, ConclusionContent, type LadderStep } from './DiscoveryLadder';
+import { DiscoveryLadder, ConclusionContent, EvidenceContent, ReplayContent, type LadderStep } from './DiscoveryLadder';
 import { conclusionFor, nextExperimentFor } from './discoveryNarrative';
+import type { WorldDiscoveryEvidenceSummary } from '../../core/agent/worldDiscoverySession';
+import type { SavedWorldDiscoveryReplay } from '../../core/scienceMemory';
 
 /**
  * VIRTUAL CELL LAB — Control vs Treatment (P0, GENESIS C2 next-sprint directive).
@@ -346,8 +348,10 @@ function cellLabLadderSteps(args: {
   diff: number;
   conclusion: ReturnType<typeof conclusionFor>;
   nextExperiment: string;
+  evidence: WorldDiscoveryEvidenceSummary | null;
+  replay: SavedWorldDiscoveryReplay | null;
 }): LadderStep[] {
-  const { stats, diff, conclusion, nextExperiment } = args;
+  const { stats, diff, conclusion, nextExperiment, evidence, replay } = args;
   return [
     {
       key: 'control',
@@ -385,6 +389,27 @@ function cellLabLadderSteps(args: {
       key: 'next-experiment',
       label: 'NEXT EXPERIMENT',
       content: <p>{nextExperiment}</p>,
+    },
+    {
+      key: 'evidence',
+      label: 'EVIDENCE',
+      content: (
+        <EvidenceContent
+          evidence={evidence}
+          provenance="SIMULATED"
+          pendingText="Run a Discovery search (left panel) to produce a real Evidence Bundle for this culture."
+        />
+      ),
+    },
+    {
+      key: 'replay',
+      label: 'REPLAY',
+      content: (
+        <ReplayContent
+          replay={replay}
+          pendingText="Available once a search has run — Genesis re-executes its own result from the same recorded inputs and checks it still matches."
+        />
+      ),
     },
   ];
 }
@@ -426,7 +451,9 @@ export function CellLabScreen() {
   const nextExperiment = nextExperimentFor(discoveryResult);
   const currentLever = GENESIS_CELL_CULTURE_LEVERS.find((l) => l.leverId === `lever:${treatmentId}`)!;
   const currentHypothesis = currentLever.hypothesis('totalCells', 'maximize');
-  const evidenceBundleId = discoveryResult?.kind === 'COMPLETE' ? (discoveryResult.evidence?.bundleId ?? null) : null;
+  const evidence = discoveryResult?.kind === 'COMPLETE' ? discoveryResult.evidence : null;
+  const replay = discoveryResult?.kind === 'COMPLETE' ? discoveryResult.replay : null;
+  const evidenceBundleId = evidence?.bundleId ?? null;
   const comparisonNote = `control ${sci(stats.controlTotal ?? 0)} cells vs treatment ${sci(stats.treatmentTotal ?? 0)} cells (${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%)`;
   const demoStatusText = discoveryResult?.kind === 'COMPLETE'
     ? 'Real search complete — see CONCLUSION below.'
@@ -500,12 +527,14 @@ export function CellLabScreen() {
           <span>t = {Math.round(stats.hoursElapsed ?? 0)} h{demoMode ? ` (${DEMO_SPEED}x)` : ''}</span>
         </div>
 
-        {/* P0 — FLAGSHIP NARRATIVE: GOAL -> HYPOTHESIS (below, in the Discovery panel) -> EXPERIMENT
-            (CONTROL/TREATMENT) -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT EXPERIMENT, every
-            value read from the live solver or from the real Discovery Loop result (via `onResult`)
-            — never a second, independently-computed verdict. `DiscoveryLadder` is the reusable
-            shell; only the step content below is Cell-Lab-specific. */}
-        <DiscoveryLadder testId="cell-lab-narrative" steps={cellLabLadderSteps({ stats, diff, conclusion, nextExperiment })} />
+        {/* P0/P1 — FLAGSHIP NARRATIVE: QUESTION -> HYPOTHESIS (below, in the Discovery panel) ->
+            EXPERIMENT (CONTROL/TREATMENT) -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT
+            EXPERIMENT -> EVIDENCE -> REPLAY, every value read from the live solver or from the real
+            Discovery Loop result (via `onResult`) — never a second, independently-computed verdict,
+            and never a second Evidence Bundle or replay check (both already come from the SAME
+            `runWorldDiscoveryAndRemember` call the Discovery panel itself made). `DiscoveryLadder`
+            is the reusable shell; only the step content below is Cell-Lab-specific. */}
+        <DiscoveryLadder testId="cell-lab-narrative" steps={cellLabLadderSteps({ stats, diff, conclusion, nextExperiment, evidence, replay })} />
 
         {/* P1 — REAL EXPERIMENT INTERFACE, UI only. Every stage past Prediction is honestly refused;
             see RealExperimentPipeline.tsx's own doc for why. */}

@@ -1969,8 +1969,21 @@ export function MatrixPanel({ view, roundNumber, run }: { view: GenesisMatrixVie
         {/* HONESTY BOUNDARY (item 16) — every value on this panel is simulation output; this badge
             says so explicitly rather than letting the panel's scientific framing imply a physical
             apparatus Genesis does not have an interface to today. Reuses the same `ProvenanceBadge`
-            the Virtual Cell Lab uses (`provenance.tsx`) rather than a second hardcoded badge. */}
-        <ProvenanceBadge provenance="SIMULATED" testId="matrix-provenance-badge" />
+            the Virtual Cell Lab uses (`provenance.tsx`) rather than a second hardcoded badge, and now
+            reads the REAL per-run provenance `StrategyRun.dataProvenance` carries (closed by C3 —
+            previously this hop lost the axis entirely) instead of assuming SIMULATED. A MECHANISM
+            run over a WorldGraph is unconditionally SIMULATED today (`WORLDGRAPH_PROVENANCE` in
+            `discoveryStrategies.ts`), so the visible badge is unchanged — but it is now a real
+            reading, not a guess, and stays correct if a PARAMETER-shape run with mixed origins ever
+            reaches this panel. `origin === null` means the run mixed origins; that state is shown
+            plainly rather than collapsed into any single one of the three canonical values. */}
+        {run && run.dataProvenance.origin === null ? (
+          <span className="gx-matrix-badge" data-testid="matrix-provenance-badge" title={run.dataProvenance.why}>
+            MIXED: {run.dataProvenance.origins.join(' + ')}
+          </span>
+        ) : (
+          <ProvenanceBadge provenance={run?.dataProvenance.origin ?? 'SIMULATED'} testId="matrix-provenance-badge" />
+        )}
       </div>
 
       <div className="gx-matrix-stage" data-testid="matrix-stage-theory">

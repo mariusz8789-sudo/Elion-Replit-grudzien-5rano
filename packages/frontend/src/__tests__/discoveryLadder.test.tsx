@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ConclusionContent, DiscoveryLadder, type LadderStep } from '../components/visual-simulation/DiscoveryLadder';
+import { ConclusionContent, DiscoveryLadder, EvidenceContent, ReplayContent, type LadderStep } from '../components/visual-simulation/DiscoveryLadder';
 import { conclusionFor, nextExperimentFor } from '../components/visual-simulation/discoveryNarrative';
 import type { PanelState } from '../components/visual-simulation/WorldDiscoveryPanel';
 import type { DiscoveryLoopResult, HypothesisBelief } from '../core/agent/discoveryLoop';
@@ -120,5 +120,43 @@ describe('ConclusionContent — the shared CONCLUSION rendering every domain reu
     expect(markup).toContain('dl-falsified');
     expect(markup).toContain('FALSIFIED');
     expect(markup).toContain('refuted text');
+  });
+});
+
+describe('EvidenceContent — the shared EVIDENCE rendering every domain reuses', () => {
+  it('renders the honest pending state before any Evidence Bundle exists', () => {
+    const markup = renderToStaticMarkup(<EvidenceContent evidence={null} provenance="SIMULATED" pendingText="No evidence yet." />);
+    expect(markup).toContain('No evidence yet.');
+    expect(markup).not.toContain('Evidence Bundle');
+  });
+
+  it('renders a real Evidence Bundle id, its own replay verdict, and the given provenance badge', () => {
+    const evidence = { bundleId: 'bundle-xyz', scientificContentFingerprint: 'fp-xyz', replayVerdict: 'MATCH' as const, replayMessage: 'ok' };
+    const markup = renderToStaticMarkup(<EvidenceContent evidence={evidence} provenance="SIMULATED" pendingText="unused" />);
+    expect(markup).toContain('bundle-xyz');
+    expect(markup).toContain('wd-replay-MATCH');
+    expect(markup).toContain('MATCH');
+    expect(markup).toContain('SIMULATION');
+  });
+});
+
+describe('ReplayContent — the shared REPLAY rendering every domain reuses', () => {
+  it('renders the honest pending state before any replay has run', () => {
+    const markup = renderToStaticMarkup(<ReplayContent replay={null} pendingText="Not replayed yet." />);
+    expect(markup).toContain('Not replayed yet.');
+  });
+
+  it('renders a real MATCH verdict with its own reason', () => {
+    const markup = renderToStaticMarkup(<ReplayContent replay={{ status: 'MATCH', reason: 'Re-executed and matched.' }} pendingText="unused" />);
+    expect(markup).toContain('wd-replay-MATCH');
+    expect(markup).toContain('MATCH');
+    expect(markup).toContain('Re-executed and matched.');
+  });
+
+  it('renders a real DRIFT verdict distinctly from MATCH', () => {
+    const markup = renderToStaticMarkup(<ReplayContent replay={{ status: 'DRIFT', reason: 'Re-execution diverged.' }} pendingText="unused" />);
+    expect(markup).toContain('wd-replay-DRIFT');
+    expect(markup).toContain('DRIFT');
+    expect(markup).toContain('Re-execution diverged.');
   });
 });

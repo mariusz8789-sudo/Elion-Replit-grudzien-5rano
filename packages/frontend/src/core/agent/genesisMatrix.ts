@@ -1,6 +1,6 @@
 import type { ReplayVerdict } from '../matrixFoundation/replayVerdict';
 import type { WorldEvidenceBundle } from '../worldModel/evidence/worldEvidenceBundle';
-import type { DiscoveryOutcome } from './discoveryOrchestrator';
+import type { DiscoveryOutcome, PriorInvestigationDecision } from './discoveryOrchestrator';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import type { AdmissionStatus, QuestionShape } from './discoveryStrategy';
 import { assessModelSufficiency, type ModelSufficiencyVerdict } from './modelSufficiency';
@@ -110,6 +110,13 @@ export interface GenesisMatrixView {
    * nothing ran, so there is no space to judge.
    */
   readonly sufficiency: ModelSufficiencyVerdict | null;
+  /**
+   * MEMORY → SELECTION (P1) — whether, and why, an earlier investigation of
+   * the same world/system already narrowed what THIS run tested. See
+   * `discoveryOrchestrator.ts`'s own doc on `PriorInvestigationDecision`.
+   * Null for a REFUSED outcome: nothing was investigated.
+   */
+  readonly priorInvestigation: PriorInvestigationDecision | null;
 }
 
 /**
@@ -144,6 +151,7 @@ export function buildGenesisMatrixView(
       nextExperiment: null,
       evidence: evidenceView,
       sufficiency: null,
+      priorInvestigation: null,
     };
   }
 
@@ -173,5 +181,6 @@ export function buildGenesisMatrixView(
     nextExperiment: run.nextExperiment,
     evidence: evidenceView,
     sufficiency: assessModelSufficiency(run),
+    priorInvestigation: outcome.priorInvestigation,
   };
 }

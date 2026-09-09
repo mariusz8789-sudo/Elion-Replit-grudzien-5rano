@@ -123,6 +123,10 @@ export function epidemicInfectiousDaysSystem(infectiousDays: number, systemId = 
     label: 'Unmitigated SEIRD outbreak (mean infectious period not yet measured)',
     worldId: EPIDEMIC_CALIBRATION_WORLD_ID,
     domainId: 'epidemiology',
+    // The same `ScenarioKind` `admitWorldQuestion` already classifies an
+    // epidemic MECHANISM question to — `solverCapabilityFor('EPIDEMIC')`
+    // reports MODELLED for both, since both run the real RK4 SEIRD solver.
+    scenarioKind: 'EPIDEMIC',
     parameterId: EPIDEMIC_CALIBRATION_PARAMETER_ID,
     hiddenValue: infectiousDays,
     buildWorldAt: buildEpidemicWorldAt,

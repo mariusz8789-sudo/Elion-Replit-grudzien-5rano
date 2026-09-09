@@ -61,6 +61,14 @@ export function narrateIntro(view: GenesisMatrixView): readonly NarrationLine[] 
     return lines;
   }
   if (view.admissionCaveat) lines.push({ phase: 'CAVEAT', text: view.admissionCaveat });
+  // MEMORY → SELECTION (P1): this run already tested a NARROWED set — the
+  // orchestrator decided what to skip before executing, not after. Spoken
+  // here as context so a listener knows why some hypothesis never appears in
+  // the rounds that follow. See `discoveryOrchestrator.ts`'s
+  // `PriorInvestigationDecision`. Spoken whenever memory had anything to say,
+  // even an empty skip list: "N earlier investigations found nothing to rule
+  // out" is real context too.
+  if (view.priorInvestigation) lines.push({ phase: 'CAVEAT', text: view.priorInvestigation.reason });
   return lines;
 }
 

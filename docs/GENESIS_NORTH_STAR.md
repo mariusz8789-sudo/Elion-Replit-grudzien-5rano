@@ -191,6 +191,13 @@ starting anything: **does this move Genesis closer to autonomous discovery, real
 validation, product readiness, or a real mechanistic biological substrate?** If
 not, it does not outrank them.
 
+**Current sequencing directive (2026-09-09):** see
+`docs/MASTER_PRIORITY_GENESIS.md` for the active, ordered task list across
+C1/C2/C3 — MECHANISM generation routing, autonomous multi-step research
+chains, a strong Virtual Cell Lab demo, and the Real Experiment Interface
+(with the mandatory `SIMULATED`/`REFERENCE`/`REAL_EXPERIMENTAL` provenance
+widening). Priority 3 is explicitly deferred until that work lands.
+
 What follows is not a restatement of the brief — it is what each priority looks
 like measured against the code as it stands, because a priority list is only
 useful if it names the *next* missing thing rather than the whole mountain.

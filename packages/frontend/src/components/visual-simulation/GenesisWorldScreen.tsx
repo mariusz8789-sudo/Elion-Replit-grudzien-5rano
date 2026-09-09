@@ -16,7 +16,11 @@ import { createPBRMaterial, type StaticGenesisMaterialId } from '../../core/thre
 import { setupGraphicsPipeline, type GraphicsPipeline } from '../../core/three/graphics/postProcessing';
 import { createPracticalLight } from '../../core/three/graphics/lighting';
 import { createLightShaft } from '../../core/three/graphics/atmosphere';
+import { createFacadeBuilding } from '../../core/three/graphics/buildingKit';
 import { createWaterSurface, captureDryLook, applyWetLook, type WaterSurfaceHandle } from '../../core/three/graphics/water';
+import { createVehicle, type VehicleHandle, type VehicleKind } from '../../core/three/graphics/vehicleKit';
+import { HumanoidAgentVisual, type HumanoidAgentState } from '../../core/three/humanoidAgentVisual';
+import { configureCinematicCamera } from '../../core/three/graphics/cinematicCamera';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
@@ -198,6 +202,18 @@ function footprintHalfExtent(scale: number): number {
   return Math.max(1.5, 1.5 * scale) / 2;
 }
 
+/** A stable, deterministic seed derived from an entity's own real id — never `Math.random()`, so a
+ * rebuilt scene (replay, branch switch) reproduces the identical building every time, the same
+ * convention `genesisScientificCitySim.ts`'s own `stableSeed` already documents. */
+function stableSeed(id: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash | 0);
+}
+
 /** Builds a square AABB obstacle centered on a real entity position, sized from its own real render scale. */
 function buildingObstacle(position: { x: number; z: number }, scale: number): Obstacle {
   const half = footprintHalfExtent(scale);
@@ -240,6 +256,25 @@ export class GenesisWorldSim3D implements Sim3D {
    * the hydrology solve reports — see `FLOOD_WATER_MIN_VISIBLE_DEPTH_M`'s own doc. ASTRA B4: a real
    * `createWaterSurface` (transmission + scrolling ripple) rather than a static flat-color plane. */
   private floodWater: WaterSurfaceHandle | null = null;
+  /** GAME-GRADE C2 — shared base materials for `createFacadeBuilding`'s output. Cloned per building
+   * (see `resolveBoundaryPlaceholder`'s own doc), created once here so cleanup has one owner. */
+  private buildingWallMaterial: THREE_NS.Material | null = null;
+  private buildingWindowMaterial: THREE_NS.Material | null = null;
+
+  /**
+   * C2-2 — AMBIENT LIFE: decorative vehicles/pedestrians looping the three REAL hospital/lab/pump
+   * landmark positions (see `buildAmbientLife`'s own doc for why this is a simple loop rather than
+   * "the real road network" — this world has no road network for anything to honestly follow).
+   * `bodyMaterial` is stored per vehicle only because it's a fresh instance this scene created (not
+   * one of `vehicleKit.ts`'s own defaults), so cleanup has a clear single owner, same convention as
+   * `buildingWallMaterial` above.
+   */
+  private ambientVehicles: { handle: VehicleHandle; bodyMaterial: THREE_NS.Material; angularSpeed: number; phase: number }[] = [];
+  private ambientPedestrians: { visual: HumanoidAgentVisual; id: number; angularSpeed: number; phase: number }[] = [];
+  private ambientLoopCenter = { x: 0, z: 0 };
+  private ambientVehicleLoopRadius = { x: 0, z: 0 };
+  private ambientPedestrianLoopRadius = { x: 0, z: 0 };
+  private ambientTimeSeconds = 0;
 
   /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
@@ -352,6 +387,30 @@ export class GenesisWorldSim3D implements Sim3D {
     this.width = w;
     this.height = h;
 
+    // C2-3 — this scene's camera is ALWAYS first-person (the outdoor `controller` or the hospital's
+    // own `interiorController`; unlike `labScene3D.ts` there is no establishing shot or hero close-up
+    // to cut to), so `SCIENTIST_POV` is not one cinematic phase among several here — it's the one lens
+    // this whole scene ever needs, applied once. `useThreeLoop.ts` hands every scene a generic
+    // `PerspectiveCamera(50, 1, 0.01, 2000)`; the wider 68deg FOV genuinely reads as "occupying the
+    // space" rather than looking through a narrow tube (the same reasoning `labScene3D.ts`'s own
+    // FREE-phase choice already documents), and SCIENTIST_POV has no DOF opinion, correctly: a
+    // scientist's own vision isn't selectively blurred (nothing in `setupPostProcessing` below passes
+    // `depthOfField`, so this was already true here — this just makes the lens match on purpose).
+    //
+    // The profile's own `far: 100` is NOT adopted: it's tuned for `labScene3D.ts`'s single-room set,
+    // not this scene's real 400-unit ground (`groundSize: 400` below) with a deliberately low
+    // `fogDensity: 0.0022` so the whole city stays legible at a distance (at that density, fog barely
+    // fades even at 400 units — nothing like the profile's small-room assumption). A hard far-plane
+    // clip at 100 would cut real, intended-to-be-visible geometry well before fog ever meaningfully
+    // dims it — a visible regression, not an improvement. Keeping this scene's own far plane and
+    // adopting only the profile's FOV/near is the same class of honest, explained deviation as
+    // `resolveBoundaryPlaceholder`'s own (wiring the real code path instead of the directive's literal
+    // line) and `buildAmbientLife`'s own (a loop instead of a road network that doesn't exist here).
+    const previousFar = camera.far;
+    configureCinematicCamera(camera, 'SCIENTIST_POV');
+    camera.far = previousFar;
+    camera.updateProjectionMatrix();
+
     // TIER1.3 — this scene used to hand-roll its own background color, a single hemisphere+directional
     // light pair, and a flat unlit-looking ground plane, independently of the shared exterior baseline
     // every other outdoor scene composes with (see `sceneEnvironment.ts`'s own module doc — this scene
@@ -389,6 +448,20 @@ export class GenesisWorldSim3D implements Sim3D {
     this.root = new THREE.Group();
     scene.add(this.root);
 
+    // Declared here (not down with the rest of PRIORITY 2's building setup) because
+    // `resolveBoundaryPlaceholder` below needs it in its closure too, and this is the one canonical
+    // place both consumers read from — no second literal of this id anywhere in this file.
+    const labBuildingId: WorldFrameEntityId = 'building:chemistry-lab-building';
+
+    // GAME-GRADE C2 — same recipe `genesisScientificCitySim.ts` already proved: a plain CONCRETE wall
+    // and a white, warm-emissive window base (InstanceBatch multiplies this by each window's own
+    // lit/unlit vertex color, so white lets that tint show through undistorted; the emissive feeds
+    // the bloom threshold ASTRA B2 already lowered for exactly this kind of light source).
+    this.buildingWallMaterial = createPBRMaterial(THREE, 'CONCRETE');
+    this.buildingWindowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.25, metalness: 0.05, emissive: 0xffc98a, emissiveIntensity: 0.45,
+    });
+
     const resolveVisual = (entity: WorldFrameEntity): EntityVisualSpec => {
       const size = Math.max(1.5, 1.5 * (entity.scale ?? 1));
       const geometry = new THREE.BoxGeometry(size, size, size);
@@ -421,20 +494,62 @@ export class GenesisWorldSim3D implements Sim3D {
     // and the procedural city-grid fillers) is `NOT_MODELED` (no domain binding — nobody solves
     // building architecture), so `WorldFrameRenderer.sync()` never reaches `resolveVisual` for any of
     // them at all: it routes straight to the boundary-placeholder path BEFORE `resolveVisual` is ever
-    // called (confirmed by direct instrumentation, not assumed). Giving them a real windowed facade
-    // material there would be dishonest — claiming detail the model does not have, exactly what the
-    // grounding discipline exists to prevent. The actual, honest fix is a placeholder SHAPED like the
-    // real footprint (`resolveVisual`'s own box-size formula) instead of the default's generic small
-    // sphere, so a building at least reads as a building-shaped gap in the model — still wireframe,
-    // still transparent, still unmistakably "not modeled," just legible. Every other NOT_MODELED kind
-    // keeps the renderer's own default sphere, reproduced verbatim below (not exported to override
+    // called (confirmed by direct instrumentation, not assumed). Every other NOT_MODELED kind still
+    // gets the renderer's own default sphere, reproduced verbatim below (not exported to override
     // selectively).
+    //
+    // GAME-GRADE C2 — B1's first pass gave `building`-kind entities a wireframe box SHAPED like their
+    // real footprint instead of the renderer's generic sphere, reasoning that a real windowed facade
+    // would be dishonest here. Revisited: `createFacadeBuilding` tags its own output
+    // `userData.visualOnlyContext = true` by default specifically for this case — a proven, shipped
+    // building block (`genesisScientificCitySim.ts` already uses it for its own decorative background
+    // buildings under the exact same tag) whose window pattern is deterministic massing, not a claim
+    // about any real occupancy/state data. That is a materially different claim from what B1 was
+    // actually guarding against (a solver-derived reading rendered as if measured); a plausible window
+    // grid on a building whose EXISTENCE and FOOTPRINT are real is no more dishonest than giving the
+    // pump a plausible metal color no solver picked either. `resolveVisual`'s bare `BoxGeometry` (this
+    // scene's single biggest "reads like a debug view" culprit) is why this kit exists in the first
+    // place — see that function's own doc there: "the reason genesisScientificCitySim had to render
+    // its buildings as bare BoxGeometry." This scene had the same reason; wiring it here removes it,
+    // in the ONE place these entities actually render (the placeholder path, not `resolveVisual`).
     const resolveBoundaryPlaceholder = (_THREE: typeof THREE_NS, entity: WorldFrameEntity): THREE_NS.Object3D => {
-      const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x5a6b7a, wireframe: true, transparent: true, opacity: 0.35 });
-      if (entity.visualHint === 'building') {
-        const size = Math.max(1.5, 1.5 * (entity.scale ?? 1));
-        return new THREE.Mesh(new THREE.BoxGeometry(size, size, size), boundaryMaterial);
+      if (entity.visualHint === 'building' && this.buildingWallMaterial && this.buildingWindowMaterial) {
+        const scale = entity.scale ?? 1;
+        const isHospital = entity.id === this.city.hospitalBuildingId;
+        const isLab = entity.id === labBuildingId;
+        // The exact footprint the existing collision obstacle already uses (`footprintHalfExtent`'s
+        // own formula) for the two real, walkable buildings, so the visual silhouette always matches
+        // what actually blocks the player; a plausible default for the water-system building and the
+        // procedural city-grid fillers, which carry no presentation-scale patch (`scale` stays 1) and
+        // have no collision of their own to match.
+        const footprint = isHospital || isLab ? Math.max(1.5, 1.5 * scale) : 4.5;
+        const height = isHospital ? 9 : isLab ? 8 : 6 + (stableSeed(entity.id) % 8);
+        // `WorldFrameRenderer.applyTransform` applies `object.scale.setScalar(entity.scale)` UNIFORMLY
+        // on top of whatever this returns (ADAPTER_CONTRACT.md rule 4, and the exact bug ASTRA B1
+        // already found and fixed for this building's own graph-children). Dividing every dimension by
+        // that same `scale` here cancels it out, so the absolute sizes above are the final on-screen
+        // size, not `scale` squared. A no-op for entities with no presentation-scale patch (`scale===1`).
+        // `floorHeight` (default 1.2) is an ABSOLUTE local-space constant `createFacadeBuilding` uses
+        // to derive window-row count/size — it has no idea its output is about to be rescaled. Dividing
+        // width/depth/height by `scale` without also dividing `floorHeight` by the SAME `scale` breaks
+        // that ratio: for the hospital (scale 7), `height/scale` collapses to about one floor's worth,
+        // so `rows = floor(height/floorHeight)` rounds down to a single giant "window" per facade —
+        // confirmed the hard way via a real Chromium screenshot, not assumed. Scaling `floorHeight` by
+        // the same factor keeps every internal ratio (row count, window proportions) identical to what
+        // it would be at the true absolute size, so the facade reads correctly at any presentation scale.
+        const building = createFacadeBuilding(THREE, {
+          position: [0, 0, 0],
+          width: footprint / scale, depth: footprint / scale, height: height / scale,
+          floorHeight: 1.2 / scale,
+          seed: stableSeed(entity.id),
+          wallMaterial: this.buildingWallMaterial.clone(),
+          windowMaterial: this.buildingWindowMaterial.clone(),
+          roofMaterial: this.buildingWallMaterial.clone(),
+          litFraction: isHospital ? 0.6 : 0.4,
+        });
+        return building;
       }
+      const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x5a6b7a, wireframe: true, transparent: true, opacity: 0.35 });
       const radius = 0.5 * (entity.scale ?? 1);
       return new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), boundaryMaterial);
     };
@@ -484,7 +599,6 @@ export class GenesisWorldSim3D implements Sim3D {
     // real footprints into real collision.
     const hospitalEntity = spawnFrame.entities.find((e) => e.id === this.city.hospitalBuildingId);
     const hospitalPos = hospitalEntity ? hospitalEntity.transform.position : { x: 0, y: 0, z: 0 };
-    const labBuildingId: WorldFrameEntityId = 'building:chemistry-lab-building';
     const labBuildingEntity = spawnFrame.entities.find((e) => e.id === labBuildingId);
     const labBuildingPos = labBuildingEntity ? labBuildingEntity.transform.position : { x: 0, y: 0, z: 0 };
     for (const [id, position, scale] of [
@@ -558,6 +672,7 @@ export class GenesisWorldSim3D implements Sim3D {
 
     this.buildHospitalInterior(THREE, scene);
     this.buildLandmarkLighting(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
+    this.buildAmbientLife(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
 
     this.syncNow();
   }
@@ -606,6 +721,123 @@ export class GenesisWorldSim3D implements Sim3D {
         decay: 2,
       });
     }
+  }
+
+  /**
+   * C2-2 — AMBIENT LIFE. `vehicleKit.ts`/`humanoidAgentVisual.ts` are both already documented as
+   * DECORATIVE, caller-drives-motion kits — `vehicleKit.ts`'s own doc states outright "every vehicle
+   * here is DECORATIVE city population... it never claims to be a WorldFrame/C3 entity", and
+   * `HumanoidAgentState` is a plain interface with no required link to a real `SimAgent`. That is
+   * exactly the honesty label this scene needs, because there is no real road network here for
+   * anything to follow: this world's `road:city-road-*` entities (`CITY_TEMPLATE`, in
+   * `specification/templates.ts`) are single-point, NOT_MODELED placeholders, and that template's own
+   * doc says outright "C3 has no dedicated road/transport-network scale, and does not fabricate one
+   * here." `core/world/roadNetwork.ts`'s real `CityLayout`/`buildRoadNetwork` is a completely separate
+   * subsystem belonging only to the `epidemicCity3D.ts`/`City3DWebGLScreen.tsx` family of scenes (the
+   * `#/city3d` route) — it has no relationship to `genesisScientificCity4`'s world at all. Importing
+   * it here just so these vehicles could "follow" it would fabricate a connection C3 never declared,
+   * dressing up decoration as a real network — the same class of dishonesty this engine's grounding
+   * discipline exists to prevent, just moved into road geometry instead of a sensor reading.
+   *
+   * What this DOES do: loop a handful of vehicles/pedestrians around a simple ellipse sized from the
+   * three REAL landmark positions passed in (never guessed, never re-derived independently of where
+   * `init()` actually placed the hospital/lab/pump) — filling the empty ground between them with
+   * motion, honestly scoped as ambiance rather than a traffic/pedestrian simulation. Positions are
+   * driven every real frame in `updateAmbientLife()`, the same "pure rendering-layer animation, not
+   * simulation time" category `update(dt)`'s own doc already carves out for the fire VFX/haze/player
+   * movement.
+   */
+  private buildAmbientLife(
+    THREE: typeof THREE_NS,
+    scene: THREE_NS.Scene,
+    landmarks: readonly { x: number; z: number }[],
+  ): void {
+    const xs = landmarks.map((p) => p.x);
+    const zs = landmarks.map((p) => p.z);
+    this.ambientLoopCenter = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
+    const spanX = Math.max(...xs) - Math.min(...xs);
+    const spanZ = Math.max(...zs) - Math.min(...zs);
+    // Margin clears the largest real landmark footprint in this scene (the hospital's own
+    // `footprintHalfExtent(HOSPITAL_BUILDING_SCALE)` = 5.25) plus room for a vehicle body/pedestrian
+    // silhouette — the pedestrian loop sits inside the vehicle loop, like a sidewalk inside a street.
+    this.ambientVehicleLoopRadius = { x: spanX / 2 + 14, z: spanZ / 2 + 14 };
+    this.ambientPedestrianLoopRadius = { x: spanX / 2 + 8, z: spanZ / 2 + 8 };
+
+    const kinds: VehicleKind[] = ['car', 'van', 'ambulance', 'car'];
+    const colors: THREE_NS.ColorRepresentation[] = [0x8a2f2f, 0x2f5c9a, 0xd8d8d8, 0x4a7a4a];
+    kinds.forEach((kind, i) => {
+      const bodyMaterial = createPBRMaterial(THREE, 'PAINTED_METAL', { color: colors[i % colors.length] });
+      const handle = createVehicle(THREE, {
+        kind,
+        // Repositioned every frame in `updateAmbientLife()` — this scene drives motion itself, per
+        // `vehicleKit.ts`'s own "kit owns geometry, caller owns motion" boundary.
+        position: [0, 0, 0],
+        bodyMaterial,
+        seed: i * 11 + 5,
+        state: kind === 'ambulance' ? 'EMERGENCY' : 'MOVING',
+      });
+      scene.add(handle.group);
+      this.ambientVehicles.push({ handle, bodyMaterial, angularSpeed: 0.045 + i * 0.012, phase: (i / kinds.length) * Math.PI * 2 });
+    });
+
+    const pedestrianCount = 4;
+    for (let i = 0; i < pedestrianCount; i++) {
+      const id = 900_000 + i; // far outside any real entity/population id range, so it can never collide with one
+      const visual = new HumanoidAgentVisual(THREE, id);
+      scene.add(visual.root);
+      this.ambientPedestrians.push({ visual, id, angularSpeed: 0.10 + i * 0.02, phase: (i / pedestrianCount) * Math.PI * 2 + 0.6 });
+    }
+
+    this.updateAmbientLife(0); // place everyone at their real starting point immediately, not at the origin for one visible frame
+  }
+
+  /** Advances every ambient vehicle/pedestrian one step along its own ellipse — see `buildAmbientLife`'s
+   * own doc for why an ellipse (not "the real road network"). Heading is always the path's own tangent
+   * at this instant (`d/dangle`), so it exactly matches the direction each frame's position actually
+   * moved from the last, without tracking a separate velocity. */
+  private updateAmbientLife(dt: number): void {
+    this.ambientTimeSeconds += dt;
+    const t = this.ambientTimeSeconds;
+    for (const v of this.ambientVehicles) {
+      const angle = v.phase + t * v.angularSpeed;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const x = this.ambientLoopCenter.x + this.ambientVehicleLoopRadius.x * cos;
+      const z = this.ambientLoopCenter.z + this.ambientVehicleLoopRadius.z * sin;
+      v.handle.group.position.set(x, 0, z);
+      v.handle.group.rotation.y = Math.atan2(-this.ambientVehicleLoopRadius.x * sin, this.ambientVehicleLoopRadius.z * cos);
+    }
+    for (const p of this.ambientPedestrians) {
+      const angle = p.phase + t * p.angularSpeed;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const x = this.ambientLoopCenter.x + this.ambientPedestrianLoopRadius.x * cos;
+      const z = this.ambientLoopCenter.z + this.ambientPedestrianLoopRadius.z * sin;
+      const facing = Math.atan2(-this.ambientPedestrianLoopRadius.x * sin, this.ambientPedestrianLoopRadius.z * cos);
+      const state: HumanoidAgentState = {
+        id: p.id,
+        worldX: x,
+        worldZ: z,
+        facing,
+        speed: 0.4,
+        gait: t * 3.4 + p.phase * 2,
+        pose: 'walk',
+        health: 'unknown', // decorative ambiance — never a claim about the real population's own epidemiological state
+        behavior: 'walk',
+        stateSince: 0,
+        isolated: false,
+        hospitalized: false,
+      };
+      p.visual.sync(state, t);
+    }
+  }
+
+  /** Hides/shows the ambient vehicles/pedestrians alongside `this.root` — same toggle the hazard-field
+   * overlays (`setShowWildfire`/`setShowLandslide`) already apply to every other entity mesh, since
+   * these live directly under `scene` (not `this.root`) and would otherwise keep showing through. */
+  private setAmbientLifeVisible(visible: boolean): void {
+    for (const v of this.ambientVehicles) v.handle.group.visible = visible;
+    for (const p of this.ambientPedestrians) p.visual.root.visible = visible;
   }
 
   /**
@@ -942,6 +1174,7 @@ export class GenesisWorldSim3D implements Sim3D {
       this.removeOverlayMesh(this.landslideField);
       this.buildWildfireDemo();
       if (this.root) this.root.visible = false;
+      this.setAmbientLifeVisible(false);
       if (this.wildfireField && this.scene && !this.wildfireField.mesh.parent) {
         this.scene.add(this.wildfireField.mesh);
       }
@@ -950,6 +1183,7 @@ export class GenesisWorldSim3D implements Sim3D {
       }
     } else {
       if (this.root) this.root.visible = true;
+      this.setAmbientLifeVisible(true);
       this.removeOverlayMesh(this.wildfireField);
       this.removeFireVfx();
     }
@@ -1012,11 +1246,13 @@ export class GenesisWorldSim3D implements Sim3D {
       this.removeFireVfx();
       this.buildLandslideDemo();
       if (this.root) this.root.visible = false;
+      this.setAmbientLifeVisible(false);
       if (this.landslideField && this.scene && !this.landslideField.mesh.parent) {
         this.scene.add(this.landslideField.mesh);
       }
     } else {
       if (this.root) this.root.visible = true;
+      this.setAmbientLifeVisible(true);
       this.removeOverlayMesh(this.landslideField);
     }
   }
@@ -1047,6 +1283,7 @@ export class GenesisWorldSim3D implements Sim3D {
     this.sceneEnvironment?.update(dt);
     if (this.showWildfire) this.fireVfx?.update(dt);
     if (this.floodWater?.mesh.visible) this.floodWater.update(dt); // ripple only scrolls while there's water to see it on
+    this.updateAmbientLife(dt);
     const active = this.activeController();
     if (active) this.fpState = active.update(dt);
   }
@@ -1217,6 +1454,13 @@ export class GenesisWorldSim3D implements Sim3D {
     this.fireVfx?.dispose();
     this.sceneEnvironment?.dispose();
     this.sceneEnvironment = null;
+    // GAME-GRADE C2 — the renderer's own dispose() above already disposes every tracked object,
+    // which covers every per-building `.clone()` of these; these two are the shared base instances
+    // those clones came from, never themselves added to the scene, so nothing else owns them.
+    this.buildingWallMaterial?.dispose();
+    this.buildingWallMaterial = null;
+    this.buildingWindowMaterial?.dispose();
+    this.buildingWindowMaterial = null;
     // PRIORITY 2 — the hospital interior's own geometry/materials: built once in `init()`, disposed
     // here the same way every other GPU resource in this scene already is.
     if (this.interiorGroup) {
@@ -1235,6 +1479,20 @@ export class GenesisWorldSim3D implements Sim3D {
       this.floodWater.dispose();
       this.floodWater = null;
     }
+    // C2-2 — ambient vehicles/pedestrians: each `bodyMaterial` was created fresh in `buildAmbientLife`
+    // (never one of `vehicleKit.ts`'s own defaults), so it needs disposing here explicitly; `handle.dispose()`
+    // only frees geometry/materials the kit itself created.
+    for (const v of this.ambientVehicles) {
+      v.handle.group.parent?.remove(v.handle.group);
+      v.handle.dispose();
+      v.bodyMaterial.dispose();
+    }
+    this.ambientVehicles = [];
+    for (const p of this.ambientPedestrians) {
+      p.visual.root.parent?.remove(p.visual.root);
+      p.visual.dispose();
+    }
+    this.ambientPedestrians = [];
   }
 }
 

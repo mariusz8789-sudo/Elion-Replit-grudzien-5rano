@@ -118,6 +118,162 @@ function realExperimentProvenanceDataProvenance(): DataProvenance {
 }
 
 /**
+ * THE SECOND HONEST BRIDGE — a cited, published REFERENCE figure (never a
+ * physical measurement, never Genesis's own solver), assembled into the same
+ * `ExperimentRun` shape as `createRealExperimentRun` above. This exists so
+ * "close the loop with real data" does not have to wait on a physical lab
+ * partner: a real, citable number (e.g. generator-sizing manufacturer
+ * guidance already quoted in `electricalGenerator.ts`'s own doc comment) can
+ * be compared against a Genesis prediction TODAY, honestly tagged
+ * `dataProvenance: 'REFERENCE'` — never `REAL_EXPERIMENTAL` (no instrument
+ * produced it) and never `SIMULATED` (Genesis's own solver did not compute
+ * it).
+ *
+ * `resultOrigin: 'knowledge-only'` is the existing, correct mapping —
+ * `dataProvenanceForResultOrigin('knowledge-only')` already returns
+ * `'REFERENCE'` (see `provenance.ts`). This reuses that mapping rather than
+ * inventing a new one.
+ */
+export interface ReferenceCitation {
+  /** The published claim itself, quoted or closely paraphrased — never invented. */
+  readonly citationText: string;
+  /** Where this figure comes from — a source name, URL, or an in-repo pointer to an existing cited constant. */
+  readonly sourceRef: string;
+}
+
+export interface ReferenceMeasurementRequest {
+  readonly structuredRequest: StructuredExperimentRequest;
+  readonly citation: ReferenceCitation;
+  /** Links back to the Discovery Engine hypothesis this reference figure tests, when there is one. */
+  readonly hypothesisId?: string;
+}
+
+/**
+ * A cited value, already shaped like `ExperimentResult.outputs` so it needs
+ * no new consumer code anywhere in Fabric/Evidence/Memory/UI — only a new
+ * PRODUCER (this file) of the same shape. No raw-reading lineage: a citation
+ * is not derived from instrument samples, it is quoted from a source.
+ */
+export interface DerivedReferenceValue {
+  readonly outputKey: string;
+  readonly value: ExperimentOutputValue;
+  readonly unit: string;
+}
+
+/** Structurally `ExperimentRun` exactly, narrowed by `provenance.dataProvenance === 'REFERENCE'`. */
+export type ReferenceMeasurementRun = ExperimentRun;
+
+function referenceProvenanceDataProvenance(): DataProvenance {
+  return 'REFERENCE';
+}
+
+/**
+ * Assembles an already-obtained citation into a valid, honestly-provenanced
+ * `ExperimentRun`. Calls no external API, invents no source: every citation
+ * text and source reference was already produced by the caller.
+ */
+export function createReferenceMeasurementRun(input: {
+  request: ReferenceMeasurementRequest;
+  derived: readonly DerivedReferenceValue[];
+  summary: string;
+  assumptions?: readonly string[];
+  warnings?: readonly string[];
+}): ReferenceMeasurementRun {
+  const { request } = input;
+  if (request.citation.citationText.trim().length === 0) {
+    throw new Error('A reference measurement needs a non-empty citationText — an unattributed claim cannot become a reference measurement.');
+  }
+  if (request.citation.sourceRef.trim().length === 0) {
+    throw new Error('A reference measurement needs a non-empty sourceRef — a citation with no traceable source cannot be verified.');
+  }
+  if (input.derived.length === 0) {
+    throw new Error('A reference measurement run needs at least one derived value — nothing was cited.');
+  }
+  for (const measurement of input.derived) {
+    if (!Number.isFinite(measurement.value)) {
+      throw new Error(`Cited value "${measurement.outputKey}" is not a finite number.`);
+    }
+  }
+
+  const outputs: Record<string, ExperimentOutputValue> = {};
+  const units: Record<string, string> = {};
+  for (const measurement of input.derived) {
+    outputs[measurement.outputKey] = measurement.value;
+    units[measurement.outputKey] = measurement.unit;
+  }
+
+  const result: ExperimentResult = {
+    contractVersion: EXPERIMENT_FABRIC_VERSION,
+    status: 'completed',
+    summary: input.summary,
+    outputs,
+    units,
+    warnings: input.warnings ?? [],
+    assumptions: input.assumptions ?? [request.citation.citationText],
+    visualization: [],
+    route: { kind: 'none' },
+  };
+
+  const plan: ExperimentPlan = {
+    contractVersion: EXPERIMENT_FABRIC_VERSION,
+    planId: `reference-measurement-plan_${fnv1a(canonicalJson({ source: request.citation.sourceRef, request: request.structuredRequest }))}`,
+    intent: {
+      contractVersion: EXPERIMENT_FABRIC_VERSION,
+      request: request.structuredRequest,
+      // Honest reuse of the SAME mapping `dataProvenanceForResultOrigin` already
+      // makes for a static corpus lookup — not a fabricated capability.
+      capability: 'KNOWLEDGE_ONLY',
+      confidence: 'high',
+      rationale: `Cited reference figure from ${request.citation.sourceRef}, not a Genesis solver route.`,
+      requiredSolver: 'none',
+      knowledgeSources: [],
+      supplementalKnowledgeIds: [],
+    },
+    engine: null,
+    modelVersion: null,
+    parameterSchema: [],
+    runnable: true,
+    route: { kind: 'none' },
+  };
+
+  const requestFingerprint = fingerprintStructuredRequest(request.structuredRequest);
+  const runFingerprint = `run_${fnv1a(canonicalJson({
+    requestFingerprint,
+    planFingerprint: fingerprintExperimentPlan(plan),
+    sourceRef: request.citation.sourceRef,
+    status: result.status,
+    outputs: result.outputs,
+    units: result.units,
+  }))}`;
+
+  return {
+    contractVersion: EXPERIMENT_FABRIC_VERSION,
+    runId: runFingerprint,
+    request: request.structuredRequest,
+    intent: plan.intent,
+    plan,
+    result,
+    provenance: {
+      contractVersion: EXPERIMENT_FABRIC_VERSION,
+      requestFingerprint,
+      runFingerprint,
+      knowledgeSources: [],
+      supplementalKnowledgeIds: [],
+      domainId: request.structuredRequest.domainId,
+      modelId: request.structuredRequest.modelId,
+      engine: null,
+      parameterSnapshot: { ...request.structuredRequest.parameters },
+      // A cited figure is stable and reproducible by construction — re-quoting
+      // the same source always yields the same value, unlike a fresh physical
+      // reading's real noise.
+      deterministic: true,
+      resultOrigin: 'knowledge-only',
+      dataProvenance: referenceProvenanceDataProvenance(),
+    },
+  };
+}
+
+/**
  * Assembles already-obtained raw and derived measurements into a valid,
  * honestly-provenanced `ExperimentRun` — the seam a later real result enters
  * through. Calls no instrument, no lab API, no network: every value it

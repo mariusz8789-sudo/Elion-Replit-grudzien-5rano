@@ -42,7 +42,7 @@ import {
 import { buildWorldEvidenceBundle, type WorldEvidenceBundle } from './worldModel/evidence/worldEvidenceBundle';
 import { compareBranches, projectToWorldState } from './worldModel/bridge/worldFrameState';
 import { TemporalEngine, TemporalBranchRegistry } from './worldModel/temporal/temporalEngine';
-import type { RealExperimentRequest } from './experimentFabric/realExperiment';
+import type { RealExperimentRequest, ReferenceMeasurementRequest } from './experimentFabric/realExperiment';
 import type { FalsificationCriterion } from './experimentFabric/scientificDiscovery';
 import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
@@ -2177,9 +2177,18 @@ export function replaySavedMechanismComposition(saved: SavedExperiment): SavedMe
 export const REAL_EXPERIMENT_VERIFICATION_CONTRACT_VERSION = '1.0.0';
 
 /**
- * A REAL_EXPERIMENTAL measurement, judged against a WorldGraph prediction —
- * the fifth investigation shape, alongside `hypothesisLoop`, `worldDiscovery`,
- * `parameterInquiry` and `mechanismComposition`.
+ * An externally-sourced measurement (REAL_EXPERIMENTAL or REFERENCE), judged
+ * against a WorldGraph prediction — the fifth investigation shape, alongside
+ * `hypothesisLoop`, `worldDiscovery`, `parameterInquiry` and
+ * `mechanismComposition`.
+ *
+ * `request` is a union rather than two separate saved shapes: a physical
+ * measurement's request (`physicalProtocolRef`) and a cited reference's
+ * request (`citation`) both PRODUCE the same `ExperimentRun` shape and are
+ * judged by the exact same `verifyPredictionAgainstRealExperiment` — only
+ * the origin of the number differs, and `realRun.provenance.dataProvenance`
+ * already says which. Splitting this into two saved shapes would duplicate
+ * everything below `request` for no real difference in behavior.
  *
  * The prediction itself is NOT duplicated here: `predictionSourceExperimentId`
  * links back to the existing `SavedWorldDiscoveryRun` (saved through the
@@ -2199,10 +2208,15 @@ export interface SavedRealExperimentVerification {
   predictionSourceExperimentId: string;
   predictedRoundIndex: number;
   hypothesisId: string;
-  request: RealExperimentRequest;
+  request: RealExperimentRequest | ReferenceMeasurementRequest;
   realRun: ExperimentRun;
   verification: PredictionVerification;
   resultFingerprint: string;
+}
+
+/** A single human-readable label for either request shape — never branch on this twice in two places. */
+function requestSourceLabel(request: RealExperimentRequest | ReferenceMeasurementRequest): string {
+  return 'physicalProtocolRef' in request ? request.physicalProtocolRef : request.citation.sourceRef;
 }
 
 export interface BuildSavedRealExperimentVerificationInput {
@@ -2221,7 +2235,7 @@ export interface BuildSavedRealExperimentVerificationInput {
    * already uses, never a fabricated universal threshold invented here.
    */
   verificationCriterion: FalsificationCriterion;
-  request: RealExperimentRequest;
+  request: RealExperimentRequest | ReferenceMeasurementRequest;
   realRun: ExperimentRun;
 }
 
@@ -2255,6 +2269,8 @@ export function buildSavedRealExperimentVerification(input: BuildSavedRealExperi
   };
 }
 
+const EXTERNAL_VERIFICATION_PROVENANCE = new Set(['REAL_EXPERIMENTAL', 'REFERENCE']);
+
 /** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
 export function isSavedRealExperimentVerification(value: unknown): value is SavedRealExperimentVerification {
   if (!isRecordLike(value)) return false;
@@ -2263,10 +2279,14 @@ export function isSavedRealExperimentVerification(value: unknown): value is Save
   if (typeof value.predictedRoundIndex !== 'number' || !Number.isInteger(value.predictedRoundIndex) || value.predictedRoundIndex < 0) return false;
   if (!nonEmptyString(value.hypothesisId)) return false;
   if (!nonEmptyString(value.resultFingerprint)) return false;
-  if (!isRecordLike(value.request) || !nonEmptyString(value.request.physicalProtocolRef)) return false;
+  if (!isRecordLike(value.request)) return false;
+  const hasPhysicalProtocol = nonEmptyString(value.request.physicalProtocolRef);
+  const citation = value.request.citation;
+  const hasCitation = isRecordLike(citation) && nonEmptyString(citation.citationText) && nonEmptyString(citation.sourceRef);
+  if (!hasPhysicalProtocol && !hasCitation) return false;
   if (!isRecordLike(value.realRun)) return false;
   const provenance = value.realRun.provenance;
-  if (!isRecordLike(provenance) || provenance.dataProvenance !== 'REAL_EXPERIMENTAL') return false;
+  if (!isRecordLike(provenance) || typeof provenance.dataProvenance !== 'string' || !EXTERNAL_VERIFICATION_PROVENANCE.has(provenance.dataProvenance)) return false;
   if (!isRecordLike(value.verification) || typeof value.verification.predictedValue !== 'number' || typeof value.verification.assessment !== 'string') return false;
   return true;
 }
@@ -2276,7 +2296,7 @@ function realExperimentVerificationAnalysis(saved: SavedRealExperimentVerificati
   return [
     {
       title: 'Protokół',
-      body: `${request.physicalProtocolRef}${request.hypothesisId ? ` (hipoteza ${request.hypothesisId})` : ''}`,
+      body: `${requestSourceLabel(request)}${request.hypothesisId ? ` (hipoteza ${request.hypothesisId})` : ''}`,
       kind: 'real-experiment-protocol',
     },
     {
@@ -2295,15 +2315,18 @@ function realExperimentVerificationAnalysis(saved: SavedRealExperimentVerificati
  */
 export function saveRealExperimentVerificationToMemory(saved: SavedRealExperimentVerification): SavedExperiment {
   const { verification, request } = saved;
+  const provenance = saved.realRun.provenance.dataProvenance ?? 'REAL_EXPERIMENTAL';
+  const sourceLabel = requestSourceLabel(request);
+  const sourceKind = provenance === 'REFERENCE' ? 'cytowaną wartość referencyjną' : 'realny pomiar fizyczny (protokół)';
   return saveExperiment({
     labId: 'real-experiment',
     experimentId: `real-experiment-verification:${saved.predictionSourceExperimentId}:${saved.resultFingerprint}`,
-    experimentName: `Weryfikacja realnym pomiarem — ${saved.hypothesisId}`,
+    experimentName: `Weryfikacja ${provenance === 'REFERENCE' ? 'danymi referencyjnymi' : 'realnym pomiarem'} — ${saved.hypothesisId}`,
     params: {
       predictionSourceExperimentId: saved.predictionSourceExperimentId,
       predictedRoundIndex: saved.predictedRoundIndex,
       hypothesisId: saved.hypothesisId,
-      physicalProtocolRef: request.physicalProtocolRef,
+      physicalProtocolRef: sourceLabel,
       metric: verification.criterion.metric,
     },
     stats: {
@@ -2313,10 +2336,10 @@ export function saveRealExperimentVerificationToMemory(saved: SavedRealExperimen
     realExperimentVerification: saved,
     analysis: realExperimentVerificationAnalysis(saved),
     honesty: 'simplified',
-    honestyNote: `Realny pomiar fizyczny (protokół ${request.physicalProtocolRef}) porównany z predykcją Genesis dla "${verification.criterion.metric}"; `
-      + `werdykt (${verification.assessment}) dotyczy TEGO jednego pomiaru i TEGO modelu, nie ogólnej prawdy o świecie.`,
+    honestyNote: `${sourceKind} (${sourceLabel}) porównana z predykcją Genesis dla "${verification.criterion.metric}"; `
+      + `werdykt (${verification.assessment}) dotyczy TEGO jednego pomiaru/cytowania i TEGO modelu, nie ogólnej prawdy o świecie.`,
     assumptions: [],
-    epistemicStatus: 'REAL_EXPERIMENTAL',
+    epistemicStatus: provenance,
   });
 }
 
@@ -2349,8 +2372,9 @@ export function replaySavedRealExperimentVerification(saved: SavedExperiment): S
   if (selfCheck !== record.resultFingerprint) {
     return { status: 'DRIFT', reason: `Zapisana weryfikacja została zmieniona po zapisie: jej treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
   }
-  if (record.realRun.provenance.dataProvenance !== 'REAL_EXPERIMENTAL') {
-    return { status: 'BLOCKED', reason: 'Zapisany realny przebieg nie jest oznaczony REAL_EXPERIMENTAL — odtworzenie odmawia potraktowania go jako realnego pomiaru.' };
+  const storedProvenance = record.realRun.provenance.dataProvenance;
+  if (storedProvenance === undefined || !EXTERNAL_VERIFICATION_PROVENANCE.has(storedProvenance)) {
+    return { status: 'BLOCKED', reason: 'Zapisany przebieg nie jest oznaczony REAL_EXPERIMENTAL ani REFERENCE — odtworzenie odmawia potraktowania go jako danych zewnętrznych.' };
   }
   const source = getExperiment(record.predictionSourceExperimentId);
   const sourceRecord = source?.worldDiscovery;

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { getExperiment, type SavedExperiment } from '../../core/scienceMemory';
+import { buildIntegrityEnvelope } from '../../core/integrity';
 import { ProvenanceBadge } from './provenance';
 import {
   buildCaseStudy, listCaseStudyCandidates, replayCaseStudy,
@@ -48,22 +49,35 @@ function ReplayVerdictBlock({ replay }: { replay: CaseStudyReplay }) {
   );
 }
 
-function provenanceExplanation(kind: CaseStudy['kind']): string {
-  switch (kind) {
-    case 'REAL_VERIFICATION':
-      return ' The prediction it was checked against is SIMULATED (a WorldGraph forecast); the measurement it was checked against is REAL_EXPERIMENTAL (a real, physical reading someone entered) — both are shown above under Data, exactly as recorded, never blended into one number.';
+function provenanceExplanation(caseStudy: Pick<CaseStudy, 'kind' | 'recordProvenance'>): string {
+  switch (caseStudy.kind) {
+    case 'REAL_VERIFICATION': {
+      const sourceLabel = caseStudy.recordProvenance === 'REFERENCE'
+        ? 'REFERENCE (a cited, published figure — not a fresh physical reading)'
+        : 'REAL_EXPERIMENTAL (a real, physical reading someone entered)';
+      return ` The prediction it was checked against is SIMULATED (a WorldGraph forecast); the measurement it was checked against is ${sourceLabel} — both are shown above under Data, exactly as recorded, never blended into one number.`;
+    }
     case 'SIMULATED_DISCOVERY':
-      return ' Every number in this case study, including the Data step above, is SIMULATED — no physical laboratory measurement exists for this record. A real measurement, once entered against a prediction, produces a REAL_EXPERIMENTAL case study like the other kind this screen can show.';
+      return ' Every number in this case study, including the Data step above, is SIMULATED — no external measurement exists for this record. A real or cited measurement, once entered against a prediction, produces a REAL_EXPERIMENTAL or REFERENCE case study like the other kind this screen can show.';
     case 'LEGACY_EVIDENCE_PACK':
-      return " This is a real-engine-executed run from Genesis's earlier Fabric-router investigation flow (the same Evidence Pack `ExperimentPilotScreen.tsx` uses) — genuinely executed, but SIMULATED: no physical laboratory measurement exists for this record.";
+      return " This is a real-engine-executed run from Genesis's earlier Fabric-router investigation flow (the same Evidence Pack `ExperimentPilotScreen.tsx` uses) — genuinely executed, but SIMULATED: no external measurement exists for this record.";
     default:
       return '';
   }
 }
 
-function downloadJson(caseStudy: CaseStudy, saved: SavedExperiment): void {
+/**
+ * Wraps the download in an `IntegrityEnvelope` (`core/integrity`) — a SHA-256
+ * hash over a canonicalized copy of the payload, so an external auditor can
+ * verify the downloaded file was not altered after Genesis produced it,
+ * without trusting Genesis's UI to say so. This is an integrity check, not a
+ * signature: `verificationInstructions` says so explicitly, and so does the
+ * caption under the Download button below.
+ */
+async function downloadJson(caseStudy: CaseStudy, saved: SavedExperiment): Promise<void> {
   const payload = { caseStudy, record: saved };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const envelope = await buildIntegrityEnvelope(payload, new Date().toISOString());
+  const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -110,12 +124,17 @@ export function EvidenceShowcaseScreen() {
             <button type="button" onClick={() => window.print()} data-testid="ecs-print">
               Print / Export
             </button>
-            <button type="button" onClick={() => saved && downloadJson(caseStudy, saved)} data-testid="ecs-download-json">
+            <button type="button" onClick={() => { if (saved) void downloadJson(caseStudy, saved); }} data-testid="ecs-download-json">
               Download JSON
             </button>
           </>
         )}
       </div>
+      {caseStudy && (
+        <p className="gsc-caption" data-testid="ecs-integrity-note">
+          The downloaded file carries a SHA-256 integrity hash (not a signature) so a reader can verify it was not altered after export — see the file's own <code>verificationInstructions</code> field.
+        </p>
+      )}
 
       {!caseStudy ? (
         <div className="ecs-empty" data-testid="ecs-empty-state">
@@ -154,7 +173,7 @@ export function EvidenceShowcaseScreen() {
             <span className="dl-label">Provenance</span>
             <p>
               This record is tagged <ProvenanceBadge provenance={caseStudy.recordProvenance} />.
-              {provenanceExplanation(caseStudy.kind)}
+              {provenanceExplanation(caseStudy)}
             </p>
           </section>
 

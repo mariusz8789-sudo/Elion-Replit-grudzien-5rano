@@ -100,6 +100,9 @@ function realVerificationCaseStudy(saved: SavedExperiment): CaseStudy | null {
   const { verification, request, realRun } = record;
   const source = getExperiment(record.predictionSourceExperimentId);
   const sourceGoal = source?.worldDiscovery?.goal ?? null;
+  const provenance = realRun.provenance.dataProvenance ?? 'REAL_EXPERIMENTAL';
+  const sourceLabel = 'physicalProtocolRef' in request ? request.physicalProtocolRef : request.citation.sourceRef;
+  const dataLabel = provenance === 'REFERENCE' ? `Cited reference (REFERENCE, source "${sourceLabel}")` : `Real measurement (REAL_EXPERIMENTAL, protocol "${sourceLabel}")`;
 
   const steps: CaseStudyStep[] = [
     {
@@ -126,7 +129,7 @@ function realVerificationCaseStudy(saved: SavedExperiment): CaseStudy | null {
       label: 'Data',
       lines: [
         `Predicted (SIMULATED, WorldGraph): ${verification.predictedValue}`,
-        `Real measurement (REAL_EXPERIMENTAL, protocol "${request.physicalProtocolRef}"): ${verification.observedValue ?? 'no finite numeric value recorded for this metric'}`,
+        `${dataLabel}: ${verification.observedValue ?? 'no finite numeric value recorded for this metric'}`,
         `Recorded: ${realRun.runId}`,
       ],
     },
@@ -142,7 +145,7 @@ function realVerificationCaseStudy(saved: SavedExperiment): CaseStudy | null {
     experimentId: saved.id,
     title: saved.experimentName,
     createdAt: saved.createdAt,
-    recordProvenance: 'REAL_EXPERIMENTAL',
+    recordProvenance: provenance,
     honestyNote: saved.honestyNote,
     steps,
   };

@@ -5,6 +5,7 @@ import {
   saveParameterInquiryToMemory,
   type SavedExperiment,
   type SavedParameterInquiry,
+  type ParameterSkipGrounds,
   type SavedParameterInquiryMemoryUse,
   type SavedParameterInquiryReplay,
 } from '../scienceMemory';
@@ -100,21 +101,77 @@ export function memoryNarrowedHypotheses(input: InquiryLoopInput): {
     };
   }
   if (toSkip.length === offered.length) {
+    // The grounds matter MORE here, not less: this is the branch that refuses
+    // to narrow to nothing and re-runs everything, so a reader is owed the
+    // evidence that made the whole declared set look exhausted.
+    const allGrounds = skipGrounds(priors, toSkip);
     return {
       executedInput: input,
       resumedFromMemory: {
         skippedHypothesisIds: [],
-        reason: `Pamięć obaliła już wszystkie ${offered.length} zaproponowanych hipotez dla tego układu. Pominięcie ich wszystkich nie zostawiłoby czego badać, więc zestaw jest testowany ponownie w całości, a nie po cichu opróżniany.`,
+        reason:
+          `Pamięć obaliła już wszystkie ${offered.length} zaproponowanych hipotez dla tego układu. Pominięcie ich ` +
+          'wszystkich nie zostawiłoby czego badać, więc zestaw jest testowany ponownie w całości, a nie po cichu ' +
+          'opróżniany. ' +
+          (allGrounds.length > 0
+            ? `Podstawy z zapamiętanych pomiarów: ${allGrounds
+                .map((g) => `${g.hypothesisId} przewidywało ${g.predicted} przy ${g.probeValue}, zmierzono ${g.observed}`)
+                .join('; ')}.`
+            : 'Zapamiętane rekordy nie niosą pojedynczego pomiaru obalającego dla żadnej z nich.'),
+        grounds: allGrounds,
       },
     };
   }
+  const grounds = skipGrounds(priors, toSkip);
   return {
     executedInput: { ...input, hypotheses: input.hypotheses.filter((h) => !alreadyFalsified.has(h.hypothesisId)) },
     resumedFromMemory: {
       skippedHypothesisIds: toSkip,
-      reason: `Pominięto ${toSkip.length} hipotez obalonych we wcześniejszym dochodzeniu na tym samym układzie (${toSkip.join(', ')}); pozostałe ${offered.length - toSkip.length} zostały przebadane realnymi pomiarami.`,
+      reason:
+        `Pominięto ${toSkip.length} hipotez obalonych we wcześniejszym dochodzeniu na tym samym układzie ` +
+        `(${toSkip.join(', ')}); pozostałe ${offered.length - toSkip.length} zostały przebadane realnymi pomiarami. ` +
+        (grounds.length > 0
+          ? `Podstawy z zapamiętanych pomiarów: ${grounds
+              .map((g) => `${g.hypothesisId} przewidywało ${g.predicted} przy ${g.probeValue}, zmierzono ${g.observed}`)
+              .join('; ')}.`
+          : 'Zapamiętane rekordy nie niosą pojedynczego pomiaru obalającego dla żadnej z nich.'),
+      grounds,
     },
   };
+}
+
+/**
+ * Recovers, for each skipped hypothesis, the measurement that actually refuted
+ * it — from the stored inquiry, never restated.
+ *
+ * Takes the FIRST refuting round found, which is the earliest evidence against
+ * that hypothesis in this system's history. Where a hypothesis was refuted in
+ * more than one prior inquiry this reports one of them rather than summarising
+ * across them, and says so here rather than implying it weighed them.
+ */
+function skipGrounds(
+  priors: readonly SavedParameterInquiry[],
+  skipped: readonly string[],
+): readonly ParameterSkipGrounds[] {
+  const grounds: ParameterSkipGrounds[] = [];
+  for (const id of skipped) {
+    for (const prior of priors) {
+      const round = prior.result.rounds.find((r) =>
+        r.outcomes.some((o) => o.hypothesisId === id && o.assessment === 'FALSIFIED_WITHIN_PROTOCOL'),
+      );
+      if (round === undefined) continue;
+      const outcome = round.outcomes.find((o) => o.hypothesisId === id)!;
+      grounds.push({
+        hypothesisId: id,
+        probeValue: round.probeValue,
+        predicted: outcome.predicted,
+        observed: round.observed,
+        reason: outcome.reason,
+      });
+      break;
+    }
+  }
+  return grounds;
 }
 
 /**

@@ -165,14 +165,38 @@ need two different next experiments:
    disagree. No real fixture demonstrates this today; it is named here so C1
    can verify the shape rather than have it invented at implementation time.
 
-**What this section deliberately does not do.** No code changes. No scoring
-function, no scalar utility, no scheduling change to `selectNext` — those
-would be exactly the invented methodology `discoveryLoop.ts`'s own module doc
-and `AUTONOMOUS_DISCOVERY_ROADMAP.md` §5 already refuse elsewhere.
-Implementing option 1 (the joint arm) is the smaller, well-grounded next
-step — it has a real fixture ready to test against today (the generator
-catalog above) — and should be scoped as its own P6 increment once C1
-confirms the design.
+**Update — option 1 measured and built as a standalone primitive (C3, next
+10h pass).** The additivity assumption in the worked example above was
+EXPLICITLY FLAGGED as unverified and has now been checked against the real
+solver rather than assumed: `mechanismInteraction.ts`'s `runJointIntervention`
+forks one branch applying `h:fuel-efficiency` and `h:load-shedding` together
+at strength 0.5 (the same `TemporalEngine.forkBranch` + `reduceObjectiveTrajectory`
+`discoveryLoop.ts` already uses, nothing new). Measured: baseline 40.0 L,
+individually +22.92 L and +29.33 L, naive additive sum 92.25 L — **real joint
+reading 87.67 L, 4.58 L (5.0%) BELOW the naive sum.** Not noise: the solver's
+`fuelRateLPerHr = loadKw × specificFuelConsumptionLPerKwh` multiplies the two
+levers, so cutting both at once compounds their fractional rate reductions
+rather than summing their absolute fuel-remaining effects — a real,
+mechanistically-explained sub-additive interaction.
+
+`assessJointIntervention` classifies an already-measured joint reading against
+the naive additive prediction (`ADDITIVE`/`SUB_ADDITIVE`/`SUPER_ADDITIVE`/`INCONCLUSIVE`,
+within a declared tolerance — the same `agreementTolerance` discipline as
+`SystemUnderStudy`/`WorldParameterSystem`, no statistical test this repository
+has no methodology for). Both functions are tested in
+`mechanismInteraction.test.ts` against this exact real fixture plus three pure
+classifier-boundary cases (additive-within-tolerance, super-additive, and the
+both-effects-zero `INCONCLUSIVE` case).
+
+**Deliberately NOT wired into `discoveryLoop.ts`'s round loop.** This is the
+measurement and classification proven standalone on a real fixture — the same
+order `competingModels.ts` and `worldParameterCalibration.ts` were each built
+before any orchestrator wiring. Auto-triggering a joint arm whenever two
+hypotheses are simultaneously `SUPPORTED` (which pairs, at which strength, how
+many rounds it costs) is a real control-flow decision for whoever owns that
+loop, not decided here. No scoring function, no scalar utility, no scheduling
+change to `selectNext` was introduced — those remain exactly the invented
+methodology this document already refuses elsewhere.
 
 ---
 
@@ -656,3 +680,113 @@ insufficient" into "so here is the hypothesis that isn't in it" — and that,
 not a better ranking, is the step that makes the loop
 *experiment → knowledge → model change → next experiment* rather than
 *experiment → knowledge → next experiment*.
+
+### 10.6 The PARAMETER-side primitive — measured and built standalone (C3, next 10h pass)
+
+The minimal generation primitive named in §10.5 is built and tested:
+`parameterRegeneration.ts`'s `deriveInterpolatedParameterValue`. It takes the
+FALSIFIED hypotheses' own real predictions at one shared observation and, when
+two of them bracket the real observed value, linearly interpolates a new
+CLAIMED VALUE between their two claimed values — a mechanical reading of
+already-measured numbers, the same restraint `deriveAlternativeCriteria`
+already holds on the MECHANISM side (`RELATION_FLIP`/`TOLERANCE_WIDENED` are
+arithmetic on real numbers, never a guess at the mechanism).
+
+**Measured on the real `epidemicInfectiousDaysCalibration` fixture** (P6/P7),
+hidden value 6.75 days — not among the five declared candidates (6, 6.5, 7,
+7.5, 8): at tick=30 three candidates are falsified against one shared real
+observation (488.62), and `h:extended` (claimed 7.5, predicted 396.50) and
+`h:short` (claimed 6, predicted 622.73) bracket it. Interpolating recovers
+**6.889** — 0.14 days from the real 6.75, not exact (the epidemic model is not
+linear in `infectiousDays`) but a genuinely useful proposal, not a guess.
+
+**The refusal is equally load-bearing and equally measured.** For a hidden
+value far outside the declared range (20 days), every candidate's prediction
+lies on the SAME side of the real observation — nothing brackets it — and the
+function correctly returns `null` rather than extrapolate. Extrapolating past
+a declared range with one linear step has no honest error bound, and this
+primitive does not manufacture one.
+
+**Anti-HARK guard needs no new field here**, unlike MECHANISM's
+`excludedStrengths`: `inquiryLoop.ts`'s `triedProbes` and
+`worldParameterCalibration.ts`'s `tried` ticks are GLOBAL, not per-hypothesis
+— once a setting is measured, `selectNextProbe` never offers it to ANY
+hypothesis again, declared or derived. A derived candidate's first test is
+therefore structurally guaranteed to land on an untried setting by the loop's
+own existing bookkeeping.
+
+**Scope stated, not faked:** declared and tested for the single-scalar case
+only (`WorldParameterCalibration.claimedValue: number`, or a Fabric
+`ParameterHypothesis.claimedValues` with exactly one key). Arrhenius-style
+multi-dimensional claimed values (`activationEnergyKJ` AND
+`preExponentialLog10` at once) have no well-defined single interpolated point
+from a 1-D bracket, and this module does not invent one to look more complete.
+
+**Deliberately NOT wired into `inquiryLoop.ts`'s or
+`worldParameterCalibration.ts`'s round loop**, for the identical reason
+§10.5 itself gave for not building this eagerly: it is a new generation
+capability on a LIVE loop, and deciding WHEN to trigger it (only on total
+falsification? every round?), how many derived candidates to allow, and how
+it interacts with the round budget is a real control-flow decision for
+whoever owns those loops — not decided by this measurement. Tested in
+`parameterRegeneration.test.ts` against the real fixture above plus pure
+classifier-boundary cases (degenerate equal-prediction pair, bracket order
+independence, fewer than two points).
+
+### 10.7 The OUTER loop, confirmed independently — no multi-investigation autonomy exists anywhere
+
+§10.1–10.2 measured that the loop is genuinely adaptive ROUND to ROUND, within
+one investigation. A separate question — does anything decide WHICH question
+to investigate NEXT, once one run ends? — was checked directly (C3, this
+pass, read-only trace, not inferred from this document): grepped every call
+site of `runDiscovery`, `runAutonomousDiscovery`, `runAutonomousInquiry`,
+`runWorldDiscoveryAndRemember`, `runInquiryAndRemember`. **None is ever called
+more than once in a loop where run N's output feeds run N+1's input.**
+
+- `hypothesisLoop.ts`'s five next-experiment selectors (unified in
+  `nextAction.ts`) are pure functions that PROPOSE a next experiment for a
+  caller to run; none is wired to any auto-execution call site
+  (`grep` for their names under `packages/frontend/src/components` returns
+  nothing).
+- The backend's `campaign/orchestrator.mjs` loops over GENERATIONS toward one
+  fixed, human-supplied objective (drug-candidate search) — the same kind of
+  inner-loop autonomy `discoveryLoop.ts` already has, for a different
+  substrate. It never changes the objective or domain itself, and no code
+  creates a second campaign from a first campaign's result.
+- The exact break point: `WorldDiscoveryPanel.tsx`, function `run(text,
+  forCatalogId)` — a human types a goal, clicks submit, `runWorldDiscoveryAndRemember`
+  runs ONCE, and the result is rendered for the human to read. Nothing in that
+  file or its callers reads the result back into a new goal and re-invokes
+  `run`. `rerunSaved` re-runs the SAME stored goal verbatim — it derives
+  nothing new.
+
+So the honest, complete answer to "is autonomous discovery really
+autonomous": **within one investigation, yes — genuinely, measured in §10.1–
+10.2. Across investigations, no — every new question, at every level (a
+`goal` string, a `SystemUnderStudy`, a `WorldParameterCalibrationInput`, a
+lever catalog) is supplied by a human or a test fixture, with no exception
+found anywhere in the codebase.** This is not a bug to fix quietly; it is the
+honest current boundary of "autonomous" in "autonomous discovery," and it is
+larger than any single missing primitive named in §10.4–10.6 — even a fully
+wired PARAMETER/MECHANISM generation primitive would still stop at the edge
+of ONE investigation, never choosing to start a different one.
+
+### 10.8 Competing-models UI fidelity, checked against real code — no eureka-on-unresolved found
+
+Checked directly (C3, this pass) against the specific failure mode named for
+this audit: does the Matrix/narration UI ever show a confident "eureka" for a
+result the run itself reports as unresolved?
+
+`GenesisWorldScreen.tsx`'s `updateObserverScientist()` gates the observer
+scientist's pose explicitly: the confident `'gesture'` pose requires BOTH
+`sufficiency.status === 'SUPPORTED_MECHANISM_FOUND'` AND
+`competingModels.status === 'SINGLE_EXPLANATION'`, checked on the LAST round
+only. When `competingModels.status === 'COMPETING_MODELS_UNRESOLVED'` instead,
+the pose stays `'idle'` and the facing genuinely oscillates between the beacon
+and the player — the module's own comment states the reason: *"a false
+'eureka' here would misrepresent an unresolved result."* The rendered rival
+hypothesis list (`{view.competingModels.competingHypothesisIds.map((id) =>
+<li key={id}>{id}</li>)}`) maps directly over the REAL verdict's ids, no
+placeholder text. `genesisMatrix.ts` wires `competingModels:
+assessCompetingModels(run)` directly — no UI-layer reimplementation of the
+verdict. No violation found.

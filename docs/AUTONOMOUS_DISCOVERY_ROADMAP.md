@@ -1119,3 +1119,89 @@ Two honest limits, both load-bearing:
    running it rather than by inspection — and now names the disconnection
    explicitly while still refusing to report a narrower range, because there
    isn't one.
+
+### 10.15 MODEL UPDATE — audited, and deliberately NOT built as a contract
+
+The brief asked for a minimal formal `Model Update` contract:
+`prediction ≠ observation → hypothesis falsified → model update candidate →
+new model → test`. Audited against the substrate, and the honest answer is that
+three of those five arrows exist and the fourth cannot.
+
+What Genesis really updates after a falsification:
+
+| level | can it revise? | how |
+| --- | --- | --- |
+| belief in a hypothesis | yes | `updateConfidence` / `HypothesisBelief`, both loops |
+| a parameter VALUE | yes | `parameterAlternative.ts` derives one nobody declared |
+| that value's PRECISION | yes | `intervalNarrowing.ts` shrinks an earned interval |
+| a mechanism's CRITERION | yes | `deriveAlternativeCriteria` → `~RELATION_FLIP` |
+| which MECHANISM to apply | yes, since this sprint | `mechanismGeneration.ts` composes two declared levers |
+| the MODEL itself | **no** | — |
+
+The last row is the whole finding. A "model" here is a registered router model
+(`biology-protein-folding-hp`, `chemistry-arrhenius`, …) or a WorldGraph domain
+updater — compiled code with a fixed structural form. Genesis can vary what it
+*claims about* a model's parameters and levers; it cannot change the model's
+equations, add a term, or propose a different functional form. There is no
+representation in this repository in which a structural change to a model is a
+value that could be produced, tested, or stored.
+
+So a `ModelUpdate` contract would be a type with no substrate behind it — the
+exact "fake abstraction" the brief's own rule 4 rules out. Writing one would
+also do real damage: `modelSufficiency.ts` is careful to say that an exhausted
+declared space is insufficiency *of the declared space*, **never** proof that
+the model is wrong, and a `ModelUpdate` type sitting next to
+`DECLARED_SPACE_INSUFFICIENT` would quietly invite exactly the inference that
+verdict exists to refuse.
+
+What would be needed, stated so the gap is actionable rather than vague: a model
+would have to be a VALUE — a declared structure (terms, couplings, functional
+form) that a solver can be built FROM at runtime — before "propose a different
+model" could be a step Genesis takes rather than a sentence it prints. That is a
+substrate change to the Experiment Fabric, not an agent feature, and it is the
+honest prerequisite for structural discovery. Until then the reachable frontier
+is what the table above already shows: richer hypotheses over fixed models.
+
+### 10.16 INFORMATION GAIN AT THE QUESTION LEVEL — measured as not yet computable
+
+The brief asked whether Genesis could rank several candidate research questions
+by how much each would reduce uncertainty ("Q1: is the pump the mechanism?
+Q2: does pipe length matter? Q3: does population change the result?"), and
+explicitly asked for a fixture and a measurement before any planner.
+
+Measured on the real candidates `nextQuestion.ts` actually produces. The
+question kinds a finished run raises are:
+
+| kind | its uncertainty, concretely | unit |
+| --- | --- | --- |
+| `TEST_UNTESTED_HYPOTHESIS` | how many declared hypotheses were never measured | a count |
+| `SEPARATE_SURVIVORS` | how many rivals remain consistent | a count |
+| `NARROW_A_DERIVED_INTERVAL` | the width of the earned interval | the parameter's own units |
+| `RESOLVE_APPARATUS_FAILURE` | whether the instrument works at all | not a quantity |
+| `GO_OUTSIDE_THE_DECLARED_SPACE` | unbounded — the space is by definition not enumerated | none |
+
+These do not share a scale. "An interval 0.4 wide" and "two unseparated rivals"
+and "the instrument returned nothing" cannot be ordered by a common measure of
+information without declaring an exchange rate between them, and this repository
+has no methodology that would justify one — the same reason every existing
+selector here is a declared lexicographic cascade and none of them scores
+(`worldCounterfactual.ts` says so in as many words). Inventing a score to rank
+them would be the overclaim, not the feature.
+
+Two things ARE computable today, and both are already used:
+
+1. **Within the PARAMETER experiment level**, information gain is real and
+   implemented: `selectNextProbe` checks which untried settings actually
+   separate contenders, using real solver predictions, and widens past the top
+   two when they cannot be separated (`§0bis`). That is discriminability, not a
+   score, and it is genuine.
+2. **Within one question kind**, comparison is meaningful because the unit is
+   shared: of two intervals the wider one is more uncertain; of two untested
+   sets the larger one has more to settle. `nextQuestion.ts` does not need this
+   yet because a finished run raises at most one question of each kind.
+
+So the honest state is: question-level ranking exists and is a declared cascade
+with each position justified; question-level *information gain* is not
+computable and will not be until candidate questions carry a declared
+uncertainty measure with units. Recording that as a measured negative rather
+than shipping a scorer that looks quantitative.

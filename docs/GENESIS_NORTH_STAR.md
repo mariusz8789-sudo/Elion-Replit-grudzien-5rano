@@ -200,7 +200,8 @@ useful if it names the *next* missing thing rather than the whole mountain.
 Success is defined as: `A ❌ B ❌ C ❌ → Genesis creates D → D is automatically
 tested → D ✅/❌ → the result changes the next choice.`
 
-Measured against `2ec96dd`, link by link:
+Measured against `2ec96dd` at first, then re-measured after closing the one
+gap that audit found:
 
 | link | status |
 |---|---|
@@ -208,24 +209,27 @@ Measured against `2ec96dd`, link by link:
 | generates a new explanation | **done** — MECHANISM (`~RELATION_FLIP`) and PARAMETER (bracketed value) |
 | runs the test itself | **done** — `runInquiryWithGeneration`, unprompted, on evidence the derivation never saw |
 | judges the result | **done** — a real verdict from a real second inquiry |
-| **updates memory** | **MISSING** |
-| **the result changes the next choice** | **MISSING, because of the line above** |
+| updates memory | **done** — both runs now go through `runInquiryAndRemember`; see `AUTONOMOUS_DISCOVERY_ROADMAP.md` §10.10 |
+| the result changes the next choice | **done, measured twice** — a later inquiry into the same system now genuinely narrows on what the generated run found |
 
-The gap is small, specific, and mine: `runInquiryWithGeneration` calls
+Found and closed in one pass: `runInquiryWithGeneration` called the bare
 `runAutonomousInquiryWithRuns` for both the first inquiry and the follow-up —
-not `runInquiryAndRemember`. So the derived hypothesis's verdict is never
-persisted. A later inquiry into the same system starts blind to it, and
-`memoryNarrowedHypotheses` cannot narrow on a discovery Genesis itself made.
-The loop currently *generates and tests* without *learning*.
+not `runInquiryAndRemember`. So the derived hypothesis's verdict was never
+persisted. Fixed by routing both calls through the SAME session pipeline every
+other PARAMETER caller already uses — no second memory store. Measured on the
+real exhausted-space fixture (`inquirySession.test.ts`): a later inquiry into
+the same system correctly re-tests a fully-falsified set rather than skipping
+to nothing (the existing empty-narrowing fallback, now reachable here), and a
+partial declared set correctly skips an already-falsified candidate while
+leaving the generated hypothesis untouched — because it survived, and memory
+never carries a SUPPORTED verdict forward, the same rule every declared
+hypothesis already follows.
 
-A second, untested branch, worth naming before it is assumed: every fixture so
-far ends `D ✅`. What happens when the derived value is ALSO falsified —
-does a second derivation follow, and does it refuse to loop forever? The
-success definition says `D ✅/❌`, so both outcomes have to be real.
-
-**Next step, and it is one focused change:** persist the generated
-investigation through the path that already exists, so a discovery Genesis made
-becomes something Genesis remembers. That closes the last two rows above.
+A second, untested branch, still worth naming: every fixture so far ends
+`D ✅`. What happens when the derived value is ALSO falsified — does a second
+derivation follow, and does it refuse to loop forever? The success definition
+says `D ✅/❌`, so both outcomes still need a real fixture, not just an
+argument that the refusal logic would presumably handle it.
 
 ### Priority 2 — Real-world validation
 

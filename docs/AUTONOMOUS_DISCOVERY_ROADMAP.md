@@ -877,3 +877,53 @@ hypothesis list (`{view.competingModels.competingHypothesisIds.map((id) =>
 placeholder text. `genesisMatrix.ts` wires `competingModels:
 assessCompetingModels(run)` directly — no UI-layer reimplementation of the
 verdict. No violation found.
+
+### 10.10 §10.7's own gap, closed — generation now LEARNS, not just fires
+
+Found while auditing Priority 5 in `GENESIS_NORTH_STAR.md`, by re-reading
+§10.7's own code rather than trusting its "bridge closed" title: both calls
+inside `runInquiryWithGeneration` went through the bare
+`runAutonomousInquiryWithRuns`, not `runInquiryAndRemember`. So the function
+generated a hypothesis nobody declared and tested it — real, proven — but
+never narrowed against prior memory, and never left anything behind for a
+LATER inquiry into the same system to narrow against. Genesis generated and
+tested without learning; the loop's last link (§10.5's own
+`experiment → knowledge → model change → NEXT experiment`) was still open.
+
+**The fix reuses the existing session pipeline verbatim, no second memory
+store.** Both the first inquiry and the generated follow-up now go through
+`runInquiryAndRemember` — the same function every other PARAMETER caller
+already uses. `InquiryWithGenerationResult` and `GeneratedContinuation` gained
+the fields that pipeline already produces (`firstResumedFromMemory`,
+`firstSaved`, `firstReplay`, `followUpSaved`, `followUpReplay`) rather than
+inventing new bookkeeping.
+
+**Measured, two ways, on the real exhausted-space fixture** (a fold at
+temperature 0.5 that falsifies all four declared candidates,
+`inquirySession.test.ts`):
+
+1. Calling the SAME full four-candidate request a second time (fresh modules,
+   same persisted storage — a real process restart) now returns
+   `firstResumedFromMemory` non-null with the honest "would leave nothing to
+   test" reason and the full set re-tested — the same never-narrow-to-empty
+   fallback `runInquiryAndRemember` already holds for every other caller,
+   now reachable here because a record finally exists to trigger it.
+2. A genuinely partial declared set — one already-falsified candidate
+   (`h:cold`) alongside round 1's OWN generated hypothesis
+   (`h:derived-temperature-0.5`, which survived and so is never carried
+   forward as settled, per the existing "never carries a SUPPORTED verdict
+   forward" rule) — shows real, executable narrowing: `h:cold` is skipped,
+   the generated hypothesis is not. The generated hypothesis behaves exactly
+   like any declared one under memory's own rules, because it now goes
+   through the identical path.
+
+The generated follow-up is also independently confirmed as a real, queryable
+Science Memory record (`getExperiment` returns it, `followUpReplay.status`
+is `MATCH` from a real re-execution) — not merely returned to the caller and
+discarded.
+
+This closes the last open item §10.7 itself named ("Not yet wired into a
+loop" no longer applies to persistence — deciding whether an inquiry should
+COMBINE the first and generated runs into one caller-visible investigation,
+versus reporting two, remains the deliberate `runDiscovery`-contract decision
+§10.7 always deferred, and still is).

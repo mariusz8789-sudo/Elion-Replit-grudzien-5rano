@@ -645,3 +645,110 @@ which is the property a probe axis actually needs. It is declared as a fixed
 nuisance parameter rather than searched, and the module doc says why, in place
 of a fabricated "this domain also has an inert lever" that would not be true
 in the same sense the others are.
+
+---
+
+## 11. §5's gap, closed — one real domain, checked before building
+
+§5 named the gap and deliberately did not build it: *"a stateful world whose
+solver has an unknown coefficient, where Genesis chooses the next tick to
+measure at in order to pin that coefficient down."* This section is that
+composition, done the way §5 said it should be if anyone ever did it: **as a
+third composition over the two existing loops, not a rewrite of either** — and
+only after checking a real domain has the shape at all.
+
+### 11.1 The domain audit — what was checked, and why each other candidate lost
+
+The requirement, read literally out of §5: a WorldGraph solver reading a
+genuinely uncertain INPUT CONSTANT (not a lever anyone would switch — a fixed
+value nobody currently knows), plus a time-evolving metric that separates
+differently at different ticks. Domains checked, by reading the solver code,
+not by guessing:
+
+| Domain | Candidate constant | Verdict |
+|---|---|---|
+| `chemistryKinetics.ts` | activation energy / pre-exponential | **Ruled out.** Both are already MECHANISM levers in `chemistryLeverCatalog.ts`; at fixed temperature the rate constant `k` is time-invariant, so no tick-probing scheme can separate compensation-line pairs at one fixed T — that degeneracy needs a temperature sweep, which is exactly the SETTING-based probe `inquiryLoop.ts` already runs for this same Arrhenius physics on the Fabric (`inquiryLoop.test.ts`'s own compensation-line system), not a tick-based one. |
+| `electricalGeneratorLeverCatalog.ts` | `startupDelayS` | **Ruled out.** The catalog's declared world always starts already RUNNING; there is no "unknown startup delay" to calibrate because the delay is never exercised in the world this catalog builds. |
+| `cellCultureLeverCatalog.ts` | `g2mDurationH` | **Not pursued.** A real unexploited numeric input (phase-duration constant, not a lever), structurally the same shape as `infectiousDays` below — noted as a second real candidate for a future declaration, not built here because one clean, fully-measured domain is what this brief asked to design, not an exhaustive catalogue. |
+| `floodInundation.ts` / `rainfallRunoff.ts` | — | **Ruled out.** Every real constant these solvers read (outlet capacity, pump capacity, rainfall intensity) is already exposed as a MECHANISM lever; nothing left over is both unswitched and genuinely unknown. |
+| `epidemicSEIR.ts` | `infectiousDays` / `incubationDays` | **Chosen.** Both are read by the real RK4 solver, both are declared in `epidemicLeverCatalog.ts`'s own doc comment as inputs the solver only ever *reads* (never a lever `r0`, `interventionEffect` and `ifr` already are), and the mean infectious period is exactly the kind of pathogen property real epidemiology estimates from case-count curves rather than sets. |
+
+No artificial uncertainty was invented anywhere in this table: every ruled-out
+row is ruled out because the constant is either already a lever (switchable,
+not calibratable) or structurally inert in the world as built, checked against
+the actual solver code, not assumed.
+
+### 11.2 Why the tick has to be chosen, not just read at the end — measured
+
+Declared in `epidemicInfectiousDaysCalibration.ts` and measured on the real
+solver (fixed r0=2.5, incubationDays=3, ifr=0.01, population=100 000), five
+candidate infectious periods spanning 6–8 days:
+
+```
+day=2                    all five candidates read within ~2.5% of each other
+day=30   d=6:623   d=6.5:528   d=7:454   d=7.5:397   d=8:350   — cleanly separated
+day=80   d=6:9081  d=6.5:11869 d=7:14279 d=7.5:15976 d=8:16801 — REVERSED
+```
+
+`betaAt` computes β = r0 / infectiousDays: R0 fixed, so a SHORTER infectious
+period means HIGHER transmission — that epidemic runs hotter and peaks
+earlier. By day 80 the short-period run has already peaked and receded below
+the still-climbing long-period one, flipping the day-30 ranking. A calibration
+that always read at the horizon would misjudge this domain in a way that gets
+*worse* the longer it waits, not better — choosing the tick adaptively, from
+real per-hypothesis predictions the same way `inquiryLoop.ts` chooses a probe
+setting, is what keeps the answer correct at all, not a refinement on top of a
+"good enough" default.
+
+### 11.3 What was built, and what was reused unchanged
+
+**New:** `worldParameterCalibration.ts` (the composition engine) and
+`epidemicInfectiousDaysCalibration.ts` (the one domain declared on it so far).
+Together these are the WorldGraph-side counterpart of `SystemUnderStudy` /
+`runAutonomousInquiry`: `WorldParameterSystem` plays `SystemUnderStudy`'s role
+(`hiddenValue` is read exactly once, to build the one hidden world every
+candidate is judged against, and never handed to any reasoning step below that
+point — the same boundary `ObservableSystem` enforces by type erasure on the
+Fabric side, here enforced by construction instead, since a WorldGraph world
+has no flat parameter record to erase a field from).
+
+**Reused, unmodified:** `createHypothesis`, `updateConfidence`,
+`rankHypotheses`, `checkDiscriminability`, `evidenceMagnitudeWithinTolerance`
+(`beliefRevision.ts`); `evaluateTwoArmRelation` (`falsificationRelation.ts`);
+`reduceObjectiveTrajectory` with the `AT_HORIZON` reducer (`objectiveTrajectory.ts`,
+used exactly as designed — read one tick off an already-advanced trajectory).
+`discoveryLoop.ts`, `inquiryLoop.ts`, `discoveryOrchestrator.ts`,
+`objectiveReducer.ts` and `objectiveTrajectory.ts` itself were **not modified**
+— an audit of each (reading the actual code, per the brief) found no forcing
+need to touch any of them; `inquiryLoop.ts`'s own control flow
+(`inContention`, `snapshot`, `selectNextProbe`'s double-direction
+discriminability check) is mirrored rather than imported, because it is
+hard-wired to Fabric-specific calls (`runExperiment`, `getRouterModel`) a
+WorldGraph world has no use for.
+
+Measured end-to-end (`epidemicInfectiousDaysCalibration.test.ts`): every one
+of the five declared candidates resolves to the correct single survivor in
+exactly two rounds, and — proof the loop is genuinely driven by what it
+measures rather than a fixed schedule — **which second tick it picks depends
+on which truth is hidden**: 30 for short/brief/typical, 45 for extended/long,
+because the pair of top contenders surviving round one shifts with the
+observation, and different pairs need different ticks to separate. A
+tightly-spaced control case (three candidates 0.1 day apart, a tenth of this
+domain's own default) never separates within the declared ±12% band at any of
+the six candidate ticks and correctly reports `NO_DISCRIMINATING_PROBE` rather
+than guessing — the honest tie this domain's own real candidate spacing does
+not otherwise produce.
+
+### 11.4 Left open, deliberately: orchestrator wiring
+
+`WorldParameterCalibrationInput` is not `InquiryLoopInput` and
+`WorldParameterCalibrationResult` is not `StrategyRun` — wiring this
+composition into `discoveryOrchestrator.ts`'s `DiscoveryRequest` union would
+mean editing a file this brief listed as untouchable absent an audited need,
+and no such need was found: nothing downstream (Science Memory, Replay, the UI
+screens) currently calls this composition, so there is nothing forcing the
+union to grow yet. Whether it should — a third `DiscoveryRequest.shape`, or a
+variant of `PARAMETER` that branches on substrate — is a real design decision
+for whoever first needs to call this from the orchestrator rather than
+directly, the same kind of call §5 itself deferred. Left open here rather than
+guessed at.

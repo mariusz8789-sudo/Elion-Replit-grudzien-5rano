@@ -15,10 +15,13 @@ import { evidenceSummary, priorRefutedHypothesisIds } from './worldDiscoverySess
 import type { WorldParameterCalibrationInput } from './worldParameterCalibration';
 import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldGoalIntent, type WorldLeverCatalog } from './worldGoalIntent';
 import {
+  buildSavedMechanismComposition,
   buildSavedWorldDiscoveryRun,
   buildWorldDiscoveryEvidenceBundle,
   replaySavedWorldDiscoveryRun,
+  saveMechanismCompositionToMemory,
   saveWorldDiscoveryRunToMemory,
+  type SavedMechanismComposition,
   type SavedWorldDiscoveryReplay,
 } from '../scienceMemory';
 
@@ -571,29 +574,31 @@ function prepareMechanismInvestigation(request: MechanismRequest): {
  * functions `runWorldDiscoveryAndRemember` already calls. No second Evidence
  * mechanism, no second Memory schema, no second replay verdict vocabulary.
  *
- * ## What is deliberately NOT persisted here
+ * ## The composed joint-arm generation IS persisted, as its own record
  *
- * The composed joint-arm generation (`outcome.generated`, when present) is
- * reported in the returned `DiscoveryOutcome` exactly as `runDiscovery`
- * already reports it, but only the FIRST run — `mechanismGeneration.first`/
- * `.firstExecution` — is banked to Memory. Persisting the joint arm as its
- * own record (the way PARAMETER's generated follow-up gets its own
- * `SavedExperiment`) is real future work, not done here: the joint arm's
- * `DiscoveryLoopExecution` is not currently returned by `mechanismGeneration.ts`
- * (only its lean `StrategyRun` projection is), and widening that too is a
- * second, separate change — naming it rather than doing it silently.
+ * `outcome.generated` (when present) is reported in the returned
+ * `DiscoveryOutcome` exactly as `runDiscovery` already reports it, and now
+ * ALSO banked as its own `SavedMechanismComposition` — the identical
+ * `buildSavedMechanismComposition`/`saveMechanismCompositionToMemory`
+ * `worldDiscoverySession.ts::runWorldDiscoveryAndRemember` already uses for
+ * the SAME fourth Science Memory shape, never a second one invented here.
+ * Two separate records, the same discipline the first run/generated split
+ * already established: the base investigation and the composition are
+ * different findings and neither subsumes the other.
  */
 export interface MechanismDiscoveryRemembered {
   readonly outcome: DiscoveryOutcome;
   /** Null exactly when `outcome.status !== 'RAN'` — nothing ran, so nothing to persist. */
   readonly savedExperimentId: string | null;
   readonly replay: SavedWorldDiscoveryReplay | null;
+  /** Null whenever `outcome.generated` is null — nothing was composed this run, so nothing to bank. */
+  readonly mechanismComposition: SavedMechanismComposition | null;
 }
 
 export function runMechanismDiscoveryAndRemember(request: MechanismRequest): MechanismDiscoveryRemembered {
   const prepared = prepareMechanismInvestigation(request);
   if (prepared.outcome.status !== 'RAN' || prepared.mechanismGeneration === null || prepared.intent === null) {
-    return { outcome: prepared.outcome, savedExperimentId: null, replay: null };
+    return { outcome: prepared.outcome, savedExperimentId: null, replay: null, mechanismComposition: null };
   }
 
   const { mechanismGeneration, intent } = prepared;
@@ -612,5 +617,22 @@ export function runMechanismDiscoveryAndRemember(request: MechanismRequest): Mec
   });
   const savedExperiment = saveWorldDiscoveryRunToMemory(saved);
   const replay = replaySavedWorldDiscoveryRun(savedExperiment);
-  return { outcome: prepared.outcome, savedExperimentId: savedExperiment.id, replay };
+
+  let mechanismComposition: SavedMechanismComposition | null = null;
+  if (mechanismGeneration.generated !== null) {
+    const composition = buildSavedMechanismComposition({
+      catalogId: request.catalog.catalogId,
+      goal: request.goal,
+      worldId: request.catalog.worldId,
+      domainId: request.catalog.domainId,
+      resumedFromMemory: prepared.outcome.priorInvestigation,
+      derived: mechanismGeneration.generated.derived,
+      assessment: mechanismGeneration.generated.assessment,
+      betterThanBestSingle: mechanismGeneration.generated.betterThanBestSingle,
+    });
+    saveMechanismCompositionToMemory(composition);
+    mechanismComposition = composition;
+  }
+
+  return { outcome: prepared.outcome, savedExperimentId: savedExperiment.id, replay, mechanismComposition };
 }

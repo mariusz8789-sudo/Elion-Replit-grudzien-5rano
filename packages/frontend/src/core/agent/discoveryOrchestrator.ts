@@ -1,7 +1,10 @@
 import { admitWorldQuestion } from './discoveryAdmission';
-import { mechanismStrategy, parameterStrategy } from './discoveryStrategies';
+import { calibrationStrategy, mechanismStrategy, parameterStrategy } from './discoveryStrategies';
 import type { Admission, QuestionShape, StrategyRun } from './discoveryStrategy';
+import { memoryNarrowedHypotheses } from './inquirySession';
 import type { InquiryLoopInput } from './inquiryLoop';
+import { priorRefutedHypothesisIds } from './worldDiscoverySession';
+import type { WorldParameterCalibrationInput } from './worldParameterCalibration';
 import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalog } from './worldGoalIntent';
 
 /**
@@ -35,7 +38,7 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * capability is worth exactly what that capability is worth, and a consumer that
  * only ever sees `run` would have no way to know.
  *
- * ## Why admission runs before planning, and why the two shapes differ there
+ * ## Why admission runs before planning, and why MECHANISM is the odd one out
  *
  * `DiscoveryStrategy.admit` takes the strategy's own input, which for MECHANISM
  * exists only AFTER a plan is built. Building one first would produce a worse
@@ -45,8 +48,10 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * volcano solver. So MECHANISM is admitted on the raw goal via
  * `admitWorldQuestion`, which is precisely the function `mechanismStrategy.admit`
  * delegates to — the same admission, asked where the information exists, not a
- * second copy of it. PARAMETER's input is fully declared by its caller, so
- * `parameterStrategy.admit` is used directly.
+ * second copy of it. PARAMETER's and CALIBRATION's inputs are both fully
+ * declared by their caller, so `parameterStrategy.admit` /
+ * `calibrationStrategy.admit` are used directly on `request.input`, no planning
+ * step involved for either.
  *
  * ## Why the request shapes are asymmetric, and why that is honest
  *
@@ -60,19 +65,27 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * configured, and its `hiddenParameters` ARE the answer being sought. An
  * orchestrator that manufactured one from a sentence would be inventing the
  * result it is supposed to measure — which is the exact failure
- * `ObservableSystem` exists to make impossible at compile time. The asymmetry is
- * a fact about the two substrates, and it is stated rather than papered over
- * with a symmetry that would have to fabricate something.
+ * `ObservableSystem` exists to make impossible at compile time.
+ *
+ * A CALIBRATION request carries its `WorldParameterCalibrationInput` whole for
+ * the identical reason, one level down: `WorldParameterSystem.hiddenValue` and
+ * `buildWorldAt` together ARE the world the calibration is trying to identify,
+ * so there is nothing here for an orchestrator to derive from a sentence
+ * either — `system.scenarioKind` is the one thing it reads, purely to admit,
+ * never to build anything. The asymmetry across all three is a fact about the
+ * substrates, not a shortcut, and it is stated rather than papered over with a
+ * symmetry that would have to fabricate something.
  *
  * ## What this deliberately does not do
  *
- * It does not generate hypotheses. Both strategies are handed the hypotheses
- * they investigate, and turning falsifications into new candidates is P3
- * (`deriveAlternativeCriteria`, built and tested and not yet wired) — a separate
- * change, on top of this one, once this stands on its own.
+ * It does not generate hypotheses. All three strategies are handed the
+ * hypotheses they investigate, and turning falsifications into new candidates
+ * is P3 (`deriveAlternativeCriteria`, built and tested and not yet wired) — a
+ * separate change, on top of this one, once this stands on its own.
  */
 
-export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.0.0';
+/** 1.1.0 added the `CALIBRATION` shape and `CalibrationRequest`. Additive: `DiscoveryOutcome`'s own shape is unchanged, `shape` simply carries a third real value now. */
+export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.1.0';
 
 /** A mechanism question: a goal, against a world that declares its own levers. */
 export interface MechanismRequest {
@@ -87,7 +100,20 @@ export interface ParameterRequest {
   readonly input: InquiryLoopInput;
 }
 
-export type DiscoveryRequest = MechanismRequest | ParameterRequest;
+/**
+ * A calibration question: a fully declared world-parameter calibration. Same
+ * asymmetry rationale as `ParameterRequest`, one level down: a
+ * `WorldParameterSystem`'s `hiddenValue` and `buildWorldAt` ARE the answer
+ * being sought and the world that produces it, so this carries the whole
+ * `WorldParameterCalibrationInput` rather than a goal an orchestrator would
+ * have to guess a `ScenarioKind` and a solver constant out of.
+ */
+export interface CalibrationRequest {
+  readonly shape: 'CALIBRATION';
+  readonly input: WorldParameterCalibrationInput;
+}
+
+export type DiscoveryRequest = MechanismRequest | ParameterRequest | CalibrationRequest;
 
 /** Where a question stopped. Both are real refusals; they are not the same fact. */
 export type RefusalStage =
@@ -104,6 +130,30 @@ export interface DiscoveryRefused {
   readonly admission: Admission;
 }
 
+/**
+ * MEMORY, CONSULTED BUT NOT OBEYED — a warning, not a narrowing.
+ *
+ * `worldDiscoverySession.ts`/`inquirySession.ts` already have a STRONGER
+ * mechanism: they drop hypotheses an earlier run in the SAME world/system
+ * already falsified before executing. This orchestrator deliberately does
+ * NOT do that — it is Genesis's one front door, and a caller asking a
+ * declared question should get exactly that question answered in full, never
+ * a silently smaller one. What it DOES do is read the same memory those
+ * sessions already narrow on (`priorRefutedHypothesisIds`,
+ * `memoryNarrowedHypotheses` — reused, not reimplemented) and report what it
+ * found, so a caller — the Matrix, the Voice Guide — can say "Genesis already
+ * ruled this out once" without the run itself being any different for it.
+ *
+ * Whether `runDiscovery` should also narrow, matching the legacy sessions, is
+ * a real product question — same question, different behaviour depending on
+ * which entry point answers it, is not something to decide unilaterally here.
+ */
+export interface PriorInvestigationWarning {
+  /** Hypotheses in THIS request already refuted by an earlier investigation of the same world/system. */
+  readonly skippedHypothesisIds: readonly string[];
+  readonly reason: string;
+}
+
 export interface DiscoveryRan {
   readonly status: 'RAN';
   readonly contractVersion: string;
@@ -111,6 +161,8 @@ export interface DiscoveryRan {
   /** Carried on success too: a finding is worth what the capability behind it is worth. */
   readonly admission: Admission;
   readonly run: StrategyRun;
+  /** Null when memory has nothing to say — no prior investigation, or none of it applies here. */
+  readonly priorInvestigation: PriorInvestigationWarning | null;
 }
 
 export type DiscoveryOutcome = DiscoveryRan | DiscoveryRefused;
@@ -124,8 +176,13 @@ function refused(shape: QuestionShape, stage: RefusalStage, admission: Admission
   return { status: 'REFUSED', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, stage, admission };
 }
 
-function ran(shape: QuestionShape, admission: Admission, run: StrategyRun): DiscoveryRan {
-  return { status: 'RAN', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, admission, run };
+function ran(
+  shape: QuestionShape,
+  admission: Admission,
+  run: StrategyRun,
+  priorInvestigation: PriorInvestigationWarning | null,
+): DiscoveryRan {
+  return { status: 'RAN', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, admission, run, priorInvestigation };
 }
 
 /**
@@ -140,13 +197,33 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
   if (request.shape === 'PARAMETER') {
     const admission = parameterStrategy.admit(request.input);
     if (!admits(admission)) return refused('PARAMETER', 'ADMISSION', admission);
-    return ran('PARAMETER', admission, parameterStrategy.run(request.input));
+
+    // Reads the same match rule `inquirySession.ts` narrows on
+    // (`parameterInquirySystemKey`) but the returned `executedInput` is
+    // discarded on purpose — this front door runs the request as declared.
+    const { resumedFromMemory } = memoryNarrowedHypotheses(request.input);
+    const priorInvestigation: PriorInvestigationWarning | null = resumedFromMemory
+      ? { skippedHypothesisIds: resumedFromMemory.skippedHypothesisIds, reason: resumedFromMemory.reason }
+      : null;
+
+    return ran('PARAMETER', admission, parameterStrategy.run(request.input), priorInvestigation);
+  }
+
+  if (request.shape === 'CALIBRATION') {
+    const admission = calibrationStrategy.admit(request.input);
+    if (!admits(admission)) return refused('CALIBRATION', 'ADMISSION', admission);
+    // Memory-warning not yet wired for this shape: no existing session narrows
+    // world-parameter calibration the way `worldDiscoverySession.ts`/
+    // `inquirySession.ts` do for the other two, so there is nothing to read
+    // yet — null here is honest, not an oversight.
+    return ran('CALIBRATION', admission, calibrationStrategy.run(request.input), null);
   }
 
   const admission = admitWorldQuestion(request.goal);
   if (!admits(admission)) return refused('MECHANISM', 'ADMISSION', admission);
 
-  const plan = buildWorldDiscoveryPlan(parseWorldDiscoveryGoal(request.goal, request.catalog), request.catalog);
+  const intent = parseWorldDiscoveryGoal(request.goal, request.catalog);
+  const plan = buildWorldDiscoveryPlan(intent, request.catalog);
   if ('error' in plan) {
     // The capability exists; this world could not be ASKED this. Reported in the
     // same vocabulary rather than a second one, with the planner's own sentence
@@ -159,5 +236,17 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     });
   }
 
-  return ran('MECHANISM', admission, mechanismStrategy.run(plan));
+  // `intent.objectiveMetric`/`intent.direction` are non-null here — `plan`
+  // only builds once the planner has resolved both.
+  const refuted = priorRefutedHypothesisIds(request.catalog.catalogId, intent.objectiveMetric!, intent.direction!);
+  const alreadyRefuted = plan.hypotheses.map((h) => h.hypothesisId).filter((id) => refuted.has(id));
+  const priorInvestigation: PriorInvestigationWarning | null =
+    alreadyRefuted.length > 0
+      ? {
+          skippedHypothesisIds: alreadyRefuted,
+          reason: `${alreadyRefuted.join(', ')} already refuted for "${intent.direction} ${intent.objectiveMetric}" in an earlier run on this world.`,
+        }
+      : null;
+
+  return ran('MECHANISM', admission, mechanismStrategy.run(plan), priorInvestigation);
 }

@@ -23,11 +23,18 @@ import {
   NEXT_ACTION_SELECTORS,
   PARAMETER_INQUIRY_SELECTOR_ID,
   parameterInquiryNextAction,
+  WORLD_CALIBRATION_SELECTOR_ID,
+  worldCalibrationNextAction,
   WORLD_COUNTERFACTUAL_SELECTOR_ID,
   worldCounterfactualNextAction,
   type NextAction,
 } from '../core/agent/nextAction';
 import { runAutonomousInquiry } from '../core/agent/inquiryLoop';
+import {
+  epidemicInfectiousDaysCalibration,
+  epidemicInfectiousDaysSystem,
+} from '../core/agent/epidemicInfectiousDaysCalibration';
+import { runAutonomousWorldCalibration } from '../core/agent/worldParameterCalibration';
 import { compareBranches } from '../core/worldModel/bridge/worldFrameState';
 import {
   assessWorldCounterfactual,
@@ -254,10 +261,10 @@ describe('The shared shape is honest about what each selector does not report', 
     expect(selector({}).request).toBeNull();
   });
 
-  it('registers all six real selectors, each naming the state it needs', () => {
-    expect(NEXT_ACTION_SELECTORS).toHaveLength(6);
+  it('registers all seven real selectors, each naming the state it needs', () => {
+    expect(NEXT_ACTION_SELECTORS).toHaveLength(7);
     const ids = NEXT_ACTION_SELECTORS.map((s) => s.selectorId);
-    expect(new Set(ids).size).toBe(6);
+    expect(new Set(ids).size).toBe(7);
     for (const selector of NEXT_ACTION_SELECTORS) {
       expect(selector.answersFor).toBeTruthy();
       expect(selector.requiresState).toBeTruthy();
@@ -323,5 +330,57 @@ describe('The parameter-inquiry adapter delegates and does not re-decide', () =>
     expect(action.status).toBe('RESOLVED');
     expect(action.request).toBeNull();
     expect(action.rule).toBe('NO_CONTENDERS_LEFT');
+  });
+});
+
+describe('The world-calibration adapter delegates and does not re-decide', () => {
+  it('reports the composition\'s own proposal verbatim, request left null (no WorldGraph equivalent)', () => {
+    const input = epidemicInfectiousDaysCalibration(6);
+    const result = runAutonomousWorldCalibration(input);
+    const action = worldCalibrationNextAction({ result, system: input.system });
+
+    expect(action.selectorId).toBe(WORLD_CALIBRATION_SELECTOR_ID);
+    expect(action.domain).toBe('epidemiology');
+    expect(action.native).toBe(result.nextExperiment); // verbatim, not a copy
+    expect(action.why).toBe(result.nextExperiment.why);
+    expect(action.rule).toBe(result.nextExperiment.rule);
+    expect(action.about).toEqual(result.nextExperiment.betweenHypothesisIds);
+    // No `StructuredExperimentRequest` equivalent exists for "rebuild this
+    // world and read a different tick" — same choice `worldCounterfactualNextAction`
+    // already makes for its own WorldGraph substrate.
+    expect(action.request).toBeNull();
+  });
+
+  it('is RESOLVED with no request when the composition reached a conclusion', () => {
+    const input = epidemicInfectiousDaysCalibration(6); // resolves in exactly 2 rounds (measured)
+    const result = runAutonomousWorldCalibration(input);
+    expect(result.nextExperiment.probeTick).toBeNull();
+
+    const action = worldCalibrationNextAction({ result, system: input.system });
+    expect(action.status).toBe('RESOLVED');
+    expect(action.request).toBeNull();
+    expect(action.rule).toBe('NO_CONTENDERS_LEFT');
+  });
+
+  it('is RESOLVED with rule NO_DISCRIMINATING_PROBE on an honest tie, not silently treated as READY_TO_RUN', () => {
+    const closeHypotheses = [
+      { hypothesisId: 'h:a', statement: 'a', claimedValue: 6.9, priorConfidence: 0.5 },
+      { hypothesisId: 'h:b', statement: 'b', claimedValue: 7.0, priorConfidence: 0.5 },
+      { hypothesisId: 'h:c', statement: 'c', claimedValue: 7.1, priorConfidence: 0.5 },
+    ];
+    const input = {
+      question: "What is this outbreak's real mean infectious period?",
+      system: epidemicInfectiousDaysSystem(7.0, 'nextaction-tie-test'),
+      hypotheses: closeHypotheses,
+      openingProbeTick: 2,
+      maxRounds: 6,
+    };
+    const result = runAutonomousWorldCalibration(input);
+    expect(result.stopReason).toBe('NO_DISCRIMINATING_PROBE');
+
+    const action = worldCalibrationNextAction({ result, system: input.system });
+    expect(action.status).toBe('RESOLVED');
+    expect(action.rule).toBe('NO_DISCRIMINATING_PROBE');
+    expect(action.request).toBeNull();
   });
 });

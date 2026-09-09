@@ -1951,7 +1951,7 @@ export class GenesisWorldSim3D implements Sim3D {
  * `data-testid`, so "several explanations still stand" is a structural fact a reader (or a test)
  * can see, not a decoration.
  */
-function MatrixPanel({ view, roundNumber }: { view: GenesisMatrixView; roundNumber: number }) {
+export function MatrixPanel({ view, roundNumber, run }: { view: GenesisMatrixView; roundNumber: number; run: StrategyRun | null }) {
   const introLines = narrateIntro(view);
   const entry = view.entries.find((e) => e.round === roundNumber) ?? null;
   const roundLines = entry ? narrateRound(entry) : [];
@@ -1963,12 +1963,60 @@ function MatrixPanel({ view, roundNumber }: { view: GenesisMatrixView; roundNumb
 
   return (
     <div className="gx-matrix-panel" data-testid="genesis-matrix-panel">
-      <span className="gx-experiment-world">Genesis Matrix — the real loop this run actually ran</span>
+      <div className="gx-matrix-header">
+        <span className="gx-experiment-world">Genesis Matrix — the real loop this run actually ran</span>
+        {/* HONESTY BOUNDARY (item 16) — every value on this panel is simulation output; this badge
+            says so explicitly rather than letting the panel's scientific framing imply a physical
+            apparatus Genesis does not have an interface to today. */}
+        <span className="gx-matrix-badge" data-testid="matrix-provenance-badge">SIMULATION</span>
+      </div>
 
       <div className="gx-matrix-stage" data-testid="matrix-stage-theory">
         <span className="gx-matrix-stage-label">THEORY</span>
         {byPhase('INTRO', introLines).map((l, i) => <p key={`i${i}`} className="gsc-caption">{l.text}</p>)}
         {byPhase('CAVEAT', introLines).map((l, i) => <p key={`c${i}`} className="gx-matrix-caveat">{l.text}</p>)}
+      </div>
+
+      {/* HYPOTHESES — the real run.surviving/falsified/untested partition (discoveryStrategy.ts's own
+          contract), not a UI-invented status. `run` is null only when no StrategyRun exists yet at
+          all (never mid-run), so that case renders NOT AVAILABLE rather than an empty list guessed
+          to mean "no hypotheses". */}
+      <div className="gx-matrix-stage" data-testid="matrix-stage-hypotheses">
+        <span className="gx-matrix-stage-label">HYPOTHESES</span>
+        {!run ? (
+          <p className="gx-matrix-empty" data-testid="matrix-hypotheses-unavailable">NOT AVAILABLE</p>
+        ) : (
+          <ul className="gx-matrix-hyp-list">
+            {run.surviving.map((id) => (
+              <li key={id} className="gx-matrix-hyp gx-matrix-hyp-supported" data-testid={`matrix-hypothesis-${id}`}>
+                <code>{id}</code><span>SUPPORTED</span>
+              </li>
+            ))}
+            {run.falsified.map((id) => (
+              <li key={id} className="gx-matrix-hyp gx-matrix-hyp-falsified" data-testid={`matrix-hypothesis-${id}`}>
+                <code>{id}</code><span>FALSIFIED</span>
+              </li>
+            ))}
+            {run.untested.map((id) => (
+              <li key={id} className="gx-matrix-hyp gx-matrix-hyp-untested" data-testid={`matrix-hypothesis-${id}`}>
+                <code>{id}</code><span>UNTESTED</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {/* DECLARED_SPACE_INSUFFICIENT (item 7) — a real, nameable finding ("none of the mechanisms we
+            declared explains this"), framed as a discovery moment, never an error banner: no red
+            alarm styling, real nextStep/caveat text verbatim from modelSufficiency.ts. */}
+        {view.sufficiency?.status === 'DECLARED_SPACE_INSUFFICIENT' && (
+          <div className="gx-matrix-insufficient" data-testid="matrix-space-insufficient">
+            <strong>Known mechanisms exhausted</strong>
+            <p className="gsc-caption">
+              None of the {view.sufficiency.declaredMechanismCount} declared mechanism(s) explains the observation.
+            </p>
+            {view.sufficiency.nextStep && <p className="gsc-caption" data-testid="matrix-insufficient-next-step">{view.sufficiency.nextStep}</p>}
+            {view.sufficiency.caveat && <p className="gx-matrix-caveat">{view.sufficiency.caveat}</p>}
+          </div>
+        )}
       </div>
 
       <div className="gx-matrix-stage" data-testid="matrix-stage-prediction">
@@ -2012,6 +2060,47 @@ function MatrixPanel({ view, roundNumber }: { view: GenesisMatrixView; roundNumb
         )}
         {byPhase('VERDICT', nextLines).map((l, i) => <p key={`nv${i}`} className="gsc-caption">{l.text}</p>)}
         {byPhase('NEXT', nextLines).map((l, i) => <p key={`nn${i}`} className="gsc-caption">{l.text}</p>)}
+      </div>
+
+      {/* WHY THIS EXPERIMENT? (item 4) — real reasoning text off NextAction.why, the selector's own
+          words, never a UI-authored explanation. Only meaningful once the search actually finished
+          (same isLastRound gate the existing nextExperimentAction read already uses) — mid-run there
+          is no next-experiment decision yet to explain. */}
+      <div className="gx-matrix-stage" data-testid="matrix-stage-why">
+        <span className="gx-matrix-stage-label">WHY THIS EXPERIMENT?</span>
+        {isLastRound && view.nextExperiment ? (
+          <>
+            <p className="gx-matrix-decided" data-testid="matrix-genesis-decided">Genesis decided: {view.nextExperiment.action}</p>
+            <p className="gsc-caption" data-testid="matrix-why-text">{view.nextExperiment.why}</p>
+            {view.nextExperiment.about.length > 0 && (
+              <p className="gsc-caption" data-testid="matrix-why-about">About: {view.nextExperiment.about.join(', ')}</p>
+            )}
+          </>
+        ) : (
+          <p className="gx-matrix-empty" data-testid="matrix-why-unavailable">Reason not yet available.</p>
+        )}
+      </div>
+
+      {/* MEMORY (item 14) — PriorInvestigationDecision, real content off discoveryOrchestrator.ts.
+          Null genuinely means "no prior investigation influenced this run" (its own doc: "no prior
+          investigation, or none of it applies here") — a real, informative state, not a missing-data
+          gap, so it gets its own honest sentence rather than NOT AVAILABLE. */}
+      <div className="gx-matrix-stage" data-testid="matrix-stage-memory">
+        <span className="gx-matrix-stage-label">MEMORY</span>
+        {view.priorInvestigation ? (
+          <p className="gsc-caption" data-testid="matrix-memory-text">{view.priorInvestigation.reason}</p>
+        ) : (
+          <p className="gx-matrix-empty" data-testid="matrix-memory-none">No prior investigation influenced this run.</p>
+        )}
+      </div>
+
+      {/* INFORMATION GAIN (item 3) — genuinely not computed anywhere in this codebase today
+          (inquiryLoop.ts's own doc: "No score, no ranking function, no expected-information number" —
+          selection is a boolean discriminability check, not a quantified gain). Stated plainly rather
+          than fabricated for this panel. */}
+      <div className="gx-matrix-stage" data-testid="matrix-stage-information-gain">
+        <span className="gx-matrix-stage-label">INFORMATION GAIN</span>
+        <p className="gx-matrix-empty" data-testid="matrix-information-gain-unavailable">NOT AVAILABLE — no selector in Genesis computes a quantified information-gain score yet; next-experiment choice above is a real but non-numeric reason.</p>
       </div>
     </div>
   );
@@ -2554,7 +2643,7 @@ export function GenesisWorldScreen() {
                 </div>
               </div>
             )}
-            {matrixView && roundView && <MatrixPanel view={matrixView} roundNumber={roundView.roundNumber} />}
+            {matrixView && roundView && <MatrixPanel view={matrixView} roundNumber={roundView.roundNumber} run={strategyRun} />}
           </div>
         )}
 

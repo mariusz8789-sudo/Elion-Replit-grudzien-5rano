@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import '../labs/index';
 import { getLabs } from '../core/registry';
 import { defaultParams } from '../components/Controls';
-import { fft, quantumTunneling } from '../labs/experiments/quantum-tunneling';
+import { fft } from '../labs/experiments/quantum-tunneling';
 import type { ExperimentDef, LabDefinition } from '../core/types';
 
 /**
@@ -82,29 +82,5 @@ describe('FFT (silnik równania Schrödingera)', () => {
   });
 });
 
-describe('tunelowanie: fizyka jakościowa', () => {
-  function transmissionAfter(energyFrac: number, seconds: number): number {
-    const sim = quantumTunneling.createSim!();
-    sim.init(390, 400);
-    const params = { ...defaultParams(quantumTunneling.params), energy: energyFrac };
-    for (let i = 0; i < seconds * 60; i++) sim.update(1 / 60, params);
-    return Number(sim.getStats!().trans);
-  }
-
-  it('prawdopodobieństwo jest zachowane (trans+refl ≤ 100%)', () => {
-    const sim = quantumTunneling.createSim!();
-    sim.init(390, 400);
-    const params = defaultParams(quantumTunneling.params);
-    for (let i = 0; i < 300; i++) sim.update(1 / 60, params);
-    const s = sim.getStats!();
-    expect(Number(s.trans) + Number(s.refl)).toBeLessThanOrEqual(101);
-    expect(Number(s.trans)).toBeGreaterThanOrEqual(0);
-  });
-
-  it('transmisja poniżej bariery > 0 (tunelowanie!) i rośnie z energią', () => {
-    const low = transmissionAfter(0.4, 6);
-    const high = transmissionAfter(0.9, 6);
-    expect(low).toBeGreaterThan(0); // klasycznie byłoby 0
-    expect(high).toBeGreaterThan(low);
-  });
-});
+// Tunelowanie 3D (createSim3D) ma własną wersję tych testów jakościowych —
+// patrz quantumTunneling3D.test.ts (potrzebuje prawdziwych THREE.Scene/Camera).

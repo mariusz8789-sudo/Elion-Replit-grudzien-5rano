@@ -5,8 +5,11 @@ import { compareBranches } from '../worldModel/bridge/worldFrameState';
 import { CAPABILITY_CODE, type SolverCapability } from '../worldModel/capability/solverCapability';
 import { reduceObjectiveTrajectory } from '../worldModel/discovery/objectiveTrajectory';
 import {
+  criterionFingerprint,
+  deriveAlternativeCriteria,
   forkedArmControl,
   preregisterWorldCounterfactual,
+  type AlternativeCriterion,
   type ObjectiveOverride,
   type WorldCounterfactualAssessment,
   type WorldCounterfactualDiff,
@@ -94,6 +97,31 @@ export interface MechanisticHypothesis {
    */
   readonly apply: (graph: WorldGraph, strength: number) => void;
   readonly rationale: string;
+  /**
+   * PROVENANCE FOR A GENERATED HYPOTHESIS. Absent on every declared hypothesis
+   * — a caller writes none of this, the loop fills it in only when IT derived
+   * the hypothesis from a falsification (`deriveAlternativeCriteria`).
+   *
+   * Typed off `AlternativeCriterion['generatedBy']` rather than importing
+   * `beliefRevision.ts`'s `HypothesisGenerationMechanism` directly: this file
+   * deliberately does not import that module (see the file doc — ordinal
+   * belief, not numeric), and reusing the type through the one function that
+   * already crosses that boundary keeps it that way.
+   */
+  readonly generatedBy?: AlternativeCriterion['generatedBy'];
+  readonly parentHypothesisId?: string | null;
+  /**
+   * Magnitudes this hypothesis must NOT be scheduled at.
+   *
+   * The one guard that keeps regeneration from HARKing on a deterministic
+   * world: a derived hypothesis proposes the SAME `apply` its parent used,
+   * re-interpreted under a new criterion, so running it at the exact strength
+   * that produced the parent's falsification would replay bit-identical
+   * results and "confirm" the new criterion with the data that generated it.
+   * `selectNext` refuses to pick an excluded strength; see the roadmap
+   * (`docs/AUTONOMOUS_DISCOVERY_ROADMAP.md`) for why this is not negotiable.
+   */
+  readonly excludedStrengths?: readonly number[];
 }
 
 /**
@@ -328,31 +356,51 @@ interface Selection {
  * numerically, and inventing one here would be the same overclaim it refuses
  * everywhere else.
  */
+/**
+ * Whether `strength` is off-limits for `hypothesis` — the anti-HARK guard.
+ * See `MechanisticHypothesis.excludedStrengths`'s own doc for why this exists.
+ */
+function isExcludedStrength(hypothesis: MechanisticHypothesis, strength: number): boolean {
+  return (hypothesis.excludedStrengths ?? []).includes(strength);
+}
+
 function selectNext(
   hypotheses: readonly MechanisticHypothesis[],
   beliefs: ReadonlyMap<string, HypothesisBelief>,
   replicationStrength: number,
 ): Selection | null {
-  // 1. Consolidate: a mechanism supported at exactly one magnitude is worth a second.
+  // 1. Consolidate: a mechanism supported at exactly one magnitude is worth a
+  //    second, at the OTHER canonical magnitude — not unconditionally
+  //    `replicationStrength`, because a derived hypothesis may have been
+  //    forced to its FIRST test at `replicationStrength` (its full strength
+  //    excluded), and retesting it there again would silently repeat the same
+  //    intervention rather than genuinely consolidating at a second one.
   for (const hypothesis of hypotheses) {
     const belief = beliefs.get(hypothesis.hypothesisId)!;
-    if (belief.status === 'SUPPORTED' && new Set(belief.testedAtStrengths).size === 1) {
-      return {
-        hypothesis,
-        strength: replicationStrength,
-        reason: `"${hypothesis.hypothesisId}" survived its criterion at full strength; re-testing at ${replicationStrength}× to see whether the effect is dose-dependent or an artefact of one setting.`,
-      };
-    }
+    if (belief.status !== 'SUPPORTED' || new Set(belief.testedAtStrengths).size !== 1) continue;
+    const tested = belief.testedAtStrengths[0]!;
+    const retestStrength = tested === 1 ? replicationStrength : 1;
+    if (isExcludedStrength(hypothesis, retestStrength)) continue; // no second magnitude left to consolidate at
+    return {
+      hypothesis,
+      strength: retestStrength,
+      reason:
+        tested === 1
+          ? `"${hypothesis.hypothesisId}" survived its criterion at full strength; re-testing at ${retestStrength}× to see whether the effect is dose-dependent or an artefact of one setting.`
+          : `"${hypothesis.hypothesisId}" survived its criterion at ${tested}×; re-testing at ${retestStrength === 1 ? 'full strength' : `${retestStrength}×`} to see whether the effect is dose-dependent or an artefact of one setting.`,
+    };
   }
-  // 2. Otherwise explore: the first mechanism nothing has been observed about.
+  // 2. Otherwise explore: the first mechanism nothing has been observed about,
+  //    at full strength unless that magnitude is excluded for it.
   for (const hypothesis of hypotheses) {
-    if (beliefs.get(hypothesis.hypothesisId)!.status === 'UNTESTED') {
-      return {
-        hypothesis,
-        strength: 1,
-        reason: `No mechanism is currently supported and awaiting consolidation, so the loop moves to the next untested one: "${hypothesis.hypothesisId}".`,
-      };
-    }
+    if (beliefs.get(hypothesis.hypothesisId)!.status !== 'UNTESTED') continue;
+    const strength = isExcludedStrength(hypothesis, 1) ? replicationStrength : 1;
+    if (isExcludedStrength(hypothesis, strength)) continue; // both canonical magnitudes excluded: not testable this run
+    return {
+      hypothesis,
+      strength,
+      reason: `No mechanism is currently supported and awaiting consolidation, so the loop moves to the next untested one: "${hypothesis.hypothesisId}".`,
+    };
   }
   return null;
 }
@@ -392,12 +440,23 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
   const beliefs = new Map<string, HypothesisBelief>(
     input.hypotheses.map((h) => [h.hypothesisId, initialBelief(h)]),
   );
+  // Mutable and grows: a falsification this run may derive an alternative
+  // hypothesis (see the regeneration block below), and `selectNext` needs to
+  // see it. `input.hypotheses` itself stays untouched — it is the CALLER's
+  // declared search space, and this loop reports what it added on top of it
+  // via each derived hypothesis's own `generatedBy`/`parentHypothesisId`.
+  const activeHypotheses: MechanisticHypothesis[] = [...input.hypotheses];
+  // Every criterion actually judged this run, declared or derived — the
+  // input `deriveAlternativeCriteria` needs to refuse a candidate this
+  // investigation already tried in either direction. See that function's own
+  // doc for why silently reappearing negative evidence would be dishonest.
+  const judgedCriterionFingerprints = new Set<string>();
   const rounds: DiscoveryRound[] = [];
   const trace: DiscoveryTraceStep[] = [];
   let stopReason: DiscoveryStopReason = 'ROUND_BUDGET_EXHAUSTED';
 
   for (let round = 1; round <= input.maxRounds; round++) {
-    const selection = selectNext(input.hypotheses, beliefs, replicationStrength);
+    const selection = selectNext(activeHypotheses, beliefs, replicationStrength);
     if (!selection) {
       stopReason = rounds.length === 0 ? 'NO_TESTABLE_HYPOTHESIS' : 'ALL_HYPOTHESES_RESOLVED';
       break;
@@ -464,6 +523,46 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
     const before = beliefs.get(hypothesis.hypothesisId)!;
     const after = updateBelief(before, round, strength, assessment, effect, metricMoved);
     beliefs.set(hypothesis.hypothesisId, after);
+    judgedCriterionFingerprints.add(criterionFingerprint(hypothesis.criterion));
+
+    // --- Regeneration: a clean falsification proposes its own alternative --
+    //
+    // Gated on the SAME condition `deriveAlternativeCriteria` itself requires
+    // (a real, evaluable FALSIFIED_WITHIN_PROTOCOL) — this is not a second
+    // check duplicating that function's judgement, it is the caller reading
+    // the same fact before deciding whether to act on what it returns.
+    //
+    // The derived hypothesis reuses `hypothesis.apply` UNCHANGED: it is the
+    // same declared mechanism, re-interpreted under a new criterion, never a
+    // mechanism this loop invented. `excludedStrengths` carries forward every
+    // strength already used against that `apply` (this hypothesis's own, plus
+    // whatever its parent already excluded, for a chain of derivations) so
+    // `selectNext` can never schedule it at a magnitude that would just
+    // replay the falsifying run and "confirm" the new criterion with the
+    // data that generated it — the HARKing risk the roadmap names.
+    if (assessment.assessment === 'FALSIFIED_WITHIN_PROTOCOL') {
+      const alternatives: readonly AlternativeCriterion[] = deriveAlternativeCriteria(
+        hypothesis.criterion, assessment, judgedCriterionFingerprints,
+      );
+      for (const alternative of alternatives) {
+        const derivedId = `${hypothesis.hypothesisId}~${alternative.generatedBy}`;
+        if (beliefs.has(derivedId)) continue; // defensive: never overwrite an existing line of inquiry
+        const derived: MechanisticHypothesis = {
+          hypothesisId: derivedId,
+          statement: `${hypothesis.statement} — revised after falsification in round ${round}: ${alternative.criterion.rationale}`,
+          mechanism: hypothesis.mechanism,
+          entityId: hypothesis.entityId,
+          criterion: alternative.criterion,
+          apply: hypothesis.apply,
+          rationale: alternative.criterion.rationale,
+          generatedBy: alternative.generatedBy,
+          parentHypothesisId: hypothesis.hypothesisId,
+          excludedStrengths: [...(hypothesis.excludedStrengths ?? []), strength],
+        };
+        activeHypotheses.push(derived);
+        beliefs.set(derivedId, initialBelief(derived));
+      }
+    }
 
     // --- What next, via the dispatcher -------------------------------------
     const nextAction = worldCounterfactualNextAction({ assessment, diff, domain: input.domainId });
@@ -522,7 +621,7 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
 
     const consolidated = [...beliefs.values()].some((b) => b.confidence === 'SUPPORTED_AT_TWO_MAGNITUDES');
     if (consolidated) { stopReason = 'LEADER_CONFIRMED_AT_TWO_MAGNITUDES'; break; }
-    if (!selectNext(input.hypotheses, beliefs, replicationStrength)) { stopReason = 'ALL_HYPOTHESES_RESOLVED'; break; }
+    if (!selectNext(activeHypotheses, beliefs, replicationStrength)) { stopReason = 'ALL_HYPOTHESES_RESOLVED'; break; }
   }
 
   const all = [...beliefs.values()];

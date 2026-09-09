@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { InquiryLoopInput, ParameterHypothesis } from '../core/agent/inquiryLoop';
-import { proteinFoldingInquiry } from '../core/agent/proteinFoldingInquiry';
 
 /**
  * PASS 2 — TRYING TO BREAK THE AUTONOMY CLAIM, and the end-to-end pipeline
@@ -212,83 +211,12 @@ describe('inquirySession — memory is read back, and only for what it may decid
   });
 });
 
-describe('runInquiryWithGeneration — the generated discovery is REMEMBERED, not just made', () => {
-  beforeEach(() => { vi.resetModules(); vi.stubGlobal('window', { localStorage: makeFakeStorage() }); });
-  afterEach(() => vi.unstubAllGlobals());
-
-  /**
-   * Was the exact gap named in `AUTONOMOUS_DISCOVERY_ROADMAP.md`: the first
-   * version of `runInquiryWithGeneration` called the bare engine for both runs,
-   * so it generated and tested a hypothesis nobody declared but never left
-   * anything behind for a LATER inquiry into the same system to narrow
-   * against — Genesis generated and tested without learning. This proves the
-   * fix on the real exhausted-space fixture: a fold at temperature 0.5 that
-   * falsifies every declared candidate.
-   */
-  it('a later inquiry into the SAME system remembers what the exhausted-space run already falsified', async () => {
-    const storage = makeFakeStorage();
-    vi.stubGlobal('window', { localStorage: storage });
-
-    const first = await import('../core/agent/inquirySession');
-    const round1 = first.runInquiryWithGeneration(proteinFoldingInquiry(0.5));
-    // Ground the fixture: this really is the exhausted-space case, and
-    // generation really fired.
-    expect([...round1.first.falsifiedHypothesisIds].sort()).toEqual(['h:cold', 'h:cool', 'h:hot', 'h:warm']);
-    expect(round1.firstResumedFromMemory).toBeNull(); // nothing to resume from yet
-    expect(round1.generated).not.toBeNull();
-    expect(round1.generated!.survived).toBe(true);
-
-    // A process restart: fresh modules, same persisted storage.
-    vi.resetModules();
-    vi.stubGlobal('window', { localStorage: storage });
-    const second = await import('../core/agent/inquirySession');
-    // THE FIX, proven two ways on the SAME declared four candidates:
-
-    // 1. Every one of them was already falsified — before the fix, memory
-    // would have nothing to say (no record ever existed); now it correctly
-    // recognises this and retests the full set rather than skipping to
-    // nothing (the same fallback `runInquiryAndRemember` already holds).
-    const roundAll = second.runInquiryWithGeneration(proteinFoldingInquiry(0.5));
-    expect(roundAll.firstResumedFromMemory).not.toBeNull();
-    expect(roundAll.firstResumedFromMemory!.skippedHypothesisIds).toEqual([]);
-    expect(roundAll.firstResumedFromMemory!.reason).toContain('nie zostawiłoby czego badać');
-
-    // 2. A genuinely PARTIAL declared set — one already-falsified candidate
-    // alongside round 1's own generated hypothesis, which SURVIVED and so is
-    // never carried forward as settled — shows real, executable narrowing:
-    // the falsified one is skipped, the generated one is not.
-    vi.resetModules();
-    vi.stubGlobal('window', { localStorage: storage });
-    const third = await import('../core/agent/inquirySession');
-    const { asParameterHypothesis } = await import('../core/agent/parameterAlternative');
-    const mixedInput: InquiryLoopInput = {
-      ...proteinFoldingInquiry(0.5),
-      hypotheses: [proteinFoldingInquiry(0.5).hypotheses[0]!, asParameterHypothesis(round1.generated!.derived)],
-    };
-    const roundMixed = third.runInquiryAndRemember(mixedInput);
-    expect(roundMixed.resumedFromMemory).not.toBeNull();
-    expect(roundMixed.resumedFromMemory!.skippedHypothesisIds).toEqual(['h:cold']);
-    expect(roundMixed.executedInput.hypotheses.map((h) => h.hypothesisId)).toEqual([round1.generated!.derived.hypothesisId]);
-  });
-
-  /** The generated follow-up itself is a real, listed Science Memory record — not merely returned and discarded. */
-  it('the generated follow-up investigation is a real, queryable memory record', async () => {
-    const storage = makeFakeStorage();
-    vi.stubGlobal('window', { localStorage: storage });
-
-    const inquirySession = await import('../core/agent/inquirySession');
-    const scienceMemory = await import('../core/scienceMemory');
-    const round = inquirySession.runInquiryWithGeneration(proteinFoldingInquiry(0.5));
-    expect(round.generated).not.toBeNull();
-
-    const followUpRecord = scienceMemory.getExperiment(round.generated!.followUpSaved.id);
-    expect(followUpRecord).not.toBeUndefined();
-    expect(followUpRecord!.parameterInquiry?.input.hypotheses.map((h) => h.hypothesisId))
-      .toContain(round.generated!.derived.hypothesisId);
-    // A real re-execution verdict was produced for it, not merely asserted.
-    expect(round.generated!.followUpReplay.status).toBe('MATCH');
-  });
-});
+// The memory-persistence gap once tested here directly against
+// `runInquiryWithGeneration` is now covered — more thoroughly, including the
+// full `runDiscovery` front-door path and cross-system isolation — by
+// `generationMemoryChain.test.ts`, against `runInquiryWithGenerationAndRemember`
+// (C3's design: `runInquiryWithGeneration` itself stays pure/unpersisted; the
+// separate `*AndRemember` wrapper is what banks both investigations).
 
 describe('inquirySession — replay actually catches things', () => {
   beforeEach(() => { vi.resetModules(); vi.stubGlobal('window', { localStorage: makeFakeStorage() }); });

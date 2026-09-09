@@ -206,24 +206,28 @@ gap that audit found:
 | link | status |
 |---|---|
 | detects its own space is insufficient | **done** — `DECLARED_SPACE_INSUFFICIENT` is now a precondition, not a report |
-| generates a new explanation | **done** — MECHANISM (`~RELATION_FLIP`) and PARAMETER (bracketed value) |
-| runs the test itself | **done** — `runInquiryWithGeneration`, unprompted, on evidence the derivation never saw |
-| judges the result | **done** — a real verdict from a real second inquiry |
-| updates memory | **done** — both runs now go through `runInquiryAndRemember`; see `AUTONOMOUS_DISCOVERY_ROADMAP.md` §10.10 |
-| the result changes the next choice | **done, measured twice** — a later inquiry into the same system now genuinely narrows on what the generated run found |
+| generates a new explanation | **done** — MECHANISM (`~RELATION_FLIP`, and now composing two declared levers via `mechanismGeneration.ts`) and PARAMETER (bracketed value) |
+| runs the test itself | **done** — `runInquiryWithGeneration`, unprompted, on evidence the derivation never saw; reachable through the actual `runDiscovery` front door as a second `StrategyRun` |
+| judges the result | **done** — a real verdict from a real second inquiry, honestly reported (see below) |
+| updates memory | **done** — `runInquiryWithGenerationAndRemember` banks both investigations through the same `saveParameterInquiryToMemory` every other caller uses |
+| the result changes the next choice | **done, measured twice, then again through the front door** — a later inquiry into the same system genuinely narrows on what the generated run found, including a plain `runDiscovery` call over a memory-backed system |
 
-Found and closed in one pass: `runInquiryWithGeneration` called the bare
-`runAutonomousInquiryWithRuns` for both the first inquiry and the follow-up —
-not `runInquiryAndRemember`. So the derived hypothesis's verdict was never
-persisted. Fixed by routing both calls through the SAME session pipeline every
-other PARAMETER caller already uses — no second memory store. Measured on the
-real exhausted-space fixture (`inquirySession.test.ts`): a later inquiry into
-the same system correctly re-tests a fully-falsified set rather than skipping
-to nothing (the existing empty-narrowing fallback, now reachable here), and a
-partial declared set correctly skips an already-falsified candidate while
-leaving the generated hypothesis untouched — because it survived, and memory
-never carries a SUPPORTED verdict forward, the same rule every declared
-hypothesis already follows.
+Closed in two passes that converged on the same gap from different sides
+(Priority-1 and Priority-5 audits, same window) — see
+`AUTONOMOUS_DISCOVERY_ROADMAP.md` §10.10 and §10.11 for the full trace. The
+persistence gap was real: `runInquiryWithGeneration` originally called the
+bare `runAutonomousInquiryWithRuns` for both the first inquiry and the
+follow-up, so a derived hypothesis's verdict was never persisted and a later
+inquiry into the same system could not learn from it. The version now on
+`main` keeps `runInquiryWithGeneration` itself pure (no storage) and adds a
+separate `runInquiryWithGenerationAndRemember` that banks both investigations
+— and wires that into `discoveryOrchestrator.ts`'s PARAMETER path, so the
+generated continuation runs through the real front door, not only through a
+direct call. It also carries an honesty fix found while measuring: on the
+real seeded fold, several different true temperatures produce the identical
+surviving derived value, so `survived: true` alone overclaimed at settings
+the declared agreement band cannot separate — the standing now reports what
+the evidence actually earned.
 
 A second, untested branch, still worth naming: every fixture so far ends
 `D ✅`. What happens when the derived value is ALSO falsified — does a second

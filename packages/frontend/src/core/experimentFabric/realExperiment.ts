@@ -135,6 +135,28 @@ export function createRealExperimentRun(input: {
   warnings?: readonly string[];
 }): RealExperimentRun {
   const { request } = input;
+  if (request.physicalProtocolRef.trim().length === 0) {
+    throw new Error('A real experiment request needs a non-empty physicalProtocolRef — an unattributed request cannot become a real measurement.');
+  }
+  if (input.derived.length === 0) {
+    throw new Error('A real experiment run needs at least one derived measurement — nothing was entered.');
+  }
+  for (const measurement of input.derived) {
+    if (measurement.derivedFrom.length === 0) {
+      throw new Error(`Derived measurement "${measurement.outputKey}" has no raw readings behind it (derivedFrom is empty) — that is a fabrication, not a measurement.`);
+    }
+    if (!Number.isFinite(measurement.value)) {
+      throw new Error(`Derived measurement "${measurement.outputKey}" is not a finite number.`);
+    }
+    for (const raw of measurement.derivedFrom) {
+      if (!Number.isFinite(raw.value)) {
+        throw new Error(`Raw reading on channel "${raw.channel}" backing "${measurement.outputKey}" is not a finite number.`);
+      }
+      if (raw.channel.trim().length === 0) {
+        throw new Error(`Derived measurement "${measurement.outputKey}" has a raw reading with no channel — an orphaned reading cannot back a real measurement.`);
+      }
+    }
+  }
   const outputs: Record<string, ExperimentOutputValue> = {};
   const units: Record<string, string> = {};
   for (const measurement of input.derived) {

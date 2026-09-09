@@ -32,7 +32,7 @@ import { runWorldDiscoveryAndRemember } from '../../core/agent/worldDiscoverySes
 import { admitWorldQuestion } from '../../core/agent/discoveryAdmission';
 import { DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, type DiscoveryRan } from '../../core/agent/discoveryOrchestrator';
 import { buildGenesisMatrixView, type GenesisMatrixView } from '../../core/agent/genesisMatrix';
-import { narrateInvestigation } from '../../core/agent/genesisNarration';
+import { narrateIntro, narrateRound, narrateNext, narrateInvestigation, type NarrationPhase } from '../../core/agent/genesisNarration';
 import { detectRenderTier, type InteractiveRenderTier } from '../../core/three/quality';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
@@ -301,6 +301,17 @@ export class GenesisWorldSim3D implements Sim3D {
   private roundStageBeacon: THREE_NS.Mesh | null = null;
   private roundStageKind: LeverSceneKind | null = null;
   private roundStageElapsed = 0;
+
+  /**
+   * WOW MOMENTS — an observer scientist standing beside the round-stage beacon, reacting to the
+   * REAL verdict of the currently staged round (never a scripted animation). `showStatusOverlay:
+   * false` because this is not an epidemiological agent — see `humanoidAgentVisual.ts::sync()`'s
+   * own doc for why forcing `health:'unknown'` onto a non-epidemic actor is a category error this
+   * codebase already refuses elsewhere. Built once, repositioned/shown per `stageRound()`, hidden on
+   * `clearRoundStage()` — the same lifecycle split the beacon itself already uses.
+   */
+  private observerScientist: HumanoidAgentVisual | null = null;
+  private observerFacing = 0;
 
   /**
    * VOICE GUIDE — the joined Genesis Matrix view (`genesisMatrix.ts`) for the currently staged run,
@@ -722,6 +733,7 @@ export class GenesisWorldSim3D implements Sim3D {
     this.buildHospitalInterior(THREE, scene);
     this.buildLandmarkLighting(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
     this.buildAmbientLife(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
+    this.buildObserverScientist(THREE, scene);
 
     this.syncNow();
   }
@@ -879,6 +891,81 @@ export class GenesisWorldSim3D implements Sim3D {
       };
       p.visual.sync(state, t);
     }
+  }
+
+  /** Builds the observer scientist once — hidden until a round is actually staged (`stageRound()`
+   * makes it visible and positions it at the real lever's target). Reused across rounds/runs, never
+   * rebuilt, the same "build once, reposition" discipline the round-stage beacon itself follows. */
+  private buildObserverScientist(THREE: typeof THREE_NS, scene: THREE_NS.Scene): void {
+    const id = 999_999; // outside any real entity/population id range, same convention as ambient pedestrians
+    this.observerScientist = new HumanoidAgentVisual(THREE, id);
+    this.observerScientist.root.visible = false;
+    scene.add(this.observerScientist.root);
+  }
+
+  /**
+   * WOW MOMENTS — the observer scientist's pose/facing, driven EACH frame purely from the real
+   * verdict of the currently staged round and, once the search has actually finished (the staged
+   * round is the last one), the run's real cross-cutting `sufficiency`/`competingModels` fields —
+   * never a scripted timeline. Three real states, three honestly distinct reactions:
+   *
+   *  - A round's verdict is `SUPPORTED_WITHIN_PROTOCOL` AND (once finished) the run actually settled
+   *    on ONE mechanism (`sufficiency.status === 'SUPPORTED_MECHANISM_FOUND'` and
+   *    `competingModels.status === 'SINGLE_EXPLANATION'`) → pose 'gesture', facing the beacon: this
+   *    is the one case that has actually earned a confident reaction.
+   *  - The run finished `COMPETING_MODELS_UNRESOLVED` → pose stays 'idle' (deliberately NOT the
+   *    confident gesture — a false "eureka" here would misrepresent an unresolved result) while the
+   *    facing genuinely oscillates between the beacon and the player, standing in for "torn between
+   *    rival explanations" — the honest visual available given `StrategyRound` carries no per-
+   *    hypothesis world position to point at (see `genesisMatrix.ts`'s own doc on why SPACE is `null`).
+   *  - Anything else (mid-search, falsified, inconclusive) → plain 'idle', facing the beacon.
+   */
+  private updateObserverScientist(): void {
+    const scientist = this.observerScientist;
+    if (!scientist || !scientist.root.visible || !this.lastStrategyRun) return;
+    // Reuses the clock `updateAmbientLife(dt)` already advances this same frame — one shared scene
+    // clock, not a second timer.
+    const t = this.ambientTimeSeconds;
+    const round = this.lastStrategyRun.rounds[this.stagedRoundIndex];
+    if (!round) return;
+    const isLastRound = this.stagedRoundIndex === this.lastStrategyRun.rounds.length - 1;
+    const verdict = round.verdicts[0] ?? null;
+
+    const singleExplanationSupported =
+      verdict?.assessment === 'SUPPORTED_WITHIN_PROTOCOL' &&
+      isLastRound &&
+      this.lastMatrixView?.sufficiency?.status === 'SUPPORTED_MECHANISM_FOUND' &&
+      this.lastMatrixView?.competingModels?.status === 'SINGLE_EXPLANATION';
+    const competingUnresolved = isLastRound && this.lastMatrixView?.competingModels?.status === 'COMPETING_MODELS_UNRESOLVED';
+
+    const beaconPos = this.roundStageBeacon?.position;
+    const beaconAngle = beaconPos
+      ? Math.atan2(beaconPos.x - scientist.root.position.x, beaconPos.z - scientist.root.position.z)
+      : this.observerFacing;
+
+    if (competingUnresolved) {
+      // Torn between rival explanations: facing swings slowly between the beacon and straight ahead,
+      // never settling — the honest stand-in for "not yet resolved" described in this method's doc.
+      this.observerFacing = beaconAngle + Math.sin(t * 0.9) * 0.9;
+    } else {
+      this.observerFacing = beaconAngle;
+    }
+
+    const state: HumanoidAgentState = {
+      id: 999_999,
+      worldX: scientist.root.position.x,
+      worldZ: scientist.root.position.z,
+      facing: this.observerFacing,
+      speed: 0,
+      gait: 0,
+      pose: singleExplanationSupported ? 'gesture' : 'idle',
+      health: 'unknown',
+      behavior: singleExplanationSupported ? 'react-supported' : competingUnresolved ? 'react-unresolved' : 'observe',
+      stateSince: 0,
+      isolated: false,
+      hospitalized: false,
+    };
+    scientist.sync(state, t, false);
   }
 
   /** Hides/shows the ambient vehicles/pedestrians alongside `this.root` — same toggle the hazard-field
@@ -1334,6 +1421,7 @@ export class GenesisWorldSim3D implements Sim3D {
     if (this.floodWater?.mesh.visible) this.floodWater.update(dt); // ripple only scrolls while there's water to see it on
     this.updateAmbientLife(dt);
     this.updateRoundStageBeacon(dt);
+    this.updateObserverScientist();
     const active = this.activeController();
     if (active) this.fpState = active.update(dt);
   }
@@ -1588,6 +1676,14 @@ export class GenesisWorldSim3D implements Sim3D {
     this.roundStageBeacon = this.buildRoundStageBeacon(THREE, sceneForm.kind);
     this.roundStageBeacon.position.set(position.x, position.y + 2.2, position.z);
     this.scene.add(this.roundStageBeacon);
+
+    // WOW MOMENTS — stand the observer scientist beside the real lever's target, offset by a fixed
+    // 1.8m so it never overlaps the beacon itself; `updateObserverScientist()` decides its pose/
+    // facing every frame from the round's real verdict, never here.
+    if (this.observerScientist) {
+      this.observerScientist.root.position.set(position.x + 1.8, position.y, position.z);
+      this.observerScientist.root.visible = true;
+    }
   }
 
   /**
@@ -1669,6 +1765,10 @@ export class GenesisWorldSim3D implements Sim3D {
   }
 
   private clearRoundStageBeacon(): void {
+    // Hidden every time the beacon is cleared, not just disposed on full dismiss — a round whose
+    // lever declares no `sceneForm`/target must not leave the observer scientist standing at a
+    // stale position from a PREVIOUS round; `stageRound()` re-shows it only once it finds a real one.
+    if (this.observerScientist) this.observerScientist.root.visible = false;
     if (!this.roundStageBeacon) return;
     this.roundStageBeacon.parent?.remove(this.roundStageBeacon);
     this.roundStageBeacon.geometry.dispose();
@@ -1747,6 +1847,16 @@ export class GenesisWorldSim3D implements Sim3D {
     };
   }
 
+  /**
+   * MATRIX UI — the same joined view Voice Guide already narrates from
+   * (`buildGenesisMatrixView`, computed once per run in `runStrategyDiscovery()`), exposed here so
+   * the React layer can render the whole loop (Theory/Prediction/Simulation/Evidence/Falsification)
+   * as a live panel instead of only reading it aloud.
+   */
+  getMatrixView(): GenesisMatrixView | null {
+    return this.lastMatrixView;
+  }
+
   getStats(): Record<string, number> {
     return {
       nearInteractable: this.nearestInteractableId !== null ? 1 : 0,
@@ -1809,11 +1919,96 @@ export class GenesisWorldSim3D implements Sim3D {
       p.visual.dispose();
     }
     this.ambientPedestrians = [];
+    if (this.observerScientist) {
+      this.observerScientist.root.parent?.remove(this.observerScientist.root);
+      this.observerScientist.dispose();
+      this.observerScientist = null;
+    }
     this.clearRoundStageBeacon();
     // VOICE GUIDE — stop any pending line rather than leaving a scene the player has already left
     // still talking.
     if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   }
+}
+
+/**
+ * MATRIX UI — the whole loop (Theory → Prediction → Simulation → Evidence → Falsification) as a
+ * live panel, fed EXCLUSIVELY by real fields off `GenesisMatrixView` (`genesisMatrix.ts`) — the
+ * same join Voice Guide already narrates from. Every stage's text is either read verbatim off
+ * `narrateIntro`/`narrateRound`/`narrateNext` (never paraphrased — those functions already assert
+ * their words against real data, re-typing the sentence here would just be a second, unverified
+ * copy of it) or a bare field (`view.evidence`) that narration has no phase for at all.
+ *
+ * COMPETING MODELS gets its own explicit block, not just the sentence buried in FALSIFICATION's
+ * narration text: when `competingModels.status === 'COMPETING_MODELS_UNRESOLVED'`, the real rival
+ * hypothesis ids (`competingHypothesisIds`) are rendered as a genuine list, each with its own
+ * `data-testid`, so "several explanations still stand" is a structural fact a reader (or a test)
+ * can see, not a decoration.
+ */
+function MatrixPanel({ view, roundNumber }: { view: GenesisMatrixView; roundNumber: number }) {
+  const introLines = narrateIntro(view);
+  const entry = view.entries.find((e) => e.round === roundNumber) ?? null;
+  const roundLines = entry ? narrateRound(entry) : [];
+  const isLastRound = view.entries.length > 0 && roundNumber === view.entries[view.entries.length - 1]!.round;
+  const nextLines = isLastRound ? narrateNext(view) : [];
+
+  const byPhase = (phase: NarrationPhase, lines: readonly { phase: NarrationPhase; text: string }[]) =>
+    lines.filter((l) => l.phase === phase);
+
+  return (
+    <div className="gx-matrix-panel" data-testid="genesis-matrix-panel">
+      <span className="gx-experiment-world">Genesis Matrix — the real loop this run actually ran</span>
+
+      <div className="gx-matrix-stage" data-testid="matrix-stage-theory">
+        <span className="gx-matrix-stage-label">THEORY</span>
+        {byPhase('INTRO', introLines).map((l, i) => <p key={`i${i}`} className="gsc-caption">{l.text}</p>)}
+        {byPhase('CAVEAT', introLines).map((l, i) => <p key={`c${i}`} className="gx-matrix-caveat">{l.text}</p>)}
+      </div>
+
+      <div className="gx-matrix-stage" data-testid="matrix-stage-prediction">
+        <span className="gx-matrix-stage-label">PREDICTION</span>
+        {byPhase('PREDICTION', roundLines).length === 0
+          ? <p className="gx-matrix-empty" data-testid="matrix-no-prediction">This shape asserts a direction, not a predicted value.</p>
+          : byPhase('PREDICTION', roundLines).map((l, i) => <p key={`p${i}`} className="gsc-caption">{l.text}</p>)}
+      </div>
+
+      <div className="gx-matrix-stage" data-testid="matrix-stage-simulation">
+        <span className="gx-matrix-stage-label">SIMULATION</span>
+        {byPhase('ACTION', roundLines).map((l, i) => <p key={`a${i}`} className="gsc-caption">{l.text}</p>)}
+        {byPhase('OBSERVATION', roundLines).map((l, i) => <p key={`o${i}`} className="gsc-caption">{l.text}</p>)}
+      </div>
+
+      <div className="gx-matrix-stage" data-testid="matrix-stage-evidence">
+        <span className="gx-matrix-stage-label">EVIDENCE</span>
+        {view.evidence
+          ? (
+            <p className="gsc-caption" data-testid="matrix-evidence-bundle">
+              Bundle <code>{view.evidence.bundleId}</code> — replay {view.evidence.replayVerdict}
+            </p>
+          )
+          : <p className="gx-matrix-empty" data-testid="matrix-no-evidence">No evidence bundle attached to this run.</p>}
+      </div>
+
+      <div className="gx-matrix-stage" data-testid="matrix-stage-falsification">
+        <span className="gx-matrix-stage-label">FALSIFICATION</span>
+        {byPhase('VERDICT', roundLines).map((l, i) => <p key={`v${i}`} className="gsc-caption">{l.text}</p>)}
+        {view.competingModels?.status === 'COMPETING_MODELS_UNRESOLVED' && (
+          <div className="gx-matrix-competing" data-testid="matrix-competing-models">
+            <strong>
+              {view.competingModels.competingHypothesisIds.length} rival explanations still fit every observation:
+            </strong>
+            <ul>
+              {view.competingModels.competingHypothesisIds.map((id) => (
+                <li key={id} data-testid={`matrix-competing-model-${id}`}>{id}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {byPhase('VERDICT', nextLines).map((l, i) => <p key={`nv${i}`} className="gsc-caption">{l.text}</p>)}
+        {byPhase('NEXT', nextLines).map((l, i) => <p key={`nn${i}`} className="gsc-caption">{l.text}</p>)}
+      </div>
+    </div>
+  );
 }
 
 // LIVING WORLD — the exact same key-code -> MoveKey map `FirstPersonLabScreen.tsx` already uses,
@@ -1852,6 +2047,10 @@ export function GenesisWorldScreen() {
   // genuinely different facts — advancing the round must not re-run the search.
   const [strategyRun, setStrategyRun] = useState<StrategyRun | null>(null);
   const [roundView, setRoundView] = useState<ReturnType<GenesisWorldSim3D['getCurrentRoundView']>>(null);
+  // MATRIX UI — the same joined view, kept as its own piece of state (not derived from `roundView`)
+  // because it carries cross-cutting fields (competingModels/sufficiency/evidence/priorInvestigation)
+  // that live on the WHOLE run, not on any one staged round.
+  const [matrixView, setMatrixView] = useState<GenesisMatrixView | null>(null);
   const lastNearestIdRef = useRef<WorldFrameEntityId | null>(null);
   const onStats = useCallback((s: Record<string, number>) => {
     const id = sim.getNearestInteractableId();
@@ -1865,6 +2064,7 @@ export function GenesisWorldScreen() {
     setNearHospitalEntrance(s.nearHospitalEntrance === 1);
     setInsideHospital(s.insideHospital === 1);
     setRoundView(sim.getCurrentRoundView());
+    setMatrixView(sim.getMatrixView());
   }, [sim]);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
 
@@ -1956,19 +2156,23 @@ export function GenesisWorldScreen() {
     const run = sim.runStrategyDiscovery();
     setStrategyRun(run);
     setRoundView(sim.getCurrentRoundView());
+    setMatrixView(sim.getMatrixView());
   };
   const handleNextRound = () => {
     sim.nextRound();
     setRoundView(sim.getCurrentRoundView());
+    setMatrixView(sim.getMatrixView());
   };
   const handlePrevRound = () => {
     sim.prevRound();
     setRoundView(sim.getCurrentRoundView());
+    setMatrixView(sim.getMatrixView());
   };
   const handleDismissStrategyRun = () => {
     sim.dismissStrategyRun();
     setStrategyRun(null);
     setRoundView(null);
+    setMatrixView(null);
   };
 
   // PRIORITY 2 — REAL WORLD GEOMETRY: step through the hospital's real entrance. Movement/look input
@@ -2344,6 +2548,7 @@ export function GenesisWorldScreen() {
                 </div>
               </div>
             )}
+            {matrixView && roundView && <MatrixPanel view={matrixView} roundNumber={roundView.roundNumber} />}
           </div>
         )}
 

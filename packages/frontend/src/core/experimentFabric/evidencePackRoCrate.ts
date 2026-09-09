@@ -117,6 +117,7 @@ export function exportEvidencePackRoCrate(pack: ScientificEvidencePack): Genesis
       'genesis:contractVersion': run.provenance.contractVersion,
       'genesis:deterministic': run.provenance.deterministic,
       'genesis:resultOrigin': run.provenance.resultOrigin,
+      ...(run.provenance.dataProvenance === undefined ? {} : { 'genesis:dataProvenance': run.provenance.dataProvenance }),
       'genesis:status': run.status,
     });
 

@@ -14,6 +14,7 @@
  */
 
 import type { ConfirmationLevel } from './citation';
+import type { DataProvenance } from './dataProvenance';
 
 export interface DataSourceCitation {
   /** Skąd dane pochodzą lub pochodziłyby, gdyby były realne — np. "CERN Open Data". */
@@ -28,8 +29,13 @@ export interface DataSource<T> {
   /** Krótki opis po polsku, np. "Masy rezonansów dimionowych". */
   label: string;
   citation: DataSourceCitation;
-  /** false = realne dane załadowane; true = generator/próbka syntetyczna. */
-  isSynthetic: boolean;
+  /**
+   * SIMULATED = generator/próbka syntetyczna; REFERENCE = realne dane
+   * zewnętrzne załadowane (np. CERN Open Data, NASA factsheet). Ten rejestr
+   * nie produkuje danych laboratoryjnych własnych, więc REAL_EXPERIMENTAL
+   * się tu nie pojawia — patrz `dataProvenance.ts`.
+   */
+  provenance: DataProvenance;
   load: () => T;
 }
 

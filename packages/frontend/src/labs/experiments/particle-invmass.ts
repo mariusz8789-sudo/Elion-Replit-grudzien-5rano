@@ -61,13 +61,13 @@ registerDataSource<number[] | null>({
   // więc czytamy je stąd zamiast trzymać na sztywno jeden numer rekordu —
   // wpisanie "rekord 545" pod dane z innego rekordu byłoby fałszywym
   // przypisem, nawet gdyby same liczby były prawdziwe. Gdy realnych danych
-  // nie ma, zostaje ścieżka syntetyczna, jawnie oznaczona `isSynthetic`.
+  // nie ma, zostaje ścieżka syntetyczna, jawnie oznaczona `provenance`.
   citation: {
     label: realProvenance?.label ?? 'CERN Open Data — CMS DoubleMu (rekord 545)',
     url: realProvenance?.recordUrl ?? 'https://opendata.cern.ch',
     confirmation: realMasses ? 'confirmed' : 'partial',
   },
-  isSynthetic: realMasses === null,
+  provenance: realMasses === null ? 'SIMULATED' : 'REFERENCE',
   load: () => realMasses,
 });
 

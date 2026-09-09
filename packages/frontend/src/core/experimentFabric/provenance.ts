@@ -1,4 +1,5 @@
 import { canonicalJson, fnv1a } from '../events/hash';
+import type { DataProvenance } from '../dataProvenance';
 import type { KnowledgeCapability, KnowledgeCorpusFile } from '../knowledge/registry';
 import {
   EXPERIMENT_FABRIC_VERSION,
@@ -84,6 +85,30 @@ export function resultOriginForCapability(capability: KnowledgeCapability): Expe
   }
 }
 
+/**
+ * The `dataProvenance` counterpart to `resultOrigin`, for every run this
+ * module itself derives — i.e. every solver-executed Fabric run, never a
+ * Real Experiment (that path sets `dataProvenance` directly, see
+ * `realExperiment.ts`). `real-engine`/`hypothetical-visualization` are
+ * Genesis's own computation (SIMULATED); `knowledge-only` is a static
+ * corpus lookup (REFERENCE, the same meaning `dataSource.ts`'s registry
+ * already uses for external reference data). `capability-seam` and
+ * `engine-not-available` produced no output, so there is no provenance to
+ * report — undefined, not a fabricated third bucket.
+ */
+export function dataProvenanceForResultOrigin(resultOrigin: ExperimentProvenance['resultOrigin']): DataProvenance | undefined {
+  switch (resultOrigin) {
+    case 'real-engine':
+    case 'hypothetical-visualization':
+      return 'SIMULATED';
+    case 'knowledge-only':
+      return 'REFERENCE';
+    case 'capability-seam':
+    case 'engine-not-available':
+      return undefined;
+  }
+}
+
 export function validateExperimentOutputs(outputs: Readonly<Record<string, ExperimentOutputValue>>): void {
   for (const [key, value] of Object.entries(outputs)) {
     if (!Array.isArray(value)) continue;
@@ -131,6 +156,7 @@ export function createExperimentProvenance(input: {
     seed: input.request.seed,
     deterministic: input.deterministic,
     resultOrigin: resultOriginForRunStatus(input.result.status, input.plan.intent.capability),
+    dataProvenance: dataProvenanceForResultOrigin(resultOriginForRunStatus(input.result.status, input.plan.intent.capability)),
     ...(input.backendExecution === undefined ? {} : { backendExecution: input.backendExecution }),
   };
 }

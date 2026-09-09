@@ -106,7 +106,15 @@ describe('The full pipeline: hypothesis -> experiment -> memory -> evidence -> r
     const firstRun = first.runWorldDiscoveryAndRemember(GOAL);
     if (firstRun.kind !== 'COMPLETE') throw new Error('expected COMPLETE');
     expect(firstRun.memory).toBeNull(); // nothing to resume from on the very first run
-    expect(firstRun.result.failedHypotheses.map((b) => b.hypothesisId)).toEqual(['h:outlet-capacity']);
+    // TWO refutations, not one. The loop no longer quits the moment a leader
+    // consolidates, so `h:pump-capacity` — which this run used to leave in
+    // `unresolvedQuestions` as "never tested" — is now actually tested and
+    // actually refuted. A real negative finding Genesis previously never
+    // reached, and more for memory to carry into the next run.
+    expect([...firstRun.result.failedHypotheses.map((b) => b.hypothesisId)].sort()).toEqual([
+      'h:outlet-capacity',
+      'h:pump-capacity',
+    ]);
 
     // Simulate an actual process restart: fresh module graph, same underlying storage.
     vi.resetModules();
@@ -116,8 +124,9 @@ describe('The full pipeline: hypothesis -> experiment -> memory -> evidence -> r
 
     // Observable, executable proof — not a label: memory changed what actually ran.
     expect(secondRun.memory).not.toBeNull();
-    expect(secondRun.memory!.skippedHypothesisIds).toEqual(['h:outlet-capacity']);
+    expect([...secondRun.memory!.skippedHypothesisIds].sort()).toEqual(['h:outlet-capacity', 'h:pump-capacity']);
     expect(secondRun.result.rounds.every((r) => r.hypothesisId !== 'h:outlet-capacity')).toBe(true);
+    expect(secondRun.result.rounds.every((r) => r.hypothesisId !== 'h:pump-capacity')).toBe(true);
     // The first thing it tries this time is what remained open, not what was already ruled out.
     expect(secondRun.result.rounds[0].hypothesisId).toBe('h:infiltration');
 

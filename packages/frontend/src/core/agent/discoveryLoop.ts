@@ -458,7 +458,33 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
   for (let round = 1; round <= input.maxRounds; round++) {
     const selection = selectNext(activeHypotheses, beliefs, replicationStrength);
     if (!selection) {
-      stopReason = rounds.length === 0 ? 'NO_TESTABLE_HYPOTHESIS' : 'ALL_HYPOTHESES_RESOLVED';
+      // THE ONLY PLACE THIS LOOP STOPS EARLY IS WHEN THERE IS NOTHING LEFT TO
+      // TEST. A consolidated leader used to end the investigation the instant
+      // it appeared, and that was measurably the wrong science:
+      //
+      //   `Maximise remaining fuel` on GENESIS_GENERATOR_CATALOG, budget 8.
+      //   Round 1 tested h:fuel-efficiency at strength 1 (40.0 -> 85.83),
+      //   round 2 replicated it at 0.5 (-> 62.92), and the run STOPPED —
+      //   declaring a leader with three declared levers never tested and six
+      //   experiments of budget unused. h:load-shedding was one of them, and
+      //   it is the STRONGER mechanism: measured at the same 0.5 magnitude it
+      //   adds 29.33 L against fuel-efficiency's 22.92 L
+      //   (`competingModels.test.ts`, `mechanismInteraction.ts`). Genesis was
+      //   stopping on the first lever it happened to try, not the best one,
+      //   and calling that an answer.
+      //
+      // The goal routed in ("maximise M") is a question about the whole
+      // declared catalog, so consolidating one lever answers a narrower
+      // question than the one asked. `LEADER_CONFIRMED_AT_TWO_MAGNITUDES` now
+      // means something strictly stronger than it did — every testable
+      // mechanism was tested AND one of them replicated at two magnitudes —
+      // rather than "we quit as soon as one did".
+      stopReason =
+        rounds.length === 0
+          ? 'NO_TESTABLE_HYPOTHESIS'
+          : [...beliefs.values()].some((b) => b.confidence === 'SUPPORTED_AT_TWO_MAGNITUDES')
+            ? 'LEADER_CONFIRMED_AT_TWO_MAGNITUDES'
+            : 'ALL_HYPOTHESES_RESOLVED';
       break;
     }
     const { hypothesis, strength } = selection;
@@ -619,9 +645,8 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
       provenanceEventIds: arm.journal.allEvents().filter((e) => e.timestamp >= input.decisionAtTick).map((e) => e.id),
     });
 
-    const consolidated = [...beliefs.values()].some((b) => b.confidence === 'SUPPORTED_AT_TWO_MAGNITUDES');
-    if (consolidated) { stopReason = 'LEADER_CONFIRMED_AT_TWO_MAGNITUDES'; break; }
-    if (!selectNext(activeHypotheses, beliefs, replicationStrength)) { stopReason = 'ALL_HYPOTHESES_RESOLVED'; break; }
+    // No early exit here any more: the loop continues while `selectNext` has
+    // work, and the top of the loop decides the stop reason when it does not.
   }
 
   const all = [...beliefs.values()];

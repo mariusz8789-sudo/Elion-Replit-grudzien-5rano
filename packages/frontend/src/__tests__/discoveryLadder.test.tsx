@@ -61,6 +61,7 @@ function completeStateFixture(bestSupported: HypothesisBelief[], failedHypothese
     evidence: { bundleId: 'bundle-synth', scientificContentFingerprint: 'fp', replayVerdict: 'MATCH', replayMessage: 'ok' },
     replay: { status: 'MATCH', reason: 'matches' },
     savedExperimentId: 'exp-synth',
+    mechanismComposition: null,
   };
 }
 

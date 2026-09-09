@@ -90,12 +90,40 @@ export interface ResearchStep {
   readonly remembered: readonly SavedExperiment[];
 }
 
+/**
+ * THE HONEST CATEGORY THE CHAIN STOPPED IN — four facts that must never be
+ * collapsed into one another, because they call for different next actions
+ * from whoever reads this result.
+ *
+ *   SETTLED       — nothing is left open. The investigation is DONE.
+ *   OPEN          — a runnable next question exists; the chain simply ran out
+ *                   of `maxSteps` before taking it. More autonomous work is
+ *                   available right now, on demand.
+ *   INCONCLUSIVE  — a real open question exists and the EVIDENCE ITSELF does
+ *                   not decide it: no untried setting separates real rivals,
+ *                   an interaction settled nothing (both effects were zero),
+ *                   or a value could not be derived from what was measured.
+ *                   More data of a kind Genesis already knows how to gather
+ *                   would resolve this — none is left to gather.
+ *   BLOCKED       — a real open question exists and Genesis has no MECHANISM
+ *                   for it at all: no capability to run the investigation, no
+ *                   actuator this chain implements yet, or the apparatus
+ *                   itself failed and nothing here can diagnose why.
+ *
+ * `INCONCLUSIVE` and `BLOCKED` are kept apart on purpose. Conflating "the data
+ * doesn't decide this" with "Genesis cannot even try" would hide exactly the
+ * distinction a reader deciding what to build or measure next needs.
+ */
+export type ResearchChainTerminalStatus = 'SETTLED' | 'OPEN' | 'INCONCLUSIVE' | 'BLOCKED';
+
 export interface ResearchChainResult {
   readonly contractVersion: string;
   readonly steps: readonly ResearchStep[];
   /** Steps Genesis chose for itself — every step after the caller's own. */
   readonly selfChosenSteps: number;
   readonly stoppedBecause: string;
+  /** The honest category `stoppedBecause` falls into — see `ResearchChainTerminalStatus`. */
+  readonly terminalStatus: ResearchChainTerminalStatus;
 }
 
 /** What a proposed narrowing step needs to carry into the iteration that runs it. */
@@ -117,6 +145,10 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
   let why = 'The question the caller asked.';
   let pending: PendingNarrowing | null = null;
   let stoppedBecause = `Step budget of ${maxSteps} reached.`;
+  // Running out of budget while still producing runnable steps is OPEN, not
+  // stuck: the default matches what the loop is actually doing when it exits
+  // for this reason alone.
+  let terminalStatus: ResearchChainTerminalStatus = 'OPEN';
 
   for (let step = 1; step <= maxSteps; step++) {
     const outcome = runDiscovery({ shape: 'PARAMETER', input: current });
@@ -142,6 +174,8 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
 
     if (outcome.status !== 'RAN') {
       stoppedBecause = `Step ${step} was refused: ${outcome.admission.why}`;
+      // No capability behind the question at all — the definition of BLOCKED.
+      terminalStatus = 'BLOCKED';
       break;
     }
     rememberProbes(outcome, triedProbeValues);
@@ -149,12 +183,23 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     const selection = selectNextResearchQuestion(outcome, current);
     if (selection.selected === null) {
       stoppedBecause = `Step ${step} settled its question and raised no new one.`;
+      terminalStatus = 'SETTLED';
       break;
     }
     if (selection.nextExecutable === null) {
       stoppedBecause =
         `Step ${step} raised ${selection.candidates.length} question(s), none of which Genesis can run. ` +
         `Highest: ${selection.selected.question}`;
+      // SEPARATE_SURVIVORS / GO_OUTSIDE_THE_DECLARED_SPACE here mean the
+      // EVIDENCE does not decide (no untried setting separates real rivals, or
+      // nothing could be derived from what was measured) — INCONCLUSIVE.
+      // RESOLVE_APPARATUS_FAILURE and anything this reader does not recognise
+      // mean Genesis has no mechanism for the question at all — BLOCKED, the
+      // conservative default for an unclassified kind.
+      terminalStatus =
+        selection.selected.kind === 'SEPARATE_SURVIVORS' || selection.selected.kind === 'GO_OUTSIDE_THE_DECLARED_SPACE'
+          ? 'INCONCLUSIVE'
+          : 'BLOCKED';
       break;
     }
 
@@ -172,11 +217,17 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
         stoppedBecause =
           `Step ${step} proposed separating ${outcome.run.surviving.join(' and ')}, but the setting its own ` +
           'selector named is either absent or already spent, so there is no untried measurement to run.';
+        // Real rivals, and no evidence left that would tell them apart — the
+        // data does not decide, not a capability gap.
+        terminalStatus = 'INCONCLUSIVE';
         break;
       }
       const survivors = current.hypotheses.filter((h) => outcome.run.surviving.includes(h.hypothesisId));
       if (survivors.length < 2) {
         stoppedBecause = `Step ${step} proposed separating survivors, but fewer than two of them are declared hypotheses.`;
+        // A derived (not declared) survivor cannot be re-tested this way — an
+        // actuator limitation of this chain, not a fact about the evidence.
+        terminalStatus = 'BLOCKED';
         break;
       }
       pending = null;
@@ -194,6 +245,9 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
 
     if (next.kind !== 'NARROW_A_DERIVED_INTERVAL') {
       stoppedBecause = `Step ${step} proposed "${next.kind}", which this chain has no actuator for yet: ${next.question}`;
+      // A real open question, and this chain literally does not implement it —
+      // an architecture gap, not an evidence one.
+      terminalStatus = 'BLOCKED';
       break;
     }
 
@@ -214,6 +268,9 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
           : proposeInteriorCandidatesFrom(supported);
     if (proposal === null) {
       stoppedBecause = `Step ${step} proposed narrowing, but the interval could not produce interior candidates.`;
+      // The interval's own shape (degenerate, or the incumbent not strictly
+      // inside it) refuses to propose — a fact about this evidence.
+      terminalStatus = 'INCONCLUSIVE';
       break;
     }
 
@@ -236,6 +293,9 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
       stoppedBecause =
         `Step ${step} proposed narrowing, but every candidate setting of ${current.system.probeParameterId} was ` +
         'already used, so the interior candidates could only have been judged on the evidence that produced them.';
+      // Out of untried settings, not out of capability — more measurements of
+      // a kind Genesis already knows how to take would resolve this.
+      terminalStatus = 'INCONCLUSIVE';
       break;
     }
 
@@ -250,6 +310,7 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     steps,
     selfChosenSteps: Math.max(0, steps.length - 1),
     stoppedBecause,
+    terminalStatus,
   };
 }
 

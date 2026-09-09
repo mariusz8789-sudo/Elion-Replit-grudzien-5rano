@@ -21,23 +21,51 @@ import type { InquiryLoopInput } from '../core/agent/inquiryLoop';
  */
 
 describe('selectNextResearchQuestion — derived from the run, never invented', () => {
-  it('MECHANISM with two survivors: the next question is whether they compose, and Genesis can run it', () => {
+  it('MECHANISM composition ALREADY ran inside this outcome, so it is not re-proposed as open', () => {
+    // discoveryOrchestrator wires generation into the SAME runDiscovery call
+    // (P0), so by the time this outcome exists the joint arm has already been
+    // measured and classified (SUB_ADDITIVE on this fixture). Proposing
+    // TEST_WHETHER_MECHANISMS_COMPOSE here — as this test originally asserted,
+    // before that wiring existed — would present an answered question as an
+    // open, runnable one.
     const outcome = runDiscovery({
       shape: 'MECHANISM',
       goal: 'Maximise remaining fuel, at most 12 experiments.',
       catalog: GENESIS_GENERATOR_CATALOG,
     });
+    if (outcome.status !== 'RAN') throw new Error('expected RAN');
+    expect(outcome.generated?.kind).toBe('COMPOSED_MECHANISM');
+    if (outcome.generated?.kind !== 'COMPOSED_MECHANISM') throw new Error('expected a composed mechanism');
+    expect(outcome.generated.assessment.interaction).toBe('SUB_ADDITIVE');
+
     const selection = selectNextResearchQuestion(outcome);
+    expect(selection.selected).toBeNull();
+    expect(selection.candidates).toEqual([]);
+    expect(selection.why).toContain('no open question');
+  });
 
+  it('composition is proposed as OPEN only when it genuinely has not run yet', () => {
+    // Survivors here are DERIVED (~RELATION_FLIP), so mechanismGeneration.ts
+    // itself refuses: a derived hypothesis reuses its parent's intervention,
+    // and combining it would apply the same lever twice. That refusal is real
+    // and current, so the question is honestly reported as open but blocked —
+    // never as "answerableNow: true" the way an already-run composition once
+    // was.
+    const goal = `Minimise ${Object.keys(GENESIS_GENERATOR_CATALOG.metricPhrases)[0]!}, at most 10 experiments.`;
+    const outcome = runDiscovery({ shape: 'MECHANISM', goal, catalog: GENESIS_GENERATOR_CATALOG });
+    if (outcome.status !== 'RAN') throw new Error('expected RAN');
+    expect(outcome.generated).toBeNull();
+    expect([...outcome.run.surviving].sort()).toEqual([
+      'h:fuel-efficiency~RELATION_FLIP',
+      'h:load-shedding~RELATION_FLIP',
+    ]);
+
+    const selection = selectNextResearchQuestion(outcome);
     expect(selection.selected?.kind).toBe('TEST_WHETHER_MECHANISMS_COMPOSE');
-    // Not "which of the two is right": two surviving mechanisms are not rivals.
     expect(selection.selected!.question).toContain('compose');
-    expect(selection.selected!.groundedIn).toContain('survived h:fuel-efficiency');
-    expect(selection.selected!.groundedIn).toContain('survived h:load-shedding');
-
-    // Autonomy: Genesis can proceed here without a person.
-    expect(selection.nextExecutable?.kind).toBe('TEST_WHETHER_MECHANISMS_COMPOSE');
-    expect(selection.blockedOnHuman).toBe(false);
+    expect(selection.selected!.answerableNow).toBe(false);
+    expect(selection.selected!.why).toBe(outcome.noGenerationReason);
+    expect(selection.blockedOnHuman).toBe(true);
   });
 
   it('after its own generation succeeds, the open question is the interval — and it is runnable', () => {

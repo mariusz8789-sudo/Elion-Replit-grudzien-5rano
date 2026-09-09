@@ -3,7 +3,13 @@ import {
   saveParameterInquiryToMemory,
   type SavedExperiment,
 } from '../scienceMemory';
-import { runDiscovery, type DiscoveryOutcome } from './discoveryOrchestrator';
+import {
+  runDiscovery,
+  runMechanismDiscoveryAndRemember,
+  type DiscoveryOutcome,
+  type MechanismDiscoveryRemembered,
+  type MechanismRequest,
+} from './discoveryOrchestrator';
 import type { InquiryLoopInput, InquiryLoopResult } from './inquiryLoop';
 import {
   assessNarrowing,
@@ -303,6 +309,134 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     current = narrowingInput;
     kind = next.kind;
     why = selection.why;
+  }
+
+  return {
+    contractVersion: RESEARCH_CHAIN_CONTRACT_VERSION,
+    steps,
+    selfChosenSteps: Math.max(0, steps.length - 1),
+    stoppedBecause,
+    terminalStatus,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// MECHANISM — the same actuator/termination contract as the PARAMETER chain
+// above, over a genuinely different execution shape.
+// ---------------------------------------------------------------------------
+
+export interface MechanismResearchStep {
+  readonly step: number;
+  /** The goal text this step investigated. MECHANISM's whole "executed input" under `MechanismRequest`'s thin (goal, catalog) shape. */
+  readonly question: string;
+  readonly kind: ResearchQuestionKind | 'INITIAL';
+  readonly why: string;
+  readonly outcome: DiscoveryOutcome;
+  /** This step's Science Memory records — the base investigation, plus the composed-mechanism follow-up when there was one. */
+  readonly remembered: MechanismDiscoveryRemembered;
+}
+
+export interface MechanismResearchChainResult {
+  readonly contractVersion: string;
+  readonly steps: readonly MechanismResearchStep[];
+  readonly selfChosenSteps: number;
+  readonly stoppedBecause: string;
+  readonly terminalStatus: ResearchChainTerminalStatus;
+}
+
+/**
+ * THE LAST ASYMMETRY, CLOSED: `TEST_WHETHER_MECHANISMS_COMPOSE` reaches a real
+ * chain, the same way `SEPARATE_SURVIVORS`/`NARROW_A_DERIVED_INTERVAL` already
+ * do for PARAMETER — not by making it runnable (it never can be: see
+ * `nextQuestion.ts`'s own doc on this candidate, `mechanismGeneration.ts` has
+ * no mechanism to retry a joint arm at a different magnitude), but by giving
+ * it the SAME quality of explicit, correct termination handling those two
+ * already get, instead of falling into the generic "unrecognised kind"
+ * default.
+ *
+ * `runMechanismDiscoveryAndRemember` already runs admission → plan →
+ * memory-narrow → run → composed-mechanism generation → save → replay in ONE
+ * call (`discoveryOrchestrator.ts`), so this loop's only job is to read what
+ * that call left open and decide whether to stop — there is no second engine,
+ * no second replay mechanism, and no narrowing concept for MECHANISM to
+ * reimplement here.
+ *
+ * ## Stated plainly: this genuinely never exceeds one step today
+ *
+ * `maxSteps` exists for the same reason it exists on the PARAMETER chain
+ * above, and is honoured identically, but no MECHANISM candidate
+ * `nextQuestion.ts` can raise has a real actuator that continues this loop —
+ * `TEST_WHETHER_MECHANISMS_COMPOSE` cannot be (see above), and
+ * `TEST_UNTESTED_HYPOTHESIS` would need re-issuing the SAME `MechanismRequest`
+ * with a higher experiment budget, which this thin (goal, catalog) shape has
+ * no way to express without parsing and rewriting the goal's own declared
+ * text — a second, fragile mechanism this file will not build to manufacture
+ * a longer chain. So every real run through here settles, blocks, or reports
+ * itself inconclusive on step 1. That is not a bug in this loop; it is an
+ * honest report of where MECHANISM's actuators currently stand.
+ */
+export function runMechanismResearchChain(request: MechanismRequest, maxSteps = 4): MechanismResearchChainResult {
+  const steps: MechanismResearchStep[] = [];
+
+  // Always `INITIAL`/the caller's own question: unlike the PARAMETER chain
+  // above, no MECHANISM candidate here has a real actuator that continues
+  // the loop, so every iteration re-issues the SAME request and either stops
+  // or runs out of budget — there is no second, self-chosen question to
+  // label. See the loop body for exactly why each candidate stops here.
+  const kind: ResearchQuestionKind | 'INITIAL' = 'INITIAL';
+  const why = 'The question the caller asked.';
+  let stoppedBecause = `Step budget of ${maxSteps} reached.`;
+  let terminalStatus: ResearchChainTerminalStatus = 'OPEN';
+
+  for (let step = 1; step <= maxSteps; step++) {
+    const remembered = runMechanismDiscoveryAndRemember(request);
+    const outcome = remembered.outcome;
+    steps.push({ step, question: request.goal, kind, why, outcome, remembered });
+
+    if (outcome.status !== 'RAN') {
+      stoppedBecause = `Step ${step} was refused: ${outcome.admission.why}`;
+      terminalStatus = 'BLOCKED';
+      break;
+    }
+
+    const selection = selectNextResearchQuestion(outcome);
+    if (selection.selected === null) {
+      stoppedBecause = `Step ${step} settled its question and raised no new one.`;
+      terminalStatus = 'SETTLED';
+      break;
+    }
+    if (selection.nextExecutable === null) {
+      stoppedBecause =
+        `Step ${step} raised ${selection.candidates.length} question(s), none of which Genesis can run. ` +
+        `Highest: ${selection.selected.question}`;
+      // `TEST_WHETHER_MECHANISMS_COMPOSE` splits on whether composition
+      // actually ran this step: `outcome.generated` present means the joint
+      // arm was really measured and settled nothing (INCONCLUSIVE — the
+      // evidence itself does not decide, not a capability gap); absent means
+      // composition was never attempted for an architectural reason (fewer
+      // than two declared survivors, mismatched objectives) — BLOCKED. The
+      // same split `nextQuestion.ts`'s own two MECHANISM branches already
+      // draw, read here rather than re-derived.
+      terminalStatus =
+        selection.selected.kind === 'GO_OUTSIDE_THE_DECLARED_SPACE'
+          ? 'INCONCLUSIVE'
+          : selection.selected.kind === 'TEST_WHETHER_MECHANISMS_COMPOSE'
+            ? (outcome.generated !== null ? 'INCONCLUSIVE' : 'BLOCKED')
+            : 'BLOCKED';
+      break;
+    }
+
+    // No MECHANISM candidate has a real actuator here yet. `TEST_UNTESTED_HYPOTHESIS`
+    // is reported runnable by `nextQuestion.ts` (re-running the same
+    // investigation needs no new capability in principle), but `MechanismRequest`'s
+    // thin (goal, catalog) shape carries no way to ask for just the untested
+    // subset, and re-running the IDENTICAL request reproduces the identical
+    // result — the PARAMETER chain above does not actuate this kind either,
+    // for the same reason it would be a no-op there too.
+    const next = selection.nextExecutable;
+    stoppedBecause = `Step ${step} proposed "${next.kind}", which this chain has no actuator for yet: ${next.question}`;
+    terminalStatus = 'BLOCKED';
+    break;
   }
 
   return {

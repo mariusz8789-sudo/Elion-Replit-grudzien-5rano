@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { assessCompetingModels, COMPETING_MODELS_CONTRACT_VERSION } from '../core/agent/competingModels';
+import { runAutonomousDiscovery } from '../core/agent/discoveryLoop';
+import { GENESIS_GENERATOR_CATALOG } from '../core/agent/electricalGeneratorLeverCatalog';
 import { runAutonomousInquiry, type InquiryLoopInput, type ParameterHypothesis, type SystemUnderStudy } from '../core/agent/inquiryLoop';
-import { toParameterRun } from '../core/agent/discoveryStrategies';
+import { toMechanismRun, toParameterRun } from '../core/agent/discoveryStrategies';
+import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal } from '../core/agent/worldGoalIntent';
 
 /**
  * Same real degeneracy `inquiryLoop.test.ts` proves: Arrhenius kinetics on the
@@ -100,5 +103,71 @@ describe('competingModels — reads a real StrategyRun, invents nothing', () => 
     expect(run.nextExperiment).not.toBeNull();
     expect(run.nextExperiment?.status).toBe('RESOLVED');
     expect(verdict.nextStep).toContain('This run proposed no next step');
+  });
+});
+
+/**
+ * MECHANISM SHAPE — the coverage this module's own doc names as an open gap
+ * ("MECHANISM/CALIBRATION runs get no such sentence at all"). Found by
+ * measuring every real lever catalog under a generic, all-levers goal
+ * (`docs/AUTONOMOUS_DISCOVERY_ROADMAP.md`'s C3 audit), not assumed: of the
+ * five real domains, only `GENESIS_GENERATOR_CATALOG` reaches
+ * `bestSupported.length > 1` under `discoveryLoop.ts`'s current `selectNext` —
+ * see that file's own module doc for why this is structurally rare (greedy
+ * consolidation always retests a `SUPPORTED_ONCE` hypothesis before exploring
+ * a new one, so two DECLARED hypotheses can never be simultaneously
+ * mid-consolidation without help).
+ *
+ * The mechanism here is P3 regeneration, not plain declared-hypothesis
+ * competition. Measured: `h:fuel-efficiency` and `h:load-shedding` are BOTH
+ * declared with a criterion whose expected direction the real solver
+ * contradicts (baseline 40.0 L fuel remaining; strength=1 gives 85.83 and
+ * 98.67 respectively — the metric moves, just the opposite way the criterion
+ * expected) — genuine `FALSIFIED_WITHIN_PROTOCOL`, not `REFUTED_BY_NO_EFFECT`.
+ * Both derive a `RELATION_FLIP` alternative, each excluding strength=1 (the
+ * strength that falsified its parent) from ever being retested. Both flipped
+ * alternatives are tested at strength=0.5 and are genuinely `SUPPORTED` there
+ * (62.92 and 69.33 respectively, same direction as their own strength-1
+ * measurement — a real, dose-proportional effect, not noise: 22.92 ≈ 45.83/2
+ * and 29.33 ≈ 58.67/2). Neither can EVER reach `SUPPORTED_AT_TWO_MAGNITUDES`,
+ * because their only remaining untested magnitude (1) is the one excluded —
+ * so `LEADER_CONFIRMED_AT_TWO_MAGNITUDES` never fires at all here, and the
+ * loop instead runs out of testable hypotheses honestly
+ * (`ALL_HYPOTHESES_RESOLVED`) with two permanently-unconsolidated survivors.
+ */
+describe('competingModels — MECHANISM shape, a real domain that reaches 2+ simultaneous survivors', () => {
+  function generatorRun() {
+    const goal = `Minimise ${Object.keys(GENESIS_GENERATOR_CATALOG.metricPhrases)[0]!}, at most 10 experiments.`;
+    const intent = parseWorldDiscoveryGoal(goal, GENESIS_GENERATOR_CATALOG);
+    const plan = buildWorldDiscoveryPlan(intent, GENESIS_GENERATOR_CATALOG);
+    if ('error' in plan) throw new Error(`expected a runnable plan, got: ${plan.error}`);
+    return toMechanismRun(runAutonomousDiscovery(plan));
+  }
+
+  it('grounds the fixture: two independently-derived survivors, neither consolidated, real measured numbers', () => {
+    const run = generatorRun();
+    // Grounding first, per this repo's measure-before-asserting discipline —
+    // trusting the verdict on this fixture requires knowing the fixture is
+    // really what the module doc above claims.
+    expect(run.stopReason).toBe('ALL_HYPOTHESES_RESOLVED');
+    expect(run.surviving).toEqual(['h:fuel-efficiency~RELATION_FLIP', 'h:load-shedding~RELATION_FLIP']);
+    expect(run.falsified).toEqual(['h:fuel-efficiency', 'h:load-shedding', 'h:generator-rating', 'h:larger-tank']);
+  });
+
+  it('COMPETING_MODELS_UNRESOLVED: MECHANISM can reach 2+ simultaneous survivors WITHOUT LEADER_CONFIRMED_AT_TWO_MAGNITUDES ever firing', () => {
+    const run = generatorRun();
+    const verdict = assessCompetingModels(run);
+
+    expect(verdict.status).toBe('COMPETING_MODELS_UNRESOLVED');
+    expect(verdict.competingHypothesisIds).toEqual(['h:fuel-efficiency~RELATION_FLIP', 'h:load-shedding~RELATION_FLIP']);
+    // The real finding: this MECHANISM run never even attempts the greedy
+    // two-magnitude confirmation that would normally end the search on ONE
+    // hypothesis — both survivors are stuck at SUPPORTED_ONCE by the
+    // anti-HARK exclusion, so the loop reports the honest MECHANISM-specific
+    // stop reason instead, exactly as this module's own doc says it must
+    // (carried verbatim, never generalised into PARAMETER's vocabulary).
+    expect(verdict.stopReason).toBe('ALL_HYPOTHESES_RESOLVED');
+    expect(verdict.nextStep).toContain('2 hypotheses remain consistent');
+    expect(verdict.nextStep).toContain('ALL_HYPOTHESES_RESOLVED');
   });
 });

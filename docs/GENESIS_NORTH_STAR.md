@@ -139,3 +139,45 @@ since P1 has been extending.
   does X make one more row of §3's table true, on a real substrate, without
   fabricating the row it doesn't yet earn? If not, it is decoration, and per
   standing instruction this repository does not build decoration.
+
+## 7. Honesty audit log
+
+Each entry is a full repository pass checking for §4's specific failure mode —
+simulated output labelled as if it came from real apparatus — recorded even
+when the finding is negative, the same discipline `AUTONOMOUS_DISCOVERY_ROADMAP.md`
+applies to a measured no-effect lever.
+
+**C3, this pass — no violation found.** Grepped the whole repository (frontend,
+backend, docs) for the failure mode's actual shapes: `REAL_EXPERIMENT` as an
+evidence/admission status (zero hits — not even a leftover reference),
+`RealExperimentInterface` (zero hits — confirms it has not been prematurely
+stubbed, exactly what §4 requires until the interface genuinely exists),
+apparatus/sensor/hardware-in-the-loop language in both source and backend
+routes (every hit is either a 3D-scene rendering term — "hero apparatus" means
+a lit Three.js prop, not a lab connection — or an explicit disclaimer that
+hardware/apparatus/a detector is NOT what the model computes), and "real data"
+in prose (every hit is genuine bundled reference data — NASA orbital elements,
+PDG particle masses, NNDC isotope table, CERN Open Data with a runtime
+real-vs-synthetic branch and a SHA-256-verified provenance record when the real
+file is actually present — never Genesis's own simulated output relabelled).
+
+Checked the vocabulary itself, not just prose: `GroundingLevel`
+(`GROUNDED_EXACT`/`MODEL_ESTIMATE`/`PROCEDURAL_APPROXIMATION`/`UNGROUNDED_APPROXIMATION`)
+and `AdmissionStatus`/`ElementClassification`'s `'REAL'` value are all
+internally documented, at their declaration, as "a real domain SOLVER
+produced this" — never "verified against real-world apparatus" — and `'REAL'`
+is never rendered to a user as a bare status word without the explanatory
+sentence next to it (`admission.why`, a citation's own note, a lab's
+`honestyNote`). This naming needs its doc comment to not be misread in
+isolation, which is worth naming as a standing risk for whoever adds the next
+status value, but every existing use is paired with the context that keeps it
+honest.
+
+`Citation`/`ConfirmationLevel` ("★★★★★ confirmed experimentally") attaches
+only to the CITED PHYSICS being well-established in the literature (Aspect
+1982, Bennett et al. 1993) — every such citation sits next to explicit prose
+that the Genesis run itself is a simulation, not the cited experiment.
+
+Conclusion: the §4 boundary holds today. Nothing to fix. Re-run this grep
+whenever a new domain, evidence field, or admission status is added — it is
+cheap and the one boundary this whole document exists to protect.

@@ -656,3 +656,62 @@ insufficient" into "so here is the hypothesis that isn't in it" — and that,
 not a better ranking, is the step that makes the loop
 *experiment → knowledge → model change → next experiment* rather than
 *experiment → knowledge → next experiment*.
+
+### 10.6 The gap in 10.5, closed — `parameterAlternative.ts`
+
+Built exactly as 10.5 specified, and no larger. `deriveAlternativeParameterValue`
+is a pure derivation over a finished inquiry — the same shape as its MECHANISM
+sibling `deriveAlternativeCriteria`, which was likewise a pure function long
+before P3 gave it a call site. It runs no solver and touches no loop.
+
+**It is also the first ACTUATOR on the insufficiency sensor.** 10.4 found
+`DECLARED_SPACE_INSUFFICIENT` being computed, announced by narration, and acted
+on by nothing. It is now the precondition for deriving at all: "my declared
+space is insufficient" finally leads somewhere.
+
+**How the value is derived — bracketing.** At a probe where the measurement came
+back, every hypothesis has a real prediction from a real solver run. If one
+prediction sits below the observation and another above it, a value between
+those two claims is what the data points at. Nothing is fitted, searched or
+randomised.
+
+**Measured, on the real fixture 10.5 asked for.** A fold at temperature 0.5 is
+one nobody declared (candidates: 0.3, 0.7, 1.2, 2.0). A real run refutes all
+four — `DECLARED_SPACE_INSUFFICIENT`, `openQuestions` carrying *"not among the
+values anyone proposed"*. At 5000 steps the observed acceptance rate 0.2576
+sits between `h:cold`'s 0.1728 (T=0.3) and `h:cool`'s 0.3428 (T=0.7). Midpoint:
+**0.5 — the true hidden value, derived from the failure rather than guessed.**
+
+**And it survives being tested.** The derived hypothesis was run in a genuinely
+new inquiry against the two claims that bracketed it, opened at 20000 steps —
+untried in the first inquiry, and NOT the 5000 that produced the derivation.
+Result: `h:derived-temperature-0.5` is the sole survivor; `h:cold` and `h:cool`
+are refuted again, on measurements neither the derivation nor the original run
+had seen. That is `A ❌ B ❌ C ❌ D ❌ → derive E → test E on evidence it did not
+author → E stands`.
+
+**Anti-HARKing is carried, not trusted.** The probe that produced the
+derivation is returned as `excludedProbeValues`, so a caller scheduling the
+test cannot silently reuse it — the same failure mode `excludedStrengths`
+guards against on the MECHANISM side.
+
+**Three refusals, each asserted on a real case:** something still survives (the
+space is not exhausted, and testing between survivors is the loop's own job);
+hypotheses claim two coupled parameters rather than one scalar (a 1-D bracket
+cannot locate a point in the Arrhenius compensation plane, so it refuses rather
+than approximates); and no bracket exists (at 200 steps every candidate
+predicts the identical 0.13 — a real algorithmic floor — and extrapolating past
+the declared range would be inventing, so it declines).
+
+**Honest limits, stated rather than implied.** Bracketing assumes the metric
+moves monotonically with the parameter between the two bracketing claims; that
+is not verified, and does not need to be, because the candidate faces a real
+experiment before it is believed — the same measurement shows the midpoint
+landing well away from the truth on other folds. When several rounds bracket,
+only the last is used; intervals are not intersected and a contradiction
+between rounds is not yet detected.
+
+**Not yet wired into a loop.** Deriving is now possible and proven; deciding
+that an inquiry should automatically continue with the derived candidate is a
+control-flow change to a live loop, and gets its own pass — exactly the
+sequencing P3 followed.

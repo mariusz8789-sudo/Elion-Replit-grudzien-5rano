@@ -89,6 +89,47 @@ describe('genesis narration — real fields, never filler', () => {
     expect(lines.some((l) => l.phase === 'PREDICTION')).toBe(true);
   });
 
+  it('COMPETING MODELS (P6): narrates the real rival hypotheses when the evidence genuinely did not settle on one', () => {
+    // The same real Arrhenius-compensation degeneracy `competingModels.test.ts`
+    // and `inquiryLoop.test.ts` both ground their claim on: four hypotheses on
+    // the compensation line through 350 K, probed only at 350 K, so they are
+    // indistinguishable by construction — not a scripted tie.
+    const outcome = runDiscovery({
+      shape: 'PARAMETER',
+      input: {
+        question: 'Which activation energy / pre-exponential pair does this sample actually have?',
+        system: {
+          systemId: 'sample-Ea60', label: 'Unmeasured kinetic sample (Ea = 60 kJ/mol)', modelId: 'chemistry-arrhenius',
+          hiddenParameters: { activationEnergyKJ: 60, preExponentialLog10: 11.0 }, probeParameterId: 'temperatureK',
+          candidateProbeValues: [350], fixedParameters: {}, observedMetric: 'rateConstant', agreementTolerance: 0.25,
+        },
+        hypotheses: [
+          { hypothesisId: 'h:A-Ea60', statement: 'Ea=60, log10 A=11.0', claimedValues: { activationEnergyKJ: 60, preExponentialLog10: 11.0 }, priorConfidence: 0.5 },
+          { hypothesisId: 'h:C-Ea62', statement: 'Ea=62, log10 A=11.2985', claimedValues: { activationEnergyKJ: 62, preExponentialLog10: 11.2985 }, priorConfidence: 0.5 },
+          { hypothesisId: 'h:B-Ea66', statement: 'Ea=66, log10 A=11.8956', claimedValues: { activationEnergyKJ: 66, preExponentialLog10: 11.8956 }, priorConfidence: 0.5 },
+          { hypothesisId: 'h:D-Ea70', statement: 'Ea=70, log10 A=12.4926', claimedValues: { activationEnergyKJ: 70, preExponentialLog10: 12.4926 }, priorConfidence: 0.5 },
+        ],
+        openingProbeValue: 350,
+        maxRounds: 4,
+      },
+    });
+    if (outcome.status !== 'RAN') throw new Error(`expected RAN, got REFUSED: ${outcome.admission.why}`);
+    const view = buildGenesisMatrixView(outcome);
+    expect(view.competingModels?.status).toBe('COMPETING_MODELS_UNRESOLVED');
+
+    const lines = narrateNext(view);
+    // No fabricated "explored" claim: sufficiency did not fire (something DID
+    // survive), so the competing-models line is the whole closing, exactly one
+    // VERDICT plus one NEXT — never silently dropped, never doubled with a
+    // separate nextExperiment line.
+    expect(lines).toHaveLength(2);
+    expect(lines[0]!.phase).toBe('VERDICT');
+    expect(lines[0]!.text).toContain('4 explanations still fit');
+    for (const id of ['h:A-Ea60', 'h:C-Ea62', 'h:B-Ea66', 'h:D-Ea70']) expect(lines[0]!.text).toContain(id);
+    expect(lines[1]!.phase).toBe('NEXT');
+    expect(lines[1]!.text).toBe(view.competingModels!.nextStep);
+  });
+
   it('a refused question narrates only the real refusal, never a fake investigation', () => {
     const outcome = runDiscovery({ shape: 'MECHANISM', goal: 'Will the volcano erupt tomorrow?', catalog: GENESIS_FLOOD_CATALOG });
     const view = buildGenesisMatrixView(outcome);

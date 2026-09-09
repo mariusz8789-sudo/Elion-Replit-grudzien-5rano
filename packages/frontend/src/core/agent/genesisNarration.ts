@@ -106,12 +106,18 @@ export function narrateRound(entry: GenesisMatrixEntry): readonly NarrationLine[
 
 /**
  * Once, after the last round: whether the declared model explained the
- * observation (P4), then what Genesis does next or why it stopped.
+ * observation (P4), whether it explained it with one mechanism or several
+ * still-rival ones (P6), then what Genesis does next or why it stopped.
  *
  * The insufficiency line comes first because it reframes everything after it:
  * "none of these mechanisms explains it" is the finding, and the stop reason is
  * just how the loop reached it. Voiced only when the run really ended
  * insufficient — a supported or unsettled run narrates no such line.
+ *
+ * The competing-models line comes next, and only reachable when insufficiency
+ * did NOT fire — `competingModels.ts`'s own doc states why the two are
+ * orthogonal (zero survivors is `sufficiency`'s finding, several survivors is
+ * this one's) rather than layering two verdicts on the same empty result.
  */
 export function narrateNext(view: GenesisMatrixView): readonly NarrationLine[] {
   const lines: NarrationLine[] = [];
@@ -126,6 +132,15 @@ export function narrateNext(view: GenesisMatrixView): readonly NarrationLine[] {
     // The honest boundary is spoken too, not just recorded: a wider set of
     // mechanisms, or a different model, might still explain it.
     if (view.sufficiency.nextStep) lines.push({ phase: 'NEXT', text: view.sufficiency.nextStep });
+    return lines;
+  }
+
+  if (view.competingModels && view.competingModels.status === 'COMPETING_MODELS_UNRESOLVED') {
+    lines.push({
+      phase: 'VERDICT',
+      text: `${view.competingModels.competingHypothesisIds.length} explanations still fit every observation this run made: ${view.competingModels.competingHypothesisIds.join(', ')}. This is not settled yet.`,
+    });
+    if (view.competingModels.nextStep) lines.push({ phase: 'NEXT', text: view.competingModels.nextStep });
     return lines;
   }
 

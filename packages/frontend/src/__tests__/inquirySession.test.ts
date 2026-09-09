@@ -211,6 +211,13 @@ describe('inquirySession — memory is read back, and only for what it may decid
   });
 });
 
+// The memory-persistence gap once tested here directly against
+// `runInquiryWithGeneration` is now covered — more thoroughly, including the
+// full `runDiscovery` front-door path and cross-system isolation — by
+// `generationMemoryChain.test.ts`, against `runInquiryWithGenerationAndRemember`
+// (C3's design: `runInquiryWithGeneration` itself stays pure/unpersisted; the
+// separate `*AndRemember` wrapper is what banks both investigations).
+
 describe('inquirySession — replay actually catches things', () => {
   beforeEach(() => { vi.resetModules(); vi.stubGlobal('window', { localStorage: makeFakeStorage() }); });
   afterEach(() => vi.unstubAllGlobals());

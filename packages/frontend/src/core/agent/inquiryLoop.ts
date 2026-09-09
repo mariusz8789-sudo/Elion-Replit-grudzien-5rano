@@ -171,7 +171,25 @@ export type ProbeSelectionRule =
   /** No untried setting separates ANY pair still in contention; the inquiry stops rather than running an uninformative experiment. */
   | 'NO_DISCRIMINATING_PROBE'
   /** Fewer than two hypotheses are still in contention, so there is nothing left to separate. */
-  | 'NO_CONTENDERS_LEFT';
+  | 'NO_CONTENDERS_LEFT'
+  /**
+   * The measurement itself did not come back, so no probe is proposed.
+   *
+   * This exists because the alternative was actively wrong. When a measurement
+   * failed, the loop used to break while `selection` still held the selection
+   * that had CHOSEN the failed probe — so the run's `nextExperiment` came out
+   * as a `READY_TO_RUN` instruction to run the exact measurement that had just
+   * failed, and `openQuestions` said nothing about the failure at all. Measured
+   * on the real HP-lattice solver by probing `steps=999999`, outside the
+   * runner's validated [1, 50000] range: the run stopped with zero rounds and
+   * proposed "Measure acceptanceRate at steps=999999" as ready to run. A
+   * consumer routing on that status would retry the same failure forever.
+   *
+   * A failed measurement is not a proposal, so this carries `probeValue: null`
+   * and the adapter reports it as RESOLVED-with-no-request, exactly as the
+   * other two refusals already do.
+   */
+  | 'MEASUREMENT_FAILED';
 
 export interface ProbeSelection {
   readonly probeValue: number | null;
@@ -515,6 +533,8 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
   /** Shared across rounds — see `selectNextProbe`'s `predictionFor` for why that is sound. */
   const predictionCache = new Map<string, number | null>();
   let stopReason: InquiryStopReason = 'ROUND_BUDGET_EXHAUSTED';
+  /** The setting whose measurement failed, so the failure can be NAMED rather than left silent. */
+  let failedProbeValue: number | null = null;
   let selection: ProbeSelection = {
     probeValue: input.openingProbeValue,
     rule: 'OPENING_PROBE_DECLARED',
@@ -536,6 +556,20 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
     const observed = readMetric(measurement, system.observedMetric);
     if (measurement === null || observed === null) {
       stopReason = 'MEASUREMENT_FAILED';
+      // The proposal must not survive the failure. Leaving `selection` as it
+      // was would report the measurement that just failed as the next one to
+      // run — see `ProbeSelectionRule`'s own note on why that was worse than
+      // proposing nothing.
+      failedProbeValue = probeValue;
+      selection = {
+        probeValue: null,
+        rule: 'MEASUREMENT_FAILED',
+        why:
+          `The measurement of ${system.systemId} at ${system.probeParameterId}=${probeValue} did not return a ` +
+          `usable ${system.observedMetric}, so this round produced no observation and no next probe is proposed. ` +
+          'Re-running the same setting would repeat the failure rather than resolve it.',
+        betweenHypothesisIds: selection.betweenHypothesisIds,
+      };
       break;
     }
     measurements.push(measurement);
@@ -626,6 +660,16 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
     falsifiedHypothesisIds: falsified.map((h) => h.id),
     untestedHypothesisIds: untested.map((h) => h.id),
     openQuestions: [
+      // A failed measurement is an open question about the APPARATUS, and it
+      // comes first: without it a reader sees "never tested" for every
+      // hypothesis and no reason why.
+      ...(failedProbeValue !== null
+        ? [
+            `The measurement at ${system.probeParameterId}=${failedProbeValue} returned no usable ` +
+              `${system.observedMetric}, so this inquiry took no observation. Whether that setting is outside what ` +
+              `${system.modelId} can compute, or the run failed for another reason, is not settled here.`,
+          ]
+        : []),
       ...(surviving.length > 1
         ? [`${surviving.length} hypotheses are still consistent with every measurement taken: ${surviving.map((h) => h.id).join(', ')}. The inquiry did not separate them.`]
         : []),

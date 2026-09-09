@@ -17,6 +17,7 @@ import {
   type WorldParameterCalibrationResult,
 } from './worldParameterCalibration';
 import { parameterInquiryNextAction, worldCalibrationNextAction } from './nextAction';
+import { worldGraphMeasurementOrigin } from '../measurementProvenance';
 import { admitParameterInquiry, admitWorldCalibration, admitWorldQuestion } from './discoveryAdmission';
 import {
   DISCOVERY_STRATEGY_CONTRACT_VERSION,
@@ -102,6 +103,10 @@ export function toMechanismRun(result: DiscoveryLoopResult): StrategyRun {
     // contract carries them together because a reader needs both to know what
     // the run does not cover.
     limitations: [...result.declaredAssumptions, ...result.notModelledFactors],
+    // WorldGraph arms are simulated trajectories by construction — every one is
+    // a TemporalEngine advanced through SolverRouter. Derived from that path
+    // rather than assumed.
+    measurementProvenance: worldGraphMeasurementOrigin(),
     resultFingerprint: discoveryResultFingerprint(result),
     native: result,
   };
@@ -171,6 +176,8 @@ export function toParameterRun(result: InquiryLoopResult, input: InquiryLoopInpu
     nextExperiment: parameterInquiryNextAction({ result, system: input.system }),
     openQuestions: result.openQuestions,
     limitations: result.limitations,
+    // Carried from the loop, which derived it from the real ExperimentRuns it took.
+    measurementProvenance: result.measurementProvenance,
     resultFingerprint: inquiryResultFingerprint(result),
     native: result,
   };
@@ -243,6 +250,8 @@ export function toCalibrationRun(result: WorldParameterCalibrationResult, input:
     nextExperiment: worldCalibrationNextAction({ result, system: input.system }),
     openQuestions: result.openQuestions,
     limitations: result.limitations,
+    // Same substrate as MECHANISM: independently built worlds, advanced by solvers.
+    measurementProvenance: worldGraphMeasurementOrigin(),
     resultFingerprint: worldCalibrationResultFingerprint(result),
     native: result,
   };

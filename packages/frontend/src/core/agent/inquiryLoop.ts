@@ -9,6 +9,11 @@ import {
 } from '../experimentFabric/beliefRevision';
 import { runExperiment } from '../experimentFabric/executor';
 import { evaluateTwoArmRelation } from '../experimentFabric/falsificationRelation';
+import {
+  originOfExperimentRun,
+  summariseMeasurementOrigins,
+  type MeasurementProvenanceSummary,
+} from '../measurementProvenance';
 import { getRouterModel } from '../experimentFabric/router';
 import type { FalsificationCriterion, HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import { buildStructuredRequestFromModel } from '../experimentFabric/structuredRequestBuilder';
@@ -239,6 +244,17 @@ export interface InquiryLoopResult {
   readonly systemId: string;
   readonly modelId: string;
   readonly domainId: string;
+  /**
+   * WHERE THESE NUMBERS CAME FROM — computed, looked up, or measured.
+   *
+   * Derived from the real `ExperimentRun`s this inquiry took, never asserted.
+   * A separate axis from `resultOrigin` (which says whether a SOLVER ran) and
+   * from `ConfirmationLevel` (which grades the science). It lives on the result
+   * rather than beside it so that everything downstream — `StrategyRun`,
+   * Science Memory, replay, the UI — carries it without anyone having to
+   * remember to thread it through. See `measurementProvenance.ts`.
+   */
+  readonly measurementProvenance: MeasurementProvenanceSummary;
   readonly rounds: readonly InquiryRound[];
   readonly finalBeliefs: readonly BeliefSnapshot[];
   readonly stopReason: InquiryStopReason;
@@ -679,6 +695,10 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
       ...untested.map((h) => `Never tested: ${h.id}.`),
     ],
     nextExperiment: selection,
+    measurementProvenance: summariseMeasurementOrigins(
+      measurements.map(originOfExperimentRun),
+      `${measurements.length} ExperimentRun(s) taken by this inquiry`,
+    ),
     limitations: [
       `Every number here comes from ${system.modelId} (${model?.engine ?? 'unknown engine'}), a model. A hypothesis surviving this inquiry has survived contact with that model, which is not the same as being true of any real substance, organism or apparatus.`,
       `Only the parameter assignments the caller declared were ever in contention; the inquiry cannot find a value nobody proposed.`,

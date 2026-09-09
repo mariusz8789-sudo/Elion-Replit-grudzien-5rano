@@ -1205,3 +1205,45 @@ with each position justified; question-level *information gain* is not
 computable and will not be until candidate questions carry a declared
 uncertainty measure with units. Recording that as a measured negative rather
 than shipping a scorer that looks quantitative.
+
+### 10.17 §10.15 was half wrong — SELECTING a structure needs no Fabric change
+
+§10.15 concluded that Genesis cannot revise a MODEL, and that the prerequisite
+is making a model "a VALUE a solver can be built from at runtime" — a Fabric
+change. Audited properly against the substrate, that conflates two different
+things, and only one of them is out of reach.
+
+A WorldGraph model IS already a value. `SolverRouter` holds
+`Map<string, DomainSolver>` and registers at runtime
+(`solvers/solverRouter.ts:49-53`); every entity selects its solver by a string
+on itself, `domainBinding.solverId` (`:87`). Rebinding an entity to a different
+solver is a one-line mutation of exactly the kind `TemporalEngine.forkBranch`
+already applies.
+
+So:
+
+- **CHOOSING among structures somebody wrote** — no Fabric change. The registry
+  is runtime, the binding is a value, and a structural comparison is a
+  MECHANISM-shaped fork-and-compare, the same machinery `mechanismGeneration.ts`
+  uses for two levers.
+- **INVENTING a structure nobody wrote** — this is what needs a runtime-built
+  solver, and §10.15's prerequisite is right for this case alone.
+
+What actually blocks the first is not the substrate but the absence of a claim:
+all eighteen registered solvers cover eighteen DIFFERENT quantities, so no
+quantity has a competitor and "which structure?" has never been askable.
+
+Prior art exists and must not be duplicated: `domains/seismicFragility.ts`'s
+`FragilityRegistry` (`:255`) already holds several models for the same quantity
+and can enumerate those applicable to one hazard (`:279`), with registration
+that REJECTS a model lacking a citation or licence (`:265-271`) — "once a number
+is in the code an uncited one is indistinguishable from an invented one". That
+discipline is what a structural-alternative registry has to inherit, for the
+stronger reason that a structure is a bigger claim than a number.
+
+The full contract, the test path, and the honest cost of a first demonstration
+are in `RUNTIME_CONFIGURABLE_MODEL_CONTRACT.md`. The short version of the cost:
+a domain must declare a second REAL, CITED structure for a quantity it already
+computes. Writing one purely so that there are two would be fabricating physics
+to have something to discriminate, which is why that document stops at the
+contract.

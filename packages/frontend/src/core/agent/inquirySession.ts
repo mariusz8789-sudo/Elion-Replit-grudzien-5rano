@@ -9,6 +9,11 @@ import {
   type SavedParameterInquiryReplay,
 } from '../scienceMemory';
 import { runAutonomousInquiryWithRuns, type InquiryLoopInput, type InquiryLoopResult } from './inquiryLoop';
+import {
+  asParameterHypothesis,
+  deriveAlternativeParameterValue,
+  type DerivedParameterHypothesis,
+} from './parameterAlternative';
 
 /**
  * THE END-TO-END PATH for the autonomous parameter inquiry:
@@ -129,5 +134,131 @@ export function runInquiryAndRemember(input: InquiryLoopInput): InquirySessionRe
     saved,
     savedInquiry,
     replay: replaySavedParameterInquiry(saved),
+  };
+}
+
+/**
+ * AUTOMATIC CONTINUATION AFTER AN EXHAUSTED SPACE — the call site
+ * `parameterAlternative.ts` was built for.
+ *
+ * `deriveAlternativeParameterValue` proved Genesis CAN derive a value nobody
+ * declared. This is what makes it do so without being asked, and it is the same
+ * sequencing P3 followed on the MECHANISM side: the pure derivation first, its
+ * call site second, once the derivation had been measured on a real fixture.
+ *
+ * The flow, end to end, all of it existing mechanisms:
+ *
+ *   declared hypotheses -> inquiry -> every one falsified
+ *     -> DECLARED_SPACE_INSUFFICIENT (`modelSufficiency.ts`)
+ *     -> derive a bracketed value (`parameterAlternative.ts`)
+ *     -> a fresh inquiry, opened at a setting the derivation never saw
+ *     -> a real verdict on the derived hypothesis
+ *
+ * ## Why a FRESH inquiry rather than more rounds of the first one
+ *
+ * The derived value is a different scientific claim from the ones the first
+ * inquiry was given, and it must be judged on evidence that inquiry did not
+ * already use. Continuing the original run would mean judging it partly on the
+ * measurements that produced it. A second investigation, opened on an untried
+ * setting, keeps the two separable — and keeps `inquiryLoop.ts` itself
+ * untouched, which is why this is wiring rather than a rewrite.
+ *
+ * ## Anti-HARKing is ENFORCED here, not merely carried
+ *
+ * `DerivedParameterHypothesis` reports `excludedProbeValues` so a caller cannot
+ * unknowingly reuse the measurement that generated the candidate. This is that
+ * caller, and it honours the exclusion by construction: the follow-up opens at
+ * the first candidate setting that is BOTH untried in the first inquiry AND not
+ * excluded. When no such setting exists it refuses to continue rather than
+ * testing the candidate on the data that authored it — an honest stop, and the
+ * same shape as every other refusal in this path.
+ *
+ * ## What it deliberately does not do
+ *
+ * It does not touch `runDiscovery`'s contract. That returns ONE `StrategyRun`,
+ * and reporting "two runs, the second derived from the first" through it is a
+ * contract decision worth taking on its own rather than smuggling in here.
+ */
+
+/** The second investigation, when one was warranted and possible. */
+export interface GeneratedContinuation {
+  readonly derived: DerivedParameterHypothesis;
+  /** The follow-up actually executed — its opening probe is the enforced-new evidence. */
+  readonly followUpInput: InquiryLoopInput;
+  readonly followUpResult: InquiryLoopResult;
+  /** Did the derived value survive contact with evidence it did not author? */
+  readonly survived: boolean;
+}
+
+export interface InquiryWithGenerationResult {
+  readonly first: InquiryLoopResult;
+  readonly executedInput: InquiryLoopInput;
+  /** Null whenever nothing was generated — `noGenerationReason` always says why. */
+  readonly generated: GeneratedContinuation | null;
+  readonly noGenerationReason: string | null;
+}
+
+/**
+ * Runs the inquiry and, if its declared space turned out to be exhausted,
+ * derives a value nobody proposed and tests it in a fresh investigation.
+ *
+ * Every refusal `deriveAlternativeParameterValue` already makes is preserved
+ * untouched — this adds exactly one more, for the case where the candidate
+ * exists but no untested setting is left to judge it on.
+ */
+export function runInquiryWithGeneration(input: InquiryLoopInput): InquiryWithGenerationResult {
+  const first = runAutonomousInquiryWithRuns(input).result;
+
+  const derived = deriveAlternativeParameterValue(first, input);
+  if (derived === null) {
+    return {
+      first,
+      executedInput: input,
+      generated: null,
+      noGenerationReason:
+        'No alternative was derived: either a declared hypothesis is still standing, the hypotheses do not claim one shared scalar parameter, or no round bracketed the observation. See `parameterAlternative.ts` for which refusals apply.',
+    };
+  }
+
+  const tried = new Set(first.rounds.map((r) => r.probeValue));
+  const excluded = new Set(derived.excludedProbeValues);
+  const openingProbeValue = input.system.candidateProbeValues.find((p) => !tried.has(p) && !excluded.has(p));
+  if (openingProbeValue === undefined) {
+    return {
+      first,
+      executedInput: input,
+      generated: null,
+      noGenerationReason:
+        `A value was derived (${derived.parameterId}=${derived.value}), but every candidate setting of ` +
+        `${input.system.probeParameterId} was already used by the inquiry that produced it. Testing it here would ` +
+        'mean judging it on the measurements that generated it, so it is reported as an untested proposal instead.',
+    };
+  }
+
+  // The two claims whose predictions drew the bracket: the most relevant
+  // comparison for the value derived between them, and enough contenders for
+  // the loop to have something to discriminate.
+  const bracketParents = input.hypotheses.filter(
+    (h) => h.hypothesisId === derived.bracketLowHypothesisId || h.hypothesisId === derived.bracketHighHypothesisId,
+  );
+  const followUpInput: InquiryLoopInput = {
+    question: `Does ${derived.parameterId}=${derived.value}, derived after every declared value was refuted, hold up?`,
+    system: input.system,
+    hypotheses: [asParameterHypothesis(derived), ...bracketParents],
+    openingProbeValue,
+    maxRounds: input.maxRounds,
+  };
+  const followUpResult = runAutonomousInquiryWithRuns(followUpInput).result;
+
+  return {
+    first,
+    executedInput: input,
+    generated: {
+      derived,
+      followUpInput,
+      followUpResult,
+      survived: followUpResult.survivingHypothesisIds.includes(derived.hypothesisId),
+    },
+    noGenerationReason: null,
   };
 }

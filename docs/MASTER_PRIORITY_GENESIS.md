@@ -196,3 +196,145 @@ prompt do wklejenia:
 Start reading punkty: `docs/GENESIS_DATA_PROVENANCE_AND_REAL_EXPERIMENT_CONTRACT.md`,
 `docs/GENESIS_MECHANISM_PERSISTENCE_AND_E2E_CHAIN.md`, `core/experimentFabric/realExperiment.ts`,
 `core/agent/discoveryAdmission.ts`, `components/visual-simulation/RealExperimentPipeline.tsx`.
+
+---
+
+## UPDATE — 2026-09-09, noc: C1's Real Experiment E2E — ZAMKNIĘTE
+
+Pierwszy prawdziwy most domknięty i wpięty w realną ścieżkę produkcyjną
+(`fce2bde`, zreconciled po kolizji z C2 jako `879ac6e`).
+
+**Kluczowe odkrycie architektoniczne, które zmieniło pierwotny plan**:
+audyt (potwierdzony przez research agenta, nie założony) pokazał, że żywa
+ścieżka produkcyjna (`WorldDiscoveryPanel` → `runWorldDiscoveryAndRemember`
+→ `runAutonomousDiscoveryWithEngines`) to substrat WorldGraph
+(`discoveryLoop.ts`), NIE starszy Fabric `hypothesisLoop.ts`/
+`scientificDiscovery.ts`, na który pierwotnie celował ten dokument.
+WorldGraph nigdy nie importował `ExperimentRun`/`DataProvenance` — zero
+seamu na dostarczony realny pomiar wewnątrz autonomicznej pętli, a naiwny
+replay (`replaySavedWorldDiscoveryRun`) bezwarunkowo przelicza CAŁĄ pętlę
+solverem, co cicho zniszczyłoby wstrzykniętą realną wartość.
+
+**Najmniejsza poprawna zmiana**: Real Experiment NIE wchodzi do wnętrza
+autonomicznej pętli (fizycznego pomiaru nie da się zaplanować
+autonomicznie w środku). Zamiast tego to osobny krok WERYFIKACJI PO
+FAKCIE: bierze ZAMROŻONĄ predykcję (ostatnia runda ukończonego, już
+zapisanego `SavedWorldDiscoveryRun`) i porównuje ją z realnym pomiarem —
+piąty kształt inwestygacji w `scienceMemory.ts`
+(`SavedRealExperimentVerification`, obok `worldDiscovery`/`hypothesisLoop`/
+`parameterInquiry`/`mechanismComposition`), zero nowej Pamięci, zero
+nowego mechanizmu replay (replay odtwarza WYŁĄCZNIE symulowaną predykcję
+przez niezmieniony `runAutonomousDiscoveryWithEngines`, realny pomiar
+zamrożony 1:1).
+
+**Druga poprawka architektoniczna w trakcie**: pierwotny plan zakładał
+ponowne użycie kryterium ORYGINALNEJ hipotezy (`baseline vs intervention`)
+do osądzenia `predykcja vs rzeczywistość` — to źle zadane pytanie (dwie
+różne oceny). Poprawka: osobne, jawnie prerejestrowane
+`verificationCriterion` (`equal-within-tolerance`, tolerancja deklarowana
+PRZEZ CZŁOWIEKA PRZED wpisaniem pomiaru) — reuse `evaluateTwoArmRelation`
+(ten sam sędzia co `worldCounterfactual.ts`), zero nowej statystyki, zero
+fabrykowanego uniwersalnego progu.
+
+**Kolizja z C2 (uczciwie odnotowana, nie zamieciona)**: C2 niezależnie
+zcommitował `3c2317c` (product-copy pass na `RealExperimentPipeline.tsx`,
+plus `realExperimentPipeline.test.tsx`) w tym samym ~5-minutowym oknie, w
+którym C1 kończył pełne przepisanie tego samego pliku z prawdziwym
+wpięciem. Ręcznie zreconciled: zachowano wpięcie C1 (prawdziwy formularz,
+prawdziwe wywołania), przyjęto lepsze, prostsze sformułowania C2 dla
+tekstów `not-modelled` (gdy `prediction` jest `null`), scalono OBA zestawy
+testów w jeden plik (zamiast kolidującego add/add). Zweryfikowane na nowo
+po reconciliation: tsc, eslint, testy docelowe (39/39), pełny suite.
+Zsynchronizowano z powrotem do gałęzi C2 i C3.
+
+**Zamknięte E2E wymagania** (A–L z promptu C1): symulacja→predykcja
+SIMULATED, `RealExperimentRequest`, ręczna `RawMeasurement`→
+`REAL_EXPERIMENTAL`, dane niezmienione po porównaniu, jawny werdykt,
+proweniencja zachowana w Evidence, zapis do Scientific Memory, restart
+sesji odczytuje zapis, replay odtwarza WYŁĄCZNIE symulację (nigdy pomiaru
+fizycznego), replay zwraca deterministyczny werdykt, celowy mismatch daje
+`FALSIFIED_WITHIN_PROTOCOL`/`DRIFT`, nigdy cichy `MATCH`.
+
+**Znane, świadomie pozostawione ograniczenie**: wielokrotne powtórzenia
+(`repetitionsPerArm > 1`) dla jednego realnego ramienia w starszym Fabric
+`scientificExecutor.ts` nadal mają znaną lukę w `reproductionVerdict`
+(bit-identyczny fingerprint), ale ta ścieżka Fabric pozostaje niewpięta w
+żywą produkcję — nie jest to dziś blocker dla tego mostu, który idzie
+przez WorldGraph, nie przez Fabric.
+
+Real Experiment E2E jest teraz GOTOWE jako baza dla P2 ("pierwszy
+eksperyment na prawdziwych komórkach") — kolejny krok to podłączenie
+realnego źródła danych (lab partner) do tego samego kontraktu, nie nowa
+architektura.
+
+---
+
+## UPDATE — 2026-09-09, strategiczna ocena zewnętrzna (Qwen) — co bierzemy, co odkładamy
+
+Zewnętrzny model (Qwen, bez dostępu do repo — recenzja na podstawie
+Knowledge Pack) dał uczciwą, w większości trafną ocenę. Punkt po punkcie,
+co robimy z tym realnie:
+
+**Trafne i już się dzieje (nie trzeba nowej decyzji):**
+- GAP 3 (Model Update) jako priorytet — ZGADZA SIĘ z tym, co C3 już
+  zrobił DZIŚ (`StructuralAlternativeRegistry`, realny rebind
+  `domainBinding.solverId` napędzany falsyfikacją — patrz update wyżej).
+  Recenzja tego nie widziała (audyt bez repo), ale kierunek był już słuszny
+  przed jej przeczytaniem.
+- "Jeden killer case zamiast rozproszenia" — real Experiment E2E (ten
+  update) to PIERWSZY krok w tę stronę: most Prediction→Real
+  Data→Comparison→Evidence→Memory→Replay jest teraz architektonicznie
+  gotowy na PIERWSZY prawdziwy przypadek z realnym partnerem/danymi, nie
+  kolejną domenę symulacyjną.
+
+**Trafne, wymaga decyzji NIE-inżynierskiej (biznes/partnerstwo)** — poza
+zakresem tego, co C1/C2/C3 mogą rozstrzygnąć w kodzie:
+- "Evidence & Replay Platform jako pierwszy produkt" (B2B, nie "AI
+  Scientist") — pozycjonowanie produktowe, decyzja użytkownika/zarządu.
+- "Partnerstwo z istniejącym labem zamiast budowy własnego" — biznes
+  development, poza tym repo.
+- Te dwa punkty ZOSTAJĄ przy użytkowniku do decyzji; architektura (ten
+  update + Real Experiment Contract) już nie blokuje żadnej z tych ścieżek
+  — `RealExperimentRequest`/`physicalProtocolRef` jest zaprojektowany tak,
+  by przyjąć DOWOLNY realny protokół pomiarowy bez przebudowy.
+
+**Trafne, świadomie odłożone teraz, przekazane QN (Qwen) jako izolowane
+zadanie budowlane** (patrz sesja czatu z użytkownikiem — QN nie ma
+dostępu do repo, więc dostaje samodzielną specyfikację modułu, nie audyt):
+- GAP 7 (Literature intelligence & novelty detection) — jedyna luka z
+  listy Qwen, która NIE koliduje z aktywną pracą C1 (Real Experiment,
+  zamknięte) ani C3 (Mechanism Composition/researchChain, w toku), więc
+  jest bezpieczna do przekazania równoległemu agentowi bez ryzyka
+  konfliktu (patrz precedens kolizji C1/C2 na `RealExperimentPipeline.tsx`
+  wyżej — trzymamy się od tego z daleka).
+
+**Zasada dla wyniku QN, zanim trafi z powrotem do repo**: żadnego
+fabrykowanego cytowania, żadnej fałszywej "noveltyScore" bez jawnej
+formuły, honest `NOT_MODELLED`/capability-seam tam gdzie QN nie ma
+realnego dostępu do API literatury — dokładnie ta sama dyscyplina co
+Real Experiment Contract. C1 audytuje i wpina wynik dopiero po weryfikacji
+zgodności z tą zasadą, nigdy automatycznie.
+
+### ⚠️ UWAGA — wynik QN (Multi-Model Tournament) trafił przypadkowo bezpośrednio do C3
+
+Użytkownik przez pomyłkę wkleił output Qwena (moduł Multi-Model
+Tournament, zadanie zlecone przez C1 w sesji czatu) bezpośrednio do C3,
+z pominięciem audytu C1. **C3: jeśli budujesz/commitujesz cokolwiek na
+podstawie tego outputu, PRZED commitem sprawdź samodzielnie dokładnie te
+same warunki, które C1 zlecił Qwenowi audytować:**
+- żaden "confidence score"/"tournament rating" bez jawnie zapisanej
+  formuły (zero Elo, zero wag znikąd),
+- cykl w relacji zgody (A zgadza się z B, B z C, A NIE zgadza się z C)
+  musi dać `INCONCLUSIVE_CYCLE`, nigdy wymuszonego zwycięzcy — sprawdź
+  testem na fixture, który realnie konstruuje taki cykl,
+- < 2 ukończone porównania → zawsze `INCONCLUSIVE_INSUFFICIENT_DATA`,
+- reuse WYŁĄCZNIE istniejącego kontraktu `ModelVsModelComparison`/
+  `ModelAgreementVerdict`/`verdictOf` z `core/experimentFabric/
+  modelVsModelCompare.ts` — zero nowego równoległego enuma/typu.
+
+Jeśli C3 już to zcommitował PRZED przeczytaniem tej notatki: C1 i tak
+przejdzie przez to przy najbliższej synchronizacji gałęzi (standardowa
+dyscyplina tej sesji — każdy commit z drugiej gałęzi jest inspekcjonowany
+`git show --stat` + bezpieczeństwo cyber/gov PRZED cherry-pickiem do
+`main`), więc nic nie wejdzie do `main` bez tego audytu — ale lepiej
+zamknąć to świadomie niż czekać na przypadkowe złapanie.

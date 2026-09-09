@@ -205,7 +205,13 @@ widening — not a new subsystem.
 
 ---
 
-## 0bis. Information Gain / Experiment Planner — audit, not implementation yet
+## 0bis. Information Gain / Experiment Planner — DONE for PARAMETER and CALIBRATION
+
+**Status: implemented.** The design below was built exactly as audited, and the
+worked example at the end of this section is now a passing test. What follows
+is kept as the reasoning record — including the measurement that decided it —
+because the "why not a score" argument governs anything built on top of this.
+MECHANISM is still open; see the end of the section.
 
 The user's third named priority, after Memory→Selection and Competing Models.
 **"Information gain" cannot mean a numeric utility function here** — nothing
@@ -229,7 +235,7 @@ THIRD contender from either of them, at an untried candidate value — real
 progress (one fewer live rival) that today's `NO_DISCRIMINATING_PROBE` gives
 up on without checking.
 
-### The minimal honest increment — designed, not yet built
+### The minimal honest increment — built
 
 **Widen the search from "the top-two pair" to "every pair among the current
 contenders", only as a fallback AFTER the existing top-two check fails.**
@@ -240,13 +246,13 @@ that this measurement narrows the field WITHOUT settling the top-ranked
 disagreement, rather than reusing `DISCRIMINATES_TOP_TWO`'s wording for a
 different, weaker claim.
 
-**Why this is not implemented in this pass.** `selectNextProbe` and its
+**Why it was audited before being written.** `selectNextProbe` and its
 `worldParameterCalibration.ts` twin are live, tested, in-production loops —
 `NO_DISCRIMINATING_PROBE` is asserted by name in at least 12 files across the
 test suite. A fallback that only activates when the existing check already
 failed cannot change a test where EVERY pair is genuinely indistinguishable,
 and three of the real fixtures checked are exactly that (safe, confirmed by
-reading, not assumed):
+reading, not assumed — and all still green after the change):
 
 - Arrhenius compensation-line (`inquiryLoop.test.ts`): exactly one candidate
   probe, already tried — nothing left to widen into.
@@ -277,14 +283,24 @@ guessed):
   rounds" to "2 survive (`h:warm`/`h:hot`), stop after 3 rounds" — a real,
   correct, MORE complete answer than what ships today, not a regression.
 
-This is exactly the worked example an implementation should build and test
-against first: it proves the widening is not just risk-free elsewhere but
-genuinely finds a real separation this fixture's current behaviour misses.
-The three-pair check, the exact new round, and the updated
-`survivingHypothesisIds`/`rounds.length` assertions this test needs are
-already known from this measurement — implementing needs no further
-guessing, only doing it and re-verifying the other 11 dependent files stay
-green.
+This is exactly the worked example the implementation was built against, and
+it is now the `INFORMATION GAIN: runs the experiment that narrows the field
+when none settles the top two` test in `proteinFoldingInquiry.test.ts`: round
+3 exists, runs at steps=20000 under `DISCRIMINATES_OTHER_PAIR`, and moves
+`h:cool` from standing to `FALSIFIED_WITHIN_PROTOCOL`. The fixture's other
+assertions were updated to the REAL new result (falsified `h:cold`+`h:cool`,
+surviving `h:warm`+`h:hot`) — no fixture or solver was touched to make
+anything pass. All 11 other dependent files stayed green.
+
+**One cost note, since it is load-bearing.** The widened search puts the same
+hypothesis in several pairs, and successive rounds re-scan the same untried
+settings; on the protein-folding solver that was enough to blow the default
+5s timeout of the determinism test. The fix is a prediction cache keyed by
+(hypothesis, setting), shared across rounds — behaviour-neutral, because a
+prediction depends only on the hypothesis's claimed values and the setting
+(neither moves as beliefs update), and because those runs, unlike
+measurements, are never collected. With it, the file is faster than before
+the change. The timeout was never raised.
 
 **MECHANISM has no equivalent at all**, live or dead — this is the same gap
 P6 §"open second increment" names. Designing what a discriminating

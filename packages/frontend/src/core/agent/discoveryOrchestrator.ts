@@ -1,7 +1,8 @@
 import { admitWorldQuestion } from './discoveryAdmission';
-import { calibrationStrategy, mechanismStrategy, parameterStrategy } from './discoveryStrategies';
+import { calibrationStrategy, mechanismStrategy, parameterStrategy, toParameterRun } from './discoveryStrategies';
 import type { Admission, QuestionShape, StrategyRun } from './discoveryStrategy';
-import { memoryNarrowedHypotheses } from './inquirySession';
+import { memoryNarrowedHypotheses, runInquiryWithGeneration } from './inquirySession';
+import { derivedValueStanding, type DerivedParameterHypothesis, type DerivedValueAssessment } from './parameterAlternative';
 import type { InquiryLoopInput } from './inquiryLoop';
 import { priorRefutedHypothesisIds } from './worldDiscoverySession';
 import type { WorldParameterCalibrationInput } from './worldParameterCalibration';
@@ -76,16 +77,32 @@ import { buildWorldDiscoveryPlan, parseWorldDiscoveryGoal, type WorldLeverCatalo
  * substrates, not a shortcut, and it is stated rather than papered over with a
  * symmetry that would have to fabricate something.
  *
- * ## What this deliberately does not do
+ * ## What it does NOT hand its strategies, and what it now does
  *
- * It does not generate hypotheses. All three strategies are handed the
- * hypotheses they investigate, and turning falsifications into new candidates
- * is P3 (`deriveAlternativeCriteria`, built and tested and not yet wired) — a
- * separate change, on top of this one, once this stands on its own.
+ * It still hands no strategy a hypothesis of its own invention: all three are
+ * given the hypotheses their caller declared, and routing never edits a claim.
+ *
+ * What changed is what happens AFTER a strategy exhausts those claims. On the
+ * PARAMETER path this front door now runs the generation continuation
+ * (`GeneratedInvestigation` below): when every declared value is refuted,
+ * Genesis derives one nobody proposed and tests it, without a caller asking.
+ * MECHANISM's own generation primitive (`deriveAlternativeCriteria`) has no
+ * equivalent continuation yet, so `generated` is null there and says so — a
+ * real asymmetry, reported rather than smoothed over.
  */
 
-/** 1.1.0 added the `CALIBRATION` shape and `CalibrationRequest`. Additive: `DiscoveryOutcome`'s own shape is unchanged, `shape` simply carries a third real value now. */
-export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.1.0';
+/**
+ * 1.1.0 added the `CALIBRATION` shape and `CalibrationRequest`. Additive:
+ * `DiscoveryOutcome`'s own shape is unchanged, `shape` simply carries a third
+ * real value now.
+ *
+ * 1.2.0 added `DiscoveryRan.generated`/`noGenerationReason`. Additive in the
+ * strict sense that matters here: `run` is byte-for-byte what 1.1.0 returned
+ * for the same request — the same first inquiry, projected by the same
+ * adapter — so a 1.1.0 reader is not merely compatible, it sees an unchanged
+ * finding. What it never sees is the second investigation.
+ */
+export const DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION = '1.2.0';
 
 /** A mechanism question: a goal, against a world that declares its own levers. */
 export interface MechanismRequest {
@@ -177,6 +194,57 @@ export interface PriorInvestigationDecision {
   readonly reason: string;
 }
 
+/**
+ * GENERATION AT THE FRONT DOOR — P0. What Genesis did after the declared space
+ * ran out, reported as a second run rather than smuggled into the first.
+ *
+ * ## Why this is a second `StrategyRun` and not more rounds of the first
+ *
+ * The module doc below used to say generation "is a separate change, on top of
+ * this one" — this is that change. The contract decision it deferred is taken
+ * here in the only way that keeps both facts intact: `run` stays EXACTLY what a
+ * direct strategy call produces, so the equivalence test that guards this file
+ * still holds and every existing consumer sees precisely what it saw before,
+ * and the continuation is an ADDITIONAL, separately-labelled run beside it.
+ *
+ * Merging the two would have destroyed the one property that makes a derived
+ * hypothesis worth anything: that it was judged on evidence it did not author.
+ * A single flattened run of "9 rounds" cannot express "rounds 1-5 refuted every
+ * declared value, then rounds 6-9 tested a value derived from round 4, at a
+ * setting round 4 never used". Two runs can, and do.
+ *
+ * ## When it is null, and why that is not a failure
+ *
+ * Null is the NORMAL case, and `noGenerationReason` always says which of
+ * `parameterAlternative.ts`'s refusals applied. A run where a declared
+ * hypothesis is still standing generates nothing because generation is for an
+ * EXHAUSTED space — inventing a value while a declared one still fits would be
+ * the engine preferring novelty to evidence.
+ *
+ * ## What it deliberately still does not do
+ *
+ * It does not write to memory. This orchestrator reads memory and owns no
+ * store (see `PriorInvestigationDecision`), and that boundary is unchanged:
+ * `runInquiryWithGenerationAndRemember` is the storage-wired composition, the
+ * same split `runInquiry`/`runInquiryAndRemember` already established.
+ */
+export interface GeneratedInvestigation {
+  /** The value nobody declared, with the bracket and the round that produced it. */
+  readonly derived: DerivedParameterHypothesis;
+  /** The follow-up investigation, in the same shared shape as any other run. */
+  readonly run: StrategyRun;
+  /** Did the derived value survive evidence it did not author? */
+  readonly survived: boolean;
+  /**
+   * What that survival actually earned. Carried BESIDE `survived` and never
+   * instead of it, because the boolean alone overclaims: measured on the real
+   * fold, the identical `survived: true` comes back for four different true
+   * temperatures (see `derivedValueStanding`). A consumer that reports the
+   * boolean without this is reporting a point value the run never established.
+   */
+  readonly standing: DerivedValueAssessment;
+}
+
 export interface DiscoveryRan {
   readonly status: 'RAN';
   readonly contractVersion: string;
@@ -187,6 +255,16 @@ export interface DiscoveryRan {
   readonly run: StrategyRun;
   /** Null when memory had nothing to say — no prior investigation, or none of it applies here. */
   readonly priorInvestigation: PriorInvestigationDecision | null;
+  /**
+   * The investigation Genesis started BY ITSELF after `run` exhausted its
+   * declared space. Null whenever nothing was generated, which is the normal
+   * case — `noGenerationReason` then says why. Always null for MECHANISM and
+   * CALIBRATION: neither has a generation path yet, and a field left null is
+   * honest where a fabricated one would not be.
+   */
+  readonly generated: GeneratedInvestigation | null;
+  /** Why no continuation was started. Null exactly when `generated` is non-null. */
+  readonly noGenerationReason: string | null;
 }
 
 export type DiscoveryOutcome = DiscoveryRan | DiscoveryRefused;
@@ -205,8 +283,19 @@ function ran(
   admission: Admission,
   run: StrategyRun,
   priorInvestigation: PriorInvestigationDecision | null,
+  generated: GeneratedInvestigation | null = null,
+  noGenerationReason: string | null = 'This question shape has no generation path: only PARAMETER can derive a value nobody declared.',
 ): DiscoveryRan {
-  return { status: 'RAN', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, admission, run, priorInvestigation };
+  return {
+    status: 'RAN',
+    contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION,
+    shape,
+    admission,
+    run,
+    priorInvestigation,
+    generated,
+    noGenerationReason,
+  };
 }
 
 /**
@@ -231,7 +320,31 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
       ? { skippedHypothesisIds: resumedFromMemory.skippedHypothesisIds, reason: resumedFromMemory.reason }
       : null;
 
-    return ran('PARAMETER', admission, parameterStrategy.run(executedInput), priorInvestigation);
+    // GENERATION IS PART OF ANSWERING NOW, not a separate call a caller has to
+    // know to make. `runInquiryWithGeneration` runs the SAME first inquiry
+    // `parameterStrategy.run` would have run — `runAutonomousInquiryWithRuns`
+    // on the same input — so `run` below is identical to a direct strategy
+    // call, and the continuation only exists when the first run exhausted its
+    // declared space. Nothing extra executes in the ordinary case.
+    const generation = runInquiryWithGeneration(executedInput);
+    const generated: GeneratedInvestigation | null =
+      generation.generated === null
+        ? null
+        : {
+            derived: generation.generated.derived,
+            run: toParameterRun(generation.generated.followUpResult, generation.generated.followUpInput),
+            survived: generation.generated.survived,
+            standing: derivedValueStanding(generation.generated.derived, generation.generated.followUpResult),
+          };
+
+    return ran(
+      'PARAMETER',
+      admission,
+      toParameterRun(generation.first, executedInput),
+      priorInvestigation,
+      generated,
+      generation.noGenerationReason,
+    );
   }
 
   if (request.shape === 'CALIBRATION') {

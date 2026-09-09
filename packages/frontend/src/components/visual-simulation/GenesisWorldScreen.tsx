@@ -1626,6 +1626,12 @@ export class GenesisWorldSim3D implements Sim3D {
       // for THIS run (`WorldDiscoveryMemoryUse`/`PriorInvestigationWarning` are
       // the same shape) — not a re-derived guess.
       priorInvestigation: state.memory,
+      // MECHANISM has no generation continuation, so there is nothing real to
+      // report here. Null with the reason the orchestrator itself gives, rather
+      // than a fabricated second run this search never performed.
+      generated: null,
+      noGenerationReason:
+        'This question shape has no generation path: only PARAMETER can derive a value nobody declared.',
     };
     this.lastMatrixView = buildGenesisMatrixView(outcome);
     this.narratedLineCount = 0;

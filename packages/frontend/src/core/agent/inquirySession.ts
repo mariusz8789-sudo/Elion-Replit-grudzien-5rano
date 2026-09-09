@@ -8,7 +8,12 @@ import {
   type SavedParameterInquiryMemoryUse,
   type SavedParameterInquiryReplay,
 } from '../scienceMemory';
-import { runAutonomousInquiryWithRuns, type InquiryLoopInput, type InquiryLoopResult } from './inquiryLoop';
+import {
+  runAutonomousInquiryWithRuns,
+  type InquiryExecution,
+  type InquiryLoopInput,
+  type InquiryLoopResult,
+} from './inquiryLoop';
 import {
   asParameterHypothesis,
   deriveAlternativeParameterValue,
@@ -186,6 +191,14 @@ export interface GeneratedContinuation {
   /** The follow-up actually executed — its opening probe is the enforced-new evidence. */
   readonly followUpInput: InquiryLoopInput;
   readonly followUpResult: InquiryLoopResult;
+  /**
+   * The follow-up's own solver runs, carried so this can be PERSISTED with the
+   * same real provenance any other remembered inquiry has. Without it a caller
+   * wanting to bank the derived hypothesis's verdict would have to re-execute
+   * the follow-up to obtain a measurement, and a second execution is a second
+   * result — not the one being recorded.
+   */
+  readonly followUpMeasurements: InquiryExecution['measurements'];
   /** Did the derived value survive contact with evidence it did not author? */
   readonly survived: boolean;
 }
@@ -193,6 +206,8 @@ export interface GeneratedContinuation {
 export interface InquiryWithGenerationResult {
   readonly first: InquiryLoopResult;
   readonly executedInput: InquiryLoopInput;
+  /** The first investigation's own solver runs, carried for the same reason as `followUpMeasurements`. */
+  readonly firstMeasurements: InquiryExecution['measurements'];
   /** Null whenever nothing was generated — `noGenerationReason` always says why. */
   readonly generated: GeneratedContinuation | null;
   readonly noGenerationReason: string | null;
@@ -207,13 +222,16 @@ export interface InquiryWithGenerationResult {
  * exists but no untested setting is left to judge it on.
  */
 export function runInquiryWithGeneration(input: InquiryLoopInput): InquiryWithGenerationResult {
-  const first = runAutonomousInquiryWithRuns(input).result;
+  const firstExecution = runAutonomousInquiryWithRuns(input);
+  const first = firstExecution.result;
+  const firstMeasurements = firstExecution.measurements;
 
   const derived = deriveAlternativeParameterValue(first, input);
   if (derived === null) {
     return {
       first,
       executedInput: input,
+      firstMeasurements,
       generated: null,
       noGenerationReason:
         'No alternative was derived: either a declared hypothesis is still standing, the hypotheses do not claim one shared scalar parameter, or no round bracketed the observation. See `parameterAlternative.ts` for which refusals apply.',
@@ -227,6 +245,7 @@ export function runInquiryWithGeneration(input: InquiryLoopInput): InquiryWithGe
     return {
       first,
       executedInput: input,
+      firstMeasurements,
       generated: null,
       noGenerationReason:
         `A value was derived (${derived.parameterId}=${derived.value}), but every candidate setting of ` +
@@ -248,17 +267,96 @@ export function runInquiryWithGeneration(input: InquiryLoopInput): InquiryWithGe
     openingProbeValue,
     maxRounds: input.maxRounds,
   };
-  const followUpResult = runAutonomousInquiryWithRuns(followUpInput).result;
+  const followUpExecution = runAutonomousInquiryWithRuns(followUpInput);
+  const followUpResult = followUpExecution.result;
 
   return {
     first,
     executedInput: input,
+    firstMeasurements,
     generated: {
       derived,
       followUpInput,
       followUpResult,
+      followUpMeasurements: followUpExecution.measurements,
       survived: followUpResult.survivingHypothesisIds.includes(derived.hypothesisId),
     },
     noGenerationReason: null,
   };
+}
+
+/**
+ * GENERATION THAT REACHES MEMORY — the step that makes a derived hypothesis
+ * part of what Genesis knows, rather than a fact that existed only inside one
+ * call and was lost when it returned.
+ *
+ * `runInquiryWithGeneration` proved Genesis can derive a value nobody declared
+ * and test it. Until this, that verdict went nowhere: the derived hypothesis
+ * was assessed and then dropped, so the NEXT investigation of the same system
+ * started from the same declared set as if the generation had never happened.
+ * A discovery engine that forgets what it just discovered is not accumulating
+ * knowledge — it is repeating itself.
+ *
+ * ## Two records, because there were two investigations
+ *
+ * Both are persisted through `saveParameterInquiryToMemory` with their OWN real
+ * last measurement, exactly as `runInquiryAndRemember` persists one. They are
+ * not merged into a single record: they asked different questions, over
+ * different hypothesis sets, at different settings, and collapsing them would
+ * make the derived hypothesis look like it had been declared up front — which
+ * is precisely the provenance that must not be lost, since a derived value's
+ * standing depends on it having faced evidence it did not author.
+ *
+ * ## What this buys the NEXT run
+ *
+ * `memoryNarrowedHypotheses` reads `falsifiedHypothesisIds` from every prior
+ * inquiry into the same system. Once the follow-up is banked, a derived value
+ * that was REFUTED is skipped by the next investigation of that system the same
+ * way any declared refutation is — so generation feeds selection through the
+ * existing memory path, with no second store and no special case for derived
+ * ids. That chain is what `Memory -> Selection -> Generation` means concretely,
+ * and it is testable rather than asserted.
+ */
+export interface GenerationSessionResult {
+  readonly generation: InquiryWithGenerationResult;
+  /** The first investigation's memory record. */
+  readonly savedFirst: SavedExperiment;
+  /** The follow-up's own record. Null exactly when nothing was generated. */
+  readonly savedFollowUp: SavedExperiment | null;
+}
+
+/**
+ * Runs the generating inquiry and banks BOTH investigations in Science Memory.
+ *
+ * Memory narrowing runs first, exactly as `runInquiryAndRemember` does it —
+ * same function, same rules — so this composes with what memory already knows
+ * instead of re-deriving a narrowing of its own.
+ */
+export function runInquiryWithGenerationAndRemember(input: InquiryLoopInput): GenerationSessionResult {
+  const { executedInput, resumedFromMemory } = memoryNarrowedHypotheses(input);
+  const generation = runInquiryWithGeneration(executedInput);
+
+  const savedFirst = saveParameterInquiryToMemory(
+    buildSavedParameterInquiry({ input: executedInput, result: generation.first, resumedFromMemory }),
+    generation.firstMeasurements[generation.firstMeasurements.length - 1],
+  );
+  if (generation.generated === null) return { generation, savedFirst, savedFollowUp: null };
+
+  const { followUpInput, followUpResult, followUpMeasurements } = generation.generated;
+  const savedFollowUp = saveParameterInquiryToMemory(
+    buildSavedParameterInquiry({
+      input: followUpInput,
+      result: followUpResult,
+      // Not `resumedFromMemory`: this investigation was not narrowed by memory,
+      // it was CREATED by the first one's failure. Reusing the first run's
+      // narrowing note here would attribute the follow-up's hypothesis set to
+      // memory rather than to the derivation that actually produced it.
+      resumedFromMemory: {
+        skippedHypothesisIds: [],
+        reason: generation.generated.derived.why,
+      },
+    }),
+    followUpMeasurements[followUpMeasurements.length - 1],
+  );
+  return { generation, savedFirst, savedFollowUp };
 }

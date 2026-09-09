@@ -258,9 +258,15 @@ export interface DiscoveryRan {
   /**
    * The investigation Genesis started BY ITSELF after `run` exhausted its
    * declared space. Null whenever nothing was generated, which is the normal
-   * case — `noGenerationReason` then says why. Always null for MECHANISM and
-   * CALIBRATION: neither has a generation path yet, and a field left null is
-   * honest where a fabricated one would not be.
+   * case — `noGenerationReason` then says why.
+   *
+   * Always null for MECHANISM and CALIBRATION today, for two DIFFERENT reasons
+   * that must not be collapsed. CALIBRATION has no generation primitive at all.
+   * MECHANISM does — `mechanismGeneration.ts` composes two declared levers into
+   * one nobody declared and really runs it — but it returns its own result
+   * shape rather than a second `StrategyRun`, so routing it through here is a
+   * contract decision still to be taken. Saying "MECHANISM has no generation
+   * path" would now be false.
    */
   readonly generated: GeneratedInvestigation | null;
   /** Why no continuation was started. Null exactly when `generated` is non-null. */
@@ -284,7 +290,7 @@ function ran(
   run: StrategyRun,
   priorInvestigation: PriorInvestigationDecision | null,
   generated: GeneratedInvestigation | null = null,
-  noGenerationReason: string | null = 'This question shape has no generation path: only PARAMETER can derive a value nobody declared.',
+  noGenerationReason: string | null = 'This front door does not route this question shape to a generation path yet. PARAMETER derives a value nobody declared (parameterAlternative.ts) and runs it here; MECHANISM can compose a lever nobody declared (mechanismGeneration.ts) but is not routed through this function yet, so a run through here reports none rather than implying none exists.',
 ): DiscoveryRan {
   return {
     status: 'RAN',

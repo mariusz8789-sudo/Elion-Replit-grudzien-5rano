@@ -140,7 +140,16 @@ export class HumanoidAgentVisual {
     this.selected = selected;
   }
 
-  sync(state: HumanoidAgentState, timeSeconds: number): void {
+  /**
+   * `showStatusOverlay` (default true) gates the health ring / isolation ring / hospital
+   * cross — decorations whose MEANING is epidemiological (infection state, quarantine,
+   * hospitalization). A non-epidemic actor (e.g. a lab scientist in a physics scene) has
+   * no real value for those fields, and forcing `health: 'unknown'` onto them would still
+   * paint a status ring that means nothing for that scene — the same category error this
+   * codebase's honesty discipline refuses elsewhere. Set `false` to keep the rig/pose/
+   * gesture machinery (which IS generic) while dropping the epidemic-specific chrome.
+   */
+  sync(state: HumanoidAgentState, timeSeconds: number, showStatusOverlay = true): void {
     // D pozostaje neutralną, nieruchomą sylwetką w ostatniej pozycji modelu;
     // nie sugerujemy upadku, ciała ani severity, których model nie opisuje.
     this.root.visible = true;
@@ -149,6 +158,13 @@ export class HumanoidAgentVisual {
     this.character.setFacing(this.lastFacing);
     this.character.update(state.health === 'D' ? 'idle' : state.pose, state.pose === 'walk' ? state.gait : timeSeconds, state.health === 'D' ? 0 : state.speed);
 
+    if (!showStatusOverlay) {
+      this.healthRing.visible = false;
+      this.isolationRing.visible = false;
+      this.hospitalCross.visible = false;
+      return;
+    }
+    this.healthRing.visible = true;
     const pulse = state.health === 'I' ? 0.5 + 0.5 * Math.sin(timeSeconds * 3.2) : state.health === 'E' ? 0.5 + 0.5 * Math.sin(timeSeconds * 1.8) : state.health === 'R' ? 0.5 + 0.5 * Math.sin(timeSeconds * 1.1) : 0;
     const intensity = state.health === 'S' ? 0.24 : state.health === 'E' ? 0.46 + pulse * 0.10 : state.health === 'I' ? 0.68 + pulse * 0.14 : state.health === 'R' ? 0.52 + (1 - Math.min(1, state.stateSince / 4)) * 0.12 : state.health === 'D' ? 0.88 : 0.20;
     this.character.setEpidemicTint(HEALTH_COLORS[state.health], intensity);

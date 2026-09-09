@@ -174,7 +174,7 @@ function bracketMonotonicity(
 }
 
 /** The single scalar parameter every hypothesis claims, or null when they do not share exactly one. */
-function sharedScalarParameter(hypotheses: readonly ParameterHypothesis[]): string | null {
+export function sharedScalarParameter(hypotheses: readonly ParameterHypothesis[]): string | null {
   if (hypotheses.length < 2) return null;
   const keys = Object.keys(hypotheses[0]!.claimedValues);
   if (keys.length !== 1) return null;

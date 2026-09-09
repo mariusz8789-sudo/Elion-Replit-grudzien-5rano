@@ -1,4 +1,6 @@
 import { assessCompetingModels } from './competingModels';
+import type { InquiryLoopInput, InquiryLoopResult } from './inquiryLoop';
+import { supportedIntervalOf } from './intervalNarrowing';
 import type { DiscoveryOutcome } from './discoveryOrchestrator';
 import { assessModelSufficiency } from './modelSufficiency';
 
@@ -133,8 +135,21 @@ export interface NextQuestionSelection {
   readonly why: string;
 }
 
-/** Reads a finished investigation and reports what it left worth asking. */
-export function selectNextResearchQuestion(outcome: DiscoveryOutcome): NextQuestionSelection {
+/**
+ * Reads a finished investigation and reports what it left worth asking.
+ *
+ * `executedInput` is optional and only ever ADDS a question. It is what the
+ * PARAMETER run actually executed, and it is needed for one reading this module
+ * cannot make from `StrategyRun` alone: `StrategyRun` reports hypothesis IDS,
+ * never the values they claim, so without the input there is no way to tell
+ * that the survivors sit between two refuted values. A caller that has the
+ * input (the chain does) gets the interval question; one that does not still
+ * gets everything else, and nothing is guessed in its absence.
+ */
+export function selectNextResearchQuestion(
+  outcome: DiscoveryOutcome,
+  executedInput?: InquiryLoopInput,
+): NextQuestionSelection {
   const candidates: CandidateResearchQuestion[] = [];
 
   if (outcome.status === 'REFUSED') {
@@ -202,20 +217,49 @@ export function selectNextResearchQuestion(outcome: DiscoveryOutcome): NextQuest
     }
   }
 
-  if (
+  // An interval worth narrowing arises two ways, and BOTH are read here so the
+  // question can recur. After a generation, the follow-up's own standing gives
+  // it. After a narrowing, there is no generation at all — the run simply left
+  // one survivor with refutations either side, which is the same evidence in a
+  // stronger form. Reading only the first would have made narrowing a
+  // one-shot: the chain would refine once and then declare itself finished.
+  const interval =
     generated !== null &&
     generated.kind === 'DERIVED_PARAMETER_VALUE' &&
     generated.standing.standing === 'SUPPORTED_INTERVAL_NOT_IDENTIFIED'
-  ) {
-    const [lo, hi] = generated.standing.interval;
+      ? {
+          bounds: generated.standing.interval,
+          parameterId: generated.derived.parameterId,
+          incumbent: String(generated.derived.value),
+          groundedIn: [
+            `derived ${generated.derived.hypothesisId}`,
+            `interval [${generated.standing.interval[0]}, ${generated.standing.interval[1]}]`,
+            `refuted ends ${generated.standing.refutedBracketEnds.join(', ')}`,
+          ],
+        }
+      : executedInput !== undefined && run.shape === 'PARAMETER'
+        ? (() => {
+            const supported = supportedIntervalOf(run.native as InquiryLoopResult, executedInput);
+            if (supported === null || supported.survivingValues.length !== 1) return null;
+            return {
+              bounds: supported.interval,
+              parameterId: supported.parameterId,
+              incumbent: String(supported.survivingValues[0]),
+              groundedIn: [
+                `survived ${run.surviving.join(', ')}`,
+                `interval [${supported.interval[0]}, ${supported.interval[1]}]`,
+                `refuted ${run.falsified.join(', ')}`,
+              ],
+            };
+          })()
+        : null;
+
+  if (interval !== null) {
+    const [lo, hi] = interval.bounds;
     candidates.push({
       kind: 'NARROW_A_DERIVED_INTERVAL',
-      question: `Where in [${lo}, ${hi}] does ${generated.derived.parameterId} actually lie? ${generated.derived.value} survived, but so would other values in that interval.`,
-      groundedIn: [
-        `derived ${generated.derived.hypothesisId}`,
-        `interval [${lo}, ${hi}]`,
-        `refuted ends ${generated.standing.refutedBracketEnds.join(', ')}`,
-      ],
+      question: `Where in [${lo}, ${hi}] does ${interval.parameterId} actually lie? ${interval.incumbent} survived, but so would other values in that interval.`,
+      groundedIn: interval.groundedIn,
       // `intervalNarrowing.ts` exists precisely because this question came back
       // unanswerable when this module first ran: generation is gated on an
       // EXHAUSTED space and this space has a survivor, so nothing could propose

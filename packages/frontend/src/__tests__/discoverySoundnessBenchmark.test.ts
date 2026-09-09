@@ -103,7 +103,15 @@ describe('discovery soundness, swept across hidden values', () => {
           }
         }
 
-        if (step.narrowing !== null && step.narrowing.narrowed) {
+        // Only a BRACKETED_PREDICTIONS range is a localisation. A
+        // SURVIVOR_NEIGHBOURS range is a search region and is measured to be
+        // able to exclude the truth — pinned in its own test below rather than
+        // asserted away here.
+        if (
+          step.narrowing !== null &&
+          step.narrowing.narrowed &&
+          step.narrowing.basis === 'BRACKETED_PREDICTIONS'
+        ) {
           narrowingsSeen++;
           const [lo, hi] = step.narrowing.narrowedInterval;
           if (!(truth >= lo && truth <= hi)) {
@@ -153,4 +161,53 @@ describe('discovery soundness, swept across hidden values', () => {
     expect(outcome.generated).toBeNull();
     expect(outcome.noGenerationReason).not.toBeNull();
   }, 120_000);
+});
+
+/**
+ * THE COUNTEREXAMPLE THAT FORCED `IntervalBasis`, pinned so it cannot be
+ * quietly re-read as a localisation.
+ *
+ * Bounding a survivor by its refuted neighbours LOOKS like the bracketing that
+ * produced the first interval and is a different, weaker inference: refuting a
+ * value says the system does not have THAT value, never which side of it the
+ * answer lies on. On the real solver the difference is not academic.
+ */
+describe('a SURVIVOR_NEIGHBOURS range is a search region, and can exclude the truth', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('measured: at a true 0.45 the range excludes the truth, and is labelled so it cannot be misread', async () => {
+    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+    vi.resetModules();
+    const { runResearchChain } = await import('../core/agent/researchChain');
+    const { proteinFoldingSystem, PROTEIN_FOLDING_HYPOTHESES } = await import(
+      '../core/agent/proteinFoldingInquiry'
+    );
+
+    // Nine observation lengths, all inside the HP runner's validated [1, 50000].
+    // More lengths is a real experimental choice, and it is what exposes the
+    // saturation that breaks the inference.
+    const base = proteinFoldingSystem(0.45);
+    const chain = runResearchChain(
+      {
+        question: 'What temperature did this HP-lattice protein fold actually run at?',
+        system: { ...base, candidateProbeValues: [200, 500, 1000, 2000, 5000, 10000, 20000, 35000, 50000] },
+        hypotheses: PROTEIN_FOLDING_HYPOTHESES,
+        openingProbeValue: 200,
+        maxRounds: 4,
+      },
+      8,
+    );
+
+    const narrowing = chain.steps.find((s) => s.narrowing !== null)?.narrowing;
+    expect(narrowing, 'expected a narrowing step').toBeDefined();
+    expect(narrowing!.basis).toBe('SURVIVOR_NEIGHBOURS');
+    expect(narrowing!.narrowed).toBe(true);
+
+    // 0.5 refuted while 0.7 and 0.95 both survive: the instrument saturates at
+    // long runs, so distant claims agree with each other while a nearer one
+    // does not.
+    expect(narrowing!.refutedValues).toContain(0.5);
+    const [lo, hi] = narrowing!.narrowedInterval;
+    expect(0.45 >= lo && 0.45 <= hi, `range [${lo}, ${hi}] unexpectedly contains the truth`).toBe(false);
+  }, 300_000);
 });

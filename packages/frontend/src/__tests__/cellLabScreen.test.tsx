@@ -3,12 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CellCultureLabSim,
   CellLabScreen,
-  conclusionFor,
   deriveArmStats,
-  nextExperimentFor,
   TREATMENTS,
   type TreatmentId,
 } from '../components/visual-simulation/CellLabScreen';
+import { conclusionFor, nextExperimentFor } from '../components/visual-simulation/discoveryNarrative';
 import type { PanelState } from '../components/visual-simulation/WorldDiscoveryPanel';
 import type { DiscoveryLoopResult, HypothesisBelief } from '../core/agent/discoveryLoop';
 import { CELL_CYCLE_DEFAULTS, CULTURE_STATE_CODE } from '../core/worldModel/domains/cellCycle';
@@ -180,35 +179,35 @@ function completeStateFixture(bestSupported: HypothesisBelief[], failedHypothese
 
 describe('conclusionFor — reads the SAME verdict the real Discovery Loop reached, never a second one', () => {
   it('returns null before any search has run', () => {
-    expect(conclusionFor(null, 'mitogen')).toBeNull();
+    expect(conclusionFor(null, 'h:mitogen')).toBeNull();
   });
 
   it('returns null while a search is running or was refused', () => {
-    expect(conclusionFor({ kind: 'RUNNING', goal: 'x' }, 'mitogen')).toBeNull();
+    expect(conclusionFor({ kind: 'RUNNING', goal: 'x' }, 'h:mitogen')).toBeNull();
   });
 
-  it('reports SUPPORTED verbatim when this treatment\'s real hypothesis id survived', () => {
+  it('reports SUPPORTED verbatim when the real hypothesis id survived', () => {
     const supported = beliefFixture('h:mitogen', 'SUPPORTED', 'Held up at two magnitudes.');
     const state = completeStateFixture([supported], [], []);
-    const conclusion = conclusionFor(state, 'mitogen');
+    const conclusion = conclusionFor(state, 'h:mitogen');
     expect(conclusion).not.toBeNull();
     expect(conclusion!.verdict).toBe('SUPPORTED');
     expect(conclusion!.text).toContain('Held up at two magnitudes.');
   });
 
-  it('reports FALSIFIED verbatim when this treatment\'s real hypothesis id was refuted', () => {
+  it('reports FALSIFIED verbatim when the real hypothesis id was refuted', () => {
     const failed = beliefFixture('h:cytotoxic', 'REFUTED', 'Moved the count the wrong direction.');
     const state = completeStateFixture([], [failed], []);
-    const conclusion = conclusionFor(state, 'cytotoxic');
+    const conclusion = conclusionFor(state, 'h:cytotoxic');
     expect(conclusion).not.toBeNull();
     expect(conclusion!.verdict).toBe('FALSIFIED');
     expect(conclusion!.text).toContain('wrong direction');
   });
 
-  it('returns null when the completed search never tested the currently-selected substance', () => {
+  it('returns null when the completed search never tested the requested hypothesis id', () => {
     const supported = beliefFixture('h:mitogen', 'SUPPORTED', 'reason');
     const state = completeStateFixture([supported], [], []);
-    expect(conclusionFor(state, 'cytotoxic')).toBeNull();
+    expect(conclusionFor(state, 'h:cytotoxic')).toBeNull();
   });
 });
 
@@ -240,7 +239,7 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     const markup = renderToStaticMarkup(<CellLabScreen />);
     expect(markup).toContain('data-testid="cell-lab-narrative"');
     for (const stage of ['control', 'treatment', 'observation', 'difference', 'conclusion', 'next-experiment']) {
-      expect(markup).toContain(`data-testid="narrative-${stage}"`);
+      expect(markup).toContain(`data-testid="ladder-${stage}"`);
     }
     expect(markup).toContain('CONTROL');
     expect(markup).toContain('TREATMENT');
@@ -264,7 +263,7 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toContain('data-testid="rex-stage-data"');
     expect(markup).toContain('AVAILABLE');
     expect(markup).toContain('NOT YET AVAILABLE');
-    expect(markup).toMatch(/no realexperimentinterface is registered/i);
+    expect(markup).toMatch(/createRealExperimentRun/);
   });
 
   it('exposes a Demo Mode toggle', () => {

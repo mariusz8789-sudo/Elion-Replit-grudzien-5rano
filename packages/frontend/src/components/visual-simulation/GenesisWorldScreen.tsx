@@ -44,6 +44,7 @@ import {
 } from '../../core/worldModel/domains/landslide';
 import type { TemporalEngine } from '../../core/worldModel/temporal/temporalEngine';
 import { PUMP_PIPE_DEFAULTS } from '../../core/engineeringGraph/pumpPipe';
+import { ProvenanceBadge } from './provenance';
 
 export interface WildfireFieldSummary {
   readonly headRosMS: number;
@@ -1967,8 +1968,9 @@ export function MatrixPanel({ view, roundNumber, run }: { view: GenesisMatrixVie
         <span className="gx-experiment-world">Genesis Matrix — the real loop this run actually ran</span>
         {/* HONESTY BOUNDARY (item 16) — every value on this panel is simulation output; this badge
             says so explicitly rather than letting the panel's scientific framing imply a physical
-            apparatus Genesis does not have an interface to today. */}
-        <span className="gx-matrix-badge" data-testid="matrix-provenance-badge">SIMULATION</span>
+            apparatus Genesis does not have an interface to today. Reuses the same `ProvenanceBadge`
+            the Virtual Cell Lab uses (`provenance.tsx`) rather than a second hardcoded badge. */}
+        <ProvenanceBadge provenance="SIMULATED" testId="matrix-provenance-badge" />
       </div>
 
       <div className="gx-matrix-stage" data-testid="matrix-stage-theory">

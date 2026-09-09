@@ -276,6 +276,9 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     // measure a real reading against — the form only appears once one exists.
     expect(markup).toMatch(/run a discovery search on the left first/i);
     expect(markup).not.toContain('data-testid="rex-entry-form"');
+    // Product/demo copy: the "not yet" reason is plain language for a demo audience, not an
+    // engineering changelog — no internal function names on screen.
+    expect(markup).not.toContain('createRealExperimentRun');
   });
 
   it('exposes a Demo Mode toggle', () => {

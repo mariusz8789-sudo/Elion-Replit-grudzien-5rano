@@ -10,7 +10,11 @@ import type { PredictionVerification } from '../../core/agent/predictionVerifica
 import { ProvenanceBadge } from './provenance';
 
 /**
- * REAL EXPERIMENT INTERFACE — frontend + wiring (C1, Real Experiment E2E).
+ * REAL EXPERIMENT INTERFACE — frontend + wiring (C1, Real Experiment E2E) plus
+ * a product/demo-readiness copy pass (C2): the rendered `note` text below is
+ * written for the person looking at the live app, not for an engineer reading
+ * this file — no source paths or function names in on-screen copy. Engineering
+ * detail stays in this doc comment.
  *
  * Target pipeline, per `docs/MASTER_PRIORITY_GENESIS.md`:
  *
@@ -31,9 +35,10 @@ import { ProvenanceBadge } from './provenance';
  * `parameterInquiry` and `mechanismComposition`).
  *
  * `prediction` is null until a search completes — every stage past Prediction
- * then stays honestly `not-modelled`, exactly as before this file was wired.
- * No apparatus, sensor, or laboratory connection exists or is implied: a
- * PERSON reads an instrument and types the number in.
+ * then stays honestly `not-modelled`, in plain product language, never a source
+ * path or function name in the rendered copy. No apparatus, sensor, or
+ * laboratory connection exists or is implied: a PERSON reads an instrument and
+ * types the number in.
  */
 
 export type PipelineStatus = 'real' | 'approximation' | 'not-modelled';
@@ -170,19 +175,19 @@ function buildStages(props: RealExperimentPipelineProps, submission: Submission 
           <span> Real reading recorded and stamped REAL_EXPERIMENTAL.</span>
         </>
       : <ManualEntryForm prediction={prediction} onSubmitted={onSubmitted} />
-    : 'No apparatus, sensor, or laboratory connection exists anywhere in this codebase, and no completed prediction exists yet to measure against.';
+    : 'A real reading, once entered, would flow correctly into Evidence and Memory — but there is no way to enter one on this screen yet, and none has been.';
 
   const comparisonStageNote: ReactNode = submission?.kind === 'success'
     ? `Predicted ${submission.verification.predictedValue} vs. real ${submission.verification.observedValue ?? '(no numeric value)'}: ${submission.verification.message}`
     : submission?.kind === 'error'
       ? `Refused: ${submission.message}`
-      : `The fork-and-compare machinery already runs today, simulated arm vs simulated arm: ${comparisonNote}. Comparing against a REAL measurement needs a real reading entered above first.`;
+      : `Right now Genesis can only compare two simulated arms: ${comparisonNote}. Comparing against a real measurement isn't possible without one to compare against.`;
 
   const evidenceStageNote: ReactNode = submission?.kind === 'success'
     ? `Saved to Scientific Memory (experiment ${submission.savedExperimentId}) and replayed: ${submission.replayStatus}. Replay re-runs the SIMULATED prediction only — the real reading is never re-executed.`
     : evidenceBundleId
-      ? `A real Evidence Bundle (${evidenceBundleId}) was recorded for the simulated prediction — enter a real reading above to also produce a REAL_EXPERIMENTAL verification.`
-      : 'No Evidence Bundle recorded yet for this session — run a Discovery search on the left to produce one.';
+      ? `A real Evidence Bundle (${evidenceBundleId}) was recorded for this simulated run — run a Discovery search on the left to produce your own. Genesis already knows how to mark a bundle as real-experimental; it just doesn't have a real measurement yet to mark one with.`
+      : 'No Evidence Bundle recorded yet for this session — run a Discovery search on the left to produce one. It will be simulated; a real-experimental bundle needs a real measurement, which does not exist yet.';
 
   return [
     { key: 'prediction', label: 'Experiment Prediction', status: 'real', note: `${predictionMechanism}. ${predictionRationale}` },
@@ -191,7 +196,9 @@ function buildStages(props: RealExperimentPipelineProps, submission: Submission 
       key: 'waiting',
       label: 'Waiting for Laboratory',
       status: prediction ? 'real' : 'not-modelled',
-      note: prediction ? 'No queue for manual entry — the person who took the reading enters it directly below, immediately.' : 'Not reachable while no prediction exists to measure against.',
+      note: prediction
+        ? 'No queue for manual entry — the person who took the reading enters it directly below, immediately.'
+        : 'No laboratory, instrument, or sensor is connected to Genesis yet, so this step cannot run — nothing is waiting because nothing has been requested.',
     },
     { key: 'data', label: 'Real Experimental Data', status: prediction ? 'real' : 'not-modelled', note: dataNote },
     { key: 'comparison', label: 'Comparison', status: submission?.kind === 'success' ? 'real' : 'approximation', note: comparisonStageNote },

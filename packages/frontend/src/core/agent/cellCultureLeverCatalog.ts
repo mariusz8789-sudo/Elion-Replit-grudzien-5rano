@@ -95,14 +95,19 @@ const CELL_DECISION_TICK = 2;
  */
 const CELL_HORIZON_TICK = 30;
 
-/** 11 -> 7 h. A real shortening of G1 transit, the effect mitogenic signalling has at the restriction point. */
-const MITOGEN_G1_DURATION_H = 7;
+/**
+ * 11 -> 7 h. A real shortening of G1 transit, the effect mitogenic signalling has at the restriction
+ * point. Exported (with the three magnitudes below) so a live visualization (Virtual Cell Lab) can
+ * apply the SAME declared full-dose values via the SAME `cultureParamLever` interpolation, rather
+ * than a second copy of these numbers drifting out of sync with the discovery catalogue's own.
+ */
+export const MITOGEN_G1_DURATION_H = 7;
 /** 8 -> 16 h. A real doubling of S-phase transit, the effect a DNA-synthesis inhibitor has. */
-const BLOCKED_S_DURATION_H = 16;
+export const BLOCKED_S_DURATION_H = 16;
 /** 0 -> 0.01 /h. A real first-order loss; the model's own default is zero, so any non-zero value is a declared datum. */
-const CYTOTOXIC_DEATH_RATE_PER_HOUR = 0.01;
+export const CYTOTOXIC_DEATH_RATE_PER_HOUR = 0.01;
 /** 1e6 -> 5e6 cells. A real fivefold increase in the contact-inhibition ceiling: a larger vessel. */
-const LARGER_CAPACITY_CELLS = 5_000_000;
+export const LARGER_CAPACITY_CELLS = 5_000_000;
 
 /**
  * Builds a fresh culture plus the updater that advances it.

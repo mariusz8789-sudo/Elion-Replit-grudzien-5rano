@@ -49,6 +49,7 @@ const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/Conc
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const GenesisWorldScreen = lazy(() => import('./components/visual-simulation/GenesisWorldScreen').then((m) => ({ default: m.GenesisWorldScreen })));
 const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/MoleculeLabScreen').then((m) => ({ default: m.MoleculeLabScreen })));
+const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
@@ -103,6 +104,7 @@ type Route =
   | { kind: 'character' }
   | { kind: 'genesis-world' }
   | { kind: 'molecule' }
+  | { kind: 'cell-lab' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
   | { kind: 'looking-glass' }
@@ -142,6 +144,7 @@ function parseHash(): Route {
   // Canvas-2D `registerLab()` registry's own route match above (`^#\/lab\/`), which would resolve
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
   if (h === '#/molecule') return { kind: 'molecule' };
+  if (h === '#/cell-lab') return { kind: 'cell-lab' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
@@ -632,6 +635,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'cell-lab') {
+      return (
+        <div className="app">
+          <TopBar title="🧫 Genesis Virtual Cell Lab — Control vs Treatment" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <CellLabScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     return (
       <div className="app">
         <main className="home" id="main-content" tabIndex={-1}>
@@ -670,6 +685,14 @@ export default function App() {
             <span className="timeline-cta-text">
               <span className="timeline-cta-title">Molecule Lab — realne atomy i wiązania</span>
               <span className="timeline-cta-sub">Kofeina, renderowana z realnej geometrii RDKit i realnego kanału wiązań (Phase 8.1): rząd wiązania, aromatyczność, CPK. To druga twarz Genesis — Scientific World Engine, nie tylko symulator miasta.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
+          <button className="timeline-cta" onClick={() => { window.location.hash = '#/cell-lab'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">🧫</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Virtual Cell Lab — Control vs Treatment</span>
+              <span className="timeline-cta-sub">Realny solwer G1/S/G2M (RK4): dwie hodowle na żywo, kontrolna i traktowana substancją, plus pełna pętla Question → Hypotheses → Experiment → Observation na tej samej domenie.</span>
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>

@@ -165,14 +165,38 @@ need two different next experiments:
    disagree. No real fixture demonstrates this today; it is named here so C1
    can verify the shape rather than have it invented at implementation time.
 
-**What this section deliberately does not do.** No code changes. No scoring
-function, no scalar utility, no scheduling change to `selectNext` — those
-would be exactly the invented methodology `discoveryLoop.ts`'s own module doc
-and `AUTONOMOUS_DISCOVERY_ROADMAP.md` §5 already refuse elsewhere.
-Implementing option 1 (the joint arm) is the smaller, well-grounded next
-step — it has a real fixture ready to test against today (the generator
-catalog above) — and should be scoped as its own P6 increment once C1
-confirms the design.
+**Update — option 1 measured and built as a standalone primitive (C3, next
+10h pass).** The additivity assumption in the worked example above was
+EXPLICITLY FLAGGED as unverified and has now been checked against the real
+solver rather than assumed: `mechanismInteraction.ts`'s `runJointIntervention`
+forks one branch applying `h:fuel-efficiency` and `h:load-shedding` together
+at strength 0.5 (the same `TemporalEngine.forkBranch` + `reduceObjectiveTrajectory`
+`discoveryLoop.ts` already uses, nothing new). Measured: baseline 40.0 L,
+individually +22.92 L and +29.33 L, naive additive sum 92.25 L — **real joint
+reading 87.67 L, 4.58 L (5.0%) BELOW the naive sum.** Not noise: the solver's
+`fuelRateLPerHr = loadKw × specificFuelConsumptionLPerKwh` multiplies the two
+levers, so cutting both at once compounds their fractional rate reductions
+rather than summing their absolute fuel-remaining effects — a real,
+mechanistically-explained sub-additive interaction.
+
+`assessJointIntervention` classifies an already-measured joint reading against
+the naive additive prediction (`ADDITIVE`/`SUB_ADDITIVE`/`SUPER_ADDITIVE`/`INCONCLUSIVE`,
+within a declared tolerance — the same `agreementTolerance` discipline as
+`SystemUnderStudy`/`WorldParameterSystem`, no statistical test this repository
+has no methodology for). Both functions are tested in
+`mechanismInteraction.test.ts` against this exact real fixture plus three pure
+classifier-boundary cases (additive-within-tolerance, super-additive, and the
+both-effects-zero `INCONCLUSIVE` case).
+
+**Deliberately NOT wired into `discoveryLoop.ts`'s round loop.** This is the
+measurement and classification proven standalone on a real fixture — the same
+order `competingModels.ts` and `worldParameterCalibration.ts` were each built
+before any orchestrator wiring. Auto-triggering a joint arm whenever two
+hypotheses are simultaneously `SUPPORTED` (which pairs, at which strength, how
+many rounds it costs) is a real control-flow decision for whoever owns that
+loop, not decided here. No scoring function, no scalar utility, no scheduling
+change to `selectNext` was introduced — those remain exactly the invented
+methodology this document already refuses elsewhere.
 
 ---
 
@@ -775,3 +799,81 @@ uses only the LAST round that brackets. It does not intersect the intervals
 several rounds imply, and does not detect a contradiction between them — which
 would itself be a real signal that the metric is not monotonic in the parameter,
 the one assumption bracketing rests on.
+### 10.8 The OUTER loop, confirmed independently — then one narrow exception landed
+
+§10.1–10.2 measured that the loop is genuinely adaptive ROUND to ROUND, within
+one investigation. A separate question — does anything decide WHICH question
+to investigate NEXT, once one run ends? — was checked directly (C3, this
+pass, read-only trace, not inferred from this document, and BEFORE §10.6-10.7
+landed): grepped every call site of `runDiscovery`, `runAutonomousDiscovery`,
+`runAutonomousInquiry`, `runWorldDiscoveryAndRemember`, `runInquiryAndRemember`.
+At that moment, none was ever called more than once in a loop where run N's
+output fed run N+1's input.
+
+**§10.6-10.7 is now a real, if narrow, exception, and this section is revised
+to say so rather than stand as overtaken.** `runInquiryWithGeneration` DOES
+call `runAutonomousInquiryWithRuns` twice, with the second call's hypotheses
+and opening probe DERIVED from the first call's result
+(`deriveAlternativeParameterValue`) — output N genuinely feeding input N+1,
+autonomously, on a real fixture, with the derived hypothesis surviving
+evidence neither run had seen. So "no exception found anywhere" no longer
+holds as stated. What still holds, checked again after that landing: the
+exception is BOUNDED to one single generate-and-retest cycle triggered by one
+specific verdict (`DECLARED_SPACE_INSUFFICIENT` on a single-scalar PARAMETER
+space) — it does not choose a domain, a catalog, or a goal, and
+`runInquiryWithGeneration` is not yet called from `discoveryOrchestrator.ts`
+or any UI path (`grep` confirms zero call sites outside `inquirySession.ts`
+and its own test), so today's actual front doors
+(`WorldDiscoveryPanel.tsx`, `discoveryOrchestrator.runDiscovery`) still stop
+at one investigation per human-supplied question.
+
+- `hypothesisLoop.ts`'s five next-experiment selectors (unified in
+  `nextAction.ts`) are pure functions that PROPOSE a next experiment for a
+  caller to run; none is wired to any auto-execution call site
+  (`grep` for their names under `packages/frontend/src/components` returns
+  nothing).
+- The backend's `campaign/orchestrator.mjs` loops over GENERATIONS toward one
+  fixed, human-supplied objective (drug-candidate search) — the same kind of
+  inner-loop autonomy `discoveryLoop.ts` already has, for a different
+  substrate. It never changes the objective or domain itself, and no code
+  creates a second campaign from a first campaign's result.
+- The exact break point: `WorldDiscoveryPanel.tsx`, function `run(text,
+  forCatalogId)` — a human types a goal, clicks submit, `runWorldDiscoveryAndRemember`
+  runs ONCE, and the result is rendered for the human to read. Nothing in that
+  file or its callers reads the result back into a new goal and re-invokes
+  `run`. `rerunSaved` re-runs the SAME stored goal verbatim — it derives
+  nothing new.
+
+So the honest, complete answer to "is autonomous discovery really
+autonomous": **within one investigation, yes — genuinely, measured in §10.1–
+10.2. Choosing to run a SECOND investigation from the first one's result: yes,
+in the one narrow case §10.6-10.7 built and proved. Choosing WHAT to
+investigate in any open-ended sense — a new domain, a new goal nobody
+phrased, a new catalog — no exception found anywhere, still.** The honest
+boundary moved rather than dissolved: it used to sit at the edge of every
+investigation; it now sits at the edge of every investigation UNLESS a
+PARAMETER run's declared space is exhausted, in which case it sits one
+generate-and-retest cycle later. Extending that boundary further (MECHANISM's
+own generation loop, or wiring `runInquiryWithGeneration` into
+`discoveryOrchestrator.ts` so it is reachable from the actual front door) is
+real, well-scoped next work — not decided here.
+
+### 10.9 Competing-models UI fidelity, checked against real code — no eureka-on-unresolved found
+
+Checked directly (C3, this pass) against the specific failure mode named for
+this audit: does the Matrix/narration UI ever show a confident "eureka" for a
+result the run itself reports as unresolved?
+
+`GenesisWorldScreen.tsx`'s `updateObserverScientist()` gates the observer
+scientist's pose explicitly: the confident `'gesture'` pose requires BOTH
+`sufficiency.status === 'SUPPORTED_MECHANISM_FOUND'` AND
+`competingModels.status === 'SINGLE_EXPLANATION'`, checked on the LAST round
+only. When `competingModels.status === 'COMPETING_MODELS_UNRESOLVED'` instead,
+the pose stays `'idle'` and the facing genuinely oscillates between the beacon
+and the player — the module's own comment states the reason: *"a false
+'eureka' here would misrepresent an unresolved result."* The rendered rival
+hypothesis list (`{view.competingModels.competingHypothesisIds.map((id) =>
+<li key={id}>{id}</li>)}`) maps directly over the REAL verdict's ids, no
+placeholder text. `genesisMatrix.ts` wires `competingModels:
+assessCompetingModels(run)` directly — no UI-layer reimplementation of the
+verdict. No violation found.

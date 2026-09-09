@@ -866,3 +866,62 @@ physics).
 | `quantum-kitaev-bulk` (`genesis-kitaev-bulk`) | **DONE, narrow scope** | `core/compute/kitaevBulk.ts` is a genuine closed-form minimisation of the bulk BdG dispersion, with a real, correctly-derived critical threshold μ±=±2\|t\| — a real physical boundary, not a placeholder. **Scope caveat for C2's 3D plan specifically:** the solver is BULK-ONLY (infinite, translationally-invariant chain) — it structurally cannot produce a finite wire, edge sites, or Majorana zero modes, and says so on-screen (`finiteSizeCaveat`, always returned). 3D over this solver may show the bulk band/phase diagram; it must not visually imply a finite-wire or Majorana-device result the solver does not compute. Showing that would need a new solver (diagonalising a finite BdG Hamiltonian), not a 3D reskin. |
 
 None of the four is a placeholder or an oversold simplification. `quantum-chsh-correlation` (`genesis-singlet-correlation`) was audited earlier in this same pass for the same reason and is DONE on identical grounds (`sampleSingletPair`/`sampleLocalHiddenPair` in `core/physics.ts` are a correct Monte Carlo construction of the real quantum and local-hidden-variable correlations respectively) — named here only for completeness, since it was not one of C2's four named labs.
+
+### 13.1 CHSH ported to 3D since this audit — checked, real, one cosmetic bug found
+
+C2 shipped `quantum-chsh.ts` as `createSim3D` (game-grade Three.js scene) in the
+next 10h pass, the same standard as the flood city (PBR, HERO+BACKGROUND
+lighting, bloom/GTAO). Checked directly against this document's own honesty
+criteria, not trusted from the module doc:
+
+- Analyzer rotation is `mesh.rotation.x = angle in radians` set EVERY frame
+  directly from the slider, never tweened — verified by reading
+  `syncStation()`.
+- The entanglement beam's colour/intensity is recomputed every frame from
+  `singletCorrelation(a,b)` at the CURRENT angles — reacts before a new pair
+  is even sampled — and is kept visually and numerically SEPARATE from the
+  |S| gauge fill, which reads the real running Monte Carlo estimate
+  (`this.S()`, identical sums/counts logic to the old 2D version). A second,
+  thin mark on the same gauge reads the exact theory (`chshS(...)`) for the
+  current angles. Two different real quantities, never conflated into one
+  number — confirmed live: the on-screen readout prints both, labelled
+  `estymata` and `teoria` separately.
+- A photon's colour reveals only on arrival at ITS OWN detector, never at
+  emission — correctly avoids visually implying a pre-determined hidden value,
+  which is exactly what Bell's theorem rules out. The underlying ±1 outcome is
+  still generated at sample time (unavoidable in a deterministic frame loop)
+  and feeds the real running statistic immediately; only the SPRITE's colour
+  reveal is paced for readability, not the actual measurement bookkeeping.
+- `runChshCorrelationScenario` (the function the Fabric/backend bundle calls)
+  is untouched; the 3D scene imports the same `core/physics.ts` functions,
+  never a second implementation.
+- Live in Chromium: `3D · WEBGL` badge present, scene renders (two analyzer
+  stations, glowing entanglement beam, an observer scientist figure, a |S|
+  gauge with tick marks at 2 and 2√2), zero console errors.
+
+**One real, reproducible bug found, cosmetic not scientific:** the on-screen
+readout's second line (`quantum-chsh.ts:484`, `\`|S| estymata = ${sEst.toFixed(3)}   |S| teoria = ${this.sTheoryAbs.toFixed(3)}\``)
+overflows its 560px-wide canvas (`readoutCanvas.width = 560`, set at
+`quantum-chsh.ts:338`) at the default 24px monospace font — confirmed live,
+the theory value renders as truncated `"2."` instead of `"2.828"` at the
+default angles (0°/90°/45°/135°, the Tsirelson-maximising setting). The
+UNDERLYING number is correct (the gauge's theory tick mark is positioned
+correctly, at the real `sTheoryAbs`); only the TEXT is clipped, but a clipped
+number that reads as a different, wrong number ("2" instead of "2.828") is
+exactly the kind of thing this document's own honesty discipline exists to
+catch, so it is named here for C2 to fix (smaller font, a second line, or a
+wider canvas) rather than left as "looks fine in a screenshot."
+
+**Test coverage note, not a regression:** `quantumChsh3D.test.ts` tests only
+the two extracted pure helpers (`outcomeColor`, `lerpColor`); `ChshSim3D`
+itself is a private, unexported class with no direct behavioural test —
+identical to `BlochSim3D` in `quantum-bloch-3d.ts` (also private, also
+untested beyond its own extracted pure functions in `quantum-bloch.ts`). This
+is the established convention for `createSim3D`-only experiments in this
+codebase, not a gap introduced by this port specifically. `GenesisWorldSim3D`
+(`GenesisWorldScreen.tsx`) shows this codebase CAN test `Sim3D` behaviour
+directly with a real (headless) `THREE.Scene`/`PerspectiveCamera` and a
+stubbed `document.createElement('canvas')` — worth adopting consistently for
+the "value = visual" claims these quantum scenes make, but that is a
+cross-cutting hardening decision for whoever owns the `Sim3D` test
+convention, not a defect specific to CHSH.

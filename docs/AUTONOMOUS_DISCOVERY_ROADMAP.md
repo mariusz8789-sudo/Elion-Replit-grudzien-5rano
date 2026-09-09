@@ -175,8 +175,36 @@ Additive to `Hypothesis`, not a new type:
 | **P7** | World ↔ inquiry calibration (the composition named in `TWO_AUTONOMOUS_LOOPS_DECISION.md` §5) | P1 | Unlocks parameter identification *on a stateful world*. |
 
 P3 is deliberately placed before P4: it converts an existing, tested, unused
-capability into live behaviour at the cost of one call site, and it will teach us
-what a wider generator actually needs before we design one.
+capability into live behaviour, and it will teach us what a wider generator
+actually needs before we design one.
+
+### The constraint that decides HOW P3 is wired — found by thinking it through
+
+A derived alternative **cannot be judged against the run that produced it.**
+
+`RELATION_FLIP` says: *we predicted the lever lowers X; it raised it; so propose
+that it raises it.* That alternative is, by construction, satisfied by the exact
+numbers that falsified the original. And these worlds are deterministic — re-running
+the same lever at the same strength returns identical values. So "testing" the
+flipped criterion against that run, or against a re-run of it, is confirming a
+hypothesis with the data that generated it. Textbook HARKing, arrived at through
+a mechanically honest derivation, which is precisely what makes it dangerous.
+
+The alternative must therefore face evidence it did not see: it has to be
+**scheduled at a strength (or probe setting) not yet used**, and preregistered
+before that arm runs.
+
+Two consequences, and they are not negotiable:
+
+1. **P3 belongs in the round loop, not above it.** Only the loop can schedule a
+   hypothesis at an untested magnitude — it already does exactly this for
+   surviving hypotheses via `replicationStrength`. An orchestrator-level
+   "regenerate and re-run" would either repeat the identical run or need its own
+   scheduler, which is a second loop by another name.
+2. **A derived hypothesis with no untested magnitude left is not testable**, and
+   the honest outcome is to report it as an untested proposal rather than to
+   confirm it cheaply. That is the same discipline as INCONCLUSIVE: failing to
+   test something is not the same as testing it.
 
 ## 8. Test strategy
 

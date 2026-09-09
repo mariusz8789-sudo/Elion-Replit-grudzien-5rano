@@ -91,7 +91,10 @@ describe('discovery engine on cell biology (fourth domain)', () => {
     expect(state.kind).toBe('COMPLETE');
     if (state.kind !== 'COMPLETE') return;
 
-    expect(state.result.bestSupported).toHaveLength(0);
+    // `h:cytotoxic` claimed the agent RAISES cell count — that claim stays
+    // refuted, and neither it nor any other hypothesis about that direction
+    // is ever supported.
+    expect(state.result.bestSupported.map((b) => b.hypothesisId)).not.toContain('h:cytotoxic');
     expect(state.result.failedHypotheses.map((b) => b.hypothesisId)).toContain('h:cytotoxic');
     expect(state.result.beliefs.find((b) => b.hypothesisId === 'h:cytotoxic')!.confidence)
       .toBe('REFUTED_BY_CRITERION');
@@ -104,6 +107,33 @@ describe('discovery engine on cell biology (fourth domain)', () => {
     // The refutation is by the criterion, so the metric DID move — the
     // distinction the loop keeps between its two refuting paths.
     expect(first.effect).not.toBe(0);
+
+    /**
+     * P3 — REGENERATION, caught by this exact test rather than a synthetic one.
+     *
+     * A clean FALSIFIED_WITHIN_PROTOCOL now automatically proposes its mirror
+     * criterion (`deriveAlternativeCriteria`'s RELATION_FLIP): "the agent
+     * RAISES growth" refuted becomes "the agent LOWERS growth" — the SAME
+     * lever, re-interpreted, never a mechanism invented here. Genesis
+     * autonomously derived and confirmed it, so `bestSupported` now correctly
+     * contains one entry: not a regression in this test's own claim (which was
+     * about the original direction, and still holds), but the new, correct
+     * capability this codebase did not have when the test was first written.
+     *
+     * The anti-HARK guard is what makes the confirmation honest: round 2 runs
+     * at strength 0.5, never the strength-1 run that produced the
+     * falsification, so this is a genuinely independent measurement — at half
+     * dose the agent still kills cells, just less (122 100 vs the 268 524
+     * baseline), not a coincidental repeat dressed up as new evidence.
+     */
+    const second = state.result.rounds[1]!;
+    expect(second.hypothesisId).toBe('h:cytotoxic~RELATION_FLIP');
+    expect(second.strength).toBe(0.5);
+    expect(second.strength).not.toBe(first.strength);
+    expect(second.assessment.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+    expect(second.objectiveObserved!).toBeCloseTo(122099.79, 2);
+    expect(second.objectiveObserved!).toBeLessThan(first.objectiveBaseline!);
+    expect(state.result.bestSupported.map((b) => b.hypothesisId)).toEqual(['h:cytotoxic~RELATION_FLIP']);
   });
 
   /**

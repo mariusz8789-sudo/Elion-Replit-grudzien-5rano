@@ -142,6 +142,43 @@ function populationParamLever(
 }
 
 /**
+ * A virtual metric, resolved at hypothesis-construction time — never a real
+ * `domainState` field, and never seen past this file.
+ *
+ * "Peak infected" is a real, distinct objective from plain "infected", and it
+ * is exactly the case `objectiveReducer.ts` was built for: unlike the flood
+ * city's `maxDepthM` (a running peak the solver already tracks for itself),
+ * `I` is the CURRENT infected count at one tick, so asking for the peak needs
+ * `objectiveTrajectory.ts`'s scan (`{kind: 'MAX'}`), not a different field.
+ *
+ * Deliberately NOT applied to plain "infected". That phrase has committed
+ * tests reading `I` AT the catalog's declared horizon (day 60), and
+ * retrofitting it to MAX would silently change what they measure — measured,
+ * not assumed: at full strength the distancing arm's true peak (day 19,
+ * I=28.714) differs from its day-60 reading (I=28.502), because by day 60 it
+ * has already come down off that peak. So this is a new, additive metric a
+ * goal can ask for, not a redefinition of an existing one.
+ */
+const EPIDEMIC_PEAK_INFECTED_METRIC = 'I_PEAK';
+
+/**
+ * Translates the virtual peak metric into the real field plus its reducer,
+ * and leaves every other declared metric (`I`, `D`) exactly as it always was —
+ * `{ metric }`, no `reducer` key at all, so `hypothesis.criterion.reducer` is
+ * `undefined` and `discoveryLoop.ts` takes the AT_HORIZON path unchanged.
+ */
+function objectiveField(metric: string): { readonly metric: string; readonly reducer?: { readonly kind: 'MAX' } } {
+  return metric === EPIDEMIC_PEAK_INFECTED_METRIC
+    ? { metric: GENESIS_EPIDEMIC_OBJECTIVE_METRIC, reducer: { kind: 'MAX' } }
+    : { metric };
+}
+
+/** The prose name for a metric. Real field names read fine as-is ("I", "D"); the virtual peak metric needs a name a sentence can actually use. */
+function metricLabel(metric: string): string {
+  return metric === EPIDEMIC_PEAK_INFECTED_METRIC ? 'the peak of I' : metric;
+}
+
+/**
  * The levers this epidemic world really has.
  *
  * Two of them change the course of the epidemic and one deliberately does not.
@@ -166,11 +203,11 @@ export const GENESIS_EPIDEMIC_LEVERS: readonly WorldLever[] = [
     targetEntityId: GENESIS_EPIDEMIC_POPULATION_ID,
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:distancing',
-      statement: `The epidemic is limited by the transmission rate, so a distancing policy from day ${EPIDEMIC_DECISION_TICK} ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
+      statement: `The epidemic is limited by the transmission rate, so a distancing policy from day ${EPIDEMIC_DECISION_TICK} ${direction === 'minimize' ? 'lowers' : 'raises'} "${metricLabel(metric)}".`,
       mechanism: `a distancing policy reducing the transmission rate β from day ${EPIDEMIC_DECISION_TICK}`,
       entityId: GENESIS_EPIDEMIC_POPULATION_ID,
       criterion: {
-        metric,
+        ...objectiveField(metric),
         relation: relationFor(direction),
         rationale: 'β is the rate at which contact turns susceptibles into exposed; scaling it down from a policy day must move the trajectory that follows.',
       },
@@ -190,11 +227,11 @@ export const GENESIS_EPIDEMIC_LEVERS: readonly WorldLever[] = [
     targetEntityId: GENESIS_EPIDEMIC_POPULATION_ID,
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:contact-reduction',
-      statement: `The epidemic is limited by the reproduction number, so cutting R0 from ${GENESIS_EPIDEMIC_PARAMS.r0} to ${REDUCED_R0} ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
+      statement: `The epidemic is limited by the reproduction number, so cutting R0 from ${GENESIS_EPIDEMIC_PARAMS.r0} to ${REDUCED_R0} ${direction === 'minimize' ? 'lowers' : 'raises'} "${metricLabel(metric)}".`,
       mechanism: `reducing the basic reproduction number R0 to ${REDUCED_R0}`,
       entityId: GENESIS_EPIDEMIC_POPULATION_ID,
       criterion: {
-        metric,
+        ...objectiveField(metric),
         relation: relationFor(direction),
         rationale: 'R0 sets β = R0/D_inf, so a permanently lower reproduction number changes the force of infection for the whole remaining run.',
       },
@@ -208,11 +245,11 @@ export const GENESIS_EPIDEMIC_LEVERS: readonly WorldLever[] = [
     targetEntityId: GENESIS_EPIDEMIC_POPULATION_ID,
     hypothesis: (metric, direction) => ({
       hypothesisId: 'h:treatment',
-      statement: `The epidemic is limited by how badly infections end, so cutting the infection fatality ratio from ${GENESIS_EPIDEMIC_PARAMS.ifr} to ${TREATED_IFR} ${direction === 'minimize' ? 'lowers' : 'raises'} "${metric}".`,
+      statement: `The epidemic is limited by how badly infections end, so cutting the infection fatality ratio from ${GENESIS_EPIDEMIC_PARAMS.ifr} to ${TREATED_IFR} ${direction === 'minimize' ? 'lowers' : 'raises'} "${metricLabel(metric)}".`,
       mechanism: `improving treatment so the infection fatality ratio falls to ${TREATED_IFR}`,
       entityId: GENESIS_EPIDEMIC_POPULATION_ID,
       criterion: {
-        metric,
+        ...objectiveField(metric),
         relation: relationFor(direction),
         rationale: 'If the outcome of infection governed this metric, improving survival would move it.',
       },
@@ -238,8 +275,23 @@ export const GENESIS_EPIDEMIC_CATALOG: WorldLeverCatalog = {
    * `interventionEffect` are likewise absent: the solver only ever READS them,
    * and they appear in `domainState` at all only because a live intervention
    * has to survive the tick. `t` is the clock.
+   *
+   * `'peak infected'`/`'szczyt zakażeń'` resolve to `I_PEAK`, a metric name that
+   * exists only in this map, never in `domainState` — `objectiveField` (above)
+   * translates it back to the real `I` field plus the MAX reducer before any
+   * criterion is built. "Longest phrase first" (`worldGoalIntent.ts`) means
+   * plain "infected" still wins for goals that name it alone, exactly as it
+   * always has.
    */
   metricPhrases: {
+    'peak infected': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'peak infections': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'infection peak': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'infected peak': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'szczyt zakażeń': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'szczyt zakazen': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'szczyt zachorowań': EPIDEMIC_PEAK_INFECTED_METRIC,
+    'szczyt zachorowan': EPIDEMIC_PEAK_INFECTED_METRIC,
     infected: 'I',
     infections: 'I',
     infectious: 'I',
@@ -258,6 +310,7 @@ export const GENESIS_EPIDEMIC_CATALOG: WorldLeverCatalog = {
   entityIdForMetric: {
     I: GENESIS_EPIDEMIC_POPULATION_ID,
     D: GENESIS_EPIDEMIC_POPULATION_ID,
+    [EPIDEMIC_PEAK_INFECTED_METRIC]: GENESIS_EPIDEMIC_POPULATION_ID,
   },
   levers: GENESIS_EPIDEMIC_LEVERS,
   decisionAtTick: EPIDEMIC_DECISION_TICK,

@@ -51,17 +51,12 @@ function mechanismRounds(result: DiscoveryLoopResult): readonly StrategyRound[] 
     // The loop decides this BEFORE the round runs and stores it; carried verbatim.
     why: round.selectionReason,
     observed: round.objectiveObserved,
-    verdicts: [{
-      hypothesisId: round.hypothesisId,
-      assessment: round.assessment.assessment,
-      // The real "no intervention" reading this exact round's arm was forked from — the loop's own
-      // `objectiveBaseline`, not re-derived.
-      reference: round.objectiveBaseline,
-      // The preregistered criterion's own declared comparison value, decided before the round ran —
-      // `assessWorldCounterfactual`'s own `reference` field (see that function's doc: "the value the
-      // variant was actually compared against").
-      predicted: round.assessment.reference,
-    }],
+    // The control arm's own reading, so a reader can judge the observation
+    // rather than being handed a bare number.
+    reference: round.objectiveBaseline,
+    // No prediction: this loop's hypotheses assert a direction against that
+    // control, never a value. See the contract's own note.
+    verdicts: [{ hypothesisId: round.hypothesisId, assessment: round.assessment.assessment, predicted: null }],
   }));
 }
 
@@ -128,17 +123,15 @@ function parameterRounds(result: InquiryLoopResult, probeParameterId: string): r
     // previous observation. Carried verbatim.
     why: round.selection.why,
     observed: round.observed,
+    // Null on purpose: this loop's reference is per-hypothesis, and it is
+    // carried on each verdict below rather than collapsed to one number.
+    reference: null,
     // This loop judges EVERY surviving hypothesis each round, not one.
     verdicts: round.outcomes.map((outcome) => ({
       hypothesisId: outcome.hypothesisId,
       assessment: outcome.assessment,
-      // This loop probes ONE system rather than comparing a with/without pair, so it has no
-      // "before this round" reading to report — left null rather than reusing `observed` from a
-      // different round, which would misrepresent it as this round's own baseline.
-      reference: null,
-      // The loop's own real prediction: `HypothesisOutcome.predicted`, from actually running the
-      // solver at this hypothesis's claimed parameter values (see `inquiryLoop.ts`'s own doc: "a
-      // prediction is a real model run, not a formula transcribed here").
+      // A real solver run at this probe setting, under the same code path as
+      // the measurement it is judged against — carried, not recomputed.
       predicted: outcome.predicted,
     })),
   }));

@@ -1596,7 +1596,7 @@ export class GenesisWorldSim3D implements Sim3D {
   /**
    * A plain, serialisable projection of the currently staged round for React — the exact
    * why/what/reference/predicted/observed/assessment/nextExperiment vocabulary, read straight off
-   * `StrategyRun`/`StrategyRound`/`StrategyVerdict`, nothing computed or re-derived here.
+   * `StrategyRun`/`StrategyRound`, nothing computed or re-derived here.
    */
   getCurrentRoundView(): {
     readonly roundNumber: number;
@@ -1621,7 +1621,12 @@ export class GenesisWorldSim3D implements Sim3D {
       why: round.why,
       what: round.what,
       actionLabel: this.leverForRound(round)?.sceneForm?.actionLabel ?? null,
-      reference: verdict?.reference ?? null,
+      // `reference` lives on the round itself (what `observed` was judged against); `predicted` is
+      // per-hypothesis on the verdict — see `discoveryStrategy.ts`'s own doc for why the two live at
+      // different levels (a MECHANISM round always carries exactly one verdict, so reading `[0]` here
+      // loses nothing; a PARAMETER round's several verdicts each get their own real prediction, and
+      // this view shows the one for the hypothesis this round actually tested).
+      reference: round.reference,
       predicted: verdict?.predicted ?? null,
       observed: round.observed,
       assessment: verdict?.assessment ?? null,

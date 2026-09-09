@@ -46,7 +46,7 @@ function inquiryInput(): InquiryLoopInput {
     system: {
       systemId: 'sample-under-test',
       label: 'Unknown kinetics sample',
-      modelId: 'chem-arrhenius',
+      modelId: 'chemistry-arrhenius',
       hiddenParameters: { activationEnergyKJ: 60 },
       probeParameterId: 'temperatureK',
       candidateProbeValues: [400, 450, 800],
@@ -98,10 +98,6 @@ describe('discovery strategy adapters', () => {
       expect(round.why).toBe(source.selectionReason);
       expect(round.observed).toBe(source.objectiveObserved);
       expect(round.verdicts[0]!.assessment).toBe(source.assessment.assessment);
-      // The two numbers a live-round playback stages: the real "before" reading this round's arm
-      // forked from, and the preregistered criterion's own declared comparison value.
-      expect(round.verdicts[0]!.reference).toBe(source.objectiveBaseline);
-      expect(round.verdicts[0]!.predicted).toBe(source.assessment.reference);
     }
   });
 
@@ -116,6 +112,17 @@ describe('discovery strategy adapters', () => {
     expect(run.rounds.length).toBeGreaterThan(0);
     // Same adapter, same shape, genuinely different science underneath.
     expect(run.strategyId).toBe(mechanismStrategy.run(floodPlan()).strategyId);
+  });
+
+  it('PARAMETER: the declared model is one the router really carries', () => {
+    // This guard exists because it caught a real defect in this file: an earlier
+    // version named a model id from memory that the router does not carry, so
+    // `runAutonomousInquiry` produced a run in which NO measurement ever
+    // executed. The equivalence assertions below still passed — the adapter
+    // faithfully preserved a degenerate result — while the file claimed to be
+    // exercising real Arrhenius discrimination. Asserting admission here makes a
+    // wrong id fail loudly instead of quietly hollowing out every test under it.
+    expect(parameterStrategy.admit(inquiryInput()).status).toBe('REAL');
   });
 
   it('PARAMETER: native is exactly what calling the inquiry loop directly returns', () => {
@@ -141,18 +148,6 @@ describe('discovery strategy adapters', () => {
     expect(run.untested).toEqual(direct.untestedHypothesisIds);
     // The proposal comes from the existing nextAction adapter, not a second converter.
     expect(run.nextExperiment?.selectorId).toBe('parameter-inquiry');
-
-    // This loop has no "before this round" arm (it probes one system, never a with/without pair),
-    // so `reference` is honestly null rather than reusing a number that would misrepresent it —
-    // `predicted` is real, per-hypothesis, from the loop's own solver run at its claimed values.
-    for (const [i, round] of run.rounds.entries()) {
-      const source = direct.rounds[i]!;
-      expect(round.verdicts).toHaveLength(source.outcomes.length);
-      for (const [j, verdict] of round.verdicts.entries()) {
-        expect(verdict.reference).toBeNull();
-        expect(verdict.predicted).toBe(source.outcomes[j]!.predicted);
-      }
-    }
   });
 
   /**
@@ -189,6 +184,46 @@ describe('discovery strategy adapters', () => {
     // A world that declared no limits would be claiming more than it can prove.
     expect(run.limitations.length).toBeGreaterThan(0);
     expect(run.shape).toBe('MECHANISM');
+  });
+
+  /**
+   * THE REPORTING PIPELINE, RENDERABLE FROM THE CONTRACT ALONE.
+   *
+   * A reader (a screen, a report) must be able to show
+   * question -> hypotheses -> prediction -> observation -> result -> next
+   * without reaching into `native` and branching on which loop ran. These two
+   * tests hold that: whatever each substrate genuinely produces reaches the
+   * shared shape, and whatever it does not is null rather than manufactured.
+   */
+  it('PARAMETER: carries each hypothesis\'s real predicted value, not just the verdict', () => {
+    const input = inquiryInput();
+    const direct = runAutonomousInquiry(input);
+    const run = parameterStrategy.run(input);
+
+    const predicted = run.rounds.flatMap((r) => r.verdicts.map((v) => v.predicted)).filter((p) => p !== null);
+    // Real solver output, not arithmetic done in the adapter.
+    expect(predicted.length).toBeGreaterThan(0);
+    for (const [i, round] of run.rounds.entries()) {
+      for (const [j, verdict] of round.verdicts.entries()) {
+        expect(verdict.predicted).toBe(direct.rounds[i]!.outcomes[j]!.predicted);
+      }
+      // This loop's reference is per-hypothesis, so the round-level one stays null.
+      expect(round.reference).toBeNull();
+    }
+  });
+
+  it('MECHANISM: carries the control reading the observation was judged against', () => {
+    const plan = floodPlan();
+    const direct = runAutonomousDiscovery(plan);
+    const run = mechanismStrategy.run(plan);
+
+    for (const [i, round] of run.rounds.entries()) {
+      expect(round.reference).toBe(direct.rounds[i]!.objectiveBaseline);
+      // No prediction: these hypotheses assert a direction, never a value.
+      for (const verdict of round.verdicts) expect(verdict.predicted).toBeNull();
+    }
+    // An observation with no reference is a number a reader cannot judge.
+    expect(run.rounds.every((r) => r.reference !== null)).toBe(true);
   });
 
   it('admits before it runs, and refuses a question with no solver behind it', () => {

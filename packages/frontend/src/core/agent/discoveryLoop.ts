@@ -18,6 +18,7 @@ import type { WorldGraph } from '../worldModel/ecs/worldGraph';
 import { TemporalBranchRegistry, TemporalEngine, type TemporalUpdater } from '../worldModel/temporal/temporalEngine';
 import { GENESIS_TOOLS, WORLD_COUNTERFACTUAL_TOOL, WORLD_DIFF_TOOL } from './genesisAgentTools';
 import { worldCounterfactualNextAction, type NextAction } from './nextAction';
+import { GENESIS_STRUCTURAL_ALTERNATIVES } from './structuralAlternative';
 
 /**
  * THE AUTONOMOUS DISCOVERY LOOP — round N's result changes what round N+1 does.
@@ -584,6 +585,57 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
           generatedBy: alternative.generatedBy,
           parentHypothesisId: hypothesis.hypothesisId,
           excludedStrengths: [...(hypothesis.excludedStrengths ?? []), strength],
+        };
+        activeHypotheses.push(derived);
+        beliefs.set(derivedId, initialBelief(derived));
+      }
+
+      // --- Structural model update: a clean falsification may mean the
+      // WRONG MODEL is bound, not that the mechanism is inert. Same gating
+      // condition as the criterion-alternative block above; the derived
+      // hypothesis keeps the SAME criterion and mechanism and changes only
+      // which registered solver the entity runs under before the SAME
+      // `apply` runs — a real runtime model update, not a re-interpretation
+      // of the evidence. See `structuralAlternative.ts`. Reusing the exact
+      // strength that falsified the parent is not the HARKing risk the
+      // criterion-alternative block guards against: a DIFFERENT solver
+      // produces a genuinely different arm, not a replay of the same run.
+      //
+      // Gated OFF a hypothesis that is itself already a structural
+      // alternative: without this, a falsified structural-alternative
+      // hypothesis would spawn ANOTHER structural alternative against the
+      // same registry entry every round, an unbounded chain that never
+      // reflects a new model actually being tried (`world.graph` always
+      // reports the WORLD's declared incumbent binding, not which solver a
+      // given derived hypothesis's own `apply` rebinds to mid-arm).
+      const boundEntity = world.graph.getEntity(hypothesis.entityId);
+      const incumbentSolverId = boundEntity.domainBinding?.solverId;
+      const structuralAlternatives =
+        incumbentSolverId && hypothesis.generatedBy !== 'STRUCTURAL_ALTERNATIVE'
+          ? GENESIS_STRUCTURAL_ALTERNATIVES.alternativesFor(incumbentSolverId)
+          : [];
+      for (const alternative of structuralAlternatives) {
+        const derivedId = `${hypothesis.hypothesisId}~STRUCTURAL_ALTERNATIVE:${alternative.alternativeSolverId}`;
+        if (beliefs.has(derivedId)) continue; // defensive: never overwrite an existing line of inquiry
+        const parentApply = hypothesis.apply;
+        const parentEntityId = hypothesis.entityId;
+        const derived: MechanisticHypothesis = {
+          hypothesisId: derivedId,
+          statement: `${hypothesis.statement} — re-tested in round ${round} under a different model of the same entity: ${alternative.statement}`,
+          mechanism: hypothesis.mechanism,
+          entityId: hypothesis.entityId,
+          criterion: hypothesis.criterion,
+          apply: (graph, strength) => {
+            const entity = graph.getEntity(parentEntityId);
+            if (entity.domainBinding) {
+              graph.updateEntity(parentEntityId, { domainBinding: { ...entity.domainBinding, solverId: alternative.alternativeSolverId } });
+            }
+            parentApply(graph, strength);
+          },
+          rationale: `${alternative.citation} A refutation under "${incumbentSolverId}" does not settle that the mechanism is inert — it may mean the wrong model structure is bound.`,
+          generatedBy: 'STRUCTURAL_ALTERNATIVE',
+          parentHypothesisId: hypothesis.hypothesisId,
+          excludedStrengths: hypothesis.excludedStrengths,
         };
         activeHypotheses.push(derived);
         beliefs.set(derivedId, initialBelief(derived));

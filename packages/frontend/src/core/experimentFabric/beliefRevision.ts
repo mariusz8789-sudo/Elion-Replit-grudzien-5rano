@@ -33,8 +33,13 @@ export const BELIEF_REVISION_CONTRACT_VERSION = '1.0.0';
 
 /** Which mechanical mechanism produced a hypothesis. Never omitted — a caller must
  * always be able to tell "declared by a human/preregistration" from "mechanically
- * derived from a falsified parent", and by which specific mechanism. */
-export type HypothesisGenerationMechanism = 'INITIAL' | 'RELATION_FLIP' | 'TOLERANCE_WIDENED';
+ * derived from a falsified parent", and by which specific mechanism.
+ *
+ * `STRUCTURAL_ALTERNATIVE`: the parent's criterion and intervention are kept
+ * unchanged; what changes is which registered domain solver the entity is
+ * bound to before the intervention runs — a real runtime MODEL update, not a
+ * re-interpretation of the evidence (see `structuralAlternative.ts`). */
+export type HypothesisGenerationMechanism = 'INITIAL' | 'RELATION_FLIP' | 'TOLERANCE_WIDENED' | 'STRUCTURAL_ALTERNATIVE';
 
 export interface ConfidenceUpdateRecord {
   readonly stepIndex: number;

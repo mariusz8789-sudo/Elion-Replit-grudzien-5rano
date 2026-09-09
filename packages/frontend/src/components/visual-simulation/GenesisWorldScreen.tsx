@@ -18,6 +18,8 @@ import { createPracticalLight } from '../../core/three/graphics/lighting';
 import { createLightShaft } from '../../core/three/graphics/atmosphere';
 import { createFacadeBuilding } from '../../core/three/graphics/buildingKit';
 import { createWaterSurface, captureDryLook, applyWetLook, type WaterSurfaceHandle } from '../../core/three/graphics/water';
+import { createVehicle, type VehicleHandle, type VehicleKind } from '../../core/three/graphics/vehicleKit';
+import { HumanoidAgentVisual, type HumanoidAgentState } from '../../core/three/humanoidAgentVisual';
 import { getFrameState } from '../../core/worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../../core/worldModel/bridge/graphicsWorldFrameAdapter';
 import { inspectEntity, leversForEntity, applyLeverIntervention, type EntityInspection } from '../../core/worldModel/bridge/entityInteractionBridge';
@@ -257,6 +259,21 @@ export class GenesisWorldSim3D implements Sim3D {
    * (see `resolveBoundaryPlaceholder`'s own doc), created once here so cleanup has one owner. */
   private buildingWallMaterial: THREE_NS.Material | null = null;
   private buildingWindowMaterial: THREE_NS.Material | null = null;
+
+  /**
+   * C2-2 — AMBIENT LIFE: decorative vehicles/pedestrians looping the three REAL hospital/lab/pump
+   * landmark positions (see `buildAmbientLife`'s own doc for why this is a simple loop rather than
+   * "the real road network" — this world has no road network for anything to honestly follow).
+   * `bodyMaterial` is stored per vehicle only because it's a fresh instance this scene created (not
+   * one of `vehicleKit.ts`'s own defaults), so cleanup has a clear single owner, same convention as
+   * `buildingWallMaterial` above.
+   */
+  private ambientVehicles: { handle: VehicleHandle; bodyMaterial: THREE_NS.Material; angularSpeed: number; phase: number }[] = [];
+  private ambientPedestrians: { visual: HumanoidAgentVisual; id: number; angularSpeed: number; phase: number }[] = [];
+  private ambientLoopCenter = { x: 0, z: 0 };
+  private ambientVehicleLoopRadius = { x: 0, z: 0 };
+  private ambientPedestrianLoopRadius = { x: 0, z: 0 };
+  private ambientTimeSeconds = 0;
 
   /**
    * LIVING WORLD — reuses the SAME production first-person controller `labScene3D.ts`/
@@ -630,6 +647,7 @@ export class GenesisWorldSim3D implements Sim3D {
 
     this.buildHospitalInterior(THREE, scene);
     this.buildLandmarkLighting(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
+    this.buildAmbientLife(THREE, scene, [hospitalPos, labBuildingPos, pumpPos]);
 
     this.syncNow();
   }
@@ -678,6 +696,123 @@ export class GenesisWorldSim3D implements Sim3D {
         decay: 2,
       });
     }
+  }
+
+  /**
+   * C2-2 — AMBIENT LIFE. `vehicleKit.ts`/`humanoidAgentVisual.ts` are both already documented as
+   * DECORATIVE, caller-drives-motion kits — `vehicleKit.ts`'s own doc states outright "every vehicle
+   * here is DECORATIVE city population... it never claims to be a WorldFrame/C3 entity", and
+   * `HumanoidAgentState` is a plain interface with no required link to a real `SimAgent`. That is
+   * exactly the honesty label this scene needs, because there is no real road network here for
+   * anything to follow: this world's `road:city-road-*` entities (`CITY_TEMPLATE`, in
+   * `specification/templates.ts`) are single-point, NOT_MODELED placeholders, and that template's own
+   * doc says outright "C3 has no dedicated road/transport-network scale, and does not fabricate one
+   * here." `core/world/roadNetwork.ts`'s real `CityLayout`/`buildRoadNetwork` is a completely separate
+   * subsystem belonging only to the `epidemicCity3D.ts`/`City3DWebGLScreen.tsx` family of scenes (the
+   * `#/city3d` route) — it has no relationship to `genesisScientificCity4`'s world at all. Importing
+   * it here just so these vehicles could "follow" it would fabricate a connection C3 never declared,
+   * dressing up decoration as a real network — the same class of dishonesty this engine's grounding
+   * discipline exists to prevent, just moved into road geometry instead of a sensor reading.
+   *
+   * What this DOES do: loop a handful of vehicles/pedestrians around a simple ellipse sized from the
+   * three REAL landmark positions passed in (never guessed, never re-derived independently of where
+   * `init()` actually placed the hospital/lab/pump) — filling the empty ground between them with
+   * motion, honestly scoped as ambiance rather than a traffic/pedestrian simulation. Positions are
+   * driven every real frame in `updateAmbientLife()`, the same "pure rendering-layer animation, not
+   * simulation time" category `update(dt)`'s own doc already carves out for the fire VFX/haze/player
+   * movement.
+   */
+  private buildAmbientLife(
+    THREE: typeof THREE_NS,
+    scene: THREE_NS.Scene,
+    landmarks: readonly { x: number; z: number }[],
+  ): void {
+    const xs = landmarks.map((p) => p.x);
+    const zs = landmarks.map((p) => p.z);
+    this.ambientLoopCenter = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
+    const spanX = Math.max(...xs) - Math.min(...xs);
+    const spanZ = Math.max(...zs) - Math.min(...zs);
+    // Margin clears the largest real landmark footprint in this scene (the hospital's own
+    // `footprintHalfExtent(HOSPITAL_BUILDING_SCALE)` = 5.25) plus room for a vehicle body/pedestrian
+    // silhouette — the pedestrian loop sits inside the vehicle loop, like a sidewalk inside a street.
+    this.ambientVehicleLoopRadius = { x: spanX / 2 + 14, z: spanZ / 2 + 14 };
+    this.ambientPedestrianLoopRadius = { x: spanX / 2 + 8, z: spanZ / 2 + 8 };
+
+    const kinds: VehicleKind[] = ['car', 'van', 'ambulance', 'car'];
+    const colors: THREE_NS.ColorRepresentation[] = [0x8a2f2f, 0x2f5c9a, 0xd8d8d8, 0x4a7a4a];
+    kinds.forEach((kind, i) => {
+      const bodyMaterial = createPBRMaterial(THREE, 'PAINTED_METAL', { color: colors[i % colors.length] });
+      const handle = createVehicle(THREE, {
+        kind,
+        // Repositioned every frame in `updateAmbientLife()` — this scene drives motion itself, per
+        // `vehicleKit.ts`'s own "kit owns geometry, caller owns motion" boundary.
+        position: [0, 0, 0],
+        bodyMaterial,
+        seed: i * 11 + 5,
+        state: kind === 'ambulance' ? 'EMERGENCY' : 'MOVING',
+      });
+      scene.add(handle.group);
+      this.ambientVehicles.push({ handle, bodyMaterial, angularSpeed: 0.045 + i * 0.012, phase: (i / kinds.length) * Math.PI * 2 });
+    });
+
+    const pedestrianCount = 4;
+    for (let i = 0; i < pedestrianCount; i++) {
+      const id = 900_000 + i; // far outside any real entity/population id range, so it can never collide with one
+      const visual = new HumanoidAgentVisual(THREE, id);
+      scene.add(visual.root);
+      this.ambientPedestrians.push({ visual, id, angularSpeed: 0.10 + i * 0.02, phase: (i / pedestrianCount) * Math.PI * 2 + 0.6 });
+    }
+
+    this.updateAmbientLife(0); // place everyone at their real starting point immediately, not at the origin for one visible frame
+  }
+
+  /** Advances every ambient vehicle/pedestrian one step along its own ellipse — see `buildAmbientLife`'s
+   * own doc for why an ellipse (not "the real road network"). Heading is always the path's own tangent
+   * at this instant (`d/dangle`), so it exactly matches the direction each frame's position actually
+   * moved from the last, without tracking a separate velocity. */
+  private updateAmbientLife(dt: number): void {
+    this.ambientTimeSeconds += dt;
+    const t = this.ambientTimeSeconds;
+    for (const v of this.ambientVehicles) {
+      const angle = v.phase + t * v.angularSpeed;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const x = this.ambientLoopCenter.x + this.ambientVehicleLoopRadius.x * cos;
+      const z = this.ambientLoopCenter.z + this.ambientVehicleLoopRadius.z * sin;
+      v.handle.group.position.set(x, 0, z);
+      v.handle.group.rotation.y = Math.atan2(-this.ambientVehicleLoopRadius.x * sin, this.ambientVehicleLoopRadius.z * cos);
+    }
+    for (const p of this.ambientPedestrians) {
+      const angle = p.phase + t * p.angularSpeed;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const x = this.ambientLoopCenter.x + this.ambientPedestrianLoopRadius.x * cos;
+      const z = this.ambientLoopCenter.z + this.ambientPedestrianLoopRadius.z * sin;
+      const facing = Math.atan2(-this.ambientPedestrianLoopRadius.x * sin, this.ambientPedestrianLoopRadius.z * cos);
+      const state: HumanoidAgentState = {
+        id: p.id,
+        worldX: x,
+        worldZ: z,
+        facing,
+        speed: 0.4,
+        gait: t * 3.4 + p.phase * 2,
+        pose: 'walk',
+        health: 'unknown', // decorative ambiance — never a claim about the real population's own epidemiological state
+        behavior: 'walk',
+        stateSince: 0,
+        isolated: false,
+        hospitalized: false,
+      };
+      p.visual.sync(state, t);
+    }
+  }
+
+  /** Hides/shows the ambient vehicles/pedestrians alongside `this.root` — same toggle the hazard-field
+   * overlays (`setShowWildfire`/`setShowLandslide`) already apply to every other entity mesh, since
+   * these live directly under `scene` (not `this.root`) and would otherwise keep showing through. */
+  private setAmbientLifeVisible(visible: boolean): void {
+    for (const v of this.ambientVehicles) v.handle.group.visible = visible;
+    for (const p of this.ambientPedestrians) p.visual.root.visible = visible;
   }
 
   /**
@@ -1014,6 +1149,7 @@ export class GenesisWorldSim3D implements Sim3D {
       this.removeOverlayMesh(this.landslideField);
       this.buildWildfireDemo();
       if (this.root) this.root.visible = false;
+      this.setAmbientLifeVisible(false);
       if (this.wildfireField && this.scene && !this.wildfireField.mesh.parent) {
         this.scene.add(this.wildfireField.mesh);
       }
@@ -1022,6 +1158,7 @@ export class GenesisWorldSim3D implements Sim3D {
       }
     } else {
       if (this.root) this.root.visible = true;
+      this.setAmbientLifeVisible(true);
       this.removeOverlayMesh(this.wildfireField);
       this.removeFireVfx();
     }
@@ -1084,11 +1221,13 @@ export class GenesisWorldSim3D implements Sim3D {
       this.removeFireVfx();
       this.buildLandslideDemo();
       if (this.root) this.root.visible = false;
+      this.setAmbientLifeVisible(false);
       if (this.landslideField && this.scene && !this.landslideField.mesh.parent) {
         this.scene.add(this.landslideField.mesh);
       }
     } else {
       if (this.root) this.root.visible = true;
+      this.setAmbientLifeVisible(true);
       this.removeOverlayMesh(this.landslideField);
     }
   }
@@ -1119,6 +1258,7 @@ export class GenesisWorldSim3D implements Sim3D {
     this.sceneEnvironment?.update(dt);
     if (this.showWildfire) this.fireVfx?.update(dt);
     if (this.floodWater?.mesh.visible) this.floodWater.update(dt); // ripple only scrolls while there's water to see it on
+    this.updateAmbientLife(dt);
     const active = this.activeController();
     if (active) this.fpState = active.update(dt);
   }
@@ -1314,6 +1454,20 @@ export class GenesisWorldSim3D implements Sim3D {
       this.floodWater.dispose();
       this.floodWater = null;
     }
+    // C2-2 — ambient vehicles/pedestrians: each `bodyMaterial` was created fresh in `buildAmbientLife`
+    // (never one of `vehicleKit.ts`'s own defaults), so it needs disposing here explicitly; `handle.dispose()`
+    // only frees geometry/materials the kit itself created.
+    for (const v of this.ambientVehicles) {
+      v.handle.group.parent?.remove(v.handle.group);
+      v.handle.dispose();
+      v.bodyMaterial.dispose();
+    }
+    this.ambientVehicles = [];
+    for (const p of this.ambientPedestrians) {
+      p.visual.root.parent?.remove(p.visual.root);
+      p.visual.dispose();
+    }
+    this.ambientPedestrians = [];
   }
 }
 

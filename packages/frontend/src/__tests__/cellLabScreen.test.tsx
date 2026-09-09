@@ -235,10 +235,10 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toContain('MODEL_ESTIMATE');
   });
 
-  it('renders the full flagship narrative ladder: CONTROL -> TREATMENT -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT EXPERIMENT', () => {
+  it('renders the full flagship narrative ladder: CONTROL -> TREATMENT -> OBSERVATION -> DIFFERENCE -> CONCLUSION -> NEXT EXPERIMENT -> EVIDENCE -> REPLAY', () => {
     const markup = renderToStaticMarkup(<CellLabScreen />);
     expect(markup).toContain('data-testid="cell-lab-narrative"');
-    for (const stage of ['control', 'treatment', 'observation', 'difference', 'conclusion', 'next-experiment']) {
+    for (const stage of ['control', 'treatment', 'observation', 'difference', 'conclusion', 'next-experiment', 'evidence', 'replay']) {
       expect(markup).toContain(`data-testid="ladder-${stage}"`);
     }
     expect(markup).toContain('CONTROL');
@@ -247,11 +247,19 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toContain('DIFFERENCE');
     expect(markup).toContain('CONCLUSION');
     expect(markup).toContain('NEXT EXPERIMENT');
+    expect(markup).toContain('EVIDENCE');
+    expect(markup).toContain('REPLAY');
   });
 
   it('shows the honest "no conclusion yet" state before any Discovery search has run', () => {
     const markup = renderToStaticMarkup(<CellLabScreen />);
     expect(markup).toMatch(/run a discovery search.*reach a real conclusion/i);
+  });
+
+  it('shows the honest "not yet" state for EVIDENCE and REPLAY before any Discovery search has run', () => {
+    const markup = renderToStaticMarkup(<CellLabScreen />);
+    expect(markup).toMatch(/run a discovery search.*evidence bundle/i);
+    expect(markup).toMatch(/available once a search has run/i);
   });
 
   it('renders the Real Experiment Interface pipeline with Prediction real and every later stage honestly refused', () => {

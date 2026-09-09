@@ -51,6 +51,129 @@ P6 is the next real priority: every earlier item it depended on is done, and
 it is the one row of the North Star's §3 table ("generate competing models")
 still missing.
 
+### P6, MECHANISM-shape audit (C3) — measured, not assumed
+
+`competingModels.test.ts` had zero MECHANISM-shape coverage until this audit,
+named as an open gap in that module's own doc. The question: can a REAL lever
+catalog (flood, epidemiology, chemistry, generator, cell-culture) reach
+`bestSupported.length > 1` under `discoveryLoop.ts`'s current `selectNext`,
+and if so, does that happen before or instead of
+`LEADER_CONFIRMED_AT_TWO_MAGNITUDES`?
+
+**Measured on all five, under a generic all-levers goal:** four of five never
+reach it — `selectNext`'s consolidation-first rule (a `SUPPORTED_ONCE`
+hypothesis is ALWAYS retested before the loop explores a new one) serialises
+the search onto one hypothesis at a time, so two DECLARED hypotheses can never
+be simultaneously mid-consolidation without help. `genesis-backup-generator`
+is the exception, and the mechanism is P3 regeneration, not plain declared
+competition:
+
+- `h:fuel-efficiency` and `h:load-shedding` are both declared with a criterion
+  whose expected direction the real solver contradicts at strength=1
+  (baseline 40.0 L fuel remaining; observed 85.83 and 98.67 — the metric moves
+  a lot, just the opposite way the criterion expected) — genuine
+  `FALSIFIED_WITHIN_PROTOCOL`, not a no-effect result.
+- Each derives a `RELATION_FLIP` alternative, excluding strength=1 (its
+  parent's falsifying strength) from ever being retested.
+- Both flipped alternatives are tested at strength=0.5 and are genuinely
+  `SUPPORTED` there (62.92 and 69.33 — a real, dose-proportional effect:
+  22.92 ≈ 45.83/2 and 29.33 ≈ 58.67/2, not noise).
+- **Neither can ever reach `SUPPORTED_AT_TWO_MAGNITUDES`**, because their one
+  remaining untested magnitude (1) is the one excluded. So
+  `LEADER_CONFIRMED_AT_TWO_MAGNITUDES` never fires at all in this run — the
+  loop instead runs out of testable hypotheses honestly
+  (`ALL_HYPOTHESES_RESOLVED`) with **two permanently-unconsolidated
+  survivors**, both reported in `bestSupported`.
+
+Test added: `competingModels.test.ts`'s `"MECHANISM shape, a real domain that
+reaches 2+ simultaneous survivors"` describe block, against this exact fixture
+— `assessCompetingModels` correctly reports `COMPETING_MODELS_UNRESOLVED` with
+both hypothesis ids and `stopReason: 'ALL_HYPOTHESES_RESOLVED'` carried
+verbatim (not generalised into PARAMETER's `NO_DISCRIMINATING_PROBE`
+vocabulary, per this module's own rule on why `stopReason` travels
+unedited).
+
+**A conceptual point this measurement surfaces, worth carrying into the next
+section:** `h:fuel-efficiency~RELATION_FLIP` and `h:load-shedding~RELATION_FLIP`
+are not RIVAL explanations of one phenomenon the way four Arrhenius
+`(Ea, log A)` pairs are — they are claims about two DIFFERENT levers, and both
+can be true at once (both really do move fuel remaining). Two survivors here
+is not necessarily "Genesis is confused between two stories"; it may
+legitimately be "two real, independent effects are both confirmed." Designing
+what a live discriminator should DO with this state needs that distinction —
+see the next section.
+
+### P6, live discrimination for MECHANISM — architecture (C3, not implemented)
+
+`inquiryLoop.ts`'s `checkDiscriminability`/`selectMostDiscriminatingExperiment`
+(`beliefRevision.ts`) work because every PARAMETER hypothesis makes a
+**prediction about the same shared observable** at a candidate probe setting —
+so one measurement can be checked against every rival's own prediction, and a
+setting where two predictions disagree is directly a discriminating
+experiment. `discoveryLoop.ts` has no equivalent because a MECHANISM
+hypothesis does not predict a value at a shared probe; it names an
+**intervention**, and each hypothesis is judged against its OWN fork from a
+shared baseline. There is no single number two rival mechanisms both make a
+claim about the way two Arrhenius pairs both predict a rate constant at 400 K.
+
+**Why porting `checkDiscriminability` verbatim would misdiagnose the real
+case.** The measured generator fixture above is the concrete example: are
+`h:fuel-efficiency~RELATION_FLIP` and `h:load-shedding~RELATION_FLIP` rivals to
+discriminate between, or two independent findings to report together? They are
+the latter — different levers, both genuinely effective, not two competing
+stories about the same lever. A discriminator built on the PARAMETER
+assumption ("exactly one of these is true") would be answering a question this
+domain shape does not ask. The two situations MECHANISM can actually reach
+need two different next experiments:
+
+1. **Two DIFFERENT levers, both independently `SUPPORTED`** (the generator
+   case, measured above). These are not mutually exclusive, so "discriminating
+   between them" is the wrong operation. The informative next experiment is a
+   **JOINT ARM**: fork one branch that applies BOTH hypotheses' `apply`
+   functions together (`forkBranch`'s mutation callback already accepts
+   arbitrary graph mutations — applying two levers in sequence inside one
+   callback needs no new primitive), and compare the combined effect against
+   the SUM of the two effects already measured individually. Worked example
+   from the real numbers above: `h:fuel-efficiency~RELATION_FLIP` alone
+   contributes +22.92 at strength 0.5, `h:load-shedding~RELATION_FLIP` alone
+   contributes +29.33; if the two mechanisms are independent, a joint arm at
+   the same two strengths should read close to `40.0 + 22.92 + 29.33 ≈ 92.25`.
+   A joint reading that matches names both levers as independent contributors
+   (the honest report: "two real findings," not "a discrimination"). A joint
+   reading that differs materially is itself a new, real finding — an
+   interaction between two declared levers neither single-lever test could
+   reveal — and is worth its own criterion and its own name (`INTERACTION_DETECTED`,
+   say), not silently averaged away. This is a genuinely new capability
+   (`discoveryLoop.ts` never runs a multi-mechanism arm today), reuses every
+   existing primitive (`forkBranch`, `compareBranches`,
+   `reduceObjectiveTrajectory`), and needs no new solver, no scoring function,
+   and no probability model — it is arithmetic on already-measured effects,
+   checked against a fresh, real third measurement.
+2. **Two hypotheses that really do claim the SAME lever, at the SAME time**
+   (not observed in any real catalog today — see the audit above: a lever's
+   original criterion and its own `RELATION_FLIP` alternative can never both
+   be `SUPPORTED` simultaneously, because deriving the alternative requires the
+   original to already be `REFUTED`). If a future catalog ever declares two
+   independent hypotheses that are genuinely mutually exclusive claims about
+   ONE mechanism (rather than two different levers), THAT case is the real
+   `checkDiscriminability` analog, and the natural probe axis is `strength`
+   itself: `selectMostDiscriminatingExperiment`'s candidate-list scan already
+   generalises directly — feed it the untested strengths in
+   `MechanisticHypothesis`'s own declared range (a lever already has a natural
+   strength axis: 0 to 1, sampled today only at `{1, replicationStrength}`) and
+   ask which untested strength would make the two hypotheses' criteria
+   disagree. No real fixture demonstrates this today; it is named here so C1
+   can verify the shape rather than have it invented at implementation time.
+
+**What this section deliberately does not do.** No code changes. No scoring
+function, no scalar utility, no scheduling change to `selectNext` — those
+would be exactly the invented methodology `discoveryLoop.ts`'s own module doc
+and `AUTONOMOUS_DISCOVERY_ROADMAP.md` §5 already refuse elsewhere.
+Implementing option 1 (the joint arm) is the smaller, well-grounded next
+step — it has a real fixture ready to test against today (the generator
+catalog above) — and should be scoped as its own P6 increment once C1
+confirms the design.
+
 ---
 
 ## 0. The finding that reframes this

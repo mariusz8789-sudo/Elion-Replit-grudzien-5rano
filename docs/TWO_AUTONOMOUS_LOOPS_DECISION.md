@@ -843,3 +843,26 @@ into one shape with a substrate flag — `discoveryOrchestrator.ts`'s own
 asymmetry section already explains why forcing PARAMETER and MECHANISM into
 one shape would have to fabricate something, and the identical argument holds
 one level down between PARAMETER and CALIBRATION.
+
+---
+
+## 13. Quantum lab substrate audit, for C2 — all four DONE, one scope caveat
+
+C2 asked, before building 3D over the remaining quantum labs, whether each
+engine actually computes rather than returning a placeholder, and whether each
+has a real declared limitation the way the WorldGraph domains do. Checked by
+reading the solver code, the shared frontend/backend bundle
+(`compute:bundle:check` — clean, no drift), the backend API tests
+(`*FabricApi.test.mjs`, which assert the API's own output equals a direct call
+to the same runner), and live in a Chromium session (0 console errors on all
+five lab tabs, on-screen numbers cross-checked by hand against the closed-form
+physics).
+
+| Lab (engine) | Verdict | Real negative result / declared limit |
+|---|---|---|
+| `quantum-teleportation` (`genesis-three-qubit-state-vector`) | **DONE** | `core/quantumState.ts`'s `teleport()` is real complex state-vector algebra (H+CNOT Bell pair, projective measurement with renormalisation, I/X/Z/XZ correction); `teleportationRunner.ts` enumerates all 4 measurement branches by rigging the RNG, not by precomputing constants. Boundary: exact-protocol fidelity=1 is a property of the IDEAL protocol, not evidence about hardware; needs 2 classical bits, never faster than light. |
+| `quantum-tunneling-1d` (`genesis-split-step-fft`) | **DONE** | Genuine radix-2 in-place FFT + symmetric Strang splitting (V/2, K, V/2), real absorbing boundary mask — an actual numerical PDE integrator, `TunnelingSim` (2D Canvas) and `runTunnelingScenario` (Fabric/backend) both call the SAME `TunnelingSolver` class. Boundary: fixed 512-point grid, 1D only, "remaining probability" includes the wave still inside the barrier plus edge absorption (disclosed in `warnings`). |
+| `quantum-bloch-circuit` (`genesis-single-qubit`) | **DONE** | Exact 2×2 unitary matrices for H/X/Y/Z/S/T, Born-rule probabilities, exact Bloch-vector formula. The ONLY one of the four already ported to real 3D (`quantum-bloch-3d.ts`, Three.js) — and correctly: `GATE_ROTATIONS`' claim that a gate IS a continuous SU(2)→SO(3) rotation is cross-checked in `quantumBloch.test.ts` against `applyGate` for 6 gates × 5 random states at 1e-6 tolerance, and live-verified (clicking H on \|0⟩ lands the arrow exactly on \|+⟩, 50/50, and a mid-animation frame reads the real partially-rotated probability, not the endpoint). Boundary: single-qubit only, no CNOT/entanglement, never samples a measurement outcome outside the explicit measure button. |
+| `quantum-kitaev-bulk` (`genesis-kitaev-bulk`) | **DONE, narrow scope** | `core/compute/kitaevBulk.ts` is a genuine closed-form minimisation of the bulk BdG dispersion, with a real, correctly-derived critical threshold μ±=±2\|t\| — a real physical boundary, not a placeholder. **Scope caveat for C2's 3D plan specifically:** the solver is BULK-ONLY (infinite, translationally-invariant chain) — it structurally cannot produce a finite wire, edge sites, or Majorana zero modes, and says so on-screen (`finiteSizeCaveat`, always returned). 3D over this solver may show the bulk band/phase diagram; it must not visually imply a finite-wire or Majorana-device result the solver does not compute. Showing that would need a new solver (diagonalising a finite BdG Hamiltonian), not a 3D reskin. |
+
+None of the four is a placeholder or an oversold simplification. `quantum-chsh-correlation` (`genesis-singlet-correlation`) was audited earlier in this same pass for the same reason and is DONE on identical grounds (`sampleSingletPair`/`sampleLocalHiddenPair` in `core/physics.ts` are a correct Monte Carlo construction of the real quantum and local-hidden-variable correlations respectively) — named here only for completeness, since it was not one of C2's four named labs.

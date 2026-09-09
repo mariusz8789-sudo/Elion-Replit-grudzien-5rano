@@ -131,25 +131,48 @@ export interface DiscoveryRefused {
 }
 
 /**
- * MEMORY, CONSULTED BUT NOT OBEYED — a warning, not a narrowing.
+ * MEMORY → SELECTION — P1. Genesis reads what it already knows, recognises
+ * which declared hypotheses are already settled, and lets that decide what it
+ * still needs to find out before choosing the next experiment.
  *
- * `worldDiscoverySession.ts`/`inquirySession.ts` already have a STRONGER
- * mechanism: they drop hypotheses an earlier run in the SAME world/system
- * already falsified before executing. This orchestrator deliberately does
- * NOT do that — it is Genesis's one front door, and a caller asking a
- * declared question should get exactly that question answered in full, never
- * a silently smaller one. What it DOES do is read the same memory those
- * sessions already narrow on (`priorRefutedHypothesisIds`,
- * `memoryNarrowedHypotheses` — reused, not reimplemented) and report what it
- * found, so a caller — the Matrix, the Voice Guide — can say "Genesis already
- * ruled this out once" without the run itself being any different for it.
+ * ## Not a second memory
  *
- * Whether `runDiscovery` should also narrow, matching the legacy sessions, is
- * a real product question — same question, different behaviour depending on
- * which entry point answers it, is not something to decide unilaterally here.
+ * This orchestrator has no store of its own. It reads the SAME persisted
+ * Science Memory `worldDiscoverySession.ts`/`inquirySession.ts` already
+ * narrow on — `priorRefutedHypothesisIds` and `memoryNarrowedHypotheses`,
+ * reused verbatim, not reimplemented. A run through this front door and a run
+ * through the legacy session now see the same memory and make the same
+ * narrowing decision from it, because they call the same two functions.
+ *
+ * ## What "recognises already obalone" actually means here
+ *
+ * `priorRefutedHypothesisIds`/`memoryNarrowedHypotheses` look at PRIOR
+ * `StrategyRun`s of the SAME world/system and collect every hypothesis that
+ * ended REFUTED — never SUPPORTED (see `memoryNarrowedHypotheses`'s own doc
+ * on why: under degeneracy, agreeing with one measurement settles nothing, so
+ * a "supported" survivor is tested again, not banked). "What Genesis still
+ * needs to find out" is therefore exactly the declared hypotheses NOT in that
+ * refuted set — the open questions a prior run left standing.
+ *
+ * ## The one rule that keeps this from ever silently testing nothing
+ *
+ * If EVERY declared hypothesis was already refuted, narrowing to the empty
+ * set would not be "efficient" — it would be running nothing and calling it a
+ * result. So this reuses the legacy sessions' own fallback: run the full
+ * declared set again rather than test an empty one, and say so honestly in
+ * `reason`.
+ *
+ * ## Why this still isn't a change to which strategy answers, or how
+ *
+ * `MechanismStrategy`/`ParameterStrategy` are handed a NARROWED
+ * `hypotheses`/`executedInput` — the exact same shape they already accept
+ * from any caller. Neither strategy, neither loop, and no belief
+ * representation changes. This is memory deciding WHAT is asked, never HOW
+ * the asking works — the same boundary that kept P3's regeneration out of the
+ * loop's own control flow.
  */
-export interface PriorInvestigationWarning {
-  /** Hypotheses in THIS request already refuted by an earlier investigation of the same world/system. */
+export interface PriorInvestigationDecision {
+  /** Hypotheses in THIS request an earlier investigation of the same world/system already refuted — and this run skipped for it. */
   readonly skippedHypothesisIds: readonly string[];
   readonly reason: string;
 }
@@ -160,9 +183,10 @@ export interface DiscoveryRan {
   readonly shape: QuestionShape;
   /** Carried on success too: a finding is worth what the capability behind it is worth. */
   readonly admission: Admission;
+  /** The strategy's own result — over whatever hypotheses memory left open. */
   readonly run: StrategyRun;
-  /** Null when memory has nothing to say — no prior investigation, or none of it applies here. */
-  readonly priorInvestigation: PriorInvestigationWarning | null;
+  /** Null when memory had nothing to say — no prior investigation, or none of it applies here. */
+  readonly priorInvestigation: PriorInvestigationDecision | null;
 }
 
 export type DiscoveryOutcome = DiscoveryRan | DiscoveryRefused;
@@ -180,7 +204,7 @@ function ran(
   shape: QuestionShape,
   admission: Admission,
   run: StrategyRun,
-  priorInvestigation: PriorInvestigationWarning | null,
+  priorInvestigation: PriorInvestigationDecision | null,
 ): DiscoveryRan {
   return { status: 'RAN', contractVersion: DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, shape, admission, run, priorInvestigation };
 }
@@ -198,15 +222,16 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
     const admission = parameterStrategy.admit(request.input);
     if (!admits(admission)) return refused('PARAMETER', 'ADMISSION', admission);
 
-    // Reads the same match rule `inquirySession.ts` narrows on
-    // (`parameterInquirySystemKey`) but the returned `executedInput` is
-    // discarded on purpose — this front door runs the request as declared.
-    const { resumedFromMemory } = memoryNarrowedHypotheses(request.input);
-    const priorInvestigation: PriorInvestigationWarning | null = resumedFromMemory
+    // The SAME narrowing `inquirySession.ts` already applies
+    // (`parameterInquirySystemKey`) — `executedInput` is what actually runs,
+    // never discarded: memory now decides what this front door still needs
+    // to find out, exactly as it already decides for the legacy session.
+    const { executedInput, resumedFromMemory } = memoryNarrowedHypotheses(request.input);
+    const priorInvestigation: PriorInvestigationDecision | null = resumedFromMemory
       ? { skippedHypothesisIds: resumedFromMemory.skippedHypothesisIds, reason: resumedFromMemory.reason }
       : null;
 
-    return ran('PARAMETER', admission, parameterStrategy.run(request.input), priorInvestigation);
+    return ran('PARAMETER', admission, parameterStrategy.run(executedInput), priorInvestigation);
   }
 
   if (request.shape === 'CALIBRATION') {
@@ -240,13 +265,28 @@ export function runDiscovery(request: DiscoveryRequest): DiscoveryOutcome {
   // only builds once the planner has resolved both.
   const refuted = priorRefutedHypothesisIds(request.catalog.catalogId, intent.objectiveMetric!, intent.direction!);
   const alreadyRefuted = plan.hypotheses.map((h) => h.hypothesisId).filter((id) => refuted.has(id));
-  const priorInvestigation: PriorInvestigationWarning | null =
-    alreadyRefuted.length > 0
-      ? {
-          skippedHypothesisIds: alreadyRefuted,
-          reason: `${alreadyRefuted.join(', ')} already refuted for "${intent.direction} ${intent.objectiveMetric}" in an earlier run on this world.`,
-        }
-      : null;
 
-  return ran('MECHANISM', admission, mechanismStrategy.run(plan), priorInvestigation);
+  // Same fallback `worldDiscoverySession.ts::runWorldDiscoveryAndRemember`
+  // already uses: never narrow to the empty set. If nothing declared is still
+  // open, running the full set again is the honest move — a result that
+  // "tested nothing" is not a result.
+  let hypothesesToRun = plan.hypotheses;
+  let priorInvestigation: PriorInvestigationDecision | null = null;
+  if (alreadyRefuted.length > 0) {
+    const stillOpen = plan.hypotheses.filter((h) => !refuted.has(h.hypothesisId));
+    if (stillOpen.length > 0) {
+      hypothesesToRun = stillOpen;
+      priorInvestigation = {
+        skippedHypothesisIds: alreadyRefuted,
+        reason: `Skipped ${alreadyRefuted.join(', ')}: already refuted for "${intent.direction} ${intent.objectiveMetric}" in an earlier run on this world, so this run tests only what is still open.`,
+      };
+    } else {
+      priorInvestigation = {
+        skippedHypothesisIds: [],
+        reason: `Every declared hypothesis for "${intent.direction} ${intent.objectiveMetric}" was already refuted in an earlier run; running the full declared set again rather than testing nothing.`,
+      };
+    }
+  }
+
+  return ran('MECHANISM', admission, mechanismStrategy.run({ ...plan, hypotheses: hypothesesToRun }), priorInvestigation);
 }

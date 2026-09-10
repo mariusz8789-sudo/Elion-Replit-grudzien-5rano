@@ -47,6 +47,7 @@ import type { FalsificationCriterion } from './experimentFabric/scientificDiscov
 import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
 } from './agent/predictionVerification';
+import { isWellFormedCyberInvestigation, type CyberInvestigationResult } from './agent/cyberInvestigation';
 
 
 /**
@@ -271,6 +272,17 @@ export interface SavedExperiment {
    * `SavedResearchChainManifest`.
    */
   researchChain?: SavedResearchChainManifest;
+  /**
+   * A completed security investigation against a synthetic target
+   * (`core/agent/cyberInvestigation.ts`) — the seventh investigation shape.
+   * A genuinely different substrate from every WorldGraph shape above: a
+   * vulnerability hypothesis is categorical (auth bypass present or not),
+   * not a numeric lever on a simulated physical world, so it cannot reuse
+   * `worldDiscovery`'s `DiscoveryLoopResult`/`resolveWorldLeverCatalog`
+   * replay path without inventing a fake catalog to satisfy the type. See
+   * `cyberInvestigation.ts`'s own module doc for the full reasoning.
+   */
+  cyberInvestigation?: SavedCyberInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -577,6 +589,7 @@ export interface SaveExperimentInput {
   mechanismComposition?: SavedMechanismComposition;
   realExperimentVerification?: SavedRealExperimentVerification;
   researchChain?: SavedResearchChainManifest;
+  cyberInvestigation?: SavedCyberInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -630,6 +643,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.mechanismComposition !== undefined && !isSavedMechanismComposition(input.mechanismComposition)) throw new Error('Zapis kompozycji mechanizmów musi zawierać katalog, cel, wynik i odcisk treści.');
   if (input.realExperimentVerification !== undefined && !isSavedRealExperimentVerification(input.realExperimentVerification)) throw new Error('Zapis weryfikacji realnym eksperymentem musi zawierać źródło predykcji, request, realny przebieg REAL_EXPERIMENTAL i wynik porównania.');
   if (input.researchChain !== undefined && !isSavedResearchChainManifest(input.researchChain)) throw new Error('Zapis łańcucha badawczego musi zawierać co najmniej jeden krok, odcisk treści i status końcowy.');
+  if (input.cyberInvestigation !== undefined && !isSavedCyberInvestigation(input.cyberInvestigation)) throw new Error('Zapis dochodzenia bezpieczeństwa musi zawierać dobrze uformowany wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -656,6 +670,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.mechanismComposition === undefined ? {} : { mechanismComposition: input.mechanismComposition }),
     ...(input.realExperimentVerification === undefined ? {} : { realExperimentVerification: input.realExperimentVerification }),
     ...(input.researchChain === undefined ? {} : { researchChain: input.researchChain }),
+    ...(input.cyberInvestigation === undefined ? {} : { cyberInvestigation: input.cyberInvestigation }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -2354,6 +2369,118 @@ export function replaySavedResearchChainManifest(saved: SavedExperiment): SavedR
     }
   }
   return { status: 'MATCH', reason: `Każdy z ${record.steps.length} krok(ów) ma własny, wciąż dostępny zapis, a każdy sprawdzalny krok odtworzył się identycznie.` };
+}
+
+// ---------------------------------------------------------------------------
+// CYBER INVESTIGATION — a security investigation against a synthetic
+// target. See `cyberInvestigation.ts` for why this is a genuinely
+// different substrate from every WorldGraph shape above, and reuses only
+// the shared verdict vocabularies (DataProvenance/HypothesisAssessment/
+// ReplayVerdict) and the one `saveExperiment` persistence seam.
+// ---------------------------------------------------------------------------
+
+export const CYBER_INVESTIGATION_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+export interface SavedCyberInvestigation {
+  contractVersion: string;
+  result: CyberInvestigationResult;
+  resultFingerprint: string;
+}
+
+export function buildSavedCyberInvestigation(result: CyberInvestigationResult): SavedCyberInvestigation {
+  if (!isWellFormedCyberInvestigation(result)) {
+    throw new Error('Dochodzenie bezpieczeństwa musi zawierać obserwacje, hipotezy wywiedzione z realnych assetów, wyniki testów i werdykty — nie może być pustą powłoką.');
+  }
+  return {
+    contractVersion: CYBER_INVESTIGATION_MEMORY_CONTRACT_VERSION,
+    result,
+    resultFingerprint: fnv1a(canonicalJson(result)),
+  };
+}
+
+export function isSavedCyberInvestigation(value: unknown): value is SavedCyberInvestigation {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string' || !nonEmptyString(value.resultFingerprint)) return false;
+  return isWellFormedCyberInvestigation(value.result);
+}
+
+function cyberInvestigationAnalysis(saved: SavedCyberInvestigation): SavedExperimentAnalysisBlock[] {
+  const { result } = saved;
+  const supported = result.verdicts.filter((v) => v.assessment === 'SUPPORTED_WITHIN_PROTOCOL');
+  const falsified = result.verdicts.filter((v) => v.assessment === 'FALSIFIED_WITHIN_PROTOCOL');
+  return [
+    { title: 'Cel', body: result.goal, kind: 'cyber-investigation-goal' },
+    {
+      title: 'Hipotezy',
+      body: result.hypotheses.map((h) => `${h.hypothesisId} (${h.kind}): ${h.statement}`).join(' | '),
+      kind: 'cyber-investigation-hypotheses',
+    },
+    {
+      title: 'Werdykty',
+      body: `${supported.length} SUPPORTED_WITHIN_PROTOCOL, ${falsified.length} FALSIFIED_WITHIN_PROTOCOL, ${result.verdicts.length - supported.length - falsified.length} inne.`,
+      kind: 'cyber-investigation-verdicts',
+    },
+    ...(result.retestVerdict
+      ? [{ title: 'Weryfikacja po remediacji', body: `${result.retestVerdict.assessment}: ${result.retestVerdict.reasoning}`, kind: 'cyber-investigation-retest' }]
+      : []),
+  ];
+}
+
+/**
+ * Persists a completed Cyber Investigation as its own Science Memory
+ * record, through `saveExperiment` unchanged. No `execution`/`ExperimentRun`
+ * attached: like `researchChain`/`mechanismComposition`, this is an
+ * orchestration result over a synthetic target, not a Fabric run.
+ */
+export function saveCyberInvestigationToMemory(saved: SavedCyberInvestigation): SavedExperiment {
+  const { result } = saved;
+  return saveExperiment({
+    labId: 'cyber-security',
+    experimentId: `cyber-investigation:${result.investigationId}:${saved.resultFingerprint}`,
+    experimentName: `Dochodzenie bezpieczeństwa — ${result.goal}`,
+    params: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length },
+    stats: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length, verdictCount: result.verdicts.length },
+    cyberInvestigation: saved,
+    analysis: cyberInvestigationAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: `Dochodzenie przeciw syntetycznemu, kontrolowanemu celowi (fixture), nie realnemu systemowi. ` +
+      `Każda hipoteza wywiedziona z realnych obserwacji attack surface, każdy werdykt z porównania predykcji ` +
+      `z realnie wykonanym testem — żadna wartość nie jest odczytana wprost z metadanych fixture.`,
+    assumptions: ['Cel jest syntetycznym, deterministycznym fixture — wyniki nie ekstrapolują na realne systemy.'],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export interface SavedCyberInvestigationReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Verifies self-consistency: does the saved record still match its own
+ * fingerprint? This does NOT yet re-execute the investigation against the
+ * synthetic target — there is no investigation engine to call (see
+ * `cyberInvestigation.ts`'s module doc: the pure hypothesis-generation/
+ * test-execution engine is a separate, not-yet-landed piece). Reporting
+ * MATCH here means exactly "unmodified since save", never "independently
+ * reproduced" — the same honest distinction `CaseStudyReplay.computedLive`
+ * already draws for the legacy Evidence Pack shape. Once a real engine
+ * lands, this function is the one place to add genuine re-execution, the
+ * same way `replaySavedMechanismComposition` re-executes today.
+ */
+export function replaySavedCyberInvestigation(saved: SavedExperiment): SavedCyberInvestigationReplay {
+  const record = saved.cyberInvestigation;
+  if (record === undefined || !isSavedCyberInvestigation(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera dochodzenia bezpieczeństwa.' };
+  }
+  const selfCheck = fnv1a(canonicalJson(record.result));
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisane dochodzenie zostało zmienione po zapisie: jego treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  return {
+    status: 'MATCH',
+    reason: 'Sprawdzenie tylko wewnętrznej spójności: zapis odpowiada własnemu odciskowi. Pełne ponowne wykonanie przeciw syntetycznemu celowi nie jest jeszcze podłączone tutaj.',
+  };
 }
 
 // ---------------------------------------------------------------------------

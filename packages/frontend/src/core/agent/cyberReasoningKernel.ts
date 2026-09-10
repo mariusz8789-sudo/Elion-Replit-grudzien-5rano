@@ -11,7 +11,14 @@ import type {
   SecurityTestResult,
   SecurityVerdict,
   VulnerabilityHypothesis,
+  VulnerabilityHypothesisKind,
 } from './cyberInvestigation';
+import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import {
+  selectNextTest,
+  type CyberTestCandidate,
+  type CyberTestSelection,
+} from './cyberTestPlanner';
 
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic
@@ -367,6 +374,161 @@ export function runInvestigation(app: ToyVulnerableApp): InvestigationTrace {
   const competing = competingGroups(hypotheses, verdicts);
   steps.push({ stage: 'COMPETING', detail: competing.map((g) => g.join('+')).join(' vs ') || 'none' });
   return { steps, observations, assets, hypotheses, tests, verdicts, edges, competing };
+}
+
+// ================= ADAPTIVE TEST PLANNER — REAL CALLER =================
+
+/**
+ * ADAPTIVE INVESTIGATION — the real caller of `cyberTestPlanner.ts`.
+ *
+ * `runInvestigation` above runs every hypothesis's test unconditionally, in
+ * one fixed pass; it has no notion of "which test is most worth running
+ * next" and no adaptivity. This function is the small addition that gives
+ * the existing kernel that capability, by looping:
+ *
+ *   build candidates (from hypotheses + real execution history)
+ *   -> selectNextTest (cyberTestPlanner.ts)
+ *   -> execute the SELECTED test through the EXISTING `runSecurityTest`/`retest`
+ *   -> judgeVerdict (existing, unchanged)
+ *   -> append to this hypothesis's assessment history (never overwritten/deleted)
+ *   -> recompute candidates from the NEW state
+ *   -> ask the planner again
+ *
+ * until the planner reports nothing worth running or `maxSteps` is hit. Once
+ * a hypothesis resolves SUPPORTED_WITHIN_PROTOCOL and the target declares a
+ * remediation for it, the SAME planner (not a separate code path) is offered
+ * an `INDEPENDENT_REPLICATION` candidate for it, so applying the remediation
+ * and retesting also flows through test selection rather than being called
+ * directly — this is what makes remediation/retest/outcome-verification part
+ * of the adaptive loop instead of a bolt-on after it.
+ *
+ * Hand-assigned per-kind scoring inputs (discrimination/downstream/safety)
+ * live here, next to the hypothesis kinds they describe — the planner itself
+ * stays generic. INJECTION is marked UNSAFE by policy: this fixture's own
+ * INJECTION probe (`designTest`) happens to be a harmless read, but the
+ * planner has no way to know that about a real target, so automatic
+ * execution is refused regardless. `generateHypotheses` does not currently
+ * emit INJECTION hypotheses, so this exclusion is exercised directly in
+ * `cyberTestPlanner.test.ts` rather than through this loop.
+ */
+
+const DISCRIMINATION_BY_KIND: Record<VulnerabilityHypothesisKind, number> = {
+  AUTH_BYPASS: 0.8, INFO_DISCLOSURE: 0.6, PRIVILEGE_ESCALATION: 0.9, INJECTION: 0.7,
+};
+const DOWNSTREAM_BY_KIND: Record<VulnerabilityHypothesisKind, number> = {
+  AUTH_BYPASS: 0.9, INFO_DISCLOSURE: 0.5, PRIVILEGE_ESCALATION: 0.9, INJECTION: 0.8,
+};
+const SAFETY_BY_KIND: Record<VulnerabilityHypothesisKind, 'SAFE' | 'UNSAFE'> = {
+  AUTH_BYPASS: 'SAFE', INFO_DISCLOSURE: 'SAFE', PRIVILEGE_ESCALATION: 'SAFE', INJECTION: 'UNSAFE',
+};
+
+export interface AdaptiveStep {
+  readonly stepIndex: number;
+  readonly selection: CyberTestSelection;
+  readonly hypothesisId: string | null;
+  readonly testResult: SecurityTestResult | null;
+  readonly verdict: SecurityVerdict | null;
+  readonly remediation: RemediationAction | null;
+  readonly outcomeVerification: OutcomeVerification | null;
+}
+
+export interface AdaptiveInvestigationResult {
+  readonly observations: readonly CyberObservation[];
+  readonly assets: readonly AttackSurfaceAsset[];
+  readonly hypotheses: readonly VulnerabilityHypothesis[];
+  readonly steps: readonly AdaptiveStep[];
+  /** Every assessment a hypothesis has ever received, in order — falsified/superseded entries are never removed. */
+  readonly assessmentHistory: ReadonlyMap<string, readonly HypothesisAssessment[]>;
+  /** Hypothesis ids whose history contains BOTH a SUPPORTED and a FALSIFIED entry — preserved, never averaged away. */
+  readonly conflicts: readonly string[];
+  readonly stopReason: string;
+}
+
+export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): AdaptiveInvestigationResult {
+  const observations = collectObservations(app);
+  const assets = generateAttackSurface(observations);
+  const hypotheses = generateHypotheses(assets);
+
+  const assessmentHistory = new Map<string, HypothesisAssessment[]>(hypotheses.map((h) => [h.hypothesisId, []]));
+  const attempts = new Map<string, number>();
+  const remediatedFor = new Set<string>();
+  const steps: AdaptiveStep[] = [];
+  let stopReason = '';
+  let testCounter = 0;
+
+  const currentAssessment = (id: string): HypothesisAssessment => {
+    const history = assessmentHistory.get(id)!;
+    return history.length > 0 ? history[history.length - 1]! : 'CANDIDATE';
+  };
+
+  for (let i = 0; i < maxSteps; i++) {
+    const candidates: CyberTestCandidate[] = [];
+    for (const h of hypotheses) {
+      const attemptCount = attempts.get(h.hypothesisId) ?? 0;
+      const assessment = currentAssessment(h.hypothesisId);
+      const shared = {
+        hypothesisId: h.hypothesisId,
+        discriminationPower: DISCRIMINATION_BY_KIND[h.kind],
+        safety: SAFETY_BY_KIND[h.kind],
+        cost: 0.1,
+        downstreamValue: DOWNSTREAM_BY_KIND[h.kind],
+        priorAttempts: attemptCount,
+      };
+      if (attemptCount === 0) {
+        candidates.push({ ...shared, identityKind: 'NEW' });
+      } else if (attemptCount === 1 && assessment === 'SUPPORTED_WITHIN_PROTOCOL' && !remediatedFor.has(h.hypothesisId) && createRemediation(app, h) !== null) {
+        // Deliberate re-test after remediation: the target's state genuinely changes, so this
+        // is independent replication, not an accidental repeat of an unchanged probe.
+        candidates.push({ ...shared, cost: 0.15, identityKind: 'INDEPENDENT_REPLICATION' });
+      } else if (attemptCount === 1 && assessment === 'INCONCLUSIVE') {
+        // Same deterministic probe, same target state: re-running it cannot produce new
+        // information, but the planner must still be ABLE to recognize and penalize the option
+        // rather than never seeing it. Offered exactly once, never accumulated.
+        candidates.push({ ...shared, identityKind: 'REPEAT' });
+      }
+      // Otherwise: terminal and already handled (FALSIFIED, or SUPPORTED+remediated, or a REPEAT
+      // already spent) — no candidate offered, so accidental infinite repetition is impossible.
+    }
+
+    const assessments = new Map(hypotheses.map((h) => [h.hypothesisId, currentAssessment(h.hypothesisId)]));
+    const selection = selectNextTest(candidates, assessments);
+
+    if (selection.selectedHypothesisId === null) {
+      stopReason = selection.whySelected;
+      steps.push({ stepIndex: i, selection, hypothesisId: null, testResult: null, verdict: null, remediation: null, outcomeVerification: null });
+      break;
+    }
+
+    const h = hypotheses.find((x) => x.hypothesisId === selection.selectedHypothesisId)!;
+    const selectedCandidate = candidates.find((c) => c.hypothesisId === h.hypothesisId)!;
+    const isReplication = selectedCandidate.identityKind === 'INDEPENDENT_REPLICATION';
+    let remediation: RemediationAction | null = null;
+    let outcomeVerification: OutcomeVerification | null = null;
+    let testResult: SecurityTestResult;
+
+    if (isReplication) {
+      const priorTest = [...steps].reverse().find((s) => s.hypothesisId === h.hypothesisId)?.testResult ?? null;
+      remediation = createRemediation(app, h);
+      if (remediation) applyRemediation(app, remediation);
+      testResult = retest(h, app, `adaptive${testCounter++}`);
+      if (priorTest) outcomeVerification = verifySecurityOutcome(priorTest, testResult);
+      remediatedFor.add(h.hypothesisId);
+    } else {
+      testResult = runSecurityTest(h, app, `adaptive${testCounter++}`);
+    }
+
+    const verdict = judgeVerdict(h, testResult);
+    assessmentHistory.get(h.hypothesisId)!.push(verdict.assessment);
+    attempts.set(h.hypothesisId, (attempts.get(h.hypothesisId) ?? 0) + 1);
+    steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult, verdict, remediation, outcomeVerification });
+  }
+  if (!stopReason) stopReason = `osiągnięto maxSteps=${maxSteps}`;
+
+  const conflicts = [...assessmentHistory.entries()]
+    .filter(([, history]) => history.includes('SUPPORTED_WITHIN_PROTOCOL') && history.includes('FALSIFIED_WITHIN_PROTOCOL'))
+    .map(([id]) => id);
+
+  return { observations, assets, hypotheses, steps, assessmentHistory, conflicts, stopReason };
 }
 
 // ================= SEAM TO SCIENCE MEMORY =================

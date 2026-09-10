@@ -18,6 +18,11 @@ import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
 import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory, buildSavedSubstitutionInvestigation, replaySavedSubstitutionInvestigation, saveSubstitutionInvestigationToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
 import { runSubstitutionInvestigation } from '../core/biotechData/substitutionPlanner';
+import { rerankWithRealEvidence, selectNextRealEvidenceCandidate } from '../core/biotechData/biotechRealEvidenceRerank';
+import { verifyPredictionAgainstRealExperiment, type PredictionVerification } from '../core/agent/predictionVerification';
+import { createReferenceMeasurementRun, type ReferenceMeasurementRequest } from '../core/experimentFabric/realExperiment';
+import { EXPERIMENT_FABRIC_VERSION, type StructuredExperimentRequest } from '../core/experimentFabric/types';
+import type { FalsificationCriterion } from '../core/experimentFabric/scientificDiscovery';
 
 /**
  * Drug Discovery — reachable workspace (P6.9). Uczciwy przepływ na Backend
@@ -106,6 +111,52 @@ function DrugWorkspace() {
   const saveSubstitution = () => {
     const saved = saveSubstitutionInvestigationToMemory(buildSavedSubstitutionInvestigation(substitutionInvestigation));
     setSubstitutionReplay(replaySavedSubstitutionInvestigation(saved, activeReplacementReports));
+  };
+  // REAL-EVIDENCE RERANK — the loop closure `biotechRealEvidenceRerank.ts` adds
+  // over the substitution investigation above: a real/cited measurement judged
+  // against a candidate's own predicted targetRelevance component through the
+  // SAME comparator Dome World already uses (verifyPredictionAgainstRealExperiment),
+  // then folded back into which candidate this screen recommends next. Nothing
+  // here computes a new verdict vocabulary or a second ranking — it reuses
+  // HypothesisAssessment and reads report.ranking, never writes it.
+  const [realEvidenceMap, setRealEvidenceMap] = useState<Map<string, PredictionVerification>>(() => new Map());
+  const [realEvidenceCandidateId, setRealEvidenceCandidateId] = useState('');
+  const [realEvidenceObserved, setRealEvidenceObserved] = useState('');
+  const [realEvidenceTolerance, setRealEvidenceTolerance] = useState('0.1');
+  const [realEvidenceCitation, setRealEvidenceCitation] = useState('');
+  const [realEvidenceRequested, setRealEvidenceRequested] = useState<Set<string>>(() => new Set());
+  const realEvidenceRerank = rerankWithRealEvidence(activeReplacementReports, realEvidenceMap);
+  const nextRealEvidenceSelection = selectNextRealEvidenceCandidate(realEvidenceRerank, realEvidenceRequested);
+  const submitRealEvidence = () => {
+    const candidate = activeReplacementReports.find((r) => r.candidateId === realEvidenceCandidateId);
+    const observed = Number(realEvidenceObserved);
+    const tolerance = Number(realEvidenceTolerance);
+    if (!candidate?.ranking || !Number.isFinite(observed) || !Number.isFinite(tolerance) || realEvidenceCitation.trim().length === 0) return;
+    const structuredRequest: StructuredExperimentRequest = {
+      contractVersion: EXPERIMENT_FABRIC_VERSION,
+      sourceText: `Cited target-relevance figure for ${candidate.candidateId}`,
+      domainId: 'biotech-real-evidence', operation: 'compute', parameters: {},
+    };
+    const request: ReferenceMeasurementRequest = {
+      structuredRequest,
+      citation: { citationText: realEvidenceCitation.trim(), sourceRef: realEvidenceCitation.trim() },
+      hypothesisId: candidate.hypothesisId,
+    };
+    const realRun = createReferenceMeasurementRun({
+      request,
+      derived: [{ outputKey: 'targetRelevance', value: observed, unit: 'score' }],
+      summary: `Cited target-relevance figure for ${candidate.candidateId}: ${observed}`,
+    });
+    const criterion: FalsificationCriterion = {
+      metric: 'targetRelevance', relation: 'equal-within-tolerance', tolerance,
+      rationale: 'Real/cited target-relevance figure judged against this candidate\'s own predicted component.',
+    };
+    const verification = verifyPredictionAgainstRealExperiment({
+      predictedValue: candidate.ranking.components.targetRelevance, criterion, realRun,
+    });
+    setRealEvidenceMap((prev) => new Map(prev).set(candidate.candidateId, verification));
+    setRealEvidenceRequested((prev) => new Set(prev).add(candidate.candidateId));
+    setRealEvidenceObserved(''); setRealEvidenceCitation('');
   };
   // Ranking mówi, KTÓRA para jest wyżej. Dossier mówi, co z tym zrobić: skąd
   // składnik, dlaczego akurat on, co wnosi sam, co jest policzone, czego
@@ -316,6 +367,43 @@ function DrugWorkspace() {
             <button className="chip-btn" type="button" onClick={saveSubstitution}>Zapisz dochodzenie substytucji</button>
           </div>
           {substitutionReplay && <p className="settings-hint" role="status"><strong>{substitutionReplay.status}</strong> · {substitutionReplay.reason}</p>}
+        </section>
+        <section className="settings-section dossier-card" aria-label="Real-evidence rerank">
+          <h3>Real Evidence Rerank · loop closure</h3>
+          <p className="settings-hint">
+            Wpisz cytowaną/realną wartość target relevance dla kandydata — zostanie osądzona wobec jego własnej
+            predykcji tym samym komparatorem, którego już autonomicznie używa Dome World
+            (verifyPredictionAgainstRealExperiment). Realny dowód obalający kandydata bije symulowany ranking zawsze.
+          </p>
+          <div className="account-field-group">
+            <label className="account-field">
+              <span>Candidate ID</span>
+              <select value={realEvidenceCandidateId} onChange={(e) => setRealEvidenceCandidateId(e.target.value)}>
+                <option value="">wybierz…</option>
+                {activeReplacementReports.filter((r) => r.ranking).map((r) => <option key={r.candidateId} value={r.candidateId}>{r.candidateId}</option>)}
+              </select>
+            </label>
+            <label className="account-field"><span>Obserwowana/cytowana wartość target relevance</span><input type="text" value={realEvidenceObserved} onChange={(e) => setRealEvidenceObserved(e.target.value)} placeholder="np. 0.0" /></label>
+            <label className="account-field"><span>Tolerancja</span><input type="text" value={realEvidenceTolerance} onChange={(e) => setRealEvidenceTolerance(e.target.value)} placeholder="np. 0.1" /></label>
+            <label className="account-field"><span>Cytat/źródło</span><input type="text" value={realEvidenceCitation} onChange={(e) => setRealEvidenceCitation(e.target.value)} placeholder="np. cytowany wynik assay" /></label>
+          </div>
+          <div className="pilot-actions">
+            <button className="chip-btn" type="button" onClick={submitRealEvidence} disabled={!realEvidenceCandidateId}>Osądź realnym dowodem</button>
+          </div>
+          {realEvidenceRerank.some((r) => r.realAssessment !== null) && (
+            <div className="cde-results" aria-label="Real evidence rerank results">
+              {realEvidenceRerank.filter((r) => r.realAssessment !== null).map((r) => (
+                <div className="cde-result" key={r.candidateId}>
+                  <span className="cde-result-label">{r.candidateId} · {r.recommendation}</span>
+                  <span className="cde-result-actual">{r.realAssessment}</span>
+                  <span className="cde-result-bound">{r.why}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="settings-hint" role="status">
+            Następny kandydat do zdobycia realnego dowodu: <strong>{nextRealEvidenceSelection.selectedCandidateId ?? 'brak'}</strong> · {nextRealEvidenceSelection.why}
+          </p>
         </section>
         {replacementResult?.reports.length ? <section className="settings-section dossier-card" aria-label="Natural composition analysis">
           <h3>Natural Composition Discovery · top 2</h3>

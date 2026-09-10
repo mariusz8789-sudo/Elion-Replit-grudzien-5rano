@@ -755,6 +755,38 @@ export async function getScienceEnvironment(): Promise<ApiResult<{ environment: 
   return request('GET', '/compute/environment');
 }
 
+/* ---------------- Bezpieczeństwo: audyt podatności zależności (npm audit) ---------------- */
+
+export type DependencyFindingStatus = 'SUSPECTED' | 'INVESTIGATING' | 'VALIDATED' | 'REJECTED' | 'FIXED' | 'VERIFIED';
+
+export interface DependencyAuditFinding {
+  id: string;
+  status: DependencyFindingStatus;
+  severity: string;
+  affectedComponent: string;
+  range: string | null;
+  isDirect: boolean;
+  evidence: { advisoryTitles: string[]; advisoryUrls: string[]; via: unknown[] };
+  hypothesis: string;
+  remediation: string;
+  regressionStatus: string;
+}
+
+export interface DependencyAuditResult {
+  findings: DependencyAuditFinding[];
+  summary: { total: number; bySeverity: Record<string, number> };
+  auditedAt: number;
+}
+
+/**
+ * Realny `npm audit` na wdrożonym repo (security/dependencyAudit.mjs — "the
+ * one honest slice of Genesis Cyber"), zmapowany na SUSPECTED-only findings.
+ * Wymaga zalogowania — patrz komentarz przy trasie w api.mjs.
+ */
+export async function getDependencyAudit(token: string): Promise<ApiResult<DependencyAuditResult>> {
+  return request('GET', '/security/dependency-audit', { token });
+}
+
 export async function listCampaignScienceRuns(token: string, projectId: string, campaignId: string): Promise<ApiResult<ScienceRun[]>> {
   const r = await request<{ scienceRuns: ScienceRun[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/science-runs`, { token });
   return r.ok ? { ok: true, data: r.data.scienceRuns } : r;

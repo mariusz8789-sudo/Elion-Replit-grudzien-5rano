@@ -69,10 +69,22 @@ export interface AttackSurface {
 
 export type VulnerabilityHypothesisKind = 'AUTH_BYPASS' | 'INJECTION' | 'PRIVILEGE_ESCALATION' | 'INFO_DISCLOSURE';
 
+/**
+ * A structured, matchable observable — not a free-text description. At least
+ * one field must be present; `judgeVerdict`-style matching treats every
+ * present field as an AND, every list field as an OR within itself.
+ */
+export interface ObservableExpectation {
+  readonly statusCode?: number;
+  readonly statusCodeIn?: readonly number[];
+  readonly summaryContains?: readonly string[];
+  readonly summaryNotContains?: readonly string[];
+}
+
 /** What would be seen if the hypothesis holds, and what would be seen if it does not — a categorical falsifier. */
 export interface SecurityFalsifier {
-  readonly predictedObservable: string;
-  readonly falsifyingObservable: string;
+  readonly predictedObservable: ObservableExpectation;
+  readonly falsifyingObservable: ObservableExpectation;
 }
 
 /**
@@ -88,12 +100,19 @@ export interface VulnerabilityHypothesis {
   readonly falsifier: SecurityFalsifier;
 }
 
+/** A structured observation of one controlled execution — what `judgeVerdict` actually compares against a falsifier. */
+export interface ObservedResult {
+  readonly statusCode: number;
+  readonly body: string;
+  readonly responseSummary: string;
+}
+
 /** A real, independent execution against the synthetic target — one per hypothesis test. */
 export interface SecurityTestResult {
   readonly testId: string;
   readonly hypothesisId: string;
   readonly executedAt: string;
-  readonly observedResult: string;
+  readonly observedResult: ObservedResult;
   readonly provenance: DataProvenance;
 }
 
@@ -160,13 +179,39 @@ function isCyberObservation(value: unknown): value is CyberObservation {
     && typeof v.statusCode === 'number' && Number.isFinite(v.statusCode) && nonEmptyString(v.responseSummary);
 }
 
+function isObservableExpectation(value: unknown): value is ObservableExpectation {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const hasAnyField = v.statusCode !== undefined || v.statusCodeIn !== undefined
+    || v.summaryContains !== undefined || v.summaryNotContains !== undefined;
+  if (!hasAnyField) return false;
+  if (v.statusCode !== undefined && typeof v.statusCode !== 'number') return false;
+  if (v.statusCodeIn !== undefined && !Array.isArray(v.statusCodeIn)) return false;
+  if (v.summaryContains !== undefined && !Array.isArray(v.summaryContains)) return false;
+  if (v.summaryNotContains !== undefined && !Array.isArray(v.summaryNotContains)) return false;
+  return true;
+}
+
 function isVulnerabilityHypothesis(value: unknown): value is VulnerabilityHypothesis {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   if (!nonEmptyString(v.hypothesisId) || !nonEmptyString(v.statement)) return false;
   if (!Array.isArray(v.derivedFromAssetIds) || v.derivedFromAssetIds.length === 0) return false;
   const falsifier = v.falsifier as Record<string, unknown> | undefined;
-  return !!falsifier && nonEmptyString(falsifier.predictedObservable) && nonEmptyString(falsifier.falsifyingObservable);
+  return !!falsifier && isObservableExpectation(falsifier.predictedObservable) && isObservableExpectation(falsifier.falsifyingObservable);
+}
+
+function isObservedResult(value: unknown): value is ObservedResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.statusCode === 'number' && Number.isFinite(v.statusCode) && typeof v.body === 'string' && nonEmptyString(v.responseSummary);
+}
+
+function isSecurityTestResult(value: unknown): value is SecurityTestResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return nonEmptyString(v.testId) && nonEmptyString(v.hypothesisId) && nonEmptyString(v.executedAt)
+    && isObservedResult(v.observedResult) && v.provenance === 'SIMULATED';
 }
 
 /**
@@ -184,7 +229,7 @@ export function isWellFormedCyberInvestigation(value: unknown): value is CyberIn
   if (!nonEmptyString(v.investigationId) || !nonEmptyString(v.goal)) return false;
   if (!Array.isArray(v.observations) || v.observations.length === 0 || !v.observations.every(isCyberObservation)) return false;
   if (!Array.isArray(v.hypotheses) || v.hypotheses.length === 0 || !v.hypotheses.every(isVulnerabilityHypothesis)) return false;
-  if (!Array.isArray(v.testResults) || v.testResults.length === 0) return false;
+  if (!Array.isArray(v.testResults) || v.testResults.length === 0 || !v.testResults.every(isSecurityTestResult)) return false;
   if (!Array.isArray(v.verdicts) || v.verdicts.length === 0) return false;
   // Every hypothesis's derivedFromAssetIds must resolve to a real declared asset — anti-fabrication, not just non-empty.
   const attackSurface = v.attackSurface as AttackSurface | undefined;

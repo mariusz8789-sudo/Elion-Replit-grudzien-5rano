@@ -38,11 +38,15 @@ function wellFormedFixture(overrides: Partial<CyberInvestigationResult> = {}): C
         kind: 'AUTH_BYPASS',
         statement: '/admin is reachable without authentication.',
         derivedFromAssetIds: ['asset-admin'],
-        falsifier: { predictedObservable: 'status 200 without auth header', falsifyingObservable: 'status 403 without auth header' },
+        falsifier: { predictedObservable: { statusCode: 200 }, falsifyingObservable: { statusCodeIn: [401, 403] } },
       },
     ],
     testResults: [
-      { testId: 'test-1', hypothesisId: 'hyp-auth-bypass', executedAt: '2026-09-10T00:00:00.000Z', observedResult: 'status 200', provenance: 'SIMULATED' },
+      {
+        testId: 'test-1', hypothesisId: 'hyp-auth-bypass', executedAt: '2026-09-10T00:00:00.000Z',
+        observedResult: { statusCode: 200, body: 'admin panel', responseSummary: 'ADMIN_PANEL_SECRET' },
+        provenance: 'SIMULATED',
+      },
     ],
     verdicts: [
       { hypothesisId: 'hyp-auth-bypass', assessment: 'SUPPORTED_WITHIN_PROTOCOL', reasoning: 'Observed status 200 matches the predicted observable.' },
@@ -68,7 +72,7 @@ describe('isWellFormedCyberInvestigation', () => {
           kind: 'AUTH_BYPASS',
           statement: 'x',
           derivedFromAssetIds: ['asset-that-does-not-exist'],
-          falsifier: { predictedObservable: 'a', falsifyingObservable: 'b' },
+          falsifier: { predictedObservable: { statusCode: 200 }, falsifyingObservable: { statusCode: 403 } },
         },
       ],
     });
@@ -83,7 +87,7 @@ describe('isWellFormedCyberInvestigation', () => {
           kind: 'AUTH_BYPASS',
           statement: 'x',
           derivedFromAssetIds: [],
-          falsifier: { predictedObservable: 'a', falsifyingObservable: 'b' },
+          falsifier: { predictedObservable: { statusCode: 200 }, falsifyingObservable: { statusCode: 403 } },
         },
       ],
     });

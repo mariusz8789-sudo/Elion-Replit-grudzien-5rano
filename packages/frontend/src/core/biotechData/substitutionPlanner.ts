@@ -6,6 +6,7 @@ import type {
   SubstitutionCandidateAssessment, SubstitutionComparisonRecord, SubstitutionInvestigationResult,
   SubstitutionPlannerSelection, SubstitutionVerdict,
 } from './substitutionInvestigation';
+import { paretoFrontier } from './substitutionPareto';
 
 /**
  * SUBSTITUTION PLANNER — the adaptive addition over the existing natural
@@ -145,12 +146,22 @@ export function runSubstitutionInvestigation(input: SubstitutionInvestigationInp
     .filter((a) => a.verdict === 'CANDIDATE_HYPOTHESIS')
     .sort((a, b) => (b.rankingScore ?? 0) - (a.rankingScore ?? 0) || a.candidateId.localeCompare(b.candidateId))[0] ?? null;
 
+  // Pareto frontier over evidence quality / target relevance / safety penalty for every
+  // CANDIDATE_HYPOTHESIS report — restricted to that verdict because INSUFFICIENT_DATA
+  // candidates have nothing decision-worthy to trade off yet.
+  const candidateHypothesisRankings = assessments
+    .filter((a) => a.verdict === 'CANDIDATE_HYPOTHESIS')
+    .map((a) => byId.get(a.candidateId)!.ranking)
+    .filter((r): r is NonNullable<typeof r> => r !== undefined);
+  const pareto = paretoFrontier(candidateHypothesisRankings, ['evidenceQuality', 'targetRelevance', 'safetyPenalty']);
+
   const identity = { question, requestedTargetIds, candidateIds: reports.map((r) => r.candidateId) };
   return {
     investigationId: `substitution-investigation:${fnv1a(canonicalJson(identity))}`,
     question, requestedTargetIds, candidateIds: reports.map((r) => r.candidateId),
     assessments, steps, maxStepsUsed,
     bestCandidateId: bestCandidate?.candidateId ?? null,
+    paretoFrontier: pareto,
     combinationHypothesis, compositionHypotheses, stopReason,
   };
 }

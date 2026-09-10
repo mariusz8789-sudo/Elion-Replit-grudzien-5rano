@@ -85,6 +85,14 @@ export interface SubstitutionInvestigationResult {
   /** The `maxSteps` value actually used (explicit input or the computed default) — persisted so replay can reproduce it exactly. */
   readonly maxStepsUsed: number;
   readonly bestCandidateId: string | null;
+  /**
+   * Candidate ids not dominated on evidence quality / target relevance / safety
+   * penalty among the `CANDIDATE_HYPOTHESIS` set — see `substitutionPareto.ts`.
+   * A candidate can be Pareto-optimal without being `bestCandidateId` (the
+   * single top-ranked one): this surfaces every candidate worth considering
+   * on its own trade-off, not just the winner of one weighted score.
+   */
+  readonly paretoFrontier: readonly string[];
   readonly combinationHypothesis: CandidateCombinationHypothesis | undefined;
   readonly compositionHypotheses: readonly RankedCompositionHypothesis[];
   readonly stopReason: string;
@@ -123,6 +131,7 @@ export function isWellFormedSubstitutionInvestigation(value: unknown): value is 
   if (!Array.isArray(v.assessments) || v.assessments.length === 0 || !v.assessments.every(isSubstitutionCandidateAssessment)) return false;
   if (!Array.isArray(v.steps)) return false;
   if (typeof v.maxStepsUsed !== 'number') return false;
+  if (!Array.isArray(v.paretoFrontier)) return false;
   if (!nonEmptyString(v.stopReason)) return false;
   const candidateIds = new Set(v.candidateIds as string[]);
   for (const a of v.assessments as SubstitutionCandidateAssessment[]) {

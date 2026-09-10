@@ -159,6 +159,15 @@ describe('runSubstitutionInvestigation — the real orchestrator', () => {
     const result = runSubstitutionInvestigation({ question: 'q', reports, requestedTargetIds: ['A1'] });
     expect(isWellFormedSubstitutionInvestigation(result)).toBe(true);
   });
+
+  it('paretoFrontier is non-empty, restricted to CANDIDATE_HYPOTHESIS candidates, and includes the best candidate', () => {
+    const reports = realReports();
+    const result = runSubstitutionInvestigation({ question: 'q', reports, requestedTargetIds: ['A1'] });
+    const candidateHypothesisIds = new Set(result.assessments.filter((a) => a.verdict === 'CANDIDATE_HYPOTHESIS').map((a) => a.candidateId));
+    expect(result.paretoFrontier.length).toBeGreaterThan(0);
+    for (const id of result.paretoFrontier) expect(candidateHypothesisIds.has(id)).toBe(true);
+    expect(result.paretoFrontier).toContain(result.bestCandidateId);
+  });
 });
 
 describe('Science Memory persistence and GENUINE replay (not self-consistency-only)', () => {
@@ -195,7 +204,7 @@ describe('Science Memory persistence and GENUINE replay (not self-consistency-on
   it('rejects an empty/degenerate result at build time (anti-fabrication)', () => {
     expect(() => buildSavedSubstitutionInvestigation({
       investigationId: 'x', question: 'q', requestedTargetIds: [], candidateIds: [], assessments: [],
-      steps: [], maxStepsUsed: 0, bestCandidateId: null, combinationHypothesis: undefined, compositionHypotheses: [], stopReason: 'none',
+      steps: [], maxStepsUsed: 0, bestCandidateId: null, paretoFrontier: [], combinationHypothesis: undefined, compositionHypotheses: [], stopReason: 'none',
     })).toThrow();
   });
 });

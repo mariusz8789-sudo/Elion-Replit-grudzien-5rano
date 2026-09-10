@@ -556,6 +556,21 @@ export function CellLabScreen() {
           prediction={realExperimentPrediction}
         />
 
+        {/* Demo-path discoverability: the one navigation link from the flagship Cell Lab screen to
+            EvidenceShowcaseScreen.tsx — otherwise that screen is reachable only by typing its URL or an
+            NL command, invisible to anyone just clicking through a demo. Always shown, even before any
+            Evidence Bundle exists: the showcase screen's own honest empty state already handles that
+            case and points back here — this link just makes the next step discoverable either way. */}
+        <div className="gsc-panel-row">
+          <button
+            type="button"
+            onClick={() => { window.location.hash = '#/evidence-showcase'; }}
+            data-testid="cell-lab-open-evidence-showcase"
+          >
+            View as audit-ready Evidence Showcase →
+          </button>
+        </div>
+
         <details className="cell-lab-honesty" data-testid="cell-lab-honesty">
           <summary>What this model does and doesn't claim</summary>
           <p className="gsc-caption">

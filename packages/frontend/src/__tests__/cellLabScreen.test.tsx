@@ -287,6 +287,12 @@ describe('CellLabScreen — markup contract (SIMULATION badge, narrative, honest
     expect(markup).toContain('Demo Mode');
   });
 
+  it('links to the Evidence Showcase — otherwise it would only be reachable by typing its URL or an NL command', () => {
+    const markup = renderToStaticMarkup(<CellLabScreen />);
+    expect(markup).toContain('data-testid="cell-lab-open-evidence-showcase"');
+    expect(markup).toContain('Evidence Showcase');
+  });
+
   it('discloses the real model simplification (dose applied at t=0) rather than hiding it', () => {
     const markup = renderToStaticMarkup(<CellLabScreen />);
     expect(markup).toContain('data-testid="cell-lab-honesty"');

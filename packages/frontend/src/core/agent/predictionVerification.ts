@@ -29,7 +29,13 @@ export interface PredictionVerificationInput {
   readonly predictedValue: number;
   /** The ORIGINAL hypothesis's own preregistered criterion — never a new one invented for this comparison. */
   readonly criterion: FalsificationCriterion;
-  /** The real, physical measurement — must already carry `provenance.dataProvenance === 'REAL_EXPERIMENTAL'`. */
+  /**
+   * The externally-sourced measurement — either a real, physical reading
+   * (`dataProvenance: 'REAL_EXPERIMENTAL'`) or a cited, published reference
+   * figure (`dataProvenance: 'REFERENCE'`, e.g. a generator-sizing
+   * rule-of-thumb from manufacturer literature). Both are honest, non-Genesis
+   * sources; only `'SIMULATED'` is refused.
+   */
   readonly realRun: ExperimentRun;
 }
 
@@ -44,24 +50,32 @@ export interface PredictionVerification {
   readonly message: string;
 }
 
+const EXTERNAL_PROVENANCE = new Set(['REAL_EXPERIMENTAL', 'REFERENCE']);
+
 /**
- * Judges a real, physical measurement against a WorldGraph prediction.
+ * Judges an externally-sourced measurement (real physical reading OR cited
+ * reference figure) against a WorldGraph prediction.
  *
- * Refuses to compare when `realRun` is not honestly tagged
- * `REAL_EXPERIMENTAL` — this function exists specifically so a prediction is
- * never silently checked against a re-simulated number instead of a real one.
+ * Refuses to compare when `realRun` is tagged `SIMULATED` (or carries no
+ * provenance at all) — this function exists specifically so a prediction is
+ * never silently checked against a re-simulated number instead of a genuinely
+ * external one. `REAL_EXPERIMENTAL` and `REFERENCE` are both honest,
+ * non-Genesis sources and are treated identically here: the SAME comparison
+ * primitive judges "does reality match the prediction" whether reality was
+ * read off an instrument or off a published citation.
  */
 export function verifyPredictionAgainstRealExperiment(input: PredictionVerificationInput): PredictionVerification {
   const { predictedValue, criterion, realRun } = input;
   const base = { contractVersion: PREDICTION_VERIFICATION_CONTRACT_VERSION, predictedValue, criterion };
 
-  if (realRun.provenance.dataProvenance !== 'REAL_EXPERIMENTAL') {
+  const provenance = realRun.provenance.dataProvenance;
+  if (provenance === undefined || !EXTERNAL_PROVENANCE.has(provenance)) {
     return {
       ...base,
       observedValue: null,
       outcome: null,
       assessment: 'INCONCLUSIVE',
-      message: `Run "${realRun.runId}" is not tagged REAL_EXPERIMENTAL (got "${realRun.provenance.dataProvenance ?? 'undefined'}") — refusing to compare a prediction against it as if it were a real measurement.`,
+      message: `Run "${realRun.runId}" is not tagged REAL_EXPERIMENTAL or REFERENCE (got "${provenance ?? 'undefined'}") — refusing to compare a prediction against it as if it were externally sourced.`,
     };
   }
 

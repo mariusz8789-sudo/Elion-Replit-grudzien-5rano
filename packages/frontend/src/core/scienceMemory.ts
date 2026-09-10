@@ -42,11 +42,12 @@ import {
 import { buildWorldEvidenceBundle, type WorldEvidenceBundle } from './worldModel/evidence/worldEvidenceBundle';
 import { compareBranches, projectToWorldState } from './worldModel/bridge/worldFrameState';
 import { TemporalEngine, TemporalBranchRegistry } from './worldModel/temporal/temporalEngine';
-import type { RealExperimentRequest } from './experimentFabric/realExperiment';
+import type { RealExperimentRequest, ReferenceMeasurementRequest } from './experimentFabric/realExperiment';
 import type { FalsificationCriterion } from './experimentFabric/scientificDiscovery';
 import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
 } from './agent/predictionVerification';
+import { isWellFormedCyberInvestigation, type CyberInvestigationResult } from './agent/cyberInvestigation';
 
 
 /**
@@ -260,6 +261,28 @@ export interface SavedExperiment {
    * from a completed `worldDiscovery` run. See `SavedRealExperimentVerification`.
    */
   realExperimentVerification?: SavedRealExperimentVerification;
+  /**
+   * A completed run of `runResearchChain`/`runMechanismResearchChain`
+   * (`core/agent/researchChain.ts`) — the sixth investigation shape. Every
+   * step it lists was ALREADY persisted as its own `worldDiscovery`/
+   * `parameterInquiry` record by the step that produced it; this manifest
+   * duplicates none of that. What it adds is the one thing no individual
+   * step's own record carries: that Genesis chose the NEXT step itself,
+   * from what the previous step left open, and why. See
+   * `SavedResearchChainManifest`.
+   */
+  researchChain?: SavedResearchChainManifest;
+  /**
+   * A completed security investigation against a synthetic target
+   * (`core/agent/cyberInvestigation.ts`) — the seventh investigation shape.
+   * A genuinely different substrate from every WorldGraph shape above: a
+   * vulnerability hypothesis is categorical (auth bypass present or not),
+   * not a numeric lever on a simulated physical world, so it cannot reuse
+   * `worldDiscovery`'s `DiscoveryLoopResult`/`resolveWorldLeverCatalog`
+   * replay path without inventing a fake catalog to satisfy the type. See
+   * `cyberInvestigation.ts`'s own module doc for the full reasoning.
+   */
+  cyberInvestigation?: SavedCyberInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -565,6 +588,8 @@ export interface SaveExperimentInput {
   parameterInquiry?: SavedParameterInquiry;
   mechanismComposition?: SavedMechanismComposition;
   realExperimentVerification?: SavedRealExperimentVerification;
+  researchChain?: SavedResearchChainManifest;
+  cyberInvestigation?: SavedCyberInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -617,6 +642,8 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.parameterInquiry !== undefined && !isSavedParameterInquiry(input.parameterInquiry)) throw new Error('Zapis dochodzenia parametrycznego musi zawierać wejścia, wynik i odcisk treści.');
   if (input.mechanismComposition !== undefined && !isSavedMechanismComposition(input.mechanismComposition)) throw new Error('Zapis kompozycji mechanizmów musi zawierać katalog, cel, wynik i odcisk treści.');
   if (input.realExperimentVerification !== undefined && !isSavedRealExperimentVerification(input.realExperimentVerification)) throw new Error('Zapis weryfikacji realnym eksperymentem musi zawierać źródło predykcji, request, realny przebieg REAL_EXPERIMENTAL i wynik porównania.');
+  if (input.researchChain !== undefined && !isSavedResearchChainManifest(input.researchChain)) throw new Error('Zapis łańcucha badawczego musi zawierać co najmniej jeden krok, odcisk treści i status końcowy.');
+  if (input.cyberInvestigation !== undefined && !isSavedCyberInvestigation(input.cyberInvestigation)) throw new Error('Zapis dochodzenia bezpieczeństwa musi zawierać dobrze uformowany wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -642,6 +669,8 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.parameterInquiry === undefined ? {} : { parameterInquiry: input.parameterInquiry }),
     ...(input.mechanismComposition === undefined ? {} : { mechanismComposition: input.mechanismComposition }),
     ...(input.realExperimentVerification === undefined ? {} : { realExperimentVerification: input.realExperimentVerification }),
+    ...(input.researchChain === undefined ? {} : { researchChain: input.researchChain }),
+    ...(input.cyberInvestigation === undefined ? {} : { cyberInvestigation: input.cyberInvestigation }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -2170,6 +2199,291 @@ export function replaySavedMechanismComposition(saved: SavedExperiment): SavedMe
 }
 
 // ---------------------------------------------------------------------------
+// RESEARCH CHAIN MANIFEST — Genesis choosing its own next question, banked.
+// ---------------------------------------------------------------------------
+
+export const RESEARCH_CHAIN_MANIFEST_CONTRACT_VERSION = '1.0.0';
+
+/**
+ * One step of a persisted research chain. `savedExperimentIds` point at
+ * records `core/agent/researchChain.ts`'s own step loop ALREADY saved
+ * through `saveParameterInquiryToMemory`/`runMechanismDiscoveryAndRemember`
+ * before this manifest is built — never duplicated here. `kind`/`why` are
+ * kept as plain strings, not `ResearchQuestionKind` from `nextQuestion.ts`:
+ * that module sits above `scienceMemory.ts` in the dependency graph (it
+ * reads `DiscoveryOutcome` from `discoveryOrchestrator.ts`, which itself
+ * imports this file), so importing its vocabulary here would be a cycle.
+ * A snapshot string is what every other loosely-typed field in this file
+ * already does for a producer's evolving vocabulary (e.g. `epistemicStatus`).
+ */
+export interface SavedResearchChainStep {
+  readonly step: number;
+  readonly question: string;
+  readonly kind: string;
+  readonly why: string;
+  readonly ranSuccessfully: boolean;
+  readonly savedExperimentIds: readonly string[];
+}
+
+/**
+ * A completed `ResearchChainResult`/`MechanismResearchChainResult`
+ * (`core/agent/researchChain.ts`), banked as its own Science Memory record
+ * — the sixth investigation shape. What makes this different from every
+ * step's own `worldDiscovery`/`parameterInquiry` record: THIS is the only
+ * place "Genesis chose step 2 itself, because of what step 1 left open" is
+ * ever written down. Without it, a chain of N self-chosen steps is
+ * indistinguishable, once saved, from N unrelated investigations a human
+ * happened to run back to back.
+ */
+export interface SavedResearchChainManifest {
+  contractVersion: string;
+  chainShape: 'PARAMETER' | 'MECHANISM';
+  initialQuestion: string;
+  steps: readonly SavedResearchChainStep[];
+  selfChosenSteps: number;
+  stoppedBecause: string;
+  terminalStatus: 'SETTLED' | 'OPEN' | 'INCONCLUSIVE' | 'BLOCKED';
+  resultFingerprint: string;
+}
+
+export interface BuildSavedResearchChainManifestInput {
+  chainShape: 'PARAMETER' | 'MECHANISM';
+  steps: readonly SavedResearchChainStep[];
+  selfChosenSteps: number;
+  stoppedBecause: string;
+  terminalStatus: 'SETTLED' | 'OPEN' | 'INCONCLUSIVE' | 'BLOCKED';
+}
+
+function researchChainManifestFingerprint(input: BuildSavedResearchChainManifestInput): string {
+  return fnv1a(canonicalJson({
+    chainShape: input.chainShape,
+    steps: input.steps.map((s) => ({ step: s.step, kind: s.kind, ranSuccessfully: s.ranSuccessfully, savedExperimentIds: s.savedExperimentIds })),
+    stoppedBecause: input.stoppedBecause,
+    terminalStatus: input.terminalStatus,
+  }));
+}
+
+export function buildSavedResearchChainManifest(input: BuildSavedResearchChainManifestInput): SavedResearchChainManifest {
+  if (input.steps.length === 0) throw new Error('Łańcuch badawczy musi zawierać co najmniej jeden krok.');
+  return {
+    contractVersion: RESEARCH_CHAIN_MANIFEST_CONTRACT_VERSION,
+    chainShape: input.chainShape,
+    initialQuestion: input.steps[0]!.question,
+    steps: input.steps,
+    selfChosenSteps: input.selfChosenSteps,
+    stoppedBecause: input.stoppedBecause,
+    terminalStatus: input.terminalStatus,
+    resultFingerprint: researchChainManifestFingerprint(input),
+  };
+}
+
+export function isSavedResearchChainManifest(value: unknown): value is SavedResearchChainManifest {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string') return false;
+  if (value.chainShape !== 'PARAMETER' && value.chainShape !== 'MECHANISM') return false;
+  if (!nonEmptyString(value.initialQuestion) || !nonEmptyString(value.resultFingerprint)) return false;
+  if (!Array.isArray(value.steps) || value.steps.length === 0) return false;
+  return true;
+}
+
+function researchChainAnalysis(saved: SavedResearchChainManifest): SavedExperimentAnalysisBlock[] {
+  return [
+    { title: 'Pytanie wyjściowe', body: saved.initialQuestion, kind: 'research-chain-question' },
+    {
+      title: 'Kroki',
+      body: saved.steps.map((s) => `Krok ${s.step} (${s.kind}): ${s.question} — ${s.why}`).join(' | '),
+      kind: 'research-chain-steps',
+    },
+    {
+      title: 'Dlaczego się zatrzymał',
+      body: `${saved.terminalStatus}: ${saved.stoppedBecause} (${saved.selfChosenSteps} kroków wybranych samodzielnie przez Genesis).`,
+      kind: 'research-chain-stop',
+    },
+  ];
+}
+
+/**
+ * Persists a completed research chain as its own Science Memory record,
+ * through `saveExperiment` unchanged — the same seam every other shape in
+ * this file uses. No `execution`/`ExperimentRun` attached: like
+ * `mechanismComposition`, the chain itself is an orchestration result, not
+ * a Fabric run.
+ */
+export function saveResearchChainManifestToMemory(saved: SavedResearchChainManifest): SavedExperiment {
+  return saveExperiment({
+    labId: saved.chainShape === 'MECHANISM' ? 'mechanism-research-chain' : 'parameter-research-chain',
+    experimentId: `research-chain:${saved.resultFingerprint}`,
+    experimentName: `Łańcuch badawczy — ${saved.initialQuestion}`,
+    params: { chainShape: saved.chainShape, stepCount: saved.steps.length, selfChosenSteps: saved.selfChosenSteps },
+    stats: { stepCount: saved.steps.length, selfChosenSteps: saved.selfChosenSteps },
+    researchChain: saved,
+    analysis: researchChainAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: `${saved.selfChosenSteps} z ${saved.steps.length} kroków wybrało samo Genesis, na podstawie tego, co zostawił otwarte krok poprzedni; ` +
+      `każdy krok ma własny, pełny zapis w Scientific Memory — ten rekord jedynie łączy je w kolejność i podaje powód każdego wyboru.`,
+    assumptions: [],
+    epistemicStatus: saved.terminalStatus,
+  });
+}
+
+export interface SavedResearchChainReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Verifies a saved chain by re-checking every step's OWN already-saved
+ * record — never by re-running the chain's decision procedure itself
+ * (`runResearchChain`/`runMechanismResearchChain` sit above this file in
+ * the dependency graph, so this file cannot call back into them without a
+ * cycle). A chain-level MATCH means: every step's saved record still
+ * exists and its own replay still matches — the same discipline as
+ * checking a chain of receipts by checking every receipt, not by
+ * re-running the purchase.
+ */
+export function replaySavedResearchChainManifest(saved: SavedExperiment): SavedResearchChainReplay {
+  const record = saved.researchChain;
+  if (record === undefined || !isSavedResearchChainManifest(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera łańcucha badawczego.' };
+  }
+  const selfCheck = researchChainManifestFingerprint(record);
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisany łańcuch został zmieniony po zapisie: jego treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  for (const step of record.steps) {
+    if (!step.ranSuccessfully) continue;
+    if (step.savedExperimentIds.length === 0) {
+      return { status: 'NOT_REPRODUCIBLE', reason: `Krok ${step.step} nie ma żadnego powiązanego zapisu do zweryfikowania.` };
+    }
+    for (const id of step.savedExperimentIds) {
+      const stepExperiment = getExperiment(id);
+      if (stepExperiment === undefined) {
+        return { status: 'NOT_REPRODUCIBLE', reason: `Krok ${step.step}: zapis "${id}" nie jest już dostępny w tej przeglądarce.` };
+      }
+      if (stepExperiment.worldDiscovery !== undefined && isSavedWorldDiscoveryRun(stepExperiment.worldDiscovery)) {
+        const stepReplay = replaySavedWorldDiscoveryRun(stepExperiment);
+        if (stepReplay.status !== 'MATCH') {
+          return { status: stepReplay.status, reason: `Krok ${step.step} (${id}): ${stepReplay.reason}` };
+        }
+      }
+    }
+  }
+  return { status: 'MATCH', reason: `Każdy z ${record.steps.length} krok(ów) ma własny, wciąż dostępny zapis, a każdy sprawdzalny krok odtworzył się identycznie.` };
+}
+
+// ---------------------------------------------------------------------------
+// CYBER INVESTIGATION — a security investigation against a synthetic
+// target. See `cyberInvestigation.ts` for why this is a genuinely
+// different substrate from every WorldGraph shape above, and reuses only
+// the shared verdict vocabularies (DataProvenance/HypothesisAssessment/
+// ReplayVerdict) and the one `saveExperiment` persistence seam.
+// ---------------------------------------------------------------------------
+
+export const CYBER_INVESTIGATION_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+export interface SavedCyberInvestigation {
+  contractVersion: string;
+  result: CyberInvestigationResult;
+  resultFingerprint: string;
+}
+
+export function buildSavedCyberInvestigation(result: CyberInvestigationResult): SavedCyberInvestigation {
+  if (!isWellFormedCyberInvestigation(result)) {
+    throw new Error('Dochodzenie bezpieczeństwa musi zawierać obserwacje, hipotezy wywiedzione z realnych assetów, wyniki testów i werdykty — nie może być pustą powłoką.');
+  }
+  return {
+    contractVersion: CYBER_INVESTIGATION_MEMORY_CONTRACT_VERSION,
+    result,
+    resultFingerprint: fnv1a(canonicalJson(result)),
+  };
+}
+
+export function isSavedCyberInvestigation(value: unknown): value is SavedCyberInvestigation {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string' || !nonEmptyString(value.resultFingerprint)) return false;
+  return isWellFormedCyberInvestigation(value.result);
+}
+
+function cyberInvestigationAnalysis(saved: SavedCyberInvestigation): SavedExperimentAnalysisBlock[] {
+  const { result } = saved;
+  const supported = result.verdicts.filter((v) => v.assessment === 'SUPPORTED_WITHIN_PROTOCOL');
+  const falsified = result.verdicts.filter((v) => v.assessment === 'FALSIFIED_WITHIN_PROTOCOL');
+  return [
+    { title: 'Cel', body: result.goal, kind: 'cyber-investigation-goal' },
+    {
+      title: 'Hipotezy',
+      body: result.hypotheses.map((h) => `${h.hypothesisId} (${h.kind}): ${h.statement}`).join(' | '),
+      kind: 'cyber-investigation-hypotheses',
+    },
+    {
+      title: 'Werdykty',
+      body: `${supported.length} SUPPORTED_WITHIN_PROTOCOL, ${falsified.length} FALSIFIED_WITHIN_PROTOCOL, ${result.verdicts.length - supported.length - falsified.length} inne.`,
+      kind: 'cyber-investigation-verdicts',
+    },
+    ...(result.retestVerdict
+      ? [{ title: 'Weryfikacja po remediacji', body: `${result.retestVerdict.assessment}: ${result.retestVerdict.reasoning}`, kind: 'cyber-investigation-retest' }]
+      : []),
+  ];
+}
+
+/**
+ * Persists a completed Cyber Investigation as its own Science Memory
+ * record, through `saveExperiment` unchanged. No `execution`/`ExperimentRun`
+ * attached: like `researchChain`/`mechanismComposition`, this is an
+ * orchestration result over a synthetic target, not a Fabric run.
+ */
+export function saveCyberInvestigationToMemory(saved: SavedCyberInvestigation): SavedExperiment {
+  const { result } = saved;
+  return saveExperiment({
+    labId: 'cyber-security',
+    experimentId: `cyber-investigation:${result.investigationId}:${saved.resultFingerprint}`,
+    experimentName: `Dochodzenie bezpieczeństwa — ${result.goal}`,
+    params: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length },
+    stats: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length, verdictCount: result.verdicts.length },
+    cyberInvestigation: saved,
+    analysis: cyberInvestigationAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: `Dochodzenie przeciw syntetycznemu, kontrolowanemu celowi (fixture), nie realnemu systemowi. ` +
+      `Każda hipoteza wywiedziona z realnych obserwacji attack surface, każdy werdykt z porównania predykcji ` +
+      `z realnie wykonanym testem — żadna wartość nie jest odczytana wprost z metadanych fixture.`,
+    assumptions: ['Cel jest syntetycznym, deterministycznym fixture — wyniki nie ekstrapolują na realne systemy.'],
+    epistemicStatus: 'SIMULATION',
+  });
+}
+
+export interface SavedCyberInvestigationReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Verifies self-consistency: does the saved record still match its own
+ * fingerprint? This does NOT yet re-execute the investigation against the
+ * synthetic target — there is no investigation engine to call (see
+ * `cyberInvestigation.ts`'s module doc: the pure hypothesis-generation/
+ * test-execution engine is a separate, not-yet-landed piece). Reporting
+ * MATCH here means exactly "unmodified since save", never "independently
+ * reproduced" — the same honest distinction `CaseStudyReplay.computedLive`
+ * already draws for the legacy Evidence Pack shape. Once a real engine
+ * lands, this function is the one place to add genuine re-execution, the
+ * same way `replaySavedMechanismComposition` re-executes today.
+ */
+export function replaySavedCyberInvestigation(saved: SavedExperiment): SavedCyberInvestigationReplay {
+  const record = saved.cyberInvestigation;
+  if (record === undefined || !isSavedCyberInvestigation(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera dochodzenia bezpieczeństwa.' };
+  }
+  const selfCheck = fnv1a(canonicalJson(record.result));
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisane dochodzenie zostało zmienione po zapisie: jego treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  return {
+    status: 'MATCH',
+    reason: 'Sprawdzenie tylko wewnętrznej spójności: zapis odpowiada własnemu odciskowi. Pełne ponowne wykonanie przeciw syntetycznemu celowi nie jest jeszcze podłączone tutaj.',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // REAL EXPERIMENT VERIFICATION — a real, physical measurement judged against
 // a WorldGraph prediction Genesis already produced and saved.
 // ---------------------------------------------------------------------------
@@ -2177,9 +2491,18 @@ export function replaySavedMechanismComposition(saved: SavedExperiment): SavedMe
 export const REAL_EXPERIMENT_VERIFICATION_CONTRACT_VERSION = '1.0.0';
 
 /**
- * A REAL_EXPERIMENTAL measurement, judged against a WorldGraph prediction —
- * the fifth investigation shape, alongside `hypothesisLoop`, `worldDiscovery`,
- * `parameterInquiry` and `mechanismComposition`.
+ * An externally-sourced measurement (REAL_EXPERIMENTAL or REFERENCE), judged
+ * against a WorldGraph prediction — the fifth investigation shape, alongside
+ * `hypothesisLoop`, `worldDiscovery`, `parameterInquiry` and
+ * `mechanismComposition`.
+ *
+ * `request` is a union rather than two separate saved shapes: a physical
+ * measurement's request (`physicalProtocolRef`) and a cited reference's
+ * request (`citation`) both PRODUCE the same `ExperimentRun` shape and are
+ * judged by the exact same `verifyPredictionAgainstRealExperiment` — only
+ * the origin of the number differs, and `realRun.provenance.dataProvenance`
+ * already says which. Splitting this into two saved shapes would duplicate
+ * everything below `request` for no real difference in behavior.
  *
  * The prediction itself is NOT duplicated here: `predictionSourceExperimentId`
  * links back to the existing `SavedWorldDiscoveryRun` (saved through the
@@ -2199,10 +2522,15 @@ export interface SavedRealExperimentVerification {
   predictionSourceExperimentId: string;
   predictedRoundIndex: number;
   hypothesisId: string;
-  request: RealExperimentRequest;
+  request: RealExperimentRequest | ReferenceMeasurementRequest;
   realRun: ExperimentRun;
   verification: PredictionVerification;
   resultFingerprint: string;
+}
+
+/** A single human-readable label for either request shape — never branch on this twice in two places. */
+function requestSourceLabel(request: RealExperimentRequest | ReferenceMeasurementRequest): string {
+  return 'physicalProtocolRef' in request ? request.physicalProtocolRef : request.citation.sourceRef;
 }
 
 export interface BuildSavedRealExperimentVerificationInput {
@@ -2221,7 +2549,7 @@ export interface BuildSavedRealExperimentVerificationInput {
    * already uses, never a fabricated universal threshold invented here.
    */
   verificationCriterion: FalsificationCriterion;
-  request: RealExperimentRequest;
+  request: RealExperimentRequest | ReferenceMeasurementRequest;
   realRun: ExperimentRun;
 }
 
@@ -2255,6 +2583,8 @@ export function buildSavedRealExperimentVerification(input: BuildSavedRealExperi
   };
 }
 
+const EXTERNAL_VERIFICATION_PROVENANCE = new Set(['REAL_EXPERIMENTAL', 'REFERENCE']);
+
 /** localStorage jest edytowalne poza aplikacją — rekord walidujemy pole po polu. */
 export function isSavedRealExperimentVerification(value: unknown): value is SavedRealExperimentVerification {
   if (!isRecordLike(value)) return false;
@@ -2263,10 +2593,14 @@ export function isSavedRealExperimentVerification(value: unknown): value is Save
   if (typeof value.predictedRoundIndex !== 'number' || !Number.isInteger(value.predictedRoundIndex) || value.predictedRoundIndex < 0) return false;
   if (!nonEmptyString(value.hypothesisId)) return false;
   if (!nonEmptyString(value.resultFingerprint)) return false;
-  if (!isRecordLike(value.request) || !nonEmptyString(value.request.physicalProtocolRef)) return false;
+  if (!isRecordLike(value.request)) return false;
+  const hasPhysicalProtocol = nonEmptyString(value.request.physicalProtocolRef);
+  const citation = value.request.citation;
+  const hasCitation = isRecordLike(citation) && nonEmptyString(citation.citationText) && nonEmptyString(citation.sourceRef);
+  if (!hasPhysicalProtocol && !hasCitation) return false;
   if (!isRecordLike(value.realRun)) return false;
   const provenance = value.realRun.provenance;
-  if (!isRecordLike(provenance) || provenance.dataProvenance !== 'REAL_EXPERIMENTAL') return false;
+  if (!isRecordLike(provenance) || typeof provenance.dataProvenance !== 'string' || !EXTERNAL_VERIFICATION_PROVENANCE.has(provenance.dataProvenance)) return false;
   if (!isRecordLike(value.verification) || typeof value.verification.predictedValue !== 'number' || typeof value.verification.assessment !== 'string') return false;
   return true;
 }
@@ -2276,7 +2610,7 @@ function realExperimentVerificationAnalysis(saved: SavedRealExperimentVerificati
   return [
     {
       title: 'Protokół',
-      body: `${request.physicalProtocolRef}${request.hypothesisId ? ` (hipoteza ${request.hypothesisId})` : ''}`,
+      body: `${requestSourceLabel(request)}${request.hypothesisId ? ` (hipoteza ${request.hypothesisId})` : ''}`,
       kind: 'real-experiment-protocol',
     },
     {
@@ -2295,15 +2629,18 @@ function realExperimentVerificationAnalysis(saved: SavedRealExperimentVerificati
  */
 export function saveRealExperimentVerificationToMemory(saved: SavedRealExperimentVerification): SavedExperiment {
   const { verification, request } = saved;
+  const provenance = saved.realRun.provenance.dataProvenance ?? 'REAL_EXPERIMENTAL';
+  const sourceLabel = requestSourceLabel(request);
+  const sourceKind = provenance === 'REFERENCE' ? 'cytowaną wartość referencyjną' : 'realny pomiar fizyczny (protokół)';
   return saveExperiment({
     labId: 'real-experiment',
     experimentId: `real-experiment-verification:${saved.predictionSourceExperimentId}:${saved.resultFingerprint}`,
-    experimentName: `Weryfikacja realnym pomiarem — ${saved.hypothesisId}`,
+    experimentName: `Weryfikacja ${provenance === 'REFERENCE' ? 'danymi referencyjnymi' : 'realnym pomiarem'} — ${saved.hypothesisId}`,
     params: {
       predictionSourceExperimentId: saved.predictionSourceExperimentId,
       predictedRoundIndex: saved.predictedRoundIndex,
       hypothesisId: saved.hypothesisId,
-      physicalProtocolRef: request.physicalProtocolRef,
+      physicalProtocolRef: sourceLabel,
       metric: verification.criterion.metric,
     },
     stats: {
@@ -2313,10 +2650,10 @@ export function saveRealExperimentVerificationToMemory(saved: SavedRealExperimen
     realExperimentVerification: saved,
     analysis: realExperimentVerificationAnalysis(saved),
     honesty: 'simplified',
-    honestyNote: `Realny pomiar fizyczny (protokół ${request.physicalProtocolRef}) porównany z predykcją Genesis dla "${verification.criterion.metric}"; `
-      + `werdykt (${verification.assessment}) dotyczy TEGO jednego pomiaru i TEGO modelu, nie ogólnej prawdy o świecie.`,
+    honestyNote: `${sourceKind} (${sourceLabel}) porównana z predykcją Genesis dla "${verification.criterion.metric}"; `
+      + `werdykt (${verification.assessment}) dotyczy TEGO jednego pomiaru/cytowania i TEGO modelu, nie ogólnej prawdy o świecie.`,
     assumptions: [],
-    epistemicStatus: 'REAL_EXPERIMENTAL',
+    epistemicStatus: provenance,
   });
 }
 
@@ -2349,8 +2686,9 @@ export function replaySavedRealExperimentVerification(saved: SavedExperiment): S
   if (selfCheck !== record.resultFingerprint) {
     return { status: 'DRIFT', reason: `Zapisana weryfikacja została zmieniona po zapisie: jej treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
   }
-  if (record.realRun.provenance.dataProvenance !== 'REAL_EXPERIMENTAL') {
-    return { status: 'BLOCKED', reason: 'Zapisany realny przebieg nie jest oznaczony REAL_EXPERIMENTAL — odtworzenie odmawia potraktowania go jako realnego pomiaru.' };
+  const storedProvenance = record.realRun.provenance.dataProvenance;
+  if (storedProvenance === undefined || !EXTERNAL_VERIFICATION_PROVENANCE.has(storedProvenance)) {
+    return { status: 'BLOCKED', reason: 'Zapisany przebieg nie jest oznaczony REAL_EXPERIMENTAL ani REFERENCE — odtworzenie odmawia potraktowania go jako danych zewnętrznych.' };
   }
   const source = getExperiment(record.predictionSourceExperimentId);
   const sourceRecord = source?.worldDiscovery;

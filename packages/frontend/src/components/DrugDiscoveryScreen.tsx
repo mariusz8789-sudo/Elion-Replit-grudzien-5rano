@@ -15,8 +15,9 @@ import { executeCompositionCompute, fabricCompositionComputeExecutor, planCompos
 import { naturalCandidateStructures } from '../core/biotechData/naturalReplacement';
 import { runFabricCompute } from '../core/backend/client';
 import { mapPinnedPubChemCaffeine } from '../core/biotechData/pubchem';
-import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory } from '../core/scienceMemory';
+import { recordBiotechAdminAudit, replaySavedBiotechComparison, saveBiotechDiscoveryComparisonToMemory, buildSavedSubstitutionInvestigation, replaySavedSubstitutionInvestigation, saveSubstitutionInvestigationToMemory } from '../core/scienceMemory';
 import { resolveNaturalFunctionalReplacementFromSources, type NaturalFunctionalReplacementResult } from '../core/biotechData/naturalReplacement';
+import { runSubstitutionInvestigation } from '../core/biotechData/substitutionPlanner';
 
 /**
  * Drug Discovery — reachable workspace (P6.9). Uczciwy przepływ na Backend
@@ -92,6 +93,20 @@ function DrugWorkspace() {
     referenceTarget ? [referenceTarget] : [],
     3,
   );
+  // Adaptive substitution investigation: comparison-driven verdict per candidate
+  // (CANDIDATE_HYPOTHESIS / INSUFFICIENT_DATA) plus a real, cross-candidate
+  // validation-priority queue — reuses the SAME reports/ranking above, adds
+  // nothing to candidate generation itself. See core/biotechData/substitutionPlanner.ts.
+  const substitutionInvestigation = runSubstitutionInvestigation({
+    question: `Który kandydat jest najbardziej priorytetowy jako badawczy zamiennik dla ${pinnedDiscovery.candidate.label}${referenceTarget ? ` @ ${referenceTarget}` : ''}?`,
+    reports: activeReplacementReports,
+    requestedTargetIds: referenceTarget ? [referenceTarget] : [],
+  });
+  const [substitutionReplay, setSubstitutionReplay] = useState<ReturnType<typeof replaySavedSubstitutionInvestigation> | null>(null);
+  const saveSubstitution = () => {
+    const saved = saveSubstitutionInvestigationToMemory(buildSavedSubstitutionInvestigation(substitutionInvestigation));
+    setSubstitutionReplay(replaySavedSubstitutionInvestigation(saved, activeReplacementReports));
+  };
   // Ranking mówi, KTÓRA para jest wyżej. Dossier mówi, co z tym zrobić: skąd
   // składnik, dlaczego akurat on, co wnosi sam, co jest policzone, czego
   // brakuje i jaki eksperyment to rozstrzygnie.
@@ -270,6 +285,38 @@ function DrugWorkspace() {
         {replacementResult?.reports.length ? <div className="cde-results" aria-label="Resolved natural product reports">
           {replacementResult.reports.map((report) => <div className="cde-result" key={report.reportId}><label className="cde-result-label"><input type="checkbox" checked={selectedNaturalReportIds.includes(report.reportId)} onChange={() => toggleNaturalReport(report.reportId)} disabled={!selectedNaturalReportIds.includes(report.reportId) && selectedNaturalReportIds.length >= 2} /> {report.candidateId}</label><span className="cde-result-actual">Research priority {(report.ranking?.score ?? 0).toFixed(4)} · {report.scientificEvidenceStatus} · target {report.targetIds.length ? report.targetIds.join(', ') : 'UNKNOWN'}</span><span className="cde-result-bound">safety {report.safetySignalIds.length ? 'SOURCE_STATUS' : 'UNKNOWN'} · ADME/PK/Tox {report.admeProfile?.status ?? 'UNKNOWN'} · validation {report.experimentRequestId ?? 'NOT_EXECUTED / BLOCKED'} · {report.clinicalEfficacy}</span><button className="chip-btn" type="button" onClick={() => saveComparison('dossier', report.candidateId)}>Zapisz i otwórz dossier</button></div>)}
         </div> : null}
+        <section className="settings-section dossier-card" aria-label="Substitution investigation">
+          <h3>Substitution Investigation · adaptive validation queue</h3>
+          <p className="settings-hint">
+            Werdykt każdego kandydata wynika z porównania: czy zadeklarowane targety, evidence i target relevance
+            wspierają go dla żądanego targetu. Kolejka poniżej to realna, adaptacyjna priorytetyzacja WŚRÓD
+            kandydatów CANDIDATE_HYPOTHESIS — nie nowy ranking, tylko kolejność sprawdzania. {substitutionInvestigation.stopReason}
+          </p>
+          <div className="cde-results" aria-label="Substitution verdicts">
+            {substitutionInvestigation.assessments.map((a) => (
+              <div className="cde-result" key={a.candidateId}>
+                <span className="cde-result-label">{a.candidateId}{a.candidateId === substitutionInvestigation.bestCandidateId ? ' · NAJLEPSZY OBECNIE' : ''}</span>
+                <span className="cde-result-actual">{a.verdict} · {a.verdictReason}</span>
+                <span className="cde-result-bound">{a.comparison.result} · {a.comparison.observed}</span>
+              </div>
+            ))}
+          </div>
+          {substitutionInvestigation.steps.filter((s) => s.selectedCandidateId).length > 0 && (
+            <div className="cde-results" aria-label="Validation priority queue">
+              {substitutionInvestigation.steps.filter((s) => s.selectedCandidateId).map((s) => (
+                <div className="cde-result" key={s.stepIndex}>
+                  <span className="cde-result-label">krok {s.stepIndex + 1} · {s.selectedCandidateId}</span>
+                  <span className="cde-result-actual">{s.why}</span>
+                  <span className="cde-result-bound">alternatywa: {s.whyNot} · walidacja: {s.validationRequest?.status ?? 'brak'}{s.validationRequest?.blockedReason ? ` (${s.validationRequest.blockedReason})` : ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="pilot-actions">
+            <button className="chip-btn" type="button" onClick={saveSubstitution}>Zapisz dochodzenie substytucji</button>
+          </div>
+          {substitutionReplay && <p className="settings-hint" role="status"><strong>{substitutionReplay.status}</strong> · {substitutionReplay.reason}</p>}
+        </section>
         {replacementResult?.reports.length ? <section className="settings-section dossier-card" aria-label="Natural composition analysis">
           <h3>Natural Composition Discovery · top 2</h3>
           <p className="settings-hint">Wybierz dokładnie dwa istniejące raporty źródłowe. To deterministyczna hipoteza badawcza, nie dowód synergii ani skuteczności.</p>

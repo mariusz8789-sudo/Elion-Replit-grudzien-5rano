@@ -48,6 +48,8 @@ import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
 } from './agent/predictionVerification';
 import { isWellFormedCyberInvestigation, type CyberInvestigationResult } from './agent/cyberInvestigation';
+import { isWellFormedSubstitutionInvestigation, type SubstitutionInvestigationResult } from './biotechData/substitutionInvestigation';
+import { runSubstitutionInvestigation } from './biotechData/substitutionPlanner';
 
 
 /**
@@ -283,6 +285,20 @@ export interface SavedExperiment {
    * `cyberInvestigation.ts`'s own module doc for the full reasoning.
    */
   cyberInvestigation?: SavedCyberInvestigation;
+  /**
+   * A completed substitution/replacement-candidate investigation
+   * (`core/biotechData/substitutionInvestigation.ts` /
+   * `substitutionPlanner.ts`) — the eighth investigation shape. Not a new
+   * candidate-generation or ranking substrate: it orchestrates the EXISTING
+   * `CandidateDiscoveryReport`/`CandidateRanking`/`CandidateComparison`
+   * machinery in `biotechDiscoveryContract.ts` (already wired into
+   * `DrugDiscoveryScreen.tsx`'s natural functional replacement flow) with a
+   * comparison-driven verdict and an adaptive cross-candidate validation
+   * planner, neither of which existed before. See that module's own doc for
+   * why it is its own shape rather than reusing `cyberInvestigation`'s or
+   * `biotech`'s existing persistence.
+   */
+  substitutionInvestigation?: SavedSubstitutionInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -590,6 +606,7 @@ export interface SaveExperimentInput {
   realExperimentVerification?: SavedRealExperimentVerification;
   researchChain?: SavedResearchChainManifest;
   cyberInvestigation?: SavedCyberInvestigation;
+  substitutionInvestigation?: SavedSubstitutionInvestigation;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -644,6 +661,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.realExperimentVerification !== undefined && !isSavedRealExperimentVerification(input.realExperimentVerification)) throw new Error('Zapis weryfikacji realnym eksperymentem musi zawierać źródło predykcji, request, realny przebieg REAL_EXPERIMENTAL i wynik porównania.');
   if (input.researchChain !== undefined && !isSavedResearchChainManifest(input.researchChain)) throw new Error('Zapis łańcucha badawczego musi zawierać co najmniej jeden krok, odcisk treści i status końcowy.');
   if (input.cyberInvestigation !== undefined && !isSavedCyberInvestigation(input.cyberInvestigation)) throw new Error('Zapis dochodzenia bezpieczeństwa musi zawierać dobrze uformowany wynik i odcisk treści.');
+  if (input.substitutionInvestigation !== undefined && !isSavedSubstitutionInvestigation(input.substitutionInvestigation)) throw new Error('Zapis dochodzenia substytucji musi zawierać dobrze uformowany wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -671,6 +689,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.realExperimentVerification === undefined ? {} : { realExperimentVerification: input.realExperimentVerification }),
     ...(input.researchChain === undefined ? {} : { researchChain: input.researchChain }),
     ...(input.cyberInvestigation === undefined ? {} : { cyberInvestigation: input.cyberInvestigation }),
+    ...(input.substitutionInvestigation === undefined ? {} : { substitutionInvestigation: input.substitutionInvestigation }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -2481,6 +2500,134 @@ export function replaySavedCyberInvestigation(saved: SavedExperiment): SavedCybe
     status: 'MATCH',
     reason: 'Sprawdzenie tylko wewnętrznej spójności: zapis odpowiada własnemu odciskowi. Pełne ponowne wykonanie przeciw syntetycznemu celowi nie jest jeszcze podłączone tutaj.',
   };
+}
+
+// ---------------------------------------------------------------------------
+// SUBSTITUTION INVESTIGATION — the eighth investigation shape. See
+// `biotechData/substitutionInvestigation.ts`'s module doc for why this is
+// its own shape rather than reusing `biotech`/`cyberInvestigation`.
+// ---------------------------------------------------------------------------
+
+export const SUBSTITUTION_INVESTIGATION_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+export interface SavedSubstitutionInvestigation {
+  contractVersion: string;
+  result: SubstitutionInvestigationResult;
+  resultFingerprint: string;
+}
+
+export function buildSavedSubstitutionInvestigation(result: SubstitutionInvestigationResult): SavedSubstitutionInvestigation {
+  if (!isWellFormedSubstitutionInvestigation(result)) {
+    throw new Error('Dochodzenie substytucji musi zawierać co najmniej jednego kandydata z ocenionym werdyktem.');
+  }
+  return {
+    contractVersion: SUBSTITUTION_INVESTIGATION_MEMORY_CONTRACT_VERSION,
+    result,
+    resultFingerprint: fnv1a(canonicalJson(result)),
+  };
+}
+
+export function isSavedSubstitutionInvestigation(value: unknown): value is SavedSubstitutionInvestigation {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string' || !nonEmptyString(value.resultFingerprint)) return false;
+  return isWellFormedSubstitutionInvestigation(value.result);
+}
+
+function substitutionInvestigationAnalysis(saved: SavedSubstitutionInvestigation): SavedExperimentAnalysisBlock[] {
+  const { result } = saved;
+  const candidateHypotheses = result.assessments.filter((a) => a.verdict === 'CANDIDATE_HYPOTHESIS');
+  const insufficient = result.assessments.filter((a) => a.verdict === 'INSUFFICIENT_DATA');
+  return [
+    { title: 'Pytanie', body: result.question, kind: 'substitution-investigation-question' },
+    {
+      title: 'Kandydaci',
+      body: `${result.candidateIds.length} kandydatów ocenionych: ${candidateHypotheses.length} CANDIDATE_HYPOTHESIS, ${insufficient.length} INSUFFICIENT_DATA.`,
+      kind: 'substitution-investigation-assessments',
+    },
+    { title: 'Najlepszy obecny kandydat', body: result.bestCandidateId ?? 'brak', kind: 'substitution-investigation-best' },
+    {
+      title: 'Kolejka walidacji (adaptive planner)',
+      body: result.steps.filter((s) => s.selectedCandidateId !== null).map((s) => `${s.selectedCandidateId}: ${s.why}`).join(' | ') || 'brak',
+      kind: 'substitution-investigation-planner',
+    },
+    { title: 'Powód zatrzymania', body: result.stopReason, kind: 'substitution-investigation-stop' },
+  ];
+}
+
+/**
+ * Persists a completed Substitution Investigation as its own Science Memory
+ * record, through `saveExperiment` unchanged. No `biotech`/`execution`
+ * attached: like `cyberInvestigation`/`researchChain`, this is an
+ * orchestration result over already-persisted candidate reports, not a
+ * Fabric run of its own.
+ */
+export function saveSubstitutionInvestigationToMemory(saved: SavedSubstitutionInvestigation): SavedExperiment {
+  const { result } = saved;
+  return saveExperiment({
+    labId: 'biotechnology',
+    experimentId: `substitution-investigation:${result.investigationId}:${saved.resultFingerprint}`,
+    experimentName: `Dochodzenie substytucji — ${result.question}`,
+    params: { candidateCount: result.candidateIds.length },
+    stats: {
+      candidateCount: result.candidateIds.length,
+      candidateHypothesisCount: result.assessments.filter((a) => a.verdict === 'CANDIDATE_HYPOTHESIS').length,
+    },
+    substitutionInvestigation: saved,
+    analysis: substitutionInvestigationAnalysis(saved),
+    honesty: 'simplified',
+    honestyNote: 'Priorytetyzacja kandydatów zamiennika oparta wyłącznie na już istniejących, źródłowych raportach ' +
+      '(CandidateDiscoveryReport) i ich rankingu; żadna wartość biologicznej skuteczności, bezpieczeństwa ani ' +
+      'równoważności klinicznej nie jest tu orzekana. Walidacja pozostaje NOT_EXECUTED/BLOCKED, dopóki w tym ' +
+      'środowisku nie jest skonfigurowany realny wykonawca biologiczny.',
+    assumptions: ['Raporty kandydatów pochodzą z istniejącego pipeline\'u natural functional replacement (PubChem/ChEMBL/DailyMed); to dochodzenie ich nie generuje ani nie zmienia.'],
+    epistemicStatus: 'PREDICTION',
+  });
+}
+
+export interface SavedSubstitutionInvestigationReplay {
+  status: ReplayVerdict | 'NOT_REPRODUCIBLE';
+  reason: string;
+}
+
+/**
+ * Genuine re-execution, not self-consistency-only: `runSubstitutionInvestigation`
+ * is a pure function of `reports`/`requestedTargetIds`/`maxStepsUsed`, so
+ * replay recomputes it fresh from the SAME externally-supplied reports
+ * (never re-fetched or re-guessed — the caller passes the same
+ * `CandidateDiscoveryReport[]` it already has) and compares both the
+ * recomputed `investigationId` (content-derived, so a mismatch here means
+ * the supplied reports don't match the original query) and the resulting
+ * fingerprint.
+ */
+export function replaySavedSubstitutionInvestigation(
+  saved: SavedExperiment,
+  reports: readonly CandidateDiscoveryReport[],
+): SavedSubstitutionInvestigationReplay {
+  const record = saved.substitutionInvestigation;
+  if (record === undefined || !isSavedSubstitutionInvestigation(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera dochodzenia substytucji.' };
+  }
+  if (reports.length === 0) {
+    return { status: 'BLOCKED', reason: 'Odtworzenie wymaga tych samych raportów kandydatów, co oryginalne dochodzenie.' };
+  }
+  try {
+    const recomputed = runSubstitutionInvestigation({
+      question: record.result.question, reports, requestedTargetIds: record.result.requestedTargetIds,
+      maxSteps: record.result.maxStepsUsed,
+    });
+    if (recomputed.investigationId !== record.result.investigationId) {
+      return {
+        status: 'NOT_REPRODUCIBLE',
+        reason: `Odtworzone investigationId (${recomputed.investigationId}) różni się od zapisanego (${record.result.investigationId}) — dostarczone raporty nie odpowiadają oryginalnemu zapytaniu.`,
+      };
+    }
+    const recomputedFingerprint = fnv1a(canonicalJson(recomputed));
+    return recomputedFingerprint === record.resultFingerprint
+      ? { status: 'MATCH', reason: 'Dochodzenie odtworzone z tych samych raportów daje identyczny wynik i odcisk.' }
+      : { status: 'DRIFT', reason: `Odtworzony wynik różni się od zapisanego (${record.resultFingerprint} → ${recomputedFingerprint}).` };
+  } catch (error) {
+    return { status: 'BLOCKED', reason: `Nie można odtworzyć dochodzenia: ${error instanceof Error ? error.message : String(error)}` };
+  }
 }
 
 // ---------------------------------------------------------------------------

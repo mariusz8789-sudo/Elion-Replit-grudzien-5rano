@@ -3779,3 +3779,80 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
     top: calc(62vh + 1rem); max-height: calc(38vh - 2rem); overflow-y: auto;
   }
 }
+
+/* ==========================================================================
+   GENESIS MATRIX HUB — deliberately its own, lighter palette (scoped to
+   .matrix-hub, never touching :root) rather than reworking every existing
+   dark panel at once. "Premium, not ponury": raised slate instead of
+   near-black, generous spacing, one clear type scale independent of the
+   app-wide --fs-micro/--fs-body scale (which the redesign brief calls out
+   as too small to read comfortably).
+   ========================================================================== */
+.matrix-hub {
+  --mx-bg: #10131e;
+  --mx-panel: #171b2c;
+  --mx-panel-raised: #1e2338;
+  --mx-border: rgba(180, 195, 230, 0.14);
+  --mx-border-strong: rgba(180, 195, 230, 0.32);
+  --mx-text: #f3f5fb;
+  --mx-text-dim: #a6aecb;
+  background: radial-gradient(120% 100% at 15% 0%, #171d33 0%, var(--mx-bg) 55%);
+  color: var(--mx-text);
+  min-height: 100vh;
+  padding: 3rem clamp(1.25rem, 4vw, 4rem) 5rem;
+  font-family: var(--font-body);
+}
+.matrix-hub-header { max-width: 52rem; margin-bottom: 2.5rem; }
+.matrix-hub-eyebrow {
+  font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--cyan); margin: 0 0 0.6rem;
+}
+.matrix-hub-header h1 {
+  font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 650; margin: 0 0 1rem; letter-spacing: -0.01em;
+}
+.matrix-hub-sub { font-size: 1.05rem; line-height: 1.65; color: var(--mx-text-dim); margin: 0; max-width: 56ch; }
+
+.matrix-hub-filters { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 2.25rem; }
+.matrix-filter-chip {
+  font-family: var(--font-body); font-size: 0.92rem; padding: 0.55rem 1.1rem; border-radius: 999px;
+  border: 1px solid var(--mx-border); background: var(--mx-panel); color: var(--mx-text-dim);
+  cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.matrix-filter-chip:hover { border-color: var(--mx-border-strong); color: var(--mx-text); }
+.matrix-filter-chip.active { background: var(--mx-panel-raised); border-color: var(--cyan); color: var(--mx-text); }
+
+.matrix-hub-empty { font-size: 1.05rem; line-height: 1.65; color: var(--mx-text-dim); max-width: 48ch; }
+
+.matrix-hub-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem;
+}
+.matrix-card {
+  background: var(--mx-panel); border: 1px solid var(--mx-border); border-radius: 18px;
+  padding: 1.5rem; cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.matrix-card:hover { border-color: var(--mx-border-strong); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28); }
+.matrix-card.expanded { border-color: var(--cyan); background: var(--mx-panel-raised); grid-column: 1 / -1; }
+.matrix-card-kinds { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.9rem; }
+.matrix-kind-tag {
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 0.25rem 0.55rem; border-radius: 999px; background: rgba(92, 214, 232, 0.12); color: var(--cyan);
+}
+.matrix-card-title { font-size: 1.15rem; font-weight: 600; margin: 0 0 0.4rem; line-height: 1.4; }
+.matrix-card-meta { font-size: 0.85rem; color: var(--mx-text-dim); margin: 0; font-family: var(--font-mono); }
+.matrix-card-detail { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--mx-border); cursor: default; }
+.matrix-detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.9rem 1.5rem; margin: 0 0 1.25rem; }
+.matrix-detail-list > div { display: flex; flex-direction: column; gap: 0.2rem; }
+.matrix-detail-list dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mx-text-dim); }
+.matrix-detail-list dd { margin: 0; font-size: 0.95rem; }
+.matrix-detail-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+
+.matrix-hub-cta .timeline-cta-title { color: var(--cyan); }
+.matrix-nav-btn {
+  font-family: var(--font-body); font-weight: 600; color: var(--cyan) !important;
+  border-color: rgba(92, 214, 232, 0.4) !important;
+}
+
+@media (max-width: 640px) {
+  .matrix-hub { padding: 2rem 1rem 3rem; }
+  .matrix-hub-grid { grid-template-columns: 1fr; }
+}

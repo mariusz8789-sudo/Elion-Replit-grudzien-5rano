@@ -59,6 +59,7 @@ const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScr
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
+const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -112,7 +113,8 @@ type Route =
   | { kind: 'looking-glass' }
   | { kind: 'investor-demo' }
   | { kind: 'pilot' }
-  | { kind: 'molecular-reference-analysis' };
+  | { kind: 'molecular-reference-analysis' }
+  | { kind: 'matrix' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -154,6 +156,7 @@ function parseHash(): Route {
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
+  if (h === '#/matrix') return { kind: 'matrix' };
   return { kind: 'home' };
 }
 
@@ -435,6 +438,18 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'matrix') {
+      return (
+        <div className="app">
+          <TopBar title="◈ Genesis Matrix" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GenesisMatrixHub />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'drug') {
       return (
         <div className="app">
@@ -687,6 +702,14 @@ export default function App() {
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>
+          <button className="timeline-cta timeline-cta-primary matrix-hub-cta" onClick={() => { window.location.hash = '#/matrix'; }}>
+            <span className="timeline-cta-icon" aria-hidden="true">◈</span>
+            <span className="timeline-cta-text">
+              <span className="timeline-cta-title">Genesis Matrix — mapa całego systemu</span>
+              <span className="timeline-cta-sub">Jedna, realna mapa wszystkiego, co Genesis zarejestrował: hipotezy, światy, modele, scenariusze, evidence, cyber, replay. Czyta tę samą Pamięć Naukową co reszta aplikacji — nic tu nie jest udawane.</span>
+            </span>
+            <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+          </button>
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/first-person-lab'; }}>
             <span className="timeline-cta-icon" aria-hidden="true">🔬</span>
             <span className="timeline-cta-text">
@@ -737,6 +760,9 @@ export default function App() {
           </button>
           {/* Narzędzia do nauki — produkt edukacyjny (Faza 1). Zawsze widoczne. */}
           <nav className="home-nav" aria-label="Nawigacja Genesis OS">
+            <button className="matrix-nav-btn" onClick={() => { window.location.hash = '#/matrix'; }}>
+              <span aria-hidden="true">◈</span> Matrix
+            </button>
             <button className="whatif-nav-btn" onClick={() => { window.location.hash = '#/what-if'; }}>
               <span aria-hidden="true">🌀</span> {t('nav.whatIf')}
             </button>

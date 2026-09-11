@@ -1043,6 +1043,24 @@ export interface SavedNextExperiment {
  * `scientificDiscoveryLoop.ts` NAD istniejącą pętlą (obserwacje/analiza z PR
  * Manusa + `selectNextHypothesisExperiment`).
  */
+/**
+ * Set only when this cycle was started by `researchCampaign.ts`'s
+ * `continueResearchCampaign` from a REAL previous cycle's REAL
+ * `nextExperiment` — never from a freshly generated question.
+ * `previousCycleId` is the actual `SavedExperiment.id` of the previous
+ * cycle's own saved record (never the caller's own in-memory `cycleId`),
+ * so `computeEvidenceImpact` (`evidenceImpact.ts`) can walk this like any
+ * other record-to-record reference already in Science Memory.
+ * `resolvedFrom` is the literal quote of that previous cycle's
+ * `nextExperiment.resolves` — never a paraphrase.
+ */
+export interface SavedDiscoveryLoopCampaignProvenance {
+  readonly previousCycleId: string;
+  readonly resolvedFrom: string;
+  /** The previous cycle's own `discoveryLoopFingerprint` — reused, not re-invented. */
+  readonly previousCycleFingerprint: string;
+}
+
 export interface SavedScientificDiscoveryLoop {
   contractVersion: string;
   problemId: string;
@@ -1054,6 +1072,8 @@ export interface SavedScientificDiscoveryLoop {
   crossHypothesisAnalysis: DiscoveryAnalysis;
   /** Odcisk TYLKO tej warstwy (dowody + następny eksperyment) — wykrywa dryf niezależnie od loopFingerprint. */
   discoveryLoopFingerprint: string;
+  /** Research Campaign provenance — see `SavedDiscoveryLoopCampaignProvenance`. Folded into `discoveryLoopFingerprint`, so tampering with it after save is itself detected as DRIFT on replay, same as every other field here. */
+  campaignProvenance?: SavedDiscoveryLoopCampaignProvenance;
 }
 
 function savedDiscoveryEvidenceLink(link: HypothesisEvidenceChainLink): SavedDiscoveryEvidenceLink {
@@ -1081,7 +1101,10 @@ function savedNextExperiment(next: NextHypothesisExperiment): SavedNextExperimen
  * prerejestracji) wyłącznie po `loopFingerprint` — reszta pętli hipotez jest
  * już zapisana osobno w `hypothesisLoop`, więc tu nie jest duplikowana.
  */
-export function buildSavedScientificDiscoveryLoop(result: ScientificDiscoveryLoopResult): SavedScientificDiscoveryLoop {
+export function buildSavedScientificDiscoveryLoop(
+  result: ScientificDiscoveryLoopResult,
+  campaignProvenance?: SavedDiscoveryLoopCampaignProvenance,
+): SavedScientificDiscoveryLoop {
   const loop = buildSavedHypothesisLoop(result.loop);
   const base = {
     contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
@@ -1091,6 +1114,7 @@ export function buildSavedScientificDiscoveryLoop(result: ScientificDiscoveryLoo
     evidenceChain: result.evidenceChain.map(savedDiscoveryEvidenceLink),
     nextExperiment: savedNextExperiment(result.nextExperiment),
     crossHypothesisAnalysis: result.crossHypothesisAnalysis,
+    ...(campaignProvenance === undefined ? {} : { campaignProvenance }),
   };
   return { ...base, discoveryLoopFingerprint: fnv1a(canonicalJson(base)) };
 }
@@ -1115,6 +1139,10 @@ export function isSavedScientificDiscoveryLoop(value: unknown): value is SavedSc
   if (!Array.isArray(value.evidenceChain) || !value.evidenceChain.every(isSavedDiscoveryEvidenceLink)) return false;
   if (!isRecordLike(value.nextExperiment) || typeof value.nextExperiment.status !== 'string') return false;
   if (!isRecordLike(value.crossHypothesisAnalysis) || !Array.isArray(value.crossHypothesisAnalysis.findings)) return false;
+  if (value.campaignProvenance !== undefined) {
+    const cp = value.campaignProvenance;
+    if (!isRecordLike(cp) || typeof cp.previousCycleId !== 'string' || typeof cp.resolvedFrom !== 'string' || typeof cp.previousCycleFingerprint !== 'string') return false;
+  }
   return true;
 }
 
@@ -1126,9 +1154,12 @@ export function isSavedScientificDiscoveryLoop(value: unknown): value is SavedSc
  * treść to warstwa Obserwacja/Analiza/Dowód + Następny Eksperyment, której
  * `saveHypothesisLoopToMemory` nie niosło.
  */
-export function saveScientificDiscoveryLoopToMemory(result: ScientificDiscoveryLoopResult): SavedExperiment {
+export function saveScientificDiscoveryLoopToMemory(
+  result: ScientificDiscoveryLoopResult,
+  campaignProvenance?: SavedDiscoveryLoopCampaignProvenance,
+): SavedExperiment {
   const loop = buildSavedHypothesisLoop(result.loop);
-  const discoveryLoop = buildSavedScientificDiscoveryLoop(result);
+  const discoveryLoop = buildSavedScientificDiscoveryLoop(result, campaignProvenance);
   const supported = loop.outcomes.filter((entry) => entry.status === 'SUPPORTED').length;
   const falsified = loop.outcomes.filter((entry) => entry.status === 'FALSIFIED').length;
   const totalFindings = discoveryLoop.evidenceChain.reduce((sum, link) => sum + link.findingsCount, 0);
@@ -1159,6 +1190,10 @@ export function saveScientificDiscoveryLoopToMemory(result: ScientificDiscoveryL
       { title: 'Rozstrzygniecie', body: loop.discrimination.decisive ? `Uporzadkowanie ${loop.problem.primaryMetric}: ${loop.discrimination.ranking.map((entry) => `${entry.candidate}=${entry.metric}`).join(' < ')}. Zwyciezca: ${loop.discrimination.winnerHypothesisId}.` : 'Uporzadkowanie nie wylonilo zwyciezcy.', kind: 'hypothesis-discrimination' },
       { title: 'Dowod', body: `${totalFindings} znalezisk z ${discoveryLoop.evidenceChain.filter((link) => link.evidenceChainId !== null).length} wykonanych hipotez, kazde z realnym resultFingerprint i dniem.`, kind: 'discovery-evidence' },
       { title: 'Nastepny eksperyment', body: `${discoveryLoop.nextExperiment.status}: ${discoveryLoop.nextExperiment.why}`, kind: 'discovery-next-experiment' },
+      ...(campaignProvenance ? [{
+        title: 'Pochodzenie cyklu', kind: 'discovery-campaign-provenance',
+        body: `Ten cykl wystartował WYŁĄCZNIE z realnego następnego eksperymentu cyklu ${campaignProvenance.previousCycleId}: „${campaignProvenance.resolvedFrom}"`,
+      }] : []),
       { title: 'Granice', body: 'Genesis wygenerowal prerejestrowane hipotezy, wykonal istniejacy model obliczeniowy, powiazal realne obserwacje/analize i porownal wyniki w zadeklarowanym zakresie. To nie jest odkrycie naukowe, obserwacja swiata ani wskazowka operacyjna.', kind: 'hypothesis-boundary' },
     ],
     honesty: 'simplified',
@@ -1212,7 +1247,7 @@ export async function replaySavedScientificDiscoveryLoop(saved: SavedExperiment)
     nextExperiment: selectNextHypothesisExperiment(replayed.result),
     crossHypothesisAnalysis: buildCrossHypothesisAnalysis(saved.hypothesisLoop.problem, replayed.result),
   };
-  const fresh = buildSavedScientificDiscoveryLoop(freshResult);
+  const fresh = buildSavedScientificDiscoveryLoop(freshResult, saved.discoveryLoop.campaignProvenance);
   if (fresh.discoveryLoopFingerprint !== saved.discoveryLoop.discoveryLoopFingerprint) {
     return { status: 'DRIFT', reason: `Odtworzona warstwa dowodowa różni się od zapisanej (odcisk ${saved.discoveryLoop.discoveryLoopFingerprint} → ${fresh.discoveryLoopFingerprint}).` };
   }

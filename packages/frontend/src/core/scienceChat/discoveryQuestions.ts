@@ -183,6 +183,18 @@ const DISCOVERY_REPLAY_MARKERS: readonly string[] = [
   'replay petli', 'replay petle', 'replay discovery', 'replay loop', 'odtworz discovery',
 ];
 
+/**
+ * Markers for advancing a Research Campaign by ONE more cycle
+ * (`researchCampaign.ts::continueResearchCampaign`), distinct from starting
+ * a brand new loop (`DISCOVERY_LOOP_MARKERS`) and from re-running the last
+ * one unchanged (`DISCOVERY_REPLAY_MARKERS`): this asks for the NEXT real
+ * step the last run itself proposed.
+ */
+const RESEARCH_CAMPAIGN_CONTINUE_MARKERS: readonly string[] = [
+  'kontynuuj badanie', 'kontynuuj petle', 'nastepny cykl', 'kolejny cykl',
+  'kolejny eksperyment', 'nastepny eksperyment', 'continue research', 'next cycle', 'research cycle',
+];
+
 export function hasDiscoveryLoopMarker(message: string): boolean {
   const norm = normalize(message);
   return DISCOVERY_LOOP_MARKERS.some((marker) => norm.includes(normalize(marker)));
@@ -197,6 +209,11 @@ export function hasExplicitDiscoveryLoopMarker(message: string): boolean {
 export function hasDiscoveryReplayMarker(message: string): boolean {
   const norm = normalize(message);
   return DISCOVERY_REPLAY_MARKERS.some((marker) => norm.includes(normalize(marker)));
+}
+
+export function hasResearchCampaignContinueMarker(message: string): boolean {
+  const norm = normalize(message);
+  return RESEARCH_CAMPAIGN_CONTINUE_MARKERS.some((marker) => norm.includes(normalize(marker)));
 }
 
 /**

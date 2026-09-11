@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
+import { subscribeScienceMemoryChanges } from '../core/scienceMemoryEvents';
 import { kindsOf, type MatrixKind } from './GenesisMatrixHub';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { getToken, useSession } from '../core/backend/session';
 import { listProjects, type Project } from '../core/backend/client';
 import { synthesizeNextQuestion } from '../core/agent/crossDomainSynthesis';
-import { subscribeScienceMemory } from '../core/scienceMemoryEvents';
 
 /** Where to send the user for a cross-domain next question — the one screen
  * that always shows the record (`#/matrix`) unless the domain has its own
@@ -138,9 +138,8 @@ export function GenesisDashboard(): JSX.Element {
     // Re-read on every Science Memory write, not only at mount: Home hosts the
     // real chat inline, so a loop saved in the conversation must be visible to
     // the Next Question card beside it without a reload.
-    const read = (): void => setRecords(listExperiments());
-    read();
-    return subscribeScienceMemory(read);
+    setRecords(listExperiments());
+    return subscribeScienceMemoryChanges(() => setRecords(listExperiments()));
   }, []);
 
   useEffect(() => {

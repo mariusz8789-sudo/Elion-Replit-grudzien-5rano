@@ -1,35 +1,42 @@
 /**
- * SCIENCE MEMORY CHANGE SIGNAL — one notification, no second memory.
+ * SCIENCE MEMORY EVENTS — lets any screen react live when Science Memory
+ * changes (a save or delete from ANY source: this screen, Science Chat, a
+ * background investigation), instead of only ever reading `listExperiments()`
+ * once on mount. Same pub/sub shape `scienceChatBridge.ts` already uses for
+ * cross-component signalling. Holds no data of its own and is never a cache:
+ * every subscriber re-reads the real store (`listExperiments()`) itself in
+ * response — this is only the "something changed, go re-read" signal.
  *
- * Science Memory is read with `listExperiments()` at mount time, which was
- * correct while every writer lived on a screen you had to navigate away from
- * to see the result. Chat entry breaks that assumption: on Home the chat IS
- * the workspace, so a loop saved in the conversation and the Next Question
- * card that should notice it are on screen at the same moment. Without a
- * signal the card kept showing "Pamięć Naukowa jest pusta" next to a chat turn
- * that had just reported a successful save — found in a real browser run, not
- * by inspection.
- *
- * This holds no records and no logic: it is the same pub/sub shape
- * `scienceChatBridge.ts` and `core/backend/session.ts` already use, kept in
- * its own module purely so `scienceMemory.ts` can notify without importing a
- * component. `scienceMemory.ts` stays the one store.
+ * `notifyScienceMemoryChanged` is called from exactly one place —
+ * `scienceMemory.ts`'s own `saveExperiment`/`deleteExperiment`, right after
+ * the real mutation lands — never speculatively, and never from a screen or
+ * any other module. `scienceMemoryEventsBoundary.test.ts` enforces this by
+ * scanning the whole source tree for any other caller.
  */
 
-type Listener = () => void;
+export type ScienceMemoryChangeReason = 'SAVED' | 'DELETED';
+
+export interface ScienceMemoryChangeEvent {
+  /** Which kind of real mutation just landed. */
+  readonly reason: ScienceMemoryChangeReason;
+  /** The `SavedExperiment.id` that was saved or deleted. */
+  readonly experimentId: string;
+}
+
+type Listener = (event: ScienceMemoryChangeEvent) => void;
 const listeners = new Set<Listener>();
 
-/** Subscribe to writes. Returns an unsubscribe function, for use in a `useEffect`. */
-export function subscribeScienceMemory(listener: Listener): () => void {
+/** Called by any screen that wants to react when Science Memory changes. Returns an unsubscribe function. */
+export function subscribeScienceMemoryChanges(listener: Listener): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => listeners.delete(listener);
 }
 
 /**
- * Called by `scienceMemory.ts` after a record is written or removed. Never
- * called from anywhere else: a change signal nobody can fire spuriously is
- * what keeps this from becoming a second source of truth about the store.
+ * Called ONLY by `scienceMemory.ts`, right after `saveExperiment`/
+ * `deleteExperiment` really writes — see this module's own doc and
+ * `scienceMemoryEventsBoundary.test.ts`.
  */
-export function notifyScienceMemoryChanged(): void {
-  for (const listener of [...listeners]) listener();
+export function notifyScienceMemoryChanged(event: ScienceMemoryChangeEvent): void {
+  for (const listener of listeners) listener(event);
 }

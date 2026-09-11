@@ -7,7 +7,10 @@ import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 import { parseObservationIntent } from '../lookingGlass/observationIntent';
 import { hasActiveObservationControl } from '../activeObservationControl';
-import { hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker, resolveDiscoveryQuestion } from './discoveryQuestions';
+import {
+  hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
+  hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
+} from './discoveryQuestions';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -90,7 +93,18 @@ export type ChatAction =
    * fingerprint, not a cached read. No arguments: the record is found in Memory by
    * `ScienceChat.tsx`, which is where every other Memory access in this layer lives.
    */
-  | { type: 'replayDiscoveryLoop' };
+  | { type: 'replayDiscoveryLoop' }
+  /**
+   * RESEARCH CAMPAIGN CONTINUATION — advances the last Research Cycle this
+   * conversation ran (`researchCampaign.ts::continueResearchCampaign`) by
+   * EXACTLY the request its own real `nextExperiment` proposed. No
+   * arguments: `ScienceChat.tsx` holds the last cycle in memory, the same
+   * place `lastDiscoveryLoop` already lives. If that cycle's
+   * `nextExperiment.status` is not `READY_TO_RUN`, the next cycle refuses
+   * to start (`NO_JUSTIFIED_NEXT_QUESTION`) and `ScienceChat.tsx` reports
+   * that explicitly rather than inventing a further question.
+   */
+  | { type: 'continueResearch' };
 
 export interface ChatResponse {
   text: string;
@@ -578,6 +592,18 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'MODEL',
       intent: 'VERIFY',
       action: { type: 'replayDiscoveryLoop' },
+    };
+  }
+  // --- RESEARCH CAMPAIGN CONTINUATION — advances the last Research Cycle by EXACTLY
+  //     the request its own real nextExperiment proposed (researchCampaign.ts). Checked
+  //     BEFORE the generic discovery-loop markers below so "kontynuuj badanie" never gets
+  //     read as a request to start a brand new loop instead of continuing the last one.
+  if (hasResearchCampaignContinueMarker(message)) {
+    return {
+      text: 'Kontynuuję Research Campaign: uruchamiam DOKŁADNIE ten request, który realny następny eksperyment ostatniego cyklu wskazał — nigdy nowo wygenerowane pytanie. Jeśli ostatni cykl nie ma uzasadnionego następnego kroku, powiem to wprost (NO_JUSTIFIED_NEXT_QUESTION) zamiast zgadywać.',
+      tag: 'MODEL',
+      intent: 'PROPOSE_EXPERIMENT',
+      action: { type: 'continueResearch' },
     };
   }
   if (hasDiscoveryLoopMarker(message)) {

@@ -25,7 +25,8 @@ import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deci
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
 import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyberInvestigation, saveCyberInvestigationToMemory } from '../core/scienceMemory';
 import { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop } from '../core/scienceMemory';
-import { runScientificDiscoveryLoopAsync, type ScientificDiscoveryLoopResult } from '../core/experimentFabric/scientificDiscoveryLoop';
+import type { ScientificDiscoveryLoopResult } from '../core/experimentFabric/scientificDiscoveryLoop';
+import { continueResearchCampaign, isNoJustifiedNextQuestion, startResearchCampaign, type ResearchCycle } from '../core/experimentFabric/researchCampaign';
 import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
@@ -378,6 +379,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   // Same pattern again for the Scientific Discovery Loop, so a follow-up "zapisz"
   // persists the loop that was actually run rather than re-running it.
   const [lastDiscoveryLoop, setLastDiscoveryLoop] = useState<ScientificDiscoveryLoopResult | null>(null);
+  // Research Campaign — the last real Research Cycle this conversation ran, so
+  // "kontynuuj badanie" can advance it by EXACTLY its own real nextExperiment.request.
+  const [lastResearchCycle, setLastResearchCycle] = useState<ResearchCycle | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -681,8 +685,13 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       // number.
       appendGenesis('Prowadzę badanie… (prerejestracja, wykonanie, łańcuch dowodowy)', 'SYSTEM');
       try {
-        const loop = await runScientificDiscoveryLoopAsync(a.problemId);
+        // Started as Research Cycle #1 (researchCampaign.ts::startResearchCampaign, itself
+        // exactly runScientificDiscoveryLoopAsync) so "kontynuuj badanie" has a real cycle
+        // to chain from afterwards — not a second execution of the same question.
+        const cycle = await startResearchCampaign(a.problemId);
+        const loop = cycle.result;
         setLastDiscoveryLoop(loop);
+        setLastResearchCycle(cycle);
         const perHypothesis = loop.loop.outcomes.map((outcome) => {
           const hypothesis = loop.loop.preregistration.hypotheses.find((entry) => entry.hypothesisId === outcome.hypothesisId);
           const candidate = hypothesis?.proposedExperiment?.parameters[loop.problem.candidateVariable];
@@ -698,11 +707,56 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           + `ROZSTRZYGNIĘCIE: ${loop.loop.discrimination.reason}\n`
           + `NASTĘPNY EKSPERYMENT: ${loop.nextExperiment.status} — ${loop.nextExperiment.why}\n`
           + `  CO ROZSTRZYGNIE: ${loop.nextExperiment.resolves}\n\n`
-          + 'Wpisz „zapisz", żeby zachować pętlę w Pamięci Naukowej (wtedy Następne Pytanie na ekranie głównym ją zobaczy), albo „odtwórz pętlę", żeby wykonać ten sam prerejestrowany zbiór jeszcze raz i porównać z odciskiem.',
+          + 'Wpisz „zapisz", żeby zachować pętlę w Pamięci Naukowej (wtedy Następne Pytanie na ekranie głównym ją zobaczy), „odtwórz pętlę", żeby wykonać ten sam prerejestrowany zbiór jeszcze raz i porównać z odciskiem, albo „kontynuuj badanie", żeby uruchomić DOKŁADNIE ten następny eksperyment jako kolejny cykl.',
           'WYNIK',
         );
       } catch (loopError) {
         appendGenesis(`Pętla nie wykonała się: ${loopError instanceof Error ? loopError.message : String(loopError)}`, 'SYSTEM');
+      }
+    } else if (a?.type === 'continueResearch') {
+      // RESEARCH CAMPAIGN CONTINUATION (researchCampaign.ts) — advances the last real
+      // Research Cycle held in memory by EXACTLY the request its own real nextExperiment
+      // proposed. Never starts from a freshly generated question: if that cycle's
+      // nextExperiment is not READY_TO_RUN, continueResearchCampaign refuses to start a
+      // next cycle and returns NO_JUSTIFIED_NEXT_QUESTION, reported here verbatim.
+      if (!lastResearchCycle) {
+        appendGenesis('Nie mam jeszcze żadnego cyklu badawczego do kontynuowania w tej rozmowie. Uruchom najpierw badanie (np. „zbadaj: jak późno można wprowadzić izolację"), a potem powiedz „kontynuuj badanie".');
+      } else {
+        appendGenesis(`Kontynuuję cykl ${lastResearchCycle.cycleId} (${lastResearchCycle.problemId})…`, 'SYSTEM');
+        try {
+          const step = await continueResearchCampaign(lastResearchCycle);
+          if (isNoJustifiedNextQuestion(step)) {
+            appendGenesis(
+              `NO_JUSTIFIED_NEXT_QUESTION — nie ma uzasadnionego następnego pytania.\n`
+              + `Poprzedni cykl: ${step.previousCycleId} (${step.previousCycleProblemId}).\n`
+              + `${step.reason}`,
+              'SYSTEM',
+            );
+          } else {
+            const cycle = step;
+            setLastDiscoveryLoop(cycle.result);
+            setLastResearchCycle(cycle);
+            const loop = cycle.result;
+            const perHypothesis = loop.loop.outcomes.map((outcome) => {
+              const hypothesis = loop.loop.preregistration.hypotheses.find((entry) => entry.hypothesisId === outcome.hypothesisId);
+              const candidate = hypothesis?.proposedExperiment?.parameters[loop.problem.candidateVariable];
+              const measured = outcome.observedMetric === null ? 'brak porównywalnej wartości' : `${loop.problem.primaryMetric}=${outcome.observedMetric}`;
+              return `  · ${loop.problem.candidateVariable}=${String(candidate ?? '?')} → ${outcome.status} (${measured})`;
+            }).join('\n');
+            appendGenesis(
+              `RESEARCH CYCLE #${cycle.cycleIndex}: ${cycle.cycleId}\n`
+              + `PROVENANCE: previousCycleId=${cycle.provenance?.previousCycleId} · fingerprint poprzedniego cyklu=${cycle.provenance?.previousCycleFingerprint}\n`
+              + `RESOLVED FROM (dosłowny cytat poprzedniego nextExperiment.resolves): „${cycle.provenance?.resolvedFrom}"\n`
+              + `OCENA HIPOTEZ:\n${perHypothesis}\n`
+              + `ROZSTRZYGNIĘCIE: ${loop.loop.discrimination.reason}\n`
+              + `NASTĘPNY EKSPERYMENT: ${loop.nextExperiment.status} — ${loop.nextExperiment.why}\n\n`
+              + 'Wpisz „zapisz" albo „kontynuuj badanie" jeszcze raz, żeby uruchomić kolejny cykl z tego samego łańcucha.',
+              'WYNIK',
+            );
+          }
+        } catch (loopError) {
+          appendGenesis(`Kolejny cykl nie wystartował: ${loopError instanceof Error ? loopError.message : String(loopError)}`, 'SYSTEM');
+        }
       }
     } else if (a?.type === 'replayDiscoveryLoop') {
       // REAL re-execution through the existing `replaySavedScientificDiscoveryLoop`,

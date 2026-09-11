@@ -138,8 +138,9 @@ export function GenesisDashboard(): JSX.Element {
     // Re-read on every Science Memory write, not only at mount: Home hosts the
     // real chat inline, so a loop saved in the conversation must be visible to
     // the Next Question card beside it without a reload.
-    setRecords(listExperiments());
-    return subscribeScienceMemoryChanges(() => setRecords(listExperiments()));
+    const read = (): void => setRecords(listExperiments());
+    read();
+    return subscribeScienceMemoryChanges(read);
   }, []);
 
   useEffect(() => {

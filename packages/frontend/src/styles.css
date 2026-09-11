@@ -4357,3 +4357,50 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 @media (max-width: 900px) {
   .science-chat-fab { display: none !important; }
 }
+
+/* ---- Matrix relations + gaps ---- */
+.matrix-detail-sub {
+  margin: 1rem 0 0.4rem; font-family: var(--font-mono); font-size: var(--fs-micro);
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--mx-text-faint); font-weight: 600;
+}
+.matrix-relation-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.matrix-relation-row {
+  display: flex; flex-direction: column; gap: 0.1rem; width: 100%; text-align: left;
+  padding: 0.5rem 0.65rem; border-radius: var(--r-sm);
+  border: 1px solid var(--mx-border); background: var(--mx-panel-sunken);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.matrix-relation-row:hover:not(:disabled) { border-color: var(--cyan); }
+.matrix-relation-row:disabled { opacity: 0.55; cursor: default; }
+.matrix-relation-kind { font-size: var(--fs-meta); font-weight: 650; color: var(--cyan); }
+.matrix-relation-target {
+  font-size: var(--fs-meta); color: var(--mx-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.matrix-relation-basis {
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--mx-text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.matrix-missing { margin-top: 1.25rem; }
+.matrix-missing-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.matrix-missing-list li {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  padding: 0.7rem 0.85rem; border-radius: var(--r-sm);
+  border: 1px dashed rgba(240, 179, 92, 0.4); background: rgba(240, 179, 92, 0.05);
+}
+.matrix-missing-link { font-family: var(--font-mono); font-size: var(--fs-meta); font-weight: 650; color: var(--gold); letter-spacing: 0.05em; }
+.matrix-missing-reason { font-family: var(--font-mono); font-size: 0.62rem; color: var(--mx-text-faint); letter-spacing: 0.1em; }
+.matrix-missing-detail { font-size: var(--fs-meta); color: var(--mx-text-dim); line-height: 1.5; }
+
+/* The long tail of modules, collapsed. It is a disclosure, not a menu item,
+   so it reads as "there is more" rather than as an eleventh destination. */
+.shell-nav-more {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; text-align: left;
+  padding: 0.5rem 0.6rem; border-radius: var(--r-sm);
+  font-size: var(--fs-meta); color: var(--text-faint); font-weight: 600;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.shell-nav-more:hover { color: var(--text-dim); }
+.shell-nav-more .shell-nav-badge { color: var(--text-faint); border-color: var(--border); }
+.shell-nav-section + .shell-nav-section { border-top: 1px solid var(--border); margin-top: var(--sp-2); padding-top: var(--sp-2); }

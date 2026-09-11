@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 
 /**
@@ -38,6 +38,8 @@ function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolea
 export function AppShell({ children }: { children: ReactNode }): JSX.Element {
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [menuOpen, setMenuOpen] = useState(false);
+  /** The long tail of modules, collapsed by default — see MORE_ITEMS. */
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     const onHashChange = (): void => { setHash(window.location.hash || '#/'); setMenuOpen(false); };
@@ -54,14 +56,28 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
     setMenuOpen(false);
   };
 
-  const sections = NAV_SECTIONS.map((section) => (
-    <div className="shell-nav-section" key={section.id}>
-      <h2 className="shell-nav-section-title">{section.label}</h2>
-      {section.items.map((item) => (
-        <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
+  const sections = (
+    <>
+      {NAV_SECTIONS.map((section) => (
+        <div className="shell-nav-section" key={section.id}>
+          {section.label && <h2 className="shell-nav-section-title">{section.label}</h2>}
+          {section.items.map((item) => (
+            <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
+          ))}
+        </div>
       ))}
-    </div>
-  ));
+      <div className="shell-nav-section">
+        <button className="shell-nav-more" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
+          <span className="shell-nav-icon" aria-hidden="true">{moreOpen ? '−' : '+'}</span>
+          <span className="shell-nav-label">Wszystkie moduły</span>
+          <span className="shell-nav-badge">{MORE_ITEMS.length}</span>
+        </button>
+        {moreOpen && MORE_ITEMS.map((item) => (
+          <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
+        ))}
+      </div>
+    </>
+  );
 
   return (
     <div className="shell">

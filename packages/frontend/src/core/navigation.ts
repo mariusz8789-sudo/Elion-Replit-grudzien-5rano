@@ -43,78 +43,73 @@ export interface NavSection {
   readonly items: readonly NavItem[];
 }
 
+/**
+ * THE MENU IS TEN ITEMS. That is the whole list.
+ *
+ * The previous version listed every capability the system has — six sections,
+ * twenty-odd entries with names like "Precision Reference" and "Konflikt
+ * modeli". That is an inventory, not a menu: it asks the user to know the
+ * system's internal vocabulary before they can move. Scenario, Evidence,
+ * Memory, Replay, Decision, Sensitivity, Temporal Navigation and the rest are
+ * NOT top-level destinations — they are things you do inside a workspace.
+ *
+ * Everything that left the menu is still reachable: `MORE_ITEMS` keeps the
+ * full route list behind one collapsed disclosure, and every deep link still
+ * resolves. Nothing was deleted; it stopped being shouted.
+ */
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
-    id: 'workspace',
-    label: 'Workspace',
+    id: 'main',
+    label: '',
     items: [
-      { id: 'home', label: 'Command Center', icon: '◉', hash: '#/', primary: true },
-      { id: 'chat', label: 'Science Chat', icon: '✦', kind: 'chat', primary: true },
+      { id: 'home', label: 'Home', icon: '◉', hash: '#/', primary: true },
+      { id: 'chat', label: 'Chat', icon: '✦', kind: 'chat', primary: true },
       { id: 'matrix', label: 'Matrix', icon: '◈', hash: '#/matrix', primary: true },
-      { id: 'projects', label: 'Projekty', icon: '☁', hash: '#/projects' },
-    ],
-  },
-  {
-    id: 'create',
-    label: 'Twórz',
-    items: [
-      { id: 'generate', label: 'Generator symulacji', icon: '🔭', hash: '#/generate', primary: true },
-      { id: 'world', label: 'World Engine', icon: '🌍', hash: '#/genesis-world' },
-      { id: 'whatif', label: 'Co by było, gdyby?', icon: '🌀', hash: '#/what-if' },
-      { id: 'decision-explorer', label: 'Decision Explorer', icon: '🌠', hash: '#/decision-explorer' },
-    ],
-  },
-  {
-    id: 'science',
-    label: 'Nauka',
-    items: [
-      { id: 'drug', label: 'Drug Discovery', icon: '💊', hash: '#/drug' },
-      { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde' },
-      { id: 'campaign', label: 'Kampania naukowa', icon: '⚡', hash: '#/campaign' },
-      { id: 'pilot', label: 'Pilot eksperymentu', icon: '🧪', hash: '#/pilot' },
-      { id: 'precision', label: 'Precision Reference', icon: '🔬', hash: '#/molecular-reference-analysis' },
-      { id: 'conflict', label: 'Konflikt modeli', icon: '⚖', hash: '#/conflict' },
-    ],
-  },
-  {
-    id: 'evidence',
-    label: 'Evidence i pamięć',
-    items: [
-      { id: 'evidence', label: 'Evidence i Replay', icon: '📋', hash: '#/evidence' },
-      { id: 'memory', label: 'Pamięć Naukowa', icon: '🧠', hash: '#/memory' },
-      { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
-      { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },
-    ],
-  },
-  {
-    id: 'world',
-    label: 'Świat i symulacja',
-    items: [
-      { id: 'city3d', label: 'Miasto 3D (WebGL)', icon: '🏙', hash: '#/city3d', primary: true },
-      { id: 'scientific-city', label: 'Scientific City', icon: '🏗', hash: '#/scientific-city' },
-      { id: 'first-person-lab', label: 'Laboratorium 1. osoby', icon: '🔬', hash: '#/first-person-lab' },
-      { id: 'molecule', label: 'Molecule Lab', icon: '🧪', hash: '#/molecule' },
-      { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab' },
-      { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass' },
-      { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline' },
-    ],
-  },
-  {
-    id: 'systems',
-    label: 'Systemy',
-    items: [
+      { id: 'world', label: 'World', icon: '🌍', hash: '#/genesis-world', primary: true },
+      { id: 'simulation', label: 'Simulation', icon: '🔭', hash: '#/generate', primary: true },
+      { id: 'science', label: 'Science', icon: '🧬', hash: '#/drug' },
       {
         id: 'cyber', label: 'Cyber', icon: '🛡', status: 'planned',
         plannedNote: 'Rdzeń działa (reasoning kernel, EIG test planner, investigation, evidence) — workspace jeszcze nie zbudowany. Przebiegi cyber są dziś widoczne w Matrix i Pamięci Naukowej.',
       },
-      { id: 'glossary', label: 'Słowniczek', icon: '📚', hash: '#/glossary' },
-      { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings' },
+      {
+        id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
+        plannedNote: 'Profil instytucjonalny (skala miasta/energii/wody/transportu) — nie istnieje jeszcze ani jako route, ani jako model uprawnień. Wymieniony, żeby nie udawać, że go pomijamy.',
+      },
+      { id: 'projects', label: 'Projects', icon: '☁', hash: '#/projects' },
+      { id: 'settings', label: 'Settings', icon: '⚙', hash: '#/settings' },
     ],
   },
 ];
 
+/**
+ * Everything the menu no longer shouts. Reachable behind one disclosure, so
+ * no capability was lost — it stopped competing with the ten that matter.
+ */
+export const MORE_ITEMS: readonly NavItem[] = [
+  { id: 'memory', label: 'Pamięć Naukowa', icon: '🧠', hash: '#/memory' },
+  { id: 'evidence', label: 'Evidence i Replay', icon: '📋', hash: '#/evidence' },
+  { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
+  { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },
+  { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde' },
+  { id: 'campaign', label: 'Kampania naukowa', icon: '⚡', hash: '#/campaign' },
+  { id: 'pilot', label: 'Pilot eksperymentu', icon: '🧪', hash: '#/pilot' },
+  { id: 'precision', label: 'Precision Reference', icon: '🔬', hash: '#/molecular-reference-analysis' },
+  { id: 'conflict', label: 'Konflikt modeli', icon: '⚖', hash: '#/conflict' },
+  { id: 'whatif', label: 'Co by było, gdyby?', icon: '🌀', hash: '#/what-if' },
+  { id: 'decision-explorer', label: 'Decision Explorer', icon: '🌠', hash: '#/decision-explorer' },
+  { id: 'city3d', label: 'Miasto 3D (WebGL)', icon: '🏙', hash: '#/city3d' },
+  { id: 'scientific-city', label: 'Scientific City', icon: '🏗', hash: '#/scientific-city' },
+  { id: 'first-person-lab', label: 'Laboratorium 1. osoby', icon: '🔬', hash: '#/first-person-lab' },
+  { id: 'molecule', label: 'Molecule Lab', icon: '🧪', hash: '#/molecule' },
+  { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab' },
+  { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass' },
+  { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline' },
+  { id: 'glossary', label: 'Słowniczek', icon: '📚', hash: '#/glossary' },
+];
+
 /** Flat view, for lookups and for the mobile primary bar. */
-export const NAV_ITEMS: readonly NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
+export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) => section.items), ...MORE_ITEMS];
 
 export const PRIMARY_NAV_ITEMS: readonly NavItem[] = NAV_ITEMS.filter((item) => item.primary);
 

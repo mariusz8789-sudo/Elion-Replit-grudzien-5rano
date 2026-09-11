@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
+import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/matrixRelations';
 
 /**
  * GENESIS MATRIX — the central workspace, not a memory-record list.
@@ -103,6 +104,11 @@ export function GenesisMatrixHub() {
     for (const { kinds } of withKinds) for (const k of kinds) counts.set(k, (counts.get(k) ?? 0) + 1);
     return counts;
   }, [withKinds]);
+
+  /** Edges derived ONLY from fields that really link two records — see
+      core/agent/matrixRelations.ts. Relations the data cannot support are
+      returned as `missing` and rendered below as gaps, never as faint lines. */
+  const relations = useMemo(() => buildMatrixRelationGraph(records), [records]);
 
   const [activeKind, setActiveKind] = useState<MatrixKind | null>(null);
   const [detail, setDetail] = useState<DetailTarget | null>(null);
@@ -233,6 +239,24 @@ export function GenesisMatrixHub() {
             </div>
           </div>
 
+          {/* Gaps in the chain, stated as gaps. A graph that quietly omits the
+              links it cannot prove reads as a complete picture; naming them is
+              the difference between a map and a sales pitch. */}
+          {relations.missing.length > 0 && (
+            <div className="matrix-missing">
+              <h3 className="matrix-rail-title">Brakujące powiązania</h3>
+              <ul className="matrix-missing-list">
+                {relations.missing.map((gap, i) => (
+                  <li key={`${gap.from}:${gap.to}:${i}`}>
+                    <span className="matrix-missing-link">{gap.from} → {gap.to}</span>
+                    <span className="matrix-missing-reason">{gap.reason}</span>
+                    <span className="matrix-missing-detail">{gap.detail}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="matrix-next-actions">
             <h3 className="matrix-rail-title">Next Action</h3>
             <div className="matrix-next-grid">
@@ -260,6 +284,39 @@ export function GenesisMatrixHub() {
                   <div key={key}><dt>{key}</dt><dd>{Number.isFinite(value) ? value : String(value)}</dd></div>
                 ))}
               </dl>
+              {/* Relations — the point of a Matrix. Every row names the field
+                  that proves it, so a user can check the claim rather than
+                  trust a drawn line. */}
+              <h4 className="matrix-detail-sub">Powiązania</h4>
+              {edgesFor(relations, detail.record.id).length === 0 ? (
+                <p className="matrix-rail-empty">
+                  Brak powiązań wyprowadzalnych z danych. Ten rekord nie dzieli evidence packa, chaina ani kapsuły
+                  replay z żadnym innym i nic go nie weryfikuje — Genesis nie dorysowuje relacji „na oko".
+                </p>
+              ) : (
+                <ul className="matrix-relation-list">
+                  {edgesFor(relations, detail.record.id).map((edge) => {
+                    const otherId = edge.fromId === detail.record.id ? edge.toId : edge.fromId;
+                    const other = records.find((r) => r.id === otherId);
+                    const incoming = edge.toId === detail.record.id && edge.directed;
+                    return (
+                      <li key={`${edge.kind}:${edge.fromId}:${edge.toId}`}>
+                        <button
+                          className="matrix-relation-row"
+                          onClick={() => { const target = withKinds.find((w) => w.record.id === otherId); if (target) openDetail(target); }}
+                          disabled={!other}
+                        >
+                          <span className="matrix-relation-kind">
+                            {edge.directed ? (incoming ? '←' : '→') : '↔'} {EDGE_LABEL[edge.kind]}
+                          </span>
+                          <span className="matrix-relation-target">{other ? (other.experimentName || other.id) : otherId}</span>
+                          <span className="matrix-relation-basis">podstawa: {edge.basis}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               <div className="matrix-detail-actions">
                 <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz w Pamięci Naukowej →</button>
                 {(detail.record.biotech || detail.record.substitutionInvestigation) && (

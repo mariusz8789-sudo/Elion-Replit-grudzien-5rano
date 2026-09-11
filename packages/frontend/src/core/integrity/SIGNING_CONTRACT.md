@@ -1,5 +1,13 @@
 # The `integrityEnvelope.ts` Signing Contract
 
+**Note added post-reconciliation:** `packages/csrn-reference`, cited several times below as a worked
+example, was a duplicate implementation built concurrently with `packages/csrn` (same CSRN v4 spec,
+two sessions, same branch). It has been removed; `packages/csrn` is the real, Genesis-integrated
+package that shipped (see `packages/frontend/src/core/csrn/genesisCertificateAdapter.ts` and
+`packages/frontend/src/__tests__/csrnGenesisIntegration.test.ts`). Every design point below (the
+signed-payload/certificate-fingerprint split, JWK vs SPKI public-key format) still applies
+verbatim to `packages/csrn` — only the file paths in the citations no longer resolve.
+
 **Audience: C2, integrating CSRN cert:// with real Genesis objects (`evidence://`, `cert://`).**
 **Author: C3. Written because C2's integration had not yet landed when this was requested — this
 documents the ALREADY-SHIPPED, ALREADY-TESTED contract on its own, so it's ready the moment C2's

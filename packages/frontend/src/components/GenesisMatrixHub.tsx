@@ -1,7 +1,19 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/matrixRelations';
+import { ALL_MATRIX_KINDS, KIND_ICON, KIND_LABEL, kindsOf, type MatrixKind } from './matrixKinds';
+import { projectMatrixGraph } from './matrixGraphProjection';
+import { MatrixGraph } from './MatrixGraph';
+
+/**
+ * `kindsOf` and the kind vocabulary live in `./matrixKinds` so the graph
+ * projection can use them without importing this component (which would be a
+ * cycle). They are re-exported here UNCHANGED so every existing import path —
+ * `MatrixDataStream.tsx`, `GenesisDashboard.tsx` and the tests — keeps working
+ * against the exact same implementation.
+ */
+export { kindsOf, KIND_LABEL, KIND_ICON, type MatrixKind } from './matrixKinds';
 
 /**
  * GENESIS MATRIX — the central workspace, not a memory-record list.
@@ -33,37 +45,6 @@ import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/ma
  * instead. NEXT ACTION is real navigation, not a generated recommendation:
  * it always shows the actual screens that extend whatever is selected.
  */
-
-export type MatrixKind =
-  | 'HYPOTHESIS' | 'WORLD' | 'MODEL' | 'SCENARIO' | 'EVIDENCE'
-  | 'CYBER' | 'DECIPHERMENT' | 'RESEARCH_CHAIN' | 'REPLAY' | 'EXPERIMENT';
-
-const KIND_LABEL: Record<MatrixKind, string> = {
-  HYPOTHESIS: 'Hypotheses', WORLD: 'Worlds', MODEL: 'Models', SCENARIO: 'Scenarios',
-  EVIDENCE: 'Evidence', CYBER: 'Cyber', DECIPHERMENT: 'Decipherment', RESEARCH_CHAIN: 'Research Chain',
-  REPLAY: 'Replay', EXPERIMENT: 'Experiment',
-};
-
-const KIND_ICON: Record<MatrixKind, string> = {
-  HYPOTHESIS: '◆', WORLD: '◇', MODEL: '▣', SCENARIO: '⑂', EVIDENCE: '✓',
-  CYBER: '◈', DECIPHERMENT: '📜', RESEARCH_CHAIN: '⛓', REPLAY: '↺', EXPERIMENT: '●',
-};
-
-/** Every kind this record honestly carries — never a single forced category. */
-export function kindsOf(record: SavedExperiment): MatrixKind[] {
-  const kinds: MatrixKind[] = [];
-  if (record.discoveryLoop || record.hypothesisLoop || record.parameterInquiry) kinds.push('HYPOTHESIS');
-  if (record.worldDiscovery) kinds.push('WORLD');
-  if (record.mechanismComposition) kinds.push('MODEL');
-  if (record.scenario || record.counterfactual) kinds.push('SCENARIO');
-  if (record.biotech || record.realExperimentVerification || record.substitutionInvestigation || record.evidencePackId || record.evidenceChainId) kinds.push('EVIDENCE');
-  if (record.cyberInvestigation) kinds.push('CYBER');
-  if (record.deciphermentCase) kinds.push('DECIPHERMENT');
-  if (record.researchChain) kinds.push('RESEARCH_CHAIN');
-  if (record.replayIdentity) kinds.push('REPLAY');
-  if (kinds.length === 0) kinds.push('EXPERIMENT');
-  return kinds;
-}
 
 type LoopStage = 'HYPOTHESIS' | 'EXPERIMENT' | 'EVIDENCE';
 const STAGE_KINDS: Record<LoopStage, MatrixKind[]> = {
@@ -114,11 +95,25 @@ export function GenesisMatrixHub() {
   const [activeKind, setActiveKind] = useState<MatrixKind | null>(null);
   const [detail, setDetail] = useState<DetailTarget | null>(null);
   const [askInput, setAskInput] = useState('');
+  const [view, setView] = useState<'GRAPH' | 'RECORDS'>('GRAPH');
+
+  /**
+   * The graph is a projection of the SAME `records` and the SAME `relations`
+   * the list below already uses — one relation computation, one classification,
+   * so the two views can never disagree about what is related to what.
+   * Memoized on both, so panning/zooming/selecting never recomputes layout.
+   */
+  const graphModel = useMemo(() => projectMatrixGraph(records, relations), [records, relations]);
+
+  const selectById = useCallback((id: string) => {
+    const target = withKinds.find((w) => w.record.id === id);
+    if (target) setDetail((current) => (current?.record.id === id ? null : target));
+  }, [withKinds]);
 
   const latest = withKinds[0] ?? null; // listExperiments() sorts newest-first
   const recentFive = withKinds.slice(0, 5);
   const visible = activeKind ? withKinds.filter(({ kinds }) => kinds.includes(activeKind)) : withKinds;
-  const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'DECIPHERMENT', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
+  const ALL_KINDS = ALL_MATRIX_KINDS;
 
   const submitAsk = () => {
     const text = askInput.trim();
@@ -202,7 +197,41 @@ export function GenesisMatrixHub() {
           <p className="matrix-loop-legend">
             Hypothesis → Prediction → Experiment → Evidence → Verdict → Memory → Next Action
           </p>
-          <div className="matrix-loop-columns">
+
+          {/* GRAPH | RECORDS. The graph is the visual centre, but the list view
+              it replaced is one click away and unchanged — a new projection
+              should not cost anyone the view they already rely on. */}
+          <div className="matrix-view-toggle" role="tablist" aria-label="Widok Matrix">
+            <button
+              role="tab"
+              aria-selected={view === 'GRAPH'}
+              className={view === 'GRAPH' ? 'matrix-view-tab active' : 'matrix-view-tab'}
+              onClick={() => setView('GRAPH')}
+              data-testid="matrix-view-graph"
+            >
+              Graf relacji
+            </button>
+            <button
+              role="tab"
+              aria-selected={view === 'RECORDS'}
+              className={view === 'RECORDS' ? 'matrix-view-tab active' : 'matrix-view-tab'}
+              onClick={() => setView('RECORDS')}
+              data-testid="matrix-view-records"
+            >
+              Pętla i rekordy
+            </button>
+          </div>
+
+          {view === 'GRAPH' && (
+            <MatrixGraph
+              model={graphModel}
+              selectedId={detail?.record.id ?? null}
+              onSelect={(node) => selectById(node.id)}
+              onClearSelection={() => setDetail(null)}
+            />
+          )}
+
+          <div className="matrix-loop-columns" hidden={view !== 'RECORDS'}>
             {(['HYPOTHESIS', 'EXPERIMENT', 'EVIDENCE'] as LoopStage[]).map((stage, i) => {
               const items = withKinds.filter(({ kinds }) => kinds.some((k) => STAGE_KINDS[stage].includes(k)));
               return (
@@ -280,7 +309,11 @@ export function GenesisMatrixHub() {
               <p className="matrix-card-meta">{new Date(detail.record.createdAt).toLocaleString()} · lab {detail.record.labId}</p>
               <dl className="matrix-detail-list">
                 <div><dt>ID</dt><dd className="mono">{detail.record.id}</dd></div>
+                <div><dt>Status epistemiczny</dt><dd className="mono">{detail.record.epistemicStatus}</dd></div>
+                <div><dt>Rzetelność</dt><dd className="mono">{detail.record.honesty}</dd></div>
                 {detail.record.evidencePackId && <div><dt>Evidence pack</dt><dd className="mono">{detail.record.evidencePackId}</dd></div>}
+                {detail.record.evidenceChainId && <div><dt>Evidence chain</dt><dd className="mono">{detail.record.evidenceChainId}</dd></div>}
+                {detail.record.replayIdentity && <div><dt>Replay capsule</dt><dd className="mono">{detail.record.replayIdentity.capsuleId}</dd></div>}
                 {Object.entries(detail.record.stats).slice(0, 5).map(([key, value]) => (
                   <div key={key}><dt>{key}</dt><dd>{Number.isFinite(value) ? value : String(value)}</dd></div>
                 ))}
@@ -289,6 +322,18 @@ export function GenesisMatrixHub() {
                   that proves it, so a user can check the claim rather than
                   trust a drawn line. */}
               <h4 className="matrix-detail-sub">Powiązania</h4>
+              {(graphModel.selfEdgesById.get(detail.record.id)?.length ?? 0) > 0 && (
+                <ul className="matrix-relation-list" data-testid="matrix-detail-selfedges">
+                  {graphModel.selfEdgesById.get(detail.record.id)!.map((edge) => (
+                    <li key={`self:${edge.kind}`}>
+                      <span className="matrix-relation-row matrix-relation-row-self">
+                        <span className="matrix-relation-kind">↺ {EDGE_LABEL[edge.kind]} (do samego siebie)</span>
+                        <span className="matrix-relation-basis">podstawa: {edge.basis}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {edgesFor(relations, detail.record.id).length === 0 ? (
                 <p className="matrix-rail-empty">
                   Brak powiązań wyprowadzalnych z danych. Ten rekord nie dzieli evidence packa, chaina ani kapsuły
@@ -320,6 +365,17 @@ export function GenesisMatrixHub() {
               )}
               <div className="matrix-detail-actions">
                 <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz w Pamięci Naukowej →</button>
+                {/* The SAME globally-mounted ScienceChat every other entry point
+                    opens — this passes the selected record as context, it does
+                    not create a second chat. */}
+                <button
+                  className="chip-btn"
+                  type="button"
+                  data-testid="matrix-detail-ask-chat"
+                  onClick={() => requestOpenScienceChat(`Opowiedz o zapisie „${detail.record.experimentName || detail.record.experimentId}" (${detail.record.id}) z Pamięci Naukowej.`)}
+                >
+                  Zapytaj Science Chat o ten rekord →
+                </button>
                 {(detail.record.biotech || detail.record.substitutionInvestigation) && (
                   <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/drug'; }}>Otwórz w Drug Discovery →</button>
                 )}

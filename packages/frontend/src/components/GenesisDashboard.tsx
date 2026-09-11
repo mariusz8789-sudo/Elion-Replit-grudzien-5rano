@@ -4,6 +4,17 @@ import { kindsOf, type MatrixKind } from './GenesisMatrixHub';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { getToken, useSession } from '../core/backend/session';
 import { listProjects, type Project } from '../core/backend/client';
+import { synthesizeNextQuestion } from '../core/agent/crossDomainSynthesis';
+
+/** Where to send the user for a cross-domain next question — the one screen
+ * that always shows the record (`#/matrix`) unless the domain has its own
+ * dedicated workspace already registered in `navigation.ts`. Exported so it
+ * can be pinned directly, the same way `decideNextAction` is below. */
+export function crossDomainHash(labId: string): string {
+  if (labId === 'cyber-security') return '#/cyber';
+  if (labId === 'decipherment') return '#/decipherment';
+  return '#/matrix';
+}
 
 /**
  * GENESIS DASHBOARD — the mission surface of the application.
@@ -155,6 +166,18 @@ export function GenesisDashboard(): JSX.Element {
   const recent = useMemo(() => records.slice(0, 5), [records]);
   const focus = recent[0] ?? null;
   const next = useMemo(() => decideNextAction(counts), [counts]);
+  /**
+   * CROSS-DOMAIN NEXT QUESTION (master gap plan P1.3) — a read-only
+   * projection over the SAME `records` this screen already loaded, looking
+   * across every domain's own already-persisted terminal-status/conflict
+   * vocabulary (`synthesizeNextQuestion`, crossDomainSynthesis.ts) rather
+   * than `decideNextAction`'s coarse stage counts above. When it finds a
+   * genuinely open item, it replaces the generic "Postaw pierwszą hipotezę"
+   * card with the specific one; when it finds nothing (its own honest
+   * `null`, not an empty placeholder), the existing count-based `next`
+   * stands unchanged. No second Memory, no second Discovery Engine.
+   */
+  const crossDomain = useMemo(() => synthesizeNextQuestion(records), [records]);
   const activeProject = projects && projects.length > 0 ? projects[0] : null;
 
   const submitAsk = (): void => {
@@ -211,11 +234,39 @@ export function GenesisDashboard(): JSX.Element {
       </section>
 
       <div className="dash-grid">
-        <section className="dash-card dash-card-next" aria-label="Następny krok">
+        <section className="dash-card dash-card-next" aria-label="Następny krok" data-testid="dash-next-step">
           <div className="dash-card-head"><span className="dash-card-kicker">Następny krok</span></div>
-          <h2 className="dash-next-title">{next.title}</h2>
-          <p className="dash-next-why">{next.why}</p>
-          <button className="dash-btn dash-btn-primary" onClick={() => { window.location.hash = next.hash; }}>{next.cta} →</button>
+          {crossDomain ? (
+            <div className="dash-cross-domain" data-testid="dash-cross-domain-question">
+              <h2 className="dash-next-title">{crossDomain.question}</h2>
+              <p className="dash-next-why">{crossDomain.whyThisQuestion}</p>
+              <p className="gsc-caption">{crossDomain.whyNow}</p>
+              {crossDomain.conflicts.length > 0 && (
+                <p className="gsc-caption dash-next-conflict">
+                  Konflikt w tej domenie: {crossDomain.conflicts[0]}
+                </p>
+              )}
+              {crossDomain.relatedPriorWork.length > 0 && (
+                <p className="gsc-caption">
+                  Powiązana wcześniejsza praca: {crossDomain.relatedPriorWork.length} rekord(y)
+                  ({crossDomain.relatedPriorWork.map((r) => r.relation).join(', ')}).
+                </p>
+              )}
+              <p className="gsc-caption dash-next-test">Następny test: {crossDomain.nextTestOrExperiment}</p>
+              <button
+                className="dash-btn dash-btn-primary"
+                onClick={() => { window.location.hash = crossDomainHash(crossDomain.domain); }}
+              >
+                Otwórz {crossDomain.domain} →
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 className="dash-next-title">{next.title}</h2>
+              <p className="dash-next-why">{next.why}</p>
+              <button className="dash-btn dash-btn-primary" onClick={() => { window.location.hash = next.hash; }}>{next.cta} →</button>
+            </>
+          )}
         </section>
 
         <section className="dash-card" aria-label="Ostatnia aktywność naukowa">

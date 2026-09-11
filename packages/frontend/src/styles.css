@@ -4148,6 +4148,8 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .dash-next-title { margin: 0; font-size: var(--fs-title); font-weight: 650; letter-spacing: -0.015em; }
 .dash-next-why { margin: 0; color: var(--text-dim); font-size: var(--fs-body); line-height: 1.6; }
 .dash-card-next .dash-btn { align-self: flex-start; margin-top: auto; }
+.dash-cross-domain { display: flex; flex-direction: column; gap: var(--sp-2); }
+.dash-next-conflict, .dash-next-test { color: var(--text-dim); }
 .dash-card > .dash-btn { align-self: flex-start; margin-top: auto; }
 .dash-empty { margin: 0; color: var(--text-dim); font-size: var(--fs-body); line-height: 1.65; }
 

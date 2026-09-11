@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { GenesisDashboard, decideNextAction } from '../components/GenesisDashboard';
+import { GenesisDashboard, decideNextAction, crossDomainHash } from '../components/GenesisDashboard';
 import type { MatrixKind } from '../components/GenesisMatrixHub';
 
 /**
@@ -69,5 +69,22 @@ describe('GenesisDashboard (no DOM — the brand-new-user state)', () => {
   it('exposes the Science Chat command bar as part of the page, not as a floating widget', () => {
     expect(html).toContain('dash-ask-input');
     expect(html).toContain('Science Chat');
+  });
+
+  it('with an empty Science Memory (nothing to synthesize across domains), still renders the count-based next step, never a cross-domain placeholder', () => {
+    expect(html).not.toContain('dash-cross-domain-question');
+  });
+});
+
+describe('crossDomainHash (master gap plan P1.3) — routes a cross-domain question to a real screen', () => {
+  it('sends cyber-security and decipherment to their own dedicated workspaces', () => {
+    expect(crossDomainHash('cyber-security')).toBe('#/cyber');
+    expect(crossDomainHash('decipherment')).toBe('#/decipherment');
+  });
+
+  it('falls back to Matrix for every domain without a dedicated workspace, so the link is always real', () => {
+    expect(crossDomainHash('mechanism-research-chain')).toBe('#/matrix');
+    expect(crossDomainHash('parameter-research-chain')).toBe('#/matrix');
+    expect(crossDomainHash('some-future-domain')).toBe('#/matrix');
   });
 });

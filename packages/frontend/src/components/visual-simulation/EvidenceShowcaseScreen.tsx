@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { getExperiment, type SavedExperiment } from '../../core/scienceMemory';
-import { buildIntegrityEnvelope } from '../../core/integrity';
+import type { VerificationResult } from '../../core/integrity';
 import { ProvenanceBadge } from './provenance';
 import {
-  buildCaseStudy, listCaseStudyCandidates, replayCaseStudy,
+  buildCaseStudy, buildSignedEvidenceDownload, listCaseStudyCandidates, replayCaseStudy, verifyEvidenceFile,
   type CaseStudy, type CaseStudyReplay,
 } from './evidenceShowcase';
 
@@ -69,17 +69,18 @@ function provenanceExplanation(caseStudy: Pick<CaseStudy, 'kind' | 'recordProven
 }
 
 /**
- * Wraps the download in an `IntegrityEnvelope` (`core/integrity`) — a SHA-256
- * hash over a canonicalized copy of the payload, so an external auditor can
- * verify the downloaded file was not altered after Genesis produced it,
- * without trusting Genesis's UI to say so. This is an integrity check, not a
- * signature: `verificationInstructions` says so explicitly, and so does the
- * caption under the Download button below.
+ * Wraps the download in a `SignedIntegrityEnvelope` (`core/integrity`) — a
+ * SHA-256 hash over a canonicalized copy of the payload, plus a real ECDSA
+ * P-256 signature over that hash (`buildSignedEvidenceDownload`, in
+ * `evidenceShowcase.ts`), so a recipient can verify BOTH that the file was
+ * not altered after Genesis produced it AND that it was produced by whoever
+ * held the (ephemeral, per-download) private key — never institutional
+ * non-repudiation, exactly as `SignedIntegrityEnvelope`'s own doc comment
+ * states, and exactly as the caption under the Download button below says.
  */
 async function downloadJson(caseStudy: CaseStudy, saved: SavedExperiment): Promise<void> {
-  const payload = { caseStudy, record: saved };
-  const envelope = await buildIntegrityEnvelope(payload, new Date().toISOString());
-  const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+  const signed = await buildSignedEvidenceDownload(caseStudy, saved);
+  const blob = new Blob([JSON.stringify(signed, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -100,6 +101,21 @@ export function EvidenceShowcaseScreen() {
   });
 
   const { saved, caseStudy, replay } = useLiveCaseStudy(selectedId);
+  const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+
+  async function handleVerifyFile(file: File): Promise<void> {
+    setVerifyBusy(true);
+    try {
+      const text = await file.text();
+      const parsed: unknown = JSON.parse(text);
+      setVerifyResult(await verifyEvidenceFile(parsed));
+    } catch (error) {
+      setVerifyResult({ valid: false, reason: `Could not read this file as JSON: ${error instanceof Error ? error.message : String(error)}`, status: 'STRUCTURALLY_INVALID' });
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
 
   return (
     <div className="ecs-screen" data-testid="evidence-showcase-screen">
@@ -134,9 +150,26 @@ export function EvidenceShowcaseScreen() {
       </div>
       {caseStudy && (
         <p className="gsc-caption" data-testid="ecs-integrity-note">
-          The downloaded file carries a SHA-256 integrity hash (not a signature) so a reader can verify it was not altered after export — see the file's own <code>verificationInstructions</code> field.
+          The downloaded file carries a SHA-256 integrity hash AND a real ECDSA P-256 signature over that hash, produced by a fresh key generated in this browser tab for this one download — this proves the file has not been altered since export and was produced by whoever holds that (ephemeral) key, but is NOT institutional non-repudiation. See the file's own <code>verificationInstructions</code> field.
         </p>
       )}
+
+      <div className="ecs-verify" data-testid="ecs-verify-section">
+        <label htmlFor="ecs-verify-input">Verify a downloaded Evidence file</label>
+        <input
+          id="ecs-verify-input"
+          type="file"
+          accept="application/json"
+          data-testid="ecs-verify-input"
+          disabled={verifyBusy}
+          onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleVerifyFile(file); }}
+        />
+        {verifyResult && (
+          <p className={`gsc-caption ecs-verify-${verifyResult.status}`} data-testid="ecs-verify-result">
+            <b>{verifyResult.status}</b>{' — '}{verifyResult.reason}
+          </p>
+        )}
+      </div>
 
       {!caseStudy ? (
         <div className="ecs-empty" data-testid="ecs-empty-state">

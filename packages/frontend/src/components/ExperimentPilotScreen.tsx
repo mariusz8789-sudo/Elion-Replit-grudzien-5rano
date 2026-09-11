@@ -26,6 +26,7 @@ import {
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
   analyseExperimentSeries,
+  parseEvidenceUri,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
   type ScientificEvidencePack,
@@ -149,8 +150,14 @@ export function ExperimentPilotScreen() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
-    const evidencePackId = params.get('replay');
-    if (!evidencePackId) return;
+    const replayParam = params.get('replay');
+    if (!replayParam) return;
+    // The producer side (ScientificMemoryScreen.tsx) writes this as a real
+    // `evidence://` URI (evidenceUri.ts). Bare, unprefixed ids are still
+    // accepted so a link copied before this wiring, or typed by hand, keeps
+    // working — `parseEvidenceUri` returns null on anything that isn't a
+    // well-formed v1 URI rather than guessing, so the fallback is explicit.
+    const evidencePackId = parseEvidenceUri(replayParam)?.evidencePackId ?? replayParam;
     const stored = getScientificEvidencePack(evidencePackId);
     if (!stored) {
       setError(`Nie znaleziono lokalnego Evidence Pack: ${evidencePackId}`);

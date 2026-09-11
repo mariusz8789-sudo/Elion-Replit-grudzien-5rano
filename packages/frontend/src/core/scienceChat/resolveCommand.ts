@@ -436,6 +436,34 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Particle physics / collider (C2, integracja propozycji Qwena) — REALNA domena na tym samym
+  //     WorldGraph co powódź/chemia/epidemia: `domains/particlePhysics.ts` (relatywistyczna kinematyka,
+  //     relatywistyczny Breit-Wigner, stałe PDG) + `particlePhysicsLeverCatalog.ts`. Nie ma osobnego
+  //     ekranu i nie powinno go być: panel Discovery na `#/scientific-city` czyta rejestr katalogów,
+  //     więc zderzacz jest tam w liście światów obok pozostałych. ---
+  if (has(norm, 'zderzacz', 'collider', 'czastki elementarne', 'fizyka czastek', 'particle physics', 'rezonans z', 'bozon z', 'z boson', 'luminozj', 'swietlnos', 'akcelerator')) {
+    return {
+      text: 'Otwieram panel Discovery — wybierz świat „particle-physics — genesis-particle-collider". To realna domena na tym samym silniku co pozostałe: relatywistyczny kształt Breit-Wignera wokół piku Z (masa i szerokość z PDG), realna rozdzielczość detektora w oknie masowym i realna akceptacja geometryczna. Wydajności są w jednostkach znormalizowanych, NIE w pikobarnach — znaczenie mają wyłącznie stosunki między ramionami, nigdy wartość bezwzględna.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
+  // --- Atomic Lab / jonizacja (C2, integracja pakietu Qwena "Particle & Atomic Physics Laboratory") —
+  //     DRUGIE ŚRODOWISKO tego samego laboratorium, nie drugi silnik: `domains/atomicIonization.ts`
+  //     (zmierzony przekrój czynny Lotza dla wodoru + prawo Beera-Lamberta) +
+  //     `atomicIonizationLeverCatalog.ts`. Virtual CERN to jeden wiersz w
+  //     `particleAtomicLabEnvironments.ts`, a nie granica możliwości. ---
+  if (has(norm, 'jonizacj', 'ionizacj', 'ionization', 'ionisation', 'atomic lab', 'laboratorium atomowe', 'fizyka atomowa', 'atomic physics', 'przekroj czynny', 'komora jonizacyjna', 'ionization chamber')) {
+    return {
+      text: 'Otwieram panel Discovery — wybierz świat „atomic-physics — genesis-atomic-ionization". To Atomic Lab: to samo laboratorium co zderzacz, inne środowisko. Fizyka jest realna i cytowalna: zmierzony przekrój czynny jonizacji wodoru Lotza (1967) z twardym progiem 13,606 eV i MAKSIMUM koło 55 eV, oraz prawdziwe tłumienie Beera-Lamberta w komorze. Uwaga na wynik, który zwykle zaskakuje: podnoszenie energii wiązki POWYŻEJ piku ZMNIEJSZA liczbę jonów — odwrotnie niż przy strojeniu zderzacza na rezonans. Prąd wiązki, gaz resztkowy i ciemny prąd detektora są zadeklarowanymi parametrami aparatury, więc znaczenie mają wyłącznie porównania między ramionami jednego biegu.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
   // --- Evidence & Replay Showcase (C2 "Evidence & Replay as Product") — jeden kompletny, realny
   //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`) albo w starszym
   //     `evidencePackStore.ts`, pokazany jako jednostronicowy raport audytowy: pytanie -> hipoteza ->

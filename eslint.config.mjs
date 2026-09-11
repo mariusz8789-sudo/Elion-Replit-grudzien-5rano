@@ -66,6 +66,14 @@ export default tseslint.config(
     },
   },
   {
+    // CSRN demo entry points (`npm run demo`/`demo:federation`) — CLI harnesses
+    // that report their own execution, same convention as scripts/**/*.mjs above.
+    files: ['packages/csrn/demo/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     // Committed reproducibility/benchmark harnesses run under Node and attach
     // to a real Chromium CDP endpoint; they are not browser application code.
     files: ['artifacts/**/*.mjs'],

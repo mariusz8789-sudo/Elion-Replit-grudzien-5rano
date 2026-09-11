@@ -1,0 +1,22 @@
+{
+  "name": "@genesis-os/csrn",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Certification / addressing / evidence-exchange layer over existing Genesis evidence, replay and provenance objects — not a second research system.",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "demo": "npm run build && node dist/demo/e2eDemo.js",
+    "demo:federation": "npm run build && node dist/demo/federationDemo.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
+  }
+}

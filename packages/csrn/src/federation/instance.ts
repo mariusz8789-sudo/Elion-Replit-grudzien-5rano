@@ -1,4 +1,4 @@
-import { generateKeyPair, publicKeyToString, type KeyPair } from '../crypto/signing.js';
+import { computePublicKeyId, generateKeyPair, type KeyPair } from '../crypto/signing.js';
 import type { Certificate, Evidence } from '../cert/types.js';
 
 /**
@@ -29,12 +29,13 @@ export async function createInstance(instanceId: string, domain: string): Promis
   return { instanceId, domain, keyPair, packs: new Map(), trustedPublicKeys: new Set() };
 }
 
-export function ownPublicKey(instance: SimulatedInstance): string {
-  return publicKeyToString(instance.keyPair.publicKeyJwk);
+/** The canonical id (see `crypto/signing.ts::computePublicKeyId`) an auditor's trust store keys on — never the raw JWK string. */
+export async function ownPublicKeyId(instance: SimulatedInstance): Promise<string> {
+  return computePublicKeyId(instance.keyPair.publicKeyJwk);
 }
 
-export function trust(instance: SimulatedInstance, publicKey: string): void {
-  instance.trustedPublicKeys.add(publicKey);
+export function trust(instance: SimulatedInstance, publicKeyId: string): void {
+  instance.trustedPublicKeys.add(publicKeyId);
 }
 
 export function storePack(instance: SimulatedInstance, record: EvidencePackRecord): void {

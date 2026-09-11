@@ -1,4 +1,4 @@
-import { bytesToHex, hexToBytes } from './fingerprint.js';
+import { bytesToHex, computeFingerprint, hexToBytes } from './fingerprint.js';
 
 /**
  * REAL ECDSA P-256 signing/verification via Web Crypto — not a placeholder,
@@ -30,9 +30,25 @@ export async function generateKeyPair(): Promise<KeyPair> {
   return { privateKeyJwk, publicKeyJwk };
 }
 
-/** Serializes a JWK the same way everywhere in this package — used both to store a public key in a Signature and to compare/trust it. */
+/** Serializes a JWK for EMBEDDING in a `Signature.publicKey` field — needs to reconstruct the exact key via `JSON.parse` for verification, so full fidelity matters here, not identity. */
 export function publicKeyToString(publicKeyJwk: JsonWebKey): string {
   return JSON.stringify(publicKeyJwk);
+}
+
+/**
+ * A canonical, deterministic identity for a public key — used ONLY for
+ * trust-store membership (`federation/instance.ts::trust`,
+ * `cert/auditor.ts`'s `trustedPublicKeys`), never for reconstructing the key
+ * itself. Deliberately NOT `JSON.stringify(jwk)`: `crypto.subtle.exportKey`
+ * does not guarantee a stable field order across engines, so two exports of
+ * the SAME key could serialize differently and silently fail a trust-set
+ * lookup. This hashes only the coordinates that actually identify an EC
+ * public key (`kty`/`crv`/`x`/`y`) through the SAME canonical-JSON + SHA-256
+ * pipeline every other fingerprint in this package already uses.
+ */
+export async function computePublicKeyId(publicKeyJwk: JsonWebKey): Promise<string> {
+  const { kty, crv, x, y } = publicKeyJwk;
+  return computeFingerprint({ kty, crv, x, y });
 }
 
 /**

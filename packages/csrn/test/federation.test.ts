@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createInstance, ownPublicKey, storePack, trust } from '../src/federation/instance.js';
+import { createInstance, ownPublicKeyId, storePack, trust } from '../src/federation/instance.js';
 import { receiverAudit, simulateExchange } from '../src/federation/exchange.js';
 import { buildCertificate } from '../src/cert/builder.js';
-import { signFingerprint } from '../src/crypto/signing.js';
+import { publicKeyToString, signFingerprint } from '../src/crypto/signing.js';
 import type { Certificate, UnsignedCertificateInput } from '../src/cert/types.js';
 
 const claimInput: UnsignedCertificateInput = {
@@ -17,7 +17,7 @@ describe('Federation — offline simulation of independent instances (not a real
     const rainfall = await createInstance('noaa-rainfall', 'rainfall');
     const biotech = await createInstance('pennington-biotech', 'biotech');
     expect(rainfall.packs).not.toBe(biotech.packs);
-    expect(ownPublicKey(rainfall)).not.toBe(ownPublicKey(biotech));
+    expect(await ownPublicKeyId(rainfall)).not.toBe(await ownPublicKeyId(biotech));
   });
 
   it('exchange copies a pack from sender to receiver; a real ECDSA-signed cert survives the copy', async () => {
@@ -27,7 +27,7 @@ describe('Federation — offline simulation of independent instances (not a real
     const unsigned = await buildCertificate(claimInput);
     const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, rainfall.keyPair.privateKeyJwk);
     const cert: Certificate = await buildCertificate(claimInput, {
-      algorithm: 'ECDSA-P256-SHA256', publicKey: ownPublicKey(rainfall), signatureValue, signedAt: claimInput.issuedAt,
+      algorithm: 'ECDSA-P256-SHA256', publicKey: publicKeyToString(rainfall.keyPair.publicKeyJwk), signatureValue, signedAt: claimInput.issuedAt,
     });
     storePack(rainfall, { evidencePackId: 'pack-rain-001', evidence: claimInput.evidence, cert });
 
@@ -46,13 +46,13 @@ describe('Federation — offline simulation of independent instances (not a real
     const unsigned = await buildCertificate(claimInput);
     const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, rainfall.keyPair.privateKeyJwk);
     const cert: Certificate = await buildCertificate(claimInput, {
-      algorithm: 'ECDSA-P256-SHA256', publicKey: ownPublicKey(rainfall), signatureValue, signedAt: claimInput.issuedAt,
+      algorithm: 'ECDSA-P256-SHA256', publicKey: publicKeyToString(rainfall.keyPair.publicKeyJwk), signatureValue, signedAt: claimInput.issuedAt,
     });
     storePack(rainfall, { evidencePackId: 'pack-rain-001', evidence: claimInput.evidence, cert });
     simulateExchange(rainfall, biotech, 'pack-rain-001');
 
     expect((await receiverAudit(biotech, 'pack-rain-001'))!.verdict).toBe('INTEGRITY_VALID_SIGNED_UNTRUSTED');
-    trust(biotech, ownPublicKey(rainfall));
+    trust(biotech, await ownPublicKeyId(rainfall));
     expect((await receiverAudit(biotech, 'pack-rain-001'))!.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
   });
 
@@ -64,12 +64,12 @@ describe('Federation — offline simulation of independent instances (not a real
     const unsigned = await buildCertificate(claimInput);
     const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, rainfall.keyPair.privateKeyJwk);
     const cert: Certificate = await buildCertificate(claimInput, {
-      algorithm: 'ECDSA-P256-SHA256', publicKey: ownPublicKey(rainfall), signatureValue, signedAt: claimInput.issuedAt,
+      algorithm: 'ECDSA-P256-SHA256', publicKey: publicKeyToString(rainfall.keyPair.publicKeyJwk), signatureValue, signedAt: claimInput.issuedAt,
     });
     storePack(rainfall, { evidencePackId: 'pack-rain-001', evidence: claimInput.evidence, cert });
 
     simulateExchange(rainfall, biotech, 'pack-rain-001');
-    trust(biotech, ownPublicKey(rainfall));
+    trust(biotech, await ownPublicKeyId(rainfall));
     simulateExchange(rainfall, particle, 'pack-rain-001'); // particle never trusts
 
     expect((await receiverAudit(biotech, 'pack-rain-001'))!.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
@@ -83,10 +83,10 @@ describe('Federation — offline simulation of independent instances (not a real
     const unsigned = await buildCertificate(claimInput);
     const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, rainfall.keyPair.privateKeyJwk);
     const cert: Certificate = await buildCertificate(claimInput, {
-      algorithm: 'ECDSA-P256-SHA256', publicKey: ownPublicKey(rainfall), signatureValue, signedAt: claimInput.issuedAt,
+      algorithm: 'ECDSA-P256-SHA256', publicKey: publicKeyToString(rainfall.keyPair.publicKeyJwk), signatureValue, signedAt: claimInput.issuedAt,
     });
     storePack(rainfall, { evidencePackId: 'pack-rain-001', evidence: claimInput.evidence, cert });
-    trust(biotech, ownPublicKey(rainfall));
+    trust(biotech, await ownPublicKeyId(rainfall));
     simulateExchange(rainfall, biotech, 'pack-rain-001');
 
     expect((await receiverAudit(biotech, 'pack-rain-001'))!.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');

@@ -3,10 +3,10 @@
  * (never a real network — see `src/federation/instance.ts`'s own doc).
  * Run: `npm run demo:federation`.
  */
-import { createInstance, ownPublicKey, storePack, trust } from '../src/federation/instance.js';
+import { createInstance, ownPublicKeyId, storePack, trust } from '../src/federation/instance.js';
 import { receiverAudit, simulateExchange } from '../src/federation/exchange.js';
 import { buildCertificate } from '../src/cert/builder.js';
-import { signFingerprint } from '../src/crypto/signing.js';
+import { publicKeyToString, signFingerprint } from '../src/crypto/signing.js';
 import type { UnsignedCertificateInput } from '../src/cert/types.js';
 
 function bar(title: string): string {
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
 
   const unsigned = await buildCertificate(input);
   const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, rainfall.keyPair.privateKeyJwk);
-  const cert = await buildCertificate(input, { algorithm: 'ECDSA-P256-SHA256', publicKey: ownPublicKey(rainfall), signatureValue, signedAt: input.issuedAt });
+  const cert = await buildCertificate(input, { algorithm: 'ECDSA-P256-SHA256', publicKey: publicKeyToString(rainfall.keyPair.publicKeyJwk), signatureValue, signedAt: input.issuedAt });
   storePack(rainfall, { evidencePackId: 'pack-rain-001', evidence: input.evidence, cert });
   console.log('\nRainfall published a real ECDSA-signed certificate for pack-rain-001.');
 
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   console.log(bar('Biotech receives the pack, before deciding to trust rainfall'));
   console.log('verdict:', beforeTrust!.verdict, '(cryptographically valid, but not yet trusted)');
 
-  trust(biotech, ownPublicKey(rainfall));
+  trust(biotech, await ownPublicKeyId(rainfall));
   const afterTrust = await receiverAudit(biotech, 'pack-rain-001');
   console.log(bar('Biotech now trusts rainfall\'s public key'));
   console.log('verdict:', afterTrust!.verdict);

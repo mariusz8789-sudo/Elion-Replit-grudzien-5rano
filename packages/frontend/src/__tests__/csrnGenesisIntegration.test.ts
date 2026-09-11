@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { auditCertificate, buildCertificate, generateKeyPair, publicKeyToString, signFingerprint } from '@genesis-os/csrn';
+import { auditCertificate, buildCertificate, computePublicKeyId, generateKeyPair, publicKeyToString, signFingerprint } from '@genesis-os/csrn';
 import { parseEvidenceUri } from '../core/experimentFabric/evidenceUri';
 import { buildCertificateInputFromDiscoveryLoop } from '../core/csrn/genesisCertificateAdapter';
 
@@ -66,10 +66,11 @@ describe('CSRN certificate over a real Research Campaign cycle', () => {
     const unsigned = await buildCertificate(input);
     const keys = await generateKeyPair();
     const publicKey = publicKeyToString(keys.publicKeyJwk);
+    const publicKeyId = await computePublicKeyId(keys.publicKeyJwk);
     const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, keys.privateKeyJwk);
     const cert = await buildCertificate(input, { algorithm: 'ECDSA-P256-SHA256', publicKey, signatureValue, signedAt: input.issuedAt });
 
-    const verified = await auditCertificate(cert, new Set([publicKey]));
+    const verified = await auditCertificate(cert, new Set([publicKeyId]));
     expect(verified.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
 
     const untrusted = await auditCertificate(cert, new Set());
@@ -89,11 +90,12 @@ describe('CSRN certificate over a real Research Campaign cycle', () => {
     const unsigned = await buildCertificate(input);
     const keys = await generateKeyPair();
     const publicKey = publicKeyToString(keys.publicKeyJwk);
+    const publicKeyId = await computePublicKeyId(keys.publicKeyJwk);
     const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, keys.privateKeyJwk);
     const cert = await buildCertificate(input, { algorithm: 'ECDSA-P256-SHA256', publicKey, signatureValue, signedAt: input.issuedAt });
 
     const tampered = { ...cert, claim: { ...cert.claim, statement: 'A claim CSRN never certified' } };
-    const result = await auditCertificate(tampered, new Set([publicKey]));
+    const result = await auditCertificate(tampered, new Set([publicKeyId]));
     expect(result.verdict).toBe('INTEGRITY_INVALID');
     expect(result.errors.some((e) => e.includes('claimFingerprint mismatch'))).toBe(true);
   });

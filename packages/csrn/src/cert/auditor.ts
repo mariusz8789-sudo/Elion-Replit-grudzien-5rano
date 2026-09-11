@@ -1,5 +1,5 @@
 import { computeFingerprint } from '../crypto/fingerprint.js';
-import { verifySignature } from '../crypto/signing.js';
+import { computePublicKeyId, verifySignature } from '../crypto/signing.js';
 import { computeSignedPayloadFingerprint } from './builder.js';
 import type { Certificate, Provenance, UnsignedCertificateInput } from './types.js';
 
@@ -122,9 +122,11 @@ function verifyProvenanceChain(provenance: Provenance): string[] {
 }
 
 /**
- * Audits one certificate. `trustedPublicKeys` holds JWK strings (see
- * `crypto/signing.ts::publicKeyToString`) this auditor is willing to call
- * `INTEGRITY_VALID_SIGNED_VERIFIED` rather than merely
+ * Audits one certificate. `trustedPublicKeys` holds canonical key ids (see
+ * `crypto/signing.ts::computePublicKeyId` — deliberately NOT the raw JWK
+ * string embedded in `Signature.publicKey`, since two genuine exports of the
+ * same key are not guaranteed to serialize to the same string) this auditor
+ * is willing to call `INTEGRITY_VALID_SIGNED_VERIFIED` rather than merely
  * `..._SIGNED_UNTRUSTED` — cryptographic validity and trust are always
  * checked as two SEPARATE questions, never conflated.
  */
@@ -149,7 +151,8 @@ export async function auditCertificate(certificate: Certificate, trustedPublicKe
     return { verdict: 'INTEGRITY_INVALID', errors: ['ECDSA-P256-SHA256 signature verification failed'], warnings: [] };
   }
 
-  if (trustedPublicKeys.has(certificate.signature.publicKey)) {
+  const keyId = await computePublicKeyId(publicKeyJwk);
+  if (trustedPublicKeys.has(keyId)) {
     return { verdict: 'INTEGRITY_VALID_SIGNED_VERIFIED', errors: [], warnings: [] };
   }
   return { verdict: 'INTEGRITY_VALID_SIGNED_UNTRUSTED', errors: [], warnings: ['signature is cryptographically valid, but the signing public key is not in the trust store'] };

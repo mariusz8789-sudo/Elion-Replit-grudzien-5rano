@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { auditCertificate } from '../src/cert/auditor.js';
 import { buildCertificate } from '../src/cert/builder.js';
-import { generateKeyPair, publicKeyToString, signFingerprint } from '../src/crypto/signing.js';
+import { computePublicKeyId, generateKeyPair, publicKeyToString, signFingerprint } from '../src/crypto/signing.js';
 import type { Certificate, UnsignedCertificateInput } from '../src/cert/types.js';
 
 const baseInput: UnsignedCertificateInput = {
@@ -16,13 +16,14 @@ const baseInput: UnsignedCertificateInput = {
   },
 };
 
-async function signedCertificate(): Promise<{ cert: Certificate; publicKey: string }> {
+async function signedCertificate(): Promise<{ cert: Certificate; publicKey: string; publicKeyId: string }> {
   const unsigned = await buildCertificate(baseInput);
   const keys = await generateKeyPair();
   const publicKey = publicKeyToString(keys.publicKeyJwk);
+  const publicKeyId = await computePublicKeyId(keys.publicKeyJwk);
   const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, keys.privateKeyJwk);
   const cert = await buildCertificate(baseInput, { algorithm: 'ECDSA-P256-SHA256', publicKey, signatureValue, signedAt: baseInput.issuedAt });
-  return { cert, publicKey };
+  return { cert, publicKey, publicKeyId };
 }
 
 describe('auditCertificate — the five verdicts', () => {
@@ -109,8 +110,8 @@ describe('auditCertificate — the five verdicts', () => {
   });
 
   it('INTEGRITY_VALID_SIGNED_VERIFIED: real signature, signing key IS in the trust store', async () => {
-    const { cert, publicKey } = await signedCertificate();
-    const result = await auditCertificate(cert, new Set([publicKey]));
+    const { cert, publicKeyId } = await signedCertificate();
+    const result = await auditCertificate(cert, new Set([publicKeyId]));
     expect(result.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
     expect(result.errors).toEqual([]);
   });
@@ -123,9 +124,9 @@ describe('auditCertificate — the five verdicts', () => {
   });
 
   it('trusting the key after the fact upgrades the verdict from UNTRUSTED to VERIFIED — same certificate, same signature, different trust store', async () => {
-    const { cert, publicKey } = await signedCertificate();
+    const { cert, publicKeyId } = await signedCertificate();
     const before = await auditCertificate(cert, new Set());
-    const after = await auditCertificate(cert, new Set([publicKey]));
+    const after = await auditCertificate(cert, new Set([publicKeyId]));
     expect(before.verdict).toBe('INTEGRITY_VALID_SIGNED_UNTRUSTED');
     expect(after.verdict).toBe('INTEGRITY_VALID_SIGNED_VERIFIED');
   });

@@ -779,4 +779,93 @@ describe('realExperimentVerification: PredictionVerification.assessment, the sam
     const record = saveRealExperimentVerificationToMemory(saved);
     expect(collectCrossDomainOpenItems([record])).toHaveLength(0);
   });
+
+  it('KNOWLEDGE GRAPH CONSISTENCY: reports UNRESOLVED_CONFLICT when reality FALSIFIES a hypothesis the simulation itself SUPPORTED, found by following the declared predictionSourceExperimentId link — no similarity heuristic', async () => {
+    const { GENESIS_GENERATOR_CATALOG, GENESIS_GENERATOR_CATALOG_ID, GENESIS_GENERATOR_OBJECTIVE_METRIC } = await import('../core/agent/electricalGeneratorLeverCatalog');
+    const { runWorldDiscoveryAndRemember } = await import('../core/agent/worldDiscoverySession');
+    const { createRealExperimentRun } = await import('../core/experimentFabric/realExperiment');
+    const { EXPERIMENT_FABRIC_VERSION } = await import('../core/experimentFabric/types');
+    const {
+      buildSavedWorldDiscoveryRun, saveWorldDiscoveryRunToMemory,
+      buildSavedRealExperimentVerification, saveRealExperimentVerificationToMemory,
+    } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems } = await import('../core/agent/crossDomainSynthesis');
+
+    // A different goal than the fixture above: empirically (checked directly,
+    // not assumed) this one leaves the last round's own hypothesis SUPPORTED
+    // rather than REFUTED, which is the premise this test needs.
+    const state = runWorldDiscoveryAndRemember('Maximise fuel efficiency, at most 12 experiments.', GENESIS_GENERATOR_CATALOG_ID);
+    if (state.kind !== 'COMPLETE') throw new Error(`expected COMPLETE, got ${state.kind}`);
+    const lastRound = state.result.rounds[state.result.rounds.length - 1]!;
+    const predictedValue = lastRound.objectiveObserved!;
+    const sourceBelief = state.result.beliefs.find((b) => b.hypothesisId === lastRound.hypothesisId);
+    // The premise this whole test rests on: the simulation's OWN belief for the
+    // exact hypothesis this verification is about really is SUPPORTED — checked,
+    // not assumed, exactly as `verifyPredictionAgainstRealExperiment`'s own
+    // assessment is checked below rather than assumed.
+    expect(sourceBelief?.status).toBe('SUPPORTED');
+
+    // This test's environment stubs no storage (unlike the "Next Question
+    // reads the real..." describe block above), so `state.savedExperimentId`
+    // names a record `runWorldDiscoveryAndRemember` never actually persisted.
+    // Rebuilding the SAME `state.result` into a `SavedExperiment` directly
+    // (exactly what `saveWorldDiscoveryRunToMemory` does internally) gives a
+    // real, addressable source record without depending on storage.
+    const sourceRecord = saveWorldDiscoveryRunToMemory(buildSavedWorldDiscoveryRun({
+      resultKind: 'HYPOTHESIS_LOOP',
+      goal: state.result.question,
+      catalogId: GENESIS_GENERATOR_CATALOG_ID,
+      worldId: GENESIS_GENERATOR_CATALOG.worldId,
+      domainId: GENESIS_GENERATOR_CATALOG.domainId,
+      objectiveMetric: GENESIS_GENERATOR_OBJECTIVE_METRIC,
+      objectiveDirection: 'maximize',
+      loopResult: state.result,
+      evidence: null,
+      resumedFromMemory: null,
+    }));
+
+    const request = {
+      structuredRequest: {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText: 'x',
+        domainId: GENESIS_GENERATOR_CATALOG.domainId, operation: 'simulate' as const, parameters: {},
+      },
+      physicalProtocolRef: 'manual-fuel-dipstick-reading-v1',
+      hypothesisId: lastRound.hypothesisId,
+    };
+    // Far outside the tolerance band below, on purpose: a real measurement that
+    // flatly disagrees with what the simulation itself called SUPPORTED.
+    const realRun = createRealExperimentRun({
+      request,
+      derived: [{ outputKey: GENESIS_GENERATOR_OBJECTIVE_METRIC, value: predictedValue + 1000, unit: 'L', derivedFrom: [
+        { channel: 'fuel-tank-dipstick', value: predictedValue + 1000, unit: 'L', capturedAt: '2026-09-11T00:00:00.000Z' },
+      ] }],
+      summary: 'Manual reading wildly disagreeing with the model prediction.',
+    });
+    const saved = buildSavedRealExperimentVerification({
+      predictionSourceExperimentId: sourceRecord.id,
+      loopResult: state.result,
+      verificationCriterion: {
+        metric: GENESIS_GENERATOR_OBJECTIVE_METRIC, relation: 'equal-within-tolerance', tolerance: 0.5,
+        rationale: 'A real reading should sit close to the model prediction.',
+      },
+      request,
+      realRun,
+    });
+    expect(saved.verification.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
+
+    const record = saveRealExperimentVerificationToMemory(saved);
+
+    // Passing ONLY the verification record: the source is not in `records`, so
+    // the declared link cannot be followed — no conflict can be reported, the
+    // same honesty `matrixRelations.ts` already applies to a dangling reference.
+    expect(collectCrossDomainOpenItems([record])).toHaveLength(0);
+
+    // Passing BOTH, exactly as `listExperiments()` would in real use: the link
+    // resolves and the flip is caught.
+    const items = collectCrossDomainOpenItems([sourceRecord, record]);
+    const conflict = items.find((item) => item.shape === 'realExperimentVerification');
+    expect(conflict?.kind).toBe('UNRESOLVED_CONFLICT');
+    expect(conflict?.detail).toContain('SUPPORTED');
+    expect(conflict?.detail).toContain('FALSIFIED_WITHIN_PROTOCOL');
+  });
 });

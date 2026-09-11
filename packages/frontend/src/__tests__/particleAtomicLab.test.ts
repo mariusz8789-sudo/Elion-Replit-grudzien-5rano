@@ -504,3 +504,33 @@ describe('the two-body constructor generalises without breaking the equal-mass c
     expect(twoBodyFinalState(100, PROTON_MASS_MEV, PROTON_MASS_MEV, 1)).toBeNull();
   });
 });
+
+describe('chat intents route to the existing screen, through the one command layer', () => {
+  it('recognises collider phrasing in both languages and opens the existing panel', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
+    for (const phrase of ['pokaż zderzacz', 'particle physics', 'rezonans Z', 'akcelerator']) {
+      const out = resolveCommand(phrase, null);
+      expect(out.action, phrase).toEqual({ type: 'openRoute', hash: '#/scientific-city' });
+      expect(out.tag, phrase).toBe('MODEL');
+    }
+  });
+
+  it('recognises atomic-lab phrasing and says what is surprising about it up front', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
+    for (const phrase of ['jonizacja', 'atomic lab', 'fizyka atomowa', 'komora jonizacyjna']) {
+      const out = resolveCommand(phrase, null);
+      expect(out.action, phrase).toEqual({ type: 'openRoute', hash: '#/scientific-city' });
+    }
+    const answer = resolveCommand('pokaż jonizację', null).text;
+    // The honest headline of this environment, stated before the user runs it.
+    expect(answer).toContain('Lotz');
+    expect(answer).toContain('13,606 eV');
+    expect(answer).toContain('ZMNIEJSZA');
+  });
+
+  it('keeps the two physics environments on separate intents, not one merged branch', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
+    expect(resolveCommand('zderzacz', null).text).not.toContain('Lotz');
+    expect(resolveCommand('jonizacja', null).text).not.toContain('Breit-Wigner');
+  });
+});

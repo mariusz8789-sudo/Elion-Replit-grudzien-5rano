@@ -12,6 +12,7 @@ import {
   type WorldDiscoveryRememberedState,
 } from '../../core/agent/worldDiscoverySession';
 import { runMechanismResearchChain, type MechanismResearchChainResult } from '../../core/agent/researchChain';
+import { LabEnvironmentPicker } from './LabEnvironmentPicker';
 import {
   GENESIS_FLOOD_CATALOG,
   parseWorldDiscoveryGoal,
@@ -276,6 +277,15 @@ export function WorldDiscoveryPanel({
           </>
         )}
       </section>
+
+      {/* The Particle & Atomic Physics Laboratory's environments, shown only when the
+          panel is already sitting on one of its worlds. Entering an environment just
+          re-points the <select> above — there is no second loop behind this. */}
+      <LabEnvironmentPicker
+        catalogId={catalogId}
+        onSelectCatalog={setCatalogId}
+        disabled={state.kind === 'RUNNING'}
+      />
 
       <form
         className="lg-obs-form"

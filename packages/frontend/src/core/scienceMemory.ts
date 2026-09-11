@@ -2481,6 +2481,50 @@ export function replaySavedResearchChainManifest(saved: SavedExperiment): SavedR
   return { status: 'MATCH', reason: `Każdy z ${record.steps.length} krok(ów) ma własny, wciąż dostępny zapis, a każdy sprawdzalny krok odtworzył się identycznie.` };
 }
 
+/**
+ * A filtered read over already-saved `SavedResearchChainManifest` records —
+ * "which research chains investigated this, and how did they end" — not a
+ * new index or a second store. Every field filters against data
+ * `buildSavedResearchChainManifest`/`saveExperiment` already wrote.
+ *
+ * NAMING NOTE: this is deliberately NOT called "campaign search". Genesis
+ * already has a "Campaign" — the backend evolutionary molecule-optimization
+ * workshop (`CampaignScreen.tsx` → `core/backend/client.ts` →
+ * `packages/backend/src/campaign/`, RDKit → ADMET → docking → Pareto).
+ * C3's audit confirmed that is a DIFFERENT CONCEPT from a research chain's
+ * self-chosen step sequence — reusing the word here would suggest a
+ * relationship that does not exist.
+ */
+export interface ResearchChainSearchQuery {
+  readonly chainShape?: 'PARAMETER' | 'MECHANISM';
+  /** Qwen's "outcomeType" — the chain's own honest termination category. */
+  readonly terminalStatus?: 'SETTLED' | 'OPEN' | 'INCONCLUSIVE' | 'BLOCKED';
+  /** Case-insensitive substring match against the chain's own initialQuestion. */
+  readonly questionContains?: string;
+  /** Inclusive ISO-8601 bound on the OWNING SavedExperiment's createdAt. */
+  readonly createdAfter?: string;
+  /** Inclusive ISO-8601 bound on the OWNING SavedExperiment's createdAt. */
+  readonly createdBefore?: string;
+}
+
+export interface ResearchChainSearchResult {
+  readonly experimentId: string;
+  readonly createdAt: string;
+  readonly manifest: SavedResearchChainManifest;
+}
+
+export function searchResearchChains(query: ResearchChainSearchQuery = {}): ResearchChainSearchResult[] {
+  const questionNeedle = query.questionContains?.toLowerCase();
+  return listExperiments()
+    .filter((e): e is SavedExperiment & { researchChain: SavedResearchChainManifest } => e.researchChain !== undefined)
+    .filter((e) => query.chainShape === undefined || e.researchChain.chainShape === query.chainShape)
+    .filter((e) => query.terminalStatus === undefined || e.researchChain.terminalStatus === query.terminalStatus)
+    .filter((e) => questionNeedle === undefined || e.researchChain.initialQuestion.toLowerCase().includes(questionNeedle))
+    .filter((e) => query.createdAfter === undefined || e.createdAt >= query.createdAfter)
+    .filter((e) => query.createdBefore === undefined || e.createdAt <= query.createdBefore)
+    .map((e) => ({ experimentId: e.id, createdAt: e.createdAt, manifest: e.researchChain }));
+}
+
 // ---------------------------------------------------------------------------
 // CYBER INVESTIGATION — a security investigation against a synthetic
 // target. See `cyberInvestigation.ts` for why this is a genuinely

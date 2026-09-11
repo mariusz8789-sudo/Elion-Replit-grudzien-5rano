@@ -1,6 +1,64 @@
-# Qwen "Genesis Cyber Foundation" — staged, unreviewed, off `main`
+# Qwen "Genesis Cyber Foundation" — RESOLVED: REJECT_DUPLICATE, superseded by real `main`
 
-## Status (updated 2026-09-10, second pass)
+## RESOLUTION (2026-09-11, C3, per GENESIS MASTER GAP PLAN P0.2)
+
+**Everything in this branch is superseded. Do not integrate any of it.**
+Between this branch's last update and now, C1 built a real, integrated Cyber
+substrate directly on `main`:
+
+- `packages/frontend/src/core/agent/cyberReasoningKernel.ts` (570 lines)
+- `packages/frontend/src/core/agent/cyberInvestigation.ts` (241 lines — the
+  type contract)
+- `packages/frontend/src/core/agent/cyberTestPlanner.ts` (130 lines)
+- `packages/frontend/src/components/CyberWorkspace.tsx` (279 lines — real UI,
+  which nothing in this branch ever had)
+- Tests: `cyberReasoningKernel.test.ts`, `cyberInvestigationMemory.test.ts`,
+  `cyberAdaptiveInvestigation.test.ts`, `cyberTestPlanner.test.ts` — all
+  passing on `main` as of `d64f762b`.
+
+It was also adapted from an external (Qwen) draft, per its own doc
+comments — but integrated far more rigorously than anything staged here:
+real persistence through `scienceMemory.ts`'s `SavedCyberInvestigation`
+(this branch's module explicitly did not have that — see "Integration gaps"
+below, now moot); reuses the real, existing `HypothesisAssessment`
+(`experimentFabric/scientificDiscovery.ts`) and `DataProvenance`
+(`core/dataProvenance.ts`) vocabularies directly, never re-declaring them;
+an adaptive test planner with explicit, documented, non-fabricated
+heuristic weights and hard-excluded (not merely down-weighted) UNSAFE
+candidates; attack-path edges backed by their own relation-specific
+control-probe evidence (an R1/relation-probe + R2/control-probe pair per
+edge) rather than inherited from a hypothesis's own verdict; and explicit,
+permanent conflict preservation (`conflicts`: hypothesis ids whose history
+contains both `SUPPORTED_WITHIN_PROTOCOL` and `FALSIFIED_WITHIN_PROTOCOL`,
+shown in the UI rather than averaged away) — which is exactly what the
+master gap plan's item 8 was asking whether Cyber already had. It does.
+
+Notably, `cyberInvestigation.ts`'s doc comment for `RemediationAction`
+references, nearly verbatim, the exact remediation-id-vs-action-name bug
+this README documented finding in this branch's own `core/cyber/` module
+(`'rem-1'` vs `'admin-auth-fix'`) — so this branch's audit work already fed
+into the real integration, even though its code did not.
+
+### Per-file verdict (P0.2 of the master gap plan)
+
+| This branch | Verdict | Reason |
+|---|---|---|
+| `packages/frontend/src/core/cyber/*` (the vertical slice C3 built and tested here) | **REJECT_DUPLICATE** | Fully superseded by `cyberReasoningKernel.ts`+`cyberInvestigation.ts`+`cyberTestPlanner.ts`, which do everything this slice did (synthetic vulnerable target, observation→hypothesis→test→evidence→attack-path→remediation→retest) and materially more: real Memory integration, an adaptive planner, relation-specific edge evidence, conflict preservation, and a real UI. |
+| `governance-primitives-v3-raw.md` (permission gate, attention evaluator, drift detector, decision-chain-as-DAG, conflict resolver via discriminating test) | **REJECT_UNUSED** | Not duplicated (the real substrate has no permission gate or attention scorer), but also not needed by anything that exists: the real Cyber substrate has no execution/approval boundary to gate, and its own conflict handling (preserve, don't resolve) is simpler and arguably more honest than a "discriminating test" resolver for a domain this small. Nothing calls for this scaffolding today. |
+| `implementation-pack-v1-raw.md` / `implementation-pack-v2-raw.md` (the two original raw pastes) | **REJECT_DUPLICATE** | Superseded the same way as the vertical slice above; these were its unimplemented ancestors. |
+
+### What C3 should do next (this branch)
+
+Nothing. This branch stays exactly where it is, off `main`, as a record of
+what was proposed, what was actually tried, what bugs that trying found, and
+why the real substrate on `main` made all of it moot. Do not merge, do not
+extract code from it — if a future Cyber capability is genuinely missing,
+build it as a further adaptation of `cyberReasoningKernel.ts`, the same way
+C1 did, not from this branch's drafts.
+
+---
+
+## Status (updated 2026-09-10, second pass) — historical, superseded by the resolution above
 
 **One real, tested, isolated module now exists on this branch:
 `packages/frontend/src/core/cyber/`.** It compiles (`tsc --noEmit` clean),

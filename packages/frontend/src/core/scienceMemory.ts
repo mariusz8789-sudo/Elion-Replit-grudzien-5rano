@@ -1,4 +1,5 @@
 import { readJSON, writeJSON } from './storage';
+import { notifyScienceMemoryChanged } from './scienceMemoryEvents';
 import type { HonestyLevel, SimParams } from './types';
 import { biotechScientificFingerprint, buildCandidateCombinationHypothesis, rankNaturalCompositionHypotheses, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateCombinationHypothesis, type CandidateDiscoveryReport, type CandidateRanking, type RankedCompositionHypothesis, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
@@ -716,6 +717,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   };
   const all = [...readAll(), entry].slice(-MAX_TOTAL);
   writeJSON(KEY, all);
+  notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: entry.id });
   return entry;
 }
 
@@ -3026,6 +3028,7 @@ export function getExperiment(id: string): SavedExperiment | undefined {
 
 export function deleteExperiment(id: string): void {
   writeJSON(KEY, readAll().filter((e) => e.id !== id));
+  notifyScienceMemoryChanged({ reason: 'DELETED', experimentId: id });
 }
 
 export function countExperiments(): number {

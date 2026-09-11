@@ -436,6 +436,20 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Particle physics / collider (C2, integracja propozycji Qwena) — REALNA domena na tym samym
+  //     WorldGraph co powódź/chemia/epidemia: `domains/particlePhysics.ts` (relatywistyczna kinematyka,
+  //     relatywistyczny Breit-Wigner, stałe PDG) + `particlePhysicsLeverCatalog.ts`. Nie ma osobnego
+  //     ekranu i nie powinno go być: panel Discovery na `#/scientific-city` czyta rejestr katalogów,
+  //     więc zderzacz jest tam w liście światów obok pozostałych. ---
+  if (has(norm, 'zderzacz', 'collider', 'czastki elementarne', 'fizyka czastek', 'particle physics', 'rezonans z', 'bozon z', 'z boson', 'luminozj', 'swietlnos', 'akcelerator')) {
+    return {
+      text: 'Otwieram panel Discovery — wybierz świat „particle-physics — genesis-particle-collider". To realna domena na tym samym silniku co pozostałe: relatywistyczny kształt Breit-Wignera wokół piku Z (masa i szerokość z PDG), realna rozdzielczość detektora w oknie masowym i realna akceptacja geometryczna. Wydajności są w jednostkach znormalizowanych, NIE w pikobarnach — znaczenie mają wyłącznie stosunki między ramionami, nigdy wartość bezwzględna.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
   // --- Evidence & Replay Showcase (C2 "Evidence & Replay as Product") — jeden kompletny, realny
   //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`) albo w starszym
   //     `evidencePackStore.ts`, pokazany jako jednostronicowy raport audytowy: pytanie -> hipoteza ->

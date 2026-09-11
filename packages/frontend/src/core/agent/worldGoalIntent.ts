@@ -15,6 +15,7 @@ import { GENESIS_CHEMISTRY_CATALOG, GENESIS_CHEMISTRY_CATALOG_ID } from './chemi
 import { GENESIS_GENERATOR_CATALOG, GENESIS_GENERATOR_CATALOG_ID } from './electricalGeneratorLeverCatalog';
 import { GENESIS_EPIDEMIC_CATALOG, GENESIS_EPIDEMIC_CATALOG_ID } from './epidemicLeverCatalog';
 import { relationFor } from './leverCriterion';
+import { GENESIS_PARTICLE_PHYSICS_CATALOG, GENESIS_PARTICLE_PHYSICS_CATALOG_ID } from './particlePhysicsLeverCatalog';
 import { GENESIS_RAINFALL_RUNOFF_CATALOG, GENESIS_RAINFALL_RUNOFF_CATALOG_ID } from './rainfallRunoffLeverCatalog';
 
 /**
@@ -442,6 +443,7 @@ export const WORLD_LEVER_CATALOGS: Readonly<Record<string, WorldLeverCatalog>> =
   [GENESIS_CELL_CULTURE_CATALOG_ID]: GENESIS_CELL_CULTURE_CATALOG,
   [GENESIS_GENERATOR_CATALOG_ID]: GENESIS_GENERATOR_CATALOG,
   [GENESIS_RAINFALL_RUNOFF_CATALOG_ID]: GENESIS_RAINFALL_RUNOFF_CATALOG,
+  [GENESIS_PARTICLE_PHYSICS_CATALOG_ID]: GENESIS_PARTICLE_PHYSICS_CATALOG,
 };
 
 export function resolveWorldLeverCatalog(catalogId: string): WorldLeverCatalog | undefined {

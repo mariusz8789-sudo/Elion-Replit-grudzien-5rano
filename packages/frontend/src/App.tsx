@@ -61,7 +61,7 @@ const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/Precisi
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
-const GenesisDashboard = lazy(() => import('./components/GenesisDashboard').then((m) => ({ default: m.GenesisDashboard })));
+const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -682,11 +682,12 @@ export default function App() {
     return (
       <div className="app">
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
-          {/* Mission control FIRST. The 3D hero and the capability showcase are
-              real and stay, but they are a tour of the system — they belong
-              below the state of the actual work, not above it. */}
+          {/* The workspace stage: mission context by default, or one of the
+              EXISTING renderers (City3D / Scientific City / World Engine)
+              mounted right here beside the chat. Opening a world no longer
+              unmounts the conversation. */}
           <HeavyRoute>
-            <GenesisDashboard />
+            <WorkspaceStage />
           </HeavyRoute>
           <div className="section-label">Zacznij tutaj</div>
           <div className="home-launcher">
@@ -891,8 +892,15 @@ export default function App() {
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —
           so this is a shell around the existing router, not a second one. */}
-      <AppShell>{renderRoute()}</AppShell>
-      {!onboardingOpen && <ErrorBoundary><ScienceChat /></ErrorBoundary>}
+      {/* ONE ScienceChat instance, handed to the shell. On Home it lays out as
+          the workspace column (chat IS the primary interface); everywhere else
+          it floats. Same node, same state, one conversation. */}
+      <AppShell
+        chatInline={route.kind === 'home' && !onboardingOpen}
+        chat={!onboardingOpen ? <ErrorBoundary><ScienceChat inline={route.kind === 'home'} /></ErrorBoundary> : null}
+      >
+        {renderRoute()}
+      </AppShell>
     </>
   );
 }

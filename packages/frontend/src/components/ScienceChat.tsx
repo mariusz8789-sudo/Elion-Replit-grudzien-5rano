@@ -322,7 +322,15 @@ const SUGGESTIONS = [
   'Uruchom model Isinga: temperatura=2.2 seed=42',
 ];
 
-export function ScienceChat() {
+/**
+ * `inline` turns this from a floating panel into the main workspace column
+ * on Home. It is the SAME component and the SAME instance — `App.tsx` mounts
+ * exactly one `<ScienceChat>` and flips this prop by route. That matters:
+ * mounting a second, embedded chat would give it its own `useState` and the
+ * conversation would fork the moment you navigated. Chat being the primary
+ * interface and chat having one history are the same requirement.
+ */
+export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([{
@@ -629,7 +637,9 @@ export function ScienceChat() {
     if (request.message) void send(request.message);
   }), []);
 
-  if (!open) {
+  // Inline mode is always open: on Home the chat IS the workspace, so there is
+  // nothing to open or close.
+  if (!inline && !open) {
     return (
       <button className="science-chat-fab" onClick={() => setOpen(true)} aria-label="Otwórz Science Chat">
         💬 Science Chat
@@ -638,14 +648,18 @@ export function ScienceChat() {
   }
 
   return (
-    <aside className="science-chat" role="dialog" aria-label="Science Chat">
+    <aside
+      className={inline ? 'science-chat science-chat-inline' : 'science-chat'}
+      role={inline ? 'region' : 'dialog'}
+      aria-label="Science Chat"
+    >
       <header className="science-chat-head">
         <div>
           <strong>💬 Science Chat</strong>
           <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
           {projectAccess && <span className="science-chat-ctx" title="Poziom egzekwowany przez backend">dostęp: {projectAccess.accessLevel} · {projectAccess.canRun ? 'run dozwolony' : 'run zablokowany'}</span>}
         </div>
-        <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>
+        {!inline && <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>}
       </header>
 
       <DiscoveryStageRail stage={stage} />

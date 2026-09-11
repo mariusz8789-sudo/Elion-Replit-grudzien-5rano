@@ -35,7 +35,15 @@ function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolea
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }): JSX.Element {
+export function AppShell({ children, chat, chatInline = false }: {
+  children: ReactNode;
+  /** The ONE ScienceChat instance, handed in by App.tsx. */
+  chat?: ReactNode;
+  /** When true the chat is laid out as the workspace column beside the route
+      instead of floating over it. Same node either way — the chat is never
+      mounted twice, so its conversation never forks. */
+  chatInline?: boolean;
+}): JSX.Element {
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [menuOpen, setMenuOpen] = useState(false);
   /** The long tail of modules, collapsed by default — see MORE_ITEMS. */
@@ -92,7 +100,11 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
         <nav className="shell-nav">{sections}</nav>
       </aside>
 
-      <div className="shell-main">{children}</div>
+      <div className={chatInline ? 'shell-main shell-main-split' : 'shell-main'}>
+        <div className="shell-route">{children}</div>
+        {chatInline && <div className="shell-chat">{chat}</div>}
+      </div>
+      {!chatInline && chat}
 
       {/* Mobile: a real command bar, not a shrunken sidebar. */}
       <nav className="shell-mobilebar" aria-label="Nawigacja Genesis (mobile)">

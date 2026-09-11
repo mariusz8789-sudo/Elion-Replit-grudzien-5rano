@@ -717,6 +717,8 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   };
   const all = [...readAll(), entry].slice(-MAX_TOTAL);
   writeJSON(KEY, all);
+  // Every `save*ToMemory` helper funnels through here, so this one call covers
+  // the whole store — see `scienceMemoryEvents.ts` for why the signal exists.
   notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: entry.id });
   return entry;
 }

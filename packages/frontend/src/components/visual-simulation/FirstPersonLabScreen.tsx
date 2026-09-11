@@ -18,7 +18,7 @@ import {
   replayLabRun, runLabScenario, saveLabCounterfactualToMemory,
 } from '../../core/experimentFabric/labSession';
 import type { ScenarioComparison, ScenarioReplay, ScenarioRun } from '../../core/simulation/scenarioEngine';
-import type { SavedExperiment } from '../../core/scienceMemory';
+import { saveScientificDiscoveryLoopToMemory, type SavedExperiment } from '../../core/scienceMemory';
 import { extractObservations } from '../../core/observationAnalysis/observationExtraction';
 import { analyzeExperiment } from '../../core/observationAnalysis/analysis';
 import { deriveFindings, type Finding } from '../../core/observationAnalysis/findings';
@@ -98,6 +98,7 @@ export function FirstPersonLabScreen() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [discoveryLoop, setDiscoveryLoop] = useState<ScientificDiscoveryLoopResult | null>(null);
   const [discoveryLoopError, setDiscoveryLoopError] = useState<string | null>(null);
+  const [discoveryLoopSaveNotice, setDiscoveryLoopSaveNotice] = useState<string | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const runARef = useRef(runA);
@@ -795,6 +796,32 @@ export function FirstPersonLabScreen() {
           <div className="fp-observation-section">
             <h2>NASTĘPNY EKSPERYMENT</h2>
             <p><strong>{discoveryLoop.nextExperiment.status}</strong>: {discoveryLoop.nextExperiment.why}</p>
+            <p className="fp-observation-meta">CO ROZSTRZYGNIE: {discoveryLoop.nextExperiment.resolves}</p>
+            {/*
+              Ten ekran był jedynym miejscem, które NAPRAWDĘ uruchamiało
+              `runScientificDiscoveryLoop`, i jednocześnie jedynym, które nigdy
+              nie zapisywało wyniku — przez co kształt `discoveryLoop` (jedyny
+              niosący wybrany NASTĘPNY EKSPERYMENT) nie mógł trafić do Pamięci
+              Naukowej z działającej aplikacji, a Następne Pytanie na Home nie
+              miało go skąd przeczytać. To jest wyłącznie podłączenie
+              istniejącego `saveScientificDiscoveryLoopToMemory` — bez nowej
+              pamięci, bez nowego silnika, bez drugiego selektora.
+            */}
+            <button
+              className="fp-observation-chip"
+              type="button"
+              onClick={() => {
+                try {
+                  const record = saveScientificDiscoveryLoopToMemory(discoveryLoop);
+                  setDiscoveryLoopSaveNotice(`Pętla zapisana w Pamięci Naukowej: #${record.contentHash}. Następne Pytanie na ekranie głównym czyta teraz ten wybrany krok.`);
+                } catch (saveError) {
+                  setDiscoveryLoopSaveNotice(`Nie zapisano pętli: ${saveError instanceof Error ? saveError.message : String(saveError)}`);
+                }
+              }}
+            >
+              Zapisz pętlę w Pamięci Naukowej
+            </button>
+            {discoveryLoopSaveNotice && <p className="fp-observation-meta" role="status">{discoveryLoopSaveNotice}</p>}
           </div>
         </section>
       )}

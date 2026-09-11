@@ -24,6 +24,9 @@ import type { HypothesisAssessment } from '../core/experimentFabric/scientificDi
 import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
 import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyberInvestigation, saveCyberInvestigationToMemory } from '../core/scienceMemory';
+import { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop } from '../core/scienceMemory';
+import { runScientificDiscoveryLoopAsync, type ScientificDiscoveryLoopResult } from '../core/experimentFabric/scientificDiscoveryLoop';
+import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
 
@@ -372,6 +375,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   // requiring the user to open the workspace. Cleared by nothing else — a later run just replaces it.
   const [lastCyberRun, setLastCyberRun] = useState<AdaptiveInvestigationResult | null>(null);
   const [lastDeciphermentState, setLastDeciphermentState] = useState<DeciphermentCaseState | null>(null);
+  // Same pattern again for the Scientific Discovery Loop, so a follow-up "zapisz"
+  // persists the loop that was actually run rather than re-running it.
+  const [lastDiscoveryLoop, setLastDiscoveryLoop] = useState<ScientificDiscoveryLoopResult | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -564,7 +570,15 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       return;
     }
     const fabricRequest = parseScienceChatMessage(msg);
-    const isFabricRequest = fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown';
+    // CHAT ENTRY FOR THE DISCOVERY LOOP. The Fabric parser recognises the DOMAIN of
+    // nearly every declared research question and would plan ONE experiment for it,
+    // which is a different ask than the loop's competing-hypotheses set — so when the
+    // message explicitly asks for the loop AND names a question Genesis declares, the
+    // single-experiment planner steps aside and `resolveCommand` (still the one router)
+    // handles it. Deliberately narrow: a loop marker on a question outside the catalog
+    // keeps its existing Fabric behaviour instead of being hijacked into a refusal.
+    const isFabricRequest = (fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown')
+      && !isDiscoveryLoopRequest(msg);
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
@@ -655,6 +669,60 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         + `Wpisz „zapisz" by zachować w Pamięci Naukowej, albo otwórz sekcję „Deszyfracja" w menu po pełny widok odczytów i hipotez.`,
         'WYNIK',
       );
+    } else if (a?.type === 'runDiscoveryLoop') {
+      // THE WHOLE LOOP, run from the conversation: Question -> competing hypotheses ->
+      // preregistration -> real execution -> evidence chain -> assessment -> next
+      // experiment. Every one of those stages is `runScientificDiscoveryLoopAsync`'s
+      // own work (scientificDiscoveryLoop.ts); this component only starts it and reads
+      // the result. The ASYNC twin is used deliberately: it is the one entry point that
+      // covers the WHOLE declared catalog, routing BACKEND_REAL_ENGINE questions (real
+      // PySCF, real RDKit) to the real backend instead of reporting them BLOCKED — and
+      // when that backend is absent it still says BLOCKED honestly rather than faking a
+      // number.
+      appendGenesis('Prowadzę badanie… (prerejestracja, wykonanie, łańcuch dowodowy)', 'SYSTEM');
+      try {
+        const loop = await runScientificDiscoveryLoopAsync(a.problemId);
+        setLastDiscoveryLoop(loop);
+        const perHypothesis = loop.loop.outcomes.map((outcome) => {
+          const hypothesis = loop.loop.preregistration.hypotheses.find((entry) => entry.hypothesisId === outcome.hypothesisId);
+          const candidate = hypothesis?.proposedExperiment?.parameters[loop.problem.candidateVariable];
+          const measured = outcome.observedMetric === null ? 'brak porównywalnej wartości' : `${loop.problem.primaryMetric}=${outcome.observedMetric}`;
+          return `  · ${loop.problem.candidateVariable}=${String(candidate ?? '?')} → ${outcome.status} (${measured})`;
+        }).join('\n');
+        const observations = loop.evidenceChain.reduce((sum, link) => sum + link.observations.length, 0);
+        appendGenesis(
+          `PYTANIE: ${loop.problem.statement}\n`
+          + `PREREJESTRACJA: ${loop.loop.preregistration.hypotheses.length} konkurencyjnych hipotez, odcisk ${loop.loop.preregistration.preregistrationFingerprint}; nienaruszona po wykonaniu: ${String(loop.loop.preregistrationIntact.intact)}.\n`
+          + `WYKONANIE: ${loop.loop.allRuns.length} realnych przebiegów · ${observations} realnych obserwacji · Evidence Packs: ${loop.loop.packs.map((pack) => pack.evidencePackId).join(', ') || 'brak'}.\n`
+          + `OCENA HIPOTEZ (status z prerejestrowanego kryterium, nie z wyniku):\n${perHypothesis}\n`
+          + `ROZSTRZYGNIĘCIE: ${loop.loop.discrimination.reason}\n`
+          + `NASTĘPNY EKSPERYMENT: ${loop.nextExperiment.status} — ${loop.nextExperiment.why}\n`
+          + `  CO ROZSTRZYGNIE: ${loop.nextExperiment.resolves}\n\n`
+          + 'Wpisz „zapisz", żeby zachować pętlę w Pamięci Naukowej (wtedy Następne Pytanie na ekranie głównym ją zobaczy), albo „odtwórz pętlę", żeby wykonać ten sam prerejestrowany zbiór jeszcze raz i porównać z odciskiem.',
+          'WYNIK',
+        );
+      } catch (loopError) {
+        appendGenesis(`Pętla nie wykonała się: ${loopError instanceof Error ? loopError.message : String(loopError)}`, 'SYSTEM');
+      }
+    } else if (a?.type === 'replayDiscoveryLoop') {
+      // REAL re-execution through the existing `replaySavedScientificDiscoveryLoop`,
+      // which re-runs the preregistered set and compares fingerprints. No second replay
+      // engine, and no reporting a stored verdict as if it were a fresh one.
+      const saved = listExperiments().find((record) => record.discoveryLoop !== undefined);
+      if (!saved) {
+        appendGenesis('W Pamięci Naukowej nie ma jeszcze żadnej pętli odkrycia naukowego do odtworzenia. Uruchom badanie (np. „zbadaj: jak późno można wprowadzić izolację") i powiedz „zapisz".');
+      } else {
+        appendGenesis('Odtwarzam… (realne ponowne wykonanie prerejestrowanego zbioru)', 'SYSTEM');
+        const verdict = await replaySavedScientificDiscoveryLoop(saved);
+        appendGenesis(
+          `ODTWORZENIE: ${verdict.status} — ${verdict.reason}\n`
+          + `Rekord: ${saved.experimentName} · #${saved.contentHash}.\n`
+          + (verdict.status === 'MATCH'
+            ? 'MATCH znaczy: ten sam prerejestrowany zbiór wykonany od nowa dał tę samą treść i ten sam odcisk. To jest odtwarzalność, nie odczyt zapisu.'
+            : 'To NIE jest błąd interfejsu — taki werdykt jest wynikiem naukowym i zostaje pokazany wprost, zamiast być ukryty.'),
+          verdict.status === 'MATCH' ? 'WYNIK' : 'SYSTEM',
+        );
+      }
     } else if (a?.type === 'save') {
       const c = getSimContext();
       if (c) {
@@ -668,6 +736,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           epistemicStatus: recipe ? EPISTEMIC_LABELS[epistemicStatusOf(recipe)] : undefined,
         });
         appendGenesis(`Zapisano ✓ Odcisk treści: #${saved.contentHash}. Rekord zawiera model, parametry, równania, założenia, status epistemiczny i migawkę wyników. Wpisz „pokaż zapisane", by wrócić do niego później.`);
+      } else if (lastDiscoveryLoop) {
+        const record = saveScientificDiscoveryLoopToMemory(lastDiscoveryLoop);
+        appendGenesis(`Zapisano ✓ Pętla odkrycia naukowego: ${lastDiscoveryLoop.problem.problemId}. Odcisk treści: #${record.contentHash}. Następne Pytanie na ekranie głównym czyta teraz wybrany następny eksperyment tej pętli; „odtwórz pętlę" wykona ją od nowa i porówna.`);
       } else if (lastDeciphermentState) {
         const result = toDeciphermentCaseResult(lastDeciphermentState);
         const saved = buildSavedDeciphermentCase(result);

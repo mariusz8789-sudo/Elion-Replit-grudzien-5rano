@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { GenesisMatrixHub, kindsOf, buildGraphLayout, type MatrixKind } from '../components/GenesisMatrixHub';
+import { GenesisMatrixHub, kindsOf, computeGraphLayout, domainCenters, type MatrixKind } from '../components/GenesisMatrixHub';
 import type { SavedExperiment } from '../core/scienceMemory';
+
+function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
 
 /**
  * This repo's component tests run without a DOM (`renderToStaticMarkup`,
@@ -56,38 +60,6 @@ describe('kindsOf — real classification, never fabricated or uncategorized', (
   });
 });
 
-describe('buildGraphLayout — Etap 3 Matrix graph, deterministic and never reshuffled', () => {
-  it('groups by primary kind into columns, ordered by ALL_KINDS, only for kinds actually present', () => {
-    const items = [
-      { record: baseRecord({ id: 'a', scenario: {} as SavedExperiment['scenario'] }), kinds: ['SCENARIO'] as MatrixKind[] },
-      { record: baseRecord({ id: 'b', cyberInvestigation: {} as SavedExperiment['cyberInvestigation'] }), kinds: ['CYBER'] as MatrixKind[] },
-    ];
-    const layout = buildGraphLayout(items);
-    // SCENARIO precedes CYBER in ALL_KINDS order — so with only these two kinds present,
-    // SCENARIO's column must come first, and only these two columns should exist at all.
-    expect(layout.columns).toEqual(['SCENARIO', 'CYBER']);
-    expect(layout.positions.has('a')).toBe(true);
-    expect(layout.positions.has('b')).toBe(true);
-    expect(layout.positions.get('a')!.x).toBeLessThan(layout.positions.get('b')!.x);
-  });
-
-  it('orders records within a column chronologically (oldest first), not by insertion order', () => {
-    const items = [
-      { record: baseRecord({ id: 'newer', createdAt: '2025-01-02T00:00:00.000Z' }), kinds: ['EXPERIMENT'] as MatrixKind[] },
-      { record: baseRecord({ id: 'older', createdAt: '2025-01-01T00:00:00.000Z' }), kinds: ['EXPERIMENT'] as MatrixKind[] },
-    ];
-    const layout = buildGraphLayout(items);
-    expect(layout.positions.get('older')!.y).toBeLessThan(layout.positions.get('newer')!.y);
-  });
-
-  it('an empty item list produces a valid, non-zero layout rather than a degenerate one', () => {
-    const layout = buildGraphLayout([]);
-    expect(layout.columns).toEqual([]);
-    expect(layout.width).toBeGreaterThan(0);
-    expect(layout.height).toBeGreaterThan(0);
-  });
-});
-
 describe('GenesisMatrixHub (no DOM — storage.ts degrades to an empty store)', () => {
   const html = renderToStaticMarkup(<GenesisMatrixHub />);
 
@@ -117,13 +89,54 @@ describe('GenesisMatrixHub (no DOM — storage.ts degrades to an empty store)', 
     expect(html).toContain('Ta sama rozmowa co wszędzie w Genesis');
   });
 
-  it('offers the List/Graph toggle even with zero records (defaults to List, per initial state)', () => {
-    expect(html).toContain('mx-view-toggle');
-    expect(html).toContain('>Lista<');
-    expect(html).toContain('>Graf<');
-    // Default view is the list — this is a static-markup render, so no click can switch it; the
-    // graph's own interactive behavior (toggling, node selection) is proven by real browser E2E.
-    expect(html).toContain('matrix-hub-grid');
-    expect(html).not.toContain('mx-graph-svg');
+  it('with zero records, the graph says so honestly rather than rendering an empty canvas', () => {
+    expect(html).toContain('Graf relacji');
+    expect(html).toContain('Brak rekordów, więc graf jest pusty');
+  });
+});
+
+describe('computeGraphLayout / domainCenters (master gap plan P1.4) — deterministic, domain-grouped, never randomised', () => {
+  it('is deterministic: the same input always produces the same positions', () => {
+    const nodes = [{ id: 'a', labId: 'cyber-security' }, { id: 'b', labId: 'decipherment' }, { id: 'c', labId: 'cyber-security' }];
+    const first = computeGraphLayout(nodes);
+    const second = computeGraphLayout(nodes);
+    for (const id of ['a', 'b', 'c']) expect(first.get(id)).toEqual(second.get(id));
+  });
+
+  it('is stable to input ORDER, not just input identity — a re-render with records in a different order does not reshuffle the layout', () => {
+    const nodes = [{ id: 'a', labId: 'cyber-security' }, { id: 'b', labId: 'decipherment' }, { id: 'c', labId: 'cyber-security' }];
+    const shuffled = [nodes[2]!, nodes[0]!, nodes[1]!];
+    const a = computeGraphLayout(nodes);
+    const b = computeGraphLayout(shuffled);
+    for (const id of ['a', 'b', 'c']) expect(a.get(id)).toEqual(b.get(id));
+  });
+
+  it('groups nodes by domain: two nodes in the SAME labId are closer together than either is to a node in a DIFFERENT labId', () => {
+    const nodes = [
+      { id: 'cyber-1', labId: 'cyber-security' }, { id: 'cyber-2', labId: 'cyber-security' },
+      { id: 'decipherment-1', labId: 'decipherment' },
+    ];
+    const positions = computeGraphLayout(nodes);
+    const withinDomain = distance(positions.get('cyber-1')!, positions.get('cyber-2')!);
+    const acrossDomain = distance(positions.get('cyber-1')!, positions.get('decipherment-1')!);
+    expect(withinDomain).toBeLessThan(acrossDomain);
+  });
+
+  it('places a single node at the origin rather than an arbitrary offset', () => {
+    const positions = computeGraphLayout([{ id: 'only', labId: 'cyber-security' }]);
+    // `-0` from the trig here is numerically zero (`Object.is(-0, 0)` is the
+    // only thing that disagrees) — `toBeCloseTo` treats them as equal, `toEqual` does not.
+    expect(positions.get('only')?.x).toBeCloseTo(0);
+    expect(positions.get('only')?.y).toBeCloseTo(0);
+  });
+
+  it('domainCenters reports one center per real domain, with an honest count', () => {
+    const nodes = [
+      { id: 'a', labId: 'cyber-security' }, { id: 'b', labId: 'cyber-security' }, { id: 'c', labId: 'decipherment' },
+    ];
+    const centers = domainCenters(nodes);
+    expect(centers).toHaveLength(2);
+    expect(centers.find((c) => c.labId === 'cyber-security')?.count).toBe(2);
+    expect(centers.find((c) => c.labId === 'decipherment')?.count).toBe(1);
   });
 });

@@ -4,6 +4,7 @@ import {
   runSecurityTest, judgeVerdict, buildAttackPath,
   executeRelationTests, createRemediation, applyRemediation, retest,
   verifySecurityOutcome, runInvestigation, toCyberInvestigationResult,
+  runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive,
 } from '../core/agent/cyberReasoningKernel';
 import { isWellFormedCyberInvestigation } from '../core/agent/cyberInvestigation';
 import { buildSavedCyberInvestigation, saveCyberInvestigationToMemory, replaySavedCyberInvestigation } from '../core/scienceMemory';
@@ -176,14 +177,32 @@ describe('seam to Science Memory (SavedCyberInvestigation)', () => {
     expect(before.observedResult.statusCode).toBe(200);
     expect(retestResult.observedResult.statusCode).toBe(403);
   });
+
+  it('a real ADAPTIVE run (the loop Chat/CyberWorkspace actually use) maps to a well-formed, savable CyberInvestigationResult that carries the loop\'s own live conflicts through to Memory', () => {
+    (globalThis as { window?: unknown }).window = { localStorage: makeFakeStorage() };
+    const adaptive = runAdaptiveInvestigation(new ToyVulnerableApp());
+    // The whole point of this bridge: a hypothesis genuinely remediated mid-run is SUPPORTED before
+    // the fix and FALSIFIED on the independent post-fix retest — a real conflict, not a hand fixture.
+    expect(adaptive.conflicts.length).toBeGreaterThan(0);
+
+    const result = toCyberInvestigationResultFromAdaptive('inv-adaptive-1', 'Adaptive investigation of the toy app.', adaptive);
+    expect(isWellFormedCyberInvestigation(result)).toBe(true);
+    expect(result.conflicts).toEqual(adaptive.conflicts);
+    expect(result.attackPath).toBeNull();
+
+    const saved = buildSavedCyberInvestigation(result);
+    const experiment = saveCyberInvestigationToMemory(saved);
+    expect(experiment.cyberInvestigation?.result.conflicts).toEqual(adaptive.conflicts);
+    expect(replaySavedCyberInvestigation(experiment).status).toBe('MATCH');
+  });
 });
 
-describe('chat intent routes to the existing Cyber Workspace, through the one command layer', () => {
-  it('recognises cyber-investigation phrasing in both languages and opens the existing screen, not a second engine', async () => {
+describe('chat intent runs the real Cyber kernel inline (ETAP 1.5), through the one command layer', () => {
+  it('recognises cyber-investigation phrasing in both languages and returns a runCyber action, not a second engine', async () => {
     const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     for (const phrase of ['dochodzenie bezpieczenstwa', 'test penetracyjny', 'podatnosc', 'auth bypass', 'attack surface', 'pentest']) {
       const out = resolveCommand(phrase, null);
-      expect(out.action, phrase).toEqual({ type: 'openRoute', hash: '#/cyber' });
+      expect(out.action, phrase).toEqual({ type: 'runCyber' });
       expect(out.tag, phrase).toBe('MODEL');
     }
   });

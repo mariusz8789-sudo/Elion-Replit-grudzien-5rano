@@ -19,6 +19,23 @@ import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
+import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import type { HypothesisAssessment } from '../core/experimentFabric/scientificDiscovery';
+import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
+import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
+import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyberInvestigation, saveCyberInvestigationToMemory } from '../core/scienceMemory';
+import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
+import { fnv1a, canonicalJson } from '../core/events/hash';
+
+/** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
+ * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
+ * workspace's own rendering of the same result. */
+const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
+  CANDIDATE: 'kandydat',
+  SUPPORTED_WITHIN_PROTOCOL: 'potwierdzona w protokole',
+  FALSIFIED_WITHIN_PROTOCOL: 'obalona w protokole',
+  INCONCLUSIVE: 'nierozstrzygnięta',
+};
 
 /**
  * Genesis Science Chat — inteligentna warstwa rozmowy NAD istniejącymi
@@ -350,6 +367,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [researchAccessLoading, setResearchAccessLoading] = useState(false);
   const [lastHypothesisPlan, setLastHypothesisPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const [researchPanel, setResearchPanel] = useState<ResearchPanel>(null);
+  // CHAT-FIRST ETAP 1.5 — the real result of the last inline 'runCyber'/'runDecipherment' action,
+  // so a follow-up "zapisz" in the SAME conversation can persist it without re-running anything or
+  // requiring the user to open the workspace. Cleared by nothing else — a later run just replaces it.
+  const [lastCyberRun, setLastCyberRun] = useState<AdaptiveInvestigationResult | null>(null);
+  const [lastDeciphermentState, setLastDeciphermentState] = useState<DeciphermentCaseState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -598,6 +620,41 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         const result = control.applyObservation(a.sentence);
         appendGenesis(result.narration, result.found ? 'MODEL' : 'SYSTEM');
       }
+    } else if (a?.type === 'runCyber') {
+      // ETAP 1.5 — the real kernel, run synchronously right here, exactly like CyberWorkspace.tsx's
+      // own `run()` does. The result lives in chat state so a follow-up "zapisz" can persist it
+      // without re-running anything; there is deliberately no navigation away from the conversation.
+      const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+      setLastCyberRun(result);
+      const counts = new Map<HypothesisAssessment, number>();
+      for (const step of result.steps) if (step.verdict) counts.set(step.verdict.assessment, (counts.get(step.verdict.assessment) ?? 0) + 1);
+      const verdictLine = [...counts.entries()].map(([assessment, count]) => `${CHAT_ASSESSMENT_LABEL[assessment]}: ${count}`).join(', ') || 'brak werdyktów w tym przebiegu';
+      appendGenesis(
+        `Gotowe. Zasoby: ${result.assets.length} · Hipotezy: ${result.hypotheses.length} · Kroki: ${result.steps.length} · Konflikty: ${result.conflicts.length}.\n`
+        + `Werdykty — ${verdictLine}.\n`
+        + (result.conflicts.length > 0 ? `Konflikty (potwierdzona i obalona naraz, nie uśrednione): ${result.conflicts.join(', ')}.\n` : '')
+        + `Pełny widok krok po kroku (dlaczego ten test, obserwacja, remediacja): sekcja „Cyber" w menu.`,
+        'WYNIK',
+      );
+    } else if (a?.type === 'runDecipherment') {
+      // ETAP 1.5 — same pattern, reusing DeciphermentWorkspace.tsx's own sequenceFromText/demo specs
+      // instead of a second copy. `sequenceText` is null when the message had no plausible sequence.
+      const usedDemo = a.sequenceText === null;
+      const text = a.sequenceText ?? DEMO_CIPHERTEXT;
+      const sourceKind = usedDemo ? 'SYNTHETIC' as const : 'HUMAN_TRANSCRIPTION' as const;
+      const sequence = sequenceFromText(text, sourceKind);
+      const orchestrator = new GenesisDeciphermentOrchestrator(sequence, { seed: sequence.glyphs.length, modelVersion: '1.0.0', readingSpecs: demoReadingSpecs() });
+      const state = orchestrator.runFullLoop();
+      setLastDeciphermentState(state);
+      const top = state.readings[0];
+      appendGenesis(
+        (usedDemo ? 'Nie znalazłem w wiadomości sekwencji glifów, więc używam demonstracyjnej: ' + DEMO_CIPHERTEXT + '.\n' : `Sekwencja: ${text}.\n`)
+        + `Glify: ${sequence.glyphs.length} · Odczyty: ${state.readings.length} · Testy: ${state.testsRun.length} · Konflikty: ${state.conflicts.length}.\n`
+        + (top ? `Najlepiej dopasowany odczyt: „${top.label}" (${top.cipherModelId}), fit ${top.structuralFit.toFixed(3)}.\n` : '')
+        + (state.conflicts.length > 0 ? `Konflikty (potwierdzona i obalona naraz, nie uśrednione): ${state.conflicts.length}.\n` : '')
+        + `Wpisz „zapisz" by zachować w Pamięci Naukowej, albo otwórz sekcję „Deszyfracja" w menu po pełny widok odczytów i hipotez.`,
+        'WYNIK',
+      );
     } else if (a?.type === 'save') {
       const c = getSimContext();
       if (c) {
@@ -611,6 +668,23 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           epistemicStatus: recipe ? EPISTEMIC_LABELS[epistemicStatusOf(recipe)] : undefined,
         });
         appendGenesis(`Zapisano ✓ Odcisk treści: #${saved.contentHash}. Rekord zawiera model, parametry, równania, założenia, status epistemiczny i migawkę wyników. Wpisz „pokaż zapisane", by wrócić do niego później.`);
+      } else if (lastDeciphermentState) {
+        const result = toDeciphermentCaseResult(lastDeciphermentState);
+        const saved = buildSavedDeciphermentCase(result);
+        const record = saveDeciphermentCaseToMemory(saved);
+        appendGenesis(`Zapisano ✓ Dochodzenie deszyfracji: ${result.caseId}. Odcisk treści: #${record.contentHash}. Wpisz „pokaż zapisane", by wrócić do niego później.`);
+      } else if (lastCyberRun) {
+        // Deterministic id derived from the investigation's own content (never Date.now(), which
+        // would leak non-determinism into resultFingerprint) — mirrors decipherment's caseId
+        // being derived from the sequence's own fingerprint rather than a wall-clock value.
+        const goal = 'Dochodzenie bezpieczeństwa uruchomione z czatu przeciw syntetycznemu celowi (ToyVulnerableApp).';
+        const investigationId = `cyber:${fnv1a(canonicalJson({ goal, hypothesisIds: lastCyberRun.hypotheses.map((h) => h.hypothesisId) }))}`;
+        const result = toCyberInvestigationResultFromAdaptive(investigationId, goal, lastCyberRun);
+        const saved = buildSavedCyberInvestigation(result);
+        const record = saveCyberInvestigationToMemory(saved);
+        appendGenesis(`Zapisano ✓ Dochodzenie bezpieczeństwa: ${result.investigationId}. Odcisk treści: #${record.contentHash}. Wpisz „pokaż zapisane", by wrócić do niego później.`);
+      } else {
+        appendGenesis('Nie mam teraz nic do zapisania — otwórz zjawisko albo uruchom dochodzenie (np. „deszyfracja" lub „dochodzenie bezpieczeństwa"), a potem powiedz „zapisz".');
       }
     } else if (a?.type === 'list') {
       const recs = listExperiments();

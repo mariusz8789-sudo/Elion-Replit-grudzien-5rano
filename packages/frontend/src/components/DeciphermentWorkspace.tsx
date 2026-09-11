@@ -37,9 +37,11 @@ const ASSESSMENT_CLASS: Record<HypothesisAssessment, string> = {
 };
 
 /** Classic pedagogical Caesar example (shift=3): "ATTACKATDAWN" -> "DWWDFNDWGDZQ". Entirely synthetic/toy. */
-const DEMO_CIPHERTEXT = 'DWWDFNDWGDZQ';
+export const DEMO_CIPHERTEXT = 'DWWDFNDWGDZQ';
 
-function sequenceFromText(text: string, sourceKind: GlyphSequence['sourceKind']): GlyphSequence {
+/** Exported so Science Chat's inline "run decipherment" intent reuses this exact conversion instead
+ * of a second copy — see resolveCommand.ts's 'runDecipherment' action and its handler in ScienceChat.tsx. */
+export function sequenceFromText(text: string, sourceKind: GlyphSequence['sourceKind']): GlyphSequence {
   const glyphs: GlyphToken[] = [...text].map((ch, i) => ({
     symbol: ch === '?' ? '¿' : ch.toUpperCase(),
     position: i,
@@ -50,7 +52,7 @@ function sequenceFromText(text: string, sourceKind: GlyphSequence['sourceKind'])
 }
 
 /** Three competing readings: no key (baseline), and two rival Caesar shifts. Real rivals, not a strawman. */
-function demoReadingSpecs(): readonly ReadingSpec[] {
+export function demoReadingSpecs(): readonly ReadingSpec[] {
   return [
     { label: 'A — bez klucza (linia bazowa)', cipherModelId: 'CAESAR', candidateKey: null, assumptions: ['identity pass: no decryption applied'] },
     { label: 'B — Cezar, przesunięcie 3', cipherModelId: 'CAESAR', candidateKey: { kind: 'CAESAR', shift: 3 }, assumptions: [] },

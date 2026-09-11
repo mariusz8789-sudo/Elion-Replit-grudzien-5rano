@@ -24,18 +24,21 @@ import { buildMatrixRelationGraph, edgesFor, type MatrixEdge } from './matrixRel
  * already recorded, or an explicit, named, non-numeric heuristic ranking
  * (`OPEN_ITEM_PRIORITY`) — never a fabricated confidence score.
  *
- * SCOPE, HONESTLY: this first pass reads three of the nine investigation
- * shapes — `cyberInvestigation`, `deciphermentCase`, `researchChain` —
- * because those three already carry an explicit, unambiguous "this is
- * still open" signal in their own persisted record. The other six
- * (`worldDiscovery`, `parameterInquiry`, `mechanismComposition`,
- * `realExperimentVerification`, `substitutionInvestigation`, the legacy
- * `hypothesisLoop`/`discoveryLoop`/`investigation` Fabric shapes) do not
- * currently expose a comparably explicit "still open" flag on their own
- * saved shape without additional interpretation this module does not
- * attempt yet — INTEGRATION_POINT_TO_CONFIRM for whoever extends this.
- * Silently guessing at open-ness for those shapes would be worse than
- * naming the gap.
+ * SCOPE, HONESTLY: this reads five of the nine investigation shapes —
+ * `cyberInvestigation`, `deciphermentCase`, `researchChain`,
+ * `worldDiscovery` (its `loopResult.unresolvedQuestions` only — the
+ * `comparisonResult` alternative shape is not yet read), and
+ * `mechanismComposition` (its `assessment.interaction === 'INCONCLUSIVE'`,
+ * `mechanismInteraction.ts`'s own explicit fourth outcome alongside
+ * ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE) — because those already carry an
+ * explicit, unambiguous "this is still open" signal in their own persisted
+ * record. The other four (`parameterInquiry`, `realExperimentVerification`,
+ * `substitutionInvestigation`, the legacy `hypothesisLoop`/`discoveryLoop`/
+ * `investigation` Fabric shapes) do not currently expose a comparably
+ * explicit "still open" flag on their own saved shape without additional
+ * interpretation this module does not attempt yet —
+ * INTEGRATION_POINT_TO_CONFIRM for whoever extends this. Silently guessing
+ * at open-ness for those shapes would be worse than naming the gap.
  */
 
 export type CrossDomainOpenItemKind =
@@ -43,6 +46,8 @@ export type CrossDomainOpenItemKind =
   | 'UNRESOLVED_CONFLICT'
   /** A research chain (`researchChain.ts`) that stopped OPEN or INCONCLUSIVE — Genesis itself flagged this as unfinished. */
   | 'UNSETTLED_CHAIN'
+  /** A world-discovery loop (`discoveryLoop.ts`) that stopped with at least one question in its own `unresolvedQuestions` — Genesis itself named the question as unanswered. */
+  | 'UNRESOLVED_QUESTION'
   /** A research chain that stopped BLOCKED — not a data gap, an actuator Genesis does not have yet. */
   | 'BLOCKED_CHAIN'
   /** A single hypothesis whose only verdict so far is INCONCLUSIVE. */
@@ -53,15 +58,18 @@ export type CrossDomainOpenItemKind =
  * not a learned weight. Reasoning: an unresolved conflict is the most
  * epistemically urgent (Genesis is holding two contradictory truths at
  * once); a stalled chain is next (Genesis itself already tried to continue
- * and stopped); a blocked chain is last among "still open" because no
- * further experiment — only a new capability — can move it; and a bare
- * inconclusive hypothesis is the least urgent of the truly open items,
- * since nothing about it says progress stalled, only that no test has
- * discriminated it yet.
+ * and stopped); an unresolved question from a world-discovery loop ranks
+ * just under that — the loop stopped without the contradiction a conflict
+ * implies, but still named a specific question it could not answer; a
+ * blocked chain is last among "still open" because no further experiment —
+ * only a new capability — can move it; and a bare inconclusive hypothesis
+ * is the least urgent of the truly open items, since nothing about it says
+ * progress stalled, only that no test has discriminated it yet.
  */
 const OPEN_ITEM_PRIORITY: Record<CrossDomainOpenItemKind, number> = {
-  UNRESOLVED_CONFLICT: 4,
-  UNSETTLED_CHAIN: 3,
+  UNRESOLVED_CONFLICT: 5,
+  UNSETTLED_CHAIN: 4,
+  UNRESOLVED_QUESTION: 3,
   INCONCLUSIVE_HYPOTHESIS: 2,
   BLOCKED_CHAIN: 1,
 };
@@ -69,7 +77,7 @@ const OPEN_ITEM_PRIORITY: Record<CrossDomainOpenItemKind, number> = {
 export interface CrossDomainOpenItem {
   readonly sourceExperimentId: string;
   readonly labId: string;
-  readonly shape: 'cyberInvestigation' | 'deciphermentCase' | 'researchChain';
+  readonly shape: 'cyberInvestigation' | 'deciphermentCase' | 'researchChain' | 'worldDiscovery' | 'mechanismComposition';
   readonly kind: CrossDomainOpenItemKind;
   readonly question: string;
   readonly detail: string;
@@ -81,8 +89,27 @@ function cyberOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
   if (!record.cyberInvestigation) return [];
   const { result } = record.cyberInvestigation;
   const items: CrossDomainOpenItem[] = [];
+  // Real conflicts (SUPPORTED_WITHIN_PROTOCOL and FALSIFIED_WITHIN_PROTOCOL both on record for the
+  // same hypothesis) rank above a bare INCONCLUSIVE — see OPEN_ITEM_PRIORITY. `result.conflicts` is
+  // only ever non-empty on records built via `toCyberInvestigationResultFromAdaptive`, since that is
+  // the one seam that carries `runAdaptiveInvestigation`'s live conflict tracking through to Memory.
+  for (const hypothesisId of result.conflicts) {
+    const hyp = result.hypotheses.find((h) => h.hypothesisId === hypothesisId);
+    const relevantVerdicts = result.verdicts.filter((v) => v.hypothesisId === hypothesisId);
+    items.push({
+      sourceExperimentId: record.id,
+      labId: record.labId,
+      shape: 'cyberInvestigation',
+      kind: 'UNRESOLVED_CONFLICT',
+      question: hyp ? hyp.statement : `Hypothesis ${hypothesisId} in "${result.goal}"`,
+      detail: `History: ${relevantVerdicts.map((v) => v.assessment).join(' -> ')}.`,
+      createdAt: record.createdAt,
+      evidencePackId: record.evidencePackId ?? null,
+    });
+  }
   for (const verdict of result.verdicts) {
     if (verdict.assessment !== 'INCONCLUSIVE') continue;
+    if (result.conflicts.includes(verdict.hypothesisId)) continue; // already reported as a conflict, not a mere inconclusive
     const hyp = result.hypotheses.find((h) => h.hypothesisId === verdict.hypothesisId);
     items.push({
       sourceExperimentId: record.id,
@@ -132,12 +159,63 @@ function researchChainOpenItems(record: SavedExperiment): CrossDomainOpenItem[] 
   }];
 }
 
+/**
+ * Only `loopResult.unresolvedQuestions` — `discoveryLoop.ts`'s own explicit
+ * "what the loop could not settle" list, named by the loop itself, never
+ * inferred from `stopReason`/`bestSupported` by this module. The alternative
+ * `comparisonResult` shape (`crossActionComparison.ts`) is not read here —
+ * INTEGRATION_POINT_TO_CONFIRM, same honesty as the module doc's scope note.
+ */
+function worldDiscoveryOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
+  const loopResult = record.worldDiscovery?.loopResult;
+  if (!loopResult) return [];
+  return loopResult.unresolvedQuestions.map((question) => ({
+    sourceExperimentId: record.id,
+    labId: record.labId,
+    shape: 'worldDiscovery' as const,
+    kind: 'UNRESOLVED_QUESTION' as const,
+    question,
+    detail: `Stop reason: ${loopResult.stopReason}. ${loopResult.bestSupported.length} best-supported mechanism(s) so far, ${loopResult.failedHypotheses.length} refuted.`,
+    createdAt: record.createdAt,
+    evidencePackId: record.evidencePackId ?? null,
+  }));
+}
+
+/**
+ * `assessment.interaction === 'INCONCLUSIVE'` is `mechanismInteraction.ts`'s
+ * own fourth, explicit outcome alongside ADDITIVE/SUB_ADDITIVE/
+ * SUPER_ADDITIVE — a joint-mechanism hypothesis Genesis measured but could
+ * not classify, the same "no test has discriminated this yet" shape
+ * `INCONCLUSIVE_HYPOTHESIS` already names for cyber, reused here rather
+ * than invented afresh.
+ */
+function mechanismCompositionOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
+  const composition = record.mechanismComposition;
+  if (!composition || composition.assessment.interaction !== 'INCONCLUSIVE') return [];
+  return [{
+    sourceExperimentId: record.id,
+    labId: record.labId,
+    shape: 'mechanismComposition',
+    kind: 'INCONCLUSIVE_HYPOTHESIS',
+    question: composition.derived.statement,
+    detail: composition.assessment.reason,
+    createdAt: record.createdAt,
+    evidencePackId: record.evidencePackId ?? null,
+  }];
+}
+
 /** Every open item across every domain — the whole point being that nothing here filters by domain first. */
 export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]): readonly CrossDomainOpenItem[] {
   const all = records ?? listExperiments();
   const items: CrossDomainOpenItem[] = [];
   for (const record of all) {
-    items.push(...cyberOpenItems(record), ...deciphermentOpenItems(record), ...researchChainOpenItems(record));
+    items.push(
+      ...cyberOpenItems(record),
+      ...deciphermentOpenItems(record),
+      ...researchChainOpenItems(record),
+      ...worldDiscoveryOpenItems(record),
+      ...mechanismCompositionOpenItems(record),
+    );
   }
   return items;
 }
@@ -161,6 +239,8 @@ function expectedDiscrimination(kind: CrossDomainOpenItemKind, item: CrossDomain
       return 'Would resolve nothing by itself: this chain stopped because Genesis has no actuator for the question it raised, not for lack of data. The gap is architectural, not experimental — see "next test" below.';
     case 'INCONCLUSIVE_HYPOTHESIS':
       return 'Would move this single hypothesis from INCONCLUSIVE to a terminal SUPPORTED_WITHIN_PROTOCOL or FALSIFIED_WITHIN_PROTOCOL.';
+    case 'UNRESOLVED_QUESTION':
+      return 'Would answer a question the world-discovery loop itself named as unresolved when it stopped, rather than leaving it implicit in an unread trace.';
   }
 }
 
@@ -174,6 +254,10 @@ function nextTestOrExperiment(item: CrossDomainOpenItem): string {
       return item.kind === 'BLOCKED_CHAIN'
         ? `No experiment resolves this without a new actuator: "${item.detail}" names the missing capability.`
         : 'Continue this chain: call `runResearchChain`/`runMechanismResearchChain` again on the same catalog and goal with a larger step budget, or address why it stopped: "' + item.detail + '"';
+    case 'worldDiscovery':
+      return 'Re-run the world-discovery loop (`runDiscoveryLoop`, discoveryLoop.ts) on the same world/catalog with a larger round budget, targeting this specific unresolved question.';
+    case 'mechanismComposition':
+      return 'Re-measure the joint arm for these two mechanisms (`runMechanismDiscoveryAndRemember`, discoveryOrchestrator.ts) — a tighter tolerance band or a repeated measurement may resolve ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE where this run could not.';
   }
 }
 
@@ -246,10 +330,11 @@ export function synthesizeNextQuestion(
   return {
     question: winner.question,
     domain: winner.labId,
-    whyThisQuestion: `Kind=${winner.kind} (priority ${OPEN_ITEM_PRIORITY[winner.kind]} of 4) — ${winner.detail}`,
+    whyThisQuestion: `Kind=${winner.kind} (priority ${OPEN_ITEM_PRIORITY[winner.kind]} of ${Object.keys(OPEN_ITEM_PRIORITY).length}) — ${winner.detail}`,
     whyNow: `Highest-ranked open item across ${domainsScanned} domain(s) scanned (${items.length} open item(s) total: ` +
       `${items.filter((i) => i.kind === 'UNRESOLVED_CONFLICT').length} conflict(s), ` +
       `${items.filter((i) => i.kind === 'UNSETTLED_CHAIN').length} unsettled chain(s), ` +
+      `${items.filter((i) => i.kind === 'UNRESOLVED_QUESTION').length} unresolved question(s), ` +
       `${items.filter((i) => i.kind === 'BLOCKED_CHAIN').length} blocked chain(s), ` +
       `${items.filter((i) => i.kind === 'INCONCLUSIVE_HYPOTHESIS').length} inconclusive hypothesis(es)); ` +
       `raised ${relativeAge(winner.createdAt, nowMs)} and never resolved since.`,

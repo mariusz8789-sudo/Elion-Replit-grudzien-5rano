@@ -1,19 +1,8 @@
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
+import { subscribeScienceMemoryChanges } from '../core/scienceMemoryEvents';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
-import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/matrixRelations';
-import { ALL_MATRIX_KINDS, KIND_ICON, KIND_LABEL, kindsOf, type MatrixKind } from './matrixKinds';
-import { projectMatrixGraph } from './matrixGraphProjection';
-import { MatrixGraph } from './MatrixGraph';
-
-/**
- * `kindsOf` and the kind vocabulary live in `./matrixKinds` so the graph
- * projection can use them without importing this component (which would be a
- * cycle). They are re-exported here UNCHANGED so every existing import path —
- * `MatrixDataStream.tsx`, `GenesisDashboard.tsx` and the tests — keeps working
- * against the exact same implementation.
- */
-export { kindsOf, KIND_LABEL, KIND_ICON, type MatrixKind } from './matrixKinds';
+import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL, type MatrixEdge, type MatrixRelationGraph } from '../core/agent/matrixRelations';
 
 /**
  * GENESIS MATRIX — the central workspace, not a memory-record list.
@@ -45,6 +34,37 @@ export { kindsOf, KIND_LABEL, KIND_ICON, type MatrixKind } from './matrixKinds';
  * instead. NEXT ACTION is real navigation, not a generated recommendation:
  * it always shows the actual screens that extend whatever is selected.
  */
+
+export type MatrixKind =
+  | 'HYPOTHESIS' | 'WORLD' | 'MODEL' | 'SCENARIO' | 'EVIDENCE'
+  | 'CYBER' | 'DECIPHERMENT' | 'RESEARCH_CHAIN' | 'REPLAY' | 'EXPERIMENT';
+
+const KIND_LABEL: Record<MatrixKind, string> = {
+  HYPOTHESIS: 'Hypotheses', WORLD: 'Worlds', MODEL: 'Models', SCENARIO: 'Scenarios',
+  EVIDENCE: 'Evidence', CYBER: 'Cyber', DECIPHERMENT: 'Decipherment', RESEARCH_CHAIN: 'Research Chain',
+  REPLAY: 'Replay', EXPERIMENT: 'Experiment',
+};
+
+const KIND_ICON: Record<MatrixKind, string> = {
+  HYPOTHESIS: '◆', WORLD: '◇', MODEL: '▣', SCENARIO: '⑂', EVIDENCE: '✓',
+  CYBER: '◈', DECIPHERMENT: '📜', RESEARCH_CHAIN: '⛓', REPLAY: '↺', EXPERIMENT: '●',
+};
+
+/** Every kind this record honestly carries — never a single forced category. */
+export function kindsOf(record: SavedExperiment): MatrixKind[] {
+  const kinds: MatrixKind[] = [];
+  if (record.discoveryLoop || record.hypothesisLoop || record.parameterInquiry) kinds.push('HYPOTHESIS');
+  if (record.worldDiscovery) kinds.push('WORLD');
+  if (record.mechanismComposition) kinds.push('MODEL');
+  if (record.scenario || record.counterfactual) kinds.push('SCENARIO');
+  if (record.biotech || record.realExperimentVerification || record.substitutionInvestigation || record.evidencePackId || record.evidenceChainId) kinds.push('EVIDENCE');
+  if (record.cyberInvestigation) kinds.push('CYBER');
+  if (record.deciphermentCase) kinds.push('DECIPHERMENT');
+  if (record.researchChain) kinds.push('RESEARCH_CHAIN');
+  if (record.replayIdentity) kinds.push('REPLAY');
+  if (kinds.length === 0) kinds.push('EXPERIMENT');
+  return kinds;
+}
 
 type LoopStage = 'HYPOTHESIS' | 'EXPERIMENT' | 'EVIDENCE';
 const STAGE_KINDS: Record<LoopStage, MatrixKind[]> = {
@@ -78,8 +98,192 @@ function timeAgo(iso: string): string {
 
 interface DetailTarget { record: SavedExperiment; kinds: MatrixKind[]; }
 
+// ============================================================================
+// MATRIX GRAPH (master gap plan P1.4) — a real node/edge graph over the
+// SAME `matrixRelations.ts` edges the list view and inspector already use.
+// No new relationship engine, no fabricated edges: every line drawn here is
+// one of `relations.edges` computed above, and every node is a real
+// `SavedExperiment`. Selecting a node in the graph calls the SAME
+// `openDetail` the grid/activity feed already use, so the existing
+// "Selected Object" inspector panel IS the contextual inspector this graph
+// needs — not a second one.
+// ============================================================================
+
+interface GraphNodePosition { readonly x: number; readonly y: number; }
+
+/**
+ * Deterministic domain-grouped layout: no physics simulation, no
+ * randomness, so the SAME set of records always lays out identically.
+ * Each domain (`labId`) gets an evenly-spaced point around one large
+ * circle; every record in that domain gets its own point on a small circle
+ * around its domain's point. Sorting by id keeps the layout stable
+ * across re-renders even when records arrive in a different order.
+ */
+export function computeGraphLayout(nodes: readonly { id: string; labId: string }[]): ReadonlyMap<string, GraphNodePosition> {
+  const positions = new Map<string, GraphNodePosition>();
+  const domains = [...new Set(nodes.map((n) => n.labId))].sort();
+  const DOMAIN_RADIUS = domains.length <= 1 ? 0 : 220;
+
+  domains.forEach((domain, di) => {
+    const domainAngle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
+    const cx = DOMAIN_RADIUS * Math.cos(domainAngle);
+    const cy = DOMAIN_RADIUS * Math.sin(domainAngle);
+    const inDomain = nodes.filter((n) => n.labId === domain).map((n) => n.id).sort();
+    const clusterRadius = inDomain.length <= 1 ? 0 : Math.min(100, 20 + inDomain.length * 8);
+    inDomain.forEach((id, ni) => {
+      const angle = (ni / inDomain.length) * 2 * Math.PI - Math.PI / 2;
+      positions.set(id, { x: cx + clusterRadius * Math.cos(angle), y: cy + clusterRadius * Math.sin(angle) });
+    });
+  });
+  return positions;
+}
+
+/** Domain cluster centers — used only to draw the faint grouping circle and label, from the SAME layout. */
+export function domainCenters(nodes: readonly { id: string; labId: string }[]): readonly { labId: string; x: number; y: number; count: number }[] {
+  const domains = [...new Set(nodes.map((n) => n.labId))].sort();
+  const DOMAIN_RADIUS = domains.length <= 1 ? 0 : 220;
+  return domains.map((labId, di) => {
+    const angle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
+    return { labId, x: DOMAIN_RADIUS * Math.cos(angle), y: DOMAIN_RADIUS * Math.sin(angle), count: nodes.filter((n) => n.labId === labId).length };
+  });
+}
+
+const EDGE_COLOR: Record<MatrixEdge['kind'], string> = {
+  VERIFIES_PREDICTION: '#6ee7a0',
+  SHARED_EVIDENCE_PACK: '#7dd3fc',
+  SHARED_EVIDENCE_CHAIN: '#a78bfa',
+  SAME_REPLAY_CAPSULE: '#f0b35c',
+  SAME_EXPERIMENT_RERUN: '#f47c7c',
+};
+
+interface MatrixGraphProps {
+  readonly nodes: readonly DetailTarget[];
+  readonly relations: MatrixRelationGraph;
+  readonly selectedId: string | null;
+  readonly onSelect: (target: DetailTarget) => void;
+}
+
+const GRAPH_VIEW_SIZE = 620;
+
+function MatrixGraph({ nodes, relations, selectedId, onSelect }: MatrixGraphProps) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragging = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+
+  const positions = useMemo(() => computeGraphLayout(nodes.map((n) => ({ id: n.record.id, labId: n.record.labId }))), [nodes]);
+  const clusters = useMemo(() => domainCenters(nodes.map((n) => ({ id: n.record.id, labId: n.record.labId }))), [nodes]);
+
+  const selectedEdgeIds = useMemo(() => {
+    if (!selectedId) return null;
+    return new Set(edgesFor(relations, selectedId).map((e) => `${e.kind}:${e.fromId}:${e.toId}`));
+  }, [relations, selectedId]);
+
+  const half = GRAPH_VIEW_SIZE / 2 / zoom;
+  const viewBox = `${pan.x - half} ${pan.y - half} ${half * 2} ${half * 2}`;
+
+  const onWheel = (e: ReactWheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    setZoom((z) => Math.min(4, Math.max(0.35, z * (e.deltaY > 0 ? 0.9 : 1.1))));
+  };
+  const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    dragging.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+  };
+  const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (!dragging.current) return;
+    const scale = GRAPH_VIEW_SIZE / zoom / GRAPH_VIEW_SIZE; // px -> svg-unit factor at current zoom
+    setPan({
+      x: dragging.current.panX - (e.clientX - dragging.current.startX) / zoom * scale * zoom,
+      y: dragging.current.panY - (e.clientY - dragging.current.startY) / zoom * scale * zoom,
+    });
+  };
+  const endDrag = () => { dragging.current = null; };
+
+  if (nodes.length === 0) {
+    return <p className="matrix-rail-empty">Brak rekordów, więc graf jest pusty — pojawi się, gdy Genesis zapisze pierwszy przebieg.</p>;
+  }
+
+  return (
+    <div className="matrix-graph-wrap">
+      <div className="matrix-graph-toolbar">
+        <button type="button" className="chip-btn" onClick={() => setZoom((z) => Math.min(4, z * 1.2))}>Przybliż +</button>
+        <button type="button" className="chip-btn" onClick={() => setZoom((z) => Math.max(0.35, z * 0.8))}>Oddal −</button>
+        <button type="button" className="chip-btn" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
+        <span className="gsc-caption">{nodes.length} węzłów · {relations.edges.length} krawędzi realnych · {clusters.length} domen</span>
+      </div>
+      <svg
+        className="matrix-graph-svg"
+        viewBox={viewBox}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerLeave={endDrag}
+        role="img"
+        aria-label="Graf relacji Matrix — węzły to rzeczywiste rekordy, krawędzie to realne powiązania"
+      >
+        {clusters.map((c) => (
+          <g key={c.labId}>
+            <circle cx={c.x} cy={c.y} r={Math.max(30, 20 + c.count * 8) + 14} className="matrix-graph-domain-ring" />
+            <text x={c.x} y={c.y - Math.max(30, 20 + c.count * 8) - 20} className="matrix-graph-domain-label" textAnchor="middle">
+              {c.labId} ({c.count})
+            </text>
+          </g>
+        ))}
+        {relations.edges.map((edge) => {
+          const from = positions.get(edge.fromId);
+          const to = positions.get(edge.toId);
+          if (!from || !to) return null;
+          const edgeId = `${edge.kind}:${edge.fromId}:${edge.toId}`;
+          const highlighted = selectedEdgeIds?.has(edgeId) ?? false;
+          const dimmed = selectedEdgeIds !== null && !highlighted;
+          return (
+            <line
+              key={edgeId}
+              x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+              stroke={EDGE_COLOR[edge.kind]}
+              strokeWidth={highlighted ? 2.5 : 1}
+              opacity={dimmed ? 0.12 : highlighted ? 1 : 0.55}
+              markerEnd={edge.directed ? 'url(#matrix-graph-arrow)' : undefined}
+            />
+          );
+        })}
+        <defs>
+          <marker id="matrix-graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--text-faint)" />
+          </marker>
+        </defs>
+        {nodes.map(({ record, kinds }) => {
+          const pos = positions.get(record.id);
+          if (!pos) return null;
+          const isSelected = record.id === selectedId;
+          return (
+            <g
+              key={record.id}
+              transform={`translate(${pos.x}, ${pos.y})`}
+              className="matrix-graph-node"
+              onClick={() => onSelect({ record, kinds })}
+              role="button"
+              aria-label={record.experimentName || record.experimentId}
+            >
+              <circle r={isSelected ? 12 : 8} className={isSelected ? 'matrix-graph-node-circle selected' : 'matrix-graph-node-circle'} />
+              <text y={isSelected ? 24 : 20} textAnchor="middle" className="matrix-graph-node-label">
+                {KIND_ICON[kinds[0] ?? 'EXPERIMENT']}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="gsc-caption matrix-graph-caption">
+        Scroll do zoomu, przeciągnij żeby przesunąć. Kolor krawędzi = rodzaj powiązania
+        ({Object.values(EDGE_LABEL).join(', ')}). Kliknij węzeł, żeby zobaczyć go w panelu po prawej.
+      </p>
+    </div>
+  );
+}
+
 export function GenesisMatrixHub() {
-  const records = useMemo(() => listExperiments(), []);
+  const [records, setRecords] = useState<readonly SavedExperiment[]>(() => listExperiments());
+  useEffect(() => subscribeScienceMemoryChanges(() => setRecords(listExperiments())), []);
   const withKinds = useMemo(() => records.map((r) => ({ record: r, kinds: kindsOf(r) })), [records]);
   const countsByKind = useMemo(() => {
     const counts = new Map<MatrixKind, number>();
@@ -95,25 +299,11 @@ export function GenesisMatrixHub() {
   const [activeKind, setActiveKind] = useState<MatrixKind | null>(null);
   const [detail, setDetail] = useState<DetailTarget | null>(null);
   const [askInput, setAskInput] = useState('');
-  const [view, setView] = useState<'GRAPH' | 'RECORDS'>('GRAPH');
-
-  /**
-   * The graph is a projection of the SAME `records` and the SAME `relations`
-   * the list below already uses — one relation computation, one classification,
-   * so the two views can never disagree about what is related to what.
-   * Memoized on both, so panning/zooming/selecting never recomputes layout.
-   */
-  const graphModel = useMemo(() => projectMatrixGraph(records, relations), [records, relations]);
-
-  const selectById = useCallback((id: string) => {
-    const target = withKinds.find((w) => w.record.id === id);
-    if (target) setDetail((current) => (current?.record.id === id ? null : target));
-  }, [withKinds]);
 
   const latest = withKinds[0] ?? null; // listExperiments() sorts newest-first
   const recentFive = withKinds.slice(0, 5);
   const visible = activeKind ? withKinds.filter(({ kinds }) => kinds.includes(activeKind)) : withKinds;
-  const ALL_KINDS = ALL_MATRIX_KINDS;
+  const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'DECIPHERMENT', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
 
   const submitAsk = () => {
     const text = askInput.trim();
@@ -197,41 +387,7 @@ export function GenesisMatrixHub() {
           <p className="matrix-loop-legend">
             Hypothesis → Prediction → Experiment → Evidence → Verdict → Memory → Next Action
           </p>
-
-          {/* GRAPH | RECORDS. The graph is the visual centre, but the list view
-              it replaced is one click away and unchanged — a new projection
-              should not cost anyone the view they already rely on. */}
-          <div className="matrix-view-toggle" role="tablist" aria-label="Widok Matrix">
-            <button
-              role="tab"
-              aria-selected={view === 'GRAPH'}
-              className={view === 'GRAPH' ? 'matrix-view-tab active' : 'matrix-view-tab'}
-              onClick={() => setView('GRAPH')}
-              data-testid="matrix-view-graph"
-            >
-              Graf relacji
-            </button>
-            <button
-              role="tab"
-              aria-selected={view === 'RECORDS'}
-              className={view === 'RECORDS' ? 'matrix-view-tab active' : 'matrix-view-tab'}
-              onClick={() => setView('RECORDS')}
-              data-testid="matrix-view-records"
-            >
-              Pętla i rekordy
-            </button>
-          </div>
-
-          {view === 'GRAPH' && (
-            <MatrixGraph
-              model={graphModel}
-              selectedId={detail?.record.id ?? null}
-              onSelect={(node) => selectById(node.id)}
-              onClearSelection={() => setDetail(null)}
-            />
-          )}
-
-          <div className="matrix-loop-columns" hidden={view !== 'RECORDS'}>
+          <div className="matrix-loop-columns">
             {(['HYPOTHESIS', 'EXPERIMENT', 'EVIDENCE'] as LoopStage[]).map((stage, i) => {
               const items = withKinds.filter(({ kinds }) => kinds.some((k) => STAGE_KINDS[stage].includes(k)));
               return (
@@ -267,6 +423,16 @@ export function GenesisMatrixHub() {
               <p className="matrix-loop-column-note">Każdy przebieg trafia tutaj automatycznie — to jest ta sama Pamięć Naukowa, którą widzisz w kolumnach obok.</p>
               <button className="matrix-loop-empty" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz pełną Pamięć Naukową →</button>
             </div>
+          </div>
+
+          {/* THE GRAPH (master gap plan P1.4): real nodes (every SavedExperiment
+              on screen), real edges (relations.edges, the SAME graph the
+              inspector's "Powiązania" list below already reads), domain-grouped,
+              with focus/zoom and a click-through to the SAME "Selected Object"
+              panel — not a second inspector. */}
+          <div className="matrix-graph-section">
+            <h3 className="matrix-rail-title">Graf relacji</h3>
+            <MatrixGraph nodes={visible} relations={relations} selectedId={detail?.record.id ?? null} onSelect={openDetail} />
           </div>
 
           {/* Gaps in the chain, stated as gaps. A graph that quietly omits the
@@ -309,11 +475,7 @@ export function GenesisMatrixHub() {
               <p className="matrix-card-meta">{new Date(detail.record.createdAt).toLocaleString()} · lab {detail.record.labId}</p>
               <dl className="matrix-detail-list">
                 <div><dt>ID</dt><dd className="mono">{detail.record.id}</dd></div>
-                <div><dt>Status epistemiczny</dt><dd className="mono">{detail.record.epistemicStatus}</dd></div>
-                <div><dt>Rzetelność</dt><dd className="mono">{detail.record.honesty}</dd></div>
                 {detail.record.evidencePackId && <div><dt>Evidence pack</dt><dd className="mono">{detail.record.evidencePackId}</dd></div>}
-                {detail.record.evidenceChainId && <div><dt>Evidence chain</dt><dd className="mono">{detail.record.evidenceChainId}</dd></div>}
-                {detail.record.replayIdentity && <div><dt>Replay capsule</dt><dd className="mono">{detail.record.replayIdentity.capsuleId}</dd></div>}
                 {Object.entries(detail.record.stats).slice(0, 5).map(([key, value]) => (
                   <div key={key}><dt>{key}</dt><dd>{Number.isFinite(value) ? value : String(value)}</dd></div>
                 ))}
@@ -322,18 +484,6 @@ export function GenesisMatrixHub() {
                   that proves it, so a user can check the claim rather than
                   trust a drawn line. */}
               <h4 className="matrix-detail-sub">Powiązania</h4>
-              {(graphModel.selfEdgesById.get(detail.record.id)?.length ?? 0) > 0 && (
-                <ul className="matrix-relation-list" data-testid="matrix-detail-selfedges">
-                  {graphModel.selfEdgesById.get(detail.record.id)!.map((edge) => (
-                    <li key={`self:${edge.kind}`}>
-                      <span className="matrix-relation-row matrix-relation-row-self">
-                        <span className="matrix-relation-kind">↺ {EDGE_LABEL[edge.kind]} (do samego siebie)</span>
-                        <span className="matrix-relation-basis">podstawa: {edge.basis}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
               {edgesFor(relations, detail.record.id).length === 0 ? (
                 <p className="matrix-rail-empty">
                   Brak powiązań wyprowadzalnych z danych. Ten rekord nie dzieli evidence packa, chaina ani kapsuły
@@ -365,17 +515,6 @@ export function GenesisMatrixHub() {
               )}
               <div className="matrix-detail-actions">
                 <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz w Pamięci Naukowej →</button>
-                {/* The SAME globally-mounted ScienceChat every other entry point
-                    opens — this passes the selected record as context, it does
-                    not create a second chat. */}
-                <button
-                  className="chip-btn"
-                  type="button"
-                  data-testid="matrix-detail-ask-chat"
-                  onClick={() => requestOpenScienceChat(`Opowiedz o zapisie „${detail.record.experimentName || detail.record.experimentId}" (${detail.record.id}) z Pamięci Naukowej.`)}
-                >
-                  Zapytaj Science Chat o ten rekord →
-                </button>
                 {(detail.record.biotech || detail.record.substitutionInvestigation) && (
                   <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/drug'; }}>Otwórz w Drug Discovery →</button>
                 )}

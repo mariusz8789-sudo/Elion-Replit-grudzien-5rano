@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
+import { subscribeScienceMemoryChanges } from '../core/scienceMemoryEvents';
 import { kindsOf, type MatrixKind } from './GenesisMatrixHub';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { getToken, useSession } from '../core/backend/session';
@@ -135,6 +136,7 @@ export function GenesisDashboard(): JSX.Element {
 
   useEffect(() => {
     setRecords(listExperiments());
+    return subscribeScienceMemoryChanges(() => setRecords(listExperiments()));
   }, []);
 
   useEffect(() => {

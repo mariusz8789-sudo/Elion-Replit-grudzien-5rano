@@ -15,8 +15,9 @@ import { CIPHER_MODELS } from './cipherModels';
  * COMPETING_DECIPHERMENTS → (TESTS →) FALSIFICATION → VERDICT → NEXT_TEST.
  *
  * Does NOT replace Discovery Loop, Simulation, Evidence, Memory, Matrix,
- * Replay, Chat, or World — see `deciphermentMemory.ts` for how this plugs
- * into the real Science Memory instead of inventing a second store.
+ * Replay, Chat, or World — see `scienceMemory.ts`'s `buildSavedDeciphermentCase`/
+ * `saveDeciphermentCaseToMemory` for how this plugs into the real Science
+ * Memory instead of inventing a second store.
  */
 
 export interface PatternAnalysisResult {

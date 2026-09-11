@@ -1,4 +1,5 @@
 import { readJSON, writeJSON } from './storage';
+import { notifyScienceMemoryChanged } from './scienceMemoryEvents';
 import type { HonestyLevel, SimParams } from './types';
 import { biotechScientificFingerprint, buildCandidateCombinationHypothesis, rankNaturalCompositionHypotheses, type BiologicalExperimentRequest, type BiologicalExperimentRequestStatus, type BiotechEpistemicStatus, type BiotechProvenance, type CandidateCombinationHypothesis, type CandidateDiscoveryReport, type CandidateRanking, type RankedCompositionHypothesis, type TherapeuticCandidate, type TherapeuticHypothesis } from './biotechDiscoveryContract';
 import type { ExperimentOutputValue, ExperimentRoute, ExperimentRun } from './experimentFabric/types';
@@ -716,6 +717,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   };
   const all = [...readAll(), entry].slice(-MAX_TOTAL);
   writeJSON(KEY, all);
+  notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: entry.id });
   return entry;
 }
 
@@ -2458,6 +2460,9 @@ function cyberInvestigationAnalysis(saved: SavedCyberInvestigation): SavedExperi
     ...(result.retestVerdict
       ? [{ title: 'Weryfikacja po remediacji', body: `${result.retestVerdict.assessment}: ${result.retestVerdict.reasoning}`, kind: 'cyber-investigation-retest' }]
       : []),
+    ...(result.conflicts.length > 0
+      ? [{ title: 'Konflikty', body: `${result.conflicts.length} hipotez ma w historii zarówno SUPPORTED, jak i FALSIFIED — zachowane, nie uśrednione.`, kind: 'cyber-investigation-conflicts' }]
+      : []),
   ];
 }
 
@@ -2474,7 +2479,7 @@ export function saveCyberInvestigationToMemory(saved: SavedCyberInvestigation): 
     experimentId: `cyber-investigation:${result.investigationId}:${saved.resultFingerprint}`,
     experimentName: `Dochodzenie bezpieczeństwa — ${result.goal}`,
     params: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length },
-    stats: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length, verdictCount: result.verdicts.length },
+    stats: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length, verdictCount: result.verdicts.length, conflictCount: result.conflicts.length },
     cyberInvestigation: saved,
     analysis: cyberInvestigationAnalysis(saved),
     honesty: 'simplified',
@@ -3023,6 +3028,7 @@ export function getExperiment(id: string): SavedExperiment | undefined {
 
 export function deleteExperiment(id: string): void {
   writeJSON(KEY, readAll().filter((e) => e.id !== id));
+  notifyScienceMemoryChanged({ reason: 'DELETED', experimentId: id });
 }
 
 export function countExperiments(): number {

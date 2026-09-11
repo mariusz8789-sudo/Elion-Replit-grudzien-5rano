@@ -464,6 +464,57 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Cyber investigation (C1, CHAT-FIRST closure) — REALNY silnik `cyberReasoningKernel.ts` +
+  //     `cyberInvestigation.ts` + `cyberTestPlanner.ts` (941 linii działającego kodu), do tej pory
+  //     osiągalny WYŁĄCZNIE przez kliknięcie w CyberWorkspace — dokładnie ten anty-wzorzec
+  //     "laboratory-only entry point", którego CHAT-FIRST ma się pozbyć. Nie tworzymy drugiego
+  //     silnika ani drugiego resolvera: to samo `openRoute`, ten sam wzorzec co zderzacz/Atomic Lab
+  //     powyżej — chat tylko wskazuje istniejący ekran, który uruchamia realny kernel. ---
+  if (has(norm, 'cyberbezpieczenstwo', 'cyber bezpieczenstwo', 'dochodzenie bezpieczenstwa', 'test penetracyjny', 'test bezpieczenstwa', 'podatnosc', 'podatnosci', 'obejscie autoryzacji', 'auth bypass', 'powierzchnia ataku', 'attack surface', 'pentest', 'cyber investigation', 'cyber reasoning', 'vulnerability', 'hipoteza ataku')) {
+    return {
+      text: 'Otwieram Cyber Workspace — realny kernel śledztwa bezpieczeństwa (cyberReasoningKernel.ts) na syntetycznej, celowo podatnej aplikacji (ToyVulnerableApp), nie na żadnym prawdziwym systemie. Kernel buduje hipotezy z obserwacji, planuje kolejny test (ten sam adaptacyjny planer co reszta Genesis) i zachowuje konflikty (hipoteza raz potwierdzona, raz obalona) zamiast je uśredniać.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/cyber' },
+    };
+  }
+
+  // --- Decipherment (C1, CHAT-FIRST closure) — REALNY silnik deszyfracji (deciphermentOrchestrator.ts:
+  //     ekstrakcja glifów, konkurencyjne odczyty, holdout falsyfikacja), do tej pory osiągalny
+  //     WYŁĄCZNIE przez kliknięcie w DeciphermentWorkspace. Wejście to zawsze już posegmentowana
+  //     sekwencja glifów (znak = glif) — Genesis nie ma pipeline'u OCR/vision, więc chat nie może
+  //     przyjąć obrazu i nie udaje, że może. ---
+  if (has(norm, 'deszyfracj', 'decyfrowa', 'decyfrowanie', 'decipher', 'odczytaj sekwencje glifow', 'nieznane symbole', 'nieznanych symboli', 'szyfr cezara', 'caesar cipher', 'analiza glifow', 'sekwencja glifow', 'kryptoanaliza', 'cryptanalysis', 'unknown glyphs')) {
+    return {
+      text: 'Otwieram Laboratorium deszyfracji — realny silnik (deciphermentOrchestrator.ts): ekstrakcja glifów, konkurencyjne odczyty (klasyczne szyfry: Cezar, afiniczny, Vigenère, podstawieniowy, przestawieniowy), test holdout na niezależnej połowie sekwencji, werdykt i zachowane konflikty. Wejście to zawsze już posegmentowana sekwencja glifów (jeden znak = jeden glif) — Genesis nie ma nigdzie pipeline\'u OCR, więc nie wklejaj obrazu, tylko transkrypcję.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/decipherment' },
+    };
+  }
+
+  // --- Drug Discovery (C1, CHAT-FIRST closure) — REALNY przepływ na Backend Compute Engine
+  //     (DrugDiscoveryScreen.tsx: projekt -> cel biologiczny -> kandydaci -> paszport -> ranking,
+  //     realna cheminformatyka, nic nie udaje dokowania/ADMET/toksyczności) plus dochodzenie
+  //     substytucji (substitutionPlanner.ts, ósmy kształt Pamięci Naukowej), do tej pory osiągalne
+  //     WYŁĄCZNIE przez kliknięcie w ten ekran. ---
+  // UWAGA: żadna z tych fraz nie może zawierać JEDNOCZEŚNIE słowa z
+  // `isNaturalDiscovery` (ScienceChat.tsx) — 'natural(ne|nych)?'/'kandydat(ów|y)?'
+  // razem z 'reference'/'związk'/'lek'/'porówn'/'znajdź'/'wyszuk' — bo ten,
+  // bardziej specyficzny handler jest sprawdzany WCZEŚNIEJ, zanim resolveCommand
+  // w ogóle zostanie wywołany, i przechwyci wiadomość pierwszy (np. 'kandydat na
+  // lek' nigdy tu nie dotrze — i słusznie, bo ma bogatszy, realny przepływ
+  // PubChem/ChEMBL). Znalezione i zweryfikowane w realnym E2E w przeglądarce, nie
+  // w izolowanym teście jednostkowym, który to przeoczył.
+  if (has(norm, 'drug discovery', 'odkrywanie lekow', 'cel biologiczny', 'substytucja naturalna', 'zamiennik naturalny', 'natural replacement', 'biotech candidate', 'cheminformatyka', 'paszport kandydata')) {
+    return {
+      text: 'Otwieram Drug Discovery: realny przepływ projekt -> cel biologiczny -> kandydaci (realna cheminformatyka) -> paszport właściwości -> ranking, na Backend Compute Engine. Ekran uczciwie pokazuje luki zdolności — nic tu nie udaje dokowania, ADMET ani testu toksyczności.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/drug' },
+    };
+  }
+
   // --- Evidence & Replay Showcase (C2 "Evidence & Replay as Product") — jeden kompletny, realny
   //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`) albo w starszym
   //     `evidencePackStore.ts`, pokazany jako jednostronicowy raport audytowy: pytanie -> hipoteza ->

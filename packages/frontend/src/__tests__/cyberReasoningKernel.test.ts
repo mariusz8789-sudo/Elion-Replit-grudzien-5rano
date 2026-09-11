@@ -177,3 +177,14 @@ describe('seam to Science Memory (SavedCyberInvestigation)', () => {
     expect(retestResult.observedResult.statusCode).toBe(403);
   });
 });
+
+describe('chat intent routes to the existing Cyber Workspace, through the one command layer', () => {
+  it('recognises cyber-investigation phrasing in both languages and opens the existing screen, not a second engine', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
+    for (const phrase of ['dochodzenie bezpieczenstwa', 'test penetracyjny', 'podatnosc', 'auth bypass', 'attack surface', 'pentest']) {
+      const out = resolveCommand(phrase, null);
+      expect(out.action, phrase).toEqual({ type: 'openRoute', hash: '#/cyber' });
+      expect(out.tag, phrase).toBe('MODEL');
+    }
+  });
+});

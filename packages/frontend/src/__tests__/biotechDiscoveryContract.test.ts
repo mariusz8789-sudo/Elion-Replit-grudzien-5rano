@@ -137,3 +137,29 @@ describe('biotech discovery contract', () => {
     expect(isPredictiveBiotechStatus('UNKNOWN')).toBe(false);
   });
 });
+
+describe('chat intent routes to the existing Drug Discovery screen, through the one command layer', () => {
+  it('recognises drug-discovery phrasing in both languages and opens the existing screen, not a second engine', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
+    for (const phrase of ['drug discovery', 'odkrywanie lekow', 'cel biologiczny', 'substytucja naturalna', 'cheminformatyka']) {
+      const out = resolveCommand(phrase, null);
+      expect(out.action, phrase).toEqual({ type: 'openRoute', hash: '#/drug' });
+      expect(out.tag, phrase).toBe('MODEL');
+    }
+  });
+
+  // Found via real browser E2E, not this unit test (which calls resolveCommand directly and so
+  // cannot see it): ScienceChat.tsx's own `isNaturalDiscovery` check runs BEFORE resolveCommand is
+  // ever reached, and intercepts any message matching natural/naturalne/naturalnych/kandydat(ów|y)?
+  // together with reference/związk/lek/porówn/znajdź/wyszuk. A drug-discovery chat keyword must never
+  // satisfy both halves at once, or it is silently unreachable in the real app despite this test
+  // passing in isolation.
+  it('never picks a phrase that ScienceChat.tsx\'s natural-discovery intercept would shadow', () => {
+    const naturalRe = /natural|naturalne|naturalnych|kandydat(ów|y)?/i;
+    const referenceRe = /reference|związk|lek|porówn|znajdź|wyszuk/i;
+    const phrases = ['drug discovery', 'odkrywanie lekow', 'cel biologiczny', 'substytucja naturalna', 'zamiennik naturalny', 'natural replacement', 'biotech candidate', 'cheminformatyka', 'paszport kandydata'];
+    for (const phrase of phrases) {
+      expect(naturalRe.test(phrase) && referenceRe.test(phrase), phrase).toBe(false);
+    }
+  });
+});

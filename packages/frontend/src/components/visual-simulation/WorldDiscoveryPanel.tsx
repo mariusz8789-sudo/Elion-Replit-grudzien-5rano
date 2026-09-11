@@ -27,6 +27,21 @@ import {
   type SavedExperiment,
   type SavedWorldDiscoveryReplay,
 } from '../../core/scienceMemory';
+import { GENESIS_PARTICLE_PHYSICS_CATALOG_ID } from '../../core/agent/particlePhysicsLeverCatalog';
+import { GENESIS_ATOMIC_IONIZATION_CATALOG_ID } from '../../core/agent/atomicIonizationLeverCatalog';
+import {
+  LAB_ENVIRONMENT_IDS,
+  LAB_ENVIRONMENTS,
+  environmentFidelityFloor,
+} from '../../core/agent/particleAtomicLabEnvironments';
+
+/** The status → existing `.gx-status` modifier this laboratory table honestly earns — never
+ * `real` for a status other than RUNNABLE, whatever the environment's label sounds like. */
+const LAB_ENV_STATUS_CLASS: Record<string, string> = {
+  RUNNABLE: 'real',
+  CHANNELS_ONLY: 'approximation',
+  NOT_BUILT: 'not-modelled',
+};
 
 /** Local UI states the session module has no reason to know about. Exported so an embedding screen
  * (Demo Mode, a flagship narrative strip) can type an `onResult` callback against the real shape
@@ -276,6 +291,47 @@ export function WorldDiscoveryPanel({
           </>
         )}
       </section>
+
+      {/* Lab Environment UI gap (master gap plan P1.6): particleAtomicLabEnvironments.ts already
+          existed as data with nothing rendering it, so PLASMA_LAB's NOT_BUILT status was invisible
+          to anyone who hadn't read the source. Only shown for the two catalogs that table actually
+          describes — it says nothing about flood/chemistry/epidemic/etc. Read-only: no new engine,
+          no lab picker that changes which apparatus runs, just the honest table made visible. */}
+      {(catalogId === GENESIS_PARTICLE_PHYSICS_CATALOG_ID || catalogId === GENESIS_ATOMIC_IONIZATION_CATALOG_ID) && (
+        <section className="wd-section wd-lab-environments" data-testid="wd-lab-environments">
+          <h4>Particle &amp; Atomic Physics Laboratory — environments</h4>
+          <p className="gsc-caption">
+            This world is one apparatus in a six-environment laboratory. An environment is a name for a
+            configuration — which reaction channels it offers, and whether a real lever catalogue is wired to
+            run a search there today — never a second engine.
+          </p>
+          <ul className="wd-lab-environment-list">
+            {LAB_ENVIRONMENT_IDS.map((envId) => {
+              const env = LAB_ENVIRONMENTS[envId];
+              const fidelityFloor = environmentFidelityFloor(envId);
+              return (
+                <li key={envId} className="wd-lab-environment-row">
+                  <div className="gsc-panel-row">
+                    <span className={`gx-status ${LAB_ENV_STATUS_CLASS[env.status] ?? 'not-modelled'}`}>
+                      {env.status}
+                    </span>
+                    <span className="wd-lab-environment-label">{env.label}</span>
+                    {fidelityFloor && <span className="gsc-caption">fidelity floor: {fidelityFloor}</span>}
+                  </div>
+                  <p className="gsc-caption">{env.epistemicNote}</p>
+                  {env.status !== 'RUNNABLE' && (
+                    <p className="gsc-caption wd-lab-environment-unavailable">
+                      {env.status === 'NOT_BUILT'
+                        ? 'Not available to run: reserved name only, nothing behind it exists.'
+                        : 'Not available to run yet: real channels, no apparatus wired to the Discovery Loop.'}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <form
         className="lg-obs-form"

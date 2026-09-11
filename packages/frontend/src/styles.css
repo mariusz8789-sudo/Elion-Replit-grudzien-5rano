@@ -3624,6 +3624,15 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .wd-world-about { font-size: 0.85rem; }
 .wd-world-about-label { margin: 0.4rem 0 0.15rem; font-weight: 600; opacity: 0.85; }
 
+/* Lab Environment UI gap (master gap plan P1.6): a plain, honest list of
+   particleAtomicLabEnvironments.ts's six rows — no bullets, no engine, just
+   status + label + epistemic note made visible for the first time. */
+.wd-lab-environments { font-size: 0.85rem; }
+.wd-lab-environment-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.wd-lab-environment-row { padding: 0.55rem 0.65rem; border: 1px solid var(--border-strong); border-radius: 8px; background: rgba(141, 151, 180, 0.04); }
+.wd-lab-environment-label { font-weight: 600; }
+.wd-lab-environment-unavailable { color: var(--text-faint); font-style: italic; }
+
 /* Step-by-step trace: one block per round, matching the "What I tried" rounds list
    directly above it so the two read as the same account at different resolutions. */
 .wd-trace-round { margin-top: 0.5rem; }

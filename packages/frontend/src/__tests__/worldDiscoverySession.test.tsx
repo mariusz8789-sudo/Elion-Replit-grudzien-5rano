@@ -146,3 +146,31 @@ describe('Multi-action goals route to the comparison engine; everything else sti
     expect(markup).not.toContain('best action');
   });
 });
+
+describe('Lab Environment UI gap (master gap plan P1.6): the environment table is now visible', () => {
+  it('does not render the lab-environments table for a world that table says nothing about', () => {
+    const markup = renderToStaticMarkup(<WorldDiscoveryPanel />);
+    expect(markup).not.toContain('wd-lab-environments');
+  });
+
+  it('shows all six environments with their real status when a particle/atomic world is selected, and never claims PLASMA_LAB is runnable', () => {
+    const markup = renderToStaticMarkup(<WorldDiscoveryPanel defaultCatalogId="genesis-particle-collider" />);
+    expect(markup).toContain('wd-lab-environments');
+    expect(markup).toContain('Virtual CERN / LHC-like');
+    expect(markup).toContain('Plasma Lab');
+    expect(markup).toContain('Not available to run: reserved name only, nothing behind it exists.');
+    // The one status string legitimately used for both a real domain AND an unbuilt one:
+    // NOT_BUILT must never be painted with the "real" (green, RUNNABLE) status class.
+    const plasmaRowStart = markup.indexOf('Plasma Lab');
+    const plasmaRow = markup.slice(Math.max(0, plasmaRowStart - 400), plasmaRowStart);
+    expect(plasmaRow).toContain('gx-status not-modelled');
+    expect(plasmaRow).not.toContain('gx-status real');
+  });
+
+  it('shows the same honest table for the atomic-ionization world too, with a fidelity floor', () => {
+    const markup = renderToStaticMarkup(<WorldDiscoveryPanel defaultCatalogId="genesis-atomic-ionization" />);
+    expect(markup).toContain('wd-lab-environments');
+    expect(markup).toContain('Atomic Lab');
+    expect(markup).toMatch(/fidelity floor: \S+/);
+  });
+});

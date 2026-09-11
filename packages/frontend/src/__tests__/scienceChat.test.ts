@@ -53,6 +53,17 @@ describe('scienceChat: SCIENTIFIC INTENT — każda odpowiedź ma typowaną inte
     expect(resolveCommand('pomoc', null).intent).toBe('HELP');
   });
 
+  // Regression: the save branch used to short-circuit on `!ctx` and return no `action` at all,
+  // which silently broke ETAP 1.5's "zapisz" follow-up for a Cyber/Decipherment run triggered
+  // from chat (those never open a classic sim context, so ctx is always null there) — found via
+  // real browser E2E, not by this file's own resolveCommand()-only tests, which always passed a
+  // real ctx() and so never exercised the null path.
+  it('always returns a save action even with no open simulation, so ScienceChat.tsx can check its own state', () => {
+    const r = resolveCommand('zapisz', null);
+    expect(r.intent).toBe('SAVE');
+    expect(r.action).toEqual({ type: 'save' });
+  });
+
   it('PROPOSE_EXPERIMENT bez kontekstu proponuje realny start (akcja open)', () => {
     const r = resolveCommand('zaproponuj kolejny eksperyment', null);
     expect(r.intent).toBe('PROPOSE_EXPERIMENT');
@@ -254,10 +265,14 @@ describe('scienceChat: Scientific Memory (zapis / lista / wczytanie)', () => {
     expect(r.action).toEqual({ type: 'save' });
   });
 
-  it('"zapisz eksperyment" bez kontekstu -> nie zapisuje, prosi o otwarcie', () => {
+  // Was: expected `action` to be undefined here, so ScienceChat.tsx's side effect never ran and
+  // the "nothing to save" decision had to be made by resolveCommand itself — but resolveCommand
+  // has no visibility into ScienceChat.tsx's own state (e.g. ETAP 1.5's last inline Cyber/
+  // Decipherment run), so that decision can only be made correctly in the component. This resolver
+  // now always returns the `save` action and lets ScienceChat.tsx decide what there is to save.
+  it('"zapisz eksperyment" bez kontekstu -> nadal zwraca akcję save (decyzję podejmuje ScienceChat.tsx)', () => {
     const r = resolveCommand('zapisz eksperyment', null);
-    expect(r.action).toBeUndefined();
-    expect(r.text).toMatch(/otwórz|otworz/i);
+    expect(r.action).toEqual({ type: 'save' });
   });
 
   it('"pokaż zapisane" -> akcja list', () => {

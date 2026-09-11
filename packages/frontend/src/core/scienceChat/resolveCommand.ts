@@ -51,7 +51,17 @@ export type ChatAction =
    * open, via `activeObservationControl.ts`. Never decided HERE whether the named object exists or
    * the scene even supports observation commands — that is `ScienceChat.tsx`'s side effect to
    * execute and report honestly, exactly like `setParam` already defers to `getSimContext()`. */
-  | { type: 'observe'; sentence: string };
+  | { type: 'observe'; sentence: string }
+  /** CHAT-FIRST ETAP 1.5 — run the real kernel synchronously and show the result IN the chat
+   * turn, instead of only navigating to a workspace (the ETAP 1 `openRoute` pattern above). The
+   * side effect (running `runAdaptiveInvestigation`, formatting the summary) lives in
+   * `ScienceChat.tsx`, exactly like every other action here — this resolver stays a pure function. */
+  | { type: 'runCyber' }
+  /** Same ETAP 1.5 pattern for Decipherment. `sequenceText` is whatever the message itself supplied
+   * as a candidate glyph sequence (see the extraction right before this action is returned) — null
+   * when none was found, in which case `ScienceChat.tsx` falls back to the honest toy demo sequence
+   * and SAYS SO, rather than silently substituting it. */
+  | { type: 'runDecipherment'; sequenceText: string | null };
 
 export interface ChatResponse {
   text: string;
@@ -143,6 +153,27 @@ function recipeFor(ctx: ChatSimSnapshot): SimulationRecipe | undefined {
 }
 
 const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
+
+/**
+ * Best-effort extraction of a candidate glyph sequence from a chat message,
+ * for the 'runDecipherment' action. Deliberately conservative: looks for an
+ * ALL-CAPS token (letters/digits/'?' only, 4+ chars, no lowercase) — either
+ * right after a colon (e.g. "przeanalizuj ten szyfr: DWWDFNDWGDZQ") or
+ * anywhere in the sentence — on the ORIGINAL message (never the
+ * normalized/lowercased `norm`, which would destroy both the case and the
+ * distinction this relies on). Requiring uppercase is what keeps this from
+ * accidentally grabbing an ordinary word like "deszyfracja" or
+ * "przeanalizuj" as if it were the sequence. Returns null rather than
+ * guessing when nothing plausible is found — the caller then falls back to
+ * the honest toy demo sequence instead of fabricating one.
+ */
+function extractGlyphSequenceFromMessage(message: string): string | null {
+  const afterColon = message.split(':')[1]?.trim();
+  const candidate = (afterColon && afterColon.length > 0 ? afterColon : message)
+    .split(/\s+/)
+    .find((token) => /^[A-Z0-9?]{4,}$/.test(token));
+  return candidate ?? null;
+}
 
 /**
  * VERIFY checks only the contract already present in the live snapshot.
@@ -313,8 +344,17 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     return { text: 'Twoje zapisane eksperymenty (Pamięć Naukowa, lokalnie w tej przeglądarce):', tag: 'SYSTEM', intent: 'LIST', action: { type: 'list' } };
   }
   if (has(norm, 'zapisz eksperyment', 'zapisz to', 'zapisz symulacj', 'zapisz wynik', 'zapisz ten') || /^zapisz\b/.test(norm)) {
-    if (!ctx) return { text: 'Nie ma otwartej symulacji do zapisania. Najpierw otwórz zjawisko, np. „problem trzech ciał".', tag: 'SYSTEM', intent: 'SAVE' };
-    return { text: `Zapisuję „${ctx.experimentName}" do Pamięci Naukowej…`, tag: 'SYSTEM', intent: 'SAVE', action: { type: 'save' } };
+    // MUST always return the 'save' action, never short-circuit on `ctx` here: this resolver has no
+    // visibility into ScienceChat.tsx's own local state (e.g. the last inline Cyber/Decipherment run
+    // from ETAP 1.5), so only the side-effect handler in ScienceChat.tsx can know whether there is
+    // anything real to save. A ctx-only check here silently swallowed 'zapisz' for every other saveable
+    // thing — found via real browser E2E, not this file's own unit tests, which never touch that path.
+    return {
+      text: ctx ? `Zapisuję „${ctx.experimentName}" do Pamięci Naukowej…` : 'Sprawdzam, czy jest coś do zapisania…',
+      tag: 'SYSTEM',
+      intent: 'SAVE',
+      action: { type: 'save' },
+    };
   }
 
   // --- Zaproponuj kolejny eksperyment (SCIENTIFIC INTENT: PROPOSE_EXPERIMENT).
@@ -464,32 +504,34 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
-  // --- Cyber investigation (C1, CHAT-FIRST closure) — REALNY silnik `cyberReasoningKernel.ts` +
-  //     `cyberInvestigation.ts` + `cyberTestPlanner.ts` (941 linii działającego kodu), do tej pory
-  //     osiągalny WYŁĄCZNIE przez kliknięcie w CyberWorkspace — dokładnie ten anty-wzorzec
-  //     "laboratory-only entry point", którego CHAT-FIRST ma się pozbyć. Nie tworzymy drugiego
-  //     silnika ani drugiego resolvera: to samo `openRoute`, ten sam wzorzec co zderzacz/Atomic Lab
-  //     powyżej — chat tylko wskazuje istniejący ekran, który uruchamia realny kernel. ---
+  // --- Cyber investigation (C1, CHAT-FIRST ETAP 1.5) — REALNY silnik `cyberReasoningKernel.ts` +
+  //     `cyberInvestigation.ts` + `cyberTestPlanner.ts` (941 linii działającego kodu). ETAP 1
+  //     (poprzednia wersja tego bloku) tylko otwierał CyberWorkspace; ETAP 1.5 idzie dalej —
+  //     `ScienceChat.tsx` uruchamia `runAdaptiveInvestigation` NAPRAWDĘ i wkleja realny wynik
+  //     wprost do tury czatu, więc rozmowa nie musi się przenosić na inny ekran, żeby zobaczyć
+  //     wynik. Nie tworzymy drugiego silnika ani drugiego resolvera — akcja to nowy typ
+  //     (`runCyber`), ale efekt uboczny woła dokładnie te same funkcje co CyberWorkspace.tsx. ---
   if (has(norm, 'cyberbezpieczenstwo', 'cyber bezpieczenstwo', 'dochodzenie bezpieczenstwa', 'test penetracyjny', 'test bezpieczenstwa', 'podatnosc', 'podatnosci', 'obejscie autoryzacji', 'auth bypass', 'powierzchnia ataku', 'attack surface', 'pentest', 'cyber investigation', 'cyber reasoning', 'vulnerability', 'hipoteza ataku')) {
     return {
-      text: 'Otwieram Cyber Workspace — realny kernel śledztwa bezpieczeństwa (cyberReasoningKernel.ts) na syntetycznej, celowo podatnej aplikacji (ToyVulnerableApp), nie na żadnym prawdziwym systemie. Kernel buduje hipotezy z obserwacji, planuje kolejny test (ten sam adaptacyjny planer co reszta Genesis) i zachowuje konflikty (hipoteza raz potwierdzona, raz obalona) zamiast je uśredniać.',
+      text: 'Uruchamiam realny kernel śledztwa bezpieczeństwa (cyberReasoningKernel.ts) na syntetycznej, celowo podatnej aplikacji (ToyVulnerableApp), nie na żadnym prawdziwym systemie. Kernel buduje hipotezy z obserwacji, planuje kolejny test (ten sam adaptacyjny planer co reszta Genesis) i zachowuje konflikty (hipoteza raz potwierdzona, raz obalona) zamiast je uśredniać.',
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
-      action: { type: 'openRoute', hash: '#/cyber' },
+      action: { type: 'runCyber' },
     };
   }
 
-  // --- Decipherment (C1, CHAT-FIRST closure) — REALNY silnik deszyfracji (deciphermentOrchestrator.ts:
-  //     ekstrakcja glifów, konkurencyjne odczyty, holdout falsyfikacja), do tej pory osiągalny
-  //     WYŁĄCZNIE przez kliknięcie w DeciphermentWorkspace. Wejście to zawsze już posegmentowana
-  //     sekwencja glifów (znak = glif) — Genesis nie ma pipeline'u OCR/vision, więc chat nie może
-  //     przyjąć obrazu i nie udaje, że może. ---
+  // --- Decipherment (C1, CHAT-FIRST ETAP 1.5) — REALNY silnik deszyfracji (deciphermentOrchestrator.ts:
+  //     ekstrakcja glifów, konkurencyjne odczyty, holdout falsyfikacja). Wejście to zawsze już
+  //     posegmentowana sekwencja glifów (znak = glif) — Genesis nie ma pipeline'u OCR/vision, więc
+  //     chat nie może przyjąć obrazu i nie udaje, że może; jeśli wiadomość nie zawiera rozpoznawalnej
+  //     sekwencji, `ScienceChat.tsx` uczciwie sięga po sekwencję demonstracyjną i MÓWI o tym wprost,
+  //     zamiast cicho podstawiać inny tekst. ---
   if (has(norm, 'deszyfracj', 'decyfrowa', 'decyfrowanie', 'decipher', 'odczytaj sekwencje glifow', 'nieznane symbole', 'nieznanych symboli', 'szyfr cezara', 'caesar cipher', 'analiza glifow', 'sekwencja glifow', 'kryptoanaliza', 'cryptanalysis', 'unknown glyphs')) {
     return {
-      text: 'Otwieram Laboratorium deszyfracji — realny silnik (deciphermentOrchestrator.ts): ekstrakcja glifów, konkurencyjne odczyty (klasyczne szyfry: Cezar, afiniczny, Vigenère, podstawieniowy, przestawieniowy), test holdout na niezależnej połowie sekwencji, werdykt i zachowane konflikty. Wejście to zawsze już posegmentowana sekwencja glifów (jeden znak = jeden glif) — Genesis nie ma nigdzie pipeline\'u OCR, więc nie wklejaj obrazu, tylko transkrypcję.',
+      text: 'Uruchamiam realny silnik deszyfracji (deciphermentOrchestrator.ts): ekstrakcja glifów, konkurencyjne odczyty (klasyczne szyfry: Cezar, afiniczny, Vigenère, podstawieniowy, przestawieniowy), test holdout na niezależnej połowie sekwencji, werdykt i zachowane konflikty. Wejście to zawsze już posegmentowana sekwencja glifów (jeden znak = jeden glif) — Genesis nie ma nigdzie pipeline\'u OCR, więc nie wklejaj obrazu, tylko transkrypcję po dwukropku.',
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
-      action: { type: 'openRoute', hash: '#/decipherment' },
+      action: { type: 'runDecipherment', sequenceText: extractGlyphSequenceFromMessage(message) },
     };
   }
 

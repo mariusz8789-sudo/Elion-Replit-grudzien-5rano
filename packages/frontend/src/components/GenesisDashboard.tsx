@@ -6,7 +6,6 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { getToken, useSession } from '../core/backend/session';
 import { listProjects, type Project } from '../core/backend/client';
 import { synthesizeNextQuestion } from '../core/agent/crossDomainSynthesis';
-import { subscribeScienceMemoryChanges } from '../core/scienceMemoryEvents';
 
 /** Where to send the user for a cross-domain next question — the one screen
  * that always shows the record (`#/matrix`) unless the domain has its own

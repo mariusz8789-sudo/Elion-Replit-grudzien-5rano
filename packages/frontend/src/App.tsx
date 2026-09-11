@@ -61,6 +61,7 @@ const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/Precisi
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
+const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
@@ -116,7 +117,8 @@ type Route =
   | { kind: 'investor-demo' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
-  | { kind: 'matrix' };
+  | { kind: 'matrix' }
+  | { kind: 'cyber' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -159,6 +161,7 @@ function parseHash(): Route {
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
+  if (h === '#/cyber') return { kind: 'cyber' };
   return { kind: 'home' };
 }
 
@@ -446,6 +449,18 @@ export default function App() {
           <TopBar title="◈ Genesis Matrix" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GenesisMatrixHub />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'cyber') {
+      return (
+        <div className="app">
+          <TopBar title="🛡 Cyber" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <CyberWorkspace />
           </HeavyRoute>
           {overlays}
         </div>

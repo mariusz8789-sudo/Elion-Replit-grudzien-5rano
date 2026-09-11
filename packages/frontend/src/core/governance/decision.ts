@@ -21,7 +21,7 @@ import {
  * result is that a decision here is always a subset of what the server already
  * permitted: the layer can narrow, and has no expressible way to widen.
  *
- * That is the whole security argument, and `governance.test.ts` checks it
+ * That is the whole security argument, and `governanceFoundation.test.ts` checks it
  * exhaustively over every capability and every (role, level, verdict) triple
  * rather than trusting this comment.
  */

@@ -7,9 +7,11 @@ import type { HypothesisAssessment } from '../../experimentFabric/scientificDisc
  * analysis, and structural ancient-script decipherment. It reuses Genesis's
  * real falsification vocabulary (`HypothesisAssessment`, imported here, never
  * redeclared) and plugs into the real Science Memory / Evidence / Matrix /
- * Replay layers via `deciphermentMemory.ts` — there is no second Evidence
- * store, no second Replay engine, no second Matrix, no second orchestrator
- * beyond this one bounded domain's own loop driver.
+ * Replay layers via `scienceMemory.ts`'s `buildSavedDeciphermentCase`/
+ * `saveDeciphermentCaseToMemory` (the ninth investigation shape, same seam
+ * every other domain uses) — there is no second Evidence store, no second
+ * Replay engine, no second Matrix, no second orchestrator beyond this one
+ * bounded domain's own loop driver.
  *
  * NO OCR. Verified against the full repo: no image-to-text pipeline exists
  * anywhere in Genesis (`uploadKnowledgeMaterial` accepts only

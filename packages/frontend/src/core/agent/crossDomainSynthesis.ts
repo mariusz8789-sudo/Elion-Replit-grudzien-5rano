@@ -81,8 +81,27 @@ function cyberOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
   if (!record.cyberInvestigation) return [];
   const { result } = record.cyberInvestigation;
   const items: CrossDomainOpenItem[] = [];
+  // Real conflicts (SUPPORTED_WITHIN_PROTOCOL and FALSIFIED_WITHIN_PROTOCOL both on record for the
+  // same hypothesis) rank above a bare INCONCLUSIVE — see OPEN_ITEM_PRIORITY. `result.conflicts` is
+  // only ever non-empty on records built via `toCyberInvestigationResultFromAdaptive`, since that is
+  // the one seam that carries `runAdaptiveInvestigation`'s live conflict tracking through to Memory.
+  for (const hypothesisId of result.conflicts) {
+    const hyp = result.hypotheses.find((h) => h.hypothesisId === hypothesisId);
+    const relevantVerdicts = result.verdicts.filter((v) => v.hypothesisId === hypothesisId);
+    items.push({
+      sourceExperimentId: record.id,
+      labId: record.labId,
+      shape: 'cyberInvestigation',
+      kind: 'UNRESOLVED_CONFLICT',
+      question: hyp ? hyp.statement : `Hypothesis ${hypothesisId} in "${result.goal}"`,
+      detail: `History: ${relevantVerdicts.map((v) => v.assessment).join(' -> ')}.`,
+      createdAt: record.createdAt,
+      evidencePackId: record.evidencePackId ?? null,
+    });
+  }
   for (const verdict of result.verdicts) {
     if (verdict.assessment !== 'INCONCLUSIVE') continue;
+    if (result.conflicts.includes(verdict.hypothesisId)) continue; // already reported as a conflict, not a mere inconclusive
     const hyp = result.hypotheses.find((h) => h.hypothesisId === verdict.hypothesisId);
     items.push({
       sourceExperimentId: record.id,

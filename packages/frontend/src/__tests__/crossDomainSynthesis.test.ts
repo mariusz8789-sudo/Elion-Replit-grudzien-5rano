@@ -53,7 +53,7 @@ function baseExperiment(overrides: Partial<SavedExperiment> & Pick<SavedExperime
   };
 }
 
-function cyberResultWithInconclusive(): CyberInvestigationResult {
+function cyberResultWithInconclusive(overrides: Partial<CyberInvestigationResult> = {}): CyberInvestigationResult {
   return {
     investigationId: 'inv-1',
     goal: 'Is /profile safe?',
@@ -72,7 +72,21 @@ function cyberResultWithInconclusive(): CyberInvestigationResult {
     remediation: null,
     retestResult: null,
     retestVerdict: null,
+    conflicts: [],
+    ...overrides,
   };
+}
+
+/** Same fixture, but with a real SUPPORTED+FALSIFIED history preserved as a conflict — the shape
+ * `toCyberInvestigationResultFromAdaptive` actually produces from a live `runAdaptiveInvestigation`. */
+function cyberResultWithConflict(): CyberInvestigationResult {
+  return cyberResultWithInconclusive({
+    verdicts: [
+      { hypothesisId: 'hyp:AUTH_BYPASS::/profile', assessment: 'SUPPORTED_WITHIN_PROTOCOL', reasoning: 'First test matched the predicted observable.' },
+      { hypothesisId: 'hyp:AUTH_BYPASS::/profile', assessment: 'FALSIFIED_WITHIN_PROTOCOL', reasoning: 'Independent retest matched the falsifying observable instead.' },
+    ],
+    conflicts: ['hyp:AUTH_BYPASS::/profile'],
+  });
 }
 
 function deciphermentResultWithConflict(): DeciphermentCaseResult {
@@ -149,6 +163,18 @@ describe('collectCrossDomainOpenItems: reads three domains\' own terminal-status
     expect(byDomain.get('decipherment')?.kind).toBe('UNRESOLVED_CONFLICT');
     expect(byDomain.get('mechanism-research-chain')?.kind).toBe('BLOCKED_CHAIN');
     expect(byDomain.has('parameter-research-chain')).toBe(false);
+  });
+
+  it('reports a real cyber conflict (SUPPORTED and FALSIFIED both on record for the same hypothesis) as UNRESOLVED_CONFLICT, not merely INCONCLUSIVE', () => {
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'cyber-conflict-1', labId: 'cyber-security', cyberInvestigation: { contractVersion: '1.0.0', result: cyberResultWithConflict(), resultFingerprint: 'fp:cyber-conflict-1' } }),
+    ];
+    const items = collectCrossDomainOpenItems(records);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe('UNRESOLVED_CONFLICT');
+    expect(items[0]?.shape).toBe('cyberInvestigation');
+    expect(items[0]?.detail).toContain('SUPPORTED_WITHIN_PROTOCOL');
+    expect(items[0]?.detail).toContain('FALSIFIED_WITHIN_PROTOCOL');
   });
 });
 

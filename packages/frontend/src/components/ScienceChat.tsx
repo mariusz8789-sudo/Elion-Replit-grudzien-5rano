@@ -19,12 +19,13 @@ import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
-import { ToyVulnerableApp, runAdaptiveInvestigation, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
 import type { HypothesisAssessment } from '../core/experimentFabric/scientificDiscovery';
 import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
-import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory } from '../core/scienceMemory';
+import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyberInvestigation, saveCyberInvestigationToMemory } from '../core/scienceMemory';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
+import { fnv1a, canonicalJson } from '../core/events/hash';
 
 /** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
  * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
@@ -673,11 +674,15 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         const record = saveDeciphermentCaseToMemory(saved);
         appendGenesis(`Zapisano ✓ Dochodzenie deszyfracji: ${result.caseId}. Odcisk treści: #${record.contentHash}. Wpisz „pokaż zapisane", by wrócić do niego później.`);
       } else if (lastCyberRun) {
-        // Honest gap, not a false promise: CyberWorkspace.tsx itself has no save-to-memory path yet
-        // (the seam that exists, toCyberInvestigationResult(), takes the OLDER runInvestigation()
-        // trace shape, not the AdaptiveInvestigationResult this chat action actually runs) — so this
-        // says so rather than claiming a save that would not really happen.
-        appendGenesis('Zapis dochodzenia Cyber do Pamięci Naukowej nie jest jeszcze dostępny — ani z czatu, ani z Cyber Workspace. To realna, nazwana luka, nie ukryta.');
+        // Deterministic id derived from the investigation's own content (never Date.now(), which
+        // would leak non-determinism into resultFingerprint) — mirrors decipherment's caseId
+        // being derived from the sequence's own fingerprint rather than a wall-clock value.
+        const goal = 'Dochodzenie bezpieczeństwa uruchomione z czatu przeciw syntetycznemu celowi (ToyVulnerableApp).';
+        const investigationId = `cyber:${fnv1a(canonicalJson({ goal, hypothesisIds: lastCyberRun.hypotheses.map((h) => h.hypothesisId) }))}`;
+        const result = toCyberInvestigationResultFromAdaptive(investigationId, goal, lastCyberRun);
+        const saved = buildSavedCyberInvestigation(result);
+        const record = saveCyberInvestigationToMemory(saved);
+        appendGenesis(`Zapisano ✓ Dochodzenie bezpieczeństwa: ${result.investigationId}. Odcisk treści: #${record.contentHash}. Wpisz „pokaż zapisane", by wrócić do niego później.`);
       } else {
         appendGenesis('Nie mam teraz nic do zapisania — otwórz zjawisko albo uruchom dochodzenie (np. „deszyfracja" lub „dochodzenie bezpieczeństwa"), a potem powiedz „zapisz".');
       }

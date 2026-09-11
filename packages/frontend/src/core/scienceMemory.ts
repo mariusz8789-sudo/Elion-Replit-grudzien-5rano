@@ -2458,6 +2458,9 @@ function cyberInvestigationAnalysis(saved: SavedCyberInvestigation): SavedExperi
     ...(result.retestVerdict
       ? [{ title: 'Weryfikacja po remediacji', body: `${result.retestVerdict.assessment}: ${result.retestVerdict.reasoning}`, kind: 'cyber-investigation-retest' }]
       : []),
+    ...(result.conflicts.length > 0
+      ? [{ title: 'Konflikty', body: `${result.conflicts.length} hipotez ma w historii zarówno SUPPORTED, jak i FALSIFIED — zachowane, nie uśrednione.`, kind: 'cyber-investigation-conflicts' }]
+      : []),
   ];
 }
 
@@ -2474,7 +2477,7 @@ export function saveCyberInvestigationToMemory(saved: SavedCyberInvestigation): 
     experimentId: `cyber-investigation:${result.investigationId}:${saved.resultFingerprint}`,
     experimentName: `Dochodzenie bezpieczeństwa — ${result.goal}`,
     params: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length },
-    stats: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length, verdictCount: result.verdicts.length },
+    stats: { hypothesisCount: result.hypotheses.length, testCount: result.testResults.length, verdictCount: result.verdicts.length, conflictCount: result.conflicts.length },
     cyberInvestigation: saved,
     analysis: cyberInvestigationAnalysis(saved),
     honesty: 'simplified',

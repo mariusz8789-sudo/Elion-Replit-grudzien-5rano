@@ -55,6 +55,7 @@ function wellFormedFixture(overrides: Partial<CyberInvestigationResult> = {}): C
     remediation: null,
     retestResult: null,
     retestVerdict: null,
+    conflicts: [],
     ...overrides,
   };
 }
@@ -99,6 +100,19 @@ describe('isWellFormedCyberInvestigation', () => {
     expect(isWellFormedCyberInvestigation(wellFormedFixture({ hypotheses: [] }))).toBe(false);
     expect(isWellFormedCyberInvestigation(wellFormedFixture({ testResults: [] }))).toBe(false);
     expect(isWellFormedCyberInvestigation(wellFormedFixture({ verdicts: [] }))).toBe(false);
+  });
+
+  it('accepts a real conflict naming a hypothesis this investigation actually declared', () => {
+    expect(isWellFormedCyberInvestigation(wellFormedFixture({ conflicts: ['hyp-auth-bypass'] }))).toBe(true);
+  });
+
+  it('rejects a conflict naming a hypothesis that was never declared (anti-fabrication)', () => {
+    expect(isWellFormedCyberInvestigation(wellFormedFixture({ conflicts: ['hyp-that-does-not-exist'] }))).toBe(false);
+  });
+
+  it('rejects a non-array or non-string conflicts field', () => {
+    expect(isWellFormedCyberInvestigation(wellFormedFixture({ conflicts: undefined as unknown as readonly string[] }))).toBe(false);
+    expect(isWellFormedCyberInvestigation(wellFormedFixture({ conflicts: [42] as unknown as readonly string[] }))).toBe(false);
   });
 });
 

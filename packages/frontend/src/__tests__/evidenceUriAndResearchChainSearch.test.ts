@@ -72,6 +72,13 @@ describe('searchResearchChains — filtered read over real saved manifests', () 
   afterEach(() => vi.unstubAllGlobals());
 
   async function seedThreeChains() {
+    // storage.ts caches `isAvailable()`'s result at module scope — without a
+    // fresh module instance per test, a `window` from an EARLIER test file in
+    // this worker (or none at all) stays cached, and every write here becomes
+    // a silent no-op (this is the fix for exactly that: all six tests below
+    // originally saw `searchResearchChains()` return `[]` because nothing was
+    // ever really persisted, not because the search itself was wrong).
+    vi.resetModules();
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     const { buildSavedResearchChainManifest, saveResearchChainManifestToMemory } = await import('../core/scienceMemory');
     const step = (question: string) => [{ step: 1, question, kind: 'INITIAL', why: 'w', ranSuccessfully: true, savedExperimentIds: ['x'] }];
@@ -136,6 +143,7 @@ describe('searchResearchChains — filtered read over real saved manifests', () 
   });
 
   it('an empty Science Memory returns an empty result, not an error', async () => {
+    vi.resetModules();
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     const { searchResearchChains } = await import('../core/scienceMemory');
     expect(searchResearchChains()).toEqual([]);

@@ -5,7 +5,7 @@
  */
 import { buildCertificate } from '../src/cert/builder.js';
 import { auditCertificate } from '../src/cert/auditor.js';
-import { generateKeyPair, publicKeyToString, signFingerprint } from '../src/crypto/signing.js';
+import { computePublicKeyId, generateKeyPair, publicKeyToString, signFingerprint } from '../src/crypto/signing.js';
 import type { UnsignedCertificateInput } from '../src/cert/types.js';
 
 function bar(title: string): string {
@@ -32,6 +32,7 @@ async function main(): Promise<void> {
 
   const keys = await generateKeyPair();
   const publicKey = publicKeyToString(keys.publicKeyJwk);
+  const publicKeyId = await computePublicKeyId(keys.publicKeyJwk);
   const signatureValue = await signFingerprint(unsigned.integrity.signedPayloadFingerprint, keys.privateKeyJwk);
   const signed = await buildCertificate(input, { algorithm: 'ECDSA-P256-SHA256', publicKey, signatureValue, signedAt: input.issuedAt });
   console.log('Signed with a real ECDSA P-256 keypair (crypto.subtle.generateKey/sign).');
@@ -43,18 +44,18 @@ async function main(): Promise<void> {
   console.log('warnings:', untrusted.warnings.join('; ') || '(none)');
 
   console.log(bar('AUDIT — trusted key'));
-  const trusted = await auditCertificate(signed, new Set([publicKey]));
+  const trusted = await auditCertificate(signed, new Set([publicKeyId]));
   console.log('verdict:', trusted.verdict);
 
   console.log(bar('AUDIT — tampered claim'));
   const tampered = { ...signed, claim: { ...signed.claim, statement: 'TAMPERED CLAIM' } };
-  const tamperedResult = await auditCertificate(tampered, new Set([publicKey]));
+  const tamperedResult = await auditCertificate(tampered, new Set([publicKeyId]));
   console.log('verdict:', tamperedResult.verdict);
   console.log('errors:', tamperedResult.errors.join('; '));
 
   console.log(bar('AUDIT — malformed certificate (missing claimId)'));
   const malformed = { ...signed, claim: { ...signed.claim, claimId: '' } };
-  const malformedResult = await auditCertificate(malformed, new Set([publicKey]));
+  const malformedResult = await auditCertificate(malformed, new Set([publicKeyId]));
   console.log('verdict:', malformedResult.verdict);
   console.log('errors:', malformedResult.errors.join('; '));
 

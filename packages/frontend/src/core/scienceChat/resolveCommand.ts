@@ -6,6 +6,7 @@ import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 import { parseObservationIntent } from '../lookingGlass/observationIntent';
 import { hasActiveObservationControl } from '../activeObservationControl';
+import { hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker, resolveDiscoveryQuestion } from './discoveryQuestions';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -61,7 +62,23 @@ export type ChatAction =
    * as a candidate glyph sequence (see the extraction right before this action is returned) — null
    * when none was found, in which case `ScienceChat.tsx` falls back to the honest toy demo sequence
    * and SAYS SO, rather than silently substituting it. */
-  | { type: 'runDecipherment'; sequenceText: string | null };
+  | { type: 'runDecipherment'; sequenceText: string | null }
+  /**
+   * CHAT ENTRY FOR THE SCIENTIFIC DISCOVERY LOOP. `problemId` is always one that
+   * `HYPOTHESIS_PROBLEMS` already declares — resolved by `resolveDiscoveryQuestion`
+   * BEFORE this action is returned, so a question outside the catalog never reaches
+   * an executor at all (it comes back as text with the real catalog, no action).
+   * `ScienceChat.tsx` then runs the existing `runScientificDiscoveryLoopAsync`; this
+   * resolver neither generates hypotheses nor judges them.
+   */
+  | { type: 'runDiscoveryLoop'; problemId: string }
+  /**
+   * Re-executes the discovery loop last saved to Science Memory through the existing
+   * `replaySavedScientificDiscoveryLoop` — a real re-run compared against the stored
+   * fingerprint, not a cached read. No arguments: the record is found in Memory by
+   * `ScienceChat.tsx`, which is where every other Memory access in this layer lives.
+   */
+  | { type: 'replayDiscoveryLoop' };
 
 export interface ChatResponse {
   text: string;
@@ -501,6 +518,59 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
       action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
+  // --- SCIENTIFIC DISCOVERY LOOP FROM CHAT (C1 — CHAT ENTRY IS REQUIRED) ---
+  //     Sprawdzane PRZED pozostałymi dochodzeniami, bo marker jest jawny ("zbadaj",
+  //     "pętla odkrycia", "konkurencyjne hipotezy") i nie może zostać przechwycony przez
+  //     ogólniejsze słowo kluczowe domeny poniżej.
+  //
+  //     To jest WEJŚCIE, nie silnik: pytanie jest rozstrzygane wyłącznie względem
+  //     zadeklarowanego katalogu `HYPOTHESIS_PROBLEMS` (przez `resolveDiscoveryQuestion`),
+  //     a całą pętlę wykonuje istniejący `runScientificDiscoveryLoopAsync` w efekcie
+  //     ubocznym `ScienceChat.tsx`. Nie powstaje tu drugi generator hipotez, drugi
+  //     selektor eksperymentu ani drugi router.
+  //
+  //     Pytanie spoza katalogu NIE uruchamia żadnego modelu: wraca uczciwe
+  //     NOT_AVAILABLE razem z pełną listą pytań, na które Genesis naprawdę potrafi
+  //     odpowiedzieć — bo hipotezy powstają z zadeklarowanej powierzchni modelu,
+  //     więc pętla na pytaniu „zbliżonym" odpowiadałaby na inne pytanie niż zadane.
+  if (hasDiscoveryReplayMarker(message)) {
+    return {
+      text: 'Odtwarzam ostatnią zapisaną pętlę odkrycia naukowego z Pamięci Naukowej: to REALNE ponowne wykonanie tego samego prerejestrowanego zbioru hipotez, porównywane z zapisanym odciskiem — nie odczyt zapisanego wyniku. Werdykt może brzmieć MATCH, DRIFT, BLOCKED albo NOT_REPRODUCIBLE i każdy z nich zostanie pokazany wprost.',
+      tag: 'MODEL',
+      intent: 'VERIFY',
+      action: { type: 'replayDiscoveryLoop' },
+    };
+  }
+  if (hasDiscoveryLoopMarker(message)) {
+    const resolution = resolveDiscoveryQuestion(message);
+    if (resolution.status === 'GOVERNED' && resolution.problem !== null) {
+      const problem = resolution.problem;
+      return {
+        text: `Uruchamiam pełną pętlę odkrycia naukowego (scientificDiscoveryLoop.ts) dla zadeklarowanego problemu ${problem.problemId}.\n`
+          + `PYTANIE: ${problem.statement}\n`
+          + `Genesis postawi konkurencyjne hipotezy z WŁASNEJ zadeklarowanej powierzchni modelu (${problem.candidateVariable}), zamrozi je razem z kryteriami falsyfikacji PRZED jakimkolwiek przebiegiem, wykona je istniejącym silnikiem ${problem.modelId}, zbuduje łańcuch dowodowy, przypisze status z prerejestrowanego kryterium i wybierze następny eksperyment. Metryka rozstrzygająca: ${problem.primaryMetric}.\n`
+          + 'SYNTHETIC · SCENARIO · NON_OPERATIONAL · NOT_CALIBRATED — to nie jest odkrycie naukowe ani wskazówka operacyjna.',
+        tag: 'MODEL',
+        intent: 'PROPOSE_EXPERIMENT',
+        action: { type: 'runDiscoveryLoop', problemId: problem.problemId },
+      };
+    }
+    // A GENERIC verb ("zbadaj") on a question outside the catalog is not a loop
+    // request at all — it belongs to whichever intent already owned it (e.g.
+    // "Zbadaj problem trzech ciał" opens the Universe lab, and did so long
+    // before this block existed). Falling out of this `if` hands the message
+    // back to the rest of this same router, unchanged. Only an explicit
+    // "pętla odkrycia"/"konkurencyjne hipotezy" earns the catalog refusal.
+    if (hasExplicitDiscoveryLoopMarker(message)) return {
+      text: `Nie uruchamiam pętli: ${resolution.reason}\n\n`
+        + 'Pytania, na które Genesis naprawdę potrafi poprowadzić pełne badanie:\n'
+        + resolution.available.map((entry, i) => `${i + 1}. [${entry.domainId}] ${entry.statement}`).join('\n')
+        + '\n\nPowtórz pytanie jednym z powyższych zdań (albo jego identyfikatorem), a poprowadzę na nim całą pętlę.',
+      tag: 'SYSTEM',
+      intent: 'PROPOSE_EXPERIMENT',
     };
   }
 

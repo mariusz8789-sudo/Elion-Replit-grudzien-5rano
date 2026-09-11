@@ -2,14 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { notifyScienceMemoryChanged, subscribeScienceMemoryChanges, type ScienceMemoryChangeEvent } from '../core/scienceMemoryEvents';
+import { notifyScienceMemoryChanged, subscribeScienceMemory } from '../core/scienceMemoryEvents';
 
 /**
  * SCIENCE MEMORY EVENTS — two things proven here:
  *
  * 1. The pub/sub mechanism itself (subscribe, unsubscribe, multiple
- *    listeners, no listeners) — mirroring the shape `scienceChatBridge.ts`
- *    already has tests for.
+ *    listeners, no listeners, a listener that unsubscribes itself mid-
+ *    notification) — mirroring the shape `scienceChatBridge.ts` already has
+ *    tests for.
  * 2. THE GUARD: `notifyScienceMemoryChanged` must be called from exactly
  *    one place in the whole source tree — `core/scienceMemory.ts`, right
  *    after its own real mutation — never speculatively from a screen or any
@@ -18,38 +19,46 @@ import { notifyScienceMemoryChanged, subscribeScienceMemoryChanges, type Science
  *    toward its own boundary.
  */
 
-describe('subscribeScienceMemoryChanges / notifyScienceMemoryChanged', () => {
-  it('delivers a notified event to a subscribed listener', () => {
-    const received: ScienceMemoryChangeEvent[] = [];
-    const unsubscribe = subscribeScienceMemoryChanges((event) => received.push(event));
-    notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: 'exp-1' });
-    expect(received).toEqual([{ reason: 'SAVED', experimentId: 'exp-1' }]);
+describe('subscribeScienceMemory / notifyScienceMemoryChanged', () => {
+  it('delivers a notification to a subscribed listener', () => {
+    let calls = 0;
+    const unsubscribe = subscribeScienceMemory(() => { calls += 1; });
+    notifyScienceMemoryChanged();
+    expect(calls).toBe(1);
     unsubscribe();
   });
 
   it('stops delivering once unsubscribed', () => {
-    const received: ScienceMemoryChangeEvent[] = [];
-    const unsubscribe = subscribeScienceMemoryChanges((event) => received.push(event));
+    let calls = 0;
+    const unsubscribe = subscribeScienceMemory(() => { calls += 1; });
     unsubscribe();
-    notifyScienceMemoryChanged({ reason: 'DELETED', experimentId: 'exp-2' });
-    expect(received).toHaveLength(0);
+    notifyScienceMemoryChanged();
+    expect(calls).toBe(0);
   });
 
   it('delivers to every subscribed listener, independently', () => {
     const a = vi.fn();
     const b = vi.fn();
-    const unsubA = subscribeScienceMemoryChanges(a);
-    const unsubB = subscribeScienceMemoryChanges(b);
-    notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: 'exp-3' });
+    const unsubA = subscribeScienceMemory(a);
+    const unsubB = subscribeScienceMemory(b);
+    notifyScienceMemoryChanged();
     unsubA();
-    notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: 'exp-4' });
+    notifyScienceMemoryChanged();
     unsubB();
     expect(a).toHaveBeenCalledTimes(1);
     expect(b).toHaveBeenCalledTimes(2);
   });
 
   it('notifying with no subscribers does not throw', () => {
-    expect(() => notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: 'exp-5' })).not.toThrow();
+    expect(() => notifyScienceMemoryChanged()).not.toThrow();
+  });
+
+  it('tolerates a listener that unsubscribes itself mid-notification (iterates a snapshot, not the live Set)', () => {
+    let otherCalls = 0;
+    const unsubSelf = subscribeScienceMemory(() => unsubSelf());
+    subscribeScienceMemory(() => { otherCalls += 1; });
+    expect(() => notifyScienceMemoryChanged()).not.toThrow();
+    expect(otherCalls).toBe(1);
   });
 });
 

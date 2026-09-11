@@ -159,3 +159,136 @@ export async function verifyIntegrityEnvelope(envelope: IntegrityEnvelope): Prom
     return { valid: false, reason: `Verification error: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
+
+/**
+ * SIGNED INTEGRITY ENVELOPE — real ECDSA signatures over the hash above,
+ * same zero-dependency philosophy (native Web Crypto `SubtleCrypto`, nothing
+ * imported).
+ *
+ * WHAT THIS ADDS OVER THE BARE HASH, AND WHAT IT STILL DOES NOT PROVE.
+ * `computeIntegrityHash` alone lets ANYONE recompute the same hash from the
+ * record alone — it detects tampering but says nothing about who produced
+ * the file. A real signature needs a private key nobody but the signer
+ * holds; `signIntegrityEnvelope` produces that signature, over the hash
+ * (not the whole record — the hash already commits to the record's exact
+ * bytes, so signing it is equivalent to signing the record and far
+ * cheaper).
+ *
+ * NON-REPUDIATION IS STILL NOT ACHIEVED BY THIS MODULE ALONE, and this is
+ * stated as plainly as the parent envelope's own "not a signature" notice:
+ * `publicKeySpki` travels INSIDE the same JSON as the signature. Verifying
+ * against that embedded key only proves internal self-consistency — "this
+ * signature really was produced by the holder of THIS declared key" — the
+ * same class of limit `verifyIntegrityEnvelope` already has for hashes
+ * ("this record matches its OWN claimed hash"). Establishing that the
+ * embedded key actually belongs to a specific real signer needs the
+ * verifier to already know that signer's public key fingerprint from an
+ * INDEPENDENT channel — which is why `verifySignedEnvelope` takes an
+ * optional `expectedPublicKeySpki` to check against, rather than only ever
+ * trusting the key riding along in the file.
+ */
+export type SignatureAlgorithm = 'ECDSA-P256-SHA256';
+
+export interface SignedIntegrityEnvelope extends IntegrityEnvelope {
+  /** Base64-encoded ECDSA signature (raw P1363 format) over `integrityHash`'s UTF-8 bytes. */
+  readonly signature: string;
+  /** Base64-encoded SPKI-format public key the signature verifies against. Travels with the file — see module doc on why that alone is not non-repudiation. */
+  readonly publicKeySpki: string;
+  readonly signatureAlgorithm: SignatureAlgorithm;
+}
+
+const ECDSA_PARAMS = { name: 'ECDSA', namedCurve: 'P-256' } as const;
+const ECDSA_SIGN_PARAMS = { name: 'ECDSA', hash: 'SHA-256' } as const;
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/** A fresh ECDSA P-256 key pair for signing envelopes. Both keys are extractable, so the public key can travel with the envelope and the private key can be persisted by whoever holds it. */
+export async function generateSigningKeyPair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey(ECDSA_PARAMS, true, ['sign', 'verify']);
+}
+
+/** Portable (base64 SPKI) form of a public key, for embedding in an envelope or publishing out-of-band as a fingerprint to check against later. */
+export async function exportPublicKeySpki(publicKey: CryptoKey): Promise<string> {
+  return bufferToBase64(await crypto.subtle.exportKey('spki', publicKey));
+}
+
+/** Inverse of `exportPublicKeySpki` — reconstructs a usable verification key from its portable form. */
+export async function importPublicKeySpki(base64Spki: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('spki', base64ToBuffer(base64Spki), ECDSA_PARAMS, true, ['verify']);
+}
+
+/**
+ * Signs an already-built `IntegrityEnvelope` with an ECDSA key pair,
+ * producing a `SignedIntegrityEnvelope` a recipient can check with
+ * `verifySignedEnvelope` — no private key ever leaves this function's
+ * caller.
+ */
+export async function signIntegrityEnvelope(envelope: IntegrityEnvelope, keyPair: CryptoKeyPair): Promise<SignedIntegrityEnvelope> {
+  const hashBytes = new TextEncoder().encode(envelope.integrityHash);
+  const signatureBuffer = await crypto.subtle.sign(ECDSA_SIGN_PARAMS, keyPair.privateKey, hashBytes);
+  return {
+    ...envelope,
+    signature: bufferToBase64(signatureBuffer),
+    publicKeySpki: await exportPublicKeySpki(keyPair.publicKey),
+    signatureAlgorithm: 'ECDSA-P256-SHA256',
+  };
+}
+
+/**
+ * Verifies a `SignedIntegrityEnvelope` in two independent steps, and reports
+ * exactly which one failed:
+ *
+ * 1. HASH — same check `verifyIntegrityEnvelope` does: does `record` still
+ *    match `integrityHash`?
+ * 2. SIGNATURE — does `signature` really verify against `integrityHash`
+ *    under the declared public key?
+ *
+ * `expectedPublicKeySpki`, when passed, adds a THIRD check: does the
+ * envelope's own embedded key match the key the caller already knows (from
+ * an out-of-band fingerprint) belongs to the expected signer? Omitting it
+ * verifies only "internally self-consistent — signed by SOMEONE holding the
+ * embedded key", the same self-consistency-only honesty the bare hash
+ * already carries; passing it is what turns this into a real identity
+ * check.
+ */
+export async function verifySignedEnvelope(signed: SignedIntegrityEnvelope, expectedPublicKeySpki?: string): Promise<VerificationResult> {
+  const hashResult = await verifyIntegrityEnvelope(signed);
+  if (!hashResult.valid) return hashResult;
+
+  if (!signed || typeof signed !== 'object') return { valid: false, reason: 'Invalid signed envelope: not an object.' };
+  if (typeof signed.signature !== 'string' || signed.signature.length === 0) {
+    return { valid: false, reason: 'Invalid signed envelope: missing "signature".' };
+  }
+  if (typeof signed.publicKeySpki !== 'string' || signed.publicKeySpki.length === 0) {
+    return { valid: false, reason: 'Invalid signed envelope: missing "publicKeySpki".' };
+  }
+  if (signed.signatureAlgorithm !== 'ECDSA-P256-SHA256') {
+    return { valid: false, reason: `Unsupported signature algorithm "${String(signed.signatureAlgorithm)}" — only ECDSA-P256-SHA256 is verified here.` };
+  }
+  if (expectedPublicKeySpki !== undefined && expectedPublicKeySpki !== signed.publicKeySpki) {
+    return { valid: false, reason: 'The embedded public key does not match the expected signer\'s key — this file was not signed by the key you were told to trust.' };
+  }
+
+  try {
+    const publicKey = await importPublicKeySpki(signed.publicKeySpki);
+    const hashBytes = new TextEncoder().encode(signed.integrityHash);
+    const signatureBuffer = base64ToBuffer(signed.signature);
+    const signatureValid = await crypto.subtle.verify(ECDSA_SIGN_PARAMS, publicKey, signatureBuffer, hashBytes);
+    return signatureValid
+      ? { valid: true, reason: 'Integrity and signature both verified: the record is unmodified and the signature matches the declared key.' }
+      : { valid: false, reason: 'Signature does not verify: the file was altered after signing, or the signature does not belong to the declared key.' };
+  } catch (error) {
+    return { valid: false, reason: `Signature verification error: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildIntegrityEnvelope, computeIntegrityHash, verifyIntegrityEnvelope,
-  type ExportableRecord, type IntegrityEnvelope,
+  generateSigningKeyPair, exportPublicKeySpki, importPublicKeySpki,
+  signIntegrityEnvelope, verifySignedEnvelope,
+  type ExportableRecord, type IntegrityEnvelope, type SignedIntegrityEnvelope,
 } from '../core/integrity';
 
 describe('Integrity Envelope — (a) determinism', () => {
@@ -144,5 +146,96 @@ describe('Integrity Envelope — edge cases', () => {
 
   it('handles unicode text', async () => {
     await expect(computeIntegrityHash({ text: 'Unicode: 你好 世界 🌍 αβγδ' })).resolves.toMatch(/^[a-f0-9]{64}$/);
+  });
+});
+
+describe('Signed Integrity Envelope — real ECDSA signatures, zero dependencies', () => {
+  it('signs and verifies a real envelope end to end', async () => {
+    const record: ExportableRecord = { hypothesisId: 'hyp-1', assessment: 'SUPPORTED_WITHIN_PROTOCOL' };
+    const envelope = await buildIntegrityEnvelope(record, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+
+    expect(signed.signatureAlgorithm).toBe('ECDSA-P256-SHA256');
+    expect(signed.signature.length).toBeGreaterThan(0);
+    expect(signed.publicKeySpki.length).toBeGreaterThan(0);
+
+    const result = await verifySignedEnvelope(signed);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a signature produced by a DIFFERENT key pair (not the one embedded)', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const realKeyPair = await generateSigningKeyPair();
+    const attackerKeyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, realKeyPair);
+
+    // An attacker who tampers the payload and re-signs with their OWN key still
+    // fails verification once the record no longer matches the original hash —
+    // but even re-signing an UNCHANGED hash with a different key must fail,
+    // because the signature bytes themselves would differ.
+    const forged: SignedIntegrityEnvelope = { ...signed, signature: (await signIntegrityEnvelope(envelope, attackerKeyPair)).signature };
+    const result = await verifySignedEnvelope(forged);
+    expect(result.valid).toBe(false);
+  });
+
+  it('detects tampering of the record even when the signature field itself is untouched', async () => {
+    const original = { balance: 100 };
+    const envelope = await buildIntegrityEnvelope(original, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+
+    const tampered: SignedIntegrityEnvelope = { ...signed, record: { balance: 999999 } };
+    const result = await verifySignedEnvelope(tampered);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain('Hash mismatch');
+  });
+
+  it('expectedPublicKeySpki: accepts the real signer\'s key and rejects an impostor\'s, even though the impostor\'s own signature verifies against ITS OWN embedded key', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const realSigner = await generateSigningKeyPair();
+    const impostor = await generateSigningKeyPair();
+
+    const signedByRealSigner = await signIntegrityEnvelope(envelope, realSigner);
+    const signedByImpostor = await signIntegrityEnvelope(envelope, impostor);
+
+    const realSignerFingerprint = await exportPublicKeySpki(realSigner.publicKey);
+
+    // Without an expected key, both verify — each is internally self-consistent.
+    expect((await verifySignedEnvelope(signedByRealSigner)).valid).toBe(true);
+    expect((await verifySignedEnvelope(signedByImpostor)).valid).toBe(true);
+
+    // With the real signer's known fingerprint, only the real signer's envelope passes.
+    expect((await verifySignedEnvelope(signedByRealSigner, realSignerFingerprint)).valid).toBe(true);
+    const impostorResult = await verifySignedEnvelope(signedByImpostor, realSignerFingerprint);
+    expect(impostorResult.valid).toBe(false);
+    expect(impostorResult.reason).toContain('does not match the expected signer');
+  });
+
+  it('importPublicKeySpki round-trips exportPublicKeySpki into a usable verification key', async () => {
+    const keyPair = await generateSigningKeyPair();
+    const exported = await exportPublicKeySpki(keyPair.publicKey);
+    const reimported = await importPublicKeySpki(exported);
+    expect(await exportPublicKeySpki(reimported)).toBe(exported);
+  });
+
+  it('rejects a signed envelope missing its signature or public key', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+
+    expect((await verifySignedEnvelope({ ...signed, signature: '' })).valid).toBe(false);
+    expect((await verifySignedEnvelope({ ...signed, publicKeySpki: '' })).valid).toBe(false);
+    expect((await verifySignedEnvelope({ ...signed, signatureAlgorithm: 'RSA-FAKE' as SignedIntegrityEnvelope['signatureAlgorithm'] })).valid).toBe(false);
+  });
+
+  it('the same envelope signed twice by the same key produces two DIFFERENT signature bytes (ECDSA is randomized) but both verify', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const first = await signIntegrityEnvelope(envelope, keyPair);
+    const second = await signIntegrityEnvelope(envelope, keyPair);
+    expect(first.signature).not.toBe(second.signature);
+    expect((await verifySignedEnvelope(first)).valid).toBe(true);
+    expect((await verifySignedEnvelope(second)).valid).toBe(true);
   });
 });

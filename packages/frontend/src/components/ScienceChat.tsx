@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf, EPISTEMIC_LABELS } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
+import { subscribeScienceChatOpenRequests } from '../core/scienceChatBridge';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
@@ -620,6 +621,13 @@ export function ScienceChat() {
       else { setPendingScenario(rec.labId, rec.params, rec.experimentId); window.location.hash = `#/lab/${rec.labId}`; setOpen(false); }
     }
   };
+
+  // Lets another screen (the Matrix dashboard) surface THIS SAME chat instance —
+  // reusing every real state/handler above — instead of a second chat surface.
+  useEffect(() => subscribeScienceChatOpenRequests((request) => {
+    setOpen(true);
+    if (request.message) void send(request.message);
+  }), []);
 
   if (!open) {
     return (

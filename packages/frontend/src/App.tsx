@@ -60,6 +60,7 @@ const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/Precisi
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
+const GenesisDashboard = lazy(() => import('./components/GenesisDashboard').then((m) => ({ default: m.GenesisDashboard })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -679,21 +680,15 @@ export default function App() {
 
     return (
       <div className="app">
-        <main className="home" id="main-content" tabIndex={-1}>
+        <main className="home home-dashboard" id="main-content" tabIndex={-1}>
+          {/* Mission control FIRST. The 3D hero and the capability showcase are
+              real and stay, but they are a tour of the system — they belong
+              below the state of the actual work, not above it. */}
           <HeavyRoute>
-            <GenesisCommandCenterHero />
+            <GenesisDashboard />
           </HeavyRoute>
-          <HeavyRoute>
-            <GenesisCapabilityShowcase />
-          </HeavyRoute>
-          <div style={{ position: 'relative' }}>
-            <ScaleJourney />
-            <span className="hud-corner hud-tl" aria-hidden="true" />
-            <span className="hud-corner hud-tr" aria-hidden="true" />
-            <span className="hud-corner hud-bl" aria-hidden="true" />
-            <span className="hud-corner hud-br" aria-hidden="true" />
-          </div>
           <div className="section-label">Zacznij tutaj</div>
+          <div className="home-launcher">
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>
             <span className="timeline-cta-icon" aria-hidden="true">🔭</span>
             <span className="timeline-cta-text">
@@ -758,6 +753,7 @@ export default function App() {
             </span>
             <span className="timeline-cta-arrow" aria-hidden="true">→</span>
           </button>
+          </div>
           {/* Narzędzia do nauki — produkt edukacyjny (Faza 1). Zawsze widoczne. */}
           <nav className="home-nav" aria-label="Nawigacja Genesis OS">
             <button className="matrix-nav-btn" onClick={() => { window.location.hash = '#/matrix'; }}>
@@ -847,6 +843,20 @@ export default function App() {
               </nav>
             </div>
           )}
+          <div className="section-label">Czym jest Genesis · przegląd systemu</div>
+          <HeavyRoute>
+            <GenesisCommandCenterHero />
+          </HeavyRoute>
+          <HeavyRoute>
+            <GenesisCapabilityShowcase />
+          </HeavyRoute>
+          <div style={{ position: 'relative' }}>
+            <ScaleJourney />
+            <span className="hud-corner hud-tl" aria-hidden="true" />
+            <span className="hud-corner hud-tr" aria-hidden="true" />
+            <span className="hud-corner hud-bl" aria-hidden="true" />
+            <span className="hud-corner hud-br" aria-hidden="true" />
+          </div>
           <div className="section-label">Laboratoria · {getLabs().length} modułów</div>
           <div className="labs-grid">
             {getLabs().map((l) => (

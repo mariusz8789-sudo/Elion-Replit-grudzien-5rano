@@ -57,15 +57,31 @@ describe('kindsOf — real classification, never fabricated or uncategorized', (
 });
 
 describe('GenesisMatrixHub (no DOM — storage.ts degrades to an empty store)', () => {
-  it('renders the honest empty state rather than fabricating data', () => {
-    const html = renderToStaticMarkup(<GenesisMatrixHub />);
-    expect(html).toContain('Scientific Memory jest pusta');
-    expect(html).toContain('0 pozycji');
-    expect(html).not.toContain('matrix-card"');
+  const html = renderToStaticMarkup(<GenesisMatrixHub />);
+
+  it('renders the workspace structure even with zero records — never a blank page', () => {
+    // The loop, its columns and the rails exist before any data does; that is
+    // what stops an empty Matrix from reading as a broken screen.
+    expect(html).toContain('matrix-workspace');
+    expect(html).toContain('Hypothesis → Prediction → Experiment → Evidence → Verdict → Memory → Next Action');
+    expect(html).toContain('matrix-loop-columns');
   });
 
-  it('never claims to be the only place to interact with a kind — links out to existing dedicated screens', () => {
-    const html = renderToStaticMarkup(<GenesisMatrixHub />);
-    expect(html).toContain('Matrix');
+  it('states the empty state honestly instead of fabricating records', () => {
+    expect(html).toContain('Brak aktywnego dochodzenia');
+    expect(html).toContain('Brak rekordów w tej kategorii.');
+    // Every loop column reports a real count of 0 rather than a seeded number.
+    expect(html).toContain('<span class="matrix-loop-column-count">0</span>');
+  });
+
+  it('every empty loop stage offers the real screen that would create its first record', () => {
+    expect(html).toContain('Uruchom Discovery Loop w World Engine →');
+    expect(html).toContain('Uruchom scenariusz lub eksperyment →');
+    expect(html).toContain('Zbuduj dochodzenie w Drug Discovery →');
+  });
+
+  it('docks the one real Science Chat rather than presenting a second chat surface', () => {
+    expect(html).toContain('matrix-chat-dock');
+    expect(html).toContain('Ta sama rozmowa co wszędzie w Genesis');
   });
 });

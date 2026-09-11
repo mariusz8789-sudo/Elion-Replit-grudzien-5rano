@@ -1,29 +1,36 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
+import { requestOpenScienceChat } from '../core/scienceChatBridge';
 
 /**
- * GENESIS MATRIX HUB — the cross-domain map screen.
+ * GENESIS MATRIX — the central workspace, not a memory-record list.
  *
- * This is the "rozbuduj istniejący" case: `core/agent/genesisMatrix.ts`
- * already builds a real joined view (World/Time/Space/Experiment/Hypothesis/
- * Model/Observation/Evidence/Replay/NextAction) for ONE live discovery run,
- * and `MatrixPanel` (`GenesisWorldScreen.tsx`) already renders it. Neither is
- * duplicated here. What was missing: a screen that surfaces ALL of Genesis's
- * persisted work — every domain, every shape — as one navigable map, not
- * just one investigation at a time.
+ * Reuses, never duplicates: `listExperiments()` is the SAME Science Memory
+ * store `ScientificMemoryScreen.tsx` reads. The docked "Ask Genesis" bar
+ * opens the SAME `ScienceChat` instance already mounted globally in
+ * `App.tsx` (via `scienceChatBridge.ts`) — there is exactly one chat, one
+ * state, one history; this is a second entry point into it, not a second
+ * chat. `core/agent/genesisMatrix.ts` + `MatrixPanel` still own the joined
+ * view of one live discovery run; this screen is the map ABOVE that, across
+ * every persisted domain.
  *
- * The data is real, not mocked: `listExperiments()` reads the SAME Science
- * Memory store `ScientificMemoryScreen.tsx` already reads. Every "kind" a
- * card shows is derived from which optional shape field
- * (`SavedExperiment.biotech`/`.discoveryLoop`/`.scenario`/...) is actually
- * present on that record — never invented. A record with no shape field at
- * all is still a real experiment (`labId`/`experimentId`/`params`/`stats`
- * are required on every row), so it is never left uncategorized.
- *
- * Deliberately NOT built here (left to later phases, per the phased plan):
- * a force-directed relationship graph, or per-kind rich visual hierarchies
- * (candidate cards, evidence-strength bars). This is the real navigational
- * skeleton first; the deeper per-type visual language is Phase 3+.
+ * STAGE ASSIGNMENT — honest, not fabricated. A record lands in a loop stage
+ * only because a real field is present on it:
+ *   HYPOTHESIS  — discoveryLoop / hypothesisLoop / parameterInquiry /
+ *                 mechanismComposition / worldDiscovery / researchChain
+ *   EXPERIMENT  — cyberInvestigation / scenario / counterfactual, or the
+ *                 record itself (every SavedExperiment IS a run)
+ *   EVIDENCE    — biotech / realExperimentVerification /
+ *                 substitutionInvestigation / an attached evidence pack
+ *   MEMORY      — every record, always (persistence is the definition)
+ * PREDICTION and VERDICT are not separate columns: they are real fields
+ * carried INSIDE Hypothesis/Evidence records (a discovery round's own
+ * predicted/observed values, a comparison's own verdict) that this map does
+ * not re-extract per record — naming them as fabricated top-level buckets
+ * with invented counts would be exactly the overclaim this codebase
+ * refuses. The legend below states the full conceptual chain in words
+ * instead. NEXT ACTION is real navigation, not a generated recommendation:
+ * it always shows the actual screens that extend whatever is selected.
  */
 
 export type MatrixKind =
@@ -34,6 +41,11 @@ const KIND_LABEL: Record<MatrixKind, string> = {
   HYPOTHESIS: 'Hypotheses', WORLD: 'Worlds', MODEL: 'Models', SCENARIO: 'Scenarios',
   EVIDENCE: 'Evidence', CYBER: 'Cyber', RESEARCH_CHAIN: 'Research Chain',
   REPLAY: 'Replay', EXPERIMENT: 'Experiment',
+};
+
+const KIND_ICON: Record<MatrixKind, string> = {
+  HYPOTHESIS: '◆', WORLD: '◇', MODEL: '▣', SCENARIO: '⑂', EVIDENCE: '✓',
+  CYBER: '◈', RESEARCH_CHAIN: '⛓', REPLAY: '↺', EXPERIMENT: '●',
 };
 
 /** Every kind this record honestly carries — never a single forced category. */
@@ -51,95 +63,239 @@ export function kindsOf(record: SavedExperiment): MatrixKind[] {
   return kinds;
 }
 
-const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
+type LoopStage = 'HYPOTHESIS' | 'EXPERIMENT' | 'EVIDENCE';
+const STAGE_KINDS: Record<LoopStage, MatrixKind[]> = {
+  HYPOTHESIS: ['HYPOTHESIS', 'WORLD', 'MODEL', 'RESEARCH_CHAIN'],
+  EXPERIMENT: ['EXPERIMENT', 'CYBER', 'SCENARIO'],
+  EVIDENCE: ['EVIDENCE'],
+};
+const STAGE_LABEL: Record<LoopStage, string> = { HYPOTHESIS: 'Hypothesis', EXPERIMENT: 'Experiment', EVIDENCE: 'Evidence' };
+const STAGE_EMPTY_CTA: Record<LoopStage, { label: string; hash: string }> = {
+  HYPOTHESIS: { label: 'Uruchom Discovery Loop w World Engine →', hash: '#/genesis-world' },
+  EXPERIMENT: { label: 'Uruchom scenariusz lub eksperyment →', hash: '#/first-person-lab' },
+  EVIDENCE: { label: 'Zbuduj dochodzenie w Drug Discovery →', hash: '#/drug' },
+};
+
+const NEXT_ACTIONS: { label: string; sub: string; hash: string }[] = [
+  { label: 'Drug Discovery', sub: 'Kandydaci, substitution, real evidence rerank', hash: '#/drug' },
+  { label: 'World Engine', sub: 'Discovery Loop, WorldGraph, scenariusze', hash: '#/genesis-world' },
+  { label: 'Scientific Memory', sub: 'Pełny, surowy zapis każdego przebiegu', hash: '#/memory' },
+  { label: 'Discovery Log', sub: 'Chronologia potwierdzeń i obaleń', hash: '#/discovery-log' },
+];
+
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.round(ms / 60000);
+  if (min < 1) return 'przed chwilą';
+  if (min < 60) return `${min} min temu`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} godz. temu`;
+  return `${Math.round(h / 24)} dni temu`;
+}
+
+interface DetailTarget { record: SavedExperiment; kinds: MatrixKind[]; }
 
 export function GenesisMatrixHub() {
   const records = useMemo(() => listExperiments(), []);
-  const [activeKind, setActiveKind] = useState<MatrixKind | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
   const withKinds = useMemo(() => records.map((r) => ({ record: r, kinds: kindsOf(r) })), [records]);
   const countsByKind = useMemo(() => {
     const counts = new Map<MatrixKind, number>();
     for (const { kinds } of withKinds) for (const k of kinds) counts.set(k, (counts.get(k) ?? 0) + 1);
     return counts;
   }, [withKinds]);
+
+  const [activeKind, setActiveKind] = useState<MatrixKind | null>(null);
+  const [detail, setDetail] = useState<DetailTarget | null>(null);
+  const [askInput, setAskInput] = useState('');
+
+  const latest = withKinds[0] ?? null; // listExperiments() sorts newest-first
+  const recentFive = withKinds.slice(0, 5);
   const visible = activeKind ? withKinds.filter(({ kinds }) => kinds.includes(activeKind)) : withKinds;
+  const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
+
+  const submitAsk = () => {
+    const text = askInput.trim();
+    if (!text) { requestOpenScienceChat(); return; }
+    requestOpenScienceChat(text);
+    setAskInput('');
+  };
+
+  const openDetail = (target: DetailTarget) => setDetail(detail?.record.id === target.record.id ? null : target);
 
   return (
     <main className="matrix-hub" id="main-content" tabIndex={-1}>
       <header className="matrix-hub-header">
-        <p className="matrix-hub-eyebrow">GENESIS · SCIENTIFIC OPERATING SYSTEM</p>
-        <h1>Matrix</h1>
-        <p className="matrix-hub-sub">
-          Realna mapa wszystkiego, co Genesis zarejestrował w Scientific Memory — {records.length}{' '}
-          {records.length === 1 ? 'pozycja' : 'pozycji'}. Kliknij pozycję, aby zobaczyć jej realne dane;
-          pełna interakcja (Evidence → provenance, Experiment → prediction/result) żyje w dedykowanych
-          ekranach, do których Matrix prowadzi.
-        </p>
+        <div className="matrix-hub-header-text">
+          <p className="matrix-hub-eyebrow">GENESIS · SCIENTIFIC OPERATING SYSTEM</p>
+          <h1>Matrix</h1>
+        </div>
+        <div className="matrix-focus-card">
+          <span className="matrix-focus-label">CURRENT FOCUS</span>
+          {latest ? (
+            <>
+              <strong className="matrix-focus-title">{latest.record.experimentName || latest.record.experimentId}</strong>
+              <span className="matrix-focus-meta">
+                {latest.kinds.map((k) => KIND_LABEL[k]).join(' · ')} · {timeAgo(latest.record.createdAt)}
+              </span>
+            </>
+          ) : (
+            <>
+              <strong className="matrix-focus-title">Brak aktywnego dochodzenia</strong>
+              <span className="matrix-focus-meta">Genesis czeka na pierwsze pytanie — zapytaj poniżej albo otwórz jeden z modułów.</span>
+            </>
+          )}
+        </div>
       </header>
 
-      <nav className="matrix-hub-filters" aria-label="Filtruj Matrix wg rodzaju">
-        <button className={activeKind === null ? 'matrix-filter-chip active' : 'matrix-filter-chip'} onClick={() => setActiveKind(null)}>
-          Wszystko · {records.length}
-        </button>
-        {ALL_KINDS.filter((k) => (countsByKind.get(k) ?? 0) > 0).map((k) => (
-          <button key={k} className={activeKind === k ? 'matrix-filter-chip active' : 'matrix-filter-chip'} onClick={() => setActiveKind(k)}>
-            {KIND_LABEL[k]} · {countsByKind.get(k) ?? 0}
-          </button>
-        ))}
-      </nav>
+      <div className="matrix-ask-bar">
+        <span className="matrix-ask-icon" aria-hidden="true">✦</span>
+        <input
+          className="matrix-ask-input"
+          value={askInput}
+          onChange={(e) => setAskInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submitAsk(); }}
+          placeholder='Zapytaj Genesis — np. "Build a coastal hotel in Hong Kong"'
+        />
+        <button className="matrix-ask-submit" type="button" onClick={submitAsk}>Ask Genesis →</button>
+      </div>
 
-      {visible.length === 0 ? (
-        <p className="matrix-hub-empty">
-          Scientific Memory jest pusta. Uruchom eksperyment, discovery loop, scenariusz albo dochodzenie
-          substytucji — pojawi się tutaj automatycznie, bo Matrix czyta ten sam magazyn co Pamięć Naukowa.
-        </p>
-      ) : (
-        <div className="matrix-hub-grid">
-          {visible.map(({ record, kinds }) => (
-            <article
-              key={record.id}
-              className={expandedId === record.id ? 'matrix-card expanded' : 'matrix-card'}
-              onClick={() => setExpandedId(expandedId === record.id ? null : record.id)}
-            >
-              <div className="matrix-card-kinds">
-                {kinds.map((k) => <span key={k} className="matrix-kind-tag">{KIND_LABEL[k]}</span>)}
-              </div>
-              <h3 className="matrix-card-title">{record.experimentName || record.experimentId}</h3>
-              <p className="matrix-card-meta">{new Date(record.createdAt).toLocaleString()} · lab {record.labId}</p>
-              {expandedId === record.id && (
-                <div className="matrix-card-detail" onClick={(e) => e.stopPropagation()}>
-                  <dl className="matrix-detail-list">
-                    <div><dt>ID</dt><dd className="mono">{record.id}</dd></div>
-                    <div><dt>Experiment ID</dt><dd className="mono">{record.experimentId}</dd></div>
-                    {record.evidencePackId && <div><dt>Evidence pack</dt><dd className="mono">{record.evidencePackId}</dd></div>}
-                    {record.evidenceChainId && <div><dt>Evidence chain</dt><dd className="mono">{record.evidenceChainId}</dd></div>}
-                    {Object.entries(record.stats).slice(0, 6).map(([key, value]) => (
-                      <div key={key}><dt>{key}</dt><dd>{Number.isFinite(value) ? value : String(value)}</dd></div>
-                    ))}
-                  </dl>
-                  <div className="matrix-detail-actions">
-                    <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/memory'; }}>
-                      Otwórz w Pamięci Naukowej →
-                    </button>
-                    {(record.biotech || record.substitutionInvestigation) && (
-                      <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/drug'; }}>
-                        Otwórz w Drug Discovery →
+      <div className="matrix-workspace">
+        <aside className="matrix-rail matrix-rail-left">
+          <h2 className="matrix-rail-title">System</h2>
+          <nav className="matrix-kind-nav" aria-label="Filtruj wg rodzaju">
+            <button className={activeKind === null ? 'matrix-kind-nav-item active' : 'matrix-kind-nav-item'} onClick={() => setActiveKind(null)}>
+              <span>Wszystko</span><span className="matrix-kind-count">{records.length}</span>
+            </button>
+            {ALL_KINDS.filter((k) => (countsByKind.get(k) ?? 0) > 0).map((k) => (
+              <button key={k} className={activeKind === k ? 'matrix-kind-nav-item active' : 'matrix-kind-nav-item'} onClick={() => setActiveKind(activeKind === k ? null : k)}>
+                <span><span aria-hidden="true">{KIND_ICON[k]}</span> {KIND_LABEL[k]}</span>
+                <span className="matrix-kind-count">{countsByKind.get(k)}</span>
+              </button>
+            ))}
+          </nav>
+
+          <h2 className="matrix-rail-title">Recent Activity</h2>
+          {recentFive.length === 0 ? (
+            <p className="matrix-rail-empty">Jeszcze nic — pierwsza aktywność pojawi się tutaj automatycznie.</p>
+          ) : (
+            <ul className="matrix-activity-feed">
+              {recentFive.map(({ record, kinds }) => (
+                <li key={record.id}>
+                  <button className="matrix-activity-item" onClick={() => openDetail({ record, kinds })}>
+                    <span className="matrix-activity-title">{record.experimentName || record.experimentId}</span>
+                    <span className="matrix-activity-time">{timeAgo(record.createdAt)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
+
+        <section className="matrix-loop" aria-label="Scientific loop">
+          <p className="matrix-loop-legend">
+            Hypothesis → Prediction → Experiment → Evidence → Verdict → Memory → Next Action
+          </p>
+          <div className="matrix-loop-columns">
+            {(['HYPOTHESIS', 'EXPERIMENT', 'EVIDENCE'] as LoopStage[]).map((stage, i) => {
+              const items = withKinds.filter(({ kinds }) => kinds.some((k) => STAGE_KINDS[stage].includes(k)));
+              return (
+                <Fragment key={stage}>
+                  <div className="matrix-loop-column">
+                    <h3 className="matrix-loop-column-title">{STAGE_LABEL[stage]}<span className="matrix-loop-column-count">{items.length}</span></h3>
+                    {items.length === 0 ? (
+                      <button className="matrix-loop-empty" onClick={() => { window.location.hash = STAGE_EMPTY_CTA[stage].hash; }}>
+                        {STAGE_EMPTY_CTA[stage].label}
                       </button>
-                    )}
-                    {(record.scenario || record.counterfactual) && (
-                      <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/genesis-world'; }}>
-                        Otwórz w World Engine →
-                      </button>
+                    ) : (
+                      <div className="matrix-loop-chips">
+                        {items.slice(0, 8).map(({ record, kinds }) => (
+                          <button key={record.id} className="matrix-loop-chip" onClick={() => openDetail({ record, kinds })}>
+                            {record.experimentName || record.experimentId}
+                          </button>
+                        ))}
+                        {items.length > 8 && <span className="matrix-loop-more">+{items.length - 8} więcej</span>}
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
-            </article>
-          ))}
+                  {i < 2 && <div className="matrix-loop-arrow" aria-hidden="true">→</div>}
+                </Fragment>
+              );
+            })}
+            <div className="matrix-loop-arrow" aria-hidden="true">→</div>
+            <div className="matrix-loop-column matrix-loop-column-memory">
+              <h3 className="matrix-loop-column-title">Memory<span className="matrix-loop-column-count">{records.length}</span></h3>
+              <p className="matrix-loop-column-note">Każdy przebieg trafia tutaj automatycznie — to jest ta sama Pamięć Naukowa, którą widzisz w kolumnach obok.</p>
+              <button className="matrix-loop-empty" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz pełną Pamięć Naukową →</button>
+            </div>
+          </div>
+
+          <div className="matrix-next-actions">
+            <h3 className="matrix-rail-title">Next Action</h3>
+            <div className="matrix-next-grid">
+              {NEXT_ACTIONS.map((a) => (
+                <button key={a.hash} className="matrix-next-card" onClick={() => { window.location.hash = a.hash; }}>
+                  <strong>{a.label}</strong>
+                  <span>{a.sub}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <aside className="matrix-rail matrix-rail-right">
+          <h2 className="matrix-rail-title">Selected Object</h2>
+          {detail ? (
+            <div className="matrix-detail-panel">
+              <div className="matrix-card-kinds">{detail.kinds.map((k) => <span key={k} className="matrix-kind-tag">{KIND_LABEL[k]}</span>)}</div>
+              <h3 className="matrix-detail-title">{detail.record.experimentName || detail.record.experimentId}</h3>
+              <p className="matrix-card-meta">{new Date(detail.record.createdAt).toLocaleString()} · lab {detail.record.labId}</p>
+              <dl className="matrix-detail-list">
+                <div><dt>ID</dt><dd className="mono">{detail.record.id}</dd></div>
+                {detail.record.evidencePackId && <div><dt>Evidence pack</dt><dd className="mono">{detail.record.evidencePackId}</dd></div>}
+                {Object.entries(detail.record.stats).slice(0, 5).map(([key, value]) => (
+                  <div key={key}><dt>{key}</dt><dd>{Number.isFinite(value) ? value : String(value)}</dd></div>
+                ))}
+              </dl>
+              <div className="matrix-detail-actions">
+                <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz w Pamięci Naukowej →</button>
+                {(detail.record.biotech || detail.record.substitutionInvestigation) && (
+                  <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/drug'; }}>Otwórz w Drug Discovery →</button>
+                )}
+                {(detail.record.scenario || detail.record.counterfactual || detail.record.worldDiscovery) && (
+                  <button className="chip-btn" type="button" onClick={() => { window.location.hash = '#/genesis-world'; }}>Otwórz w World Engine →</button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="matrix-rail-empty">Kliknij dowolny obiekt w Matrix, żeby zobaczyć jego realne dane i dostępne akcje.</p>
+          )}
+
+          <h2 className="matrix-rail-title">Science Chat</h2>
+          <button className="matrix-chat-dock" onClick={() => requestOpenScienceChat()}>
+            <span>💬 Otwórz Science Chat</span>
+            <span className="matrix-chat-dock-sub">Ta sama rozmowa co wszędzie w Genesis — pytania, plany, uruchamianie eksperymentów.</span>
+          </button>
+        </aside>
+      </div>
+
+      <section className="matrix-hub-grid-section" aria-label="Wszystkie rekordy">
+        <div className="matrix-hub-grid-header">
+          <h2 className="matrix-rail-title">Wszystkie rekordy {activeKind ? `· ${KIND_LABEL[activeKind]}` : ''}</h2>
         </div>
-      )}
+        {visible.length === 0 ? (
+          <p className="matrix-hub-empty">Brak rekordów w tej kategorii.</p>
+        ) : (
+          <div className="matrix-hub-grid">
+            {visible.map(({ record, kinds }) => (
+              <article key={record.id} className="matrix-card" onClick={() => openDetail({ record, kinds })}>
+                <div className="matrix-card-kinds">{kinds.map((k) => <span key={k} className="matrix-kind-tag">{KIND_LABEL[k]}</span>)}</div>
+                <h3 className="matrix-card-title">{record.experimentName || record.experimentId}</h3>
+                <p className="matrix-card-meta">{timeAgo(record.createdAt)} · lab {record.labId}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }

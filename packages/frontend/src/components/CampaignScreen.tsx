@@ -7,7 +7,7 @@ import {
   type Project, type ToolchainEntry, type Campaign, type CampaignCandidate, type CampaignDecision,
   type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification, type ScientificComputeReport,
 } from '../core/backend/client';
-import { AccountPanel } from './AccountPanel';
+import { LockedScreen } from './LockedScreen';
 import { parseDiscoveryGoal, buildCampaignRequest } from '../core/discovery/discoveryGoalIntent';
 
 /**
@@ -23,17 +23,18 @@ export function CampaignScreen() {
   const session = useSession();
   if (!session) {
     return (
-      <main className="settings-view" id="main-content" tabIndex={-1}>
-        <section className="settings-section">
-          <h2>Kampania naukowa</h2>
-          <p className="settings-hint">
-            Zaloguj się, aby prowadzić kampanie odkrywcze na realnych silnikach (RDKit). Silnik przyspieszenia sam
-            wybiera następny eksperyment na podstawie utrwalonych danych — nie zmyśla wyników, nie deklaruje „leku",
-            a każdą decyzję da się wyjaśnić dowodem (WHY). To walidacja oprogramowania, nie odkrycie terapeutyczne.
-          </p>
-          <AccountPanel />
-        </section>
-      </main>
+      <LockedScreen
+        icon="⚡"
+        title="Kampania naukowa"
+        lede="Prowadź kampanie odkrywcze na realnych silnikach (RDKit → ADMET → dokowanie → chemia kwantowa), z pełną prowieniencją i weryfikacją odtwarzalności."
+        capabilities={[
+          'Silnik przyspieszenia wybiera następny eksperyment z utrwalonych danych',
+          'Każdą decyzję da się wyjaśnić dowodem (WHY)',
+          'Wielofidelitowe przebiegi z zachowaną prowieniencją',
+          'Weryfikacja odtwarzalności każdego kroku kampanii',
+        ]}
+        note="To walidacja oprogramowania, nie odkrycie terapeutyczne — silnik nie zmyśla wyników i nie deklaruje „leku”."
+      />
     );
   }
   return <CampaignWorkspace />;

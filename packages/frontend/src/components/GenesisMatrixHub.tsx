@@ -221,7 +221,11 @@ export function GenesisMatrixHub() {
                 </Fragment>
               );
             })}
-            <div className="matrix-loop-arrow" aria-hidden="true">→</div>
+            {/* Memory is not a fourth stage in the row — it is the substrate
+                every stage drains into, so the connector points DOWN into a
+                full-width column rather than sideways into a wrapped one
+                (which left a dangling arrow at the end of the first line). */}
+            <div className="matrix-loop-arrow matrix-loop-arrow-down" aria-hidden="true">↓</div>
             <div className="matrix-loop-column matrix-loop-column-memory">
               <h3 className="matrix-loop-column-title">Memory<span className="matrix-loop-column-count">{records.length}</span></h3>
               <p className="matrix-loop-column-note">Każdy przebieg trafia tutaj automatycznie — to jest ta sama Pamięć Naukowa, którą widzisz w kolumnach obok.</p>

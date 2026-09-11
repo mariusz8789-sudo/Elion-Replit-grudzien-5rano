@@ -26,7 +26,7 @@ import {
   type MergeRequest,
   type ContributionGraph,
 } from '../core/backend/client';
-import { AccountPanel } from './AccountPanel';
+import { LockedScreen } from './LockedScreen';
 import { setActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import { setActiveSpatialOverlay } from '../core/backend/spatialOverlayContext';
 import { normalizeOsmMapXml } from '../core/experimentFabric/spatialImport';
@@ -101,17 +101,18 @@ export function CloudProjectsScreen() {
 
   if (!session) {
     return (
-      <main className="settings-view" id="main-content" tabIndex={-1}>
-        <section className="settings-section">
-          <h2>Projekty (chmura)</h2>
-          <p className="settings-hint">
-            Zaloguj się, aby tworzyć współdzielone Projekty i trwałe Serie Prób, które przetrwają restart i pozwolą
-            pracować zespołowo (role: właściciel / administrator / edytor / obserwator). Bez logowania Genesis OS działa
-            w pełni lokalnie — konto jest opcją współdzielenia.
-          </p>
-          <AccountPanel />
-        </section>
-      </main>
+      <LockedScreen
+        icon="☁"
+        title="Projekty (chmura)"
+        lede="Twórz współdzielone Projekty i trwałe Serie Prób, które przetrwają restart i pozwolą pracować zespołowo."
+        capabilities={[
+          'Role zespołowe: właściciel / administrator / edytor / obserwator',
+          'Serie Prób utrwalone po stronie serwera, nie w przeglądarce',
+          'Materiały wiedzy i wyszukiwanie w obrębie projektu',
+          'Odblokowuje zaawansowane przepływy w Drug Discovery i Kampanii',
+        ]}
+        note="Bez logowania Genesis OS działa w pełni lokalnie — konto jest opcją współdzielenia, nie warunkiem pracy."
+      />
     );
   }
 

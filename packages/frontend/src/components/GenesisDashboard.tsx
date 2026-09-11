@@ -56,6 +56,16 @@ const LOOP_TILES: readonly { kind: MatrixKind; label: string; hash: string; hint
   { kind: 'SCENARIO', label: 'Scenariusze', hash: '#/what-if', hint: 'Rozgałęzienia i porównania' },
 ];
 
+/**
+ * The backend reports each tool's real status string — today `AVAILABLE` or
+ * `BLOCKED_BY_RUNTIME` from `listToolchain()`. Matching those exact values
+ * matters: an over-narrow match would render "0/6 gotowych" on a perfectly
+ * healthy install, which is the same class of lie as a fake green light.
+ */
+function isToolReady(tool: { status: string }): boolean {
+  return tool.status === 'AVAILABLE' || tool.status === 'ready' || tool.status === 'ok';
+}
+
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   if (!Number.isFinite(ms)) return '—';
@@ -251,7 +261,7 @@ export function GenesisDashboard(): JSX.Element {
                 <li>
                   <span>Toolchain</span>
                   <span className="dash-ok">
-                    {health.payload.toolchain.filter((tool) => tool.status === 'ready' || tool.status === 'ok').length}/{health.payload.toolchain.length} gotowych
+                    {health.payload.toolchain.filter(isToolReady).length}/{health.payload.toolchain.length} gotowych
                   </span>
                 </li>
               )}

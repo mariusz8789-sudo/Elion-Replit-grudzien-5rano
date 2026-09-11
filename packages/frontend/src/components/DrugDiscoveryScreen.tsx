@@ -5,7 +5,7 @@ import {
   getCandidatePassport, getCandidateRanking,
   type Project, type Capability, type Target, type Candidate, type CandidatePassport, type RankedCandidate,
 } from '../core/backend/client';
-import { AccountPanel } from './AccountPanel';
+import { LockedScreen } from './LockedScreen';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
 import { buildPinnedChEMBLTheophyllineDiscovery } from '../core/biotechData/theophylline';
@@ -41,17 +41,18 @@ export function DrugDiscoveryScreen() {
   const session = useSession();
   if (!session) {
     return (
-      <main className="settings-view" id="main-content" tabIndex={-1}>
-        <section className="settings-section">
-          <h2>Drug Discovery</h2>
-          <p className="settings-hint">
-            Zaloguj się, aby projektować cele biologiczne i oceniać kandydatów obliczeniowych. Platforma liczy realną
-            chemię (masa molowa, skład) i JAWNIE oznacza brakujące zdolności (dokowanie, ADMET, toksyczność) — niczego
-            nie zmyśla. To nie jest narzędzie diagnostyczne ani deklaracja skuteczności leku.
-          </p>
-          <AccountPanel />
-        </section>
-      </main>
+      <LockedScreen
+        icon="💊"
+        title="Drug Discovery"
+        lede="Projektuj cele biologiczne i oceniaj kandydatów obliczeniowych na realnych silnikach naukowych. Platforma liczy realną chemię (masa molowa, skład) i JAWNIE oznacza brakujące zdolności — niczego nie zmyśla."
+        capabilities={[
+          'Paszport kandydata z realnych deskryptorów RDKit',
+          'Substitution investigation na przypiętym zbiorze referencyjnym',
+          'Real-evidence rerank: pomiar zmienia ranking, nie tylko Pamięć',
+          'Każdy wynik oznaczony jako MODEL_ESTIMATE, nie odkrycie terapeutyczne',
+        ]}
+        note="To nie jest narzędzie diagnostyczne ani deklaracja skuteczności leku."
+      />
     );
   }
   return <DrugWorkspace />;

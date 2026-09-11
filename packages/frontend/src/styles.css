@@ -3939,9 +3939,16 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   display: flex; align-items: center; justify-content: center; color: var(--mx-text-faint);
   font-size: 1.4rem; flex: 0 0 auto; padding-top: 2rem;
 }
+/* The Hypothesis→Experiment→Evidence row drains DOWN into Memory: a
+   full-width connector, so Memory reads as the substrate rather than as a
+   fourth stage that happened to wrap onto its own line. */
+.matrix-loop-arrow-down { flex: 1 1 100%; padding: 0.1rem 0 0; font-size: 1.2rem; }
+.matrix-loop-column-memory { flex: 1 1 100%; }
 
 .matrix-next-actions { margin-top: 0.5rem; }
-.matrix-next-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+/* Exactly two columns: the four next actions then form a clean 2x2 instead
+   of a 3+1 row with one orphan card hanging below the fold. */
+.matrix-next-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 .matrix-next-card {
   display: flex; flex-direction: column; gap: 0.3rem; text-align: left; padding: 1rem 1.1rem;
   border-radius: 14px; border: 1px solid var(--mx-border); background: var(--mx-panel);
@@ -4017,7 +4024,20 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
    same visual language as .matrix-hub and every other screen — the point
    of v3 is that Genesis stops looking like eight different applications.
    ========================================================================== */
-.home-dashboard { padding-top: 0; }
+/* `.home` masks its bottom to transparent so the decorative grid backdrop
+   fades out — but a mask applies to CONTENT too, which dimmed the System
+   Status and Active Project rows into unreadability. The dashboard keeps
+   the grid and drops the mask; the fade is re-created as a background-only
+   gradient below, where it cannot touch text. */
+.home-dashboard {
+  padding-top: 0;
+  mask-image: none; -webkit-mask-image: none;
+  background-image:
+    linear-gradient(rgba(188, 201, 232, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(188, 201, 232, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, transparent 0%, transparent 55%, var(--bg) 100%);
+  background-size: 48px 48px, 48px 48px, 100% 100%;
+}
 
 .dash {
   padding: clamp(1.25rem, 3vw, 2.5rem) clamp(1rem, 3.5vw, 3rem) var(--sp-5);
@@ -4036,7 +4056,7 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   text-transform: uppercase; color: var(--gold); font-weight: 600;
 }
 .dash-title {
-  margin: 0.35rem 0 0.5rem; font-size: clamp(1.7rem, 3.6vw, 2.6rem); font-weight: 700;
+  margin: 0.35rem 0 0.5rem; font-size: clamp(1.45rem, 3.6vw, 2.6rem); font-weight: 700;
   letter-spacing: -0.025em; line-height: 1.12; text-wrap: balance;
 }
 .dash-subtitle {
@@ -4171,4 +4191,51 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .dash-ask { flex-direction: column; }
   .dash-ask-send { width: 100%; }
   .home-launcher { padding-left: 1rem; padding-right: 1rem; grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   LOCKED SCREEN — one shared sign-in gate. Replaces four near-identical
+   gates that each rendered a full-width auth panel at the top of an
+   otherwise empty page. Two columns on desktop (what you unlock | how to
+   unlock it), one column on a phone, and the page is never mostly blank.
+   ========================================================================== */
+.locked-screen {
+  flex: 1; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center;
+  padding: clamp(1.5rem, 5vh, 4rem) clamp(1rem, 4vw, 3rem) calc(var(--sp-5) + var(--safe-bottom));
+  background: radial-gradient(120% 80% at 20% 0%, var(--bg-raised) 0%, transparent 60%);
+}
+/* Auto block margins centre the gate vertically without the clipping that
+   `align-items: center` causes when the content is taller than the viewport
+   — so a phone still scrolls to the top of the pitch. */
+.locked-inner {
+  margin-block: auto;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem); align-items: start;
+  width: 100%; max-width: 64rem;
+}
+.locked-pitch { display: flex; flex-direction: column; gap: var(--sp-2); }
+.locked-icon { font-size: 2.4rem; line-height: 1; }
+.locked-title {
+  margin: 0.2rem 0 0; font-size: clamp(1.6rem, 3.4vw, 2.4rem); font-weight: 700;
+  letter-spacing: -0.025em; line-height: 1.15;
+}
+.locked-lede { margin: 0; color: var(--text-dim); font-size: var(--fs-lead); line-height: 1.65; max-width: 46ch; }
+.locked-caps { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+.locked-caps li {
+  display: flex; gap: 0.65rem; align-items: baseline;
+  font-size: var(--fs-body); color: var(--text); line-height: 1.5;
+}
+.locked-caps li > span { color: var(--cyan); font-size: 0.7em; flex: none; }
+.locked-note {
+  margin: var(--sp-2) 0 0; font-size: var(--fs-meta); color: var(--text-faint);
+  line-height: 1.6; border-left: 2px solid var(--border-strong); padding-left: 0.8rem;
+}
+.locked-auth {
+  background: var(--bg-panel); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); padding: var(--sp-3); box-shadow: var(--shadow-md);
+}
+.locked-auth .settings-section { border: none; background: none; padding: 0; margin: 0; }
+
+@media (max-width: 860px) {
+  .locked-inner { grid-template-columns: 1fr; gap: var(--sp-4); }
 }

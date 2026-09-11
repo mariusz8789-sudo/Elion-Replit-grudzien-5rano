@@ -146,7 +146,7 @@ export function GenesisDashboard(): JSX.Element {
   const counts = useMemo(() => {
     const base = {
       HYPOTHESIS: 0, WORLD: 0, MODEL: 0, SCENARIO: 0, EVIDENCE: 0,
-      CYBER: 0, RESEARCH_CHAIN: 0, REPLAY: 0, EXPERIMENT: 0,
+      CYBER: 0, DECIPHERMENT: 0, RESEARCH_CHAIN: 0, REPLAY: 0, EXPERIMENT: 0,
     } as Record<MatrixKind, number>;
     for (const record of records) for (const kind of kindsOf(record)) base[kind] += 1;
     return base;

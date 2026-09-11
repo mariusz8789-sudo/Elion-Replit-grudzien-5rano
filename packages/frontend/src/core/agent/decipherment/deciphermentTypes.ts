@@ -165,3 +165,72 @@ export interface ReadingSpec {
   readonly candidateKey: CipherKey | null;
   readonly assumptions: readonly string[];
 }
+
+/**
+ * JSON-serializable snapshot of a finished case. `DeciphermentCaseState`
+ * (above) is the live orchestrator state — it carries a `ReadonlyMap`, which
+ * does not round-trip through `JSON.stringify`. This is what actually gets
+ * persisted, the same relationship `CyberInvestigationResult` has to
+ * `runAdaptiveInvestigation`'s live `AdaptiveInvestigationResult`.
+ */
+export interface DeciphermentCaseResult {
+  readonly caseId: string;
+  readonly sequenceFingerprint: string;
+  readonly sourceKind: GlyphSequence['sourceKind'];
+  readonly glyphCount: number;
+  readonly readings: readonly DeciphermentReading[];
+  readonly hypotheses: readonly DeciphermentHypothesis[];
+  readonly testsRun: readonly string[];
+  readonly assessmentHistory: Readonly<Record<string, readonly HypothesisAssessment[]>>;
+  readonly conflicts: readonly ConflictRecord[];
+  readonly seed: number;
+  readonly modelVersion: string;
+}
+
+export function toDeciphermentCaseResult(state: DeciphermentCaseState): DeciphermentCaseResult {
+  const assessmentHistory: Record<string, readonly HypothesisAssessment[]> = {};
+  for (const [hypothesisId, history] of state.assessmentHistory) assessmentHistory[hypothesisId] = history;
+  return Object.freeze({
+    caseId: `decipherment:${state.sequence.fingerprint}`,
+    sequenceFingerprint: state.sequence.fingerprint,
+    sourceKind: state.sequence.sourceKind,
+    glyphCount: state.sequence.glyphs.length,
+    readings: state.readings,
+    hypotheses: state.hypotheses,
+    testsRun: state.testsRun,
+    assessmentHistory: Object.freeze(assessmentHistory),
+    conflicts: state.conflicts,
+    seed: state.seed,
+    modelVersion: state.modelVersion,
+  });
+}
+
+/**
+ * A decipherment case must actually have run the loop — real glyphs, at
+ * least one competing reading with its own falsifier, at least one recorded
+ * assessment. Mirrors `isWellFormedCyberInvestigation`'s "not an empty
+ * shell" check.
+ */
+export function isWellFormedDeciphermentCaseResult(value: unknown): value is DeciphermentCaseResult {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.caseId !== 'string' || v.caseId.length === 0) return false;
+  if (typeof v.sequenceFingerprint !== 'string' || v.sequenceFingerprint.length === 0) return false;
+  if (typeof v.glyphCount !== 'number' || v.glyphCount <= 0) return false;
+  if (!Array.isArray(v.readings) || v.readings.length === 0) return false;
+  if (!Array.isArray(v.hypotheses) || v.hypotheses.length === 0) return false;
+  if (v.hypotheses.length !== v.readings.length) return false;
+  for (const h of v.hypotheses as unknown[]) {
+    if (!h || typeof h !== 'object') return false;
+    const hyp = h as Record<string, unknown>;
+    if (typeof hyp.hypothesisId !== 'string' || hyp.hypothesisId.length === 0) return false;
+    if (!hyp.falsifier || typeof hyp.falsifier !== 'object') return false;
+    const f = hyp.falsifier as Record<string, unknown>;
+    if (typeof f.predictedObservable !== 'string' || f.predictedObservable.length === 0) return false;
+    if (typeof f.falsifyingObservable !== 'string' || f.falsifyingObservable.length === 0) return false;
+  }
+  if (!Array.isArray(v.testsRun)) return false;
+  if (typeof v.seed !== 'number') return false;
+  if (typeof v.modelVersion !== 'string' || v.modelVersion.length === 0) return false;
+  return true;
+}

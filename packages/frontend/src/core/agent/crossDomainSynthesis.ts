@@ -24,13 +24,15 @@ import { buildMatrixRelationGraph, edgesFor, type MatrixEdge } from './matrixRel
  * already recorded, or an explicit, named, non-numeric heuristic ranking
  * (`OPEN_ITEM_PRIORITY`) — never a fabricated confidence score.
  *
- * SCOPE, HONESTLY: this reads four of the nine investigation shapes —
- * `cyberInvestigation`, `deciphermentCase`, `researchChain`, and
+ * SCOPE, HONESTLY: this reads five of the nine investigation shapes —
+ * `cyberInvestigation`, `deciphermentCase`, `researchChain`,
  * `worldDiscovery` (its `loopResult.unresolvedQuestions` only — the
- * `comparisonResult` alternative shape is not yet read) — because those
- * already carry an explicit, unambiguous "this is still open" signal in
- * their own persisted record. The other five (`parameterInquiry`,
- * `mechanismComposition`, `realExperimentVerification`,
+ * `comparisonResult` alternative shape is not yet read), and
+ * `mechanismComposition` (its `assessment.interaction === 'INCONCLUSIVE'`,
+ * `mechanismInteraction.ts`'s own explicit fourth outcome alongside
+ * ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE) — because those already carry an
+ * explicit, unambiguous "this is still open" signal in their own persisted
+ * record. The other four (`parameterInquiry`, `realExperimentVerification`,
  * `substitutionInvestigation`, the legacy `hypothesisLoop`/`discoveryLoop`/
  * `investigation` Fabric shapes) do not currently expose a comparably
  * explicit "still open" flag on their own saved shape without additional
@@ -75,7 +77,7 @@ const OPEN_ITEM_PRIORITY: Record<CrossDomainOpenItemKind, number> = {
 export interface CrossDomainOpenItem {
   readonly sourceExperimentId: string;
   readonly labId: string;
-  readonly shape: 'cyberInvestigation' | 'deciphermentCase' | 'researchChain' | 'worldDiscovery';
+  readonly shape: 'cyberInvestigation' | 'deciphermentCase' | 'researchChain' | 'worldDiscovery' | 'mechanismComposition';
   readonly kind: CrossDomainOpenItemKind;
   readonly question: string;
   readonly detail: string;
@@ -179,6 +181,29 @@ function worldDiscoveryOpenItems(record: SavedExperiment): CrossDomainOpenItem[]
   }));
 }
 
+/**
+ * `assessment.interaction === 'INCONCLUSIVE'` is `mechanismInteraction.ts`'s
+ * own fourth, explicit outcome alongside ADDITIVE/SUB_ADDITIVE/
+ * SUPER_ADDITIVE — a joint-mechanism hypothesis Genesis measured but could
+ * not classify, the same "no test has discriminated this yet" shape
+ * `INCONCLUSIVE_HYPOTHESIS` already names for cyber, reused here rather
+ * than invented afresh.
+ */
+function mechanismCompositionOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
+  const composition = record.mechanismComposition;
+  if (!composition || composition.assessment.interaction !== 'INCONCLUSIVE') return [];
+  return [{
+    sourceExperimentId: record.id,
+    labId: record.labId,
+    shape: 'mechanismComposition',
+    kind: 'INCONCLUSIVE_HYPOTHESIS',
+    question: composition.derived.statement,
+    detail: composition.assessment.reason,
+    createdAt: record.createdAt,
+    evidencePackId: record.evidencePackId ?? null,
+  }];
+}
+
 /** Every open item across every domain — the whole point being that nothing here filters by domain first. */
 export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]): readonly CrossDomainOpenItem[] {
   const all = records ?? listExperiments();
@@ -189,6 +214,7 @@ export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]
       ...deciphermentOpenItems(record),
       ...researchChainOpenItems(record),
       ...worldDiscoveryOpenItems(record),
+      ...mechanismCompositionOpenItems(record),
     );
   }
   return items;
@@ -230,6 +256,8 @@ function nextTestOrExperiment(item: CrossDomainOpenItem): string {
         : 'Continue this chain: call `runResearchChain`/`runMechanismResearchChain` again on the same catalog and goal with a larger step budget, or address why it stopped: "' + item.detail + '"';
     case 'worldDiscovery':
       return 'Re-run the world-discovery loop (`runDiscoveryLoop`, discoveryLoop.ts) on the same world/catalog with a larger round budget, targeting this specific unresolved question.';
+    case 'mechanismComposition':
+      return 'Re-measure the joint arm for these two mechanisms (`runMechanismDiscoveryAndRemember`, discoveryOrchestrator.ts) — a tighter tolerance band or a repeated measurement may resolve ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE where this run could not.';
   }
 }
 

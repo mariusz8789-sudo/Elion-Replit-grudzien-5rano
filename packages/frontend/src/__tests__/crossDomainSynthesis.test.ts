@@ -162,6 +162,41 @@ function worldDiscoveryResultWithUnresolvedQuestion(): SavedExperiment['worldDis
   };
 }
 
+function mechanismCompositionResultInconclusive(): SavedExperiment['mechanismComposition'] {
+  return {
+    contractVersion: '1.0.0',
+    catalogId: 'catalog-1',
+    goal: 'Maximise output.',
+    worldId: 'world-1',
+    domainId: 'domain-1',
+    resumedFromMemory: null,
+    derived: {
+      contractVersion: '1.0.0',
+      hypothesisId: 'joint:leverA+leverB',
+      parentHypothesisIds: ['hyp:leverA', 'hyp:leverB'],
+      strength: 1,
+      metric: 'output',
+      entityId: 'entity-1',
+      statement: 'Lever A and lever B compose to raise output.',
+      why: 'Both individually raised output; testing whether they compose.',
+    },
+    assessment: {
+      contractVersion: '1.0.0',
+      baseline: 10,
+      effectA: 2,
+      effectB: 2,
+      naiveAdditivePrediction: 14,
+      jointObserved: 14,
+      deviation: 0,
+      relativeDeviation: 0,
+      interaction: 'INCONCLUSIVE',
+      reason: 'Measurement noise exceeds the deviation needed to classify additive vs. non-additive.',
+    },
+    betterThanBestSingle: false,
+    resultFingerprint: 'fp:mechanism-composition-1',
+  };
+}
+
 describe('collectCrossDomainOpenItems: reads four domains\' own terminal-status vocabularies, invents nothing', () => {
   it('finds an INCONCLUSIVE cyber hypothesis, an UNRESOLVED_CONFLICT decipherment hypothesis, and a BLOCKED research chain, each attributed to its own domain', () => {
     const records: SavedExperiment[] = [
@@ -197,6 +232,25 @@ describe('collectCrossDomainOpenItems: reads four domains\' own terminal-status 
     expect(byDomain.get('world-discovery')?.kind).toBe('UNRESOLVED_QUESTION');
     expect(byDomain.get('world-discovery')?.question).toBe('Does lever B interact with lever C?');
     expect(byDomain.has('parameter-research-chain')).toBe(false);
+  });
+
+  it('finds an INCONCLUSIVE joint-mechanism composition (interaction could not be classified) as INCONCLUSIVE_HYPOTHESIS', () => {
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'mech-1', labId: 'domain-1', mechanismComposition: mechanismCompositionResultInconclusive() }),
+    ];
+    const items = collectCrossDomainOpenItems(records);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe('INCONCLUSIVE_HYPOTHESIS');
+    expect(items[0]?.shape).toBe('mechanismComposition');
+    expect(items[0]?.question).toBe('Lever A and lever B compose to raise output.');
+  });
+
+  it('finds no open item in a mechanism composition whose interaction WAS classified (ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE)', () => {
+    const classified = mechanismCompositionResultInconclusive()!;
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'mech-2', labId: 'domain-1', mechanismComposition: { ...classified, assessment: { ...classified.assessment, interaction: 'ADDITIVE' } } }),
+    ];
+    expect(collectCrossDomainOpenItems(records)).toHaveLength(0);
   });
 
   it('finds no open item in a world-discovery record whose loop left nothing unresolved', () => {

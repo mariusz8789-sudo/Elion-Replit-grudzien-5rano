@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   collectCrossDomainOpenItems,
   synthesizeNextQuestion,
@@ -277,5 +277,145 @@ describe('End to end on REAL persisted records: a real BLOCKED chain and a real 
     // INCONCLUSIVE_HYPOTHESIS (priority 2) outranks BLOCKED_CHAIN (priority 1).
     expect(answer.domain).toBe('cyber-security');
     expect(answer.consideredAlternatives.some((a) => a.domain === 'mechanism-research-chain' && a.kind === 'BLOCKED_CHAIN')).toBe(true);
+  });
+});
+
+/**
+ * THE LAST ARROW OF THE LOOP, on the flagship shape.
+ *
+ * Everything under here runs the REAL scientific loop — `runScientificDiscoveryLoop`
+ * (competing hypotheses -> preregistration -> real execution against a real engine ->
+ * assessment -> evidence chain -> `selectNextHypothesisExperiment`) — persists it with
+ * the REAL `saveScientificDiscoveryLoopToMemory`, and then asks `synthesizeNextQuestion()`
+ * with NO fixture override. No hand-written `SavedExperiment` anywhere in this block:
+ * if the loop's own records were invisible to Next Question (which they were before this
+ * change), every assertion here fails.
+ */
+describe('Next Question reads the real hypothesis/discovery loop — the cycle actually closes', () => {
+  const QUESTION_ID = 'problem:intervention-timing';
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a really-executed discovery loop becomes a real open item, carrying Genesis\'s OWN next experiment verbatim', async () => {
+    const { runScientificDiscoveryLoop } = await import('../core/experimentFabric/scientificDiscoveryLoop');
+    const { saveScientificDiscoveryLoopToMemory } = await import('../core/scienceMemory');
+    const { synthesizeNextQuestion: realSynthesize, collectCrossDomainOpenItems: realCollect } =
+      await import('../core/agent/crossDomainSynthesis');
+
+    const loop = runScientificDiscoveryLoop(QUESTION_ID);
+    const saved = saveScientificDiscoveryLoopToMemory(loop);
+
+    const items = realCollect();
+    const fromLoop = items.filter((item) => item.sourceExperimentId === saved.id);
+    expect(fromLoop.length).toBeGreaterThan(0);
+    expect(fromLoop.every((item) => item.shape === 'hypothesisLoop' || item.shape === 'discoveryLoop')).toBe(true);
+
+    const answer = realSynthesize();
+    expect(answer).not.toBeNull();
+    if (!answer) return;
+
+    // Whatever the loop's real state turned out to be, the reported next step for a
+    // discoveryLoop item must be the persisted one, never a template invented here.
+    const discoveryItem = fromLoop.find((item) => item.shape === 'discoveryLoop');
+    if (discoveryItem) {
+      expect(discoveryItem.domainNextStep).toBeDefined();
+      expect(discoveryItem.domainNextStep).toContain(saved.discoveryLoop!.nextExperiment.resolves);
+      expect(discoveryItem.detail).toContain(saved.discoveryLoop!.nextExperiment.why);
+    }
+  });
+
+  it('every open item it reports is backed by a status the loop itself recorded — never inferred', async () => {
+    const { runScientificDiscoveryLoop } = await import('../core/experimentFabric/scientificDiscoveryLoop');
+    const { saveScientificDiscoveryLoopToMemory } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems: realCollect } = await import('../core/agent/crossDomainSynthesis');
+
+    const saved = saveScientificDiscoveryLoopToMemory(runScientificDiscoveryLoop(QUESTION_ID));
+    const loopRecord = saved.hypothesisLoop!;
+
+    for (const item of realCollect().filter((entry) => entry.shape === 'hypothesisLoop')) {
+      if (item.kind === 'UNDECIDED_DISCRIMINATION') {
+        expect(loopRecord.discrimination.decisive).toBe(false);
+        continue;
+      }
+      // Any per-hypothesis item must correspond to a real INCONCLUSIVE/BLOCKED outcome.
+      const expectedStatus = item.kind === 'BLOCKED_HYPOTHESIS' ? 'BLOCKED' : 'INCONCLUSIVE';
+      expect(loopRecord.outcomes.some((outcome) => outcome.status === expectedStatus)).toBe(true);
+    }
+  });
+
+  it('a SUPPORTED/FALSIFIED hypothesis is never reopened — settled within its protocol stays settled', async () => {
+    const { runScientificDiscoveryLoop } = await import('../core/experimentFabric/scientificDiscoveryLoop');
+    const { saveScientificDiscoveryLoopToMemory } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems: realCollect } = await import('../core/agent/crossDomainSynthesis');
+
+    const saved = saveScientificDiscoveryLoopToMemory(runScientificDiscoveryLoop(QUESTION_ID));
+    const settled = saved.hypothesisLoop!.outcomes.filter(
+      (outcome) => outcome.status === 'SUPPORTED' || outcome.status === 'FALSIFIED',
+    );
+    const statements = new Set(
+      settled.map((outcome) =>
+        saved.hypothesisLoop!.hypotheses.find((h) => h.hypothesisId === outcome.hypothesisId)?.statement,
+      ),
+    );
+
+    const perHypothesisItems = realCollect().filter(
+      (item) => item.shape === 'hypothesisLoop' && item.kind !== 'UNDECIDED_DISCRIMINATION',
+    );
+    for (const item of perHypothesisItems) {
+      expect(statements.has(item.question)).toBe(false);
+    }
+  });
+
+  it('is deterministic across repeated synthesis of the same persisted loop', async () => {
+    const { runScientificDiscoveryLoop } = await import('../core/experimentFabric/scientificDiscoveryLoop');
+    const { saveScientificDiscoveryLoopToMemory } = await import('../core/scienceMemory');
+    const { synthesizeNextQuestion: realSynthesize } = await import('../core/agent/crossDomainSynthesis');
+
+    saveScientificDiscoveryLoopToMemory(runScientificDiscoveryLoop(QUESTION_ID));
+    const fixedNow = Date.parse('2026-01-01T00:00:00.000Z');
+    const first = realSynthesize(undefined, fixedNow);
+    const second = realSynthesize(undefined, fixedNow);
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+  });
+});
+
+/**
+ * REACHABILITY, not logic.
+ *
+ * The E2E run that validated the block above also exposed why the last arrow
+ * had stayed invisible in practice: `discoveryLoop` is the ONLY Science Memory
+ * shape that carries the selector's chosen next experiment, and nothing in the
+ * running application ever wrote it — `saveScientificDiscoveryLoopToMemory` had
+ * test callers only. Correct logic over a shape no screen can produce is a
+ * capability on paper. This guards the shape's production entry point, so the
+ * same defect cannot come back silently by someone dropping the save button.
+ */
+describe('the discoveryLoop shape has a real production writer, not only test callers', () => {
+  it('at least one shipped component calls saveScientificDiscoveryLoopToMemory', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+
+    const callers: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry !== '__tests__' && entry !== 'node_modules') walk(full);
+          continue;
+        }
+        if (!full.endsWith('.tsx') && !full.endsWith('.ts')) continue;
+        if (full.includes('/core/scienceMemory.ts')) continue; // the definition, not a caller
+        if (readFileSync(full, 'utf8').includes('saveScientificDiscoveryLoopToMemory')) callers.push(full);
+      }
+    };
+    walk(join(process.cwd(), 'src'));
+
+    expect(callers.length).toBeGreaterThan(0);
+    // A component, not another core module quietly re-exporting it.
+    expect(callers.some((file) => file.endsWith('.tsx'))).toBe(true);
   });
 });

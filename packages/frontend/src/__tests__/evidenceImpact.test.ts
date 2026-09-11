@@ -24,6 +24,11 @@ function makeFakeStorage(): Storage {
 describe('computeEvidenceImpact — real multi-cycle Research Campaign chain', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  // Chains 3 REAL sequential Research Campaign cycles (no mocked solver) —
+  // consistently ~6s on this machine, past vitest's 5000ms default. Not a
+  // parallel-worker flake (it fails standalone, every time): the workload
+  // itself is genuinely slower than the default, so the deadline is
+  // widened rather than the test weakened.
   it('evidence from Cycle #1, used to justify Cycle #2 and Cycle #3 → impact score = 2 (one direct, one transitive)', async () => {
     vi.resetModules();
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
@@ -75,7 +80,7 @@ describe('computeEvidenceImpact — real multi-cycle Research Campaign chain', (
       const hasConcerningStatus = recordedStatuses.some((status) => status === 'FALSIFIED' || status === 'INCONCLUSIVE' || status === 'BLOCKED');
       expect(Boolean(flaggedEntry)).toBe(hasConcerningStatus);
     }
-  });
+  }, 20000);
 
   it('a record with no dependents reports zero impact honestly, not an error', async () => {
     vi.resetModules();

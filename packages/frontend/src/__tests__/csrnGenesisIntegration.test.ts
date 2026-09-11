@@ -33,6 +33,10 @@ function makeFakeStorage(): Storage {
 describe('CSRN certificate over a real Research Campaign cycle', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  // Chains 2 REAL sequential Research Campaign cycles (no mocked solver) plus
+  // real ECDSA signing/verification — measured 4.7-5.4s across runs, straddling
+  // vitest's 5000ms default (same root cause as evidenceImpact.test.ts's fix
+  // earlier: genuinely slow real work, not a parallel-worker flake).
   it('a real, saved discovery-loop cycle can be certified, signed, and audited as INTEGRITY_VALID_SIGNED_VERIFIED', async () => {
     vi.resetModules();
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
@@ -75,7 +79,7 @@ describe('CSRN certificate over a real Research Campaign cycle', () => {
 
     const untrusted = await auditCertificate(cert, new Set());
     expect(untrusted.verdict).toBe('INTEGRITY_VALID_SIGNED_UNTRUSTED');
-  });
+  }, 20000);
 
   it('tampering with the SAVED Science Memory record after certification is caught by the audit — a real integrity finding, not a contrived one', async () => {
     vi.resetModules();

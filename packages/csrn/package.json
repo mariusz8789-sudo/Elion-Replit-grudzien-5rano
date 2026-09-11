@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "description": "Certification / addressing / evidence-exchange layer over existing Genesis evidence, replay and provenance objects — not a second research system.",
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./dist/src/index.js"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "build": "tsc -b",

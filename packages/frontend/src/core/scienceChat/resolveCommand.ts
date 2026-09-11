@@ -1,4 +1,5 @@
 import type { HonestyLevel, ParamDef, SimParams } from '../types';
+import type { ResearchChainSearchQuery } from '../scienceMemory';
 import { resolveQuery } from '../generator/resolve';
 import { epistemicStatusOf, getRecipes, type SimulationRecipe } from '../generator/recipe';
 import { normalize } from '../generator/resolve';
@@ -37,7 +38,7 @@ export type ScientificIntent =
   | 'OPEN_SIMULATION' | 'CHANGE_PARAMETER' | 'WHAT_IF' | 'EXPLAIN'
   | 'SHOW_EQUATION' | 'SHOW_ASSUMPTIONS' | 'COMPARE_MODELS' | 'CREATE_TASK'
   | 'CHECK_RESULT' | 'VERIFY' | 'PROPOSE_EXPERIMENT' | 'OPEN_CAMPAIGN'
-  | 'SAVE' | 'LIST' | 'LOAD' | 'CONTROL' | 'HELP' | 'UNKNOWN';
+  | 'SAVE' | 'LIST' | 'LOAD' | 'CONTROL' | 'HELP' | 'SEARCH_RESEARCH_CHAINS' | 'UNKNOWN';
 
 export type ChatAction =
   | { type: 'open'; labId: string; experimentId?: string; params?: Partial<SimParams> }
@@ -46,6 +47,17 @@ export type ChatAction =
   | { type: 'save' }
   | { type: 'list' }
   | { type: 'load'; index: number }
+  /**
+   * A filtered read over saved research chains (`searchResearchChains`,
+   * `scienceMemory.ts`) — deliberately NOT named "campaign" (see that
+   * function's own doc: Genesis's "Campaign" already means the backend
+   * molecule-optimization workshop, a different concept, per C3's audit).
+   * `query` is parsed here from keywords in the message BEFORE this action
+   * is returned — the same discipline as `runDecipherment`'s
+   * `sequenceText` — so `ScienceChat.tsx` only has to execute the query,
+   * never re-derive it from the raw text.
+   */
+  | { type: 'searchResearchChains'; query: ResearchChainSearchQuery }
   | { type: 'compare'; a: ModelConfig; b: ModelConfig }
   | { type: 'openRoute'; hash: string }
   /** GENESIS WORLD INTERACTION — forwards one sentence to whichever real 3D scene is currently
@@ -341,6 +353,30 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
         action: { type: 'observe', sentence: message },
       };
     }
+  }
+
+  // --- Research chain search (C1: campaign search / evidence:// task) — a FILTERED
+  //     read over saved research chains, checked before the general "pamiec naukowa"
+  //     catch-all below so a more specific request does not fall into the plain list.
+  //     Deliberately not "kampani*": that word already means the backend molecule-
+  //     optimization workshop (`OPEN_CAMPAIGN` below) — a different concept per C3's audit.
+  if (has(norm, 'lancuch badawcz', 'lancuchy badawcz', 'historia lancucha badawczego', 'historia lancuchow badawczych')) {
+    const terminalStatus: ResearchChainSearchQuery['terminalStatus'] = has(norm, 'rozstrzygniet', 'osiagniet wynik')
+      ? 'SETTLED'
+      : has(norm, 'zablokowan')
+        ? 'BLOCKED'
+        : has(norm, 'niejednoznaczn', 'nierozstrzygniet')
+          ? 'INCONCLUSIVE'
+          : has(norm, 'otwart')
+            ? 'OPEN'
+            : undefined;
+    const query: ResearchChainSearchQuery = terminalStatus === undefined ? {} : { terminalStatus };
+    return {
+      text: 'Szukam zapisanych łańcuchów badawczych (Pamięć Naukowa, lokalnie w tej przeglądarce)…',
+      tag: 'SYSTEM',
+      intent: 'SEARCH_RESEARCH_CHAINS',
+      action: { type: 'searchResearchChains', query },
+    };
   }
 
   // --- Scientific Memory history — otwiera istniejący lokalny ekran historii.

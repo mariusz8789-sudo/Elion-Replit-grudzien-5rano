@@ -7,7 +7,7 @@ import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingComparison } from '../core/compareBridge';
 import { resetActiveSim, toggleActiveSimRunning } from '../core/activeSimControls';
 import { getActiveObservationControl } from '../core/activeObservationControl';
-import { saveExperiment, listExperiments, saveBiotechDiscoveryComparisonToMemory, type SavedBiotechComputeRun } from '../core/scienceMemory';
+import { saveExperiment, listExperiments, searchResearchChains, saveBiotechDiscoveryComparisonToMemory, type SavedBiotechComputeRun } from '../core/scienceMemory';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { track } from '../core/analytics';
 import { parseScienceChatMessage, planEvidenceGuidedExperiment, confirmEvidenceGuidedExperiment, confirmEarthquakeEvidenceGuidedExperiment, confirmBackendEvidenceGuidedExperiment, isBackendEvidenceGuidedPlan, capsuleFromConfirmedExperiment, type EvidenceGuidedExperimentPlan, type EvidenceGuidedExperimentCapsule, type ExperimentRun } from '../core/experimentFabric';
@@ -772,6 +772,18 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       const rec = listExperiments()[a.index - 1];
       if (!rec) appendGenesis(`Nie ma zapisanego eksperymentu #${a.index}. Wpisz „pokaż zapisane", by zobaczyć listę.`);
       else { setPendingScenario(rec.labId, rec.params, rec.experimentId); window.location.hash = `#/lab/${rec.labId}`; setOpen(false); }
+    } else if (a?.type === 'searchResearchChains') {
+      const results = searchResearchChains(a.query);
+      if (results.length === 0) {
+        appendGenesis('Żaden zapisany łańcuch badawczy nie pasuje do tego zapytania. Wpisz „łańcuchy badawcze", by zobaczyć wszystkie.');
+      } else {
+        appendGenesis(
+          results.slice(0, 10).map((r, i) =>
+            `${i + 1}. ${r.manifest.initialQuestion} · ${r.manifest.chainShape} · ${r.manifest.terminalStatus} · ${r.manifest.steps.length} krok(ów), ${r.manifest.selfChosenSteps} wybranych samodzielnie · ${new Date(r.createdAt).toLocaleString('pl-PL')}`
+          ).join('\n')
+          + (results.length > 10 ? `\n\n…i ${results.length - 10} więcej.` : ''),
+        );
+      }
     }
   };
 

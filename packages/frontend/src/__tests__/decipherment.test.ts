@@ -353,14 +353,24 @@ describe('Science Memory integration — one shape on SavedExperiment, no second
   });
 });
 
-describe('chat intent routes to the existing Decipherment Workspace, through the one command layer', () => {
-  it('recognises decipherment phrasing in both languages and opens the existing screen, not a second engine', async () => {
+describe('chat intent runs the real Decipherment orchestrator inline (ETAP 1.5), through the one command layer', () => {
+  it('recognises decipherment phrasing in both languages and returns a runDecipherment action, not a second engine', async () => {
     const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     for (const phrase of ['deszyfracja', 'szyfr cezara', 'caesar cipher', 'nieznane symbole', 'kryptoanaliza', 'sekwencja glifow']) {
       const out = resolveCommand(phrase, null);
-      expect(out.action, phrase).toEqual({ type: 'openRoute', hash: '#/decipherment' });
+      expect(out.action, phrase).toEqual({ type: 'runDecipherment', sequenceText: null });
       expect(out.tag, phrase).toBe('MODEL');
     }
+  });
+
+  it('extracts an ALL-CAPS candidate sequence after a colon, never guessing from an ordinary word', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
+    const withSequence = resolveCommand('deszyfracja: DWWDFNDWGDZQ', null);
+    expect(withSequence.action).toEqual({ type: 'runDecipherment', sequenceText: 'DWWDFNDWGDZQ' });
+
+    // No colon, no all-caps token anywhere -> must not mistake an ordinary lowercase word for a sequence.
+    const withoutSequence = resolveCommand('deszyfracja tego tekstu', null);
+    expect(withoutSequence.action).toEqual({ type: 'runDecipherment', sequenceText: null });
   });
 
   it('states the no-OCR boundary up front, not just inside the workspace', async () => {

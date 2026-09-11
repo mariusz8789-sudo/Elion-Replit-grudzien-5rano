@@ -166,6 +166,17 @@ export interface CyberInvestigationResult {
   /** Present only once a remediation has actually been applied and independently re-tested. */
   readonly retestResult: SecurityTestResult | null;
   readonly retestVerdict: SecurityVerdict | null;
+  /**
+   * Hypothesis ids whose `verdicts` history (across every test this
+   * investigation ran against them) holds BOTH a SUPPORTED_WITHIN_PROTOCOL
+   * and a FALSIFIED_WITHIN_PROTOCOL assessment — preserved here, never
+   * averaged away. Same rule `runAdaptiveInvestigation`'s own `conflicts`
+   * already applies live in `cyberReasoningKernel.ts`; this field is what
+   * lets that same information survive into the PERSISTED record (it did
+   * not before — see `toCyberInvestigationResultFromAdaptive`'s doc).
+   * Always an array, never omitted: empty means none, not "not computed".
+   */
+  readonly conflicts: readonly string[];
 }
 
 function nonEmptyString(value: unknown): value is string {
@@ -231,11 +242,15 @@ export function isWellFormedCyberInvestigation(value: unknown): value is CyberIn
   if (!Array.isArray(v.hypotheses) || v.hypotheses.length === 0 || !v.hypotheses.every(isVulnerabilityHypothesis)) return false;
   if (!Array.isArray(v.testResults) || v.testResults.length === 0 || !v.testResults.every(isSecurityTestResult)) return false;
   if (!Array.isArray(v.verdicts) || v.verdicts.length === 0) return false;
+  if (!Array.isArray(v.conflicts) || !v.conflicts.every((c) => typeof c === 'string')) return false;
   // Every hypothesis's derivedFromAssetIds must resolve to a real declared asset — anti-fabrication, not just non-empty.
   const attackSurface = v.attackSurface as AttackSurface | undefined;
   const assetIds = new Set((attackSurface?.assets ?? []).map((a) => a.assetId));
   for (const h of v.hypotheses as VulnerabilityHypothesis[]) {
     if (!h.derivedFromAssetIds.every((id) => assetIds.has(id))) return false;
   }
+  // Every conflict must name a hypothesis this investigation actually declared — never a fabricated id.
+  const hypothesisIds = new Set((v.hypotheses as VulnerabilityHypothesis[]).map((h) => h.hypothesisId));
+  if (!(v.conflicts as string[]).every((id) => hypothesisIds.has(id))) return false;
   return true;
 }

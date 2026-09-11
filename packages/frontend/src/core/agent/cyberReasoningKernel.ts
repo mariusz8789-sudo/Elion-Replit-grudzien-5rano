@@ -566,5 +566,48 @@ export function toCyberInvestigationResult(
     remediation: extras.remediation ?? null,
     retestResult: extras.retestResult ?? null,
     retestVerdict: extras.retestVerdict ?? null,
+    // The simple, non-adaptive loop this converts from never produces the
+    // SUPPORTED+FALSIFIED history conflicts require — see
+    // `toCyberInvestigationResultFromAdaptive` for the real, non-empty source.
+    conflicts: [],
+  };
+}
+
+/**
+ * The bridge this gap plan actually needed: `runAdaptiveInvestigation` is
+ * the loop the UI (Chat, `CyberWorkspace`) really runs, and its live
+ * `AdaptiveInvestigationResult` already computes real conflicts — but
+ * until this function existed, there was no path from that result to the
+ * persistable `CyberInvestigationResult`, so a Chat-run cyber investigation
+ * could never actually be saved to Science Memory. This is that path.
+ *
+ * `attackPath` is honestly `null`: the adaptive loop never calls
+ * `executeRelationTests` (it does not retain the `ToyVulnerableApp`
+ * reference needed to run relation-probe/control-probe pairs after the
+ * fact), so there is no real attack-path evidence to report — reporting
+ * one anyway would be fabrication.
+ */
+export function toCyberInvestigationResultFromAdaptive(
+  investigationId: string,
+  goal: string,
+  result: AdaptiveInvestigationResult,
+): CyberInvestigationResult {
+  const attackSurface: AttackSurface = { assets: result.assets, trustBoundaries: buildTrustBoundaries(result.assets) };
+  const testResults = result.steps.map((s) => s.testResult).filter((t): t is SecurityTestResult => t !== null);
+  const verdicts = result.steps.map((s) => s.verdict).filter((v): v is SecurityVerdict => v !== null);
+  const remediationStep = [...result.steps].reverse().find((s) => s.remediation !== null);
+  return {
+    investigationId,
+    goal,
+    observations: result.observations,
+    attackSurface,
+    hypotheses: result.hypotheses,
+    testResults,
+    verdicts,
+    attackPath: null,
+    remediation: remediationStep?.remediation ?? null,
+    retestResult: remediationStep?.testResult ?? null,
+    retestVerdict: remediationStep?.verdict ?? null,
+    conflicts: result.conflicts,
   };
 }

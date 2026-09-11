@@ -53,7 +53,7 @@ function baseExperiment(overrides: Partial<SavedExperiment> & Pick<SavedExperime
   };
 }
 
-function cyberResultWithInconclusive(): CyberInvestigationResult {
+function cyberResultWithInconclusive(overrides: Partial<CyberInvestigationResult> = {}): CyberInvestigationResult {
   return {
     investigationId: 'inv-1',
     goal: 'Is /profile safe?',
@@ -72,7 +72,21 @@ function cyberResultWithInconclusive(): CyberInvestigationResult {
     remediation: null,
     retestResult: null,
     retestVerdict: null,
+    conflicts: [],
+    ...overrides,
   };
+}
+
+/** Same fixture, but with a real SUPPORTED+FALSIFIED history preserved as a conflict — the shape
+ * `toCyberInvestigationResultFromAdaptive` actually produces from a live `runAdaptiveInvestigation`. */
+function cyberResultWithConflict(): CyberInvestigationResult {
+  return cyberResultWithInconclusive({
+    verdicts: [
+      { hypothesisId: 'hyp:AUTH_BYPASS::/profile', assessment: 'SUPPORTED_WITHIN_PROTOCOL', reasoning: 'First test matched the predicted observable.' },
+      { hypothesisId: 'hyp:AUTH_BYPASS::/profile', assessment: 'FALSIFIED_WITHIN_PROTOCOL', reasoning: 'Independent retest matched the falsifying observable instead.' },
+    ],
+    conflicts: ['hyp:AUTH_BYPASS::/profile'],
+  });
 }
 
 function deciphermentResultWithConflict(): DeciphermentCaseResult {
@@ -117,7 +131,73 @@ function deciphermentResultWithConflict(): DeciphermentCaseResult {
   };
 }
 
-describe('collectCrossDomainOpenItems: reads three domains\' own terminal-status vocabularies, invents nothing', () => {
+function worldDiscoveryResultWithUnresolvedQuestion(): SavedExperiment['worldDiscovery'] {
+  return {
+    contractVersion: '1.0.0',
+    resultKind: 'HYPOTHESIS_LOOP',
+    goal: 'Maximise output.',
+    catalogId: 'catalog-1',
+    worldId: 'world-1',
+    domainId: 'domain-1',
+    objectiveMetric: 'output',
+    objectiveDirection: 'maximize',
+    loopResult: {
+      contractVersion: '1.0.0',
+      question: 'Which lever maximises output?',
+      worldId: 'world-1',
+      domainId: 'domain-1',
+      beliefs: [],
+      rounds: [],
+      trace: [],
+      stopReason: 'ROUND_BUDGET_EXHAUSTED',
+      failedHypotheses: [],
+      bestSupported: [],
+      unresolvedQuestions: ['Does lever B interact with lever C?'],
+      declaredAssumptions: [],
+      notModelledFactors: [],
+    },
+    evidence: null,
+    resumedFromMemory: null,
+    resultFingerprint: 'fp:world-discovery-1',
+  };
+}
+
+function mechanismCompositionResultInconclusive(): SavedExperiment['mechanismComposition'] {
+  return {
+    contractVersion: '1.0.0',
+    catalogId: 'catalog-1',
+    goal: 'Maximise output.',
+    worldId: 'world-1',
+    domainId: 'domain-1',
+    resumedFromMemory: null,
+    derived: {
+      contractVersion: '1.0.0',
+      hypothesisId: 'joint:leverA+leverB',
+      parentHypothesisIds: ['hyp:leverA', 'hyp:leverB'],
+      strength: 1,
+      metric: 'output',
+      entityId: 'entity-1',
+      statement: 'Lever A and lever B compose to raise output.',
+      why: 'Both individually raised output; testing whether they compose.',
+    },
+    assessment: {
+      contractVersion: '1.0.0',
+      baseline: 10,
+      effectA: 2,
+      effectB: 2,
+      naiveAdditivePrediction: 14,
+      jointObserved: 14,
+      deviation: 0,
+      relativeDeviation: 0,
+      interaction: 'INCONCLUSIVE',
+      reason: 'Measurement noise exceeds the deviation needed to classify additive vs. non-additive.',
+    },
+    betterThanBestSingle: false,
+    resultFingerprint: 'fp:mechanism-composition-1',
+  };
+}
+
+describe('collectCrossDomainOpenItems: reads four domains\' own terminal-status vocabularies, invents nothing', () => {
   it('finds an INCONCLUSIVE cyber hypothesis, an UNRESOLVED_CONFLICT decipherment hypothesis, and a BLOCKED research chain, each attributed to its own domain', () => {
     const records: SavedExperiment[] = [
       baseExperiment({ id: 'cyber-1', labId: 'cyber-security', cyberInvestigation: { contractVersion: '1.0.0', result: cyberResultWithInconclusive(), resultFingerprint: 'fp:cyber-1' } }),
@@ -139,16 +219,58 @@ describe('collectCrossDomainOpenItems: reads three domains\' own terminal-status
           selfChosenSteps: 0, stoppedBecause: 'settled its question', terminalStatus: 'SETTLED', resultFingerprint: 'fp:chain-2',
         },
       }),
+      baseExperiment({ id: 'world-1', labId: 'world-discovery', worldDiscovery: worldDiscoveryResultWithUnresolvedQuestion() }),
     ];
 
     const items = collectCrossDomainOpenItems(records);
     const byDomain = new Map(items.map((i) => [i.labId, i]));
 
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(4);
     expect(byDomain.get('cyber-security')?.kind).toBe('INCONCLUSIVE_HYPOTHESIS');
     expect(byDomain.get('decipherment')?.kind).toBe('UNRESOLVED_CONFLICT');
     expect(byDomain.get('mechanism-research-chain')?.kind).toBe('BLOCKED_CHAIN');
+    expect(byDomain.get('world-discovery')?.kind).toBe('UNRESOLVED_QUESTION');
+    expect(byDomain.get('world-discovery')?.question).toBe('Does lever B interact with lever C?');
     expect(byDomain.has('parameter-research-chain')).toBe(false);
+  });
+
+  it('finds an INCONCLUSIVE joint-mechanism composition (interaction could not be classified) as INCONCLUSIVE_HYPOTHESIS', () => {
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'mech-1', labId: 'domain-1', mechanismComposition: mechanismCompositionResultInconclusive() }),
+    ];
+    const items = collectCrossDomainOpenItems(records);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe('INCONCLUSIVE_HYPOTHESIS');
+    expect(items[0]?.shape).toBe('mechanismComposition');
+    expect(items[0]?.question).toBe('Lever A and lever B compose to raise output.');
+  });
+
+  it('finds no open item in a mechanism composition whose interaction WAS classified (ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE)', () => {
+    const classified = mechanismCompositionResultInconclusive()!;
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'mech-2', labId: 'domain-1', mechanismComposition: { ...classified, assessment: { ...classified.assessment, interaction: 'ADDITIVE' } } }),
+    ];
+    expect(collectCrossDomainOpenItems(records)).toHaveLength(0);
+  });
+
+  it('finds no open item in a world-discovery record whose loop left nothing unresolved', () => {
+    const settled = worldDiscoveryResultWithUnresolvedQuestion()!;
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'world-2', labId: 'world-discovery', worldDiscovery: { ...settled, loopResult: { ...settled.loopResult!, unresolvedQuestions: [] } } }),
+    ];
+    expect(collectCrossDomainOpenItems(records)).toHaveLength(0);
+  });
+
+  it('reports a real cyber conflict (SUPPORTED and FALSIFIED both on record for the same hypothesis) as UNRESOLVED_CONFLICT, not merely INCONCLUSIVE', () => {
+    const records: SavedExperiment[] = [
+      baseExperiment({ id: 'cyber-conflict-1', labId: 'cyber-security', cyberInvestigation: { contractVersion: '1.0.0', result: cyberResultWithConflict(), resultFingerprint: 'fp:cyber-conflict-1' } }),
+    ];
+    const items = collectCrossDomainOpenItems(records);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe('UNRESOLVED_CONFLICT');
+    expect(items[0]?.shape).toBe('cyberInvestigation');
+    expect(items[0]?.detail).toContain('SUPPORTED_WITHIN_PROTOCOL');
+    expect(items[0]?.detail).toContain('FALSIFIED_WITHIN_PROTOCOL');
   });
 });
 
@@ -273,9 +395,16 @@ describe('End to end on REAL persisted records: a real BLOCKED chain and a real 
     const answer = realSynthesize();
     expect(answer).not.toBeNull();
     if (!answer) return;
-    expect(answer.domainsScanned).toBeGreaterThanOrEqual(2);
-    // INCONCLUSIVE_HYPOTHESIS (priority 2) outranks BLOCKED_CHAIN (priority 1).
-    expect(answer.domain).toBe('cyber-security');
+    // Real production side effect, not a fixture: `runMechanismDiscoveryAndRemember`
+    // (discoveryOrchestrator.ts) banks a REAL `worldDiscovery` record on every step,
+    // under the catalog's own worldId — so this run surfaces a third, genuinely
+    // real domain alongside cyber-security and mechanism-research-chain.
+    expect(answer.domainsScanned).toBeGreaterThanOrEqual(3);
+    // UNRESOLVED_QUESTION (priority 3) outranks INCONCLUSIVE_HYPOTHESIS (priority 2)
+    // outranks BLOCKED_CHAIN (priority 1) — a real question the discovery loop itself
+    // named as unanswered wins over both.
+    expect(answer.domain).toBe(GENESIS_GENERATOR_CATALOG.worldId);
+    expect(answer.consideredAlternatives.some((a) => a.domain === 'cyber-security' && a.kind === 'INCONCLUSIVE_HYPOTHESIS')).toBe(true);
     expect(answer.consideredAlternatives.some((a) => a.domain === 'mechanism-research-chain' && a.kind === 'BLOCKED_CHAIN')).toBe(true);
   });
 });

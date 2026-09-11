@@ -719,7 +719,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   writeJSON(KEY, all);
   // Every `save*ToMemory` helper funnels through here, so this one call covers
   // the whole store — see `scienceMemoryEvents.ts` for why the signal exists.
-  notifyScienceMemoryChanged();
+  notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: entry.id });
   return entry;
 }
 
@@ -3030,7 +3030,7 @@ export function getExperiment(id: string): SavedExperiment | undefined {
 
 export function deleteExperiment(id: string): void {
   writeJSON(KEY, readAll().filter((e) => e.id !== id));
-  notifyScienceMemoryChanged();
+  notifyScienceMemoryChanged({ reason: 'DELETED', experimentId: id });
 }
 
 export function countExperiments(): number {

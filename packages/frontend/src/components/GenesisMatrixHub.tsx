@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
-import { subscribeScienceMemory } from '../core/scienceMemoryEvents';
+import { subscribeScienceMemoryChanges } from '../core/scienceMemoryEvents';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL, type MatrixEdge, type MatrixRelationGraph } from '../core/agent/matrixRelations';
 
@@ -283,7 +283,7 @@ function MatrixGraph({ nodes, relations, selectedId, onSelect }: MatrixGraphProp
 
 export function GenesisMatrixHub() {
   const [records, setRecords] = useState<readonly SavedExperiment[]>(() => listExperiments());
-  useEffect(() => subscribeScienceMemory(() => setRecords(listExperiments())), []);
+  useEffect(() => subscribeScienceMemoryChanges(() => setRecords(listExperiments())), []);
   const withKinds = useMemo(() => records.map((r) => ({ record: r, kinds: kindsOf(r) })), [records]);
   const countsByKind = useMemo(() => {
     const counts = new Map<MatrixKind, number>();

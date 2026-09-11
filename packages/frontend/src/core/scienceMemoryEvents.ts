@@ -10,7 +10,7 @@
  * `notifyScienceMemoryChanged` is called from exactly one place —
  * `scienceMemory.ts`'s own `saveExperiment`/`deleteExperiment`, right after
  * the real mutation lands — never speculatively, and never from a screen or
- * any other module. `scienceMemoryEventsBoundary.test.ts` enforces this by
+ * any other module. `scienceMemoryEvents.test.ts` enforces this by
  * scanning the whole source tree for any other caller.
  */
 
@@ -35,8 +35,11 @@ export function subscribeScienceMemoryChanges(listener: Listener): () => void {
 /**
  * Called ONLY by `scienceMemory.ts`, right after `saveExperiment`/
  * `deleteExperiment` really writes — see this module's own doc and
- * `scienceMemoryEventsBoundary.test.ts`.
+ * `scienceMemoryEvents.test.ts`.
  */
 export function notifyScienceMemoryChanged(event: ScienceMemoryChangeEvent): void {
-  for (const listener of listeners) listener(event);
+  // Snapshot before iterating: a listener that unsubscribes itself (or another
+  // listener) while handling this event must never cause the live `Set` to
+  // skip whoever comes after it mid-iteration.
+  for (const listener of [...listeners]) listener(event);
 }

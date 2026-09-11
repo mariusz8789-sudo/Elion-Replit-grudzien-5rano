@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { GenesisMatrixHub, kindsOf, type MatrixKind } from '../components/GenesisMatrixHub';
+import { GenesisMatrixHub, kindsOf, buildGraphLayout, type MatrixKind } from '../components/GenesisMatrixHub';
 import type { SavedExperiment } from '../core/scienceMemory';
 
 /**
@@ -56,6 +56,38 @@ describe('kindsOf — real classification, never fabricated or uncategorized', (
   });
 });
 
+describe('buildGraphLayout — Etap 3 Matrix graph, deterministic and never reshuffled', () => {
+  it('groups by primary kind into columns, ordered by ALL_KINDS, only for kinds actually present', () => {
+    const items = [
+      { record: baseRecord({ id: 'a', scenario: {} as SavedExperiment['scenario'] }), kinds: ['SCENARIO'] as MatrixKind[] },
+      { record: baseRecord({ id: 'b', cyberInvestigation: {} as SavedExperiment['cyberInvestigation'] }), kinds: ['CYBER'] as MatrixKind[] },
+    ];
+    const layout = buildGraphLayout(items);
+    // SCENARIO precedes CYBER in ALL_KINDS order — so with only these two kinds present,
+    // SCENARIO's column must come first, and only these two columns should exist at all.
+    expect(layout.columns).toEqual(['SCENARIO', 'CYBER']);
+    expect(layout.positions.has('a')).toBe(true);
+    expect(layout.positions.has('b')).toBe(true);
+    expect(layout.positions.get('a')!.x).toBeLessThan(layout.positions.get('b')!.x);
+  });
+
+  it('orders records within a column chronologically (oldest first), not by insertion order', () => {
+    const items = [
+      { record: baseRecord({ id: 'newer', createdAt: '2025-01-02T00:00:00.000Z' }), kinds: ['EXPERIMENT'] as MatrixKind[] },
+      { record: baseRecord({ id: 'older', createdAt: '2025-01-01T00:00:00.000Z' }), kinds: ['EXPERIMENT'] as MatrixKind[] },
+    ];
+    const layout = buildGraphLayout(items);
+    expect(layout.positions.get('older')!.y).toBeLessThan(layout.positions.get('newer')!.y);
+  });
+
+  it('an empty item list produces a valid, non-zero layout rather than a degenerate one', () => {
+    const layout = buildGraphLayout([]);
+    expect(layout.columns).toEqual([]);
+    expect(layout.width).toBeGreaterThan(0);
+    expect(layout.height).toBeGreaterThan(0);
+  });
+});
+
 describe('GenesisMatrixHub (no DOM — storage.ts degrades to an empty store)', () => {
   const html = renderToStaticMarkup(<GenesisMatrixHub />);
 
@@ -83,5 +115,15 @@ describe('GenesisMatrixHub (no DOM — storage.ts degrades to an empty store)', 
   it('docks the one real Science Chat rather than presenting a second chat surface', () => {
     expect(html).toContain('matrix-chat-dock');
     expect(html).toContain('Ta sama rozmowa co wszędzie w Genesis');
+  });
+
+  it('offers the List/Graph toggle even with zero records (defaults to List, per initial state)', () => {
+    expect(html).toContain('mx-view-toggle');
+    expect(html).toContain('>Lista<');
+    expect(html).toContain('>Graf<');
+    // Default view is the list — this is a static-markup render, so no click can switch it; the
+    // graph's own interactive behavior (toggling, node selection) is proven by real browser E2E.
+    expect(html).toContain('matrix-hub-grid');
+    expect(html).not.toContain('mx-graph-svg');
   });
 });

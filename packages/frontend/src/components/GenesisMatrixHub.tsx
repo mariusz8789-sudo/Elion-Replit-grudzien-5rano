@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
-import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/matrixRelations';
+import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL, type MatrixRelationGraph } from '../core/agent/matrixRelations';
 
 /**
  * GENESIS MATRIX — the central workspace, not a memory-record list.
@@ -37,6 +37,8 @@ import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/ma
 export type MatrixKind =
   | 'HYPOTHESIS' | 'WORLD' | 'MODEL' | 'SCENARIO' | 'EVIDENCE'
   | 'CYBER' | 'DECIPHERMENT' | 'RESEARCH_CHAIN' | 'REPLAY' | 'EXPERIMENT';
+
+const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'DECIPHERMENT', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
 
 const KIND_LABEL: Record<MatrixKind, string> = {
   HYPOTHESIS: 'Hypotheses', WORLD: 'Worlds', MODEL: 'Models', SCENARIO: 'Scenarios',
@@ -97,6 +99,149 @@ function timeAgo(iso: string): string {
 
 interface DetailTarget { record: SavedExperiment; kinds: MatrixKind[]; }
 
+/**
+ * MATRIX GRAPH — Etap 3: turns the list of records above into an actual map
+ * of the scientific process, not a second copy of it. Every node here is one
+ * of the SAME `withKinds` items the list view already computed; every edge
+ * is a SAME `relations.edges` entry from `matrixRelations.ts` — no second
+ * relation engine, no invented edge kind, no force-directed physics claiming
+ * a precision this data doesn't have. Layout is a plain deterministic grid
+ * (column = primary kind, row = chronological order within it) so the
+ * picture never reshuffles between renders. Clicking a node calls the SAME
+ * `onSelect` (= `openDetail`) the list/loop views already use, so selection,
+ * the relations list, and Next Action all come for free instead of being a
+ * second inspector.
+ */
+const GRAPH_COLUMN_WIDTH = 190;
+const GRAPH_ROW_HEIGHT = 60;
+const GRAPH_NODE_RADIUS = 14;
+const GRAPH_PADDING = 36;
+
+interface GraphLayout {
+  readonly columns: readonly MatrixKind[];
+  readonly positions: ReadonlyMap<string, { readonly x: number; readonly y: number }>;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Exported so the layout logic (grouping, chronological order, column filtering) is testable
+ * directly, the same convention `kindsOf` already uses in this file. */
+export function buildGraphLayout(items: readonly { record: SavedExperiment; kinds: MatrixKind[] }[]): GraphLayout {
+  const byColumn = new Map<MatrixKind, { record: SavedExperiment; kinds: MatrixKind[] }[]>();
+  for (const item of items) {
+    const column = item.kinds[0];
+    const bucket = byColumn.get(column);
+    if (bucket) bucket.push(item);
+    else byColumn.set(column, [item]);
+  }
+  // Oldest first within a column — a stable order, not a fabricated ranking.
+  for (const bucket of byColumn.values()) bucket.sort((a, b) => a.record.createdAt.localeCompare(b.record.createdAt));
+  const columns = ALL_KINDS.filter((k) => byColumn.has(k));
+
+  const positions = new Map<string, { x: number; y: number }>();
+  let maxRows = 0;
+  columns.forEach((column, columnIndex) => {
+    const bucket = byColumn.get(column)!;
+    maxRows = Math.max(maxRows, bucket.length);
+    bucket.forEach((item, rowIndex) => {
+      positions.set(item.record.id, {
+        x: GRAPH_PADDING + columnIndex * GRAPH_COLUMN_WIDTH,
+        y: GRAPH_PADDING + 20 + rowIndex * GRAPH_ROW_HEIGHT,
+      });
+    });
+  });
+
+  const width = GRAPH_PADDING * 2 + Math.max(0, columns.length - 1) * GRAPH_COLUMN_WIDTH + GRAPH_NODE_RADIUS * 2;
+  const height = GRAPH_PADDING * 2 + 20 + Math.max(0, maxRows - 1) * GRAPH_ROW_HEIGHT + GRAPH_NODE_RADIUS * 2;
+  return { columns, positions, width: Math.max(width, 200), height: Math.max(height, 160) };
+}
+
+interface MatrixGraphViewProps {
+  readonly items: readonly { record: SavedExperiment; kinds: MatrixKind[] }[];
+  readonly relations: MatrixRelationGraph;
+  readonly selectedId: string | null;
+  readonly onSelect: (target: DetailTarget) => void;
+}
+
+function MatrixGraphView({ items, relations, selectedId, onSelect }: MatrixGraphViewProps) {
+  const layout = useMemo(() => buildGraphLayout(items), [items]);
+  const visibleIds = useMemo(() => new Set(items.map((i) => i.record.id)), [items]);
+  // Only draw an edge when BOTH ends are actually on screen (e.g. still visible under the active
+  // kind filter) — a line to an invisible node would be worse than no line.
+  const visibleEdges = useMemo(
+    () => relations.edges.filter((e) => visibleIds.has(e.fromId) && visibleIds.has(e.toId)),
+    [relations, visibleIds],
+  );
+  const selectedEdgeKeys = useMemo(
+    () => new Set(selectedId ? edgesFor(relations, selectedId).map((e) => `${e.kind}:${e.fromId}:${e.toId}`) : []),
+    [relations, selectedId],
+  );
+  const connectedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of relations.edges) { set.add(e.fromId); set.add(e.toId); }
+    return set;
+  }, [relations]);
+  const isolatedCount = items.filter((i) => !connectedIds.has(i.record.id)).length;
+
+  return (
+    <div className="mx-graph-wrap">
+      <svg
+        className="mx-graph-svg"
+        width={layout.width}
+        height={layout.height}
+        viewBox={`0 0 ${layout.width} ${layout.height}`}
+        role="img"
+        aria-label="Genesis Matrix — graf relacji między zapisanymi przebiegami"
+      >
+        {layout.columns.map((column, columnIndex) => (
+          <text key={column} className="mx-graph-col-label" x={GRAPH_PADDING + columnIndex * GRAPH_COLUMN_WIDTH} y={14}>
+            {KIND_LABEL[column]}
+          </text>
+        ))}
+        <g className="mx-graph-edges">
+          {visibleEdges.map((edge) => {
+            const from = layout.positions.get(edge.fromId);
+            const to = layout.positions.get(edge.toId);
+            if (!from || !to) return null;
+            const key = `${edge.kind}:${edge.fromId}:${edge.toId}`;
+            const active = selectedEdgeKeys.has(key);
+            return <line key={key} x1={from.x} y1={from.y} x2={to.x} y2={to.y} className={`mx-graph-edge${active ? ' mx-graph-edge-active' : ''}`} />;
+          })}
+        </g>
+        <g className="mx-graph-nodes">
+          {items.map(({ record, kinds }) => {
+            const pos = layout.positions.get(record.id);
+            if (!pos) return null;
+            const isolated = !connectedIds.has(record.id);
+            const active = record.id === selectedId;
+            return (
+              <g
+                key={record.id}
+                className={`mx-graph-node${active ? ' mx-graph-node-active' : ''}${isolated ? ' mx-graph-node-isolated' : ''}`}
+                transform={`translate(${pos.x},${pos.y})`}
+                onClick={() => onSelect({ record, kinds })}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect({ record, kinds }); } }}
+                tabIndex={0}
+                role="button"
+                aria-label={`${record.experimentName || record.id}${isolated ? ' — bez powiązań' : ''}`}
+              >
+                <circle r={GRAPH_NODE_RADIUS} />
+                <text className="mx-graph-node-icon" textAnchor="middle" dy="0.35em">{KIND_ICON[kinds[0]]}</text>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+      {isolatedCount > 0 && (
+        <p className="mx-graph-isolated-note">
+          {isolatedCount} {isolatedCount === 1 ? 'obiekt bez wykrywalnych powiązań' : 'obiektów bez wykrywalnych powiązań'} — pokazane
+          normalnie (obwódka kreskowana), nie ukryte i nie dorysowane na siłę.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function GenesisMatrixHub() {
   const records = useMemo(() => listExperiments(), []);
   const withKinds = useMemo(() => records.map((r) => ({ record: r, kinds: kindsOf(r) })), [records]);
@@ -118,7 +263,7 @@ export function GenesisMatrixHub() {
   const latest = withKinds[0] ?? null; // listExperiments() sorts newest-first
   const recentFive = withKinds.slice(0, 5);
   const visible = activeKind ? withKinds.filter(({ kinds }) => kinds.includes(activeKind)) : withKinds;
-  const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'DECIPHERMENT', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
+  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
 
   const submitAsk = () => {
     const text = askInput.trim();
@@ -343,9 +488,15 @@ export function GenesisMatrixHub() {
       <section className="matrix-hub-grid-section" aria-label="Wszystkie rekordy">
         <div className="matrix-hub-grid-header">
           <h2 className="matrix-rail-title">Wszystkie rekordy {activeKind ? `· ${KIND_LABEL[activeKind]}` : ''}</h2>
+          <div className="mx-view-toggle" role="group" aria-label="Widok">
+            <button type="button" className={viewMode === 'list' ? 'mx-view-toggle-btn active' : 'mx-view-toggle-btn'} onClick={() => setViewMode('list')}>Lista</button>
+            <button type="button" className={viewMode === 'graph' ? 'mx-view-toggle-btn active' : 'mx-view-toggle-btn'} onClick={() => setViewMode('graph')}>Graf</button>
+          </div>
         </div>
         {visible.length === 0 ? (
           <p className="matrix-hub-empty">Brak rekordów w tej kategorii.</p>
+        ) : viewMode === 'graph' ? (
+          <MatrixGraphView items={visible} relations={relations} selectedId={detail?.record.id ?? null} onSelect={openDetail} />
         ) : (
           <div className="matrix-hub-grid">
             {visible.map(({ record, kinds }) => (

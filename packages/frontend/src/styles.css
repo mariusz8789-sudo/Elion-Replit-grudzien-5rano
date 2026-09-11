@@ -3975,7 +3975,33 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 
 /* ---- secondary: full record grid ---- */
 .matrix-hub-grid-section { border-top: 1px solid var(--mx-border); padding-top: 2rem; }
-.matrix-hub-grid-header { margin-bottom: 1.25rem; }
+.matrix-hub-grid-header { margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+/* ---- Etap 3: Matrix graph (List/Graph toggle + SVG node map) ---- */
+.mx-view-toggle { display: flex; gap: 0.35rem; background: var(--mx-panel); border: 1px solid var(--mx-border); border-radius: 999px; padding: 0.2rem; }
+.mx-view-toggle-btn {
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 600; color: var(--mx-text-dim);
+  background: transparent; border: none; border-radius: 999px; padding: 0.35rem 0.9rem; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.mx-view-toggle-btn.active { background: rgba(92, 214, 232, 0.14); color: var(--cyan); }
+.mx-view-toggle-btn:hover { color: var(--mx-text); }
+
+.mx-graph-wrap { overflow-x: auto; }
+/* Rendered at its own real pixel size (explicit width/height attrs on the <svg>, matching
+   viewBox 1:1) — NOT stretched to fill the container, which would blow a small graph up to an
+   absurd scale. `.mx-graph-wrap`'s overflow-x handles a graph wider than the viewport instead. */
+.mx-graph-svg { display: block; max-width: none; }
+.mx-graph-col-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; fill: var(--mx-text-dim); }
+.mx-graph-edge { stroke: var(--mx-border-strong); stroke-width: 1.2; }
+.mx-graph-edge-active { stroke: var(--cyan); stroke-width: 2.2; }
+.mx-graph-node { cursor: pointer; outline: none; }
+.mx-graph-node circle { fill: var(--mx-panel); stroke: var(--mx-border-strong); stroke-width: 1.5; transition: stroke 0.15s ease, fill 0.15s ease; }
+.mx-graph-node:hover circle, .mx-graph-node:focus-visible circle { stroke: var(--cyan); }
+.mx-graph-node-active circle { fill: rgba(92, 214, 232, 0.18); stroke: var(--cyan); stroke-width: 2; }
+.mx-graph-node-isolated circle { stroke-dasharray: 3 3; }
+.mx-graph-node-icon { font-size: 12px; fill: var(--mx-text); pointer-events: none; }
+.mx-graph-isolated-note { font-size: 0.78rem; color: var(--mx-text-dim); margin: 0.8rem 0 0; max-width: 60ch; }
 .matrix-hub-empty { font-size: 1rem; line-height: 1.6; color: var(--mx-text-dim); max-width: 48ch; }
 .matrix-hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 .matrix-card {

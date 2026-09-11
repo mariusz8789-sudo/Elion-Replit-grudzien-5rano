@@ -199,48 +199,24 @@ describe('generic research verbs do not swallow the intents that already owned t
  * Next Question card beside it still read "Pamięć Naukowa jest pusta", because
  * every Memory reader loaded once at mount. That was invisible while writers
  * lived on screens you navigated away from; chat entry puts writer and reader
- * on the same screen at the same moment.
+ * on the same screen at the same moment. The generic pub/sub mechanism and its
+ * one-caller boundary guard now live in `scienceMemoryEvents.test.ts`
+ * (C3) — this only adds the one case that is specific to THIS session's chat
+ * path: a discovery loop saved through the real chat helper, not a synthetic
+ * `saveExperiment` call, still reaches the signal.
  */
-describe('Science Memory announces its own writes', () => {
-  it('fires on a real save and on a real delete, and stops after unsubscribe', async () => {
-    vi.resetModules();
-    vi.stubGlobal('window', { localStorage: makeFakeStorage() });
-    const { subscribeScienceMemoryChanges } = await import('../core/scienceMemoryEvents');
-    const { saveExperiment, deleteExperiment } = await import('../core/scienceMemory');
-
-    let fired = 0;
-    const unsubscribe = subscribeScienceMemoryChanges(() => { fired += 1; });
-
-    const saved = saveExperiment({
-      labId: 'lab-1', experimentId: 'e-1', experimentName: 'Test', params: {}, stats: {},
-      honesty: 'simplified', honestyNote: 'test fixture',
-    });
-    expect(fired).toBe(1);
-
-    deleteExperiment(saved.id);
-    expect(fired).toBe(2);
-
-    unsubscribe();
-    saveExperiment({
-      labId: 'lab-1', experimentId: 'e-2', experimentName: 'Test 2', params: {}, stats: {},
-      honesty: 'simplified', honestyNote: 'test fixture',
-    });
-    expect(fired).toBe(2);
-
-    vi.unstubAllGlobals();
-  });
-
-  it('a discovery loop saved through the real helper also announces itself — the chat path, not just saveExperiment', async () => {
+describe('Science Memory announces its own writes — the chat path specifically', () => {
+  it('a discovery loop saved through the real chat helper announces itself, with the real experiment id', async () => {
     vi.resetModules();
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });
     const { subscribeScienceMemoryChanges } = await import('../core/scienceMemoryEvents');
     const { saveScientificDiscoveryLoopToMemory } = await import('../core/scienceMemory');
     const { runScientificDiscoveryLoop } = await import('../core/experimentFabric/scientificDiscoveryLoop');
 
-    let fired = 0;
-    const unsubscribe = subscribeScienceMemoryChanges(() => { fired += 1; });
-    saveScientificDiscoveryLoopToMemory(runScientificDiscoveryLoop('problem:intervention-timing'));
-    expect(fired).toBe(1);
+    const received: { reason: string; experimentId: string }[] = [];
+    const unsubscribe = subscribeScienceMemoryChanges((event) => received.push(event));
+    const saved = saveScientificDiscoveryLoopToMemory(runScientificDiscoveryLoop('problem:intervention-timing'));
+    expect(received).toEqual([{ reason: 'SAVED', experimentId: saved.id }]);
     unsubscribe();
     vi.unstubAllGlobals();
   });

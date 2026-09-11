@@ -51,6 +51,14 @@ describe('subscribeScienceMemoryChanges / notifyScienceMemoryChanged', () => {
   it('notifying with no subscribers does not throw', () => {
     expect(() => notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: 'exp-5' })).not.toThrow();
   });
+
+  it('tolerates a listener that unsubscribes itself mid-notification (iterates a snapshot, not the live Set)', () => {
+    let otherCalls = 0;
+    const unsubSelf = subscribeScienceMemoryChanges(() => unsubSelf());
+    subscribeScienceMemoryChanges(() => { otherCalls += 1; });
+    expect(() => notifyScienceMemoryChanged({ reason: 'SAVED', experimentId: 'exp-6' })).not.toThrow();
+    expect(otherCalls).toBe(1);
+  });
 });
 
 const HERE = dirname(fileURLToPath(import.meta.url));

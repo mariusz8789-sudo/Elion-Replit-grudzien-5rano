@@ -548,3 +548,235 @@ describe('the discoveryLoop shape has a real production writer, not only test ca
     expect(callers.some((file) => file.endsWith('.tsx'))).toBe(true);
   });
 });
+
+/**
+ * C1 FINAL PASS — the two shapes checked and found to have a clean,
+ * non-interpretive "still open" signal after all: `parameterInquiry`
+ * (`InquiryLoopResult.stopReason`) and `realExperimentVerification`
+ * (`PredictionVerification.assessment`, the same `HypothesisAssessment`
+ * every other extractor in this file already reads). Both fixtures below
+ * are the REAL engines, reusing the exact scenarios their own test suites
+ * already prove are real: the Arrhenius compensation-line degeneracy
+ * (`inquiryLoop.test.ts`) and the generator fuel-level bridge
+ * (`realExperimentE2E.test.ts`).
+ */
+describe('parameterInquiry: InquiryLoopResult.stopReason, reused exactly as recorded', () => {
+  const ON_COMPENSATION_LINE = [
+    { id: 'h:A-Ea60', ea: 60, logA: 11.0 },
+    { id: 'h:C-Ea62', ea: 62, logA: 11.2985 },
+    { id: 'h:B-Ea66', ea: 66, logA: 11.8956 },
+    { id: 'h:D-Ea70', ea: 70, logA: 12.4926 },
+  ] as const;
+  const HIDDEN = ON_COMPENSATION_LINE[0];
+
+  async function runDegenerateInquiry() {
+    const { runAutonomousInquiry } = await import('../core/agent/inquiryLoop');
+    return runAutonomousInquiry({
+      question: 'Can a single measurement at the compensation temperature separate compensated pairs?',
+      system: {
+        systemId: `sample-Ea${HIDDEN.ea}`,
+        label: `Unmeasured kinetic sample (Ea = ${HIDDEN.ea} kJ/mol)`,
+        modelId: 'chemistry-arrhenius',
+        hiddenParameters: { activationEnergyKJ: HIDDEN.ea, preExponentialLog10: HIDDEN.logA },
+        probeParameterId: 'temperatureK',
+        candidateProbeValues: [350], // only the degenerate point — no probe can separate them
+        fixedParameters: {},
+        observedMetric: 'rateConstant',
+        agreementTolerance: 0.25,
+      },
+      hypotheses: ON_COMPENSATION_LINE.map((h) => ({
+        hypothesisId: h.id,
+        statement: `The sample's activation energy is ${h.ea} kJ/mol with log10 A = ${h.logA}`,
+        claimedValues: { activationEnergyKJ: h.ea, preExponentialLog10: h.logA },
+        priorConfidence: 0.5,
+      })),
+      openingProbeValue: 350,
+      maxRounds: 4,
+    });
+  }
+
+  it('a real NO_DISCRIMINATING_PROBE inquiry becomes UNDECIDED_DISCRIMINATION — the same predicament a preregistered set names, reached by adaptive measurement', async () => {
+    const { buildSavedParameterInquiry, saveParameterInquiryToMemory } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems } = await import('../core/agent/crossDomainSynthesis');
+
+    const result = await runDegenerateInquiry();
+    expect(result.stopReason).toBe('NO_DISCRIMINATING_PROBE'); // real engine, not assumed
+
+    const saved = buildSavedParameterInquiry({
+      input: {
+        question: result.question,
+        system: {
+          systemId: result.systemId, label: '', modelId: result.modelId,
+          hiddenParameters: {}, probeParameterId: 'temperatureK', candidateProbeValues: [350],
+          fixedParameters: {}, observedMetric: 'rateConstant', agreementTolerance: 0.25,
+        },
+        hypotheses: ON_COMPENSATION_LINE.map((h) => ({
+          hypothesisId: h.id, statement: `Ea=${h.ea}`,
+          claimedValues: { activationEnergyKJ: h.ea, preExponentialLog10: h.logA }, priorConfidence: 0.5,
+        })),
+        openingProbeValue: 350,
+        maxRounds: 4,
+      },
+      result,
+      resumedFromMemory: null,
+    });
+    const record = saveParameterInquiryToMemory(saved);
+
+    const items = collectCrossDomainOpenItems([record]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.shape).toBe('parameterInquiry');
+    expect(items[0]!.kind).toBe('UNDECIDED_DISCRIMINATION');
+    expect(items[0]!.question).toBe(result.question);
+  });
+
+  it('does not report an inquiry that resolved to a single survivor', async () => {
+    const { buildSavedParameterInquiry, saveParameterInquiryToMemory } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems } = await import('../core/agent/crossDomainSynthesis');
+    const { runAutonomousInquiry } = await import('../core/agent/inquiryLoop');
+
+    // Away from the degenerate point, with every candidate probe offered —
+    // the real loop actually separates the hypotheses.
+    const result = runAutonomousInquiry({
+      question: 'Which activation energy / pre-exponential pair does this sample actually have?',
+      system: {
+        systemId: `sample-Ea${HIDDEN.ea}`, label: '', modelId: 'chemistry-arrhenius',
+        hiddenParameters: { activationEnergyKJ: HIDDEN.ea, preExponentialLog10: HIDDEN.logA },
+        probeParameterId: 'temperatureK', candidateProbeValues: [400, 450, 500, 600, 800],
+        fixedParameters: {}, observedMetric: 'rateConstant', agreementTolerance: 0.25,
+      },
+      hypotheses: ON_COMPENSATION_LINE.map((h) => ({
+        hypothesisId: h.id,
+        statement: `Ea=${h.ea}`,
+        claimedValues: { activationEnergyKJ: h.ea, preExponentialLog10: h.logA },
+        priorConfidence: 0.5,
+      })),
+      openingProbeValue: 400,
+      maxRounds: 4,
+    });
+    expect(result.survivingHypothesisIds.length).toBeLessThanOrEqual(1);
+
+    const saved = buildSavedParameterInquiry({
+      input: {
+        question: result.question,
+        system: {
+          systemId: result.systemId, label: '', modelId: result.modelId,
+          hiddenParameters: {}, probeParameterId: 'temperatureK', candidateProbeValues: [400],
+          fixedParameters: {}, observedMetric: 'rateConstant', agreementTolerance: 0.25,
+        },
+        hypotheses: ON_COMPENSATION_LINE.map((h) => ({
+          hypothesisId: h.id, statement: `Ea=${h.ea}`,
+          claimedValues: { activationEnergyKJ: h.ea, preExponentialLog10: h.logA }, priorConfidence: 0.5,
+        })),
+        openingProbeValue: 400, maxRounds: 4,
+      },
+      result,
+      resumedFromMemory: null,
+    });
+    const record = saveParameterInquiryToMemory(saved);
+    expect(collectCrossDomainOpenItems([record])).toHaveLength(0);
+  });
+});
+
+describe('realExperimentVerification: PredictionVerification.assessment, the same HypothesisAssessment every other extractor already reads', () => {
+  it('a real verification that cannot judge its criterion (missing metric) becomes INCONCLUSIVE_HYPOTHESIS', async () => {
+    const { GENESIS_GENERATOR_CATALOG, GENESIS_GENERATOR_CATALOG_ID } = await import('../core/agent/electricalGeneratorLeverCatalog');
+    const { runWorldDiscoveryAndRemember } = await import('../core/agent/worldDiscoverySession');
+    const { createRealExperimentRun } = await import('../core/experimentFabric/realExperiment');
+    const { EXPERIMENT_FABRIC_VERSION } = await import('../core/experimentFabric/types');
+    const {
+      buildSavedRealExperimentVerification, saveRealExperimentVerificationToMemory,
+    } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems } = await import('../core/agent/crossDomainSynthesis');
+
+    const state = runWorldDiscoveryAndRemember('Maximise remaining fuel, at most 12 experiments.', GENESIS_GENERATOR_CATALOG_ID);
+    if (state.kind !== 'COMPLETE') throw new Error(`expected COMPLETE, got ${state.kind}`);
+    const lastRound = state.result.rounds[state.result.rounds.length - 1]!;
+
+    const request = {
+      structuredRequest: {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText: 'x',
+        domainId: GENESIS_GENERATOR_CATALOG.domainId, operation: 'simulate' as const, parameters: {},
+      },
+      physicalProtocolRef: 'manual-fuel-dipstick-reading-v1',
+      hypothesisId: lastRound.hypothesisId,
+    };
+    const realRun = createRealExperimentRun({
+      request,
+      derived: [{ outputKey: 'fuelLitersRemaining', value: 10, unit: 'L', derivedFrom: [
+        { channel: 'fuel-tank-dipstick', value: 10, unit: 'L', capturedAt: '2026-09-11T00:00:00.000Z' },
+      ] }],
+      summary: 'Manual reading.',
+    });
+
+    // A criterion naming a metric this real run does NOT carry — the exact
+    // second INCONCLUSIVE branch in verifyPredictionAgainstRealExperiment
+    // ("no finite numeric value ... to judge the preregistered criterion
+    // against"), not a fabricated third state.
+    const saved = buildSavedRealExperimentVerification({
+      predictionSourceExperimentId: state.savedExperimentId,
+      loopResult: state.result,
+      verificationCriterion: {
+        metric: 'thisMetricDoesNotExistOnTheRealRun',
+        relation: 'equal-within-tolerance',
+        tolerance: 0.5,
+        rationale: 'Deliberately unjudgeable, to prove the real INCONCLUSIVE path rather than assume it.',
+      },
+      request,
+      realRun,
+    });
+    expect(saved.verification.assessment).toBe('INCONCLUSIVE'); // real engine, not assumed
+
+    const record = saveRealExperimentVerificationToMemory(saved);
+    const items = collectCrossDomainOpenItems([record]);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.shape).toBe('realExperimentVerification');
+    expect(items[0]!.kind).toBe('INCONCLUSIVE_HYPOTHESIS');
+    expect(items[0]!.detail).toBe(saved.verification.message);
+  });
+
+  it('does not report a real verification that SUPPORTED its prediction', async () => {
+    const { GENESIS_GENERATOR_CATALOG, GENESIS_GENERATOR_CATALOG_ID, GENESIS_GENERATOR_OBJECTIVE_METRIC } = await import('../core/agent/electricalGeneratorLeverCatalog');
+    const { runWorldDiscoveryAndRemember } = await import('../core/agent/worldDiscoverySession');
+    const { createRealExperimentRun } = await import('../core/experimentFabric/realExperiment');
+    const { EXPERIMENT_FABRIC_VERSION } = await import('../core/experimentFabric/types');
+    const {
+      buildSavedRealExperimentVerification, saveRealExperimentVerificationToMemory,
+    } = await import('../core/scienceMemory');
+    const { collectCrossDomainOpenItems } = await import('../core/agent/crossDomainSynthesis');
+
+    const state = runWorldDiscoveryAndRemember('Maximise remaining fuel, at most 12 experiments.', GENESIS_GENERATOR_CATALOG_ID);
+    if (state.kind !== 'COMPLETE') throw new Error(`expected COMPLETE, got ${state.kind}`);
+    const lastRound = state.result.rounds[state.result.rounds.length - 1]!;
+    const predictedValue = lastRound.objectiveObserved!;
+
+    const request = {
+      structuredRequest: {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, sourceText: 'x',
+        domainId: GENESIS_GENERATOR_CATALOG.domainId, operation: 'simulate' as const, parameters: {},
+      },
+      physicalProtocolRef: 'manual-fuel-dipstick-reading-v1',
+      hypothesisId: lastRound.hypothesisId,
+    };
+    const realRun = createRealExperimentRun({
+      request,
+      derived: [{ outputKey: GENESIS_GENERATOR_OBJECTIVE_METRIC, value: predictedValue + 0.1, unit: 'L', derivedFrom: [
+        { channel: 'fuel-tank-dipstick', value: predictedValue + 0.1, unit: 'L', capturedAt: '2026-09-11T00:00:00.000Z' },
+      ] }],
+      summary: 'Manual reading close to prediction.',
+    });
+    const saved = buildSavedRealExperimentVerification({
+      predictionSourceExperimentId: state.savedExperimentId,
+      loopResult: state.result,
+      verificationCriterion: {
+        metric: GENESIS_GENERATOR_OBJECTIVE_METRIC, relation: 'equal-within-tolerance', tolerance: 0.5,
+        rationale: 'A real reading should sit close to the model prediction.',
+      },
+      request,
+      realRun,
+    });
+    expect(saved.verification.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+
+    const record = saveRealExperimentVerificationToMemory(saved);
+    expect(collectCrossDomainOpenItems([record])).toHaveLength(0);
+  });
+});

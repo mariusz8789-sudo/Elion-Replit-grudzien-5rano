@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GenesisDashboard } from './GenesisDashboard';
+import { TimeTransport } from './TimeTransport';
 import {
   getWorkspaceStage, setWorkspaceStage, subscribeWorkspaceStage,
   STAGE_LABEL, STAGE_NOTE, type WorkspaceStageKind,
@@ -72,6 +73,13 @@ export function WorkspaceStage(): JSX.Element {
           </Suspense>
         </ErrorBoundary>
       </div>
+      {/* Time is a layer under whatever is on stage, not a screen of its own —
+          it is only mounted for surfaces that actually have a simulated
+          timeline. Showing a transport bar under a static dashboard would
+          imply a time dimension that surface does not have. */}
+      {(stage === 'CITY3D' || stage === 'SCIENTIFIC_CITY' || stage === 'WORLD') && (
+        <ErrorBoundary><TimeTransport /></ErrorBoundary>
+      )}
     </div>
   );
 }

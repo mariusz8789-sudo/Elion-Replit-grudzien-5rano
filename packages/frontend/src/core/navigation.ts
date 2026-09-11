@@ -13,9 +13,10 @@
  *   - `status: 'planned'` marks a capability whose CORE EXISTS AND RUNS but
  *     whose workspace is not built yet. It renders visibly disabled with the
  *     reason, rather than being hidden (which would understate the system) or
- *     linked (which would overstate it). Cyber is the live example: 941 lines
- *     of reasoning kernel, planner and investigation that today surface only
- *     as a record label in the Matrix.
+ *     linked (which would overstate it). Cyber used to be that case — 941
+ *     lines of reasoning kernel with no screen — and stopped being it once
+ *     `CyberWorkspace` shipped, so its entry became a real link. Sovereign is
+ *     the remaining one.
  *   - `kind: 'chat'` is an action, not a route — it opens the ONE globally
  *     mounted ScienceChat through `scienceChatBridge`.
  */
@@ -68,10 +69,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { id: 'world', label: 'World', icon: '🌍', hash: '#/genesis-world', primary: true },
       { id: 'simulation', label: 'Simulation', icon: '🔭', hash: '#/generate', primary: true },
       { id: 'science', label: 'Science', icon: '🧬', hash: '#/drug' },
-      {
-        id: 'cyber', label: 'Cyber', icon: '🛡', status: 'planned',
-        plannedNote: 'Rdzeń działa (reasoning kernel, EIG test planner, investigation, evidence) — workspace jeszcze nie zbudowany. Przebiegi cyber są dziś widoczne w Matrix i Pamięci Naukowej.',
-      },
+      { id: 'cyber', label: 'Cyber', icon: '🛡', hash: '#/cyber' },
       {
         id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
         plannedNote: 'Profil instytucjonalny (skala miasta/energii/wody/transportu) — nie istnieje jeszcze ani jako route, ani jako model uprawnień. Wymieniony, żeby nie udawać, że go pomijamy.',

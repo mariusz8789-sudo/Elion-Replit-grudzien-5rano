@@ -4688,3 +4688,29 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .tt-notmodelled { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.25rem; font-size: var(--fs-micro); color: var(--text-faint); line-height: 1.5; }
 
 @media (max-width: 900px) { .tt { max-height: none; } }
+
+/* --- Particle & Atomic Physics Laboratory: environment list (LabEnvironmentPicker.tsx) ---
+   Deliberately plain. The one thing the styling has to carry is that a NOT_BUILT
+   environment does not read as an offer: it sits under its own heading, dimmed,
+   with no affordance to click. Everything else reuses existing panel tokens. */
+.lab-env-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.lab-env-item {
+  border: 1px solid var(--gx-line, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  background: var(--gx-panel-2, rgba(255, 255, 255, 0.03));
+}
+.lab-env-item.lab-env-active { border-color: var(--gx-accent, #5ad1c8); }
+.lab-env-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; }
+.lab-env-name { font-weight: 600; }
+.lab-env-status-RUNNABLE { background: rgba(90, 209, 200, 0.18); color: #8ff0e8; }
+.lab-env-status-CHANNELS_ONLY { background: rgba(224, 184, 96, 0.18); color: #f0d79a; }
+.lab-env-status-NOT_BUILT { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.55); }
+.lab-env-item .gsc-caption { margin: 0.35rem 0 0; overflow-wrap: anywhere; }
+.lab-env-channels code { font-size: 0.85em; }
+.lab-env-unavailable { margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--gx-line, rgba(255, 255, 255, 0.12)); }
+.lab-env-unavailable h5 { margin: 0; font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+.lab-env-unavailable .lab-env-item { opacity: 0.55; }
+@media (max-width: 520px) {
+  .lab-env-head { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+}

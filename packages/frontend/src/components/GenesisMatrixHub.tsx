@@ -1,7 +1,7 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
-import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/matrixRelations';
+import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL, type MatrixEdge, type MatrixRelationGraph } from '../core/agent/matrixRelations';
 
 /**
  * GENESIS MATRIX — the central workspace, not a memory-record list.
@@ -96,6 +96,189 @@ function timeAgo(iso: string): string {
 }
 
 interface DetailTarget { record: SavedExperiment; kinds: MatrixKind[]; }
+
+// ============================================================================
+// MATRIX GRAPH (master gap plan P1.4) — a real node/edge graph over the
+// SAME `matrixRelations.ts` edges the list view and inspector already use.
+// No new relationship engine, no fabricated edges: every line drawn here is
+// one of `relations.edges` computed above, and every node is a real
+// `SavedExperiment`. Selecting a node in the graph calls the SAME
+// `openDetail` the grid/activity feed already use, so the existing
+// "Selected Object" inspector panel IS the contextual inspector this graph
+// needs — not a second one.
+// ============================================================================
+
+interface GraphNodePosition { readonly x: number; readonly y: number; }
+
+/**
+ * Deterministic domain-grouped layout: no physics simulation, no
+ * randomness, so the SAME set of records always lays out identically.
+ * Each domain (`labId`) gets an evenly-spaced point around one large
+ * circle; every record in that domain gets its own point on a small circle
+ * around its domain's point. Sorting by id keeps the layout stable
+ * across re-renders even when records arrive in a different order.
+ */
+export function computeGraphLayout(nodes: readonly { id: string; labId: string }[]): ReadonlyMap<string, GraphNodePosition> {
+  const positions = new Map<string, GraphNodePosition>();
+  const domains = [...new Set(nodes.map((n) => n.labId))].sort();
+  const DOMAIN_RADIUS = domains.length <= 1 ? 0 : 220;
+
+  domains.forEach((domain, di) => {
+    const domainAngle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
+    const cx = DOMAIN_RADIUS * Math.cos(domainAngle);
+    const cy = DOMAIN_RADIUS * Math.sin(domainAngle);
+    const inDomain = nodes.filter((n) => n.labId === domain).map((n) => n.id).sort();
+    const clusterRadius = inDomain.length <= 1 ? 0 : Math.min(100, 20 + inDomain.length * 8);
+    inDomain.forEach((id, ni) => {
+      const angle = (ni / inDomain.length) * 2 * Math.PI - Math.PI / 2;
+      positions.set(id, { x: cx + clusterRadius * Math.cos(angle), y: cy + clusterRadius * Math.sin(angle) });
+    });
+  });
+  return positions;
+}
+
+/** Domain cluster centers — used only to draw the faint grouping circle and label, from the SAME layout. */
+export function domainCenters(nodes: readonly { id: string; labId: string }[]): readonly { labId: string; x: number; y: number; count: number }[] {
+  const domains = [...new Set(nodes.map((n) => n.labId))].sort();
+  const DOMAIN_RADIUS = domains.length <= 1 ? 0 : 220;
+  return domains.map((labId, di) => {
+    const angle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
+    return { labId, x: DOMAIN_RADIUS * Math.cos(angle), y: DOMAIN_RADIUS * Math.sin(angle), count: nodes.filter((n) => n.labId === labId).length };
+  });
+}
+
+const EDGE_COLOR: Record<MatrixEdge['kind'], string> = {
+  VERIFIES_PREDICTION: '#6ee7a0',
+  SHARED_EVIDENCE_PACK: '#7dd3fc',
+  SHARED_EVIDENCE_CHAIN: '#a78bfa',
+  SAME_REPLAY_CAPSULE: '#f0b35c',
+  SAME_EXPERIMENT_RERUN: '#f47c7c',
+};
+
+interface MatrixGraphProps {
+  readonly nodes: readonly DetailTarget[];
+  readonly relations: MatrixRelationGraph;
+  readonly selectedId: string | null;
+  readonly onSelect: (target: DetailTarget) => void;
+}
+
+const GRAPH_VIEW_SIZE = 620;
+
+function MatrixGraph({ nodes, relations, selectedId, onSelect }: MatrixGraphProps) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragging = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+
+  const positions = useMemo(() => computeGraphLayout(nodes.map((n) => ({ id: n.record.id, labId: n.record.labId }))), [nodes]);
+  const clusters = useMemo(() => domainCenters(nodes.map((n) => ({ id: n.record.id, labId: n.record.labId }))), [nodes]);
+
+  const selectedEdgeIds = useMemo(() => {
+    if (!selectedId) return null;
+    return new Set(edgesFor(relations, selectedId).map((e) => `${e.kind}:${e.fromId}:${e.toId}`));
+  }, [relations, selectedId]);
+
+  const half = GRAPH_VIEW_SIZE / 2 / zoom;
+  const viewBox = `${pan.x - half} ${pan.y - half} ${half * 2} ${half * 2}`;
+
+  const onWheel = (e: ReactWheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    setZoom((z) => Math.min(4, Math.max(0.35, z * (e.deltaY > 0 ? 0.9 : 1.1))));
+  };
+  const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    dragging.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+  };
+  const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (!dragging.current) return;
+    const scale = GRAPH_VIEW_SIZE / zoom / GRAPH_VIEW_SIZE; // px -> svg-unit factor at current zoom
+    setPan({
+      x: dragging.current.panX - (e.clientX - dragging.current.startX) / zoom * scale * zoom,
+      y: dragging.current.panY - (e.clientY - dragging.current.startY) / zoom * scale * zoom,
+    });
+  };
+  const endDrag = () => { dragging.current = null; };
+
+  if (nodes.length === 0) {
+    return <p className="matrix-rail-empty">Brak rekordów, więc graf jest pusty — pojawi się, gdy Genesis zapisze pierwszy przebieg.</p>;
+  }
+
+  return (
+    <div className="matrix-graph-wrap">
+      <div className="matrix-graph-toolbar">
+        <button type="button" className="chip-btn" onClick={() => setZoom((z) => Math.min(4, z * 1.2))}>Przybliż +</button>
+        <button type="button" className="chip-btn" onClick={() => setZoom((z) => Math.max(0.35, z * 0.8))}>Oddal −</button>
+        <button type="button" className="chip-btn" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
+        <span className="gsc-caption">{nodes.length} węzłów · {relations.edges.length} krawędzi realnych · {clusters.length} domen</span>
+      </div>
+      <svg
+        className="matrix-graph-svg"
+        viewBox={viewBox}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerLeave={endDrag}
+        role="img"
+        aria-label="Graf relacji Matrix — węzły to rzeczywiste rekordy, krawędzie to realne powiązania"
+      >
+        {clusters.map((c) => (
+          <g key={c.labId}>
+            <circle cx={c.x} cy={c.y} r={Math.max(30, 20 + c.count * 8) + 14} className="matrix-graph-domain-ring" />
+            <text x={c.x} y={c.y - Math.max(30, 20 + c.count * 8) - 20} className="matrix-graph-domain-label" textAnchor="middle">
+              {c.labId} ({c.count})
+            </text>
+          </g>
+        ))}
+        {relations.edges.map((edge) => {
+          const from = positions.get(edge.fromId);
+          const to = positions.get(edge.toId);
+          if (!from || !to) return null;
+          const edgeId = `${edge.kind}:${edge.fromId}:${edge.toId}`;
+          const highlighted = selectedEdgeIds?.has(edgeId) ?? false;
+          const dimmed = selectedEdgeIds !== null && !highlighted;
+          return (
+            <line
+              key={edgeId}
+              x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+              stroke={EDGE_COLOR[edge.kind]}
+              strokeWidth={highlighted ? 2.5 : 1}
+              opacity={dimmed ? 0.12 : highlighted ? 1 : 0.55}
+              markerEnd={edge.directed ? 'url(#matrix-graph-arrow)' : undefined}
+            />
+          );
+        })}
+        <defs>
+          <marker id="matrix-graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--text-faint)" />
+          </marker>
+        </defs>
+        {nodes.map(({ record, kinds }) => {
+          const pos = positions.get(record.id);
+          if (!pos) return null;
+          const isSelected = record.id === selectedId;
+          return (
+            <g
+              key={record.id}
+              transform={`translate(${pos.x}, ${pos.y})`}
+              className="matrix-graph-node"
+              onClick={() => onSelect({ record, kinds })}
+              role="button"
+              aria-label={record.experimentName || record.experimentId}
+            >
+              <circle r={isSelected ? 12 : 8} className={isSelected ? 'matrix-graph-node-circle selected' : 'matrix-graph-node-circle'} />
+              <text y={isSelected ? 24 : 20} textAnchor="middle" className="matrix-graph-node-label">
+                {KIND_ICON[kinds[0] ?? 'EXPERIMENT']}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="gsc-caption matrix-graph-caption">
+        Scroll do zoomu, przeciągnij żeby przesunąć. Kolor krawędzi = rodzaj powiązania
+        ({Object.values(EDGE_LABEL).join(', ')}). Kliknij węzeł, żeby zobaczyć go w panelu po prawej.
+      </p>
+    </div>
+  );
+}
 
 export function GenesisMatrixHub() {
   const records = useMemo(() => listExperiments(), []);
@@ -238,6 +421,16 @@ export function GenesisMatrixHub() {
               <p className="matrix-loop-column-note">Każdy przebieg trafia tutaj automatycznie — to jest ta sama Pamięć Naukowa, którą widzisz w kolumnach obok.</p>
               <button className="matrix-loop-empty" onClick={() => { window.location.hash = '#/memory'; }}>Otwórz pełną Pamięć Naukową →</button>
             </div>
+          </div>
+
+          {/* THE GRAPH (master gap plan P1.4): real nodes (every SavedExperiment
+              on screen), real edges (relations.edges, the SAME graph the
+              inspector's "Powiązania" list below already reads), domain-grouped,
+              with focus/zoom and a click-through to the SAME "Selected Object"
+              panel — not a second inspector. */}
+          <div className="matrix-graph-section">
+            <h3 className="matrix-rail-title">Graf relacji</h3>
+            <MatrixGraph nodes={visible} relations={relations} selectedId={detail?.record.id ?? null} onSelect={openDetail} />
           </div>
 
           {/* Gaps in the chain, stated as gaps. A graph that quietly omits the

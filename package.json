@@ -22,7 +22,10 @@
     "compute:bundle:check": "node scripts/check-compute-bundle.mjs",
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
-    "e2e:discovery": "node scripts/discovery-e2e.mjs"
+    "e2e:discovery": "node scripts/discovery-e2e.mjs",
+    "build:csrn-reference": "npm run build --workspace=packages/csrn-reference",
+    "test:csrn-reference": "npm run test --workspace=packages/csrn-reference",
+    "demo:csrn-reference": "npm run demo --workspace=packages/csrn-reference"
   },
   "keywords": [
     "genesis-os",
@@ -34,7 +37,8 @@
   "license": "UNLICENSED",
   "workspaces": [
     "packages/frontend",
-    "packages/backend"
+    "packages/backend",
+    "packages/csrn-reference"
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",

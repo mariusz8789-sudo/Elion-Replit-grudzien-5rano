@@ -1,0 +1,16 @@
+{
+  "name": "csrn-reference",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal, real reference implementation of CSRN cert:// signature semantics (ECDSA P-256 via Web Crypto) — not part of the Genesis product surface.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "demo": "npm run build && node dist/demo/federation-demo.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
+  }
+}

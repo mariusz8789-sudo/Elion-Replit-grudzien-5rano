@@ -66,6 +66,14 @@ export default tseslint.config(
     },
   },
   {
+    // The CSRN reference demo is a CLI script reporting progress via console,
+    // same rationale as scripts/**/*.mjs above.
+    files: ['packages/csrn-reference/demo/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     // Committed reproducibility/benchmark harnesses run under Node and attach
     // to a real Chromium CDP endpoint; they are not browser application code.
     files: ['artifacts/**/*.mjs'],

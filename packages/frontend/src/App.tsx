@@ -62,6 +62,7 @@ const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandC
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
+const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
@@ -118,7 +119,8 @@ type Route =
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
-  | { kind: 'cyber' };
+  | { kind: 'cyber' }
+  | { kind: 'decipherment' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -162,6 +164,7 @@ function parseHash(): Route {
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
   if (h === '#/cyber') return { kind: 'cyber' };
+  if (h === '#/decipherment') return { kind: 'decipherment' };
   return { kind: 'home' };
 }
 
@@ -461,6 +464,18 @@ export default function App() {
           <TopBar title="🛡 Cyber" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <CyberWorkspace />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'decipherment') {
+      return (
+        <div className="app">
+          <TopBar title="📜 Deszyfracja" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <DeciphermentWorkspace />
           </HeavyRoute>
           {overlays}
         </div>

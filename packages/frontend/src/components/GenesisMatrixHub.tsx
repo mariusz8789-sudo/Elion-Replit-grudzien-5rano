@@ -36,17 +36,17 @@ import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL } from '../core/agent/ma
 
 export type MatrixKind =
   | 'HYPOTHESIS' | 'WORLD' | 'MODEL' | 'SCENARIO' | 'EVIDENCE'
-  | 'CYBER' | 'RESEARCH_CHAIN' | 'REPLAY' | 'EXPERIMENT';
+  | 'CYBER' | 'DECIPHERMENT' | 'RESEARCH_CHAIN' | 'REPLAY' | 'EXPERIMENT';
 
 const KIND_LABEL: Record<MatrixKind, string> = {
   HYPOTHESIS: 'Hypotheses', WORLD: 'Worlds', MODEL: 'Models', SCENARIO: 'Scenarios',
-  EVIDENCE: 'Evidence', CYBER: 'Cyber', RESEARCH_CHAIN: 'Research Chain',
+  EVIDENCE: 'Evidence', CYBER: 'Cyber', DECIPHERMENT: 'Decipherment', RESEARCH_CHAIN: 'Research Chain',
   REPLAY: 'Replay', EXPERIMENT: 'Experiment',
 };
 
 const KIND_ICON: Record<MatrixKind, string> = {
   HYPOTHESIS: '◆', WORLD: '◇', MODEL: '▣', SCENARIO: '⑂', EVIDENCE: '✓',
-  CYBER: '◈', RESEARCH_CHAIN: '⛓', REPLAY: '↺', EXPERIMENT: '●',
+  CYBER: '◈', DECIPHERMENT: '📜', RESEARCH_CHAIN: '⛓', REPLAY: '↺', EXPERIMENT: '●',
 };
 
 /** Every kind this record honestly carries — never a single forced category. */
@@ -58,6 +58,7 @@ export function kindsOf(record: SavedExperiment): MatrixKind[] {
   if (record.scenario || record.counterfactual) kinds.push('SCENARIO');
   if (record.biotech || record.realExperimentVerification || record.substitutionInvestigation || record.evidencePackId || record.evidenceChainId) kinds.push('EVIDENCE');
   if (record.cyberInvestigation) kinds.push('CYBER');
+  if (record.deciphermentCase) kinds.push('DECIPHERMENT');
   if (record.researchChain) kinds.push('RESEARCH_CHAIN');
   if (record.replayIdentity) kinds.push('REPLAY');
   if (kinds.length === 0) kinds.push('EXPERIMENT');
@@ -67,7 +68,7 @@ export function kindsOf(record: SavedExperiment): MatrixKind[] {
 type LoopStage = 'HYPOTHESIS' | 'EXPERIMENT' | 'EVIDENCE';
 const STAGE_KINDS: Record<LoopStage, MatrixKind[]> = {
   HYPOTHESIS: ['HYPOTHESIS', 'WORLD', 'MODEL', 'RESEARCH_CHAIN'],
-  EXPERIMENT: ['EXPERIMENT', 'CYBER', 'SCENARIO'],
+  EXPERIMENT: ['EXPERIMENT', 'CYBER', 'DECIPHERMENT', 'SCENARIO'],
   EVIDENCE: ['EVIDENCE'],
 };
 const STAGE_LABEL: Record<LoopStage, string> = { HYPOTHESIS: 'Hypothesis', EXPERIMENT: 'Experiment', EVIDENCE: 'Evidence' };
@@ -117,7 +118,7 @@ export function GenesisMatrixHub() {
   const latest = withKinds[0] ?? null; // listExperiments() sorts newest-first
   const recentFive = withKinds.slice(0, 5);
   const visible = activeKind ? withKinds.filter(({ kinds }) => kinds.includes(activeKind)) : withKinds;
-  const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
+  const ALL_KINDS: MatrixKind[] = ['HYPOTHESIS', 'WORLD', 'MODEL', 'SCENARIO', 'EVIDENCE', 'CYBER', 'DECIPHERMENT', 'RESEARCH_CHAIN', 'REPLAY', 'EXPERIMENT'];
 
   const submitAsk = () => {
     const text = askInput.trim();

@@ -24,15 +24,33 @@ import { buildMatrixRelationGraph, edgesFor, type MatrixEdge } from './matrixRel
  * already recorded, or an explicit, named, non-numeric heuristic ranking
  * (`OPEN_ITEM_PRIORITY`) — never a fabricated confidence score.
  *
- * SCOPE, HONESTLY: this reads seven of the investigation shapes —
+ * SCOPE, HONESTLY: this reads nine of the investigation shapes —
  * `cyberInvestigation`, `deciphermentCase`, `researchChain`,
  * `worldDiscovery` (its `loopResult.unresolvedQuestions` only — the
  * `comparisonResult` alternative shape is not yet read),
  * `mechanismComposition` (its `assessment.interaction === 'INCONCLUSIVE'`,
  * `mechanismInteraction.ts`'s own explicit fourth outcome alongside
- * ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE), and `hypothesisLoop` +
- * `discoveryLoop` — because those already carry an explicit, unambiguous
- * "this is still open" signal in their own persisted record.
+ * ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE), `hypothesisLoop` + `discoveryLoop`,
+ * and (added in this pass) `parameterInquiry` + `realExperimentVerification`
+ * — because those already carry an explicit, unambiguous "this is still
+ * open" signal in their own persisted record.
+ *
+ * `parameterInquiry` reuses `InquiryLoopResult.stopReason`
+ * (`inquiryLoop.ts`)'s own verdict: `NO_DISCRIMINATING_PROBE` maps onto
+ * `UNDECIDED_DISCRIMINATION` (the identical predicament `discrimination.
+ * decisive === false` names for a preregistered set, reached here by
+ * adaptive measurement instead), `ROUND_BUDGET_EXHAUSTED` with more than one
+ * survivor maps onto `INCONCLUSIVE_HYPOTHESIS`, and `MEASUREMENT_FAILED`
+ * onto `BLOCKED_HYPOTHESIS`. Its fourth value, `NO_CONTENDERS_LEFT` (every
+ * hypothesis eliminated), is deliberately NOT reported: that is a different
+ * real finding — the declared search space itself came up short — not a
+ * "still open" state, and forcing it into an existing kind would misname it.
+ *
+ * `realExperimentVerification` reuses `PredictionVerification.assessment`
+ * (`predictionVerification.ts`) — literally the same `HypothesisAssessment`
+ * vocabulary `hypothesisLoop.ts` uses — so `INCONCLUSIVE` here is read
+ * exactly as it is read everywhere else in this module, mapped onto the same
+ * `INCONCLUSIVE_HYPOTHESIS` kind.
  *
  * WHY `hypothesisLoop`/`discoveryLoop` matter most of the seven: they are
  * Genesis's FLAGSHIP scientific record. A `SavedHypothesisLoop` is a
@@ -49,12 +67,22 @@ import { buildMatrixRelationGraph, edgesFor, type MatrixEdge } from './matrixRel
  * persisted `nextExperiment.why`/`.resolves` verbatim (see `domainNextStep`)
  * rather than inventing a second opinion about it.
  *
- * The remaining shapes (`parameterInquiry`, `realExperimentVerification`,
- * `substitutionInvestigation`, the legacy `investigation` shape) still do
- * not expose a comparably explicit "still open" flag on their own saved
- * shape without additional interpretation this module does not attempt —
- * INTEGRATION_POINT_TO_CONFIRM for whoever extends this. Silently guessing
- * at open-ness for those shapes would be worse than naming the gap.
+ * The remaining shapes (`substitutionInvestigation`, the legacy
+ * `investigation` shape) still do not expose a comparably explicit "still
+ * open" flag on their own saved shape without additional interpretation
+ * this module does not attempt — INTEGRATION_POINT_TO_CONFIRM for whoever
+ * extends this. `substitutionInvestigation` was checked, not skipped by
+ * default: `SubstitutionVerdict` is only `CANDIDATE_HYPOTHESIS` |
+ * `INSUFFICIENT_DATA` — there is no terminal "resolved" value at all in this
+ * domain (a real biological measurement, not a further simulated round,
+ * is what would settle one), so treating either value as "still open" would
+ * either fire on every record with a candidate or require guessing which
+ * `bestCandidateId !== null` records count as settled enough. `investigation`
+ * is a RO-Crate BUNDLE of hypothesisLoop/discoveryLoop runs that are each
+ * ALSO their own separate `SavedExperiment` record; extracting open items
+ * from the bundle would double-count what those records already report.
+ * Silently guessing at open-ness for either shape would be worse than
+ * naming the gap.
  */
 
 export type CrossDomainOpenItemKind =
@@ -148,7 +176,8 @@ export interface CrossDomainOpenItem {
   readonly shape:
     | 'cyberInvestigation' | 'deciphermentCase' | 'researchChain'
     | 'worldDiscovery' | 'mechanismComposition'
-    | 'hypothesisLoop' | 'discoveryLoop';
+    | 'hypothesisLoop' | 'discoveryLoop'
+    | 'parameterInquiry' | 'realExperimentVerification';
   readonly kind: CrossDomainOpenItemKind;
   readonly question: string;
   readonly detail: string;
@@ -358,6 +387,72 @@ function mechanismCompositionOpenItems(record: SavedExperiment): CrossDomainOpen
   }];
 }
 
+/**
+ * `InquiryLoopResult.stopReason` (inquiryLoop.ts) is `inquiryLoop`'s OWN
+ * explicit verdict on why it stopped — reused exactly as recorded, never
+ * re-derived from `rounds`. See the module doc above for why each of three
+ * values maps onto an EXISTING kind rather than a new one, and why the
+ * fourth (`NO_CONTENDERS_LEFT`) is deliberately not reported here.
+ */
+function parameterInquiryOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
+  const inquiry = record.parameterInquiry;
+  if (!inquiry) return [];
+  const { result } = inquiry;
+  const survivorCount = result.survivingHypothesisIds.length;
+  const base = {
+    sourceExperimentId: record.id,
+    labId: record.labId,
+    shape: 'parameterInquiry' as const,
+    question: result.question,
+    createdAt: record.createdAt,
+    evidencePackId: record.evidencePackId ?? null,
+  };
+  if (result.stopReason === 'NO_DISCRIMINATING_PROBE') {
+    return [{
+      ...base,
+      kind: 'UNDECIDED_DISCRIMINATION',
+      detail: `${survivorCount} hypothesis(es) survived every measurement this inquiry took (${result.rounds.length} round(s)), and no offered probe setting could separate them — the same predicament a preregistered set reaches with discrimination.decisive === false, arrived at here by adaptive measurement instead.`,
+    }];
+  }
+  if (result.stopReason === 'MEASUREMENT_FAILED') {
+    return [{
+      ...base,
+      kind: 'BLOCKED_HYPOTHESIS',
+      detail: `The measurement itself failed mid-inquiry (stopReason MEASUREMENT_FAILED) on model "${result.modelId}" — this needs a working executor, not a re-run of the same probe.`,
+    }];
+  }
+  if (result.stopReason === 'ROUND_BUDGET_EXHAUSTED' && survivorCount > 1) {
+    return [{
+      ...base,
+      kind: 'INCONCLUSIVE_HYPOTHESIS',
+      detail: `${survivorCount} hypothesis(es) still survive after ${result.rounds.length} round(s); the inquiry ran out of round budget before finding a discriminating probe, not because none exists — that would be NO_DISCRIMINATING_PROBE, a different real state.`,
+    }];
+  }
+  return [];
+}
+
+/**
+ * `PredictionVerification.assessment` (predictionVerification.ts) reuses
+ * Genesis's own `HypothesisAssessment` vocabulary — the SAME enum
+ * `hypothesisLoop.ts` uses — so `INCONCLUSIVE` is read here exactly as it is
+ * read everywhere else in this module: no test has discriminated it yet.
+ * SUPPORTED_WITHIN_PROTOCOL/FALSIFIED_WITHIN_PROTOCOL stay settled.
+ */
+function realExperimentVerificationOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
+  const verification = record.realExperimentVerification;
+  if (!verification || verification.verification.assessment !== 'INCONCLUSIVE') return [];
+  return [{
+    sourceExperimentId: record.id,
+    labId: record.labId,
+    shape: 'realExperimentVerification',
+    kind: 'INCONCLUSIVE_HYPOTHESIS',
+    question: `Does the real/reference measurement for hypothesis ${verification.hypothesisId} match its frozen prediction?`,
+    detail: verification.verification.message,
+    createdAt: record.createdAt,
+    evidencePackId: record.evidencePackId ?? null,
+  }];
+}
+
 /** Every open item across every domain — the whole point being that nothing here filters by domain first. */
 export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]): readonly CrossDomainOpenItem[] {
   const all = records ?? listExperiments();
@@ -371,6 +466,8 @@ export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]
       ...discoveryLoopOpenItems(record),
       ...worldDiscoveryOpenItems(record),
       ...mechanismCompositionOpenItems(record),
+      ...parameterInquiryOpenItems(record),
+      ...realExperimentVerificationOpenItems(record),
     );
   }
   return items;
@@ -431,6 +528,12 @@ function nextTestOrExperiment(item: CrossDomainOpenItem): string {
       return 'Re-run the world-discovery loop (`runDiscoveryLoop`, discoveryLoop.ts) on the same world/catalog with a larger round budget, targeting this specific unresolved question.';
     case 'mechanismComposition':
       return 'Re-measure the joint arm for these two mechanisms (`runMechanismDiscoveryAndRemember`, discoveryOrchestrator.ts) — a tighter tolerance band or a repeated measurement may resolve ADDITIVE/SUB_ADDITIVE/SUPER_ADDITIVE where this run could not.';
+    case 'parameterInquiry':
+      return item.kind === 'BLOCKED_HYPOTHESIS'
+        ? `No further round resolves this without a working executor: "${item.detail}"`
+        : 'Re-enter this inquiry through its own selector: `runAutonomousInquiry` (inquiryLoop.ts) with a larger `maxRounds` — or, if the stop reason was NO_DISCRIMINATING_PROBE, a wider declared probe range, since no setting within the one already offered can separate the survivors.';
+    case 'realExperimentVerification':
+      return 'A second real or reference measurement, judged against the same preregistered verificationCriterion, is the only thing that can move this past INCONCLUSIVE — re-running the simulated prediction changes nothing here.';
   }
 }
 

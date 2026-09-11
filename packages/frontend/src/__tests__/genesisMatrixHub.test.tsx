@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { GenesisMatrixHub, kindsOf, computeGraphLayout, domainCenters, type MatrixKind } from '../components/GenesisMatrixHub';
+import { GenesisMatrixHub, kindsOf, computeGraphLayout, domainCenters, countIsolatedNodes, type MatrixKind } from '../components/GenesisMatrixHub';
 import type { SavedExperiment } from '../core/scienceMemory';
 
 function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
@@ -138,5 +138,36 @@ describe('computeGraphLayout / domainCenters (master gap plan P1.4) — determin
     expect(centers).toHaveLength(2);
     expect(centers.find((c) => c.labId === 'cyber-security')?.count).toBe(2);
     expect(centers.find((c) => c.labId === 'decipherment')?.count).toBe(1);
+  });
+});
+
+/**
+ * countIsolatedNodes — triaged out of the abandoned
+ * `claude/genesis-graphics-engine-v1-wd0r66` branch: the one real gap its
+ * self-relation/isolated-band work found underneath a lot that duplicated
+ * what this file already has. A record with zero real edges used to be
+ * indistinguishable, in the toolbar count, from a well-connected one.
+ */
+describe('countIsolatedNodes — an honest count of records with zero real edges', () => {
+  it('counts a node with no edges at all as isolated', () => {
+    expect(countIsolatedNodes(['a', 'b'], [{ fromId: 'a', toId: 'a' }])).toBe(1); // 'b' unreferenced
+  });
+
+  it('a node referenced as either fromId or toId is not isolated', () => {
+    expect(countIsolatedNodes(['a', 'b', 'c'], [{ fromId: 'a', toId: 'b' }])).toBe(1); // only 'c'
+  });
+
+  it('zero edges means every node is isolated', () => {
+    expect(countIsolatedNodes(['a', 'b'], [])).toBe(2);
+  });
+
+  it('zero nodes means zero isolated, never a negative or fabricated count', () => {
+    expect(countIsolatedNodes([], [])).toBe(0);
+  });
+
+  it('every node connected means zero isolated', () => {
+    expect(countIsolatedNodes(['a', 'b', 'c'], [
+      { fromId: 'a', toId: 'b' }, { fromId: 'b', toId: 'c' },
+    ])).toBe(0);
   });
 });

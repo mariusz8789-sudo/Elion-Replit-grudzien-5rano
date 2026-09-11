@@ -148,6 +148,18 @@ export function domainCenters(nodes: readonly { id: string; labId: string }[]): 
   });
 }
 
+/**
+ * Real edge count is 0 → isolated, without exception: the whole point is
+ * that this reports exactly what `matrixRelations.ts` proved, nothing more.
+ * Extracted as a pure function (same convention as `computeGraphLayout`/
+ * `domainCenters` above) so it is directly testable without a DOM.
+ */
+export function countIsolatedNodes(nodeIds: readonly string[], edges: readonly Pick<MatrixEdge, 'fromId' | 'toId'>[]): number {
+  const connected = new Set<string>();
+  for (const edge of edges) { connected.add(edge.fromId); connected.add(edge.toId); }
+  return nodeIds.filter((id) => !connected.has(id)).length;
+}
+
 const EDGE_COLOR: Record<MatrixEdge['kind'], string> = {
   VERIFIES_PREDICTION: '#6ee7a0',
   SHARED_EVIDENCE_PACK: '#7dd3fc',
@@ -177,6 +189,24 @@ function MatrixGraph({ nodes, relations, selectedId, onSelect }: MatrixGraphProp
     if (!selectedId) return null;
     return new Set(edgesFor(relations, selectedId).map((e) => `${e.kind}:${e.fromId}:${e.toId}`));
   }, [relations, selectedId]);
+
+  /**
+   * Triaged from the abandoned `claude/genesis-graphics-engine-v1-wd0r66`
+   * branch (never merged — it had drifted ~2300 lines behind main). Its
+   * standalone MatrixGraph.tsx/matrixGraphProjection.ts/matrixKinds.ts
+   * duplicated this already-live graph and were rejected outright; its
+   * self-relation handling was rejected too, because `matrixRelations.ts`'s
+   * `j = i + 1` pairing loop makes `fromId === toId` structurally
+   * unreachable — there is nothing to render. The one real, low-risk gap it
+   * found: a record with zero real edges is currently rendered identically
+   * to a well-connected one, so "how much of this memory stands alone" was
+   * invisible. This count is that one honest number, computed from data the
+   * toolbar already has — no new layout, no second graph.
+   */
+  const isolatedCount = useMemo(
+    () => countIsolatedNodes(nodes.map((n) => n.record.id), relations.edges),
+    [nodes, relations],
+  );
 
   const half = GRAPH_VIEW_SIZE / 2 / zoom;
   const viewBox = `${pan.x - half} ${pan.y - half} ${half * 2} ${half * 2}`;
@@ -208,7 +238,10 @@ function MatrixGraph({ nodes, relations, selectedId, onSelect }: MatrixGraphProp
         <button type="button" className="chip-btn" onClick={() => setZoom((z) => Math.min(4, z * 1.2))}>Przybliż +</button>
         <button type="button" className="chip-btn" onClick={() => setZoom((z) => Math.max(0.35, z * 0.8))}>Oddal −</button>
         <button type="button" className="chip-btn" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
-        <span className="gsc-caption">{nodes.length} węzłów · {relations.edges.length} krawędzi realnych · {clusters.length} domen</span>
+        <span className="gsc-caption">
+          {nodes.length} węzłów · {relations.edges.length} krawędzi realnych · {clusters.length} domen
+          {isolatedCount > 0 && <> · {isolatedCount} bez żadnej powiązanej krawędzi</>}
+        </span>
       </div>
       <svg
         className="matrix-graph-svg"

@@ -48,6 +48,7 @@ import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
 } from './agent/predictionVerification';
 import { isWellFormedCyberInvestigation, type CyberInvestigationResult } from './agent/cyberInvestigation';
+import { isWellFormedDeciphermentCaseResult, type DeciphermentCaseResult } from './agent/decipherment/deciphermentTypes';
 import { isWellFormedSubstitutionInvestigation, type SubstitutionInvestigationResult } from './biotechData/substitutionInvestigation';
 import { runSubstitutionInvestigation } from './biotechData/substitutionPlanner';
 
@@ -299,6 +300,18 @@ export interface SavedExperiment {
    * `biotech`'s existing persistence.
    */
   substitutionInvestigation?: SavedSubstitutionInvestigation;
+  /**
+   * A completed decipherment case — classical cryptanalysis, unknown-symbol
+   * analysis, or structural ancient-script decipherment
+   * (`core/agent/decipherment/`) — the ninth investigation shape. Same
+   * family as `cyberInvestigation`: categorical, falsifiable hypotheses
+   * over a synthetic/toy or structurally-transcribed target, never a
+   * numeric WorldGraph lever. Input is an already-segmented glyph
+   * sequence — Genesis has no OCR/image pipeline anywhere, so this domain
+   * never accepts one; see `decipherment/deciphermentTypes.ts`'s module
+   * doc for why that boundary is real, not a shortcut.
+   */
+  deciphermentCase?: SavedDeciphermentCase;
   replayIdentity?: SavedExperimentReplayIdentity;
   honesty: HonestyLevel;
   honestyNote: string;
@@ -607,6 +620,7 @@ export interface SaveExperimentInput {
   researchChain?: SavedResearchChainManifest;
   cyberInvestigation?: SavedCyberInvestigation;
   substitutionInvestigation?: SavedSubstitutionInvestigation;
+  deciphermentCase?: SavedDeciphermentCase;
   replayIdentity?: SavedExperimentReplayIdentity;
 }
 
@@ -662,6 +676,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.researchChain !== undefined && !isSavedResearchChainManifest(input.researchChain)) throw new Error('Zapis łańcucha badawczego musi zawierać co najmniej jeden krok, odcisk treści i status końcowy.');
   if (input.cyberInvestigation !== undefined && !isSavedCyberInvestigation(input.cyberInvestigation)) throw new Error('Zapis dochodzenia bezpieczeństwa musi zawierać dobrze uformowany wynik i odcisk treści.');
   if (input.substitutionInvestigation !== undefined && !isSavedSubstitutionInvestigation(input.substitutionInvestigation)) throw new Error('Zapis dochodzenia substytucji musi zawierać dobrze uformowany wynik i odcisk treści.');
+  if (input.deciphermentCase !== undefined && !isSavedDeciphermentCase(input.deciphermentCase)) throw new Error('Zapis dochodzenia deszyfracji musi zawierać dobrze uformowany wynik i odcisk treści.');
   if (!validAnalysis(input.analysis)) throw new Error('Analiza musi zawierać niepuste bloki.');
   const hash = contentHash(input);
   const entry: SavedExperiment = {
@@ -690,6 +705,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.researchChain === undefined ? {} : { researchChain: input.researchChain }),
     ...(input.cyberInvestigation === undefined ? {} : { cyberInvestigation: input.cyberInvestigation }),
     ...(input.substitutionInvestigation === undefined ? {} : { substitutionInvestigation: input.substitutionInvestigation }),
+    ...(input.deciphermentCase === undefined ? {} : { deciphermentCase: input.deciphermentCase }),
     ...(input.replayIdentity === undefined ? {} : { replayIdentity: input.replayIdentity }),
     honesty: input.honesty,
     honestyNote: input.honestyNote,
@@ -2885,6 +2901,116 @@ export function replaySavedRealExperimentVerification(saved: SavedExperiment): S
     return { status: 'DRIFT', reason: `Odtworzona weryfikacja różni się od zapisanej (${record.resultFingerprint} → ${freshFingerprint}): ${freshVerification.message}` };
   }
   return { status: 'MATCH', reason: 'Predykcja odtworzyła się identycznie, a porównanie z tym samym, nietkniętym realnym pomiarem dało ten sam werdykt.' };
+}
+
+// ---------------------------------------------------------------------------
+// DECIPHERMENT CASE — the ninth investigation shape. Classical cryptanalysis,
+// unknown-symbol analysis, structural ancient-script decipherment
+// (`core/agent/decipherment/`). Same family as `cyberInvestigation`:
+// categorical, falsifiable hypotheses over a bounded target, not a numeric
+// WorldGraph lever — see `SavedExperiment.deciphermentCase`'s own doc above
+// for why it needs its own shape.
+// ---------------------------------------------------------------------------
+
+export const DECIPHERMENT_CASE_MEMORY_CONTRACT_VERSION = '1.0.0';
+
+export interface SavedDeciphermentCase {
+  contractVersion: string;
+  result: DeciphermentCaseResult;
+  resultFingerprint: string;
+}
+
+export function buildSavedDeciphermentCase(result: DeciphermentCaseResult): SavedDeciphermentCase {
+  if (!isWellFormedDeciphermentCaseResult(result)) {
+    throw new Error('Dochodzenie deszyfracji musi zawierać realną sekwencję glifów, co najmniej jedną konkurencyjną hipotezę odczytu z falsyfikatorem — nie może być pustą powłoką.');
+  }
+  return {
+    contractVersion: DECIPHERMENT_CASE_MEMORY_CONTRACT_VERSION,
+    result,
+    resultFingerprint: fnv1a(canonicalJson(result)),
+  };
+}
+
+export function isSavedDeciphermentCase(value: unknown): value is SavedDeciphermentCase {
+  if (!isRecordLike(value)) return false;
+  if (typeof value.contractVersion !== 'string' || !nonEmptyString(value.resultFingerprint)) return false;
+  return isWellFormedDeciphermentCaseResult(value.result);
+}
+
+function deciphermentCaseAnalysis(saved: SavedDeciphermentCase): SavedExperimentAnalysisBlock[] {
+  const { result } = saved;
+  const supported = result.hypotheses.filter((h) => h.assessment === 'SUPPORTED_WITHIN_PROTOCOL');
+  const falsified = result.hypotheses.filter((h) => h.assessment === 'FALSIFIED_WITHIN_PROTOCOL');
+  return [
+    { title: 'Sekwencja', body: `${result.glyphCount} glifów, źródło: ${result.sourceKind}.`, kind: 'decipherment-sequence' },
+    {
+      title: 'Konkurencyjne odczyty',
+      body: result.readings.map((r) => `${r.label} (${r.cipherModelId}): structuralFit=${r.structuralFit}, unresolved=${r.unresolvedGlyphs}`).join(' | '),
+      kind: 'decipherment-readings',
+    },
+    {
+      title: 'Werdykty',
+      body: `${supported.length} SUPPORTED_WITHIN_PROTOCOL, ${falsified.length} FALSIFIED_WITHIN_PROTOCOL, ${result.hypotheses.length - supported.length - falsified.length} inne.`,
+      kind: 'decipherment-verdicts',
+    },
+    ...(result.conflicts.length > 0
+      ? [{ title: 'Konflikty', body: `${result.conflicts.length} hipotez ma w historii zarówno SUPPORTED, jak i FALSIFIED — zachowane, nie uśrednione.`, kind: 'decipherment-conflicts' }]
+      : []),
+  ];
+}
+
+/**
+ * Persists a completed Decipherment case as its own Science Memory record,
+ * through `saveExperiment` unchanged. No `execution`/`ExperimentRun`
+ * attached: like `cyberInvestigation`/`researchChain`, this is an
+ * orchestration result over a bounded target, not a Fabric run.
+ */
+export function saveDeciphermentCaseToMemory(saved: SavedDeciphermentCase): SavedExperiment {
+  const { result } = saved;
+  return saveExperiment({
+    labId: 'decipherment',
+    experimentId: `decipherment-case:${result.caseId}:${saved.resultFingerprint}`,
+    experimentName: `Deszyfracja — ${result.glyphCount} glifów, ${result.readings.length} odczytów`,
+    params: { glyphCount: result.glyphCount, readingCount: result.readings.length, seed: result.seed },
+    stats: { readingCount: result.readings.length, hypothesisCount: result.hypotheses.length, testCount: result.testsRun.length, conflictCount: result.conflicts.length },
+    deciphermentCase: saved,
+    analysis: deciphermentCaseAnalysis(saved),
+    honesty: 'educational',
+    honestyNote: 'Klasyczna kryptoanaliza i dezyfracja strukturalna na sekwencji glifów wejściowej jako już posegmentowanej — bez OCR ani rozpoznawania obrazu. ' +
+      'Każdy odczyt jest rekonstrukcją lub hipotezą, nigdy obserwacją; żaden werdykt nie jest odczytywany wprost z wyniku, na którym liczono własny wynik hipotezy — ' +
+      'test falsyfikacji sprawdza odłożoną (held-out) część sekwencji, niezależną od tego, co zbudowało hipotezę.',
+    assumptions: ['Modele szyfrów są klasyczne/edukacyjne (Cezar, afiniczny, Vigenère, podstawieniowy, przestawieniowy) — nie dotyczą realnych systemów ani kont.'],
+    epistemicStatus: 'RECONSTRUCTED',
+  });
+}
+
+export interface SavedDeciphermentCaseReplay {
+  status: ReplayVerdict;
+  reason: string;
+}
+
+/**
+ * Verifies self-consistency: does the saved record still match its own
+ * fingerprint? Same honest scope as `replaySavedCyberInvestigation` —
+ * MATCH here means "unmodified since save", not "independently
+ * reproduced from the raw glyph sequence". Full re-execution would mean
+ * re-running `GenesisDeciphermentOrchestrator` against the original
+ * `GlyphSequence`, which this function does not have (the sequence itself
+ * is not persisted on the record — only the finished result).
+ */
+export function replaySavedDeciphermentCase(saved: SavedExperiment): SavedDeciphermentCaseReplay {
+  const record = saved.deciphermentCase;
+  if (record === undefined || !isSavedDeciphermentCase(record)) {
+    return { status: 'BLOCKED', reason: 'Zapis nie zawiera dochodzenia deszyfracji.' };
+  }
+  const selfCheck = fnv1a(canonicalJson(record.result));
+  if (selfCheck !== record.resultFingerprint) {
+    return { status: 'DRIFT', reason: `Zapisane dochodzenie zostało zmienione po zapisie: jego treść nie odpowiada już własnemu zapisanemu odciskowi (${record.resultFingerprint} → ${selfCheck}).` };
+  }
+  return {
+    status: 'MATCH',
+    reason: 'Sprawdzenie tylko wewnętrznej spójności: zapis odpowiada własnemu odciskowi. Pełne ponowne wykonanie od surowej sekwencji glifów nie jest jeszcze podłączone tutaj.',
+  };
 }
 
 export function listExperiments(): SavedExperiment[] {

@@ -9,16 +9,26 @@ import { glyphAlphabet, repeatedPatterns, ngramFrequency, symbolFrequency } from
  * a hypothesis, never an observation, and never evidence on its own.
  */
 
-/** Transparent structural-fit heuristic: rewards a decode that preserves the
- * sequence's own repeat structure and doesn't inflate bigram diversity. This
- * is a real, inspectable formula — not a black-box confidence score. */
-function computeStructuralFit(seq: GlyphSequence, decodedSymbols: readonly string[]): number {
-  const decodedSeq: GlyphSequence = Object.freeze({
+function buildDecodedSequence(seq: GlyphSequence, decodedSymbols: readonly string[]): GlyphSequence {
+  return Object.freeze({
     sequenceId: `${seq.sequenceId}:decoded`,
     sourceKind: seq.sourceKind,
     glyphs: Object.freeze(decodedSymbols.map((s, i) => Object.freeze({ symbol: s, position: i, provenance: 'RECONSTRUCTED' as GlyphProvenance }))),
     fingerprint: fnv1a(canonicalJson(decodedSymbols)),
   });
+}
+
+/** Transparent structural-fit heuristic: rewards a decode that preserves the
+ * sequence's own repeat structure and doesn't inflate bigram diversity. This
+ * is a real, inspectable formula — not a black-box confidence score. NOTE: any
+ * cipher that applies a single consistent symbol->symbol bijection to the
+ * whole sequence (CAESAR, AFFINE, SUBSTITUTION) is a pure relabeling, so this
+ * repeat/bigram-shape metric is mathematically invariant to it — it cannot by
+ * itself distinguish a right key from a wrong one for those models. It CAN
+ * discriminate VIGENERE (period-dependent shift) and TRANSPOSITION (reorders
+ * positions). This is a real, documented limitation of the toy heuristic, not
+ * a bug: see `linguisticFit` below for the signal that actually varies by key. */
+function computeStructuralFit(seq: GlyphSequence, decodedSeq: GlyphSequence, decodedSymbols: readonly string[]): number {
   const repeatsOriginal = repeatedPatterns(seq, 2, 4).length;
   const repeatsDecoded = repeatedPatterns(decodedSeq, 2, 4).length;
   const repeatScore = repeatsOriginal === 0 ? 0.5 : Math.min(1, repeatsDecoded / repeatsOriginal);
@@ -29,9 +39,13 @@ function computeStructuralFit(seq: GlyphSequence, decodedSymbols: readonly strin
   return Math.round((0.6 * repeatScore + 0.4 * smoothness) * 1000) / 1000;
 }
 
-/** TOY placeholder only — symbol-frequency concentration, not a real language model. */
-function computeLinguisticFit(seq: GlyphSequence): number {
-  const freq = symbolFrequency(seq);
+/** TOY placeholder only — symbol-frequency concentration of the DECODED
+ * output, not a real language model. Must run on the decode, not the raw
+ * ciphertext: a bijective cipher only permutes which symbol is "most
+ * frequent," so scoring the raw sequence instead would make this identical
+ * for every candidate key and defeat its purpose as a discriminating signal. */
+function computeLinguisticFit(decodedSeq: GlyphSequence): number {
+  const freq = symbolFrequency(decodedSeq);
   if (freq.length === 0) return 0;
   return Math.round(freq[0].frequency * 1000) / 1000;
 }
@@ -55,8 +69,9 @@ export function buildReading(seq: GlyphSequence, spec: ReadingSpec, seed: number
   const reconstructed = seq.glyphs.filter((g) => g.damaged === true || g.provenance === 'RECONSTRUCTED').length;
   const unresolved = decodedSymbols.filter((s) => s === '?').length;
 
-  const structuralFit = computeStructuralFit(seq, decodedSymbols);
-  const linguisticFit = computeLinguisticFit(seq);
+  const decodedSeq = buildDecodedSequence(seq, decodedSymbols);
+  const structuralFit = computeStructuralFit(seq, decodedSeq, decodedSymbols);
+  const linguisticFit = computeLinguisticFit(decodedSeq);
 
   const core = {
     readingId: `reading:${seed}:${counter}`,

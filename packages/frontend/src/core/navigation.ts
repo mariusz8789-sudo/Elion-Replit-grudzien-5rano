@@ -103,6 +103,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass' },
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline' },
+  { id: 'decipherment', label: 'Deszyfracja', icon: '📜', hash: '#/decipherment' },
   { id: 'glossary', label: 'Słowniczek', icon: '📚', hash: '#/glossary' },
 ];
 

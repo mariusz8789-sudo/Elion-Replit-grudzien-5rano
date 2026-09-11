@@ -14,7 +14,7 @@ import type { MatrixKind } from '../components/GenesisMatrixHub';
 
 const counts = (over: Partial<Record<MatrixKind, number>> = {}): Record<MatrixKind, number> => ({
   HYPOTHESIS: 0, WORLD: 0, MODEL: 0, SCENARIO: 0, EVIDENCE: 0,
-  CYBER: 0, RESEARCH_CHAIN: 0, REPLAY: 0, EXPERIMENT: 0,
+  CYBER: 0, DECIPHERMENT: 0, RESEARCH_CHAIN: 0, REPLAY: 0, EXPERIMENT: 0,
   ...over,
 });
 

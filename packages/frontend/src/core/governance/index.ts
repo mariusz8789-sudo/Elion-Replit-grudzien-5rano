@@ -9,7 +9,7 @@
  * The one property to preserve through any future change: this layer can only
  * NARROW what the server already permitted, never widen it. `decision.ts`
  * achieves that by taking the server's verdict as an input rather than
- * re-deriving it, and `governance.test.ts` checks it exhaustively.
+ * re-deriving it, and `governanceFoundation.test.ts` checks it exhaustively.
  */
 export * from './capabilities';
 export * from './decision';

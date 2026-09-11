@@ -213,6 +213,31 @@ export interface DiscoveryLoopInput {
   readonly replicationStrength?: number;
   readonly declaredAssumptions: readonly string[];
   readonly notModelledFactors: readonly string[];
+  /**
+   * P0.2 BELIEF PERSISTENCE — the posterior from a PREVIOUS run of this exact
+   * investigation (typically `result.beliefs` from an earlier call, rehydrated
+   * from `agent_runs.final_json` via the `agentRun.mjs` bridge — see
+   * `toAgentStepInput`'s own doc for the storage side of this contract).
+   *
+   * Matched onto `input.hypotheses` by `hypothesisId`; a hypothesis with no
+   * matching entry here starts `UNTESTED` exactly as before (100% backward
+   * compatible — every existing caller that omits this field is unaffected).
+   * A hypothesis whose PRIOR belief is already `SUPPORTED`/`REFUTED` is read
+   * by `selectNext` exactly as if THIS run had reached that verdict itself:
+   * a prior `REFUTED` is never re-explored, and a prior `SUPPORTED` at one
+   * magnitude is still eligible for consolidation at the other. This is the
+   * whole fix — without it, every call starts every hypothesis at `UNTESTED`
+   * regardless of what an earlier cycle already established, and a caller
+   * has no way to make cycle N respect cycle N-1's posterior.
+   *
+   * DOES NOT invent a second Memory: this is a plain input field on an
+   * already-pure function. Storage and rehydration are the CALLER's job
+   * (`agent_run_steps`/`agent_runs.final_json`, already built, previously
+   * unwired — see `autonomousDiscoveryLoop.test.ts`'s
+   * "P0.2: belief persists across two separate agent runs" for the real,
+   * SQLite-backed round trip).
+   */
+  readonly priorBeliefs?: readonly HypothesisBelief[];
 }
 
 export interface DiscoveryRound {
@@ -438,8 +463,12 @@ export function runAutonomousDiscoveryWithEngines(input: DiscoveryLoopInput): Di
   for (let i = 0; i < input.horizonTick; i++) baseline.advance(input.dt, world.updater);
   let lastArm: TemporalEngine | null = null;
 
+  // P0.2: a hypothesis with a matching PRIOR belief resumes from it verbatim
+  // (the posterior a previous cycle actually reached); everything else still
+  // starts UNTESTED. See `DiscoveryLoopInput.priorBeliefs`'s own doc.
+  const priorBeliefById = new Map((input.priorBeliefs ?? []).map((b) => [b.hypothesisId, b]));
   const beliefs = new Map<string, HypothesisBelief>(
-    input.hypotheses.map((h) => [h.hypothesisId, initialBelief(h)]),
+    input.hypotheses.map((h) => [h.hypothesisId, priorBeliefById.get(h.hypothesisId) ?? initialBelief(h)]),
   );
   // Mutable and grows: a falsification this run may derive an alternative
   // hypothesis (see the regeneration block below), and `selectNext` needs to

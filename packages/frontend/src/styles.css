@@ -4011,7 +4011,12 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .matrix-hub { padding: 1.5rem 1rem 3rem; }
   .matrix-hub-header { flex-direction: column; align-items: stretch; }
   .matrix-focus-card { max-width: none; }
-  .matrix-ask-bar { flex-wrap: wrap; border-radius: 20px; padding: 0.8rem; }
+  /* The pill row clipped the input at phone width — the field was the
+     flexible child but had no basis to shrink from, so the placeholder ran
+     off the edge while the button took the space. Stack it instead. */
+  .matrix-ask-bar { flex-direction: column; align-items: stretch; border-radius: 20px; padding: 0.8rem; gap: 0.6rem; }
+  .matrix-ask-icon { display: none; }
+  .matrix-ask-input { width: 100%; min-width: 0; }
   .matrix-ask-submit { width: 100%; }
   .matrix-loop-columns { flex-direction: column; }
   .matrix-loop-arrow { display: none; }
@@ -4238,4 +4243,117 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 
 @media (max-width: 860px) {
   .locked-inner { grid-template-columns: 1fr; gap: var(--sp-4); }
+}
+
+/* ==========================================================================
+   APP SHELL — the frame that makes Genesis one product. Desktop gets a
+   persistent sidebar; a phone gets a bottom command bar plus a full menu
+   sheet, because a shrunk sidebar is exactly the "mobile is a smaller
+   desktop" failure. Both render from the same NAV_SECTIONS model.
+   ========================================================================== */
+.shell { display: flex; height: 100%; min-height: 0; }
+.shell-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.shell-main > .app { flex: 1; min-height: 0; }
+
+.shell-sidebar {
+  flex: 0 0 15rem; width: 15rem; height: 100%;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, var(--bg-raised), var(--bg));
+  border-right: 1px solid var(--border);
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.shell-brand {
+  display: flex; align-items: center; gap: 0.7rem; width: 100%; text-align: left;
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border); flex: none;
+}
+.shell-brand-mark { font-size: 1.3rem; color: var(--cyan); }
+.shell-brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.shell-brand-text strong {
+  font-family: var(--font-mono); font-size: var(--fs-meta); letter-spacing: 0.22em; font-weight: 700;
+}
+.shell-brand-text em {
+  font-style: normal; font-size: var(--fs-micro); color: var(--text-faint); letter-spacing: 0.06em;
+}
+
+.shell-nav { padding: var(--sp-2) 0 var(--sp-5); }
+.shell-nav-section { padding: var(--sp-2) 0.55rem 0; }
+.shell-nav-section-title {
+  margin: 0 0 0.3rem; padding: 0 0.6rem;
+  font-family: var(--font-mono); font-size: var(--fs-micro); letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-faint); font-weight: 600;
+}
+.shell-nav-item {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; text-align: left;
+  padding: 0.5rem 0.6rem; border-radius: var(--r-sm);
+  font-size: var(--fs-body); color: var(--text-dim); font-weight: 550;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.shell-nav-item:hover { background: var(--bg-panel); color: var(--text); }
+.shell-nav-item.active {
+  background: linear-gradient(90deg, rgba(92, 214, 232, 0.16), rgba(92, 214, 232, 0.04));
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
+.shell-nav-item.planned { color: var(--text-faint); cursor: default; }
+.shell-nav-item.planned:hover { background: none; color: var(--text-faint); }
+.shell-nav-icon { width: 1.25rem; text-align: center; flex: none; font-size: 0.95em; }
+.shell-nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell-nav-badge {
+  margin-left: auto; flex: none;
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.08em;
+  color: var(--gold); border: 1px solid rgba(240, 179, 92, 0.35);
+  border-radius: 999px; padding: 0.05rem 0.4rem;
+}
+
+/* Mobile bar + sheet are desktop-hidden; the sidebar is mobile-hidden. */
+.shell-mobilebar, .shell-sheet { display: none; }
+
+@media (max-width: 900px) {
+  .shell-sidebar { display: none; }
+  .shell-main { padding-bottom: calc(3.9rem + var(--safe-bottom)); }
+  .shell-mobilebar {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    padding: 0.35rem 0.2rem calc(0.35rem + var(--safe-bottom));
+    background: var(--glass-strong);
+    backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--border);
+  }
+  .shell-mobilebar-item {
+    display: flex; flex-direction: column; align-items: center; gap: 0.12rem;
+    padding: 0.35rem 0.1rem; border-radius: var(--r-sm);
+    color: var(--text-faint); font-size: 0.62rem; font-weight: 600; line-height: 1.1;
+    min-width: 0;
+  }
+  .shell-mobilebar-item > span:first-child { font-size: 1.05rem; line-height: 1; }
+  .shell-mobilebar-item > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .shell-mobilebar-item.active { color: var(--cyan); }
+
+  .shell-sheet {
+    display: flex; flex-direction: column;
+    position: fixed; inset: 0; z-index: 50;
+    background: var(--bg);
+    animation: view-fade-in var(--dur-base) var(--ease-out) both;
+  }
+  .shell-sheet-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--sp-3); border-bottom: 1px solid var(--border); flex: none;
+    font-family: var(--font-mono); letter-spacing: 0.2em; font-size: var(--fs-meta);
+  }
+  .shell-sheet-close { font-size: 1.2rem; color: var(--text-dim); padding: 0.3rem 0.6rem; }
+  .shell-sheet-body { flex: 1; overflow-y: auto; padding-bottom: calc(var(--sp-5) + var(--safe-bottom)); }
+}
+
+/* The floating Science Chat button must not sit under the mobile command bar. */
+@media (max-width: 900px) {
+  .science-chat-fab { bottom: calc(4.4rem + var(--safe-bottom)) !important; }
+}
+
+/* On a phone the Science Chat FAB is redundant with the command bar's own
+   Science Chat entry — two controls for one chat, one of them floating over
+   the content. The bar wins; the FAB is desktop-only. This is also the
+   brief's point that chat must stop reading as a bolted-on widget. */
+@media (max-width: 900px) {
+  .science-chat-fab { display: none !important; }
 }

@@ -4,6 +4,7 @@ import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
 import { ScaleJourney } from './components/ScaleJourney';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppShell } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
@@ -887,7 +888,10 @@ export default function App() {
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
-      {renderRoute()}
+      {/* One frame around every route. AppShell owns no routing — it only sets
+          window.location.hash, exactly as the app's own buttons already do —
+          so this is a shell around the existing router, not a second one. */}
+      <AppShell>{renderRoute()}</AppShell>
       {!onboardingOpen && <ErrorBoundary><ScienceChat /></ErrorBoundary>}
     </>
   );

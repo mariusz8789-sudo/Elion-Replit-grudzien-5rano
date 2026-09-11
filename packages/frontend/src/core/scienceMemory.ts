@@ -2265,6 +2265,32 @@ export interface SavedResearchChainStep {
 }
 
 /**
+ * One hypothesis's own outcome across the chain — the memory-side mirror of
+ * `HypothesisOutcomeLeaf` (`core/agent/researchChain.ts`). Kept as a local
+ * type rather than an import: `researchChain.ts` already sits above this
+ * file in the dependency graph (see `replaySavedResearchChainManifest`'s own
+ * doc), so importing back from it would create a cycle.
+ */
+export interface SavedResearchBranchLeaf {
+  readonly hypothesisId: string;
+  readonly finalStatus: 'FALSIFIED' | 'SURVIVING' | 'UNTESTED';
+  readonly eliminatedAtStep: number | null;
+}
+
+/**
+ * A DERIVED trunk-and-leaves read of the chain's steps, not a second
+ * execution record — see `summarizeResearchBranches` in `researchChain.ts`
+ * for what "branch" means here and why it is this shape rather than an
+ * n-ary fork. Optional so a manifest saved before this field existed still
+ * passes `isSavedResearchChainManifest` and simply has none to show.
+ */
+export interface SavedResearchBranches {
+  readonly initialHypothesisIds: readonly string[];
+  readonly sharedTrunkSteps: readonly number[];
+  readonly leaves: readonly SavedResearchBranchLeaf[];
+}
+
+/**
  * A completed `ResearchChainResult`/`MechanismResearchChainResult`
  * (`core/agent/researchChain.ts`), banked as its own Science Memory record
  * — the sixth investigation shape. What makes this different from every
@@ -2283,6 +2309,14 @@ export interface SavedResearchChainManifest {
   stoppedBecause: string;
   terminalStatus: 'SETTLED' | 'OPEN' | 'INCONCLUSIVE' | 'BLOCKED';
   resultFingerprint: string;
+  /**
+   * Not part of `resultFingerprint`'s input — added after that hash was
+   * already load-bearing for every saved chain, so including it would
+   * change the fingerprint of every manifest saved before this field
+   * existed. A derived view earns that cost back later only if it turns out
+   * worth banking into the hash; until then it rides along un-hashed.
+   */
+  branches?: SavedResearchBranches;
 }
 
 export interface BuildSavedResearchChainManifestInput {
@@ -2291,6 +2325,7 @@ export interface BuildSavedResearchChainManifestInput {
   selfChosenSteps: number;
   stoppedBecause: string;
   terminalStatus: 'SETTLED' | 'OPEN' | 'INCONCLUSIVE' | 'BLOCKED';
+  branches?: SavedResearchBranches;
 }
 
 function researchChainManifestFingerprint(input: BuildSavedResearchChainManifestInput): string {
@@ -2313,6 +2348,7 @@ export function buildSavedResearchChainManifest(input: BuildSavedResearchChainMa
     stoppedBecause: input.stoppedBecause,
     terminalStatus: input.terminalStatus,
     resultFingerprint: researchChainManifestFingerprint(input),
+    ...(input.branches !== undefined ? { branches: input.branches } : {}),
   };
 }
 

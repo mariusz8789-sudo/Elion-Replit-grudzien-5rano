@@ -135,6 +135,122 @@ export interface ResearchChainResult {
   readonly terminalStatus: ResearchChainTerminalStatus;
 }
 
+/**
+ * ONE HYPOTHESIS'S OWN OUTCOME, read off the steps that already ran it.
+ *
+ * `FALSIFIED` and `SURVIVING` reuse exactly the split `InquiryLoopResult`
+ * already computes every step (`falsifiedHypothesisIds` / a hypothesis that
+ * was tested and never falsified) — no new epistemic status is invented
+ * here. `UNTESTED` covers a hypothesis the caller declared in step 1 that no
+ * step ever actually measured (the chain stopped, was refused, or narrowed
+ * to other survivors before reaching it).
+ */
+export type ResearchBranchStatus = 'FALSIFIED' | 'SURVIVING' | 'UNTESTED';
+
+export interface HypothesisOutcomeLeaf {
+  readonly hypothesisId: string;
+  readonly finalStatus: ResearchBranchStatus;
+  /** The step at which this hypothesis was falsified, or null if it never was. */
+  readonly eliminatedAtStep: number | null;
+}
+
+/**
+ * A DERIVED read of `steps` as a tree — not a second execution engine. The
+ * chain above runs ONE narrowing line of inquiry, on purpose (see the file
+ * doc): every hypothesis this chain ever considers travels together through
+ * the SAME shared steps until it is either falsified or the chain stops.
+ * There is no parallel per-hypothesis execution to report, so the honest
+ * shape is TRUNK + LEAVES, not an n-ary fork:
+ *
+ *   Question (trunk: steps 1..k, shared by every hypothesis still live)
+ *   ├── H1 -> FALSIFIED at step 2
+ *   ├── H2 -> SURVIVING when the chain stopped
+ *   └── H3 -> UNTESTED (narrowed away before any step measured it)
+ *
+ * Built purely from the already-collected `steps` — calling this changes
+ * nothing about how the chain ran or what it saved before this function
+ * existed.
+ */
+export interface ResearchBranchSummary {
+  readonly initialHypothesisIds: readonly string[];
+  readonly sharedTrunkSteps: readonly number[];
+  readonly leaves: readonly HypothesisOutcomeLeaf[];
+}
+
+export interface SeparateSurvivorsClassification {
+  readonly terminalStatus: 'SETTLED' | 'BLOCKED';
+  readonly detail: string;
+}
+
+/**
+ * CAMPAIGN-LEVEL STOP, not a blanket capability gap — the pure decision
+ * behind `runResearchChain`'s SEPARATE_SURVIVORS branch when fewer than two
+ * of the run's survivors are among the chain's own DECLARED hypotheses.
+ * Extracted so this decision is directly testable against every
+ * (declared, total) survivor combination, without needing a real fixture
+ * that happens to land the solver on this exact edge.
+ *
+ * Whether this is truly decisive depends on `allSurvivingHypothesisIds` as a
+ * WHOLE, not the declared subset alone: a DERIVED survivor (one not among
+ * this chain's declared hypotheses) can still be a live rival even when zero
+ * or one DECLARED hypothesis remains, so "only one declared hypothesis is
+ * left" is not by itself proof the question is settled.
+ */
+export function classifyUnseparatedSurvivors(allSurvivingHypothesisIds: readonly string[]): SeparateSurvivorsClassification {
+  if (allSurvivingHypothesisIds.length === 1) {
+    // Exactly one hypothesis survived AT ALL — declared or derived. Nothing
+    // else is even a rival, so there is nothing left for SEPARATE_SURVIVORS
+    // to separate FROM. The question is already decided; generating a next
+    // step here would be exactly the sztuczny kolejny eksperyment a decisive
+    // result must not produce.
+    return {
+      terminalStatus: 'SETTLED',
+      detail: `only ${allSurvivingHypothesisIds[0]} survived at all — the last measurement already decided the question SEPARATE_SURVIVORS was going to ask.`,
+    };
+  }
+  // Real rivals remain (derived ones, or none at all), but none of the
+  // declared set this chain can re-test against — an actuator limitation of
+  // this chain, not a fact about the evidence.
+  return { terminalStatus: 'BLOCKED', detail: 'fewer than two of them are declared hypotheses.' };
+}
+
+export function summarizeResearchBranches(result: ResearchChainResult): ResearchBranchSummary {
+  const firstStep = result.steps[0];
+  if (firstStep === undefined) return { initialHypothesisIds: [], sharedTrunkSteps: [], leaves: [] };
+
+  const initialIds = firstStep.executedInput.hypotheses.map((h) => h.hypothesisId);
+  const leafById = new Map<string, { finalStatus: ResearchBranchStatus; eliminatedAtStep: number | null }>(
+    initialIds.map((id) => [id, { finalStatus: 'UNTESTED', eliminatedAtStep: null }]),
+  );
+  const trunk: number[] = [];
+
+  for (const step of result.steps) {
+    trunk.push(step.step);
+    if (step.outcome.status !== 'RAN') continue;
+    const native = step.outcome.run.native as InquiryLoopResult;
+    for (const id of native.survivingHypothesisIds) {
+      const leaf = leafById.get(id);
+      if (leaf !== undefined && leaf.finalStatus === 'UNTESTED') leaf.finalStatus = 'SURVIVING';
+    }
+    for (const id of native.falsifiedHypothesisIds) {
+      const leaf = leafById.get(id);
+      if (leaf !== undefined && leaf.eliminatedAtStep === null) {
+        leaf.finalStatus = 'FALSIFIED';
+        leaf.eliminatedAtStep = step.step;
+      }
+    }
+  }
+
+  return {
+    initialHypothesisIds: initialIds,
+    sharedTrunkSteps: trunk,
+    leaves: initialIds.map((id) => {
+      const leaf = leafById.get(id)!;
+      return { hypothesisId: id, finalStatus: leaf.finalStatus, eliminatedAtStep: leaf.eliminatedAtStep };
+    }),
+  };
+}
+
 /** What a proposed narrowing step needs to carry into the iteration that runs it. */
 interface PendingNarrowing {
   readonly proposal: InteriorProposal;
@@ -233,10 +349,9 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
       }
       const survivors = current.hypotheses.filter((h) => outcome.run.surviving.includes(h.hypothesisId));
       if (survivors.length < 2) {
-        stoppedBecause = `Step ${step} proposed separating survivors, but fewer than two of them are declared hypotheses.`;
-        // A derived (not declared) survivor cannot be re-tested this way — an
-        // actuator limitation of this chain, not a fact about the evidence.
-        terminalStatus = 'BLOCKED';
+        const classification = classifyUnseparatedSurvivors(native.survivingHypothesisIds);
+        stoppedBecause = `Step ${step} proposed separating survivors, but ${classification.detail}`;
+        terminalStatus = classification.terminalStatus;
         break;
       }
       pending = null;
@@ -328,7 +443,7 @@ export function runResearchChain(input: InquiryLoopInput, maxSteps = 4): Researc
     why: s.why,
     ranSuccessfully: s.outcome.status === 'RAN',
     savedExperimentIds: s.remembered.map((e) => e.id),
-  })), result.selfChosenSteps, result.stoppedBecause, result.terminalStatus);
+  })), result.selfChosenSteps, result.stoppedBecause, result.terminalStatus, summarizeResearchBranches(result));
   return result;
 }
 
@@ -484,7 +599,11 @@ export function runMechanismResearchChain(request: MechanismRequest, maxSteps = 
     why: s.why,
     ranSuccessfully: s.outcome.status === 'RAN',
     savedExperimentIds: s.remembered.savedExperimentId === null ? [] : [s.remembered.savedExperimentId],
-  })), result.selfChosenSteps, result.stoppedBecause, result.terminalStatus);
+  })), result.selfChosenSteps, result.stoppedBecause, result.terminalStatus,
+  // MECHANISM steps do not share PARAMETER's per-hypothesis-set shape (see
+  // `summarizeResearchBranches`'s doc), so there is nothing to derive a
+  // branch summary FROM here — an empty summary, not a guess.
+  { initialHypothesisIds: [], sharedTrunkSteps: steps.map((s) => s.step), leaves: [] });
   return result;
 }
 
@@ -502,10 +621,11 @@ function bankResearchChainManifest(
   selfChosenSteps: number,
   stoppedBecause: string,
   terminalStatus: ResearchChainTerminalStatus,
+  branches: ResearchBranchSummary,
 ): void {
   if (!steps.some((s) => s.ranSuccessfully)) return;
   saveResearchChainManifestToMemory(
-    buildSavedResearchChainManifest({ chainShape, steps, selfChosenSteps, stoppedBecause, terminalStatus }),
+    buildSavedResearchChainManifest({ chainShape, steps, selfChosenSteps, stoppedBecause, terminalStatus, branches }),
   );
 }
 

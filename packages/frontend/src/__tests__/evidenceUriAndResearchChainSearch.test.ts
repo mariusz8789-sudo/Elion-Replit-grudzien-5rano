@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { formatEvidenceUri, parseEvidenceUri, EVIDENCE_URI_VERSION, type EvidenceUriFields } from '../core/experimentFabric/evidenceUri';
-import { resolveCommand } from '../core/scienceChat/resolveCommand';
 
 /**
  * C1 — "CAMPAIGN SEARCH + evidence:// ADRESOWALNOŚĆ" (the C1 task, reconciled
@@ -143,29 +142,42 @@ describe('searchResearchChains — filtered read over real saved manifests', () 
 });
 
 describe('CHAT ENTRY — resolveCommand recognizes research chain search, not "kampani*"', () => {
-  it('a bare "łańcuchy badawcze" request resolves with an empty query', () => {
+  // Dynamically imported (not a top-level static import) for the same reason
+  // every scienceMemory-adjacent import in this file is: `core/storage.ts`
+  // caches `window.localStorage` availability in a MODULE-LEVEL variable on
+  // its first call, for the lifetime of this test file. A static top-level
+  // import of resolveCommand.ts (or anything in ITS import graph) would run
+  // before any `vi.stubGlobal` below, poisoning that cache to `false`
+  // permanently — exactly the bug this file used to have, traced down to
+  // this mechanism.
+  it('a bare "łańcuchy badawcze" request resolves with an empty query', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     const res = resolveCommand('pokaz lancuchy badawcze', null);
     expect(res.intent).toBe('SEARCH_RESEARCH_CHAINS');
     expect(res.action).toEqual({ type: 'searchResearchChains', query: {} });
   });
 
-  it('"rozstrzygnięte łańcuchy badawcze" resolves with terminalStatus SETTLED', () => {
+  it('"rozstrzygnięte łańcuchy badawcze" resolves with terminalStatus SETTLED', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     const res = resolveCommand('pokaz rozstrzygniete lancuchy badawcze', null);
     expect(res.action).toEqual({ type: 'searchResearchChains', query: { terminalStatus: 'SETTLED' } });
   });
 
-  it('"zablokowane łańcuchy badawcze" resolves with terminalStatus BLOCKED', () => {
+  it('"zablokowane łańcuchy badawcze" resolves with terminalStatus BLOCKED', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     const res = resolveCommand('zablokowane lancuchy badawcze', null);
     expect(res.action).toEqual({ type: 'searchResearchChains', query: { terminalStatus: 'BLOCKED' } });
   });
 
-  it('does not fire on the unrelated "kampania naukowa" (molecule-optimization) trigger', () => {
+  it('does not fire on the unrelated "kampania naukowa" (molecule-optimization) trigger', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     const res = resolveCommand('otworz kampanie naukowa', null);
     expect(res.intent).toBe('OPEN_CAMPAIGN');
     expect(res.intent).not.toBe('SEARCH_RESEARCH_CHAINS');
   });
 
-  it('does not fire on an unrelated message', () => {
+  it('does not fire on an unrelated message', async () => {
+    const { resolveCommand } = await import('../core/scienceChat/resolveCommand');
     const res = resolveCommand('jaka jest temperatura wrzenia wody', null);
     expect(res.intent).not.toBe('SEARCH_RESEARCH_CHAINS');
   });

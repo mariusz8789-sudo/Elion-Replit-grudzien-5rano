@@ -450,6 +450,20 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Atomic Lab / jonizacja (C2, integracja pakietu Qwena "Particle & Atomic Physics Laboratory") —
+  //     DRUGIE ŚRODOWISKO tego samego laboratorium, nie drugi silnik: `domains/atomicIonization.ts`
+  //     (zmierzony przekrój czynny Lotza dla wodoru + prawo Beera-Lamberta) +
+  //     `atomicIonizationLeverCatalog.ts`. Virtual CERN to jeden wiersz w
+  //     `particleAtomicLabEnvironments.ts`, a nie granica możliwości. ---
+  if (has(norm, 'jonizacj', 'ionizacj', 'ionization', 'ionisation', 'atomic lab', 'laboratorium atomowe', 'fizyka atomowa', 'atomic physics', 'przekroj czynny', 'komora jonizacyjna', 'ionization chamber')) {
+    return {
+      text: 'Otwieram panel Discovery — wybierz świat „atomic-physics — genesis-atomic-ionization". To Atomic Lab: to samo laboratorium co zderzacz, inne środowisko. Fizyka jest realna i cytowalna: zmierzony przekrój czynny jonizacji wodoru Lotza (1967) z twardym progiem 13,606 eV i MAKSIMUM koło 55 eV, oraz prawdziwe tłumienie Beera-Lamberta w komorze. Uwaga na wynik, który zwykle zaskakuje: podnoszenie energii wiązki POWYŻEJ piku ZMNIEJSZA liczbę jonów — odwrotnie niż przy strojeniu zderzacza na rezonans. Prąd wiązki, gaz resztkowy i ciemny prąd detektora są zadeklarowanymi parametrami aparatury, więc znaczenie mają wyłącznie porównania między ramionami jednego biegu.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
   // --- Evidence & Replay Showcase (C2 "Evidence & Replay as Product") — jeden kompletny, realny
   //     Evidence Bundle już zapisany w Scientific Memory (`scienceMemory.ts`) albo w starszym
   //     `evidencePackStore.ts`, pokazany jako jednostronicowy raport audytowy: pytanie -> hipoteza ->

@@ -481,3 +481,33 @@ osieroconych modułów. Sprawdziłem realnych konsumentów na bieżącym tip:
 
 Wszystkie trzy zamknięte/potwierdzone — żadnego realnego osieroconego
 modułu nie znaleziono.
+
+### 7b. Korekta do sekcji 7: jeden realny osierocony moduł jednak istniał — `core/agent/domeWorld/`
+
+Sekcja 7 sprawdziła trzy moduły wskazane w audycie Construct i zamknęła
+temat wnioskiem „żadnego realnego osieroconego modułu nie znaleziono". Ten
+wniosek był poprawny dla tych trzech, ale nie dla repo: sweep nie objął
+`core/agent/domeWorld/`, który miał **zero konsumentów produkcyjnych** —
+kompletny, przetestowany i całkowicie niewidoczny dla użytkownika.
+
+Moduł liczy, co przewiduje model płaskiego dysku z lokalnym słońcem i
+kopułą, i sądzi te przewidywania przeciw cytowanym pomiarom przez ISTNIEJĄCY
+pipeline REFERENCE (`createReferenceMeasurementRun` +
+`verifyPredictionAgainstRealExperiment`) — ten sam, którego
+`RealExperimentPipeline.tsx` używa dla ręcznie wprowadzonego cytowania:
+
+- `shadow_angle_degrees` — kopuła przewiduje 9,09°, Eratostenes 7,2° ± 0,5°
+  (Kleomedes, ~240 p.n.e.) → `FALSIFIED_WITHIN_PROTOCOL`
+- `horizon_distance_km` — kopuła przewiduje 100 km, geodezja 4,65 km ± 0,2
+  (d = √(2Rh+h²), potwierdzone obserwacją hull-down) → `FALSIFIED_WITHIN_PROTOCOL`
+
+Podpięte jako `#/dome-world` (commit `2a92cd5`). Ekran nic nie liczy i nie
+wydaje własnego werdyktu — renderuje to, co zwrócił pipeline; tolerancja
+każdego kryterium to własna niepewność cytowania. Suwak wysokości słońca
+istnieje po to, żeby czytelnik mógł przemieść jedyny wolny parametr modelu
+po całym zakresie i sam zobaczyć, że żadna wartość go nie ratuje — różnica
+między „aplikacja twierdzi" a „możesz sprawdzić".
+
+Wniosek dla przyszłych sweepów: sprawdzanie listy modułów wskazanych przez
+wcześniejszy audyt nie jest tym samym co sprawdzenie repo. `domeWorld`
+nie był na żadnej liście, bo nikt go nie podejrzewał.

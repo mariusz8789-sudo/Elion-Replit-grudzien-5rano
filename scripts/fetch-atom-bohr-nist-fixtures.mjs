@@ -95,8 +95,26 @@ for (const item of artifacts) {
       throw new Error(`${item.id}: payload missing required marker ${marker}; bytes=${raw.byteLength}; preview=${preview}`);
     }
   }
-  if (item.id === 'A4-nist-srd-terms' && /pk[.][A-Za-z0-9_-]+/.test(text)) {
-    throw new Error('A4-nist-srd-terms: official terms payload contains an embedded access token; refusing to write or upload it');
+  if (item.id === 'A4-nist-srd-terms') {
+    const match = /pk[.][A-Za-z0-9_-]+/.exec(text);
+    if (match) {
+      // DIAGNOSTIC, NOT A LEAK: the matched token itself is NEVER printed —
+      // only its length, a truncated non-reversible digest, and the
+      // surrounding context with the token redacted. This is enough to tell
+      // a public, client-embedded key (e.g. a Mapbox `pk.` access token
+      // meant to sit in page HTML) from something that would actually need
+      // rotating, without putting the value itself into a CI log that is
+      // readable by anyone with repo access.
+      const idx = match.index;
+      const before = text.slice(Math.max(0, idx - 80), idx).replace(/\s+/g, ' ');
+      const after = text.slice(idx + match[0].length, idx + match[0].length + 80).replace(/\s+/g, ' ');
+      const digest = createHash('sha256').update(match[0]).digest('hex').slice(0, 12);
+      throw new Error(
+        `A4-nist-srd-terms: official terms payload contains a string matching /pk[.][A-Za-z0-9_-]+/ ` +
+        `(length=${match[0].length}, sha256[0:12]=${digest}); refusing to write or upload it. ` +
+        `Context (token itself redacted as [REDACTED]): "...${before}[REDACTED]${after}..."`,
+      );
+    }
   }
   const sha256 = createHash('sha256').update(raw).digest('hex');
   const target = join(OUT, item.file);

@@ -8,6 +8,8 @@ import {
   createScenarioCapsule,
   serializeScenarioCapsule,
   replayScenarioCapsule,
+  formatEvidenceUri,
+  parseEvidenceUri,
 } from '../core/experimentFabric';
 
 /**
@@ -83,5 +85,23 @@ describe('Pilot UI workflow (structured form -> plan -> run -> capsule -> export
     expect(plan.disclosure.runnable).toBe(false);
     expect(plan.disclosure.resultWillComeFromRealRun).toBe(false);
     expect(() => confirmEvidenceGuidedExperiment(plan)).toThrow();
+  });
+
+  describe('#/pilot?replay= — the exact evidence:// wiring ExperimentPilotScreen and ScientificMemoryScreen share', () => {
+    // ScientificMemoryScreen.tsx writes `replay=` with formatEvidenceUri (not a bare evidencePackId);
+    // ExperimentPilotScreen.tsx reads it back with
+    // `parseEvidenceUri(replayParam)?.evidencePackId ?? replayParam` — this proves that exact
+    // round trip, plus the backward-compatible fallback for a link written before this wiring existed.
+    it('a real evidence:// URI written by the producer parses back to the exact original evidencePackId', () => {
+      const uri = formatEvidenceUri({ evidencePackId: 'pack-legacy-pilot-42', evidenceChainId: null });
+      const parsedId = parseEvidenceUri(uri)?.evidencePackId ?? uri;
+      expect(parsedId).toBe('pack-legacy-pilot-42');
+    });
+
+    it('a bare, unprefixed id (an old link, or one typed by hand) falls back to itself rather than being dropped', () => {
+      const bareId = 'pack-legacy-pilot-42';
+      const parsedId = parseEvidenceUri(bareId)?.evidencePackId ?? bareId;
+      expect(parsedId).toBe(bareId);
+    });
   });
 });

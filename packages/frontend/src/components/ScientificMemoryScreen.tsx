@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { deleteExperiment, listExperiments, type SavedExperiment } from '../core/scienceMemory';
-import { classifyStoredEvidencePack, getStoredEvidencePackReplayVerdict, listScientificEvidencePacks, serializeScientificEvidencePack, type StoredEvidencePack } from '../core/experimentFabric';
+import { classifyStoredEvidencePack, formatEvidenceUri, getStoredEvidencePackReplayVerdict, listScientificEvidencePacks, serializeScientificEvidencePack, type StoredEvidencePack } from '../core/experimentFabric';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
 import { buildPinnedChEMBLAdenosineDiscovery } from '../core/biotechData/adenosine';
@@ -424,7 +424,7 @@ export function ScientificMemoryScreen() {
                   <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'verify')}>Sam werdykt odtworzenia</button>
                   <button className="chip-btn" onClick={() => replayScenarioRecord(record, 'drift')}>Zmień R₀ → pokaż DRIFT</button>
                 </>}
-                {record.evidencePackId && <button className="chip-btn" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.evidencePackId!)}`; }}>Otwórz Evidence replay</button>}
+                {record.evidencePackId && <button className="chip-btn" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(formatEvidenceUri({ evidencePackId: record.evidencePackId!, evidenceChainId: null }))}`; }}>Otwórz Evidence replay</button>}
                 <button className="chip-btn" onClick={() => downloadJson(record)}>Eksportuj JSON</button>
                 {artifact && <>
                   <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/dossier?candidate=${encodeURIComponent(artifact.reports[0]?.candidateId ?? '')}`; }}>Open Candidate Dossier</button>
@@ -469,7 +469,7 @@ export function ScientificMemoryScreen() {
             <p className="settings-hint">{snapshotVerdict === 'MATCH' ? 'MATCH pochodzi z zapisanego snapshotu armów; nie oznacza nowego uruchomienia.' : snapshotVerdict === 'DRIFT' ? 'DRIFT zapisany w snapshotcie; wykonaj jawny rerun, aby porównać aktualny wynik.' : 'BLOCKED: zapis nie zawiera pełnego wykonanego replay; nie traktuj go jako potwierdzenia.'}</p>
             {record.pack.externalObservationComparison && <p className="settings-hint">AME2020 source: {record.pack.externalObservationComparison.provenance.sourceUrl}; raw SHA-256: {record.pack.externalObservationComparison.provenance.rawPayloadSha256}. This is an independent observation comparison, not a calibrated accuracy claim.</p>}
             <div className="pilot-actions">
-              <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(record.pack.evidencePackId)}`; }}>Otwórz do jawnego rerun</button>
+              <button className="chip-btn pilot-primary" onClick={() => { window.location.hash = `#/pilot?mode=protocol&replay=${encodeURIComponent(formatEvidenceUri({ evidencePackId: record.pack.evidencePackId, evidenceChainId: null }))}`; }}>Otwórz do jawnego rerun</button>
               <button className="chip-btn" onClick={() => downloadEvidencePack(record)}>Eksportuj Evidence Pack JSON</button>
             </div>
           </article>

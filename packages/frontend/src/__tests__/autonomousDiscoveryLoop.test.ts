@@ -301,4 +301,98 @@ describe('The trace persists through the real AgentRun tables', () => {
       expect(row.provenanceEventIds).toEqual(step.provenanceEventIds);
     });
   });
+
+  /**
+   * P0.2 BELIEF PERSISTENCE — the actual gap this closes, proven end to end
+   * through the REAL `agent_runs`/`agent_run_steps` tables, not a mock.
+   *
+   * Two SEPARATE agent runs (`run1`, `run2`) model two separate cycles of the
+   * SAME investigation. `run1` executes cold (no `priorBeliefs`) and reaches
+   * real verdicts on the real flood city. Its final belief state is persisted
+   * to `run1.final_json` via `updateAgentRunStatus` — the same column
+   * `agentRun.mjs` already exposed for exactly this and that nothing wrote to
+   * before this change. `run2` then rehydrates THAT persisted state as its
+   * own `priorBeliefs` and is executed against the SAME declared hypotheses
+   * and world.
+   *
+   * The assertion that matters: `run2` does NOT repeat `run1`'s work. Every
+   * hypothesis `run1` already decided is honored as already-decided, so
+   * `run2`'s `selectNext` finds nothing left to test and stops on its very
+   * first round — the observable, falsifiable difference between "cycle 2
+   * inherits cycle 1's posterior" (this) and "cycle 2 starts blind" (the
+   * pre-fix behavior, still exercised by every OTHER test in this file that
+   * never passes `priorBeliefs`).
+   */
+  it('P0.2: belief persists across two separate agent runs — cycle 2 inherits cycle 1s verdicts and re-tests nothing', async () => {
+    const storeUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/store.mjs')).href;
+    const agentRunUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/agentRun.mjs')).href;
+    const authUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/auth.mjs')).href;
+    const store = (await import(/* @vite-ignore */ storeUrl)) as Record<string, (...args: never[]) => never>;
+    const agentRun = (await import(/* @vite-ignore */ agentRunUrl)) as Record<string, (...args: never[]) => never>;
+    const auth = (await import(/* @vite-ignore */ authUrl)) as Record<string, (...args: never[]) => never>;
+
+    const db = (store.openDatabase as unknown as () => unknown)();
+    const user = (store.createUser as unknown as (d: unknown, u: unknown) => { id: string })(db, {
+      email: 'p02@lab.org', displayName: 'P02', passwordHash: (auth.hashPassword as unknown as (p: string) => string)('password123'),
+    });
+    const project = (store.createProject as unknown as (d: unknown, p: unknown) => { id: string })(db, { name: 'P0.2', ownerId: user.id });
+
+    // --- Cycle 1: cold start, no priorBeliefs — real rounds run, real verdicts reached. ---
+    const cycle1 = runAutonomousDiscovery(loopInput(SHORT_HORIZON));
+    expect(cycle1.rounds.length).toBeGreaterThan(0);
+    expect(cycle1.beliefs.find((b) => b.hypothesisId === OUTLET_HYPOTHESIS.hypothesisId)!.status).toBe('REFUTED');
+    expect(cycle1.beliefs.find((b) => b.hypothesisId === INFILTRATION_HYPOTHESIS.hypothesisId)!.status).toBe('SUPPORTED');
+
+    const run1 = (agentRun.createAgentRun as unknown as (d: unknown, r: unknown) => { id: string })(db, {
+      projectId: project.id, goal: cycle1.question, domain: cycle1.domainId, budget: { maxRounds: 4 }, createdBy: user.id,
+    });
+    for (const step of cycle1.trace) {
+      (agentRun.addAgentStep as unknown as (d: unknown, s: unknown) => string)(db, toAgentStepInput(step, run1.id));
+    }
+    // The one call this whole feature was missing a caller for: bank the
+    // cycle's real posterior where a later cycle can find it.
+    (agentRun.updateAgentRunStatus as unknown as (d: unknown, id: string, status: string, final: unknown) => void)(
+      db, run1.id, 'RESOLVED', { beliefs: cycle1.beliefs, stopReason: cycle1.stopReason },
+    );
+
+    // --- Rehydrate: read run1 back from the database exactly as a fresh process would. ---
+    const storedRun1 = (agentRun.getAgentRun as unknown as (d: unknown, id: string) => { final: { beliefs: unknown[] } })(db, run1.id);
+    const rehydratedPriorBeliefs = storedRun1.final.beliefs as DiscoveryLoopInput['priorBeliefs'];
+    expect(rehydratedPriorBeliefs).toHaveLength(cycle1.beliefs.length);
+
+    // --- Cycle 2: SAME declared hypotheses, SAME world, seeded from run1's persisted posterior. ---
+    const cycle2 = runAutonomousDiscovery(loopInput(SHORT_HORIZON, { priorBeliefs: rehydratedPriorBeliefs }));
+
+    // The core claim: nothing is re-tested. Every hypothesis run1 already
+    // decided is honored, so selectNext finds nothing left and stops cold —
+    // never re-running the round-1 OUTLET test cycle1 itself needed.
+    expect(cycle2.rounds).toHaveLength(0);
+    expect(cycle2.trace).toHaveLength(0);
+    expect(cycle2.stopReason).toBe('NO_TESTABLE_HYPOTHESIS');
+    // The posterior for every DECLARED hypothesis survived the round trip
+    // unchanged — a resume, not a reset relabelled as one. (A real, honest
+    // limitation, not asserted away here: cycle1 also derived a fourth,
+    // UNTESTED hypothesis mid-run via deriveAlternativeCriteria — see its
+    // "~RELATION_FLIP" id below. `input.hypotheses` is the CALLER's declared
+    // search space, and cycle2's caller declared only the original three, so
+    // the derived one is correctly absent from cycle2 too; carrying a
+    // DERIVED hypothesis's live `apply` closure across a real persistence
+    // boundary is a materially different, larger feature than this fix.)
+    const declaredIds = new Set([OUTLET_HYPOTHESIS, INFILTRATION_HYPOTHESIS, PUMP_HYPOTHESIS].map((h) => h.hypothesisId));
+    expect(cycle2.beliefs).toEqual(cycle1.beliefs.filter((b) => declaredIds.has(b.hypothesisId)));
+    expect(cycle1.beliefs.length).toBe(cycle2.beliefs.length + 1); // the one derived hypothesis, honestly not carried forward
+    expect(cycle1.beliefs.some((b) => b.hypothesisId.includes('~RELATION_FLIP'))).toBe(true);
+
+    // A second, SEPARATE agent_runs row records cycle 2 — two real cycles of
+    // one investigation, not one run silently mutated in place.
+    const run2 = (agentRun.createAgentRun as unknown as (d: unknown, r: unknown) => { id: string })(db, {
+      projectId: project.id, goal: cycle2.question, domain: cycle2.domainId, budget: { maxRounds: 4 }, createdBy: user.id,
+    });
+    expect(run2.id).not.toBe(run1.id);
+    (agentRun.updateAgentRunStatus as unknown as (d: unknown, id: string, status: string, final: unknown) => void)(
+      db, run2.id, 'RESOLVED', { beliefs: cycle2.beliefs, stopReason: cycle2.stopReason },
+    );
+    const storedRun2 = (agentRun.getAgentRun as unknown as (d: unknown, id: string) => { final: { stopReason: string } })(db, run2.id);
+    expect(storedRun2.final.stopReason).toBe('NO_TESTABLE_HYPOTHESIS');
+  });
 });

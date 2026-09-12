@@ -1,0 +1,11 @@
+Subsystem 	 Measured 2nd Renyi Entropy 	 Standard Error  	 Numerical Simulation Unitary	 Numerical Simulation incl. Dec
+1 	 0.983 	 0.003  	 0.99 	 0.99
+2 	 1.56 	 0.02  	 1.47 	 1.51
+3 	 1.70 	 0.03  	 1.57 	 1.68
+4 	 1.83 	 0.04  	 1.66 	 1.84
+5 	 1.98 	 0.05  	 1.68 	 1.93
+6 	 1.95 	 0.07  	 1.69 	 2.01
+7 	 1.94 	 0.08  	 1.61 	 2.01
+8 	 1.9 	 0.1  	 1.51 	 1.97
+9 	 1.2 	 0.1  	 0.99 	 1.53
+10 	 0.4 	 0.1  	 0.00 	 0.63

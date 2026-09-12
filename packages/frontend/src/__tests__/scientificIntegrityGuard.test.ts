@@ -169,7 +169,7 @@ describe('4. Evidence provenance', () => {
     const withPack: SavedExperiment = {
       id: 'r1', createdAt: new Date().toISOString(), labId: 'lab', experimentId: 'e1', experimentName: 'n',
       params: {}, stats: {}, honesty: 'simplified', honestyNote: 'fixture', equations: [], assumptions: [],
-      epistemicStatus: 'x', contentHash: 'h1', evidencePackId: 'pack_real_123',
+      epistemicStatus: 'UNKNOWN', contentHash: 'h1', evidencePackId: 'pack_real_123',
       researchChain: {
         contractVersion: '1.0.0', chainShape: 'MECHANISM', initialQuestion: 'Q?',
         steps: [{ step: 1, question: 'Q?', kind: 'INITIAL', why: 'start', ranSuccessfully: false, savedExperimentIds: [] }],
@@ -328,7 +328,7 @@ describe('8. crossDomainSynthesis priority/tally correctness', () => {
     return {
       createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(), experimentId: overrides.id, experimentName: overrides.id,
       params: {}, stats: {}, honesty: 'simplified', honestyNote: 'fixture', equations: [], assumptions: [],
-      epistemicStatus: 'TEST_FIXTURE', contentHash: `hash:${overrides.id}`,
+      epistemicStatus: 'UNKNOWN', contentHash: `hash:${overrides.id}`,
       ...overrides,
     };
   }
@@ -452,7 +452,7 @@ describe('Specifically named guards', () => {
     const records: SavedExperiment[] = [{
       id: 'r1', createdAt: new Date().toISOString(), labId: 'lab', experimentId: 'e1', experimentName: 'n',
       params: {}, stats: {}, honesty: 'simplified', honestyNote: 'fixture', equations: [], assumptions: [],
-      epistemicStatus: 'x', contentHash: 'h1',
+      epistemicStatus: 'UNKNOWN', contentHash: 'h1',
       researchChain: {
         contractVersion: '1.0.0', chainShape: 'MECHANISM', initialQuestion: 'Q?',
         steps: [{ step: 1, question: 'Q?', kind: 'INITIAL', why: 'start', ranSuccessfully: false, savedExperimentIds: [] }],

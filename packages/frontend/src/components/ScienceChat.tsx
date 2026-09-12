@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ensureGeneratorReady, getRecipes, epistemicStatusOf, EPISTEMIC_LABELS } from '../core/generator';
+import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { subscribeScienceChatOpenRequests } from '../core/scienceChatBridge';
@@ -787,7 +787,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           params: c.getParams(), stats: c.getStats(),
           honesty: c.honesty, honestyNote: c.honestyNote,
           equations: recipe?.equations, assumptions: recipe?.assumptions,
-          epistemicStatus: recipe ? EPISTEMIC_LABELS[epistemicStatusOf(recipe)] : undefined,
+          epistemicStatus: recipe ? epistemicStatusOf(recipe) : undefined,
         });
         appendGenesis(`Zapisano ✓ Odcisk treści: #${saved.contentHash}. Rekord zawiera model, parametry, równania, założenia, status epistemiczny i migawkę wyników. Wpisz „pokaż zapisane", by wrócić do niego później.`);
       } else if (lastDiscoveryLoop) {

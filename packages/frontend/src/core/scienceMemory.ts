@@ -44,7 +44,10 @@ import { buildWorldEvidenceBundle, type WorldEvidenceBundle } from './worldModel
 import { compareBranches, projectToWorldState } from './worldModel/bridge/worldFrameState';
 import { TemporalEngine, TemporalBranchRegistry } from './worldModel/temporal/temporalEngine';
 import type { RealExperimentRequest, ReferenceMeasurementRequest } from './experimentFabric/realExperiment';
-import type { FalsificationCriterion } from './experimentFabric/scientificDiscovery';
+import type { FalsificationCriterion, HypothesisAssessment } from './experimentFabric/scientificDiscovery';
+import type { KnowledgeEpistemicStatus } from './knowledge/supplementalRegistry';
+import type { DataProvenance } from './dataProvenance';
+import type { EpistemicStatus } from './generator/recipe';
 import {
   verifyPredictionAgainstRealExperiment, predictionVerificationFingerprint, type PredictionVerification,
 } from './agent/predictionVerification';
@@ -184,6 +187,101 @@ export interface SavedExperimentReplayIdentity {
   confirmationId: string;
 }
 
+/**
+ * CONSOLIDATED EPISTEMIC-STATUS VOCABULARY for `SavedExperiment.epistemicStatus`
+ * (was an untyped `string`, fed by at least four pre-existing, independently
+ * typed axes plus a dozen ad-hoc literals — verified by tracing every real
+ * `saveExperiment(...)` call site across the app, not guessed):
+ *
+ *   - `KnowledgeEpistemicStatus` (`knowledge/supplementalRegistry.ts`) — the
+ *     nature of a cited external knowledge claim (FACT/MODEL/THEORY/
+ *     HYPOTHESIS/SCENARIO_ASSUMPTION/FICTIONAL_REFERENCE).
+ *   - `HypothesisAssessment` (`experimentFabric/scientificDiscovery.ts`) —
+ *     a protocol's falsification VERDICT (CANDIDATE/SUPPORTED_WITHIN_PROTOCOL/
+ *     FALSIFIED_WITHIN_PROTOCOL/INCONCLUSIVE), stored verbatim by
+ *     `saveScientificEvidencePackToMemory` — a genuinely different question
+ *     ("did this specific test succeed?") from claim reliability, kept as a
+ *     real, separate union member rather than collapsed into one meaning.
+ *   - `SavedResearchChainManifest['terminalStatus']` — a research chain's
+ *     own lifecycle state (SETTLED/OPEN/INCONCLUSIVE/BLOCKED), stored
+ *     verbatim by `saveResearchChainManifestToMemory`. Referenced by
+ *     indexed-access type, not a fresh import: `researchChain.ts` already
+ *     sits above this file in the dependency graph (see
+ *     `SavedResearchBranchLeaf`'s own doc a few hundred lines below), so the
+ *     manifest interface — and this alias to one of its fields — has to stay
+ *     local rather than imported back from there.
+ *   - `DataProvenance` (`dataProvenance.ts`) — where the underlying DATA came
+ *     from (SIMULATED/REFERENCE/REAL_EXPERIMENTAL), stored verbatim by
+ *     `saveRealExperimentVerificationToMemory` — confirmed load-bearing by
+ *     `realExperimentE2E.test.ts`/`referenceDataE2E.test.ts`, which assert
+ *     the exact stored string, so this consolidation preserves it rather
+ *     than remapping it into something "more epistemic-sounding."
+ *   - `EpistemicStatus` (`generator/recipe.ts`, "Universal Scientific
+ *     Experiment Engine") — scientific-consensus level of a simulated MODEL
+ *     (ESTABLISHED_SCIENCE/WELL_SUPPORTED_MODEL/THEORETICAL_MODEL/HYPOTHESIS/
+ *     THOUGHT_EXPERIMENT/SPECULATIVE_MODEL/UNSUPPORTED_CLAIM) — already
+ *     shipped, already has Polish `EPISTEMIC_LABELS` wired into
+ *     `ScienceChat.tsx`. Worth flagging loudly for whoever builds the next
+ *     epistemic-status engine: THIS may already be it, or its intended
+ *     ancestor, not a clean slate.
+ *   - `BiotechEpistemicStatus` (`biotechDiscoveryContract.ts`) — a biotech
+ *     record's own evidentiary basis (FACT/OBSERVED/LITERATURE_SUPPORTED/
+ *     PREDICTION/INFERENCE/HYPOTHESIS/UNKNOWN/BLOCKED), stored verbatim by
+ *     `saveBiotechDiscoveryReportToMemory`/`saveBiotechHypothesisToMemory`
+ *     (`report.epistemicStatus`/`input.hypothesis.status`) — found only by
+ *     `tsc` once this field stopped being `string`, not by grepping for
+ *     quoted literals, since both call sites forward a typed VARIABLE.
+ *   - The remaining members are ad-hoc literals with no existing named type,
+ *     used consistently by real callers: `SIMULATION` (9 call sites, every
+ *     fully-Genesis-simulated investigation shape) is a DIFFERENT WORD for
+ *     the same concept `DataProvenance.SIMULATED` already names elsewhere —
+ *     kept as its own literal here rather than merged, since collapsing it
+ *     would change the stored value for 9 existing call sites with no test
+ *     coverage forcing that change; `` `MAX_SUPPORTABLE_CLAIM=${...}` `` is a
+ *     template-literal member because `precisionEvidencePack.ts` stores a
+ *     formatted string, not a bare category — still a closed, finite set
+ *     (`PrecisionFalsificationAssessment['maxSupportableClaim']` only ever
+ *     has two values), so union membership stays exact rather than widened
+ *     to a bare `string`.
+ *
+ * THIS IS A CONSOLIDATION, NOT A RANK OR A NEW MEANING: every value already
+ * stored today is preserved exactly as-is (verified against
+ * `realExperimentE2E.test.ts`/`referenceDataE2E.test.ts`'s exact-string
+ * assertions before this type was written) — the win is that `tsc` now
+ * catches a typo or a genuinely wrong axis leaking in here, where `string`
+ * caught nothing.
+ *
+ * GraphEpistemicStatus (`experimentFabric/experimentGraph.ts`) is
+ * DELIBERATELY NOT a member: it is a DERIVED, computed classification of an
+ * `ExperimentGraphNode`'s place in the question→hypothesis→experiment→
+ * observation pipeline (QUESTION/HYPOTHESIS/SIMULATION/MODEL_ESTIMATE/
+ * OBSERVED/UNKNOWN/BLOCKED/VERIFY_REQUIRED) — a workflow-STATE axis over
+ * graph nodes, not a description of a `SavedExperiment` record's own
+ * content reliability. It happens to share several NAMES with this union by
+ * convergent design, not because it is (or should become) the canonical
+ * epistemic dictionary; it is missing FACT/MODEL/THEORY/PREDICTION/
+ * RECONSTRUCTED/SCENARIO_ASSUMPTION/FICTIONAL_REFERENCE entirely and adds
+ * process-only values (BLOCKED/VERIFY_REQUIRED/MODEL_ESTIMATE) that do not
+ * belong on a "how much do we trust this record" axis at all.
+ */
+export type SavedExperimentEpistemicStatus =
+  | KnowledgeEpistemicStatus
+  | HypothesisAssessment
+  | SavedResearchChainManifest['terminalStatus']
+  | DataProvenance
+  | EpistemicStatus
+  | BiotechEpistemicStatus
+  | 'SIMULATION'
+  | 'PREDICTION'
+  | 'OBSERVED'
+  | 'RECONSTRUCTED'
+  | 'UNKNOWN'
+  | 'QUESTION'
+  | 'OBSERVATION_RECORDED_NOT_VALIDATED'
+  | 'EXECUTED_REAL_ENGINE'
+  | 'EXECUTED_WITH_LIMITATIONS'
+  | `MAX_SUPPORTABLE_CLAIM=${'STRUCTURAL_SIMILARITY' | 'NONE'}`;
+
 export interface SavedExperiment {
   id: string;
   createdAt: string;
@@ -318,7 +416,7 @@ export interface SavedExperiment {
   honestyNote: string;
   equations: string[];
   assumptions: string[];
-  epistemicStatus: string;
+  epistemicStatus: SavedExperimentEpistemicStatus;
   contentHash: string;
 }
 
@@ -603,7 +701,7 @@ export interface SaveExperimentInput {
   honestyNote: string;
   equations?: string[];
   assumptions?: string[];
-  epistemicStatus?: string;
+  epistemicStatus?: SavedExperimentEpistemicStatus;
   execution?: SavedExperimentExecution;
   evidencePackId?: string;
   evidenceChainId?: string;
@@ -712,7 +810,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     honestyNote: input.honestyNote,
     equations: input.equations ?? [],
     assumptions: input.assumptions ?? [],
-    epistemicStatus: input.epistemicStatus ?? '',
+    epistemicStatus: input.epistemicStatus ?? 'UNKNOWN',
     contentHash: hash,
   };
   const all = [...readAll(), entry].slice(-MAX_TOTAL);

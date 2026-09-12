@@ -47,7 +47,7 @@ function baseExperiment(overrides: Partial<SavedExperiment> & Pick<SavedExperime
     honestyNote: 'test fixture',
     equations: [],
     assumptions: [],
-    epistemicStatus: 'TEST_FIXTURE',
+    epistemicStatus: 'UNKNOWN',
     contentHash: `hash:${overrides.id}`,
     ...overrides,
   };

@@ -6,6 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/frontend/package.json packages/frontend/
 COPY packages/backend/package.json packages/backend/
+COPY packages/csrn/package.json packages/csrn/
 RUN npm ci
 COPY . .
 RUN npm run build

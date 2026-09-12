@@ -347,3 +347,65 @@ kształtem JSON użytym w skrypcie potwierdzonym wykonaniem
 (`docs/P0_EVIDENCE.md`, sekcja P0.2). Sam `docker build`/`docker run` — czyli
 dokładnie to, czego ten sandbox nie potrafi zrobić — pozostaje `NOT VERIFIED`
 z TEGO środowiska i zweryfikowany dopiero w Actions po pierwszym pushu.
+
+---
+
+## D-017 (2026-09-12, R-006) — `docker-image` job z D-016 rzeczywiście uruchomiony w CI: RED, przyczyna znaleziona i naprawiona, dowód wciąż w toku
+
+**Fakt, nie zgadnięty.** Pierwsze uruchomienie joba `docker-image` (run
+`34709914327`, commit `d70e130`) zostało sprawdzone przez `mcp__github__actions_get`/
+`get_workflow_jobs`/`get_job_logs` — status `completed`, `conclusion: "failure"`,
+na kroku „Budowa obrazu z realnym identyfikatorem wydania” (33 s, więc to NIE
+jest blokada CDN opisana w D-016 — runner GitHub Actions ściągnął `node:22-slim`
+bez problemu, warstwy pobrały się w kilka sekund).
+
+**Rzeczywisty błąd z logu (cytat, nie streszczenie):**
+```
+../csrn/src/crypto/fingerprint.ts(18,35): error TS2307: Cannot find module 'node:crypto'
+../csrn/src/crypto/signing.ts(21,35): error TS2307: Cannot find module 'node:crypto'
+src/core/discovery/molecular/rdkitTransport.node.ts(1,30): error TS2307: Cannot find module 'node:child_process'
+src/core/discovery/molecular/rdkitTransport.node.ts(31,10): error TS2591: Cannot find name 'process'
+src/core/discovery/molecular/rdkitTransport.node.ts(35,23): error TS2304: Cannot find name '__dirname'
+```
+`tsc -b` w etapie `build` Dockerfile'a nie widział typów `@types/node` przy
+kompilacji plików `packages/csrn/src/**` i `rdkitTransport.node.ts`.
+
+**Diagnoza.** `Dockerfile`, etap `build`, kopiował przed `npm ci` TYLKO
+`package.json`/`package-lock.json` (root) + `packages/frontend/package.json` +
+`packages/backend/package.json` — **nie** `packages/csrn/package.json`, mimo że
+root `package.json::workspaces` deklaruje trzy przestrzenie robocze
+(`frontend`, `backend`, `csrn`), a `packages/frontend/package.json` ma
+`"@genesis-os/csrn": "^1.0.0"` jako realną zależność (zweryfikowane
+`grep`-em, nie założeniem). Dockerfile nie nadążył za tym, że `csrn` przestał
+być samodzielnym, niezależnym pakietem.
+
+**Próba odtworzenia lokalnie — częściowa, uczciwie opisana.** Odtworzono
+dokładnie sekwencję COPY z Dockerfile'a w katalogu roboczym (kopiowanie
+podzbioru `package.json`, `npm ci`, potem `git archive HEAD | tar -x` jako
+odpowiednik `COPY . .`, potem `npm run build`) — zarówno z brakującym, jak i z
+dodanym `packages/csrn/package.json`. **W tym środowisku (lokalny Node
+v22.22.2/npm 10.9.7) OBIE wersje budują się poprawnie** — błąd z CI się tu NIE
+odtworzył. Najbardziej prawdopodobne wyjaśnienie: `node:22-slim` w GitHub
+Actions niesie inną (prawdopodobnie starszą) wersję npm, której zachowanie
+przy `npm ci` wobec workspace'u zadeklarowanego w `workspaces`, ale bez
+obecnego na dysku `package.json`, różni się od lokalnej — ale to jest
+HIPOTEZA, nie zweryfikowany fakt, bo Docker w tym sandboxie nie buduje obrazu
+(D-016).
+
+**Naprawa zastosowana mimo niepełnej reprodukcji, i dlaczego to nie jest
+zgadywanie.** Dodano `COPY packages/csrn/package.json packages/csrn/` do
+etapu `build`, tuż obok analogicznych linii dla `frontend`/`backend` — to
+przywraca Dockerfile do stanu, w którym etap `build` widzi DOKŁADNIE ten sam
+zestaw plików `package.json` co `npm ci` uruchamiane lokalnie i w jobie
+`verify` (gdzie `actions/checkout` daje PEŁNE repo przed `npm ci`, więc `verify`
+nigdy nie mógł ujawnić tego konkretnego braku — luka istniała wyłącznie w
+etapie `build` Dockerfile'a). To jest naprawa realnej rozbieżności w pliku, nie
+łatanie objawu bez zrozumienia przyczyny.
+
+**Status.** `NOT VERIFIED` z pełnym dowodem `docker build` — to zostanie
+potwierdzone (lub obalone) dopiero na następnym uruchomieniu joba
+`docker-image` w Actions, na commicie niosącym tę poprawkę. Jeśli błąd wróci
+mimo tej zmiany, hipoteza o wersji npm w `node:22-slim` będzie wymagała
+dalszego śledztwa (np. przypięcie konkretnej wersji npm w obrazie `build`
+przez `RUN npm install -g npm@<pinned>`), zapisanego tutaj jako kolejna
+decyzja, nie po cichu.

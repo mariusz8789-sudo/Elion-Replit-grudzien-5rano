@@ -159,9 +159,26 @@ egress do Docker Hub nie jest ograniczony. Logika HTTP tego joba
 kontenera przed wpisaniem do workflow (`docs/P0_EVIDENCE.md`, sekcja P0.2) —
 każdy kształt JSON w skrypcie sprawdzony wykonaniem, nie założony.
 
+**Pierwsze uruchomienie w Actions (commit `d70e130`, run `34709914327`):
+RED, przyczyna INNA niż blokada egress.** Sprawdzone realnie przez
+`mcp__github__actions_get`/`get_job_logs` (nie założone) — krok „Budowa
+obrazu” padł po 33 s na `tsc -b` wewnątrz `RUN npm run build`:
+`Cannot find module 'node:crypto'`/`'node:child_process'` w
+`packages/csrn/src/crypto/*.ts` i `rdkitTransport.node.ts`. Przyczyna:
+etap `build` Dockerfile'a kopiował przed `npm ci` `package.json` dla
+`frontend`/`backend`, ale NIE dla `packages/csrn` — mimo że `csrn` jest
+zadeklarowanym workspace'em i realną zależnością `frontend/package.json`
+(`"@genesis-os/csrn": "^1.0.0"`). Naprawione dodaniem brakującej linii
+`COPY packages/csrn/package.json packages/csrn/` (`docs/DECISIONS.md`,
+D-017). Lokalna próba odtworzenia dała wynik NIEROZSTRZYGAJĄCY — dokładna
+sekwencja COPY z Dockerfile'a zbudowała się poprawnie w tym sandboxie z OBOMA
+wariantami (z brakiem i z dodaniem pliku), więc różnica prawdopodobnie leży w
+wersji npm w obrazie `node:22-slim`, nie potwierdzone wprost.
+
 **Wciąż nie jest to samodzielny dowód z TEGO środowiska** — dowód powstaje
-przy pierwszym pushu tego commita, w Actions, na tym SHA. Status: sprawdzić
-w zakładce Actions dla `.github/workflows/ci.yml` przed wdrożeniem.
+na kolejnym pushu niosącym poprawkę D-017, w Actions, na tym SHA. Status:
+sprawdzić w zakładce Actions dla `.github/workflows/ci.yml` przed wdrożeniem
+— `docker-image` MUSI być zielony, nie tylko `verify`.
 
 ---
 

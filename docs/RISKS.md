@@ -9,33 +9,27 @@ z opisanym resztkowym · **ACCEPTED** = świadomie przyjęte na tym etapie.
 
 ---
 
-## R-001 — Tokeny sesji przechowywane w postaci jawnej · OPEN
+## R-001 — Tokeny sesji przechowywane w postaci jawnej · MITIGATED
 
-**Fakt.** `packages/backend/src/store.mjs:634-644` zapisuje token sesji dosłownie
-w kolumnie `sessions.token`. Kto zdobędzie plik bazy — **w tym plik backupu**,
-który `scripts/db-backup.mjs` właśnie uczynił łatwym do wykonania i
-skopiowania — może użyć tych tokenów bezpośrednio do końca ich TTL.
+**Status zamknięty w pakiecie P1** (`docs/P1_EVIDENCE.md`, sekcja „R-001
+BONUS”). `packages/backend/src/store.mjs::createSession`/`getUserByToken`/
+`deleteSession` haszują teraz token SHA-256 (`secrets.mjs`, cherry-pick
+bajt-w-bajt z `3bce0c2`, nie reimplementacja) przed każdym zapisem/odczytem
+z `sessions.token`; klient nadal loguje się swoim surowym tokenem — hash nigdy
+nie opuszcza serwera i sam w sobie nie uwierzytelnia (zweryfikowane testem).
+Migracja `version < 13` w `migrate()` haszuje w miejscu każdy ISTNIEJĄCY
+plaintextowy token, idempotentnie (`looksHashed()` pomija już-zahaszowane
+wiersze), przetestowana TDD na realnej legacy-bazie z prawdziwą sesją —
+zero utraconych/zduplikowanych sesji.
 
-**Czego to NIE jest.** Nie jest regresją tej gałęzi. Gotowa implementacja
-haszowania w spoczynku (`hashSecret`/`keyHint`/`looksHashed`, SHA-256, czyste
-funkcje) istnieje w commicie `3bce0c2`, ale ten commit **nie jest przodkiem
-HEAD** — leży na `origin/genesis/main` i
-`origin/claude/genesis-takeover-audit-kpz019`. Sprawdzone:
-`git merge-base --is-ancestor 3bce0c2 HEAD` → fałsz.
+**Resztkowe, świadomie NIE zamknięte.** `keyHint()` (ta sama cherry-pickowana
+paczka) jest nieużywana — repo na tej gałęzi nie ma jeszcze koncepcji kluczy
+API do wyświetlenia klientowi, więc nie ma dziś czego nią maskować.
 
-**Proponowana naprawa (reuse, nie nowa implementacja).** Cherry-pick
-`3bce0c2:packages/backend/src/secrets.mjs`, przełączenie `createSession`/
-`getUserByToken` na hash + migracja idempotentna (`looksHashed` istnieje
-właśnie po to). Wymaga TDD i testów granicznych na bazie z danymi — czyli
-reguł P1.3.
-
-**Łagodzenie operacyjne do zastosowania natychmiast** (`OPS_RUNBOOK.md` §4):
-prawa `700` na katalogu backupów, szyfrowanie kopii poza woluminem, czyszczenie
-tabeli `sessions` po restore z kopii starszej niż incydent.
-
-**Termin proponowany:** przed jakimkolwiek wdrożeniem publicznym z realnymi
-kontami. Do tego czasu instancja demonstracyjna nie powinna zawierać kont osób
-trzecich.
+**Łagodzenie operacyjne pozostaje aktualne** (`OPS_RUNBOOK.md` §4): prawa `700`
+na katalogu backupów, szyfrowanie kopii poza woluminem — teraz jako
+DODATKOWA, nie jedyna, warstwa obrony, skoro sam backup już nie niesie
+bezpośrednio użytecznego tokenu.
 
 ---
 

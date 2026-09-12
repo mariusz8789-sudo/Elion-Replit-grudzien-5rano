@@ -22,6 +22,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { newId } from './auth.mjs';
 import { ensureAccessSchema } from './access.mjs';
+import { hashSecret, looksHashed } from './secrets.mjs';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -464,8 +465,27 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_agent_run_steps_run ON agent_run_steps(agent_run_id, step_index);
 `;
 
+/**
+ * Najwyższa wersja schematu, jaką TEN kod zna i umie migrować do niej.
+ * `PRAGMA user_version` jest już metadaną wersji schematu wbudowaną w plik
+ * bazy (przenosi się przez `VACUUM INTO`/backup, patrz P0.2) — P1.3 dodaje
+ * do niej jedynie GUARD w drugą stronę: dziś `migrate()` umiał tylko iść w
+ * przód (`if (version < N)`), więc baza NOWSZA niż ten kod przechodziłaby
+ * przez każdy warunek jako fałszywy i trafiała w ręce starszego kodu bez
+ * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
+ * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
+ */
+export const CURRENT_SCHEMA_VERSION = 13;
+
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
+  if (version > CURRENT_SCHEMA_VERSION) {
+    throw new Error(
+      `GENESIS DB SCHEMA TOO NEW: ta baza ma schema_version=${version}, ale ten kod zna schemat tylko do wersji ${CURRENT_SCHEMA_VERSION}. ` +
+      'Uruchomienie starszego backendu na nowszej bazie mogłoby po cichu uszkodzić lub błędnie zinterpretować dane -- odmawiam otwarcia zamiast zgadywać. ' +
+      'Podnieś backend do wersji, która zna schema_version >= ' + version + ', zanim otworzysz tę bazę.',
+    );
+  }
   if (version < 9) db.exec(SCHEMA_V9);
   if (version < 10) db.exec(SCHEMA_V10);
   if (version < 11) db.exec(SCHEMA_V11);
@@ -513,11 +533,27 @@ function migrate(db) {
       db.prepare('UPDATE trials SET branch_id = ? WHERE project_id = ? AND branch_id IS NULL').run(main.id, p.id);
     }
   }
+  // R-001 (docs/RISKS.md): hash any PLAINTEXT session token left over from before
+  // this migration existed. `looksHashed` makes this idempotent by construction,
+  // not just by the `version < 13` gate: a token that is already a 64-hex-char
+  // SHA-256 is left untouched, so re-running this block twice on the same row
+  // (e.g. two `openDatabase()` calls before user_version could even be bumped)
+  // never double-hashes a value that was already hashed.
+  if (version < 13) {
+    const rows = db.prepare('SELECT token FROM sessions').all();
+    for (const row of rows) {
+      if (looksHashed(row.token)) continue;
+      const hashed = hashSecret(row.token);
+      if (hashed === null) continue;
+      db.prepare('UPDATE sessions SET token = ? WHERE token = ?').run(hashed, row.token);
+    }
+  }
   if (version < 8) db.exec('PRAGMA user_version = 8');
   if (version < 9) db.exec('PRAGMA user_version = 9');
   if (version < 10) db.exec('PRAGMA user_version = 10');
   if (version < 11) db.exec('PRAGMA user_version = 11');
   if (version < 12) db.exec('PRAGMA user_version = 12');
+  if (version < 13) db.exec('PRAGMA user_version = 13');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -631,11 +667,18 @@ export function getPasswordHash(db, userId) {
 
 /* ---------------- Sesje ---------------- */
 
+/**
+ * R-001 (docs/RISKS.md): `sessions.token` stores ONLY `hashSecret(token)`, never
+ * the raw value — a database backup (P0.2's `db-backup.mjs`) must not carry a
+ * live, directly usable credential. The raw token is still returned here and by
+ * `issueSession` (api.mjs), because that is the one moment the client is handed
+ * it; every later lookup re-hashes the presented token and compares hashes.
+ */
 export function createSession(db, { userId, token, ttlMs }) {
   const now = Date.now();
   const expiresAt = now + ttlMs;
   db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(
-    token,
+    hashSecret(token),
     userId,
     now,
     expiresAt,
@@ -646,17 +689,18 @@ export function createSession(db, { userId, token, ttlMs }) {
 /** Zwraca użytkownika powiązanego z ważnym tokenem (albo null). Wygasłą sesję kasuje. */
 export function getUserByToken(db, token) {
   if (!token) return null;
-  const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  const hashed = hashSecret(token);
+  const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(hashed);
   if (!s) return null;
   if (Date.now() > s.expires_at) {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(hashed);
     return null;
   }
   return getUserById(db, s.user_id);
 }
 
 export function deleteSession(db, token) {
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  db.prepare('DELETE FROM sessions WHERE token = ?').run(hashSecret(token));
 }
 
 /** Sprząta wygasłe sesje (wołane okresowo przez serwer). Zwraca liczbę usuniętych. */

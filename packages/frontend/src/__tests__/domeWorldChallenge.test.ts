@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runDomeWorldChallenge } from '../core/agent/domeWorld/domeChallenge';
 import { DEFAULT_DOME_PARAMETERS, predictHorizonDistanceKm, predictShadowAngleDegrees } from '../core/agent/domeWorld/domeModel';
 import { ERATOSTHENES_GROUND_DISTANCE_KM, ERATOSTHENES_SHADOW_ANGLE, HORIZON_DISTANCE_1_7M } from '../core/agent/domeWorld/domeReferenceCitations';
@@ -67,5 +70,54 @@ describe('Dome World Challenge — real REFERENCE verification, no hardcoded ver
     // A sun height chosen to reproduce Eratosthenes' own angle exactly should now be SUPPORTED —
     // the verdict tracks the parameters, it is not a fixed pass/fail baked into the challenge.
     expect(shadowCase.verification.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
+  });
+});
+
+/**
+ * The challenge above was complete, tested and correct for weeks — and
+ * unreachable: nothing in the application called it, so no user ever saw
+ * Genesis falsify anything. These tests are about REACHABILITY, which is the
+ * property that was actually missing.
+ */
+describe('Dome World is reachable from the running application', () => {
+  const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+  it('a real route renders the screen, and the screen calls the real challenge', () => {
+    const app = readFileSync(join(SRC, 'App.tsx'), 'utf8');
+    expect(app).toMatch(/DomeWorldScreen/);
+    expect(app).toMatch(/#\/dome-world/);
+
+    const screen = readFileSync(join(SRC, 'components', 'DomeWorldScreen.tsx'), 'utf8');
+    expect(screen).toMatch(/runDomeWorldChallenge/);
+  });
+
+  /**
+   * The screen must not compute or hardcode a verdict of its own — the whole
+   * point is that the judgment comes from the REFERENCE pipeline.
+   */
+  it('the screen states no verdict of its own', () => {
+    const screen = readFileSync(join(SRC, 'components', 'DomeWorldScreen.tsx'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(screen).not.toMatch(/assessment:\s*'/);
+    // A single `=` is assignment (producing a verdict); `===` is comparison
+    // (reading the one the pipeline produced, e.g. to pick a CSS class), which
+    // is exactly what this screen is allowed to do.
+    expect(screen).not.toMatch(/[^=!<>]=\s*'FALSIFIED_WITHIN_PROTOCOL'/);
+  });
+
+  /**
+   * The sun height is the dome model's only free parameter. If some value of
+   * it rescued the model, presenting the falsification as settled would be
+   * dishonest — so the claim is checked across the control's whole range
+   * rather than at the default alone.
+   */
+  it('no sun height across the full control range rescues the model', () => {
+    for (const sunHeightKm of [500, 1000, 2000, 3000, 5000, 8000, 12000, 20000, 50000]) {
+      const run = runDomeWorldChallenge({ ...DEFAULT_DOME_PARAMETERS, sunHeightKm });
+      for (const c of run.cases) {
+        expect(c.verification.assessment, `sunHeightKm=${sunHeightKm} / ${c.caseId}`)
+          .toBe('FALSIFIED_WITHIN_PROTOCOL');
+      }
+    }
   });
 });

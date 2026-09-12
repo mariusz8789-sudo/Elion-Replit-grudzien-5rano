@@ -9,6 +9,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
+import { DomeWorldScreen } from './components/DomeWorldScreen';
 import { WhatIfScreen } from './components/WhatIfScreen';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
@@ -95,6 +96,7 @@ type Route =
   | { kind: 'dossier' }
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
+  | { kind: 'dome-world' }
   | { kind: 'what-if' }
   | { kind: 'timeline'; mode?: 'cosmic' | 'place' }
   | { kind: 'decision-explorer' }
@@ -135,6 +137,7 @@ function parseHash(): Route {
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
+  if (h === '#/dome-world') return { kind: 'dome-world' };
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline' || h === '#/timeline?mode=cosmic') return { kind: 'timeline', mode: 'cosmic' };
   if (h === '#/timeline?mode=place') return { kind: 'timeline', mode: 'place' };
@@ -349,6 +352,16 @@ export default function App() {
         <div className="app">
           <TopBar title={`📚 ${t('nav.glossary')}`} onSearch={() => setSearchOpen(true)} />
           <GlossaryScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'dome-world') {
+      return (
+        <div className="app">
+          <TopBar title="🌍 Kopuła vs kula — falsyfikacja" onSearch={() => setSearchOpen(true)} />
+          <DomeWorldScreen />
           {overlays}
         </div>
       );

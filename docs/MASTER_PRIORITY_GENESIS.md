@@ -511,3 +511,112 @@ między „aplikacja twierdzi" a „możesz sprawdzić".
 Wniosek dla przyszłych sweepów: sprawdzanie listy modułów wskazanych przez
 wcześniejszy audyt nie jest tym samym co sprawdzenie repo. `domeWorld`
 nie był na żadnej liście, bo nikt go nie podejrzewał.
+
+### 8. Mechaniczny sweep osiągalności — 44 moduły osierocone, 5 podpiętych, 1 usunięty
+
+Wniosek z 7b („sprawdzenie listy nie jest sprawdzeniem repo") został zamieniony
+na narzędzie. `packages/frontend/src/__tests__/moduleReachability.test.ts`
+przechodzi realny graf importów z `main.tsx` i **wywala się na KAŻDYM nowym
+module nieosiągalnym z aplikacji**. Testy nie są punktem wejścia — bycie
+osiągalnym wyłącznie z własnego testu to dokładnie kształt `domeWorld`:
+zielony, udowodniony, niewidoczny.
+
+Stan w chwili wpisu: **606 z 650 modułów produkcyjnych osiągalnych**.
+
+Allowlista NIE jest listą wyciszeń. Każdy z 44 wpisów niesie powód, dla
+którego moduł jest osierocony **zasadnie**, a drugi test odrzuca powody-
+zaślepki (za krótkie, `TODO`). Test wywala się także wtedy, gdy moduł z
+allowlisty STAJE SIĘ osiągalny — bez tego lista zgniłaby w fikcję. Ten
+mechanizm zadziałał trzy razy w trakcie tej sesji (`beliefChangeRun.ts`,
+`modelVsModelCompare.ts`, `protectionPriority.ts`).
+
+Pułapka warta zapamiętania: sweep, który dopasowuje tylko `from '...'`, gubi
+`import './labs/index';` — a tak ładuje się CAŁY rejestr 23 eksperymentów.
+Pierwsza wersja raportowała więc każde laboratorium jako sierotę. Fałszywy
+alarm tej klasy zabija wiarygodność takiego testu przy pierwszym uruchomieniu.
+
+#### Podpięte w tej sesji (każde zweryfikowane realnym Chromium)
+
+1. **Trwały zapis świata** — backend serwował `POST/GET/PUT /api/worlds` z
+   własnym zielonym testem („survives a real process restart"),
+   `worldSnapshot.ts` i `worldPersistenceClient.ts` były kompletne i
+   przetestowane, a przeglądarka nie wołała NICZEGO z tego. Zbudowane na obu
+   końcach, połączone na żadnym. `GenesisWorldScreen` (jedyny ekran trzymający
+   żywy `TemporalEngine`) zapisuje i odczytuje przez nie. Zmierzone: 2 ticki →
+   zapis → `GET /api/worlds` zwraca świat z realną specyfikacją → odczyt
+   round-trip zgodny co do liczby (tick 2 = żywy 2, 27 encji = 27, 16 zdarzeń
+   = 16). ZAKRES POWIEDZIANY W UI: zapisywana jest gałąź BAZOWA (fork sceny
+   powstaje przez `engine.forkBranch`, nie przez `WorldRegistry.fork`, więc nie
+   ma własnego `worldId` — wymyślenie go byłoby wymyśleniem tożsamości, której
+   model świata nigdy nie wydał), a ścieżka odczytu mówi wprost, że scena 3D
+   nadal pokazuje świat żywy.
+
+2. **„Dlaczego zmieniło się przekonanie"** na `#/pilot` — `explainWhyBeliefChanged`
+   to czysta, synchroniczna połowa `beliefChangeRun.ts`; nic nie przelicza i
+   nic nie wnioskuje. Ekran pokazywał CO rozstrzygnięto i nigdy CO SIĘ
+   ZMIENIŁO. Zmierzone na realnym przebiegu wzrostu logistycznego: 8 realnych
+   runów, obie hipotezy PREREGISTERED → SUPPORTED, fractionOfCapacity 80,2957
+   vs 16,8665. „Żadna hipoteza nie zmieniła statusu" jest renderowane jako
+   własny, uczciwy wynik.
+
+3. **Stan epistemiczny + zasięg dowodu** na `#/matrix` —
+   `buildEpistemicStateGraph` bierze dokładnie te dane, które ekran już miał, i
+   dokłada jedyną rzecz, której graf relacji nie niesie: status WYPROWADZONY z
+   realnych pól, z regułą wyprowadzenia obok niego (status, którego nie da się
+   sprawdzić, to etykieta, nie klasyfikacja). `computeEvidenceImpact` odpowiada
+   na pytanie, na które lista relacji odpowiedzieć nie może: co jeszcze się
+   sypie, jeśli ten rekord jest błędny (przechodnio, po siedmiu realnych polach
+   referencyjnych).
+
+4. **Turniej modeli** na `#/conflict` — `counterfactualCompare.ts` jawnie
+   odmawia porównania dwóch różnych `modelId` i NAZYWA protokół, który to robi.
+   `modelVsModelCompare.ts` JEST tym protokołem i nikt go nie wołał. Osobny
+   panel obok `ModelConflictPanel` (tamten czyta zapisane korelacje MCRE, ten
+   URUCHAMIA dwa modele) — przepisanie jednego na kształt drugiego byłoby
+   przeetykietowaniem realnego wyniku. Zmierzone: v/c=0,02 → Newton
+   0,000102200 MeV vs Einstein 0,000102231 MeV (ZGODNE); v/c=0,99 → 0,25042 vs
+   3,1114 MeV (ROZBIEŻNE), najbardziej rozróżniający eksperyment v/c=0,99.
+
+5. **„Kogo chronić najpierw?"** jako `#/protection-priority` —
+   `protectionPriority.ts` uruchamia każdy wariant ochrony jako osobną, w pełni
+   udowodnioną sprawę i podaje ranking OSOBNO dla każdego z 8 celów. Zmierzone
+   (260 agentów, 60 dni, ziarno 4242, 523 ms, 3/3 kandydatów DOPUSZCZONYCH z
+   replay MATCH): przy profilu ilustracyjnym wszystkie cele wskazują
+   PROTECT_ADULTS, przy neutralnym pojawia się REALNA rozbieżność —
+   `deaths_adult → PROTECT_SENIORS` przy `PROTECT_ADULTS` we wszystkich
+   pozostałych. To jest sedno modułu i do tej pory nikt nie mógł tego zobaczyć.
+
+#### Usunięte
+
+`components/MissionStatusBar.tsx` wraz z jego CSS `.mission-bar`. Jego własny
+komentarz mówił, że został wydzielony, „żeby Genesis Command Center mógł go
+reużyć bez drugiej implementacji tego samego statusu" — Command Center
+zbudował drugą implementację mimo to. `GenesisCommandCenterHero.tsx` renderuje
+wszystkie cztery te same fakty z tych samych źródeł i to jego montuje
+`App.tsx`. Zero importerów, zero testów. Zdublowany, wyparty moduł to dokładnie
+to, czego reguły tego repo zabraniają trzymać.
+
+#### Co zostaje otwarte (nie zamykam sam z siebie)
+
+Największa grupa w allowlist to **kompletna, przetestowana nauka zablokowana za
+NAZWANYM brakiem**, nie za zapomnieniem — i to jest realny materiał na kolejne
+zadania dla C2/C3/Qwen, każde z gotowym, zielonym rdzeniem:
+
+- `proteinFoldingInquiry.ts`, `quantumTunnelingInquiry.ts` — brakuje
+  PRODUKCYJNEGO wywołania runnera inquiry i ekranu dla `InquiryLoopResult`.
+- `epidemicInfectiousDaysCalibration.ts` — podpięta jest tylko strategia
+  MECHANISM; potrzebne wywołanie CALIBRATION i renderer werdyktu parametru.
+- `discoveryTrace.ts` — konsumuje `ResearchChainResult` (łańcuch PARAMETER), a
+  produkcja uruchamia wyłącznie `runMechanismResearchChain` (inny typ).
+- `relativityGeodesic.ts` — kompletny SZÓSTY świat naukowy bez ekranu.
+- `llmWorldProposalAdapter.ts` + `resolveWorldProposal.ts` — backend
+  `/api/world-proposal` istnieje, brakuje wejścia w UI.
+- `moleculeWorldAdapter.ts`, `particleWorldAdapter.ts` — 2. i 3. domena dowodu,
+  że kontrakt `WorldState` jest ogólny; ta druga czeka na `DivergenceSweepResult`.
+- `spatialWorldFrame.ts` + `spatialFeatureBridge.ts` — most OSM → renderer
+  kanoniczny, zablokowany brakiem wejścia z realnymi, licencjonowanymi danymi.
+
+Reszta allowlisty to świadome decyzje (Sovereign OFF), kod nie-przeglądarkowy
+(`.node.ts`, `serverEntry.ts`), wykonywalna dokumentacja (`graphics/examples/`),
+barrele oraz prymitywy (odciski, steppery), których brak konsumenta nie jest
+defektem — odcisk nigdy nie jest tematem ekranu.

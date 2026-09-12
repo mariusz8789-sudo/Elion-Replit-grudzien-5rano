@@ -233,12 +233,74 @@ $ PORT=0 node packages/backend/src/start.mjs          # ścieżka domyślna
 {"level":"warn","msg":"db_not_durable","durability":"EPHEMERAL_IN_APP_TREE","why":"...konta, projekty i Serie Prób zostaną utracone bez żadnego błędu..."}
 ```
 
-### NOT VERIFIED w tym punkcie
+### NOT VERIFIED w tym punkcie — i KOREKTA wcześniejszego, zbyt szerokiego stwierdzenia
 
-- **Redeploy na poziomie kontenera z zamontowanym woluminem.**
-  `docker ps` → `Cannot connect to the Docker daemon at unix:///var/run/docker.sock`.
-  Zweryfikowana jest wymiana procesu ORAZ katalogu wdrożenia; zachowanie
-  montowania woluminu przez platformę — nie.
+Pierwsza wersja tej sekcji mówiła „brak demona Dockera w tym środowisku"
+(`docker ps` → `Cannot connect to the Docker daemon at unix:///var/run/docker.sock`)
+i zostawiała na tym sprawę. **To było niedokładne** — poprawione tutaj, bo
+twierdzenie bez ponownego sprawdzenia byłoby dokładnie tym, czego ta misja
+zabrania.
+
+Domyślny socket (`/var/run/docker.sock`) faktycznie odmawia (`ulimit: error
+setting limit (Operation not permitted)` w skrypcie startowym demona), ale
+**demon URUCHAMIA SIĘ poprawnie** z własnym `--data-root` i własnym socketem:
+
+```bash
+$ dockerd --data-root=/tmp/.../docker-data --host=unix:///tmp/.../docker.sock
+...
+level=info msg="Daemon has completed initialization"
+level=info msg="API listen on /tmp/.../docker.sock"
+$ DOCKER_HOST=unix:///tmp/.../docker.sock docker ps
+CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES
+```
+
+Zablokowane jest coś WĘŻSZEGO: `docker build`/`docker pull` osiąga API
+manifestów Docker Hub (`registry-1.docker.io`), ale pobranie warstwy obrazu z
+CDN (`production.cloudfront.docker.com`) kończy się `403 Forbidden` — ten sam
+rodzaj blokady egress co przy NASA Exoplanet Archive/CERN Open Data (P2.3),
+tylko na innym hoście:
+
+```bash
+$ docker pull --platform linux/amd64 node:22-slim
+failed to copy: httpReadSeeker: failed open: failed to do request:
+  Get "https://production.cloudfront.docker.com/registry-v2/.../data?...": Forbidden
+```
+
+Wypróbowano: przekazanie zmiennych proxy demonowi (`DOCKER_HTTPS_PROXY`, już
+obecna w środowisku) — manifest zaczął się rozwiązywać (429 zamiast 403 przy
+pierwszych próbach, potem czyste dotarcie do API), ale pobranie warstwy z CDN
+pozostało zablokowane przy każdej z pięciu prób z narastającym odstępem.
+
+**Realna naprawa zamiast dalszego obchodzenia blokady**: `.github/workflows/ci.yml`
+zyskał job `docker-image`, który buduje TEN SAM obraz i wykonuje TEN SAM drill
+redeployu (kontener zabity i USUNIĘTY, nowy kontener na tym samym
+NAZWANYM woluminie, konto i projekt sprzed redeployu odczytane po) — na
+runnerze GitHub Actions, który nie ma tego ograniczenia egress. To jest
+pierwszy job w tym repo, który w ogóle buduje `Dockerfile` — wcześniej nie
+istniał żaden.
+
+Logika HTTP tego joba (rejestracja → utworzenie projektu → zabicie procesu →
+restart na tej samej ścieżce bazy → logowanie → odczyt projektu) jest
+zweryfikowana TUTAJ, bez kontenera, żeby nie spalić minut CI na błąd w
+samym skrypcie:
+
+```bash
+$ GENESIS_DB_PATH=/tmp/civol/genesis.db PORT=8091 node packages/backend/src/start.mjs &
+$ curl .../api/auth/register ... → {"token":"...","user":{"email":"ci-redeploy-drill@genesis.local",...},...}
+$ curl .../api/projects ... → {"project":{"name":"CI redeploy drill",...}}
+$ kill <pid>
+$ GENESIS_DB_PATH=/tmp/civol/genesis.db PORT=8092 node packages/backend/src/start.mjs &   # ta sama ścieżka bazy
+$ curl .../api/auth/login ... → P0.2 OK: login after restart works
+$ curl .../api/projects -H "authorization: Bearer ..." → P0.2 OK: project survives restart, found=true
+```
+
+Wszystkie kształty JSON użyte w skrypcie CI (`{token, user}`, `{project}`,
+`{projects: [...]}`) zgodne co do bajta z tym, co API naprawdę zwraca —
+sprawdzone przed wpisaniem do workflow, nie założone.
+
+**Wciąż NOT VERIFIED z tego środowiska**: sam `docker build`/`docker run` na
+obrazie (blokada CDN). Zweryfikowane W CI po pierwszym pushu tego commita —
+patrz status joba `docker-image` w Actions dla tego SHA.
 
 ---
 

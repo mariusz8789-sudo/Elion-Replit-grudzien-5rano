@@ -104,6 +104,105 @@ jobs:
           path: artifacts/atom-bohr-nist
           retention-days: 90
 
+  docker-image:
+    name: Obraz produkcyjny — build i realny smoke test kontenera
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # DLACZEGO TEN JOB ISTNIEJE. `Dockerfile` nigdy nie był budowany w CI —
+    # jedyna weryfikacja przed tą misją była ręczna, lokalna, zależna od tego,
+    # czy ktoś akurat miał dostęp do Dockera. P0.1-P0.3 tej misji (runtime
+    # Node, trwałość danych, tożsamość wydania) są zakodowane W TYM obrazie —
+    # `docker build --build-arg GENESIS_COMMIT=...` i cały łańcuch
+    # `nodeRuntime.mjs`/`dbDurability.mjs`/`buildInfo.mjs` nie mają żadnego
+    # dowodu wykonania na PRAWDZIWYM obrazie kontenerowym, dopóki ten job nie
+    # zaistnieje. Runner GitHub Actions ma zwykły dostęp do Docker Hub —
+    # sandbox deweloperski, w którym te pliki powstały, miał egress
+    # ograniczony do rejestrów pakietów (npm/pypi/crates), więc `docker pull
+    # node:22-slim` był tam zablokowany na poziomie CDN (production.
+    # cloudfront.docker.com → 403), niezależnie od poprawności samego
+    # Dockerfile. Ten job jest więc PIERWSZYM miejscem, gdzie obraz faktycznie
+    # się buduje i uruchamia.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Budowa obrazu z realnym identyfikatorem wydania
+        run: |
+          docker build \
+            --build-arg GENESIS_COMMIT=${{ github.sha }} \
+            --build-arg GENESIS_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            -t genesis-os:ci .
+
+      - name: Realny redeploy drill — kontener + zamontowany wolumin (P0.2, dotąd NOT VERIFIED lokalnie)
+        # Tworzy WOLUMEN NAMED (nie bind mount z runnera), uruchamia kontener,
+        # tworzy konto przez HTTP, ZABIJA kontener i USUWA go (`docker rm -f`
+        # — nie tylko stop), uruchamia NOWY kontener na tym samym woluminie i
+        # loguje się tym samym kontem. To jest dokładnie ten scenariusz, który
+        # `docs/RISKS.md` R-006 nazywał NOT VERIFIED z braku demona Dockera w
+        # sandboxie — tutaj demon jest, więc scenariusz jest wykonywany naprawdę,
+        # nie tylko deklarowany.
+        run: |
+          set -e
+          docker volume create genesis-ci-data
+
+          docker run -d --name genesis-a -p 8080:8080 \
+            -v genesis-ci-data:/data \
+            -e GENESIS_DB_PATH=/data/genesis.db \
+            -e ANTHROPIC_API_KEY= \
+            genesis-os:ci
+
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/health > /tmp/health-a.json && break
+            sleep 1
+          done
+          cat /tmp/health-a.json
+          node -e "const h=require('/tmp/health-a.json'); if(!h.ok) throw new Error('health not ok'); if(h.commit !== '${{ github.sha }}') throw new Error('commit mismatch: '+h.commit); if(h.db.durability !== 'PERSISTENT') throw new Error('db not persistent: '+h.db.durability); console.log('P0.3 OK: commit', h.commit, 'durability', h.db.durability);"
+
+          TOKEN=$(curl -sf -X POST http://127.0.0.1:8080/api/auth/register \
+            -H 'content-type: application/json' \
+            -d '{"email":"ci-redeploy-drill@genesis.local","password":"password123"}' | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).token))")
+          curl -sf -X POST http://127.0.0.1:8080/api/projects \
+            -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+            -d '{"name":"CI redeploy drill"}' > /tmp/project-a.json
+          cat /tmp/project-a.json
+
+          # Redeploy: kontener NIE zatrzymany łagodnie — zabity i USUNIĘTY,
+          # tak jak orchestrator robi to przy wymianie obrazu.
+          docker rm -f genesis-a
+
+          docker run -d --name genesis-b -p 8080:8080 \
+            -v genesis-ci-data:/data \
+            -e GENESIS_DB_PATH=/data/genesis.db \
+            -e ANTHROPIC_API_KEY= \
+            genesis-os:ci
+
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/health > /tmp/health-b.json && break
+            sleep 1
+          done
+
+          LOGIN=$(curl -sf -X POST http://127.0.0.1:8080/api/auth/login \
+            -H 'content-type: application/json' \
+            -d '{"email":"ci-redeploy-drill@genesis.local","password":"password123"}')
+          echo "$LOGIN" > /tmp/login-b.json
+          node -e "
+            const login = require('/tmp/login-b.json');
+            if (login.user.email !== 'ci-redeploy-drill@genesis.local') throw new Error('account did not survive redeploy: ' + JSON.stringify(login));
+            console.log('P0.2 OK: account created before redeploy is readable after container replacement + volume remount');
+          "
+          TOKEN_B=$(node -e "console.log(require('/tmp/login-b.json').token)")
+          curl -sf http://127.0.0.1:8080/api/projects -H "authorization: Bearer $TOKEN_B" > /tmp/projects-b.json
+          node -e "
+            const list = require('/tmp/projects-b.json');
+            const found = list.projects.some((p) => p.name === 'CI redeploy drill');
+            if (!found) throw new Error('project created before redeploy is missing after it: ' + JSON.stringify(list));
+            console.log('P0.2 OK: project created before redeploy is readable after container replacement + volume remount');
+          "
+
+          docker rm -f genesis-b
+          docker volume rm genesis-ci-data
+
   pyscf-real:
     name: Real PySCF benchmark
     runs-on: ubuntu-latest

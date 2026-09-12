@@ -139,17 +139,29 @@ hardkodowany ID — więc kolejna próba (inne środowisko z dostępem, albo inn
 
 ---
 
-## R-006 — Redeploy kontenerowy z woluminem nie jest zweryfikowany · OPEN
+## R-006 — Redeploy kontenerowy z woluminem · MITIGATED przez CI, nie przez to środowisko
 
-**Fakt.** P0.2 dowodzi wykonaniem, że dane przeżywają wymianę procesu ORAZ
-katalogu wdrożenia. Nie dowodzi zachowania montowania woluminu przez platformę,
-bo w środowisku wykonawczym nie ma demona Dockera
-(`Cannot connect to the Docker daemon at unix:///var/run/docker.sock`).
+**Fakt, poprawiony.** Poprzednia wersja tego wpisu mówiła „brak demona
+Dockera" — nieprecyzyjne. Demon URUCHAMIA SIĘ w tym środowisku (własny
+`--data-root`/socket), ale `docker pull`/`docker build` dociera do API
+manifestów Docker Hub i dostaje `403 Forbidden` przy pobieraniu warstwy obrazu
+z CDN (`production.cloudfront.docker.com`) — ten sam rodzaj blokady egress co
+przy NASA Exoplanet Archive/CERN Open Data (P2.3), inny host. Pięć prób z
+narastającym odstępem, w tym z jawnie przekazanymi zmiennymi proxy demonowi —
+bez skutku na poziomie CDN.
 
-**Co pozostaje do zrobienia, konkretnie.** Zbudować obraz, uruchomić z
-`-v genesis-data:/data`, utworzyć konto, `docker rm -f` kontener, uruchomić
-nowy z tego samego woluminu, zalogować się tym kontem. To jest dziesięć minut
-na maszynie z Dockerem i powinno być wykonane przed wdrożeniem.
+**Naprawa.** `.github/workflows/ci.yml` → job `docker-image`: buduje TEN SAM
+obraz i wykonuje TEN SAM drill redeployu (kontener zabity i USUNIĘTY przez
+`docker rm -f`, nowy kontener na tym samym NAZWANYM woluminie, konto i
+projekt sprzed redeployu odczytane po) na runnerze GitHub Actions, gdzie
+egress do Docker Hub nie jest ograniczony. Logika HTTP tego joba
+(rejestracja→projekt→restart→login→odczyt) zweryfikowana lokalnie BEZ
+kontenera przed wpisaniem do workflow (`docs/P0_EVIDENCE.md`, sekcja P0.2) —
+każdy kształt JSON w skrypcie sprawdzony wykonaniem, nie założony.
+
+**Wciąż nie jest to samodzielny dowód z TEGO środowiska** — dowód powstaje
+przy pierwszym pushu tego commita, w Actions, na tym SHA. Status: sprawdzić
+w zakładce Actions dla `.github/workflows/ci.yml` przed wdrożeniem.
 
 ---
 

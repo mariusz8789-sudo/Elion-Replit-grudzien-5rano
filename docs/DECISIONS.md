@@ -312,3 +312,38 @@ goły SHA — ścieżka bez `ref:`), drugi na `-b <gałąź>` (ścieżka `ref:` 
 `commondir` — bez tego drugiego testu poprawka dla detached HEAD dałaby
 fałszywe poczucie bezpieczeństwa, bo nie przechodzi przez `resolveCommonDir`
 wcale).
+
+---
+
+## D-016 (2026-09-12, R-006) — Redeploy kontenerowy weryfikowany w CI, nie obchodzeniem blokady lokalnie
+
+**Decyzja.** Dowód wykonania redeployu na kontenerze z zamontowanym woluminem
+przeniesiony do nowego joba `.github/workflows/ci.yml::docker-image`, zamiast
+dalej próbować go uzyskać z tego sandboxa.
+
+**Co faktycznie sprawdzono, zanim podjęto tę decyzję — nie zgadnięto.**
+`dockerd` URUCHAMIA SIĘ w tym środowisku z własnym `--data-root`/socketem
+(domyślny `/var/run/docker.sock` odmawia przez `ulimit: Operation not
+permitted` w skrypcie startowym — to inny, węższy problem niż „demona nie
+ma"). `docker pull`/`docker build` dociera do API manifestów Docker Hub, ale
+pobranie warstwy obrazu z CDN (`production.cloudfront.docker.com`) kończy się
+`403 Forbidden` przy każdej z pięciu prób (w tym z jawnie przekazanymi
+zmiennymi proxy demonowi) — ten sam rodzaj blokady egress co przy NASA
+Exoplanet Archive/CERN Open Data w P2.3, na innym hoście. To POPRAWIA
+wcześniejsze, zbyt szerokie stwierdzenie „brak demona Dockera" w
+`P0_EVIDENCE.md`/`RISKS.md` — poprawione tam, nie tylko tutaj.
+
+**Dlaczego CI, a nie dalsze obchodzenie.** Runner GitHub Actions nie ma tego
+ograniczenia egress i już istnieje w tym repo (`ci.yml`), a Dockerfile NIGDY
+wcześniej nie był tam budowany — dodanie joba naprawia lukę trwałą (każdy
+przyszły push dostaje ten dowód), nie tylko jednorazową.
+
+**Dlaczego skrypt joba jest bezpieczny do wysłania bez lokalnego testu na
+kontenerze.** Cała logika HTTP wewnątrz joba (rejestracja → utworzenie
+projektu → zabicie procesu → restart na tej samej ścieżce bazy → logowanie →
+odczyt projektu) została wykonana lokalnie jako zwykły proces Node (bez
+Dockera — sam kontener nie zmienia kształtu odpowiedzi API), z każdym
+kształtem JSON użytym w skrypcie potwierdzonym wykonaniem
+(`docs/P0_EVIDENCE.md`, sekcja P0.2). Sam `docker build`/`docker run` — czyli
+dokładnie to, czego ten sandbox nie potrafi zrobić — pozostaje `NOT VERIFIED`
+z TEGO środowiska i zweryfikowany dopiero w Actions po pierwszym pushu.

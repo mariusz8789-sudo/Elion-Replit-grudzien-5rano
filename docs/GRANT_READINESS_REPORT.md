@@ -148,7 +148,7 @@ repro-demo: 12/12, exit 0
 | G6 — kanoniczny słownik niezawodności epistemicznej | Częściowo zamknięte (3 z 6 osi skonsolidowane, C2) | C2 | zamknięte częściowo |
 | 25 golden cases Tautology Gate + reguły C1–C6 poza tym, co dostarczono | Spec `GENESIS_TAUTOLOGY_AND_EMPIRICAL_TEST_GATE.md` nie istnieje nigdzie w repo; wymyślenie treści byłoby fabrykacją | — | gdy prawdziwy spec się pojawi |
 | QE4–QE7 (hipotezy splątania) | Wymagają pakietu obserwabli z jawnym rozdzieleniem tautologii algebry od tego, co falsyfikowalne (zlecone Qwenowi, nie odebrane) | Qwen | otwarte |
-| Redeploy na poziomie KONTENERA z zamontowanym woluminem | Brak demona Dockera w tym środowisku (`Cannot connect to the Docker daemon`); zweryfikowana jest wymiana procesu i katalogu, nie montowanie woluminu przez platformę | operator przy pierwszym wdrożeniu | przed produkcją |
+| Redeploy na poziomie KONTENERA z zamontowanym woluminem | Blokada egress do CDN Docker Hub w tym środowisku (demon działa, `docker build` nie); przeniesione do `ci.yml::docker-image` — buduje obraz i uruchamia realny drill (kontener zabity+usunięty, nowy na tym samym woluminie, konto/projekt sprzed redeployu odczytane po) na runnerze bez tego ograniczenia. Sprawdź status tego joba w Actions dla bieżącego SHA przed wdrożeniem | CI (automatyczne od następnego pusha) | przed produkcją — jeden rzut oka na Actions |
 | Alerty niedostępności i retencja logów | Konfiguracje gotowe (`docs/OPS_RUNBOOK.md`), niezastosowane — wymaga wyboru platformy hostingu i zgody na wdrożenie | operator | przy wyborze platformy |
 | `nodejs-22` w `.replit` | Nazwa modułu zgodna z konwencją Replita, ale nieskontrolowana wobec rejestru platformy z tego środowiska | operator | pierwsze uruchomienie na Replicie |
 | G4/G5/G9 (generowanie hipotez, scoring wartości eksperymentu, warstwa starzenia dowodów) | ŚWIADOMIE nie robione — dodanie scoringu bez uzasadnionej metodologii albo stałej rozpadu bez uzasadnienia byłoby dokładnie regresem, którego to repo odmawia | — | poza zakresem obecnej rundy |
@@ -264,7 +264,7 @@ commit:
 | R-003 zależność od zewnętrznego API (Anthropic) | MITIGATED — system działa w pełni bez klucza, żaden wynik naukowy nie przechodzi przez LLM |
 | R-004 bus factor = 1 | OPEN — pozycja budżetowa (FTE recenzja), nie deklaracja |
 | R-005 brak kotwicy w danych zewnętrznych | **ZWĘŻONE** (P2.3, jedna kotwica działająca) — nie zamknięte: brak live ingestion, brak kotwicy empirycznej |
-| R-006 redeploy kontenerowy z woluminem niezweryfikowany | OPEN — brak Dockera w tym środowisku |
+| R-006 redeploy kontenerowy z woluminem niezweryfikowany | MITIGATED — przeniesione do CI (`ci.yml::docker-image`), które nie ma blokady egress tego środowiska; sprawdź status w Actions przed wdrożeniem |
 | R-007 nazwa modułu `nodejs-22` w `.replit` niesprawdzona | OPEN, niegroźne — bramka runtime i tak wypisze czytelny komunikat |
 
 ---

@@ -134,6 +134,36 @@ describe('Tautology Gate integration in discoveryConclusion — CONSISTENCY_CHEC
     expect(notSupported.tautologyAssessment?.classification).toBe('EMPIRICAL_TEST');
   });
 
+  it('a declaration on a SUPPORTING criterion only (primary undeclared) leaves the primary decision untouched and still excludes the inert supporting one', () => {
+    const supportingCriterion = CRITERION({ metric: 'peakInfectious', relation: 'less-than' });
+    // Only the supporting metric declares a derivation — the primary (totalDeaths)
+    // is undeclared, exactly like every pre-P2.1 case, and must decide the
+    // verdict exactly as before: assessDeclaredDerivations() builds a
+    // single-component assessment from the one declared metric, so the
+    // aggregate classification here is that ONE component's own
+    // (CONSISTENCY_CHECK), not a MIXED_TEST — there is nothing to mix.
+    const record = caseWith(CRITERION(), {
+      supportingCriteria: [supportingCriterion],
+      observableDerivations: { peakInfectious: { prediction: MODEL_INVARIANT, observation: MODEL_INVARIANT } },
+    });
+
+    const conclusion = deriveDiscoveryConclusion(
+      record,
+      COMPARISON([
+        { key: 'totalDeaths', baseline: 10, variant: 5 },
+        { key: 'peakInfectious', baseline: 9, variant: 12 }, // declared FAILING — must not count
+      ]),
+      REPLAY,
+    );
+
+    expect(conclusion.primary?.tautologyClassification ?? null).toBeNull();
+    expect(conclusion.verdict).toBe('SUPPORTED');
+    expect(conclusion.tautologyAssessment?.classification).toBe('CONSISTENCY_CHECK');
+    const supporting = conclusion.supporting.find((s) => s.metricKey === 'peakInfectious');
+    expect(supporting?.tautologyClassification).toBe('CONSISTENCY_CHECK');
+    expect(supporting?.met).toBe(false);
+  });
+
   it('MIXED_TEST: an empirical primary still decides, but a tautologically-inert supporting criterion never downgrades the verdict', () => {
     const supportingCriterion = CRITERION({ metric: 'peakInfectious', relation: 'less-than' });
     const record = caseWith(CRITERION(), {

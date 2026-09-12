@@ -775,3 +775,53 @@ która sonda, która reguła wyboru, który werdykt, który stop);
 `moduleReachability.test.ts` + `orphanModuleWiring.test.ts` 62 zielone — nowy
 moduł jest osiągalny z `main.tsx`, bo QE1–QE3 są w `#/inquiry` obok złącza
 kwantowego i zwijania białka, w tym samym `StrategyRunReport`.
+
+### Podział pracy po QE1–QE3 (C1 → C2 / C3 / Qwen)
+
+Kolejność wynika z macierzy priorytetów planu master, nie z wygody. Każde
+zadanie ma ZIELONY rdzeń i nazwany brak — żadne nie jest „zbuduj coś nowego".
+
+**C3 — G3: kotwica anty-HARKing w prerejestracji (P0, jedyne P0 na liście).**
+`experimentFabric/hypothesisLoop.ts:299` ustawia `createdBeforeRun: true`
+BEZWARUNKOWO, a odcisk (`:301-305`) nie zawiera ani `createdAt`, ani żadnego id
+/odcisku przebiegu. Rekord dowodzi więc tylko „ten tekst nie zmienił się od
+zahaszowania" i nic o tym, KIEDY powstał względem danych: sekwencja
+`uruchom → zobacz wyniki → napisz candidateValues → prerejestruj → wykonaj`
+daje rekord bit-identyczny i „nienaruszony". Zakres: do odcisku wchodzi kotwica
+(znacznik czasu prerejestracji + odcisk stanu świata/przebiegu, który
+prerejestracja poprzedza), `createdBeforeRun` przestaje być literałem i staje
+się czymś, co da się PODWAŻYĆ. **Test najpierw, na czerwono**: napisz test,
+który udaje HARKing (prerejestracja po zobaczeniu wyników) i pokaż, że dziś
+przechodzi. Nie dodawaj scoringu ani niczego z G5 — repo słusznie tego odmawia.
+
+**C2 — G6: kanoniczny słownik epistemiczny + warstwa zgodności (P1).**
+`scienceMemory.ts:267-283` — `SavedExperimentEpistemicStatus` to unia SZEŚCIU
+nazwanych osi plus dziesięć literałów ad-hoc. `HYPOTHESIS` należy do trzech osi
+naraz; `SIMULATION` i `DataProvenance.SIMULATED` to jedno pojęcie w dwóch
+pisowniach (plik sam to przyznaje w `:236-240`). Cztery słowniki są genuinnie
+ortogonalne i ZOSTAJĄ (`ReplayVerdict`, `DataProvenance`, `GroundingLevel`,
+`AdmissionStatus`); trzy to redundantne rankingi „jak ustalone jest
+twierdzenie" (`ConfirmationLevel` / `EpistemicStatus` /
+`KnowledgeEpistemicStatus`) i te się konsolidują. Twardy warunek: **zero
+łamania zapisanych danych** — warstwa zgodności czyta stare stringi i mapuje na
+osie, migracja jest jednokierunkowa i przetestowana na realnych rekordach z
+`localStorage`/SQLite, nie na fikcyjnych.
+
+**Qwen — pakiet badawczy, NIE kod: obserwable dla QE4–QE7.**
+QE1–QE3 dały się sfalsyfikować, bo istniała dla nich MIARA. QE4–QE7 nie mają
+jeszcze obserwabli na podłożu, które Genesis faktycznie posiada. Zadanie:
+dla każdej z QE4–QE7 podać (a) konkretną liczbę, którą można policzyć z
+istniejących solverów lub z jednej nazwanej, dodanej funkcji, (b) rodzinę stanów
+/układów z ZAMKNIĘTĄ formą, żeby wynik dał się sprawdzić arytmetycznie,
+(c) ustawienie sondy, przy którym pomiar jest BEZUŻYTECZNY, i takie, przy którym
+rozstrzyga, (d) jawnie: co z tego jest tautologią liczonej algebry, a co realnie
+falsyfikowalne. Bez tego czwartego punktu pakiet jest nieprzyjmowalny — QE1
+pokazał, że łatwo zbudować „test", który nie może nie przejść.
+**Solar H051–H056** (P1 planu master) wciąż czeka: raporty `SOLAR_MIND_*` nie
+weszły do repo i nie zostały uruchomione, więc kto to bierze, musi najpierw
+dostać ich pełny tekst i wciągnąć go jako DANE do `knowledge/` z adnotacją
+„nieuruchomione", zanim cokolwiek z H051–H056 stanie się problemem pętli.
+
+**Czego NIE robimy teraz:** QE4–QE7 jako przebiegi (do czasu pakietu Qwena),
+warstwa starzenia dowodów (G9 — zamiast niej jeden komentarz mówiący, że jej
+brak jest decyzją), scoring wartości eksperymentu (G5).

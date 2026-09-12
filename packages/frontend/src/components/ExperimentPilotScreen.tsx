@@ -41,6 +41,7 @@ import type { ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
 import { GOVERNED_PREPAREDNESS_QUESTIONS, governedCounterfactualParameters, resolvePreparednessQuestion, type PreparednessResolution } from '../core/simulation/preparednessQuestions';
 import {
+  deriveNarrowedHypothesisProblem,
   executePreregisteredHypotheses,
   generateCompetingHypotheses,
   HYPOTHESIS_PROBLEMS,
@@ -612,6 +613,35 @@ export function ExperimentPilotScreen() {
                 </div>
               </>
             )}
+            {/* G4 — generowanie hipotez świadome obserwacji: kandydat, którego
+                nikt nie zadeklarował, wyprowadzony z REALNIE zmierzonego
+                zwycięzcy i jego bezpośredniego konkurenta. Widoczne tylko, gdy
+                deriveNarrowedHypothesisProblem uzna zbiór za rozstrzygnięty i
+                liczbowy — dla remisu albo zmiennej kategorycznej (np.
+                scenarioId) przycisk się nie pojawia, zamiast zgadywać. */}
+            {(() => {
+              const narrowed = deriveNarrowedHypothesisProblem(loopResult);
+              if (!narrowed.ok) return null;
+              return (
+                <div className="pilot-actions" data-testid="pilot-narrow-hypothesis">
+                  <p className="settings-hint">ZAWĘŻENIE (G4): {narrowed.derivation.rationale}</p>
+                  <button
+                    className="chip-btn"
+                    disabled={loopBusy}
+                    onClick={() => {
+                      const priorFingerprints = [...new Set(loopResult.allRuns.map((entry) => entry.provenance.runFingerprint))];
+                      const registered = preregisterHypotheses(generateCompetingHypotheses(narrowed.derivation.problem), { priorRunFingerprints: priorFingerprints });
+                      setPrereg(registered);
+                      setLoopResult(null);
+                      setNextStep(null);
+                      setLoopNotice(`Zawężono wokół zwycięzcy: nowy kandydat ${String(narrowed.derivation.problem.candidateValues[0])} nie był wcześniej zadeklarowany. Prerejestrowano ${registered.hypotheses.length} hipotez(ę) — nic jeszcze nie zostało uruchomione.`);
+                    }}
+                  >
+                    Zawęź wokół zwycięzcy
+                  </button>
+                </div>
+              );
+            })()}
           </>
         )}
         {loopNotice && <p className="settings-hint" role="status">{loopNotice}</p>}

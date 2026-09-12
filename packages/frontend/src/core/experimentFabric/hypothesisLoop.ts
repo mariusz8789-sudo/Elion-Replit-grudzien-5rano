@@ -267,6 +267,92 @@ export function generateCompetingHypotheses(problem: HypothesisProblem): Hypothe
   };
 }
 
+/** Jeden nowo wyprowadzony problem-następca, gotowy do podania z powrotem do `generateCompetingHypotheses`. */
+export interface NarrowedHypothesisDerivation {
+  readonly problem: HypothesisProblem;
+  /** Skąd dokładnie wziął się kandydat — liczby, nie narracja. */
+  readonly rationale: string;
+}
+
+export type NarrowedHypothesisResult =
+  | { readonly ok: true; readonly derivation: NarrowedHypothesisDerivation }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * GENEROWANIE HIPOTEZ ŚWIADOME OBSERWACJI (G4).
+ *
+ * `generateCompetingHypotheses` powyżej rozwija WYŁĄCZNIE zadeklarowaną z góry
+ * tablicę `candidateValues` — nie czyta żadnego wyniku. To jest udokumentowana,
+ * świadoma decyzja projektowa (patrz nagłówek pliku): hipotezy mają być
+ * wyprowadzalne z zadeklarowanej powierzchni modelu, nigdy z tekstu generowanego
+ * przez model językowy. Jedyny w repo kod, który TWORZY nową, wcześniej
+ * niezadeklarowaną wartość z realnego wyniku, to interpolacja środka przedziału
+ * (`parameterAlternative.ts`, `intervalNarrowing.ts`) — ale ta należy do innego
+ * kontraktu hipotez (`inquiryLoop.ts`'s `ParameterHypothesis`), zbudowanego dla
+ * ciągłej estymacji jednego parametru, nie dla tego, dyskretnego zestawu
+ * konkurencyjnych kandydatów.
+ *
+ * Ta funkcja daje `hypothesisLoop.ts` DOKŁADNIE TĘ SAMĄ zasadę, bez kopiowania
+ * kodu: z REALNIE wykonanego, rozstrzygniętego zbioru bierze zwycięzcę i jego
+ * bezpośredniego konkurenta na uporządkowaniu metryki, i — TYLKO gdy zmienna
+ * kandydująca jest liczbowa — zwraca nowy `HypothesisProblem`, którego jedyny
+ * kandydat to ŚRODEK PRZEDZIAŁU między nimi. Ten problem nigdy nie był
+ * zadeklarowany w `HYPOTHESIS_PROBLEMS`; powstaje wyłącznie z tego, co Genesis
+ * już zmierzył. Podany z powrotem do `generateCompetingHypotheses` przechodzi
+ * przez DOKŁADNIE ten sam silnik, prerejestrację i wykonanie — zero nowego
+ * kodu generującego, zero drugiego silnika.
+ *
+ * Granica jest jawna, nie domyślna: zmienna kategoryczna (np. `scenarioId`,
+ * `smiles`) nie ma między wartościami żadnego "środka" — funkcja odmawia
+ * zamiast zgadywać, tak samo jak reszta tego pliku odmawia scoringu bez
+ * uzasadnionej metodologii (G5).
+ */
+export function deriveNarrowedHypothesisProblem(result: HypothesisLoopResult): NarrowedHypothesisResult {
+  const problem = result.preregistration.set.problem;
+
+  if (!result.discrimination.decisive) {
+    return { ok: false, reason: 'Zbiór nie jest rozstrzygnięty (remis albo brak wyniku) — zawężanie wymaga realnego zwycięzcy, nie remisu.' };
+  }
+  const ranking = result.discrimination.ranking;
+  if (ranking.length < 2) {
+    return { ok: false, reason: 'Za mało rozstrzygniętych kandydatów, żeby wyznaczyć przedział do zawężenia — potrzeba co najmniej dwóch.' };
+  }
+
+  const winner = ranking[0]!;
+  const runnerUp = ranking[1]!;
+  const winnerValue = Number(winner.candidate);
+  const runnerUpValue = Number(runnerUp.candidate);
+  if (!Number.isFinite(winnerValue) || !Number.isFinite(runnerUpValue)) {
+    return {
+      ok: false,
+      reason: `Zmienna kandydująca "${problem.candidateVariable}" nie jest liczbowa (wartości: "${winner.candidate}", "${runnerUp.candidate}") — interpolacja środka przedziału nie ma znaczenia dla wartości kategorycznych.`,
+    };
+  }
+
+  const midpoint = (winnerValue + runnerUpValue) / 2;
+  if (midpoint === winnerValue || midpoint === runnerUpValue) {
+    return {
+      ok: false,
+      reason: `Zwycięzca (${winnerValue}) i bezpośredni konkurent (${runnerUpValue}) są już zbyt blisko siebie — nie ma punktu wewnętrznego, który dałoby się odróżnić od obu.`,
+    };
+  }
+
+  const narrowedProblem: HypothesisProblem = {
+    ...problem,
+    problemId: `${problem.problemId}:narrowed:${fnv1a(canonicalJson({ parent: problem.problemId, winnerValue, runnerUpValue, midpoint }))}`,
+    statement: `Zawężenie „${problem.statement}" — czy ${problem.candidateVariable}=${midpoint} (środek przedziału między zmierzonym zwycięzcą ${winnerValue} a bezpośrednim konkurentem ${runnerUpValue}) nadal daje ${problem.objective === 'minimize' ? 'najniższą' : 'najwyższą'} wartość ${problem.primaryMetric} spośród tego węższego zbioru?`,
+    candidateValues: [midpoint],
+  };
+
+  return {
+    ok: true,
+    derivation: {
+      problem: narrowedProblem,
+      rationale: `Kandydat ${midpoint} NIE był zadeklarowany w problemie źródłowym (${problem.problemId}) — powstał z interpolacji środka przedziału między realnie zmierzonym zwycięzcą (${problem.candidateVariable}=${winnerValue}, ${problem.primaryMetric}=${winner.metric}) a jego bezpośrednim konkurentem (${problem.candidateVariable}=${runnerUpValue}, ${problem.primaryMetric}=${runnerUp.metric}) na REALNYM, wykonanym uporządkowaniu — tą samą zasadą co istniejąca interpolacja środka przedziału w parameterAlternative.ts/intervalNarrowing.ts, zastosowaną do kontraktu tego pliku.`,
+    },
+  };
+}
+
 /**
  * KOTWICA ANTY-HARKINGOWA. Bez niej prerejestracja dowodzi wyłącznie tego,
  * że treść nie zmieniła się od zahaszowania — nic o TYM, KIEDY powstała

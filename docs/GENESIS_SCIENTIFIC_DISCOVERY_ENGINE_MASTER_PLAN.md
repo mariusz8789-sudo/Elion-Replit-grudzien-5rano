@@ -74,12 +74,22 @@ zahaszowania" — i nic o TYM, KIEDY powstał względem danych. Sekwencja „uru
 `candidateValues` → prerejestruj → wykonaj" produkuje rekord bit-identyczny, „nienaruszony",
 `createdBeforeRun: true`. To jest realna luka i jest dokładnie tym, co prompt nazywa P1.
 
-### G4 [ZWERYFIKOWANA] generowanie hipotez nie jest generowaniem
+### G4 [ZWERYFIKOWANA — ZAMKNIĘTA 2026-09-12, C3] generowanie hipotez nie jest generowaniem
 `generateCompetingHypotheses` (`hypothesisLoop.ts:201-268`) nie czyta żadnych obserwacji, dowodów ani
 wcześniejszych przebiegów. Rozwija zadeklarowaną tablicę `candidateValues` w szablony. Plik mówi to o
 sobie wprost (`:22-29`). `inquiryLoop` hipotezy DOSTAJE. Jedyny kod, który TWORZY nową wartość, to
 interpolacja środka przedziału (`parameterAlternative.ts:240`, `intervalNarrowing.ts:233`).
 **To nie jest wada ukryta — jest udokumentowana. Ryzykiem jest czytelnik biorący NAZWY funkcji za dobrą monetę.**
+
+> **ZAMKNIĘTA.** `hypothesisLoop.ts::deriveNarrowedHypothesisProblem` — TA SAMA zasada interpolacji
+> środka przedziału (nie kopia kodu, ta sama idea, zastosowana do tego kontraktu): z REALNIE
+> wykonanego, rozstrzygniętego zbioru bierze zwycięzcę i jego bezpośredniego konkurenta na
+> uporządkowaniu metryki i — tylko dla zmiennej LICZBOWEJ — zwraca nowy `HypothesisProblem`, którego
+> jedyny kandydat jest środkiem przedziału między nimi, nigdy wcześniej niezadeklarowanym. Podany z
+> powrotem do `generateCompetingHypotheses` przechodzi przez dokładnie ten sam silnik. Kategoryczna
+> zmienna kandydująca (`scenarioId`, `smiles`) i remis odmawiają wprost, zamiast zgadywać. Wpięte w
+> `ExperimentPilotScreen.tsx` jako przycisk „Zawęź wokół zwycięzcy", widoczny tylko gdy derywacja się
+> uda. Dowód: `docs/MASTER_PRIORITY_GENESIS.md`, sekcja „UPDATE — C3: G4 ZAMKNIĘTE".
 
 ### G5 [ZWERYFIKOWANA] brak jakiegokolwiek scoringu wartości eksperymentu
 Nie ma KL, informacji wzajemnej, oczekiwanej redukcji entropii, projektowania bayesowskiego. Jest
@@ -261,7 +271,7 @@ muszą być lokalne i zamknięte analitycznie.
 | P0 | QE1→QE2→QE3 przez prawdziwy StrategyRun | W TOKU |
 | P0 | G3 — kotwica anty-HARKing w prerejestracji | ZAPROJEKTOWANE |
 | P1 | G6 — kanoniczny słownik epistemiczny + warstwa zgodności | ZAPROJEKTOWANE |
-| P1 | G4 — kontrakt generowania hipotez świadomego obserwacji | ZAPROJEKTOWANE |
+| P1 | G4 — kontrakt generowania hipotez świadomego obserwacji | ZAMKNIĘTE (2026-09-12) |
 | P1 | Solar H051–H056 jako `HypothesisProblem` | ZAPLANOWANE |
 | P2 | Warstwa matematyczna (§10 PHASE 3) | ZAPLANOWANE |
 | P2 | Solar Visualizer 3D | ZAPLANOWANE |

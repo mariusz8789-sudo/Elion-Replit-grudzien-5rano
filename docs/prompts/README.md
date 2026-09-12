@@ -15,9 +15,12 @@ i definicję DONE, więc sesja przyjmująca nie musi rekonstruować kontekstu.
 | `C2-QE4-brydges-execution.md` | C2 | wykonanie QE4 na realnym zbiorze Brydgesa (Zenodo 2527010) | własny research `QE4_REAL_DATASET_AND_EXPERIMENT.md` (jeszcze poza repo — krok 0 zadania), CI recon na `773bef0` |
 | `C3-QE5-QE6-QE7-implementacja.md` | C3 | implementacja QE5–QE7 wg pakietu Qwena | `QWEN-QE4-QE7-obserwable.md` już w repo; QE1–QE3 zamknięte |
 | `QWEN-QE4-ground-state-datasets.md` | Qwen | szukanie zbioru zdolnego domknąć ŚCISŁY test QE4 (pakiet badawczy) | `QE4_REAL_DATASET_AND_EXPERIMENT.md` (C2): ścisły test BLOCKED, wycinek strukturalny READY |
+| `C1-A1-glp1-substitution.md` | C1 | A1 — GLP-1 substytucja (semaglutyd↔liraglutyd), część 2 po CMS | pakiet Qwena `DRUG_SUBSTITUTE_REAL_DATASET_AND_EXPERIMENT.md`; reużywa wzorzec `chembl.ts` |
 
-Co zostaje u C1 po CMS: P3 (pakiet grantowy), jeśli nic pilniejszego nie wypłynie z powyższych
-czterech torów.
+Co zostaje u C1 po CMS i A1: P3 (pakiet grantowy), jeśli nic pilniejszego nie wypłynie z powyższych
+torów. **B1 (ULEZ/polityka publiczna, drugi pakiet Qwena) jest ŚWIADOMIE NIEPRZYPISANE** — wymaga
+nowego prymitywu przyczynowo-statystycznego (DiD/synthetic control), którego Genesis nie ma;
+zaczynać dopiero po jawnej decyzji użytkownika, patrz sekcja na końcu `C1-A1-glp1-substitution.md`.
 
 ## Dwa wspólne warunki odbioru dla KAŻDEGO z tych zadań
 

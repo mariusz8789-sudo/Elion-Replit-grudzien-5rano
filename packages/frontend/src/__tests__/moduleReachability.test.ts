@@ -164,7 +164,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/agent/quantumTunnelingInquiry.ts': 'Same blocker as proteinFoldingInquiry: the inquiry runner itself has no production caller.',
   'core/agent/epidemicInfectiousDaysCalibration.ts': 'Needs the CALIBRATION strategy invoked (only MECHANISM is wired) plus a parameter-verdict renderer.',
   'core/agent/discoveryTrace.ts': 'Consumes ResearchChainResult (the PARAMETER chain); production runs only runMechanismResearchChain, a different type.',
-  'core/discovery/campaignWhyIntent.ts': 'Free-text routing onto campaign WHY kinds that CampaignScreen already exposes as buttons; a convenience input, not yet built.',
   'core/simulationRenderer/spatialWorldFrame.ts': 'Data half of the OSM -> canonical-renderer bridge; no screen imports real licensed OSM data yet.',
   'core/three/graphics/spatialFeatureBridge.ts': 'Rendering half of the same OSM bridge, blocked by the same missing real-data entry point.',
   'core/three/shotPlanPlayer.ts': "Blocked by the contract bug its own doc records: shotPlan.ts casts 'OBSERVER', which is a member of neither camera union.",

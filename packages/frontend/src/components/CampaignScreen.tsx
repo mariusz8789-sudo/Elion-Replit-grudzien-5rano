@@ -9,6 +9,7 @@ import {
 } from '../core/backend/client';
 import { LockedScreen } from './LockedScreen';
 import { parseDiscoveryGoal, buildCampaignRequest } from '../core/discovery/discoveryGoalIntent';
+import { parseCampaignWhyQuestion } from '../core/discovery/campaignWhyIntent';
 
 /**
  * Scientific Acceleration UI (P12) — jeden warsztat Kampanii Naukowej. Każdy
@@ -62,6 +63,20 @@ function CampaignWorkspace() {
   const [conflicts, setConflicts] = useState<ModelConflict[]>([]);
   const [admetEndpointCount, setAdmetEndpointCount] = useState<number | null>(null);
   const [why, setWhy] = useState<{ label: string; a: WhyAnswer } | null>(null);
+  /**
+   * FREE-TEXT "WHY", routed by `campaignWhyIntent.ts` — the same deterministic
+   * grammar discipline as `discoveryGoalIntent.ts` right above. It adds no
+   * reasoning: it decides WHICH of the 9 real `why` kinds the backend already
+   * serves answers this sentence, and returns `kind: null` rather than guessing
+   * a default, because guessing wrong answers a different question than the one
+   * asked.
+   *
+   * It is not redundant with the WHY buttons. Three of the nine kinds
+   * (`status`, `stage-selection`, `conflict`) have no button anywhere on this
+   * screen, so they were unreachable by any means until now.
+   */
+  const [whyQuestion, setWhyQuestion] = useState('');
+  const [whyUnresolved, setWhyUnresolved] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -494,6 +509,37 @@ function CampaignWorkspace() {
               </ul>
             </div>
           )}
+
+          {/* Zapytaj wprost — wolny tekst zamiast wyłącznie przycisków. */}
+          <div className="settings-subsection">
+            <h4>Zapytaj „dlaczego?" własnymi słowami</h4>
+            <div className="pilot-actions">
+              <input
+                className="matrix-ask-input" type="text" value={whyQuestion}
+                data-testid="campaign-why-input"
+                placeholder="np. dlaczego kampania się zatrzymała? / co dalej? / który silnik to policzył?"
+                onChange={(e) => { setWhyQuestion(e.target.value); setWhyUnresolved(''); }}
+              />
+              <button
+                className="chip-btn" data-testid="campaign-why-ask"
+                onClick={() => {
+                  const intent = parseCampaignWhyQuestion(whyQuestion);
+                  if (intent.kind === null) {
+                    // Honest refusal, not a fallback answer to a question nobody asked.
+                    // Every example below was verified against the parser itself,
+                    // not guessed — suggesting a phrasing it rejects would make
+                    // this message a lie about what the screen understands.
+                    setWhyUnresolved('Nie rozpoznano, o które „dlaczego" chodzi. Rozpoznawane są m.in.: „dlaczego kampania się zatrzymała", „dlaczego zmieniono strategię", „co dalej", „który silnik to policzył", „konflikt modeli". Pytania o KONKRETNEGO kandydata zadaj przyciskiem WHY przy nim — identyfikator kandydata nie jest zgadywany z tekstu.');
+                    return;
+                  }
+                  void onWhy(intent.kind, `Pytanie: ${whyQuestion}`, undefined, intent.generation ?? undefined);
+                }}
+              >
+                Zapytaj
+              </button>
+            </div>
+            {whyUnresolved !== '' && <p className="settings-hint" data-testid="campaign-why-unresolved">{whyUnresolved}</p>}
+          </div>
 
           {/* Panel WHY */}
           {why && (

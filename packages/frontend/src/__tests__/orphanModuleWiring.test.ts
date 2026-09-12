@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseCampaignWhyQuestion } from '../core/discovery/campaignWhyIntent';
 
 /**
  * WIRING REGRESSIONS for the modules a reachability sweep found complete,
@@ -210,6 +211,54 @@ describe('the protection study shows the conflict instead of one number', () => 
   it('shows the cohort calibration and labels the gradient profile illustrative', () => {
     expect(screen).toMatch(/cohortCalibration/);
     expect(screen).toMatch(/ILUSTRACYJNY, nieskalibrowany/);
+  });
+});
+
+describe('the campaign screen accepts a "why" question in words', () => {
+  const campaign = read('components', 'CampaignScreen.tsx');
+
+  it('routes free text through the real intent parser', () => {
+    expect(campaign).toMatch(/parseCampaignWhyQuestion\s*\(\s*whyQuestion\s*\)/);
+  });
+
+  /**
+   * The parser returns `kind: null` rather than guessing, precisely because a
+   * guessed kind answers a different question than the one asked. The screen
+   * must carry that refusal through instead of falling back to some default.
+   */
+  it('refuses honestly when no kind matches, rather than answering something else', () => {
+    expect(campaign).toMatch(/intent\.kind === null/);
+    expect(campaign).toMatch(/data-testid="campaign-why-unresolved"/);
+    const code = campaign.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // A `?? 'status'`-style default on the kind would be exactly the guess the
+    // parser exists to avoid.
+    expect(code).not.toMatch(/intent\.kind\s*\?\?/);
+  });
+
+  /** The parsed generation must reach the backend, or "why stop at generation 3" silently becomes "why stop". */
+  it('forwards the generation the sentence named', () => {
+    expect(campaign).toMatch(/intent\.generation \?\? undefined/);
+  });
+
+  /**
+   * REGRESSION for a real bug caught only by running the thing: the first
+   * version of this input offered "dlaczego stop" as an example, and the
+   * grammar does not accept it (it wants "dlaczego kampania się zatrzymała").
+   * A screen that suggests phrasings its own parser rejects teaches the user
+   * that the feature is broken. So every example the UI shows is parsed here.
+   */
+  it('every example phrasing the screen suggests is one the parser really accepts', () => {
+    const examples = [
+      'dlaczego kampania się zatrzymała',
+      'dlaczego zmieniono strategię',
+      'co dalej',
+      'który silnik to policzył',
+      'konflikt modeli',
+    ];
+    for (const example of examples) {
+      expect(campaign, `the UI no longer offers "${example}" — update this list with the new examples`).toContain(example);
+      expect(parseCampaignWhyQuestion(example).kind, `"${example}" is offered in the UI but the parser rejects it`).not.toBeNull();
+    }
   });
 });
 

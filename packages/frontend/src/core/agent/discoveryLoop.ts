@@ -235,7 +235,30 @@ export interface DiscoveryLoopInput {
    * (`agent_run_steps`/`agent_runs.final_json`, already built, previously
    * unwired — see `autonomousDiscoveryLoop.test.ts`'s
    * "P0.2: belief persists across two separate agent runs" for the real,
-   * SQLite-backed round trip).
+   * SQLite-backed round trip, INCLUDING a real process restart: close the
+   * DB handle, reopen a fresh one on the same file, rehydrate from that).
+   * Use `priorBeliefsFromAgentRunFinal` below to extract this field safely
+   * from whatever `getAgentRun(db, id).final` returns.
+   *
+   * DELIBERATE SCOPE BOUNDARY, stated explicitly rather than left as a
+   * silent omission: only `HypothesisBelief` — a plain, JSON-serializable
+   * record — survives a cycle boundary. A hypothesis this loop DERIVES
+   * mid-run (`deriveAlternativeCriteria`, the `~RELATION_FLIP`/
+   * `~TOLERANCE_WIDENED`/`~STRUCTURAL_ALTERNATIVE` suffixed ids) is NOT
+   * carried into a later cycle automatically, because its `apply` field
+   * (`MechanisticHypothesis.apply: (graph, strength) => void`) is a live JS
+   * closure over the declaring caller's own lever functions — there is no
+   * JSON-safe form of "how to intervene on the world" to persist, and
+   * fabricating one (e.g. serializing a lever name and re-deriving `apply`
+   * on rehydration) would require a second, parallel description of every
+   * domain's levers that could drift from the real ones. A caller that
+   * wants a derived hypothesis to persist across cycles must re-declare it
+   * in `input.hypotheses` itself, with a real `apply` — exactly the same
+   * way every other hypothesis reaches this loop. This is a real, checked
+   * limitation, not an oversight: `autonomousDiscoveryLoop.test.ts`'s P0.2
+   * test asserts the derived hypothesis is (correctly) absent from a
+   * rehydrated cycle's belief set, one entry short of the cycle that
+   * derived it.
    */
   readonly priorBeliefs?: readonly HypothesisBelief[];
 }
@@ -831,4 +854,64 @@ export function toAgentStepInput(step: DiscoveryTraceStep, agentRunId: string): 
     nextAction: { why: step.why, what: step.what, next: step.nextAction, tool: step.tool, input: step.input, output: step.output },
     provenanceEventIds: step.provenanceEventIds,
   };
+}
+
+const HYPOTHESIS_STATUSES: ReadonlySet<HypothesisStatus> = new Set(['UNTESTED', 'SUPPORTED', 'REFUTED', 'UNRESOLVED']);
+const CONFIDENCE_LABELS: ReadonlySet<ConfidenceLabel> = new Set([
+  'UNTESTED', 'REFUTED_BY_NO_EFFECT', 'REFUTED_BY_CRITERION', 'SUPPORTED_ONCE', 'SUPPORTED_AT_TWO_MAGNITUDES', 'CONTESTED', 'UNRESOLVED',
+]);
+
+function isHypothesisBelief(value: unknown): value is HypothesisBelief {
+  if (typeof value !== 'object' || value === null) return false;
+  const b = value as Record<string, unknown>;
+  return (
+    typeof b.hypothesisId === 'string' && b.hypothesisId.length > 0 &&
+    typeof b.statement === 'string' &&
+    HYPOTHESIS_STATUSES.has(b.status as HypothesisStatus) &&
+    CONFIDENCE_LABELS.has(b.confidence as ConfidenceLabel) &&
+    Array.isArray(b.supportedInRounds) && Array.isArray(b.refutedInRounds) &&
+    Array.isArray(b.testedAtStrengths) && Array.isArray(b.observedEffects) &&
+    typeof b.reason === 'string'
+  );
+}
+
+/**
+ * P0.2 HARDENING — the one safe way to turn `getAgentRun(db, id).final`
+ * (whatever `agent_runs.final_json` deserialized to) into
+ * `DiscoveryLoopInput.priorBeliefs`.
+ *
+ * Three real failure modes this refuses to paper over silently:
+ *  1. The run never reached a final state at all (still `RUNNING`, or the
+ *     process crashed before `updateAgentRunStatus` was ever called) —
+ *     `final` is `null`. Returns `undefined`, the SAME value an omitted
+ *     `priorBeliefs` field has, so the next cycle starts cold exactly as if
+ *     no prior cycle had run — never a fabricated empty belief set that a
+ *     caller could misread as "everything already decided".
+ *  2. `final` exists but was written by something else entirely (a
+ *     different workflow reusing the same `agent_runs` row shape) and
+ *     carries no `beliefs` array, or one that is not actually an array —
+ *     returns `undefined` rather than crashing the caller or coercing
+ *     garbage into a belief.
+ *  3. `final.beliefs` is an array but individual entries are malformed
+ *     (a hand-edited row, a future schema change, `localStorage`-style
+ *     tampering if this ever moves to a client-editable store) — EACH
+ *     entry is validated against `HypothesisBelief`'s real shape
+ *     (`isHypothesisBelief`), and a malformed entry is dropped rather than
+ *     silently trusted; it never corrupts the well-formed entries around it.
+ *
+ * Deliberately does NOT reconstruct beliefs from `agent_run_steps` rows:
+ * `agent_runs.final_json` is written ONCE, atomically, by
+ * `updateAgentRunStatus` at the end of a completed cycle — so a gap or a
+ * missing row in `agent_run_steps` (a step that failed to persist, a crash
+ * mid-loop before that one `addAgentStep` call returned) can never produce
+ * a partially-reconstructed, silently-wrong belief snapshot: either the
+ * cycle finished and `final` carries its real, complete posterior, or it
+ * didn't and there is nothing here to rehydrate from.
+ */
+export function priorBeliefsFromAgentRunFinal(final: unknown): readonly HypothesisBelief[] | undefined {
+  if (typeof final !== 'object' || final === null) return undefined;
+  const beliefs = (final as Record<string, unknown>).beliefs;
+  if (!Array.isArray(beliefs)) return undefined;
+  const valid = beliefs.filter(isHypothesisBelief);
+  return valid.length > 0 ? valid : undefined;
 }

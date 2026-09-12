@@ -18,6 +18,8 @@ i definicję DONE, więc sesja przyjmująca nie musi rekonstruować kontekstu.
 | `C1-A1-glp1-substitution.md` | C1 | A1 — GLP-1 substytucja (semaglutyd↔liraglutyd), część 2 po CMS | pakiet Qwena `DRUG_SUBSTITUTE_REAL_DATASET_AND_EXPERIMENT.md`; reużywa wzorzec `chembl.ts` |
 | `C1-B1-ulez-no2-adjudication.md` | C1 | B1 — ULEZ 2023→NO₂, adjudykacja sprzecznych publikacji (Tong vs TfL) | pakiet Qwena `B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md`; wymaga NOWEGO reużywalnego modułu `causalInference.ts` (DiD/ITS/synthetic-control) — użytkownik jawnie autoryzował budowę |
 | `C1-QE4-multi-verdict-architecture-audit.md` | C1 | audyt architektury: eksperyment z wieloma niezależnymi werdyktami nad jednym zbiorem (Phase 6 po QE4) — **idzie PRZED B1** | QE4 (C2) GREEN na `dab127d0`/`f4818cf4`; luka zidentyfikowana przez C2 przy okazji wykonania QE4 |
+| `C2-cross-campaign-dedup.md` | C2 | cross-campaign dedup w silniku kampanii lekowych — jedyna realna luka z audytu pakietu Qwena | `docs/DISCOVERY_ENGINE_AUDIT_2026-09-12.md` + `docs/GENESIS_AUTONOMOUS_DISCOVERY_ENGINE_MASTER_SPEC.md` na `03be47c`; `campaign/orchestrator.mjs` dedupuje tylko WEWNĄTRZ jednego przebiegu |
+| `2026-09-12-DZIS-priorytety-F1.md` | C1+C2+C3+Qwen | GO dla P0 z klasyfikacji Discovery Engine — zadania na dziś, jeden dokument, cztery strony | `docs/DISCOVERY_ENGINE_FINAL_CLASSIFICATION_2026-09-12.md` na `75ebdc1` |
 
 Kolejność u C1: CMS → A1 → **ten audyt architektury** → B1 → P3 (pakiet grantowy), jeśli nic
 pilniejszego nie wypłynie z powyższych torów. Audyt architektury jest wstawiony PRZED B1, bo

@@ -82,3 +82,71 @@ export function toMatrixConfig(state: GenesisVisualState): MatrixConfigInput {
     reducedMotion: state.reducedMotion,
   };
 }
+
+/**
+ * CALIBRATION — the real-state → visual-tier table, deliberately expressed
+ * over PLAIN SIGNALS rather than Genesis objects, so this file's own
+ * boundary rule ("nothing under liveMatrix/ imports Genesis" —
+ * `liveMatrixBoundary.test.tsx`) still holds. Whoever wires this in derives
+ * these booleans/counts from the real store (`listExperiments().length`, a
+ * campaign's `status === 'running'`, an open research-chain/conflict check)
+ * — this module only ever decides what the RESULT of that should look like.
+ *
+ * Named here explicitly because the honest answer to "what should Home /
+ * a real Research Campaign run / an empty Science Memory look like" is not
+ * obvious from the five-value `GenesisActivity` union alone, and guessing it
+ * per call-site is exactly how one screen ends up ATTENTION-red for a reason
+ * nobody can explain.
+ */
+export interface GenesisActivitySignals {
+  /**
+   * A real backend run is executing RIGHT NOW — a Research Campaign
+   * generation in progress (`Campaign.status === 'running'`), a discovery
+   * loop mid-round, a compute job awaiting its result. This is the ONE
+   * signal that should make the background visibly the busiest it gets:
+   * real work, happening this second, is the truest "alive" a decorative
+   * layer can honestly claim.
+   */
+  readonly runInProgress: boolean;
+  /**
+   * Something needs a HUMAN decision now — a blocked capability, an
+   * unresolved conflict Genesis is holding both sides of. Deliberately not
+   * "this looks scientifically interesting": see `GenesisActivity.ATTENTION`
+   * own doc — this tier must never be read as a verdict.
+   */
+  readonly needsAttention: boolean;
+  /**
+   * An investigation is open — a declared question with no closing verdict
+   * yet — but nothing is executing against it AT THIS INSTANT. Calmer than
+   * RUNNING (real execution in flight) and more present than plain ACTIVE
+   * (nothing in particular declared open).
+   */
+  readonly hasOpenInvestigation: boolean;
+  /** `listExperiments().length` (or equivalent) — how many records Science Memory currently holds. */
+  readonly savedExperimentCount: number;
+}
+
+/**
+ * Derives a calibrated `GenesisVisualState` from real, checkable signals.
+ * Priority order, highest first, mirrors this codebase's own established
+ * "an explicit ranking, never a blended score" discipline
+ * (`crossDomainSynthesis.ts::OPEN_ITEM_PRIORITY` is the same pattern one
+ * layer up): a run in progress or something needing attention always wins
+ * over a merely-open investigation, which always wins over an idle/active
+ * split read off whether Science Memory holds anything at all.
+ *
+ * The Home-screen / empty-Memory case is deliberately the CALMEST tier
+ * (`IDLE`, `intensity: 0`) rather than a default "medium hum": the same
+ * honesty `MatrixDataStream.tsx`'s own `systemTokens()` already states in
+ * prose ("a quiet system looks quiet" — `STATE::EMPTY`) applies here. A
+ * background that always looks moderately busy regardless of whether
+ * anything is actually happening is the exact failure this function exists
+ * to rule out.
+ */
+export function deriveGenesisVisualState(signals: GenesisActivitySignals): GenesisVisualState {
+  if (signals.needsAttention) return { activity: 'ATTENTION', intensity: 0.65 };
+  if (signals.runInProgress) return { activity: 'RUNNING', intensity: 1 };
+  if (signals.hasOpenInvestigation) return { activity: 'RESEARCH', intensity: 0.5 };
+  if (signals.savedExperimentCount === 0) return { activity: 'IDLE', intensity: 0 };
+  return { activity: 'ACTIVE', intensity: 0.25 };
+}

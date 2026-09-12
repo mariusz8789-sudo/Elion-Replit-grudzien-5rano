@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MatrixController, type MatrixHost } from '../components/liveMatrix/matrixController';
 import { QUALITY_DPR_CAP, type RenderContext } from '../components/liveMatrix/matrixEngine';
-import { toMatrixConfig, type GenesisVisualState } from '../components/liveMatrix/genesisVisualState';
+import { toMatrixConfig, deriveGenesisVisualState, type GenesisVisualState, type GenesisActivitySignals } from '../components/liveMatrix/genesisVisualState';
 
 /**
  * LIVE MATRIX LIFECYCLE — the part that actually breaks, tested directly.
@@ -514,6 +514,55 @@ describe('Genesis visual-state adapter', () => {
     expect(c.getConfig().activity).toBe(4);
     pump(2);
     expect(c.telemetry().framesRendered).toBe(2);
+    c.destroy();
+  });
+});
+
+describe('deriveGenesisVisualState — the real-state calibration table', () => {
+  const QUIET: GenesisActivitySignals = { runInProgress: false, needsAttention: false, hasOpenInvestigation: false, savedExperimentCount: 0 };
+
+  it('Home / empty Science Memory: IDLE at zero intensity — a quiet system looks quiet', () => {
+    expect(deriveGenesisVisualState(QUIET)).toEqual({ activity: 'IDLE', intensity: 0 });
+  });
+
+  it('Science Memory has records but nothing is open or running: ACTIVE, not IDLE and not artificially busy', () => {
+    const state = deriveGenesisVisualState({ ...QUIET, savedExperimentCount: 12 });
+    expect(state.activity).toBe('ACTIVE');
+    expect(state.intensity).toBeGreaterThan(0);
+    expect(state.intensity!).toBeLessThan(0.5); // calmer than an open investigation, let alone a real run
+  });
+
+  it('an open investigation with nothing executing right now: RESEARCH, calmer than RUNNING', () => {
+    const state = deriveGenesisVisualState({ ...QUIET, hasOpenInvestigation: true, savedExperimentCount: 5 });
+    expect(state.activity).toBe('RESEARCH');
+    expect(state.intensity!).toBeLessThan(deriveGenesisVisualState({ ...QUIET, runInProgress: true }).intensity!);
+  });
+
+  it('a real Research Campaign run in flight: RUNNING at maximum intensity — the busiest the background ever gets', () => {
+    const state = deriveGenesisVisualState({ ...QUIET, runInProgress: true, hasOpenInvestigation: true, savedExperimentCount: 5 });
+    expect(state).toEqual({ activity: 'RUNNING', intensity: 1 });
+  });
+
+  it('needsAttention outranks everything else, including a run in progress', () => {
+    const state = deriveGenesisVisualState({ runInProgress: true, needsAttention: true, hasOpenInvestigation: true, savedExperimentCount: 5 });
+    expect(state.activity).toBe('ATTENTION');
+  });
+
+  it('never reports RUNNING or ATTENTION when nothing is actually running or blocked — no fabricated urgency', () => {
+    for (const savedExperimentCount of [0, 1, 500]) {
+      const state = deriveGenesisVisualState({ runInProgress: false, needsAttention: false, hasOpenInvestigation: false, savedExperimentCount });
+      expect(['IDLE', 'ACTIVE']).toContain(state.activity);
+    }
+  });
+
+  it('feeds straight into toMatrixConfig and the controller with no extra translation step', () => {
+    const { host, pump } = fakeHost();
+    const config = toMatrixConfig(deriveGenesisVisualState({ ...QUIET, runInProgress: true }));
+    const c = new MatrixController(host, config);
+    sized(c);
+    expect(c.getConfig().activity).toBe(3); // RUNNING
+    pump(1);
+    expect(c.telemetry().framesRendered).toBe(1);
     c.destroy();
   });
 });

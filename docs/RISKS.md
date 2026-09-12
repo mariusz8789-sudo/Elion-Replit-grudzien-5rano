@@ -89,7 +89,7 @@ deklaracją dobrych intencji.
 
 ---
 
-## R-005 — Brak kotwicy w danych zewnętrznych · ZWĘŻONE (2026-09-12), nie zamknięte
+## R-005 — Brak kotwicy w danych zewnętrznych · DALEJ ZWĘŻONE (2026-09-12, druga kotwica), nie zamknięte
 
 **Fakt.** Na dzień pisania Genesis mierzy przede wszystkim WŁASNĄ spójność:
 solvery, prowieniencja, replay i falsyfikacja działają, ale obserwacje, wobec
@@ -120,22 +120,43 @@ wprost, z tą samą wagą wizualną co werdykt;
 danych naukowych jest odrzucany przez politykę proxy (dowód w
 `P2_EVIDENCE.md`), a sfabrykowanie zbioru byłoby zakazane.
 
+**Próba drugiej kotwicy (2026-09-12, Kepler/NASA Exoplanet Archive):
+BLOCKED z tego sandboxa — ale ZAMKNIĘTA innym źródłem.** Exoplanet Archive
+pozostaje zablokowany (403 na CONNECT, dowód w `docs/P2_EVIDENCE.md`) i
+ilustracyjny rekord z pakietu badawczego nie został przypięty (byłby
+fabrykacją). Zamiast czekać: druga kotwica została zbudowana na danych
+Układu Słonecznego (Mars, NASA NSSDCA Planetary Fact Sheet), realnie
+pobranych przez GitHub Actions (gdzie egress nie jest zablokowany) w innym
+zadaniu (C1, commit `d2af93cf`), z payloadem odzyskanym z loga CI i
+bajtowo zweryfikowanym SHA-256 (potrójnie: skrypt fetchujący, osobny krok
+weryfikacyjny joba, i niezależne przeliczenie w tej sesji — wszystkie
+zgodne). Exoplanet Archive był unikany nie tylko z powodu blokady sieciowej,
+ale z powodu realnego ryzyka cyrkularności (dla wielu wpisów tam półoś
+wielka jest wyprowadzona z okresu przez to samo III prawo Keplera, którego
+kotwica by użyła) — Solar System tego unika (odległość: radar/sondy; okres:
+astrometria pozycyjna od stuleci — dwa niezależne kanały). Pełny dowód w
+`docs/P2_EVIDENCE.md`, sekcja „P2.3 — DRUGA kotwica (Kepler/Mars, NASA
+NSSDCA): ZAIMPLEMENTOWANA".
+
+**Co się zmieniło razem z drugą kotwicą.** `runExternalAnchor` ma teraz
+wpięty Tautology Gate (`core/agent/tautologyGate.ts`) dla OBU kotwic —
+audyt wcześniej stwierdził, że tego wpięcia brakowało w ogóle. Obie kotwice
+klasyfikują się jako `EMPIRICAL_TEST`, nigdy `CONSISTENCY_CHECK` — to jest
+strukturalna gwarancja, nie tylko wynik tego jednego przebiegu, bo
+`tautologyDerivation.observation.source` MUSI być `'independent-measurement'`
+dla każdej zadeklarowanej kotwicy.
+
+**Dlaczego to WCIĄŻ nie zamyka ryzyka w całości.** Obie kotwice są
+WERYFIKACJĄ WOBEC NIEZALEŻNEGO ŹRÓDŁA (arytmetyka/model kontra publikacja),
+nie POMIAREM PRZYRODY wykonanym przez Genesis — to jest jawnie powiedziane
+na ekranie dla obu. Prawdziwa kotwica empiryczna (instrumentalny pomiar, nie
+przeliczona wartość) zostaje następnym krokiem — patrz CMS Open Data niżej.
+
 **Następny krok, konkretnie.** Kotwica empiryczna na CMS Open Data Z→μμ 2011
 (rekord 5208, CC0): `compute/cmsOpenDataAdapter.mjs` już czyta ten zbiór z
 weryfikacją SHA-256 i zwraca `DATA_REQUIRED` zamiast syntetyku, ale
-`Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest zablokowany. To jest
-pomiar instrumentalny, nie wartość przeliczona — czyli kotwica, która zamyka
-punkt (1).
-
-**Próba drugiej kotwicy (2026-09-12, Kepler/NASA Exoplanet Archive):
-BLOCKED, nie zmienia stanu ryzyka.** Zmierzono niezależnie ten sam rodzaj
-blokady co wyżej — `exoplanetarchive.ipac.caltech.edu` odmawia CONNECT (403),
-dowód w `docs/P2_EVIDENCE.md`. Zamiast przypinać ilustracyjny rekord z
-pakietu badawczego (co byłoby fabrykacją), zadanie zostało zgłoszone jako
-`BLOCKED — brak dostępu do źródła`. Jedyna trwała zmiana: `#/evidence`
-renderuje teraz WSZYSTKIE wpisy `EXTERNAL_ANCHORS` przez pętlę, nie jeden
-hardkodowany ID — więc kolejna próba (inne środowisko z dostępem, albo inne
-źródło bez kluczy) nie wymaga już zmian w ekranie.
+`Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest zablokowany z tego
+sandboxa — ten sam obejście (CI z otwartym egressem) może zadziałać tu też.
 
 ---
 

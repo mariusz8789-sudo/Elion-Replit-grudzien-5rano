@@ -1086,3 +1086,51 @@ zero nowej metodologii. Nie dotyka `selectNextHypothesisExperiment` (duży, deli
 z wieloma konsumentami — `crossDomainSynthesis.ts`, `nextAction.ts`, `researchCampaign.ts`,
 `scienceMemory.ts`) — to jest ADDYTYWNA, osobna ścieżka, żeby nie zmienić zachowania niczego, co już
 na niej polega.
+
+## UPDATE — C3: P2.3 druga kotwica (Kepler/Mars) ZAMKNIĘTA + Tautology Gate wpięty w OBIE kotwice (2026-09-12)
+
+Poprzedni wpis (wyżej) zgłosił P2.3 jako `BLOCKED — brak dostępu do źródła` (Exoplanet Archive,
+403 z tego sandboxa). To ustalenie pozostaje PRAWDZIWE dla tego konkretnego hosta — ale zamiast
+czekać, druga kotwica została zbudowana na innym, realnym źródle: NASA NSSDCA Planetary Fact
+Sheet (Mars), pobranym RZECZYWIŚCIE przez GitHub Actions w innym zadaniu (C1, commit `d2af93cf`,
+świadomie NIE Exoplanet Archive — realne ryzyko cyrkularności: tam półoś wielka bywa wyprowadzona
+z okresu przez to samo III prawo Keplera, którego kotwica by użyła do predykcji).
+
+**Jak dane trafiły do repo mimo zablokowanego Azure Blob Storage.** CI pobrał i przypiął stronę
+(dowód w logu joba, run `34714125596`), ale URL artefaktu jest zablokowany tą samą polityką proxy
+co bezpośredni fetch. Zamiast czekać na inną sesję: odczytano log joba przez GitHub MCP
+(`get_job_logs`), znaleziono krok DIAGNOSTIC (`cat` przypiętego pliku wprost do logu), odtworzono
+treść pliku usuwając prefiksy znaczników czasu, i policzono SHA-256 odtworzonego pliku —
+**dokładnie zgodny** z hashem, który sam skrypt fetchujący wypisał w tym samym logu PODCZAS
+pobierania, ORAZ z hashem osobnego, niezależnego kroku weryfikacyjnego tego samego joba (trzy
+niezależne obliczenia tej samej sumy, wszystkie zgodne — `42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c`,
+14363 B). To jest dowód bajtowej identyczności, nie odtworzenie „na oko".
+
+**Kotwica.** Predykcja: REALNY `universe-kepler` (III prawo Keplera) na odległości Marsa
+(228.0×10⁶ km z tej samej strony) → 687.2335878355307 dni. Obserwacja: okres orbitalny Marsa,
+687.0 dni, z INNEGO wiersza tej samej strony (nigdy z tego, co czyta predykcja). Pasmo ±0,344 dnia
+(0,05%, z rozdzielczości publikacji NASA propagowanej przez wykładnik 3/2). Werdykt
+`SUPPORTED_WITHIN_PROTOCOL`, replay `MATCH`.
+
+**Tautology Gate wpięty w cały kontrakt kotwic, nie tylko w Kepler.** Audyt C1 (commit `d2af93cf`)
+stwierdził wprost, że `runExternalAnchor` nie miał żadnego wpięcia Gate'u. Zamknięte generycznie:
+`ExternalAnchor` ma nowe pole `tautologyDerivation`; `runExternalAnchor` liczy
+`assessSingleTautology` i dodaje `tautologyAssessment` do wyniku. Obie kotwice (PubChem i
+Kepler/Mars) klasyfikują się jako `EMPIRICAL_TEST` — nigdy `CONSISTENCY_CHECK`, bo
+`observation.source` musi być zadeklarowane `independent-measurement`. To jest zdanie z prośby
+zadania: system porównuje własną predykcję z czymś NIEZALEŻNYM od siebie, i Brama to teraz
+strukturalnie potwierdza, a nie tylko narracyjnie.
+
+**TDD i weryfikacja.** 14 nowych testów (`keplerExternalAnchor.test.ts`), czerwone przed
+implementacją (`KEPLER_MARS_ANCHOR_ID`/`tautologyDerivation`/`tautologyAssessment` nie istniały),
+25/25 zielone po. `scripts/repro-demo.mjs`: 16/16 (było 12/12) — przy okazji naprawiono
+niezwiązaną, ale sąsiadującą lukę (`GENESIS_KEPLER_FIXTURE_DIR` brakujący w `.env.example`,
+wprowadzony przez commit `d2af93cf`). Realny Chromium na `#/evidence` pokazuje OBIE kotwice przez
+wspólną pętlę (C3'a wcześniejsza generalizacja `ExternalAnchorsSection`), zero błędów konsoli.
+Pełna bramka: tsc czysto, eslint czysto, frontend 470 plików/5215 passed (1 znany niezwiązany
+flake w `nextActionSelectors.test.ts`, potwierdzony osobnym uruchomieniem — zielony), backend
+396/396, build czysto. Pełny dowód command+output+hash w `docs/P2_EVIDENCE.md`.
+
+Priorytet ZAMKNIĘTY: P2.3 (obie kotwice, Tautology Gate wpięty). Pozostaje otwarte, świadomie poza
+zakresem: prawdziwa kotwica EMPIRYCZNA (instrumentalny pomiar, nie przeliczona wartość) — CMS Open
+Data Z→μμ, `docs/RISKS.md` R-005.

@@ -12,9 +12,11 @@
  * dlatego `.node.ts` i wpis w `ALLOWED_ORPHANS` w `moduleReachability.test.ts`.
  */
 
-import { runExternalAnchor, MOLECULAR_WEIGHT_ANCHOR_ID } from '../biotechData/externalAnchor';
+import { runExternalAnchor, MOLECULAR_WEIGHT_ANCHOR_ID, KEPLER_MARS_ANCHOR_ID } from '../biotechData/externalAnchor';
 import { qe3BoundEntanglementInquiry } from '../agent/entanglementInquiry';
 import { inquiryResultFingerprint, runAutonomousInquiry } from '../agent/inquiryLoop';
+
+export { MOLECULAR_WEIGHT_ANCHOR_ID, KEPLER_MARS_ANCHOR_ID };
 
 export interface ReproAnchorReport {
   readonly anchorId: string;
@@ -24,6 +26,7 @@ export interface ReproAnchorReport {
   readonly observationOrigin: string;
   readonly verificationFingerprint: string;
   readonly replay: string;
+  readonly tautologyClassification: string;
   readonly whatRemainsUntested: string;
 }
 
@@ -39,9 +42,14 @@ export interface ReproInquiryReport {
   readonly resultFingerprint: string;
 }
 
-/** Kotwica zewnętrzna (P2.3), dokładnie tak jak renderuje ją `#/evidence`. */
-export function reproExternalAnchor(): ReproAnchorReport {
-  const result = runExternalAnchor(MOLECULAR_WEIGHT_ANCHOR_ID);
+/**
+ * Kotwica zewnętrzna (P2.3), dokładnie tak jak renderuje ją `#/evidence`.
+ * `anchorId` domyślnie wskazuje pierwszą kotwicę (PubChem) dla wstecznej
+ * zgodności; `scripts/repro-demo.mjs` woła to ponownie dla drugiej (Kepler)
+ * zamiast dodawać drugą fasadę.
+ */
+export function reproExternalAnchor(anchorId: string = MOLECULAR_WEIGHT_ANCHOR_ID): ReproAnchorReport {
+  const result = runExternalAnchor(anchorId);
   if (!result.ok) throw new Error(`Kotwica odmówiła: ${result.reason}`);
   return {
     anchorId: result.anchorId,
@@ -51,6 +59,7 @@ export function reproExternalAnchor(): ReproAnchorReport {
     observationOrigin: result.observationOrigin,
     verificationFingerprint: result.verificationFingerprint,
     replay: result.replay,
+    tautologyClassification: result.tautologyAssessment.classification,
     whatRemainsUntested: result.whatRemainsUntested,
   };
 }

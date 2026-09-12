@@ -7,10 +7,20 @@ import {
   verifyPredictionAgainstRealExperiment,
   type PredictionVerification,
 } from '../agent/predictionVerification';
+import { assessSingleTautology, type ObservableDerivation, type TautologyAssessment } from '../agent/tautologyGate';
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
 import type { DataProvenance } from '../dataProvenance';
+import { getRouterModel } from '../experimentFabric/router';
+import { buildStructuredRequestFromModel } from '../experimentFabric/structuredRequestBuilder';
+import { runExperiment } from '../experimentFabric/executor';
 import pubchemCid2519 from './pubchem-cid-2519.json';
 import { PUBCHEM_CID_2519_RETRIEVED_AT, PUBCHEM_CID_2519_SOURCE_URL } from './pubchem';
+import nssdcPlanetaryFactSheetHtml from './nssdc-planetary-factsheet.html?raw';
+import {
+  NSSDC_PLANETARY_FACTSHEET_RETRIEVED_AT,
+  NSSDC_PLANETARY_FACTSHEET_SOURCE_URL,
+  parseNssdcPlanetaryFactSheet,
+} from './nssdcPlanetaryFactSheet';
 
 /**
  * KOTWICA ZEWNĘTRZNA (P2.3) — obserwacja, której Genesis NIE wyprodukował.
@@ -104,6 +114,19 @@ export interface ExternalAnchor {
   readonly whatThisTests: string;
   /** Co POZOSTAJE nieprzetestowane — punkt obowiązkowy, patrz QE1. */
   readonly whatRemainsUntested: string;
+  /**
+   * Derywacja dla Tautology Gate (`core/agent/tautologyGate.ts`) — jawna
+   * deklaracja, SKĄD wzięła się każda strona porównania. `observation.source`
+   * MUSI być `'independent-measurement'`: to jest cała treść tego, co czyni
+   * kotwicę kotwicą, a nie sprawdzeniem modelu wobec samego siebie. Bez tego
+   * pola `runExternalAnchor` nie miałby jak odróżnić „porównaliśmy z czymś
+   * niezależnym" od „porównaliśmy liczbę z tą samą liczbą" — dokładnie to
+   * rozróżnienie, którego cała Brama pilnuje gdzie indziej (QE1-3).
+   */
+  readonly tautologyDerivation: {
+    readonly prediction: ObservableDerivation;
+    readonly observation: ObservableDerivation;
+  };
 }
 
 /** Odcisk treści przypiętego payloadu. Detektor zmiany, nie suma kryptograficzna. */
@@ -162,10 +185,99 @@ const molecularWeightAnchor: ExternalAnchor = {
   },
   whatThisTests: 'Że implementacja cheminformatyki Genesis (parser wzoru + tablica mas atomowych IUPAC 2021) odtwarza masę molową opublikowaną niezależnie przez PubChem dla tej samej substancji. Dwie niezależne implementacje na dwóch niezależnie utrzymywanych tablicach muszą się zgodzić, a jeśli nie — werdykt jest FALSIFIED i to jest realna informacja o naszym kodzie.',
   whatRemainsUntested: 'To NIE jest pomiar przyrody. PubChem swojej masy molowej też nie mierzy — liczy ją z wzoru, własną konwencją mas atomowych. Kotwica jest więc WERYFIKACJĄ WOBEC NIEZALEŻNEGO ŹRÓDŁA, nie testem empirycznym: zgodność nie potwierdza żadnej hipotezy fizycznej, a jedynie to, że nasza arytmetyka i nasza tablica pierwiastków nie rozjechały się z cudzymi. Empiryczną kotwicą byłby dopiero POMIAR (np. spektrometria mas), którego w tym zbiorze nie ma.',
+  tautologyDerivation: {
+    prediction: {
+      source: 'hypothesis-parameter',
+      modelId: 'cheminformatics-formula-parser-iupac2021',
+      rationale: 'Predykcja jest liczona z formuły chemicznej (MolecularFormula) przez parser wzoru Genesis + własną tablicę mas atomowych IUPAC 2021 — genuinie zależy od tego, jaka formuła jest podana, nie jest analitycznym sufitem żadnego modelu.',
+    },
+    observation: {
+      source: 'independent-measurement',
+      modelId: 'pubchem-pug-rest',
+      rationale: 'Wartość MolecularWeight pochodzi z opublikowanej, niezależnie utrzymywanej bazy PubChem (NCBI/NLM) — inny kod, inna tablica mas atomowych, zero współdzielonych parametrów z parserem Genesis.',
+    },
+  },
+};
+
+const KEPLER_AU_KILOMETERS = 149597870.7;
+
+/** Zawężenie kształtu payloadu Marsa z przypiętej strony NASA. */
+function marsElementsFromNssdcPayload(payload: unknown): { readonly distanceFromSunMillionKm: number; readonly orbitalPeriodDays: number } | null {
+  if (typeof payload !== 'string') return null;
+  const parsed = parseNssdcPlanetaryFactSheet(payload);
+  return parsed.mars ?? null;
+}
+
+export const KEPLER_MARS_ANCHOR_ID = 'nasa-nssdc-mars-orbital-period-kepler-third-law';
+
+const keplerMarsAnchor: ExternalAnchor = {
+  id: KEPLER_MARS_ANCHOR_ID,
+  label: 'Okres orbitalny Marsa: predykcja Genesis z III prawa Keplera (universe-kepler) kontra opublikowana wartość NASA NSSDCA',
+  // Surowa strona HTML NASA, DOSŁOWNIE — patrz nssdcPlanetaryFactSheet.ts dla
+  // pełnej prowieniencji (odtworzone z realnego loga CI, SHA-256 zweryfikowany
+  // dwoma niezależnymi metodami).
+  payload: nssdcPlanetaryFactSheetHtml,
+  sourceUrl: NSSDC_PLANETARY_FACTSHEET_SOURCE_URL,
+  sourceVersion: 'NASA NSSDCA Planetary Fact Sheet (metric)',
+  retrievedAt: NSSDC_PLANETARY_FACTSHEET_RETRIEVED_AT,
+  license: 'US Government work — NASA material is generally not copyrighted (public domain), attribution: NASA/NSSDCA, Dr. David R. Williams.',
+  // Literał — patrz komentarz przy `payloadDigest` w interfejsie i D-014 w
+  // docs/DECISIONS.md. Po ŚWIADOMEJ aktualizacji przypiętego pliku przelicz
+  // ponownie i wklej tutaj; NIGDY `anchorPayloadDigest(anchor.payload)` na żywo.
+  payloadDigest: '2296fa16',
+  metric: 'orbitalPeriodDays',
+  unit: 'days',
+  // Pasmo z ROZDZIELCZOŚCI PUBLIKACJI, nie z gustu: NASA podaje odległość
+  // Marsa jako "228.0" (4 cyfry znaczące, ostatnia cyfra ±0.05 -> względny
+  // błąd ~0,022%). Okres skaluje się jak a^(3/2) (III prawo Keplera), więc
+  // ten sam względny błąd w odległości daje ~1,5× większy względny błąd w
+  // okresie (~0,033%). Do tego dochodzi zaokrąglenie SAMEGO okresu w źródle
+  // ("687.0", ±0.05 dnia, ~0,007%). Suma (nie RSS, dla prostoty i spójności z
+  // pasmem pierwszej kotwicy) zaokrąglona w górę do czystej liczby: 0,05%.
+  // Realnie zmierzona rozbieżność (0,234 dnia) mieści się w tym paśmie z
+  // zapasem, a pasmo jest prerejestrowane PRZED wykonaniem, nie dobrane po
+  // zobaczeniu tej liczby.
+  tolerance: 687.0 * 0.0005,
+  toleranceRationale: '±0,05% pokrywa zaokrąglenie publikacji NASA do 4 cyfr znaczących odległości (propagowane przez wykładnik 3/2 III prawa Keplera) plus zaokrąglenie samego okresu; nie pokrywa błędu w implementacji universe-kepler ani błędnej stałej AU.',
+  readObservation: (payload) => {
+    const mars = marsElementsFromNssdcPayload(payload);
+    return mars === null ? null : mars.orbitalPeriodDays;
+  },
+  computePrediction: (payload) => {
+    // Z ODLEGŁOŚCI Marsa od Słońca, przez REALNY graf universe-kepler
+    // (orbitalGraph.ts, III prawo Keplera dokładnie). Kolumna "Orbital
+    // Period" payloadu NIE jest tu czytana — inaczej kotwica porównywałaby
+    // okres z samym sobą.
+    const mars = marsElementsFromNssdcPayload(payload);
+    if (mars === null) return null;
+    const model = getRouterModel('universe-kepler');
+    if (model === undefined) return null;
+    const orbitalRadiusAu = (mars.distanceFromSunMillionKm * 1e6) / KEPLER_AU_KILOMETERS;
+    const request = buildStructuredRequestFromModel(model, { centralMassSolar: 1, orbitalRadiusAu }, {
+      sourceText: `Kotwica Kepler/Mars: predykcja III prawa Keplera dla orbitalRadiusAu=${orbitalRadiusAu}.`,
+    });
+    const run = runExperiment(request);
+    const periodYears = run.result.outputs.orbitalPeriodYears;
+    return typeof periodYears === 'number' && Number.isFinite(periodYears) ? periodYears * 365.25 : null;
+  },
+  whatThisTests: 'Że istniejący graf orbitalny Genesis (universe-kepler, III prawo Keplera dla zagadnienia dwóch ciał) przewiduje okres orbitalny Marsa z jego odległości od Słońca zgodnie z tym, co niezależnie opublikowała NASA. Odległość (mierzona radarowo/śledzeniem sond kosmicznych, technika XX wieku) i okres (mierzony bezpośrednią astrometrią pozycyjną od stuleci) pochodzą z dwóch historycznie niezależnych kanałów pomiarowych — dokładnie ta struktura, która pozwoliła Keplerowi sformułować to prawo, a Newtonowi je wyjaśnić. Rozbieżność ponad prerejestrowane pasmo byłaby FALSIFIED i realną informacją o naszej implementacji.',
+  whatRemainsUntested: 'To NIE jest pomiar wykonany przez Genesis — obie liczby (odległość i okres) są wzięte z publikacji NASA, nie zmierzone tym systemem. Kotwica weryfikuje, czy nasza implementacja III prawa Keplera (arytmetyka, stała AU, jednostki) odtwarza publicznie znaną relację między dwiema NIEZALEŻNIE zmierzonymi wielkościami — nie testuje samego prawa fizycznego (ugruntowanego od XVII wieku) ani nie odkrywa niczego o Marsie. Nie testuje też perturbacji od innych planet (przybliżenie dwóch ciał) ani ekscentryczności orbity ponad to, co już zawiera się w użyciu półosi wielkiej.',
+  tautologyDerivation: {
+    prediction: {
+      source: 'hypothesis-parameter',
+      modelId: 'universe-kepler',
+      rationale: 'Predykcja jest liczona przez REALNY graf orbitalny (buildOrbitalModelGraph -> orbitalPeriodYears) z odległości Marsa jako wejścia — genuinie zależy od tego, jaka odległość jest podana; nie jest analitycznym sufitem, tylko realnym wynikiem modelu na konkretnym wejściu.',
+    },
+    observation: {
+      source: 'independent-measurement',
+      modelId: 'nasa-nssdc-planetary-factsheet',
+      rationale: 'Okres orbitalny Marsa pochodzi z niezależnie opublikowanej strony NASA NSSDCA, zmierzony historycznie inną techniką (astrometria pozycyjna) niż odległość użyta do predykcji (radar/śledzenie sond) — zero współdzielonego kodu ani parametrów z universe-kepler.',
+    },
+  },
 };
 
 /** Zadeklarowane kotwice. Każda z prowieniencją i z jawnym „co zostaje nieprzetestowane". */
-export const EXTERNAL_ANCHORS: readonly ExternalAnchor[] = [molecularWeightAnchor];
+export const EXTERNAL_ANCHORS: readonly ExternalAnchor[] = [molecularWeightAnchor, keplerMarsAnchor];
 
 export type AnchorResolution =
   | { readonly ok: true; readonly observedValue: number; readonly unit: string }
@@ -235,6 +347,14 @@ export type AnchorRunResult =
     readonly observationOrigin: DataProvenance;
     readonly replay: 'MATCH' | 'DRIFT';
     readonly whatRemainsUntested: string;
+    /**
+     * Klasyfikacja Tautology/Circularity Gate (`core/agent/tautologyGate.ts`)
+     * dla TĘJ konkretnej pary predykcja/obserwacja. Kotwica z prawdziwie
+     * niezależną obserwacją MUSI wyjść jako `EMPIRICAL_TEST` — jeśli kiedyś
+     * wyjdzie `CONSISTENCY_CHECK`, to znaczy, że `tautologyDerivation`
+     * kotwicy przestał być uczciwy, nie że Brama się myli.
+     */
+    readonly tautologyAssessment: TautologyAssessment;
   }
   | { readonly ok: false; readonly anchorId: string; readonly reason: string };
 
@@ -293,6 +413,12 @@ export function runExternalAnchor(
     return { ok: false, anchorId, reason: `Run kotwiczący "${anchor.id}" nie deklaruje dataProvenance — nie wolno go użyć jako obserwacji zewnętrznej.` };
   }
 
+  const tautologyAssessment = assessSingleTautology({
+    componentId: anchor.id,
+    prediction: anchor.tautologyDerivation.prediction,
+    observation: anchor.tautologyDerivation.observation,
+  });
+
   return {
     ok: true,
     anchorId,
@@ -302,5 +428,6 @@ export function runExternalAnchor(
     observationOrigin,
     replay,
     whatRemainsUntested: anchor.whatRemainsUntested,
+    tautologyAssessment,
   };
 }

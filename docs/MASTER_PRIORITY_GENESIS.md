@@ -959,3 +959,54 @@ Dwa gotowe prompty, każdy jako osobny dokument:
    zapisania w `knowledge/`, oznaczonego NIEURUCHOMIONE, plus tabelę H051–H056
    na wzór tabeli QE1–QE7. Explicite: żaden kod, żadna implementacja na tym
    etapie.
+
+## UPDATE — C3: P2.3 druga kotwica (Kepler) BLOCKED · P2.2 Solar ingestion BLOCKED (2026-09-12)
+
+Zadanie `docs/prompts/C3-P2.3-kepler-anchor-i-P2.2-solar-ingestion.md`
+zakładało, że oba prompty wydane Qwenowi (sekcja wyżej) już wróciły z
+odpowiedzią i że ta odpowiedź trafiła do C3. **Sprawdzone przed napisaniem
+czegokolwiek**: `docs/prompts/QWEN-P2.3-kotwica-zewnetrzna.md` i
+`docs/prompts/QWEN-QE4-QE7-obserwable.md` w repo to WYŁĄCZNIE te same dwa
+prompty WYDANE Qwenowi (identyczne z opisem w sekcji wyżej) — nie zawierają
+odpowiedzi Qwena. Przeszukano `git log --all --full-history` po całym repo
+(wszystkie gałęzie lokalne i `origin/*`, w tym `staging/qwen-cyber-foundation-unreviewed`,
+który jest osobnym, niepowiązanym pakietem Qwena — Cyber Foundation, odrzuconym
+w `de565414`) — realny tekst `SOLAR_MIND_MASTER_REPORT.md`/`SOLAR_MIND_EXPANSION.md`
+ani szczegółowy pakiet Kepler (§1–§10 z promptu C3, ilustracyjny CSV, wzory
+pasma) nie istnieją nigdzie w repo. To pokrywa się z tym, co ta sekcja MASTER
+PRIORITY już mówiła wyżej: „Solar H051–H056... czekają na surowy tekst
+raportów w repo" — tekst nadal nie wszedł.
+
+**Część zrobiona mimo braku pakietu (nie wymagała jego treści):**
+- Zmierzono niezależnie dostęp sieciowy do `exoplanetarchive.ipac.caltech.edu`
+  z TEGO środowiska: `403` na CONNECT, ten sam rodzaj blokady co już
+  udokumentowana dla pierwszej kotwicy. Zgodnie z regułą zadania („jeśli NIE
+  masz dostępu... nie przypinaj rekordu ilustracyjnego") druga kotwica
+  keplerowska zostaje `BLOCKED — brak dostępu do źródła`, dowód w
+  `docs/P2_EVIDENCE.md`.
+- Wygeneralizowano `EvidenceShowcaseScreen.tsx`: `ExternalAnchorSection`
+  (hardkodująca `MOLECULAR_WEIGHT_ANCHOR_ID`) zastąpiona przez
+  `ExternalAnchorCard`/`ExternalAnchorsSection`, iterującą po całym
+  `EXTERNAL_ANCHORS`. Zero zmiany zachowania dziś (nadal jedna kotwica), ale
+  kolejna kotwica (Kepler albo inna) wyrenderuje się bez zmian ekranu.
+  Zweryfikowane: `tsc --noEmit` czysto, `eslint` czysto,
+  `evidenceShowcaseScreen.test.tsx` + `externalObservationAnchor.test.ts` +
+  `moduleReachability.test.ts` — 17/17, bez regresji.
+- Zaktualizowano `docs/RISKS.md` R-005 i `docs/P2_EVIDENCE.md` z prawdziwym
+  stanem obu prób.
+
+**Część NIEROBIONA, bo wymaga treści, której nie mam:**
+- Sam wpis kotwicy keplerowskiej (pasmo z `pl_orbpererr1`, `whatThisTests`/
+  `whatRemainsUntested`) — zablokowany na sieci, więc nie ma payloadu do
+  przypięcia niezależnie od treści pakietu.
+- **P2.2 Solar ingestion w całości.** `knowledge/SOLAR_MIND_MASTER_REPORT.md`
+  i `knowledge/SOLAR_MIND_EXPANSION.md` wymagają DOSŁOWNEGO tekstu raportów —
+  nie da się ich uczciwie napisać z opisu zadania, bo zadanie samo zakłada, że
+  tekst już istnieje u wykonawcy. Wymyślenie hipotez H051–H056 albo treści
+  raportu byłoby dokładnie tą fabrykacją, której cała ta misja zabrania od
+  pierwszego promptu. **Zgłoszone useriwi jako blokada wymagająca jego
+  działania**: wklejenie realnej, pełnej odpowiedzi Qwena (oba prompty) do
+  sesji, zanim P2.2 i reszta P2.3 mogą ruszyć.
+
+Priorytet NIE ZAMKNIĘTY: P2.3 (druga kotwica) = `BLOCKED — brak dostępu do
+źródła`. P2.2 (Solar ingestion) = `BLOCKED — brak treści źródłowej od Qwena`.

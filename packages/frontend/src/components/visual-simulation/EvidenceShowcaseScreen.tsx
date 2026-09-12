@@ -6,7 +6,7 @@ import {
   buildCaseStudy, buildSignedEvidenceDownload, listCaseStudyCandidates, replayCaseStudy, verifyEvidenceFile,
   type CaseStudy, type CaseStudyReplay,
 } from './evidenceShowcase';
-import { EXTERNAL_ANCHORS, MOLECULAR_WEIGHT_ANCHOR_ID, runExternalAnchor } from '../../core/biotechData/externalAnchor';
+import { EXTERNAL_ANCHORS, runExternalAnchor, type ExternalAnchor } from '../../core/biotechData/externalAnchor';
 
 /**
  * EVIDENCE & REPLAY SHOWCASE (C2, "Evidence & Replay as a product" directive).
@@ -64,28 +64,31 @@ function ReplayVerdictBlock({ replay }: { replay: CaseStudyReplay }) {
  * Blok pokazuje też — z tą samą wagą wizualną — co ta kotwica POZOSTAWIA
  * nieprzetestowane. Bez tego zdania kotwica sugerowałaby pomiar przyrody,
  * którym nie jest.
+ *
+ * Renderuje JEDNĄ kotwicę, przekazaną jako prop — `ExternalAnchorsSection`
+ * poniżej mapuje to na WSZYSTKIE wpisy `EXTERNAL_ANCHORS`, więc dodanie
+ * drugiej kotwicy do rejestru wystarcza, żeby wyrenderowała się tutaj bez
+ * dalszych zmian w tym ekranie.
  */
-function ExternalAnchorSection() {
-  const anchor = EXTERNAL_ANCHORS.find((candidate) => candidate.id === MOLECULAR_WEIGHT_ANCHOR_ID);
-  const result = useMemo(() => runExternalAnchor(MOLECULAR_WEIGHT_ANCHOR_ID), []);
-  if (anchor === undefined) return null;
+function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
+  const result = useMemo(() => runExternalAnchor(anchor.id), [anchor.id]);
 
   return (
-    <section className="ecs-section" data-testid="ecs-external-anchor">
+    <section className="ecs-section" data-testid={`ecs-external-anchor-${anchor.id}`}>
       <span className="dl-label">External anchor — an observation Genesis did not produce</span>
       {!result.ok ? (
-        <p className="ecs-replay-line wd-replay-BLOCKED" data-testid="ecs-anchor-blocked">
+        <p className="ecs-replay-line wd-replay-BLOCKED" data-testid={`ecs-anchor-blocked-${anchor.id}`}>
           <b>BLOCKED</b>{' — '}{result.reason}
         </p>
       ) : (
         <>
-          <p data-testid="ecs-anchor-verdict">
+          <p data-testid={`ecs-anchor-verdict-${anchor.id}`}>
             <b>{result.verification.assessment}</b>{' — '}
             Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric} from
             the published molecular formula; the externally published value is {result.verification.observedValue} {anchor.unit}.
             Preregistered band ±{anchor.tolerance.toFixed(3)} {anchor.unit}.
           </p>
-          <dl className="pilot-provenance" data-testid="ecs-anchor-provenance">
+          <dl className="pilot-provenance" data-testid={`ecs-anchor-provenance-${anchor.id}`}>
             <div><dt>observation origin</dt><dd><ProvenanceBadge provenance={result.observationOrigin} /></dd></div>
             <div><dt>source</dt><dd className="mono">{anchor.sourceUrl}</dd></div>
             <div><dt>version / retrieved</dt><dd className="mono">{anchor.sourceVersion} · {anchor.retrievedAt}</dd></div>
@@ -93,18 +96,29 @@ function ExternalAnchorSection() {
             <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
             <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
           </dl>
-          <p className={`ecs-replay-line wd-replay-${result.replay}`} data-testid="ecs-anchor-replay">
+          <p className={`ecs-replay-line wd-replay-${result.replay}`} data-testid={`ecs-anchor-replay-${anchor.id}`}>
             <b>{result.replay}</b>{' — '}
             the comparison was re-executed just now, in this browser, from the pinned payload; the two
             verdict fingerprints were then compared. A changed payload refuses outright rather than
             reporting a different number.
           </p>
-          <p className="gsc-caption" data-testid="ecs-anchor-untested">
+          <p className="gsc-caption" data-testid={`ecs-anchor-untested-${anchor.id}`}>
             <b>What this does NOT establish:</b> {result.whatRemainsUntested}
           </p>
         </>
       )}
     </section>
+  );
+}
+
+/** Itera po CAŁYM rejestrze `EXTERNAL_ANCHORS` — żadna kotwica nie jest hardkodowana po ID. */
+function ExternalAnchorsSection() {
+  return (
+    <>
+      {EXTERNAL_ANCHORS.map((anchor) => (
+        <ExternalAnchorCard key={anchor.id} anchor={anchor} />
+      ))}
+    </>
   );
 }
 
@@ -286,7 +300,7 @@ export function EvidenceShowcaseScreen() {
       )}
 
       {/* Zawsze widoczna, nawet bez żadnego zapisanego rekordu — patrz doc komponentu. */}
-      <ExternalAnchorSection />
+      <ExternalAnchorsSection />
     </div>
   );
 }

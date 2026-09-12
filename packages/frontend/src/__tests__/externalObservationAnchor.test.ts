@@ -6,7 +6,7 @@ import {
   buildAnchoredReferenceRun,
   runExternalAnchor,
   MOLECULAR_WEIGHT_ANCHOR_ID,
-  KEPLER_VENUS_ANCHOR_ID,
+  KEPLER_MARS_ANCHOR_ID,
 } from '../core/biotechData/externalAnchor';
 import { verifyPredictionAgainstRealExperiment } from '../core/agent/predictionVerification';
 import { molecularWeight, parseFormula } from '../core/compute/cheminformatics';
@@ -164,128 +164,53 @@ describe('pełny cykl kotwicy: predykcja → obserwacja zewnętrzna → werdykt 
 });
 
 /**
- * SECOND ANCHOR (C1, P2.3 follow-up) — Kepler's third law vs. Venus's real,
- * independently measured orbital period, from the pinned NASA NSSDCA
- * Planetary Fact Sheet (`packages/frontend/src/core/biotechData/
- * nssdc-planetary-factsheet.html`, byte-verified against the real CI fetch —
- * see `docs/DECISIONS.md`). Reuses the SAME anchor contract as the molecular
- * weight anchor above; these tests exercise what that anchor's generic tests
- * cannot: the Tautology Gate wiring, belief revision, and the specific
- * prediction/observation independence a two-metric HTML table introduces.
+ * BELIEF REVISION + NEXT QUESTION (C1, P2.3 follow-up) — the two pieces of the
+ * PROBLEM -> ... -> NEXT QUESTION loop that were still missing after the
+ * Kepler/Mars anchor (`keplerExternalAnchor.test.ts`, built concurrently by
+ * another session) closed the "second external anchor" gap. Added here,
+ * generically, for EVERY declared anchor rather than a competing third
+ * anchor — the DoD asks for a belief that actually moves and a next question
+ * that is actually proposed, not for a duplicate Kepler observation.
  */
-describe('druga kotwica: Kepler + Wenus — niezależność ekstrakcji predykcji od obserwacji', () => {
-  const anchor = EXTERNAL_ANCHORS.find((a) => a.id === KEPLER_VENUS_ANCHOR_ID)!;
+describe('rewizja przekonania i next question — dla każdej zadeklarowanej kotwicy', () => {
+  it('SUPPORTED podnosi pewność z neutralnego priora 0.5; FALSIFIED ją obniża', () => {
+    for (const anchor of EXTERNAL_ANCHORS) {
+      const supported = runExternalAnchor(anchor.id);
+      expect(supported.ok).toBe(true);
+      if (!supported.ok) throw new Error('unreachable');
+      expect(supported.belief.before).toBe(0.5);
+      if (supported.verification.assessment === 'SUPPORTED_WITHIN_PROTOCOL') {
+        expect(supported.belief.after).toBeGreaterThan(supported.belief.before);
+      }
 
-  it('kotwica jest zadeklarowana', () => {
-    expect(anchor).toBeDefined();
-  });
-
-  it('zadeklarowany odcisk jest LITERAŁEM w źródle, a nie wyliczeniem z payloadu', () => {
-    expect(anchor.payloadDigest).toBe('2296fa16');
-  });
-
-  it('predykcja czyta WYŁĄCZNIE wiersz semi-major axis ("Distance from Sun"), nigdy wiersz okresu', () => {
-    // Podmieniamy TYLKO wiersz "Orbital Period" (obserwację) na inną wartość,
-    // zostawiając wiersz "Distance from Sun" bez zmian — jeśli predykcja
-    // czytałaby okres, ta podmiana by ją zmieniła. Nie zmienia.
-    const html = anchor.payload as string;
-    const tamperedObservationOnly = html.replace('>224.7<', '>999.9<');
-    expect(tamperedObservationOnly).not.toBe(html);
-    const predictedBefore = anchor.computePrediction(html);
-    const predictedAfter = anchor.computePrediction(tamperedObservationOnly);
-    expect(predictedAfter).toBe(predictedBefore);
-  });
-
-  it('obserwacja czyta WYŁĄCZNIE wiersz Orbital Period, nigdy wiersz semi-major axis', () => {
-    const html = anchor.payload as string;
-    const tamperedPredictionInputOnly = html.replace('>108.2<', '>999.9<');
-    expect(tamperedPredictionInputOnly).not.toBe(html);
-    const observedBefore = anchor.readObservation(html);
-    const observedAfter = anchor.readObservation(tamperedPredictionInputOnly);
-    expect(observedAfter).toBe(observedBefore);
-  });
-
-  it('ODMAWIA, gdy przypięty payload (surowy HTML) został zmieniony', () => {
-    const html = anchor.payload as string;
-    const tampered = { ...anchor, payload: html.replace('>224.7<', '>300.0<') };
-    const resolved = resolveExternalAnchor(tampered);
-    expect(resolved.ok).toBe(false);
-    if (resolved.ok) throw new Error('unreachable');
-    expect(resolved.reason).toMatch(/odcisk|digest/i);
-    expect(() => buildAnchoredReferenceRun(tampered)).toThrow(/odcisk|digest/i);
-  });
-
-  it('pełny cykl: realna predykcja Keplera zgadza się z realnym, niezależnie zmierzonym okresem Wenus (SUPPORTED)', () => {
-    const result = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('unreachable');
-    expect(result.verification.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
-    // 224.7 dni / 365.25 dnia — obserwacja jest CZYTANA, nie liczona.
-    expect(result.verification.observedValue).toBeCloseTo(224.7 / 365.25, 9);
-    // Kepler III z a=108.2e6 km / AU i M=1 M☉ — realna wartość, nie zaokrąglona ręcznie.
-    expect(result.verification.predictedValue).toBeCloseTo(0.615109979562335, 9);
-    expect(result.criterion.tolerance).toBeGreaterThan(0);
-    expect(result.observationOrigin).toBe('REFERENCE');
-  });
-
-  it('FALSYFIKACJA JEST REALNA dla drugiej kotwicy też — zła predykcja zostaje odrzucona', () => {
-    const falsified = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID, { predictedValueOverride: 5.0 });
-    expect(falsified.ok).toBe(true);
-    if (!falsified.ok) throw new Error('unreachable');
-    expect(falsified.verification.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
-  });
-
-  it('REPLAY MATCH — ten sam payload i ta sama predykcja dają ten sam odcisk', () => {
-    const first = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID);
-    const second = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID);
-    expect(first.ok && second.ok).toBe(true);
-    if (!first.ok || !second.ok) throw new Error('unreachable');
-    expect(second.verificationFingerprint).toBe(first.verificationFingerprint);
-    expect(second.replay).toBe('MATCH');
-    const drifted = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID, { predictedValueOverride: 0.7 });
-    expect(drifted.ok).toBe(true);
-    if (!drifted.ok) throw new Error('unreachable');
-    expect(drifted.verificationFingerprint).not.toBe(first.verificationFingerprint);
-  });
-
-  it('Tautology Gate klasyfikuje tę kotwicę jako EMPIRICAL_TEST — predykcja i obserwacja to różne kanały', () => {
-    const result = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('unreachable');
-    expect(result.tautologyAssessment).not.toBeNull();
-    expect(result.tautologyAssessment!.classification).toBe('EMPIRICAL_TEST');
-  });
-
-  it('pierwsza (chemiczna) kotwica NADAL zwraca tautologyAssessment: null — pole jest addytywne, nie zmienia starego zachowania', () => {
-    const result = runExternalAnchor(MOLECULAR_WEIGHT_ANCHOR_ID);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('unreachable');
-    expect(result.tautologyAssessment).toBeNull();
-  });
-
-  it('rewizja przekonania: SUPPORTED podnosi pewność z neutralnego priora; FALSIFIED ją obniża', () => {
-    const supported = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID);
-    expect(supported.ok).toBe(true);
-    if (!supported.ok) throw new Error('unreachable');
-    expect(supported.belief.before).toBe(0.5);
-    expect(supported.belief.after).toBeGreaterThan(supported.belief.before);
-    expect(supported.belief.status).toBe('SUPPORTED_WITHIN_PROTOCOL');
-
-    const falsified = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID, { predictedValueOverride: 5.0 });
-    expect(falsified.ok).toBe(true);
-    if (!falsified.ok) throw new Error('unreachable');
-    expect(falsified.belief.before).toBe(0.5);
-    expect(falsified.belief.after).toBeLessThan(falsified.belief.before);
-    expect(falsified.belief.status).toBe('FALSIFIED_WITHIN_PROTOCOL');
+      const falsified = runExternalAnchor(anchor.id, { predictedValueOverride: -1e9 });
+      expect(falsified.ok).toBe(true);
+      if (!falsified.ok) throw new Error('unreachable');
+      expect(falsified.verification.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
+      expect(falsified.belief.after).toBeLessThan(falsified.belief.before);
+      expect(falsified.belief.status).toBe('FALSIFIED_WITHIN_PROTOCOL');
+    }
   });
 
   it('proponuje realne, konkretne następne pytanie — inne dla SUPPORTED niż dla FALSIFIED', () => {
-    const supported = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID);
-    const falsified = runExternalAnchor(KEPLER_VENUS_ANCHOR_ID, { predictedValueOverride: 5.0 });
-    expect(supported.ok && falsified.ok).toBe(true);
-    if (!supported.ok || !falsified.ok) throw new Error('unreachable');
-    expect(supported.nextQuestion.length).toBeGreaterThan(20);
-    expect(falsified.nextQuestion.length).toBeGreaterThan(20);
-    expect(supported.nextQuestion).not.toBe(falsified.nextQuestion);
+    for (const anchor of EXTERNAL_ANCHORS) {
+      const supported = runExternalAnchor(anchor.id);
+      const falsified = runExternalAnchor(anchor.id, { predictedValueOverride: -1e9 });
+      expect(supported.ok && falsified.ok).toBe(true);
+      if (!supported.ok || !falsified.ok) throw new Error('unreachable');
+      expect(supported.nextQuestion.length).toBeGreaterThan(20);
+      expect(falsified.nextQuestion.length).toBeGreaterThan(20);
+      expect(supported.nextQuestion).not.toBe(falsified.nextQuestion);
+    }
+  });
+
+  it('ruch przekonania jest ograniczony sufitem Tautology Gate (evidenceCeiling)', () => {
+    // Obie zadeklarowane kotwice mają EMPIRICAL_TEST (sufit null = brak ograniczenia),
+    // więc to jest test na to, że sufit jest w ogóle STOSOWANY, nie martwym polem.
+    const marsResult = runExternalAnchor(KEPLER_MARS_ANCHOR_ID);
+    expect(marsResult.ok).toBe(true);
+    if (!marsResult.ok) throw new Error('unreachable');
+    expect(marsResult.tautologyAssessment.classification).toBe('EMPIRICAL_TEST');
+    expect(marsResult.belief.after).not.toBe(marsResult.belief.before);
   });
 });

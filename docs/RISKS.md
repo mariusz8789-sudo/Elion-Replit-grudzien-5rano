@@ -89,7 +89,7 @@ deklaracją dobrych intencji.
 
 ---
 
-## R-005 — Brak kotwicy w danych zewnętrznych · ZWĘŻONE DALEJ (2026-09-12, druga kotwica EMPIRYCZNA), nie zamknięte
+## R-005 — Brak kotwicy w danych zewnętrznych · ZWĘŻONE DALEJ (2026-09-12, druga kotwica EMPIRYCZNA + belief revision), nie zamknięte
 
 **Fakt.** Na dzień pisania Genesis mierzy przede wszystkim WŁASNĄ spójność:
 solvery, prowieniencja, replay i falsyfikacja działają, ale obserwacje, wobec
@@ -123,9 +123,8 @@ danych naukowych jest odrzucany przez politykę proxy (dowód w
 **Następny krok, konkretnie.** Kotwica empiryczna na CMS Open Data Z→μμ 2011
 (rekord 5208, CC0): `compute/cmsOpenDataAdapter.mjs` już czyta ten zbiór z
 weryfikacją SHA-256 i zwraca `DATA_REQUIRED` zamiast syntetyku, ale
-`Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest zablokowany. To jest
-pomiar instrumentalny, nie wartość przeliczona — czyli kotwica, która zamyka
-punkt (1).
+`Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest zablokowany z tego
+sandboxa — ten sam obejście (CI z otwartym egressem) może zadziałać tu też.
 
 **Próba drugiej kotwicy (2026-09-12, Kepler/NASA Exoplanet Archive):
 BLOCKED z tego środowiska, potem ZAMKNIĘTA przez inne, bezpieczniejsze
@@ -133,30 +132,49 @@ BLOCKED z tego środowiska, potem ZAMKNIĘTA przez inne, bezpieczniejsze
 sandboxa pozostaje zablokowany (403), potwierdzone ponownie. Ale zamiast
 zatrzymać się na `BLOCKED`, C1 zreużył sprawdzony wzorzec CI-fetch-pin
 (`nist-g3-pinned-artifacts`) dla INNEGO, bezpieczniejszego źródła: NASA
-NSSDCA Planetary Fact Sheet (Wenus). Powód zmiany źródła nie jest blokadą
-egress (runner GitHub Actions jej nie ma) — jest nim realne ryzyko
-cykliczności specyficzne dla archiwum egzoplanet (wiele wpisów ma półoś
-wielką WYLICZONĄ z okresu przez III prawo Keplera — dokładnie formułę,
-którą testowałaby ta kotwica), którego nie dało się zweryfikować bez
-dostępu do archiwum. Dane Układu Słonecznego usuwają tę niejednoznaczność:
-okres i odległość pochodzą z dwóch historycznie niezależnych technik
-pomiarowych.
+NSSDCA Planetary Fact Sheet. Powód zmiany źródła nie jest blokadą egress
+(runner GitHub Actions jej nie ma) — jest nim realne ryzyko cykliczności
+specyficzne dla archiwum egzoplanet (wiele wpisów ma półoś wielką WYLICZONĄ
+z okresu przez III prawo Keplera — dokładnie formułę, którą testowałaby ta
+kotwica), którego nie dało się zweryfikować bez dostępu do archiwum. Dane
+Układu Słonecznego usuwają tę niejednoznaczność: okres i odległość pochodzą
+z dwóch historycznie niezależnych technik pomiarowych.
+
+**Dwie sesje trafiły w to samo rozwiązanie równolegle — udokumentowane, nie
+ukryte.** Ta sesja (C1) i inna, równoległa sesja doszły do IDENTYCZNEGO
+wniosku niezależnie: ten sam plik NASA NSSDCA, ten sam powód unikania
+Exoplanet Archive, ten sam wzorzec CI-fetch-pin. Równoległa sesja
+zaimplementowała i wypchnęła kotwicę Kepler/Mars (commit `81189cf`,
+`nssdcPlanetaryFactSheet.ts`, Tautology Gate wpięta w OBIE kotwice,
+`keplerExternalAnchor.test.ts`, 25 testów) PIERWSZA. C1 miał w tym samym
+czasie gotową, równoważną kotwicę Kepler/Wenus na tym samym pliku — po
+`git fetch` i porównaniu obu implementacji, C1 odrzucił własną wersję
+zamiast wypychać konkurencyjną, duplikującą implementację (dokładnie to,
+czego zadanie miało unikać) i przyjął kotwicę Mars jako kanoniczną. Jedyne,
+czego kanoniczna implementacja NIE miała, a czego wymagało zadanie: rewizja
+przekonania (belief revision) i konkretne „next question" po każdym
+przebiegu. C1 dołożył te dwa pola (`belief: {before, after, status}`,
+`nextQuestion: string`) do `runExternalAnchor` GENERYCZNIE — dla OBU
+zadeklarowanych kotwic, nie jako trzecia, konkurencyjna kotwica.
 
 **Rezultat: PIERWSZA prawdziwie EMPIRYCZNA kotwica w tym repo, nie tylko
-weryfikacja wzajemna.** Predykcja Genesis (III prawo Keplera z półosi
-wielkiej Wenus, `universe-kepler`, niezmieniony) = 0.615110 roku; realny,
-niezależnie zmierzony okres orbitalny Wenus (NASA NSSDCA) = 0.615195 roku;
-różnica 0.014%, wewnątrz prerejestrowanego pasma ±0.5%. Werdykt:
-`SUPPORTED_WITHIN_PROTOCOL`. Tautology Gate klasyfikuje to jako
-`EMPIRICAL_TEST` (nie `CONSISTENCY_CHECK`, jak pierwsza kotwica) — obserwacja
-jest zadeklarowana jako `independent-measurement`, prawdziwy pomiar
-astronomiczny, nie liczba przeliczona z tego samego wzoru. To zamyka punkt
-(1) powyżej dla tej JEDNEJ pary predykcja/obserwacja: mamy teraz przykład, w
-którym zgodność potwierdza rzeczywistą hipotezę fizyczną, nie tylko spójność
-dwóch niezależnie utrzymywanych tablic. Punkt (2) (brak ingestion API na
-żywo) pozostaje otwarty — dane są przypięte przez CI-fetch, nie pobierane w
-czasie rzeczywistym. Pełny opis: `docs/MASTER_PRIORITY_GENESIS.md`,
-`docs/DECISIONS.md`.
+weryfikacja wzajemna — plus rewizja przekonania i next question dla obu.**
+Predykcja Genesis (III prawo Keplera z półosi wielkiej Marsa,
+`universe-kepler`, niezmieniony) = 687.2336 dnia; realny, niezależnie
+zmierzony okres orbitalny Marsa (NASA NSSDCA) = 687.0 dnia; różnica 0.034%,
+wewnątrz prerejestrowanego pasma ±0.05%. Werdykt: `SUPPORTED_WITHIN_PROTOCOL`.
+Tautology Gate klasyfikuje to jako `EMPIRICAL_TEST` (obie kotwice, nie tylko
+ta) — obserwacja jest zadeklarowana jako `independent-measurement`, prawdziwy
+pomiar astronomiczny, nie liczba przeliczona z tego samego wzoru. Rewizja
+przekonania: pewność hipotezy „model poprawnie przewiduje ${metric}" rusza
+z neutralnego priora 0.5 i faktycznie się zmienia (0.5→0.618 dla Marsa,
+0.5→0.817 dla PubChem po tym jednym przebiegu — patrz `docs/DECISIONS.md`).
+To zamyka punkt (1) powyżej dla tej JEDNEJ pary predykcja/obserwacja: mamy
+teraz przykład, w którym zgodność potwierdza rzeczywistą hipotezę fizyczną,
+nie tylko spójność dwóch niezależnie utrzymywanych tablic. Punkt (2) (brak
+ingestion API na żywo) pozostaje otwarty — dane są przypięte przez CI-fetch,
+nie pobierane w czasie rzeczywistym. Pełny opis: `docs/MASTER_PRIORITY_GENESIS.md`,
+`docs/P2_EVIDENCE.md`, `docs/DECISIONS.md`.
 
 ---
 

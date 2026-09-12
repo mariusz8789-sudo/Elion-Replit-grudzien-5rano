@@ -151,8 +151,8 @@ jobs:
           const committed = await readFile('packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html', 'utf8');
           if (fresh !== committed) {
             throw new Error(
-              'NSSDC Planetary Fact Sheet drifted from the committed, hash-pinned copy the Kepler anchor reads ' +
-              '(externalAnchor.ts, payloadDigest 2296fa16). NASA changed the source page since this was pinned -- ' +
+              'NSSDC Planetary Fact Sheet drifted from the committed, hash-pinned copy the Kepler anchor reads. ' +
+              'NASA changed the source page since this was pinned -- ' +
               're-fetch, re-verify the extraction regex against the new content, and re-pin deliberately; ' +
               'do not silently accept a changed value as the same observation.',
             );

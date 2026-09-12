@@ -84,7 +84,7 @@ function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
         <>
           <p data-testid={`ecs-anchor-verdict-${anchor.id}`}>
             <b>{result.verification.assessment}</b>{' — '}
-            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric} {anchor.predictionSourceLabel};
+            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric};
             the externally published value is {result.verification.observedValue} {anchor.unit}.
             Preregistered band ±{anchor.tolerance.toFixed(3)} {anchor.unit}.
           </p>
@@ -96,12 +96,12 @@ function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
             <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
             <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
           </dl>
-          {result.tautologyAssessment && (
-            <p data-testid={`ecs-anchor-tautology-${anchor.id}`}>
-              <b>Tautology Gate: {result.tautologyAssessment.classification}</b>{' — '}
-              {result.tautologyAssessment.reasons[0]}
-            </p>
-          )}
+          <p className="gsc-caption" data-testid={`ecs-anchor-tautology-${anchor.id}`}>
+            <b>Tautology Gate: {result.tautologyAssessment.classification}</b>{' — '}
+            {result.tautologyAssessment.classification === 'EMPIRICAL_TEST'
+              ? 'the observation is registered as an independent channel, separate from whatever produced the prediction — agreement or disagreement here carries real information.'
+              : result.tautologyAssessment.reasons[0]}
+          </p>
           <p data-testid={`ecs-anchor-belief-${anchor.id}`}>
             <b>Belief revision</b>{' — '}
             confidence that this model correctly predicts this real observation moved from{' '}

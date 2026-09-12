@@ -180,6 +180,16 @@ przyrody, i nie ma jeszcze ingestion publicznego API na żywo.
 
 ## P2.3 — DRUGA kotwica (Kepler, NASA Exoplanet Archive): BLOCKED — brak dostępu do źródła
 
+> **ZAMKNIĘTE od 2026-09-12 (C3), innym źródłem.** NASA Exoplanet Archive
+> pozostaje zablokowany z tego sandboxa (dowód niżej, niezmieniony). Zamiast
+> czekać na dostęp, druga kotwica została zbudowana na Solar System (Mars,
+> NASA NSSDCA Planetary Fact Sheet) — realnie pobranym przez GitHub Actions
+> (bez blokady egressu tam), z bajtowo zweryfikowanym payloadem odzyskanym z
+> loga CI. Pełny dowód: sekcja „P2.3 — DRUGA kotwica (Kepler/Mars, NASA
+> NSSDCA): ZAIMPLEMENTOWANA" niżej. Sekcja poniżej (pierwsza próba,
+> Exoplanet Archive) zostaje jako dowód, że blokada sieciowa była realna, nie
+> wymówka.
+
 **Status: NIE ZAIMPLEMENTOWANA. Pomiar dostępu sieciowego wykonany PRZED
 podjęciem decyzji projektowej — środowisko odmawia egresu do
 `exoplanetarchive.ipac.caltech.edu`, tak samo jak udokumentowano wyżej dla
@@ -238,106 +248,196 @@ tego samego powodu: nie ma czego dodać bez fabrykacji.
 
 ---
 
-## P2.3 — DRUGA kotwica ZAMKNIĘTA (2026-09-12, C1): Kepler + Wenus, NASA NSSDCA, nie NASA Exoplanet Archive
+## P2.3 — DRUGA kotwica (Kepler/Mars, NASA NSSDCA): ZAIMPLEMENTOWANA
 
-**Status: ZROBIONE, empirycznie, z realnymi liczbami.** Blokada bezpośredniego
-dostępu do `exoplanetarchive.ipac.caltech.edu` z TEGO środowiska pozostaje w
-mocy (potwierdzona ponownie w tej sesji) — ale zamiast czekać na inne
-środowisko, wykorzystano wzorzec, który już działa w tym repo: CI-fetch-pin
-(`scripts/fetch-atom-bohr-nist-fixtures.mjs`/`nist-g3-pinned-artifacts`,
-zielony), gdzie egress GitHub Actions nie ma tego ograniczenia.
+**Status: ZAIMPLEMENTOWANA i ZWERYFIKOWANA WYKONANIEM, z realną obserwacją
+zewnętrzną (okres orbitalny Marsa, NASA NSSDCA Planetary Fact Sheet) i z
+Tautology Gate wpiętym w OBIE kotwice (nie tylko tę).**
 
-**Dlaczego NIE NASA Exoplanet Archive, mimo że runner CI mógłby go dosięgnąć.**
-Realne ryzyko cykliczności, nie kolejna blokada: w archiwum egzoplanet
-`pl_orbsmax` (półoś wielka) dla wielu wpisów — zwłaszcza planet
-tranzytujących — jest WYLICZONA z `pl_orbper` (okres) przez III prawo
-Keplera, dokładnie tę formułę, którą testowałaby predykcja tej kotwicy.
-Porównanie „przewidywany okres z półosi" wobec „opublikowany okres" byłoby
-wtedy identycznością przez konstrukcję dla takich wpisów — a bez dostępu do
-archiwum nie dało się sprawdzić per-planeta, które wpisy tego unikają.
-Dlatego wybrano dane Układu Słonecznego (NASA NSSDCA Planetary Fact Sheet):
-okres orbitalny mierzony bezpośrednią astronomią pozycyjną od stuleci,
-odległość — zupełnie inną techniką (radar/śledzenie sond) — dwa historycznie
-niezależne kanały, bez potrzeby weryfikowania per-rekordowej prowieniencji.
+### Skąd wzięły się dane, skoro exoplanetarchive.ipac.caltech.edu jest zablokowany
 
-**Droga pozyskania danych — w kolejności, z pomyłkami, nie ukryte.**
-1. `scripts/fetch-kepler-solar-system-fixture.mjs` + job CI
-   `kepler-solar-system-pinned-artifact` — dokładny wzorzec NIST.
-2. Pierwszy fetch: strona dotarła (14363 B), ale marker „Venus"/„Orbital
-   Period" nie pasował do rzeczywistej treści — osłabiono do potwierdzonego
-   „Planetary Fact Sheet".
-3. Artefakt CI jest pobieralny wyłącznie z URL-a Azure Blob Storage — TAKŻE
-   zablokowanego z tego sandboxa. Zamiast zgadywać strukturę strony,
-   tymczasowo wydrukowano zawartość pliku do loga joba (GitHub API jest
-   dostępne stąd) i odczytano PRAWDZIWĄ tabelę.
-4. Zrekonstruowano plik lokalnie z loga i policzono SHA-256 —
-   **bajt-w-bajt zgodny** z tym, co CI obliczyło z realnego fetcha
-   (`42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c`) —
-   dopiero ta zgodność dała podstawę do przypięcia pliku do repo.
-5. Krok diagnostyczny w CI zastąpiono trwałą kontrolą dryfu: nowy fetch
-   porównywany z przypiętą kopią w repo przy każdym pushu.
+Blokada z sekcji wyżej dotyczy TYLKO tego sandboxa. Inna sesja (C1) zbudowała
+`scripts/fetch-kepler-solar-system-fixture.mjs` — analogiczny do
+`fetch-atom-bohr-nist-fixtures.mjs` skrypt fetchujący, uruchamiany w CI
+(`kepler-solar-system-pinned-artifact` job w `.github/workflows/ci.yml`),
+gdzie egress NIE jest zablokowany (GitHub Actions runner, nie ten sandbox).
+Celowo NIE Exoplanet Archive — commit `d2af93cf` udokumentował realne
+ryzyko cyrkularności: dla wielu wpisów Exoplanet Archive półoś wielka jest
+sama wyprowadzona z okresu przez III prawo Keplera, czyli dokładnie ten wzór,
+którego ta kotwica by użyła do predykcji. Solar System (Mars) tego unika:
+odległość mierzona radarem/śledzeniem sond (technika XX w.), okres mierzony
+bezpośrednią astrometrią pozycyjną (od stuleci) — dwa historycznie niezależne
+kanały.
 
-**Kotwica: co porównuje i skąd pochodzi każda strona.**
+CI faktycznie pobrał stronę (dowód w logu joba run `34714125596`, commit
+`a4f4314e`), ale URL artefaktu (Azure Blob Storage) jest zablokowany z TEGO
+sandboxa tą samą polityką proxy co bezpośredni fetch. Zamiast czekać:
 
-| | |
-|---|---|
-| Predykcja | `orbitalPeriodYears` z `buildOrbitalModelGraph()` (`orbitalGraph.ts`, NIEZMIENIONY — ta sama funkcja co Universe Lab), wejście: półoś wielka Wenus (108,2×10⁶ km → AU) z pinowanego payloadu, masa Słońca = 1 M☉ (stała, nie z payloadu) |
-| Obserwacja | Okres orbitalny Wenus czytany z INNEGO wiersza tego samego pinowanego payloadu (224,7 dni → lata), NIGDY liczony |
-| Źródło | `https://nssdc.gsfc.nasa.gov/planetary/factsheet/` — NASA NSSDCA Planetary Fact Sheet, domena publiczna (praca rządu USA) |
-| Odcisk payloadu | `2296fa16` (literał, nie wyliczenie — D-014) |
-| Pasmo | ±0,5%, prerejestrowane przed odczytaniem obserwacji |
+1. Odczytano log joba przez GitHub MCP (`get_job_logs`) — job "Kepler anchor
+   — pinned NASA NSSDCA Solar System fact sheet" ma krok DIAGNOSTIC, który
+   robi `cat` na przypiętym pliku HTML wprost do logu.
+2. Odtworzono treść pliku z logu (usunięcie prefiksów znacznika czasu z
+   każdej linii), i policzono SHA-256 odtworzonego pliku.
+3. Odtworzony hash (`42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c`,
+   14363 B) zgadza się DOKŁADNIE z hashem, który sam skrypt fetchujący
+   wypisał w tym samym logu PODCZAS pobierania, ORAZ z hashem z osobnego,
+   niezależnego kroku weryfikacyjnego tego samego joba (odczyt pliku z dysku
+   i ponowne liczenie sumy) — TRZY niezależne obliczenia tej samej sumy,
+   wszystkie zgodne. To jest dowód bajtowej identyczności: odzyskana treść
+   jest tym, co runner naprawdę pobrał z `nssdc.gsfc.nasa.gov`, a nie czymś
+   przepisanym ręcznie.
 
-**Realny wynik, wykonany, nie założony.**
+```bash
+$ python3 -c "import hashlib; print(hashlib.sha256(open('packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html','rb').read()).hexdigest())"
+42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c
 ```
-predicted = 0.615109979562335 roku
-observed  = 0.6151950718685831 roku  (224.7 / 365.25)
-|diff|    = 0.0000851 roku (0.014%), wewnątrz pasma ±0,5%
-verdict   = SUPPORTED_WITHIN_PROTOCOL
-tautology = EMPIRICAL_TEST (obserwacja: independent-measurement; predykcja: hypothesis-parameter)
-belief    = 0.500 → 0.814 (SUPPORTED_WITHIN_PROTOCOL)
-replay    = MATCH
+
+Plik jest w repo dosłownie:
+`packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html`.
+
+### Kotwica: co porównuje i skąd pochodzi każda strona
+
+| | Wartość | Skąd |
+|---|---|---|
+| **Predykcja Genesis** | 687.2335878355307 dni | REALNY `universe-kepler` (`orbitalGraph.ts`, III prawo Keplera) na odległości Marsa (228.0 ×10⁶ km → 1.5240858638772057 AU) odczytanej z przypiętej strony NASA |
+| **Obserwacja zewnętrzna** | 687.0 dni | odczytana z tej samej strony, ale z INNEGO wiersza tabeli ("Orbital Period"), nigdy z tego, co czyta predykcja ("Distance from Sun") |
+| **Pasmo** | ±0,344 dnia (0,05%) | z rozdzielczości publikacji NASA (4 cyfry znaczące odległości, propagowane przez wykładnik 3/2 III prawa Keplera) + zaokrąglenia okresu — PREREJESTROWANE w deklaracji kotwicy |
+| **Werdykt** | `SUPPORTED_WITHIN_PROTOCOL` | istniejące `verifyPredictionAgainstRealExperiment`; realna rozbieżność 0,234 dnia mieści się w paśmie |
+| **Tautology Gate** | `EMPIRICAL_TEST` | `assessSingleTautology`: obserwacja zadeklarowana `independent-measurement`, predykcja `hypothesis-parameter` z realnego wyniku `universe-kepler` — nigdy `CONSISTENCY_CHECK` |
+| **Odcisk werdyktu** | `prediction-verification_7530a91a` | istniejące `predictionVerificationFingerprint` |
+| **Replay** | `MATCH` | porównanie POWTÓRZONE z przypiętego payloadu |
+
+### Tautology Gate wpięty w OBIE kotwice, nie tylko w Kepler
+
+Audyt (commit `d2af93cf`) stwierdził wprost: „`runExternalAnchor` currently
+has NO Tautology Gate wiring". Zamknięte dla całego kontraktu, nie tylko
+nowej kotwicy: `ExternalAnchor` ma teraz pole `tautologyDerivation`
+(predykcja + obserwacja, `ObservableDerivation`), a `runExternalAnchor`
+liczy `assessSingleTautology` i dodaje `tautologyAssessment` do
+`AnchorRunResult`. Obie kotwice (PubChem i Kepler/Mars) klasyfikują się jako
+`EMPIRICAL_TEST` — dowód w teście `keplerExternalAnchor.test.ts` describe
+`'Tautology Gate wpięta w OBIE kotwice (nie tylko Kepler)'`.
+
+### Testy (14 nowych + 11 istniejących = 25/25), TDD
+
+```bash
+$ npx vitest run src/__tests__/keplerExternalAnchor.test.ts   # przed implementacją
+ FAIL  ... 13 failed | 1 passed (14)   — brak KEPLER_MARS_ANCHOR_ID, tautologyDerivation, tautologyAssessment
+
+$ npx vitest run src/__tests__/keplerExternalAnchor.test.ts src/__tests__/externalObservationAnchor.test.ts   # po
+ Test Files  2 passed (2) | Tests  25 passed (25)
 ```
-Falsyfikacja realna zweryfikowana przez `predictedValueOverride: 5.0` →
-`FALSIFIED_WITHIN_PROTOCOL`, przekonanie spada poniżej 0,500.
 
-**Rozszerzenie kontraktu — addytywne, zero zmiany zachowania pierwszej
-kotwicy.** `ExternalAnchor` zyskuje opcjonalne `predictionDerivation`/
-`observationDerivation` (`tautologyGate.ts`) i wymagane `predictionSourceLabel`
-(naprawia sztywny tekst UI „ze wzoru molekularnego", który nie generalizował
-się na kotwicę spoza chemii). `AnchorRunResult` zyskuje `tautologyAssessment`
-(`null` dla pierwszej kotwicy — potwierdzone testem), `belief`
-(`beliefRevision.ts::createHypothesis`/`updateConfidence`, czysta funkcja,
-nierejestrowana między wywołaniami — deterministyczny replay bez zapisu do
-Science Memory) i `nextQuestion`.
+Co pokrywają nowe testy, poza „przechodzi": odmowa przy zmienionym payloadzie
+HTML (na LITERALE odcisku `2296fa16`); predykcja liczona z odległości przez
+REALNY `universe-kepler`, nigdy z okresu; run oznaczony `REFERENCE` z
+cytatem ze zbioru; `EMPIRICAL_TEST` nigdy `CONSISTENCY_CHECK`; realna
+falsyfikacja (predykcja 700.0 → `FALSIFIED_WITHIN_PROTOCOL`); replay `MATCH`
+i wykrywalny dryf; run `SIMULATED` odrzucony; obie kotwice mają jawną
+derywację Tautology Gate.
 
-**Testy: 23/23 zielone** (`externalObservationAnchor.test.ts`, 10 nowych:
-niezależność ekstrakcji predykcja/obserwacja, literalny odcisk, odmowa przy
-manipulacji surowego HTML-a, pełny cykl SUPPORTED, falsyfikacja, replay
-MATCH+drift, klasyfikacja Tautology Gate, addytywność dla starej kotwicy,
-rewizja przekonania w obie strony, „next question" różne dla SUPPORTED/
-FALSIFIED).
+### Dowód wizualny — Chromium, `#/evidence`, DWIE kotwice, zero błędów runtime
 
-**Dowód wizualny — realny Chromium, `#/evidence`, desktop + mobile, zero
-`pageerror`/`console.error`.** Nowy `scripts/evidence-anchor-e2e.mjs`
-potwierdza: obie kotwice renderują się (regresja pierwszej wykluczona),
-werdykt Kepler+Wenus = SUPPORTED_WITHIN_PROTOCOL z opisem źródła predykcji,
-Tautology Gate = EMPIRICAL_TEST, rewizja przekonania od 0,500, replay MATCH,
-prowieniencja pokazuje `nssdc.gsfc.nasa.gov` i odcisk `2296fa16`, a „co
-pozostaje nieprzetestowane" wprost nazywa precesję Merkurego jako granicę
-modelu.
+Realny przebieg w przeglądarce (zrzut ekranu wysłany osobno): obie sekcje
+`ecs-external-anchor-*` renderują się przez wspólną pętlę
+(`ExternalAnchorsSection`, C3'a wcześniejsza generalizacja), każda z pełnym
+łańcuchem — werdykt, Tautology Gate, prowieniencja, replay, „czego to NIE
+dowodzi". `CONSOLE_ERRORS: []`.
 
-**Skutek dla R-005.** ZWĘŻONE DALEJ — to jest PIERWSZA prawdziwie
-EMPIRYCZNA kotwica w repo (Tautology Gate = `EMPIRICAL_TEST`, nie
-`CONSISTENCY_CHECK`): zgodność potwierdza rzeczywistą hipotezę fizyczną
-(Kepler III dla realnego ciała), nie tylko spójność dwóch niezależnie
-utrzymywanych tablic, jak przy PubChem. Pełny opis decyzji i drogi:
-`docs/DECISIONS.md`, `docs/RISKS.md` (R-005), `docs/MASTER_PRIORITY_GENESIS.md`.
+### `scripts/repro-demo.mjs` — 16/16 (było 12/12)
 
-**Co NADAL pozostaje otwarte.** Brak ingestion publicznego API na żywo (dane
-przypięte przez CI-fetch, nie pobierane w czasie rzeczywistym) — to samo
-ograniczenie środowiska co przy pierwszej kotwicy. Testuje JEDNO ciało
-(Wenus) na niemal kołowej orbicie; nie testuje modelu pod silną perturbacją
-ani korektą relatywistyczną — nazwane wprost w `whatRemainsUntested` kotwicy,
-nie przemilczane. Ten sam pinowany payload zawiera dane wszystkich ośmiu
-planet i Księżyca — konkretny, wykonalny „next question" dla kolejnej,
-osobnej kotwicy, świadomie poza zakresem tego zadania.
+```bash
+$ node scripts/repro-demo.mjs
+  OK    P2.3 kotwica (Kepler/Mars): werdykt          SUPPORTED_WITHIN_PROTOCOL (oczekiwane SUPPORTED_WITHIN_PROTOCOL)
+  OK    P2.3 kotwica (Kepler/Mars): obserwacja zewnętrzna 687 days, pochodzenie REFERENCE (oczekiwane 687 / REFERENCE)
+  OK    P2.3 kotwica (Kepler/Mars): predykcja Genesis (universe-kepler) 687.2335878355307 days (oczekiwane 687.2335878355307)
+  OK    P2.3 kotwica (Kepler/Mars): odcisk, replay, Tautology Gate prediction-verification_7530a91a / MATCH / EMPIRICAL_TEST (...)
+  WYNIK: 16/16 zgodne z wartościami oczekiwanymi w repo.
+```
+
+Przy okazji naprawiony drobny, niezwiązany z Keplerem, ale sąsiadujący
+defekt: `GENESIS_KEPLER_FIXTURE_DIR` (używany przez
+`fetch-kepler-solar-system-fixture.mjs`, dodany w commicie `d2af93cf`) nie
+był udokumentowany w `.env.example`, więc P0.4 raportował 1 rozbieżność
+niezwiązaną z tym zadaniem — dodano jedną linię.
+
+### CO TA KOTWICA POZOSTAWIA NIEPRZETESTOWANE
+
+Renderowane na ekranie z tą samą wagą wizualną co werdykt: „To NIE jest
+pomiar wykonany przez Genesis — obie liczby (odległość i okres) są wzięte z
+publikacji NASA, nie zmierzone tym systemem. Kotwica weryfikuje, czy nasza
+implementacja III prawa Keplera odtwarza publicznie znaną relację między
+dwiema NIEZALEŻNIE zmierzonymi wielkościami — nie testuje samego prawa
+fizycznego ani nie odkrywa niczego o Marsie. Nie testuje perturbacji od
+innych planet (przybliżenie dwóch ciał) ani ekscentryczności orbity ponad to,
+co już zawiera się w użyciu półosi wielkiej."
+
+### Pełna weryfikacja
+
+```
+tsc --noEmit                     czysto
+eslint src --max-warnings=0      czysto
+vitest run (frontend)            470 plików, 5215 passed / 1 znany niezwiązany flake (nextActionSelectors.test.ts,
+                                  potwierdzony jako flake: zielony osobno) / 1 znany niezwiązany skip
+npm test (backend)                396/396 passed
+npm run build                    czysto
+node scripts/repro-demo.mjs      16/16
+```
+
+### Dodatek (2026-09-12, C1): dwie sesje trafiły w to samo rozwiązanie równolegle — belief revision + next question dołożone na kanonicznej implementacji
+
+Ta sesja (C1) dostała identyczne zadanie i doszła do IDENTYCZNEGO wniosku
+niezależnie, w tym samym czasie: ten sam plik NASA NSSDCA, ten sam powód
+unikania NASA Exoplanet Archive (ryzyko cyrkularności `pl_orbsmax`
+wyliczanego z `pl_orbper`), ten sam wzorzec CI-fetch-pin. C1 miał gotową,
+równoważną kotwicę Kepler/Wenus na tym samym pinowanym pliku (wynik:
+`predicted = 0.615109979562335` roku, `observed = 0.6151950718685831` roku,
+różnica 0,014%, `SUPPORTED_WITHIN_PROTOCOL`) — po `git fetch` i porównaniu z
+sekcją powyżej, C1 odrzucił własną implementację zamiast wypychać drugą,
+konkurencyjną kotwicę Keplera (dokładnie to, czego zadanie miało unikać:
+„jeśli zadanie Keplera jest już zrobione przez C3, NIE duplikuj go").
+
+Jedyne, czego kanoniczna implementacja (Mars, opisana powyżej) NIE miała, a
+czego wymagało zadanie: rewizja przekonania (belief revision) i konkretne
+„next question" po każdym przebiegu kotwicy — punkty z pętli PROBLEM → ... →
+BELIEF REVISION → NEXT QUESTION. C1 dołożył to GENERYCZNIE do
+`runExternalAnchor`, dla OBU zadeklarowanych kotwic (PubChem i Kepler/Mars),
+zamiast jako część trzeciej, zbędnej kotwicy:
+
+- `AnchorRunResult.belief: { before: number; after: number; status }` —
+  świeża hipoteza (`beliefRevision.ts::createHypothesis`, prior 0,5) za
+  każdym wywołaniem, zaktualizowana `updateConfidence` na podstawie
+  werdyktu i wielkości zgodności (`evidenceMagnitudeWithinTolerance`),
+  z ruchem OGRANICZONYM sufitem Tautology Gate (`evidenceCeiling`) — dla
+  `CONSISTENCY_CHECK`/`UNTESTABLE` sufit wynosi 0, więc żaden werdykt bez
+  prawdziwie niezależnej obserwacji nie mógłby fałszywie podnieść pewności.
+  Realny wynik: PubChem 0,500→0,817, Kepler/Mars 0,500→0,618 (oba
+  `SUPPORTED_WITHIN_PROTOCOL`, zweryfikowane w `scripts/repro-demo.mjs`).
+- `AnchorRunResult.nextQuestion: string` — tekstowa propozycja, inna dla
+  SUPPORTED (zbadać przypadek, który napina własną, zadeklarowaną granicę
+  kotwicy) niż dla FALSIFIED (zbadać jednostki/stałą/pasmo, zanim wyciągnie
+  się wniosek o modelu) niż dla INCONCLUSIVE (rozwiązać niejednoznaczność
+  danych najpierw).
+
+**Testy: 28/28 zielone** (`externalObservationAnchor.test.ts` 14/14 +
+`keplerExternalAnchor.test.ts` 14/14): rewizja przekonania w obie strony (dla
+KAŻDEJ zadeklarowanej kotwicy, pętlą po `EXTERNAL_ANCHORS`, nie osobnym
+testem per kotwica), „next question" różne dla SUPPORTED/FALSIFIED, ruch
+przekonania faktycznie ograniczony przez `evidenceCeiling`.
+
+`scripts/repro-demo.mjs` rozszerzony o dwa nowe czeki (rewizja przekonania +
+next question, dla obu kotwic) — **18/18 zielone**, realnie wykonane:
+
+```
+OK  P2.3 kotwica (PubChem): rewizja przekonania, next question       przekonanie 0.5→0.817
+OK  P2.3 kotwica (Kepler/Mars): rewizja przekonania, next question   przekonanie 0.5→0.618
+WYNIK: 18/18 zgodne z wartościami oczekiwanymi w repo.
+```
+
+**Skutek dla R-005 (aktualizacja).** Kotwica Kepler/Mars (sekcja powyżej)
+pozostaje PIERWSZĄ prawdziwie EMPIRYCZNĄ kotwicą w repo. Ten dodatek nie
+zmienia tego werdyktu naukowego — domyka wyłącznie brakujące ogniwo pętli
+odkrycia (rewizja przekonania, następne pytanie), którego zadanie
+wymagało, a żadna z dwóch równoległych implementacji jeszcze nie miała.
+Pełny opis reużytej kotwicy i decyzji o odrzuceniu duplikatu: `docs/RISKS.md`
+(R-005), `docs/DECISIONS.md`.

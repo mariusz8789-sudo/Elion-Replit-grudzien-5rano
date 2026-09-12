@@ -50,6 +50,16 @@ const EXPECTED = {
   anchorOrigin: 'REFERENCE',
   anchorReplay: 'MATCH',
   anchorFingerprint: 'prediction-verification_c5c0af94',
+  anchorTautology: 'EMPIRICAL_TEST',
+  anchorBeliefBefore: 0.5,
+  keplerAssessment: 'SUPPORTED_WITHIN_PROTOCOL',
+  keplerObserved: 687.0,
+  keplerPredicted: 687.2335878355307,
+  keplerOrigin: 'REFERENCE',
+  keplerReplay: 'MATCH',
+  keplerFingerprint: 'prediction-verification_7530a91a',
+  keplerTautology: 'EMPIRICAL_TEST',
+  keplerBeliefBefore: 0.5,
   qe3Rounds: 2,
   qe3Probes: [1, 0],
   qe3Surviving: ['h:a-0.4'],
@@ -117,33 +127,48 @@ record('P0.4 kontrakt .env', envMissing.length === 0, `${envUsed.size} zmiennych
 // --- 5 i 6. Warstwa naukowa (TypeScript, bundlowana na czas uruchomienia) ----
 const bundleDir = mkdtempSync(path.join(tmpdir(), 'genesis-repro-bundle-'));
 let anchor;
+let keplerAnchor;
 let qe3;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
     path.join(REPO, 'packages/frontend/src/core/repro/reproEntry.node.ts'),
-    '--bundle', '--format=esm', '--platform=node', '--target=node22', '--log-level=error',
-    // externalAnchor.ts pulls in the Kepler anchor's pinned HTML fixture via
-    // Vite's `?raw` import convention; esbuild (used standalone here, not
-    // through Vite) needs its own loader told to treat `.html` as raw text
-    // to match that semantic, or bundling fails outright.
+    '--bundle', '--format=esm', '--platform=node', '--target=node22', '--log-level=error', `--outfile=${out}`,
+    // Kotwica Kepler/Mars importuje przypiętą stronę NASA jako surowy tekst
+    // (Vite `?raw`, jak w przeglądarce) — esbuild potrzebuje tego jawnie.
     '--loader:.html=text',
-    `--outfile=${out}`,
   ], { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'] });
   const science = await import(out);
-  anchor = science.reproExternalAnchor();
+  anchor = science.reproExternalAnchor(science.MOLECULAR_WEIGHT_ANCHOR_ID);
+  keplerAnchor = science.reproExternalAnchor(science.KEPLER_MARS_ANCHOR_ID);
   qe3 = science.reproQe3Inquiry();
 } finally {
   rmSync(bundleDir, { recursive: true, force: true });
 }
 
-record('P2.3 kotwica: werdykt', anchor.assessment === EXPECTED.anchorAssessment, `${anchor.assessment} (oczekiwane ${EXPECTED.anchorAssessment})`);
-record('P2.3 kotwica: obserwacja zewnętrzna', anchor.observedValue === EXPECTED.anchorObserved && anchor.observationOrigin === EXPECTED.anchorOrigin,
+record('P2.3 kotwica (PubChem): werdykt', anchor.assessment === EXPECTED.anchorAssessment, `${anchor.assessment} (oczekiwane ${EXPECTED.anchorAssessment})`);
+record('P2.3 kotwica (PubChem): obserwacja zewnętrzna', anchor.observedValue === EXPECTED.anchorObserved && anchor.observationOrigin === EXPECTED.anchorOrigin,
   `${anchor.observedValue} g/mol, pochodzenie ${anchor.observationOrigin} (oczekiwane ${EXPECTED.anchorObserved} / ${EXPECTED.anchorOrigin})`);
-record('P2.3 kotwica: predykcja Genesis', Math.abs(anchor.predictedValue - EXPECTED.anchorPredicted) < 1e-9,
+record('P2.3 kotwica (PubChem): predykcja Genesis', Math.abs(anchor.predictedValue - EXPECTED.anchorPredicted) < 1e-9,
   `${anchor.predictedValue} g/mol (oczekiwane ${EXPECTED.anchorPredicted})`);
-record('P2.3 kotwica: odcisk i replay', anchor.verificationFingerprint === EXPECTED.anchorFingerprint && anchor.replay === EXPECTED.anchorReplay,
-  `${anchor.verificationFingerprint} / ${anchor.replay} (oczekiwane ${EXPECTED.anchorFingerprint} / ${EXPECTED.anchorReplay})`);
+record('P2.3 kotwica (PubChem): odcisk, replay, Tautology Gate',
+  anchor.verificationFingerprint === EXPECTED.anchorFingerprint && anchor.replay === EXPECTED.anchorReplay && anchor.tautologyClassification === EXPECTED.anchorTautology,
+  `${anchor.verificationFingerprint} / ${anchor.replay} / ${anchor.tautologyClassification} (oczekiwane ${EXPECTED.anchorFingerprint} / ${EXPECTED.anchorReplay} / ${EXPECTED.anchorTautology})`);
+record('P2.3 kotwica (PubChem): rewizja przekonania, next question',
+  anchor.beliefBefore === EXPECTED.anchorBeliefBefore && anchor.beliefAfter > anchor.beliefBefore && anchor.nextQuestion.length > 20,
+  `przekonanie ${anchor.beliefBefore}→${anchor.beliefAfter.toFixed(3)} (oczekiwane start ${EXPECTED.anchorBeliefBefore}, wzrost bo SUPPORTED); "${anchor.nextQuestion.slice(0, 60)}..."`);
+
+record('P2.3 kotwica (Kepler/Mars): werdykt', keplerAnchor.assessment === EXPECTED.keplerAssessment, `${keplerAnchor.assessment} (oczekiwane ${EXPECTED.keplerAssessment})`);
+record('P2.3 kotwica (Kepler/Mars): obserwacja zewnętrzna', keplerAnchor.observedValue === EXPECTED.keplerObserved && keplerAnchor.observationOrigin === EXPECTED.keplerOrigin,
+  `${keplerAnchor.observedValue} days, pochodzenie ${keplerAnchor.observationOrigin} (oczekiwane ${EXPECTED.keplerObserved} / ${EXPECTED.keplerOrigin})`);
+record('P2.3 kotwica (Kepler/Mars): predykcja Genesis (universe-kepler)', Math.abs(keplerAnchor.predictedValue - EXPECTED.keplerPredicted) < 1e-9,
+  `${keplerAnchor.predictedValue} days (oczekiwane ${EXPECTED.keplerPredicted})`);
+record('P2.3 kotwica (Kepler/Mars): odcisk, replay, Tautology Gate',
+  keplerAnchor.verificationFingerprint === EXPECTED.keplerFingerprint && keplerAnchor.replay === EXPECTED.keplerReplay && keplerAnchor.tautologyClassification === EXPECTED.keplerTautology,
+  `${keplerAnchor.verificationFingerprint} / ${keplerAnchor.replay} / ${keplerAnchor.tautologyClassification} (oczekiwane ${EXPECTED.keplerFingerprint} / ${EXPECTED.keplerReplay} / ${EXPECTED.keplerTautology})`);
+record('P2.3 kotwica (Kepler/Mars): rewizja przekonania, next question',
+  keplerAnchor.beliefBefore === EXPECTED.keplerBeliefBefore && keplerAnchor.beliefAfter > keplerAnchor.beliefBefore && keplerAnchor.nextQuestion.length > 20,
+  `przekonanie ${keplerAnchor.beliefBefore}→${keplerAnchor.beliefAfter.toFixed(3)} (oczekiwane start ${EXPECTED.keplerBeliefBefore}, wzrost bo SUPPORTED); "${keplerAnchor.nextQuestion.slice(0, 60)}..."`);
 
 record('QE3 dochodzenie: przebieg', qe3.rounds === EXPECTED.qe3Rounds && eq(qe3.probes, EXPECTED.qe3Probes),
   `${qe3.rounds} rundy, sondy whiteNoise=[${qe3.probes.join(', ')}] (oczekiwane ${EXPECTED.qe3Rounds} / [${EXPECTED.qe3Probes.join(', ')}])`);
@@ -156,14 +181,17 @@ record('QE3 dochodzenie: prowieniencja', qe3.dataProvenance === EXPECTED.qe3Prov
 const failed = checks.filter((c) => !c.ok);
 
 if (UPDATE_MODE) {
-  console.log(JSON.stringify({ anchor, qe3 }, null, 2));
+  console.log(JSON.stringify({ anchor, keplerAnchor, qe3 }, null, 2));
 } else if (JSON_MODE) {
-  console.log(JSON.stringify({ commit: build.commit, node: runtime.version, checks, anchor, qe3, ok: failed.length === 0 }, null, 2));
+  console.log(JSON.stringify({ commit: build.commit, node: runtime.version, checks, anchor, keplerAnchor, qe3, ok: failed.length === 0 }, null, 2));
 } else {
   console.log(`\nGENESIS OS — PAKIET ODTWARZALNOŚCI`);
   console.log(`commit ${build.commit} (${build.commitSource}) · node ${runtime.version}\n`);
-  for (const c of checks) console.log(`  ${c.ok ? 'OK  ' : 'FAIL'}  ${c.name.padEnd(34)} ${c.detail}`);
-  console.log(`\n  Kotwica zewnętrzna — czego NIE dowodzi:\n  ${anchor.whatRemainsUntested}`);
+  for (const c of checks) console.log(`  ${c.ok ? 'OK  ' : 'FAIL'}  ${c.name.padEnd(44)} ${c.detail}`);
+  console.log(`\n  Kotwica PubChem — czego NIE dowodzi:\n  ${anchor.whatRemainsUntested}`);
+  console.log(`\n  Kotwica PubChem — next question:\n  ${anchor.nextQuestion}`);
+  console.log(`\n  Kotwica Kepler/Mars — czego NIE dowodzi:\n  ${keplerAnchor.whatRemainsUntested}`);
+  console.log(`\n  Kotwica Kepler/Mars — next question:\n  ${keplerAnchor.nextQuestion}`);
   console.log(`\n  ${failed.length === 0 ? `WYNIK: ${checks.length}/${checks.length} zgodne z wartościami oczekiwanymi w repo.` : `WYNIK: ${failed.length} rozbieżności — ${failed.map((f) => f.name).join('; ')}`}\n`);
 }
 

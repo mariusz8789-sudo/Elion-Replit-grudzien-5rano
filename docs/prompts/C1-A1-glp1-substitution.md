@@ -97,14 +97,11 @@ przejść — bez nich test „SUPPORTED" nic nie znaczy (dokładnie lekcja z fa
 
 ---
 
-## B1 (ULEZ/polityka publiczna) — ŚWIADOMIE ODROCZONE, NIE przypisane
+## B1 (ULEZ/polityka publiczna) — JUŻ NIE ODROCZONE, przypisane w osobnym prompcie
 
-Drugi pakiet Qwena (`GOVERNMENT_POLICY_REAL_DATASET_AND_EXPERIMENT.md`, ULEZ→NO₂) wymaga NOWEGO
-prymitywu statystycznego, którego Genesis nie ma: estymator difference-in-differences/synthetic
-control z klastrowanymi błędami standardowymi. To jest realny nowy silnik, nie wąska funkcja —
-sprzeczne z zasadą „zero nowych silników" bez jawnej decyzji. **Nie zaczynaj tego zadania**, dopóki
-ktoś (użytkownik) nie zdecyduje jawnie, że warto zbudować ten prymityw jako osobną, nazwaną
-infrastrukturę (analogiczną do `beliefRevision.ts` czy `tautologyGate.ts` — zaprojektowaną raz,
-reużywalną, nie jednorazowym hackiem pod ULEZ). Jeśli użytkownik o to zapyta: odpowiedź to
-„zaprojektujmy `causalInference.ts` jako nowy, ogólny moduł najpierw, osobnym zadaniem" — nie
-wciśnięty DiD wewnątrz jednego zadania.
+Użytkownik podjął dokładnie tę decyzję, na którą czekała ta sekcja: budować
+`causalInference.ts` jako nowy, ogólny, reużywalny moduł (analogiczny do `beliefRevision.ts`/
+`tautologyGate.ts`), osobnym zadaniem, nie jako jednorazowy hack wciśnięty pod ULEZ. Pełny
+prompt: `docs/prompts/C1-B1-ulez-no2-adjudication.md`, pakiet badawczy Qwena zapisany dosłownie
+w `docs/B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md`. Zaczynać PO zamknięciu CMS
+Z→μμ i tego zadania (A1) — kolejność z `docs/prompts/README.md`.

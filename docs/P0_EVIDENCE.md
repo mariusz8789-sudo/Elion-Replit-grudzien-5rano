@@ -332,8 +332,21 @@ $ git grep -nIE 'ANTHROPIC_API_KEY\s*[=:]\s*["'"'"']?[A-Za-z0-9_-]{12,}' $(git r
 
 $ git grep -nIE '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{30,}|glpat-…|xox[baprs]-…|AIza…)' -- .
   (pusto w drzewie)
-$ # ten sam skan po blobach 400 commitów historii
+$ # ten sam skan po blobach pierwszych 400 commitów historii (pierwszy przebieg)
   (pusto)
+```
+
+**Uzupełnione później, na CAŁEJ historii, nie tylko pierwszych 400** (przy
+pisaniu `GRANT_READINESS_REPORT.md` — precyzja dowodu ma znaczenie dla
+komisji, więc dopełniono, zamiast zostawić lukę w zasięgu):
+
+```bash
+$ git rev-list --all | wc -l
+1911
+$ time git rev-list --all | xargs -P4 -n50 git grep -lIE \
+    '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,})'
+real 3m2s
+(pusto — zero trafień na WSZYSTKICH 1911 commitach)
 ```
 
 **Wniosek: zero rotacji.** Nie ma czego rotować — i to jest twierdzenie z

@@ -72,7 +72,23 @@ export interface ExternalAnchor {
   readonly sourceVersion: string;
   readonly retrievedAt: string;
   readonly license: string;
-  /** Odcisk przypiętego payloadu. Niezgodność = ODMOWA, nie ostrzeżenie. */
+  /**
+   * Odcisk przypiętego payloadu — **literał zapisany w źródle**, nie liczony z
+   * payloadu przy ładowaniu modułu.
+   *
+   * Pierwsza wersja tego modułu liczyła go jako
+   * `payloadDigest: anchorPayloadDigest(anchor.payload)` w deklaracji
+   * `EXTERNAL_ANCHORS` — czyli suma kontrolna ZAWSZE zgadzała się z tym, co
+   * było w pliku, i nie mogła wykryć niczego. Test jednostkowy tego nie złapał,
+   * bo konstruował obiekt „podmieniony" z nowym payloadem i STARYM odciskiem,
+   * więc sprawdzał mechanizm, który w produkcji był pozorny. Złapało to dopiero
+   * WYKONANIE realnego scenariusza dryfu (`scripts/repro-demo.mjs` po cichej
+   * edycji `MolecularWeight` na 999.99): zgłosiło rozbieżność wartości, ale
+   * kotwica NIE odmówiła — bo odcisk przeliczył się razem z podmianą.
+   *
+   * Dlatego jest literałem. Edycja przypiętego payloadu rozjeżdża go z tym
+   * napisem i kotwica ODMAWIA.
+   */
   readonly payloadDigest: string;
   /** Nazwa mierzonej wielkości — ta sama po stronie predykcji i obserwacji. */
   readonly metric: string;
@@ -115,7 +131,9 @@ const molecularWeightAnchor: ExternalAnchor = {
   retrievedAt: PUBCHEM_CID_2519_RETRIEVED_AT,
   // PubChem to domena publiczna USA (NCBI/NLM); przypięcie próbki jest dozwolone.
   license: 'Public domain (U.S. NCBI/NLM PubChem)',
-  payloadDigest: '',
+  // Literał, nie wyliczenie — patrz komentarz przy `payloadDigest` w interfejsie.
+  // Po ŚWIADOMEJ aktualizacji zbioru przelicz: `node scripts/repro-demo.mjs --update`.
+  payloadDigest: '470de276',
   metric: 'molecularWeightGramsPerMole',
   unit: 'g/mol',
   // 0,5% — z konwencji, nie z gustu: PubChem publikuje masę zaokrągloną do
@@ -147,9 +165,7 @@ const molecularWeightAnchor: ExternalAnchor = {
 };
 
 /** Zadeklarowane kotwice. Każda z prowieniencją i z jawnym „co zostaje nieprzetestowane". */
-export const EXTERNAL_ANCHORS: readonly ExternalAnchor[] = [
-  { ...molecularWeightAnchor, payloadDigest: anchorPayloadDigest(molecularWeightAnchor.payload) },
-];
+export const EXTERNAL_ANCHORS: readonly ExternalAnchor[] = [molecularWeightAnchor];
 
 export type AnchorResolution =
   | { readonly ok: true; readonly observedValue: number; readonly unit: string }

@@ -47,6 +47,20 @@ describe('kotwica jest zadeklarowana z pełną prowieniencją, nie z pola teksto
     }
   });
 
+  /**
+   * REGRESJA. Pierwsza wersja modułu liczyła `payloadDigest` z payloadu przy
+   * ładowaniu (`{ ...anchor, payloadDigest: anchorPayloadDigest(anchor.payload) }`),
+   * więc suma kontrolna ZAWSZE się zgadzała i nie mogła wykryć niczego. Test
+   * powyżej tego nie łapał, bo porównywał wyliczenie z wyliczeniem. Łapie to
+   * dopiero asercja na LITERAŁ: gdy ktoś edytuje przypięty JSON, ten test
+   * czerwienieje i zmusza do świadomej aktualizacji, zamiast cicho przyjąć nową
+   * wartość jako „zewnętrzną obserwację".
+   */
+  it('zadeklarowany odcisk jest LITERAŁEM w źródle, a nie wyliczeniem z payloadu', () => {
+    const anchor = EXTERNAL_ANCHORS.find((a) => a.id === MOLECULAR_WEIGHT_ANCHOR_ID)!;
+    expect(anchor.payloadDigest).toBe('470de276');
+  });
+
   it('ODMAWIA, gdy przypięty payload został zmieniony — to jest cała wartość sumy kontrolnej', () => {
     const anchor = EXTERNAL_ANCHORS.find((a) => a.id === MOLECULAR_WEIGHT_ANCHOR_ID)!;
     type Tamperable = { PropertyTable: { Properties: Array<{ MolecularWeight: string }> } };

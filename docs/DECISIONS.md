@@ -239,3 +239,39 @@ grantowa to ta publiczność. Nowy ekran dodałby powierzchnię bez odbiorcy.
 coś jest w Pamięci Naukowej, więc na świeżej przeglądarce jest pusta. Kotwica
 jest przypięta w repo, więc jest widoczna ZAWSZE — recenzent otwierający
 `#/evidence` bez żadnych zapisanych danych i tak widzi pełny łańcuch.
+
+---
+
+## D-014 (2026-09-12, P2.3/P3.2) — Odcisk payloadu jest LITERAŁEM, nie wyliczeniem
+
+**Decyzja.** `ExternalAnchor.payloadDigest` to napis zapisany w źródle.
+
+**Dlaczego — to jest opis realnego błędu, który sam popełniłem.** Pierwsza
+wersja deklarowała kotwice tak:
+
+```ts
+export const EXTERNAL_ANCHORS = [
+  { ...molecularWeightAnchor, payloadDigest: anchorPayloadDigest(molecularWeightAnchor.payload) },
+];
+```
+
+Odcisk był więc liczony Z PAYLOADU przy ładowaniu modułu — czyli **zawsze się
+zgadzał** i nie mógł wykryć niczego. Suma kontrolna była pozorna.
+
+**Czego nie złapał test, a co złapało wykonanie.** Test jednostkowy
+„ODMAWIA, gdy payload został zmieniony" przechodził, bo konstruował obiekt z
+NOWYM payloadem i STARYM odciskiem — sprawdzał mechanizm, który w produkcji był
+martwy. Złapał to dopiero realny scenariusz dryfu uruchomiony przez
+`scripts/repro-demo.mjs`: po cichej edycji `MolecularWeight` na `999.99`
+skrypt zgłosił rozbieżność WARTOŚCI, ale kotwica **nie odmówiła** — bo odcisk
+przeliczył się razem z podmianą.
+
+**Co z tego wynika metodologicznie.** Test, który porównuje wyliczenie z
+wyliczeniem, nie sprawdza niczego. Dlatego doszła asercja na LITERAŁ
+(`expect(anchor.payloadDigest).toBe('470de276')`) — edycja przypiętego JSON-a
+czerwieni test i wymusza świadomą decyzję, zamiast cicho przyjąć nową wartość
+jako „zewnętrzną obserwację".
+
+**Koszt przyjęty świadomie.** Aktualizacja zbioru wymaga zmiany w TRZECH
+miejscach (odcisk, `EXPECTED` w skrypcie, asercja w teście). To jest cena za to,
+że obserwacja zewnętrzna nie zmienia się przez przypadek.

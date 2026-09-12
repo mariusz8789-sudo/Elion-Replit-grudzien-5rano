@@ -116,6 +116,7 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // backend side of the boundary. They are unreachable from main.tsx BY
   // DESIGN — reaching them from the browser bundle would be the bug.
   'core/compute/serverEntry.ts': 'Node-side entry point; never imported by the browser bundle.',
+  'core/repro/reproEntry.node.ts': 'Node-side facade for scripts/repro-demo.mjs (P3.2 one-command reproducibility pack); bundled by esbuild --platform=node and never imported by the browser bundle. It computes nothing of its own -- it calls runExternalAnchor and runAutonomousInquiry and returns what they returned.',
   'core/discovery/molecular/compoundLookupTransport.node.ts': 'Node-side transport; the browser uses the HTTP path.',
   'core/discovery/molecular/rdkitTransport.node.ts': 'Node-side RDKit transport; the browser uses the HTTP path.',
 

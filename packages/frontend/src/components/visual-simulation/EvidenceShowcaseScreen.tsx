@@ -7,6 +7,8 @@ import {
   type CaseStudy, type CaseStudyReplay,
 } from './evidenceShowcase';
 import { EXTERNAL_ANCHORS, runExternalAnchor, type ExternalAnchor } from '../../core/biotechData/externalAnchor';
+import type { ExternalDatasetCase } from '../../core/agent/externalDatasetCase';
+import { buildQe4EvidenceCase } from '../../core/biotechData/qe4EvidenceCase';
 
 /**
  * EVIDENCE & REPLAY SHOWCASE (C2, "Evidence & Replay as a product" directive).
@@ -131,6 +133,84 @@ function ExternalAnchorsSection() {
     <>
       {EXTERNAL_ANCHORS.map((anchor) => (
         <ExternalAnchorCard key={anchor.id} anchor={anchor} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * MULTI-HYPOTHESIS EXTERNAL DATASET CASE (QE4 architecture-integration
+ * round) — one external dataset that yields SEVERAL independent, co-equal
+ * hypothesis verdicts, none demoted to "supporting" the others.
+ *
+ * Renders `core/agent/externalDatasetCase.ts`'s `ExternalDatasetCase` the
+ * same way `ExternalAnchorCard` above renders a single-metric
+ * `ExternalAnchor`: live, computed in this browser from the pinned dataset,
+ * never read back from a stored verdict. The one structural difference is
+ * `.hypotheses.map(...)` — one card per verdict — instead of one verdict per
+ * anchor, so N independent verdicts stay visibly N, and `verdictCounts`/
+ * `tautologyCounts` are shown as tallies, never averaged into a single
+ * pass/fail.
+ */
+function MultiHypothesisCaseCard({ evidenceCase }: { evidenceCase: ExternalDatasetCase }) {
+  const verdictSummary = Object.entries(evidenceCase.verdictCounts)
+    .map(([verdict, count]) => `${count}× ${verdict}`)
+    .join(', ');
+  return (
+    <section className="ecs-section" data-testid={`ecs-case-${evidenceCase.caseId}`}>
+      <span className="dl-label">External dataset case — {evidenceCase.hypotheses.length} independent hypothesis verdicts over one shared dataset</span>
+      <dl className="pilot-provenance" data-testid={`ecs-case-provenance-${evidenceCase.caseId}`}>
+        <div><dt>dataset</dt><dd className="mono">{evidenceCase.provenance.datasetId}</dd></div>
+        <div><dt>source</dt><dd className="mono">{evidenceCase.provenance.sourceUrl}</dd></div>
+        <div><dt>version / retrieved</dt><dd className="mono">{evidenceCase.provenance.sourceVersion} · {evidenceCase.provenance.retrievedAt}</dd></div>
+        <div><dt>licence</dt><dd className="mono">{evidenceCase.provenance.license}</dd></div>
+        {evidenceCase.provenance.archiveSha256 && (
+          <div><dt>archive SHA-256</dt><dd className="mono">{evidenceCase.provenance.archiveSha256}</dd></div>
+        )}
+        <div><dt>domain result fingerprint</dt><dd className="mono">{evidenceCase.domainResultFingerprint}</dd></div>
+        <div><dt>case fingerprint</dt><dd className="mono">{evidenceCase.caseFingerprint}</dd></div>
+      </dl>
+      <p className="gsc-caption" data-testid={`ecs-case-tally-${evidenceCase.caseId}`}>
+        <b>Verdict tally (never collapsed into one case-level verdict):</b> {verdictSummary}
+      </p>
+      {evidenceCase.hypotheses.map((h) => (
+        <div key={h.id} className="ecs-step" data-testid={`ecs-case-hypothesis-${evidenceCase.caseId}-${h.id}`}>
+          <span className="dl-label">{h.id}</span>
+          <p data-testid={`ecs-case-verdict-${evidenceCase.caseId}-${h.id}`}>
+            <b>{h.verdict}</b>{' — '}{h.statement}
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-case-tautology-${evidenceCase.caseId}-${h.id}`}>
+            <b>Tautology Gate: {h.tautology.classification}</b>{' — '}{h.tautology.reasons[0]}
+          </p>
+          <p data-testid={`ecs-case-belief-${evidenceCase.caseId}-${h.id}`}>
+            <b>Belief revision</b>{' — '}confidence moved from {h.belief.before.toFixed(3)} to {h.belief.after.toFixed(3)} ({h.belief.status}).
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-case-next-question-${evidenceCase.caseId}-${h.id}`}>
+            <b>Next question:</b> {h.nextQuestion}
+          </p>
+        </div>
+      ))}
+      <p className="gsc-caption" data-testid={`ecs-case-honesty-${evidenceCase.caseId}`}>
+        Reproduction/replication against one already-published dataset, not new physics: a SUPPORTED_WITHIN_MODEL
+        verdict here means these hypotheses survived a preregistered, independently recomputed check against this
+        one dataset — see docs/QE4_EVIDENCE.md for the full preregistration, estimator, and limitations.
+      </p>
+    </section>
+  );
+}
+
+/** Rejestr wielohipotezowych spraw zewnętrznych — dziś tylko QE4; kolejne (np. odblokowane QE5-7) dopisują się tutaj bez zmian gdzie indziej na tym ekranie. */
+const EXTERNAL_DATASET_CASE_BUILDERS: readonly (() => ExternalDatasetCase)[] = [buildQe4EvidenceCase];
+
+function MultiHypothesisCasesSection() {
+  // Computed once per mount, not per render — QE4's own analysis runs a real
+  // 2000-iteration bootstrap, the same reason `ExternalAnchorCard` above
+  // memoizes `runExternalAnchor`.
+  const evidenceCases = useMemo(() => EXTERNAL_DATASET_CASE_BUILDERS.map((build) => build()), []);
+  return (
+    <>
+      {evidenceCases.map((evidenceCase) => (
+        <MultiHypothesisCaseCard key={evidenceCase.caseId} evidenceCase={evidenceCase} />
       ))}
     </>
   );
@@ -315,6 +395,7 @@ export function EvidenceShowcaseScreen() {
 
       {/* Zawsze widoczna, nawet bez żadnego zapisanego rekordu — patrz doc komponentu. */}
       <ExternalAnchorsSection />
+      <MultiHypothesisCasesSection />
     </div>
   );
 }

@@ -108,6 +108,28 @@ describe('EvidenceShowcaseScreen', () => {
     expect(markup).not.toContain('data-testid="ecs-case-study"');
   });
 
+  it('renders the QE4 multi-hypothesis external dataset case with all four independent verdicts, even with an empty Scientific Memory', async () => {
+    vi.stubGlobal('window', { localStorage: makeFakeStorage(), print: () => {}, location: { hash: '' } });
+    const { EvidenceShowcaseScreen } = await import('../components/visual-simulation/EvidenceShowcaseScreen');
+    const { QE4_EVIDENCE_CASE_ID } = await import('../core/biotechData/qe4EvidenceCase');
+    const { runQe4BrydgesAnalysis } = await import('../core/biotechData/qe4BrydgesAnalysis');
+    const markup = renderToStaticMarkup(<EvidenceShowcaseScreen />);
+
+    expect(markup).toContain(`data-testid="ecs-case-${QE4_EVIDENCE_CASE_ID}"`);
+    for (const id of ['P1', 'P2', 'P3', 'P4'] as const) {
+      expect(markup).toContain(`data-testid="ecs-case-hypothesis-${QE4_EVIDENCE_CASE_ID}-${id}"`);
+      expect(markup).toContain(`data-testid="ecs-case-tautology-${QE4_EVIDENCE_CASE_ID}-${id}"`);
+      expect(markup).toContain(`data-testid="ecs-case-belief-${QE4_EVIDENCE_CASE_ID}-${id}"`);
+      expect(markup).toContain(`data-testid="ecs-case-next-question-${QE4_EVIDENCE_CASE_ID}-${id}"`);
+    }
+    // Regression: no case-level scalar verdict collapses the four — the tally names all distinct verdicts present.
+    const analysis = runQe4BrydgesAnalysis();
+    expect(markup).toContain('data-testid="ecs-case-tally-' + QE4_EVIDENCE_CASE_ID + '"');
+    expect(markup).toContain(`${analysis.p1.verdict}`);
+    expect(markup).toContain('87424c2ddfbc9e68361d70a41878b63919ceb7257bdb70b4fad65d4179cd8389');
+    expect(markup).toContain(analysis.resultFingerprint);
+  }, 30_000);
+
   it('renders a real SIMULATED case study end to end, including a live MATCH replay', async () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage(), print: () => {}, location: { hash: '' } });
     const { runWorldDiscoveryAndRemember } = await import('../core/agent/worldDiscoverySession');

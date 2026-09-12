@@ -648,3 +648,58 @@ INCONCLUSIVE) do `runExternalAnchor` — dla OBU zadeklarowanych kotwic
 (PubChem i Kepler/Mars), nie jako część trzeciej kotwicy. Zero nowego
 silnika: Tautology Gate, `beliefRevision.ts` i `predictionVerification.ts`
 reużyte bez zmian.
+
+---
+
+## D-023 (2026-09-13, QE4-integration) — Nowa, minimalna, generyczna warstwa `core/agent/externalDatasetCase.ts` zamiast 11. kształtu `SavedExperiment` albo rozciągania `discoveryCase.ts`
+
+**Decyzja.** QE4 (D-021/D-022 nie dotyczą go bezpośrednio, ale są bezpośrednim
+poprzednikiem tej decyzji) potrzebował sposobu na reprezentowanie "JEDEN
+zewnętrzny zbiór danych → WIELE niezależnych, współrzędnych werdyktów
+hipotez" bez zgadywania nowej semantyki. Zbudowano JEDEN nowy, mały,
+domenowo-agnostyczny moduł — `core/agent/externalDatasetCase.ts`
+(`buildExternalDatasetCase`/`compareExternalDatasetCaseReplay`) — zamiast
+(A) dodawania 11. kształtu do `SavedExperiment` w `scienceMemory.ts`, albo
+(B) generalizowania `discoveryCase.ts`/`discoveryConclusion.ts` poza jego
+substrat Scenario Engine.
+
+**Dlaczego NIE (A).** `externalAnchor.ts` (kotwice PubChem/Kepler-Mars) jest
+najbliższym analogiem QE4: przypięty, deterministyczny zbiór zewnętrzny bez
+uruchomienia przez użytkownika. Ten analog NIE ma żadnej trwałości w
+`scienceMemory.ts` — renderuje się NA ŻYWO z rejestru statycznego
+(`ExternalAnchorsSection` w `EvidenceShowcaseScreen.tsx`). Dziesięć
+istniejących kształtów `SavedExperiment` istnieje dla eksperymentów, które
+COŚ NAPRAWDĘ URUCHOMIŁO i które użytkownik może chcieć porównać/powtórzyć —
+QE4 tym nie jest. Budowanie 11. kształtu persystencji byłoby budowaniem
+maszynerii, której najbliższy istniejący analog nie ma.
+
+**Dlaczego NIE (B).** `discoveryCase.ts` (kanoniczny wg D-021 dla
+PRIMARY+SUPPORTING per-kryterialnej Tautology Gate) jest twardo typowany na
+dwuramienny epidemiologiczny Scenario Engine (`ScenarioId`, `ScenarioRun`,
+`EpidemicCityParams`) — porównanie to delta metryk baseline-vs-variant,
+której zewnętrzny zbiór bez "ramienia wariantowego" nie może wyprodukować.
+D-021 świadomie zostawił ten substrat związany z tym silnikiem; generalizacja
+"na siłę" złamałaby dokładnie tę granicę.
+
+**Co nowy moduł faktycznie robi.** Reuse, zero nowej logiki naukowej:
+`tautologyGate.ts::assessTautology` (wołane przez DOMENĘ, nigdy przez ten
+moduł — moduł tylko przyjmuje już policzony `TautologyAssessment` per
+hipoteza), `beliefRevision.ts::createHypothesis`/`updateConfidence` +
+`evidenceCeiling` (jak w `externalAnchor.ts`, per hipoteza, świeży prior
+0,5), `events/hash.ts::fnv1a`/`canonicalJson` (jeden odcisk całej sprawy).
+Jedyny plik znający zarówno ten moduł, jak i `qe4BrydgesAnalysis.ts`, to
+`core/biotechData/qe4EvidenceCase.ts` — czysty reshaping, zero progów, zero
+bootstrapu, zero zmian w P1-P4.
+
+**UI.** `EvidenceShowcaseScreen.tsx` dostał `MultiHypothesisCasesSection` —
+dokładnie ten sam wzorzec `.map()`-po-rejestrze co `ExternalAnchorsSection`,
+tylko jeden poziom głębiej (`.map()` po `evidenceCase.hypotheses`). QE4
+przestał być sierotą w `moduleReachability.test.ts` — jest teraz osiągalny z
+`main.tsx` naprawdę, przez prawdziwy UI, nie tylko przez
+`reproEntry.node.ts`. Real Chromium E2E: `scripts/qe4-evidence-case-e2e.mjs`.
+
+**Co NIE zostało zrobione i dlaczego.** Żadna migracja istniejącej
+architektury; `discoveryCase.ts` i `externalAnchor.ts` pozostają nietknięte.
+Verdykty P1-P4, prerejestracja, bootstrap i progi w `qe4BrydgesAnalysis.ts`
+— nietknięte, zweryfikowane bit-do-bitu (`resultFingerprint` = `a6578ae8`
+przed i po tej zmianie).

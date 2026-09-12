@@ -247,6 +247,55 @@ jobs:
           console.log('All 29 pinned QE4 Brydges files match the live Zenodo archive -- no drift.');
           NODE
 
+  cms-zmumu-recon:
+    name: R-005 recon — CMS Open Data record 5208 (Z→μμ), print for job-log read-back
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # TEMPORARY BOOTSTRAP JOB (mirrors the Kepler/QE4 anchors' own history).
+    # opendata.cern.ch is blocked from this repo's own sandbox (403 on
+    # CONNECT, confirmed directly with curl) -- so this job does the one-time
+    # real fetch + SHA-256 verification on a GitHub Actions runner, which has
+    # ordinary internet access, and prints the fetched file's full content
+    # into its own log for read-back via the GitHub API. Once Zmumu.csv is
+    # committed from that read-back, this job is replaced by an ongoing
+    # drift-detection job (re-fetch vs. committed copy), exactly like
+    # `kepler-solar-system-pinned-artifact` and `qe4-brydges-verify-pinned`.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Cross-check fetch script's expected hash against the Python worker's
+        run: |
+          SCRIPT_HASH=$(grep -oE "EXPECTED_SHA256 = '[0-9a-f]{64}'" scripts/fetch-cms-zmumu-fixture.mjs | grep -oE '[0-9a-f]{64}')
+          WORKER_HASH=$(grep -oE "EXPECTED_SHA256 = '[0-9a-f]{64}'" packages/backend/src/compute/cms_zmumu_worker.py | grep -oE '[0-9a-f]{64}')
+          echo "fetch script: $SCRIPT_HASH"
+          echo "python worker: $WORKER_HASH"
+          if [ "$SCRIPT_HASH" != "$WORKER_HASH" ]; then
+            echo "MISMATCH: fetch script and worker disagree on the expected SHA-256 -- fix before trusting either." >&2
+            exit 1
+          fi
+      - name: Fetch and hash the real CMS Open Data Zmumu.csv
+        env:
+          GENESIS_CMS_ZMUMU_FIXTURE_DIR: artifacts/cms-zmumu
+        run: node scripts/fetch-cms-zmumu-fixture.mjs
+      - name: Print pinned payload into the job log (read-back source)
+        run: |
+          echo "CMS-zmumu FILE_BEGIN Zmumu.csv"
+          cat artifacts/cms-zmumu/Zmumu.csv
+          echo "CMS-zmumu FILE_END Zmumu.csv"
+          echo "CMS-zmumu MANIFEST_BEGIN manifest.json"
+          cat artifacts/cms-zmumu/manifest.json
+          echo "CMS-zmumu MANIFEST_END manifest.json"
+      - name: Upload candidate fixture (Azure blob URL is unreachable from this sandbox too -- log read-back is primary)
+        uses: actions/upload-artifact@v7
+        with:
+          name: cms-zmumu-${{ github.sha }}
+          path: artifacts/cms-zmumu
+          retention-days: 90
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

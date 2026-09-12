@@ -925,3 +925,163 @@ stubbed `document.createElement('canvas')` — worth adopting consistently for
 the "value = visual" claims these quantum scenes make, but that is a
 cross-cutting hardening decision for whoever owns the `Sim3D` test
 convention, not a defect specific to CHSH.
+
+---
+
+## 14. ADR — legacy loops stay specialised; `DiscoveryHypothesis`/`discoveryConclusion.ts` is canonical for multi-criterion Tautology Gate use
+
+**Status: DECIDED. Zero code changes accompany this entry — it records a
+choice already forced by two prior audits (`docs/DISCOVERY_MULTI_CRITERION_AUDIT.md`,
+commit `79e6e38e`, and the follow-up confirmation that re-checked the same
+files against `a4f4314e` with no changes found), not a new investigation.**
+
+### 14.1 The question
+
+Genesis now has ONE real, working multi-criterion Tautology Gate consumer:
+`DiscoveryHypothesis` (`core/discovery/discoveryCase.ts`) declares
+`falsification` (primary) + `supportingCriteria?` + `observableDerivations?`,
+and `discoveryConclusion.ts` classifies each declared metric
+(`CONSISTENCY_CHECK` / `EMPIRICAL_TEST` / aggregate `MIXED_TEST`), blocking a
+tautological criterion from moving the categorical `DiscoveryVerdict` in
+either direction. `discoveryLoop.ts` and `hypothesisLoop.ts` — real, live,
+multiply-used loops in their own right — have neither the criterion shape
+nor a belief representation the same mechanism can attach to (§14.2's table
+below restates the finding precisely). The question this ADR answers: does Genesis
+now have **two permanently separate discovery models** (A), or is the
+current split a **staging point on the way to one canonical contract** (B)?
+
+### 14.2 Decision: **(A)**, with one named exception
+
+**Legacy loops (`discoveryLoop.ts`, `hypothesisLoop.ts`) stay specialised,
+single-criterion loops on their own substrates. The canonical model for
+anything requiring PRIMARY + SUPPORTING criteria, per-criterion Tautology
+classification, or `MIXED_TEST` is `DiscoveryHypothesis` +
+`discoveryConclusion.ts`.** No migration of either legacy loop's hypothesis
+type or belief model is planned or authorized by this entry.
+
+This is not a default reached by inertia — it falls directly out of §1's own
+table, restated here for this specific axis:
+
+| | `discoveryLoop.ts` | `hypothesisLoop.ts` | `DiscoveryHypothesis` (Discovery Engine) |
+|---|---|---|---|
+| Criteria per hypothesis | exactly one (`MechanisticHypothesis.criterion`) | exactly one (`PreregisteredHypothesis.falsificationCriteria`) | one primary + N supporting |
+| Belief representation | ordinal `ConfidenceLabel` ladder, counted from categorical outcomes | one-shot `HypothesisStatus`, assigned once, never revised | categorical `DiscoveryVerdict`, computed once per case from all declared criteria together |
+| Has a magnitude to cap? | **no** — `updateBelief()` reads only `assessment.assessment` (categorical) and `metricMoved` (boolean); no scaled number anywhere in the function | **no** — `executePreregisteredHypotheses()` maps `chain.assessment.assessment` straight to a terminal status; there is no round loop to revise | **no**, and does not need one — the Gate integrates by *blocking a verdict transition* for a tautological criterion, not by capping a magnitude |
+| Tautology Gate hook today | none | none | `DiscoveryCriterionCheck.tautologyClassification`, wired since the MIXED_TEST task |
+
+### 14.3 Why forcing `MIXED_TEST` onto an ordinal ladder or a one-shot status would be semantically dishonest
+
+`MIXED_TEST` means something specific: *some declared criteria on this
+hypothesis are tautological, some are empirical, and the honest verdict is
+one that used only the empirical ones.* Producing that claim requires a
+place to say "this specific transition doesn't count" — for the numeric
+loop, that place is `evidenceMagnitude` (zeroed by `evidenceCeiling()`); for
+Discovery Engine, it is the verdict computation itself (a tautological
+criterion is excluded from `failedSupporting`, or short-circuits the primary
+to `INSUFFICIENT_EVIDENCE`, regardless of whether it happened to pass).
+
+Neither `discoveryLoop.ts`'s ladder nor `hypothesisLoop.ts`'s status has
+such a place:
+
+- An ordinal `ConfidenceLabel` is *counted*, not *weighted* — `SUPPORTED_ONCE`
+  vs `SUPPORTED_AT_TWO_MAGNITUDES` comes from counting distinct tested
+  strengths, and `CONTESTED` from whether both `supportedInRounds` and
+  `refutedInRounds` are non-empty. There is no operation on this ladder that
+  means "this round happened, but don't let it count" without inventing one
+  from nothing — and whatever got invented (skip the round entirely? record
+  it but never let it flip `UNTESTED`? something else?) would be a **new
+  belief semantics**, not a reuse of what `updateBelief()` already does.
+- A one-shot `HypothesisStatus` is assigned exactly once, from exactly one
+  criterion assessment, with no revision step to intervene in at all.
+  "Doesn't increase confidence" presupposes something that can decline to
+  increase — there is no such axis here to leave unmoved.
+
+Picking either invented mechanism would not be integrating the Gate; it
+would be redesigning what belief means for two loops whose entire point (per
+§1's own accounting) is answering a different KIND of question than
+Discovery Engine's categorical verdict does. That is exactly the "nie
+zgaduj brakujących semantyk" instruction the two prior audits were run
+under, and why both concluded BLOCKED rather than shipping a guess.
+
+### 14.4 Why the Tautology Gate stays one shared component regardless
+
+`tautologyGate.ts` (`assessTautology`, `evidenceCeiling`) is a pure,
+declaration-driven classifier over `TautologyComponent[]` — it has no
+opinion about what a caller does with the classification. That is exactly
+why it already has two working, independent integrations without knowing
+about each other:
+
+- `inquiryLoop.ts` (numeric): consults `evidenceCeiling()` to cap
+  `evidenceMagnitude` before `updateConfidence`.
+- `discoveryConclusion.ts` (categorical): consults `.classification` per
+  criterion to decide whether that criterion may participate in the verdict
+  at all.
+
+A third, future integration (if `discoveryLoop.ts` or `hypothesisLoop.ts`
+ever gain a real caller-driven need for it) would consult the SAME gate the
+SAME way — declare `TautologyComponent`s, call `assessTautology` once,
+decide what "don't count this" means for THAT loop's own belief
+representation. Nothing about this decision closes that door; it only
+declines to open it by guessing the missing piece. This is why the answer
+to "does the Gate need duplicating" is unconditionally no, independent of
+the (A)/(B) split above.
+
+### 14.5 Current boundary of each loop, restated for this specific question
+
+- **`discoveryLoop.ts`** — one mechanism, one criterion, a stateful
+  `WorldGraph` fork/diff per round, an ordinal belief ladder built for
+  counting replication across STRENGTH (not criteria). Extending it to
+  multiple criteria per hypothesis would also have to decide what a
+  multi-criterion verdict even means on a ladder that currently only
+  distinguishes "supported/refuted/contested," which is a second design
+  question layered on top of the Tautology question.
+- **`hypothesisLoop.ts`** — one criterion, one preregistered hypothesis, one
+  execution, one terminal status, explicitly never revised (§1: "adapting
+  would be HARKing" for this loop specifically — its entire value is the
+  frozen, fingerprinted, single-pass preregistration). Multi-criterion
+  support here would need to decide how a SET of criteria interacts with
+  the anti-HARKing fingerprint (`Preregistration.preregistrationFingerprint`)
+  — another design question, not a Gate-wiring question.
+- **`DiscoveryHypothesis` / `discoveryConclusion.ts`** — already answers
+  both: a `DiscoveryCase` names ONE controlled comparison (baseline vs.
+  variant scenario run) judged against a primary criterion plus any number
+  of supporting ones, and the verdict computation already had a natural
+  place to exclude a tautological criterion, because it already aggregates
+  several criteria into one verdict. This shape existed before the Gate was
+  wired to it — the Gate fit an existing joint, not a hole cut for it.
+
+### 14.6 What is canonical for a future Autonomous Scientific Discovery Engine
+
+If Genesis ever needs ONE hypothesis type that natively expresses PRIMARY +
+SUPPORTING criteria, per-criterion Tautology classification, and
+`MIXED_TEST`, the canonical starting point is `DiscoveryHypothesis` +
+`discoveryConclusion.ts` — not a redesign of `MechanisticHypothesis` or
+`PreregisteredHypothesis`, and not a fourth parallel belief model. This
+follows directly from §14.2: it is the only one of the three that already
+has the shape, already has the Gate wired to it, and already has the
+verdict semantics ("a tautological criterion cannot move this decision")
+proven correct by a full unit-test matrix
+(`discoveryConclusionTautology.test.ts`).
+
+This is a naming of direction, not an authorization to migrate anything now.
+`discoveryLoop.ts` and `hypothesisLoop.ts` keep answering the genuinely
+different questions §1 documents them for (*which mechanism?* and *which of
+these frozen candidates survives?*), on substrates Discovery Engine's
+comparison shape cannot express (a live `WorldGraph` fork; a
+router/executor-backed preregistered set with its own anti-HARKing anchor).
+Should a real, caller-driven need arise for either of them to reason over
+several criteria at once, that is a separate brief with its own audit — the
+same standing this document already holds every other extension to (§5, §9,
+§11 above each did the work before building, not after).
+
+### 14.7 What this entry does NOT do
+
+- Does not implement multi-criterion support in `discoveryLoop.ts` or
+  `hypothesisLoop.ts`.
+- Does not design a migration path, a schedule, or a bridging type between
+  the three hypothesis shapes.
+- Does not change any production code. Verified: `git diff --stat` for this
+  commit touches only this file and `docs/DECISIONS.md`.
+- Does not retire, merge, or deprecate either legacy loop — per §2's own
+  finding, neither is a subset of the other, and that finding is untouched
+  by this entry.

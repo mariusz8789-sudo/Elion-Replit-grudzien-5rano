@@ -521,7 +521,7 @@ module nieosiągalnym z aplikacji**. Testy nie są punktem wejścia — bycie
 osiągalnym wyłącznie z własnego testu to dokładnie kształt `domeWorld`:
 zielony, udowodniony, niewidoczny.
 
-Stan po tej sesji: **616 z 654 modułów produkcyjnych osiągalnych** (38 w allowliście).
+Stan po tej sesji: **622 z 657 modułów produkcyjnych osiągalnych** (35 w allowliście).
 
 Allowlista NIE jest listą wyciszeń. Każdy z 44 wpisów niesie powód, dla
 którego moduł jest osierocony **zasadnie**, a drugi test odrzuca powody-
@@ -625,6 +625,27 @@ alarm tej klasy zabija wiarygodność takiego testu przy pierwszym uruchomieniu.
    chemistry-kinetics / epidemiology / hydraulics-engineering.
    To 503 JEST działającą funkcją, nie usterką.
 
+9. **Kalibracja parametru** jako `#/calibration` i **autonomiczne dochodzenie**
+   jako `#/inquiry` — istniały TRZY przetestowane strategie
+   (`discoveryStrategies.ts`: MECHANISM, PARAMETER, CALIBRATION), a produkcja
+   uruchamiała wyłącznie MECHANISM, na sztywno wpiętą w katalog powodziowy.
+   Teraz uruchamiane są wszystkie trzy.
+   Świat ma UKRYTĄ wartość, agent jej nie dostaje, a ekran porównuje dopiero po
+   przebiegu:
+   - okres zakaźności 7,5 dnia → agent czyta dzień 2, potem dzień 45 → ODZYSKANY
+     (66 ms); przy 6 dniach czyta dzień 2, potem dzień 30 → ODZYSKANY (43 ms).
+     Inna prawda, inny moment pomiaru — to jest ta zdolność.
+   - złącze kwantowe (bariera 1,2, szerokość 2,5) → E=1,3 nie rozróżnia niczego
+     (wszystkie cztery SUPPORTED), agent schodzi do E=0,4 → ODZYSKANY (1352 ms).
+   - zwijanie białka (T=1,2) → 200 kroków daje 0,1300 dla każdego kandydata
+     (podłoga algorytmu), agent wydłuża przebieg i kończy na
+     NO_DISCRIMINATING_PROBE z h:warm i h:hot przy życiu → ZAWĘŻONE,
+     NIEROZSTRZYGNIĘTE. Moduł sam to ograniczenie deklarował; ekran mówi to
+     wprost, zamiast podawać dwóch ocalałych jako odpowiedź.
+   JEDEN RAPORT NA TRZY STRATEGIE: `StrategyRunReport.tsx`. Wszystkie trzy
+   zwracają ten sam kontrakt `StrategyRun`, więc druga tabela rund byłaby drugą
+   opinią o tym, co znaczy przebieg — wolną, żeby się rozjechać z pierwszą.
+
 #### Usunięte
 
 `components/MissionStatusBar.tsx` wraz z jego CSS `.mission-bar`. Jego własny
@@ -641,10 +662,6 @@ Największa grupa w allowlist to **kompletna, przetestowana nauka zablokowana za
 NAZWANYM brakiem**, nie za zapomnieniem — i to jest realny materiał na kolejne
 zadania dla C2/C3/Qwen, każde z gotowym, zielonym rdzeniem:
 
-- `proteinFoldingInquiry.ts`, `quantumTunnelingInquiry.ts` — brakuje
-  PRODUKCYJNEGO wywołania runnera inquiry i ekranu dla `InquiryLoopResult`.
-- `epidemicInfectiousDaysCalibration.ts` — podpięta jest tylko strategia
-  MECHANISM; potrzebne wywołanie CALIBRATION i renderer werdyktu parametru.
 - `discoveryTrace.ts` — konsumuje `ResearchChainResult` (łańcuch PARAMETER), a
   produkcja uruchamia wyłącznie `runMechanismResearchChain` (inny typ).
 - `moleculeWorldAdapter.ts`, `particleWorldAdapter.ts` — 2. i 3. domena dowodu,

@@ -117,6 +117,7 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // DESIGN — reaching them from the browser bundle would be the bug.
   'core/compute/serverEntry.ts': 'Node-side entry point; never imported by the browser bundle.',
   'core/repro/reproEntry.node.ts': 'Node-side facade for scripts/repro-demo.mjs (P3.2 one-command reproducibility pack); bundled by esbuild --platform=node and never imported by the browser bundle. It computes nothing of its own -- it calls runExternalAnchor and runAutonomousInquiry and returns what they returned.',
+  'core/agent/causalInference.ts': 'CAP-2 (docs/B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md) -- a new, general-purpose DiD/ITS/synthetic-control estimator library, built and TDD-verified against simulated panels before any real B1 data was pulled. Deliberately NOT yet wired into any UI: the B1 experiment itself (real DEFRA/AURN data, preregistration, execution, evidence classification) is still in progress. Reached today only by its own test suite (causalInference.test.ts); remove this entry once B1 wires it into the existing backend/service or Evidence path, mirroring qe4BrydgesAnalysis.ts\'s own orphan-then-wired history.',
   'core/discovery/molecular/compoundLookupTransport.node.ts': 'Node-side transport; the browser uses the HTTP path.',
   'core/discovery/molecular/rdkitTransport.node.ts': 'Node-side RDKit transport; the browser uses the HTTP path.',
 

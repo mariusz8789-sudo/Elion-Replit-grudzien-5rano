@@ -866,3 +866,96 @@ zamieniało to w `BLOCKED` (a `replaySavedHypothesisLoop` przyjmuje
 
 Zweryfikowane: tsc czysto, eslint czysto, pełny frontend suite 464/464
 plików, 5134 passed / 1 znany niezwiązany skip, build czysto.
+
+---
+
+## UPDATE — 2026-09-12, C1: G3 + G6 scalone, priorytet ZAMKNIĘTY; prompty dla Qwena wydane
+
+### Co przejrzałem i scaliłem
+
+**C3 — G3 (kotwica anty-HARKingowa).** Praca trafiła bezpośrednio na tę samą
+gałąź (`claude/genesis-autonomous-completion-95bt4e`), więc nie było scalania
+— tylko weryfikacja. Projekt jest solidny: `PreregistrationAnchor` jako
+wymagany argument `preregisterHypotheses`, zahaszowany w odcisku, sprawdzany
+mechanicznie przez `verifyAntiHarkingAnchor` względem realnie użytych
+`runFingerprints`. `createdAt` celowo POZA odciskiem (uzasadnione względem
+testu determinizmu). Skutek uboczny — trzy world-adaptery budujące
+`SavedHypothesisLoop` ręcznie i cicho lądujące w `BLOCKED` — znaleziony przez
+pełny suite, nie przez `tsc`, i naprawiony w tym samym commicie. Zgadza się z
+warunkiem z podziału pracy: kotwica, nie scoring/staleness (G5/G9 poza
+zakresem).
+
+**C2 — G6 (kanoniczny słownik niezawodności epistemicznej).** Praca była na
+osobnej gałęzi `claude/genesis-graphics-engine-v1-wd0r66`, która niesie też
+dwa wcześniej ODRZUCONE commity (`5dfe87c`, `2fd0d61` — duplikat Matrix/
+policy i Construct już rozwiązany gdzie indziej). **Nie scaliłem całej
+gałęzi** — cherry-pick wyłącznie commita G6 (`508b09a`), czysto, zero
+konfliktów, bo dotyka tylko dwóch nowych plików. Projekt trafny: trzy z
+sześciu osi (`EpistemicStatus`, `KnowledgeEpistemicStatus`,
+`BiotechEpistemicStatus`) faktycznie mierzą to samo — „ile naukowego
+wsparcia ma to twierdzenie" — i konsolidują się na już-wysłanej,
+7-poziomowej skali z polskimi etykietami; cztery pozostałe (`ReplayVerdict`,
+`DataProvenance`, `GroundingLevel`, `AdmissionStatus`) zostają nietknięte, bo
+odpowiadają na inne pytania. Zero zmian w zapisanych danych — warstwa
+wyłącznie do odczytu.
+
+**Znaleziony i naprawiony przeze mnie defekt w tym, co C2 dostarczył:**
+`core/epistemicReliability.ts` nie miał ŻADNEGO realnego konsumenta — tylko
+własny test go importował. Dokładnie ta sama klasa błędu, którą
+`moduleReachability.test.ts` istnieje, żeby złapać (patrz `domeWorld` w
+sekcji 8 wyżej), i złapał ją natychmiast: `expected ['core/epistemicReliability.ts'] to deeply equal []`.
+Podpiąłem prawdziwego konsumenta zamiast dopisywać moduł do allowlisty:
+`CandidateDossierScreen.tsx` (`#/dossier`) pokazywał dotąd
+`report.epistemicStatus`/`report.ranking.epistemicStatus` jako gołe stringi
+(`BiotechEpistemicStatus`), nieporównywalne między domenami. Teraz obok
+każdego renderuje się `reliabilityBadge()` — kanoniczna polska etykieta z tej
+samej, już przetestowanej, czystej funkcji `biotechToCanonicalReliability` +
+`canonicalReliabilityLabel`; `BLOCKED` renderuje się jako nota o procesie, nie
+zgadnięty poziom (moduł C2 już to rozstrzygał poprawnie — po prostu nikt
+tego nie czytał).
+
+### Co NIE zostało zweryfikowane wizualnie i dlaczego to napisane wprost
+
+Badge nie został potwierdzony zrzutem ekranu z prawdziwymi danymi kandydata:
+`DrugDiscoveryScreen`/`#/dossier` wymaga zalogowanej sesji backendu, a
+zbudowanie pełnego, poprawnego artefaktu biotech (przez prawdziwy przepływ
+UI albo przypięty fixture) wykraczało poza proporcjonalny zakres tego
+scalenia. Zweryfikowane zamiast tego: `tsc` czysto, `eslint` czysto, build
+czysto, `moduleReachability`/`orphanModuleWiring` zielone (dowód realnego
+podpięcia, nie tylko braku błędu kompilacji), i 14 testów C2 na
+`biotechToCanonicalReliability` nad KAŻDĄ realną wartością `BiotechEpistemicStatus`
+łącznie z `BLOCKED`. To nie jest E2E VERIFIED w sensie tego repo — jest
+TESTED + wired, i tak jest tu nazwane, zamiast udawać dowód, którego nie ma.
+
+### Pełna weryfikacja po scaleniu (G3 + G6 + QE1–QE3 razem)
+
+`tsc --noEmit` czysto · `eslint src --max-warnings=0` czysto · `npm run
+build` czysto · pełny frontend suite: **465/465 plików, 5148 passed / 1
+znany niezwiązany skip** (jeden przebieg złapał `nextActionSelectors.test.ts`
+jako flaka pod obciążeniem pełnego suite — potwierdzone: zielony osobno i
+zielony przy powtórzeniu całego suite zaraz potem, 0 failed).
+
+### Priorytet ZAMKNIĘTY
+
+G3 (P0) ✅ · G6 (P1, częściowo — 3 z 6 osi skonsolidowane, reszta świadomie
+zostaje) ✅ · QE1–QE3 przez prawdziwy `StrategyRun` ✅. Pozostają otwarte, poza
+zakresem tej rundy: G4/G5/G9 (świadomie NIE robione — patrz uzasadnienia w
+audycie PHASE 0), QE4–QE7 (czekają na pakiet obserwabli), Solar H051–H056
+(czekają na surowy tekst raportów w repo).
+
+### Prompty wydane dla Qwena (do przekazania przez usera — brak bezpośredniego
+kanału do Qwena w tej sesji)
+
+Dwa gotowe prompty, każdy jako osobny dokument:
+1. **QE4–QE7 obserwable** — wymaga dla każdej hipotezy: obserwabli
+   policzalnej na istniejących solverach Genesis, rodziny stanów o
+   zamkniętej formie, gałki bezużytecznej i rozstrzygającej, oraz — warunek
+   twardy — jawnego rozdzielenia tautologii liczonej algebry od tego, co
+   naprawdę falsyfikowalne. Instruuje wprost: jeśli hipoteza wymaga nowego
+   podsystemu (stos QKD, solver JT gravity), nazwać to BLOCKED zamiast
+   projektować fikcyjny silnik.
+2. **Solar H051–H056, wejście do ingestion** — żąda pełnego, niestreszczonego
+   tekstu `SOLAR_MIND_MASTER_REPORT.md`/`SOLAR_MIND_EXPANSION.md` gotowego do
+   zapisania w `knowledge/`, oznaczonego NIEURUCHOMIONE, plus tabelę H051–H056
+   na wzór tabeli QE1–QE7. Explicite: żaden kod, żadna implementacja na tym
+   etapie.

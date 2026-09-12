@@ -147,6 +147,14 @@ export function deriveGenesisVisualState(signals: GenesisActivitySignals): Genes
   if (signals.needsAttention) return { activity: 'ATTENTION', intensity: 0.65 };
   if (signals.runInProgress) return { activity: 'RUNNING', intensity: 1 };
   if (signals.hasOpenInvestigation) return { activity: 'RESEARCH', intensity: 0.5 };
-  if (signals.savedExperimentCount === 0) return { activity: 'IDLE', intensity: 0 };
-  return { activity: 'ACTIVE', intensity: 0.25 };
+  // `intensity` only selects the glow bucket (<0.34 LOW ⇒ glow OFF entirely,
+  // <0.67 MEDIUM, else HIGH). A resting intensity of 0 therefore switched glow
+  // off completely, and combined with the IDLE density tier it produced a
+  // background measured at 0.24-0.79% lit pixels — present in the DOM, drawn
+  // every frame, and still effectively invisible on screen. The resting tiers
+  // keep their ORDER (IDLE calmest, then ACTIVE, RESEARCH, ATTENTION, RUNNING)
+  // but now sit above the glow threshold, because a decorative layer nobody
+  // can see is not "calm", it is broken.
+  if (signals.savedExperimentCount === 0) return { activity: 'IDLE', intensity: 0.4 };
+  return { activity: 'ACTIVE', intensity: 0.45 };
 }

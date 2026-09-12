@@ -115,6 +115,33 @@ describe('density responds to quality and activity', () => {
     expect(buildStreams(0, 0, cfg())).toEqual([]);
     expect(buildStreams(-5, 100, cfg())).toEqual([]);
   });
+
+  /**
+   * REGRESSION — proven by execution (real headless Chromium, real elapsed
+   * time), not by reading the code: the v1 build placed every stream's `y`
+   * strictly above the viewport (`-rng()*height*1.6 - ...`), so on a fresh
+   * mount the canvas measured fully black for ~10-14s and still <0.2%
+   * populated at 30s, even at IDLE (the calmest, but also the DEFAULT tier
+   * for a fresh Home visit with an empty Science Memory — exactly a first
+   * grant-demo impression). `buildStreams` is the initial-build path;
+   * `updateStreams`'s respawn re-entering above y=0 (tested above) is correct
+   * and untouched — only the FIRST build must already look "in progress."
+   */
+  it('immediately after build (zero elapsed time, no updateStreams), some stream heads are already inside the visible viewport at every activity tier including IDLE', () => {
+    for (const activity of [0, 1, 2, 3, 4] as const) {
+      const streams = buildStreams(1280, 800, cfg({ seed: 42, activity }));
+      const visible = streams.filter((s) => s.y >= 0 && s.y <= 800);
+      expect(visible.length, `activity tier ${activity} has no immediately-visible stream heads`).toBeGreaterThan(0);
+    }
+  });
+
+  it('a frame rendered right after build (no updateStreams) actually draws visible glyphs, at IDLE too', () => {
+    const c = cfg({ seed: 42, activity: 0 });
+    const streams = buildStreams(1280, 800, c);
+    const ctx = recordingContext();
+    renderFrame(ctx, streams, [], c, 1280, 800);
+    expect(ctx.calls.fillText.length).toBeGreaterThan(0);
+  });
 });
 
 describe('movement and respawn', () => {

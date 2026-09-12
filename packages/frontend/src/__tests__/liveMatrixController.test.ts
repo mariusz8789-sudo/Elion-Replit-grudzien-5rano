@@ -521,8 +521,19 @@ describe('Genesis visual-state adapter', () => {
 describe('deriveGenesisVisualState — the real-state calibration table', () => {
   const QUIET: GenesisActivitySignals = { runInProgress: false, needsAttention: false, hasOpenInvestigation: false, savedExperimentCount: 0 };
 
-  it('Home / empty Science Memory: IDLE at zero intensity — a quiet system looks quiet', () => {
-    expect(deriveGenesisVisualState(QUIET)).toEqual({ activity: 'IDLE', intensity: 0 });
+  /**
+   * REGRESSION — measured, not assumed: the original "a quiet system looks
+   * quiet" resting value of `intensity: 0` put the glow bucket below its LOW
+   * threshold (glow off entirely) which, with the IDLE density tier, rendered
+   * a background at 0.24-0.79% lit pixels in real Chromium — mounted, drawn
+   * every frame, and invisible to a human. A resting tier must still be the
+   * CALMEST of the five, but it must be seen.
+   */
+  it('Home / empty Science Memory: IDLE, the calmest tier, but above the glow threshold so it is actually visible', () => {
+    const state = deriveGenesisVisualState(QUIET);
+    expect(state.activity).toBe('IDLE');
+    expect(state.intensity!).toBeGreaterThanOrEqual(0.34); // glow bucket: below this, glow is switched off entirely
+    expect(state.intensity!).toBeLessThan(deriveGenesisVisualState({ ...QUIET, savedExperimentCount: 12 }).intensity!);
   });
 
   it('Science Memory has records but nothing is open or running: ACTIVE, not IDLE and not artificially busy', () => {

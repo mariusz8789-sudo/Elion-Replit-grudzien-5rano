@@ -54,8 +54,12 @@ export const QUALITY_DPR_CAP = {
  * which is what "subtle ATTENTION signal" means. It is never a multiplier.
  */
 const ACTIVITY: readonly { speed: number; density: number; particles: number; amber: number }[] = [
-  { speed: 0.55, density: 0.6, particles: 0.15, amber: 0 },
-  { speed: 1.0, density: 1.0, particles: 0.4, amber: 0 },
+  // IDLE stays the calmest tier of the five, but not an invisible one: at the
+  // previous 0.55/0.6/0.15 it rendered ~47 streams over a 1280px viewport,
+  // measured at well under 1% lit pixels — a background that is technically
+  // running and practically absent. Still the slowest and sparsest row here.
+  { speed: 0.8, density: 1.0, particles: 0.35, amber: 0 },
+  { speed: 1.0, density: 1.15, particles: 0.4, amber: 0 },
   { speed: 1.15, density: 1.2, particles: 0.7, amber: 0 },
   { speed: 1.45, density: 1.45, particles: 1.1, amber: 0 },
   { speed: 1.2, density: 1.25, particles: 0.9, amber: 0.12 },
@@ -66,16 +70,23 @@ const SPEED_MULT: Record<SpeedLevel, number> = { LOW: 0.6, MEDIUM: 1, HIGH: 1.5 
 
 /** `flicker`, like `amber`, is a probability in [0,1] — not a multiplier. */
 const QUALITY: Record<QualityLevel, { density: number; fade: number; glowBlur: number; dprCap: number; flicker: number }> = {
-  HIGH: { density: 1, fade: 0.14, glowBlur: 9, dprCap: QUALITY_DPR_CAP.HIGH, flicker: 0.05 },
+  // `fade` is how hard each frame paints over the last one: LOWER = longer
+  // trails. 0.14 wiped a column in ~7 frames (~120ms), which is why the field
+  // read as isolated dots rather than falling streaks.
+  HIGH: { density: 1, fade: 0.09, glowBlur: 9, dprCap: QUALITY_DPR_CAP.HIGH, flicker: 0.05 },
   MEDIUM: { density: 0.8, fade: 0.18, glowBlur: 6, dprCap: QUALITY_DPR_CAP.MEDIUM, flicker: 0.03 },
   LOW: { density: 0.55, fade: 0.26, glowBlur: 0, dprCap: QUALITY_DPR_CAP.LOW, flicker: 0 },
   REDUCED_MOTION: { density: 0.7, fade: 1, glowBlur: 5, dprCap: QUALITY_DPR_CAP.REDUCED_MOTION, flicker: 0 },
 };
 
 /** Depth: BACKGROUND (slow, dim, deep) → MIDGROUND (the main field) → FOREGROUND (sparse, sharp). */
+// Alphas raised from 0.26/0.5/0.85: at the original values the field measured
+// visible to a pixel counter but not to a person — the background layer in
+// particular sat at 0.26 over a near-black fill. Depth ORDER is unchanged
+// (background dimmest, foreground sharpest); only the floor moved up.
 const LAYERS = [
-  { fs: 10, alpha: 0.26, speed: 26 },
-  { fs: 14, alpha: 0.5, speed: 58 },
+  { fs: 10, alpha: 0.42, speed: 26 },
+  { fs: 14, alpha: 0.66, speed: 58 },
   { fs: 18, alpha: 0.85, speed: 104 },
 ] as const;
 
@@ -168,8 +179,19 @@ export function buildStreams(width: number, height: number, cfg: MatrixConfig): 
       out.push({
         layer: L,
         x: col * step,
-        // Staggered starts: the field is never born on one horizontal line.
-        y: -rng() * height * 1.6 - cells * base.fs * 0.5,
+        // Staggered starts across the FULL visible height, not only above it —
+        // this is the initial BUILD, standing in for "the field has already
+        // been running." Placing every stream above the viewport (as respawn
+        // correctly does — see `updateStreams`, which re-enters a finished
+        // stream above y=0 so it never pops in mid-screen) would mean the
+        // slowest layer (26px/s base, further slowed by low-activity tiers)
+        // takes tens of seconds of real wall-clock time to scroll down into
+        // view from a `-height*1.6` start — measured empirically as a fully
+        // black canvas for the first ~10-14s and still <0.2% populated at 30s
+        // on a fresh IDLE-tier mount. `updateStreams`'s respawn logic is
+        // untouched and still re-enters above the viewport, which is correct
+        // there because other streams are already on screen by that point.
+        y: rng() * (height + cells * base.fs * 1.6) - cells * base.fs * 1.6,
         speed: base.speed * (0.6 + rng() * 0.9),
         fontSize: base.fs,
         cells,

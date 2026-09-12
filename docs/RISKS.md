@@ -89,7 +89,7 @@ deklaracją dobrych intencji.
 
 ---
 
-## R-005 — Brak kotwicy w danych zewnętrznych · ZWĘŻONE DALEJ (2026-09-12, druga kotwica EMPIRYCZNA + belief revision), nie zamknięte
+## R-005 — Brak kotwicy w danych zewnętrznych · ZWĘŻONE DALEJ (2026-09-12, PIERWSZA kotwica INSTRUMENTALNA: CMS Z→μμ), nie zamknięte w całości
 
 **Fakt.** Na dzień pisania Genesis mierzy przede wszystkim WŁASNĄ spójność:
 solvery, prowieniencja, replay i falsyfikacja działają, ale obserwacje, wobec
@@ -120,11 +120,57 @@ wprost, z tą samą wagą wizualną co werdykt;
 danych naukowych jest odrzucany przez politykę proxy (dowód w
 `P2_EVIDENCE.md`), a sfabrykowanie zbioru byłoby zakazane.
 
-**Następny krok, konkretnie.** Kotwica empiryczna na CMS Open Data Z→μμ 2011
-(rekord 5208, CC0): `compute/cmsOpenDataAdapter.mjs` już czyta ten zbiór z
-weryfikacją SHA-256 i zwraca `DATA_REQUIRED` zamiast syntetyku, ale
-`Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest zablokowany z tego
-sandboxa — ten sam obejście (CI z otwartym egressem) może zadziałać tu też.
+**ZROBIONE (2026-09-12, C1): kotwica instrumentalna na CMS Open Data Z→μμ
+2011 (rekord 5208, CC0).** Punkt (2) powyżej (brak ingestion na żywo) jest
+teraz częściowo domknięty przez PIERWSZY prawdziwy POMIAR INSTRUMENTALNY w
+repo — nie przeliczoną wartość jak PubChem/Kepler, tylko realny odczyt
+detektora CMS. `compute/cmsOpenDataAdapter.mjs`/`cms_zmumu_worker.py`/model
+Fabric `particle-cern-cms-zmumu-invariant-mass` już istniały, w pełni
+zaimplementowane i przetestowane pod nieobecność danych (`DATA_REQUIRED`) —
+brakowało wyłącznie samego pliku `Zmumu.csv`. `opendata.cern.ch` jest
+zablokowany z tego sandboksa (403 na CONNECT, zmierzone bezpośrednio), więc
+plik pobrano przez GitHub Actions (`scripts/fetch-cms-zmumu-fixture.mjs`,
+job `cms-zmumu-recon`), zweryfikowano SHA-256 przeciw wartości JUŻ
+zapisanej w `cms_zmumu_worker.py::EXPECTED_SHA256`
+(`7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1`) i
+przypięto pod `packages/backend/src/compute/cms-zmumu/Zmumu.csv`.
+
+**Realna przeszkoda po drodze, nie ukryta.** Pierwsza próba wydrukowania
+całego pliku (970 KB, 10001 linii) do jednego loga joba okazała się
+NIECZYTELNA: `get_job_logs` po cichu zwrócił tylko OSTATNIE ~5000 linii
+(~630 KB) tego joba, niezależnie od żądanego zakresu, bez żadnego błędu —
+ta sama klasa cichego obcinania, na którą trafiła kotwica QE4/Brydges
+powyżej ~2,5 MB łącznej zawartości. Rozwiązanie: job macierzowy na 4
+fragmenty, każdy z jawnie ponumerowanymi liniami (żeby dało się je złożyć w
+dowolnej kolejności odczytu), każdy log osobno mały. Po złożeniu wszystkich
+czterech fragmentów odtworzony plik dał SHA-256 **bajt-w-bajt zgodny** z
+wartością oczekiwaną — potwierdzone lokalnie: `python3 -c "import
+hashlib; print(hashlib.sha256(open('packages/backend/src/compute/cms-zmumu/Zmumu.csv','rb').read()).hexdigest())"`
+→ `7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1`.
+
+**Weryfikacja, nie deklaracja.** Uruchomiony lokalnie prawdziwy worker
+Pythona na przypiętym pliku (bez sieci) daje DOKŁADNIE te liczby, które
+`cmsOpenDataCompute.test.mjs` miał już zapisane jako oczekiwane, zanim plik
+istniał: `eventCount=10000`, `events80To100GeV=8259`,
+`median=90.28540772526225`. Trzeci test tego pliku, dotąd `{ skip:
+!configuredDataDir }`, teraz przechodzi NAPRAWDĘ (nie jest pomijany):
+`GENESIS_CERN_OPEN_DATA_DIR=.../cms-zmumu node --test
+packages/backend/src/cmsOpenDataCompute.test.mjs` → `3/3 pass`. Pełny
+backend: `397/397 pass, 33 skipped` (było `396/396, 34 skipped` — jeden
+mniej pominięty, dokładnie ten). Job CI zamieniony z jednorazowego
+bootstrapu na trwałą kontrolę dryfu (`cms-zmumu-verify-pinned`, świeży
+fetch porównywany z przypiętą kopią przy każdym pushu), a
+`GENESIS_CERN_OPEN_DATA_DIR` ustawiony w kroku testowym CI, żeby ten test
+uruchamiał się naprawdę, nie zostawał pominięty w praktyce.
+
+**Co to zamyka, a co nie.** Zamyka punkt (2) dla TEJ jednej kotwicy: mamy
+teraz przykład prawdziwego pomiaru instrumentalnego (nie przeliczonej
+wartości) w repo, opisową statystykę masy niezmienniczej z 10 000
+rzeczywistych zdarzeń dimionowych CMS. NIE zamyka punktu (2) w ogóle —
+nadal nie ma ingestion API na żywo (dane przypięte, nie pobierane w czasie
+rzeczywistym) i to jest opisowa statystyka, nie test falsyfikacyjny
+(brak tu jeszcze prerejestrowanej predykcji Genesis do porównania — to
+jest naturalny „next question" dla tej kotwicy, poza zakresem tego zadania).
 
 **Próba drugiej kotwicy (2026-09-12, Kepler/NASA Exoplanet Archive):
 BLOCKED z tego środowiska, potem ZAMKNIĘTA przez inne, bezpieczniejsze

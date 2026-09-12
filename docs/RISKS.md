@@ -139,7 +139,15 @@ hardkodowany ID — więc kolejna próba (inne środowisko z dostępem, albo inn
 
 ---
 
-## R-006 — Redeploy kontenerowy z woluminem · MITIGATED przez CI, nie przez to środowisko
+## R-006 — Redeploy kontenerowy z woluminem · MITIGATED, ZIELONY dowód w CI (2026-09-12)
+
+**Potwierdzone realnym uruchomieniem, nie deklaracją.** Job `docker-image`
+(`.github/workflows/ci.yml`) na commicie `0c78866` (run `34712028969`):
+`conclusion: "success"` na budowie obrazu I na realnym drillu redeployu
+(kill kontenera, restart na tym samym nazwanym woluminie, konto/projekt
+sprzed redeployu odczytane po). `docs/DECISIONS.md`, D-019 — sprawdzone
+przez `mcp__github__actions_get`, nie założone. To jest pierwszy realny
+`docker build`/`docker run` tego repo w historii, zakończony sukcesem.
 
 **Fakt, poprawiony.** Poprzednia wersja tego wpisu mówiła „brak demona
 Dockera" — nieprecyzyjne. Demon URUCHAMIA SIĘ w tym środowisku (własny

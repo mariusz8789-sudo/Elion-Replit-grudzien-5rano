@@ -478,3 +478,71 @@ pozostaje (blokada CDN, D-016) — ale to JEST teraz zweryfikowane wobec
 DOKŁADNEGO odtworzenia zachowania `.dockerignore`+`COPY . .`+`npm ci`, więc
 pewność jest znacznie wyższa niż przy poprzednich dwóch próbach. Ostateczne
 potwierdzenie: kolejny push, job `docker-image` w Actions.
+
+---
+
+## D-019 (2026-09-12, R-006) — `docker-image` ZIELONY w Actions: realny dowód, nie deklaracja
+
+**Fakt, sprawdzony przez `mcp__github__actions_get`/`list_workflow_jobs`, nie
+założony.** Uruchomienie na commicie `0c78866` (run `34712028969`, job
+`103602393736` „Obraz produkcyjny — build i realny smoke test kontenera"):
+`conclusion: "success"` na OBU krokach —
+„Budowa obrazu z realnym identyfikatorem wydania" (45 s) I
+„Realny redeploy drill — kontener + zamontowany wolumin" (5 s).
+
+**Co to oznacza konkretnie.** Realny `docker build` z `--build-arg
+GENESIS_COMMIT=<sha>` powiódł się na runnerze GitHub Actions. Realny drill
+(rejestracja konta → utworzenie projektu → `docker rm -f` starego kontenera →
+nowy kontener na TYM SAMYM nazwanym woluminie → logowanie tym samym kontem →
+odczyt listy projektów) potwierdził PRZETRWANIE danych przez cykl
+kill+restart kontenera — dokładnie scenariusz, którego P0.2 nigdy nie mogło
+zweryfikować lokalnie (D-016, blokada CDN). To zamyka R-006 realnym dowodem
+wykonania, nie deklaracją.
+
+**Droga do tego dowodu, uczciwie, z porażkami po drodze.** Trzy kolejne
+próby zanim to zadziałało (D-017, D-018) — pierwsza (brak
+`packages/csrn/package.json` w COPY) i druga (diagnostyka wersji) NIE
+naprawiły błędu, trzecia (prawdziwa przyczyna: produkcyjny kod przypadkowo
+polegał na przecieku typów z pliku testowego, którego `.dockerignore` po raz
+pierwszy w historii repo nie dołączył do builda) go naprawiła. Zapisane w
+kolejności, z prawdziwymi logami z każdej próby, nie tylko finałowym
+sukcesem.
+
+---
+
+## D-020 (2026-09-12, G3) — Fałszywy alarm w strażniku tokenów A4 naprawiony po realnych danych z CI, nie zgadnięty
+
+**Kontekst.** `nist-g3-pinned-artifacts` był RED od co najmniej 4 pushy
+(zauważone dopiero teraz przy przeglądzie zakładki Actions — luka w
+procesie, nie w kodzie: nikt nie sprawdzał tego joba osobno od `verify`).
+Strażnik w `scripts/fetch-atom-bohr-nist-fixtures.mjs` odmawiał zapisu
+oficjalnej strony warunków NIST, bo dopasował `/pk[.][A-Za-z0-9_-]+/` —
+wzorzec mający chwytać przypadkowo osadzone tokeny dostępu.
+
+**Diagnostyka bez zgadywania.** Ten sandbox nie ma dostępu do
+`www.nist.gov` (ta sama polityka proxy co przy CERN/NASA/Docker Hub —
+D-016). Zamiast zgadywać naprawę, dodano bezpieczną, nie-ujawniającą
+diagnostykę (redagowany kontekst + skrócony hash SHA-256 dopasowanego
+ciągu, NIGDY sam token) i poczekano na realny log z Actions, gdzie
+nist.gov JEST osiągalny.
+
+**Realny wynik (job `103602393715`, commit `0c78866`), zacytowany, nie
+streszczony:** dopasowanie leży dokładnie w
+`"nist_map":{"mapbox_access_token":"[REDACTED].LGaxtrLTglfvQHdKGEsTBw"}` —
+to jest PUBLICZNY token Mapbox (prefiks `pk.` = "publishable key" w
+dokumentacji Mapboksa, przeciwieństwo tajnego `sk.`), osadzony przez NIST we
+własnym widgecie mapy na stronie warunków. To jest fałszywy alarm, nie wyciek.
+
+**Naprawa, wąska celowo.** Strażnik teraz sprawdza KAŻDE dopasowanie
+`/pk[.][A-Za-z0-9_-]+/g` osobno: jeśli bezpośrednio poprzedza je literalny
+ciąg `"mapbox_access_token":"` (30-znakowe okno), traktowany jest jako
+znany, bezpieczny kontekst i budowa kontynuuje (z jawnym logiem
+wyjaśniającym dlaczego, bez ujawniania tokenu). KAŻDE INNE dopasowanie
+gdziekolwiek indziej na stronie WCIĄŻ odmawia zapisu dokładnie jak
+poprzednio — to zawęża wyjątek do jednego zweryfikowanego przypadku, nie
+osłabia strażnika ogólnie. Zweryfikowane trzema scenariuszami lokalnie
+(payload w kształcie realnej strony NIST → przechodzi; ten sam token w
+INNYM, niepowiązanym miejscu na stronie → wciąż odmawia; brak dopasowania →
+przechodzi), plus `node --check`/`eslint --max-warnings=0`. Ostateczne
+potwierdzenie — czy job faktycznie zazieleni się na prawdziwej stronie NIST
+— na kolejnym pushu.

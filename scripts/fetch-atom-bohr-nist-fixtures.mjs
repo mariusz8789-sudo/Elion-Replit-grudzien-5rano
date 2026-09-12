@@ -96,23 +96,45 @@ for (const item of artifacts) {
     }
   }
   if (item.id === 'A4-nist-srd-terms') {
-    const match = /pk[.][A-Za-z0-9_-]+/.exec(text);
-    if (match) {
+    // A real run on 2026-09-12 (GitHub Actions, where nist.gov is reachable)
+    // showed the ONLY match on this page is NIST's own map widget config:
+    // `"nist_map":{"mapbox_access_token":"pk...."}`. Mapbox's own docs
+    // define `pk.` tokens as PUBLIC/publishable -- meant to sit in page HTML,
+    // the counterpart to a secret `sk.` token -- so this specific, narrowly
+    // anchored context is a known false positive, not a credential leak.
+    // Any OTHER match of the same pattern anywhere else on the page is still
+    // refused exactly as before: this carves out one verified-safe case, it
+    // does not weaken the guard in general.
+    const genericPattern = /pk[.][A-Za-z0-9_-]+/g;
+    const allMatches = [...text.matchAll(genericPattern)];
+    const unexplained = allMatches.filter((m) => {
+      const before = text.slice(Math.max(0, m.index - 30), m.index);
+      return !before.includes('"mapbox_access_token":"');
+    });
+    if (unexplained.length > 0) {
+      const match = unexplained[0];
       // DIAGNOSTIC, NOT A LEAK: the matched token itself is NEVER printed —
       // only its length, a truncated non-reversible digest, and the
       // surrounding context with the token redacted. This is enough to tell
-      // a public, client-embedded key (e.g. a Mapbox `pk.` access token
-      // meant to sit in page HTML) from something that would actually need
-      // rotating, without putting the value itself into a CI log that is
-      // readable by anyone with repo access.
+      // a public, client-embedded key from something that would actually
+      // need rotating, without putting the value itself into a CI log that
+      // is readable by anyone with repo access.
       const idx = match.index;
       const before = text.slice(Math.max(0, idx - 80), idx).replace(/\s+/g, ' ');
       const after = text.slice(idx + match[0].length, idx + match[0].length + 80).replace(/\s+/g, ' ');
       const digest = createHash('sha256').update(match[0]).digest('hex').slice(0, 12);
       throw new Error(
         `A4-nist-srd-terms: official terms payload contains a string matching /pk[.][A-Za-z0-9_-]+/ ` +
+        `outside the known-safe Mapbox public-token context ` +
         `(length=${match[0].length}, sha256[0:12]=${digest}); refusing to write or upload it. ` +
         `Context (token itself redacted as [REDACTED]): "...${before}[REDACTED]${after}..."`,
+      );
+    }
+    if (allMatches.length > 0) {
+      console.log(
+        `G3 A4-nist-srd-terms: found ${allMatches.length} match(es) of /pk[.][A-Za-z0-9_-]+/, ` +
+        `all inside the known-safe Mapbox "mapbox_access_token" widget config (public/publishable ` +
+        `key per Mapbox's own docs, not a secret) — proceeding.`,
       );
     }
   }

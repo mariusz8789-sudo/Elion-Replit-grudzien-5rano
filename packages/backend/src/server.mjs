@@ -369,7 +369,13 @@ const server = http.createServer((req, res) => {
       static: staticAvailable,
       knowledgeLabs: knowledgeIndex.size,
       persistence: db ? 'ready' : 'unavailable',
-      toolchain: listToolchain().map((tool) => ({ id: tool.id ?? tool.name ?? 'unknown', status: tool.status, version: tool.version ?? null })),
+      // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
+      // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
+      // meant EVERY entry fell through to the literal 'unknown', so the health
+      // endpoint reported eight anonymous tools: you could see one AVAILABLE and
+      // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
+      // disclosure anonymised at exactly the surface an operator inspects.
+      toolchain: listToolchain().map((tool) => ({ id: tool.toolId ?? tool.id ?? tool.name ?? 'unknown', status: tool.status, version: tool.version ?? null })),
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);

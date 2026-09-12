@@ -94,6 +94,26 @@ describe('server HTTP persistence', () => {
     assert.equal(j.persistence, 'ready');
   });
 
+  /**
+   * REGRESSION: /api/health read `tool.id ?? tool.name`, but these records
+   * carry `toolId` (campaign/toolchain.mjs; /api/compute/toolchain reads
+   * `t.toolId`). Every entry therefore degraded to the literal 'unknown',
+   * so the endpoint an operator inspects — and the one the Dockerfile's
+   * HEALTHCHECK hits — reported eight anonymous engines: one AVAILABLE,
+   * seven BLOCKED_BY_RUNTIME, none identifiable. For a system whose claim
+   * is honest capability disclosure, anonymising the capability list is the
+   * defect, not a cosmetic detail.
+   */
+  test('health names every toolchain engine instead of reporting "unknown"', async () => {
+    const res = await fetch(base + '/api/health');
+    const j = await res.json();
+    assert.ok(Array.isArray(j.toolchain) && j.toolchain.length > 0, 'toolchain must be a non-empty array');
+    const unknown = j.toolchain.filter((t) => t.id === 'unknown' || !t.id);
+    assert.deepEqual(unknown, [], 'no toolchain entry may report an unknown id');
+    assert.ok(j.toolchain.some((t) => t.id === 'rdkit'), 'the real rdkit engine must be identifiable by id');
+    for (const tool of j.toolchain) assert.ok(typeof tool.status === 'string' && tool.status.length > 0, `${tool.id} must report a status`);
+  });
+
   test('full round-trip: register → project → trial → list, over HTTP', async () => {
     const reg = await api('POST', '/api/auth/register', { body: { email: 'esa@lab.org', password: 'password123' } });
     assert.equal(reg.status, 201);

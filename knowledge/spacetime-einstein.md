@@ -95,12 +95,129 @@ moduł "otwarte problemy fizyki" (Etap 2+).
 - Dodatkowe wymiary (Kaluza–Klein, ADD, Randall–Sundrum) ★★ — brak sygnatur
   w LHC do ~TeV
 
+## Tunele czasoprzestrzenne — pogłębiony katalog (falsyfikacyjny, nie budowlany)
+
+**Uwaga o źródłach.** Sekcja skompilowana z pamięci treningowej modelu
+(Qwen) bez odświeżenia na żywo w tej sesji — traktować cytowania jak
+prowizoryczne do czasu weryfikacji wobec arXiv/APS/NASA (dotyczy zwłaszcza
+wpisów bez pełnego autor+rok+czasopismo). Zasada nadrzędna: tunel
+czasoprzestrzenny to **hipoteza do sfalsyfikowania**, nie cel budowlany —
+Genesis nigdy nie twierdzi, że tunele istnieją ani że teleportacja materii
+jest możliwa.
+
+**Dlaczego przechodniość wymusza egzotyczną materię (twierdzenie, nie
+założenie modelu)** ★★★★
+Metryka Morrisa–Thorne'a: ds² = −e^{2Φ(r)}dt² + dr²/(1−b(r)/r) +
+r²dΩ². Warunek gardła b(r₀)=r₀, warunek flare-out b'(r₀)<1 — to on
+sprawia, że tunel się otwiera zamiast zapadać. Wstawienie do równań pola
+przy gardle daje ρ+p_r<0 (złamanie NEC) — to wynika z geometrii, nie jest
+wyborem modelowym. Warunki energetyczne klasyczne (NEC/WEC/SEC/DEC)
+spełnia cała znana materia klasyczna; pola kwantowe łamią je lokalnie
+(efekt Casimira, światło ściśnięte — zmierzone, FAKT), ale podlegają
+uśrednionym/skwantowanym granicom (ANEC, QNEC — Faulkner i in. 2016;
+dowód ogólny QNEC: Balakrishnan i in. 2017/2019; dowód holograficzny:
+Koeller 2016).
+
+**Ford–Roman quantum inequalities** ★★★★ — wielkość × czas trwania ujemnej
+energii jest ograniczone (Ford & Roman 1995); analizy półklasyczne (Nandi
+2004) sugerują, że tunel utrzymywany wyłącznie znaną fizyką kwantową ma
+gardło rzędu kilku rzędów wielkości powyżej długości Plancka, nie
+makroskopowe. Efekt Casimira między realnymi płytkami (Lamoreaux 1997) to
+FAKT zmierzony, ale o ~20+ rzędów wielkości za słaby, by utrzymać gardło
+metrowej skali — **krytyczne rozróżnienie: mały, zmierzony kwantowy efekt
+ujemnej energii ≠ możliwość inżynierii makroskopowej geometrii.** Nie
+łączyć tych dwóch w narracji.
+
+**Taksonomia (skrót)** — każda pozycja to matematycznie spójna geometria,
+żadna nie jest obserwacją:
+- Most Einsteina–Rosena — nieprzechodni (już w pliku wyżej)
+- Morris–Thorne (1988) ★★ — przechodni z konstrukcji, niestabilny bez
+  wsparcia egzotycznego
+- Ellis drainhole — źródło typu "duch" (ujemna energia kinetyczna);
+  Shinkai–Hayward (2002) numerycznie: **niestabilny** — perturbacja
+  prowadzi do zapadnięcia w czarną dziurę albo ekspansji inflacyjnej
+- Simpson–Visser (2019+) ★★ — jeden parametr `a` interpoluje ciągle
+  między czarną dziurą a tunelem przechodnim; siły pływowe i soczewkowanie
+  różnią BH / one-way WH / two-way WH obserwowalnie (konkretny,
+  policzalny dyskryminator dla przyszłego pipeline'u falsyfikacyjnego)
+- Cienka powłoka (Visser, warunki Israela) ★★ — egzotyka skonfinowana do
+  powłoki; zmienne równanie stanu może złagodzić niestabilność, ale
+  ujemna gęstość powierzchniowa pozostaje egzotyczna
+- Teo (1998) rotujący ★★ — uogólnienie Morrisa–Thorne'a; ryzyko CTC przy
+  wysokim spinie
+
+**Holograficzne tunele przechodnie (ER=EPR, Gao–Jafferis–Wall 2016;
+Maldacena–Qi 2018)** ★★★ w ramach AdS/CFT — sprzężenie double-trace
+między dwoma splątanymi układami wstrzykuje ujemną energię null czyniącą
+most ER przechodnim; ilość przesyłanej informacji jest ograniczona przez
+odpowiednik CFT (nie jest to kanał makroskopowy). Maldacena–Susskind
+(2013) "ER=EPR": splątanie ↔ geometria mostu ER. Status: rygorystyczne w
+modelu holograficznym, **brak** znanej płaskoprzestrzennej/makroskopowej
+realizacji inżynierskiej; analogi stołowe (SYK-like) są niesprawdzoną
+hipotezą.
+
+**Przyczynowość i CTC** ★★★ — tunele z końcami przesuniętymi czasowo
+względem siebie (ruch/grawitacja) mogą tworzyć zamknięte krzywe czasowe
+(Morris–Thorne–Yurtsever 1988). Hipoteza ochrony chronologii (Hawking
+1992): backreaction półklasyczna (rozbieżne ⟨T_μν⟩) prawdopodobnie temu
+zapobiega — nieudowodnione w pełnej grawitacji kwantowej. Otwarte.
+
+**Warp Alcubierre'a — spór o znak energii, nierozstrzygnięty** ★★
+Klasyczna bańka (już w pliku wyżej) wymaga łamania NEC. Van Den Broeck
+(1999) zredukował wymaganą energię drastycznie zmieniając geometrię
+bańki. Lentz (2021) zaproponował soliton rzekomo spełniający WEC
+("positive energy"); Santiago i in. (2022) kontrargumentują twierdzeniem,
+że generyczne warp drives łamią NEC. Spór aktywny — Genesis powinien
+traktować obie strony jako konkurujące hipotezy, nigdy nie ogłaszać
+zwycięzcy.
+
+**Zasada falsyfikacji obserwacyjnej (do przyszłego pipeline'u, jeśli
+zbudowany)** ★★★★ — dla KAŻDEJ kandydatki na sygnaturę tunelu
+(soczewkowanie, echa fal grawitacyjnych, kształt cienia EHT) dopasuj
+NAJPIERW najprostszy model konkurencyjny w kolejności: (1) czarna dziura
+Kerra/Schwarzschilda, (2) zwykła soczewka grawitacyjna, (3) znany zwarty
+obiekt, (4) egzotyczny zwarty obiekt (gwiazda bozonowa, gravastar), (5)
+plazma/krzywizna, (6) błąd systematyczny/instrumentalny. Tunel wygrywa
+tylko gdy (1)–(6) są statystycznie odrzucone. Obecne dane: cień EHT M87*
+i Sgr A* zgodny z czarną dziurą Kerra — sygnatury tunelu NIE są dziś
+wspierane. Ta reguła (najprostsze wyjaśnienie najpierw) jest bardziej
+wartościowa dla Genesis jako metoda niż sam temat tuneli — stosuje się do
+każdej anomalii obserwacyjnej, nie tylko wormholi.
+
+**Drabina epistemiczna (kryteria promocji, reużywalne poza tematem)**:
+matematyczna możliwość → fizycznie prawdopodobne (wymaga: rozwiązania
+równań pola, źródła z realnej teorii pola nie postulowanego na sztywno,
+przetrwania granic kwantowych, dowiedzionej stabilności) → wspierane
+obserwacyjnie (≥5σ, preferowane nad modelami konkurencyjnymi, powtórzone
+niezależnie) → zweryfikowane eksperymentalnie → możliwość inżynierska
+(dziś: brak znanej ścieżki, może być nieosiągalna).
+
+**Co byłoby prawdziwym przełomem, nawet negatywnym** ★★★★ — dowód, że
+płaskoprzestrzenne przechodnie tunele są niemożliwe pod QNEC, jest
+odkryciem wysokiej wartości mimo że "kończy marzenie" — to prawdziwa
+nauka, nie porażka.
+
 ## Publikacje i książki
 - James, von Tunzelmann, Franklin, Thorne 2015 — CQG 32, 065001 (open access) —
   nasza biblia renderingu
 - Luminet 1979, A&A 75, 228 (pierwszy obraz dysku)
 - EHT 2019, ApJL 875 (M87*); Morris & Thorne 1988, Am. J. Phys. 56, 395
 - Alcubierre 1994, CQG 11, L73; Einstein & Rosen 1935, Phys. Rev. 48, 73
+- Ford & Roman 1995, Phys. Rev. D 51, 4277 (quantum inequalities); Hawking
+  1992, Phys. Rev. D 46, 603 (chronology protection); Morris, Thorne &
+  Yurtsever 1988, PRL 61, 1446 (tunel jako wehikuł czasu)
+- Shinkai & Hayward 2002, Phys. Rev. D 66, 044005 (niestabilność Ellisa,
+  numerycznie); Teo 1998, Phys. Rev. D 58, 024014 (tunele rotujące)
+- Gao, Jafferis & Wall 2017, JHEP 12, 151 (tunel przechodni holograficzny);
+  Maldacena & Susskind 2013, Fortsch. Phys. 61, 781 (ER=EPR); Maldacena &
+  Qi 2018, arXiv:1804.00491 (wieczny tunel przechodni, SYK sprzężone)
+- Van Den Broeck 1999, CQG 16, 3973 (redukcja energii warp); Santiago,
+  Schuster & Visser 2022, Phys. Rev. D 105, 064038 (generyczne warp drives
+  łamią NEC — kontrargument dla Lentz 2021); Simpson & Visser 2019, JCAP
+  02, 042 (interpolacja BH↔tunel)
+- ★ Uwaga: powyższe cytowania z pamięci treningowej Qwena, nie
+  zweryfikowane na żywo w tej sesji — sprawdzić DOI/arXiv przed użyciem
+  jako twarde źródło w materiale zewnętrznym (np. wniosek grantowy)
 - Podręczniki: Hartle *Gravity* (optymalny poziom dla nas); Taylor & Wheeler
   *Spacetime Physics* (II wyd. darmowe od autorów); Carroll — darmowe notatki
   arXiv:gr-qc/9712019

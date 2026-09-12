@@ -46,6 +46,22 @@ Testy bez luk: 2015 (Delft, Wiedeń, NIST); Nobel 2022.
 Utrata koherencji przez splątanie z otoczeniem wyjaśnia, czemu makroświat
 wygląda klasycznie. Nie rozwiązuje sama problemu pomiaru (patrz spory).
 
+**Twierdzenie o zakazie klonowania (no-cloning)** ★★★★★ — brak liniowej,
+unitarnej operacji kopiującej dowolny nieznany stan kwantowy (Wootters &
+Zurek 1982; Dieks 1982). Konsekwencja liniowości MK, nie ograniczenie
+techniczne. To dlaczego teleportacja (wyżej) *przenosi* stan, niszcząc go
+u nadawcy, zamiast go kopiować — i dlaczego "teleportacja makroskopowego
+obiektu" (~10²⁸ stopni swobody, jak w SF) jest wykluczona strukturalnie,
+nie tylko technicznie trudna.
+
+**Twierdzenie o braku sygnalizacji (no-communication)** ★★★★★ — mimo
+nielokalnych korelacji Bella, splątanie samo w sobie nie pozwala przesłać
+informacji szybciej niż c: zredukowana macierz gęstości odbiorcy nie
+zależy od wyboru pomiaru nadawcy, dopóki nie dotrze kanał klasyczny
+(stąd 2 bity klasyczne na kubit w protokole teleportacji, wyżej). To
+formalny powód, dla którego żaden efekt kwantowy — teleportacja, ER=EPR
+(patrz Space-Time Lab) — nie daje sygnalizacji nadświetlnej.
+
 ## Sprzeczne teorie / otwarte spory
 
 **Interpretacje MK — wszystkie dają identyczne przewidywania pomiarowe:**

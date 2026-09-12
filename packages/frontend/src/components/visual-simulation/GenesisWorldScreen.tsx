@@ -34,7 +34,9 @@ import { DISCOVERY_ORCHESTRATOR_CONTRACT_VERSION, type DiscoveryRan } from '../.
 import { buildGenesisMatrixView, type GenesisMatrixView } from '../../core/agent/genesisMatrix';
 import { narrateIntro, narrateRound, narrateNext, narrateInvestigation, type NarrationPhase } from '../../core/agent/genesisNarration';
 import { detectRenderTier, type InteractiveRenderTier } from '../../core/three/quality';
-import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
+import type { GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
+import { Construct } from '../../core/worldModel/construct/construct';
+import { buildConstructManifest } from '../../core/worldModel/construct/constructItem';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
 import { buildUniformFuelBed, simulateWildfireSpread, type WildfireSpreadResult, type WindVector } from '../../core/worldModel/domains/wildfireSpread';
@@ -379,6 +381,16 @@ export class GenesisWorldSim3D implements Sim3D {
   nearHospitalEntrance = false;
 
   readonly city: GenesisScientificCity4;
+  /**
+   * Genesis Construct — the real production consumer this page loads
+   * the flagship city through (Variant 1: Construct -> WorldRegistry ->
+   * genesisScientificCity4.ts), rather than calling
+   * `buildGenesisScientificCity4` directly. `dispose()` below unloads it,
+   * exercising the loader's full lifecycle on this page's own real mount/
+   * unmount, not only in a test.
+   */
+  private readonly construct: Construct;
+  private static readonly FLAGSHIP_ITEM_ID = 'genesis-scientific-city-4-flagship';
   forkEngine: TemporalEngine | null = null;
   showFork = false;
   scrubTick: number | null = null;
@@ -425,7 +437,24 @@ export class GenesisWorldSim3D implements Sim3D {
   onSelect?: (id: WorldFrameEntityId | null) => void;
 
   constructor() {
-    this.city = buildGenesisScientificCity4({ rainfallAtTick: 2, populationCount: 5000 });
+    this.construct = new Construct();
+    const manifest = buildConstructManifest('genesis-world-screen', [{
+      itemId: GenesisWorldSim3D.FLAGSHIP_ITEM_ID,
+      worldType: 'GENESIS_SCIENTIFIC_CITY_4',
+      worldId: 'genesis-scientific-city-4',
+      // Declared axes carried through untouched by Construct (no silent epistemic upgrade): this
+      // is the same real, solver-backed flagship scenario `worldModelGenesisScientificCity4.test.ts`
+      // exercises directly — a well-supported procedural model, not measured/reference data.
+      modelStatus: 'WELL_SUPPORTED_MODEL',
+      dataProvenance: 'SIMULATED',
+      options: { rainfallAtTick: 2, populationCount: 5000 },
+    }]);
+    const loaded = this.construct.load(manifest);
+    const entry = loaded.entries[0];
+    if (entry.state !== 'LOADED' || !entry.world) {
+      throw new Error(`Genesis Construct failed to load the flagship City 4.0 world: ${entry.error ?? 'unknown error'}`);
+    }
+    this.city = entry.world;
     this.interactableIds = [
       this.city.pumpPipeId,
       GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
@@ -1881,6 +1910,7 @@ export class GenesisWorldSim3D implements Sim3D {
   }
 
   dispose(): void {
+    this.construct.unload(GenesisWorldSim3D.FLAGSHIP_ITEM_ID);
     this.renderer?.dispose();
     this.wildfireField?.dispose();
     this.landslideField?.dispose();

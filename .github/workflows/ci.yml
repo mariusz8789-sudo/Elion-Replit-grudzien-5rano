@@ -221,6 +221,85 @@ jobs:
           path: artifacts/qe4-brydges
           retention-days: 90
 
+  qe4-brydges-pin-exact-files:
+    name: QE4 pin — exact preregistered files, Zenodo 2527010 (Brydges)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Phase 0 recon (qe4-brydges-recon) confirmed the real file tree, real
+    # checksum (matches both Zenodo's own API and the task-stated MD5), real
+    # license (CC-BY-4.0), and real CSV/docx format. This job re-fetches
+    # (cheap, ~10s) and prints the FULL content of exactly the files the
+    # preregistered analysis (docs/QE4_PREREGISTRATION.md) commits to using —
+    # no more, no fewer — so the sandbox can reconstruct and pin them
+    # byte-for-byte via its own SHA-256 check against the printed hash,
+    # exactly the technique already used for the Kepler/NASA NSSDCA anchor.
+    # The Azure Blob artifact-download URL from the recon job is blocked by
+    # this repo's own egress policy (confirmed directly), so content must
+    # come through the job's own log, not an artifact download.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch Zenodo record + archive again, verify checksum
+        env:
+          GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
+        run: node scripts/fetch-qe4-brydges-fixture.mjs
+      - name: Extract and print full content of exactly the preregistered files
+        env:
+          GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
+        run: |
+          set -e
+          DIR="$GENESIS_QE4_FIXTURE_DIR"
+          mkdir -p "$DIR/extracted"
+          unzip -o "$DIR/Data_aau4963_Updated.zip" -d "$DIR/extracted" > /dev/null
+          ROOT="$DIR/extracted/Data_aau4963"
+          FILES=(
+            "10Ions_CleanSystem/MeasuredStates_T_0ms.csv"
+            "10Ions_CleanSystem/MeasuredStates_T_1ms.csv"
+            "10Ions_CleanSystem/MeasuredStates_T_2ms.csv"
+            "10Ions_CleanSystem/MeasuredStates_T_3ms.csv"
+            "10Ions_CleanSystem/MeasuredStates_T_4ms.csv"
+            "10Ions_CleanSystem/MeasuredStates_T_5ms.csv"
+            "10Ions_CleanSystem/RenyiEntropy_T_0ms.csv"
+            "10Ions_CleanSystem/RenyiEntropy_T_1ms.csv"
+            "10Ions_CleanSystem/RenyiEntropy_T_2ms.csv"
+            "10Ions_CleanSystem/RenyiEntropy_T_3ms.csv"
+            "10Ions_CleanSystem/RenyiEntropy_T_4ms.csv"
+            "10Ions_CleanSystem/RenyiEntropy_T_5ms.csv"
+            "10Ions_CleanSystem/RenyiEntropyAllPartitions_T_5ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_01ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_02ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_04ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_06ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_10ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_16ms.csv"
+            "10Ions_withDisorder/MeasuredStates_T_20ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_1ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_2ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_4ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_6ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_10ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_16ms.csv"
+            "10Ions_withDisorder/RenyiEntropy_T_20ms.csv"
+            "Fig1a/PureState.csv"
+            "Fig1a/MixedState.csv"
+          )
+          for rel in "${FILES[@]}"; do
+            f="$ROOT/$rel"
+            echo "QE4-PIN BEGIN $rel"
+            echo "QE4-PIN SHA256 $rel $(sha256sum "$f" | cut -d' ' -f1)"
+            echo "QE4-PIN BYTES $rel $(wc -c < "$f")"
+            cat "$f"
+            echo "QE4-PIN END $rel"
+          done
+          echo "QE4-PIN BEGIN zenodo-record.json"
+          echo "QE4-PIN SHA256 zenodo-record.json $(sha256sum "$DIR/zenodo-record.json" | cut -d' ' -f1)"
+          cat "$DIR/zenodo-record.json"
+          echo "QE4-PIN END zenodo-record.json"
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

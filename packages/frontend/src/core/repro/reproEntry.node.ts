@@ -1,0 +1,77 @@
+/**
+ * REPRODUCIBILITY ENTRY (P3.2) — jedyny punkt, przez który `scripts/repro-demo.mjs`
+ * dosięga warstwy naukowej.
+ *
+ * Istnieje, bo warstwa naukowa jest w TypeScripcie i mieszka w pakiecie
+ * frontendu, a demo dla komisji musi być JEDNYM poleceniem w Node. Ten plik
+ * jest wyłącznie fasadą: nie liczy niczego własnego, nie ma własnego werdyktu i
+ * nie duplikuje żadnego kontraktu — wywołuje `runExternalAnchor` oraz
+ * `runAutonomousInquiry` i oddaje to, co zwróciły, plus ich odciski.
+ *
+ * Uruchamiany przez esbuild (`--platform=node`), nigdy przez przeglądarkę —
+ * dlatego `.node.ts` i wpis w `ALLOWED_ORPHANS` w `moduleReachability.test.ts`.
+ */
+
+import { runExternalAnchor, MOLECULAR_WEIGHT_ANCHOR_ID } from '../biotechData/externalAnchor';
+import { qe3BoundEntanglementInquiry } from '../agent/entanglementInquiry';
+import { inquiryResultFingerprint, runAutonomousInquiry } from '../agent/inquiryLoop';
+
+export interface ReproAnchorReport {
+  readonly anchorId: string;
+  readonly assessment: string;
+  readonly predictedValue: number | null;
+  readonly observedValue: number | null;
+  readonly observationOrigin: string;
+  readonly verificationFingerprint: string;
+  readonly replay: string;
+  readonly whatRemainsUntested: string;
+}
+
+export interface ReproInquiryReport {
+  readonly question: string;
+  readonly modelId: string;
+  readonly rounds: number;
+  readonly probes: readonly number[];
+  readonly surviving: readonly string[];
+  readonly falsified: readonly string[];
+  readonly stopReason: string;
+  readonly dataProvenance: string;
+  readonly resultFingerprint: string;
+}
+
+/** Kotwica zewnętrzna (P2.3), dokładnie tak jak renderuje ją `#/evidence`. */
+export function reproExternalAnchor(): ReproAnchorReport {
+  const result = runExternalAnchor(MOLECULAR_WEIGHT_ANCHOR_ID);
+  if (!result.ok) throw new Error(`Kotwica odmówiła: ${result.reason}`);
+  return {
+    anchorId: result.anchorId,
+    assessment: result.verification.assessment,
+    predictedValue: result.verification.predictedValue,
+    observedValue: result.verification.observedValue,
+    observationOrigin: result.observationOrigin,
+    verificationFingerprint: result.verificationFingerprint,
+    replay: result.replay,
+    whatRemainsUntested: result.whatRemainsUntested,
+  };
+}
+
+/**
+ * QE3 — autonomiczne dochodzenie, w którym rozstrzyga DRUGIE kryterium (CCNR),
+ * bo wszyscy kandydaci są PPT. Wybrane do demo, bo jest deterministyczne,
+ * kończy się ODZYSKANIEM ukrytego parametru i pokazuje, że falsyfikacja
+ * naprawdę odrzuca trzy z czterech hipotez.
+ */
+export function reproQe3Inquiry(): ReproInquiryReport {
+  const result = runAutonomousInquiry(qe3BoundEntanglementInquiry(0.4));
+  return {
+    question: result.question,
+    modelId: result.modelId,
+    rounds: result.rounds.length,
+    probes: result.rounds.map((round) => round.probeValue),
+    surviving: result.survivingHypothesisIds,
+    falsified: result.falsifiedHypothesisIds,
+    stopReason: result.stopReason,
+    dataProvenance: result.dataProvenance.origin ?? 'MIXED',
+    resultFingerprint: inquiryResultFingerprint(result),
+  };
+}

@@ -89,7 +89,7 @@ deklaracją dobrych intencji.
 
 ---
 
-## R-005 — Brak kotwicy w danych zewnętrznych · OPEN (najważniejsze naukowo)
+## R-005 — Brak kotwicy w danych zewnętrznych · ZWĘŻONE (2026-09-12), nie zamknięte
 
 **Fakt.** Na dzień pisania Genesis mierzy przede wszystkim WŁASNĄ spójność:
 solvery, prowieniencja, replay i falsyfikacja działają, ale obserwacje, wobec
@@ -103,9 +103,29 @@ eksperymentu, w którym obserwacja pochodzi ze źródła niezależnego od Genesi
 całą narrację da się streścić jako „mierzymy własną spójność". To jest zdanie,
 które komisja może napisać w recenzji, a my nie mamy czym go odeprzeć.
 
-**Naprawa:** pakiet P2.3 (minimalny ingestion publicznych danych → jeden
-eksperyment end-to-end z pełną prowieniencją i replay MATCH). **Status: nie
-wykonany na dzień tego wpisu.**
+**Co się zmieniło 2026-09-12 (P2.3, `docs/P2_EVIDENCE.md`).** Powstał działający,
+przetestowany kontrakt kotwicy: obserwacja pochodzi z PRZYPIĘTEGO, sumowanego,
+cytowanego payloadu zewnętrznego (PubChem CID 2519), a nie — jak dotąd — z
+liczby wpisanej ręcznie w pole tekstowe wraz z ręcznie wpisanym cytatem
+(`DrugDiscoveryScreen.tsx:141-150`). Kotwica odmawia działania przy zmianie
+payloadu, składa cytat z prowieniencji zbioru, jest realnie falsyfikowalna
+(dowód: zła predykcja dostaje FALSIFIED) i daje replay MATCH. Widoczna na
+`#/evidence` także bez żadnych zapisanych danych.
+
+**Dlaczego to NIE zamyka ryzyka.** Dwie rzeczy zostają:
+(1) to jest WERYFIKACJA WOBEC NIEZALEŻNEGO ŹRÓDŁA, nie pomiar przyrody —
+PubChem swojej masy molowej też nie mierzy, liczy ją z wzoru; ekran mówi to
+wprost, z tą samą wagą wizualną co werdykt;
+(2) nie ma ingestion publicznego API na żywo — egress do wszystkich hostów
+danych naukowych jest odrzucany przez politykę proxy (dowód w
+`P2_EVIDENCE.md`), a sfabrykowanie zbioru byłoby zakazane.
+
+**Następny krok, konkretnie.** Kotwica empiryczna na CMS Open Data Z→μμ 2011
+(rekord 5208, CC0): `compute/cmsOpenDataAdapter.mjs` już czyta ten zbiór z
+weryfikacją SHA-256 i zwraca `DATA_REQUIRED` zamiast syntetyku, ale
+`Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest zablokowany. To jest
+pomiar instrumentalny, nie wartość przeliczona — czyli kotwica, która zamyka
+punkt (1).
 
 ---
 

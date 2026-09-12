@@ -6,6 +6,7 @@ import {
   buildCaseStudy, buildSignedEvidenceDownload, listCaseStudyCandidates, replayCaseStudy, verifyEvidenceFile,
   type CaseStudy, type CaseStudyReplay,
 } from './evidenceShowcase';
+import { EXTERNAL_ANCHORS, MOLECULAR_WEIGHT_ANCHOR_ID, runExternalAnchor } from '../../core/biotechData/externalAnchor';
 
 /**
  * EVIDENCE & REPLAY SHOWCASE (C2, "Evidence & Replay as a product" directive).
@@ -46,6 +47,64 @@ function ReplayVerdictBlock({ replay }: { replay: CaseStudyReplay }) {
       <b>{replay.status}</b>
       {' — '}{replay.reason}
     </p>
+  );
+}
+
+/**
+ * KOTWICA ZEWNĘTRZNA (P2.3) — jedyna rzecz na tym ekranie, która NIE zależy od
+ * tego, czy ktokolwiek cokolwiek wcześniej zapisał.
+ *
+ * Reszta ekranu pokazuje Evidence Bundle z Pamięci Naukowej, więc na świeżej
+ * przeglądarce jest pusta. Kotwica jest przypięta w repo, więc recenzent
+ * otwierający `#/evidence` widzi ją ZAWSZE — i widzi cały łańcuch: predykcję
+ * policzoną przez Genesis, obserwację odczytaną z opublikowanego, sumowanego
+ * zbioru zewnętrznego, prerejestrowane kryterium, werdykt falsyfikacyjny,
+ * odcisk i werdykt replayu.
+ *
+ * Blok pokazuje też — z tą samą wagą wizualną — co ta kotwica POZOSTAWIA
+ * nieprzetestowane. Bez tego zdania kotwica sugerowałaby pomiar przyrody,
+ * którym nie jest.
+ */
+function ExternalAnchorSection() {
+  const anchor = EXTERNAL_ANCHORS.find((candidate) => candidate.id === MOLECULAR_WEIGHT_ANCHOR_ID);
+  const result = useMemo(() => runExternalAnchor(MOLECULAR_WEIGHT_ANCHOR_ID), []);
+  if (anchor === undefined) return null;
+
+  return (
+    <section className="ecs-section" data-testid="ecs-external-anchor">
+      <span className="dl-label">External anchor — an observation Genesis did not produce</span>
+      {!result.ok ? (
+        <p className="ecs-replay-line wd-replay-BLOCKED" data-testid="ecs-anchor-blocked">
+          <b>BLOCKED</b>{' — '}{result.reason}
+        </p>
+      ) : (
+        <>
+          <p data-testid="ecs-anchor-verdict">
+            <b>{result.verification.assessment}</b>{' — '}
+            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric} from
+            the published molecular formula; the externally published value is {result.verification.observedValue} {anchor.unit}.
+            Preregistered band ±{anchor.tolerance.toFixed(3)} {anchor.unit}.
+          </p>
+          <dl className="pilot-provenance" data-testid="ecs-anchor-provenance">
+            <div><dt>observation origin</dt><dd><ProvenanceBadge provenance={result.observationOrigin} /></dd></div>
+            <div><dt>source</dt><dd className="mono">{anchor.sourceUrl}</dd></div>
+            <div><dt>version / retrieved</dt><dd className="mono">{anchor.sourceVersion} · {anchor.retrievedAt}</dd></div>
+            <div><dt>licence</dt><dd className="mono">{anchor.license}</dd></div>
+            <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
+            <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
+          </dl>
+          <p className={`ecs-replay-line wd-replay-${result.replay}`} data-testid="ecs-anchor-replay">
+            <b>{result.replay}</b>{' — '}
+            the comparison was re-executed just now, in this browser, from the pinned payload; the two
+            verdict fingerprints were then compared. A changed payload refuses outright rather than
+            reporting a different number.
+          </p>
+          <p className="gsc-caption" data-testid="ecs-anchor-untested">
+            <b>What this does NOT establish:</b> {result.whatRemainsUntested}
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -225,6 +284,9 @@ export function EvidenceShowcaseScreen() {
           <footer className="ecs-footer gsc-caption">{caseStudy.honestyNote}</footer>
         </article>
       )}
+
+      {/* Zawsze widoczna, nawet bez żadnego zapisanego rekordu — patrz doc komponentu. */}
+      <ExternalAnchorSection />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type { CohortProfile } from '../agents/cohortModel';
 import type { EpidemicCityParams } from '../simulation/epidemicCity';
 import type { HospitalCapacityParams } from '../simulation/hospitalResource';
 import type { ScenarioId, ScenarioRun, ScenarioSummary } from '../simulation/scenarioEngine';
+import type { TautologyAssessment, TautologyComponent } from '../agent/tautologyGate';
 
 /**
  * DISCOVERY CASE — schemat i bramki jakości pełnej ścieżki odkrycia:
@@ -61,6 +62,21 @@ export interface DiscoveryHypothesis {
   /** Dodatkowe oczekiwania; niespełnione dają PARTIALLY_SUPPORTED. */
   supportingCriteria?: readonly FalsificationCriterion[];
   assumptions: readonly string[];
+  /**
+   * OPCJONALNE, ściśle addytywne (ten sam wzorzec co
+   * `agent/inquiryLoop.ts::SystemUnderStudy.observableDerivation`) — deklaruje,
+   * PER METRYKA kryterium (klucz = `FalsificationCriterion.metric`), skąd
+   * strukturalnie bierze się wartość tego kryterium: `tautologyGate.ts`'s
+   * `TautologyComponent` bez `componentId` (ten sam klucz to i tak
+   * `componentId`, więc nie duplikujemy go).
+   *
+   * Niezadeklarowane metryki zachowują się DOKŁADNIE jak dotąd — bez capu,
+   * bez zmiany. Reuse istniejącej Bramki Tautologii (`tautologyGate.ts`),
+   * zero drugiej bramki: `deriveDiscoveryConclusion` woła `assessTautology`
+   * na zebranych deklaracjach i używa WYNIKU, nigdy nie licząc niczego
+   * samodzielnie.
+   */
+  observableDerivations?: Readonly<Record<string, Omit<TautologyComponent, 'componentId'>>>;
 }
 
 /** Kompletny, wykonywalny opis sprawy. Nic tu nie jest wynikiem. */
@@ -157,6 +173,15 @@ export interface DiscoveryCriterionCheck {
   /** Meaningful ONLY when `applicable` is true. */
   met: boolean;
   explanation: string;
+  /**
+   * `null` gdy `DiscoveryHypothesis.observableDerivations` nie zadeklarowało
+   * nic dla tej metryki (stary, nietknięty przypadek). W przeciwnym razie
+   * klasyfikacja TEJ jednej metryki z Bramki Tautologii — `CONSISTENCY_CHECK`/
+   * `UNTESTABLE` oznacza, że `met` (w obie strony) jest dowodowo obojętne i
+   * nie może ani wesprzeć, ani obalić wniosku; `EMPIRICAL_TEST` znaczy, że
+   * liczy się normalnie, jak zawsze.
+   */
+  tautologyClassification: 'CONSISTENCY_CHECK' | 'EMPIRICAL_TEST' | 'UNTESTABLE' | null;
 }
 
 export interface DiscoveryConclusion {
@@ -169,6 +194,17 @@ export interface DiscoveryConclusion {
   /** Granice ważności wniosku. */
   limitations: readonly string[];
   message: string;
+  /**
+   * `null` gdy żadna metryka w tej sprawie nie zadeklarowała
+   * `observableDerivations` — stary przypadek, nietknięty. W przeciwnym razie
+   * zagregowana ocena Bramki Tautologii (`tautologyGate.ts::assessTautology`)
+   * nad WSZYSTKIMI zadeklarowanymi metrykami (primary + supporting) naraz —
+   * `MIXED_TEST` to dokładnie stan, w którym część zadeklarowanych metryk jest
+   * `CONSISTENCY_CHECK`, a część `EMPIRICAL_TEST`. Opcjonalne pole (nie
+   * required jak w `InquiryLoopResult`), żeby nie dotykać istniejących,
+   * ręcznie budowanych fixture'ów `DiscoveryConclusion` w testach.
+   */
+  tautologyAssessment?: TautologyAssessment | null;
 }
 
 /** Ramię eksperymentu: nazwa + realny przebieg modelu. */

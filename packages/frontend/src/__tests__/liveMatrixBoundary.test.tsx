@@ -101,12 +101,32 @@ describe('the component is standalone — the dependency arrow points one way', 
     }
   });
 
-  it('is not wired into the application yet — integration is a separate, explicit decision', () => {
-    const appFiles = [join(process.cwd(), 'src', 'App.tsx'), join(process.cwd(), 'src', 'main.tsx')];
-    for (const file of appFiles) {
-      const source = readOrNull(file);
-      if (source === null) continue;
-      expect(source.includes('liveMatrix'), `${file} already mounts the background`).toBe(false);
-    }
+  /**
+   * INTEGRATION (was "not wired in yet — a separate, explicit decision"):
+   * that decision has now been made — App.tsx mounts `LiveMatrixBackground`
+   * as one persistent instance for the app's whole lifetime. What this test
+   * now guards is the SHAPE of that integration, not its absence: App.tsx
+   * reaches the component only through the existing `toMatrixConfig`
+   * adapter and `core/genesisMatrixPolicy.ts`'s policy function — never by
+   * constructing a `MatrixConfigInput`/`GenesisVisualState` object by hand,
+   * which would be a second, undocumented config path.
+   */
+  it('is wired into App.tsx exactly once, through the existing adapter — never a second, hand-rolled config path', () => {
+    const source = readOrNull(join(process.cwd(), 'src', 'App.tsx'));
+    expect(source, 'src/App.tsx could not be read').not.toBeNull();
+    const appSource = source!;
+    expect(appSource).toContain("from './components/liveMatrix/LiveMatrixBackground'");
+    expect(appSource).toContain('<LiveMatrixBackground');
+    // Exactly one JSX usage — a second `<LiveMatrixBackground` anywhere would mean two
+    // instances (two canvases, two rAF loops) rather than one persistent app-level layer.
+    expect(appSource.split('<LiveMatrixBackground').length - 1).toBe(1);
+    expect(appSource).toContain("from './components/liveMatrix/genesisVisualState'");
+    expect(appSource).toContain('toMatrixConfig(');
+  });
+
+  it('main.tsx does not mount the background directly — App.tsx is the one integration point', () => {
+    const source = readOrNull(join(process.cwd(), 'src', 'main.tsx'));
+    if (source === null) return;
+    expect(source.includes('liveMatrix'), 'src/main.tsx mounts the background outside App.tsx').toBe(false);
   });
 });

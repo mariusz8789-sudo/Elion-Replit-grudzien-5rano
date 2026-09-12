@@ -3,9 +3,13 @@
 Procedural, seeded "data field" background for a scientific command-center look.
 Canvas 2D, no images, no video, no DOM-per-glyph, no external libraries.
 
-**Status: C3 READY — STANDALONE. Not integrated with Genesis.** Nothing under
-this directory imports Genesis, and `App.tsx` does not mount it; both facts are
-enforced by `src/__tests__/liveMatrixBoundary.test.tsx`, not by convention.
+**Status: INTEGRATED.** `App.tsx` mounts one persistent instance for the
+app's whole lifetime, configured via `genesisVisualState.ts`'s `toMatrixConfig`
+adapter fed by `core/genesisMatrixPolicy.ts` (route + `hasActiveSim()` → visual
+tier — see that file). Nothing under THIS directory imports Genesis — the
+dependency still runs one way, App.tsx → adapter → this component, never the
+reverse; enforced by `src/__tests__/liveMatrixBoundary.test.tsx`, not by
+convention.
 
 ## Layout
 
@@ -49,7 +53,7 @@ actually changed since the previous render. So:
 ```
 
 ```ts
-// Future integration, when it is decided — the adapter, not the component, meets Genesis.
+// The real integration (App.tsx) — the adapter, not the component, meets Genesis.
 import { toMatrixConfig, type GenesisVisualState } from './genesisVisualState';
 <LiveMatrixBackground {...toMatrixConfig({ activity: 'RUNNING', intensity: 0.6 })} />
 ```

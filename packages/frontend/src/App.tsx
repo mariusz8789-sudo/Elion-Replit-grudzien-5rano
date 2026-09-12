@@ -21,6 +21,9 @@ import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboardin
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
+import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
+import { toMatrixConfig } from './components/liveMatrix/genesisVisualState';
+import { deriveMatrixVisualState } from './core/genesisMatrixPolicy';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -916,6 +919,34 @@ export default function App() {
 
   return (
     <>
+      {/* LIVE MATRIX INTEGRATION — one persistent instance for the app's whole lifetime,
+          mounted BEFORE `.shell` (`.shell { position: relative; z-index: 1 }`, styles.css)
+          so it paints behind the real UI regardless of DOM order, per CSS's own stacking
+          rules for a `position: fixed` z-index:0 box vs. a z-index:1 stacking context —
+          exactly the layering `.matrix-datastream`'s own (separate, still-unmounted)
+          styles.css rules already assumed. Config is `toMatrixConfig` (the existing,
+          tested Genesis->visual adapter) fed by `deriveMatrixVisualState` (the one
+          route+activity policy, core/genesisMatrixPolicy.ts) — no second config store,
+          no second engine. Never unmounted per route: `MatrixController.applyProps` diffs
+          and re-applies config changes on the SAME instance, so navigating between routes
+          reconfigures the field instead of tearing down and rebuilding its canvas/rAF loop. */}
+      <ErrorBoundary>
+        <LiveMatrixBackground
+          {...toMatrixConfig(deriveMatrixVisualState(route.kind, hasActiveSim()))}
+          // `speed`/`density` are intentionally NOT part of `GenesisVisualState`
+          // (genesisVisualState.ts's own vocabulary is deliberately narrow) — these are the
+          // component's own native props, applied directly, not a second config path.
+          // `matrixEngine.ts::buildStreams` staggers each stream's spawn point up to
+          // `height * 1.6` above the viewport by design ("the field is never born on one
+          // horizontal line"), so on a fresh app load it otherwise takes several real seconds
+          // for the first streams to fall into view, and looks sparse even once they arrive.
+          // HIGH+HIGH make the field genuinely, immediately noticeable on Home without touching
+          // the shared engine's own spawn/density math — measured in genesisMatrixPolicy.test.ts.
+          speed="HIGH"
+          density="HIGH"
+          className="genesis-matrix-bg"
+        />
+      </ErrorBoundary>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>

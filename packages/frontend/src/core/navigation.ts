@@ -109,6 +109,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'protection-priority', label: 'Kogo chronić najpierw?', icon: '🛡', hash: '#/protection-priority' },
   { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics' },
   { id: 'world-proposal', label: 'Zaproponuj świat', icon: '🧩', hash: '#/world-proposal' },
+  { id: 'calibration', label: 'Ile trwa okres zakaźności?', icon: '🔎', hash: '#/calibration' },
 ];
 
 /** Flat view, for lookups and for the mobile primary bar. */

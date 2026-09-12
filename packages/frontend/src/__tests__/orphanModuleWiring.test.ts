@@ -357,6 +357,49 @@ describe('a world can be proposed, and the screen never hides which path answere
   });
 });
 
+describe('the CALIBRATION strategy is run in the product, not only in its tests', () => {
+  const screen = read('components', 'CalibrationInquiryScreen.tsx');
+
+  it('is a real route with a real menu entry', () => {
+    expect(read('App.tsx')).toMatch(/#\/calibration/);
+    expect(read('core', 'navigation.ts')).toMatch(/#\/calibration/);
+  });
+
+  /**
+   * Three strategies exist; production only ever invoked MECHANISM. This screen
+   * has to call the CALIBRATION one, not a hand-rolled loop of its own.
+   */
+  it('invokes the real calibrationStrategy over the real calibration input', () => {
+    expect(screen).toMatch(/calibrationStrategy\.run\s*\(\s*epidemicInfectiousDaysCalibration\(/);
+  });
+
+  /**
+   * The hidden parameter is a CONTROL. If it reached the loop the whole
+   * exercise would be theatre, so it may only be used after the run, to report
+   * whether recovery succeeded.
+   */
+  it('never hands the true value to the loop, and says so where it compares', () => {
+    expect(screen).toMatch(/ukryta wartość|ukryty przed agentem/);
+    expect(screen).toMatch(/data-testid="calibration-verdict"/);
+  });
+
+  /**
+   * A run that leaves several candidates alive is a real, common outcome of
+   * measuring at the wrong moment — the module's whole point. It must be
+   * reported as a result, not hidden behind the success branch.
+   */
+  it('reports a non-unique recovery as a real result rather than a failure to hide', () => {
+    expect(screen).toMatch(/NIEODZYSKANY JEDNOZNACZNIE/);
+    expect(screen).toMatch(/nie porażka do ukrycia/);
+  });
+
+  /** Round verdicts come from the loop's own record; a view-derived list would be a second judgement. */
+  it('renders the loop own per-round verdicts, and its limitations', () => {
+    expect(screen).toMatch(/round\.verdicts\.map/);
+    expect(screen).toMatch(/run\.limitations\.map/);
+  });
+});
+
 describe('the dead duplicate is gone, not merely unused', () => {
   /**
    * `MissionStatusBar.tsx` rendered narrator/AI-health/lab-count/visited from

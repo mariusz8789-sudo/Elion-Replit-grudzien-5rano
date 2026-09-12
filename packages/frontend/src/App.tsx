@@ -45,6 +45,7 @@ const ModelTournamentPanel = lazy(() => import('./components/ModelTournamentPane
 const ProtectionPriorityScreen = lazy(() => import('./components/ProtectionPriorityScreen').then((m) => ({ default: m.ProtectionPriorityScreen })));
 const GeodesicWorldScreen = lazy(() => import('./components/GeodesicWorldScreen').then((m) => ({ default: m.GeodesicWorldScreen })));
 const WorldProposalScreen = lazy(() => import('./components/WorldProposalScreen').then((m) => ({ default: m.WorldProposalScreen })));
+const CalibrationInquiryScreen = lazy(() => import('./components/CalibrationInquiryScreen').then((m) => ({ default: m.CalibrationInquiryScreen })));
 const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
 const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
@@ -104,6 +105,7 @@ type Route =
   | { kind: 'protection-priority' }
   | { kind: 'geodesics' }
   | { kind: 'world-proposal' }
+  | { kind: 'calibration' }
   | { kind: 'what-if' }
   | { kind: 'timeline'; mode?: 'cosmic' | 'place' }
   | { kind: 'decision-explorer' }
@@ -148,6 +150,7 @@ function parseHash(): Route {
   if (h === '#/protection-priority') return { kind: 'protection-priority' };
   if (h === '#/geodesics') return { kind: 'geodesics' };
   if (h === '#/world-proposal') return { kind: 'world-proposal' };
+  if (h === '#/calibration') return { kind: 'calibration' };
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline' || h === '#/timeline?mode=cosmic') return { kind: 'timeline', mode: 'cosmic' };
   if (h === '#/timeline?mode=place') return { kind: 'timeline', mode: 'place' };
@@ -407,6 +410,18 @@ export default function App() {
           <TopBar title="🧩 Zaproponuj świat" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <WorldProposalScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'calibration') {
+      return (
+        <div className="app">
+          <TopBar title="🔎 Ile trwa okres zakaźności?" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <CalibrationInquiryScreen />
           </HeavyRoute>
           {overlays}
         </div>

@@ -64,6 +64,7 @@ kredencjałowe.
 | P0.2 | Trwałość danych: `/data` poza drzewem aplikacji, `VACUUM INTO` (nie `cp` — WAL), realny redeploy (proces+katalog wymienione) + restore drill | `0847ab7`, 8/8 testów |
 | P0.3 | `/api/health`: commit, wersja, realny stan bazy (`SELECT 1`, nie sprawdzenie obiektu); poprawka pod `git worktree` | `5f88c8f`, `a0a7b8d`, 6/6+4/4 testów |
 | P0.4 | Audyt historii: **zero sekretów do rotacji** — CAŁA historia (1911 commitów, `git rev-list --all`) przeszukana pod `.env`/`*secrets*`/`*.pem`/klucze prywatne, pod literał `sk-ant-`, oraz pod wzorce AWS/GitHub/GitLab/Slack/Google (`git grep` po każdym commicie) — wszystkie skany puste; `.env.example` 29/29 kompletny, sekrety twardo puste | `5f88c8f`, 4/4 testów + mechaniczna blokada dryfu |
+| P0.5 | Redeploy kontenerowy z zamontowanym woluminem: **realny `docker build` + realny drill** (kontener zabity i USUNIĘTY `docker rm -f`, nowy kontener na tym samym nazwanym woluminie, konto i projekt sprzed redeployu odczytane po) — ZIELONE na runnerze GitHub Actions, pierwszy w historii repo udany `docker build`/`docker run`. Po drodze dwie nietrafione próby naprawy (opisane, nie ukryte) zanim znaleziono prawdziwą przyczynę: produkcyjny kod przypadkowo polegał na tym, że plik testowy przeciekał typy `@types/node` do całego programu TypeScript — realna, wcześniej niewidoczna luka w typowaniu, nie problem środowiska | commit `0c78866`/`882e0bb`, run CI `34712219915` — WSZYSTKIE 4 joby zielone (`verify`, `G3`, PySCF, `docker-image`); `docs/DECISIONS.md` D-017–D-019 |
 
 Backup/restore operacyjne: `scripts/db-backup.mjs`/`db-restore.mjs`, retencja
 domyślna 14 snapshotów, restore odmawia nadpisania bez `--overwrite`.
@@ -148,7 +149,6 @@ repro-demo: 12/12, exit 0
 | G6 — kanoniczny słownik niezawodności epistemicznej | Częściowo zamknięte (3 z 6 osi skonsolidowane, C2) | C2 | zamknięte częściowo |
 | 25 golden cases Tautology Gate + reguły C1–C6 poza tym, co dostarczono | Spec `GENESIS_TAUTOLOGY_AND_EMPIRICAL_TEST_GATE.md` nie istnieje nigdzie w repo; wymyślenie treści byłoby fabrykacją | — | gdy prawdziwy spec się pojawi |
 | QE4–QE7 (hipotezy splątania) | Wymagają pakietu obserwabli z jawnym rozdzieleniem tautologii algebry od tego, co falsyfikowalne (zlecone Qwenowi, nie odebrane) | Qwen | otwarte |
-| Redeploy na poziomie KONTENERA z zamontowanym woluminem | Blokada egress do CDN Docker Hub w tym środowisku (demon działa, `docker build` nie); przeniesione do `ci.yml::docker-image` — buduje obraz i uruchamia realny drill (kontener zabity+usunięty, nowy na tym samym woluminie, konto/projekt sprzed redeployu odczytane po) na runnerze bez tego ograniczenia. Sprawdź status tego joba w Actions dla bieżącego SHA przed wdrożeniem | CI (automatyczne od następnego pusha) | przed produkcją — jeden rzut oka na Actions |
 | Alerty niedostępności i retencja logów | Konfiguracje gotowe (`docs/OPS_RUNBOOK.md`), niezastosowane — wymaga wyboru platformy hostingu i zgody na wdrożenie | operator | przy wyborze platformy |
 | `nodejs-22` w `.replit` | Nazwa modułu zgodna z konwencją Replita, ale nieskontrolowana wobec rejestru platformy z tego środowiska | operator | pierwsze uruchomienie na Replicie |
 | G4/G5/G9 (generowanie hipotez, scoring wartości eksperymentu, warstwa starzenia dowodów) | ŚWIADOMIE nie robione — dodanie scoringu bez uzasadnionej metodologii albo stałej rozpadu bez uzasadnienia byłoby dokładnie regresem, którego to repo odmawia | — | poza zakresem obecnej rundy |
@@ -264,7 +264,7 @@ commit:
 | R-003 zależność od zewnętrznego API (Anthropic) | MITIGATED — system działa w pełni bez klucza, żaden wynik naukowy nie przechodzi przez LLM |
 | R-004 bus factor = 1 | OPEN — pozycja budżetowa (FTE recenzja), nie deklaracja |
 | R-005 brak kotwicy w danych zewnętrznych | **ZWĘŻONE** (P2.3, jedna kotwica działająca) — nie zamknięte: brak live ingestion, brak kotwicy empirycznej |
-| R-006 redeploy kontenerowy z woluminem niezweryfikowany | MITIGATED — przeniesione do CI (`ci.yml::docker-image`), które nie ma blokady egress tego środowiska; sprawdź status w Actions przed wdrożeniem |
+| R-006 redeploy kontenerowy z woluminem niezweryfikowany | MITIGATED, ZIELONE — realny `docker build`+drill przeszedł w CI (run `34712219915`), zobacz P0.5 |
 | R-007 nazwa modułu `nodejs-22` w `.replit` niesprawdzona | OPEN, niegroźne — bramka runtime i tak wypisze czytelny komunikat |
 
 ---

@@ -73,7 +73,7 @@ const TICKS = 12;
 describe('Every adapter delegates, and none of them decides anything itself', () => {
   it('the hypothesis-loop adapter returns exactly what the real selector returns', () => {
     const problem = HYPOTHESIS_PROBLEMS[0];
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
     const direct = selectNextHypothesisExperiment(result);
     const wrapped = hypothesisLoopNextAction(result);
 
@@ -237,7 +237,7 @@ describe('The campaign adapter matches the REAL backend selector, not just a sta
 
 describe('The shared shape is honest about what each selector does not report', () => {
   const problem = HYPOTHESIS_PROBLEMS[0];
-  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
 
   it('stamps every action with the contract version and its own selector id', () => {
     const actions: NextAction[] = [

@@ -59,7 +59,7 @@ function realRdkitFetchMock() {
 
 async function runChemLoop() {
   const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === PROBLEM_ID)!;
-  return executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  return executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
 }
 
 describe('Molecular/Chemistry World Adapter — third domain for ScientificWorldState', () => {

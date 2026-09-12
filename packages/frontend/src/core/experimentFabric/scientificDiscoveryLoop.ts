@@ -180,7 +180,7 @@ function resolveProblem(problemId: string): HypothesisProblem {
 
 export function runScientificDiscoveryLoop(problemId: string): ScientificDiscoveryLoopResult {
   const problem = resolveProblem(problemId);
-  const loop = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  const loop = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
   return {
     contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
     problem,
@@ -209,7 +209,7 @@ export function runScientificDiscoveryLoop(problemId: string): ScientificDiscove
  */
 export async function runScientificDiscoveryLoopAsync(problemId: string): Promise<ScientificDiscoveryLoopResult> {
   const problem = resolveProblem(problemId);
-  const loop = await executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  const loop = await executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
   return {
     contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
     problem,

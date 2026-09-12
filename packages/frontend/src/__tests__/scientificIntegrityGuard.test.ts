@@ -76,7 +76,7 @@ const SMALL: HypothesisProblem = {
   ...HYPOTHESIS_PROBLEMS[0]!,
   sharedLevers: { days: 18, stepsPerDay: 2, nAgents: 120, initialInfected: 4, seed: 20260831, interventionStartDay: 0 },
 };
-const runHypothesisLoop = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+const runHypothesisLoop = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
 
 // =============================================================================
 // 1. EPISTEMIC STATUS CONSISTENCY — three distinct, non-reducible enumerations.
@@ -134,7 +134,7 @@ describe('1. Epistemic status consistency', () => {
 // =============================================================================
 describe('2 & 3. Preregistration + falsification-criterion integrity', () => {
   it('a preregistration intact at build time, tampered before save, is caught before it can ever reach Science Memory', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     expect(verifyPreregistrationIntact(prereg).intact).toBe(true);
 
     const tamperedFalsifier = prereg.hypotheses.map((h, i) => i !== 0 ? h : {
@@ -300,7 +300,7 @@ describe('7. Deterministic fingerprints', () => {
 
     const different = buildSavedHypothesisLoop(executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
       ...SMALL, sharedLevers: { ...SMALL.sharedLevers, seed: Number(SMALL.sharedLevers.seed) + 1 },
-    }))));
+    }), { priorRunFingerprints: [] })));
     expect(different.preregistrationFingerprint).not.toBe(a.preregistrationFingerprint);
   });
 
@@ -424,7 +424,7 @@ describe('Specifically named guards', () => {
   it('BLOCKED and FALSIFIED are never conflated: BLOCKED means "never executed" (no proposedExperiment), FALSIFIED means "executed and the falsifier matched" — real, different fixtures produce each', () => {
     const blockedResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
       ...SMALL, candidateVariable: 'nieistniejacaDzwignia',
-    })));
+    }), { priorRunFingerprints: [] }));
     expect(blockedResult.outcomes.every((o) => o.status === 'BLOCKED')).toBe(true);
     expect(blockedResult.outcomes.every((o) => o.observedMetric === null)).toBe(true);
 

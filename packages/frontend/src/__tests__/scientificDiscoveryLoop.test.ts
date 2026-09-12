@@ -81,7 +81,7 @@ describe('Scientific Discovery Loop — one real epidemiological question, close
   it('8. a chemistry/physics hypothesis (no scenario-timeline) reports NOT_MODELED for Observation/Analysis, never fabricates it', () => {
     const chemProblem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:chem-rdkit-molecular-weight-comparison')!;
     // Local sync executor cannot run a BACKEND_REAL_ENGINE model — outcome is BLOCKED, which is itself a real, honest status.
-    const loop = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(chemProblem)));
+    const loop = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(chemProblem), { priorRunFingerprints: [] }));
     const chain = buildEvidenceChain(loop);
     expect(chain.length).toBeGreaterThan(0);
     for (const link of chain) {

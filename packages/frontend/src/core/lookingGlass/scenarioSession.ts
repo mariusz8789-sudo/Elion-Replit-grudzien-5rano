@@ -237,7 +237,7 @@ function buildEpidemicSession(plan: ScenarioRunPlan): SessionBuild {
   // Epistemic states: the real pre-registered loop over the epidemiological
   // problem, projected by the existing adapter.
   const problem = HYPOTHESIS_PROBLEMS.find((candidate) => candidate.modelId === 'scenario-timeline') ?? HYPOTHESIS_PROBLEMS[0];
-  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
   const states = projectEpidemiologyWorldStates(result);
 
   // Temporal progression: the compartmental model run for exactly the span
@@ -335,7 +335,7 @@ function registerRun(run: ScenarioRun, runId: string): string | null {
  */
 function buildLaboratorySession(plan: ScenarioRunPlan): SessionBuild {
   const problem = HYPOTHESIS_PROBLEMS.find((candidate) => candidate.modelId === 'biology-logistic') ?? HYPOTHESIS_PROBLEMS[0];
-  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
   const states = projectCellWorldStates(result);
   // The loop already ran every candidate hypothesis — the ranking between
   // them exists whether or not comparison was requested. It is exposed only

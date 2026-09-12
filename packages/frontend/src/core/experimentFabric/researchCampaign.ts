@@ -176,7 +176,7 @@ export async function continueResearchCampaign(previous: ResearchCycle): Promise
     );
   }
 
-  const loop = await executePreregisteredHypothesesAsync(preregisterHypotheses(candidateSet));
+  const loop = await executePreregisteredHypothesesAsync(preregisterHypotheses(candidateSet, { priorRunFingerprints: [] }));
   const result: ScientificDiscoveryLoopResult = {
     contractVersion: SCIENTIFIC_DISCOVERY_LOOP_VERSION,
     problem,

@@ -437,7 +437,7 @@ export function ExperimentPilotScreen() {
               className="chip-btn"
               disabled={loopBusy}
               onClick={() => {
-                const registered = preregisterHypotheses(generateCompetingHypotheses(problem));
+                const registered = preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] });
                 setPrereg(registered);
                 setLoopResult(null);
                 setNextStep(null);

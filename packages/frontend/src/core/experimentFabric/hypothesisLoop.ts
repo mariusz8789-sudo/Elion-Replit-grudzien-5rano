@@ -267,11 +267,34 @@ export function generateCompetingHypotheses(problem: HypothesisProblem): Hypothe
   };
 }
 
+/**
+ * KOTWICA ANTY-HARKINGOWA. Bez niej prerejestracja dowodzi wyłącznie tego,
+ * że treść nie zmieniła się od zahaszowania — nic o TYM, KIEDY powstała
+ * względem danych. Model jest deterministyczny (stały seed), więc
+ * "podglądnięty" i "oficjalny" przebieg tej samej hipotezy mają identyczny
+ * `runFingerprint` (patrz `provenance.ts::createExperimentProvenance` —
+ * odcisk liczony jest z requestu I wyników razem). Kotwica wymaga
+ * jawnej deklaracji: jakie odciski przebiegów już były znane PRZED tą
+ * rejestracją. Uczciwa, ślepa rejestracja deklaruje pustą listę — to
+ * PRAWDA dla każdego dzisiejszego wywołania (`generateCompetingHypotheses`
+ * → `preregisterHypotheses` → `executePreregisteredHypotheses`, bez
+ * podglądu pomiędzy). Jeżeli ktoś podejrzał wynik i uczciwie go zadeklaruje
+ * tutaj, `verifyAntiHarkingAnchor` wykryje kolizję, gdy ten sam odcisk
+ * wróci jako "potwierdzający dowód". To NIE jest dowód niepodważalny —
+ * nie da się skonstruować jednego bez zewnętrznego, zaufanego zegara —
+ * ale `createdBeforeRun` przestaje być literałem, którego nic nie broni, i
+ * staje się twierdzeniem, które można PODWAŻYĆ.
+ */
+export interface PreregistrationAnchor {
+  readonly priorRunFingerprints: readonly string[];
+}
+
 export interface Preregistration {
   contractVersion: string;
   preregistrationId: string;
   problemId: string;
   createdAt: string;
+  anchor: PreregistrationAnchor;
   hypotheses: readonly PreregisteredHypothesis[];
   /** Odcisk zamrożonego zbioru. Każda późniejsza zmiana treści jest wykrywalna. */
   preregistrationFingerprint: string;
@@ -292,22 +315,33 @@ function frozenView(hypotheses: readonly PreregisteredHypothesis[]) {
   }));
 }
 
-export function preregisterHypotheses(set: HypothesisSet, now: () => Date = () => new Date()): Preregistration {
+export function preregisterHypotheses(set: HypothesisSet, anchor: PreregistrationAnchor, now: () => Date = () => new Date()): Preregistration {
   const hypotheses = set.hypotheses.map((entry) => ({
     ...entry,
     status: entry.status === 'BLOCKED' ? entry.status : ('PRE_REGISTERED' as HypothesisStatus),
     createdBeforeRun: true,
   }));
+  const createdAt = now().toISOString();
+  // `createdAt` is deliberately NOT part of the hash: it is real wall-clock
+  // time, and `preregistrationFingerprint` must stay reproducible for two
+  // genuinely identical, independent registrations of the same content (see
+  // "Deterministyczne odciski" — the same real run, called twice, must
+  // produce the same fingerprint). `anchor` IS hashed: for any given caller
+  // it is a fixed, deliberate declaration, not a clock — hashing it protects
+  // it from being silently rewritten after the fact, the same way `frozen`
+  // protects statements and criteria.
   const fingerprint = fnv1a(canonicalJson({
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     problemId: set.problem.problemId,
+    anchor,
     frozen: frozenView(hypotheses),
   }));
   return {
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistrationId: `prereg_${fingerprint}`,
     problemId: set.problem.problemId,
-    createdAt: now().toISOString(),
+    createdAt,
+    anchor,
     hypotheses,
     preregistrationFingerprint: fingerprint,
     set,
@@ -315,18 +349,51 @@ export function preregisterHypotheses(set: HypothesisSet, now: () => Date = () =
 }
 
 /**
- * Przelicza odcisk zamrożonego zbioru i porównuje z zapisanym. Wykrywa
- * dopisanie hipotezy po wyniku, zmianę przewidywania i podmianę kryterium.
+ * Przelicza odcisk zamrożonego zbioru (treść + kotwica) i porównuje z
+ * zapisanym. Wykrywa dopisanie hipotezy po wyniku, zmianę przewidywania,
+ * podmianę kryterium ORAZ przepisanie kotwicy po fakcie — `createdAt`
+ * celowo NIE wchodzi w ten odcisk (patrz komentarz w `preregisterHypotheses`).
  */
 export function verifyPreregistrationIntact(prereg: Preregistration, hypotheses: readonly PreregisteredHypothesis[] = prereg.hypotheses): { intact: boolean; reason: string } {
   const recomputed = fnv1a(canonicalJson({
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     problemId: prereg.problemId,
+    anchor: prereg.anchor,
     frozen: frozenView(hypotheses),
   }));
   return recomputed === prereg.preregistrationFingerprint
     ? { intact: true, reason: 'Prerejestracja jest nienaruszona: twierdzenia, przewidywania i kryteria są te same, co przed wykonaniem.' }
     : { intact: false, reason: `Prerejestracja została naruszona po zamrożeniu (odcisk ${prereg.preregistrationFingerprint} → ${recomputed}). Wynik nie może definiować hipotezy, która go tłumaczy.` };
+}
+
+export interface AntiHarkingCheck {
+  intact: boolean;
+  reason: string;
+  /** Odciski zadeklarowane w kotwicy jako już znane PRZED rejestracją, które mimo to wróciły jako potwierdzający dowód — bezpośredni dowód HARK-owania. */
+  contradictingFingerprints: readonly string[];
+}
+
+/**
+ * Sprawdza kotwicę anty-HARKingową: żaden odcisk przebiegu użyty jako dowód
+ * dla tej prerejestracji nie może być jednym z odcisków, które sama
+ * prerejestracja zadeklarowała jako już znane PRZED rejestracją. Naruszenie
+ * dowodzi, że autor znał wynik, zanim (rzekomo) zamroził hipotezy.
+ */
+export function verifyAntiHarkingAnchor(prereg: Preregistration, outcomes: readonly HypothesisOutcome[]): AntiHarkingCheck {
+  const anchored = new Set(prereg.anchor.priorRunFingerprints);
+  const usedFingerprints = [...new Set(outcomes.flatMap((outcome) => outcome.runFingerprints))];
+  const contradicting = usedFingerprints.filter((fp) => anchored.has(fp));
+  return contradicting.length === 0
+    ? {
+      intact: true,
+      contradictingFingerprints: [],
+      reason: 'Żaden przebieg użyty jako dowód nie był zadeklarowany w kotwicy jako już znany przed rejestracją.',
+    }
+    : {
+      intact: false,
+      contradictingFingerprints: contradicting,
+      reason: `HARK-owanie wykryte: kotwica deklarowała odcisk(i) ${contradicting.join(', ')} jako znane PRZED tą prerejestracją, a mimo to ten sam odcisk wraca teraz jako potwierdzający dowód. Hipoteza nie mogła zostać uczciwie zarejestrowana w niewiedzy o tym wyniku.`,
+    };
 }
 
 export interface HypothesisOutcome {
@@ -358,6 +425,8 @@ export interface HypothesisLoopResult {
   contractVersion: string;
   preregistration: Preregistration;
   preregistrationIntact: { intact: boolean; reason: string };
+  /** Kotwica anty-HARKingowa — patrz `verifyAntiHarkingAnchor`. Osobna oś od `preregistrationIntact`: tamta pilnuje TREŚCI, ta pilnuje KOLEJNOŚCI W CZASIE. */
+  antiHarkingCheck: AntiHarkingCheck;
   outcomes: readonly HypothesisOutcome[];
   discrimination: HypothesisDiscrimination;
   chains: readonly ScientificEvidenceChain[];
@@ -489,6 +558,7 @@ export function executePreregisteredHypotheses(prereg: Preregistration): Hypothe
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistration: prereg,
     preregistrationIntact: verifyPreregistrationIntact(prereg),
+    antiHarkingCheck: verifyAntiHarkingAnchor(prereg, outcomes),
     outcomes,
     discrimination,
     chains,
@@ -623,6 +693,7 @@ export async function executePreregisteredHypothesesAsync(prereg: Preregistratio
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistration: prereg,
     preregistrationIntact: verifyPreregistrationIntact(prereg),
+    antiHarkingCheck: verifyAntiHarkingAnchor(prereg, outcomes),
     outcomes,
     discrimination,
     chains,
@@ -768,6 +839,9 @@ export interface SavedHypothesisLoop {
   contractVersion: string;
   preregistrationId: string;
   preregistrationFingerprint: string;
+  /** Wymagane, żeby replay mógł wiernie odtworzyć `Preregistration` i jej odcisk — patrz `createdAt`/`anchor` w `Preregistration`. */
+  createdAt: string;
+  anchor: PreregistrationAnchor;
   problem: HypothesisProblem;
   hypotheses: readonly PreregisteredHypothesis[];
   outcomes: readonly {
@@ -790,6 +864,7 @@ export function buildSavedHypothesisLoop(result: HypothesisLoopResult): SavedHyp
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistrationId: result.preregistration.preregistrationId,
     preregistrationFingerprint: result.preregistration.preregistrationFingerprint,
+    anchor: result.preregistration.anchor,
     problem: result.preregistration.set.problem,
     hypotheses: result.preregistration.hypotheses,
     outcomes: result.outcomes.map((outcome) => ({
@@ -806,7 +881,11 @@ export function buildSavedHypothesisLoop(result: HypothesisLoopResult): SavedHyp
       decisive: result.discrimination.decisive,
     },
   };
-  return { ...base, loopFingerprint: fnv1a(canonicalJson(base)) };
+  // `createdAt` is real wall-clock time (see `preregisterHypotheses`'s own
+  // comment) — stored for replay reconstruction, deliberately excluded from
+  // `loopFingerprint` so two independent, content-identical runs still
+  // produce the same fingerprint (see "Deterministyczne odciski").
+  return { ...base, createdAt: result.preregistration.createdAt, loopFingerprint: fnv1a(canonicalJson(base)) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -818,6 +897,8 @@ export function isSavedHypothesisLoop(value: unknown): value is SavedHypothesisL
   if (!isRecord(value)) return false;
   if (typeof value.contractVersion !== 'string' || typeof value.preregistrationId !== 'string') return false;
   if (typeof value.preregistrationFingerprint !== 'string' || typeof value.loopFingerprint !== 'string') return false;
+  if (typeof value.createdAt !== 'string') return false;
+  if (!isRecord(value.anchor) || !Array.isArray(value.anchor.priorRunFingerprints) || !value.anchor.priorRunFingerprints.every((entry) => typeof entry === 'string')) return false;
   if (!isRecord(value.problem) || typeof value.problem.problemId !== 'string' || typeof value.problem.modelId !== 'string') return false;
   if (!Array.isArray(value.hypotheses) || value.hypotheses.length === 0) return false;
   if (!value.hypotheses.every((entry) => isRecord(entry) && typeof entry.hypothesisId === 'string' && entry.createdBeforeRun === true)) return false;
@@ -852,7 +933,8 @@ export function replaySavedHypothesisLoop(saved: unknown): HypothesisLoopReplay 
     contractVersion: saved.contractVersion,
     preregistrationId: saved.preregistrationId,
     problemId: saved.problem.problemId,
-    createdAt: '',
+    createdAt: saved.createdAt,
+    anchor: saved.anchor,
     hypotheses: saved.hypotheses,
     preregistrationFingerprint: saved.preregistrationFingerprint,
     set: generateCompetingHypotheses(saved.problem),
@@ -914,7 +996,8 @@ export async function replaySavedHypothesisLoopAsync(saved: unknown): Promise<Hy
     contractVersion: saved.contractVersion,
     preregistrationId: saved.preregistrationId,
     problemId: saved.problem.problemId,
-    createdAt: '',
+    createdAt: saved.createdAt,
+    anchor: saved.anchor,
     hypotheses: saved.hypotheses,
     preregistrationFingerprint: saved.preregistrationFingerprint,
     set: generateCompetingHypotheses(saved.problem),

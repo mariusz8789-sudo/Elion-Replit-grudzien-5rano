@@ -104,7 +104,7 @@ describe('Generowanie konkurencyjnych hipotez', () => {
 
 describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   it('zamraża zbiór i oznacza go jako utworzony przed przebiegiem', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
 
     expect(prereg.preregistrationId).toMatch(/^prereg_[0-9a-f]{8}$/);
     expect(prereg.createdAt).toBeTruthy();
@@ -116,7 +116,7 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   });
 
   it('zmiana twierdzenia po zamrożeniu jest WYKRYWANA', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const tampered = prereg.hypotheses.map((entry, index) => index !== 0 ? entry : { ...entry, statement: 'przepisane po zobaczeniu wyniku' });
     const verdict = verifyPreregistrationIntact(prereg, tampered);
 
@@ -125,7 +125,7 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   });
 
   it('podmiana kryterium falsyfikacji jest WYKRYWANA', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const tampered = prereg.hypotheses.map((entry, index) => index !== 0 ? entry : {
       ...entry,
       falsificationCriteria: { ...entry.falsificationCriteria, relation: 'greater-than' as const },
@@ -135,14 +135,14 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   });
 
   it('dopisanie hipotezy po zamrożeniu jest WYKRYWANE', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const added = [...prereg.hypotheses, { ...prereg.hypotheses[0]!, hypothesisId: 'hyp_dopisana' }];
 
     expect(verifyPreregistrationIntact(prereg, added).intact).toBe(false);
   });
 
   it('zmiana parametrów zaproponowanego eksperymentu jest WYKRYWANA', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const tampered = prereg.hypotheses.map((entry, index) => index !== 0 || entry.proposedExperiment === null ? entry : {
       ...entry,
       proposedExperiment: { ...entry.proposedExperiment, parameters: { ...entry.proposedExperiment.parameters, seed: 1 } },
@@ -150,10 +150,71 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
 
     expect(verifyPreregistrationIntact(prereg, tampered).intact).toBe(false);
   });
+
+  /**
+   * KOTWICA ANTY-HARKINGOWA (P0). Do tej pory `createdBeforeRun: true` było
+   * ustawiane bezwarunkowo (`hypothesisLoop.ts:299`), a odcisk prerejestracji
+   * nie zawierał ani `createdAt`, ani żadnej kotwicy do przebiegu, który
+   * prerejestracja poprzedza. Skutek: sekwencja
+   * URUCHOM (zobacz wynik) → PREREJESTRUJ → WYKONAJ OFICJALNIE
+   * dawała rekord bit-identyczny ze ślepą, uczciwą prerejestracją — bo model
+   * jest deterministyczny (stały seed), więc "podglądnięty" i "oficjalny"
+   * przebieg mają identyczny `runFingerprint`, a nic tego nie porównywało.
+   */
+  it('kotwica anty-HARKingowa WYKRYWA prerejestrację napisaną po zobaczeniu wyniku', () => {
+    // Krok 1 — PODGLĄD: wykonujemy ten sam eksperyment "nieformalnie", zanim
+    // cokolwiek zostanie prerejestrowane, i widzimy jego odcisk.
+    const peek = executePreregisteredHypotheses(
+      preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }),
+    );
+    const peekedFingerprint = peek.outcomes.flatMap((o) => o.runFingerprints)[0];
+    expect(peekedFingerprint).toBeTruthy();
+
+    // Krok 2 — PREREJESTRACJA PO FAKCIE: uczciwie deklarujemy, że ten
+    // konkretny odcisk już znaliśmy PRZED tą rejestracją (bo go podejrzeliśmy).
+    const dishonestPrereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), {
+      priorRunFingerprints: [peekedFingerprint!],
+    });
+
+    // Krok 3 — "OFICJALNE" wykonanie: model deterministyczny, więc odcisk
+    // wraca identyczny co w podglądzie.
+    const official = executePreregisteredHypotheses(dishonestPrereg);
+
+    expect(official.antiHarkingCheck.intact).toBe(false);
+    expect(official.antiHarkingCheck.contradictingFingerprints).toContain(peekedFingerprint);
+    expect(official.antiHarkingCheck.reason).toMatch(/HARK/i);
+  });
+
+  it('ślepa prerejestracja (pusta kotwica, żaden przebieg wcześniej nieznany) NIE jest fałszywie oskarżana', () => {
+    const result = executePreregisteredHypotheses(
+      preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }),
+    );
+
+    expect(result.antiHarkingCheck.intact).toBe(true);
+    expect(result.antiHarkingCheck.contradictingFingerprints).toHaveLength(0);
+  });
+
+  it('kotwica jest częścią odcisku prerejestracji — ciche przepisanie jej po fakcie jest WYKRYWANE', () => {
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: ['run_already_known'] });
+
+    // Ktoś podglądnął wynik, uczciwie zadeklarował to w kotwicy, a potem
+    // próbuje po cichu wyczyścić ślad — odcisk to wykrywa, bo kotwica wchodzi
+    // w jego obliczenie.
+    const erasedAnchor: typeof prereg = { ...prereg, anchor: { priorRunFingerprints: [] } };
+    expect(verifyPreregistrationIntact(erasedAnchor).intact).toBe(false);
+  });
+
+  it('createdAt NIE wchodzi w odcisk treści — to prawdziwy zegar, nie deklaracja: dwie identyczne, niezależne rejestracje muszą dać ten sam preregistrationFingerprint mimo różnego czasu', () => {
+    const a = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }, () => new Date('2020-01-01T00:00:00Z'));
+    const b = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }, () => new Date('2030-06-15T12:00:00Z'));
+
+    expect(a.createdAt).not.toBe(b.createdAt);
+    expect(a.preregistrationFingerprint).toBe(b.preregistrationFingerprint);
+  });
 });
 
 describe('Wykonanie, status i rozstrzygnięcie', () => {
-  const run = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+  const run = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
 
   it('wykonuje REALNE przebiegi przez istniejący silnik', () => {
     const result = run();
@@ -210,7 +271,7 @@ describe('Wykonanie, status i rozstrzygnięcie', () => {
     // Wszyscy kandydaci to ten sam scenariusz — wyniki są identyczne z definicji.
     const tie = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
       ...SMALL, candidateValues: ['ISOLATION', 'ISOLATION'],
-    })));
+    }), { priorRunFingerprints: [] }));
 
     expect(tie.discrimination.decisive).toBe(false);
     expect(tie.discrimination.winnerHypothesisId).toBeNull();
@@ -228,7 +289,7 @@ describe('Wykonanie, status i rozstrzygnięcie', () => {
 
 describe('Następny eksperyment', () => {
   it('po rozstrzygnięciu kieruje na kontrolę pojedynczego ziarna, ze zmianą jednego pola', () => {
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
     const next = selectNextHypothesisExperiment(result);
 
     expect(NEXT_EXPERIMENT_PRIORITY[0]).toBe('PREREGISTRATION_VIOLATED');
@@ -245,7 +306,7 @@ describe('Następny eksperyment', () => {
   });
 
   it('naruszona prerejestracja blokuje kolejny krok zamiast go proponować', () => {
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
     const violated = { ...result, preregistrationIntact: { intact: false, reason: 'test: odcisk się nie zgadza' } };
     const next = selectNextHypothesisExperiment(violated);
 
@@ -255,7 +316,7 @@ describe('Następny eksperyment', () => {
   });
 
   it('niewykonana hipoteza daje VALIDATION_REQUIRED, a nie kolejny przebieg', () => {
-    const blockedSet = preregisterHypotheses(generateCompetingHypotheses({ ...SMALL, candidateVariable: 'nieistniejacaDzwignia' }));
+    const blockedSet = preregisterHypotheses(generateCompetingHypotheses({ ...SMALL, candidateVariable: 'nieistniejacaDzwignia' }), { priorRunFingerprints: [] });
     const next = selectNextHypothesisExperiment(executePreregisteredHypotheses(blockedSet));
 
     expect(next.status).toBe('VALIDATION_REQUIRED');
@@ -293,7 +354,7 @@ describe('Pamięć i odtworzenie pętli', () => {
       get length() { return map.size; },
     };
   };
-  const executed = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+  const executed = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
 
   it('zapis niesie prerejestrację, hipotezy i statusy', () => {
     const saved = buildSavedHypothesisLoop(executed());
@@ -391,7 +452,7 @@ describe('Pamięć i odtworzenie pętli', () => {
 describe('Graf eksperymentu z pętli', () => {
   it('prerejestrowane łańcuchy dają węzły HYPOTHESIS z zachowaną kolejnością', async () => {
     const { buildExperimentGraph } = await import('../core/experimentFabric/experimentGraph');
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
     const graph = buildExperimentGraph({
       question: SMALL.statement,
       runs: result.allRuns,

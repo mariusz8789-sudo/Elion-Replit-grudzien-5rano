@@ -23,7 +23,7 @@ function assertShapesContract(state: WorldState): void {
 function runEpiLoop(problemId: string) {
   const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === problemId)!;
   const set = generateCompetingHypotheses(problem);
-  const prereg = preregisterHypotheses(set);
+  const prereg = preregisterHypotheses(set, { priorRunFingerprints: [] });
   return executePreregisteredHypotheses(prereg);
 }
 
@@ -71,7 +71,7 @@ describe('Scientific World State (Phase B) — generic contract, two real domain
     // A problem with no lever that exists for a made-up model must remain BLOCKED per-hypothesis, never guessed.
     const fakeProblem = { ...HYPOTHESIS_PROBLEMS[0]!, problemId: 'problem:test-fake', modelId: 'not-a-real-model' };
     const set = generateCompetingHypotheses(fakeProblem);
-    const prereg = preregisterHypotheses(set);
+    const prereg = preregisterHypotheses(set, { priorRunFingerprints: [] });
     const loopResult = executePreregisteredHypotheses(prereg);
     const states = projectEpidemiologyWorldStates(loopResult);
     expect(states).toHaveLength(0); // no real scenario timeline was ever produced — nothing is backfilled
@@ -165,7 +165,7 @@ describe('Scientific World State (Phase B) — generic contract, two real domain
         });
       }));
       const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:chem-rdkit-molecular-weight-comparison')!;
-      const chemLoop = await executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
+      const chemLoop = await executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
       const chem = projectMoleculeWorldStates(chemLoop)[0]!;
 
       const shapes = [epi, phys, chem].map((s) => Object.keys(s).sort());

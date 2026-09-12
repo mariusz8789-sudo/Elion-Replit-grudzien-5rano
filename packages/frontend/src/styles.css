@@ -1908,10 +1908,25 @@ kbd {
    overlay's own background, so it must actually be visible through it — only
    enough darkening at the bottom third to keep the entry text legible. */
 .fp-lab-enter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0.4rem; background: linear-gradient(to bottom, rgba(5, 8, 14, 0) 0%, rgba(5, 8, 14, 0) 55%, rgba(5, 8, 14, 0.82) 100%); color: #eaf1ff; cursor: pointer; text-align: center; padding: 1rem 1rem 3rem; }
+/* 2050-LAB GLASS PASS — Genesis World Observation is the flagship Trinity demo, so its own
+   entry overlay drops `.fp-lab-enter`'s full-bleed dark gradient (`.genesis-world-enter` nulls it
+   below) in favor of one small floating glass card, revealing far more of the real scene behind it
+   than a bottom-third scrim ever did. Scoped to this one screen only — `.fp-lab-enter`'s own
+   gradient is untouched so `FirstPersonLabScreen.tsx` (the other consumer) renders exactly as before. */
+.genesis-world-enter { background: none; }
+.fp-lab-enter-card {
+  max-width: min(30rem, 92vw); display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 0.85rem 1.15rem; border-radius: var(--r-md);
+  background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-md);
+}
 .fp-lab-enter-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
 .fp-lab-enter-hint { font: 500 0.78rem/1.4 var(--font-mono); color: #b7c6e6; margin: 0; }
 .fp-lab-crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); pointer-events: none; }
-.fp-lab-prompt { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); padding: 0.35rem 0.8rem; border-radius: 999px; background: rgba(10, 16, 28, 0.85); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font: 600 0.78rem/1 var(--font-mono); pointer-events: none; }
+/* ASTRA B6 continued — same translucent-glass swap as `.gx-interact-panel` just below: this pill
+   was still a flat, near-opaque hardcoded box with no backdrop-filter. Shared with
+   `FirstPersonLabScreen.tsx`, so both walk-up prompts pick up the same real glass, not just this one. */
+.fp-lab-prompt { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); padding: 0.35rem 0.8rem; border-radius: 999px; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font: 600 0.78rem/1 var(--font-mono); pointer-events: none; }
 .fp-lab-camera-badge { position: absolute; top: 0.8rem; left: 50%; transform: translateX(-50%); padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(240, 90, 60, 0.18); border: 1px solid rgba(245, 148, 63, 0.55); color: #ffd8b0; font: 700 0.72rem/1 var(--font-mono); letter-spacing: 0.04em; pointer-events: none; animation: fp-lab-fade-in 0.25s ease; }
 /* LIVING WORLD — Genesis World's own interact prompt is a real <button> (tappable on touch, where
    there is no keyboard "E" to press), unlike `.fp-lab-prompt`'s original inert overlay label. */
@@ -1969,7 +1984,8 @@ button.fp-lab-prompt { pointer-events: auto; cursor: pointer; appearance: none; 
    the way of the crosshair/prompt (center) and the existing sim-transport controls (below the stage).
    `touch-action: none` stops the browser's own scroll/zoom gestures from competing with a press. */
 .gx-dpad { position: absolute; left: 1rem; bottom: 1rem; width: 8.4rem; height: 8.4rem; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 0.3rem; }
-.gx-dpad-btn { touch-action: none; user-select: none; border-radius: 0.5rem; background: rgba(10, 16, 28, 0.72); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font-size: 1.1rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
+/* ASTRA B6 continued — same real glass as `.fp-lab-prompt`/`.gx-interact-panel` above, not a flat tint. */
+.gx-dpad-btn { touch-action: none; user-select: none; border-radius: 0.5rem; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border: 1px solid rgba(126, 179, 255, 0.4); color: #eaf1ff; font-size: 1.1rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .gx-dpad-btn:active { background: rgba(126, 179, 255, 0.35); }
 .gx-dpad-up { grid-column: 2; grid-row: 1; }
 .gx-dpad-left { grid-column: 1; grid-row: 2; }

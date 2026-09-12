@@ -143,6 +143,15 @@ jobs:
           name: kepler-solar-system-${{ github.sha }}
           path: artifacts/kepler-solar-system
           retention-days: 90
+      # TEMPORARY DIAGNOSTIC: the uploaded artifact is downloadable only from
+      # an Azure blob storage URL, which this repo's own sandbox environment
+      # cannot reach (same egress policy that blocks the science-data hosts
+      # in the first place) -- so the only way to inspect the REAL fetched
+      # page content, rather than guess its table structure blind, is to
+      # print it into this job's own log, which the GitHub API does expose.
+      # Removed once the real extraction logic is written from this output.
+      - name: DIAGNOSTIC — print pinned payload for inspection (removed once extraction logic is written)
+        run: cat artifacts/kepler-solar-system/B1-nssdc-planetary-factsheet.html
 
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera

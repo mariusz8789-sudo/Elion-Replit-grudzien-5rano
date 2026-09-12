@@ -110,6 +110,21 @@ export const QE1_OPENING_NOISE = 1;
  */
 export const QE1_AGREEMENT_TOLERANCE = 0.15;
 
+/**
+ * Tautology Gate declaration (`tautologyGate.ts`) for this real, runnable
+ * inquiry — NOT the excluded superquantum-source claim `QE1_NOT_MODELLED`
+ * describes. `maxCHSH` genuinely varies with which candidate visibility is
+ * true (`h:ideal` predicts 2√2, `h:classical` predicts 1.41 — see
+ * `QE1_CANDIDATES`'s own doc), on both the prediction side (a hypothesis's
+ * own claimed visibility) and the observation side (the system's real,
+ * hidden one) — both run through the same solver, which is exactly what
+ * makes this a legitimate (if simulated) parameter inquiry rather than a
+ * circular one. The Tsirelson bound itself is never checked by this system
+ * at all: it is why the excluded hypothesis was never added to
+ * `QE1_CANDIDATES` in the first place, not something this inquiry tests.
+ */
+const QE1_DERIVATION_RATIONALE = 'maxCHSH = 2√2·(1−whiteNoise)·visibility — a direct function of the candidate visibility, so different candidates genuinely predict different values';
+
 export function qe1System(trueVisibility: number): SystemUnderStudy {
   return {
     systemId: 'qe1-werner-source',
@@ -121,6 +136,11 @@ export function qe1System(trueVisibility: number): SystemUnderStudy {
     fixedParameters: { stateId: 'werner', mixingAngleDeg: 0 },
     observedMetric: 'maxCHSH',
     agreementTolerance: QE1_AGREEMENT_TOLERANCE,
+    observableDerivation: {
+      componentId: 'qe1-maxCHSH',
+      prediction: { source: 'hypothesis-parameter', modelId: ENTANGLEMENT_MODEL_ID, rationale: QE1_DERIVATION_RATIONALE },
+      observation: { source: 'hypothesis-parameter', modelId: ENTANGLEMENT_MODEL_ID, rationale: QE1_DERIVATION_RATIONALE },
+    },
   };
 }
 
@@ -199,6 +219,16 @@ export const QE2_OPENING_MIXING_ANGLE = 90;
 /** ±5%, standing in for the precision of a state-tomography reconstruction. */
 export const QE2_AGREEMENT_TOLERANCE = 0.05;
 
+/**
+ * Tautology Gate declaration — `ckwResidual` genuinely varies with θ (that is
+ * the whole point of the family's construction, see `QE2_CANDIDATES`'s own
+ * doc on the θ ↔ 90°−θ degeneracy), on both sides, through the same solver.
+ * The CKW monogamy THEOREM itself (`QE2_NOT_MODELLED`'s concern — a negative
+ * residual would falsify the implementation, not the theorem) is never what
+ * this inquiry measures; it measures WHERE in the family the source sits.
+ */
+const QE2_DERIVATION_RATIONALE = 'ckwResidual = sin²(2θ)·cos²α at whiteNoise=0 — a direct function of θ, so different candidates genuinely predict different values (except at the declared θ↔90°−θ degeneracy, which the probe schedule is designed to break)';
+
 export function qe2System(trueTheta: number): SystemUnderStudy {
   return {
     systemId: 'qe2-three-qubit-source',
@@ -210,6 +240,11 @@ export function qe2System(trueTheta: number): SystemUnderStudy {
     fixedParameters: { stateId: 'ghz-w-family', whiteNoise: 0 },
     observedMetric: 'ckwResidual',
     agreementTolerance: QE2_AGREEMENT_TOLERANCE,
+    observableDerivation: {
+      componentId: 'qe2-ckwResidual',
+      prediction: { source: 'hypothesis-parameter', modelId: ENTANGLEMENT_MODEL_ID, rationale: QE2_DERIVATION_RATIONALE },
+      observation: { source: 'hypothesis-parameter', modelId: ENTANGLEMENT_MODEL_ID, rationale: QE2_DERIVATION_RATIONALE },
+    },
   };
 }
 
@@ -278,6 +313,17 @@ export const QE3_OPENING_NOISE = 1;
 /** ±5%: the margin is exact algebra, and the four candidates differ by 11% or more at w = 0. */
 export const QE3_AGREEMENT_TOLERANCE = 0.05;
 
+/**
+ * Tautology Gate declaration — `boundEntanglementMargin` genuinely varies
+ * with the Horodecki parameter `a` (see `QE3_CANDIDATES`'s own measured
+ * margins: 0.003031, 0.002716, 0.001884, 0.000941 at w=0), on both sides,
+ * through the same solver. `QE3_NOT_MODELLED`'s concern (a margin of 0 does
+ * NOT prove separability, since CCNR is one-directional) is a limitation of
+ * what a supported outcome can claim, not a reason this comparison is
+ * circular — the metric itself is a real, hypothesis-dependent computation.
+ */
+const QE3_DERIVATION_RATIONALE = 'boundEntanglementMargin = ‖R(ρ)‖₁ − 1 (while PPT) for the Horodecki family at parameter a — a direct function of a, so different candidates genuinely predict different values at low noise';
+
 export function qe3System(trueA: number): SystemUnderStudy {
   return {
     systemId: 'qe3-horodecki-source',
@@ -289,6 +335,11 @@ export function qe3System(trueA: number): SystemUnderStudy {
     fixedParameters: { stateId: 'horodecki-bound', mixingAngleDeg: 0 },
     observedMetric: 'boundEntanglementMargin',
     agreementTolerance: QE3_AGREEMENT_TOLERANCE,
+    observableDerivation: {
+      componentId: 'qe3-boundEntanglementMargin',
+      prediction: { source: 'hypothesis-parameter', modelId: ENTANGLEMENT_MODEL_ID, rationale: QE3_DERIVATION_RATIONALE },
+      observation: { source: 'hypothesis-parameter', modelId: ENTANGLEMENT_MODEL_ID, rationale: QE3_DERIVATION_RATIONALE },
+    },
   };
 }
 

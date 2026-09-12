@@ -1,5 +1,10 @@
 # Tautology Gate — Audit (P2.1, before any implementation)
 
+> **STATUS: IMPLEMENTED.** This document is kept as-is — the audit history
+> that shaped the design — and is not rewritten to describe the shipped
+> code. See `docs/TAUTOLOGY_GATE_IMPLEMENTATION.md` for the final contract,
+> integration point, classifications, known limitations and test evidence.
+
 ## 0. Bloker, zweryfikowany niezależnie
 
 `docs/GENESIS_TAUTOLOGY_AND_EMPIRICAL_TEST_GATE.md` nie istnieje w tym repo.

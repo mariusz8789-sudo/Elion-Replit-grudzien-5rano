@@ -2505,18 +2505,20 @@ export function GenesisWorldScreen() {
 
         {!entered && !loading && !failed && (
           <div
-            className="fp-lab-enter"
+            className="fp-lab-enter genesis-world-enter"
             data-testid="genesis-world-enter"
             role="button"
             tabIndex={0}
             onClick={() => { setEntered(true); canvasRef.current?.requestPointerLock(); }}
             onKeyDown={(e) => { if (e.key === 'Enter') { setEntered(true); canvasRef.current?.requestPointerLock(); } }}
           >
-            <p className="fp-lab-enter-title">Tap or click to walk into Genesis World</p>
-            <p className="fp-lab-enter-hint">
-              Desktop: WASD — walk · Shift — run · mouse — look · E/1-9 — interact · F — enter/exit a
-              building · Esc — exit. Touch: drag to look · D-pad to walk · tap the prompt to interact.
-            </p>
+            <div className="fp-lab-enter-card">
+              <p className="fp-lab-enter-title">Tap or click to walk into Genesis World</p>
+              <p className="fp-lab-enter-hint">
+                Desktop: WASD — walk · Shift — run · mouse — look · E/1-9 — interact · F — enter/exit a
+                building · Esc — exit. Touch: drag to look · D-pad to walk · tap the prompt to interact.
+              </p>
+            </div>
           </div>
         )}
 

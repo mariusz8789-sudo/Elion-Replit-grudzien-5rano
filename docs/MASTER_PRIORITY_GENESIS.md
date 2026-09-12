@@ -1191,6 +1191,94 @@ sekcją C3), `docs/RISKS.md` (R-005).
 
 ---
 
+## UPDATE — C3: QE5/QE6/QE7 ZBADANE, każde `BLOCKED` z nazwanym powodem (2026-09-12)
+
+Zadanie (`docs/prompts/C3-QE5-QE6-QE7-implementacja.md`): zbudować `qe5.../qe6.../qe7...Inquiry`
+w `entanglementInquiry.ts`, tym samym `runAutonomousInquiry` co QE1–QE3, wg pakietu badawczego
+Qwena (`docs/prompts/QWEN-QE4-QE7-obserwable.md`). Zakres CELOWO ograniczony do
+`entanglementInquiry.ts` + `entanglementMeasures.ts`.
+
+**Wynik: żadna z trzech nie stała się czwartym realnym dochodzeniem — każda zbadana osobno i
+zablokowana z INNEGO, konkretnego, nazwanego powodu, zgodnie z regułą zadania „BLOCKED z
+nazwanym komponentem, nigdy symulowany sukces".** Pełne uzasadnienie fizyczne/architektoniczne
+jest w kodzie: `packages/frontend/src/core/agent/entanglementInquiry.ts`, stałe
+`QE5_BLOCKED`/`QE6_BLOCKED`/`QE7_BLOCKED` + `*_BLOCKED_MISSING_COMPONENT`, w tym samym stylu co
+`QE1_NOT_MODELLED`/`QE2_NOT_MODELLED`/`QE3_NOT_MODELLED`.
+
+**QE5 (PLOB ogranicza QKD).** Pakiet Qwena postawił otwarte pytanie: czy granicę PLOB da się
+wyrazić jako funkcję negatywności stanu Wernera, którą `entanglementMeasures.ts` już liczy.
+Odpowiedź, wypracowana tutaj (bo Qwen jej nie dostarczył — pakiet to prośba o zbadanie, nie
+gotowy wynik): NIE, uczciwie. PLOB (Pirandola–Laurenza–Ottaviani–Banchi 2017) to ograniczenie na
+przepustowość SEKRETNEGO KLUCZA bozonowego, ciągłozmiennowego KANAŁU strat (transmitancja η) —
+`quantum-entanglement-measures` liczy dokładną algebrę na zadeklarowanych, SKOŃCZENIE
+wymiarowych stanach qubitowych, bez kanału, bez η, bez tempa klucza. Nie istnieje zweryfikowana,
+cytowalna tożsamość sprowadzająca jedno do drugiego — wymyślenie jej byłoby dokładnie tym
+„wymuszeniem dopasowania", którego zadanie zabrania. Brakujący komponent: model kanału
+bozonowego/gaussowskiego + warstwa protokołu QKD nad nim.
+
+**QE6 (formuła wysp / krzywa Page'a).** Pakiet ma rację, że wykonalny rdzeń QE6 to WYŁĄCZNIE
+wynik Page'a z 1993: średnia entropia podukładu losowego stanu Haara na małym N, bez fizyki
+czarnych dziur — i to JEST w zasięgu istniejących solverów (`vonNeumannEntropyNats`,
+`schmidtDecomposition`), GDYBY dało się wygenerować świeży losowy stan i zmierzyć go przez
+realne dochodzenie. Nie da się, na dozwolonej ścieżce plików: `inquiryLoop.ts::runAt` dociera
+wyłącznie przez `getRouterModel(modelId)` + `runExperiment` (`executor.ts`) do zadeklarowanej
+listy presetów w `entanglementStateRunner.ts::ENTANGLEMENT_STATES` — nie ma tam (ani w
+kontrakcie parametrów Fabric, `number|string|boolean`) sposobu wyrazić „świeży losowy stan
+Haara". Dodanie takiego presetu wymaga dotknięcia `entanglementStateRunner.ts` i prawdopodobnie
+`router.ts`/`executor.ts` — poza dozwolonym zakresem tego zadania. Napisanie samej funkcji
+próbkującej w `entanglementMeasures.ts` bez ścieżki przez `runAt` byłoby martwym kodem bez
+realnego `StrategyRun` za nim — dokładnie „symulowany sukces", którego DONE zabrania.
+
+**QE7 (monogamia/SSA na splątaniu makroskopowym).** Pakiet słusznie nazywa CKW i SSA
+TWIERDZENIAMI tej algebry — żaden przebieg nie mógłby ich sfalsyfikować, więc jedyna uczciwa
+treść to weryfikacja IMPLEMENTACJI. Sprawdzone: nie da się zbudować takiej weryfikacji jako
+dochodzenia ODRĘBNEGO od QE2. Jedyna nie-NaN-owa obserwabla trójkubitowa na tym podłożu to
+`ckwResidual` (`vonNeumannEntropyNats`/`renyi2Nats`/`maxCHSH`/`concurrence`/`schmidtRank`
+wymagają `dimA=2,dimB=2` — żaden preset trójkubitowy tego nie spełnia, wszystkie są 2×4), a
+`ckwResidual` jest zdefiniowana wyłącznie przy `whiteNoise=0`. To zostawia dokładnie JEDNĄ
+rodzinę z JEDNĄ sondą: `ghz-w-family`, θ jako ukryty parametr, `mixingAngleDeg` jako sonda — czyli
+dosłownie `qe2System`. Dochodzenie zbudowane z tych samych składników pod inną nazwą nie
+przetestowałoby niczego, czego realny, już wykonany przebieg QE2 nie ustalił (θ = 70° odzyskane w
+trzech rundach, `ckwResidual` liczony i rewidowany co rundę, nigdy ujemny — patrz
+`knowledge/quantum.md`). Pytanie „czy implementacja poprawnie liczy monogamię w realnych
+przebiegach" ma więc ODPOWIEDŹ — w historii QE2, nie w nowym dochodzeniu.
+
+**Co NIE zostało zrobione, świadomie.** Żadna nowa funkcja (np. próbkowanie Haara) nie została
+napisana mimo dozwolenia zadania („jedna wąska nowa funkcja... jeśli naprawdę potrzebna") — bo
+żadna z nich byłaby REALNIE potrzebna bez wpięcia przez `runAt`, którego dozwolony zakres plików
+nie obejmuje; napisanie nieużywanej funkcji byłoby fasadą, nie postępem.
+`scripts/inquiry-e2e.mjs` NIE zyskał nowych wpisów — nie ma nowego realnego dochodzenia do
+sprawdzenia; rozszerzenie o coś nieistniejącego byłoby fikcją. `knowledge/quantum.md` (tabela
+„Co Genesis NAPRAWDĘ uruchomił") ma trzy nowe wiersze z werdyktem `BLOCKED` i konkretnym
+brakującym komponentem dla każdej hipotezy — bez zmiany kolumny „Status wg pakietu" (to ocena
+literatury, nie wynik Genesis, ta sama zasada co przy QE1–QE3).
+
+**Regresja: zero.** QE1–QE3 nietknięte (74/74 testów: `entanglementInquiry.test.ts` +
+`entanglementInquiryTautology.test.ts` + `entanglementMeasures.test.ts` +
+`moduleReachability.test.ts`), `externalObservationAnchor.test.ts`/`keplerExternalAnchor.test.ts`
+nietknięte (nie moja domena w tym zadaniu).
+
+**Pełna weryfikacja.**
+```
+tsc --noEmit                     czysto
+eslint src --max-warnings=0      czysto
+vitest run (frontend)            470 plików, 5217 passed / 1 znany niezwiązany flake
+                                  (nextActionSelectors.test.ts, zielony osobno) / 1 znany skip
+npm test (backend)                396/396 passed
+npm run build                    czysto
+node scripts/repro-demo.mjs      18/18 (bez zmian — to zadanie nie dotyka tego zakresu)
+CHROME=/opt/pw-browsers/chromium node scripts/inquiry-e2e.mjs
+                                  6/6 problemów, bez zmian — QE1-3 dochodzenia nietknięte
+```
+
+Priorytet ZAMKNIĘTY jako „zbadane i udokumentowane" (DONE dopuszcza to wprost): QE5, QE6, QE7
+każde `BLOCKED` z konkretnym, innym powodem — nie trzy odmowy tej samej wymówki. Następny krok,
+jeśli ktoś chce go podjąć: QE6 jest NAJBLIŻEJ wykonalności — wymaga tylko dodania jednego presetu
+Haar-losowego do `entanglementStateRunner.ts` (i prawdopodobnie jednego parametru w `router.ts`),
+poza zakresem plików tego zadania, nie poza zakresem fizyki czy architektury.
+
+---
+
 ## UPDATE — C1: R-005 — PIERWSZA kotwica INSTRUMENTALNA w repo, CMS Open Data Z→μμ (2026-09-12)
 
 **Zadanie.** Domknąć `docs/RISKS.md` R-005's „następny krok, konkretnie": kotwica

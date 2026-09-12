@@ -143,15 +143,22 @@ jobs:
           name: kepler-solar-system-${{ github.sha }}
           path: artifacts/kepler-solar-system
           retention-days: 90
-      # TEMPORARY DIAGNOSTIC: the uploaded artifact is downloadable only from
-      # an Azure blob storage URL, which this repo's own sandbox environment
-      # cannot reach (same egress policy that blocks the science-data hosts
-      # in the first place) -- so the only way to inspect the REAL fetched
-      # page content, rather than guess its table structure blind, is to
-      # print it into this job's own log, which the GitHub API does expose.
-      # Removed once the real extraction logic is written from this output.
-      - name: DIAGNOSTIC — print pinned payload for inspection (removed once extraction logic is written)
-        run: cat artifacts/kepler-solar-system/B1-nssdc-planetary-factsheet.html
+      - name: Compare fresh fetch to the committed pinned copy (drift detection)
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const fresh = await readFile('artifacts/kepler-solar-system/B1-nssdc-planetary-factsheet.html', 'utf8');
+          const committed = await readFile('packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html', 'utf8');
+          if (fresh !== committed) {
+            throw new Error(
+              'NSSDC Planetary Fact Sheet drifted from the committed, hash-pinned copy the Kepler anchor reads ' +
+              '(externalAnchor.ts, payloadDigest 2296fa16). NASA changed the source page since this was pinned -- ' +
+              're-fetch, re-verify the extraction regex against the new content, and re-pin deliberately; ' +
+              'do not silently accept a changed value as the same observation.',
+            );
+          }
+          console.log('Kepler fixture matches the committed pinned copy — no drift.');
+          NODE
 
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera

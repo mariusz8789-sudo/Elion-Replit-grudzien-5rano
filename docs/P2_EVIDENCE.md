@@ -235,3 +235,109 @@ identycznie, teraz przez pętlę zamiast stałej).
 per §6) — bo wymaga realnego, pobranego payloadu, którego to środowisko nie
 może pobrać. `scripts/repro-demo.mjs` nie zyskał nowego wpisu w `EXPECTED` z
 tego samego powodu: nie ma czego dodać bez fabrykacji.
+
+---
+
+## P2.3 — DRUGA kotwica ZAMKNIĘTA (2026-09-12, C1): Kepler + Wenus, NASA NSSDCA, nie NASA Exoplanet Archive
+
+**Status: ZROBIONE, empirycznie, z realnymi liczbami.** Blokada bezpośredniego
+dostępu do `exoplanetarchive.ipac.caltech.edu` z TEGO środowiska pozostaje w
+mocy (potwierdzona ponownie w tej sesji) — ale zamiast czekać na inne
+środowisko, wykorzystano wzorzec, który już działa w tym repo: CI-fetch-pin
+(`scripts/fetch-atom-bohr-nist-fixtures.mjs`/`nist-g3-pinned-artifacts`,
+zielony), gdzie egress GitHub Actions nie ma tego ograniczenia.
+
+**Dlaczego NIE NASA Exoplanet Archive, mimo że runner CI mógłby go dosięgnąć.**
+Realne ryzyko cykliczności, nie kolejna blokada: w archiwum egzoplanet
+`pl_orbsmax` (półoś wielka) dla wielu wpisów — zwłaszcza planet
+tranzytujących — jest WYLICZONA z `pl_orbper` (okres) przez III prawo
+Keplera, dokładnie tę formułę, którą testowałaby predykcja tej kotwicy.
+Porównanie „przewidywany okres z półosi" wobec „opublikowany okres" byłoby
+wtedy identycznością przez konstrukcję dla takich wpisów — a bez dostępu do
+archiwum nie dało się sprawdzić per-planeta, które wpisy tego unikają.
+Dlatego wybrano dane Układu Słonecznego (NASA NSSDCA Planetary Fact Sheet):
+okres orbitalny mierzony bezpośrednią astronomią pozycyjną od stuleci,
+odległość — zupełnie inną techniką (radar/śledzenie sond) — dwa historycznie
+niezależne kanały, bez potrzeby weryfikowania per-rekordowej prowieniencji.
+
+**Droga pozyskania danych — w kolejności, z pomyłkami, nie ukryte.**
+1. `scripts/fetch-kepler-solar-system-fixture.mjs` + job CI
+   `kepler-solar-system-pinned-artifact` — dokładny wzorzec NIST.
+2. Pierwszy fetch: strona dotarła (14363 B), ale marker „Venus"/„Orbital
+   Period" nie pasował do rzeczywistej treści — osłabiono do potwierdzonego
+   „Planetary Fact Sheet".
+3. Artefakt CI jest pobieralny wyłącznie z URL-a Azure Blob Storage — TAKŻE
+   zablokowanego z tego sandboxa. Zamiast zgadywać strukturę strony,
+   tymczasowo wydrukowano zawartość pliku do loga joba (GitHub API jest
+   dostępne stąd) i odczytano PRAWDZIWĄ tabelę.
+4. Zrekonstruowano plik lokalnie z loga i policzono SHA-256 —
+   **bajt-w-bajt zgodny** z tym, co CI obliczyło z realnego fetcha
+   (`42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c`) —
+   dopiero ta zgodność dała podstawę do przypięcia pliku do repo.
+5. Krok diagnostyczny w CI zastąpiono trwałą kontrolą dryfu: nowy fetch
+   porównywany z przypiętą kopią w repo przy każdym pushu.
+
+**Kotwica: co porównuje i skąd pochodzi każda strona.**
+
+| | |
+|---|---|
+| Predykcja | `orbitalPeriodYears` z `buildOrbitalModelGraph()` (`orbitalGraph.ts`, NIEZMIENIONY — ta sama funkcja co Universe Lab), wejście: półoś wielka Wenus (108,2×10⁶ km → AU) z pinowanego payloadu, masa Słońca = 1 M☉ (stała, nie z payloadu) |
+| Obserwacja | Okres orbitalny Wenus czytany z INNEGO wiersza tego samego pinowanego payloadu (224,7 dni → lata), NIGDY liczony |
+| Źródło | `https://nssdc.gsfc.nasa.gov/planetary/factsheet/` — NASA NSSDCA Planetary Fact Sheet, domena publiczna (praca rządu USA) |
+| Odcisk payloadu | `2296fa16` (literał, nie wyliczenie — D-014) |
+| Pasmo | ±0,5%, prerejestrowane przed odczytaniem obserwacji |
+
+**Realny wynik, wykonany, nie założony.**
+```
+predicted = 0.615109979562335 roku
+observed  = 0.6151950718685831 roku  (224.7 / 365.25)
+|diff|    = 0.0000851 roku (0.014%), wewnątrz pasma ±0,5%
+verdict   = SUPPORTED_WITHIN_PROTOCOL
+tautology = EMPIRICAL_TEST (obserwacja: independent-measurement; predykcja: hypothesis-parameter)
+belief    = 0.500 → 0.814 (SUPPORTED_WITHIN_PROTOCOL)
+replay    = MATCH
+```
+Falsyfikacja realna zweryfikowana przez `predictedValueOverride: 5.0` →
+`FALSIFIED_WITHIN_PROTOCOL`, przekonanie spada poniżej 0,500.
+
+**Rozszerzenie kontraktu — addytywne, zero zmiany zachowania pierwszej
+kotwicy.** `ExternalAnchor` zyskuje opcjonalne `predictionDerivation`/
+`observationDerivation` (`tautologyGate.ts`) i wymagane `predictionSourceLabel`
+(naprawia sztywny tekst UI „ze wzoru molekularnego", który nie generalizował
+się na kotwicę spoza chemii). `AnchorRunResult` zyskuje `tautologyAssessment`
+(`null` dla pierwszej kotwicy — potwierdzone testem), `belief`
+(`beliefRevision.ts::createHypothesis`/`updateConfidence`, czysta funkcja,
+nierejestrowana między wywołaniami — deterministyczny replay bez zapisu do
+Science Memory) i `nextQuestion`.
+
+**Testy: 23/23 zielone** (`externalObservationAnchor.test.ts`, 10 nowych:
+niezależność ekstrakcji predykcja/obserwacja, literalny odcisk, odmowa przy
+manipulacji surowego HTML-a, pełny cykl SUPPORTED, falsyfikacja, replay
+MATCH+drift, klasyfikacja Tautology Gate, addytywność dla starej kotwicy,
+rewizja przekonania w obie strony, „next question" różne dla SUPPORTED/
+FALSIFIED).
+
+**Dowód wizualny — realny Chromium, `#/evidence`, desktop + mobile, zero
+`pageerror`/`console.error`.** Nowy `scripts/evidence-anchor-e2e.mjs`
+potwierdza: obie kotwice renderują się (regresja pierwszej wykluczona),
+werdykt Kepler+Wenus = SUPPORTED_WITHIN_PROTOCOL z opisem źródła predykcji,
+Tautology Gate = EMPIRICAL_TEST, rewizja przekonania od 0,500, replay MATCH,
+prowieniencja pokazuje `nssdc.gsfc.nasa.gov` i odcisk `2296fa16`, a „co
+pozostaje nieprzetestowane" wprost nazywa precesję Merkurego jako granicę
+modelu.
+
+**Skutek dla R-005.** ZWĘŻONE DALEJ — to jest PIERWSZA prawdziwie
+EMPIRYCZNA kotwica w repo (Tautology Gate = `EMPIRICAL_TEST`, nie
+`CONSISTENCY_CHECK`): zgodność potwierdza rzeczywistą hipotezę fizyczną
+(Kepler III dla realnego ciała), nie tylko spójność dwóch niezależnie
+utrzymywanych tablic, jak przy PubChem. Pełny opis decyzji i drogi:
+`docs/DECISIONS.md`, `docs/RISKS.md` (R-005), `docs/MASTER_PRIORITY_GENESIS.md`.
+
+**Co NADAL pozostaje otwarte.** Brak ingestion publicznego API na żywo (dane
+przypięte przez CI-fetch, nie pobierane w czasie rzeczywistym) — to samo
+ograniczenie środowiska co przy pierwszej kotwicy. Testuje JEDNO ciało
+(Wenus) na niemal kołowej orbicie; nie testuje modelu pod silną perturbacją
+ani korektą relatywistyczną — nazwane wprost w `whatRemainsUntested` kotwicy,
+nie przemilczane. Ten sam pinowany payload zawiera dane wszystkich ośmiu
+planet i Księżyca — konkretny, wykonalny „next question" dla kolejnej,
+osobnej kotwicy, świadomie poza zakresem tego zadania.

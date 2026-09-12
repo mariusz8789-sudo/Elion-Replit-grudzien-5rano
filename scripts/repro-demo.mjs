@@ -122,7 +122,13 @@ try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
     path.join(REPO, 'packages/frontend/src/core/repro/reproEntry.node.ts'),
-    '--bundle', '--format=esm', '--platform=node', '--target=node22', '--log-level=error', `--outfile=${out}`,
+    '--bundle', '--format=esm', '--platform=node', '--target=node22', '--log-level=error',
+    // externalAnchor.ts pulls in the Kepler anchor's pinned HTML fixture via
+    // Vite's `?raw` import convention; esbuild (used standalone here, not
+    // through Vite) needs its own loader told to treat `.html` as raw text
+    // to match that semantic, or bundling fails outright.
+    '--loader:.html=text',
+    `--outfile=${out}`,
   ], { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'] });
   const science = await import(out);
   anchor = science.reproExternalAnchor();

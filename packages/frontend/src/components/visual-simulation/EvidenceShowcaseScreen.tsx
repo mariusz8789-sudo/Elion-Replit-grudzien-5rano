@@ -84,8 +84,8 @@ function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
         <>
           <p data-testid={`ecs-anchor-verdict-${anchor.id}`}>
             <b>{result.verification.assessment}</b>{' — '}
-            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric} from
-            the published molecular formula; the externally published value is {result.verification.observedValue} {anchor.unit}.
+            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric} {anchor.predictionSourceLabel};
+            the externally published value is {result.verification.observedValue} {anchor.unit}.
             Preregistered band ±{anchor.tolerance.toFixed(3)} {anchor.unit}.
           </p>
           <dl className="pilot-provenance" data-testid={`ecs-anchor-provenance-${anchor.id}`}>
@@ -96,6 +96,17 @@ function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
             <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
             <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
           </dl>
+          {result.tautologyAssessment && (
+            <p data-testid={`ecs-anchor-tautology-${anchor.id}`}>
+              <b>Tautology Gate: {result.tautologyAssessment.classification}</b>{' — '}
+              {result.tautologyAssessment.reasons[0]}
+            </p>
+          )}
+          <p data-testid={`ecs-anchor-belief-${anchor.id}`}>
+            <b>Belief revision</b>{' — '}
+            confidence that this model correctly predicts this real observation moved from{' '}
+            {result.belief.before.toFixed(3)} to {result.belief.after.toFixed(3)} ({result.belief.status}).
+          </p>
           <p className={`ecs-replay-line wd-replay-${result.replay}`} data-testid={`ecs-anchor-replay-${anchor.id}`}>
             <b>{result.replay}</b>{' — '}
             the comparison was re-executed just now, in this browser, from the pinned payload; the two
@@ -104,6 +115,9 @@ function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
           </p>
           <p className="gsc-caption" data-testid={`ecs-anchor-untested-${anchor.id}`}>
             <b>What this does NOT establish:</b> {result.whatRemainsUntested}
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-anchor-next-question-${anchor.id}`}>
+            <b>Next question:</b> {result.nextQuestion}
           </p>
         </>
       )}

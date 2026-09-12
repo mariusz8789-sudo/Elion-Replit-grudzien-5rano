@@ -1086,3 +1086,105 @@ zero nowej metodologii. Nie dotyka `selectNextHypothesisExperiment` (duży, deli
 z wieloma konsumentami — `crossDomainSynthesis.ts`, `nextAction.ts`, `researchCampaign.ts`,
 `scienceMemory.ts`) — to jest ADDYTYWNA, osobna ścieżka, żeby nie zmienić zachowania niczego, co już
 na niej polega.
+
+---
+
+## UPDATE — C1: P2.3 druga kotwica (Kepler + Wenus) ZAMKNIĘTA — realna empiryczna anchor + Tautology Gate + rewizja przekonania (2026-09-12)
+
+**Zadanie.** "C1 — NEXT MAJOR TASK: EXTERNAL-ANCHOR SCIENTIFIC DISCOVERY LOOP" —
+zbudować najmniejszy realny most od kontrolowanej pętli odkrycia do niezależnie
+zakotwiczonego eksperymentu naukowego, reużywając `universe-kepler` i istniejącą
+maszynerię `externalAnchor.ts` (P2.3). Audyt najpierw, implementacja potem.
+
+**Audyt (GAP MATRIX), zanim cokolwiek zmieniono.**
+
+| Element | Stan |
+|---|---|
+| `universe-kepler` (Fabric, `orbitalGraph.ts`, T=2π√(a³/GM)) | DONE, niezmienione |
+| Kontrakt `externalAnchor.ts` (generyczny, domenowo-neutralny) | DONE, reużyty bez zmian architektury |
+| Kotwica Kepler/NASA Exoplanet Archive | BLOCKED (potwierdzone PONOWNIE w tej sesji — 403 na każdym ogólnym hoście danych naukowych z tego środowiska), nie zduplikowane |
+| Tautology Gate w `externalAnchor.ts` | MISSING — `runExternalAnchor` nie wołał `assessTautology` wcale |
+| Rewizja przekonania dla werdyktu kotwicy | MISSING |
+| "Next question" po kotwicy | MISSING |
+| `EvidenceShowcaseScreen` — pętla po `EXTERNAL_ANCHORS` | DONE (C3), ale tekst werdyktu miał na sztywno „ze wzoru molekularnego" — nie generalizuje się na kotwicę spoza chemii |
+
+**Decyzja: Kepler + Wenus (NASA NSSDCA Planetary Fact Sheet), nie NASA Exoplanet
+Archive — i dlaczego, wprost.** Ten sandbox blokuje WSZYSTKIE ogólne hosty
+danych naukowych identycznie (zweryfikowano ponownie: exoplanetarchive,
+nssdc.gsfc.nasa.gov, ssd.jpl.nasa.gov, nawet Wikipedię — tylko rejestry
+pakietów i hosty Anthropic są dopuszczone). To NIE jest powód zmiany źródła —
+runner GitHub Actions nie ma tego ograniczenia (dowód: `nist-g3-pinned-artifacts`
+jest zielony). Prawdziwy powód to REALNE ryzyko cykliczności, którego nie dało
+się zweryfikować na ślepo: w archiwum egzoplanet półoś wielka wielu wpisów
+(zwłaszcza planet tranzytujących) jest WYLICZONA z okresu orbitalnego przez
+III prawo Keplera — dokładnie tę formułę, którą miałaby użyć predykcja tej
+kotwicy — co uczyniłoby porównanie cyrkularnym (identyczność przez
+konstrukcję, nie empiria), a bez dostępu do archiwum nie dało się sprawdzić,
+które konkretne wpisy tego unikają. Dane Układu Słonecznego usuwają tę
+niejednoznaczność całkowicie: okres orbitalny mierzony bezpośrednią astronomią
+pozycyjną od stuleci, półoś wielka — zupełnie inną techniką (radar/śledzenie
+sond) — to ten sam schemat dwóch niezależnych kanałów, który historycznie w
+ogóle pozwolił odkryć i zweryfikować III prawo Keplera.
+
+**Droga danych, w kolejności, z porażkami po drodze — nie ukryte.**
+1. Napisano `scripts/fetch-kepler-solar-system-fixture.mjs` + job CI
+   `kepler-solar-system-pinned-artifact` (dokładnie wzorem `fetch-atom-bohr-
+   nist-fixtures.mjs`/`nist-g3-pinned-artifacts`).
+2. Pierwszy fetch w CI: strona dotarła (14363 B, tytuł „Planetary Fact
+   Sheet"), ale marker „Venus"/„Orbital Period" nie pasował — osłabiono
+   marker do tego, co realnie potwierdzone.
+3. Artefakt CI jest pobieralny wyłącznie z URL-a Azure Blob Storage, którego
+   ten sandbox TAKŻE nie może dosięgnąć (ta sama polityka proxy) — zamiast
+   zgadywać, dodano tymczasowy krok `cat` do loga joba (GitHub API jest
+   dostępne), odczytano PRAWDZIWĄ zawartość tabeli.
+4. Zrekonstruowano plik z loga i policzono SHA-256 lokalnie — zgodny
+   BAJT-W-BAJT z tym, co obliczyło CI (`42bdc3f1...`) — dopiero to dało
+   pewność do przypięcia pliku do repo
+   (`packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html`).
+5. Krok diagnostyczny w CI zastąpiono realną, trwałą kontrolą dryfu:
+   porównaniem świeżego fetcha z przypiętą kopią w repo, nie tylko
+   jednorazowym `cat`.
+
+**Implementacja — zero nowego silnika.** `externalAnchor.ts` rozszerzony
+ADDYTYWNIE: `predictionDerivation`/`observationDerivation` (opcjonalne,
+`tautologyGate.ts`), `predictionSourceLabel` (naprawia sztywny tekst UI),
+`AnchorRunResult` zyskuje `tautologyAssessment` (null dla starej kotwicy —
+zero zmiany zachowania), `belief` (jedna hipoteza przez
+`beliefRevision.ts::createHypothesis`/`updateConfidence`, nierejestrowana
+między wywołaniami — czysta funkcja, deterministyczny replay) i
+`nextQuestion` (zdanie, nie ranking). Nowa kotwica `keplerVenusAnchor`:
+predykcja z półosi wielkiej Wenus przez ISTNIEJĄCY `buildOrbitalModelGraph`
+(`orbitalGraph.ts`, ta sama funkcja co Universe Lab), obserwacja czytana z
+kolumny „Orbital Period" tego samego payloadu — dwie ODRĘBNE ścieżki
+ekstrakcji z pinowanego HTML-a, zweryfikowane testem, że podmiana jednej
+kolumny nie zmienia wyniku drugiej.
+
+**Realny wynik, nie założony.** Predykcja: 0.615109979562335 roku. Obserwacja
+(224.7 dni / 365.25): 0.6151950718685831 roku. Różnica: 0.0000851 roku
+(0.014%), wewnątrz prerejestrowanego pasma ±0.5%. Werdykt:
+`SUPPORTED_WITHIN_PROTOCOL`. Tautology Gate: `EMPIRICAL_TEST` (obserwacja
+zadeklarowana jako `independent-measurement`, predykcja jako
+`hypothesis-parameter`). Rewizja przekonania: 0.500 → 0.814. Replay: MATCH.
+Falsyfikacja realna: `predictedValueOverride: 5.0` → `FALSIFIED_WITHIN_PROTOCOL`,
+przekonanie spada poniżej 0.500. `EvidenceShowcaseScreen` renderuje obie
+kotwice bez zmian architektury ekranu (pętla C3 działa dokładnie tak, jak
+udokumentowano), zweryfikowane realnym Chromium (desktop + mobile), zero
+`pageerror`/`console.error`.
+
+**Testy.** `externalObservationAnchor.test.ts` rozszerzony o 10 nowych testów
+(niezależność ekstrakcji predykcji/obserwacji, literalny odcisk, odmowa przy
+manipulacji, pełny cykl SUPPORTED, falsyfikacja, replay MATCH+drift,
+klasyfikacja Tautology Gate, addytywność `tautologyAssessment: null` dla
+starej kotwicy, rewizja przekonania w obie strony, „next question" różne dla
+SUPPORTED/FALSIFIED) — 23/23 zielone. Nowy `scripts/evidence-anchor-e2e.mjs`
+(desktop+mobile) potwierdza realne wykonanie w przeglądarce. QE1–QE3
+(`scripts/inquiry-e2e.mjs`) nietknięte, wciąż 6/6 zielone.
+
+**Czego to NIE ustanawia — granica jawna, w samej kotwicy.** Jedno ciało
+(Wenus), orbita niemal kołowa (e=0,007) wokół jednej dominującej masy. Nie
+testuje modelu pod silną perturbacją, wysoką ekscentrycznością ani korektą
+relatywistyczną (precesja peryhelium Merkurego NIE jest odtwarzana przez ten
+uproszczony model dwóch ciał — kotwica tego nie twierdzi). Ten sam pinowany
+payload zawiera dane WSZYSTKICH planet — naturalny, konkretny „next question"
+dla kolejnej, osobnej kotwicy, nie zaimplementowany w tym zadaniu (poza
+zakresem „najmniejszego mostu").

@@ -256,7 +256,21 @@ związanego spada do zera już przy **0,5% szumu białego**. Stany splątane
 związanie leżą tuż przy brzegu zbioru separowalnego, więc jedyne ustawienie
 sondy, które cokolwiek mówi, to preparatyka bezszumowa.
 
-QE4–QE7 nie były uruchamiane.
+QE4 nie było uruchamiane w tej sesji (osobne zadanie C2, realny zbiór
+Brydgesa z Zenodo — `docs/QE4_REAL_DATASET_AND_EXPERIMENT.md`).
+
+**QE5, QE6, QE7 zostały ZBADANE (nie pominięte) i wyszły `BLOCKED`, każde z
+innego, nazwanego powodu** (pełne uzasadnienie:
+`packages/frontend/src/core/agent/entanglementInquiry.ts`, stałe
+`QE5_BLOCKED`/`QE6_BLOCKED`/`QE7_BLOCKED` +
+`*_BLOCKED_MISSING_COMPONENT`; dowód wykonania w
+`docs/MASTER_PRIORITY_GENESIS.md`):
+
+| ID | Co sprawdzono | Werdykt | Brakujący komponent / powód |
+|---|---|---|---|
+| QE5 | czy granicę PLOB (przepustowość kanału na sekretny klucz) da się wyrazić jako funkcję negatywności stanu Wernera już policzonej przez `entanglementMeasures.ts` | `BLOCKED` | PLOB dotyczy KANAŁU bozonowego/gaussowskiego (transmitancja η); Genesis liczy dokładną algebrę na zadeklarowanych stanach qubitowych — nie ma kanału, nie ma η, nie ma tempa klucza. Brak zweryfikowanej tożsamości sprowadzającej jedno do drugiego; wymyślenie jej byłoby dokładnie tym, czego zadanie zabrania |
+| QE6 | czy formułę Page'a (średnia entropia podukładu losowego stanu Haara) da się policzyć NA MAŁYCH N bez fizyki czarnych dziur | `BLOCKED` (dostępne w zasadzie, niedostępne w tym zakresie plików) | `inquiryLoop.ts::runAt` dociera wyłącznie do `quantum-entanglement-measures` przez zadeklarowaną listę presetów w `entanglementStateRunner.ts` — nie ma tam (ani w kontrakcie parametrów) sposobu wyrazić „świeży losowy stan Haara". Dodanie tego wymaga dotknięcia `entanglementStateRunner.ts`/`router.ts`/`executor.ts`, poza dozwolonym zakresem tego zadania (`entanglementInquiry.ts`, `entanglementMeasures.ts`) |
+| QE7 | czy da się zbudować dochodzenie odrębne od QE2, testujące implementację monogamii/SSA | `BLOCKED` (odpowiedź już istnieje — w QE2) | Jedyna nie-NaN obserwabla trójkubitowa na tym podłożu to `ckwResidual`, zdefiniowana tylko przy `whiteNoise=0`, na rodzinie `ghz-w-family` sondowanej przez `mixingAngleDeg` — to jest dokładnie `qe2System`. Osobne dochodzenie z tych samych składników byłoby QE2 pod inną nazwą. Pytanie o implementację („czy CKW residual jest nieujemny w realnych przebiegach") jest już odpowiedziane przez rzeczywistą, wykonaną historię QE2 wyżej w tej tabeli |
 
 ### Otwarte problemy
 

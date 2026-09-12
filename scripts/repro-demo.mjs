@@ -66,6 +66,13 @@ const EXPECTED = {
   qe3Falsified: ['h:a-0.2', 'h:a-0.6', 'h:a-0.8'],
   qe3StopReason: 'NO_CONTENDERS_LEFT',
   qe3Provenance: 'SIMULATED',
+  qe4P1: 'SUPPORTED_WITHIN_MODEL',
+  qe4P2: 'SUPPORTED_WITHIN_MODEL',
+  qe4P3: 'SUPPORTED_WITHIN_MODEL',
+  qe4P4: 'SUPPORTED_WITHIN_MODEL',
+  qe4Tautology: 'EMPIRICAL_TEST',
+  qe4Fingerprint: 'a6578ae8',
+  qe4Doi: '10.5281/zenodo.2527010',
 };
 
 const checks = [];
@@ -129,6 +136,7 @@ const bundleDir = mkdtempSync(path.join(tmpdir(), 'genesis-repro-bundle-'));
 let anchor;
 let keplerAnchor;
 let qe3;
+let qe4;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -136,12 +144,15 @@ try {
     '--bundle', '--format=esm', '--platform=node', '--target=node22', '--log-level=error', `--outfile=${out}`,
     // Kotwica Kepler/Mars importuje przypiętą stronę NASA jako surowy tekst
     // (Vite `?raw`, jak w przeglądarce) — esbuild potrzebuje tego jawnie.
+    // QE4 robi to samo dla przypiętych plików .csv Brydgesa.
     '--loader:.html=text',
+    '--loader:.csv=text',
   ], { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'] });
   const science = await import(out);
   anchor = science.reproExternalAnchor(science.MOLECULAR_WEIGHT_ANCHOR_ID);
   keplerAnchor = science.reproExternalAnchor(science.KEPLER_MARS_ANCHOR_ID);
   qe3 = science.reproQe3Inquiry();
+  qe4 = science.reproQe4BrydgesAnalysis();
 } finally {
   rmSync(bundleDir, { recursive: true, force: true });
 }
@@ -177,13 +188,25 @@ record('QE3 dochodzenie: falsyfikacja', eq([...qe3.surviving], EXPECTED.qe3Survi
 record('QE3 dochodzenie: prowieniencja', qe3.dataProvenance === EXPECTED.qe3Provenance,
   `${qe3.dataProvenance} — dokładna algebra na zadeklarowanym stanie JEST symulacją i tak jest oznaczona`);
 
+record('QE4 (Brydges/Zenodo 2527010): P1-P4 werdykty',
+  qe4.p1Verdict === EXPECTED.qe4P1 && qe4.p2Verdict === EXPECTED.qe4P2 && qe4.p3Verdict === EXPECTED.qe4P3 && qe4.p4Verdict === EXPECTED.qe4P4,
+  `P1=${qe4.p1Verdict} P2=${qe4.p2Verdict} P3=${qe4.p3Verdict} P4=${qe4.p4Verdict} (oczekiwane wszystkie ${EXPECTED.qe4P1})`);
+record('QE4: Tautology Gate (wszystkie 4 EMPIRICAL_TEST)',
+  [qe4.p1Tautology, qe4.p2Tautology, qe4.p3Tautology, qe4.p4Tautology].every((t) => t === EXPECTED.qe4Tautology),
+  `[${qe4.p1Tautology}, ${qe4.p2Tautology}, ${qe4.p3Tautology}, ${qe4.p4Tautology}] (oczekiwane wszystkie ${EXPECTED.qe4Tautology})`);
+record('QE4: P4 integralność (0 punktów poza pasmem ±3σ)', qe4.p4FailingCount === 0,
+  `${qe4.p4FailingCount} punktów poza pasmem z 74 porównanych`);
+record('QE4: odcisk wyniku (replay)', qe4.resultFingerprint === EXPECTED.qe4Fingerprint,
+  `${qe4.resultFingerprint} (oczekiwane ${EXPECTED.qe4Fingerprint})`);
+record('QE4: tożsamość zbioru', qe4.datasetDoi === EXPECTED.qe4Doi, `DOI ${qe4.datasetDoi} (oczekiwane ${EXPECTED.qe4Doi})`);
+
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);
 
 if (UPDATE_MODE) {
-  console.log(JSON.stringify({ anchor, keplerAnchor, qe3 }, null, 2));
+  console.log(JSON.stringify({ anchor, keplerAnchor, qe3, qe4 }, null, 2));
 } else if (JSON_MODE) {
-  console.log(JSON.stringify({ commit: build.commit, node: runtime.version, checks, anchor, keplerAnchor, qe3, ok: failed.length === 0 }, null, 2));
+  console.log(JSON.stringify({ commit: build.commit, node: runtime.version, checks, anchor, keplerAnchor, qe3, qe4, ok: failed.length === 0 }, null, 2));
 } else {
   console.log(`\nGENESIS OS — PAKIET ODTWARZALNOŚCI`);
   console.log(`commit ${build.commit} (${build.commitSource}) · node ${runtime.version}\n`);

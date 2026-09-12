@@ -117,6 +117,8 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // DESIGN — reaching them from the browser bundle would be the bug.
   'core/compute/serverEntry.ts': 'Node-side entry point; never imported by the browser bundle.',
   'core/repro/reproEntry.node.ts': 'Node-side facade for scripts/repro-demo.mjs (P3.2 one-command reproducibility pack); bundled by esbuild --platform=node and never imported by the browser bundle. It computes nothing of its own -- it calls runExternalAnchor and runAutonomousInquiry and returns what they returned.',
+  'core/biotechData/qe4BrydgesAnalysis.ts': 'QE4 real-dataset analysis (docs/QE4_PREREGISTRATION.md, docs/QE4_EVIDENCE.md) -- reached only via reproEntry.node.ts (esbuild-bundled for scripts/repro-demo.mjs) and its own tests, never from main.tsx. Deliberately NOT wired into any UI: the architecture audit in docs/QE4_EVIDENCE.md section 7 found no existing Genesis seam for "one external dataset + N independent preregistered verdicts" without inventing a new SavedExperiment shape, which is a real architectural decision left unmade here rather than added silently.',
+  'core/biotechData/qe4BrydgesEstimator.ts': 'Pure math (CSV parsing, randomized-measurement estimator, bootstrap) for qe4BrydgesAnalysis.ts above -- same reachability story, reached only via that module and its own unit tests.',
   'core/discovery/molecular/compoundLookupTransport.node.ts': 'Node-side transport; the browser uses the HTTP path.',
   'core/discovery/molecular/rdkitTransport.node.ts': 'Node-side RDKit transport; the browser uses the HTTP path.',
 

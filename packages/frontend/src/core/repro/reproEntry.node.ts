@@ -15,6 +15,7 @@
 import { runExternalAnchor, MOLECULAR_WEIGHT_ANCHOR_ID, KEPLER_MARS_ANCHOR_ID } from '../biotechData/externalAnchor';
 import { qe3BoundEntanglementInquiry } from '../agent/entanglementInquiry';
 import { inquiryResultFingerprint, runAutonomousInquiry } from '../agent/inquiryLoop';
+import { runQe4BrydgesAnalysis } from '../biotechData/qe4BrydgesAnalysis';
 
 export { MOLECULAR_WEIGHT_ANCHOR_ID, KEPLER_MARS_ANCHOR_ID };
 
@@ -88,5 +89,42 @@ export function reproQe3Inquiry(): ReproInquiryReport {
     stopReason: result.stopReason,
     dataProvenance: result.dataProvenance.origin ?? 'MIXED',
     resultFingerprint: inquiryResultFingerprint(result),
+  };
+}
+
+export interface ReproQe4Report {
+  readonly p1Verdict: string;
+  readonly p2Verdict: string;
+  readonly p3Verdict: string;
+  readonly p4Verdict: string;
+  readonly p1Tautology: string;
+  readonly p2Tautology: string;
+  readonly p3Tautology: string;
+  readonly p4Tautology: string;
+  readonly p4FailingCount: number;
+  readonly datasetDoi: string;
+  readonly resultFingerprint: string;
+}
+
+/**
+ * QE4 — real-dataset recomputation (Brydges et al. 2019 / Zenodo 2527010,
+ * `docs/QE4_PREREGISTRATION.md`). Same facade pattern as the External Anchors
+ * above: no local computation, just calls `runQe4BrydgesAnalysis` and reports
+ * what it returned.
+ */
+export function reproQe4BrydgesAnalysis(): ReproQe4Report {
+  const result = runQe4BrydgesAnalysis();
+  return {
+    p1Verdict: result.p1.verdict,
+    p2Verdict: result.p2.verdict,
+    p3Verdict: result.p3.verdict,
+    p4Verdict: result.p4.verdict,
+    p1Tautology: result.p1.tautology.classification,
+    p2Tautology: result.p2.tautology.classification,
+    p3Tautology: result.p3.tautology.classification,
+    p4Tautology: result.p4.tautology.classification,
+    p4FailingCount: result.p4Deltas.filter((d) => !d.withinBand).length,
+    datasetDoi: result.provenance.datasetDoi,
+    resultFingerprint: result.resultFingerprint,
   };
 }

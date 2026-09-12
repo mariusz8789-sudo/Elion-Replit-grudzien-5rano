@@ -127,6 +127,16 @@ weryfikacją SHA-256 i zwraca `DATA_REQUIRED` zamiast syntetyku, ale
 pomiar instrumentalny, nie wartość przeliczona — czyli kotwica, która zamyka
 punkt (1).
 
+**Próba drugiej kotwicy (2026-09-12, Kepler/NASA Exoplanet Archive):
+BLOCKED, nie zmienia stanu ryzyka.** Zmierzono niezależnie ten sam rodzaj
+blokady co wyżej — `exoplanetarchive.ipac.caltech.edu` odmawia CONNECT (403),
+dowód w `docs/P2_EVIDENCE.md`. Zamiast przypinać ilustracyjny rekord z
+pakietu badawczego (co byłoby fabrykacją), zadanie zostało zgłoszone jako
+`BLOCKED — brak dostępu do źródła`. Jedyna trwała zmiana: `#/evidence`
+renderuje teraz WSZYSTKIE wpisy `EXTERNAL_ANCHORS` przez pętlę, nie jeden
+hardkodowany ID — więc kolejna próba (inne środowisko z dostępem, albo inne
+źródło bez kluczy) nie wymaga już zmian w ekranie.
+
 ---
 
 ## R-006 — Redeploy kontenerowy z woluminem nie jest zweryfikowany · OPEN

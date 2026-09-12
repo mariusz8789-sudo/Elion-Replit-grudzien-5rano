@@ -175,3 +175,63 @@ przyrody, i nie ma jeszcze ingestion publicznego API na żywo.
   zwracający `DATA_REQUIRED` zamiast syntetyku) jest do tego właściwym
   substratem, ale plik `Zmumu.csv` nie jest w repo, a `opendata.cern.ch` jest
   zablokowany. To jest następny krok P2.3, nie rzecz zrobiona.
+
+---
+
+## P2.3 — DRUGA kotwica (Kepler, NASA Exoplanet Archive): BLOCKED — brak dostępu do źródła
+
+**Status: NIE ZAIMPLEMENTOWANA. Pomiar dostępu sieciowego wykonany PRZED
+podjęciem decyzji projektowej — środowisko odmawia egresu do
+`exoplanetarchive.ipac.caltech.edu`, tak samo jak udokumentowano wyżej dla
+pierwszej kotwicy.**
+
+Zadanie (`docs/prompts/C3-P2.3-kepler-anchor-i-P2.2-solar-ingestion.md`)
+zakładało: drugi wpis w `EXTERNAL_ANCHORS` (ten sam kontrakt
+`externalAnchor.ts`, ta sama zasada literalnego `payloadDigest` — patrz
+D-014), z predykcją liczoną przez istniejący model Fabric `universe-kepler`
+(`orbitalGraph.ts::buildOrbitalModelGraph()`, III prawo Keplera,
+`orbitalPeriodYears = 2π√(a³/(G·M))`) i obserwacją `pl_orbper` pobraną z NASA
+Exoplanet Archive dla przypiętej listy planet.
+
+**Pomiar:**
+
+```bash
+$ curl -sS -o /tmp/exo-check.out -w "HTTP_CODE:%{http_code}\n" --max-time 20 \
+    "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+count(*)+from+ps&format=csv"
+curl: (56) CONNECT tunnel failed, response 403
+HTTP_CODE:000
+
+[agent-proxy] While this command ran, 1 connection through the agent proxy failed:
+- exoplanetarchive.ipac.caltech.edu:443 — connect_rejected (the egress proxy denied
+  the CONNECT (organization policy) or could not reach the destination)
+```
+
+Ten sam host był już wcześniej zmierzony jako zablokowany (sekcja wyżej,
+inny agent, inne środowisko) — ten pomiar potwierdza to niezależnie, w innym
+środowisku wykonania, tym samym kodem błędu (403 na CONNECT).
+
+**Co to oznacza, zgodnie z regułą zadania.** Zadanie wprost instruowało:
+„Jeśli NIE masz dostępu: zgłoś to jako `NOT VERIFIED`... Nie przypinaj
+rekordu ilustracyjnego. W takim razie ta część zadania (kotwica keplerowska)
+zostaje `BLOCKED — brak dostępu do źródła`". Pakiet badawczy Qwena (Part A
+promptu `QWEN-P2.3-kotwica-zewnetrzna.md`) zawierał w swojej pierwotnej
+emisji ilustracyjny rekord CSV z jawną adnotacją „wartości do potwierdzenia
+live" — **ten rekord nie został przypięty jako obserwacja**, bo byłby
+dokładnie tą fabrykacją, której ta misja zabrania (asercja podpisana jako
+dowód, bez możliwości ponownego pobrania).
+
+**Co JEST gotowe, niezależnie od bloku sieciowego.** `EvidenceShowcaseScreen.tsx`
+(`ExternalAnchorSection` → `ExternalAnchorCard`/`ExternalAnchorsSection`)
+został wygeneralizowany, żeby iterować po CAŁYM `EXTERNAL_ANCHORS` zamiast
+hardkodować `MOLECULAR_WEIGHT_ANCHOR_ID` — więc druga kotwica wyrenderuje się
+bez dalszych zmian tego ekranu w chwili, gdy zostanie dodana. Zweryfikowane:
+`npx tsc --noEmit` czysto, `npx eslint` czysto, `evidenceShowcaseScreen.test.tsx`
++ `externalObservationAnchor.test.ts` + `moduleReachability.test.ts` — 17/17
+zielono, bez regresji (jedna istniejąca kotwica nadal renderuje się
+identycznie, teraz przez pętlę zamiast stałej).
+
+**Co NIE jest zrobione.** Sam wpis kotwicy keplerowskiej w `EXTERNAL_ANCHORS`
+(pasmo z `pl_orbpererr1` per §4 promptu, `whatThisTests`/`whatRemainsUntested`
+per §6) — bo wymaga realnego, pobranego payloadu, którego to środowisko nie
+może pobrać. `scripts/repro-demo.mjs` nie zyskał nowego wpisu w `EXPECTED` z
+tego samego powodu: nie ma czego dodać bez fabrykacji.

@@ -521,7 +521,7 @@ module nieosiągalnym z aplikacji**. Testy nie są punktem wejścia — bycie
 osiągalnym wyłącznie z własnego testu to dokładnie kształt `domeWorld`:
 zielony, udowodniony, niewidoczny.
 
-Stan w chwili wpisu: **606 z 650 modułów produkcyjnych osiągalnych**.
+Stan po tej sesji: **616 z 654 modułów produkcyjnych osiągalnych** (38 w allowliście).
 
 Allowlista NIE jest listą wyciszeń. Każdy z 44 wpisów niesie powód, dla
 którego moduł jest osierocony **zasadnie**, a drugi test odrzuca powody-
@@ -586,6 +586,45 @@ alarm tej klasy zabija wiarygodność takiego testu przy pierwszym uruchomieniu.
    `deaths_adult → PROTECT_SENIORS` przy `PROTECT_ADULTS` we wszystkich
    pozostałych. To jest sedno modułu i do tej pory nikt nie mógł tego zobaczyć.
 
+6. **Wolnotekstowe „dlaczego?"** na `#/campaign` — `campaignWhyIntent.ts` mapuje
+   zdanie na jeden z 9 realnych rodzajów WHY, które backend już serwuje z
+   utrwalonych danych kampanii. TRZY z tych dziewięciu (`status`,
+   `stage-selection`, `conflict`) nie mają na tym ekranie żadnego przycisku,
+   więc były nieosiągalne w ogóle. Gdy nic nie pasuje, ekran ODMAWIA zamiast
+   podstawiać domyślny rodzaj.
+   Zweryfikowane na REALNEJ kampanii (konto lokalne, projekt, orchestrator na
+   RDKit 2026.03.6, aspiryna, 2 generacje, 20 kandydatów → STOP_RESOURCE_LIMIT):
+   „dlaczego kampania się zatrzymała?" → realna odpowiedź z frontem Pareto
+   `CC(=O)Oc1c(C(=O)O)ccc(Cl)c1Cl`; „jaka jest dzisiaj pogoda" → odmowa.
+   PRZY OKAZJI ZŁAPANY REALNY BŁĄD: pierwsza wersja podpowiadała przykład
+   „dlaczego stop", którego gramatyka NIE akceptuje. Ekran podpowiadający
+   frazy odrzucane przez własny parser uczy użytkownika, że funkcja nie
+   działa. Teraz test przepuszcza przez parser każdy przykład pokazywany w UI.
+
+7. **Fotony wokół czarnej dziury** jako `#/geodesics` —
+   `relativityGeodesic.ts` całkuje równanie geodezyjnej zerowej
+   `d²u/dφ² = −u + (3/2)·r_s·u²` (RK4) jako realny `DomainSolver`, bit w bit
+   zgodnie z runnerem Labs. Ekran nic nie całkuje: czyta publikowane pozycje i
+   dzieli je przez własny, jawny współczynnik solvera (test pilnuje, że w
+   komponencie nie ma ani trygonometrii, ani wywołania integratora).
+   Zmierzone (259 ms, 5 fotonów): b/b_crit 0,70 → POCHŁONIĘTY (min 1,0083 r_s),
+   0,90 → POCHŁONIĘTY, 1,01 → UCIEKŁ ocierając się o 1,6369 r_s przy 1,155
+   okrążenia, 1,30 i 1,80 → UCIEKŁY. Granica b_crit = 3√3/2 ≈ 2,5981 r_s jest
+   stałą zamkniętą, więc wykres można sprawdzić z podręcznikiem — ten sam
+   standard co falsyfikacja kopuły.
+
+8. **„Zaproponuj świat"** jako `#/world-proposal` — `llmWorldProposalAdapter.ts`
+   pyta realny backend `/api/world-proposal`, `resolveWorldProposal.ts` składa
+   go z torem deterministycznym. Zdanie NIE jest po cichu zamieniane na
+   przełączniki planu awaryjnego: deterministyczny proposer celowo nie rozumie
+   języka naturalnego, więc ekran prosi o jedno i drugie i mówi dlaczego (test
+   pilnuje, że komponent nigdy nie dotyka `prompt.includes/match/toLowerCase`).
+   Zmierzone: POST → 503, tor DETERMINISTYCZNY FALLBACK, powód `no-key`
+   wypisany dosłownie obok zdania „nie udajemy, że wymyślił go model";
+   zbudowany świat: walidacja OK, 25 encji, realne solvery
+   chemistry-kinetics / epidemiology / hydraulics-engineering.
+   To 503 JEST działającą funkcją, nie usterką.
+
 #### Usunięte
 
 `components/MissionStatusBar.tsx` wraz z jego CSS `.mission-bar`. Jego własny
@@ -608,9 +647,6 @@ zadania dla C2/C3/Qwen, każde z gotowym, zielonym rdzeniem:
   MECHANISM; potrzebne wywołanie CALIBRATION i renderer werdyktu parametru.
 - `discoveryTrace.ts` — konsumuje `ResearchChainResult` (łańcuch PARAMETER), a
   produkcja uruchamia wyłącznie `runMechanismResearchChain` (inny typ).
-- `relativityGeodesic.ts` — kompletny SZÓSTY świat naukowy bez ekranu.
-- `llmWorldProposalAdapter.ts` + `resolveWorldProposal.ts` — backend
-  `/api/world-proposal` istnieje, brakuje wejścia w UI.
 - `moleculeWorldAdapter.ts`, `particleWorldAdapter.ts` — 2. i 3. domena dowodu,
   że kontrakt `WorldState` jest ogólny; ta druga czeka na `DivergenceSweepResult`.
 - `spatialWorldFrame.ts` + `spatialFeatureBridge.ts` — most OSM → renderer

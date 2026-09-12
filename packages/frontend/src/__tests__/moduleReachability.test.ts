@@ -170,8 +170,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/world/moleculeWorldAdapter.ts': 'Third-domain proof of the generic WorldState contract; no screen drives a molecular run through the world layer yet.',
   'core/world/particleWorldAdapter.ts': 'Needs a DivergenceSweepResult, which only modelVsModelCompare produces — blocked behind that module.',
   'core/world/scienceDirector.ts': 'Camera/observation director over WorldState; no screen drives a world through it yet.',
-  'core/worldModel/generation/llmWorldProposalAdapter.ts': 'Backend /api/world-proposal exists; no UI asks a user for a world to propose.',
-  'core/worldModel/generation/resolveWorldProposal.ts': 'Composes the LLM adapter with the deterministic fallback; blocked behind the same missing UI entry point.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

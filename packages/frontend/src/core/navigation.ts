@@ -108,6 +108,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'dome-world', label: 'Kopuła vs kula', icon: '🌍', hash: '#/dome-world' },
   { id: 'protection-priority', label: 'Kogo chronić najpierw?', icon: '🛡', hash: '#/protection-priority' },
   { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics' },
+  { id: 'world-proposal', label: 'Zaproponuj świat', icon: '🧩', hash: '#/world-proposal' },
 ];
 
 /** Flat view, for lookups and for the mobile primary bar. */

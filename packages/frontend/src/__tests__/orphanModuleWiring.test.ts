@@ -309,6 +309,54 @@ describe('the sixth scientific world can be watched, not only tested', () => {
   });
 });
 
+describe('a world can be proposed, and the screen never hides which path answered', () => {
+  const screen = read('components', 'WorldProposalScreen.tsx');
+
+  it('is a real route with a real menu entry', () => {
+    expect(read('App.tsx')).toMatch(/#\/world-proposal/);
+    expect(read('core', 'navigation.ts')).toMatch(/#\/world-proposal/);
+  });
+
+  it('goes through the real resolver and the real world orchestrator', () => {
+    expect(screen).toMatch(/resolveWorldProposal\s*\(\s*prompt\s*,/);
+    expect(screen).toMatch(/createScientificWorld\(\{\s*kind:\s*'proposal'/);
+  });
+
+  /**
+   * `resolvedVia` exists so a caller can always tell an LLM proposal from a
+   * deterministic one. Rendering the proposal without it would be exactly the
+   * silent pretence the module was built to prevent.
+   */
+  it('always shows which path answered, and the honest failure reason when the model did not', () => {
+    expect(screen).toMatch(/data-testid="resolved-via"/);
+    expect(screen).toMatch(/llmFailure/);
+    expect(screen).toMatch(/nie udajemy, że wymyślił go model/);
+  });
+
+  /**
+   * The deterministic proposer is explicitly NOT natural-language
+   * understanding, so the screen must not quietly turn the sentence into the
+   * fallback flags and call that comprehension. The flags are asked for
+   * separately, and the screen says why.
+   */
+  it('never derives the deterministic fallback from the sentence', () => {
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/prompt\.(includes|match|toLowerCase)/);
+    expect(screen).toMatch(/Dlaczego zdanie NIE wystarcza/);
+  });
+
+  /** worldId and seed must be caller-controlled on BOTH paths, or reproducibility is only a claim. */
+  it('passes the same caller-controlled worldId and seed to both paths', () => {
+    expect(screen).toMatch(/worldId,\s*\n\s*seed,/);
+  });
+
+  /** A proposal the orchestrator rejects must surface as a refusal, not as a blank screen. */
+  it('shows the orchestrator refusal instead of swallowing it', () => {
+    expect(screen).toMatch(/data-testid="world-create-error"/);
+    expect(screen).toMatch(/data-testid="world-validation-warnings"/);
+  });
+});
+
 describe('the dead duplicate is gone, not merely unused', () => {
   /**
    * `MissionStatusBar.tsx` rendered narrator/AI-health/lab-count/visited from

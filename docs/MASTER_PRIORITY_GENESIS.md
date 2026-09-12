@@ -338,3 +338,127 @@ dyscyplina tej sesji — każdy commit z drugiej gałęzi jest inspekcjonowany
 `git show --stat` + bezpieczeństwo cyber/gov PRZED cherry-pickiem do
 `main`), więc nic nie wejdzie do `main` bez tego audytu — ale lepiej
 zamknąć to świadomie niż czekać na przypadkowe złapanie.
+
+---
+
+## UPDATE — 2026-09-12, C3: domknięcie listy + status od ostatniego wpisu (2026-09-09)
+
+**Dlaczego ten wpis istnieje**: ten dokument nie był aktualizowany od
+2026-09-09, mimo że w tym czasie zamknięto sporo z listy powyżej —
+status żył wyłącznie w osobnych sesjach czatu per-agent (C1/C2/C3), nie
+tutaj. Poniżej domykam to, co faktycznie zamknięte, zgłaszam co zostało
+zweryfikowane, i zapisuję nowy kontekst (deadline/freeze), żeby C2, Qwen
+i każda przyszła sesja miały to z jednego miejsca, nie tylko C1 w swoim
+wątku.
+
+### 1. Zamknięte formalnie: C3 — Mechanism Composition / researchChain actuator
+
+Przydział z sekcji "C1/C3/QN" wyżej (linia ok. 147) — **ZAMKNIĘTE**,
+commit `bbdc0a90`/`5051e25d` ("MECHANISM composition reaches
+researchChain, plus the killer case on the generator domain"). Ten sam
+wzorzec co `NARROW_A_DERIVED_INTERVAL` po stronie PARAMETER, bez nowej
+logiki wyboru. Wszystkie trzy równoległe ścieżki z sekcji "wieczorny
+sprint" (C1 Real Experiment E2E, C3 researchChain actuator, QN recon) są
+teraz zamknięte.
+
+### 2. Ostrzeżenie o przypadkowym handoffie Qwen→C3 (Multi-Model Tournament) — NIEAKTUALNE, zamykam
+
+Sprawdziłem repo: **żaden N-way tournament / cycle-detection kod nigdy
+nie wylądował**. Jedyny istniejący kontrakt to pre-istniejący, PARowy
+`core/experimentFabric/modelVsModelCompare.ts` (Model A vs Model B,
+commit `ea22c8bd`/`99d43172`, 2026-09-04 — sprzed tego ostrzeżenia, więc
+to NIE jest ten output). Ostrzeżenie z 2026-09-09 dotyczyło ryzyka, które
+się nie zmaterializowało — zamykam bez żadnej akcji kodowej.
+
+### 3. Audyt WorldRegistry → Construct → City 4.0 (zlecony osobno) — domknięty przez REALNĄ implementację
+
+Mój wcześniejszy audyt na checkpoint `44438afb` dał **REFUTED**: "Genesis
+Construct" wtedy nie istniał nigdzie w repo. Od tego czasu ktoś go
+zbudował realnie (`a435ac63`, "Genesis Construct: deterministic staging
+layer, integrated into the real City 4.0 screen") — **właśnie
+zweryfikowałem ten commit**, bo zostawiłem go sobie jako otwarty wątek:
+- Adresuje dokładnie ryzyko, które sam bym flagował: WorldRegistry miał
+  jednego konsumenta (`genesisScientificCity4.ts`) — Construct dostał
+  realnego konsumenta W TYM SAMYM commicie
+  (`GenesisWorldSim3D`/`GenesisWorldScreen.tsx`), zamiast zostać drugim
+  osieroconym subsystemem.
+- Zero nowego słownika epistemicznego — `epistemicStatus` jest
+  nieinterpretowanym stringiem przechodzącym przez Construct, nie nową
+  7-wartościową taksonomią równoległą do istniejącej.
+  `scenarioCapsule.ts` pozostaje osobne (replay gotowych artefaktów, nie
+  loader ze stanem LOADED/EMPTY).
+- Reużywa fingerprint z `worldGenerator.ts` (`paramsHash`) — zero nowego
+  schematu fingerprintu.
+- **Spot-check wykonany teraz, na bieżącym tip gałęzi**: `construct.test.ts`,
+  `constructGenesisScientificCity4.test.ts`,
+  `genesisWorldScreenFirstPerson.test.ts`,
+  `genesisWorldScreenPostProcessing.test.ts` → **74/74 zielone**.
+- Solar Twin (deklarowany następny konsument Construct) świadomie NIE
+  rozpoczęty w tym commicie — zgodne z poniższym freeze.
+
+### 4. Nowy kontekst od ostatniego wpisu: 24–48h deploy + grant freeze, Solar Twin zamrożony
+
+Nie zapisane dotąd nigdzie poza czatem — zapisuję teraz, żeby nie zginęło:
+**Solar Twin jest jawnie zamrożony** (potwierdzone niezależnie w dwóch
+miejscach: instrukcja przy `a435ac63` wyżej, i osobne zlecenie do C3 z
+tym samym zdaniem wprost: "Solar Twin zamrożony"). W tym oknie **zero
+nowych systemów** — wyłącznie dostrajanie/audyt/hardening istniejącego.
+
+**LiveMatrixBackground — tło dekoracyjne, teraz w produkcji**, ciąg
+commitów od zbudowania do weryfikacji:
+1. `75d2e3c6` — zbudowane i przetestowane jako czysty, wyizolowany
+   moduł (37 testów lifecycle'u), NIEwpięte.
+2. `12e312d9` (C3) — `deriveGenesisVisualState()`: kalibracja realny stan
+   Genesis → poziom aktywności tła (Home/pusta Memory = IDLE najspokojniejszy,
+   realny Campaign `status==='running'` = RUNNING najbardziej żywy), plus
+   eksport `SUPPRESSED_ROUTES`/`isSuppressed` z `MatrixDataStream.tsx` do
+   reużycia.
+3. `2e25cd18` (C1) — realne wpięcie w `App.tsx` przez adapter, plus
+   uzupełnienie luki w `SUPPRESSED_ROUTES` (`#/genesis-world` brakowało).
+4. `6837ff98` (C1) — dwa zmierzone (nie "na oko") defekty widoczności
+   naprawione: strumienie generowane od razu w kadrze zamiast 1.6 wysokości
+   ekranu nad nim, i próg `intensity` podniesiony powyżej granicy
+   wyłączającej glow całkowicie. 35 920 zapalonych pikseli @1440×900 po
+   naprawie (zmierzone, nie deklarowane).
+5. **C3, pełny visual QA przed deployem** (ten wpis dokumentuje wynik dla
+   C2/Qwen, nie tylko dla C1, który dostał to wcześniej w czacie): realny
+   Chromium, desktop 1440×900 + mobile 420×860, 26 tras × 2 viewporty = 52
+   kombinacji. Zero błędów konsoli, zero horizontal overflow, tło poprawnie
+   obecne/nieobecne zgodnie z `SUPPRESSED_ROUTES` na każdej kombinacji.
+   Znaleziona i wyjaśniona pozorna regresja: Home w tym headless sandboksie
+   mierzy ~10 fps — zbadane CPU-profilerem (CDP), przyczyna to
+   `GenesisCommandCenterHero` (WebGL) renderowany programowo przez
+   SwiftShader (sandbox nie ma prawdziwego GPU: `ANGLE ... SwiftShader
+   Device`), NIE Matrix (własny koszt renderowania Matrixa: 0,7–1,3 ms/klatkę;
+   `#/campaign` z tym samym tłem = pełne 60 fps). Potwierdzone A/B na
+   commicie SPRZED wpięcia Matrixa (`6d070cb0`): Home już wtedy mierzył
+   ~12 fps. **Wniosek: nie regresja, nie do naprawy na tej gałęzi** — do
+   zweryfikowania na prawdziwym sprzęcie z GPU przed komisją, poza
+   zakresem tego zadania.
+
+**Inne prace C3 od 2026-09-09, nigdzie wcześniej nie zapisane tutaj**:
+CSRN v4 (`8b568012`→reconciliation `d0ef51fa`/`f74914a4`, dokumentacja
+kontraktu podpisu w `4a4052e8`), P0.2 belief persistence + hardening
+(`94a0e431`, `44438afb` — realny test przetrwania restartu procesu na
+plikowym SQLite, nie mocku), World/City generator provenance completeness
+(`templateIds`/`levelOfDetail` w `world.generation.completed`, część
+`44438afb`), Earth Observatory jako pozycja backlogu post-grant w
+`VISION-BACKLOG.md` (`35a6d481` — bez implementacji, tylko zmapowane
+istniejące punkty rozszerzenia).
+
+### 5. Stan bramki jakości w chwili tego wpisu (branch tip `35a6d481`)
+
+tsc: czysto. Frontend: 458/458 plików, 4992 passed / 1 skip (znany,
+niezwiązany flake w innym miejscu). Backend: 362 passed / 0 failed / 34
+skipped. Build: czysto.
+
+### 6. Co zostaje otwarte (żadnego nowego zadania nie zamykam sam z siebie)
+
+- Weryfikacja realnego FPS Home/scen 3D na sprzęcie z prawdziwym GPU przed
+  komisją — niemożliwa do wykonania z tego sandboksa.
+- Freeze (zero nowych systemów, Solar Twin zamrożony) pozostaje w mocy do
+  odwołania — ten wpis go nie kończy, tylko dokumentuje.
+- Priorytet 3 (Product/Funding Readiness, sekcja wyżej) w praktyce JEST
+  tym, czym jest ten freeze (przygotowanie do dema/deployu/grantu) —
+  wart jawnego nazwania, jeśli ktoś wraca do tego dokumentu i zastanawia
+  się, czy Priorytet 3 wciąż czeka.

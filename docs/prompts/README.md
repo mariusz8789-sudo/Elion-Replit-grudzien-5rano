@@ -10,6 +10,7 @@ i definicję DONE, więc sesja przyjmująca nie musi rekonstruować kontekstu.
 | `C3-P2.1-tautology-gate.md` | C3 | P2.1 — **zaczyna od blokera** | spec nie istnieje w repo |
 | `QWEN-P2.3-kotwica-zewnetrzna.md` | Qwen | P2.3 + P2.2 (pakiet badawczy) | R-005 w `RISKS.md` |
 | `QWEN-QE4-QE7-obserwable.md` | Qwen | QE4–QE7 (pakiet badawczy) | QE1–QE3 zamknięte na `43a6a8e` |
+| `C3-P2.3-kepler-anchor-i-P2.2-solar-ingestion.md` | C3 | druga kotwica (Kepler) + ingestion Solar Mind | Qwen dostarczył pakiet (trafił do C3 przez pomyłkę); P2.3 (PubChem) już DONE na `c181668`/`14312f8` |
 
 Co zostaje u C1: P2.3 (implementacja po pakiecie Qwena) i P3 (pakiet grantowy).
 

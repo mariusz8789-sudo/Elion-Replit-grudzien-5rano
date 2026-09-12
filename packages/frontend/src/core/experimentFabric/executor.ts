@@ -40,6 +40,7 @@ import { buildNuclearModelGraph } from '../modelGraph/nuclearGraph';
 import { buildOrbitalModelGraph } from '../modelGraph/orbitalGraph';
 import { buildRelativisticEnergyGraph } from '../modelGraph/relativisticEnergyGraph';
 import { buildNewtonianEnergyGraph } from '../modelGraph/newtonianEnergyGraph';
+import { runEntanglementState } from '../quantum/entanglementStateRunner';
 import { buildSpecialRelativityGraph } from '../modelGraph/specialRelativityGraph';
 import { buildPhotonGraph } from '../modelGraph/photonGraph';
 import { kardashevPower, schwarzschildRadius } from '../physics';
@@ -797,6 +798,45 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
     case 'quantum-tunneling-1d': {
       const solved = runTunnelingScenario({ energy: numberParam(params, 'energy', 0.55), barrier: numberParam(params, 'barrier', 1), width: numberParam(params, 'width', 3) });
       return { contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: `Wykonano 1D split-step Fourier: transmisja ${(solved.transmission * 100).toFixed(2)}%, odbicie ${(solved.reflection * 100).toFixed(2)}%.`, outputs: { ...solved }, units: { energy: '', barrier: 'j. nat.', width: 'j. nat.', frames: 'kroki', transmission: '', reflection: '', remainingProbability: '' }, warnings: ['Tłumiąca maska przy brzegach redukuje odbicia numeryczne; pozostałe prawdopodobieństwo obejmuje falę w barierze i absorpcję brzegu.'], validity: 'Pakiet Gaussa 1D i pojedyncza bariera prostokątna, ħ=m=1, N=512; nie jest ogólnym solverem Schrödingera, obliczeniem 3D ani modelem materiałowym.', assumptions: ['Integrator i pomiar są współdzielone z istniejącym Canvasem.', 'Horyzont 1200 kroków jest ustalony dla porównywalnego scenariusza.'], visualization: ['numeric', 'graph', 'canvas-2d'], route: model.route };
+    }
+    case 'quantum-entanglement-measures': {
+      const stateId = typeof params.stateId === 'string' ? params.stateId : 'phi-plus';
+      const familyParameter = numberParam(params, 'familyParameter', 0.5);
+      const mixingAngleDeg = numberParam(params, 'mixingAngleDeg', 0);
+      const whiteNoise = numberParam(params, 'whiteNoise', 0);
+      const solved = runEntanglementState(stateId, familyParameter, { mixingAngleDeg, whiteNoise });
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Policzono miary splątania dla stanu „${solved.label}": concurrence ${Number.isNaN(solved.concurrence) ? 'n/d' : solved.concurrence.toFixed(6)}, negatywność ${solved.negativity.toFixed(6)}, CCNR ${solved.ccnrTraceNorm.toFixed(6)}.`,
+        outputs: {
+          stateId: solved.stateId,
+          whiteNoise: solved.whiteNoise,
+          negativity: solved.negativity, logNegativity: solved.logNegativity,
+          concurrence: solved.concurrence, vonNeumannEntropyNats: solved.vonNeumannEntropyNats,
+          renyi2Nats: solved.renyi2Nats, maxCHSH: solved.maxCHSH,
+          ccnrTraceNorm: solved.ccnrTraceNorm, pptMinEigenvalue: solved.pptMinEigenvalue,
+          schmidtRank: solved.schmidtRank,
+          ckwResidual: solved.ckwResidual,
+          boundEntanglementMargin: solved.boundEntanglementMargin,
+        },
+        units: {
+          stateId: '', whiteNoise: '', negativity: '', logNegativity: 'bit', concurrence: '',
+          vonNeumannEntropyNats: 'nat', renyi2Nats: 'nat', maxCHSH: '',
+          ccnrTraceNorm: '', pptMinEigenvalue: '', schmidtRank: '',
+          ckwResidual: '', boundEntanglementMargin: '',
+        },
+        warnings: [
+          'Miary dwukubitowe (concurrence, max CHSH, entropie redukowane, ranga Schmidta) są NIEZDEFINIOWANE poza 2⊗2 i zwracają NaN — nigdy 0, bo 0 znaczyłoby „brak splątania" o stanie, który potrafi być splątany.',
+          'CCNR działa w jedną stronę: ‖R‖₁ > 1 dowodzi splątania, ‖R‖₁ ≤ 1 nie dowodzi separowalności.',
+          'Przy whiteNoise > 0 stan nie jest czysty, więc ranga Schmidta i resztkowy trójsplot CKW przestają być zdefiniowane i zwracają NaN — mieszany trójsplot to convex roof, którego ten moduł nie liczy.',
+        ],
+        validity: 'Dokładna algebra macierzy gęstości na zadeklarowanych stanach o znanej postaci zamkniętej. Nie jest to pomiar laboratoryjny, symulacja detektorów ani test Bella bez luk.',
+        assumptions: [
+          'Stan jest zadeklarowanym presetem, nie wynikiem przygotowania eksperymentalnego.',
+          'Kryterium PPT rozstrzyga separowalność wyłącznie w 2⊗2 i 2⊗3; wyżej wynik PPT jest nierozstrzygający.',
+        ],
+        visualization: ['numeric', 'graph'], route: model.route,
+      };
     }
     case 'quantum-bloch-circuit': {
       const circuit = typeof params.circuit === 'string' ? params.circuit : 'H X';

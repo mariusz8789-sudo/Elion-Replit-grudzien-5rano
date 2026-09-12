@@ -673,3 +673,105 @@ Reszta allowlisty to świadome decyzje (Sovereign OFF), kod nie-przeglądarkowy
 (`.node.ts`, `serverEntry.ts`), wykonywalna dokumentacja (`graphics/examples/`),
 barrele oraz prymitywy (odciski, steppery), których brak konsumenta nie jest
 defektem — odcisk nigdy nie jest tematem ekranu.
+
+---
+
+## UPDATE — 2026-09-12, C1: QE1 → QE2 → QE3 przeszły pełny cykl w prawdziwym StrategyRun
+
+**Status: E2E VERIFIED** (wykonanie, nie inspekcja — tabele niżej pochodzą z
+przebiegów, nie z założeń).
+
+Polecenie brzmiało: wciągnąć QE1–QE3 do research-loop jako **prawdziwe
+StrategyRun**, w kolejności QE1 → QE2 → QE3, z obowiązkowym cyklem
+hypothesis → prediction → experiment → independent expected result → execution →
+falsification verdict → belief update → next question. Bez QE4–QE7, dopóki
+pierwsza trójka nie przejdzie tego end-to-end.
+
+Nie powstała żadna druga pętla, żaden drugi silnik i żaden „Entanglement Lab"
+jako osobna wyspa. Powstały **trzy systemy pod badaniem** na istniejącej
+strategii PARAMETER (`parameterStrategy` → `inquiryLoop`), na zarejestrowanym
+modelu Fabric `quantum-entanglement-measures`. Cała arytmetyka pochodzi z
+`entanglementMeasures.ts`, wszystkie decyzje z `inquiryLoop.ts`.
+
+### Co dodano (i dlaczego akurat tyle)
+
+1. **Dwie realne gałki preparatyki** w modelu Fabric (1.0.0 → 1.1.0):
+   - `whiteNoise` — kanał depolaryzujący ρ → (1−w)ρ + w·I/d. To jedyna gałka,
+     którą eksperymentator naprawdę kręci: jakość przygotowania źródła.
+   - `mixingAngleDeg` — domieszka |W⟩ do uogólnionego GHZ.
+   Bez drugiej liczbowej gałki nie ma inquiry: pętla wymaga ukrytego parametru
+   ORAZ sondy, a model miał wcześniej tylko jedną liczbę.
+2. **`SystemUnderStudy.fixedParameters`** poszerzone z `number` na
+   `ExperimentValue`. Preset stanu (`stateId`) to napis — dokładnie jak
+   sekwencja bramek w `quantum-bloch-circuit`. Ukryte parametry i sonda
+   pozostają ściśle liczbowe, więc arytmetyka pętli się nie zmienia.
+3. **`agent/entanglementInquiry.ts`** — trzy systemy, ich ukryte prawdy,
+   hipotezy konkurencyjne i pasma zgodności. Zero miar, zero solverów, zero
+   pętli.
+4. **Ucięcie pyłu numerycznego** (`NUMERICAL_ZERO = 1e-12`) na wyjściach
+   runnera. To nie kosmetyka: zmierzone, na `ghz-w-family` przy α = 90° surowa
+   reszta trójsplotu wraca jako −1,776e-15 dla θ = 20° i −6,661e-16 dla θ = 70°.
+   Pętla sądząca predykcje względem pomiaru na tej metryce **sfalsyfikowałaby
+   wszystkich kandydatów w pierwszej rundzie** na podstawie szumu
+   zmiennoprzecinkowego. Strażnik przeżywa: realne złamanie monogamii byłoby
+   rzędu 0,1–1, a `checkCKWMonogamy` dalej zwraca resztę nieuciętą.
+
+### Co pętla naprawdę zrobiła
+
+**QE1 — widzialność źródła. STOP: NO_DISCRIMINATING_PROBE, dwóch ocalałych.**
+Otwarcie przy w = 1: max CHSH dokładnie 0 dla wszystkich czterech kandydatów,
+pewność nie drgnęła (magnituda dowodu 0). Runda 2 przy w = 0,9 wybrana regułą
+`DISCRIMINATES_OTHER_PAIR` — pętla jawnie powiedziała, że ten pomiar NIE
+rozstrzyga sporu dwóch najsilniejszych, tylko zawęża pole: padły `h:marginal`
+(0,20365 vs zmierzone 0,26022) i `h:classical` (0,14142). Potem odmowa.
+**Odmowa jest strukturalna, nie pechowa**: max CHSH = 2√2·(1−w)·p, więc sonda
+mnoży każdą predykcję przez ten sam czynnik, stosunek 1,00/0,92 = 1,087 jest
+stały przy KAŻDYM ustawieniu i mieści się w zadeklarowanym paśmie ±15%. Pętla
+odkryła, że **szum biały to zła gałka do tego pytania** — i to jest wynik.
+Pasmo zadeklarowano na ±15% świadomie i jest to zapisane w module: przy ±5%
+inquiry odzyskałoby p = 0,92 w jednej rundzie. Trudniejszy wynik jest
+uczciwszy, więc został wybrany i opisany, a nie ukryty.
+
+**QE2 — monogamia CKW. STOP: NO_CONTENDERS_LEFT, ODZYSKANE θ = 70°.**
+Trzy rundy, bo dwie nie wystarczyły:
+| α | θ=20° | θ=35° | θ=45° | θ=55° | θ=70° |
+|---|---|---|---|---|---|
+| 90° (otwarcie) | 0 | 0 | 0 | 0 | 0 |
+| 0° (czysty GHZ) | 0,41318 | 0,88302 | 1,00000 | 0,88302 | 0,41318 |
+| 15° | 0,37731 | 0,79826 | 0,90698 | 0,81092 | 0,40813 |
+Najsilniejszy sygnał w rodzinie (czysty uogólniony GHZ, τ₃ = sin²2θ) jest
+**symetryczny względem 45°**, więc zostawia θ = 20° i θ = 70° remisujące co do
+1e-15 — prawdziwa degeneracja rodziny stanów, nie artefakt. Pętla sięgnęła
+poza oś, po α = 15°, gdzie |W⟩ interferuje z |000⟩ i nie z |111⟩, symetria
+pęka, i sfalsyfikowała θ = 20°.
+
+**QE3 — zakres kryterium PPT. STOP: NO_CONTENDERS_LEFT, ODZYSKANE a = 0,4.**
+Każdy z czterech kandydatów jest PPT (negatywność 0), więc partial transpose
+nie rozstrzygnąłby niczego; całe dochodzenie jedzie na drugim, niezależnym
+kryterium (CCNR). Zmierzony margines przy w = 0: 0,003031 / 0,002716 /
+0,001884 / 0,000941 dla a = 0,2 / 0,4 / 0,6 / 0,8. **Zmierzony wynik uboczny,
+który jest realnym odkryciem tego przebiegu:** margines spada do zera już przy
+w = 0,005 — pół procenta szumu białego niszczy jedyny dowód, jaki istnieje na
+splątanie związane. Dlatego wszystkie ustawienia sondy poza w = 0 są
+bezużyteczne, a pętla musiała to odkryć sama.
+
+### Czego NIE zrobiono i dlaczego (najważniejszy punkt)
+
+**QE1 NIE testuje granicy Tsirelsona i jest to zapisane w module.** Uruchomienie
+kalkulatora mechaniki kwantowej i stwierdzenie, że nie widać |S| > 2√2, jest
+tautologią, nie dowodem: granica jest wbudowana w algebrę, którą model liczy,
+więc model nie może wyprodukować kontrprzykładu. Hipoteza o źródle
+nadkwantowym jest tu **nierozstrzygalna**, a nie sfalsyfikowana — i tak jest
+raportowana. To samo dotyczy QE2: nierówność CKW jest twierdzeniem tej algebry,
+ujemna reszta falsyfikowałaby implementację, nie twierdzenie.
+
+QE4–QE7 nie ruszone, zgodnie z poleceniem.
+
+### Weryfikacja
+
+`npx tsc --noEmit` czysto; `npx eslint src --max-warnings=0` czysto;
+`entanglementInquiry.test.ts` 21 testów zielonych (asercje na DECYZJE pętli:
+która sonda, która reguła wyboru, który werdykt, który stop);
+`moduleReachability.test.ts` + `orphanModuleWiring.test.ts` 62 zielone — nowy
+moduł jest osiągalny z `main.tsx`, bo QE1–QE3 są w `#/inquiry` obok złącza
+kwantowego i zwijania białka, w tym samym `StrategyRunReport`.

@@ -13,7 +13,7 @@ import type { DataProvenance } from '../dataProvenance';
 import { getRouterModel } from '../experimentFabric/router';
 import type { FalsificationCriterion, HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import { buildStructuredRequestFromModel } from '../experimentFabric/structuredRequestBuilder';
-import type { ExperimentRun } from '../experimentFabric/types';
+import type { ExperimentRun, ExperimentValue } from '../experimentFabric/types';
 import type { StrategyRunProvenance } from './discoveryStrategy';
 
 /**
@@ -139,8 +139,19 @@ export interface SystemUnderStudy {
   readonly probeParameterId: string;
   /** Probe settings that are physically meaningful for this system, in the order to consider them. */
   readonly candidateProbeValues: readonly number[];
-  /** Everything else held fixed, so probe and unknown are the only things that move. */
-  readonly fixedParameters: Readonly<Record<string, number>>;
+  /**
+   * Everything else held fixed, so probe and unknown are the only things that
+   * move.
+   *
+   * `ExperimentValue`, not `number`, because a fixed setting is not always a
+   * quantity: the Fabric's entanglement model selects WHICH declared state
+   * family is on the bench with a string preset (`stateId`), exactly as
+   * `quantum-bloch-circuit` passes a whole gate sequence as one string. The
+   * hidden parameters and the probe stay strictly numeric — they are what
+   * predictions are computed from and what discriminability is judged on — so
+   * nothing about the inquiry's arithmetic changes.
+   */
+  readonly fixedParameters: Readonly<Record<string, ExperimentValue>>;
   /** The solver output the agent reads. */
   readonly observedMetric: string;
   /**

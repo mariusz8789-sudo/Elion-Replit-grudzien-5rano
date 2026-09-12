@@ -237,6 +237,27 @@ miesięcy (Delft, Vienna, Boulder) [[5]].
 | QE6 | Formuła wysp odtwarza krzywą Page'a | niezgodność w JT gravity | SUPPORTED WITHIN MODEL |
 | QE7 | Splątanie makro nie łamie monogamii/SSA | violacja SSA w stanie makro | SEARCHING |
 
+#### Co z tego Genesis NAPRAWDĘ uruchomił (2026-09-12)
+
+Kolumna „status wg pakietu" jest cudzą oceną literatury, nie wynikiem Genesis.
+QE1, QE2 i QE3 przeszły natomiast pełny cykl w prawdziwym `StrategyRun`
+(strategia PARAMETER → `inquiryLoop` → model Fabric
+`quantum-entanglement-measures`), jako dochodzenia o ukrytym parametrze, i to
+jest jedyne, co Genesis może o nich powiedzieć z własnego wykonania:
+
+| ID | Co Genesis uruchomił | Wynik przebiegu | Czego to NIE dowodzi |
+|---|---|---|---|
+| QE1 | widzialność źródła Wernera, sonda: szum biały, metryka `maxCHSH` | ZAWĘŻONE, NIEROZSTRZYGNIĘTE — padły p = 0,72 i p = 0,50; szum biały nie potrafi oddzielić p = 1,00 od p = 0,92 przy żadnym ustawieniu | **nie testuje granicy Tsirelsona** — 2√2 jest analitycznym sufitem liczonej tu algebry, więc brak przekroczenia jest tautologią, nie dowodem; hipoteza o źródle nadkwantowym jest NIEROZSTRZYGALNA na tym podłożu |
+| QE2 | rodzina cos α·(cos θ\|000⟩ + sin θ\|111⟩) + sin α\|W⟩, sonda: kąt domieszki, metryka `ckwResidual` | ODZYSKANE θ = 70° w trzech rundach; czysty GHZ zostawił degenerację θ ↔ 90°−θ, złamał ją dopiero pomiar poza osią | nierówność CKW jest twierdzeniem tej algebry — ujemna reszta falsyfikowałaby implementację, nie twierdzenie |
+| QE3 | rodzina Horodeckich 3⊗3, sonda: szum biały, metryka `boundEntanglementMargin` | ODZYSKANE a = 0,4; wszyscy czterej kandydaci są PPT (negatywność 0), więc rozstrzygnęło wyłącznie drugie kryterium (CCNR) | margines 0 NIE znaczy separowalność — CCNR działa w jedną stronę |
+
+Zmierzony efekt uboczny, który jest realnym wynikiem QE3: margines splątania
+związanego spada do zera już przy **0,5% szumu białego**. Stany splątane
+związanie leżą tuż przy brzegu zbioru separowalnego, więc jedyne ustawienie
+sondy, które cokolwiek mówi, to preparatyka bezszumowa.
+
+QE4–QE7 nie były uruchamiane.
+
 ### Otwarte problemy
 
 Addytywność `E_F` złamana (Hastings 2009), pełna struktura nieznana ·

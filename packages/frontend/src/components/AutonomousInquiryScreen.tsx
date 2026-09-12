@@ -8,6 +8,11 @@ import {
 import {
   PROTEIN_FOLDING_CANDIDATES, PROTEIN_FOLDING_OPENING_STEPS, PROTEIN_FOLDING_PROBE_STEPS, proteinFoldingInquiry,
 } from '../core/agent/proteinFoldingInquiry';
+import {
+  QE1_CANDIDATES, QE1_OPENING_NOISE, QE1_PROBE_NOISE, QE2_CANDIDATES, QE2_OPENING_MIXING_ANGLE,
+  QE2_PROBE_MIXING_ANGLES, QE3_CANDIDATES, QE3_OPENING_NOISE, QE3_PROBE_NOISE,
+  qe1VisibilityInquiry, qe2MonogamyInquiry, qe3BoundEntanglementInquiry,
+} from '../core/agent/entanglementInquiry';
 import { StrategyRunReport } from './StrategyRunReport';
 
 /**
@@ -29,9 +34,25 @@ import { StrategyRunReport } from './StrategyRunReport';
  *    back the same 0.13 acceptance rate, an algorithmic floor rather than a
  *    property of the fold. The answer has to be earned with a longer run.
  *
- * Both inquiries therefore OPEN on the uninformative measurement on purpose, and
- * what they reach for next is decided by what came back. That decision, in the
- * loop's own words, is what the report below shows.
+ * The three entanglement inquiries QE1-QE3 were added for the same reason and
+ * each fails the obvious measurement differently:
+ *
+ *  - QE1: at full depolarisation max CHSH is exactly 0 for every candidate
+ *    visibility. It then turns out that NO setting of white noise can separate
+ *    p = 1.00 from p = 0.92 inside the declared band — the probe multiplies
+ *    every prediction by the same factor — so the loop narrows the field and
+ *    then refuses, which is the honest answer rather than a recovered one.
+ *  - QE2: at a pure |W> state the residual three-tangle is 0 for every theta.
+ *    Worse, the strongest signal in the family (the pure generalised-GHZ limit)
+ *    is SYMMETRIC about theta = 45 degrees, so it leaves theta = 20 and
+ *    theta = 70 exactly tied. The loop has to reach off-axis to break that.
+ *  - QE3: the bound-entanglement margin is 0 at every noise setting down to
+ *    half a percent, so only a perfectly noiseless preparation says anything —
+ *    a measured fact about how close bound entanglement sits to separability.
+ *
+ * All five inquiries therefore OPEN on the uninformative measurement on purpose,
+ * and what they reach for next is decided by what came back. That decision, in
+ * the loop's own words, is what the report below shows.
  *
  * THIS SCREEN RUNS NO SCIENCE and states no verdict: `parameterStrategy.run`
  * executes the real loop, and `StrategyRunReport` — the same renderer the
@@ -54,6 +75,37 @@ interface Problem {
   readonly build: () => InquiryLoopInput;
 }
 
+/**
+ * Polish wording for the entanglement candidates.
+ *
+ * The inquiry modules keep their statements in English because those are what
+ * the loop RECORDS — `ParameterHypothesis.statement` ends up inside the
+ * criterion rationale the report quotes verbatim, and translating it here would
+ * put a second wording of the same claim on screen. The junction and the fold
+ * do the same thing: their candidate lines are built in this file from the
+ * module's numbers, not from its prose. Only the numbers cross over, so there
+ * is one source of truth for them.
+ */
+const QE1_PL: Readonly<Record<string, string>> = {
+  'h:ideal': 'źródło idealne, maksymalnie splątane, max CHSH 2√2',
+  'h:good': 'dobre źródło, łamie CHSH z zapasem',
+  'h:marginal': 'źródło graniczne, tuż nad progiem CHSH 1/√2',
+  'h:classical': 'wciąż splątane (p > 1/3), ale NIE MOŻE złamać CHSH',
+};
+const QE2_PL: Readonly<Record<string, string>> = {
+  'h:theta-20': 'silnie przechylone ku |000⟩',
+  'h:theta-35': 'lekko przechylone ku |000⟩',
+  'h:theta-45': 'zrównoważone — standardowy |GHZ⟩',
+  'h:theta-55': 'lekko przechylone ku |111⟩',
+  'h:theta-70': 'silnie przechylone ku |111⟩',
+};
+const QE3_PL: Readonly<Record<string, string>> = {
+  'h:a-0.2': 'głęboko w reżimie splątania związanego',
+  'h:a-0.4': 'wyraźne splątanie związane',
+  'h:a-0.6': 'słabe splątanie związane',
+  'h:a-0.8': 'ledwie wykrywalne splątanie związane — margines poniżej 0,001',
+};
+
 const PROBLEMS: readonly Problem[] = [
   {
     id: 'quantum-junction',
@@ -73,6 +125,33 @@ const PROBLEMS: readonly Problem[] = [
     candidates: PROTEIN_FOLDING_CANDIDATES.map((c) => `${c.id}: T = ${c.temperature}`),
     truthHypothesisId: 'h:warm', // T = 1.2
     build: () => proteinFoldingInquiry(1.2),
+  },
+  {
+    id: 'qe1-visibility',
+    label: 'QE1 — jaka jest widzialność tego źródła par splątanych?',
+    opening: `szum biały w = ${QE1_OPENING_NOISE} (pełna depolaryzacja — max CHSH dokładnie 0 dla każdego kandydata)`,
+    probes: QE1_PROBE_NOISE.join(', '),
+    candidates: QE1_CANDIDATES.map((c) => `${c.id}: p = ${c.visibility.toFixed(2)} — ${QE1_PL[c.id]}`),
+    truthHypothesisId: 'h:good', // p = 0.92
+    build: () => qe1VisibilityInquiry(0.92),
+  },
+  {
+    id: 'qe2-monogamy',
+    label: 'QE2 — gdzie to źródło trójkubitowe trzyma swoje splątanie?',
+    opening: `domieszka |W⟩ α = ${QE2_OPENING_MIXING_ANGLE}° (czysty |W⟩ — resztkowy trójsplot 0 dla każdego θ)`,
+    probes: QE2_PROBE_MIXING_ANGLES.map((a) => `${a}°`).join(', '),
+    candidates: QE2_CANDIDATES.map((c) => `${c.id}: θ = ${c.theta}° — ${QE2_PL[c.id]}`),
+    truthHypothesisId: 'h:theta-70', // theta = 70 degrees
+    build: () => qe2MonogamyInquiry(70),
+  },
+  {
+    id: 'qe3-bound-entanglement',
+    label: 'QE3 — który to stan Horodeckich, skoro PPT nie mówi o żadnym z nich niczego?',
+    opening: `szum biały w = ${QE3_OPENING_NOISE} (pełna depolaryzacja — margines splątania związanego 0 dla każdego kandydata)`,
+    probes: QE3_PROBE_NOISE.join(', '),
+    candidates: QE3_CANDIDATES.map((c) => `${c.id}: a = ${c.a.toFixed(1)} — ${QE3_PL[c.id]}`),
+    truthHypothesisId: 'h:a-0.4', // a = 0.4
+    build: () => qe3BoundEntanglementInquiry(0.4),
   },
 ];
 
@@ -123,9 +202,9 @@ export function AutonomousInquiryScreen() {
           zmierzyć. Każdy odczyt to realny przebieg solvera — nie tabela, nie zgadywanie.
         </p>
         <p className="settings-hint">
-          <strong>Oczywisty pierwszy pomiar jest tu bezużyteczny — i o to chodzi.</strong> Oba dochodzenia CELOWO
-          otwierają się na odczycie, który niczego nie rozróżnia, więc odpowiedź trzeba wypracować, a to, po co agent
-          sięgnie dalej, wynika z tego, co właśnie zmierzył.
+          <strong>Oczywisty pierwszy pomiar jest tu bezużyteczny — i o to chodzi.</strong> Każde z pięciu dochodzeń
+          CELOWO otwiera się na odczycie, który niczego nie rozróżnia, i za każdym razem z innego powodu, więc
+          odpowiedź trzeba wypracować, a to, po co agent sięgnie dalej, wynika z tego, co właśnie zmierzył.
         </p>
 
         <div className="pilot-actions">

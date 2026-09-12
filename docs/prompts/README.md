@@ -16,11 +16,10 @@ i definicję DONE, więc sesja przyjmująca nie musi rekonstruować kontekstu.
 | `C3-QE5-QE6-QE7-implementacja.md` | C3 | implementacja QE5–QE7 wg pakietu Qwena | `QWEN-QE4-QE7-obserwable.md` już w repo; QE1–QE3 zamknięte |
 | `QWEN-QE4-ground-state-datasets.md` | Qwen | szukanie zbioru zdolnego domknąć ŚCISŁY test QE4 (pakiet badawczy) | `QE4_REAL_DATASET_AND_EXPERIMENT.md` (C2): ścisły test BLOCKED, wycinek strukturalny READY |
 | `C1-A1-glp1-substitution.md` | C1 | A1 — GLP-1 substytucja (semaglutyd↔liraglutyd), część 2 po CMS | pakiet Qwena `DRUG_SUBSTITUTE_REAL_DATASET_AND_EXPERIMENT.md`; reużywa wzorzec `chembl.ts` |
+| `C1-B1-ulez-no2-adjudication.md` | C1 | B1 — ULEZ 2023→NO₂, adjudykacja sprzecznych publikacji (Tong vs TfL), część 3 po CMS+A1 | pakiet Qwena `B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md`; wymaga NOWEGO reużywalnego modułu `causalInference.ts` (DiD/ITS/synthetic-control) — użytkownik jawnie autoryzował budowę |
 
-Co zostaje u C1 po CMS i A1: P3 (pakiet grantowy), jeśli nic pilniejszego nie wypłynie z powyższych
-torów. **B1 (ULEZ/polityka publiczna, drugi pakiet Qwena) jest ŚWIADOMIE NIEPRZYPISANE** — wymaga
-nowego prymitywu przyczynowo-statystycznego (DiD/synthetic control), którego Genesis nie ma;
-zaczynać dopiero po jawnej decyzji użytkownika, patrz sekcja na końcu `C1-A1-glp1-substitution.md`.
+Co zostaje u C1 po CMS, A1 i B1: P3 (pakiet grantowy), jeśli nic pilniejszego nie wypłynie z
+powyższych torów.
 
 ## Dwa wspólne warunki odbioru dla KAŻDEGO z tych zadań
 

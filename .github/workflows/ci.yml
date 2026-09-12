@@ -221,23 +221,37 @@ jobs:
           path: artifacts/qe4-brydges
           retention-days: 90
 
-  qe4-brydges-pin-exact-files:
-    name: QE4 pin — exact preregistered files, Zenodo 2527010 (Brydges)
+  qe4-brydges-pin-measured-states:
+    name: QE4 pin — ${{ matrix.rel }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-    # Phase 0 recon (qe4-brydges-recon) confirmed the real file tree, real
-    # checksum (matches both Zenodo's own API and the task-stated MD5), real
-    # license (CC-BY-4.0), and real CSV/docx format. This job re-fetches
-    # (cheap, ~10s) and prints the FULL content of exactly the files the
-    # preregistered analysis (docs/QE4_PREREGISTRATION.md) commits to using —
-    # no more, no fewer — so the sandbox can reconstruct and pin them
-    # byte-for-byte via its own SHA-256 check against the printed hash,
-    # exactly the technique already used for the Kepler/NASA NSSDCA anchor.
-    # The Azure Blob artifact-download URL from the recon job is blocked by
-    # this repo's own egress policy (confirmed directly), so content must
-    # come through the job's own log, not an artifact download.
+    # One MATRIX JOB PER RAW MeasuredStates FILE (~200-300KB of decimal text
+    # each), so each job's own log stays small enough to read back in full
+    # through the GitHub API in one pass -- the combined single-job version
+    # of this step produced a log whose read-back was silently truncated
+    # from the start (missing exactly the first ~3 files) once total printed
+    # content passed roughly 2.5MB. Splitting keeps every individual log
+    # comfortably under that ceiling. See qe4-brydges-pin-small-files for
+    # everything else (all small: RenyiEntropy/AllPartitions/Fig1a/record).
+    strategy:
+      matrix:
+        rel:
+          - "10Ions_CleanSystem/MeasuredStates_T_0ms.csv"
+          - "10Ions_CleanSystem/MeasuredStates_T_1ms.csv"
+          - "10Ions_CleanSystem/MeasuredStates_T_2ms.csv"
+          - "10Ions_CleanSystem/MeasuredStates_T_3ms.csv"
+          - "10Ions_CleanSystem/MeasuredStates_T_4ms.csv"
+          - "10Ions_CleanSystem/MeasuredStates_T_5ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_01ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_02ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_04ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_06ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_10ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_16ms.csv"
+          - "10Ions_withDisorder/MeasuredStates_T_20ms.csv"
+      fail-fast: false
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -247,7 +261,40 @@ jobs:
         env:
           GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
         run: node scripts/fetch-qe4-brydges-fixture.mjs
-      - name: Extract and print full content of exactly the preregistered files
+      - name: Extract and print full content of this one file
+        env:
+          GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
+          REL: ${{ matrix.rel }}
+        run: |
+          set -e
+          DIR="$GENESIS_QE4_FIXTURE_DIR"
+          mkdir -p "$DIR/extracted"
+          unzip -o "$DIR/Data_aau4963_Updated.zip" -d "$DIR/extracted" > /dev/null
+          f="$DIR/extracted/Data_aau4963/$REL"
+          echo "QE4-PIN BEGIN $REL"
+          echo "QE4-PIN SHA256 $REL $(sha256sum "$f" | cut -d' ' -f1)"
+          echo "QE4-PIN BYTES $REL $(wc -c < "$f")"
+          cat "$f"
+          echo "QE4-PIN END $REL"
+
+  qe4-brydges-pin-small-files:
+    name: QE4 pin — small reference files (RenyiEntropy/Fig1a/record.json)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Everything else the preregistration uses is small (a few hundred bytes
+    # to ~22KB each) -- all 16 files fit comfortably in one job's log.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch Zenodo record + archive again, verify checksum
+        env:
+          GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
+        run: node scripts/fetch-qe4-brydges-fixture.mjs
+      - name: Extract and print full content of the small reference files
         env:
           GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
         run: |
@@ -257,12 +304,6 @@ jobs:
           unzip -o "$DIR/Data_aau4963_Updated.zip" -d "$DIR/extracted" > /dev/null
           ROOT="$DIR/extracted/Data_aau4963"
           FILES=(
-            "10Ions_CleanSystem/MeasuredStates_T_0ms.csv"
-            "10Ions_CleanSystem/MeasuredStates_T_1ms.csv"
-            "10Ions_CleanSystem/MeasuredStates_T_2ms.csv"
-            "10Ions_CleanSystem/MeasuredStates_T_3ms.csv"
-            "10Ions_CleanSystem/MeasuredStates_T_4ms.csv"
-            "10Ions_CleanSystem/MeasuredStates_T_5ms.csv"
             "10Ions_CleanSystem/RenyiEntropy_T_0ms.csv"
             "10Ions_CleanSystem/RenyiEntropy_T_1ms.csv"
             "10Ions_CleanSystem/RenyiEntropy_T_2ms.csv"
@@ -270,13 +311,6 @@ jobs:
             "10Ions_CleanSystem/RenyiEntropy_T_4ms.csv"
             "10Ions_CleanSystem/RenyiEntropy_T_5ms.csv"
             "10Ions_CleanSystem/RenyiEntropyAllPartitions_T_5ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_01ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_02ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_04ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_06ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_10ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_16ms.csv"
-            "10Ions_withDisorder/MeasuredStates_T_20ms.csv"
             "10Ions_withDisorder/RenyiEntropy_T_1ms.csv"
             "10Ions_withDisorder/RenyiEntropy_T_2ms.csv"
             "10Ions_withDisorder/RenyiEntropy_T_4ms.csv"
@@ -297,6 +331,7 @@ jobs:
           done
           echo "QE4-PIN BEGIN zenodo-record.json"
           echo "QE4-PIN SHA256 zenodo-record.json $(sha256sum "$DIR/zenodo-record.json" | cut -d' ' -f1)"
+          echo "QE4-PIN BYTES zenodo-record.json $(wc -c < "$DIR/zenodo-record.json")"
           cat "$DIR/zenodo-record.json"
           echo "QE4-PIN END zenodo-record.json"
 

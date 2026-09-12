@@ -359,3 +359,170 @@ export const QE3_NOT_MODELLED: readonly string[] = [
   'Deciding separability in 3⊗3 is NP-hard in general; PPT and CCNR are two sufficient criteria, not a decision procedure',
   'Only the four declared Horodecki parameters were ever in contention, and the whole family is one specific construction rather than a general 3⊗3 state',
 ];
+
+// ---------------------------------------------------------------------------
+// QE5 — PLOB bound on repeaterless QKD: investigated, BLOCKED.
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY QE5 DOES NOT BECOME A FOURTH INQUIRY HERE.
+ *
+ * The Qwen research package (`docs/prompts/QWEN-QE4-QE7-obserwable.md`) posed
+ * this as an open question to answer before building anything: "check whether
+ * the PLOB bound can be expressed as a function of the negativity/
+ * log-negativity of Werner/isotropic states that `entanglementMeasures.ts`
+ * already computes — if so, that is a real observable; if it requires a
+ * separate channel model, name it as a missing component."
+ *
+ * The answer, worked through here rather than assumed: NO, not honestly.
+ *
+ * The Pirandola–Laurenza–Ottaviani–Banchi (2017) bound is a statement about
+ * the SECRET-KEY CAPACITY of a point-to-point CHANNEL — for a pure-loss
+ * bosonic (continuous-variable, Gaussian) channel with transmittance η, no
+ * protocol run over that channel can exceed −log₂(1−η) secret bits per use.
+ * That is a property of a CHANNEL, derived from the relative entropy of
+ * entanglement of the channel's Choi state (a two-mode squeezed vacuum for
+ * pure loss) — a continuous-variable, infinite-dimensional object.
+ *
+ * `entanglementMeasures.ts`'s Werner/isotropic states are finite-dimensional
+ * QUBIT states with no channel behind them at all: `negativity`/
+ * `logNegativity` here describe how entangled ONE declared density matrix
+ * is, not how much secret key a protocol can extract from repeated uses of a
+ * lossy channel. There is no standard, citable identity that reduces one to
+ * the other — reframing "does the empirical key rate exceed −log₂(1−η)" as
+ * "does some function of Werner-state negativity exceed a chosen threshold"
+ * would silently substitute a different, easier claim for the one QE5 in
+ * `knowledge/quantum.md` actually states, which is exactly the kind of
+ * relabelling this repo's discipline forbids elsewhere (see the Kepler
+ * anchor's rejection of the NASA Exoplanet Archive for an analogous reason:
+ * an available number that is NOT independent evidence for the specific
+ * claim at hand).
+ *
+ * The missing component is real and specific, not a shrug: a bosonic/
+ * Gaussian lossy-channel model (transmittance η, thermal noise), and a
+ * protocol layer on top of it (an achievable-rate estimator to compare
+ * against the bound). Neither exists in this repo. Building either — or
+ * inventing an unverified negativity-to-rate identity to avoid building
+ * them — is exactly the "force a fit, build a solver to get around a real
+ * gap" move the task's own hard rules forbid.
+ */
+export const QE5_BLOCKED_MISSING_COMPONENT =
+  'A bosonic/Gaussian lossy-channel model (transmittance η) and a QKD protocol/rate-estimator layer on top of it. quantum-entanglement-measures computes exact algebra on declared finite-dimensional qubit/qutrit density matrices; it has no channel, no transmittance, and no notion of a secret-key rate. No verified identity reduces the PLOB channel-capacity bound to a function of a qubit state\'s negativity — asserting one without a citation would be exactly the invented-mapping this task\'s rules forbid.';
+
+export const QE5_BLOCKED: readonly string[] = [
+  'PLOB bounds a CHANNEL\'S secret-key capacity (continuous-variable, Gaussian); Werner/isotropic negativity describes ONE declared qubit STATE — no channel, no transmittance, no key rate exist in this model',
+  'The reduction the research package asked to check for does not hold: there is no standard, citable identity expressing −log₂(1−η) as a function of a qubit state\'s negativity or log-negativity',
+  'A DV entanglement-based upper bound on distillable key (e.g. via log-negativity) is a real, different result from PLOB specifically, and using it here would answer a different question than the one QE5 states — not attempted, to avoid that exact substitution',
+  'This is investigated and named, not skipped: see QE5_BLOCKED_MISSING_COMPONENT for the precise missing piece',
+];
+
+// ---------------------------------------------------------------------------
+// QE6 — island formula / Page curve: investigated, BLOCKED.
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY QE6 DOES NOT BECOME A FOURTH INQUIRY HERE.
+ *
+ * The research package is right that the honest, buildable core of QE6 is
+ * NOT the island formula or JT gravity — it is Page's own 1993 result: the
+ * AVERAGE entanglement entropy of a subsystem of a Haar-random pure state on
+ * N qubits has a known, closed-form value (the Page curve), computable on
+ * small N as a pure fact about random matrices, with zero black-hole physics
+ * required. That part is genuinely within reach of what this repo already
+ * computes (`vonNeumannEntropyNats`, `schmidtDecomposition`) — IF a fresh
+ * Haar-random state could be produced and measured for varying subsystem
+ * sizes.
+ *
+ * It cannot be, on the ONLY path this task is scoped to touch. Every real
+ * inquiry in this file runs through `inquiryLoop.ts::runAt`, which is
+ * hard-wired to `getRouterModel(system.modelId)` +
+ * `buildStructuredRequestFromModel` + `runExperiment` (`executor.ts`) — read
+ * in full before concluding this, not assumed. The `quantum-entanglement-
+ * measures` model's declared parameters (`stateId`, `familyParameter`,
+ * `mixingAngleDeg`, `whiteNoise`) and its declared state table
+ * (`entanglementStateRunner.ts::ENTANGLEMENT_STATES`) are a fixed, named list
+ * of CLOSED-FORM presets — there is no `stateId` for "a fresh Haar-random
+ * N-qubit state" and no parameter that could select or seed one, because
+ * `ExperimentValue` (`number | string | boolean`) cannot carry a random
+ * vector across the Fabric's flat-parameter contract as anything other than
+ * a NEW declared preset.
+ *
+ * Adding that preset is real, buildable work — but it means touching
+ * `entanglementStateRunner.ts` (the state table) and very likely
+ * `router.ts`/`executor.ts` (a new parameter or a new model id), all three
+ * outside this task\'s explicit scope (`entanglementInquiry.ts`,
+ * `entanglementMeasures.ts` only). Writing a `sampleHaarRandomState`
+ * function in `entanglementMeasures.ts` without a way to reach it through
+ * `runAt` would be dead code with no real `StrategyRun` behind it —
+ * `moduleReachability.test.ts` would rightly refuse it as an undocumented
+ * orphan, and it would violate the task\'s own "zero simulated success"
+ * rule: a Page-curve claim with no real measurement behind it is exactly
+ * the kind of claim this repo does not make.
+ */
+export const QE6_BLOCKED_MISSING_COMPONENT =
+  'A Haar-random-state preset reachable through the Fabric contract. entanglementStateRunner.ts\'s ENTANGLEMENT_STATES table is a fixed list of closed-form presets selected by a string id; there is no way to express "sample a fresh random N-qubit pure state" as one of quantum-entanglement-measures\'s existing number/string/boolean parameters. Adding one means touching entanglementStateRunner.ts and likely router.ts/executor.ts — outside this task\'s declared scope (entanglementInquiry.ts, entanglementMeasures.ts only).';
+
+export const QE6_BLOCKED: readonly string[] = [
+  'The buildable core (Page\'s 1993 average-entropy result on small N, no JT gravity needed) is real, but producing a fresh Haar-random state requires a new Fabric-reachable preset — `inquiryLoop.ts::runAt` only ever calls `getRouterModel(modelId)` + `runExperiment`, and no existing stateId/parameter can carry one',
+  'Adding that preset means editing entanglementStateRunner.ts (the closed-form state table) and likely router.ts/executor.ts — outside this task\'s declared two-file scope',
+  'A Haar-sampling helper written into entanglementMeasures.ts with no path through runAt would be unreachable from any real StrategyRun: exactly the "simulated success" this task\'s DONE criteria forbid, not a real inquiry',
+  'This is investigated and named, not skipped: see QE6_BLOCKED_MISSING_COMPONENT for the precise missing piece',
+];
+
+// ---------------------------------------------------------------------------
+// QE7 — macroscopic entanglement vs. monogamy/SSA: investigated, BLOCKED.
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY QE7 DOES NOT BECOME A FOURTH INQUIRY HERE — AND WHY QE2 ALREADY IS ITS
+ * ANSWER.
+ *
+ * The research package states plainly that CKW monogamy and strong
+ * subadditivity are THEOREMS of the algebra this model computes: no run of
+ * `quantum-entanglement-measures` could ever produce a violation, so no run
+ * tests the theorems themselves (exactly `QE2_NOT_MODELLED`'s point). The
+ * only honest content left is IMPLEMENTATION verification — does this repo's
+ * `checkCKWMonogamy` actually compute a non-negative residual across real,
+ * varied, boundary-adjacent cases — and the package asked for that to be run
+ * as a real inquiry, analogous to QE1–QE3, with its own `QE7_NOT_MODELLED`.
+ *
+ * Checked, rather than assumed: there is no way to build that inquiry as
+ * something DIFFERENT from QE2. The only observable this model computes for
+ * a three-qubit state that is not NaN'd out is `ckwResidual`
+ * (`entanglementStateRunner.ts::runEntanglementState`: `vonNeumannEntropyNats`,
+ * `renyi2Nats`, `maxCHSH`, `concurrence` and `schmidtRank` all require
+ * `dimA === 2 && dimB === 2`, which no three-qubit preset satisfies — they
+ * are all 2×4). `ckwResidual` itself is defined ONLY at `whiteNoise = 0`
+ * (any noise makes the pure-state three-tangle identity fail, and the model
+ * reports NaN rather than a fabricated number — see
+ * `entanglementStateRunner.ts`'s own documentation on this). That leaves
+ * exactly ONE numeric family with exactly ONE usable probe knob for a
+ * three-qubit inquiry on this substrate: `ghz-w-family`, hidden parameter θ,
+ * probe `mixingAngleDeg` — which is `qe2System`, verbatim. A "QE7 inquiry"
+ * built from the only available ingredients would not test anything QE2's
+ * real, already-executed run (`knowledge/quantum.md`'s QE2 row: θ = 70°
+ * recovered across three real rounds, `ckwResidual` computed and belief-
+ * revised every round, never negative) does not already establish. Building
+ * a second inquiry with the identical mechanism and a relabelled name would
+ * be exactly the kind of second, redundant system this task's own rules
+ * forbid, dressed up as new work.
+ *
+ * The real implementation-verification claim the package wants — CKW
+ * monogamy holds (residual ≥ 0) across genuinely varied, real, executed
+ * configurations — is therefore already answered by QE2's own history, not
+ * by a new inquiry. A distinct QE7 observable would need a genuinely
+ * different measurable quantity (e.g. a three-party mutual-information-style
+ * SSA check), which would need entropies for bipartitions other than the
+ * fixed A|(BC) split this model computes — again outside what
+ * `entanglementMeasures.ts`'s existing exports and this task's scope permit
+ * without inventing an unverified generalisation.
+ */
+export const QE7_BLOCKED_MISSING_COMPONENT =
+  'A three-qubit observable genuinely distinct from QE2\'s ckwResidual/ghz-w-family/mixingAngleDeg combination. Every other three-qubit-capable metric (vonNeumannEntropyNats, renyi2Nats, maxCHSH, concurrence, schmidtRank) is NaN\'d out for every declared three-qubit preset (all are 2×4, not 2×2); ckwResidual is defined only at whiteNoise=0, leaving no unused numeric axis on ghz-w-family beyond what qe2System already runs.';
+
+export const QE7_NOT_MODELLED: readonly string[] = [
+  'CKW monogamy and strong subadditivity are THEOREMS of the algebra this model computes — no run here could produce a violation, so no run here tests the theorems themselves, exactly as QE2_NOT_MODELLED already states for CKW specifically',
+  'The only three-qubit-safe, non-NaN observable on this substrate is ckwResidual, and its only usable probe (mixingAngleDeg, on ghz-w-family, at whiteNoise=0) is exactly QE2\'s system — a distinct QE7 SystemUnderStudy built from the same ingredients would be QE2 renamed, not new evidence',
+  'The implementation-verification question the package actually wants answered — does this repo compute a non-negative CKW residual across real, varied configurations — is already answered by QE2\'s own executed history (knowledge/quantum.md), not left open',
+  'This is investigated and named, not skipped: see QE7_BLOCKED_MISSING_COMPONENT for the precise missing piece',
+];

@@ -1,0 +1,110 @@
+{
+  "created": "2018-12-26T12:51:41.752080+00:00",
+  "modified": "2020-01-24T19:25:13.730057+00:00",
+  "id": 2527010,
+  "conceptrecid": "1445994",
+  "doi": "10.5281/zenodo.2527010",
+  "conceptdoi": "10.5281/zenodo.1445994",
+  "doi_url": "https://doi.org/10.5281/zenodo.2527010",
+  "metadata": {
+    "title": "Probing Rényi Entanglement Entropies via Randomized Measurements",
+    "doi": "10.5281/zenodo.2527010",
+    "publication_date": "2018-10-05",
+    "description": "<p>The data contained here is for the four figures in the main text of the manuscript Probing R&eacute;nyi Entanglement Entropies via Randomized Measurements, which is available on the arXiv:<em>1806.05747. </em> The data is contained in tab delimited .csv files.</p>",
+    "access_right": "open",
+    "creators": [
+      {
+        "name": "T. Brydges & A. Elben et. al.",
+        "affiliation": "Institute for Quantum Optics and Quantum Information",
+        "orcid": "0000-0001-5239-9752"
+      }
+    ],
+    "resource_type": {
+      "title": "Dataset",
+      "type": "dataset"
+    },
+    "license": {
+      "id": "cc-by-4.0"
+    },
+    "relations": {
+      "version": [
+        {
+          "index": 1,
+          "is_last": true,
+          "parent": {
+            "pid_type": "recid",
+            "pid_value": "1445994"
+          }
+        }
+      ]
+    }
+  },
+  "title": "Probing Rényi Entanglement Entropies via Randomized Measurements",
+  "links": {
+    "self": "https://zenodo.org/api/records/2527010",
+    "self_html": "https://zenodo.org/records/2527010",
+    "preview_html": "https://zenodo.org/records/2527010?preview=1",
+    "doi": "https://doi.org/10.5281/zenodo.2527010",
+    "self_doi": "https://doi.org/10.5281/zenodo.2527010",
+    "self_doi_html": "https://zenodo.org/doi/10.5281/zenodo.2527010",
+    "reserve_doi": "https://zenodo.org/api/records/2527010/draft/pids/doi",
+    "parent": "https://zenodo.org/api/records/1445994",
+    "parent_html": "https://zenodo.org/records/1445994",
+    "parent_doi": "https://doi.org/10.5281/zenodo.1445994",
+    "parent_doi_html": "https://zenodo.org/doi/10.5281/zenodo.1445994",
+    "self_iiif_manifest": "https://zenodo.org/api/iiif/record:2527010/manifest",
+    "self_iiif_sequence": "https://zenodo.org/api/iiif/record:2527010/sequence/default",
+    "files": "https://zenodo.org/api/records/2527010/files",
+    "media_files": "https://zenodo.org/api/records/2527010/media-files",
+    "archive": "https://zenodo.org/api/records/2527010/files-archive",
+    "archive_media": "https://zenodo.org/api/records/2527010/media-files-archive",
+    "latest": "https://zenodo.org/api/records/2527010/versions/latest",
+    "latest_html": "https://zenodo.org/records/2527010/latest",
+    "versions": "https://zenodo.org/api/records/2527010/versions",
+    "draft": "https://zenodo.org/api/records/2527010/draft",
+    "access_links": "https://zenodo.org/api/records/2527010/access/links",
+    "access_grants": "https://zenodo.org/api/records/2527010/access/grants",
+    "access_users": "https://zenodo.org/api/records/2527010/access/users",
+    "access_request": "https://zenodo.org/api/records/2527010/access/request",
+    "access": "https://zenodo.org/api/records/2527010/access",
+    "communities": "https://zenodo.org/api/records/2527010/communities",
+    "communities-suggestions": "https://zenodo.org/api/records/2527010/communities-suggestions",
+    "request_deletion": "https://zenodo.org/api/records/2527010/request-deletion",
+    "file_modification": "https://zenodo.org/api/records/2527010/file-modification",
+    "quota_increase": "https://zenodo.org/api/records/2527010/quota-increase",
+    "requests": "https://zenodo.org/api/records/2527010/requests"
+  },
+  "updated": "2020-01-24T19:25:13.730057+00:00",
+  "recid": "2527010",
+  "revision": 5,
+  "files": [
+    {
+      "id": "1c48a543-7bd8-4c8a-90bf-a66291556fcf",
+      "key": "Data_aau4963_Updated.zip",
+      "size": 2286535,
+      "checksum": "md5:5f027c6ee5d1283ca9338015e066dff6",
+      "links": {
+        "self": "https://zenodo.org/api/records/2527010/files/Data_aau4963_Updated.zip/content"
+      }
+    }
+  ],
+  "swh": {},
+  "owners": [
+    {
+      "id": "52940"
+    }
+  ],
+  "status": "published",
+  "stats": {
+    "downloads": 97,
+    "unique_downloads": 93,
+    "views": 860,
+    "unique_views": 829,
+    "version_downloads": 79,
+    "version_unique_downloads": 76,
+    "version_unique_views": 588,
+    "version_views": 612
+  },
+  "state": "done",
+  "submitted": true
+}

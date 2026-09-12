@@ -160,20 +160,23 @@ jobs:
           console.log('Kepler fixture matches the committed pinned copy — no drift.');
           NODE
 
-  qe4-brydges-recon:
-    name: QE4 recon — Zenodo 2527010 (Brydges randomized-measurement Rényi entropy data)
+  qe4-brydges-verify-pinned:
+    name: QE4 anchor — verify pinned Brydges data against live Zenodo (drift detection)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-    # TEMPORARY RECONNAISSANCE JOB (Phase 0 of QE4_REAL_DATASET_AND_EXPERIMENT.md).
-    # zenodo.org is blocked from this repo's own sandbox (403 on CONNECT,
-    # confirmed directly and via the agent-side WebFetch tool returning
-    # EGRESS_BLOCKED) -- so this job does the one-time real fetch + format
-    # verification on a GitHub Actions runner, which has ordinary internet
-    # access, and prints what it finds into its own log for read-back via the
-    # GitHub API. Superseded once the exact files/columns needed for the
-    # analysis are known and a second, narrower job pins only those.
+    # Phase 0 (see docs/QE4_PREREGISTRATION.md) fetched this dataset via three
+    # bootstrapping jobs (a fetch+recon job, then a per-file matrix pin job to
+    # work around a job-log read-back truncation above ~2.5MB) and committed
+    # all 29 real data files + the Zenodo record JSON under
+    # packages/frontend/src/core/biotechData/qe4-brydges/, each byte-verified
+    # against a SHA-256 printed in that job's own log. Those bootstrapping
+    # jobs are gone now that the data is committed; this ONE ongoing job does
+    # what the Kepler/NIST anchors' own CI jobs already do: re-fetch for real
+    # on every push (this runner has ordinary internet access; the repo's own
+    # sandbox does not) and fail loudly if the live archive ever drifts from
+    # what is pinned, rather than silently trusting a fetch made once.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -183,7 +186,7 @@ jobs:
         env:
           GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
         run: node scripts/fetch-qe4-brydges-fixture.mjs
-      - name: Extract archive and print structure (Phase 0 format verification)
+      - name: Compare every pinned file to a fresh extraction (drift detection)
         env:
           GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
         run: |
@@ -191,35 +194,58 @@ jobs:
           DIR="$GENESIS_QE4_FIXTURE_DIR"
           mkdir -p "$DIR/extracted"
           unzip -o "$DIR/Data_aau4963_Updated.zip" -d "$DIR/extracted" > /dev/null
-          echo "QE4-brydges === FULL FILE TREE ==="
-          find "$DIR/extracted" -type f | sort
-          echo "QE4-brydges === SHA256 OF EVERY EXTRACTED FILE ==="
-          find "$DIR/extracted" -type f | sort | xargs -I{} sh -c 'echo "$(sha256sum "{}" | cut -d" " -f1)  {}"'
-          echo "QE4-brydges === DOCX TEXT (any *.docx / *.doc found) ==="
-          python3 <<'PY'
-          import glob, zipfile, re
-          for path in sorted(glob.glob('artifacts/qe4-brydges/extracted/**/*.docx', recursive=True)):
-              print(f"QE4-brydges DOCX_FILE {path}")
-              with zipfile.ZipFile(path) as z:
-                  xml = z.read('word/document.xml').decode('utf-8', errors='replace')
-              text = re.sub(r'<[^>]+>', '', xml)
-              text = re.sub(r'\s+\n', '\n', text)
-              print(text)
-              print(f"QE4-brydges DOCX_FILE_END {path}")
-          PY
-          echo "QE4-brydges === CSV HEADER + FIRST 3 ROWS FOR EVERY .csv FILE ==="
-          for f in $(find "$DIR/extracted" -type f -name '*.csv' | sort); do
-            echo "QE4-brydges CSV_FILE $f"
-            echo "QE4-brydges CSV_LINECOUNT $(wc -l < "$f")"
-            head -n 4 "$f"
-            echo "QE4-brydges CSV_FILE_END $f"
-          done
-      - name: Upload full extracted QE4 recon artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: qe4-brydges-recon-${{ github.sha }}
-          path: artifacts/qe4-brydges
-          retention-days: 90
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          import { join } from 'node:path';
+
+          const PINNED_ROOT = 'packages/frontend/src/core/biotechData/qe4-brydges';
+          const FRESH_ROOT = 'artifacts/qe4-brydges/extracted/Data_aau4963';
+          const FILES = [
+            '10Ions_CleanSystem/MeasuredStates_T_0ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_1ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_2ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_3ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_4ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_5ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_0ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_1ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_2ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_3ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_4ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_5ms.csv',
+            '10Ions_CleanSystem/RenyiEntropyAllPartitions_T_5ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_01ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_02ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_04ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_06ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_10ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_16ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_20ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_1ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_2ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_4ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_6ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_10ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_16ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_20ms.csv',
+            'Fig1a/PureState.csv',
+            'Fig1a/MixedState.csv',
+          ];
+          const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+          for (const rel of FILES) {
+            const pinned = await readFile(join(PINNED_ROOT, rel));
+            const fresh = await readFile(join(FRESH_ROOT, rel));
+            if (sha256(pinned) !== sha256(fresh)) {
+              throw new Error(
+                `QE4 drift: ${rel} in the live Zenodo archive no longer matches the committed pinned copy. ` +
+                'Re-fetch, re-verify the preregistration is still valid against the new content, and re-pin deliberately -- do not silently accept a changed value as the same observation.',
+              );
+            }
+            console.log(`QE4 VERIFIED ${rel} matches committed pinned copy`);
+          }
+          console.log('All 29 pinned QE4 Brydges files match the live Zenodo archive -- no drift.');
+          NODE
 
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera

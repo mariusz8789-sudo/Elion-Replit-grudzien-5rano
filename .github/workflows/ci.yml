@@ -316,24 +316,39 @@ jobs:
           path: artifacts/cms-zmumu
           retention-days: 90
 
-  b1-defra-aurn-recon:
-    name: "B1 Phase 0 (temporary): recon DEFRA AURN flat_files + site-info for MY1/MAN3/LED6/SHBR"
+  b1-defra-aurn-pin-narrow:
+    name: "B1 Phase 3 (temporary): fetch+extract NO2/SO2 for one DEFRA AURN site-year"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-    # Local sandbox egress to uk-air.defra.gov.uk is confirmed blocked (403 on
-    # CONNECT) -- same pattern as zenodo.org/nist.gov/CERN Open Data before it.
-    # This is a ONE-OFF recon job (remove once the real fetch plan is designed
-    # from its output, mirroring qe4-brydges-recon's own lifecycle) -- it does
-    # NOT freeze or pin anything, it only discovers what DEFRA actually serves.
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [MY1, MAN3, LED6, SHBR]
+        year: [2022, 2023, 2024]
+    # Recon (2 rounds, now removed -- see docs/DECISIONS.md) found DEFRA's
+    # stable per-site-year download URL and confirmed its wide "all
+    # pollutants" CSV is far too large (~7-8MB/site-year) to freeze verbatim
+    # through job-log read-back the way every prior anchor's raw file was.
+    # scripts/fetch-b1-defra-aurn-fixture.mjs extracts ONLY the columns this
+    # experiment's preregistration reads (NO2 + SO2, date/time), bringing
+    # each site-year down to ~300-400KB -- one matrix shard per site-year, no
+    # further sharding needed (unlike CMS Zmumu's 4-way split for one file).
+    # This is a ONE-OFF pinning job: remove once its 12 shards' output has
+    # been reconstructed and committed under packages/frontend/src/core/
+    # biotechData/b1-defra-aurn/, mirroring qe4-brydges-pin-measured-states'
+    # own lifecycle.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Recon DEFRA AURN flat_files + site-info pages
-        run: node scripts/recon-b1-defra-aurn.mjs
+      - name: Fetch + extract NO2/SO2 for ${{ matrix.site }}_${{ matrix.year }}
+        env:
+          SITE: ${{ matrix.site }}
+          YEAR: ${{ matrix.year }}
+        run: node scripts/fetch-b1-defra-aurn-fixture.mjs
 
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera

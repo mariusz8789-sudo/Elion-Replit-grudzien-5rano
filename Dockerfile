@@ -20,6 +20,15 @@ COPY packages/backend/src packages/backend/src
 COPY knowledge knowledge
 COPY --from=build /app/packages/frontend/dist packages/frontend/dist
 
+# Trwały magazyn POZA drzewem aplikacji (P0.2). Bez tego GENESIS_DB_PATH
+# domyślnie wskazuje /app/packages/backend/data/genesis.db — czyli warstwę
+# zapisywalną obrazu, wymienianą przy KAŻDYM redeployu. Konta, projekty i Serie
+# Prób ginęły wtedy cicho, bez błędu, przy poprawnie działającej aplikacji.
+# Katalog musi należeć do użytkownika `node`, bo proces nie jest rootem.
+ENV GENESIS_DB_PATH=/data/genesis.db
+RUN mkdir -p /data && chown -R node:node /data
+VOLUME ["/data"]
+
 # Proces bez roota
 USER node
 EXPOSE 8080

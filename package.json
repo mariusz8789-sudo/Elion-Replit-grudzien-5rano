@@ -21,6 +21,8 @@
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
     "e2e:discovery": "node scripts/discovery-e2e.mjs",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:restore": "node scripts/db-restore.mjs",
     "csrn:build": "npm run build --workspace=packages/csrn",
     "csrn:test": "npm run test --workspace=packages/csrn",
     "csrn:demo": "npm run demo --workspace=packages/csrn",

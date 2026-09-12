@@ -38,6 +38,7 @@ import {
   parseWorldProposalToolResponse,
 } from './lib.mjs';
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
+import { classifyDbPath } from './dbDurability.mjs';
 import { handleApi } from './api.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
@@ -61,6 +62,11 @@ const client = hasKey ? new Anthropic() : null;
 // serwera; :memory: dla testów/efemerycznych wdrożeń bez woluminu. node:sqlite
 // jest wbudowany — zero zewnętrznych zależności, schemat przenośny do Postgresa.
 const DB_PATH = process.env.GENESIS_DB_PATH ?? path.join(__dirname, '../data/genesis.db');
+// Czy te dane przeżyją redeploy (P0.2). Liczone raz, raportowane i w logu
+// startowym, i w /api/health — operator nie musi zgadywać, a komisja nie musi
+// wierzyć na słowo. Sama diagnoza NIE blokuje startu: wdrożenie świadomie
+// efemeryczne (demo, :memory:) jest legalne, o ile jest NAZWANE.
+const DB_DURABILITY = classifyDbPath({ dbPath: DB_PATH, appDir: path.resolve(__dirname, '..') });
 let db = null;
 try {
   if (DB_PATH !== ':memory:') {
@@ -397,7 +403,9 @@ server.listen(PORT, () => {
     ai: hasKey ? MODEL : 'no-key',
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',
+    durability: DB_DURABILITY.durability,
   });
+  if (db && !DB_DURABILITY.persistent) log('warn', 'db_not_durable', { durability: DB_DURABILITY.durability, why: DB_DURABILITY.why });
 });
 
 // Graceful shutdown — autoscale/kontenery wysyłają SIGTERM przy skalowaniu.

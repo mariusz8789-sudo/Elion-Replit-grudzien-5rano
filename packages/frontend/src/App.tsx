@@ -24,7 +24,7 @@ import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
 import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
 import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
-import { isSuppressed as isMatrixBackgroundSuppressed } from './components/MatrixDataStream';
+import { isSuppressed as isHeavy3DRoute } from './components/MatrixDataStream';
 import { listExperiments } from './core/scienceMemory';
 
 /**
@@ -944,17 +944,28 @@ export default function App() {
     hasOpenInvestigation: false,
     savedExperimentCount: (() => { try { return listExperiments().length; } catch { return 0; } })(),
   });
-  const matrixBackgroundSuppressed = isMatrixBackgroundSuppressed(window.location.hash);
+  // The same route list `MatrixDataStream.tsx` uses, read here for a DIFFERENT
+  // decision. Suppressing the background entirely on these routes was measured
+  // to be wrong: on #/genesis-world the 3D canvas is 1200x750 inside a
+  // 1440x900 viewport — 69% — so the sidebar, title strip, description block
+  // and margins (the other 31%) were left empty for no reason. What actually
+  // needs protecting on these screens is the frame budget, since a second rAF
+  // loop runs beside the 3D scene's own. So the background stays mounted and
+  // visible, and drops to LOW quality instead: fewer streams and particles,
+  // no glow blur, lower device-pixel-ratio cap (matrixEngine.ts::QUALITY).
+  const heavy3DRoute = isHeavy3DRoute(window.location.hash);
 
   return (
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
-      {!matrixBackgroundSuppressed && (
-        <ErrorBoundary>
-          <LiveMatrixBackground className="matrix-datastream" {...toMatrixConfig(genesisVisualState)} />
-        </ErrorBoundary>
-      )}
+      <ErrorBoundary>
+        <LiveMatrixBackground
+          className="matrix-datastream"
+          {...toMatrixConfig(genesisVisualState)}
+          quality={heavy3DRoute ? 'LOW' : 'HIGH'}
+        />
+      </ErrorBoundary>
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —

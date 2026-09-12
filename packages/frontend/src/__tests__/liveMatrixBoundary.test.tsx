@@ -25,6 +25,20 @@ function readOrNull(file: string): string | null {
   try { return readFileSync(file, 'utf8'); } catch { return null; }
 }
 
+/**
+ * Comments are stripped before every "does this file name X" check in this
+ * file, on purpose and in both directions. `genesisVisualState.ts` has to be
+ * able to say "this must never take a SavedExperiment" without that sentence
+ * tripping the Genesis check, and `App.tsx` has to be able to explain WHY the
+ * background drops to the LOW tier ("no glow blur, lower device-pixel-ratio
+ * cap — matrixEngine.ts::QUALITY") without that citation reading as App.tsx
+ * importing the engine. Both rules are about what the code touches, not about
+ * which words the rationale is allowed to use.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
 function filesIn(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
@@ -88,12 +102,6 @@ describe('the component is standalone — the dependency arrow points one way', 
   });
 
   it('names no Genesis domain concept in CODE — prose explaining the boundary is allowed, using it is not', () => {
-    // Comments are stripped first, on purpose. `genesisVisualState.ts` has to
-    // be able to say "this must never take a SavedExperiment" without that
-    // sentence itself tripping the check — the rule is about what the code
-    // touches, not about which words the rationale is allowed to use.
-    const stripComments = (source: string): string =>
-      source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     const forbidden = /scienceMemory|SavedExperiment|hypothesisLoop|HypothesisAssessment|experimentFabric|crossDomainSynthesis/;
     for (const file of filesIn(COMPONENT_DIR)) {
       const code = stripComments(readFileSync(file, 'utf8'));
@@ -112,8 +120,9 @@ describe('the component is standalone — the dependency arrow points one way', 
     const appFiles = [join(process.cwd(), 'src', 'App.tsx'), join(process.cwd(), 'src', 'main.tsx')];
     let mountedSomewhere = false;
     for (const file of appFiles) {
-      const source = readOrNull(file);
-      if (source === null) continue;
+      const raw = readOrNull(file);
+      if (raw === null) continue;
+      const source = stripComments(raw);
       if (!source.includes('liveMatrix')) continue;
       mountedSomewhere = true;
       expect(source.includes('genesisVisualState'), `${file} mounts liveMatrix without going through genesisVisualState`).toBe(true);
@@ -121,5 +130,23 @@ describe('the component is standalone — the dependency arrow points one way', 
       expect(source.includes('matrixController'), `${file} reaches past the adapter into matrixController directly`).toBe(false);
     }
     expect(mountedSomewhere, 'expected at least one app file to mount the background').toBe(true);
+  });
+
+  /**
+   * MEASURED DECISION, not a preference: the background used to be unmounted
+   * entirely on heavy-3D routes. On #/genesis-world the 3D canvas measures
+   * 1200x750 inside a 1440x900 viewport — 69% — so unmounting blanked the
+   * remaining 31% (sidebar, title strip, description block, margins) where
+   * the field is genuinely visible. The real constraint there is the frame
+   * budget, because a second rAF loop runs beside the 3D scene's own, and
+   * that is what the LOW quality tier is for. Reverting to a conditional
+   * mount would silently throw that third of the screen away again.
+   */
+  it('heavy-3D routes tier the background down to LOW quality rather than unmounting it', () => {
+    const app = readOrNull(join(process.cwd(), 'src', 'App.tsx'));
+    expect(app).not.toBeNull();
+    expect(app!).toMatch(/quality=\{[^}]*\?\s*'LOW'\s*:\s*'HIGH'\}/);
+    // No conditional-render guard wrapping the background any more.
+    expect(app!).not.toMatch(/\{\s*!\w*[Ss]uppressed\w*\s*&&\s*\(/);
   });
 });

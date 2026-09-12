@@ -105,6 +105,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline' },
   { id: 'decipherment', label: 'Deszyfracja', icon: '📜', hash: '#/decipherment' },
   { id: 'glossary', label: 'Słowniczek', icon: '📚', hash: '#/glossary' },
+  { id: 'dome-world', label: 'Kopuła vs kula', icon: '🌍', hash: '#/dome-world' },
 ];
 
 /** Flat view, for lookups and for the mobile primary bar. */

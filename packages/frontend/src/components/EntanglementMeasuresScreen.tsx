@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import type { C } from '../core/quantumState';
 import {
   checkCKWMonogamy, checkNoCommunication, concurrence, densityFromState, entanglementEntropyBits,
-  entropyOfFormation, identity, logarithmicNegativity, maximumCHSH, negativity, partialTraceB,
-  peresHorodeckiTest, renyiEntropy, schmidtDecomposition, vonNeumannEntropy,
+  entropyOfFormation, horodeckiBoundEntangled3x3, identity, logarithmicNegativity, maximumCHSH,
+  negativity, partialTraceB, peresHorodeckiTest, realignmentCriterion, renyiEntropy,
+  schmidtDecomposition, vonNeumannEntropy,
   type DensityMatrix,
 } from '../core/quantum/entanglementMeasures';
 
@@ -117,6 +118,7 @@ const fmt = (x: number): string => (Math.abs(x) < 1e-9 ? '0' : x.toFixed(6));
 export function EntanglementMeasuresScreen() {
   const [stateId, setStateId] = useState(STATES[0]!.id);
   const [parameter, setParameter] = useState(0.6);
+  const [boundA, setBoundA] = useState(0.5);
   const choice = STATES.find((s) => s.id === stateId)!;
 
   const analysis = useMemo(() => {
@@ -141,6 +143,12 @@ export function EntanglementMeasuresScreen() {
         : null,
     };
   }, [choice, parameter]);
+
+  /** QE3's own state, independent of the selector above — it is a 3x3, not a qubit pair. */
+  const bound = useMemo(() => {
+    const rho = horodeckiBoundEntangled3x3(boundA);
+    return { ppt: peresHorodeckiTest(rho, 3, 3), negativity: negativity(rho, 3, 3), ccnr: realignmentCriterion(rho, 3, 3) };
+  }, [boundA]);
 
   const hasSlider = choice.id === 'partial' || choice.id === 'werner';
 
@@ -277,6 +285,41 @@ export function EntanglementMeasuresScreen() {
           </p>
         </section>
       )}
+
+      {/* QE3, DEMONSTRATED. The scope limit on Peres-Horodecki is only a claim
+          until a state exists that PPT cannot settle and something else can.
+          The Horodecki 3x3 a-family is that state: positive under partial
+          transpose AND entangled — bound entanglement. Two independent
+          criteria, opposite answers, both computed live. */}
+      <section className="pilot-step" data-testid="bound-entanglement">
+        <h2>QE3 — dowód, że PPT nie wystarcza powyżej 2⊗3</h2>
+        <p className="settings-hint">
+          Stan związany Horodeckich 3⊗3 (rodzina <span className="mono">a</span>, Horodecki×3 1998). Jest DODATNI po
+          transpozycji częściowej — więc PPT nie może o nim orzec — a mimo to jest SPLĄTANY, co pokazuje niezależne
+          kryterium realignment (CCNR). To jest splątanie związane: istnieje, ale nie da się go wydestylować.
+        </p>
+        <label>
+          Parametr rodziny a: <strong data-testid="bound-a">{boundA.toFixed(2)}</strong>
+          <input type="range" min={0.05} max={0.95} step={0.05} value={boundA}
+            data-testid="bound-slider" onChange={(e) => setBoundA(Number(e.target.value))} />
+        </label>
+        <dl className="pilot-provenance">
+          <div><dt>PPT (Peres–Horodecki)</dt><dd className="mono" data-testid="bound-ppt">{VERDICT_LABEL[bound.ppt.verdict]}</dd></div>
+          <div><dt>najmniejsza wartość własna ρ^{'{T_A}'}</dt><dd className="mono">{bound.ppt.minEigenvalue.toExponential(2)}</dd></div>
+          <div><dt>negatywność</dt><dd className="mono">{bound.negativity.toExponential(2)}</dd></div>
+          <div><dt>realignment ‖R(ρ)‖₁</dt><dd className="mono" data-testid="bound-ccnr">{bound.ccnr.traceNorm.toFixed(6)}</dd></div>
+          <div><dt>CCNR orzeka</dt><dd className="mono">{bound.ccnr.entangled ? 'SPLĄTANY' : 'milczy'}</dd></div>
+        </dl>
+        <p className="pilot-summary" data-testid="bound-verdict">
+          {bound.ppt.positiveUnderPartialTranspose && bound.ccnr.entangled
+            ? `PPT mówi „nie wiem" (ρ^{T_A} ≥ 0, negatywność ${bound.negativity.toExponential(1)}), a CCNR mówi „SPLĄTANY" (‖R‖₁ = ${bound.ccnr.traceNorm.toFixed(6)} > 1). Hipoteza „PPT wystarcza do separowalności" jest tu SFALSYFIKOWANA — poza 2⊗2 i 2⊗3 nie wystarcza.`
+            : `Przy a = ${boundA.toFixed(2)} ten przebieg NIE pokazuje splątania związanego: PPT ${bound.ppt.verdict}, CCNR ‖R‖₁ = ${bound.ccnr.traceNorm.toFixed(6)}. To wynik do zbadania, nie do przemilczenia.`}
+        </p>
+        <p className="settings-hint">
+          CCNR działa w JEDNĄ stronę: ‖R‖₁ &gt; 1 dowodzi splątania, ‖R‖₁ ≤ 1 nie dowodzi niczego. Żadne z tych dwóch
+          kryteriów nie zawiera drugiego — dlatego posiadanie tylko jednego zostawiało to twierdzenie niesprawdzalnym.
+        </p>
+      </section>
 
       <section className="pilot-step">
         <p className="settings-hint">

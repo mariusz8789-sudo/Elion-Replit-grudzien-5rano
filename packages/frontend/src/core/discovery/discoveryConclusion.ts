@@ -38,10 +38,12 @@ function checkCriterion(criterion: FalsificationCriterion, comparison: Discovery
     variant: metric ? metric.variant : null,
   };
   if (!metric) {
-    return { ...base, met: false, explanation: `Metryka „${criterion.metric}" nie występuje w tym porównaniu.` };
+    // Missing data is undecidable, not false. Reporting `met: false` here would
+    // make a metric nobody measured look like a criterion that was tested.
+    return { ...base, applicable: false, met: false, explanation: `Metryka „${criterion.metric}" nie występuje w tym porównaniu.` };
   }
   const outcome = evaluateTwoArmRelation(criterion, metric.baseline, metric.variant);
-  return { ...base, met: outcome.applicable && outcome.met, explanation: outcome.explanation };
+  return { ...base, applicable: outcome.applicable, met: outcome.met, explanation: outcome.explanation };
 }
 
 function insufficient(reason: string, limitations: readonly string[]): DiscoveryConclusion {
@@ -76,8 +78,25 @@ export function deriveDiscoveryConclusion(
   }
 
   const primary = checkCriterion(record.hypothesis.falsification, comparison);
+  /**
+   * A criterion this comparison cannot settle never reaches a verdict. The
+   * relation module already refuses to decide it (`applicable: false`), and the
+   * honest conclusion is the one this file already has for "the evidence does
+   * not reach": INSUFFICIENT_EVIDENCE — not NOT_SUPPORTED, which would announce
+   * a falsification that no run produced.
+   */
+  if (!primary.applicable) {
+    return insufficient(`kryterium prerejestrowane nie jest rozstrzygalne tym porównaniem: ${primary.explanation}`, limitations);
+  }
+
   const supporting = (record.hypothesis.supportingCriteria ?? []).map((c) => checkCriterion(c, comparison));
-  const failedSupporting = supporting.filter((s) => !s.met);
+  /**
+   * Same rule one level down: an unsettled supporting criterion is not a failed
+   * one, so it must not downgrade a supported primary. It is still reported
+   * below rather than dropped — silence would be its own kind of overstatement.
+   */
+  const failedSupporting = supporting.filter((s) => s.applicable && !s.met);
+  const unsettledSupporting = supporting.filter((s) => !s.applicable);
 
   const basis: string[] = [
     `model: ${record.model.modelId}@${record.model.modelVersion} (${record.model.engine})`,
@@ -88,6 +107,7 @@ export function deriveDiscoveryConclusion(
       (m) => `${m.key}: ${m.baseline} → ${m.variant}${m.relativeDeltaPercent === null ? '' : ` (${m.relativeDeltaPercent.toFixed(1)}%)`}`,
     ),
     `kryterium prerejestrowane: ${primary.explanation}`,
+    ...unsettledSupporting.map((s) => `kryterium wspierające „${s.metricKey}" nierozstrzygalne: ${s.explanation}`),
   ];
 
   let verdict: DiscoveryVerdict;

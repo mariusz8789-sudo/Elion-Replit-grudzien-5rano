@@ -142,6 +142,19 @@ export interface DiscoveryCriterionCheck {
   metricKey: string;
   baseline: number | null;
   variant: number | null;
+  /**
+   * Whether this comparison could settle the criterion AT ALL. False when the
+   * metric is absent, or when the relation needs an ordered series that a
+   * two-arm comparison does not have (`falsificationRelation.ts`'s
+   * SERIES_ONLY_RELATIONS).
+   *
+   * It is a separate field from `met` on purpose. Collapsing the two — reading
+   * `applicable && met` into one boolean — makes "we could not test this"
+   * indistinguishable from "we tested it and it failed", which is how an
+   * untested criterion turns into a falsification-flavoured verdict.
+   */
+  applicable: boolean;
+  /** Meaningful ONLY when `applicable` is true. */
   met: boolean;
   explanation: string;
 }

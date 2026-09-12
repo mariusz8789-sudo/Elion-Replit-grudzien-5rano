@@ -369,6 +369,103 @@ export function peresHorodeckiTest(rho: DensityMatrix, dimA: number, dimB: numbe
 }
 
 // ---------------------------------------------------------------------------
+// Realignment / CCNR criterion — the second, INDEPENDENT separability test
+// ---------------------------------------------------------------------------
+
+export interface RealignmentResult {
+  /** ||R(rho)||_1, the trace norm of the realigned matrix. */
+  readonly traceNorm: number;
+  /** Computable Cross-Norm / Realignment says: > 1 implies ENTANGLED. <= 1 decides nothing. */
+  readonly entangled: boolean;
+  /** How far past 1 the norm is — 0 when the criterion is silent. */
+  readonly margin: number;
+}
+
+/**
+ * The CCNR (computable cross-norm / realignment) criterion.
+ *
+ * WHY THIS EXISTS ALONGSIDE PPT, AND WHY IT IS NOT A DUPLICATE. Peres-Horodecki
+ * is necessary and sufficient ONLY in 2x2 and 2x3. Above that a PPT state can
+ * still be entangled — "bound" entanglement — and PPT cannot see it at all. CCNR
+ * is a DIFFERENT, independent criterion that can: it detects some states PPT
+ * misses, and misses some states PPT detects. Neither subsumes the other, which
+ * is exactly why having only one of them leaves the claim "PPT settles
+ * separability" untestable in this codebase.
+ *
+ * The realignment: R(rho)[(i,j),(k,l)] = rho[(i,k),(j,l)]. Its singular values
+ * are the square roots of the eigenvalues of R^dagger R, which is Hermitian and
+ * positive semidefinite by construction — so the existing Hermitian eigensolver
+ * covers it and no SVD is introduced.
+ *
+ * ONE DIRECTION ONLY, and the type says so. `entangled: false` means the
+ * criterion is SILENT, never that the state is separable. Reading it the other
+ * way would be the exact error this module exists to prevent.
+ */
+export function realignmentCriterion(rho: DensityMatrix, dimA: number, dimB: number): RealignmentResult {
+  if (rho.length !== dimA * dimB) {
+    throw new Error(`realignmentCriterion: matrix is ${rho.length}x${rho.length} but dimA*dimB = ${dimA * dimB}.`);
+  }
+  const rows = dimA * dimA;
+  const cols = dimB * dimB;
+  const r: C[][] = Array.from({ length: rows }, () => Array.from({ length: cols }, () => [0, 0] as C));
+  for (let i = 0; i < dimA; i++) {
+    for (let j = 0; j < dimA; j++) {
+      for (let k = 0; k < dimB; k++) {
+        for (let l = 0; l < dimB; l++) {
+          r[i * dimA + j]![k * dimB + l] = rho[i * dimB + k]![j * dimB + l]!;
+        }
+      }
+    }
+  }
+  // R^dagger R, Hermitian PSD; its eigenvalues are the squared singular values.
+  const gram: C[][] = Array.from({ length: cols }, () => Array.from({ length: cols }, () => [0, 0] as C));
+  for (let p = 0; p < cols; p++) {
+    for (let q = 0; q < cols; q++) {
+      let re = 0;
+      let im = 0;
+      for (let row = 0; row < rows; row++) {
+        const a = r[row]![p]!;
+        const b = r[row]![q]!;
+        // conj(a) * b
+        re += a[0] * b[0] + a[1] * b[1];
+        im += a[0] * b[1] - a[1] * b[0];
+      }
+      gram[p]![q] = [re, im];
+    }
+  }
+  const traceNorm = hermitianEigenvalues(gram).reduce((acc, l) => acc + Math.sqrt(Math.max(0, l)), 0);
+  return { traceNorm, entangled: traceNorm > 1 + EPS, margin: Math.max(0, traceNorm - 1) };
+}
+
+/**
+ * The Horodecki 3x3 BOUND ENTANGLED state, for 0 < a < 1.
+ *
+ * This state is the counterexample that makes "PPT implies separable" false
+ * above 2x3: it is positive under partial transpose AND entangled. Without a
+ * state like it in the codebase, the scope limit on Peres-Horodecki is a
+ * sentence in a comment rather than something a run can demonstrate.
+ *
+ * Horodecki, Horodecki & Horodecki (1998), "Mixed-State Entanglement and
+ * Distillation: Is there a Bound Entanglement in Nature?" — the a-family.
+ * Reproduced here in the computational basis; its entanglement is detected by
+ * `realignmentCriterion`, never asserted.
+ */
+export function horodeckiBoundEntangled3x3(a: number): DensityMatrix {
+  if (!(a > 0 && a < 1)) throw new Error(`horodeckiBoundEntangled3x3: a must lie strictly in (0, 1), got ${a}.`);
+  const n = 9;
+  const m: C[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => [0, 0] as C));
+  const offDiagonal = Math.sqrt(1 - a * a) / 2;
+  for (const [i, j] of [[0, 0], [0, 4], [0, 8], [4, 0], [4, 4], [4, 8], [8, 0], [8, 4]]) m[i!]![j!] = [a, 0];
+  for (const i of [1, 2, 3, 5, 7]) m[i]![i] = [a, 0];
+  m[6]![6] = [(1 + a) / 2, 0];
+  m[8]![8] = [(1 + a) / 2, 0];
+  m[6]![8] = [offDiagonal, 0];
+  m[8]![6] = [offDiagonal, 0];
+  const norm = 8 * a + 1;
+  return m.map((row) => row.map(([re, im]) => [re / norm, im / norm] as C));
+}
+
+// ---------------------------------------------------------------------------
 // Monogamy (CKW)
 // ---------------------------------------------------------------------------
 

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { C } from '../core/quantumState';
 import {
   checkCKWMonogamy, checkNoCommunication, concurrence, densityFromState, entanglementEntropyBits,
-  entropyOfFormation, hermitianEigenvalues, identity, logarithmicNegativity, maximumCHSH, negativity,
-  partialTraceA, partialTraceB, peresHorodeckiTest, renyiEntropy, schmidtDecomposition, vonNeumannEntropy,
+  entropyOfFormation, hermitianEigenvalues, horodeckiBoundEntangled3x3, identity, logarithmicNegativity,
+  maximumCHSH, negativity, partialTraceA, partialTraceB, peresHorodeckiTest, realignmentCriterion,
+  renyiEntropy, schmidtDecomposition, vonNeumannEntropy,
   type DensityMatrix,
 } from '../core/quantum/entanglementMeasures';
 
@@ -333,5 +334,76 @@ describe('no-communication theorem, demonstrated rather than asserted', () => {
     const hadamard: DensityMatrix = [[c(S), c(S)], [c(S), c(-S)]];
     const result = checkNoCommunication(densityFromState([c(0.6), c(0), c(0), c(0.8)]), 2, 2, hadamard);
     expect(result.holds).toBe(true);
+  });
+});
+
+describe('realignment (CCNR) and bound entanglement — the counterexample PPT cannot see', () => {
+  /** ||R(rho)||_1 = 2 exactly for a two-qubit maximally entangled state. */
+  it('gives exactly 2 for a Bell state', () => {
+    const result = realignmentCriterion(densityFromState(PHI_PLUS), 2, 2);
+    expect(result.traceNorm).toBeCloseTo(2, 8);
+    expect(result.entangled).toBe(true);
+  });
+
+  /** A separable state must not be flagged. 1/d for the maximally mixed state. */
+  it('stays silent on separable states rather than claiming separability', () => {
+    for (const [rho, dim] of [[maximallyMixed(4), 2], [maximallyMixed(9), 3]] as const) {
+      const result = realignmentCriterion(rho, dim, dim);
+      expect(result.traceNorm).toBeLessThanOrEqual(1 + 1e-9);
+      expect(result.entangled).toBe(false);
+      expect(result.margin).toBe(0);
+    }
+  });
+
+  /**
+   * THE POINT OF THE WHOLE PAIR OF CRITERIA. The Horodecki 3x3 a-family is
+   * positive under partial transpose AND entangled — bound entanglement. PPT
+   * therefore cannot settle separability here, and says so; CCNR, an
+   * independent criterion, detects the entanglement PPT structurally misses.
+   *
+   * This is what makes "PPT is sufficient only in 2x2 and 2x3" a checkable
+   * statement in this codebase instead of a sentence in a comment.
+   */
+  it.each([0.2, 0.5, 0.8])('the Horodecki 3x3 state at a=%f is PPT, yet CCNR proves it entangled', (a) => {
+    const rho = horodeckiBoundEntangled3x3(a);
+    // It is a real density matrix: Hermitian, trace 1, positive semidefinite.
+    expect(hermitianEigenvalues(rho).reduce((x, y) => x + y, 0)).toBeCloseTo(1, 9);
+    for (const l of hermitianEigenvalues(rho)) expect(l).toBeGreaterThan(-1e-9);
+
+    const ppt = peresHorodeckiTest(rho, 3, 3);
+    expect(ppt.positiveUnderPartialTranspose).toBe(true);
+    expect(ppt.decisiveForSeparability).toBe(false);
+    expect(ppt.verdict).toBe('PPT_BUT_UNDECIDED');
+    expect(negativity(rho, 3, 3)).toBeCloseTo(0, 9);
+
+    const ccnr = realignmentCriterion(rho, 3, 3);
+    expect(ccnr.traceNorm).toBeGreaterThan(1);
+    expect(ccnr.entangled).toBe(true);
+  });
+
+  it('refuses a parameter outside the family range instead of returning a matrix for it', () => {
+    expect(() => horodeckiBoundEntangled3x3(0)).toThrow(/strictly in/);
+    expect(() => horodeckiBoundEntangled3x3(1)).toThrow(/strictly in/);
+  });
+
+  /**
+   * MEASURED, AFTER AN ASSUMPTION OF MINE TURNED OUT WRONG. I expected the two
+   * criteria to disagree somewhere on the Werner family. They do not: the
+   * realigned trace norm is exactly (1 + 3p)/2, which crosses 1 at exactly
+   * p = 1/3 — the SAME threshold PPT gives, which in 2x2 is the true
+   * separability boundary. On this family the two agree everywhere.
+   *
+   * So the non-subsumption is not visible here, and claiming it here would have
+   * been a fabricated illustration. It is visible in the Horodecki 3x3 case
+   * above, where CCNR sees entanglement PPT structurally cannot.
+   */
+  it('on the Werner family CCNR follows (1+3p)/2 and crosses 1 at exactly the PPT threshold', () => {
+    for (const p of [0, 0.2, 0.3, 1 / 3, 0.5, 0.8, 1]) {
+      expect(realignmentCriterion(werner(p), 2, 2).traceNorm).toBeCloseTo((1 + 3 * p) / 2, 8);
+    }
+    expect(realignmentCriterion(werner(1 / 3), 2, 2).traceNorm).toBeCloseTo(1, 9);
+    expect(realignmentCriterion(werner(0.32), 2, 2).entangled).toBe(false);
+    expect(realignmentCriterion(werner(0.34), 2, 2).entangled).toBe(true);
+    expect(peresHorodeckiTest(werner(0.34), 2, 2).verdict).toBe('ENTANGLED');
   });
 });

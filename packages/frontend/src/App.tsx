@@ -21,6 +21,10 @@ import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboardin
 import { playEnterLab } from './core/sound';
 import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
+import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
+import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
+import { isSuppressed as isMatrixBackgroundSuppressed } from './components/MatrixDataStream';
+import { listExperiments } from './core/scienceMemory';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -914,10 +918,30 @@ export default function App() {
     );
   };
 
+  // Real, honest signals only (see genesisVisualState.ts's own doc): the
+  // record count is a genuine read of Science Memory; the other three
+  // signals are not yet wired to a cheap, honest global source at this
+  // App-level scope (a real-time "is a Campaign running right now" /  "is a
+  // capability blocked" check), so they stay `false` rather than guessed —
+  // `deriveGenesisVisualState` degrades gracefully to IDLE/ACTIVE off the
+  // record count alone when they are. A real follow-up, not a fabrication.
+  const genesisVisualState = deriveGenesisVisualState({
+    runInProgress: false,
+    needsAttention: false,
+    hasOpenInvestigation: false,
+    savedExperimentCount: (() => { try { return listExperiments().length; } catch { return 0; } })(),
+  });
+  const matrixBackgroundSuppressed = isMatrixBackgroundSuppressed(window.location.hash);
+
   return (
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
+      {!matrixBackgroundSuppressed && (
+        <ErrorBoundary>
+          <LiveMatrixBackground className="matrix-datastream" {...toMatrixConfig(genesisVisualState)} />
+        </ErrorBoundary>
+      )}
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —

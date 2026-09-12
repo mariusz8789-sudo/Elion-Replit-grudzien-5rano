@@ -101,12 +101,25 @@ describe('the component is standalone — the dependency arrow points one way', 
     }
   });
 
-  it('is not wired into the application yet — integration is a separate, explicit decision', () => {
+  /**
+   * Integration happened (App.tsx now mounts `LiveMatrixBackground`) — the
+   * boundary this test now protects is HOW: only through the adapter, never
+   * by an app file reaching past it into `matrixEngine`/`matrixController`
+   * directly, which would let Genesis-side code start hand-rolling the
+   * translation `genesisVisualState.ts` exists to own exclusively.
+   */
+  it('the app wires the component only through the genesisVisualState adapter, never around it', () => {
     const appFiles = [join(process.cwd(), 'src', 'App.tsx'), join(process.cwd(), 'src', 'main.tsx')];
+    let mountedSomewhere = false;
     for (const file of appFiles) {
       const source = readOrNull(file);
       if (source === null) continue;
-      expect(source.includes('liveMatrix'), `${file} already mounts the background`).toBe(false);
+      if (!source.includes('liveMatrix')) continue;
+      mountedSomewhere = true;
+      expect(source.includes('genesisVisualState'), `${file} mounts liveMatrix without going through genesisVisualState`).toBe(true);
+      expect(source.includes('matrixEngine'), `${file} reaches past the adapter into matrixEngine directly`).toBe(false);
+      expect(source.includes('matrixController'), `${file} reaches past the adapter into matrixController directly`).toBe(false);
     }
+    expect(mountedSomewhere, 'expected at least one app file to mount the background').toBe(true);
   });
 });

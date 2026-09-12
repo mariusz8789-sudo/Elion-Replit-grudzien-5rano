@@ -22,10 +22,22 @@ describe('MatrixDataStream — SUPPRESSED_ROUTES / isSuppressed', () => {
     expect(isSuppressed('#/lab/')).toBe(true);
   });
 
-  it('does NOT suppress Home, Genesis World, or other non-3D routes', () => {
-    for (const route of ['#/', '', '#/world', '#/dashboard', '#/campaign', '#/evidence']) {
+  it('does NOT suppress Home or other non-3D routes', () => {
+    for (const route of ['#/', '', '#/dashboard', '#/campaign', '#/evidence']) {
       expect(isSuppressed(route)).toBe(false);
     }
+  });
+
+  /**
+   * `#/world` above is not a route App.tsx dispatches at all — the real
+   * flagship 3D screen is `#/genesis-world` (`parseHash`'s `kind:
+   * 'genesis-world'`), and it IS a full-viewport 3D renderer by this file's
+   * own stated rule, so it belongs in `SUPPRESSED_ROUTES` alongside
+   * `#/city3d`/`#/scientific-city` — verified explicitly here rather than
+   * assumed, since the original hand-written list omitted it.
+   */
+  it('suppresses #/genesis-world — the flagship Trinity-demo 3D screen', () => {
+    expect(isSuppressed('#/genesis-world')).toBe(true);
   });
 
   it('does not false-positive on a route that merely starts with a suppressed one as a substring, not a real segment', () => {

@@ -41,7 +41,7 @@ import { kindsOf } from './GenesisMatrixHub';
  * list rather than a second one that could silently drift from it.
  */
 export const SUPPRESSED_ROUTES: readonly string[] = [
-  '#/city3d', '#/city', '#/scientific-city', '#/first-person-lab', '#/lab-3d',
+  '#/city3d', '#/city', '#/scientific-city', '#/genesis-world', '#/first-person-lab', '#/lab-3d',
   '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo',
   '#/hf-slice', '#/reality', '#/prebuild', '#/timeline',
 ];

@@ -97,6 +97,11 @@ export function compileSpecification(spec: WorldSpecification): CompiledSpecific
     seed: spec.seed,
     startSimulatedTime: 0,
     provenanceNote: spec.provenanceNote ?? `Compiled from WorldSpecification "${spec.worldId}" (templates: ${spec.worldType.join(' + ')}).`,
+    // Structured provenance, independent of whatever provenanceNote text a
+    // caller supplies above — see WorldBlueprint's own doc on why this can't
+    // be left to the free-text note alone.
+    templateIds: spec.worldType,
+    levelOfDetail: spec.levelOfDetail,
     root: {
       ref: { kind: rootKind, id: spec.worldId },
       label: `Generated World (${spec.worldType.join(' + ')})`,

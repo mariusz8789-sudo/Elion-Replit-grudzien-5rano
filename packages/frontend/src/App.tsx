@@ -47,6 +47,7 @@ const GeodesicWorldScreen = lazy(() => import('./components/GeodesicWorldScreen'
 const WorldProposalScreen = lazy(() => import('./components/WorldProposalScreen').then((m) => ({ default: m.WorldProposalScreen })));
 const CalibrationInquiryScreen = lazy(() => import('./components/CalibrationInquiryScreen').then((m) => ({ default: m.CalibrationInquiryScreen })));
 const AutonomousInquiryScreen = lazy(() => import('./components/AutonomousInquiryScreen').then((m) => ({ default: m.AutonomousInquiryScreen })));
+const EntanglementMeasuresScreen = lazy(() => import('./components/EntanglementMeasuresScreen').then((m) => ({ default: m.EntanglementMeasuresScreen })));
 const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
 const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
@@ -108,6 +109,7 @@ type Route =
   | { kind: 'world-proposal' }
   | { kind: 'calibration' }
   | { kind: 'inquiry' }
+  | { kind: 'entanglement' }
   | { kind: 'what-if' }
   | { kind: 'timeline'; mode?: 'cosmic' | 'place' }
   | { kind: 'decision-explorer' }
@@ -154,6 +156,7 @@ function parseHash(): Route {
   if (h === '#/world-proposal') return { kind: 'world-proposal' };
   if (h === '#/calibration') return { kind: 'calibration' };
   if (h === '#/inquiry') return { kind: 'inquiry' };
+  if (h === '#/entanglement') return { kind: 'entanglement' };
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline' || h === '#/timeline?mode=cosmic') return { kind: 'timeline', mode: 'cosmic' };
   if (h === '#/timeline?mode=place') return { kind: 'timeline', mode: 'place' };
@@ -437,6 +440,18 @@ export default function App() {
           <TopBar title="🔬 Autonomiczne dochodzenie" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <AutonomousInquiryScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'entanglement') {
+      return (
+        <div className="app">
+          <TopBar title="🔗 Miary splątania" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <EntanglementMeasuresScreen />
           </HeavyRoute>
           {overlays}
         </div>

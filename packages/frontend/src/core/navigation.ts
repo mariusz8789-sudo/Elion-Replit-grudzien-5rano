@@ -111,6 +111,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'world-proposal', label: 'Zaproponuj świat', icon: '🧩', hash: '#/world-proposal' },
   { id: 'calibration', label: 'Ile trwa okres zakaźności?', icon: '🔎', hash: '#/calibration' },
   { id: 'inquiry', label: 'Autonomiczne dochodzenie', icon: '🔬', hash: '#/inquiry' },
+  { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement' },
 ];
 
 /** Flat view, for lookups and for the mobile primary bar. */

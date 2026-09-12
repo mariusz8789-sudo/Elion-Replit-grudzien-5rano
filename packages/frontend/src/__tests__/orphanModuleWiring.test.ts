@@ -482,6 +482,67 @@ describe('one report renders every strategy, because they share one contract', (
   });
 });
 
+describe('the entanglement measures are reachable and stay a measurement layer', () => {
+  const screen = read('components', 'EntanglementMeasuresScreen.tsx');
+
+  it('is a real route with a real menu entry', () => {
+    expect(read('App.tsx')).toMatch(/#\/entanglement/);
+    expect(read('core', 'navigation.ts')).toMatch(/#\/entanglement/);
+  });
+
+  it('calls the real measures rather than computing any of them in the view', () => {
+    expect(screen).toMatch(/concurrence\s*\(/);
+    expect(screen).toMatch(/peresHorodeckiTest\s*\(/);
+    expect(screen).toMatch(/maximumCHSH\s*\(/);
+    expect(screen).toMatch(/checkCKWMonogamy\s*\(/);
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // A log or a sqrt here would mean the screen started deriving a measure.
+    expect(code).not.toMatch(/Math\.(log|log2)\s*\(/);
+  });
+
+  /**
+   * NOT A SECOND LAB. `labs/experiments/quantum-chsh.ts` is the entanglement
+   * lab and is untouched; this screen answers HOW MUCH, which no screen could.
+   * Importing the lab or re-deriving its correlations here would be exactly the
+   * duplication the repo forbids.
+   */
+  it('does not duplicate the existing CHSH laboratory', () => {
+    // Comments stripped first — the screen's own doc has to be able to NAME
+    // quantum-chsh.ts while explaining why it is not a second one of it. Same
+    // rule as liveMatrixBoundary.test.tsx: what the code touches, not which
+    // words the rationale may use.
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/quantum-chsh|singletCorrelation|sampleSingletPair/);
+  });
+
+  /**
+   * For a MIXED state the reduced entropy counts classical mixing too, so
+   * presenting it as an entanglement measure would be wrong. The screen has to
+   * say which number to read instead.
+   */
+  it('warns that reduced entropy is not an entanglement measure for a mixed state', () => {
+    expect(screen).toMatch(/nie jest miarą splątania/);
+  });
+
+  /**
+   * The Werner family separates at p = 1/3 but only violates CHSH at
+   * p = 1/sqrt(2). A screen that let a reader conflate "entangled" with
+   * "violates Bell" would be teaching the single most common error in the
+   * subject, so that gap is called out explicitly.
+   */
+  it('calls out an entangled state that cannot violate CHSH', () => {
+    expect(screen).toMatch(/data-testid="entangled-not-violating"/);
+    expect(screen).toMatch(/nie są synonimy/);
+  });
+
+  /** The no-FTL rule is exhibited numerically, not merely repeated. */
+  it('demonstrates the no-communication theorem instead of asserting it', () => {
+    expect(screen).toMatch(/checkNoCommunication\s*\(/);
+    expect(screen).toMatch(/data-testid="no-communication"/);
+    expect(screen).toMatch(/NIE pozwala przesłać informacji szybciej niż światło/);
+  });
+});
+
 describe('the dead duplicate is gone, not merely unused', () => {
   /**
    * `MissionStatusBar.tsx` rendered narrator/AI-health/lab-count/visited from

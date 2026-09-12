@@ -1008,5 +1008,13 @@ raportów w repo" — tekst nadal nie wszedł.
   działania**: wklejenie realnej, pełnej odpowiedzi Qwena (oba prompty) do
   sesji, zanim P2.2 i reszta P2.3 mogą ruszyć.
 
-Priorytet NIE ZAMKNIĘTY: P2.3 (druga kotwica) = `BLOCKED — brak dostępu do
-źródła`. P2.2 (Solar ingestion) = `BLOCKED — brak treści źródłowej od Qwena`.
+Priorytet CZĘŚCIOWO ZAMKNIĘTY po tym wpisie: P2.3 (druga kotwica, Kepler) =
+`BLOCKED — brak dostępu do źródła`, wciąż otwarte. P2.2 (Solar ingestion) —
+**ZAMKNIĘTE zaraz po tym wpisie C3**, przez C1: treść, którą C3 słusznie
+uznał za brakującą w repo, dotarła do C1 wprost w rozmowie z userem (po tym,
+jak trafiła najpierw do C3 przez pomyłkę, opisaną wcześniej w tym pliku) —
+`knowledge/SOLAR_MIND_MASTER_REPORT.md`/`SOLAR_MIND_EXPANSION.md` zapisane
+dosłownie, z tabelą statusu H051–H056 na wzór QE1–QE7. Diagnoza C3
+(„tekst nigdzie w repo, nie da się uczciwie napisać z opisu zadania") była w
+100% trafna w momencie jej postawienia — commit C1 jest PO tym wpisie, nie
+przeczy mu.

@@ -50,7 +50,11 @@ jobs:
 
       - name: Testy backend
         env:
-          GENESIS_CERN_OPEN_DATA_DIR: packages/backend/src/compute/cms-zmumu
+          # `npm run test --workspace=...` runs with cwd=packages/backend, so a
+          # RELATIVE path here would resolve as packages/backend/packages/backend/...
+          # (the test's own worker does Path(root) / 'Zmumu.csv' with no cwd
+          # normalization) -- must be absolute, from ${{ github.workspace }}.
+          GENESIS_CERN_OPEN_DATA_DIR: ${{ github.workspace }}/packages/backend/src/compute/cms-zmumu
         run: npm run test --workspace=packages/backend
 
       - name: Typecheck frontend

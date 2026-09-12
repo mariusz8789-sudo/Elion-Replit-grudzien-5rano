@@ -178,6 +178,40 @@ describe('QE3 — PPT sees nothing, and a second criterion decides the whole inq
   });
 });
 
+describe('QE1 with a genuinely misspecified world: no candidate is true, so none should survive', () => {
+  /**
+   * p = 0.6 is not any of QE1_CANDIDATES' declared visibilities (1.00, 0.92,
+   * 0.72, 0.50). This is the loop's OTHER honest outcome, distinct from
+   * "narrowed to two" (QE1's usual demo) and from "recovered exactly one"
+   * (QE2/QE3's demos): a correct ending WITHOUT resolution, because the world
+   * never matched any declared hypothesis in the first place. Rejecting every
+   * candidate here is the right answer, not a recovery failure — the
+   * AutonomousInquiryScreen demo built on this exact call must not blame the
+   * agent for what the world simply isn't (see its `qe1-misspecified` entry).
+   */
+  const result = runAutonomousInquiry(qe1VisibilityInquiry(0.6));
+
+  it('rejects every declared candidate and stops because none is left, not because it ran out of rounds', () => {
+    expect(result.survivingHypothesisIds).toEqual([]);
+    expect([...result.falsifiedHypothesisIds].sort()).toEqual(['h:classical', 'h:good', 'h:ideal', 'h:marginal']);
+    expect(result.stopReason).toBe('NO_CONTENDERS_LEFT');
+  });
+
+  it('still ran a real, multi-round, Tautology-Gate-uncapped inquiry — this is a real result, not an admission failure', () => {
+    expect(result.rounds.length).toBeGreaterThanOrEqual(2);
+    expect(result.tautologyAssessment?.classification).toBe('EMPIRICAL_TEST');
+    for (const round of result.rounds) expect(round.runFingerprint).toMatch(/\S/);
+    // Round 1 (full depolarisation) predicts 0 for every candidate by
+    // construction — the uninformative opening every QE1 demo shares — so real
+    // belief movement only shows up once the probe leaves it; every falsified
+    // outcome from round 2 on genuinely moved confidence, uncapped by the Gate.
+    for (const o of result.rounds[1]!.outcomes) {
+      expect(o.evidenceMagnitude).toBeGreaterThan(0);
+      expect(o.confidenceAfter).toBeLessThan(o.confidenceBefore);
+    }
+  });
+});
+
 describe('the mandatory cycle is present in every round of all three inquiries', () => {
   it.each([
     ['QE1', qe1VisibilityInquiry()],

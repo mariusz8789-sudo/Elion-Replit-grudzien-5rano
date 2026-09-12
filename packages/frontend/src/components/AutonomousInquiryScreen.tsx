@@ -70,8 +70,14 @@ interface Problem {
    * The hypothesis id the world REALLY matches — a control, never given to the
    * loop. Kept here so the screen can say afterwards whether the inquiry
    * recovered it; without that, "it narrowed to two" is unreadable.
+   *
+   * `null` marks a DELIBERATELY MISSPECIFIED problem: the world's real value is
+   * not any declared candidate's. There, zero survivors is not a recovery
+   * failure — it is the correct, honest answer ("none of these fits"), and the
+   * verdict text below must not blame the agent for what the world simply
+   * isn't.
    */
-  readonly truthHypothesisId: string;
+  readonly truthHypothesisId: string | null;
   readonly build: () => InquiryLoopInput;
 }
 
@@ -152,6 +158,20 @@ const PROBLEMS: readonly Problem[] = [
     candidates: QE3_CANDIDATES.map((c) => `${c.id}: a = ${c.a.toFixed(1)} — ${QE3_PL[c.id]}`),
     truthHypothesisId: 'h:a-0.4', // a = 0.4
     build: () => qe3BoundEntanglementInquiry(0.4),
+  },
+  {
+    id: 'qe1-misspecified',
+    label: 'QE1 (świat niedopasowany) — źródło o widzialności spoza żadnego z kandydatów',
+    opening: `szum biały w = ${QE1_OPENING_NOISE} (pełna depolaryzacja — max CHSH dokładnie 0 dla każdego kandydata)`,
+    probes: QE1_PROBE_NOISE.join(', '),
+    candidates: QE1_CANDIDATES.map((c) => `${c.id}: p = ${c.visibility.toFixed(2)} — ${QE1_PL[c.id]}`),
+    // p = 0.60 nie jest ŻADNYM z czterech zadeklarowanych kandydatów (1.00,
+    // 0.92, 0.72, 0.50) — celowa, jawna niedospecyfikowana sprawa: świat nie
+    // odpowiada żadnej hipotezie, więc poprawną odpowiedzią jest odrzucić
+    // wszystkie cztery, nie "odzyskać" żadnej. Zweryfikowane bezpośrednim
+    // wywołaniem: surviving=[], falsified=wszystkie 4, stopReason=NO_CONTENDERS_LEFT.
+    truthHypothesisId: null,
+    build: () => qe1VisibilityInquiry(0.6),
   },
 ];
 
@@ -246,13 +266,21 @@ export function AutonomousInquiryScreen() {
               common outcome here and is reported as one, not as a failure. */}
           <section className="pilot-step">
             <p className="pilot-summary" data-testid="inquiry-verdict">
-              {run.surviving.length === 0
-                ? `Żadna hipoteza nie przetrwała. Świat odpowiadał hipotezie ${problem.truthHypothesisId} — agent jej nie odzyskał.`
-                : run.surviving.length === 1 && run.surviving[0] === problem.truthHypothesisId
-                  ? `ODZYSKANY: została wyłącznie ${problem.truthHypothesisId} — dokładnie ta, której odpowiadał świat.`
-                  : run.surviving.includes(problem.truthHypothesisId)
-                    ? `ZAWĘŻONE, NIEROZSTRZYGNIĘTE: prawdziwa hipoteza (${problem.truthHypothesisId}) przetrwała razem z ${run.surviving.filter((id) => id !== problem.truthHypothesisId).join(', ')}. Przy dostępnych wartościach próbnych dane nie oddzieliły ich od siebie — to zapisane ograniczenie tego dochodzenia, nie wynik do ukrycia.`
-                    : `BŁĄD ODZYSKANIA: przetrwały ${run.surviving.join(', ')}, a świat odpowiadał ${problem.truthHypothesisId}. Agent sfalsyfikował prawdziwą hipotezę — to poważny wynik i jest pokazany wprost.`}
+              {problem.truthHypothesisId === null
+                ? // Deliberately misspecified problem: no candidate was ever true, so
+                  // rejecting all of them is the CORRECT answer, not a recovery
+                  // failure. Any survivor here would instead be the real finding —
+                  // a candidate close enough to pass at this tolerance.
+                  (run.surviving.length === 0
+                    ? `POPRAWNE ZAKOŃCZENIE BEZ ROZSTRZYGNIĘCIA: żadna z ${run.falsified.length} zadeklarowanych hipotez nie pasowała do świata — sprawa jest CELOWO niedospecyfikowana (prawdziwa wartość nie jest żadnym kandydatem). Odrzucenie wszystkich jest tu poprawnym wynikiem, nie porażką agenta.`
+                    : `Mimo niedospecyfikowania, ${run.surviving.join(', ')} przetrwał(y) przy dostępnej tolerancji — realny wynik: żaden kandydat nie jest dokładny, ale ${run.surviving.length === 1 ? 'ten' : 'te'} nie dają się jeszcze odróżnić od prawdziwej wartości tym pomiarem.`)
+                : (run.surviving.length === 0
+                    ? `Żadna hipoteza nie przetrwała. Świat odpowiadał hipotezie ${problem.truthHypothesisId} — agent jej nie odzyskał.`
+                    : run.surviving.length === 1 && run.surviving[0] === problem.truthHypothesisId
+                      ? `ODZYSKANY: została wyłącznie ${problem.truthHypothesisId} — dokładnie ta, której odpowiadał świat.`
+                      : run.surviving.includes(problem.truthHypothesisId)
+                        ? `ZAWĘŻONE, NIEROZSTRZYGNIĘTE: prawdziwa hipoteza (${problem.truthHypothesisId}) przetrwała razem z ${run.surviving.filter((id) => id !== problem.truthHypothesisId).join(', ')}. Przy dostępnych wartościach próbnych dane nie oddzieliły ich od siebie — to zapisane ograniczenie tego dochodzenia, nie wynik do ukrycia.`
+                        : `BŁĄD ODZYSKANIA: przetrwały ${run.surviving.join(', ')}, a świat odpowiadał ${problem.truthHypothesisId}. Agent sfalsyfikował prawdziwą hipotezę — to poważny wynik i jest pokazany wprost.`)}
             </p>
           </section>
           {(admissionStatus !== null && admissionStatus !== 'REAL') && (

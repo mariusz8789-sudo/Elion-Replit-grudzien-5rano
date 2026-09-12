@@ -173,17 +173,47 @@ it needs its own short ADR (mirroring D-021's process) deciding the new
 `SavedExperiment` shape's contract — not a decision this task should make by
 building it silently.
 
-## 8. Real Chromium E2E (Phase 7)
+**UPDATE (2026-09-13, QE4-integration round) — the recommendation above was
+acted on, and the "11th `SavedExperiment` shape" option was explicitly
+REJECTED once actually assessed against `externalAnchor.ts`'s own precedent.**
+QE4 is a pinned, deterministic, no-user-trigger dataset anchor — the closest
+existing analog (`externalAnchor.ts`'s PubChem/Kepler-Mars) has NO
+`scienceMemory.ts` persistence at all; it renders live from a static
+registry. Building an 11th persisted shape for QE4 would have been building
+machinery its own closest analog does not have. Instead, per `docs/DECISIONS.md`
+D-024, a single new, minimal, domain-agnostic module —
+`core/agent/externalDatasetCase.ts` — was built to hold "N independent
+co-equal verdicts over one external dataset" without collapsing them, reusing
+`assessTautology`/`beliefRevision.ts`/`fnv1a` unmodified. The only QE4-specific
+file is `core/biotechData/qe4EvidenceCase.ts` (pure reshaping, zero scientific
+logic). `#/evidence` now renders all four verdicts live via a new
+`MultiHypothesisCasesSection`, and `qe4BrydgesAnalysis.ts`/
+`qe4BrydgesEstimator.ts` are genuinely reachable from `main.tsx` — removed
+from `moduleReachability.test.ts`'s `ALLOWED_ORPHANS`. P1–P4's verdicts,
+thresholds, preregistration, and bootstrap are byte-for-byte unchanged
+(`resultFingerprint` still `a6578ae8`). See D-024 for the full comparison
+against the two rejected alternatives.
 
-No new UI screen was built for QE4, per Phase 7's explicit instruction not to
-invent one when no suitable existing UI exists (§7 above explains why none
-does, architecturally). The "real E2E" for this task is
-`node scripts/repro-demo.mjs` itself: a real Node process, real esbuild
-bundle of the actual TypeScript source (not a mock), real file reads of the
-pinned CSVs, real computation, exit code 0/1 — verified above with real
-output. This mirrors exactly how the two existing External Anchors (PubChem,
-Kepler/Mars) are already "E2E-tested" in this repo — through this same
-script, not a browser.
+## 8. Real Chromium E2E (Phase 7 at the time; superseded below)
+
+No new UI screen was built for QE4 in the original Phase 0-8 round, per
+Phase 7's explicit instruction not to invent one when no suitable existing
+UI exists (§7 above explains why none did, architecturally, AT THAT TIME).
+The "real E2E" for that round was `node scripts/repro-demo.mjs` itself: a
+real Node process, real esbuild bundle of the actual TypeScript source (not
+a mock), real file reads of the pinned CSVs, real computation, exit code
+0/1 — verified above with real output.
+
+**UPDATE (2026-09-13, QE4-integration round):** `#/evidence` now DOES
+display QE4 (see §7's update). A real Chromium E2E now also exists for it:
+`scripts/qe4-evidence-case-e2e.mjs`, run against a real `vite preview`
+server with real Playwright + Chromium (desktop and mobile viewports),
+asserting all four hypothesis cards, their Tautology Gate classifications,
+belief revision, next questions, the case-level provenance/fingerprint
+block, the un-collapsed verdict tally, zero console/page errors, and that
+the pre-existing PubChem/Kepler-Mars anchors still render (regression). Both
+`repro-demo.mjs` and this new script now pass side by side — the old
+"backend/service path" proof was not removed, a UI proof was added on top.
 
 ## 9. Quality gate (Phase 8)
 
@@ -207,4 +237,11 @@ See the task's final report (chat) for command-by-command output:
   does not affect any of P1–P4's claims (all invariant under relabeling),
   would matter for a claim about one specific physical ion, which none of
   P1–P4 make.
-- `#/evidence` does not display QE4 — see §7's architectural-gap note.
+- ~~`#/evidence` does not display QE4~~ — RESOLVED 2026-09-13, see §7's update
+  and `docs/DECISIONS.md` D-024: it now does, through a new, minimal,
+  domain-agnostic `externalDatasetCase.ts` module, not a QE4-specific hack.
+- The `EvidenceShowcaseScreen` route's browser chunk grew to ~3.25 MB
+  (~1.3 MB gzipped) now that it bundles QE4's pinned CSV dataset for the
+  live, in-browser recomputation — a real, disclosed consequence of shipping
+  real data to the browser, not a defect, and not addressed further here
+  (out of this round's "smallest reusable solution" scope).

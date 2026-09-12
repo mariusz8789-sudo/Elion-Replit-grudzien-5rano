@@ -137,6 +137,34 @@ zadaniu — wszystko inne to podłączenie do istniejącej maszynerii.
    dla nowego, nieoczekiwanego wyniku POZA samą adjudykacją.
 8. Pełna bramka przed pushem: eslint, tsc, oba suite'y, build, `node scripts/repro-demo.mjs`.
 
+## POLICY SAFETY BOUNDARY — twarda granica, nie luka
+
+Ten eksperyment jest CELOWO zaprojektowany jako **niezależna adjudykacja dowodowa**: rozstrzyga
+sprzeczne opublikowane szacunki (Tong 2025 vs TfL) na surowych odczytach monitorów DEFRA/AURN, z
+jawnym werdyktem SUPPORTED/FALSIFIED/INCONCLUSIVE i jawnym oznaczeniem, co jest pomiarem, co
+modelem statystycznym, a co założeniem przyczynowym. To NIE jest luka do domknięcia w
+przyszłości — to trwała granica funkcji, obowiązująca DZIŚ i w KAŻDEJ przyszłej rozbudowie tego
+modułu (`causalInference.ts`/CAP-2 i wszystkiego, co go użyje: Szkocja MUP, Francja 80 km/h, inne
+LEZ/CAZ):
+
+1. **Nigdy** dekret, nakaz ani „rekomendacja dla rządu" sformułowana jako decyzja — silnik nie
+   jest organem władzy publicznej i nie wolno mu udawać, że nim jest.
+2. **Nigdy** twierdzenie przyczynowe silniejsze niż to, na co pozwalają założenia
+   identyfikacyjne (równoległe trendy przed leczeniem, brak różnicowych szoków) — werdykt musi
+   zawsze jawnie oznaczać, które elementy są pomiarem (surowe odczyty), które modelem
+   (DiD/ITS/synthetic-control), a które założeniem (parallel trends, brak szoków), i nie wolno
+   mu tego zatrzeć w podsumowaniu ani w UI.
+3. Decyzję o polityce (utrzymać/rozszerzyć/wycofać ULEZ lub jakąkolwiek inną interwencję)
+   podejmuje rząd, samorząd lub regulator — **nigdy silnik**. Werdykt Genesis jest materiałem do
+   decyzji (dowód z oceną + odcisk palca + replay), nie decyzją ani zaleceniem politycznym.
+4. Ta granica dotyczy WYNIKU (co wolno powiedzieć), nie tylko UI — jeśli werdykt trafi kiedyś do
+   `#/evidence`, do raportu grantowego, do komunikatu prasowego albo do jakiegokolwiek
+   przyszłego ekranu, sformułowanie MUSI zachować dokładnie to ograniczenie (adjudykacja z
+   zastrzeżeniami, nie dekret), niezależnie od tego, kto go tam wstawi.
+5. Żadna przyszła rozbudowa CAP-2 (kolejne interwencje polityki publicznej, kolejne miasta/kraje,
+   kolejne zanieczyszczenia) nie może po cichu przekroczyć tej granicy — rozszerzenie zakresu
+   wymaga jawnej decyzji użytkownika, tej samej rangi co decyzja o zbudowaniu tego eksperymentu.
+
 ## DONE
 
 - `causalInference.ts` (albo analogicznie nazwany moduł) — nowy, ogólny, TESTOWANY estymator
@@ -148,6 +176,9 @@ zadaniu — wszystko inne to podłączenie do istniejącej maszynerii.
 - DiD/ITS/synthetic-control realnie policzone, kontrole negatywne realnie przeszły, Tautology
   Gate `MIXED_TEST`, replay MATCH.
 - Werdykt adjudykacyjny wobec Tonga i TfL, z pełną prowieniencją.
+- Werdykt sformułowany WYŁĄCZNIE jako dowód z oceną (SUPPORTED/FALSIFIED/INCONCLUSIVE + jawne
+  oznaczenie pomiar/model/założenie) — patrz POLICY SAFETY BOUNDARY — bez dekretu, bez
+  rekomendacji politycznej, bez twierdzeń przyczynowych ponad założenia identyfikacyjne.
 - `docs/RISKS.md`/`docs/MASTER_PRIORITY_GENESIS.md` zaktualizowane z realnym dowodem.
 - Jeśli którykolwiek z `[NOT VERIFIED]` punktów pakietu okaże się nie do zweryfikowania —
   zadanie kończy się `BLOCKED` z nazwanym powodem, nie improwizacją.

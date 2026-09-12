@@ -39,6 +39,20 @@ ponownie zaproponować i ponownie wykonać cząsteczkę, którą poprzednia kamp
 `packages/backend/src/campaign/persistence.mjs::listCandidates(db, campaignId, generation)`
 jest zawężone do JEDNEGO `campaignId` — nie ma żadnej funkcji odpytującej WSZYSTKIE kampanie.
 
+**AKTUALIZACJA (zweryfikowana bezpośrednio w kodzie, po napisaniu pierwszej wersji tego promptu):
+luka jest SZERSZA, niż opisano wyżej, i to zmienia zakres zadania.** `runCampaign`
+(`orchestrator.mjs`) nie tylko nie widzi innych kampanii — on nie wczytuje NICZEGO nawet
+dla WŁASNEJ kampanii. `listCandidates` nie jest w tym pliku w ogóle zaimportowane, a
+`seenCanonical`, `retained`, `history` i `generation` są inicjalizowane od zera przy każdym
+wywołaniu. Konsekwencja, którą MUSISZ sprawdzić i potwierdzić albo obalić własnym testem,
+zanim cokolwiek napiszesz: `api.mjs` pozwala wystartować kampanię ze statusu `cancelled`,
+a `campaign_candidates` nie ma UNIQUE na `canonical_smiles` — więc wznowiona kampania
+prawdopodobnie wstawia PONOWNIE własne wiersze generacji 0, z tym samym `campaign_id`.
+Jeśli to się potwierdzi, jest to poważniejszy błąd niż brak dedupu międzykampanijnego i ma
+pierwszeństwo. Drobiazg z tej samej okolicy: duplikat w generacji 0 jest porzucany po cichu
+(`continue`, bez wiersza w bazie), a duplikat w generacji ≥1 dostaje wiersz z
+`rejectedReason: 'duplicate'` — te dwie ścieżki są niespójne.
+
 ## Zadanie — dokładnie to, co audyt zaproponował w sekcji E, punkty 1-2
 
 1. **Rozszerz `campaign/persistence.mjs`**: dodaj funkcję (np. `listCandidatesAcrossCampaigns(db, { excludeCampaignId? })`
@@ -64,7 +78,8 @@ jest zawężone do JEDNEGO `campaignId` — nie ma żadnej funkcji odpytującej 
   audytu). `experimentFabric/router.ts` (17 domenIds) i `campaign/toolchain.mjs` JUŻ SĄ tym
   interfejsem domenowym.
 - NIE dotykaj `core/agent/nextAction.ts::makeCampaignNextAction` — już istnieje, już
-  zarejestrowany, nie potrzebuje szóstego selektora.
+  zarejestrowany, nie potrzebuje kolejnego selektora. (`NEXT_ACTION_SELECTORS` ma dziś SIEDEM
+  wpisów — nagłówek samego pliku mówi „FIVE" i jest nieaktualny, nie sugeruj się nim.)
 - NIE buduj przyczynowości/DiD/policy — to jest zadanie C1 (`docs/prompts/C1-B1-ulez-no2-adjudication.md`),
   osobny plik, osobna gałąź logiki, nie mieszaj.
 - Jednolitość słownictwa stopu (`InquiryStopReason` vs `DECISIONS` w `nextExperiment.mjs`) —

@@ -88,6 +88,24 @@ describe('compileSpecification (22.C)', () => {
     // Same requested structure either way.
     expect(a.blueprint.root.children?.length).toBe(b.blueprint.root.children?.length);
   });
+
+  /**
+   * PROVENANCE COMPLETENESS — checked, not assumed: WHICH templates were
+   * requested and at WHAT level of detail must survive into the compiled
+   * blueprint as STRUCTURED data, not only inside the free-text
+   * `provenanceNote` (which a caller-supplied note can silently omit —
+   * see `WorldBlueprint.templateIds`'s own doc).
+   */
+  it('carries worldType and levelOfDetail into the blueprint as structured fields, independent of provenanceNote', () => {
+    const withoutLevelOfDetail = compileSpecification(fullSpec());
+    expect(withoutLevelOfDetail.blueprint.templateIds).toEqual(['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY']);
+    expect(withoutLevelOfDetail.blueprint.levelOfDetail).toBeUndefined(); // fullSpec() never requested one — honestly absent, not defaulted
+
+    const withLevelOfDetail = compileSpecification({ ...fullSpec(), levelOfDetail: 'HIGH', provenanceNote: 'a caller note that never mentions any template' });
+    expect(withLevelOfDetail.blueprint.levelOfDetail).toBe('HIGH');
+    // Structured templateIds survives even when the caller's own free-text note says nothing about templates.
+    expect(withLevelOfDetail.blueprint.templateIds).toEqual(['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY']);
+  });
 });
 
 describe('generateSpecifiedWorld (22.D-J): composed templates produce one coherent, real world', () => {
@@ -103,6 +121,22 @@ describe('generateSpecifiedWorld (22.D-J): composed templates produce one cohere
     expect(world.graph.getEntity('substance:s1').scale.parentEntityId).toBe('lab:lab1');
     expect(world.graph.getEntity('population:city-1').scale.parentEntityId).toBe('building:hospital-building');
     expect(world.graph.getEntity('pump-pipe-system:pump-pipe-1').scale.parentEntityId).toBe('building:water-system-building');
+  });
+
+  /**
+   * PROVENANCE COMPLETENESS, end to end: the ACTUAL `world.generation.completed`
+   * event recorded into a real world's journal — the record an auditor
+   * replaying this world later would actually see — carries which templates
+   * were requested and at what level of detail, not just seed/entityCount.
+   */
+  it('the recorded generation event carries templateIds and levelOfDetail as real, queryable parameters', () => {
+    const world = generateSpecifiedWorld({ ...fullSpec(), levelOfDetail: 'LOW' });
+    const params = world.generated.generationEvent.parameters as Record<string, unknown>;
+    expect(params.templateIds).toEqual(['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY']);
+    expect(params.levelOfDetail).toBe('LOW');
+    // Still a valid, well-formed GenesisEvent — the addition changes what is
+    // recorded, never the contract every OTHER consumer of this event relies on.
+    expect(validateEvent(world.generated.generationEvent).ok).toBe(true);
   });
 
   it('applies requested initial conditions once, at generation time, via the real dotted-path patcher', () => {

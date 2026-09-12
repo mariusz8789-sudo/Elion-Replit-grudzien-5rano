@@ -11,8 +11,13 @@ i definicję DONE, więc sesja przyjmująca nie musi rekonstruować kontekstu.
 | `QWEN-P2.3-kotwica-zewnetrzna.md` | Qwen | P2.3 + P2.2 (pakiet badawczy) | R-005 w `RISKS.md` |
 | `QWEN-QE4-QE7-obserwable.md` | Qwen | QE4–QE7 (pakiet badawczy) | QE1–QE3 zamknięte na `43a6a8e` |
 | `C3-P2.3-kepler-anchor-i-P2.2-solar-ingestion.md` | C3 | druga kotwica (Kepler) + ingestion Solar Mind | Qwen dostarczył pakiet (trafił do C3 przez pomyłkę); P2.3 (PubChem) już DONE na `c181668`/`14312f8` |
+| `C1-R005-cms-zmumu-pinning.md` | C1 | R-005 — pierwsza instrumentalna kotwica (CMS Open Data Z→μμ) | P2.3 (obie kotwice + belief revision) DONE na `a822fa0`; model Fabric i worker już istnieją, czekają na dane |
+| `C2-QE4-brydges-execution.md` | C2 | wykonanie QE4 na realnym zbiorze Brydgesa (Zenodo 2527010) | własny research `QE4_REAL_DATASET_AND_EXPERIMENT.md` (jeszcze poza repo — krok 0 zadania), CI recon na `773bef0` |
+| `C3-QE5-QE6-QE7-implementacja.md` | C3 | implementacja QE5–QE7 wg pakietu Qwena | `QWEN-QE4-QE7-obserwable.md` już w repo; QE1–QE3 zamknięte |
+| `QWEN-QE4-ground-state-datasets.md` | Qwen | szukanie zbioru zdolnego domknąć ŚCISŁY test QE4 (pakiet badawczy) | `QE4_REAL_DATASET_AND_EXPERIMENT.md` (C2): ścisły test BLOCKED, wycinek strukturalny READY |
 
-Co zostaje u C1: P2.3 (implementacja po pakiecie Qwena) i P3 (pakiet grantowy).
+Co zostaje u C1 po CMS: P3 (pakiet grantowy), jeśli nic pilniejszego nie wypłynie z powyższych
+czterech torów.
 
 ## Dwa wspólne warunki odbioru dla KAŻDEGO z tych zadań
 
@@ -21,3 +26,8 @@ Co zostaje u C1: P2.3 (implementacja po pakiecie Qwena) i P3 (pakiet grantowy).
 2. **Brak wejścia = BLOCKED, nie improwizacja.** Jeśli zadanie odwołuje się do
    pliku/danych, których nie ma (jak spec Tautology Gate), właściwą odpowiedzią
    jest zgłoszenie tego, a nie wymyślenie treści i podpisanie jej jako cudzą.
+3. **`git fetch` PRZED czytaniem "co już jest zrobione" w promptcie, nie tylko przed
+   pushem.** Kilka sesji pcha na tę samą gałąź równolegle i potrafi domknąć część
+   zadania w kilka minut (QE4 Phase 0 zamknięto między napisaniem promptu dla C2 a
+   jego zapisaniem w repo) — sekcja "stan wejściowy"/"co już istnieje" w każdym
+   promptcie jest prawdziwa na podany hash commita, nie na zawsze.

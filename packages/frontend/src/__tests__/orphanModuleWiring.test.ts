@@ -393,10 +393,92 @@ describe('the CALIBRATION strategy is run in the product, not only in its tests'
     expect(screen).toMatch(/nie porażka do ukrycia/);
   });
 
-  /** Round verdicts come from the loop's own record; a view-derived list would be a second judgement. */
-  it('renders the loop own per-round verdicts, and its limitations', () => {
-    expect(screen).toMatch(/round\.verdicts\.map/);
-    expect(screen).toMatch(/run\.limitations\.map/);
+  /**
+   * The rounds, verdicts and limitations are rendered by the SHARED report
+   * (asserted in its own describe below) — this screen must delegate to it
+   * rather than growing a second round table of its own.
+   */
+  it('delegates the run itself to the shared report', () => {
+    expect(screen).toMatch(/<StrategyRunReport\s+run=\{run\}/);
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/run\.rounds\.map/);
+  });
+});
+
+describe('the PARAMETER strategy runs both declared inquiries', () => {
+  const screen = read('components', 'AutonomousInquiryScreen.tsx');
+
+  it('is a real route with a real menu entry', () => {
+    expect(read('App.tsx')).toMatch(/#\/inquiry/);
+    expect(read('core', 'navigation.ts')).toMatch(/#\/inquiry/);
+  });
+
+  it('invokes the real parameterStrategy over both real inquiries', () => {
+    expect(screen).toMatch(/parameterStrategy\.run\s*\(/);
+    expect(screen).toMatch(/quantumJunctionInquiry\(/);
+    expect(screen).toMatch(/proteinFoldingInquiry\(/);
+  });
+
+  /**
+   * An admission carries a STATUS, not a boolean. A refusal must name what
+   * Genesis would concretely need, and an APPROXIMATION's caveat must travel
+   * with the result — dropping it presents an approximation as exact.
+   */
+  it('honours the admission status rather than reducing it to pass or fail', () => {
+    expect(screen).toMatch(/admission\.status/);
+    expect(screen).toMatch(/admission\.missing/);
+    expect(screen).toMatch(/data-testid="inquiry-admission"/);
+    expect(screen).toMatch(/data-testid="inquiry-refused"/);
+  });
+
+  /**
+   * The protein fold genuinely narrows to two candidates and stops. Reporting
+   * that as anything other than what it is would be the cherry-pick this whole
+   * screen exists to avoid, so every branch is spelled out — including the one
+   * where the loop falsifies the TRUE hypothesis.
+   */
+  it('reports narrowed-but-undecided, and a wrong recovery, as real outcomes', () => {
+    expect(screen).toMatch(/ZAWĘŻONE, NIEROZSTRZYGNIĘTE/);
+    expect(screen).toMatch(/BŁĄD ODZYSKANIA/);
+    expect(screen).toMatch(/nie wynik do ukrycia/);
+  });
+
+  /** The hidden truth is a control; it must not reach the loop. */
+  it('keeps the true hypothesis out of the loop input', () => {
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/(quantumJunctionInquiry|proteinFoldingInquiry)\([^)]*truth/);
+    expect(screen).toMatch(/data-testid="inquiry-verdict"/);
+  });
+});
+
+describe('one report renders every strategy, because they share one contract', () => {
+  const report = read('components', 'StrategyRunReport.tsx');
+
+  /**
+   * MECHANISM, PARAMETER and CALIBRATION all return the same StrategyRun. A
+   * second round table per screen would be a second opinion about what a run
+   * means, free to drift — which is exactly what the shared contract exists to
+   * prevent.
+   */
+  it('both strategy screens render through the one shared report', () => {
+    expect(read('components', 'CalibrationInquiryScreen.tsx')).toMatch(/<StrategyRunReport/);
+    expect(read('components', 'AutonomousInquiryScreen.tsx')).toMatch(/<StrategyRunReport/);
+  });
+
+  it('the report states no verdict of its own', () => {
+    const code = report.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/ODZYSKANY|NIEODZYSKANY|recovered/);
+  });
+
+  /** What the run could not settle is not an optional extra. */
+  it('always renders open questions and limitations', () => {
+    expect(report).toMatch(/run\.openQuestions\.map/);
+    expect(report).toMatch(/run\.limitations\.map/);
+  });
+
+  /** `origin: null` means MIXED origins — a real state that must not collapse to one word. */
+  it('reports a mixed-provenance run as mixed, never as a single origin', () => {
+    expect(report).toMatch(/dataProvenance\.origins\.join/);
   });
 });
 

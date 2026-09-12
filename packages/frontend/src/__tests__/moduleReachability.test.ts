@@ -160,8 +160,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // --- Complete capability, blocked on a named prerequisite --------------------
   // These are the honest ones: real, tested science with nothing showing it.
   // Each line says what has to exist first, so the block is checkable.
-  'core/agent/proteinFoldingInquiry.ts': 'Declares a real inquiry, but no production caller runs runAutonomousInquiry and no screen renders an InquiryLoopResult.',
-  'core/agent/quantumTunnelingInquiry.ts': 'Same blocker as proteinFoldingInquiry: the inquiry runner itself has no production caller.',
   'core/agent/discoveryTrace.ts': 'Consumes ResearchChainResult (the PARAMETER chain); production runs only runMechanismResearchChain, a different type.',
   'core/simulationRenderer/spatialWorldFrame.ts': 'Data half of the OSM -> canonical-renderer bridge; no screen imports real licensed OSM data yet.',
   'core/three/graphics/spatialFeatureBridge.ts': 'Rendering half of the same OSM bridge, blocked by the same missing real-data entry point.',

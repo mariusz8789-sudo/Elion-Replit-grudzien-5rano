@@ -110,6 +110,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics' },
   { id: 'world-proposal', label: 'Zaproponuj świat', icon: '🧩', hash: '#/world-proposal' },
   { id: 'calibration', label: 'Ile trwa okres zakaźności?', icon: '🔎', hash: '#/calibration' },
+  { id: 'inquiry', label: 'Autonomiczne dochodzenie', icon: '🔬', hash: '#/inquiry' },
 ];
 
 /** Flat view, for lookups and for the mobile primary bar. */

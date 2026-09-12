@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { calibrationStrategy } from '../core/agent/discoveryStrategies';
 import type { StrategyRun } from '../core/agent/discoveryStrategy';
+import { StrategyRunReport } from './StrategyRunReport';
 import {
   EPIDEMIC_INFECTIOUS_DAYS_CANDIDATES, EPIDEMIC_INFECTIOUS_DAYS_PROBE_TICKS,
   epidemicInfectiousDaysCalibration,
@@ -95,18 +96,11 @@ export function CalibrationInquiryScreen() {
 
       {run !== null && (
         <>
-          <section className="pilot-step" data-testid="calibration-summary">
-            <h2>{run.question}</h2>
-            <dl className="pilot-provenance">
-              <div><dt>strategia</dt><dd className="mono">{run.strategyId}</dd></div>
-              <div><dt>kształt pytania</dt><dd className="mono">{run.shape}</dd></div>
-              <div><dt>rundy</dt><dd className="mono">{run.rounds.length}</dd></div>
-              <div><dt>powód zatrzymania</dt><dd className="mono" data-testid="calibration-stop">{run.stopReason}</dd></div>
-              <div><dt>pochodzenie danych</dt><dd className="mono">{run.dataProvenance.origin ?? 'mieszane'}</dd></div>
-              <div><dt>czas</dt><dd className="mono">{elapsedMs.toFixed(0)} ms</dd></div>
-            </dl>
-
-            {/* The control comparison, made AFTER the run and labelled as such. */}
+          {/* THE ONLY THING THIS SCREEN SAYS OF ITS OWN: did the loop recover
+              the value the world really had? That comparison needs the hidden
+              control, which the shared report deliberately does not know — so
+              it lives here and nowhere else. */}
+          <section className="pilot-step" data-testid="calibration-verdict-section">
             <p className="pilot-summary" data-testid="calibration-verdict">
               {run.surviving.length === 0
                 ? `Agent nie zostawił żadnej hipotezy przy życiu. Prawdziwa wartość to ${trueDays} dni — tego nie odzyskał.`
@@ -116,69 +110,11 @@ export function CalibrationInquiryScreen() {
             </p>
           </section>
 
-          <section className="pilot-step">
-            <h3>Runda po rundzie — co zmierzył i dlaczego właśnie to</h3>
-            {/* The loop records its own reasoning in English. Rendering it
-                verbatim keeps this a transcript; translating it here would make
-                it a paraphrase of what the agent actually wrote. */}
-            <p className="settings-hint">
-              Kolumny „co zrobił" i „dlaczego to" są cytatem z pętli, dosłownie i po angielsku — nie tłumaczymy ich,
-              żeby nie podmienić tego, co agent naprawdę zapisał, na własną parafrazę.
-            </p>
-            <div className="compare-table-wrap">
-              <table className="compare-table" data-testid="calibration-rounds">
-                <thead>
-                  <tr><th>runda</th><th>co zrobił</th><th>dlaczego to</th><th>odczyt</th><th>werdykty hipotez</th></tr>
-                </thead>
-                <tbody>
-                  {run.rounds.map((round) => (
-                    <tr key={round.round} data-testid={`calibration-round-${round.round}`}>
-                      <td className="mono">{round.round}</td>
-                      <td>{round.what}</td>
-                      <td>{round.why}</td>
-                      <td className="mono">{round.observed === null ? '—' : round.observed.toPrecision(6)}</td>
-                      {/* Every hypothesis's verdict for this round, as the loop
-                          recorded it — not a derived "falsified" list, which the
-                          round does not carry and which a view must not invent. */}
-                      <td className="mono">
-                        {round.verdicts.length === 0
-                          ? '—'
-                          : round.verdicts.map((v) => `${v.hypothesisId}: ${v.assessment}`).join(' · ')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="pilot-step">
-            <h3>Stan hipotez po przebiegu</h3>
-            <dl className="pilot-provenance">
-              <div><dt>przetrwały</dt><dd className="mono" data-testid="calibration-surviving">{run.surviving.join(', ') || '—'}</dd></div>
-              <div><dt>sfalsyfikowane</dt><dd className="mono">{run.falsified.join(', ') || '—'}</dd></div>
-              <div><dt>nieprzetestowane</dt><dd className="mono">{run.untested.join(', ') || '—'}</dd></div>
-            </dl>
-            {run.nextExperiment !== null && (
-              <p className="settings-hint" data-testid="calibration-next">
-                NASTĘPNY EKSPERYMENT ({run.nextExperiment.status}): {run.nextExperiment.action} — {run.nextExperiment.why}
-              </p>
-            )}
-            {/* Open questions and limitations are what the loop could NOT settle.
-                Dropping them would turn a bounded result into a claim. */}
-            {run.openQuestions.length > 0 && (
-              <>
-                <h4 className="matrix-detail-sub">Czego nie rozstrzygnął</h4>
-                <ul className="matrix-relation-list" data-testid="calibration-open">
-                  {run.openQuestions.map((q) => <li key={q}>{q}</li>)}
-                </ul>
-              </>
-            )}
-            <h4 className="matrix-detail-sub">Ograniczenia i założenia</h4>
-            <ul className="matrix-relation-list" data-testid="calibration-limitations">
-              {run.limitations.map((l) => <li key={l}>{l}</li>)}
-            </ul>
-          </section>
+          {/* Everything else is the shared StrategyRun report — the same one the
+              PARAMETER inquiries use, because all three strategies return the
+              same contract and a second round table would be a second opinion
+              about what a run means. */}
+          <StrategyRunReport run={run} elapsedMs={elapsedMs} />
         </>
       )}
     </main>

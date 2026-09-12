@@ -825,3 +825,44 @@ dostać ich pełny tekst i wciągnąć go jako DANE do `knowledge/` z adnotacją
 **Czego NIE robimy teraz:** QE4–QE7 jako przebiegi (do czasu pakietu Qwena),
 warstwa starzenia dowodów (G9 — zamiast niej jeden komentarz mówiący, że jej
 brak jest decyzją), scoring wartości eksperymentu (G5).
+
+## UPDATE — C3: G3 (jedyne P0) ZAMKNIĘTE — kotwica anty-HARKingowa
+
+Commit `2ab93cbf`. Test napisany i uruchomiony na czerwono NAJPIERW —
+`preregisterHypotheses` nie miała parametru kotwicy, więc próba wyrażenia
+"ten odcisk już znałem przed rejestracją" kończyła się błędem typu, nie
+cichym zaakceptowaniem — po dodaniu kotwicy do sygnatury test przeszedł na
+zielono.
+
+**Co realnie znaleziono**: modele są deterministyczne (stały seed), a
+`provenance.ts::createExperimentProvenance` liczy `runFingerprint` z
+requestu I WYNIKÓW razem — więc podglądnięty i "oficjalny" przebieg tej
+samej hipotezy mają identyczny odcisk. Sekwencja PODGLĄDNIJ → PREREJESTRUJ
+→ WYKONAJ OFICJALNIE dawała rekord nierozróżnialny od uczciwej, ślepej
+rejestracji.
+
+**Naprawa — kotwica, nie ranking/scoring (G5/G9 poza zakresem, zgodnie z
+notatką podziału pracy wyżej)**: `PreregistrationAnchor.priorRunFingerprints`
+jako WYMAGANY argument `preregisterHypotheses` — uczciwa, ślepa rejestracja
+deklaruje `[]` (prawda dla wszystkich 7 realnych miejsc wywołania w repo,
+sprawdzone jedno po drugim). Kotwica wchodzi w `preregistrationFingerprint`
+(więc nie da się jej po cichu wyczyścić po fakcie); nowa funkcja
+`verifyAntiHarkingAnchor` wykrywa kolizję, gdy zadeklarowany-jako-już-znany
+odcisk wraca jako potwierdzający dowód. `createdAt` CELOWO zostaje POZA
+odciskiem (to zegar, nie deklaracja — inaczej złamałby istniejący test
+"Deterministyczne odciski", który wymaga tej samej wartości dla dwóch
+niezależnych, treściowo identycznych rejestracji). `createdBeforeRun`
+pozostaje uczciwym twierdzeniem składanym w momencie rejestracji
+(strukturalnie prawdziwym — żadna `Preregistration` nie istnieje przed
+`generateCompetingHypotheses`), ale teraz może zostać PODWAŻONE przez
+`verifyAntiHarkingAnchor`, czego wcześniej nie dało się zrobić w ogóle.
+
+**Efekt uboczny znaleziony przez pełny suite, nie przez tsc**: trzy world
+adaptery (`cellWorldAdapter.ts`, `epidemiologyWorldAdapter.ts`,
+`moleculeWorldAdapter.ts`) budują `SavedHypothesisLoop`-kształtny obiekt
+ręcznie do replayu i nie miały nowych pól — `isSavedHypothesisLoop` cicho
+zamieniało to w `BLOCKED` (a `replaySavedHypothesisLoop` przyjmuje
+`unknown`, więc tsc tego nie złapał). Naprawione w tym samym commicie.
+
+Zweryfikowane: tsc czysto, eslint czysto, pełny frontend suite 464/464
+plików, 5134 passed / 1 znany niezwiązany skip, build czysto.

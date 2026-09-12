@@ -262,6 +262,53 @@ describe('the campaign screen accepts a "why" question in words', () => {
   });
 });
 
+describe('the sixth scientific world can be watched, not only tested', () => {
+  const screen = read('components', 'GeodesicWorldScreen.tsx');
+
+  it('is a real route with a real menu entry', () => {
+    expect(read('App.tsx')).toMatch(/#\/geodesics/);
+    expect(read('core', 'navigation.ts')).toMatch(/#\/geodesics/);
+  });
+
+  it('drives the registered solver through the real TemporalEngine', () => {
+    expect(screen).toMatch(/makeRelativityGeodesicSolver\s*\(/);
+    expect(screen).toMatch(/router\.routeTick/);
+    expect(screen).toMatch(/engine\.advance/);
+  });
+
+  /**
+   * The screen must read published coordinates, never integrate. A trajectory
+   * computed here would be a second, silently diverging relativity.
+   */
+  it('integrates nothing of its own', () => {
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/stepSchwarzschildGeodesic/);
+    // No trig on the orbital state: that is how a hand-rolled orbit starts.
+    expect(code).not.toMatch(/Math\.(sin|cos|atan2)\s*\(/);
+    expect(screen).toMatch(/entity\.spatial!\.position/);
+  });
+
+  /**
+   * The unit conversion must go through the solver's own declared scalar,
+   * which the module exposes exactly so the scaling is auditable rather than
+   * a magic number in a view.
+   */
+  it('converts to Schwarzschild radii through the solver own declared scalar', () => {
+    expect(screen).toMatch(/worldUnitsPerSchwarzschildRadius/);
+  });
+
+  /**
+   * The capture boundary is a closed-form constant, so the screen states the
+   * prediction and then reports whether the run matched it — including the
+   * disagreeing branch, which must exist and must not be silent.
+   */
+  it('states the b_crit prediction and can report a disagreement', () => {
+    expect(screen).toMatch(/CRITICAL_IMPACT_PARAMETER_RS/);
+    expect(screen).toMatch(/data-testid="geodesic-verdict"/);
+    expect(screen).toMatch(/NIEZGODNE z b_crit/);
+  });
+});
+
 describe('the dead duplicate is gone, not merely unused', () => {
   /**
    * `MissionStatusBar.tsx` rendered narrator/AI-health/lab-count/visited from

@@ -4,64 +4,48 @@
  * uk-air.defra.gov.uk is confirmed blocked — same 403 CONNECT pattern as
  * zenodo.org/nist.gov/CMS Open Data before it).
  *
- * This does NOT freeze anything. It only discovers: (a) what CSV download
- * links actually exist on each site's "flat_files" index page, (b) the
- * site's own metadata (siting description, network, dates of operation,
- * coordinates) from its site-info page. Both are printed with QE4/CMS-style
- * markers for job-log read-back, so the real fetch plan (Phase 3 freeze) is
- * built from what DEFRA ACTUALLY serves, not guessed from search-engine
- * snippets.
+ * Round 2: the flat_files index pages (round 1) revealed the exact, stable
+ * download URL pattern DEFRA actually serves:
+ *   https://uk-air.defra.gov.uk/datastore/data_files/site_data/<CODE>_<YEAR>.csv?v=1
+ * This round HEADs the exact files the real freeze plan needs (byte sizes,
+ * for sharding), and GETs one sample file's first lines (to learn the real
+ * column layout before writing a parser against it) — still freezing
+ * nothing.
  */
 
-const SITES = [
-  { code: 'MY1', label: 'London Marylebone Road (roadside, treated)' },
-  { code: 'MAN3', label: 'Manchester Piccadilly (control)' },
-  { code: 'LED6', label: 'Leeds Headingley Kerbside (control)' },
-  { code: 'SHBR', label: 'Sheffield Barnsley Road (control)' },
-];
+const SITES = ['MY1', 'MAN3', 'LED6', 'SHBR'];
+const YEARS = [2022, 2023, 2024];
 
-async function fetchText(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'genesis-os-research (recon, non-automated single fetch)' } });
-  const body = await res.text();
-  return { status: res.status, body };
+async function headSize(url) {
+  const res = await fetch(url, { method: 'HEAD' });
+  return { status: res.status, length: res.headers.get('content-length') };
 }
 
-function extractLinks(html) {
-  const hrefs = [...html.matchAll(/href="([^"]+)"/gi)].map((m) => m[1]);
-  return [...new Set(hrefs)].filter((h) => /\.csv|\.zip|flat_files|data_and_statistics/i.test(h));
-}
-
+console.log('=== B1-RECON2 SIZES BEGIN ===');
+let totalBytes = 0;
 for (const site of SITES) {
-  console.log(`\n=== B1-RECON BEGIN ${site.code} (${site.label}) ===`);
-
-  const flatFilesUrl = `https://uk-air.defra.gov.uk/data/flat_files?site_id=${site.code}`;
-  try {
-    const { status, body } = await fetchText(flatFilesUrl);
-    console.log(`B1-RECON FLATFILES-STATUS ${site.code} ${status}`);
-    const links = extractLinks(body);
-    console.log(`B1-RECON FLATFILES-LINK-COUNT ${site.code} ${links.length}`);
-    for (const link of links) console.log(`B1-RECON FLATFILES-LINK ${site.code} ${link}`);
-  } catch (error) {
-    console.log(`B1-RECON FLATFILES-ERROR ${site.code} ${String(error)}`);
+  for (const year of YEARS) {
+    const url = `https://uk-air.defra.gov.uk/datastore/data_files/site_data/${site}_${year}.csv?v=1`;
+    try {
+      const { status, length } = await headSize(url);
+      console.log(`B1-RECON2 SIZE ${site} ${year} status=${status} bytes=${length ?? 'unknown'}`);
+      if (length) totalBytes += Number(length);
+    } catch (error) {
+      console.log(`B1-RECON2 SIZE-ERROR ${site} ${year} ${String(error)}`);
+    }
   }
-
-  const siteInfoUrl = `https://uk-air.defra.gov.uk/networks/site-info?site_id=${site.code}`;
-  try {
-    const { status, body } = await fetchText(siteInfoUrl);
-    console.log(`B1-RECON SITEINFO-STATUS ${site.code} ${status}`);
-    // Print the body itself (trimmed of script/style noise) for later text-based extraction of siting description/coords/dates.
-    const cleaned = body
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    console.log(`B1-RECON SITEINFO-BODY-BEGIN ${site.code}`);
-    console.log(cleaned.slice(0, 4000));
-    console.log(`B1-RECON SITEINFO-BODY-END ${site.code}`);
-  } catch (error) {
-    console.log(`B1-RECON SITEINFO-ERROR ${site.code} ${String(error)}`);
-  }
-
-  console.log(`=== B1-RECON END ${site.code} ===`);
 }
+console.log(`B1-RECON2 TOTAL-BYTES-ESTIMATE ${totalBytes}`);
+console.log('=== B1-RECON2 SIZES END ===');
+
+console.log('\n=== B1-RECON2 SAMPLE BEGIN (MY1 2023 header + first 15 lines) ===');
+try {
+  const res = await fetch('https://uk-air.defra.gov.uk/datastore/data_files/site_data/MY1_2023.csv?v=1');
+  const text = await res.text();
+  const lines = text.split(/\r?\n/).slice(0, 15);
+  for (const line of lines) console.log(`B1-RECON2 SAMPLE-LINE ${line}`);
+  console.log(`B1-RECON2 SAMPLE-TOTAL-LINES ${text.split(/\r?\n/).length}`);
+} catch (error) {
+  console.log(`B1-RECON2 SAMPLE-ERROR ${String(error)}`);
+}
+console.log('=== B1-RECON2 SAMPLE END ===');

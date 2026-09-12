@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "genesis.cms-zmumu.fixture.v1",
+  "status": "PINNED",
+  "recordUrl": "https://opendata.cern.ch/record/5208",
+  "downloadUrl": "https://opendata.cern.ch/record/5208/files/Zmumu.csv",
+  "license": "CC0-1.0",
+  "file": {
+    "name": "Zmumu.csv",
+    "bytes": 970550,
+    "rows": 10000,
+    "sha256": "7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1"
+  },
+  "retrieval": {
+    "method": "GitHub Actions CI runner fetch (opendata.cern.ch is blocked from this repo's own sandbox: 403 on CONNECT, confirmed directly with curl)",
+    "workflow": ".github/workflows/ci.yml",
+    "job": "cms-zmumu-recon (matrix shard 0-3), run 34720957684",
+    "readBackMethod": "Each shard job printed its assigned, explicitly line-numbered row range plus a SHA-256 header (shard 0) into its own job log; content was read back via the GitHub Actions job-logs API, reassembled by line number across all 4 shards, and the reconstructed file's SHA-256 verified to match the value already hardcoded in cms_zmumu_worker.py::EXPECTED_SHA256 exactly.",
+    "retrievedAt": "2026-09-12T21:47:52Z"
+  }
+}

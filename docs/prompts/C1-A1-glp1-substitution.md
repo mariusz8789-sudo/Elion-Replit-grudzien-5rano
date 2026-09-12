@@ -86,6 +86,31 @@ przejść — bez nich test „SUPPORTED" nic nie znaczy (dokładnie lekcja z fa
    pobraniem CT.gov.
 6. Pełna bramka przed pushem: eslint, tsc, oba suite'y, build, `node scripts/repro-demo.mjs`.
 
+## MEDICAL SAFETY BOUNDARY — twarda granica, nie luka
+
+Ten eksperyment jest CELOWO zaprojektowany jako **farmakologia populacyjna**: porównuje siłę
+wiązania do receptora GLP-1 (ChEMBL) i skuteczność glikemiczną (HbA1c z ClinicalTrials.gov) z
+publicznych danych, i odpowiada WYŁĄCZNIE na pytanie „czy zamiana jest farmakologicznie
+uzasadniona na poziomie populacji, przy dawkach z etykiety". To NIE jest luka do domknięcia w
+przyszłości — to trwała granica funkcji, obowiązująca DZIŚ i w KAŻDEJ przyszłej rozbudowie tego
+modułu:
+
+1. **Nigdy** recepta, dawka dla konkretnej osoby ani indywidualne zalecenie medyczne — silnik nie
+   zna pacjenta, jego historii, przeciwwskazań ani interakcji lekowych, i nie wolno mu udawać, że
+   zna.
+2. **Nigdy** stwierdzenie, że jeden lek JEST zamiennikiem drugiego w sensie klinicznym/
+   regulacyjnym — wyłącznie: „zamiana farmakologicznie uzasadniona / nieuzasadniona /
+   nierozstrzygnięta NA POZIOMIE POPULACJI, przy dawkach z etykiety", nigdy „clinical
+   substitution" ani „approved replacement" (patrz punkt 7 oryginalnego zlecenia).
+3. Decyzję o zamianie leku podejmuje lekarz, farmaceuta lub regulator — **nigdy silnik**. Werdykt
+   Genesis jest materiałem do decyzji (dowód + odcisk palca + replay), nie decyzją.
+4. Ta granica dotyczy WYNIKU (co wolno powiedzieć), nie tylko UI — jeśli werdykt trafi kiedyś do
+   `#/evidence`, do raportu grantowego albo do jakiegokolwiek przyszłego ekranu, sformułowanie
+   MUSI zachować dokładnie to ograniczenie, niezależnie od tego, kto go tam wstawi.
+5. Żadna przyszła rozbudowa tego modułu (kolejne pary leków, kolejne receptory, dawkowanie,
+   interakcje) nie może po cichu przekroczyć tej granicy — rozszerzenie zakresu wymaga jawnej
+   decyzji użytkownika, tej samej rangi co decyzja o zbudowaniu tego eksperymentu.
+
 ## DONE
 
 - `docs/A1_GLP1_SUBSTITUTION_REAL_DATASET_AND_EXPERIMENT.md` w repo.
@@ -93,18 +118,17 @@ przejść — bez nich test „SUPPORTED" nic nie znaczy (dokładnie lekcja z fa
 - ≥2 pinowane, zweryfikowane badania CT.gov per lek z opublikowanym wynikiem HbA1c.
 - Werdykt potencji + werdykt skuteczności + kontrole negatywne realnie policzone, Tautology Gate
   `MIXED_TEST`, replay MATCH.
+- Werdykt sformułowany WYŁĄCZNIE jako populacyjna zasadność farmakologiczna (patrz MEDICAL
+  SAFETY BOUNDARY) — bez recepty, bez dawki dla osoby, bez języka klinicznej zamienności.
 - `docs/RISKS.md`/`docs/MASTER_PRIORITY_GENESIS.md` zaktualizowane z realnym dowodem.
 
 ---
 
-## B1 (ULEZ/polityka publiczna) — ŚWIADOMIE ODROCZONE, NIE przypisane
+## B1 (ULEZ/polityka publiczna) — JUŻ NIE ODROCZONE, przypisane w osobnym prompcie
 
-Drugi pakiet Qwena (`GOVERNMENT_POLICY_REAL_DATASET_AND_EXPERIMENT.md`, ULEZ→NO₂) wymaga NOWEGO
-prymitywu statystycznego, którego Genesis nie ma: estymator difference-in-differences/synthetic
-control z klastrowanymi błędami standardowymi. To jest realny nowy silnik, nie wąska funkcja —
-sprzeczne z zasadą „zero nowych silników" bez jawnej decyzji. **Nie zaczynaj tego zadania**, dopóki
-ktoś (użytkownik) nie zdecyduje jawnie, że warto zbudować ten prymityw jako osobną, nazwaną
-infrastrukturę (analogiczną do `beliefRevision.ts` czy `tautologyGate.ts` — zaprojektowaną raz,
-reużywalną, nie jednorazowym hackiem pod ULEZ). Jeśli użytkownik o to zapyta: odpowiedź to
-„zaprojektujmy `causalInference.ts` jako nowy, ogólny moduł najpierw, osobnym zadaniem" — nie
-wciśnięty DiD wewnątrz jednego zadania.
+Użytkownik podjął dokładnie tę decyzję, na którą czekała ta sekcja: budować
+`causalInference.ts` jako nowy, ogólny, reużywalny moduł (analogiczny do `beliefRevision.ts`/
+`tautologyGate.ts`), osobnym zadaniem, nie jako jednorazowy hack wciśnięty pod ULEZ. Pełny
+prompt: `docs/prompts/C1-B1-ulez-no2-adjudication.md`, pakiet badawczy Qwena zapisany dosłownie
+w `docs/B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md`. Zaczynać PO zamknięciu CMS
+Z→μμ i tego zadania (A1) — kolejność z `docs/prompts/README.md`.

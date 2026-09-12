@@ -181,7 +181,7 @@ existing analog (`externalAnchor.ts`'s PubChem/Kepler-Mars) has NO
 `scienceMemory.ts` persistence at all; it renders live from a static
 registry. Building an 11th persisted shape for QE4 would have been building
 machinery its own closest analog does not have. Instead, per `docs/DECISIONS.md`
-D-023, a single new, minimal, domain-agnostic module —
+D-024, a single new, minimal, domain-agnostic module —
 `core/agent/externalDatasetCase.ts` — was built to hold "N independent
 co-equal verdicts over one external dataset" without collapsing them, reusing
 `assessTautology`/`beliefRevision.ts`/`fnv1a` unmodified. The only QE4-specific
@@ -191,7 +191,7 @@ logic). `#/evidence` now renders all four verdicts live via a new
 `qe4BrydgesEstimator.ts` are genuinely reachable from `main.tsx` — removed
 from `moduleReachability.test.ts`'s `ALLOWED_ORPHANS`. P1–P4's verdicts,
 thresholds, preregistration, and bootstrap are byte-for-byte unchanged
-(`resultFingerprint` still `a6578ae8`). See D-023 for the full comparison
+(`resultFingerprint` still `a6578ae8`). See D-024 for the full comparison
 against the two rejected alternatives.
 
 ## 8. Real Chromium E2E (Phase 7 at the time; superseded below)
@@ -238,7 +238,7 @@ See the task's final report (chat) for command-by-command output:
   would matter for a claim about one specific physical ion, which none of
   P1–P4 make.
 - ~~`#/evidence` does not display QE4~~ — RESOLVED 2026-09-13, see §7's update
-  and `docs/DECISIONS.md` D-023: it now does, through a new, minimal,
+  and `docs/DECISIONS.md` D-024: it now does, through a new, minimal,
   domain-agnostic `externalDatasetCase.ts` module, not a QE4-specific hack.
 - The `EvidenceShowcaseScreen` route's browser chunk grew to ~3.25 MB
   (~1.3 MB gzipped) now that it bundles QE4's pinned CSV dataset for the

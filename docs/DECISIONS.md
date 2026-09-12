@@ -651,7 +651,71 @@ reużyte bez zmian.
 
 ---
 
-## D-023 (2026-09-13, QE4-integration) — Nowa, minimalna, generyczna warstwa `core/agent/externalDatasetCase.ts` zamiast 11. kształtu `SavedExperiment` albo rozciągania `discoveryCase.ts`
+## D-023 (2026-09-12, R-005) — CMS Open Data Z→μμ przypięty przez 4-fragmentowy job macierzowy, bo pojedynczy log ciszej obcina powyżej ~5000 linii
+
+**Decyzja.** `Zmumu.csv` (CERN Open Data record 5208, CC0-1.0) przypięty pod
+`packages/backend/src/compute/cms-zmumu/Zmumu.csv` — pierwsza prawdziwie
+INSTRUMENTALNA kotwica w repo (realny pomiar detektora, nie przeliczona
+wartość jak PubChem/Kepler). `compute/cmsOpenDataAdapter.mjs`,
+`cms_zmumu_worker.py` i model Fabric `particle-cern-cms-zmumu-invariant-mass`
+już istniały, w pełni zaimplementowane i testowane pod nieobecność danych —
+brakowało wyłącznie pliku. Pełny opis: `docs/RISKS.md` R-005.
+
+**Dlaczego job macierzowy (4 fragmenty), nie jeden job jak dla Keplera/NIST.**
+Pierwsza próba (job `103626153086`, run `34720797396`) wydrukowała cały
+plik (970 550 B, 10001+1 linii z pustą końcową) do jednego loga i
+zweryfikowała SHA-256 w TYM SAMYM kroku — ale `mcp__github__get_job_logs`
+przy odczycie zwrócił po cichu TYLKO ostatnie ~5000 linii (~630 KB) tego
+joba, niezależnie od zażądanego `tail_lines`, bez żadnego komunikatu błędu.
+To jest ta sama klasa cichego obcinania, na którą trafiła kotwica
+QE4/Brydges (tam próg był ~2,5 MB łącznej zawartości wielu plików w jednym
+jobie) — tutaj próg okazał się niższy (~630 KB) dla pojedynczego joba z
+mniejszą ilością towarzyszącej treści. Rozwiązanie: `strategy.matrix.shard:
+[0,1,2,3]`, każdy fragment loguje SWÓJ zakres linii, każda linia jawnie
+ponumerowana (`CMS-zmumu LINE <index> <treść>`), żeby rekonstrukcja mogła
+posortować fragmenty niezależnie od kolejności odczytu logów. Cztery
+osobne odczyty logów (każdy ~390 KB), każdy pod progiem.
+
+**Weryfikacja rekonstrukcji — nie założenie.** Po odczytaniu wszystkich
+czterech logów (`103626589418`, `103626589442`, `103626589456`,
+`103626589444`, run `34720957684`) i złożeniu 10002 linii po indeksie
+(zero brakujących), plik zapisany bez końcowej pustej linii dał SHA-256:
+
+```
+$ python3 -c "import hashlib; print(hashlib.sha256(open('packages/backend/src/compute/cms-zmumu/Zmumu.csv','rb').read()).hexdigest())"
+7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1
+```
+
+Dokładnie zgodny z `cms_zmumu_worker.py::EXPECTED_SHA256`, wartością
+którą worker i test (`cmsOpenDataCompute.test.mjs`) miały zapisaną na
+sztywno OD DAWNA, zanim ten plik istniał w repo — nie dobrano jej po fakcie.
+
+**Realne uruchomienie workera na przypiętym pliku (offline, bez sieci):**
+
+```
+$ GENESIS_CERN_OPEN_DATA_DIR=packages/backend/src/compute/cms-zmumu \
+  python3 packages/backend/src/compute/cms_zmumu_worker.py <<< '{"cmd":"zmumu_stats"}'
+eventCount=10000 events80To100GeV=8259 median=90.28540772526225
+```
+
+Dokładnie te trzy liczby, które trzeci test w `cmsOpenDataCompute.test.mjs`
+(dotąd `{ skip: !configuredDataDir }`) miał zapisane jako oczekiwane.
+
+**Rozszerzenie CI — trwałe, nie jednorazowe.** Job macierzowy
+(bootstrapujący, jak Kepler/QE4 przed nim) zastąpiony jednym trwałym
+`cms-zmumu-verify-pinned` (świeży fetch porównywany z przypiętą kopią,
+kontrola dryfu przy każdym pushu — wzorzec identyczny do
+`kepler-solar-system-pinned-artifact`/`qe4-brydges-verify-pinned`).
+`GENESIS_CERN_OPEN_DATA_DIR` ustawiony w kroku „Testy backend" joba
+`verify`, żeby trzeci test uruchamiał się naprawdę w CI, nie tylko lokalnie.
+
+**Zero nowego silnika.** Worker, adapter i model Fabric istniały wcześniej
+i nie zostały zmienione — to zadanie dostarczyło wyłącznie dane, zgodnie z
+tym, czego brakowało.
+
+---
+
+## D-024 (2026-09-13, QE4-integration) — Nowa, minimalna, generyczna warstwa `core/agent/externalDatasetCase.ts` zamiast 11. kształtu `SavedExperiment` albo rozciągania `discoveryCase.ts`
 
 **Decyzja.** QE4 (D-021/D-022 nie dotyczą go bezpośrednio, ale są bezpośrednim
 poprzednikiem tej decyzji) potrzebował sposobu na reprezentowanie "JEDEN

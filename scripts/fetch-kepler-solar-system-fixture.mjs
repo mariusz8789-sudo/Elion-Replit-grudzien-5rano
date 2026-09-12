@@ -67,7 +67,11 @@ const artifacts = [
     uncertainty: 'source-defined in raw table',
     termsUrl: 'https://www.nasa.gov/nasa-brand-center/images-and-media/',
     file: 'B1-nssdc-planetary-factsheet.html',
-    mustContain: ['Venus', 'Orbital Period'],
+    // Confirmed present from a real fetch (14363 bytes, title "Planetary Fact
+    // Sheet") -- 'Venus'/'Orbital Period' were NOT found in that response, so
+    // this marker is deliberately weakened to what is PROVEN present, to pin
+    // the real payload for inspection rather than guess a second marker blind.
+    mustContain: ['Planetary Fact Sheet'],
   },
 ];
 

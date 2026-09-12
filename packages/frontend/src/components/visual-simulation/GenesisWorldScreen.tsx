@@ -35,6 +35,7 @@ import { buildGenesisMatrixView, type GenesisMatrixView } from '../../core/agent
 import { narrateIntro, narrateRound, narrateNext, narrateInvestigation, type NarrationPhase } from '../../core/agent/genesisNarration';
 import { detectRenderTier, type InteractiveRenderTier } from '../../core/three/quality';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
+import { loadConstruct, type ConstructManifest, type ConstructRecord } from '../../core/worldModel/construct/construct';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
 import { buildUniformFuelBed, simulateWildfireSpread, type WildfireSpreadResult, type WindVector } from '../../core/worldModel/domains/wildfireSpread';
@@ -379,6 +380,15 @@ export class GenesisWorldSim3D implements Sim3D {
   nearHospitalEntrance = false;
 
   readonly city: GenesisScientificCity4;
+  /**
+   * Genesis Construct's own staging record for this exact world — real
+   * provenance/fingerprint over the SAME `buildGenesisScientificCity4`
+   * output as `city` above, not a second copy of it. `city`'s own shape and
+   * every other field on this class are unchanged by Construct's presence;
+   * this is purely additive (see `construct.test.ts` /
+   * `constructGenesisScientificCity4.test.ts` for the module's own proof).
+   */
+  readonly constructRecord: ConstructRecord;
   forkEngine: TemporalEngine | null = null;
   showFork = false;
   scrubTick: number | null = null;
@@ -425,7 +435,28 @@ export class GenesisWorldSim3D implements Sim3D {
   onSelect?: (id: WorldFrameEntityId | null) => void;
 
   constructor() {
-    this.city = buildGenesisScientificCity4({ rainfallAtTick: 2, populationCount: 5000 });
+    let builtCity: GenesisScientificCity4 | undefined;
+    const manifest: ConstructManifest = {
+      constructId: 'genesis-scientific-city-4-construct',
+      seed: 4,
+      requestedBy: 'GenesisWorldSim3D',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      items: [{
+        itemId: 'city4-world', type: 'WORLD', sourceRef: 'genesis-scientific-city-4',
+        fingerprint: 'spec:genesis-scientific-city-4', epistemicStatus: 'SIMULATION', loadOrder: 0,
+      }],
+    };
+    this.constructRecord = loadConstruct(manifest, {
+      WORLD: () => {
+        builtCity = buildGenesisScientificCity4({ rainfallAtTick: 2, populationCount: 5000 });
+        const paramsHash = builtCity.base.provenance.generationEvent.provenance?.paramsHash;
+        return paramsHash === undefined ? null : { fingerprint: paramsHash };
+      },
+    });
+    if (this.constructRecord.state !== 'LOADED' || builtCity === undefined) {
+      throw new Error(`Genesis Scientific City 4.0 failed to load through Construct: ${JSON.stringify(this.constructRecord.failedItems)}`);
+    }
+    this.city = builtCity;
     this.interactableIds = [
       this.city.pumpPipeId,
       GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,

@@ -169,6 +169,50 @@ describe('the model tournament runs both models rather than describing them', ()
   });
 });
 
+describe('the protection study shows the conflict instead of one number', () => {
+  const screen = read('components', 'ProtectionPriorityScreen.tsx');
+
+  it('is a real route with a real menu entry, not a URL-only screen', () => {
+    expect(read('App.tsx')).toMatch(/#\/protection-priority/);
+    expect(read('core', 'navigation.ts')).toMatch(/#\/protection-priority/);
+  });
+
+  it('calls the real study rather than computing a ranking of its own', () => {
+    expect(screen).toMatch(/runProtectionPriorityStudy\s*\(/);
+    const code = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // A sort here would be a second ranking, silently free to disagree with
+    // the one the study computed under its own admission rules.
+    expect(code).not.toMatch(/\.sort\s*\(/);
+  });
+
+  /**
+   * The whole point of the module is that different objectives can crown
+   * different groups. A screen that rendered one ranking, or averaged them,
+   * would answer a question the data does not answer.
+   */
+  it('renders every objective separately, never a single collapsed answer', () => {
+    expect(screen).toMatch(/PROTECTION_OBJECTIVES\.map/);
+    expect(screen).toMatch(/winnerByObjective/);
+    expect(screen).toMatch(/data-testid="protection-conflict"/);
+  });
+
+  /** Rejections and limitations are what a dishonest version of this screen drops. */
+  it('renders rejected candidates and the study limitations', () => {
+    expect(screen).toMatch(/rejectionReason/);
+    expect(screen).toMatch(/study\.limitations\.map/);
+  });
+
+  /**
+   * The age-gradient profile is DECLARED illustrative. `defineCohortProfile`
+   * without provenance marks it UNCALIBRATED, and the screen must show that
+   * marking rather than let a reviewer read the numbers as clinical.
+   */
+  it('shows the cohort calibration and labels the gradient profile illustrative', () => {
+    expect(screen).toMatch(/cohortCalibration/);
+    expect(screen).toMatch(/ILUSTRACYJNY, nieskalibrowany/);
+  });
+});
+
 describe('the dead duplicate is gone, not merely unused', () => {
   /**
    * `MissionStatusBar.tsx` rendered narrator/AI-health/lab-count/visited from

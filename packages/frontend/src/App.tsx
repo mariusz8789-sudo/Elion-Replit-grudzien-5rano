@@ -42,6 +42,7 @@ const RealityNavigator = lazy(() => import('./components/RealityNavigator').then
 const EngineeringNavigator = lazy(() => import('./components/EngineeringNavigator').then((m) => ({ default: m.EngineeringNavigator })));
 const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').then((m) => ({ default: m.ModelConflictPanel })));
 const ModelTournamentPanel = lazy(() => import('./components/ModelTournamentPanel').then((m) => ({ default: m.ModelTournamentPanel })));
+const ProtectionPriorityScreen = lazy(() => import('./components/ProtectionPriorityScreen').then((m) => ({ default: m.ProtectionPriorityScreen })));
 const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
 const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
@@ -98,6 +99,7 @@ type Route =
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
   | { kind: 'dome-world' }
+  | { kind: 'protection-priority' }
   | { kind: 'what-if' }
   | { kind: 'timeline'; mode?: 'cosmic' | 'place' }
   | { kind: 'decision-explorer' }
@@ -139,6 +141,7 @@ function parseHash(): Route {
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
   if (h === '#/dome-world') return { kind: 'dome-world' };
+  if (h === '#/protection-priority') return { kind: 'protection-priority' };
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline' || h === '#/timeline?mode=cosmic') return { kind: 'timeline', mode: 'cosmic' };
   if (h === '#/timeline?mode=place') return { kind: 'timeline', mode: 'place' };
@@ -363,6 +366,18 @@ export default function App() {
         <div className="app">
           <TopBar title="🌍 Kopuła vs kula — falsyfikacja" onSearch={() => setSearchOpen(true)} />
           <DomeWorldScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'protection-priority') {
+      return (
+        <div className="app">
+          <TopBar title="🛡 Kogo chronić najpierw?" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ProtectionPriorityScreen />
+          </HeavyRoute>
           {overlays}
         </div>
       );

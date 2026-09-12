@@ -54,6 +54,10 @@ describe('qe4EvidenceCase — QE4 wired through the generic ExternalDatasetCase 
     expect(evidenceCase.provenance.archiveSha256).toBe('87424c2ddfbc9e68361d70a41878b63919ceb7257bdb70b4fad65d4179cd8389');
   });
 
+  // Calls the real bootstrap-based estimator over the pinned Brydges CSVs
+  // TWICE (replay determinism needs two independent runs) -- each run alone
+  // fits well within the default timeout, but the pair does not; other
+  // tests in this file call it once and are unaffected.
   it('passes through QE4\'s own deterministic resultFingerprint unchanged, and is itself replay-deterministic', () => {
     const analysis = runQe4BrydgesAnalysis();
     const first = buildQe4EvidenceCase(analysis);
@@ -61,7 +65,7 @@ describe('qe4EvidenceCase — QE4 wired through the generic ExternalDatasetCase 
     expect(first.domainResultFingerprint).toBe(analysis.resultFingerprint);
     expect(first.caseFingerprint).toBe(second.caseFingerprint);
     expect(compareExternalDatasetCaseReplay(first, second)).toBe('MATCH');
-  });
+  }, 20000);
 
   it('produces a next-question for every one of the four hypotheses', () => {
     const evidenceCase = buildQe4EvidenceCase();

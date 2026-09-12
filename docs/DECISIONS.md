@@ -549,7 +549,35 @@ potwierdzenie — czy job faktycznie zazieleni się na prawdziwej stronie NIST
 
 ---
 
-## D-021 (2026-09-12, P2.3) — Druga kotwica: Kepler + Wenus (NASA NSSDCA), świadomie NIE NASA Exoplanet Archive
+## D-021 (2026-09-12, discovery-loops-audit) — Legacy loops zostają wyspecjalizowane; `DiscoveryHypothesis`/`discoveryConclusion.ts` jest kanoniczny dla wielokryterialnej Tautology Gate
+
+**Decyzja.** (A), nie (B): `discoveryLoop.ts` i `hypothesisLoop.ts` zostają
+wyspecjalizowanymi pętlami z jednym kryterium na hipotezę; kanonicznym
+modelem dla PRIMARY + SUPPORTING kryteriów, per-kryterialnej klasyfikacji
+Tautology Gate i `MIXED_TEST` pozostaje `DiscoveryHypothesis` +
+`discoveryConclusion.ts` — jedyny z trzech, który już ma ten kształt i już ma
+bramkę podłączoną (`discoveryConclusionTautology.test.ts`).
+
+**Dlaczego, w skrócie.** Dwa poprzednie audyty (`docs/DISCOVERY_MULTI_CRITERION_AUDIT.md`,
+commit `79e6e38e`) przeczytały w całości oba typy hipotez i obie funkcje
+aktualizacji przekonań: `discoveryLoop.ts`'s `updateBelief()` liczy WYŁĄCZNIE
+z kategorycznego werdyktu i boola `metricMoved` — zero magnitudy, którą
+`evidenceCeiling()` mogłaby przyciąć; `hypothesisLoop.ts`'s
+`executePreregisteredHypotheses()` przypisuje status DOKŁADNIE RAZ, bez
+żadnej pętli rewizji. Wymuszenie `MIXED_TEST` na którymkolwiek oznaczałoby
+wymyślenie nowej semantyki przekonań ("nie licz tej rundy" na drabinie
+porządkowej; "cofnij przypisanie" na modelu jednorazowym) — dokładnie to,
+czego zasada „nie zgaduj brakujących semantyk" zabrania.
+
+**Pełne uzasadnienie, tabela porównawcza granic każdej pętli i to, co jest
+kanoniczne dla przyszłego Autonomous Scientific Discovery Engine:**
+`docs/TWO_AUTONOMOUS_LOOPS_DECISION.md` §14.
+
+**Zero zmian w kodzie produkcyjnym.** Ten wpis i §14 są jedynymi zmianami.
+
+---
+
+## D-022 (2026-09-12, P2.3) — Druga kotwica: Kepler + Wenus (NASA NSSDCA), świadomie NIE NASA Exoplanet Archive
 
 **Decyzja.** Druga zewnętrzna kotwica (R-005) zbudowana na danych orbitalnych
 Wenus z NASA NSSDCA Planetary Fact Sheet, reużywając niezmieniony

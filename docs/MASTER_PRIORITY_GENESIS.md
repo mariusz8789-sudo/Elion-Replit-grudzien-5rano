@@ -1189,6 +1189,8 @@ kotwic) — 18/18 zielone, realnie wykonane, liczby powyżej z tego uruchomienia
 nie z pamięci. Pełny opis techniczny: `docs/P2_EVIDENCE.md` (dodatek pod
 sekcją C3), `docs/RISKS.md` (R-005).
 
+---
+
 ## UPDATE — C3: QE5/QE6/QE7 ZBADANE, każde `BLOCKED` z nazwanym powodem (2026-09-12)
 
 Zadanie (`docs/prompts/C3-QE5-QE6-QE7-implementacja.md`): zbudować `qe5.../qe6.../qe7...Inquiry`
@@ -1274,3 +1276,45 @@ każde `BLOCKED` z konkretnym, innym powodem — nie trzy odmowy tej samej wymó
 jeśli ktoś chce go podjąć: QE6 jest NAJBLIŻEJ wykonalności — wymaga tylko dodania jednego presetu
 Haar-losowego do `entanglementStateRunner.ts` (i prawdopodobnie jednego parametru w `router.ts`),
 poza zakresem plików tego zadania, nie poza zakresem fizyki czy architektury.
+
+---
+
+## UPDATE — C1: R-005 — PIERWSZA kotwica INSTRUMENTALNA w repo, CMS Open Data Z→μμ (2026-09-12)
+
+**Zadanie.** Domknąć `docs/RISKS.md` R-005's „następny krok, konkretnie": kotwica
+empiryczna na CMS Open Data Z→μμ 2011 (rekord 5208, CC0) — instrumentalny
+pomiar, nie przeliczona wartość jak PubChem/Kepler.
+
+**W 90% już zrobione, zanim zaczęto.** `compute/cmsOpenDataAdapter.mjs`,
+`cms_zmumu_worker.py` i model Fabric `particle-cern-cms-zmumu-invariant-mass`
+istniały od wcześniej, w pełni zaimplementowane i testowane pod nieobecność
+danych (fail-closed `DATA_REQUIRED`), z DOKŁADNYMI oczekiwanymi liczbami już
+zapisanymi w trzecim, dotąd pomijanym teście — czekały wyłącznie na sam plik
+`Zmumu.csv`. Zadanie C1 sprowadzało się do: pobrać, zweryfikować, przypiąć.
+
+**Realna przeszkoda po drodze — cichy limit odczytu logów CI, nie
+przewidziany.** Pierwsza próba wydrukowania całego pliku (970 KB, 10001
+linii) do jednego loga joba dała log, który `get_job_logs` odczytał TYLKO
+częściowo (ostatnie ~5000 linii, ~630 KB) — bez żadnego błędu, po cichu.
+Rozwiązanie: job macierzowy na 4 fragmenty, każda linia jawnie ponumerowana,
+każdy fragment odczytany osobno i złożony z powrotem po numerze linii.
+Pełny opis techniczny i dowód bajtowej zgodności: `docs/DECISIONS.md` D-023.
+
+**Weryfikacja.** Worker Pythona uruchomiony lokalnie na przypiętym pliku
+(offline) daje DOKŁADNIE liczby zapisane w teście od dawna:
+`eventCount=10000`, `events80To100GeV=8259`, `median=90.28540772526225`.
+Trzeci test `cmsOpenDataCompute.test.mjs` (był `{ skip: !configuredDataDir }`)
+teraz przechodzi naprawdę: `3/3 pass`. Pełny backend: `397/397 pass, 33
+skipped` (było `396/396, 34 skipped`). Job CI zamieniony z bootstrapu na
+trwałą kontrolę dryfu (`cms-zmumu-verify-pinned`), `GENESIS_CERN_OPEN_DATA_DIR`
+ustawiony w kroku testowym `verify`, żeby test uruchamiał się naprawdę w CI.
+
+**Czego to NIE ustanawia.** To jest opisowa statystyka realnego pomiaru
+(masa niezmiennicza 10 000 zdarzeń dimionowych), nie test falsyfikacyjny —
+nie ma tu jeszcze prerejestrowanej predykcji Genesis do porównania z tym
+pomiarem. To jest naturalny „next question" dla tej kotwicy, świadomie poza
+zakresem tego zadania (por. `docs/RISKS.md` R-005).
+
+Priorytet ZWĘŻONY: R-005 (punkt „brak pomiaru instrumentalnego" domknięty
+przykładem; punkt „brak ingestion na żywo" i "brak testu falsyfikacyjnego
+na tym pomiarze" pozostają otwarte, nazwane wprost).

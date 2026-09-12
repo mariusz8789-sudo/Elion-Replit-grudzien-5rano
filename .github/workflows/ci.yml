@@ -49,6 +49,8 @@ jobs:
         run: npm run test --workspace=packages/frontend -- --maxWorkers=1
 
       - name: Testy backend
+        env:
+          GENESIS_CERN_OPEN_DATA_DIR: packages/backend/src/compute/cms-zmumu
         run: npm run test --workspace=packages/backend
 
       - name: Typecheck frontend
@@ -247,34 +249,27 @@ jobs:
           console.log('All 29 pinned QE4 Brydges files match the live Zenodo archive -- no drift.');
           NODE
 
-  cms-zmumu-recon:
-    name: R-005 recon — CMS Open Data record 5208 (Z→μμ), print shard ${{ matrix.shard }}/4 for job-log read-back
+  cms-zmumu-verify-pinned:
+    name: R-005 anchor — verify pinned CMS Zmumu.csv against live CERN Open Data (drift detection)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-    # TEMPORARY BOOTSTRAP JOB (mirrors the Kepler/QE4 anchors' own history).
-    # opendata.cern.ch is blocked from this repo's own sandbox (403 on
-    # CONNECT, confirmed directly with curl) -- so this job does the one-time
-    # real fetch + SHA-256 verification on a GitHub Actions runner, which has
-    # ordinary internet access, and prints the fetched file's content into
-    # its own log for read-back via the GitHub API.
-    #
-    # SHARDED, because a single-job print of the whole 970KB/10001-line file
-    # (tried first, run 34720797396, job 103626153086) turned out to be
+    # Phase 0 (see docs/RISKS.md R-005) fetched this dataset via a 4-shard
+    # bootstrapping matrix job -- a single-job print of the whole
+    # 970KB/10001-line file (run 34720797396, job 103626153086) was
     # UNREADABLE: `get_job_logs` silently returned only the LAST ~5000 lines
-    # (~630KB) of the ~10244-line job log regardless of the requested
-    # `tail_lines`, with no error -- the same class of silent truncation the
-    # QE4 anchor's bootstrap already hit above ~2.5MB combined. Each shard's
-    # own job log is small enough (~2500 CSV lines, each individually
-    # line-numbered so shards can be reassembled and sorted independent of
-    # arrival order) to stay comfortably under that ceiling. Once Zmumu.csv
-    # is committed from this read-back, all 4 shard jobs are replaced by one
-    # ongoing drift-detection job (re-fetch vs. committed copy), exactly
-    # like `kepler-solar-system-pinned-artifact` and `qe4-brydges-verify-pinned`.
-    strategy:
-      matrix:
-        shard: [0, 1, 2, 3]
+    # of the job's log regardless of the requested `tail_lines`, with no
+    # error, so each of the 4 shards' explicitly line-numbered row ranges
+    # was printed into its OWN job log (run 34720957684) and reassembled by
+    # line number, matching cms_zmumu_worker.py::EXPECTED_SHA256 exactly.
+    # That bootstrapping matrix is gone now that Zmumu.csv is committed
+    # under packages/backend/src/compute/cms-zmumu/; this ONE ongoing job
+    # does what the Kepler/QE4 anchors' own CI jobs already do: re-fetch for
+    # real on every push (this runner has ordinary internet access; the
+    # repo's own sandbox does not) and fail loudly if the live CERN record
+    # ever drifts from what is pinned, rather than silently trusting a
+    # fetch made once.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -294,34 +289,23 @@ jobs:
         env:
           GENESIS_CMS_ZMUMU_FIXTURE_DIR: artifacts/cms-zmumu
         run: node scripts/fetch-cms-zmumu-fixture.mjs
-      - name: Print manifest into the job log (shard 0 only, small and only needed once)
-        if: matrix.shard == 0
-        run: |
-          echo "CMS-zmumu MANIFEST_BEGIN manifest.json"
-          cat artifacts/cms-zmumu/manifest.json
-          echo "CMS-zmumu MANIFEST_END manifest.json"
-      - name: Print this shard's line range into the job log (read-back source)
-        env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_COUNT: '4'
+      - name: Compare fresh fetch to the committed pinned copy (drift detection)
         run: |
           node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs';
-          const index = Number(process.env.SHARD_INDEX);
-          const count = Number(process.env.SHARD_COUNT);
-          const lines = readFileSync('artifacts/cms-zmumu/Zmumu.csv', 'utf8').split('\n');
-          const total = lines.length;
-          const perShard = Math.ceil(total / count);
-          const start = index * perShard;
-          const end = Math.min(start + perShard, total);
-          console.log(`CMS-zmumu SHARD_BEGIN ${index} total=${total} start=${start} end=${end}`);
-          for (let i = start; i < end; i += 1) {
-            console.log(`CMS-zmumu LINE ${i} ${lines[i]}`);
+          import { readFile } from 'node:fs/promises';
+          const fresh = await readFile('artifacts/cms-zmumu/Zmumu.csv', 'utf8');
+          const committed = await readFile('packages/backend/src/compute/cms-zmumu/Zmumu.csv', 'utf8');
+          if (fresh !== committed) {
+            throw new Error(
+              'CMS Open Data Zmumu.csv drifted from the committed, hash-pinned copy the CMS anchor reads. ' +
+              'CERN changed the source file since this was pinned -- ' +
+              're-fetch, re-verify the descriptive statistics, and re-pin deliberately; ' +
+              'do not silently accept a changed value as the same observation.',
+            );
           }
-          console.log(`CMS-zmumu SHARD_END ${index}`);
+          console.log('CMS Zmumu.csv fixture matches the committed pinned copy — no drift.');
           NODE
-      - name: Upload candidate fixture (shard 0 only; Azure blob URL is unreachable from this sandbox too -- log read-back is primary)
-        if: matrix.shard == 0
+      - name: Upload immutable CMS candidate fixture
         uses: actions/upload-artifact@v7
         with:
           name: cms-zmumu-${{ github.sha }}

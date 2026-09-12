@@ -316,6 +316,25 @@ jobs:
           path: artifacts/cms-zmumu
           retention-days: 90
 
+  b1-defra-aurn-recon:
+    name: "B1 Phase 0 (temporary): recon DEFRA AURN flat_files + site-info for MY1/MAN3/LED6/SHBR"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Local sandbox egress to uk-air.defra.gov.uk is confirmed blocked (403 on
+    # CONNECT) -- same pattern as zenodo.org/nist.gov/CERN Open Data before it.
+    # This is a ONE-OFF recon job (remove once the real fetch plan is designed
+    # from its output, mirroring qe4-brydges-recon's own lifecycle) -- it does
+    # NOT freeze or pin anything, it only discovers what DEFRA actually serves.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Recon DEFRA AURN flat_files + site-info pages
+        run: node scripts/recon-b1-defra-aurn.mjs
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

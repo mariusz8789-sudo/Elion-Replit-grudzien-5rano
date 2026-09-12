@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { bytesToHex, computeFingerprint, hexToBytes } from './fingerprint.js';
 
 /**

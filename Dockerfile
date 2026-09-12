@@ -9,21 +9,6 @@ COPY packages/backend/package.json packages/backend/
 COPY packages/csrn/package.json packages/csrn/
 RUN npm ci
 COPY . .
-# DIAGNOSTIC, TEMPORARY (D-017 follow-up): the identical `npm run build` passes
-# in the verify CI job (same ubuntu-latest runner, actions/setup-node) but
-# fails inside this node:22-slim container on a real, reproducible TS2307 for
-# node:crypto/node:child_process in packages/csrn + rdkitTransport.node.ts.
-# Two local reproductions of this exact COPY sequence (with and without
-# packages/csrn/package.json present before npm ci) both built cleanly, so the
-# difference is something about THIS container specifically. This step prints
-# only versions and directory listings -- no secrets, nothing sensitive -- to
-# find that difference from a real failing run instead of guessing again.
-RUN node --version && npm --version \
-    && echo "--- root node_modules/typescript ---" && cat node_modules/typescript/package.json 2>/dev/null | grep '"version"' \
-    && echo "--- root node_modules/@types/node ---" && cat node_modules/@types/node/package.json 2>/dev/null | grep '"version"' || echo "MISSING: node_modules/@types/node" \
-    && echo "--- packages/frontend/node_modules ---" && ls packages/frontend/node_modules 2>&1 \
-    && echo "--- packages/csrn/node_modules ---" && ls packages/csrn/node_modules 2>&1 \
-    && echo "--- packages/frontend/tsconfig.json ---" && cat packages/frontend/tsconfig.json
 RUN npm run build
 
 FROM node:22-slim AS runtime

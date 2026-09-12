@@ -409,3 +409,72 @@ mimo tej zmiany, hipoteza o wersji npm w `node:22-slim` będzie wymagała
 dalszego śledztwa (np. przypięcie konkretnej wersji npm w obrazie `build`
 przez `RUN npm install -g npm@<pinned>`), zapisanego tutaj jako kolejna
 decyzja, nie po cichu.
+
+---
+
+## D-018 (2026-09-12, R-006) — Prawdziwa przyczyna TS2307 w `docker-image` znaleziona i naprawiona: ukryta zależność produkcyjnego kodu od plików testowych
+
+**Status: rozwiązane, dowód lokalny kompletny; dowód CI w toku.**
+
+**Dwie kolejne próby naprawy w D-017 NIE zadziałały — potwierdzone przez
+ponowne uruchomienia CI, nie założone.** Commit `305b215` (dodanie
+`packages/csrn/package.json` do COPY) i commit `e678df0` (diagnostyka wersji)
+zostały wypchnięte i sprawdzone w Actions (`get_job_logs`) — IDENTYCZNY błąd
+w obu, ten sam plik, ta sama linia, w 18-19 s. Diagnostyka z `e678df0`
+pokazała: `node v22.23.2`, `npm 10.9.8`, root `typescript@6.0.3` (hoisted, spoza
+zakresu `^5.7.2` deklarowanego przez `frontend`/`csrn` — osobna, nieszkodliwa
+niespójność lockfile'a warta odnotowania, ale NIE przyczyna tego błędu).
+
+**Prawdziwa przyczyna, znaleziona przez bisekcję lokalną, nie zgadnięciem.**
+Odtworzono DOKŁADNIE zachowanie `.dockerignore` lokalnie (kopiowanie
+śledzonych plików + usunięcie `**/*.test.ts`/`**/*.test.tsx`/`**/__tests__`,
+dokładnie jak Docker robi to przy `COPY . .`) — TERAZ błąd odtworzył się
+lokalnie po raz pierwszy. Bisekcja (przywracanie po jednym katalogu)
+wykazała: obecność `packages/frontend/src/__tests__/` SAMA W SOBIE naprawia
+build. Przyczyna: `packages/frontend/src/__tests__/commitHash.test.ts` (i
+kilka innych plików testowych) robi `import { execSync } from
+'node:child_process'` jako WARTOŚCIOWY (nie tylko typowy) import. TypeScript
+z `"types": ["vite/client"]` w `packages/frontend/tsconfig.json` blokuje
+TYLKO automatyczne/domyślne dołączanie pakietów `@types/*` — ale gdy
+JAKIKOLWIEK plik w tym samym programie kompilacji jawnie rozwiąże moduł
+wbudowany `node:*`, deklaracje ambientowe `@types/node` (w tym globalne
+`process`/`__dirname` i `declare module 'node:crypto'`) stają się widoczne
+DLA CAŁEGO PROGRAMU — także dla plików produkcyjnych, które NIGDY jawnie
+tego nie deklarowały. `packages/csrn/src/crypto/fingerprint.ts`/`signing.ts`
+(kompilowane WEWNĄTRZ programu `frontend`, bo `@genesis-os/csrn` jest
+rozwiązywane jako `./src/index.ts` przez `package.json`, nie przez formalną
+referencję projektu TS) i `rdkitTransport.node.ts` od zawsze polegały na tym
+przypadkowym przecieku z plików testowych — **to jest realna, wcześniej
+istniejąca luka w typowaniu kodu produkcyjnego**, zamaskowana w KAŻDYM
+dotychczasowym typecheck/build w tym repo (lokalnie i w `verify` CI), bo
+żaden z nich nigdy nie kompilował bez plików testowych. `.dockerignore`
+(`**/*.test.ts`, `**/__tests__`) jest pierwszą rzeczą w historii repo, która
+faktycznie zbudowała `packages/frontend` bez nich — i dlatego pierwszy
+prawdziwy build Dockera (D-016/D-017) był pierwszym miejscem, gdzie ta luka
+w ogóle mogła się ujawnić.
+
+**Naprawa, zweryfikowana lokalnie w DOKŁADNYM odtworzeniu warunków Dockera
+(z i bez plików testowych), nie zgadnięciem.** Dodano `/// <reference
+types="node" />` na górze trzech plików, które faktycznie potrzebują
+ambientowych typów Node:
+`packages/csrn/src/crypto/fingerprint.ts`,
+`packages/csrn/src/crypto/signing.ts`,
+`packages/frontend/src/core/discovery/molecular/rdkitTransport.node.ts`.
+To jest idiomatyczne, lokalne (per-plik) rozwiązanie — nie zmienia globalnego
+`"types"` frontendu (co mogłoby maskować przyszłe błędy w kodzie
+przeglądarkowym), nie wymaga przebudowy granic projektu TS między
+`frontend`/`csrn`. Zweryfikowane: odtworzenie repro Dockera BEZ plików
+testowych + tą poprawką → build przechodzi; bez poprawki → ten sam błąd co
+w CI, 1:1. Pełna lokalna bramka po zmianie: eslint czysto, `tsc --noEmit -p
+packages/frontend` czysto, `tsc -b` w `packages/csrn` czysto, backend 430
+testów/396 pass/0 fail/34 skipped, frontend 469/469 plików/5200 passed/1
+skip, `packages/csrn` 5/5 plików/38 passed, `npm run build` czysto.
+
+Tymczasowy krok diagnostyczny w `Dockerfile` (z `e678df0`) usunięty w tym
+samym commicie — spełnił swoją rolę, nie zostaje jako martwy kod.
+
+**Status.** `NOT VERIFIED` z realnego `docker build` w tym środowisku
+pozostaje (blokada CDN, D-016) — ale to JEST teraz zweryfikowane wobec
+DOKŁADNEGO odtworzenia zachowania `.dockerignore`+`COPY . .`+`npm ci`, więc
+pewność jest znacznie wyższa niż przy poprzednich dwóch próbach. Ostateczne
+potwierdzenie: kolejny push, job `docker-image` w Actions.

@@ -159,26 +159,51 @@ egress do Docker Hub nie jest ograniczony. Logika HTTP tego joba
 kontenera przed wpisaniem do workflow (`docs/P0_EVIDENCE.md`, sekcja P0.2) —
 każdy kształt JSON w skrypcie sprawdzony wykonaniem, nie założony.
 
-**Pierwsze uruchomienie w Actions (commit `d70e130`, run `34709914327`):
-RED, przyczyna INNA niż blokada egress.** Sprawdzone realnie przez
-`mcp__github__actions_get`/`get_job_logs` (nie założone) — krok „Budowa
-obrazu” padł po 33 s na `tsc -b` wewnątrz `RUN npm run build`:
+**Trzy kolejne uruchomienia w Actions, ten sam błąd, aż do znalezienia
+prawdziwej przyczyny — opisane w kolejności, nie ukryte.** Pierwsze
+(`d70e130`) i drugie (`305b215`, po dodaniu brakującego
+`COPY packages/csrn/package.json`) uruchomienie dały IDENTYCZNY błąd:
 `Cannot find module 'node:crypto'`/`'node:child_process'` w
-`packages/csrn/src/crypto/*.ts` i `rdkitTransport.node.ts`. Przyczyna:
-etap `build` Dockerfile'a kopiował przed `npm ci` `package.json` dla
-`frontend`/`backend`, ale NIE dla `packages/csrn` — mimo że `csrn` jest
-zadeklarowanym workspace'em i realną zależnością `frontend/package.json`
-(`"@genesis-os/csrn": "^1.0.0"`). Naprawione dodaniem brakującej linii
-`COPY packages/csrn/package.json packages/csrn/` (`docs/DECISIONS.md`,
-D-017). Lokalna próba odtworzenia dała wynik NIEROZSTRZYGAJĄCY — dokładna
-sekwencja COPY z Dockerfile'a zbudowała się poprawnie w tym sandboxie z OBOMA
-wariantami (z brakiem i z dodaniem pliku), więc różnica prawdopodobnie leży w
-wersji npm w obrazie `node:22-slim`, nie potwierdzone wprost.
+`packages/csrn/src/crypto/*.ts` i `rdkitTransport.node.ts`, ~18-19 s w
+`RUN npm run build`. Trzecie uruchomienie (`e678df0`) dodało tymczasową
+diagnostykę wersji — bez rozstrzygnięcia (node/npm/typescript prawie
+identyczne jak lokalnie).
+
+**Prawdziwa przyczyna znaleziona lokalną bisekcją, nie zgadnięciem
+(`docs/DECISIONS.md`, D-018).** Odtworzono DOKŁADNIE zachowanie
+`.dockerignore` (usunięcie `**/*.test.ts`/`**/__tests__` z kopiowanych
+plików) — błąd odtworzył się lokalnie po raz pierwszy. To jest REALNA,
+wcześniej istniejąca luka w typowaniu kodu produkcyjnego, nie problem
+środowiska Dockera: `packages/csrn/src/crypto/{fingerprint,signing}.ts`
+(kompilowane wewnątrz programu `frontend` przez `tsc -b`, bo
+`@genesis-os/csrn` rozwiązuje się do `./src/index.ts`, nie przez formalną
+referencję projektu TS) i `rdkitTransport.node.ts` od zawsze przypadkowo
+polegały na tym, że plik testowy `__tests__/commitHash.test.ts` też
+importuje `node:child_process` — co w TypeScript z ograniczonym
+`"types": ["vite/client"]` udostępnia ambientowe typy `@types/node` CAŁEMU
+programowi kompilacji, nie tylko temu jednemu plikowi. `.dockerignore`
+(usuwający pliki testowe z obrazu — poprawne zachowanie dla obrazu
+produkcyjnego) jest pierwszą rzeczą w historii repo, która zbudowała
+`frontend` BEZ tego przypadkowego przecieku, i dlatego pierwszy prawdziwy
+`docker build` (D-016) był pierwszym miejscem, gdzie ta luka mogła się
+ujawnić — żaden wcześniejszy `tsc`/build w tym repo (lokalnie ani w
+`verify` CI) jej nie złapał.
+
+**Naprawa: `/// <reference types="node" />` na górze trzech plików, które
+faktycznie potrzebują ambientowych typów Node** — lokalne, idiomatyczne
+rozwiązanie per-plik, bez zmiany globalnego `"types"` frontendu (co
+maskowałoby przyszłe błędy w kodzie przeglądarkowym). Zweryfikowane
+odtworzeniem DOKŁADNYCH warunków Dockera lokalnie (bez plików testowych):
+bez poprawki — ten sam błąd co w CI, 1:1; z poprawką — build przechodzi.
+Pełna lokalna bramka po zmianie zielona (eslint, tsc frontend+csrn, backend
+430/396/0/34, frontend 469/5200/1skip, csrn 5/38, build).
 
 **Wciąż nie jest to samodzielny dowód z TEGO środowiska** — dowód powstaje
-na kolejnym pushu niosącym poprawkę D-017, w Actions, na tym SHA. Status:
-sprawdzić w zakładce Actions dla `.github/workflows/ci.yml` przed wdrożeniem
-— `docker-image` MUSI być zielony, nie tylko `verify`.
+na kolejnym pushu, w Actions, na tym SHA. Pewność jest znacznie wyższa niż
+przy dwóch poprzednich próbach, bo naprawa jest zweryfikowana wobec
+dokładnego odtworzenia mechanizmu awarii, nie tylko wobec samej sekwencji
+COPY. Status: sprawdzić w zakładce Actions dla `.github/workflows/ci.yml`
+przed wdrożeniem — `docker-image` MUSI być zielony, nie tylko `verify`.
 
 ---
 

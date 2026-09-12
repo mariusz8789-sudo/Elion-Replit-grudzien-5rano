@@ -72,3 +72,43 @@ replay MATCH) — to jest cel, nie gwarancja, bo C2/C3 startują P0 od zera dopi
 Realistyczny wynik dzisiejszy: P0.1–P0.5 GREEN, każde z realnym dowodem, plus B1 i dedup
 domknięte. P1 (pełny dwurundowy demonstrator) to naturalne jutro, jeśli P0 wejdzie dziś
 bez blokerów.
+
+## UPDATE (ten sam dzień) — dodatek Qwena v2, dwie poprawki, uzgodniona numeracja P0-1..P0-6
+
+Qwen przysłał `MASTER_SPEC_DELTA_ADDENDUM_v2` z bardziej szczegółową numeracją P0
+(P0-1..P0-6). Zweryfikowałem go bezpośrednio w kodzie przed przyjęciem — pełny zapis w
+`docs/DISCOVERY_ENGINE_FINAL_CLASSIFICATION_2026-09-12.md` sekcja 7. Dwie poprawki:
+
+1. **"Demonstrator QE4 na `campaign/orchestrator.mjs`" jest nieuczciwym uproszczeniem.**
+   Ten plik jest związany z RDKit/SMILES na trzech poziomach (`describeAsRun`→
+   `runModel('chem-rdkit-descriptors',...)`, `adapter.canonicalize`, sortowanie `smiles`
+   w `hashState`) — dosłowne uruchomienie na nim wymagałoby przepisania rdzenia. Reużywamy
+   KSZTAŁT pętli, nie ten plik — `DatasetLaboratory` (P0.1 z sekcji 4 klasyfikacji) jest
+   dziewiątą implementacją tego samego wzorca co `campaign/toolchain.mjs`'s 8 narzędzi,
+   nie nowym silnikiem. **Bez zmian względem wcześniejszego podziału: P0.1 zostaje osobnym,
+   wąskim adapterem, nie wciśnięciem QE4 w silnik lekowy.**
+2. **"Cross-campaign dedup: REUSE/C1-VERIFIED" jest fałszywe.** Zero implementacji w kodzie
+   (`seenCanonicalGlobal`/`listCandidatesAcrossCampaigns` — 0 trafień). **C2 kontynuuje to
+   zadanie, nikt go nie pomija.**
+
+Numeracja P0-1..P0-6 z dodatku Qwena (dokładniejsza niż moja P0.1-P0.5) — przyjęta, z
+zastrzeżeniem EIG (patrz niżej), i mapowana na tych samych ludzi co wyżej:
+
+| # (Qwen) | Zakres | Kto | Zmiana względem wcześniejszego podziału |
+|---|---|---|---|
+| P0-1 | Bramki skorowania selektora | C2 (po dedupie) | = wcześniejsze P0.3, **bez członu EIG** |
+| P0-2 | Operatory derywacji hipotez + rodowód | C3 | = wcześniejsze P0.2 |
+| P0-3 | Enum + ewaluacja reguł stopu | C3 | = wcześniejsze P0.5, **tylko dla jednej pętli, nie unifikacja 7 słowników** |
+| P0-4 | Pola truth-schema (`INFERENCE`, `CONFLICTING_EVIDENCE`, ...) | **nowe, C2 po P0-1** | wcześniej to był tylko temat badawczy dla Qwena — dodatek słusznie podnosi to do P0, przyjęte |
+| P0-5 | Obowiązkowy przebieg adwersarialny po rundzie | C3 (po P0-2/P0-3) | = punkt 7 z wcześniejszej tabeli, teraz jawnie ponumerowany |
+| P0-6 | Odcisk prowieniencji/replay na rundę | C2 lub C3, kto skończy pierwszy | reużycie `fnv1a`/`canonicalJson`/`ExperimentProvenance` — bramka replay MATCH przed zamknięciem P0 |
+
+**Zastrzeżenie do P0-1, podtrzymane:** EIG nie wchodzi do wzoru skorowania — `beliefRevision.ts`
+jest heurystyką log-odds, nie skalibrowanym posteriorem, więc "expected posterior-entropy
+reduction" nie da się z niego uczciwie policzyć (pełne uzasadnienie: klasyfikacja, sekcja 3).
+
+**C1 zostaje przy B1** — dodatek proponował przenieść C1 na sześć zadań P0, ale druga
+instancja C1 już zdecydowała "Skip to B1 now" i jest w trakcie. Nie zmieniam tego w połowie
+pracy na podstawie propozycji z zewnątrz bez dostępu do repo. Jeśli C1 skończy B1 dziś i
+zostanie czas, naturalny kolejny krok to P0.1 albo P0-4 (P0-4 nie ma jeszcze przypisanej
+osoby poza "C2 po P0-1" — C1 może je przejąć równolegle, żeby nie czekać w kolejce).

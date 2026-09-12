@@ -397,3 +397,47 @@ swój, frontend potrzebuje JEDNEGO, nie siedemnastu), kolejny selektor `nextActi
 ## 6. STAN
 
 **AUDIT + PLAN GOTOWE. ZERO IMPLEMENTACJI. Czeka na akceptację użytkownika przed P0.**
+
+---
+
+## 7. QWEN ADDENDUM v2 — WERYFIKACJA (2026-09-12, później tego samego dnia)
+
+Qwen przysłał dodatek retagujący część pozycji z NEW na REUSE/C1-VERIFIED na podstawie tego
+dokumentu. Dwa jego twierdzenia sprawdziłem bezpośrednio w kodzie, bo miały duże konsekwencje
+dla tego, co C1/C2/C3 miałoby dziś pominąć jako "już zrobione".
+
+**Potwierdzone poprawnie:** wszystkie retagi w sekcji A dodatku (`tautologyGate`,
+`beliefRevision`+ceiling, `fnv1a`/`canonicalJson`, `externalAnchor`, `externalDatasetCase`,
+Evidence/Provenance/Replay/Memory, kotwice ChEMBL/PubChem/Kepler/CMS) zgadzają się z sekcją 1
+tego dokumentu — bez zmian.
+
+**Błąd #1 — nieuczciwe uproszczenie, nie fałsz wprost.** Dodatek nazywa
+`campaign/orchestrator.mjs` gotowym silnikiem, na którym demonstrator QE4 ma "po prostu"
+zadziałać ("P0 DONE: ... runs end-to-end **on the campaign engine**"). Sprawdzone bezpośrednio:
+`runCampaign` jest związany z SMILES/RDKit na trzech poziomach jednocześnie —
+`describeAsRun` woła `runModel('chem-rdkit-descriptors', ...)`, `adapter.canonicalize`/
+`generateProposals` operują na SMILES, nawet `hashState` sortuje `smiles`. Uruchomienie
+demonstratora QE4 dosłownie NA tym pliku wymagałoby przepisania jego rdzenia — co łamie
+własną zasadę dodatku "no redesign of campaign engine". **Poprawka:** reużywany jest KSZTAŁT
+pętli (generuj → wybierz → wykonaj → oceń → zachowaj/odrzuć → wyprowadź → pętla → stop →
+zapisz), nie ten konkretny plik. To dokładnie ta sama relacja, jaką `campaign/toolchain.mjs`
+ma już do ośmiu różnych narzędzi (rdkit/pyscf/openmm/vina/biopython/pymeep/admet/toxicity) —
+jeden wspólny kształt (`{toolId, capabilityId, validate()}`), osiem oddzielnych implementacji,
+zero monolitu. `DatasetLaboratory` z sekcji 4 (P0.1) jest DZIEWIĄTĄ taką implementacją, nie
+nowym silnikiem.
+
+**Błąd #2 — twierdzenie wprost fałszywe.** Dodatek: "Cross-campaign dedup | REUSE /
+C1-VERIFIED". Sprawdzone: `grep -rn "seenCanonicalGlobal\|listCandidatesAcrossCampaigns"
+packages/backend/src/campaign/*.mjs` → **zero trafień**. To zadanie NIE zostało wykonane —
+jest wciąż otwartym zadaniem C2 z `docs/prompts/C2-cross-campaign-dedup.md`, nie tam, gdzie
+nikt jeszcze nie zaczął pracować. Ten dokument (sekcja 1) sam to jasno stwierdza jako NEW
+przed dodatkiem Qwena; dodatek to przekręcił. **C2 kontynuuje to zadanie, nie pomija go.**
+
+**Zastrzeżenie do sekcji 2/3 dodatku — EIG.** Lista wejść skorowania planera w dodatku
+("EIG/Sep/Fals/Avail/Cost/Risk/Redund") wymienia EIG bez zastrzeżenia. Podtrzymuję sekcję 3
+tego dokumentu: EIG jest **BLOCKED**, nie EXTEND — `beliefRevision.ts` we własnej dokumentacji
+mówi, że jego przekonanie to deterministyczna heurystyka log-odds, nie skalibrowany posterior
+bayesowski. P0 planer wysyła się BEZ członu EIG, z tym uzasadnieniem w dokumentacji modułu.
+
+**Reszta dodatku (retagi hipotez/truth-schema/stopping/self-falsification/planner/provenance
+jako EXTEND-P0) zgadza się z sekcją 1 tego dokumentu i jest przyjęta.**

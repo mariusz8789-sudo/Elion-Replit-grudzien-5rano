@@ -1,0 +1,74 @@
+# DZIŚ (2026-09-12) — zadania C1/C2/C3/Qwen na podstawie klasyfikacji Discovery Engine
+
+Wejście: `docs/DISCOVERY_ENGINE_FINAL_CLASSIFICATION_2026-09-12.md` na `75ebdc1`.
+To jest GO dla P0 z tamtego dokumentu — audyt był warunkiem wstępnym, jest zamknięty,
+teraz działamy. F2–F4 (Reasoning Core, World/Project, Mythos domains) **świadomie poza
+zakresem dzisiaj** — user sam to tak podzielił.
+
+## Krótki czek: F1 punkt-po-punkcie, co mamy / co brakuje
+
+| # | Luka z listy F1 | Realny stan | Kto dziś |
+|---|---|---|---|
+| 1 | Real-data autonomous loop | **BLOCKED/NEW — jedyna prawdziwie blokująca luka.** `inquiryLoop.ts`/`discoveryLoop.ts` wymagają `hiddenParameters`/`buildWorld()`, nie umieją przyjąć przypiętego zbioru jako źródła obserwacji | **C2 lub C3 (kto wolny pierwszy) — P0.1** |
+| 2 | Formalny planner scoring | EXTEND — wzorzec ważonej sumy już działa (`cyberTestPlanner.ts`) i napędza realną pętlę, tylko na złym substracie. EIG jest **BLOCKED** (uzasadnienie w klasyfikacji §3), nie wchodzi do wzoru | **ten sam co #1 — P0.3, po #1** |
+| 3 | Open-ended hypothesis generation | EXTEND — VARIANT i DERIVE realne (4 implementacje), COMPETE bierze problem nie hipotezę, ABDUCT nie istnieje | P0.2 wchodzi w #1 (hipotezy z siatki danych, nie z literału) |
+| 4 | Open-ended next-question | **NEW, potwierdzone** — `externalDatasetCase.ts::buildNextQuestion` to dosłownie sztywny switch na 4 szablony, dokładnie to, czego spec zakazuje | **C3 — mały, osobny task, dziś jeśli starczy czasu** |
+| 5 | Candidate/mechanism generation domenowo-neutralny | NEW, ale **poza P0** — demonstrator QE4 nie potrzebuje substancji, tylko nastawy `(T,k)` | odłożone |
+| 6 | Stopping rules | EXTEND — 7 osobnych słowników istnieje. **Nie unifikować wszystkich dziś** (ryzyko regresji), tylko dołożyć CONVERGENCE/NO_INFORMATION_GAIN do pętli z #1 | **C3 — P0.5** |
+| 7 | Adversarial self-falsification jako obowiązkowy krok | EXTEND — tautology gate, discriminability, anti-HARK są realne, ale kotwica anty-HARK jest wszędzie pusta (`priorRunFingerprints: []`) i nic nie wymusza kroku co rundę | **C3 — wpiąć jako obowiązkowy krok w pętli z #1, po P0.4** |
+| 8 | Laboratory abstraction | Backend EXTEND (ma realny `execute(values,{seed})`), **frontend NEW** — router to czyste dane, dyspozytor to 51-case switch bez default | to samo zadanie co #1 (P0.1 to właśnie ten kontrakt, wąsko: jeden substrat) |
+| 9 | Truth schema (INFERENCE, CONFLICTING_EVIDENCE, ...) | EXTEND — `CONFLICTING_EVIDENCE` nie istnieje NIGDZIE w repo, `epistemicReliability.ts` to już zaczęta konsolidacja 3 z 6 słowników | **Qwen — research: jak realnie zdefiniować CONFLICTING_EVIDENCE i evidence strength, żeby C1/C2/C3 nie zgadywali** |
+| 10 | Cross-campaign scientific memory / dedup | NEW, **już w toku** — `docs/prompts/C2-cross-campaign-dedup.md`, zakres poszerzony (orchestrator nie rehydratuje nawet WŁASNYCH poprzednich generacji) | **C2 — dokończyć TO przed P0.1** |
+| 11 | Autonomous provenance/replay wiring | REUSE w większości (fingerprint/provenance/replay realne). `codeHash` NEW (zero implementacji), ryzyko: ≥4 niezależne implementacje canonical JSON, front liczy inaczej niż backend (§20 klasyfikacji) | zapisane jako ryzyko w klasyfikacji, nie blokuje dziś |
+
+## Zadania na dziś
+
+### C1 — kontynuacja B1 (już w toku, zdecydowane)
+Druga instancja C1 utknęła na blokerze A1 i wybrała "Skip to B1 now" — kontynuuj
+`docs/prompts/C1-B1-ulez-no2-adjudication.md` (causalInference.ts, DiD/ITS/synthetic-control
+na realnych danych DEFRA). To już ma pełną specyfikację, nic tu nie zmieniam.
+
+### C2 — najpierw dokończ dedup, potem P0.1 (DatasetLaboratory seam)
+1. Dokończ `docs/prompts/C2-cross-campaign-dedup.md` (zakres już poszerzony o brak
+   rehydratacji własnych generacji — przeczytaj zaktualizowaną wersję przed startem).
+2. Jeśli zostanie dziś czas: **P0.1 z klasyfikacji, sekcja 4** — wąski kontrakt
+   `DatasetLaboratory { labId, observableSpec, run(config, seed) → LaboratoryResult }`
+   dla JEDNEGO substratu (QE4), czytający przypięte CSV i wołający
+   `qe4BrydgesEstimator.ts::bootstrapMultiK`. Prowenancja z
+   `externalDatasetCase.ts::ExternalDatasetProvenance` (ma już `archiveSha256`), odcisk z
+   `events/hash.ts::fnv1a`+`canonicalJson`. **NIE generalizować na 17 domen — to P2.**
+
+### C3 — P0.2 + P0.4 + P0.5 (hipotezy z siatki, hipoteza rezydualna, stopowanie)
+1. **P0.2**: hipotezy konkurencyjne LICZONE z siatki `(T,k)` przypiętego zbioru QE4
+   (reżimy: liniowy w t / logarytmiczny / saturujący), z `parentHypothesisId`/`generatedBy`
+   przez `beliefRevision.ts::createHypothesis` — nie z literału.
+2. **P0.4**: operator hipotezy rezydualnej z `weightedResidualSumOfSquares` po dopasowanym
+   reżimie (np. czas przejścia t*) — to jest ten element, który realnie spełnia "derives a
+   new hypothesis from the result" ze §23 specu Qwena.
+3. **P0.5**: dołóż `CONVERGENCE`/`NO_INFORMATION_GAIN` do słownika stopu TEJ JEDNEJ pętli
+   (nie unifikuj wszystkich siedmiu istniejących słowników — osobne zadanie, osobne ryzyko).
+4. Jeśli starczy czasu: punkt 4 z tabeli — zastąp `buildNextQuestion`'s cztery szablony
+   generowaniem wynikającym z realnego stanu (reżim odrzucony / potwierdzony / hipoteza
+   rezydualna wygenerowana), bez wymyślania nowego formatu — reużyj `nextQuestion.ts`'ego
+   wzorca zadeklarowanej kaskady, tylko zasilonej stanem, nie stałym switchem.
+
+### Qwen — dwa zadania badawcze
+1. **PILNE, odblokuj A1**: brakujący pakiet badawczy GLP-1 (semaglutyd↔liraglutyd) dla
+   `docs/prompts/C1-A1-glp1-substitution.md` — to jest bloker, który druga instancja C1
+   właśnie ominęła, przechodząc do B1. Dostarcz go, żeby A1 dało się domknąć równolegle.
+2. Jeśli starczy czasu: research punkt 9 z tabeli — jak inne systemy naukowe formalnie
+   definiują `CONFLICTING_EVIDENCE` jako stan epistemiczny (nie jako "unresolved conflict"
+   na poziomie pamięci, tylko jako stan POJEDYNCZEGO twierdzenia) i "evidence strength" jako
+   liczbę — żeby C1/C2/C3 nie musieli tego wymyślać przy P2 (§9 klasyfikacji).
+
+## Warunek odbioru — bez zmian względem reszty misji
+Dowód = komenda + wyjście + hash commita. `git fetch` przed KAŻDYM pushem — cztery strony
+pchają na tę samą gałąź równolegle, dziś bardziej niż zwykle. Pełna bramka (tsc/eslint/oba
+suite'y/build/`repro-demo.mjs`) przed każdym pushem kodu.
+
+## Uczciwe zastrzeżenie
+"Wszystko dopięte dziś" nie znaczy gotowego silnika P1 (dwie rundy end-to-end na QE4,
+replay MATCH) — to jest cel, nie gwarancja, bo C2/C3 startują P0 od zera dopiero teraz.
+Realistyczny wynik dzisiejszy: P0.1–P0.5 GREEN, każde z realnym dowodem, plus B1 i dedup
+domknięte. P1 (pełny dwurundowy demonstrator) to naturalne jutro, jeśli P0 wejdzie dziś
+bez blokerów.

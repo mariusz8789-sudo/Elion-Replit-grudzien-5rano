@@ -24,4 +24,4 @@ COPY --from=build /app/packages/frontend/dist packages/frontend/dist
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "packages/backend/src/server.mjs"]
+CMD ["node", "packages/backend/src/start.mjs"]

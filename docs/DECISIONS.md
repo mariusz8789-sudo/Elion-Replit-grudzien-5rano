@@ -184,3 +184,58 @@ Dla nie-sekretów pokazanie domyślnej wartości jest użyteczną dokumentacją
 („to system przyjmie sam"), a nie wyciekiem. Reguła jest wymuszona
 mechanicznie po WZORCU NAZWY, nie po liście — nowa zmienna sekretna jest objęta
 automatycznie (`envContract.test.mjs`).
+
+---
+
+## D-011 (2026-09-12, P2.3) — Kotwica na przypiętym payloadzie, nie na pobraniu na żywo
+
+**Decyzja.** Kotwica zewnętrzna czyta obserwację z PRZYPIĘTEGO w repo,
+sumowanego payloadu (`pubchem-cid-2519.json`), a nie z żywego wywołania API.
+
+**Dlaczego.** Egress do wszystkich hostów danych naukowych jest odrzucany przez
+politykę proxy (`gateway answered 403 to CONNECT`; przepuszczane są tylko
+rejestry pakietów). Alternatywy były trzy: (a) czekać na sieć — blokuje
+pakiet bezterminowo; (b) wygenerować „zbiór zewnętrzny" — fabrykacja, zakazana;
+(c) użyć realnego, opublikowanego payloadu, który już jest w repo z URL-em,
+datą pobrania i licencją. Wybrano (c).
+
+**Co to kupuje mimo braku sieci.** Kontrakt kotwicy jest kompletny i
+przetestowany: odmowa przy zmianie payloadu, cytat składany z prowieniencji
+zbioru (nie z pola tekstowego), realna falsyfikowalność i replay MATCH.
+Dodanie zbioru pobranego na żywo to dopisanie jednego wpisu do
+`EXTERNAL_ANCHORS` — reszta łańcucha jest już wykonana.
+
+---
+
+## D-012 (2026-09-12, P2.3) — Odcisk payloadu przez `fnv1a`, nie SHA-256
+
+**Decyzja.** Integralność przypiętego payloadu pilnuje
+`fnv1a(canonicalJson(payload))` — ta sama jedna prymitywa odciskowa, której
+używa całe repo (`core/events/hash.ts`).
+
+**Dlaczego nie SHA-256.** To jest detektor ZMIANY, nie gwarancja
+kryptograficzna, i tak jest nazwany w kodzie. Payload jest wersjonowany w
+gicie, który sam zapewnia integralność treści; zadaniem odcisku jest wyłapać
+CICHĄ EDYCJĘ przypiętej wartości. Wprowadzenie SHA-256 tylko tutaj dałoby drugi
+system haszowania w repo i — w przeglądarce — asynchroniczne WebCrypto w
+ścieżce, która jest czysta i synchroniczna.
+
+**Gdzie SHA-256 JEST użyte i słusznie.** Dla danych POZA repo:
+`scripts/fetch-atom-bohr-nist-fixtures.mjs` i `compute/cms_zmumu_worker.py`
+weryfikują SHA-256 pobranych plików. Ten podział jest świadomy, nie
+niekonsekwencją.
+
+---
+
+## D-013 (2026-09-12, P2.3) — Kotwica podpięta do `#/evidence`, nie do nowego ekranu
+
+**Decyzja.** Kotwica renderuje się w `EvidenceShowcaseScreen`.
+
+**Dlaczego tam.** Własna dokumentacja tego ekranu mówi, że jest „dla
+zewnętrznej publiczności: audytora R&D, regulatora, inwestora" — komisja
+grantowa to ta publiczność. Nowy ekran dodałby powierzchnię bez odbiorcy.
+
+**Jedna właściwość, która przy tym powstała.** Reszta ekranu zależy od tego, czy
+coś jest w Pamięci Naukowej, więc na świeżej przeglądarce jest pusta. Kotwica
+jest przypięta w repo, więc jest widoczna ZAWSZE — recenzent otwierający
+`#/evidence` bez żadnych zapisanych danych i tak widzi pełny łańcuch.

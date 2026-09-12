@@ -176,6 +176,35 @@ ingestion API na żywo) pozostaje otwarty — dane są przypięte przez CI-fetch
 nie pobierane w czasie rzeczywistym. Pełny opis: `docs/MASTER_PRIORITY_GENESIS.md`,
 `docs/P2_EVIDENCE.md`, `docs/DECISIONS.md`.
 
+**QE4 (2026-09-13): drugi, RICZEJSZY rodzaj kotwicy — wielokryterialna analiza
+realnego zbioru, nie pojedyncza para predykcja/obserwacja.** Niezależnie od
+kotwic PubChem/Kepler-Mars, ta sama sesja zbudowała
+`core/biotechData/qe4BrydgesAnalysis.ts`: rekomputację drugiego rzędu entropii
+Rényiego z SUROWYCH próbek randomized-measurement (Brydges i in., *Science*
+364, 260 (2019); Zenodo 10.5281/zenodo.2527010, CC-BY-4.0) — cztery
+NIEZALEŻNE, prerejestrowane hipotezy (`docs/QE4_PREREGISTRATION.md`)
+przetestowane na tym samym zbiorze: ekstensywność wzrostu entropii w
+układzie czystym (SUPPORTED_WITHIN_MODEL), logarytmiczny wzrost +
+subekstensywne nasycenie pod nieporządkiem — sygnatura MBL
+(SUPPORTED_WITHIN_MODEL), walidacja protokołu czysty-vs-mieszany stan
+(SUPPORTED_WITHIN_MODEL), i integralność — 74 niezależnie przeliczone punkty
+(S2, bootstrap ±3σ) porównane z opublikowanymi wartościami autorów, WSZYSTKIE
+w paśmie (SUPPORTED_WITHIN_MODEL). Bramka Tautologii (bez zmian w
+`tautologyGate.ts`) klasyfikuje wszystkie cztery jako `EMPIRICAL_TEST`. Pełny
+zapis dowodowy: `docs/QE4_EVIDENCE.md`. **Uczciwie:** to REPRODUKCJA znanej
+fizyki (termalizacja vs. MBL) i REPLIKACJA wobec opublikowanych liczb, nie
+odkrycie — i nie zamyka punktu (2) wyżej (dane przypięte przez CI-fetch, nie
+API na żywo). Zamyka natomiast realną lukę architektoniczną, nazwaną wprost
+zamiast obejść po cichu: żaden istniejący szew Genesis
+(`externalAnchor.ts` — kontrakt jeden-do-jednego; `discoveryConclusion.ts` —
+jeden PRIMARY + N SUPPORTING zwinięte w jeden werdykt) nie obsługuje „N
+niezależnych, współrzędnych werdyktów na jednym zbiorze" bez wymyślania nowej
+semantyki — więc QE4 istnieje jako osobny moduł, uruchamiany przez ten sam
+`scripts/repro-demo.mjs` co obie kotwice, i NIE jest wyświetlany na
+`#/evidence` (wymagałoby to nowej decyzji architektonicznej o 11. kształcie
+`SavedExperiment`, celowo nie podjętej tutaj jednostronnie — patrz
+`docs/QE4_EVIDENCE.md` §7).
+
 ---
 
 ## R-006 — Redeploy kontenerowy z woluminem · MITIGATED, ZIELONY dowód w CI (2026-09-12)

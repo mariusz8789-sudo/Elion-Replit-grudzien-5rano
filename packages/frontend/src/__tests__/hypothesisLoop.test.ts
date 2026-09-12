@@ -6,6 +6,7 @@ import {
   HYPOTHESIS_PROBLEMS,
   NEXT_EXPERIMENT_PRIORITY,
   buildSavedHypothesisLoop,
+  deriveNarrowedHypothesisProblem,
   isSavedHypothesisLoop,
   preregisterHypotheses,
   replaySavedHypothesisLoop,
@@ -322,6 +323,90 @@ describe('Następny eksperyment', () => {
     expect(next.status).toBe('VALIDATION_REQUIRED');
     expect(next.request).toBeNull();
     expect(next.why).toMatch(/nie zostało wykonanych|nie została wykonana/);
+  });
+});
+
+describe('Zawężanie hipotez na podstawie REALNEGO wyniku (G4)', () => {
+  const GROWTH = HYPOTHESIS_PROBLEMS.find((entry) => entry.problemId === 'problem:cell-population-growth-rate-fastest-to-capacity')!;
+
+  it('kandydat wewnętrzny NIE jest zadeklarowany w oryginalnym problemie, ale JEST liczbą pomiędzy zwycięzcą a konkurentem', () => {
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(GROWTH), { priorRunFingerprints: [] }));
+    expect(result.discrimination.decisive).toBe(true);
+
+    const derived = deriveNarrowedHypothesisProblem(result);
+    expect(derived.ok).toBe(true);
+    if (!derived.ok) return;
+
+    const [candidate] = derived.derivation.problem.candidateValues;
+    expect(typeof candidate).toBe('number');
+    expect(GROWTH.candidateValues).not.toContain(candidate);
+    const [a, b] = result.discrimination.ranking.map((entry) => Number(entry.candidate));
+    expect(candidate).toBeGreaterThan(Math.min(a!, b!));
+    expect(candidate).toBeLessThan(Math.max(a!, b!));
+    expect(derived.derivation.problem.problemId).not.toBe(GROWTH.problemId);
+  });
+
+  it('zawężony problem jest REALNIE wykonywalny przez istniejący silnik — bez drugiego solvera', () => {
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(GROWTH), { priorRunFingerprints: [] }));
+    const derived = deriveNarrowedHypothesisProblem(result);
+    expect(derived.ok).toBe(true);
+    if (!derived.ok) return;
+
+    const nextRound = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(derived.derivation.problem), {
+      priorRunFingerprints: [...new Set(result.allRuns.map((entry) => entry.provenance.runFingerprint))],
+    }));
+    expect(nextRound.allRuns.length).toBeGreaterThan(0);
+    expect(nextRound.outcomes[0]!.observedMetric).not.toBeNull();
+    // Kandydat jest GENUINE nowy (nie był w poprzedniej rundzie), więc jego odciski
+    // nie mogą kolidować z zadeklarowaną kotwicą — to nie jest HARK-owanie.
+    expect(nextRound.antiHarkingCheck.intact).toBe(true);
+    expect(nextRound.antiHarkingCheck.contradictingFingerprints).toEqual([]);
+  });
+
+  it('zmienna kategoryczna (nie liczbowa) NIE jest zawężana — interpolacja nie ma tam znaczenia', () => {
+    const categorical = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
+    // `scenarioId` bywa realnie remisowe na tym małym wariancie (patrz test wyżej
+    // w „Wykonanie, status i rozstrzygnięcie" — decisive zależy od realnego wyniku
+    // modelu). Ta jedna oś (kategoryczność zmiennej) jest testowana niezależnie od
+    // tego, czy TEN konkretny przebieg akurat się rozstrzygnął — wymuszamy decisive,
+    // żeby sprawdzić DOKŁADNIE gałąź "nie liczbowa", tak jak istniejący test wyżej
+    // wymusza `preregistrationIntact: false` przez `{ ...result, ... }`.
+    const forcedDecisive = {
+      ...categorical,
+      discrimination: {
+        ...categorical.discrimination,
+        decisive: true,
+        ranking: [
+          { hypothesisId: 'h1', candidate: 'ISOLATION', metric: 1 },
+          { hypothesisId: 'h2', candidate: 'CONTACT_REDUCTION', metric: 2 },
+        ],
+      },
+    };
+    const derived = deriveNarrowedHypothesisProblem(forcedDecisive);
+
+    expect(derived.ok).toBe(false);
+    if (derived.ok) return;
+    expect(derived.reason).toMatch(/liczbow/i);
+  });
+
+  it('remis NIE daje zawężenia — zawężanie wymaga realnego zwycięzcy', () => {
+    const tie = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
+      ...SMALL, candidateValues: ['ISOLATION', 'ISOLATION'],
+    }), { priorRunFingerprints: [] }));
+    const derived = deriveNarrowedHypothesisProblem(tie);
+
+    expect(derived.ok).toBe(false);
+    if (derived.ok) return;
+    expect(derived.reason).toMatch(/rozstrzygni/i);
+  });
+
+  it('mniej niż dwóch rozstrzygniętych kandydatów NIE daje zawężenia', () => {
+    const single = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
+      ...GROWTH, candidateValues: [0.3],
+    }), { priorRunFingerprints: [] }));
+    const derived = deriveNarrowedHypothesisProblem(single);
+
+    expect(derived.ok).toBe(false);
   });
 });
 

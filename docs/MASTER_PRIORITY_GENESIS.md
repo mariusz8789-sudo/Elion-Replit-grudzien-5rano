@@ -1010,3 +1010,71 @@ raportów w repo" — tekst nadal nie wszedł.
 
 Priorytet NIE ZAMKNIĘTY: P2.3 (druga kotwica) = `BLOCKED — brak dostępu do
 źródła`. P2.2 (Solar ingestion) = `BLOCKED — brak treści źródłowej od Qwena`.
+
+## UPDATE — C3: G4 ZAMKNIĘTE — generowanie hipotez świadome obserwacji
+
+P2.2/P2.3 pozostają zablokowane (sieć, brak treści od Qwena — sekcja wyżej). Zamiast czekać biernie,
+podjęto G4 (`docs/GENESIS_SCIENTIFIC_DISCOVERY_ENGINE_MASTER_PLAN.md`, P1, oznaczone tam
+„ZAPROJEKTOWANE" bez realnego kontraktu do znalezienia w repo) — jedyna pozycja z G4/G5/G9 bez
+zewnętrznej zależności i bez zakazu wprost (G5 jest CELOWO nierobione — scoring bez metodologii; G9
+to jedno zdanie komentarza, trywialne).
+
+**Luka, dokładnie.** `generateCompetingHypotheses` (`hypothesisLoop.ts`) rozwija WYŁĄCZNIE
+zadeklarowaną z góry tablicę `candidateValues` — nie czyta żadnego wyniku poprzedniej rundy. Jedyny
+kod w repo, który TWORZY nową, wcześniej niezadeklarowaną wartość z realnego wyniku, to interpolacja
+środka przedziału (`parameterAlternative.ts`/`intervalNarrowing.ts`) — ale ten kontrakt należy do
+INNEGO systemu hipotez (`inquiryLoop.ts`'s `ParameterHypothesis`, ciągła estymacja jednego parametru
+dla PARAMETER strategy), nie do dyskretnego zestawu konkurencyjnych kandydatów `hypothesisLoop.ts`.
+
+**Co zbudowano.** `deriveNarrowedHypothesisProblem(result: HypothesisLoopResult)` — z REALNIE
+rozstrzygniętego zbioru (`discrimination.decisive === true`, ≥2 rozstrzygnięte kandydatury) bierze
+zwycięzcę i jego bezpośredniego konkurenta na uporządkowaniu metryki i, TYLKO gdy zmienna
+kandydująca jest liczbowa, zwraca nowy `HypothesisProblem` z JEDNYM kandydatem — środkiem przedziału
+między nimi. Ten kandydat nigdy nie był w `HYPOTHESIS_PROBLEMS`; podany z powrotem do
+`generateCompetingHypotheses` przechodzi przez DOKŁADNIE ten sam silnik, prerejestrację i wykonanie
+— zero nowego kodu generującego, zero drugiego solvera, zero nowego słownika epistemicznego. Zmienna
+kategoryczna (`scenarioId`, `smiles`) i remis odmawiają wprost z nazwanym powodem, zamiast zgadywać
+— ta sama dyscyplina, którą G5 wymusza na scoringu.
+
+**Wpięcie produkcyjne.** `ExperimentPilotScreen.tsx` — nowy przycisk „Zawęź wokół zwycięzcy",
+widoczny tylko gdy derywacja się powiedzie; klika i prerejestruje nowy zbiór z prawdziwymi
+odciskami poprzedniej rundy jako `priorRunFingerprints` (uczciwe: te odciski BYŁY już znane przed tą
+rejestracją — poprawka względem istniejących wywołań, które przekazywały `[]` uniwersalnie).
+
+**TDD, test na czerwono najpierw.**
+```bash
+$ npx vitest run src/__tests__/hypothesisLoop.test.ts   # przed implementacją
+ FAIL  ... 5 failed | 34 passed (39)   — TypeError: deriveNarrowedHypothesisProblem is not a function
+
+$ npx vitest run src/__tests__/hypothesisLoop.test.ts   # po
+ Test Files  1 passed (1) | Tests  39 passed (39)
+```
+5 nowych testów: kandydat wewnętrzny jest liczbą pomiędzy zwycięzcą a konkurentem i nie był
+zadeklarowany; zawężony problem jest REALNIE wykonywalny (drugi przebieg, prawdziwy silnik
+biology-logistic, `antiHarkingCheck.intact === true`); zmienna kategoryczna odmawia z powodu
+zawierającym „liczbow"; remis odmawia; pojedynczy kandydat (< 2 rozstrzygnięte) odmawia.
+
+**Dowód wizualny — Chromium, `#/pilot`, zero błędów konsoli.** Realny przebieg end-to-end: problem
+„wewnętrznego tempa wzrostu r" (`growthRate: [0.3, 0.6]`), wykonany → zwycięzca 0.6
+(`fractionOfCapacity=80.29571527702831`) nad 0.3 (`16.86647887068201`) → przycisk „Zawęź wokół
+zwycięzcy" → nowy kandydat `growthRate=0.44999999999999996` (środek przedziału, NIGDY niezadeklarowany)
+→ prerejestracja → wykonanie → REALNY wynik `fractionOfCapacity=47.62379509262678`, liczba wewnętrzna
+między 16.87 a 80.30, dokładnie tak, jak przewiduje krzywa logistyczna. `CONSOLE_ERRORS: []`.
+
+**Pełna weryfikacja.**
+```
+tsc --noEmit                     czysto
+eslint src --max-warnings=0      czysto
+vitest run (frontend)            469 plików, 5198 passed / 1 znany niezwiązany skip
+npm test (backend)                396/396 passed
+npm run build                    czysto
+node scripts/repro-demo.mjs      12/12 (bez zmian — G4 nie dotyka tego zakresu)
+```
+
+**Czego to NIE robi — granica jest jawna.** Działa wyłącznie dla zmiennej kandydującej LICZBOWEJ i
+tylko gdy zbiór jest realnie rozstrzygnięty (nie remis, ≥2 kandydatów z liczbową metryką). Nie ma tu
+optymalizacji ani wyszukiwania — jeden środek przedziału, ta sama zasada co istniejąca interpolacja,
+zero nowej metodologii. Nie dotyka `selectNextHypothesisExperiment` (duży, delikatny graf decyzyjny
+z wieloma konsumentami — `crossDomainSynthesis.ts`, `nextAction.ts`, `researchCampaign.ts`,
+`scienceMemory.ts`) — to jest ADDYTYWNA, osobna ścieżka, żeby nie zmienić zachowania niczego, co już
+na niej polega.

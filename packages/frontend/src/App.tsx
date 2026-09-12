@@ -41,6 +41,7 @@ const QuantumDecisionExplorer = lazy(() => import('./components/QuantumDecisionE
 const RealityNavigator = lazy(() => import('./components/RealityNavigator').then((m) => ({ default: m.RealityNavigator })));
 const EngineeringNavigator = lazy(() => import('./components/EngineeringNavigator').then((m) => ({ default: m.EngineeringNavigator })));
 const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').then((m) => ({ default: m.ModelConflictPanel })));
+const ModelTournamentPanel = lazy(() => import('./components/ModelTournamentPanel').then((m) => ({ default: m.ModelTournamentPanel })));
 const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
 const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
@@ -432,6 +433,12 @@ export default function App() {
           <main id="main-content" tabIndex={-1} className="home">
             <HeavyRoute>
               <ModelConflictPanel />
+              {/* Two different questions on two different substrates, so two
+                  panels. ModelConflictPanel reads recorded MCRE friction
+                  correlations; the tournament EXECUTES two registered models
+                  and compares what they computed — the protocol
+                  counterfactualCompare.ts explicitly declines to perform. */}
+              <ModelTournamentPanel />
             </HeavyRoute>
           </main>
           {overlays}

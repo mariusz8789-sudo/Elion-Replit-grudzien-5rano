@@ -125,6 +125,50 @@ describe('the experiment pilot explains what changed, not only what was decided'
   });
 });
 
+describe('the model tournament runs both models rather than describing them', () => {
+  const panel = read('components', 'ModelTournamentPanel.tsx');
+  const app = read('App.tsx');
+
+  it('is mounted on the conflict route', () => {
+    expect(app).toMatch(/ModelTournamentPanel/);
+  });
+
+  /**
+   * `counterfactualCompare.ts` refuses a two-model comparison by design and
+   * names `modelVsModelCompare.ts` as the protocol that does it. The panel
+   * must call that protocol, not reimplement a comparison of its own.
+   */
+  it('calls the real comparison and the real sweep', () => {
+    expect(panel).toMatch(/compareModelVsModel\s*\(/);
+    expect(panel).toMatch(/sweepModelDivergence\s*\(/);
+  });
+
+  it('computes no science of its own — no arithmetic on the two models values', () => {
+    const code = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // Recomputing the delta or the divergence here would be a second, silently
+    // diverging implementation of what the module already returns.
+    expect(code).not.toMatch(/modelAValue\s*[-+*/]\s*(metric\.)?modelBValue/);
+    expect(code).not.toMatch(/Math\.(abs|max)\s*\([^)]*modelAValue/);
+  });
+
+  /**
+   * The threshold is a disclosed distance cutoff, not a statistical test, and
+   * "most discriminating" is a heuristic, not information gain. The panel
+   * renders the module's own disclaimer rather than paraphrasing it, and says
+   * what the threshold is not.
+   */
+  it('renders the honesty disclaimers instead of implying a calibrated test', () => {
+    expect(panel).toMatch(/sweep\.reasoning/);
+    expect(panel).toMatch(/nie jest\s*\n?\s*to p-value|nie jest to p-value/);
+  });
+
+  /** A non-COMPLETED comparison must read UNTESTED, never a fabricated agreement. */
+  it('renders a blocked comparison as its real status, never as agreement', () => {
+    expect(panel).toMatch(/data-testid="tournament-blocked"/);
+    expect(panel).toMatch(/UNTESTED:\s*'NIEPRZETESTOWANE'/);
+  });
+});
+
 describe('the dead duplicate is gone, not merely unused', () => {
   /**
    * `MissionStatusBar.tsx` rendered narrator/AI-health/lab-count/visited from

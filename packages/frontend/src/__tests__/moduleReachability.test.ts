@@ -165,7 +165,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/agent/epidemicInfectiousDaysCalibration.ts': 'Needs the CALIBRATION strategy invoked (only MECHANISM is wired) plus a parameter-verdict renderer.',
   'core/agent/discoveryTrace.ts': 'Consumes ResearchChainResult (the PARAMETER chain); production runs only runMechanismResearchChain, a different type.',
   'core/discovery/protectionPriority.ts': 'Real multi-objective study, but it needs a candidates-by-objectives ranking view no screen has, and runs three full discovery cases synchronously.',
-  'core/experimentFabric/modelVsModelCompare.ts': 'Belongs beside ModelConflictPanel on #/conflict, but that panel is typed to core/mcre conflicts, so it needs its own new panel.',
   'core/discovery/campaignWhyIntent.ts': 'Free-text routing onto campaign WHY kinds that CampaignScreen already exposes as buttons; a convenience input, not yet built.',
   'core/simulationRenderer/spatialWorldFrame.ts': 'Data half of the OSM -> canonical-renderer bridge; no screen imports real licensed OSM data yet.',
   'core/three/graphics/spatialFeatureBridge.ts': 'Rendering half of the same OSM bridge, blocked by the same missing real-data entry point.',

@@ -462,3 +462,22 @@ skipped. Build: czysto.
   tym, czym jest ten freeze (przygotowanie do dema/deployu/grantu) —
   wart jawnego nazwania, jeśli ktoś wraca do tego dokumentu i zastanawia
   się, czy Priorytet 3 wciąż czeka.
+
+### 7. Dodatkowy re-check: trzy moduły oznaczone wcześniej jako "ryzyko osieroconego subsystemu" (przy okazji audytu Construct)
+
+Commit `a435ac63` wymieniał `evidenceUri.ts`, `core/governance/` i
+`generateAlternativeHypotheses` jako wcześniej znalezione ryzyka
+osieroconych modułów. Sprawdziłem realnych konsumentów na bieżącym tip:
+
+- `evidenceUri.ts` — MA realnych konsumentów (`ExperimentPilotScreen.tsx`,
+  `core/experimentFabric/index.ts`, `core/csrn/genesisCertificateAdapter.ts`)
+  — nieosierocony.
+- `generateAlternativeHypotheses` — MA realnych konsumentów
+  (`core/experimentFabric/objectiveReducer.ts`,
+  `core/worldModel/discovery/worldCounterfactual.ts`) — nieosierocony.
+- `core/governance/` — zero konsumentów poza sobą. To jednak ZGODNE z
+  regułą już zapisaną w sekcji "Zasady wykonania" wyżej ("Cyber/GOV
+  pozostaje OFF `main`") — świadomie odizolowany, nie bug. Zero akcji.
+
+Wszystkie trzy zamknięte/potwierdzone — żadnego realnego osieroconego
+modułu nie znaleziono.

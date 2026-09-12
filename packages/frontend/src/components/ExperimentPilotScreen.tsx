@@ -50,6 +50,7 @@ import {
   type NextHypothesisExperiment,
   type Preregistration,
 } from '../core/experimentFabric/hypothesisLoop';
+import { explainWhyBeliefChanged } from '../core/experimentFabric/beliefChangeRun';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
@@ -519,6 +520,62 @@ export function ExperimentPilotScreen() {
             </dl>
             <p className="pilot-summary">ROZSTRZYGNIĘCIE: {loopResult.discrimination.reason}</p>
             <p className="settings-hint">{loopResult.preregistrationIntact.reason}</p>
+            {/* DLACZEGO ZMIENIŁO SIĘ PRZEKONANIE — BEFORE -> OBSERVATION -> AFTER,
+                every field read straight off the loop result that was just
+                executed above. `explainWhyBeliefChanged` is the pure, synchronous
+                half of `beliefChangeRun.ts`; it re-runs nothing and infers
+                nothing, which is why it can sit directly under the verdict.
+                Without it the screen showed WHAT was decided and never WHAT
+                CHANGED — and "the model changed its mind, here are the numbers
+                that changed it" is the claim this pilot exists to make. */}
+            {(() => {
+              const why = explainWhyBeliefChanged(loopResult);
+              const changed = why.after.filter((after) => {
+                const before = why.before.find((entry) => entry.hypothesisId === after.hypothesisId);
+                return before !== undefined && before.status !== after.status;
+              });
+              return (
+                <div className="pilot-step" data-testid="belief-change-why">
+                  <h3>Dlaczego zmieniło się przekonanie</h3>
+                  <p className="settings-hint">PYTANIE: {why.question}</p>
+                  <p className="settings-hint">PORÓWNANIE: {why.comparison}</p>
+                  <p className="settings-hint">POWÓD: {why.reason}</p>
+                  {/* Reuses the existing `compare-table` styling (and its
+                      overflow wrapper, so it stays readable on a phone) rather
+                      than minting a pilot-only table class. */}
+                  <div className="compare-table-wrap">
+                    <table className="compare-table belief-change-table">
+                      <thead>
+                        <tr><th>hipoteza</th><th>przed</th><th>obserwacja</th><th>po</th></tr>
+                      </thead>
+                      <tbody>
+                        {why.after.map((after) => {
+                          const before = why.before.find((entry) => entry.hypothesisId === after.hypothesisId);
+                          const observed = why.observation.find((entry) => entry.hypothesisId === after.hypothesisId);
+                          return (
+                            <tr key={after.hypothesisId} data-testid={`belief-change-row-${after.hypothesisId}`}>
+                              <td>{after.statement}</td>
+                              <td className="mono">{before?.status ?? '—'}</td>
+                              <td className="mono">
+                                {observed === undefined || observed.value === null
+                                  ? '—'
+                                  : `${observed.metric} = ${observed.value}${observed.unit === null ? '' : ` ${observed.unit}`}`}
+                              </td>
+                              <td className="mono">{after.status}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="settings-hint" data-testid="belief-change-count">
+                    {changed.length === 0
+                      ? 'Żadna hipoteza nie zmieniła statusu — obserwacja nie rozstrzygnęła między nimi.'
+                      : `Status zmieniło ${changed.length} z ${why.after.length} hipotez.`}
+                  </p>
+                </div>
+              );
+            })()}
             {nextStep && (
               <>
                 <h3>Następny eksperyment</h3>

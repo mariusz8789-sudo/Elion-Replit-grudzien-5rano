@@ -44,6 +44,11 @@ import {
   type SlopeStabilityField, type RunoutField,
 } from '../../core/worldModel/domains/landslide';
 import type { TemporalEngine } from '../../core/worldModel/temporal/temporalEngine';
+import { WorldRegistry } from '../../core/worldModel/persistence/worldRegistry';
+import { restoreWorld, serializeWorld } from '../../core/worldModel/persistence/worldSnapshot';
+import {
+  loadWorldSnapshotFromBackend, saveWorldSnapshotToBackend, updateWorldSnapshotOnBackend,
+} from '../../core/worldModel/persistence/worldPersistenceClient';
 import { PUMP_PIPE_DEFAULTS } from '../../core/engineeringGraph/pumpPipe';
 import { ProvenanceBadge } from './provenance';
 
@@ -2221,6 +2226,79 @@ export function GenesisWorldScreen() {
   const [showLandslide, setShowLandslideState] = useState(false);
   const [landslideSummary, setLandslideSummary] = useState<LandslideFieldSummary | null>(null);
 
+  /**
+   * WORLD PERSISTENCE — the half that was missing.
+   *
+   * The backend has served `POST/GET/PUT /api/worlds` for a while, with its
+   * own passing test ("World snapshot persistence survives a real process
+   * restart"). `persistence/worldSnapshot.ts` and
+   * `persistence/worldPersistenceClient.ts` are both complete and tested. And
+   * nothing in the browser ever called any of it, so no world a user built
+   * could outlive the tab — a whole end-to-end capability, built at both
+   * ends, connected at neither.
+   *
+   * This is that connection and nothing more: no new persistence format, no
+   * second registry, no second transport. `WorldRegistry` mints the
+   * `WorldRecord`, `serializeWorld` turns record + live engine into plain
+   * JSON, the client posts it, `restoreWorld` reads it back.
+   *
+   * SCOPE, STATED HONESTLY IN THE UI: this saves the BASE branch. The
+   * counterfactual fork is an in-scene branch created directly through
+   * `engine.forkBranch` rather than through `WorldRegistry.fork`, so it has
+   * no `worldId` of its own to be saved under, and inventing one here would
+   * be inventing a persistence identity the world model never issued.
+   *
+   * "Wczytaj i zweryfikuj" does a REAL round-trip — fetch, `restoreWorld`,
+   * then report the restored engine's own tick/branch/entity/event counts
+   * beside the live ones. It does not rebuild the 3D scene from the snapshot
+   * and the status text never says it does.
+   */
+  const registry = useMemo(() => new WorldRegistry(), []);
+  const [persistenceStatus, setPersistenceStatus] = useState('');
+  const [persistenceBusy, setPersistenceBusy] = useState(false);
+
+  const handleSaveWorld = useCallback(async () => {
+    setPersistenceBusy(true);
+    try {
+      const base = sim.city.base;
+      // `WorldRegistry.save` throws on a second save of the same id, so reuse
+      // the record it already minted rather than catching its own guard.
+      const record = registry.load(base.worldId)?.record ?? registry.save(base);
+      const snapshot = serializeWorld(record, base.engine);
+      let result = await saveWorldSnapshotToBackend(snapshot);
+      // A world already saved once is an UPDATE, not an error — the client
+      // reports 409 as `conflict` precisely so a caller can tell the two apart.
+      if (!result.ok && result.reason === 'conflict') result = await updateWorldSnapshotOnBackend(snapshot);
+      setPersistenceStatus(result.ok
+        ? `Zapisano "${result.data.worldId}" @ tick ${result.data.keyframeTick} · gałąź ${result.data.branchId} · ${result.data.keyframeEntities.length} encji · ${result.data.events.length} zdarzeń`
+        : `Nie zapisano (${result.reason}): ${result.message}`);
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }, [registry, sim]);
+
+  const handleLoadWorld = useCallback(async () => {
+    setPersistenceBusy(true);
+    try {
+      const base = sim.city.base;
+      const result = await loadWorldSnapshotFromBackend(base.worldId);
+      if (!result.ok) {
+        setPersistenceStatus(`Nie wczytano (${result.reason}): ${result.message}`);
+        return;
+      }
+      const restored = restoreWorld(result.data);
+      const live = base.engine;
+      setPersistenceStatus(
+        `Wczytano "${restored.record.worldId}": tick ${restored.engine.tick} (żywy: ${live.tick}) · gałąź ${restored.engine.branchId} · ` +
+        `${restored.engine.graph.listEntities().length} encji (żywy: ${live.graph.listEntities().length}) · ` +
+        `${restored.engine.journal.allEvents().length} zdarzeń (żywy: ${live.journal.allEvents().length}). ` +
+        'Odtworzony silnik istnieje w pamięci — scena 3D nadal pokazuje świat żywy.',
+      );
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }, [sim]);
+
   useEffect(() => {
     sim.onSelect = (id: WorldFrameEntityId | null) => setSelected(id);
     return () => {
@@ -2750,7 +2828,19 @@ export function GenesisWorldScreen() {
         <button className="chip-btn" data-testid="toggle-landslide" aria-pressed={showLandslide} onClick={() => handleToggleLandslide(!showLandslide)}>
           {showLandslide ? 'Hide landslide field' : 'Show landslide field (FS + runout)'}
         </button>
+        <button className="chip-btn" data-testid="save-world" onClick={() => { void handleSaveWorld(); }} disabled={persistenceBusy}>
+          Zapisz świat (gałąź bazowa)
+        </button>
+        <button className="chip-btn" data-testid="load-world" onClick={() => { void handleLoadWorld(); }} disabled={persistenceBusy}>
+          Wczytaj i zweryfikuj
+        </button>
       </div>
+
+      {persistenceStatus !== '' && (
+        <p className="footer-note" data-testid="world-persistence-status">
+          Trwały zapis świata: {persistenceStatus}
+        </p>
+      )}
 
       <p className="footer-note" data-testid="genesis-world-status">
         Base tick: <span data-testid="base-tick">{tick}</span>

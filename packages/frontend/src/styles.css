@@ -744,24 +744,6 @@ button:disabled { cursor: default; }
 .mcre-variant-note { font-size: 0.7rem; color: var(--text-dim); line-height: 1.4; }
 .mcre-variant-note strong { color: var(--text); }
 
-/* Pasek statusu misji — realne dane (liczba laboratoriów, status AI), nie ozdoba */
-.mission-bar {
-  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-  margin: 0.6rem 1rem 0; padding: 0.5rem 0.8rem;
-  border: 1px solid var(--border); border-radius: 10px;
-  background: linear-gradient(180deg, var(--bg-panel), var(--bg-raised));
-  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.04em;
-  color: var(--text-dim);
-}
-.mission-bar .msep { color: var(--border-strong); }
-.mission-bar .mdot {
-  width: 0.4rem; height: 0.4rem; border-radius: 50%; flex-shrink: 0;
-  background: var(--text-faint); box-shadow: none;
-}
-.mission-bar .mdot.on { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2.4s ease-in-out infinite; }
-.mission-bar .mdot.warn { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
-.mission-bar strong { color: var(--text); font-weight: 650; }
-
 .labs-grid {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem;
   padding: 1rem;
@@ -1854,6 +1836,12 @@ kbd {
 .compare-table th:first-child, .compare-table td:first-child { text-align: left; }
 .compare-table thead th { color: var(--text-faint); font-weight: 600; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
 .compare-table tbody tr:last-child td { border-bottom: 0; }
+/* Statuses like PREREGISTERED/SUPPORTED are single long tokens: left to wrap
+   they break mid-word into "PRE_REG / ISTERED", which reads as a different
+   value. The `.compare-table-wrap` around this table already scrolls
+   horizontally, so keeping them whole costs nothing on a narrow screen. */
+.belief-change-table td.mono { white-space: nowrap; }
+.belief-change-table td:first-child { min-width: 14rem; }
 .compare-meta { display: grid; grid-template-columns: 1fr; gap: 1rem; }
 @media (min-width: 720px) { .compare-meta { grid-template-columns: repeat(3, 1fr); } }
 .compare-meta ul { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--text-dim); font-size: 0.82rem; }

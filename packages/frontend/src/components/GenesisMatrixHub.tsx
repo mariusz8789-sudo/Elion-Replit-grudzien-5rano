@@ -3,6 +3,8 @@ import { listExperiments, type SavedExperiment } from '../core/scienceMemory';
 import { subscribeScienceMemoryChanges } from '../core/scienceMemoryEvents';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { buildMatrixRelationGraph, edgesFor, EDGE_LABEL, type MatrixEdge, type MatrixRelationGraph } from '../core/agent/matrixRelations';
+import { buildEpistemicStateGraph } from '../core/agent/epistemicStateGraph';
+import { computeEvidenceImpact } from '../core/agent/evidenceImpact';
 
 /**
  * GENESIS MATRIX — the central workspace, not a memory-record list.
@@ -329,6 +331,30 @@ export function GenesisMatrixHub() {
       returned as `missing` and rendered below as gaps, never as faint lines. */
   const relations = useMemo(() => buildMatrixRelationGraph(records), [records]);
 
+  /**
+   * EPISTEMIC STATE OF THE WHOLE MEMORY — not a second relation engine.
+   * `buildEpistemicStateGraph` takes the exact two inputs this screen already
+   * has (`records`, and `buildMatrixRelationGraph` for the edges, which it
+   * calls itself rather than re-deriving) and adds the one thing the relation
+   * graph does not carry: a per-record epistemic status DERIVED from real
+   * fields, with the deriving rule attached so the classification is
+   * checkable rather than asserted.
+   *
+   * It was written, tested and unreachable. What it answers — "how much of
+   * what we know is OBSERVED, and how much is still SIMULATION" — is the
+   * question this workspace exists to make answerable, so it belongs here.
+   */
+  const epistemicState = useMemo(() => buildEpistemicStateGraph(records), [records]);
+  const epistemicByRecordId = useMemo(
+    () => new Map(epistemicState.nodes.map((node) => [node.nodeId, node])),
+    [epistemicState],
+  );
+  /** Only the statuses that really occurred — a zero row would be noise, not information. */
+  const presentStatuses = useMemo(
+    () => Object.entries(epistemicState.statusDistribution).filter(([, count]) => count > 0),
+    [epistemicState],
+  );
+
   const [activeKind, setActiveKind] = useState<MatrixKind | null>(null);
   const [detail, setDetail] = useState<DetailTarget | null>(null);
   const [askInput, setAskInput] = useState('');
@@ -398,6 +424,29 @@ export function GenesisMatrixHub() {
               </button>
             ))}
           </nav>
+
+          {/* STAN EPISTEMICZNY — what the memory is made of, counted from the
+              records themselves. Each status is derived per record from a real
+              field by `epistemicStateGraph.ts`, never read from the free-text
+              `epistemicStatus` a writer happened to set. The fingerprint makes
+              the whole classification reproducible. */}
+          {presentStatuses.length > 0 && (
+            <>
+              <h2 className="matrix-rail-title">Stan epistemiczny</h2>
+              <ul className="matrix-kind-nav" aria-label="Rozkład statusów epistemicznych" data-testid="epistemic-distribution">
+                {presentStatuses.map(([status, count]) => (
+                  <li key={status} className="matrix-kind-nav-item" data-testid={`epistemic-status-${status}`}>
+                    <span>{status}</span><span className="matrix-kind-count">{count}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="matrix-rail-empty">
+                {epistemicState.nodeCount} {epistemicState.nodeCount === 1 ? 'rekord' : 'rekordów'} ·{' '}
+                {epistemicState.edgeCount} {epistemicState.edgeCount === 1 ? 'powiązanie' : 'powiązań'} · odcisk{' '}
+                <span className="mono" data-testid="epistemic-fingerprint">{epistemicState.fingerprint}</span>
+              </p>
+            </>
+          )}
 
           <h2 className="matrix-rail-title">Recent Activity</h2>
           {recentFive.length === 0 ? (
@@ -513,6 +562,46 @@ export function GenesisMatrixHub() {
                   <div key={key}><dt>{key}</dt><dd>{Number.isFinite(value) ? value : String(value)}</dd></div>
                 ))}
               </dl>
+              {/* STATUS EPISTEMICZNY of this one record, with the rule that
+                  produced it. Showing the rule is the point: a status nobody
+                  can check is a label, not a classification. */}
+              {(() => {
+                const node = epistemicByRecordId.get(detail.record.id);
+                if (node === undefined) return null;
+                return (
+                  <>
+                    <h4 className="matrix-detail-sub">Status epistemiczny</h4>
+                    <p className="matrix-rail-empty" data-testid="epistemic-node-status">
+                      <strong>{node.epistemicStatus}</strong> — wyprowadzone z: {node.derivationRule}
+                    </p>
+                  </>
+                );
+              })()}
+
+              {/* ZASIĘG DOWODU — how much of the rest of the memory leans on
+                  this record, found by walking real reference fields
+                  transitively. This is the question "what breaks if this turns
+                  out to be wrong", and the relation list below cannot answer
+                  it: relations are one hop, dependence is not. */}
+              {(() => {
+                const impact = computeEvidenceImpact(detail.record.id, records);
+                if (impact.dependentExperiments.length === 0) return null;
+                return (
+                  <>
+                    <h4 className="matrix-detail-sub">Zasięg dowodu</h4>
+                    <p className="matrix-rail-empty" data-testid="evidence-impact">
+                      Zależy od tego rekordu: <strong data-testid="evidence-impact-count">{impact.dependentExperiments.length}</strong>{' '}
+                      {impact.dependentExperiments.length === 1 ? 'rekord' : 'rekordów'}
+                      {impact.dependentCampaigns.length > 0 && <> (w tym {impact.dependentCampaigns.length} kampanii)</>}
+                      {impact.downstreamFalsifiedOrInconclusive.length > 0 && (
+                        <> · {impact.downstreamFalsifiedOrInconclusive.length} z nich ma już status FALSIFIED/INCONCLUSIVE/BLOCKED</>
+                      )}
+                      .
+                    </p>
+                  </>
+                );
+              })()}
+
               {/* Relations — the point of a Matrix. Every row names the field
                   that proves it, so a user can check the claim rather than
                   trust a drawn line. */}

@@ -44,6 +44,62 @@ test('P0.3 resolveBuildInfo czyta realny HEAD tego repo', () => {
   assert.match(info.commit, /^[0-9a-f]{40}$/);
 });
 
+/**
+ * REGRESJA (znaleziona przez C3 przy P2.1, zweryfikowana tutaj niezależnie).
+ *
+ * `.git` NIE zawsze jest katalogiem. W `git worktree` (dokładnie ten tryb
+ * izolacji, w którym część tej misji jest uruchamiana — `isolation:
+ * "worktree"`) `.git` jest PLIKIEM tekstowym `gitdir: <ścieżka>`, wskazującym
+ * na prawdziwy katalog gita gdzie indziej. Pierwsza wersja `readGitHeadFrom`
+ * zakładała katalog: `path.join(gitDir, 'HEAD')` na pliku wybuchało (ENOTDIR),
+ * łapane przez `try/catch` i cicho zwracające `null` — więc `commitSource`
+ * lądował jako `'unavailable'` w środowisku, w którym HEAD było jak najbardziej
+ * czytelne. Nie crash, ale realna utrata dokładnie tej informacji, po którą
+ * P0.3 istnieje.
+ */
+test('P0.3 resolveBuildInfo czyta HEAD z git worktree (.git jako plik gitdir:)', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-worktree-'));
+  try {
+    execFileSync('git', ['worktree', 'add', dir, 'HEAD', '--detach'], { cwd: REPO, stdio: 'ignore' });
+    const info = resolveBuildInfo({ env: {}, repoDir: dir });
+    assert.equal(info.commitSource, 'git', `.git jako "gitdir: ..." musi dać się odczytać, dostałem ${info.commitSource}`);
+    assert.match(info.commit, /^[0-9a-f]{40}$/);
+    const real = resolveBuildInfo({ env: {}, repoDir: REPO });
+    assert.equal(info.commit, real.commit, 'worktree wskazuje ten sam commit co repo macierzyste');
+  } finally {
+    execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * Ten sam scenariusz, ale NA GAŁĘZI (nie detached) — żeby naprawdę przejść
+ * ścieżką `ref: refs/heads/<branch>`. W worktree ta referencja żyje we
+ * WSPÓLNYM katalogu gita (`<gitDir>/commondir` → `refs/heads/…`), nie w
+ * katalogu per-worktree — `resolveCommonDir` istnieje dokładnie po to.
+ */
+test('P0.3 resolveBuildInfo czyta HEAD z git worktree na gałęzi (ref: przez commondir)', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(path.join(tmpdir(), 'genesis-worktree-branch-'));
+  const branch = `zz-buildinfo-worktree-test-${Date.now()}`;
+  try {
+    execFileSync('git', ['worktree', 'add', '-b', branch, dir, 'HEAD'], { cwd: REPO, stdio: 'ignore' });
+    const info = resolveBuildInfo({ env: {}, repoDir: dir });
+    assert.equal(info.commitSource, 'git', `HEAD na gałęzi w worktree musi się dać odczytać, dostałem ${info.commitSource}`);
+    const real = resolveBuildInfo({ env: {}, repoDir: REPO });
+    assert.equal(info.commit, real.commit);
+  } finally {
+    execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
+    execFileSync('git', ['branch', '-D', branch], { cwd: REPO, stdio: 'ignore' });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('P0.3 checkDatabaseState NAPRAWDĘ pyta bazę, a nie sprawdza istnienia obiektu', () => {
   const db = new DatabaseSync(':memory:');
   db.exec('CREATE TABLE t(x);');

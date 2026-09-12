@@ -275,3 +275,40 @@ jako „zewnętrzną obserwację".
 **Koszt przyjęty świadomie.** Aktualizacja zbioru wymaga zmiany w TRZECH
 miejscach (odcisk, `EXPECTED` w skrypcie, asercja w teście). To jest cena za to,
 że obserwacja zewnętrzna nie zmienia się przez przypadek.
+
+---
+
+## D-015 (2026-09-12, P0.3) — `resolveBuildInfo` rozwiązuje `.git` jako plik `gitdir:` (worktree)
+
+**Znalezisko, nie moje.** C3, budując P2.1, zauważył realny defekt w moim P0.3:
+backendowy suite raportował 1 nieoczekiwaną porażkę, którą C3 zdiagnozował jako
+„pre-existing git-worktree-only artifact" i słusznie NIE naprawił sam (poza
+zakresem jego zadania) — nazwał go i zweryfikował, że jest niezwiązany z jego
+zmianą (uruchamiając w czystym klonie).
+
+**Co dokładnie było zepsute.** `.git` NIE zawsze jest katalogiem. W trybie
+izolacji `git worktree` (dokładnie ten, w którym część tej misji jest
+uruchamiana — `isolation: "worktree"` w `Agent`) `.git` jest PLIKIEM tekstowym
+`gitdir: <ścieżka>`, wskazującym na prawdziwy katalog gita gdzie indziej
+(`<repo>/.git/worktrees/<nazwa>`). Pierwsza wersja `readGitHeadFrom` zakładała
+katalog: `path.join(gitDir, 'HEAD')` na pliku wybuchał (`ENOTDIR`), łapany
+przez `try/catch` i cicho zwracający `null`. Skutek: `commitSource` lądował
+jako `'unavailable'` w środowisku, w którym HEAD było jak najbardziej czytelne
+— nie crash, ale realna utrata dokładnie tej informacji, po którą `/api/health`
+istnieje.
+
+**Odtworzone niezależnie, nie wzięte na słowo.** `git worktree add
+/tmp/.../worktree-test HEAD --detach` w tym samym repo → `file .git` →
+`ASCII text`, treść `gitdir: /home/.../.git/worktrees/worktree-test` —
+dokładnie ten przypadek.
+
+**Naprawa, dwuwarstwowa, bo jeden test by tego nie złapał.** `resolveGitDir`
+rozróżnia plik od katalogu i podąża za wskaźnikiem `gitdir:`. Osobno:
+`resolveCommonDir` — bo w worktree gałęzie NIE są prywatne per-worktree:
+`refs/heads` i `packed-refs` żyją we WSPÓLNYM katalogu (`<gitDir>/commondir`,
+zwykle `../..`), a tylko `HEAD` jest per-worktree. Dwa testy, oba realne
+(`git worktree add`, nie atrapa filesystemu): jeden na `--detach` (HEAD jako
+goły SHA — ścieżka bez `ref:`), drugi na `-b <gałąź>` (ścieżka `ref:` przez
+`commondir` — bez tego drugiego testu poprawka dla detached HEAD dałaby
+fałszywe poczucie bezpieczeństwa, bo nie przechodzi przez `resolveCommonDir`
+wcale).

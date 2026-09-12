@@ -391,3 +391,50 @@ regresja tej gałęzi: implementacja haszowania w spoczynku istnieje w
 `origin/claude/genesis-takeover-audit-kpz019`). Zgłoszone w `docs/RISKS.md`
 z konkretną propozycją (cherry-pick istniejącego modułu, nie nowa
 implementacja); łagodzenie operacyjne opisane w `OPS_RUNBOOK.md` §4.
+
+**Status: ZAMKNIĘTE w pakiecie P1** (C2) — cherry-pick bajt-w-bajt zgodnie z
+propozycją, migracja idempotentna testowana na realnej legacy-bazie. Patrz
+`docs/RISKS.md` R-001 i `docs/P1_EVIDENCE.md`.
+
+---
+
+## P0.3 — poprawka: `resolveBuildInfo` w `git worktree`
+
+**Znalezisko C3** (przy okazji P2.1, budując na tej samej gałęzi): backendowy
+suite raportował 1 nieoczekiwaną porażkę, poprawnie zdiagnozowaną jako
+środowiskową i pozostawioną nierozwiązaną (poza zakresem jego zadania) —
+`buildInfo.mjs` zakłada, że `.git` jest katalogiem. **Naprawione tutaj,
+zweryfikowane wykonaniem, D-015.**
+
+```bash
+$ git worktree add /tmp/claude-0/worktree-test HEAD --detach
+$ file /tmp/claude-0/worktree-test/.git
+/tmp/claude-0/worktree-test/.git: ASCII text
+$ cat /tmp/claude-0/worktree-test/.git
+gitdir: /home/user/Elion-Replit-grudzien-5rano/.git/worktrees/worktree-test
+```
+
+Test dodany PRZED naprawą (czerwony):
+
+```bash
+$ node --test src/buildInfo.test.mjs
+# tests 5 | pass 4 | fail 1   (worktree HEAD → commitSource 'unavailable')
+```
+
+Po naprawie (`resolveGitDir` podąża za `gitdir:`; `resolveCommonDir` czyta
+`refs/heads`/`packed-refs` ze WSPÓLNEGO katalogu, bo w worktree gałęzie nie są
+prywatne per-worktree — tylko `HEAD` jest):
+
+```bash
+$ node --test src/buildInfo.test.mjs
+ok 1..6
+# tests 6 | pass 6 | fail 0
+```
+
+Dwa scenariusze worktree, oba na realnym `git worktree add`, nie na atrapie
+filesystemu: `--detach` (HEAD jako goły SHA) i `-b <gałąź>` (ścieżka `ref:`
+przez `commondir` — bez tego drugiego testu naprawa dla detached HEAD dałaby
+fałszywe poczucie bezpieczeństwa, bo nie przechodzi przez `resolveCommonDir`
+wcale). Pełny backend po naprawie: **430 testów, 396 passed, 0 failed, 34
+skipped** — jedna nieoczekiwana porażka, o której mówił C3, faktycznie
+zniknęła.

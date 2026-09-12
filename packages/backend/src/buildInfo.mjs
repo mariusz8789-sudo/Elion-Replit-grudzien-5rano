@@ -17,26 +17,64 @@
  * nie udaje, że wie.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
-/** Odczyt HEAD z katalogu `.git` — bez odpalania gita jako procesu. */
+/**
+ * Rozwiązuje `.git` do prawdziwego katalogu gita. `.git` NIE zawsze jest
+ * katalogiem: w `git worktree` (dokładnie ten tryb izolacji, w którym część
+ * tej misji jest uruchamiana — `isolation: "worktree"`) jest PLIKIEM
+ * tekstowym `gitdir: <ścieżka>`, wskazującym na prawdziwy katalog gita gdzie
+ * indziej (`<repo>/.git/worktrees/<nazwa>`).
+ *
+ * Bez tego `path.join(gitDir, 'HEAD')` na pliku wybuchał (ENOTDIR), łapany
+ * przez `try/catch` w `readGitHeadFrom` i cicho zwracający `null` — więc
+ * `commitSource` lądował jako `'unavailable'` w środowisku, w którym HEAD
+ * było jak najbardziej czytelne. Nie crash, ale realna utrata dokładnie tej
+ * informacji, po którą P0.3 istnieje. Znalezione przez C3 przy P2.1.
+ */
+function resolveGitDir(repoDir) {
+  const gitPath = path.join(repoDir, '.git');
+  if (!existsSync(gitPath)) return null;
+  if (statSync(gitPath).isDirectory()) return gitPath;
+  const pointer = /^gitdir:\s*(.+)$/m.exec(readFileSync(gitPath, 'utf8'));
+  if (!pointer) return null;
+  const resolved = path.isAbsolute(pointer[1].trim()) ? pointer[1].trim() : path.resolve(repoDir, pointer[1].trim());
+  return existsSync(resolved) ? resolved : null;
+}
+
+/**
+ * Katalog, w którym żyją `refs/` i `packed-refs`. W zwykłym repo to `gitDir`
+ * samo w sobie; w worktree gałęzie NIE są prywatne per-worktree — `refs/heads`
+ * i `packed-refs` żyją we WSPÓLNYM katalogu, na który wskazuje plik
+ * `<gitDir>/commondir` (zwykle `../..`). Tylko `HEAD` jest per-worktree.
+ */
+function resolveCommonDir(gitDir) {
+  const commondirFile = path.join(gitDir, 'commondir');
+  if (!existsSync(commondirFile)) return gitDir;
+  const relative = readFileSync(commondirFile, 'utf8').trim();
+  const resolved = path.isAbsolute(relative) ? relative : path.resolve(gitDir, relative);
+  return existsSync(resolved) ? resolved : gitDir;
+}
+
+/** Odczyt HEAD z katalogu `.git` (albo z worktree, przez `resolveGitDir`) — bez odpalania gita jako procesu. */
 function readGitHeadFrom(repoDir) {
   try {
-    const gitDir = path.join(repoDir, '.git');
-    if (!existsSync(gitDir)) return null;
+    const gitDir = resolveGitDir(repoDir);
+    if (gitDir === null) return null;
+    const commonDir = resolveCommonDir(gitDir);
     const head = readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
     const ref = /^ref:\s*(.+)$/.exec(head);
     if (!ref) return FULL_SHA.test(head) ? head : null;
-    const refPath = path.join(gitDir, ref[1]);
+    const refPath = path.join(commonDir, ref[1]);
     if (existsSync(refPath)) {
       const sha = readFileSync(refPath, 'utf8').trim();
       return FULL_SHA.test(sha) ? sha : null;
     }
-    // Referencja spakowana (`git gc`) — szukamy w packed-refs.
-    const packed = path.join(gitDir, 'packed-refs');
+    // Referencja spakowana (`git gc`) — szukamy w packed-refs (współdzielone).
+    const packed = path.join(commonDir, 'packed-refs');
     if (!existsSync(packed)) return null;
     for (const line of readFileSync(packed, 'utf8').split('\n')) {
       const [sha, name] = line.trim().split(/\s+/);

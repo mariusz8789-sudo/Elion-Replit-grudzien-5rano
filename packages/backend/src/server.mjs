@@ -39,6 +39,7 @@ import {
 } from './lib.mjs';
 import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
+import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
@@ -53,6 +54,10 @@ const KNOWLEDGE_DIR = path.resolve(
   process.env.GENESIS_KNOWLEDGE_DIR ?? path.join(__dirname, '../../../knowledge'),
 );
 const VERSION = process.env.npm_package_version ?? '1.0.0';
+// Tożsamość wydania (P0.3). Liczona raz na start: na produkcji pochodzi z
+// build-arga obrazu, lokalnie z .git, a gdy nie ma ani jednego — mówi
+// 'unknown' zamiast zmyślać.
+const BUILD = resolveBuildInfo({ env: process.env, repoDir: path.resolve(__dirname, '../../..') });
 const startedAt = Date.now();
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
@@ -366,15 +371,26 @@ const server = http.createServer((req, res) => {
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
 
   if (req.method === 'GET' && req.url === '/api/health') {
+    // Stan bazy z WYKONANEGO zapytania kontrolnego — `db ? 'ready' : ...` nie
+    // widziało przypadku, w którym obiekt istnieje, a baza nie odpowiada.
+    const dbState = checkDatabaseState(db);
     return json(res, 200, {
       ok: true,
       version: VERSION,
+      commit: BUILD.commit,
+      commitShort: BUILD.commitShort,
+      commitSource: BUILD.commitSource,
+      builtAt: BUILD.builtAt,
       uptimeSec: Math.round((Date.now() - startedAt) / 1000),
       ai: hasKey ? 'ready' : 'no-key',
       model: hasKey ? MODEL : null,
       static: staticAvailable,
       knowledgeLabs: knowledgeIndex.size,
-      persistence: db ? 'ready' : 'unavailable',
+      // CELOWO bez absolutnej ścieżki pliku: /api/health jest nieuwierzytelniony,
+      // a układ katalogów hosta nie jest informacją, którą trzeba tam ujawniać.
+      // Operator i tak dostaje ścieżkę w logu startowym.
+      db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
+      persistence: dbState.state,
       // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
       // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
       // meant EVERY entry fell through to the literal 'unknown', so the health
@@ -400,6 +416,8 @@ server.listen(PORT, () => {
   log('info', 'started', {
     port: server.address()?.port ?? PORT, // rzeczywisty port (PORT=0 → efemeryczny, przydatne w testach)
     version: VERSION,
+    commit: BUILD.commitShort,
+    commitSource: BUILD.commitSource,
     ai: hasKey ? MODEL : 'no-key',
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',

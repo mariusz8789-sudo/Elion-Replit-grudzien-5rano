@@ -11,6 +11,14 @@ COPY . .
 RUN npm run build
 
 FROM node:22-slim AS runtime
+# Tożsamość wydania (P0.3). Bez tego /api/health nie potrafi powiedzieć, KTÓRY
+# kod stoi na produkcji — a `.git` celowo nie jest kopiowany do obrazu.
+# Budowa:  docker build --build-arg GENESIS_COMMIT=$(git rev-parse HEAD) \
+#                       --build-arg GENESIS_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) .
+ARG GENESIS_COMMIT=unknown
+ARG GENESIS_BUILT_AT=
+ENV GENESIS_COMMIT=${GENESIS_COMMIT}
+ENV GENESIS_BUILT_AT=${GENESIS_BUILT_AT}
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./

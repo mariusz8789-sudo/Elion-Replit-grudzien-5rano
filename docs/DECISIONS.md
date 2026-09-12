@@ -108,3 +108,79 @@ rejestru modułów Replita, więc NIE zweryfikowałem, że modul o nazwie
 pierwszym uruchomieniu na Replicie** — jeśli moduł ma inną nazwę, `.replit`
 wymaga korekty, a bramka z `start.mjs` i tak wypisze czytelny komunikat zamiast
 `ERR_UNKNOWN_BUILTIN_MODULE`.
+
+---
+
+## D-006 (2026-09-12, P0.2) — Backup przez `VACUUM INTO`, nie `cp`
+
+**Decyzja.** Snapshot bazy powstaje przez `VACUUM INTO`.
+
+**Dlaczego.** Baza chodzi w WAL (`store.mjs:527`), więc świeże wiersze siedzą w
+pliku `-wal`. `cp genesis.db` daje backup BEZ ostatnich transakcji i wygląda
+przy tym na poprawny — to najgorszy możliwy rodzaj kopii zapasowej. `VACUUM INTO`
+tworzy atomowy, spójny snapshot jednym plikiem. Test `RESTORE DRILL` celowo nie
+zamyka bazy przed snapshotem, żeby sprawdzać dokładnie ten tryb porażki.
+
+**Alternatywa odrzucona.** `sqlite.backup()` (istnieje jako funkcja modułu w tym
+Node) — poprawna, ale asynchroniczna i bardziej złożona; przy tej skali nie
+kupuje nic ponad `VACUUM INTO`.
+
+---
+
+## D-007 (2026-09-12, P0.2) — Retencja: domyślnie 14, `keep < 1` odrzucane
+
+**Decyzja.** `DEFAULT_BACKUP_KEEP = 14`; `selectBackupsToPrune` rzuca wyjątkiem
+przy `keep < 1`.
+
+**Dlaczego 14.** Przy zalecanym harmonogramie co 6 h to 3,5 dnia historii; przy
+dobowym — dwa tygodnie. Wartość jest świadoma i zapisana, a nie magiczna.
+
+**Dlaczego `keep = 0` jest błędem, a nie „usuń wszystko".** Skrypt retencji,
+który przy złej konfiguracji kasuje ostatnią kopię, jest gorszy niż brak
+retencji. Retencja dotyka też WYŁĄCZNIE plików zgodnych ze wzorcem
+`<base>.<stamp>.bak` — plik bazy i cokolwiek innego w katalogu nigdy nie trafia
+na listę do usunięcia.
+
+---
+
+## D-008 (2026-09-12, P0.3) — Alerty i retencja logów: przygotowane, NIE zastosowane
+
+**Decyzja.** `docs/OPS_RUNBOOK.md` zawiera gotowe do wklejenia konfiguracje
+(Uptime Kuma/Healthchecks, Fly, Railway/Render) oznaczone jako **NIE
+ZASTOSOWANE**.
+
+**Dlaczego nie zastosowane.** Zastosowanie wymaga wyboru platformy i zgody na
+wdrożenie — oba są wstrzymane zasadą twardą tej misji. Twierdzenie „alerty
+działają" bez włączonej sondy byłoby dokładnie tym rodzajem deklaracji, której
+ta misja zabrania.
+
+**Decyzja projektowa w środku.** Warunek alarmu jest na TREŚCI odpowiedzi
+(`db.state == "ready"`), nie tylko na kodzie 200. Instancja z martwą bazą
+zwraca 200 i bez tego warunku wyglądałaby zdrowo.
+
+---
+
+## D-009 (2026-09-12, P0.3) — `/api/health` nie ujawnia ścieżki pliku bazy
+
+**Decyzja.** Endpoint zwraca `db.durability` i `db.persistent`, ale NIE
+absolutną ścieżkę pliku. Operator dostaje ścieżkę w logu startowym.
+
+**Dlaczego.** `/api/health` jest nieuwierzytelniony (i odpytywany przez
+`HEALTHCHECK` obrazu). Układ katalogów hosta nie jest informacją, którą trzeba
+tam publikować, a oś trwałości — jest.
+
+---
+
+## D-010 (2026-09-12, P0.4) — `.env.example`: sekrety zawsze puste, nie-sekrety z domyślną wartością
+
+**Decyzja.** Zmienne sekretne (`*KEY*`, `*TOKEN*`, `*SECRET*`, `*PASSWORD*`,
+`*CREDENTIAL*`) mają w `.env.example` ZAWSZE pustą prawą stronę. Zmienne
+nie-sekretne (np. `PORT=8080`, `GENESIS_AI_MODEL=claude-opus-4-8`) pokazują
+wartość domyślną.
+
+**Dlaczego nie wszystko puste, jak brzmiało polecenie („lista zmiennych BEZ
+wartości").** Dla sekretów reguła jest bezwarunkowa i tak została wdrożona.
+Dla nie-sekretów pokazanie domyślnej wartości jest użyteczną dokumentacją
+(„to system przyjmie sam"), a nie wyciekiem. Reguła jest wymuszona
+mechanicznie po WZORCU NAZWY, nie po liście — nowa zmienna sekretna jest objęta
+automatycznie (`envContract.test.mjs`).

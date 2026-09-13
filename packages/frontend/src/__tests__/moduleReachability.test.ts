@@ -160,6 +160,7 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/csrn/genesisCertificateAdapter.ts': 'Genesis record -> CSRN certificate adapter; certificate issuance is a separate pipeline with no in-app entry point.',
   'core/agent/datasetLaboratory.ts': 'Discovery Engine P0.1 seam (docs/DISCOVERY_ENGINE_FINAL_CLASSIFICATION_2026-09-12.md): a declared contract type, not a screen subject. Its first implementation is qe4DatasetLaboratory.ts, listed next; both await P0.2 (hypothesis generation from the dataset grid), the next scoped task, as their first real caller.',
   'core/biotechData/qe4DatasetLaboratory.ts': 'Discovery Engine P0.1: the QE4 implementation of datasetLaboratory.ts. Computes nothing itself (pure glue over qe4BrydgesAnalysis.ts, proven by its own tests) and has no caller yet because P0.2-P0.6 (the autonomous loop that will drive it) are the next scoped tasks, not yet built.',
+  'core/biotechData/qe4RegimeHypotheses.ts': 'Discovery Engine P0.2: competing regime hypotheses computed from the QE4 grid via qe4DatasetLaboratory.ts. Awaits P0.3/P0.5 (the planner + adversarial pass that will select and run these each round), not yet built.',
 
   // --- Complete capability, blocked on a named prerequisite --------------------
   // These are the honest ones: real, tested science with nothing showing it.

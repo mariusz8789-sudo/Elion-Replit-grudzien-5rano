@@ -312,6 +312,19 @@ export function bootstrapPurity(rows: readonly BlochVectorRow[], iterations: num
 export interface WeightedLinearFit {
   readonly slope: number;
   readonly intercept: number;
+  /**
+   * Analytic standard error of `slope` from standard weighted-least-squares
+   * theory (Var(slope) = S / (S*Sxx - Sx^2), S = sum(w)), valid when each
+   * point's own `sigma` is an independent uncertainty — true for QE4's
+   * cross-time-point fits (each timepoint's S2 comes from its own separate
+   * CSV file and its own separate bootstrap run, sharing no draws with any
+   * other timepoint). NOT the right tool for a fit across k at one fixed T,
+   * where every k's bootstrap estimate reuses the SAME resampled row
+   * indices and is therefore correlated — that case needs the paired
+   * bootstrap-of-the-slope approach `qe4BrydgesAnalysis.ts`'s own P1 test
+   * already uses, not this analytic formula.
+   */
+  readonly slopeSigma: number;
 }
 
 /** Weighted least-squares linear fit (1/sigma^2 weights) — used for P1's extensivity slope test. */
@@ -332,7 +345,8 @@ export function weightedLinearFit(x: readonly number[], y: readonly number[], si
   const denom = sw * swxx - swx * swx;
   const slope = (sw * swxy - swx * swy) / denom;
   const intercept = (swxx * swy - swx * swxy) / denom;
-  return { slope, intercept };
+  const slopeSigma = Math.sqrt(sw / denom);
+  return { slope, intercept, slopeSigma };
 }
 
 /** Weighted sum of squared residuals for a fitted model y_hat(x) vs observed y. */

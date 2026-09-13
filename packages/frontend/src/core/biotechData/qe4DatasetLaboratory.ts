@@ -126,3 +126,26 @@ export const QE4_DATASET_LABORATORY: DatasetLaboratory = {
   observableSpec,
   run,
 };
+
+export interface Qe4GridPoint {
+  readonly t: number;
+  readonly s2: number;
+  readonly sigma: number;
+}
+
+/**
+ * A domain-specific convenience alongside the generic `run()`/`observableSpec()`
+ * contract: every already-computed `(T, k)` point for one dataset/partition,
+ * sorted by T ascending. Used by `qe4RegimeHypotheses.ts` (P0.2) to fit a
+ * growth curve across time without re-deriving anything `run()` does not
+ * already expose — still pure delegation to `getAnalysis()`, no new computation.
+ */
+export function pointsForGrid(dataset: 'clean' | 'disorder', k: number): readonly Qe4GridPoint[] {
+  const analysis = getAnalysis();
+  const points = dataset === 'clean' ? analysis.cleanPoints : analysis.disorderPoints;
+  return points
+    .filter((p) => p.k === k)
+    .map((p) => ({ t: p.t, s2: p.s2, sigma: p.sigma }))
+    .slice()
+    .sort((a, b) => a.t - b.t);
+}

@@ -162,3 +162,36 @@ mały refaktor `qe4RegimeInquiryLoop.ts`, żeby pobierał punkty przez świeżo 
 `runQe4BrydgesAnalysis()` — nazwane wprost jako naturalny follow-up w komentarzu modułu, nie
 zrobione tutaj celowo (uniknięcie pośpiesznego refaktoru pod koniec zadania bez ponownej pełnej
 weryfikacji).
+
+## UPDATE 2 (2026-09-13) — P0.2 domknięte NIEZALEŻNIE DWA RAZY, druga kolizja przydziału
+
+`core/biotechData/qe4RegimeHypotheses.ts` domknięte i wypchnięte (`6a6e039`/`e7c73be`):
+trzy konkurencyjne hipotezy reżimowe (LINEAR_GROWTH/LOGARITHMIC_GROWTH/SATURATING) liczone
+z siatki `(T,k)` przez `qe4DatasetLaboratory.ts::pointsForGrid`, z realnym dopasowaniem
+(`weightedLinearFit`, rozszerzone o `slopeSigma`) i realną rewizją przekonania.
+
+**Stan faktyczny po scaleniu obu torów (C3, tuż po powyższym wpisie):** to jest DRUGA,
+niezależna implementacja P0-2, zbudowana przez tę samą sesję co P0.1, RÓWNOLEGLE do
+`qe4RegimeInquiryLoop.ts` opisanego w „KOREKCIE" wyżej — obie strony startowały z tego samego
+stanu repo (przed lądowaniem drugiej) i żadna nie widziała korekty drugiej, zanim wypchnęła
+własny kod. Różnice architektoniczne, nazwane wprost, żeby ktoś świadomie zdecydował, czy je
+scalić: `qe4RegimeHypotheses.ts` ocenia KAŻDY szablon NIEZALEŻNIE (istotność nachylenia
+analitycznego błędu standardowego) na CAŁYM zadeklarowanym zbiorze naraz, bez pojęcia rundy;
+`qe4RegimeInquiryLoop.ts` dopasowuje wszystkie trzy reżimy KONKURENCYJNIE (ranking po RSS) w
+KOLEJNYCH rundach admitujących punkty jeden po drugim, z operatorem hipotezy rezydualnej, nowym
+słownikiem stopu (`CONVERGENCE`/`NO_INFORMATION_GAIN`) i DZIAŁAJĄCĄ kotwicą anty-HARK — czyli
+pokrywa też P0-3 i P0-5, które ten wpis błędnie zakłada jako wciąż otwarte dla C3. **P0-3 i P0-5
+SĄ JUŻ ZROBIONE** (patrz „KOREKTA" wyżej i `docs/MASTER_PRIORITY_GENESIS.md`) — nie zaczynać ich
+ponownie. Reużycie/scalenie obu implementacji P0-2 jest świadomie NIE rozstrzygnięte tutaj — to
+decyzja architektoniczna (który kształt zostaje kanoniczny), nie coś do cichego wyboru przez
+kolejną sesję bez rozgłoszenia.
+
+Przy okazji scalania z B1 (C1) dwukrotnie naprawiony kontrakt `.env` (`SITE`/`YEAR`/
+`GENESIS_B1_FIXTURE_DIR` w `scripts/fetch-b1-defra-aurn-fixture.mjs` bez wpisu w
+`.env.example`) — nie luka mojej pracy, złapana przez pełną bramkę przy pushu; zduplikowane
+wpisy po scaleniu obu torów usunięte, zostaje jeden.
+
+**P0-6 (odcisk prowieniencji/replay na rundę)** — jeśli druga sesja i tak to buduje: sprawdź
+najpierw `qe4RegimeInquiryLoop.ts`'s `runFingerprint` per rundę (`fnv1a(canonicalJson(...))`,
+już przypięte w `repro-demo.mjs`) zanim zbudujesz drugą, niezależną implementację tego samego —
+trzecia kolizja tego samego dnia byłaby już wzorcem, nie przypadkiem.

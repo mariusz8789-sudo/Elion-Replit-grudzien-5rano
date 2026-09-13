@@ -104,6 +104,29 @@ async function main() {
     }
   }
 
+  console.log('--- ROUND 2: offset pagination proof on GLP-1R activities ---');
+  {
+    const url = `${CHEMBL_BASE}/activity.json?target_chembl_id=CHEMBL1784&standard_type__in=IC50,EC50,Ki,Kd&limit=200&offset=1000`;
+    const result = await getJson(url);
+    const activities = result?.activities ?? [];
+    console.log(`  fetched=${activities.length} at offset=1000`);
+    console.log(`  page_meta: ${JSON.stringify(result?.page_meta ?? null)}`);
+    console.log(`  first activity_id at this offset: ${activities[0]?.activity_id ?? 'n/a'}`);
+  }
+  console.log('');
+
+  console.log('--- ROUND 2: molecule_chembl_id__in batch resolution ---');
+  {
+    const ids = Object.values(resolved);
+    const url = `${CHEMBL_BASE}/molecule.json?molecule_chembl_id__in=${ids.join(',')}&limit=50`;
+    const result = await getJson(url);
+    const molecules = result?.molecules ?? [];
+    console.log(`  requested ${ids.length} ids, got back ${molecules.length} molecules`);
+    for (const m of molecules) {
+      console.log(`    ${m.molecule_chembl_id} "${m.pref_name}" type=${m.molecule_type} maxPhase=${m.max_phase}`);
+    }
+  }
+
   console.log('\n=== A2 RECON DONE ===');
 }
 

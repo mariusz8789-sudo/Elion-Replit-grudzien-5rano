@@ -28,6 +28,7 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **ZROBIONE (Opcja A)** | C1 | patrz niżej |
 | **A2 — autonomiczny dobór kandydata na zamiennik Ozempicu (nowy mandat)** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realna, mechanizm-owa przestrzeń kandydatów, realny werdykt `CONFLICTING_EVIDENCE`, bramka bezpieczeństwa |
 | **A3 — Genesis Government Research: rekomendacja zamiennika Ozempicu dla rządu (nowy mandat)** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — twarda bramka populacji trafiona przez własne żądanie mandatu (`REQUIRED_POLICY_INPUT`), realny błąd regexu populacji naprawiony przed użyciem, kandydat bez skuteczności usunięty ze zwycięzców rankingu |
+| **GOV-DRUG-DISCOVERY-E2E-01 — runtime E2E: generacja→lejek→TOP3→falsyfikacja→werdykt→(przepis) (nowy mandat, addendum)** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — **2671** realnych cząsteczek wygenerowanych z mechanizmu (2659 poza listą kontrolną, 2647 bez `pref_name`), lejek z 2663 zalogowanymi eliminacjami, uczciwy `NO_WINNER`, determinizm Node==Chromium `399221f5`, pakiet demo z wideo |
 
 ## Detektor residuum: znaleziona, niezałatana wada specyficzności
 
@@ -279,3 +280,61 @@ złapany przez `envContract.test.mjs`.
 Commit`y: preregestracja (odcisk `e458d17b` → naprawiony do `2b32c0a8`), fetch+pin
 `trial-conditions.json` (odcisk `fbae6c68...4ee1c`), moduł analizy + drukarka raportu
 14 sekcji + testy + demonstrator + dokumentacja (ta sesja).
+
+## §GOV-DRUG-DISCOVERY-E2E-01 — ZROBIONE: dowód runtime, że kandydaci są GENEROWANI,
+a nie wybierani z podanej listy; uczciwy `NO_WINNER` jako PASS
+
+Addendum do mandatu GOV DRUG DISCOVERY: konkretny scenariusz E2E, nagrywalny jako demo.
+Preregestracja przypięta PRZED pobraniem przestrzeni kandydatów
+(`govDrugDiscoveryE2EPreregistration.ts`, odcisk `f528c881`, commit `ee628ae`), z jawną
+linią pochodzenia do zapieczętowanych odcisków A1 `5882c619`, A2 `4642088a`, A3 `2b32c0a8`.
+
+**T1 — generacja, nie selekcja (realne liczby).** `scripts/fetch-gov-drug-discovery-
+generated-space.mjs` powtarza IDENTYCZNE zapytanie mechanizmowe A2 i przypina etap, który
+A2 wyrzuciło: **2671** odrębnych cząsteczek, **2659** poza listą kontrolną
+(`fixture_presupplied_candidates.json` = przypięte 12 z A2, użyte WYŁĄCZNIE jako kontrola
+negatywna), zbiory nierówne, każdy wiersz z pełną proweniencją i `generatedBy=GENERATOR`.
+**2647 z 2671 nie ma w ChEMBL żadnego `pref_name`** — gołe identyfikatory, których nikt
+nigdy nie nazwał. Test negatywny dowodzi, że kontrola działa: podstawienie listy
+kontrolnej w miejsce wygenerowanego zbioru **oblewa** T1 z komunikatem „selection from a
+list, not generation".
+
+**Lejek z zalogowaną każdą eliminacją:** 2671 → 20 → 8 → TOP3, **2663 eliminacje**, każda
+z powodem I konkretnym dowodem. Tier-1 odtwarza przypięte 20 z A2 co do sztuki — zgodność
+krzyżowo potwierdzająca, że to to samo realne zapytanie.
+
+**Realny błąd znaleziony testowaniem (D-032).** Pierwsza wersja selektora zwycięzcy
+mierzyła „przeciwne kierunki" znakiem **złożonego wyniku ważonego**, co dało werdykt z
+uzasadnieniem, którego dane nie potwierdzały (obaj niewetowani kandydaci są GORSI od
+semaglutydu: +0.29pp i +0.78pp). Naprawione na pomiar z realnej delty skuteczności.
+
+**Werdykt: `NO_WINNER` — i to jest PASS.** Lider (GLP-1) jest o 0.29pp gorszy od
+semaglutydu i ma 4 nierozwiązane kontrdowody; jedyny kandydat z realną przewagą
+(TIRZEPATIDE −0.79pp) jest zablokowany przez egzystencjalne weto bezpieczeństwa. Cztery z
+pięciu zapieczętowanych wyników nie wskazują kandydata — kryterium to „werdykt wynika z
+dowodów", nigdy „znaleziono lek". Przepis badawczy NIE został wygenerowany (poprawnie —
+bramkowany na `WINNER`); jego ścieżka jest zweryfikowana jednostkowo, z
+`dualUseGuard: 'ASSERTED'`, bez dawki i bez procedury operacyjnej.
+
+**Silnik prawdy:** 0 zakazanych łańcuchów (skaner udowodniony testem negatywnym),
+bezpieczeństwo tylko w słowniku stopniowanym, `NO_ACCESS_DECLARED` dla trzech realnie
+brakujących źródeł, oraz odrzucenie preferencji warstwy działania sprzecznej z
+AnswerRecord (polityka nie zmienia prawdy). FLIP udowodniony dwutorowo: w realnym
+przebiegu wstrzyknięty kontrdowód ląduje u lidera i nigdy nie daje `WINNER`; na
+syntetycznym stanie dającym `WINNER` to samo wstrzyknięcie **rewiduje** werdykt.
+
+**Determinizm międzyśrodowiskowy:** `npm run e2e:gov-drug:demo` buduje osobny bundle
+przeglądarkowy, uruchamia scenariusz w prawdziwym Chromium i porównuje odcisk z Node —
+**`399221f5` == `399221f5`**. Pakiet demo (wideo z 9 krokami, log, `fingerprints.json`,
+`report.html`) trafia do `artifacts/gov-drug-discovery-e2e-demo/` (w `.gitignore` —
+artefakt runtime, regenerowalny).
+
+Dowód uruchamialny: `npm run e2e:gov-drug` → **18/18**. Testy:
+`govDrugDiscoveryE2EPreregistration.test.ts` → **12/12**, `govDrugDiscoveryE2E.test.ts` →
+**37/37**.
+
+Pełna bramka: frontend **5675 passed/1 skip**, backend **396/396**,
+`m3-demonstrator.mjs` **18/18**, `repro-demo` **69/69**, `a1:demo` **14/14**,
+`a2:demo` **14/14**, `a3:demo` **13/13** (bez regresji), `e2e:gov-drug` **18/18**,
+tsc/eslint/build czysto. Przypięta przestrzeń (1.08 MB) **nie wchodzi do bundla
+aplikacji** — `dist/assets/index-*.js` ma identyczne 1 618 156 B co przed zmianą.

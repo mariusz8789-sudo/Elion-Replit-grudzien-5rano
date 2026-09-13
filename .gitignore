@@ -14,6 +14,9 @@ _dock*/
 # Delivery archive and local Chromium capture helpers are generated outside the source review path.
 artifacts/*.zip
 artifacts/*.mjs
+# GOV-DRUG-DISCOVERY-E2E-01 demo package (video + rendered report): regenerated on demand by
+# scripts/gov-drug-discovery-e2e-demo-capture.mjs, not source.
+artifacts/gov-drug-discovery-e2e-demo/
 
 # Python bytecode from compute workers (packages/backend/src/compute/*.py)
 __pycache__/

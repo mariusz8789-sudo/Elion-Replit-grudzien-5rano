@@ -10,6 +10,7 @@ import { canonicalJson, fnv1a } from './events/hash';
 import type { A1AnalysisReport } from './biotechData/a1Glp1Analysis';
 import type { A2AnalysisReport } from './biotechData/a2OzempicSubstitute';
 import type { A3Report } from './biotechData/a3GovernmentDrugRecommendation';
+import type { E2E01ScenarioResult } from './biotechData/govDrugDiscoveryE2E';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
@@ -3570,6 +3571,83 @@ export function saveA3GovernmentRecommendationToMemory(report: A3Report): SavedE
       'Ranking naukowy i rzadowy uzywaja identycznych wag naukowych; wymiary czysto polityczne (koszt/dostepnosc/skalowalnosc/bezpieczenstwo dostaw/mozliwosci produkcyjne/pokrycie populacji) sa INSUFFICIENT_EVIDENCE, nie zalozone.',
       'Dopasowanie populacji per-badanie pochodzi z realnego, strukturalnego pola ClinicalTrials.gov conditions, nie z domyslu na podstawie tytulu.',
       'Kandydat bez zadnego dowodu skutecznosci nie moze zostac zwyciezca naukowym/ogolnym, nawet przy wysokim wyniku samego bezpieczenstwa.',
+    ],
+    epistemicStatus,
+  });
+}
+
+/**
+ * Writes a GOV-DRUG-DISCOVERY-E2E-01 scenario run
+ * (`biotechData/govDrugDiscoveryE2E.ts`) to Science Memory. The record
+ * keeps the funnel's real shape — how many were generated, how many each
+ * stage removed, and the honest outcome — because the reduction IS the
+ * finding, not a step on the way to one.
+ */
+export function saveGovDrugDiscoveryE2EToMemory(run: E2E01ScenarioResult): SavedExperiment {
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    run.decision.outcome === 'WINNER' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : run.decision.outcome === 'NO_SAFE_WINNER' || run.decision.outcome === 'NO_WINNER' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : 'INCONCLUSIVE';
+
+  const [tier1, tier2] = run.stages;
+
+  return saveExperiment({
+    labId: 'government-research-gov-drug-discovery-e2e',
+    experimentId: `gov-drug-discovery-e2e:${run.runFingerprint}`,
+    experimentName: 'GOV-DRUG-DISCOVERY-E2E-01 — generacja kandydatow, lejek, falsyfikacja, werdykt',
+    params: {
+      generatedCandidates: run.generationCheck.generatedCount,
+      outsidePresuppliedList: run.generationCheck.outsidePresuppliedCount,
+      tier1Survivors: tier1.outputCount,
+      tier2Survivors: tier2.outputCount,
+    },
+    stats: {
+      generatedCandidates: run.generationCheck.generatedCount,
+      outsidePresuppliedList: run.generationCheck.outsidePresuppliedCount,
+      tier1Survivors: tier1.outputCount,
+      tier2Survivors: tier2.outputCount,
+      top3: run.top3.length,
+      unresolvedCounterevidence: run.falsifications.reduce((n, f) => n + f.unresolvedCounterevidence.length, 0),
+      bannedStringHits: run.bannedStringHits.length,
+    },
+    analysis: [
+      {
+        title: 'Generacja, nie selekcja z listy',
+        body: `${run.generationCheck.generatedCount} czasteczek wygenerowanych z mechanizmu; ${run.generationCheck.outsidePresuppliedCount} poza jakakolwiek lista podana z gory; zbior rowny liscie kontrolnej? ${run.generationCheck.equalsPresuppliedSet}. Kazdy wiersz ma pelna proweniencje: ${run.generationCheck.everyCandidateHasFullProvenance}.`,
+        kind: 'gov-drug-discovery-e2e-generation',
+      },
+      {
+        title: 'Lejek — kazda eliminacja z powodem i dowodem',
+        body: run.stages.map((s) => `${s.stage}: ${s.inputCount} -> ${s.outputCount} (usunieto ${s.eliminated.length})`).join('; ') + `. TOP3: ${run.top3.map((c) => c.prefName).join(', ')}.`,
+        kind: 'gov-drug-discovery-e2e-funnel',
+      },
+      {
+        title: 'Gleboka falsyfikacja',
+        body: run.falsifications.map((f) => `${f.prefName}: przetrwal wszystkie ataki=${f.survivedAll}, nierozwiazane kontrdowody=${f.unresolvedCounterevidence.length}`).join(' | '),
+        kind: 'gov-drug-discovery-e2e-falsification',
+      },
+      {
+        title: 'Werdykt',
+        body: `${run.decision.outcome}: ${run.decision.reason} Przepis badawczy: ${run.researchRecipe === null ? 'NIE wygenerowany (poprawnie — tylko dla WINNER)' : 'wygenerowany'}.`,
+        kind: 'gov-drug-discovery-e2e-outcome',
+      },
+      {
+        title: 'Luki dostepu zadeklarowane, nie zmyslone',
+        body: run.noAccessDeclarations.map((d) => `${d.status}: ${d.sourceId}`).join('; '),
+        kind: 'gov-drug-discovery-e2e-no-access',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${run.preregistrationFingerprint} (przypieta PRZED pobraniem przestrzeni kandydatow), odcisk przebiegu ${run.runFingerprint}.`,
+        kind: 'gov-drug-discovery-e2e-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Realny przebieg na realnej, przypietej, WYGENEROWANEJ przestrzeni kandydatow. Wynik bez zwyciezcy jest dozwolonym i oczekiwanym zakonczeniem — kryterium sukcesu to "werdykt wynika z dowodow", nie "znaleziono lek". To NIE jest dyrektywa kliniczna dla zadnego pacjenta.',
+    assumptions: [
+      'Przestrzen kandydatow powstaje z zapytania mechanizmowego do ChEMBL; zadna nazwa leku nie jest zapytaniem przy generacji.',
+      'Kryteria lejka, ataki falsyfikacyjne i regula wyboru zwyciezcy zostaly zapieczetowane PRZED pobraniem przestrzeni kandydatow.',
+      'Przepis badawczy moze powstac wylacznie dla wyniku WINNER i pozostaje koncepcyjny — nigdy dawka ani procedura operacyjna.',
     ],
     epistemicStatus,
   });

@@ -1193,3 +1193,98 @@ Commit'y: preregestracja + odcisk `2b32c0a8` po naprawie regexu, fetch+pin
 `trial-conditions.json` (odcisk `fbae6c68...4ee1c`), moduł analizy +
 drukarka raportu + testy + demonstrator + zapis Science Memory + naprawa
 `.env.example`.
+
+## D-032 (2026-09-13, GOV-DRUG-DISCOVERY-E2E-01) — Dowód GENERACJI, nie
+selekcji: 2671 realnych cząsteczek z mechanizmu; uczciwy NO_WINNER jako
+PASS; realny błąd „kierunku dowodu" znaleziony testowaniem i naprawiony
+
+**Decyzja.** A2 zbudowało przestrzeń kandydatów z mechanizmu, ale przypięło
+tylko 20 cząsteczek, które przeszły bramkę rozwoju klinicznego. A3 uczyniło
+to odpowiadalnym dla rządu. Żadne z nich nie dowodziło własności, dla której
+istnieje ten scenariusz: że przestrzeń kandydatów jest **KONSTRUOWANA**, a
+nie wybierana z listy podanej przez człowieka. Ten runtime E2E to dowód.
+
+**Realne liczby, i dlaczego to one są sednem.** `scripts/fetch-gov-drug-
+discovery-generated-space.mjs` powtarza IDENTYCZNE zapytanie mechanizmowe
+A2 (te same trzy cele, ta sama zapieczętowana reguła testów, ta sama pełna
+paginacja) i przypina etap, który A2 wyrzuciło:
+- **2671** odrębnych cząsteczek WYGENEROWANYCH (GLP-1R 2294 kwalifikujących
+  się aktywności, GIPR 219, GCGR 1753),
+- **2659** z nich nie występuje na żadnej liście podanej z góry,
+- **2647 z 2671 nie ma w ChEMBL żadnego `pref_name`** — to gołe
+  identyfikatory, których żaden człowiek nigdy nie nazwał; właśnie to czyni
+  „generację" sprawdzalną, a nie deklarowaną,
+- dokładnie **20** przechodzi `max_phase>=2`, **odtwarzając przypięte 20 z
+  A2 co do sztuki** — ta zgodność krzyżowo potwierdza, że to to samo realne
+  zapytanie, różniące się wyłącznie zachowaniem odrzuconego etapu.
+
+**Lejek, w którym każda eliminacja ma powód I dowód:** 2671 → 20 (Tier-1:
+mechanizm + realny rozwój kliniczny) → 8 (Tier-2: policzalne porównanie
+skuteczności ORAZ policzalne porównanie bezpieczeństwa) → TOP3 → sześć
+zapieczętowanych ataków falsyfikacyjnych na każdego ocalałego. **2663
+eliminacje, wszystkie zalogowane** z konkretnym datum (np. `ChEMBL … 
+max_phase=null`, albo „brak badania z opublikowanymi wynikami").
+
+**Realny błąd znaleziony testowaniem, nie zgadnięty.** Pierwsza wersja
+`selectWinner` wykrywała „przeciwne kierunki względem semaglutydu"
+porównując znaki **złożonego wyniku ważonego** — a ten agreguje też
+bezpieczeństwo i siłę dowodu. Na realnych danych dało to werdykt
+`CONFLICTING_EVIDENCE` z uzasadnieniem, **którego dane nie potwierdzały**:
+obaj niewetowani kandydaci z TOP3 (GLP-1 +0.29pp, PF-06291874 +0.78pp)
+wskazują ten SAM kierunek — oba są GORSZE od semaglutydu. Naprawione przez
+mierzenie kierunku z realnej delty skuteczności (`bestEfficacyDeltaPp`),
+nie z wyniku złożonego. Po naprawie werdykt to **`NO_WINNER`** z
+uzasadnieniem, które jest prawdziwe: lider jest gorszy od semaglutydu i ma
+4 nierozwiązane kontrdowody, a **jedyny kandydat z realną przewagą
+skuteczności (TIRZEPATIDE −0.79pp) jest zablokowany przez egzystencjalne
+weto bezpieczeństwa**, więc jego też nie można wskazać.
+
+**`NO_WINNER` to PASS, nie porażka.** Cztery z pięciu zapieczętowanych
+wyników nie wskazują kandydata. Kryterium akceptacji brzmi „werdykt wynika
+z dowodów", nigdy „znaleziono zwycięzcę". Wymuszony zwycięzca jest trybem
+awarii, przed którym ta preregestracja ma chronić — i przed którym ochroniła.
+
+**Ścieżki, które realnie istnieją mimo że realne dane ich nie odpaliły**,
+zweryfikowane jednostkowo przez PRAWDZIWE funkcje na jawnie syntetycznych
+wejściach: `WINNER`, `NO_SAFE_WINNER`, `INSUFFICIENT_EVIDENCE`,
+`CONFLICTING_EVIDENCE`, oraz `ResearchRecipeGenerator` (przepis badawczy z
+`dualUseGuard: 'ASSERTED'`, bez dawki i bez procedury operacyjnej —
+asercja testowa sprawdza brak wzorca `\d+\s*(mg|ml|mcg)` i słowa
+„prescri" w całym przepisie).
+
+**Silnik prawdy, egzekwowany na wyjściu, nie w promptcie:** skan zakazanych
+łańcuchów po KAŻDYM napisie wyjścia (0 trafień; test negatywny dowodzi, że
+skaner faktycznie łapie), bezpieczeństwo wyłącznie w słowniku stopniowanym,
+`NO_ACCESS_DECLARED` dla trzech realnie brakujących źródeł (ceny/przetargi,
+farmakowigilancja po dopuszczeniu, status rejestracyjny) zamiast
+zmyślania, oraz **polityka nigdy nie zmienia prawdy**: preferencja warstwy
+działania wskazująca tirzepatyd jako zwycięzcę zostaje ODRZUCONA, a
+AnswerRecord wraca niezmieniony.
+
+**Samo-falsyfikacja (FLIP) udowodniona dwutorowo:** w realnym przebiegu
+wstrzyknięty kontrdowód faktycznie ląduje w rekordzie lidera (GLP-1) i
+werdykt nigdy nie staje się `WINNER`; a na syntetycznym stanie, który
+NAPRAWDĘ daje `WINNER`, to samo wstrzyknięcie **rewiduje** werdykt z
+`WINNER` na wynik bez zwycięzcy. To drugie jest właściwym dowodem, bo
+pokazuje rewizję, a nie tylko brak zmiany.
+
+**Determinizm międzyśrodowiskowy jako dowód mocniejszy niż powtórzenie:**
+`scripts/gov-drug-discovery-e2e-demo-capture.mjs` buduje osobny bundle
+przeglądarkowy, uruchamia ten sam scenariusz w prawdziwym Chromium i
+porównuje odcisk z odciskiem z Node — **`399221f5` == `399221f5`**, przy
+zgodnym werdykcie, zgodnym wyniku FLIP i zgodnej liczbie 2671. Pakiet demo
+(wideo z 9 krokami, log, `fingerprints.json`, `report.html`) trafia do
+`artifacts/gov-drug-discovery-e2e-demo/` i jest w `.gitignore` — to
+artefakt runtime, regenerowalny `npm run e2e:gov-drug:demo`, nie źródło.
+
+**Uwaga inżynierska o rozmiarze:** przypięta przestrzeń ma 1.08 MB.
+Zweryfikowano, że **nie wchodzi do bundla aplikacji** — jedyna ścieżka
+importu z aplikacji to `import type` w `scienceMemory.ts`, który znika przy
+kompilacji; `dist/assets/index-*.js` ma po zmianie identyczne 1 618 156 B
+co przed nią. `tsc -b` zwolnił do ~40 s (inferencja typu literału dla 2671
+wierszy) — mieści się w budżecie CI, zanotowane jako realny koszt.
+
+Dowód uruchamialny: `npm run e2e:gov-drug` → **18/18**,
+`npm run e2e:gov-drug:demo` → nagrany przebieg + zgodność Node/Chromium.
+Testy: `govDrugDiscoveryE2EPreregistration.test.ts` → **12/12**,
+`govDrugDiscoveryE2E.test.ts` → **37/37**.

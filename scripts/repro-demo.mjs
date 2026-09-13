@@ -73,6 +73,18 @@ const EXPECTED = {
   qe4Tautology: 'EMPIRICAL_TEST',
   qe4Fingerprint: 'a6578ae8',
   qe4Doi: '10.5281/zenodo.2527010',
+  qe4RegimeRounds: 7,
+  qe4RegimeStopReason: 'ROUND_BUDGET_EXHAUSTED',
+  qe4RegimeWinner: 'qe4-regime-logarithmic-k5',
+  discoveryQe4Winner: 'y = c0 + c1·log(x)',
+  discoveryQe4Stop: 'EXPERIMENT_SPACE_EXHAUSTED',
+  discoveryQe4Fingerprint: '1a0226d5',
+  discoveryKeplerWinner: 'y = c0 + c1·x',
+  discoveryKeplerStop: 'CONVERGENCE',
+  discoveryKeplerSlope: 1.49987,
+  discoveryKeplerFingerprint: '2d6ce643',
+  discoveryDerivedWinnerFingerprint: '315b1877',
+  qe4RegimeFingerprints: ['e7b90572', '3c3e9083', 'c82210fb', '67711185', 'cc3e4323', 'bb6aec30', '2d470070'],
 };
 
 const checks = [];
@@ -137,6 +149,8 @@ let anchor;
 let keplerAnchor;
 let qe3;
 let qe4;
+let qe4Regime;
+let dQe4, dKepler, dDerived;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -153,6 +167,10 @@ try {
   keplerAnchor = science.reproExternalAnchor(science.KEPLER_MARS_ANCHOR_ID);
   qe3 = science.reproQe3Inquiry();
   qe4 = science.reproQe4BrydgesAnalysis();
+  qe4Regime = science.reproQe4RegimeInquiry();
+  dQe4 = science.reproDiscoveryCampaignQe4();
+  dKepler = science.reproDiscoveryCampaignKepler();
+  dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
 } finally {
   rmSync(bundleDir, { recursive: true, force: true });
 }
@@ -199,6 +217,42 @@ record('QE4: P4 integralność (0 punktów poza pasmem ±3σ)', qe4.p4FailingCou
 record('QE4: odcisk wyniku (replay)', qe4.resultFingerprint === EXPECTED.qe4Fingerprint,
   `${qe4.resultFingerprint} (oczekiwane ${EXPECTED.qe4Fingerprint})`);
 record('QE4: tożsamość zbioru', qe4.datasetDoi === EXPECTED.qe4Doi, `DOI ${qe4.datasetDoi} (oczekiwane ${EXPECTED.qe4Doi})`);
+
+record('QE4 regime inquiry (P0-2/P0-3/P0-5): przebieg i stop', qe4Regime.rounds === EXPECTED.qe4RegimeRounds && qe4Regime.stopReason === EXPECTED.qe4RegimeStopReason,
+  `${qe4Regime.rounds} rund, stop=${qe4Regime.stopReason} (oczekiwane ${EXPECTED.qe4RegimeRounds} / ${EXPECTED.qe4RegimeStopReason})`);
+record('QE4 regime inquiry: zwycięska hipoteza (wyliczona z siatki, nie literał)', qe4Regime.winningHypothesisId === EXPECTED.qe4RegimeWinner,
+  `${qe4Regime.winningHypothesisId} (oczekiwane ${EXPECTED.qe4RegimeWinner})`);
+record('QE4 regime inquiry: kotwica anty-HARK nienaruszona w KAŻDEJ rundzie', qe4Regime.antiHarkingIntactEveryRound === true,
+  `antiHarkingIntactEveryRound=${qe4Regime.antiHarkingIntactEveryRound}`);
+record('QE4 regime inquiry: odciski rund (replay)', eq(qe4Regime.roundFingerprints, EXPECTED.qe4RegimeFingerprints),
+  `[${qe4Regime.roundFingerprints.join(', ')}] (oczekiwane [${EXPECTED.qe4RegimeFingerprints.join(', ')}])`);
+
+
+
+record('Discovery engine CASE A (QE4, kwantowa): zwycieski MODEL wyliczony, nie zadeklarowany',
+  dQe4.winningFormula === EXPECTED.discoveryQe4Winner && dQe4.stopReason === EXPECTED.discoveryQe4Stop,
+  `${dQe4.winningFormula} / stop=${dQe4.stopReason} (oczekiwane ${EXPECTED.discoveryQe4Winner} / ${EXPECTED.discoveryQe4Stop})`);
+record('Discovery engine CASE A: odcisk kampanii (replay)',
+  dQe4.campaignFingerprint === EXPECTED.discoveryQe4Fingerprint,
+  `${dQe4.campaignFingerprint} (oczekiwane ${EXPECTED.discoveryQe4Fingerprint})`);
+record('Discovery engine CASE B (Kepler, astronomia): TEN SAM silnik, inna nauka, inny ksztalt',
+  dKepler.winningFormula === EXPECTED.discoveryKeplerWinner && dKepler.stopReason === EXPECTED.discoveryKeplerStop,
+  `${dKepler.winningFormula} / stop=${dKepler.stopReason} (oczekiwane ${EXPECTED.discoveryKeplerWinner} / ${EXPECTED.discoveryKeplerStop})`);
+record('Discovery engine CASE B: III prawo Keplera odzyskane z 9 liczb NASA (nachylenie ~3/2)',
+  Math.abs((dKepler.winningCoefficients[dKepler.winningCoefficients.length - 1] ?? 0) - EXPECTED.discoveryKeplerSlope) < 0.001,
+  `nachylenie=${dKepler.winningCoefficients[dKepler.winningCoefficients.length - 1]} (oczekiwane ~${EXPECTED.discoveryKeplerSlope} = 3/2)`);
+record('Discovery engine CASE B: odcisk kampanii (replay)',
+  dKepler.campaignFingerprint === EXPECTED.discoveryKeplerFingerprint,
+  `${dKepler.campaignFingerprint} (oczekiwane ${EXPECTED.discoveryKeplerFingerprint})`);
+record('Discovery engine: obie kampanie wybieraja INNE eksperymenty (dowod, ze nie jest zahardkodowane)',
+  JSON.stringify(dQe4.selectedExperiments) !== JSON.stringify(dKepler.selectedExperiments),
+  `QE4 wybral [${dQe4.selectedExperiments.join(', ')}], Kepler [${dKepler.selectedExperiments.join(', ')}]`);
+record('Discovery engine: model B wyprowadzony z RESIDUUM modelu A wygrywa kampanie (gramatyka bez LOG)',
+  dDerived.winnerWasDerivedAtRound > 0 && String(dDerived.winningFormula).includes('log'),
+  `zwyciezca "${dDerived.winningFormula}" wszedl w rundzie ${dDerived.winnerWasDerivedAtRound}; wyprowadzone: ${dDerived.derivedModelFormulas.length}`);
+record('Discovery engine: kotwica anty-HARK nienaruszona we wszystkich trzech kampaniach',
+  dQe4.antiHarkingIntactEveryRound && dKepler.antiHarkingIntactEveryRound && dDerived.antiHarkingIntactEveryRound,
+  `qe4=${dQe4.antiHarkingIntactEveryRound} kepler=${dKepler.antiHarkingIntactEveryRound} derived=${dDerived.antiHarkingIntactEveryRound}`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

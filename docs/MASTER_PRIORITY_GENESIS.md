@@ -1318,3 +1318,74 @@ zakresem tego zadania (por. `docs/RISKS.md` R-005).
 Priorytet ZWĘŻONY: R-005 (punkt „brak pomiaru instrumentalnego" domknięty
 przykładem; punkt „brak ingestion na żywo" i "brak testu falsyfikacyjnego
 na tym pomiarze" pozostają otwarte, nazwane wprost).
+
+## UPDATE — C3: P0-2/P0-3/P0-5 — QE4 Regime Inquiry Loop (2026-09-13)
+
+**Zadanie.** `docs/prompts/2026-09-12-DZIS-priorytety-F1.md`: P0-2 (hipotezy
+konkurencyjne liczone z siatki `(T,k)` przypiętego zbioru QE4, nie z literału,
+z rodowodem przez `beliefRevision.ts::createHypothesis` + operator hipotezy
+rezydualnej), P0-3 (dołożenie `CONVERGENCE`/`NO_INFORMATION_GAIN` do słownika
+stopu jednej pętli), P0-5 (obowiązkowy, DZIAŁAJĄCY krok anty-HARK co rundę).
+
+**Blokada wykryta przed startem, obejście udokumentowane.** `DatasetLaboratory`
+(P0.1 klasyfikacji), od którego P0-2/P0-3/P0-5 formalnie zależą, NIE istnieje
+w repo (zweryfikowane: zero trafień na wszystkich gałęziach zdalnych) — to
+otwarte, nierozpoczęte zadanie C2. Żadna z czterech istniejących pętli
+(`discoveryLoop`/`inquiryLoop`/`hypothesisLoop`/`scientificDiscoveryLoop`) nie
+może w ogóle przyjąć realnego przypiętego zbioru QE4 (wymagają
+symulowalnego substratu lub pojedynczego przebiegu bez rund). Zamiast czekać,
+zbudowano NOWĄ, WĄSKĄ, jednorazową pętlę `core/agent/qe4RegimeInquiryLoop.ts`
+— czwarta, nie uogólnienie żadnej z istniejących, i nie generyczny szew
+`DatasetLaboratory` (który miałby obsłużyć 17 domen). Reużywa bez zmian:
+`runQe4BrydgesAnalysis` (bootstrap na przypiętych CSV), `weightedLinearFit`/
+`weightedResidualSumOfSquares` (`qe4BrydgesEstimator.ts`), `createHypothesis`/
+`updateConfidence` (`beliefRevision.ts`), `fnv1a`/`canonicalJson`.
+
+**P0-2 — hipotezy z siatki.** Trzy konkurujące reżimy (LINIOWY / LOGARYTMICZNY
+/ SATURUJĄCY — dopasowanie profilowe z siatkownym przeszukaniem stałej τ)
+dopasowywane od nowa co rundę do REALNYCH punktów admitowanych z siatki
+`DISORDER_T_VALUES_MS` zbioru Brydgesa, jako trzy `Hypothesis` ze znacznikiem
+rodowodu `generatedBy: 'REGIME_FIT_FROM_GRID'` (nowa wartość w
+`HypothesisGenerationMechanism`, oddzielona od `INITIAL` bo pochodzi z
+KSZTAŁTU danych, nie z deklaracji człowieka). Operator hipotezy rezydualnej
+(`deriveResidualHypothesis`, druga połowa P0-2): po ustaleniu zwycięskiego
+reżimu liczy realne ważone residua i — jeśli jeden punkt odstaje ≥3× RMS
+reszty — wyprowadza NOWĄ hipotezę o anomalii w konkretnym `T`, ze znacznikiem
+`generatedBy: 'RESIDUAL_FROM_FIT'` i `parentHypothesisId` zwycięzcy, jawnie
+oznaczoną jako NIEPRZETESTOWANĄ (przetestowanie wymagałoby drobniejszej
+realnej siatki, niedostępnej w tym przypiętym zbiorze).
+
+**P0-3 — nowy, mały słownik stopu.** `Qe4RegimeStopReason =
+'CONVERGENCE' | 'NO_INFORMATION_GAIN' | 'ROUND_BUDGET_EXHAUSTED' |
+'ANTI_HARKING_VIOLATION'` — WYŁĄCZNIE dla tej pętli, bez dotykania siedmiu
+istniejących słowników stopu w innych pętlach.
+
+**P0-5 — anty-HARK naprawdę obowiązkowy.** Zastany stan (potwierdzony
+niezależnym audytem): KAŻDY istniejący wywołujący `verifyAntiHarkingAnchor`
+przekazuje literał `[]`, więc kontrola strukturalnie zawsze przechodzi, a
+`buildSavedHypothesisLoop` w ogóle nie sprawdza jej wyniku. W nowej pętli
+kotwica jest REALNA (odciski poprzednich rund tego samego przebiegu, wątkowane
+w przód) i DZIAŁAJĄCA: naruszenie natychmiast zatrzymuje pętlę
+(`ANTI_HARKING_VIOLATION`) i odmawia zgłoszenia zwycięzcy. Bezpieczna
+ekstrakcja: rdzeń kontroli wydzielony z `hypothesisLoop.ts` do
+`checkAntiHarkingAnchor` (behavior-preserving — `verifyAntiHarkingAnchor`
+deleguje do niego), żeby nowa pętla nie duplikowała logiki.
+
+**Weryfikacja.** 15 nowych testów (`qe4RegimeInquiryLoop.test.ts`) — w tym
+scenariusz anty-HARK wykrywający kolizję z odciskiem zadeklarowanym jako
+znany PRZED startem przebiegu (nie mockowany, realnie zbudowany przez
+uruchomienie pętli dwa razy). Pełna bramka zielona: eslint (repo), tsc
+(frontend), oba suite'y (frontend + backend, bez regresji), build, `node
+scripts/repro-demo.mjs` — **27/27**, z czterema nowymi kontrolami repro dla
+tej pętli. Realny wynik na przypiętym zbiorze (k=5, half-partition): 7 rund,
+`ROUND_BUDGET_EXHAUSTED`, zwycięzca `qe4-regime-logarithmic-k5` (zgodne z
+istniejącym werdyktem P2 w `qe4BrydgesAnalysis.ts`, że wzrost jest co
+najmniej logarytmiczny), brak hipotezy rezydualnej (dane czyste, bez
+odstającego punktu) — odciski rund przypięte w `repro-demo.mjs` jako literały.
+
+**Czego to NIE ustanawia.** To nie jest `DatasetLaboratory` — jeśli C2
+zbuduje generyczny szew P0.1, ta pętla może wymagać pogodzenia z nim (ryzyko
+nazwane wprost w komentarzu modułu). To nie jest też nowe odkrycie naukowe:
+zwycięski reżim (logarytmiczny) już wcześniej ustaliła prerejestrowana
+weryfikacja P2 tego samego zbioru — ta pętla demonstruje MECHANIZM (hipotezy
+z siatki, stopowanie, anty-HARK), nie nowy wynik fizyczny.

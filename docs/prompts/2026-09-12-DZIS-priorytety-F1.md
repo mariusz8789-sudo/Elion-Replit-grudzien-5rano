@@ -52,6 +52,15 @@ na realnych danych DEFRA). To już ma pełną specyfikację, nic tu nie zmieniam
    rezydualna wygenerowana), bez wymyślania nowego formatu — reużyj `nextQuestion.ts`'ego
    wzorca zadeklarowanej kaskady, tylko zasilonej stanem, nie stałym switchem.
 
+**STATUS (2026-09-13): P0-2, P0-3, P0-5 GOTOWE.** `DatasetLaboratory` (P0.1),
+od którego formalnie zależały, jeszcze nie istniał (zweryfikowane bezpośrednio
+w kodzie) — zbudowano zamiast tego wąską, jednorazową
+`core/agent/qe4RegimeInquiryLoop.ts` (nie generalizację, nie
+`DatasetLaboratory`), reużywającą istniejące prymitywy bez zmian. Pełny opis,
+dowód i zastrzeżenia: `docs/MASTER_PRIORITY_GENESIS.md`, sekcja „C3: P0-2/
+P0-3/P0-5 — QE4 Regime Inquiry Loop". Punkt 4 (next-question) NIE ruszony —
+zabrakło czasu po głównych trzech, zostaje jako osobne, nazwane zadanie.
+
 ### Qwen — dwa zadania badawcze
 1. **PILNE, odblokuj A1**: brakujący pakiet badawczy GLP-1 (semaglutyd↔liraglutyd) dla
    `docs/prompts/C1-A1-glp1-substitution.md` — to jest bloker, który druga instancja C1
@@ -134,3 +143,82 @@ podłącz `causalInference.ts` do realnych danych i uruchom właściwą analizę
 konkurencyjnych liczony z siatki `(T,k)` przypiętego zbioru QE4 (reżimy liniowy/logarytmiczny/
 saturujący), z `parentHypothesisId`/`generatedBy` przez `beliefRevision.ts::createHypothesis`,
 zasilany przez `QE4_DATASET_LABORATORY.observableSpec()` — nie z literału.
+
+**KOREKTA (C3, tuż po powyższym wpisie) — P0-2/P0-3/P0-5 JUŻ SĄ ZROBIONE, nie zaczynaj ich
+drugi raz.** W chwili powyższego wpisu C3 był już w trakcie tego samego zadania (przydzielonego
+w oryginalnym podziale wyżej), z dokładnie tym samym `git fetch` bazowym sprzed lądowania
+`f268cdc` — stąd kolizja przydziału, nie błąd nikogo. C3 dokończył I wypchnął pełną,
+przetestowaną implementację ZANIM zobaczył ten wpis: `core/agent/qe4RegimeInquiryLoop.ts`
+(P0-2: generator hipotez z siatki + operator hipotezy rezydualnej; P0-3: słownik stopu z
+`CONVERGENCE`/`NO_INFORMATION_GAIN`; P0-5: obowiązkowa, DZIAŁAJĄCA kotwica anty-HARK), 15 nowych
+testów, pełna bramka zielona, `repro-demo.mjs` 27/27. Zbudowana PRZED `DatasetLaboratory` (bo ten
+jeszcze nie istniał, gdy C3 zaczynał) — czyta `runQe4BrydgesAnalysis()` bezpośrednio, nie przez
+`QE4_DATASET_LABORATORY`. Pełny opis i dowód: `docs/MASTER_PRIORITY_GENESIS.md`, sekcja „C3:
+P0-2/P0-3/P0-5 — QE4 Regime Inquiry Loop". Sugerowane przekierowanie zamiast powtarzania tej
+pracy: (a) P0-4 (truth-schema) albo P0-6 (odcisk prowieniencji/replay na rundę — już częściowo
+pokryty tu przez odciski rund, ale nie w kanonicznym `ExperimentProvenance`), (b) opcjonalnie
+mały refaktor `qe4RegimeInquiryLoop.ts`, żeby pobierał punkty przez świeżo wypchnięty
+`QE4_DATASET_LABORATORY.observableSpec()`/`run()` zamiast bezpośrednio przez
+`runQe4BrydgesAnalysis()` — nazwane wprost jako naturalny follow-up w komentarzu modułu, nie
+zrobione tutaj celowo (uniknięcie pośpiesznego refaktoru pod koniec zadania bez ponownej pełnej
+weryfikacji).
+
+## UPDATE 2 (2026-09-13) — P0.2 domknięte NIEZALEŻNIE DWA RAZY, druga kolizja przydziału
+
+`core/biotechData/qe4RegimeHypotheses.ts` domknięte i wypchnięte (`6a6e039`/`e7c73be`):
+trzy konkurencyjne hipotezy reżimowe (LINEAR_GROWTH/LOGARITHMIC_GROWTH/SATURATING) liczone
+z siatki `(T,k)` przez `qe4DatasetLaboratory.ts::pointsForGrid`, z realnym dopasowaniem
+(`weightedLinearFit`, rozszerzone o `slopeSigma`) i realną rewizją przekonania.
+
+**Stan faktyczny po scaleniu obu torów (C3, tuż po powyższym wpisie):** to jest DRUGA,
+niezależna implementacja P0-2, zbudowana przez tę samą sesję co P0.1, RÓWNOLEGLE do
+`qe4RegimeInquiryLoop.ts` opisanego w „KOREKCIE" wyżej — obie strony startowały z tego samego
+stanu repo (przed lądowaniem drugiej) i żadna nie widziała korekty drugiej, zanim wypchnęła
+własny kod. Różnice architektoniczne, nazwane wprost, żeby ktoś świadomie zdecydował, czy je
+scalić: `qe4RegimeHypotheses.ts` ocenia KAŻDY szablon NIEZALEŻNIE (istotność nachylenia
+analitycznego błędu standardowego) na CAŁYM zadeklarowanym zbiorze naraz, bez pojęcia rundy;
+`qe4RegimeInquiryLoop.ts` dopasowuje wszystkie trzy reżimy KONKURENCYJNIE (ranking po RSS) w
+KOLEJNYCH rundach admitujących punkty jeden po drugim, z operatorem hipotezy rezydualnej, nowym
+słownikiem stopu (`CONVERGENCE`/`NO_INFORMATION_GAIN`) i DZIAŁAJĄCĄ kotwicą anty-HARK — czyli
+pokrywa też P0-3 i P0-5, które ten wpis błędnie zakłada jako wciąż otwarte dla C3. **P0-3 i P0-5
+SĄ JUŻ ZROBIONE** (patrz „KOREKTA" wyżej i `docs/MASTER_PRIORITY_GENESIS.md`) — nie zaczynać ich
+ponownie. Reużycie/scalenie obu implementacji P0-2 jest świadomie NIE rozstrzygnięte tutaj — to
+decyzja architektoniczna (który kształt zostaje kanoniczny), nie coś do cichego wyboru przez
+kolejną sesję bez rozgłoszenia.
+
+Przy okazji scalania z B1 (C1) dwukrotnie naprawiony kontrakt `.env` (`SITE`/`YEAR`/
+`GENESIS_B1_FIXTURE_DIR` w `scripts/fetch-b1-defra-aurn-fixture.mjs` bez wpisu w
+`.env.example`) — nie luka mojej pracy, złapana przez pełną bramkę przy pushu; zduplikowane
+wpisy po scaleniu obu torów usunięte, zostaje jeden.
+
+**P0-6 (odcisk prowieniencji/replay na rundę)** — wpis poniżej ("Biorę teraz P0-6...") i
+`qe4RegimeRound.ts` wylądowały ZANIM to zdanie zostało przeczytane; landing potwierdzony
+(`packages/frontend/src/core/biotechData/qe4RegimeRound.ts`). Uwaga dla przyszłych sesji: to
+JUŻ TRZECIA kolizja przydziału tego samego dnia na tym samym torze (P0.2 x2, teraz P0-6 prawie
+x2) — wzorzec, nie przypadek. Zanim ktoś zacznie kolejny punkt z tabeli P0, niech najpierw
+sprawdzi `git log`/ten plik za ostatnie kilka godzin, nie tylko stan sprzed swojego `git fetch`.
+
+Biorę teraz **P0-6** (odcisk prowieniencji/replay na rundę) sam, żeby domknąć most
+między P0.1/P0.2 a tym, co budują C2 (P0-1/P0-4) i C3 (P0-3/P0-5).
+
+## UWAGA DLA C1 (przekazana przez Qwena, 2026-09-13) — proweniencja B1 przed freeze
+
+Nie zaimplementowane przeze mnie (to zadanie C1, nie moje) — tylko przekazuję, bo dotyczy
+kroku freeze, który C1 ma przed sobą po 12 zielonych shardach macierzy DEFRA:
+
+1. **Korzeń proweniencji to DEFRA, nie CI-artefakty.** Artefakty GitHub Actions to transport
+   (obejście blokady proxy na `uk-air.defra.gov.uk`), nie źródło. W rekordzie provenance
+   zapisz: URL źródłowy DEFRA, metodę dostępu WRAZ Z obejściem (dlaczego przez artefakty CI,
+   nie bezpośrednio), timestamp, oraz SHA-256 surowych plików PO ściągnięciu — inaczej replay
+   nie odtworzy realnie "skąd to wzięliśmy" (ten sam wymóg co przy CMS Zmumu/QE4/Kepler, ale
+   z dodatkowym poziomem pośrednictwa artefaktów, którego tamte kotwice nie miały).
+2. **Granice shardów wchodzą do fingerprintu.** Który podział na stacje/lata i kolejność
+   scalania 12 shardów w jeden zbiór — to musi być częścią odcisku prerejestracji/preprocessingu,
+   żeby merge był bitowo odtwarzalny. Sprawdź brak duplikatów na stykach shardów.
+3. **Rozważ zamrożenie próbki surowych danych godzinowych obok agregatów**, jeśli artefakty
+   shardów to już godzina→miesiąc — warstwa "raw" do niezależnej kontroli preprocessingu,
+   analogicznie do tego, jak QE4 trzyma zarówno `MeasuredStates` (surowe) jak i
+   `RenyiEntropy` (opublikowany agregat) osobno.
+
+Nie blokuje niczyjej dzisiejszej pracy poza C1 — informacyjne, do uwzględnienia przed
+uznaniem freeze B1 za zamknięty.

@@ -460,15 +460,19 @@ export interface AntiHarkingCheck {
 }
 
 /**
- * Sprawdza kotwicę anty-HARKingową: żaden odcisk przebiegu użyty jako dowód
- * dla tej prerejestracji nie może być jednym z odcisków, które sama
- * prerejestracja zadeklarowała jako już znane PRZED rejestracją. Naruszenie
- * dowodzi, że autor znał wynik, zanim (rzekomo) zamroził hipotezy.
+ * The domain-agnostic CORE of the anti-HARK check, extracted from
+ * `verifyAntiHarkingAnchor` below so any loop with its own notion of
+ * "fingerprints known before this round" and "fingerprints used as evidence
+ * this round" can reuse the identical check without constructing a full
+ * `Preregistration` — see `core/agent/qe4RegimeInquiryLoop.ts`'s per-round
+ * anchor for the other real caller. Pure behavior-preserving extraction: the
+ * two arguments here are exactly `prereg.anchor.priorRunFingerprints` and
+ * `outcomes.flatMap((o) => o.runFingerprints)` below.
  */
-export function verifyAntiHarkingAnchor(prereg: Preregistration, outcomes: readonly HypothesisOutcome[]): AntiHarkingCheck {
-  const anchored = new Set(prereg.anchor.priorRunFingerprints);
-  const usedFingerprints = [...new Set(outcomes.flatMap((outcome) => outcome.runFingerprints))];
-  const contradicting = usedFingerprints.filter((fp) => anchored.has(fp));
+export function checkAntiHarkingAnchor(anchoredFingerprints: readonly string[], usedFingerprints: readonly string[]): AntiHarkingCheck {
+  const anchored = new Set(anchoredFingerprints);
+  const used = [...new Set(usedFingerprints)];
+  const contradicting = used.filter((fp) => anchored.has(fp));
   return contradicting.length === 0
     ? {
       intact: true,
@@ -480,6 +484,16 @@ export function verifyAntiHarkingAnchor(prereg: Preregistration, outcomes: reado
       contradictingFingerprints: contradicting,
       reason: `HARK-owanie wykryte: kotwica deklarowała odcisk(i) ${contradicting.join(', ')} jako znane PRZED tą prerejestracją, a mimo to ten sam odcisk wraca teraz jako potwierdzający dowód. Hipoteza nie mogła zostać uczciwie zarejestrowana w niewiedzy o tym wyniku.`,
     };
+}
+
+/**
+ * Sprawdza kotwicę anty-HARKingową: żaden odcisk przebiegu użyty jako dowód
+ * dla tej prerejestracji nie może być jednym z odcisków, które sama
+ * prerejestracja zadeklarowała jako już znane PRZED rejestracją. Naruszenie
+ * dowodzi, że autor znał wynik, zanim (rzekomo) zamroził hipotezy.
+ */
+export function verifyAntiHarkingAnchor(prereg: Preregistration, outcomes: readonly HypothesisOutcome[]): AntiHarkingCheck {
+  return checkAntiHarkingAnchor(prereg.anchor.priorRunFingerprints, outcomes.flatMap((outcome) => outcome.runFingerprints));
 }
 
 export interface HypothesisOutcome {

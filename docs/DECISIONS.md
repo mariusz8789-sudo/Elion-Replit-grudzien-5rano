@@ -825,3 +825,51 @@ funkcją `splitCsvLine` świadomą cudzysłowów PRZED uruchomieniem
 prawdziwego fetchu — zweryfikowane lokalnie wobec realnej próbki wiersza
 z MY1_2023.csv (NO2=22.56750 R, SO2=1.86263 R — zgodne z surowym wierszem
 z recon).
+
+---
+
+## D-026 (2026-09-13) — Kanonizacja dwóch równoległych implementacji P0-2
+
+**Problem.** Dwie sesje zbudowały P0-2 równolegle, nie widząc się nawzajem, i oba
+warianty wylądowały na wspólnej gałęzi przez automatyczne merge'e:
+- `core/biotechData/qe4RegimeHypotheses.ts` + `qe4RegimeRound.ts` (sesja `014DwkSo`, `6a6e039`)
+- `core/agent/qe4RegimeInquiryLoop.ts` (sesja `01K7uY6g`, `f071f7f`)
+
+Do tego kolidowała nazwa eksportowanego typu `Qe4RegimeRound` w dwóch różnych plikach
+o różnych kształtach.
+
+**Decyzja: kanoniczny jest `qe4RegimeInquiryLoop.ts`.** Porównanie wg zadeklarowanych
+kryteriów (generyczność, zgodność z architekturą, brak duplikacji, reuse, lineage/
+provenance, runtime verification):
+
+| Kryterium | `qe4RegimeHypotheses` + `qe4RegimeRound` | `qe4RegimeInquiryLoop` |
+|---|---|---|
+| Rundy / rosnący zbiór dowodów | brak (jednostrzałowa) | 7 rund, co runda dopuszcza kolejny realny punkt i przelicza wszystkie trzy reżimy |
+| Hipoteza z residuum | brak | `deriveResidualHypothesis` — nowa hipoteza wyprowadzona z residuów zwycięskiego dopasowania |
+| Reguły stopu | brak | `CONVERGENCE`/`NO_INFORMATION_GAIN`/`ROUND_BUDGET_EXHAUSTED`/`ANTI_HARKING_VIOLATION`, wszystkie z mierzalnym warunkiem |
+| Anty-HARK | brak | realna kotwica z odciskami poprzednich rund, naruszenie ZATRZYMUJE pętlę i odmawia ogłoszenia zwycięzcy |
+| Runtime verification | tylko testy jednostkowe | `scripts/repro-demo.mjs`: 4 kontrole, w tym odciski replay wszystkich 7 rund |
+| Rozróżnianie hipotez | istotność nachylenia 3σ | ważone RSS między trzema konkurencyjnymi modelami — realne porównanie modeli |
+| Sourcing przez seam P0.1 | **tak** (`pointsForGrid`) | nie (czytał `runQe4BrydgesAnalysis()` wprost) |
+
+Wariant kanoniczny przegrywał TYLKO w ostatnim wierszu — i to była jedyna przewaga
+wariantu wycofanego. Ta przewaga została **wciągnięta do kanonicznego**:
+`runQe4DisorderRegimeInquiry` źródłuje teraz punkty przez
+`qe4DatasetLaboratory.ts::pointsForGrid` (seam P0.1), a nie przez bezpośrednie wołanie
+analizy. Był to zresztą follow-up, który autor kanonicznego wariantu sam oznaczył we
+własnym komentarzu jako niezrobiony.
+
+**Dowód, że refactor niczego nie zmienił naukowo:** odciski replay wszystkich siedmiu
+rund są identyczne przed i po przepięciu na seam
+(`e7b90572, 3c3e9083, c82210fb, 67711185, cc3e4323, bb6aec30, 2d470070`), bo obie
+ścieżki czytają tę samą, już zweryfikowaną `runQe4BrydgesAnalysis()`.
+
+**Wycofane** (usunięte, nie osierocone): `qe4RegimeHypotheses.ts`, `qe4RegimeRound.ts`
+i ich testy. Zero konsumentów poza własnymi testami — sprawdzone grepem przed usunięciem.
+**Zachowane z wycofanego wariantu:** `qe4DatasetLaboratory.ts::pointsForGrid` (teraz
+używane przez kanoniczną pętlę) oraz `weightedLinearFit`'s `slopeSigma` (analityczna
+niepewność nachylenia WLS z własnymi testami — przyda się przy skorowaniu planera P0-1).
+
+**Zasada na przyszłość:** jeden właściciel na komponent. Ta kolizja kosztowała dwie
+niezależne implementacje tego samego, bo dwie sesje ruszyły równolegle bez sprawdzenia,
+czy ktoś już nie zaczął.

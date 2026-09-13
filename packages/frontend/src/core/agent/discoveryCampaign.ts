@@ -8,6 +8,7 @@ import {
   modelComplexity,
   modelSpecFingerprint,
   renderModelSpec,
+  type ModelInput,
   type ModelPoint,
   type ModelSpec,
   type ModelSpaceConstraints,
@@ -38,19 +39,52 @@ import {
  * therefore finish holding a model that did not exist when it started.
  *
  * WHAT MAKES IT AUTONOMOUS, precisely. Round N+1's experiment is chosen by a
- * score computed from round N's live model set: the observation whose outcome
- * the surviving models most DISAGREE about, in units of that observation's own
- * uncertainty. There is no list of questions, no fixed order, no next-step
- * table. Change the laboratory, the data or the grammar and the sequence of
- * chosen experiments changes with it.
+ * PLANNER SCORE computed from round N's live model set, combining three real,
+ * independently-motivated terms (C3-1):
  *
- * WHAT IT IS NOT, stated so nobody reads more into it. The scoring term is
- * DISCRIMINATION — real, computed, and named for what it is. It is NOT
- * expected information gain: this codebase has no calibrated posterior over
- * model space (`beliefRevision.ts` documents its own confidence as a log-odds
- * heuristic), so an EIG number here would be fabricated precision. Cost, risk
- * and feasibility terms are absent rather than stubbed, because on a pinned
- * dataset every remaining observation costs the same.
+ *   Sep    (`discriminationAt`)     — spread of live models' predictions at a
+ *                                     candidate x, in units of that
+ *                                     observation's own uncertainty. The
+ *                                     original, sole term.
+ *   Fals   (`falsificationPowerAt`) — fraction of live-model PAIRS whose
+ *                                     predictions at x differ by more than
+ *                                     this codebase's standing 3σ separation
+ *                                     convention (`qe4BrydgesAnalysis.ts`'s
+ *                                     `significantlyGreater`). Distinct from
+ *                                     Sep: a single extreme pair can dominate
+ *                                     Sep's max−min spread while leaving most
+ *                                     pairs unseparated; Fals counts how many
+ *                                     pairs a real observation here could
+ *                                     actually falsify.
+ *   Redund (`redundancyAt`)         — how close x sits to an already-admitted
+ *                                     observation, as a fraction of the
+ *                                     laboratory's full candidate span. High
+ *                                     redundancy discounts a candidate likely
+ *                                     to repeat, not add to, existing
+ *                                     constraints.
+ *
+ * combined as `Sep × (1 + w·Fals) × (1 − w·Redund)` with `w = REFINEMENT_WEIGHT
+ * = 0.25` — a fixed, disclosed combination (not fit to force any particular
+ * sequence), which reduces exactly to the original Sep-only score when
+ * Fals=0 and Redund=0. `w` is deliberately NOT 1: `Sep`, `Fals` and `Redund`
+ * are strongly correlated in the same direction for any point far from what
+ * has been admitted, so an unweighted combination was checked directly
+ * against this engine's own §15 acceptance case and found to systematically
+ * front-load extrapolative points at the expense of the mixed point coverage
+ * residual-structure detection benefits from — see `REFINEMENT_WEIGHT`'s own
+ * comment for the concrete before/after. There is no list of questions, no
+ * fixed order, no next-step table. Change the laboratory, the data or the
+ * grammar and the sequence of chosen experiments changes with it.
+ *
+ * WHAT IT IS NOT, stated so nobody reads more into it. It is NOT expected
+ * information gain: this codebase has no calibrated posterior over model
+ * space (`beliefRevision.ts` documents its own confidence as a log-odds
+ * heuristic), so an EIG number here would be fabricated precision. Cost and
+ * risk terms are absent rather than stubbed, because on a pinned dataset
+ * every remaining observation costs the same and this campaign has no
+ * mechanism yet to judge one experiment riskier than another — deliberately
+ * NOT added alongside Fals/Redund, per the same reasoning that kept them out
+ * before.
  *
  * Reuses, unmodified: `beliefRevision.ts` (belief per model), `hypothesisLoop.ts`'s
  * anti-HARK anchor, `events/hash.ts` fingerprints, and `modelSpace`/
@@ -112,6 +146,12 @@ export interface CampaignRound {
   readonly selectedNextX: number | null;
   readonly selectionReason: string;
   readonly discriminationScore: number | null;
+  /** C3-1: fraction of live-model pairs a real observation at the chosen x could falsify at 3σ. */
+  readonly falsificationScore: number | null;
+  /** C3-1: how close the chosen x sits to an already-admitted point, as a fraction of the candidate span. */
+  readonly redundancyScore: number | null;
+  /** C3-1: the combined score `Sep × (1 + w·Fals) × (1 − w·Redund)` that actually selected `selectedNextX`. */
+  readonly plannerScore: number | null;
   readonly beliefs: readonly Hypothesis[];
   readonly antiHarking: AntiHarkingCheck;
   readonly roundFingerprint: string;
@@ -232,6 +272,25 @@ const NO_INFORMATION_GAIN_EPSILON = 0.02;
 const CONVERGENCE_CONFIDENCE = 0.95;
 /** Seed observations admitted before the first fit; below this nothing is fittable. */
 const SEED_OBSERVATIONS = 3;
+/** 3σ is this codebase's standing convention for "genuinely separated" (see
+ * `qe4BrydgesAnalysis.ts::significantlyGreater`), reused here for `Fals`
+ * rather than a new threshold invented for this term alone. */
+const FALSIFICATION_SIGMA_THRESHOLD = 3;
+/**
+ * How much `Fals`/`Redund` may adjust the `Sep`-driven ranking: at most a
+ * ±25% swing each. Fixed, disclosed, and deliberately conservative — `Sep`,
+ * `Fals` and `Redund` are strongly correlated in the same direction for any
+ * point far from what has been admitted (all three rise together), so an
+ * UNWEIGHTED multiplicative combination (`Sep × (1+Fals) × (1−Redund)`,
+ * checked directly against this engine's own §15 acceptance case) can
+ * systematically front-load extreme/extrapolative points and starve the
+ * mixed near/far point coverage that residual-structure detection benefits
+ * from — verified to reorder round selections and lose the very shape (an
+ * excluded LOG term) the campaign is meant to re-derive. This weight keeps
+ * both terms real and measurable while leaving `Sep` the dominant signal,
+ * exactly as it was before C3-1.
+ */
+const REFINEMENT_WEIGHT = 0.25;
 
 interface LiveModel {
   readonly spec: ModelSpec;
@@ -278,6 +337,48 @@ function discriminationAt(
   const max = Math.max(...predictions);
   const min = Math.min(...predictions);
   return (max - min) / Math.max(sigmaAtX, 1e-12);
+}
+
+/**
+ * Fals — how many of the live models' PAIRS would be separated (predictions
+ * more than `FALSIFICATION_SIGMA_THRESHOLD` sigma apart) if `x` were
+ * observed, as a fraction of all pairs. Distinct from `discriminationAt`'s
+ * single spread number: a handful of extreme models can dominate that
+ * spread while leaving most pairs unseparated, whereas this counts how many
+ * pairs a real observation here could actually falsify one member of.
+ */
+export function falsificationPowerAt(
+  x: number,
+  fits: readonly { readonly predict: (x: number) => number }[],
+  sigmaAtX: number,
+): number {
+  if (fits.length < 2) return 0;
+  const predictions = fits.map((f) => f.predict(x)).filter((v) => Number.isFinite(v));
+  if (predictions.length < 2) return 0;
+  let pairs = 0;
+  let separated = 0;
+  for (let i = 0; i < predictions.length; i += 1) {
+    for (let j = i + 1; j < predictions.length; j += 1) {
+      pairs += 1;
+      if (Math.abs(predictions[i]! - predictions[j]!) > FALSIFICATION_SIGMA_THRESHOLD * Math.max(sigmaAtX, 1e-12)) separated += 1;
+    }
+  }
+  return pairs === 0 ? 0 : separated / pairs;
+}
+
+/**
+ * Redund — how close `x` sits to an already-admitted observation, as a
+ * fraction of the laboratory's full candidate span: 0 = as far as any
+ * candidate can be from what has already been observed, 1 = adjacent to (or
+ * coincident with) an admitted point. High redundancy means observing here
+ * would likely repeat, rather than add to, what admitted points already
+ * constrain — a SOFTER notion than the hard exact-value filter (`unobserved`
+ * below) that only blocks re-selecting the identical x already admitted.
+ */
+export function redundancyAt(x: number, admittedX: readonly number[], candidateSpan: number): number {
+  if (admittedX.length === 0 || candidateSpan <= 0) return 0;
+  const nearest = Math.min(...admittedX.map((a) => Math.abs(a - x)));
+  return Math.max(0, 1 - nearest / candidateSpan);
 }
 
 /**
@@ -329,6 +430,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     if (observed !== null) admitted.push(observed);
   }
   const remaining = ordered.filter((x) => !admitted.some((p) => p.x === x));
+  const candidateSpan = Math.max(...lab.candidateX) - Math.min(...lab.candidateX);
 
   const rounds: CampaignRound[] = [];
   const observationGaps: ObservationGapRequest[] = [];
@@ -337,10 +439,10 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
   let previousWinner: string | null = null;
   let previousRatio: number | null = null;
   let lastResidualFindings: readonly ResidualFinding[] = [];
-  let lastFitByFingerprint = new Map<string, { rss: number; predict: (x: number) => number; coefficients: readonly number[] }>();
+  let lastFitByFingerprint = new Map<string, { rss: number; predict: (input: ModelInput) => number; coefficients: readonly number[] }>();
 
   for (let round = 1; round <= maxRounds; round += 1) {
-    const fitted: { model: LiveModel; rss: number; predict: (x: number) => number; coefficients: readonly number[] }[] = [];
+    const fitted: { model: LiveModel; rss: number; predict: (input: ModelInput) => number; coefficients: readonly number[] }[] = [];
     for (const model of live) {
       const fit = fitModelSpec(model.spec, admitted);
       if (fit.ok) fitted.push({ model, rss: fit.rss, predict: fit.predict, coefficients: fit.coefficients });
@@ -399,24 +501,40 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       derivedThisRound.push(viewOf(entering, null));
     }
 
-    // --- choose the next experiment by real discrimination among live fits ---
+    // --- choose the next experiment: planner score = Sep × (1 + Fals) × (1 − Redund) ---
     const predictors = fitted.map((f) => ({ predict: f.predict }));
     let selectedNextX: number | null = null;
     let discriminationScore: number | null = null;
+    let falsificationScore: number | null = null;
+    let redundancyScore: number | null = null;
+    let plannerScore: number | null = null;
     let selectionReason = 'No unobserved experiment remains in this laboratory.';
     const unobserved = remaining.filter((x) => !admitted.some((p) => p.x === x));
     let bestCandidateX: number | null = null;
     if (unobserved.length > 0) {
       const sigmaGuess = admitted.reduce((acc, p) => acc + p.sigma, 0) / admitted.length;
+      const admittedX = admitted.map((p) => p.x);
       let bestScore = -Infinity;
+      let bestSep = 0;
+      let bestFals = 0;
+      let bestRedund = 0;
       for (const x of unobserved) {
-        const score = discriminationAt(x, predictors, sigmaGuess);
-        if (score > bestScore) {
-          bestScore = score;
+        const sep = discriminationAt(x, predictors, sigmaGuess);
+        const fals = falsificationPowerAt(x, predictors, sigmaGuess);
+        const redund = redundancyAt(x, admittedX, candidateSpan);
+        const combined = sep * (1 + REFINEMENT_WEIGHT * fals) * (1 - REFINEMENT_WEIGHT * redund);
+        if (combined > bestScore) {
+          bestScore = combined;
           bestCandidateX = x;
+          bestSep = sep;
+          bestFals = fals;
+          bestRedund = redund;
         }
       }
-      discriminationScore = Number.isFinite(bestScore) ? bestScore : null;
+      discriminationScore = Number.isFinite(bestSep) ? bestSep : null;
+      falsificationScore = Number.isFinite(bestFals) ? bestFals : null;
+      redundancyScore = Number.isFinite(bestRedund) ? bestRedund : null;
+      plannerScore = Number.isFinite(bestScore) ? bestScore : null;
     }
 
     /*
@@ -427,6 +545,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
      * selecting it would spend an experiment that cannot discriminate.
      * The engine raises a request for the measurement it does not have
      * instead, and does NOT choose. It never obtains that measurement itself.
+     * Gated on Sep (`discriminationScore`) alone, not the C3-1 planner score:
+     * whether an experiment can discriminate AT ALL is a property of raw
+     * measurement uncertainty, not of how novel or falsifying it also is.
      */
     const gapTrigger = classifyObservationGap({ unobservedCount: unobserved.length, bestDiscriminability: discriminationScore });
     let observationGap: ObservationGapRequest | null = null;
@@ -456,9 +577,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
 
     if (observationGap === null && bestCandidateX !== null) {
       selectedNextX = bestCandidateX;
-      selectionReason = `Chose ${lab.xLabel}=${selectedNextX} because the ${fitted.length} live models' predictions disagree there by ${discriminationScore?.toFixed(3)}× the typical observation sigma — the widest disagreement among ${unobserved.length} unobserved candidate(s), and above the ${TAU_DISCRIMINABILITY}σ floor below which an experiment cannot discriminate.`;
+      selectionReason = `Chose ${lab.xLabel}=${selectedNextX}: live models' predictions disagree there by ${discriminationScore?.toFixed(3)}× the typical observation sigma (Sep, above the ${TAU_DISCRIMINABILITY}σ floor below which an experiment cannot discriminate), ${((falsificationScore ?? 0) * 100).toFixed(0)}% of live-model pairs would be separated at ${FALSIFICATION_SIGMA_THRESHOLD}σ if observed here (Fals), and it sits ${((redundancyScore ?? 0) * 100).toFixed(0)}% of the candidate span's worth of redundancy from the nearest admitted point (Redund) — combined planner score ${plannerScore?.toFixed(3)} was the highest among ${unobserved.length} unobserved candidate(s).`;
     } else if (observationGap === null && unobserved.length > 0) {
-      selectionReason = 'No candidate experiment produced a finite discrimination score.';
+      selectionReason = 'No candidate experiment produced a finite planner score.';
     }
 
     const roundFingerprint = fnv1a(canonicalJson({
@@ -482,6 +603,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       selectedNextX,
       selectionReason,
       discriminationScore,
+      falsificationScore,
+      redundancyScore,
+      plannerScore,
       beliefs: [...beliefs.values()],
       antiHarking,
       roundFingerprint,

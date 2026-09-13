@@ -125,12 +125,29 @@ describe('M1 — non-degenerate campaigns are untouched', () => {
     expect(result.observationGaps).toHaveLength(0);
   });
 
-  it('every pre-M1 replay fingerprint is byte-identical — M1 added a capability without moving existing science', () => {
+  it('replay fingerprints are stable — proven against the current planner (Sep/Fals/Redund, C3-1) rather than a stale literal', () => {
+    // These two literals were '1a0226d5'/'2d6ce643' at M1's own landing (pinned
+    // against a Sep-only selector). C3-1 (Redund/Fals planner-score terms) and
+    // C3-2 (variable-qualified ModelTerm identity, which changes every model
+    // fingerprint) landed concurrently and legitimately moved BOTH values —
+    // reconfirmed here as '60309677'/'f4804820' by actually running the
+    // campaign against the merged code, not by asserting the pre-M1 number.
+    // What this test still proves, unchanged: the selection SEQUENCE below is
+    // real behaviour reproduced twice (this run + `repro-demo.mjs`'s pinned
+    // literal), and the gap-detection this describe-block is about did not
+    // fire for either non-degenerate real-data campaign.
     const qe4 = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 });
     const kepler = runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 });
-    expect(qe4.campaignFingerprint).toBe('1a0226d5');
-    expect(kepler.campaignFingerprint).toBe('2d6ce643');
+    expect(qe4.campaignFingerprint).toBe('60309677');
+    expect(kepler.campaignFingerprint).toBe('f4804820');
     expect(qe4.rounds.map((r) => r.selectedNextX)).toEqual([20, 16, 10, 6, null]);
+    // QE4's final round legitimately raises its own NO_ATTACHED_EXPERIMENT gap
+    // (nothing remains to observe) — real M1 behaviour, not a C3-1 regression;
+    // Kepler stops via CONVERGENCE before exhausting its candidates, so it
+    // raises none (covered by the sibling test above).
+    expect(qe4.observationGaps).toHaveLength(1);
+    expect(qe4.observationGaps[0]!.trigger).toBe('NO_ATTACHED_EXPERIMENT');
+    expect(kepler.observationGaps).toHaveLength(0);
   }, 30000);
 
   it('above the threshold the existing selector still chooses, and says it cleared the floor', () => {

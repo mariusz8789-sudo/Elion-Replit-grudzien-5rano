@@ -121,3 +121,25 @@ instancja C1 już zdecydowała "Skip to B1 now" i jest w trakcie. Nie zmieniam t
 pracy na podstawie propozycji z zewnątrz bez dostępu do repo. Jeśli C1 skończy B1 dziś i
 zostanie czas, naturalny kolejny krok to P0.1 albo P0-4 (P0-4 nie ma jeszcze przypisanej
 osoby poza "C2 po P0-1" — C1 może je przejąć równolegle, żeby nie czekać w kolejce).
+
+## STATUS (2026-09-13, rano) — co się realnie ruszyło w nocy
+
+Zero commitów od C2/C3/Qwena od wczoraj wieczorem — ich zadania z tabeli wyżej **bez zmian**,
+nikt jeszcze nie zaczął.
+
+**C1/B1 — realny postęp**: `core/agent/causalInference.ts` (DiD/ITS/synthetic-control)
+zbudowane i TDD-zweryfikowane na symulowanych panelach (`ebcea54`). Znalezione realne kody
+stacji DEFRA AURN (MY1/MAN3/LED6/SHBR, D-025 w `DECISIONS.md`) i realny wzorzec URL. **Wszystkie
+12 zadań macierzy CI pobrania (4 stacje × 2022-2024) przeszły na zielono** — dane NO₂/SO₂ są
+pobrane i zweryfikowane w logach joba, ale **jeszcze nie przypięte** jako plik w repo (brakuje
+kroku rekonstrukcji z logów CI, tak jak przy CMS Zmumu/QE4 — patrz D-023) i `causalInference.ts`
+jeszcze nie jest podłączone do żadnych prawdziwych danych. **Następny krok C1**: (1) zrekonstruuj
+12 plików z logów CI joba `b1-defra-aurn-pin-narrow` (uruchomienie 34726778201) w ten sam sposób
+co CMS/QE4, zamień tymczasowy job na stały `*-verify-pinned` (wzorzec D-023), (2) dopiero wtedy
+podłącz `causalInference.ts` do realnych danych i uruchom właściwą analizę DiD z prerejestracją.
+
+**Ja (P0.1 → teraz P0.2)**: `DatasetLaboratory` + implementacja QE4 domknięte i wypchnięte
+(`f268cdc`, pełna bramka zielona). Nikt inny nie zaczął P0.2 — biorę je teraz: generator hipotez
+konkurencyjnych liczony z siatki `(T,k)` przypiętego zbioru QE4 (reżimy liniowy/logarytmiczny/
+saturujący), z `parentHypothesisId`/`generatedBy` przez `beliefRevision.ts::createHypothesis`,
+zasilany przez `QE4_DATASET_LABORATORY.observableSpec()` — nie z literału.

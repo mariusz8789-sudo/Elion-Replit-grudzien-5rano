@@ -767,3 +767,61 @@ architektury; `discoveryCase.ts` i `externalAnchor.ts` pozostają nietknięte.
 Verdykty P1-P4, prerejestracja, bootstrap i progi w `qe4BrydgesAnalysis.ts`
 — nietknięte, zweryfikowane bit-do-bitu (`resultFingerprint` = `a6578ae8`
 przed i po tej zmianie).
+
+---
+
+## D-025 (2026-09-13, B1) — Realne kody stacji DEFRA AURN + kotwica jako EKSTRAKT kolumn, nie plik dosłowny
+
+**Decyzja.** B1 (adjudykacja ULEZ→NO₂) używa czterech realnych stacji DEFRA
+AURN, znalezionych przez wyszukiwanie, nie zgadniętych: **MY1** (London
+Marylebone Road, roadside, kanoniczna stacja NO₂ od 1997 — leczona), **MAN3**
+(Manchester Piccadilly), **LED6** (Leeds Headingley Kerbside), **SHBR**
+(Sheffield Barnsley Road) — wszystkie typu kerbside/roadside, dla
+porównywalności z klasyfikacją stacji leczonej. Świadome zmniejszenie
+zakresu: 3 miasta kontrolne zamiast sugerowanych przez pakiet 5 — job
+CI-fetch dla realnych wielostacyjnych danych godzinowych jest znacząco
+większym przedsięwzięciem niż jakakolwiek dotychczasowa kotwica
+(Kepler/NIST/CMS/QE4 pinowały PO JEDNYM pliku), a decyzja zapadła PRZED
+pobraniem jakichkolwiek liczb.
+
+**Odkryty, realny wzorzec URL** (dwie rundy recon na runnerze GitHub
+Actions, sandbox lokalny potwierdzony zablokowany — 403 na CONNECT do
+`uk-air.defra.gov.uk`, ten sam wzorzec co zenodo.org/nist.gov/CERN Open
+Data): `https://uk-air.defra.gov.uk/datastore/data_files/site_data/<KOD>_<ROK>.csv?v=1`
+— jeden plik CSV na stację na rok, WSZYSTKIE zanieczyszczenia w formacie
+szerokim (nagłówek: trójki nazwa-zanieczyszczenia/status/jednostka).
+
+**Dlaczego kotwica jest EKSTRAKTEM kolumn, nie plikiem dosłownym — zerwanie
+z dotychczasową dyscypliną (Kepler/NIST/CMS/QE4 pinują bajt-w-bajt) i
+dlaczego to uzasadnione.** Realny plik MY1_2023.csv ma dziesiątki kolumn
+(CO, PM10, NO, NO2, NOx, O3, PM2.5, SO2, kilkadziesiąt LZO) przy ~800-900
+bajtach/wiersz × 8766 wierszy godzinowych/rok ≈ 7-8 MB/rok-stację —
+wydrukowanie CAŁOŚCI do jednego loga CI trafiłoby w ten sam próg cichego
+obcinania, który D-023 znalazł dla CMS Zmumu.csv (~630 KB/job), tyle że
+wielokrotnie gorzej, wymagając dziesiątek fragmentów NA rok-stację.
+Prerejestracja tego zadania czyta wyłącznie NO₂ (główny) i SO₂ (kontrola
+negatywna) — `scripts/fetch-b1-defra-aurn-fixture.mjs` wyciąga TYLKO te
+kolumny (Date, time, NO2, NO2-status, SO2, SO2-status), sprowadzając jedną
+rok-stację do ~300-400 KB — mieści się w jednym jobie macierzowym bez
+dalszego dzielenia (12 shardów: 4 stacje × 3 lata, `b1-defra-aurn-pin-narrow`
+w `ci.yml`).
+
+**Jawne, przetestowane, nie ciche.** `manifest.json` (do zapisania przy
+zamrożeniu) niesie odcisk SHA-256 PEŁNEGO oryginalnego pliku (liczony przy
+pobraniu z całej, nieobciętej odpowiedzi) OBOK odcisku wyciągniętego,
+wąskiego pliku — a bieżący job weryfikujący (odpowiednik
+`cms-zmumu-verify-pinned`) pobiera pełny plik na nowo, uruchamia TĘ SAMĄ
+funkcję ekstrakcji i porównuje wynik z zapisaną kopią — wykrywa dryf w
+kolumnach, których to zadanie faktycznie używa, dokładnie jak porównania
+bajt-w-bajt robią dla pełnych plików innych kotwic.
+
+**Realny błąd sparsowania złapany PRZED CI, nie po.** Nagłówek DEFRA
+zawiera złożone nazwy LZO z DOSŁOWNYM przecinkiem wewnątrz cudzysłowu
+(`"1,2,3-trimethylbenzene"`) — naiwny `line.split(',')` przesunąłby indeksy
+kolumn PO tym punkcie. Ponieważ „Nitrogen dioxide"/„Sulphur dioxide"
+występują PRZED pierwszą taką nazwą w próbce MY1, błąd nie ujawniłby się
+tam, ale mógłby przy innym porządku kolumn na innej stacji. Naprawione
+funkcją `splitCsvLine` świadomą cudzysłowów PRZED uruchomieniem
+prawdziwego fetchu — zweryfikowane lokalnie wobec realnej próbki wiersza
+z MY1_2023.csv (NO2=22.56750 R, SO2=1.86263 R — zgodne z surowym wierszem
+z recon).

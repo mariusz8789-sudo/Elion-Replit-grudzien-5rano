@@ -316,6 +316,50 @@ jobs:
           path: artifacts/cms-zmumu
           retention-days: 90
 
+  b1-defra-aurn-pin-narrow:
+    name: "B1 Phase 3 (temporary): fetch+extract NO2/SO2 for one DEFRA AURN site-year"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [MY1, MAN3, LED6, SHBR]
+        year: [2022, 2023, 2024]
+    # Recon (2 rounds, now removed -- see docs/DECISIONS.md) found DEFRA's
+    # stable per-site-year download URL and confirmed its wide "all
+    # pollutants" CSV is far too large (~7-8MB/site-year) to freeze verbatim
+    # through job-log read-back the way every prior anchor's raw file was.
+    # scripts/fetch-b1-defra-aurn-fixture.mjs extracts ONLY the columns this
+    # experiment's preregistration reads (NO2 + SO2, date/time), bringing
+    # each site-year down to ~300-400KB -- one matrix shard per site-year, no
+    # further sharding needed (unlike CMS Zmumu's 4-way split for one file).
+    # The extracted CSV travels back via actions/upload-artifact (like every
+    # other pinned fixture in this workflow), NOT via stdout: job-log
+    # read-back silently caps returned content under one site-year's row
+    # count, which would corrupt the data. This is a ONE-OFF pinning job:
+    # remove once its 12 shards' artifacts have been downloaded and
+    # committed under packages/frontend/src/core/biotechData/b1-defra-aurn/,
+    # mirroring qe4-brydges-pin-measured-states' own lifecycle.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + extract NO2/SO2 for ${{ matrix.site }}_${{ matrix.year }}
+        env:
+          SITE: ${{ matrix.site }}
+          YEAR: ${{ matrix.year }}
+          GENESIS_B1_FIXTURE_DIR: artifacts/b1-defra-aurn
+        run: node scripts/fetch-b1-defra-aurn-fixture.mjs
+      - name: Upload immutable B1 DEFRA AURN candidate fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: b1-defra-aurn-${{ matrix.site }}-${{ matrix.year }}-${{ github.sha }}
+          path: artifacts/b1-defra-aurn
+          retention-days: 90
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

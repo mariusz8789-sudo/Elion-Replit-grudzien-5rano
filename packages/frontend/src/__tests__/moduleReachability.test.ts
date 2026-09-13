@@ -158,6 +158,8 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/world/worldEngineInterface.ts': 'The scientific half of a contract whose World Engine implementation is owned outside this package — deliberately no implementation here.',
   'core/hazard/datasetRegistry.ts': 'Metadata-only dataset catalogue that declares NOT_IMPLEMENTED; surfacing it would imply data Genesis has not acquired.',
   'core/csrn/genesisCertificateAdapter.ts': 'Genesis record -> CSRN certificate adapter; certificate issuance is a separate pipeline with no in-app entry point.',
+  'core/agent/datasetLaboratory.ts': 'Discovery Engine P0.1 seam (docs/DISCOVERY_ENGINE_FINAL_CLASSIFICATION_2026-09-12.md): a declared contract type, not a screen subject. Its first implementation is qe4DatasetLaboratory.ts, listed next; both await P0.2 (hypothesis generation from the dataset grid), the next scoped task, as their first real caller.',
+  'core/biotechData/qe4DatasetLaboratory.ts': 'Discovery Engine P0.1: the QE4 implementation of datasetLaboratory.ts. Computes nothing itself (pure glue over qe4BrydgesAnalysis.ts, proven by its own tests) and has no caller yet because P0.2-P0.6 (the autonomous loop that will drive it) are the next scoped tasks, not yet built.',
 
   // --- Complete capability, blocked on a named prerequisite --------------------
   // These are the honest ones: real, tested science with nothing showing it.

@@ -288,6 +288,12 @@ export interface CampaignResult {
   readonly observationGaps: readonly ObservationGapRequest[];
   readonly gapLedgerFingerprint: string;
   /**
+   * Every model spec this campaign held live, enumerated or derived. A rendered
+   * formula cannot be parsed back into a spec, so a caller that wants to refit a
+   * model out of sample needs the spec itself rather than its name.
+   */
+  readonly liveModelSpecs: readonly ModelSpec[];
+  /**
    * Every F2/F5 integrity flag raised across the whole campaign, in round
    * order — the campaign-wide ledger a caller can read without walking every
    * round's own `integrityFlags`. Flag-only (Government Research mode): a
@@ -768,7 +774,22 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
 
     if (!antiHarking.intact) { stopReason = 'ANTI_HARKING_VIOLATION'; break; }
 
-    if (decisive && best.model.fingerprint === previousWinner && beliefs.get(best.model.fingerprint)!.confidence >= CONVERGENCE_CONFIDENCE) {
+    /*
+     * CONVERGENCE, but never in a round that just built new competitors.
+     *
+     * The confidence behind a "settled" verdict was formed while the models
+     * derived THIS round did not yet exist, so it is not evidence about them.
+     * Declaring the question closed here would retire the winner against a
+     * field it was never compared with — and, worse, would silently discard
+     * exactly the structural candidates residual analysis just went to the
+     * trouble of deriving. A derived model must get at least one round of real
+     * comparison before the campaign may call the question answered.
+     */
+    const derivedNewCompetitorsThisRound = derivedThisRound.length > 0;
+    if (decisive
+      && !derivedNewCompetitorsThisRound
+      && best.model.fingerprint === previousWinner
+      && beliefs.get(best.model.fingerprint)!.confidence >= CONVERGENCE_CONFIDENCE) {
       stopReason = 'CONVERGENCE';
       break;
     }
@@ -898,6 +919,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     registrySkips,
     observationGaps,
     gapLedgerFingerprint: observationGapLedgerFingerprint(observationGaps),
+    liveModelSpecs: live.map((m) => m.spec),
     integrityFlags: rounds.flatMap((r) => r.integrityFlags),
   };
 }

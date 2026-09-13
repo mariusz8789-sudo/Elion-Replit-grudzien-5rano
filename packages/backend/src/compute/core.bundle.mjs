@@ -1831,6 +1831,277 @@ function solveKitaevBulk(parameters) {
   };
 }
 
+// packages/frontend/src/core/storage.ts
+var PREFIX = "genesis-os:";
+function available() {
+  try {
+    const k = `${PREFIX}__probe__`;
+    window.localStorage.setItem(k, "1");
+    window.localStorage.removeItem(k);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var cachedAvailable = null;
+function isAvailable() {
+  if (cachedAvailable === null) cachedAvailable = available();
+  return cachedAvailable;
+}
+function readJSON(key, fallback) {
+  if (!isAvailable()) return fallback;
+  try {
+    const raw = window.localStorage.getItem(PREFIX + key);
+    if (raw === null) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+// packages/frontend/src/core/settings.ts
+var DEFAULTS = {
+  reducedMotion: false,
+  highContrast: false,
+  compactNarrator: false,
+  analyticsEnabled: true,
+  soundEnabled: true,
+  researchModeEnabled: false
+};
+var KEY = "settings/v1";
+function sanitize(raw) {
+  return {
+    reducedMotion: typeof raw?.reducedMotion === "boolean" ? raw.reducedMotion : DEFAULTS.reducedMotion,
+    highContrast: typeof raw?.highContrast === "boolean" ? raw.highContrast : DEFAULTS.highContrast,
+    compactNarrator: typeof raw?.compactNarrator === "boolean" ? raw.compactNarrator : DEFAULTS.compactNarrator,
+    analyticsEnabled: typeof raw?.analyticsEnabled === "boolean" ? raw.analyticsEnabled : DEFAULTS.analyticsEnabled,
+    soundEnabled: typeof raw?.soundEnabled === "boolean" ? raw.soundEnabled : DEFAULTS.soundEnabled,
+    researchModeEnabled: typeof raw?.researchModeEnabled === "boolean" ? raw.researchModeEnabled : DEFAULTS.researchModeEnabled
+  };
+}
+var current = sanitize(readJSON(KEY, null));
+function applyDocumentFlags(s) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  root.classList.toggle("force-reduced-motion", s.reducedMotion);
+  root.classList.toggle("high-contrast", s.highContrast);
+}
+if (typeof document !== "undefined") applyDocumentFlags(current);
+
+// packages/frontend/src/core/three/assetGovernance.ts
+var WORLD_ENGINE_ASSET_MANIFEST = Object.freeze([
+  {
+    id: "polyhaven-modular-urban-apartments-facade",
+    runtimePath: "/assets/genesis-hf-v2/models/modular_urban_apartments_facade/modular_urban_apartments_facade.gltf",
+    format: "glTF",
+    status: "APPROVED",
+    sourceName: "Poly Haven \u2014 Modular Urban Apartments Facade",
+    sourceUrl: "https://polyhaven.com/a/modular_urban_apartments_facade",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: "James Ray Cock",
+    polygonCount: 118e3,
+    textureResolution: "1K local derivative; source supports up to 8K",
+    rationale: "Nazwa lokalnego artefaktu, zawarto\u015B\u0107 i oficjalny rekord Poly Haven zosta\u0142y zweryfikowane.",
+    sha256: { "modular_urban_apartments_facade.gltf": "1a5a17dffd27fb9e1236dea7e51c4e0393a9d88ed0885a0621e67a37f80b27eb" }
+  },
+  {
+    id: "polyhaven-street-lamp-01",
+    runtimePath: "/assets/genesis-hf-v2/models/street_lamp_01/street_lamp_01.gltf",
+    format: "glTF",
+    status: "APPROVED",
+    sourceName: "Poly Haven \u2014 Street Lamp 01",
+    sourceUrl: "https://polyhaven.com/a/street_lamp_01",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: null,
+    polygonCount: null,
+    textureResolution: "1K local derivative; source supports up to 8K",
+    rationale: "Nazwa lokalnego artefaktu odpowiada oficjalnemu rekordowi Poly Haven; licencja Poly Haven jest CC0.",
+    sha256: { "street_lamp_01.gltf": "5d0358ede168b5e04547780b99d8e6d651cbe644e468e67cb505019047cbd5c8" }
+  },
+  {
+    id: "polyhaven-braustuble-alley-hdri",
+    runtimePath: "/assets/genesis-hf/hdr/braustuble_alley_1k.hdr",
+    format: "HDR",
+    status: "APPROVED",
+    sourceName: "Poly Haven \u2014 Braustuble Alley",
+    sourceUrl: "https://polyhaven.com/a/braustuble_alley",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: "Elvis Posa",
+    polygonCount: null,
+    textureResolution: "1K local derivative; source supports up to 24K",
+    rationale: "Nazwa lokalnego HDRI odpowiada oficjalnemu rekordowi Poly Haven z licencj\u0105 CC0.",
+    sha256: { "braustuble_alley_1k.hdr": "af4ef72e21c37d81547faf5b938180926a055a230634fcf8a047ddeef3629d70" }
+  },
+  {
+    id: "polyhaven-asphalt-track-pbr",
+    runtimePath: "/assets/genesis-governed-pbr/asphalt-track/",
+    format: "PBR_TEXTURE_SET",
+    status: "APPROVED",
+    sourceName: "Poly Haven \u2014 Asphalt Track",
+    sourceUrl: "https://polyhaven.com/a/asphalt_track",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: null,
+    polygonCount: null,
+    textureResolution: "1K local JPG derivative; source supports up to 8K",
+    rationale: "Zestaw diffuse, normal GL oraz ARM pobrany z oficjalnego \u017Ar\xF3d\u0142a Poly Haven i przypisany do nawierzchni drogi.",
+    sha256: {
+      "diffuse.jpg": "05c4e79cd99160075969d37bfc6ef72be262153a410bb45510b2c23f7303894c",
+      "normal.jpg": "18caf02427a7cd9cd577ceae5aa9daa7bb3ffba60598e2df8aaf75d1925a8a94",
+      "arm.jpg": "1ad38c055c97547802912facec609ee6deda2dc9bc2f048f36ea484e5f5ccb6e"
+    }
+  },
+  {
+    id: "polyhaven-concrete-floor-01-pbr",
+    runtimePath: "/assets/genesis-governed-pbr/concrete-floor-01/",
+    format: "PBR_TEXTURE_SET",
+    status: "APPROVED",
+    sourceName: "Poly Haven \u2014 Concrete Floor 01",
+    sourceUrl: "https://polyhaven.com/a/concrete_floor_01",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: "Rob Tuytel",
+    polygonCount: null,
+    textureResolution: "1K local JPG derivative; source supports up to 8K",
+    rationale: "Zestaw diffuse, normal GL oraz ARM pobrany z oficjalnego \u017Ar\xF3d\u0142a Poly Haven i przypisany do chodnika/betonu.",
+    sha256: {
+      "diffuse.jpg": "db7c800f1464359b5f359fc743e82ac51b34e014fdfd53844f4af34bb1949229",
+      "normal.jpg": "28be1f6fa82eeab137c84954bf7ea0f5d8a4434352d01c29f15e20926eb7227e",
+      "arm.jpg": "44e3a0d18db295998c8af56ecc80095821e719e134974609aa92e5436709dabd"
+    }
+  },
+  {
+    id: "polyhaven-brick-wall-10-pbr",
+    runtimePath: "/assets/genesis-governed-pbr/brick-wall-10/",
+    format: "PBR_TEXTURE_SET",
+    status: "APPROVED",
+    sourceName: "Poly Haven \u2014 Brick Wall 10",
+    sourceUrl: "https://polyhaven.com/a/brick_wall_10",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: "Dimitrios Savva",
+    polygonCount: null,
+    textureResolution: "1K local JPG derivative; source supports up to 8K",
+    rationale: "Zestaw diffuse, normal GL oraz ARM pobrany z oficjalnego \u017Ar\xF3d\u0142a Poly Haven i przypisany do muru/fasady.",
+    sha256: {
+      "diffuse.jpg": "6acfca2cecd9861f0531b7bc2179c8ca74c9f8535f53166de676af40f2e8f6df",
+      "normal.jpg": "8aa54a734885d7e3a3630629580b63c76418af4af1474fec599f06aa5508d037",
+      "arm.jpg": "5249c139d7c31cc0c8dcdf20ae049cd7590e44d95a0e49d38ea2ea2a8051900e"
+    }
+  },
+  {
+    id: "genesis-procedural-ambulance",
+    runtimePath: "/assets/genesis-procedural/ambulance/ambulance.glb",
+    format: "GLB",
+    status: "APPROVED",
+    sourceName: "Genesis Graphics Engine \u2014 procedurally generated in-repo",
+    sourceUrl: "packages/frontend/scripts/exportAmbulanceAsset.mjs",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    author: "Genesis Graphics Engine (procedural export, no external source)",
+    polygonCount: 9 * 12,
+    // 9 simple box/cylinder meshes; see the exporter script's own geometry
+    textureResolution: null,
+    // flat MeshStandardMaterial colors only, no texture maps
+    rationale: "Original geometry authored in this repo (graphics/vehicleKit.ts's ambulance, reproduced by the exporter script), built and dedicated CC0 by the author \u2014 not a third-party asset, so the usual external-source review does not apply; provenance is the generating script itself, verifiable by re-running it and comparing the SHA-256 below.",
+    sha256: { "ambulance.glb": "2f3054bcf6fd9e1be91b9745327ccaf1dc862d2eb5ed9a30aa94709fa1f8eda5" }
+  },
+  {
+    id: "unverified-modular-fire-escape",
+    runtimePath: "/assets/genesis-hf-v2/models/modular_fire_escape/modular_fire_escape.gltf",
+    format: "glTF",
+    status: "UNVERIFIED",
+    sourceName: "Unknown",
+    sourceUrl: null,
+    license: null,
+    licenseUrl: null,
+    author: null,
+    polygonCount: null,
+    textureResolution: "1K local files",
+    rationale: "Lokalny glTF zawiera wy\u0142\u0105cznie metadane Blender generator; brak \u017Ar\xF3d\u0142a, autora i licencji.",
+    sha256: {}
+  },
+  {
+    id: "unverified-modular-street-seating",
+    runtimePath: "/assets/genesis-hf-v2/models/modular_street_seating/modular_street_seating.gltf",
+    format: "glTF",
+    status: "UNVERIFIED",
+    sourceName: "Unknown",
+    sourceUrl: null,
+    license: null,
+    licenseUrl: null,
+    author: null,
+    polygonCount: null,
+    textureResolution: "1K local files",
+    rationale: "Lokalny glTF zawiera wy\u0142\u0105cznie metadane Blender generator; brak \u017Ar\xF3d\u0142a, autora i licencji.",
+    sha256: {}
+  },
+  {
+    id: "unverified-covered-car",
+    runtimePath: "/assets/genesis-hf-v2/models/covered_car/covered_car.gltf",
+    format: "glTF",
+    status: "UNVERIFIED",
+    sourceName: "Unknown",
+    sourceUrl: null,
+    license: null,
+    licenseUrl: null,
+    author: null,
+    polygonCount: null,
+    textureResolution: "1K local files",
+    rationale: "Lokalny glTF zawiera wy\u0142\u0105cznie metadane Blender generator; brak \u017Ar\xF3d\u0142a, autora i licencji.",
+    sha256: {}
+  },
+  {
+    id: "unverified-fire-hydrant",
+    runtimePath: "/assets/genesis-hf-v2/models/fire_hydrant/fire_hydrant.gltf",
+    format: "glTF",
+    status: "UNVERIFIED",
+    sourceName: "Unknown",
+    sourceUrl: null,
+    license: null,
+    licenseUrl: null,
+    author: null,
+    polygonCount: null,
+    textureResolution: "1K local files",
+    rationale: "Lokalny glTF zawiera wy\u0142\u0105cznie metadane Blender generator; brak \u017Ar\xF3d\u0142a, autora i licencji.",
+    sha256: {}
+  },
+  {
+    id: "unverified-lod0-human",
+    runtimePath: "/assets/genesis-hf/characters/mpfb-lod0.glb",
+    format: "GLB",
+    status: "UNVERIFIED",
+    sourceName: "Unknown",
+    sourceUrl: null,
+    license: null,
+    licenseUrl: null,
+    author: null,
+    polygonCount: null,
+    textureResolution: null,
+    rationale: "Brak lokalnego rekordu \u017Ar\xF3d\u0142a i licencji dla hero GLB; asset nie mo\u017Ce by\u0107 domy\u015Blnie \u0142adowany produkcyjnie.",
+    sha256: {}
+  },
+  {
+    id: "unverified-pbr-textures",
+    runtimePath: "/assets/genesis-hf/pbr/",
+    format: "PBR_TEXTURE_SET",
+    status: "UNVERIFIED",
+    sourceName: "Unknown",
+    sourceUrl: null,
+    license: null,
+    licenseUrl: null,
+    author: null,
+    polygonCount: null,
+    textureResolution: "local JPG files",
+    rationale: "Brak lokalnego rekordu \u017Ar\xF3d\u0142a i licencji dla PBR texture sets.",
+    sha256: {}
+  }
+]);
+var byRuntimePath = new Map(WORLD_ENGINE_ASSET_MANIFEST.map((asset) => [asset.runtimePath, asset]));
+
 // packages/frontend/src/labs/experiments/quantum-chsh.ts
 var DEG = Math.PI / 180;
 function runChshCorrelationScenario({ a = 0, aP = 90, b = 45, bP = 135 } = {}) {
@@ -1979,7 +2250,7 @@ registerDataSource({
     url: "https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html",
     confirmation: "confirmed"
   },
-  isSynthetic: false,
+  provenance: "REFERENCE",
   load: () => KNOWN_NUCLIDES
 });
 

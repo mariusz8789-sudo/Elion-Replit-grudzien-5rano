@@ -1,4 +1,5 @@
 import type { CampaignLaboratory } from '../agent/discoveryCampaign';
+import type { ObservationGapFeasibility } from '../agent/observationGap';
 import type { ModelPoint } from '../agent/modelSpace';
 import { pointsForGrid } from './qe4DatasetLaboratory';
 import {
@@ -27,6 +28,38 @@ function publishedQuantizationHalfWidth(value: number): number {
   return 0.5 * Math.pow(10, -decimals);
 }
 
+/*
+ * FEASIBILITY, DECLARED HONESTLY. Both of these laboratories read PINNED
+ * ARCHIVAL data: neither this system nor this repository can perform a new
+ * measurement, so `available` is false and every cost field is null with a
+ * `basis` that says why. The point of a gap request is to tell a human what is
+ * missing; telling them an invented price for it would defeat that.
+ */
+function qe4Feasibility(): ObservationGapFeasibility {
+  return {
+    available: false,
+    costEstimate: null,
+    costUnit: null,
+    timeEstimate: null,
+    legalBoundary:
+      'None beyond the dataset licence. The request is for a physics measurement on a trapped-ion apparatus; this system cannot operate one and must not imply otherwise.',
+    basis:
+      'This laboratory serves the pinned Brydges et al. 2019 dataset (Zenodo 10.5281/zenodo.2527010). A new time point would require running the trapped-ion experiment again, which is outside this repository entirely, so no cost or lead time is estimated here.',
+  };
+}
+
+function keplerFeasibility(): ObservationGapFeasibility {
+  return {
+    available: false,
+    costEstimate: null,
+    costUnit: null,
+    timeEstimate: null,
+    legalBoundary: 'None. NASA NSSDC planetary fact sheet data is public-domain US Government work.',
+    basis:
+      'This laboratory serves the pinned NASA NSSDC planetary fact sheet. A body at a distance the sheet does not list would have to come from another published ephemeris; this system does not fetch one, so availability is reported as false rather than assumed.',
+  };
+}
+
 // --- Laboratory A: QE4 entanglement growth (quantum, Brydges et al. 2019) ----
 
 /**
@@ -48,6 +81,13 @@ export function makeQe4CampaignLab(k: 5 | 10 = 5): CampaignLaboratory {
     xRange: { min: Math.min(...xs), max: Math.max(...xs) },
     xLabel: 'T[ms]',
     yLabel: 'S2',
+    declareObservable: () => ({
+      quantity: `second Rényi entropy S2 of a ${k}-ion partition at a time this dataset does not cover`,
+      unit: 'dimensionless (S2)',
+      instrumentClass: 'trapped-ion quantum simulator with randomized-measurement readout',
+    }),
+    declareFeasibility: () => qe4Feasibility(),
+    gapRecipient: 'LABORATORY',
   };
 }
 
@@ -102,6 +142,13 @@ export function makeKeplerCampaignLab(): CampaignLaboratory {
     xRange: { min: Math.min(...xs), max: Math.max(...xs) },
     xLabel: 'ln(distance[10^6 km])',
     yLabel: 'ln(period[days])',
+    declareObservable: () => ({
+      quantity: 'orbital period of a Sun-orbiting body at a distance this fact sheet does not list',
+      unit: 'days (entering the campaign as ln days)',
+      instrumentClass: 'astronomical ephemeris / published planetary fact sheet',
+    }),
+    declareFeasibility: () => keplerFeasibility(),
+    gapRecipient: 'EXTERNAL_DATASET',
   };
 }
 

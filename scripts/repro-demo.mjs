@@ -172,7 +172,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier, dGate, conformal;
+let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier, dGate, dM3, conformal;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -195,6 +195,7 @@ try {
   dGraph = science.reproDiscoveryGraph();
   dFrontier = science.reproFrontierAcceptance();
   dGate = science.reproPracticalCandidateGate();
+  dM3 = science.reproStructuralDiscovery();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
   conformal = science.reproConformalPrediction();
@@ -360,6 +361,30 @@ record('§8: kandydat bez dowodow i bez zadeklarowanych granic nie wychodzi z wa
 record('§8: DZIALANIE wymaga czlowieka, a wynik NIEWYGODNY nie jest blokowany (policy ogranicza dzialanie, nie prawde)',
   dGate.interventionNeedsHuman === true && dGate.negativeFindingStillActivates === true && dGate.citizenSurfaceEverReachable === false,
   `interwencja → REQUIRES_HUMAN_APPROVAL=${dGate.interventionNeedsHuman}; wynik negatywny/worst-case dalej ACTIVATE=${dGate.negativeFindingStillActivates}; warstwa obywatelska osiagalna=${dGate.citizenSurfaceEverReachable}`);
+
+// --- M3: strukturalne odkrycie modelu (demonstrator) -------------------------
+record('M3: silnik BUDUJE forme modelu, ktorej nie mial — zwyciezca nie byl prerejestrowany i wszedl po obserwacji',
+  dM3.main.winnerWasPreregistered === false && dM3.main.winnerEnteredAtRound > 0 && (dM3.main.winnerOperator ?? '').startsWith('RESIDUAL_'),
+  `prerejestrowane: ${dM3.main.preregisteredFormulas.join(' | ')} → zwyciezca "${dM3.main.winner?.formula}" (runda ${dM3.main.winnerEnteredAtRound}, ${dM3.main.winnerOperator})`);
+record('M3: odpowiedz nie jest zahardkodowana — konkurowaly rozne struktury, wygrala jedna na danych',
+  new Set(dM3.main.generatedCandidates.map((c) => c.formula)).size > 1,
+  `wygenerowane z residuum: ${dM3.main.generatedCandidates.map((c) => c.formula).join(' | ')}`);
+record('M3: zwyciezca bije rodzica NA TRENINGU i NA DANYCH ODLOZONYCH, i przechodzi autofalsyfikacje',
+  dM3.main.winner !== null && dM3.main.winner.trainingRss < dM3.main.parent.trainingRss
+    && dM3.main.winner.holdoutScore < dM3.main.parent.holdoutScore && dM3.main.selfFalsification?.falsified === false,
+  `RSS ${dM3.main.winner?.trainingRss.toFixed(4)} < ${dM3.main.parent.trainingRss.toFixed(4)}; hold-out ${dM3.main.winner?.holdoutScore.toFixed(4)} < ${dM3.main.parent.holdoutScore.toFixed(4)}; Tautology Gate=${dM3.main.selfFalsification?.tautology.classification}`);
+record('M3: przekonanie zmienione przez istniejacy BeliefRevision, a przebieg jest odtwarzalny',
+  dM3.beliefBefore === 0.5 && dM3.beliefAfter > 0.5 && dM3.replayMatches === true,
+  `${dM3.beliefBefore} → ${dM3.beliefAfter.toFixed(4)} (${dM3.beliefStatus}); replay ${dM3.main.reportFingerprint} == ${dM3.replayReportFingerprint}`);
+record('M3 kontrola negatywna: brak realnej struktury → NIC wymyslonego nie trafia do wyniku, a detekcja jest AUDYTOWANA',
+  dM3.noStructure.winnerWasPreregistered === true && dM3.noStructure.winnerEnteredAtRound === 0 && dM3.noStructure.specificityFlag !== null,
+  `zwyciezca "${dM3.noStructure.winner?.formula}" z zestawu prerejestrowanego; ${dM3.noStructure.generatedCandidates.length} kandydatow odrzuconych, flaga audytowa podniesiona`);
+record('M3 kontrola negatywna: model bardziej zlozony wygrywa trening, ale PRZEGRYWA parsymonie i nie zostaje wybrany',
+  dM3.overfit.overComplexFitsTrainingAtLeastAsWell && dM3.overfit.overComplexLosesOnParsimony && dM3.overfit.engineDidNotSelectIt,
+  `"${dM3.overfit.overComplexFormula}": trening ${dM3.overfit.overComplexTrainingRss?.toFixed(4)} vs ${dM3.overfit.winnerTrainingRss?.toFixed(4)}, parsymonia ${dM3.overfit.overComplexParsimony?.toFixed(4)} vs ${dM3.overfit.winnerParsimony?.toFixed(4)}`);
+record('M3 kontrola negatywna: struktura globalnie sfalsyfikowana jest ZABLOKOWANA przez rejestr i zapisana do audytu',
+  dM3.registryControl.quadraticWasBlocked === true && dM3.registryControl.audit.length > 0 && dM3.registryControl.winnerFormula !== dM3.main.winner?.formula,
+  `zablokowano ${dM3.registryControl.blockedCount}; z rejestrem zwyciezca to "${dM3.registryControl.winnerFormula}" zamiast "${dM3.main.winner?.formula}"`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

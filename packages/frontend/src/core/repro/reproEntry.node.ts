@@ -629,3 +629,231 @@ export function reproPracticalCandidateGate(): ReproCandidateGateReport {
     citizenSurfaceEverReachable: citizenReachable,
   };
 }
+
+// --- M3 STRUCTURAL DISCOVERY DEMONSTRATOR ------------------------------------
+
+import {
+  generateDemonstratorDataset,
+  reviseBeliefFromSelfFalsification,
+  runStructuralDiscovery,
+  type StructuralDiscoveryReport,
+} from '../agent/structuralDiscovery';
+import { recordFalsification } from '../agent/falsifiedModelRegistry';
+import { createHypothesis, updateConfidence } from '../experimentFabric/beliefRevision';
+import {
+  estimatedCoefficientCount,
+  fitModelSpec,
+  modelSelectionScore,
+  modelSpecFingerprint,
+  renderModelSpec,
+  type ModelPoint,
+  type ModelSpec,
+} from '../agent/modelSpace';
+
+/** x values of the demonstrator. Every fourth point is withheld from the campaign entirely. */
+const DEMO_XS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+
+/** The starting space may use a constant and a straight line, and nothing that can bend. */
+const FLAT_GRAMMAR = ['LOG', 'POWER', 'EXP_SATURATION', 'RECIPROCAL'] as const;
+
+export interface ReproStructuralDiscoveryReport {
+  readonly main: StructuralDiscoveryReport;
+  readonly beliefBefore: number;
+  readonly beliefAfter: number;
+  readonly beliefStatus: string;
+  readonly memoryExperimentId: string | null;
+  readonly replayReportFingerprint: string;
+  readonly replayMatches: boolean;
+  readonly noStructure: StructuralDiscoveryReport;
+  readonly overfit: {
+    readonly winnerFormula: string | null;
+    readonly winnerTrainingRss: number | null;
+    readonly winnerHoldout: number | null;
+    readonly winnerParsimony: number | null;
+    readonly overComplexFormula: string;
+    readonly overComplexTrainingRss: number | null;
+    readonly overComplexHoldout: number | null;
+    readonly overComplexParsimony: number | null;
+    readonly overComplexFitsTrainingAtLeastAsWell: boolean;
+    readonly overComplexLosesOnParsimony: boolean;
+    readonly overComplexLosesOnHoldout: boolean;
+    readonly engineDidNotSelectIt: boolean;
+  };
+  readonly registryControl: {
+    readonly blockedCount: number;
+    readonly audit: readonly string[];
+    readonly winnerFormula: string | null;
+    readonly quadraticWasBlocked: boolean;
+  };
+}
+
+function mainDatasetOf() {
+  return generateDemonstratorDataset({ linear: 1.7, quadratic: 0.45, sigma: 0.25 }, DEMO_XS);
+}
+
+function mainCase(respectRegistry = false): ReturnType<typeof runStructuralDiscovery> {
+  const dataset = mainDatasetOf();
+  return runStructuralDiscovery({
+    dataset,
+    labId: 'm3-structural-demonstrator',
+    problem: 'How does y depend on x? The generating process is not disclosed to the engine.',
+    excludeBases: [...FLAT_GRAMMAR],
+    maxTerms: 2,
+    maxRounds: 12,
+    respectFalsifiedModelRegistry: respectRegistry,
+  });
+}
+
+/**
+ * The full M3 chain plus its three negative controls, all executed. Everything
+ * returned is measured from the runs; nothing is asserted here.
+ */
+export function reproStructuralDiscovery(): ReproStructuralDiscoveryReport {
+  const mainDataset = mainDatasetOf();
+  const { report } = mainCase();
+  const replay = mainCase().report;
+
+  // Belief revision, through the existing machinery, from the self-falsification verdict.
+  const belief = reviseBeliefFromSelfFalsification(
+    report.winner?.fingerprint ?? 'none',
+    report.winner?.formula ?? '(none)',
+    report.selfFalsification!,
+    report.winnerEnteredAtRound,
+  );
+
+  // NEGATIVE CONTROL 1 — a process with no curvature at all: nothing to derive.
+  const flatDataset = generateDemonstratorDataset({ linear: 1.7, quadratic: 0, sigma: 0.25 }, DEMO_XS);
+  const noStructure = runStructuralDiscovery({
+    dataset: flatDataset,
+    labId: 'm3-negative-control-no-structure',
+    problem: 'How does y depend on x, where the process is genuinely a straight line?',
+    excludeBases: [...FLAT_GRAMMAR],
+    maxTerms: 2,
+    maxRounds: 12,
+  }).report;
+
+  // NEGATIVE CONTROL 2 — overfitting: the best TRAINING fit must not be the winner
+  // unless it also survives parsimony and the hold-out.
+  const overComplex = overfitControl(report, mainDataset);
+
+  // NEGATIVE CONTROL 3 — the winning structure is pre-falsified globally, then the
+  // same campaign is re-run with the registry switched on.
+  const winnerSpecForRegistry = quadraticSpec();
+  const evidence = updateConfidence(
+    createHypothesis('pre-falsified-quadratic', { metric: 'demonstrator', relation: 'less-than', rationale: 'Refuted in an earlier campaign.' }, 0.5, 'REGIME_FIT_FROM_GRID', null),
+    'FALSIFIED_WITHIN_PROTOCOL', 1, 'Refuted on an earlier run of this demonstrator.', 1,
+  );
+  recordFalsification({
+    spec: winnerSpecForRegistry,
+    scope: {
+      domain: 'm3-structural-demonstrator',
+      assumptions: [
+        'Observations are independent and their reported sigmas are correct.',
+        'The true relationship lies within the declared model grammar.',
+        'Each basis term is linear in its coefficient; nonlinear shape parameters were enumerated, not optimised.',
+      ],
+      boundary: 'x in [1, 15]',
+    },
+    reusableAs: 'NEVER',
+    evidence,
+    campaignId: 'm3-structural-demonstrator',
+    round: 1,
+    observationIds: ['demo:x=1', 'demo:x=2', 'demo:x=3'],
+  });
+  const guarded = mainCase(true).report;
+
+  return {
+    main: report,
+    beliefBefore: belief.before.confidence,
+    beliefAfter: belief.after.confidence,
+    beliefStatus: belief.after.status,
+    memoryExperimentId: null,
+    replayReportFingerprint: replay.reportFingerprint,
+    replayMatches: replay.reportFingerprint === report.reportFingerprint && replay.campaignFingerprint === report.campaignFingerprint,
+    noStructure,
+    overfit: {
+      winnerFormula: report.winner?.formula ?? null,
+      winnerTrainingRss: report.winner?.trainingRss ?? null,
+      winnerHoldout: report.winner?.holdoutScore ?? null,
+      winnerParsimony: report.winner?.parsimonyScore ?? null,
+      overComplexFormula: overComplex.formula,
+      overComplexTrainingRss: overComplex.trainingRss,
+      overComplexHoldout: overComplex.holdoutScore,
+      overComplexParsimony: overComplex.parsimonyScore,
+      overComplexFitsTrainingAtLeastAsWell: overComplex.trainingRss !== null && report.winner?.trainingRss != null && overComplex.trainingRss <= report.winner.trainingRss + 1e-9,
+      overComplexLosesOnParsimony: overComplex.parsimonyScore !== null && report.winner?.parsimonyScore != null && overComplex.parsimonyScore > report.winner.parsimonyScore,
+      overComplexLosesOnHoldout: overComplex.holdoutScore !== null && report.winner?.holdoutScore != null && overComplex.holdoutScore > report.winner.holdoutScore,
+      engineDidNotSelectIt: report.winner !== null && report.winner.formula !== overComplex.formula,
+    },
+    registryControl: {
+      blockedCount: guarded.registryBlockedFingerprints.length,
+      audit: guarded.registryAudit,
+      winnerFormula: guarded.winner?.formula ?? null,
+      quadraticWasBlocked: guarded.registryBlockedFingerprints.includes(modelSpecFingerprint(winnerSpecForRegistry)),
+    },
+  };
+}
+
+/** `y = c0 + c1·x + c2·x²` — built from the grammar's own term shapes, used ONLY to pre-falsify it in control 3. */
+function quadraticSpec(): ModelSpec {
+  return {
+    id: '',
+    terms: [
+      { basis: 'CONSTANT' },
+      { basis: 'LINEAR', variable: 'x' },
+      { basis: 'POWER', variable: 'x', exponent: 2 },
+    ],
+    lineage: null,
+  };
+}
+
+/**
+ * NEGATIVE CONTROL 2 — OVERFITTING, built as a real comparison rather than a
+ * label. A deliberately over-complex model (the winning structure plus two more
+ * free terms) is fitted on the SAME training points and scored on the SAME
+ * held-out points. Extra freedom can only lower training RSS, so it should win
+ * on training and lose on the hold-out and on parsimony — and the engine must
+ * not have selected it.
+ */
+function overfitControl(report: StructuralDiscoveryReport, dataset: { readonly points: readonly ModelPoint[]; readonly heldOut: readonly ModelPoint[] }): {
+  readonly formula: string;
+  readonly trainingRss: number | null;
+  readonly holdoutScore: number | null;
+  readonly parsimonyScore: number | null;
+} {
+  const overComplex: ModelSpec = {
+    id: '',
+    terms: [
+      { basis: 'CONSTANT' },
+      { basis: 'LINEAR', variable: 'x' },
+      { basis: 'POWER', variable: 'x', exponent: 2 },
+      { basis: 'POWER', variable: 'x', exponent: 3 },
+      { basis: 'RECIPROCAL', variable: 'x' },
+    ],
+    lineage: null,
+  };
+  const fitted = fitModelSpec(overComplex, dataset.points);
+  const trainingRss = fitted.ok ? fitted.rss : null;
+  let holdout: number | null = null;
+  if (fitted.ok && dataset.heldOut.length > 0) {
+    let total = 0;
+    let usable = true;
+    for (const p of dataset.heldOut) {
+      const predicted = fitted.predict(p.x);
+      if (!Number.isFinite(predicted)) { usable = false; break; }
+      const r = p.y - predicted;
+      total += (r * r) / (p.sigma * p.sigma);
+    }
+    holdout = usable ? total / dataset.heldOut.length : null;
+  }
+  void report;
+  return {
+    formula: renderModelSpec(overComplex),
+    trainingRss,
+    holdoutScore: holdout,
+    parsimonyScore: trainingRss === null ? null : modelSelectionScore(trainingRss, estimatedCoefficientCount(overComplex), dataset.points.length),
+  };
+}
+
+/** Re-exported so the demonstrator script can render a model without a second renderer. */
+export { renderModelSpec };

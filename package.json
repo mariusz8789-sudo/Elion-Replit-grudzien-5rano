@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Genesis OS — mobilna platforma do eksploracji fizyki, kosmologii i nauki poprzez interaktywne symulacje oraz AI.",
   "private": true,
-  "engines": { "node": ">=22.5.0" },
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "dev": "npm run dev --workspace=packages/frontend",
     "dev:backend": "npm run dev --workspace=packages/backend",
@@ -27,7 +29,8 @@
     "csrn:build": "npm run build --workspace=packages/csrn",
     "csrn:test": "npm run test --workspace=packages/csrn",
     "csrn:demo": "npm run demo --workspace=packages/csrn",
-    "csrn:demo:federation": "npm run demo:federation --workspace=packages/csrn"
+    "csrn:demo:federation": "npm run demo:federation --workspace=packages/csrn",
+    "m3:demo": "node scripts/m3-demonstrator.mjs"
   },
   "keywords": [
     "genesis-os",

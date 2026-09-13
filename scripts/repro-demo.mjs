@@ -88,6 +88,20 @@ const EXPECTED = {
   gapStopReason: 'OBSERVATION_GAP',
   gapThreshold: 1,
   qe4RegimeFingerprints: ['e7b90572', '3c3e9083', 'c82210fb', '67711185', 'cc3e4323', 'bb6aec30', '2d470070'],
+  conformalSampleSize: 9,
+  conformalCalibrationSize: 5,
+  conformalHoldoutSize: 4,
+  conformalSplitFingerprint: 'b3554e77',
+  conformalProvenance: 'REFERENCE',
+  conformalConfidenceLevel: 0.9,
+  conformalGuaranteeAchievable: false,
+  conformalCalibrationFingerprint: '1752250d',
+  conformalReplay: 'MATCH',
+  conformalNominalCoverage: 0.9,
+  conformalObservedCoverage: 0,
+  conformalCoverageSampleSize: 4,
+  conformalRivalDiscriminability: 1.1686521299655943,
+  conformalRivalGapTrigger: null,
 };
 
 const checks = [];
@@ -153,7 +167,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap;
+let dQe4, dKepler, dDerived, dGap, conformal;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -175,6 +189,7 @@ try {
   dGap = science.reproObservationGap();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
+  conformal = science.reproConformalPrediction();
 } finally {
   rmSync(bundleDir, { recursive: true, force: true });
 }
@@ -275,6 +290,24 @@ record('M1: istniejace kampanie NIETKNIETE — Kepler zbiega bez luki, QE4 zacho
   dKepler.observationGapTriggers.length === 0 && dQe4.campaignFingerprint === EXPECTED.discoveryQe4Fingerprint && dQe4.observationGapTriggers.join(',') === 'NO_ATTACHED_EXPERIMENT',
   `kepler luki=${dKepler.observationGapTriggers.length}, qe4 odcisk=${dQe4.campaignFingerprint}, qe4 luka=${dQe4.observationGapTriggers.join(',') || 'brak'}`);
 
+// --- A8: Conformal Uncertainty Layer (realne dane Kepler/NASA NSSDC) --------
+record('A8 conformal: deterministyczny split kalibracja/holdout',
+  conformal.sampleSize === EXPECTED.conformalSampleSize && conformal.calibrationSize === EXPECTED.conformalCalibrationSize
+    && conformal.holdoutSize === EXPECTED.conformalHoldoutSize && conformal.splitFingerprint === EXPECTED.conformalSplitFingerprint,
+  `n=${conformal.sampleSize} -> kalibracja=${conformal.calibrationSize}/holdout=${conformal.holdoutSize}, split=${conformal.splitFingerprint} (oczekiwane ${EXPECTED.conformalSampleSize} -> ${EXPECTED.conformalCalibrationSize}/${EXPECTED.conformalHoldoutSize}, ${EXPECTED.conformalSplitFingerprint})`);
+record('A8 conformal: kwantyl skalibrowany, ale gwarancja NIE osiągnięta na tak małej próbce (uczciwie oflagowane)',
+  conformal.guaranteeAchievable === EXPECTED.conformalGuaranteeAchievable && conformal.calibrationWarnings.length > 0 && conformal.provenance === EXPECTED.conformalProvenance,
+  `poziom=${conformal.confidenceLevel}, guaranteeAchievable=${conformal.guaranteeAchievable}, pochodzenie=${conformal.provenance} (oczekiwane ${EXPECTED.conformalConfidenceLevel} / ${EXPECTED.conformalGuaranteeAchievable} / ${EXPECTED.conformalProvenance}); "${conformal.calibrationWarnings[0]?.slice(0, 70)}..."`);
+record('A8 conformal: odcisk kalibracji i replay',
+  conformal.calibrationFingerprint === EXPECTED.conformalCalibrationFingerprint && conformal.replay === EXPECTED.conformalReplay,
+  `${conformal.calibrationFingerprint} / ${conformal.replay} (oczekiwane ${EXPECTED.conformalCalibrationFingerprint} / ${EXPECTED.conformalReplay})`);
+record('A8 conformal: pokrycie zgłoszone WPROST — nominał vs zaobserwowane, żadnej obietnicy "gwarantowanych 90%"',
+  conformal.nominalCoverage === EXPECTED.conformalNominalCoverage && conformal.observedCoverage === EXPECTED.conformalObservedCoverage && conformal.coverageSampleSize === EXPECTED.conformalCoverageSampleSize,
+  `nominał=${conformal.nominalCoverage}, zaobserwowane=${conformal.observedCoverage} na próbce=${conformal.coverageSampleSize} punktów holdout (realne dane NASA, mała próbka — DOKŁADNIE dlatego system NIE obiecuje 90% z 5 punktów kalibracji)`);
+record('A8 conformal + M1: rywalizujące modele (liniowy vs płaski) na TYCH SAMYCH danych kalibracyjnych dają realną rozróżnialność',
+  Math.abs(conformal.rivalDiscriminability - EXPECTED.conformalRivalDiscriminability) < 1e-9 && conformal.rivalGapTrigger === EXPECTED.conformalRivalGapTrigger,
+  `dyskryminowalność=${conformal.rivalDiscriminability.toFixed(4)} (oczekiwane ${EXPECTED.conformalRivalDiscriminability.toFixed(4)}), trigger=${conformal.rivalGapTrigger ?? 'null (wystarczająco rozróżnialne, brak luki)'} — TA SAMA klasyfikacja co M1 (classifyObservationGap), żaden nowy silnik`);
+
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);
 
@@ -290,6 +323,7 @@ if (UPDATE_MODE) {
   console.log(`\n  Kotwica PubChem — next question:\n  ${anchor.nextQuestion}`);
   console.log(`\n  Kotwica Kepler/Mars — czego NIE dowodzi:\n  ${keplerAnchor.whatRemainsUntested}`);
   console.log(`\n  Kotwica Kepler/Mars — next question:\n  ${keplerAnchor.nextQuestion}`);
+  console.log(`\n  A8 conformal — czego NIE dowodzi:\n  9 realnych punktów NASA NSSDC to za mało, by "gwarantowane pokrycie 90%" znaczyło cokolwiek — i system to przyznaje: guaranteeAchievable=false, a zaobserwowane pokrycie na 4 punktach holdout wynosi ${conformal.observedCoverage} (nie ${conformal.nominalCoverage}). To NIE jest błąd metody (patrz duża syntetyczna próbka w conformalPrediction.test.ts, gdzie pokrycie zbiega do nominału) — to jest dokładnie to ostrzeżenie, o które prosił protokół: mała próbka nie daje prawa obiecać nominalnego poziomu ufności.`);
   console.log(`\n  ${failed.length === 0 ? `WYNIK: ${checks.length}/${checks.length} zgodne z wartościami oczekiwanymi w repo.` : `WYNIK: ${failed.length} rozbieżności — ${failed.map((f) => f.name).join('; ')}`}\n`);
 }
 

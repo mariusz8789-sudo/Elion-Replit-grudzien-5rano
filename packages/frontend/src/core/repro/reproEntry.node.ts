@@ -307,3 +307,129 @@ export function reproObservationGap(): ReproObservationGapReport {
     custodySteps: 'ok' in fulfilled ? 0 : (fulfilled.request.custody?.steps.length ?? 0),
   };
 }
+
+// --- A8: Conformal Uncertainty Layer, on the real pinned Kepler dataset -----
+
+import { fitModelSpec, type ModelPoint, type ModelSpec } from '../agent/modelSpace';
+import { computeReplayVerdict } from '../matrixFoundation/replayVerdict';
+import {
+  CONFORMAL_SPLIT_SEED,
+  buildConformalInterval,
+  calibrateConformalPredictor,
+  classifyConformalObservationGap,
+  deterministicCalibrationSplit,
+  discriminabilityFromConformalIntervals,
+  evaluateCoverage,
+  splitPoints,
+} from '../agent/conformalPrediction';
+
+const KEPLER_LINEAR_SPEC: ModelSpec = { id: 'a8-conformal-kepler-linear', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR', variable: 'x' }], lineage: null };
+const KEPLER_CONSTANT_SPEC: ModelSpec = { id: 'a8-conformal-kepler-constant', terms: [{ basis: 'CONSTANT' }], lineage: null };
+
+export interface ReproConformalReport {
+  readonly sampleSize: number;
+  readonly calibrationSize: number;
+  readonly holdoutSize: number;
+  readonly splitFingerprint: string;
+  readonly provenance: string;
+  readonly confidenceLevel: number;
+  readonly quantile: number;
+  readonly guaranteeAchievable: boolean;
+  readonly calibrationWarnings: readonly string[];
+  readonly calibrationFingerprint: string;
+  readonly replay: string;
+  readonly nominalCoverage: number;
+  readonly observedCoverage: number;
+  readonly coverageSampleSize: number;
+  readonly averageIntervalWidth: number;
+  readonly heldOutX: number;
+  readonly heldOutObservedY: number;
+  readonly heldOutInterval: { readonly lo: number; readonly hi: number };
+  readonly heldOutCovered: boolean;
+  readonly rivalDiscriminability: number;
+  readonly rivalGapTrigger: string | null;
+}
+
+/**
+ * REAL E2E for A8: DATA (NASA NSSDC Kepler distances/periods, same pinned
+ * dataset `makeKeplerCampaignLab` reads for the M1/discovery-campaign demo
+ * above) -> MODEL (fitModelSpec, unchanged) -> CALIBRATION -> CONFORMAL
+ * INTERVAL -> HELD-OUT OBSERVATION -> COVERAGE -> M1 DISCRIMINABILITY
+ * (linear power-law fit vs a flat/constant rival, both fit on the SAME real
+ * calibration points) -> VERDICT -> PROVENANCE -> REPLAY. No synthetic data,
+ * no second engine: every step calls a function already covered above or in
+ * `conformalPrediction.ts`.
+ */
+export function reproConformalPrediction(): ReproConformalReport {
+  const lab = makeKeplerCampaignLab();
+  const points: ModelPoint[] = lab.candidateX.map((x) => {
+    const p = lab.observe(x);
+    if (p === null) throw new Error('reproConformalPrediction: Kepler laboratory returned no point for one of its own candidateX values.');
+    return p;
+  });
+
+  const confidenceLevel = 0.9;
+  const split = deterministicCalibrationSplit(points.length, { seed: CONFORMAL_SPLIT_SEED, calibrationFraction: 0.5 });
+  const { calibrationPoints, holdoutPoints } = splitPoints(points, split);
+
+  const fit = fitModelSpec(KEPLER_LINEAR_SPEC, calibrationPoints);
+  if (!fit.ok) throw new Error(`reproConformalPrediction: linear fit failed: ${fit.reason}`);
+
+  const calibration = calibrateConformalPredictor({
+    fit, calibrationPoints, confidenceLevel, splitFingerprint: split.fingerprint, provenance: 'REFERENCE',
+  });
+  const replayedCalibration = calibrateConformalPredictor({
+    fit, calibrationPoints, confidenceLevel, splitFingerprint: split.fingerprint, provenance: 'REFERENCE',
+  });
+  const replay = computeReplayVerdict({
+    inputsAvailable: true,
+    recordFound: true,
+    recordedFingerprint: calibration.fingerprint,
+    recomputedFingerprint: replayedCalibration.fingerprint,
+  });
+
+  const coverage = evaluateCoverage({ fit, calibration, holdoutPoints });
+
+  const heldOut = holdoutPoints[0]!;
+  const heldOutInterval = buildConformalInterval({ x: heldOut.x, fit, calibration });
+
+  // M1 integration: a real rival model (flat/constant — "distance does not matter"),
+  // fit on the SAME calibration points, calibrated the SAME way, compared at the
+  // SAME held-out x. The discriminability number is not hand-picked.
+  const rivalFit = fitModelSpec(KEPLER_CONSTANT_SPEC, calibrationPoints);
+  if (!rivalFit.ok) throw new Error(`reproConformalPrediction: rival fit failed: ${rivalFit.reason}`);
+  const rivalCalibration = calibrateConformalPredictor({
+    fit: rivalFit, calibrationPoints, confidenceLevel, splitFingerprint: split.fingerprint, provenance: 'REFERENCE',
+  });
+  const rivalInterval = buildConformalInterval({ x: heldOut.x, fit: rivalFit, calibration: rivalCalibration });
+
+  const rivalDiscriminability = discriminabilityFromConformalIntervals(heldOutInterval, rivalInterval);
+  const rivalGapTrigger = classifyConformalObservationGap({
+    unobservedCount: holdoutPoints.length - 1,
+    intervals: [heldOutInterval, rivalInterval],
+  });
+
+  return {
+    sampleSize: points.length,
+    calibrationSize: calibrationPoints.length,
+    holdoutSize: holdoutPoints.length,
+    splitFingerprint: split.fingerprint,
+    provenance: calibration.provenance,
+    confidenceLevel,
+    quantile: calibration.quantile,
+    guaranteeAchievable: calibration.guaranteeAchievable,
+    calibrationWarnings: calibration.warnings,
+    calibrationFingerprint: calibration.fingerprint,
+    replay,
+    nominalCoverage: coverage.nominalCoverage,
+    observedCoverage: coverage.observedCoverage,
+    coverageSampleSize: coverage.sampleSize,
+    averageIntervalWidth: coverage.averageIntervalWidth,
+    heldOutX: heldOut.x,
+    heldOutObservedY: heldOut.y,
+    heldOutInterval: { lo: heldOutInterval.lo, hi: heldOutInterval.hi },
+    heldOutCovered: heldOut.y >= heldOutInterval.lo && heldOut.y <= heldOutInterval.hi,
+    rivalDiscriminability,
+    rivalGapTrigger,
+  };
+}

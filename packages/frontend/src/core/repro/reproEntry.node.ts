@@ -363,3 +363,64 @@ export function reproDiscoveryGraph(): ReproDiscoveryGraphReport {
     secondImportAddedNothing: twice.imported.length === 0,
   };
 }
+
+// --- §9: AUTONOMOUS_FRONTIER_ACCEPTANCE -------------------------------------
+
+export interface ReproFrontierAcceptanceReport {
+  readonly stopReason: string;
+  readonly rounds: number;
+  readonly observationsAdmitted: number;
+  readonly derivedCount: number;
+  readonly derivedContainsDeniedBasis: boolean;
+  readonly derivedAfterObservation: boolean;
+  readonly derivedWasPreRegistered: boolean;
+  readonly derivedBlockedByRegistry: boolean;
+  readonly hasLineageToResidual: boolean;
+  readonly residualFindingKinds: readonly string[];
+  readonly beliefsMovedUp: number;
+  readonly beliefsMovedDown: number;
+  readonly replay: 'MATCH' | 'DRIFT';
+  readonly graphReplay: 'MATCH' | 'DRIFT';
+  readonly gapOnDegenerate: string;
+}
+
+/**
+ * The §9 chain, end to end, on the pinned Brydges dataset with LOG denied:
+ * question -> competing models -> planner -> experiment -> observation ->
+ * residual -> structurally NEW model -> belief revision -> falsification ->
+ * stop -> replay. Plus the degenerate case, where the honest answer is to ask.
+ */
+export function reproFrontierAcceptance(): ReproFrontierAcceptanceReport {
+  const options = { maxRounds: 8, maxTerms: 2, excludeBases: ['LOG'] } as const;
+  const result = runDiscoveryCampaign(makeQe4CampaignLab(5), options);
+  const replayed = runDiscoveryCampaign(makeQe4CampaignLab(5), options);
+
+  const derived = result.rounds.flatMap((r) => r.derivedThisRound);
+  const preRegistered = new Set(result.rounds[0]!.models.map((m) => m.fingerprint));
+  const skipped = new Set(result.registrySkips.map((s) => s.fingerprint));
+  const finalRound = result.rounds[result.rounds.length - 1]!;
+
+  const degenerate = runDiscoveryCampaign(makeQe4CampaignLab(5), {
+    maxRounds: 5,
+    maxTerms: 1,
+    excludeBases: ['CONSTANT', 'LINEAR', 'POWER', 'EXP_SATURATION', 'RECIPROCAL'],
+  });
+
+  return {
+    stopReason: result.stopReason,
+    rounds: result.rounds.length,
+    observationsAdmitted: finalRound.admittedX.length,
+    derivedCount: derived.length,
+    derivedContainsDeniedBasis: derived.some((m) => m.formula.includes('log')),
+    derivedAfterObservation: derived.length > 0 && derived.every((m) => m.enteredAtRound > 0),
+    derivedWasPreRegistered: derived.some((m) => preRegistered.has(m.fingerprint)),
+    derivedBlockedByRegistry: derived.some((m) => skipped.has(m.fingerprint)),
+    hasLineageToResidual: derived.length > 0 && derived.every((m) => m.derivedFrom !== null && (m.derivationOperator ?? '').includes('RESIDUAL_')),
+    residualFindingKinds: [...new Set(result.rounds.flatMap((r) => r.residualFindings.map((f) => f.kind)))].sort(),
+    beliefsMovedUp: finalRound.beliefs.filter((h) => h.confidence > 0.5).length,
+    beliefsMovedDown: finalRound.beliefs.filter((h) => h.confidence < 0.5).length,
+    replay: result.campaignFingerprint === replayed.campaignFingerprint ? 'MATCH' : 'DRIFT',
+    graphReplay: compareDiscoveryGraphReplay(buildDiscoveryGraph(result), buildDiscoveryGraph(replayed)),
+    gapOnDegenerate: degenerate.observationGaps.length > 0 ? degenerate.stopReason : 'NO_GAP_RAISED',
+  };
+}

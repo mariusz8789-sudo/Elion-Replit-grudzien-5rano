@@ -158,7 +158,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap, dGraph;
+let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -179,6 +179,7 @@ try {
   dQe4 = science.reproDiscoveryCampaignQe4();
   dGap = science.reproObservationGap();
   dGraph = science.reproDiscoveryGraph();
+  dFrontier = science.reproFrontierAcceptance();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
 } finally {
@@ -297,6 +298,20 @@ record('§5: import jest idempotentny — drugi transfer tego samego grafu nie d
 record('M1: istniejace kampanie NIETKNIETE — Kepler zbiega bez luki, QE4 zachowuje odcisk',
   dKepler.observationGapTriggers.length === 0 && dQe4.campaignFingerprint === EXPECTED.discoveryQe4Fingerprint && dQe4.observationGapTriggers.join(',') === 'NO_ATTACHED_EXPERIMENT',
   `kepler luki=${dKepler.observationGapTriggers.length}, qe4 odcisk=${dQe4.campaignFingerprint}, qe4 luka=${dQe4.observationGapTriggers.join(',') || 'brak'}`);
+
+// --- §9: AUTONOMOUS_FRONTIER_ACCEPTANCE --------------------------------------
+record('§9: pelny lanccuch — pytanie → modele → planner → eksperyment → obserwacja → residuum → NOWY model → rewizja → stop',
+  dFrontier.derivedCount > 0 && dFrontier.residualFindingKinds.length > 0 && dFrontier.beliefsMovedUp > 0 && dFrontier.beliefsMovedDown > 0,
+  `${dFrontier.rounds} rund, ${dFrontier.observationsAdmitted} obserwacji, residua: ${dFrontier.residualFindingKinds.join('+')}, przekonania w gore/w dol: ${dFrontier.beliefsMovedUp}/${dFrontier.beliefsMovedDown}, stop=${dFrontier.stopReason}`);
+record('§9 WARUNEK 1: nowy model powstal PO obserwacji, nie byl prerejestrowany, ma rodowod do residuum, nie zostal zablokowany przez M2',
+  dFrontier.derivedAfterObservation === true && dFrontier.derivedWasPreRegistered === false && dFrontier.hasLineageToResidual === true && dFrontier.derivedBlockedByRegistry === false,
+  `wyprowadzono ${dFrontier.derivedCount} (zawiera odebrany gramatyce log: ${dFrontier.derivedContainsDeniedBasis}); po obserwacji=${dFrontier.derivedAfterObservation}, prerejestrowany=${dFrontier.derivedWasPreRegistered}, rodowod=${dFrontier.hasLineageToResidual}, zablokowany przez rejestr=${dFrontier.derivedBlockedByRegistry}`);
+record('§9 WARUNEK 2: gdy zaden eksperyment nie rozroznia modeli — OBSERVATION_GAP zamiast zgadywania',
+  dFrontier.gapOnDegenerate === 'OBSERVATION_GAP',
+  `przypadek zdegenerowany zatrzymal sie z: ${dFrontier.gapOnDegenerate}`);
+record('§9 WARUNEK 3: replay == MATCH dla kampanii i dla grafu odkrycia',
+  dFrontier.replay === 'MATCH' && dFrontier.graphReplay === 'MATCH',
+  `kampania=${dFrontier.replay}, graf=${dFrontier.graphReplay}`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

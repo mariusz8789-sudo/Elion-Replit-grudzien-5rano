@@ -3249,3 +3249,84 @@ export function deleteExperiment(id: string): void {
 export function countExperiments(): number {
   return readAll().length;
 }
+
+// --- §9: an autonomous discovery campaign, written to Science Memory ---------
+
+/**
+ * The persisted form of one `runDiscoveryCampaign` result. Deliberately NOT the
+ * whole campaign: the rounds carry every fitted model at every round, which is
+ * large, redundant and already replayable from `campaignFingerprint`. What is
+ * stored is what a later reader actually needs — the question, the winner, the
+ * lineage of anything derived mid-campaign, what stopped it, what it still
+ * wants measured, and the fingerprints that let the whole thing be reproduced.
+ */
+export interface SavedDiscoveryCampaign {
+  readonly labId: string;
+  readonly problem: string;
+  readonly rounds: number;
+  readonly stopReason: string;
+  readonly winningFormula: string | null;
+  readonly winnerEnteredAtRound: number;
+  readonly winnerDerivedFrom: string | null;
+  readonly derivedModelFormulas: readonly string[];
+  readonly observationsAdmitted: number;
+  readonly observationGapTriggers: readonly string[];
+  readonly campaignFingerprint: string;
+  readonly gapLedgerFingerprint: string;
+  readonly graphFingerprint: string | null;
+}
+
+/**
+ * Writes a finished campaign to Science Memory through the SAME `saveExperiment`
+ * path every other record uses — no second store, no new persistence layer.
+ *
+ * `epistemicStatus` is `'PREDICTION'`, not `'SIMULATION'` and not anything
+ * stronger: a campaign fits models to real pinned observations and reports
+ * which fits best, which is a model-level claim about those observations. It is
+ * not a simulation (nothing was simulated) and it is emphatically not an
+ * established fact.
+ */
+export function saveDiscoveryCampaignToMemory(saved: SavedDiscoveryCampaign): SavedExperiment {
+  return saveExperiment({
+    labId: saved.labId,
+    experimentId: `discovery-campaign:${saved.campaignFingerprint}`,
+    experimentName: `Kampania odkrycia — ${saved.problem}`,
+    params: {
+      rounds: saved.rounds,
+      observationsAdmitted: saved.observationsAdmitted,
+      derivedModels: saved.derivedModelFormulas.length,
+    },
+    stats: {
+      rounds: saved.rounds,
+      observationsAdmitted: saved.observationsAdmitted,
+      derivedModels: saved.derivedModelFormulas.length,
+      observationGaps: saved.observationGapTriggers.length,
+    },
+    analysis: [
+      {
+        title: 'Wynik',
+        body: saved.winningFormula === null
+          ? `Zatrzymano z powodem ${saved.stopReason}; zaden model nie zostal ustalony.`
+          : `Zwyciezca: ${saved.winningFormula}. ${saved.winnerEnteredAtRound > 0 ? `Wszedl do kampanii w rundzie ${saved.winnerEnteredAtRound}, wyprowadzony z ${saved.winnerDerivedFrom} — a wiec NIE istnial, gdy kampania sie zaczynala.` : 'Pochodzi z zadeklarowanej gramatyki, wyliczony przed pierwsza obserwacja.'} Zatrzymano z powodem ${saved.stopReason}.`,
+        kind: 'discovery-campaign-result',
+      },
+      {
+        title: 'Czego kampania NIE ustalila',
+        body: `${saved.observationGapTriggers.length === 0 ? 'Nie zglosila zapotrzebowania na nowy pomiar.' : `Zglosila ${saved.observationGapTriggers.length} zapotrzebowanie(a) na pomiar, ktorego to laboratorium nie oferuje (${saved.observationGapTriggers.join(', ')}) — pytanie pozostaje w tej czesci otwarte.`} Wynik obowiazuje wylacznie w zakresie dopuszczonych obserwacji i w granicach zadeklarowanej gramatyki modeli.`,
+        kind: 'discovery-campaign-boundary',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Odcisk kampanii ${saved.campaignFingerprint}, rejestr luk ${saved.gapLedgerFingerprint}${saved.graphFingerprint === null ? '' : `, graf odkrycia ${saved.graphFingerprint}`}. Ten sam zbior i te same opcje odtwarzaja te same odciski.`,
+        kind: 'discovery-campaign-replay',
+      },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Kampania dopasowala modele do realnych, przypietych obserwacji i wskazala najlepszy wedlug chi-kwadrat z kara za zlozonosc. To twierdzenie o modelu wobec tych obserwacji, nie ustalony fakt o swiecie.`,
+    assumptions: [
+      'Obserwacje sa niezalezne, a ich zadeklarowane sigmy poprawne.',
+      'Prawdziwa zaleznosc lezy w zadeklarowanej gramatyce modeli.',
+    ],
+    epistemicStatus: 'PREDICTION',
+  });
+}

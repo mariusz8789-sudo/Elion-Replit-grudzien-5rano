@@ -1,0 +1,173 @@
+{
+  "nctId": "NCT02128932",
+  "briefTitle": "Efficacy and Safety of Semaglutide Once Weekly Versus Insulin Glargine Once Daily as add-on to Metformin With or Without Sulphonylurea in Insulin-naïve Subjects With Type 2 Diabetes",
+  "arms": [
+    {
+      "label": "Semaglutide 0.5 mg/week",
+      "type": "EXPERIMENTAL",
+      "description": null
+    },
+    {
+      "label": "Semaglutide 1.0 mg/week",
+      "type": "EXPERIMENTAL",
+      "description": null
+    },
+    {
+      "label": "Insulin glargine",
+      "type": "ACTIVE_COMPARATOR",
+      "description": null
+    }
+  ],
+  "hba1cOutcomes": [
+    {
+      "title": "Change in HbA1c From Baseline",
+      "type": "PRIMARY",
+      "paramType": "LEAST_SQUARES_MEAN",
+      "dispersionType": "Standard Error",
+      "unitOfMeasure": "percentage",
+      "timeFrame": "Week 0, week 30",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 0.5mg/Week"
+        },
+        {
+          "id": "OG001",
+          "title": "Semaglutide 1.0 mg/Week"
+        },
+        {
+          "id": "OG002",
+          "title": "Insulin Glargine"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "362"
+            },
+            {
+              "groupId": "OG001",
+              "value": "360"
+            },
+            {
+              "groupId": "OG002",
+              "value": "360"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "-1.21",
+                  "spread": "0.05"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "-1.64",
+                  "spread": "0.05"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "-0.83",
+                  "spread": "0.05"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c ≤6.5% (48 mmol/Mol), American Association of Clinical Endocrinologists (AACE)",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "Count of participants",
+      "timeFrame": "After 30 weeks treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 0.5mg/Week"
+        },
+        {
+          "id": "OG001",
+          "title": "Semaglutide 1.0 mg/Week"
+        },
+        {
+          "id": "OG002",
+          "title": "Insulin Glargine"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "362"
+            },
+            {
+              "groupId": "OG001",
+              "value": "360"
+            },
+            {
+              "groupId": "OG002",
+              "value": "360"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "title": "Yes",
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "135"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "195"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "63"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "No",
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "227"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "165"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "297"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "retrievedAt": "2026-09-13T12:50:34.250Z",
+  "files": {
+    "target.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/target.json?target_synonym__icontains=GLP-1&target_type=SINGLE%20PROTEIN&organism=Homo%20sapiens&limit=20",
+      "rawSha256": "a1da3ea34a115dbb3fa18411fa5666730bbf95b4bd56a937155d22aec7ec7cb4",
+      "rawBytes": 19420,
+      "narrowSha256": "2ce28544bd638f3a26d7b6b9e5ea02137a17ebcd0084dcb9bab93447fd3e8d66"
+    },
+    "compound-semaglutide.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/molecule.json?pref_name__iexact=SEMAGLUTIDE&limit=5",
+      "rawSha256": "fa066b81e3e4f598fbe0fe84e836626aab6da4a8e2fdec6d0ad2450e3fcecd27",
+      "rawBytes": 3619,
+      "narrowSha256": "07f129becd76e76696bc1b8028bf41a38f7637e1a67c5a46cf54b3509f655f04"
+    },
+    "activities-semaglutide.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL2108724&target_chembl_id=CHEMBL1784&limit=1000",
+      "rawSha256": "da0ca1071124806f8658f19f5468ee402ac69665f2788cef8055d624cd609863",
+      "rawBytes": 33674,
+      "narrowSha256": "dffdb549416124b4405037ea1887fc28c1da199978b2584f26244a3a5c3225a9",
+      "totalCount": 21,
+      "extractedCount": 21
+    },
+    "compound-liraglutide.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/molecule.json?pref_name__iexact=LIRAGLUTIDE&limit=5",
+      "rawSha256": "8ed64727c30e241ff72d623e0db982a00e3dfb9b08bfc1b04a003620f576f255",
+      "rawBytes": 28815,
+      "narrowSha256": "71b5231e0d5a5890cea86fef22ef0c5b9712701a9d1ba86eb7cd53e9048c8617"
+    },
+    "activities-liraglutide.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL4084119&target_chembl_id=CHEMBL1784&limit=1000",
+      "rawSha256": "017902c8d09c54df63246aee91d0090b478169f6e7f86c50109a24007c3b9338",
+      "rawBytes": 69139,
+      "narrowSha256": "0e96dd8f7600e5eb6ffac88d90b40b22cb6cdb42f84f791c5ecb529ce104bf13",
+      "totalCount": 29,
+      "extractedCount": 29
+    },
+    "compound-metformin.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/molecule.json?pref_name__iexact=METFORMIN&limit=5",
+      "rawSha256": "46575ae6d4d26e9483e5ea698023900607e368fefc311b2f3d6fb9333cd7f0f3",
+      "rawBytes": 3264,
+      "narrowSha256": "bd4ce310a7239d9889349e094498fd9f225f58291f59b855d2aa7ca82ea78385"
+    },
+    "activities-metformin.json": {
+      "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=CHEMBL1431&target_chembl_id=CHEMBL1784&limit=1000",
+      "rawSha256": "037003a7f3631e9dad89108fdea19fea07b7bdc2b8ba71c985fc55d69c999ba9",
+      "rawBytes": 111,
+      "narrowSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "totalCount": 0,
+      "extractedCount": 0
+    },
+    "trial-NCT03191396.json": {
+      "url": "https://clinicaltrials.gov/api/v2/studies/NCT03191396",
+      "rawSha256": "3b9ebc834b7b46cfacaa42b5b907c3f8fba178fda972f27bc82d6c364c2c7f55",
+      "rawBytes": 176287,
+      "narrowSha256": "e442543b3aa8ac7ae432fc7a6bef55a9c9ec0afb45b7cc7d7df16321354050c0",
+      "hba1cOutcomeCount": 8
+    },
+    "trial-NCT02863419.json": {
+      "url": "https://clinicaltrials.gov/api/v2/studies/NCT02863419",
+      "rawSha256": "c318cc7a48baaf74274398bcce6de2f350201cf67ed6e99f423a0bc2ef4428cf",
+      "rawBytes": 278719,
+      "narrowSha256": "bd45c9dccacc1da2e1c04d7b8bc0627e14099ff29e861485831eea3d726b260f",
+      "hba1cOutcomeCount": 6
+    },
+    "trial-NCT00696657.json": {
+      "url": "https://clinicaltrials.gov/api/v2/studies/NCT00696657",
+      "rawSha256": "4faed0ec58e7a09288273a8d17251b7e3f9bf9a041435fdb5f68ea487839e869",
+      "rawBytes": 348904,
+      "narrowSha256": "94910ed31c3222e434088186ae23babe2e19e6a5d98fec32d0902250dd1fe15f",
+      "hba1cOutcomeCount": 1
+    },
+    "trial-NCT02128932.json": {
+      "url": "https://clinicaltrials.gov/api/v2/studies/NCT02128932",
+      "rawSha256": "479b46a79d1abbb6cc5c153283c37d10805e14eb0c38716266b1161d2a7709dd",
+      "rawBytes": 122965,
+      "narrowSha256": "0023bdff0d99d562d67d5b6773eab32dde1467a42d9ca481c5862693423c3621",
+      "hba1cOutcomeCount": 2
+    }
+  }
+}

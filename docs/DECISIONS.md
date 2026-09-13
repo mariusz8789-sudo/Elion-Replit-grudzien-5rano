@@ -915,3 +915,48 @@ Kepler nadal odtwarza nachylenie 1.49987.
 **Zasada na przyszłość, powtórzona bo znowu kosztowała:** jeden właściciel na komponent.
 Trzy komponenty zrobione dwa razy, bo dwie sesje ruszyły równolegle bez sprawdzenia
 `git fetch`, czy ktoś już nie zaczął.
+
+---
+
+## D-028 (2026-09-13, A1) — Realne ChEMBL + ClinicalTrials.gov dane przypięte; artefakt CI też nieosiągalny stąd
+
+**Decyzja.** A1 (semaglutyd↔liraglutyd) ma teraz realne, przypięte dane: target
+GLP-1R `CHEMBL1784`, trzy związki (semaglutyd `CHEMBL2108724`, liraglutyd
+`CHEMBL4084119`, metformina `CHEMBL1431` jako kontrola negatywna §13),
+21 aktywności semaglutydu i 29 liraglutydu względem GLP-1R (metformina: **0** —
+zgodne z oczekiwaniem kontroli negatywnej, nie błąd), oraz cztery badania
+ClinicalTrials.gov (`NCT03191396` SUSTAIN 7 — bezpośrednie porównanie sema/lira
+head-to-head, `NCT02863419` PIONEER 4, `NCT00696657`, `NCT02128932` SUSTAIN 4 —
+kontrola negatywna sema vs insulina glargine) z pełnymi polami wyniku HbA1c
+(paramType/dispersionType/unitOfMeasure/groups/denoms/measurements). Target i
+związki rozwiązane **na żywo** w `scripts/fetch-a1-glp1-fixture.mjs` (nie
+zaszyte na sztywno) — skrypt rzuca błędem, gdyby żywe ChEMBL nie zgadzało się z
+tym, co znalazło recon. Plik pod
+`packages/frontend/src/core/biotechData/a1-glp1/` (12 plików JSON + `meta.json`
+z URL/SHA-256 surowej odpowiedzi/SHA-256 wyciągu dla każdego).
+
+**Drugie potwierdzenie, że blob storage artefaktów CI jest nieosiągalny stąd
+(po `a4f4314`, kotwica Kepler).** `actions/upload-artifact` + próba pobrania
+przez `download_workflow_run_artifact` zwróciła URL do
+`productionresultssa10.blob.core.windows.net`, który 403-ował na CONNECT przez
+proxy egress sandboxa — dokładnie ten sam wzorzec co poprzednio dla Kepler.
+Naprawa: skrypt fetch **drukuje** każdy zapisany plik między znacznikami
+`-----BEGIN A1 FILE <nazwa>-----`/`-----END A1 FILE <nazwa>-----` w logu joba
+CI — to jest udokumentowana ścieżka transportu, upload-artefaktu zostaje jako
+wtórna. Ten fixture (12 małych plików JSON, ~70KB razem) mieści się w jednym
+logu bez dzielenia na shardy (w przeciwieństwie do B1 DEFRA, ~300-400KB/rok-stację).
+
+**Realna pułapka odtworzenia, złapana przed commitem, nie po.** Pierwsza próba
+odtworzenia plików z tekstu loga (`re.DOTALL` między znacznikami) dała **0
+dopasowań** — każda linia loga GitHub Actions ma prefiks znacznika czasu
+(`2026-09-13T12:50:38.2496718Z `), więc wieloliniowy JSON między BEGIN/END nie
+pasował do wzorca bez usunięcia prefiksów linia-po-linii najpierw. Po naprawie:
+**12/12 plików odtworzonych**, SHA-256 każdego zweryfikowany bajt-w-bajt wobec
+`narrowSha256` zapisanego w `meta.json` **przed** commitem (`ALL MATCH`), więc to,
+co trafiło do repo, jest dowiedzalnie identyczne z tym, co skrypt faktycznie
+zapisał na runnerze CI, nie z odczytu loga na oko.
+
+**Job CI `a1-glp1-pin` usunięty** z `ci.yml` po ściągnięciu i przypięciu danych
+(ten sam cykl życia co `qe4-brydges-pin-measured-states` i
+`b1-defra-aurn-pin-narrow`). `scripts/recon-a1-glp1.mjs` również usunięty — jego
+ustalenia są już wcielone w `fetch-a1-glp1-fixture.mjs`.

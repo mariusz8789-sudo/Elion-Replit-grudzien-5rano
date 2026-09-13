@@ -134,3 +134,18 @@ podłącz `causalInference.ts` do realnych danych i uruchom właściwą analizę
 konkurencyjnych liczony z siatki `(T,k)` przypiętego zbioru QE4 (reżimy liniowy/logarytmiczny/
 saturujący), z `parentHypothesisId`/`generatedBy` przez `beliefRevision.ts::createHypothesis`,
 zasilany przez `QE4_DATASET_LABORATORY.observableSpec()` — nie z literału.
+
+## UPDATE 2 (2026-09-13) — P0.2 domknięte, P0-2 zdjęte z listy C3
+
+`core/biotechData/qe4RegimeHypotheses.ts` domknięte i wypchnięte (`6a6e039`/`e7c73be`):
+trzy konkurencyjne hipotezy reżimowe (LINEAR_GROWTH/LOGARITHMIC_GROWTH/SATURATING) liczone
+z siatki `(T,k)` przez `qe4DatasetLaboratory.ts::pointsForGrid`, z realnym dopasowaniem
+(`weightedLinearFit`, rozszerzone o `slopeSigma`) i realną rewizją przekonania. **C3: P0-2
+jest już zrobione — zacznij od P0-3 (reguły stopu), potem P0-5 (przebieg adwersarialny).**
+
+Przy okazji scalania z B1 (C1) dwukrotnie naprawiony kontrakt `.env` (`SITE`/`YEAR`/
+`GENESIS_B1_FIXTURE_DIR` w `scripts/fetch-b1-defra-aurn-fixture.mjs` bez wpisu w
+`.env.example`) — nie luka mojej pracy, złapana przez pełną bramkę przy pushu.
+
+Biorę teraz **P0-6** (odcisk prowieniencji/replay na rundę) sam, żeby domknąć most
+między P0.1/P0.2 a tym, co budują C2 (P0-1/P0-4) i C3 (P0-3/P0-5).

@@ -246,4 +246,19 @@ describe('modelSpace — multi-variable models and interaction terms (C3-2)', ()
     expect(legacy.map(modelSpecFingerprint)).toEqual(explicit.map(modelSpecFingerprint));
     expect(legacy.every((m) => m.terms.every((t) => t.basis === 'CONSTANT' || t.basis === 'INTERACTION' || t.variable === 'x'))).toBe(true);
   });
+
+  it('dimensional filter (F2/F5-4): a variable name declared twice never produces a self-INTERACTION, but a real cross-variable one still appears', () => {
+    const space = generateModelSpace({ maxTerms: 3, xRange: { min: 1, max: 10 }, variables: ['a', 'a', 'b'], includeInteractions: true });
+    const selfInteraction = space.some((m) => m.terms.some((t) => t.basis === 'INTERACTION' && t.variables[0] === t.variables[1]));
+    expect(selfInteraction).toBe(false);
+    const realInteraction = space.some((m) => m.terms.some((t) => t.basis === 'INTERACTION' && t.variables[0] !== t.variables[1]));
+    expect(realInteraction).toBe(true);
+  });
+
+  it('beam limit (F2/F5-5): a combinatorially huge declared space is bounded rather than fully enumerated', () => {
+    const constraints = { maxTerms: 6, xRange: { min: 1, max: 10 }, variables: Array.from({ length: 10 }, (_, i) => `v${i}`) };
+    const space = generateModelSpace(constraints);
+    expect(space.length).toBeGreaterThan(0);
+    expect(space.length).toBeLessThanOrEqual(500);
+  });
 });

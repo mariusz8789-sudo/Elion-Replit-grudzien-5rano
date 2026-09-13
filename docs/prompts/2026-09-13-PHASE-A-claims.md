@@ -77,7 +77,7 @@ statystycznej (Opcja B — test F — wymagałby dystrybuanty rozkładu F, noweg
 **Skutek uboczny, niezależnie od wyboru A/B/C/D:** zmiana wspólnego detektora wymaga ponownej
 weryfikacji i re-pin fingerprintów QE4/Kepler oraz potwierdzenia §15/§9.
 
-**DECYZJA PODJĘTA I ZAIMPLEMENTOWANA: Opcja A.** Commit: `881bb9d`.
+**DECYZJA PODJĘTA I ZAIMPLEMENTOWANA: Opcja A.** Commit: `79a9739`.
 
 `CURVATURE` w `residualStructure.ts` porównuje teraz `modelSelectionScore` (dokładne ponowne
 użycie reguły parsymonii z `modelSpace.ts`) zamiast stałego `ratio < 0.5`.

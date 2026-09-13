@@ -139,5 +139,14 @@ nigdy auto-aktywacji).
 
 Dowód uruchamialny: `npm run a1:demo` → **14/14**. Testy: `a1Glp1Analysis.test.ts` →
 **19/19** (potencja, ekstrakcja badań, werdykt, rewizja przekonań, Science Memory,
-granica bezpieczeństwa, jednostkowe na syntetycznych danych). tsc/eslint czysto.
-Commit`y: `7c16dfd`/`5a5ae4b`/`6f73afe` (fetch+pin), reszta w tej samej sesji.
+granica bezpieczeństwa, jednostkowe na syntetycznych danych).
+
+Pełna bramka: frontend **5568 passed/1 skip** (ten sam niezwiązany flaky timeout w
+`nextActionSelectors.test.ts`, potwierdzony 15/15 w izolacji), backend **396/396**,
+`m3-demonstrator.mjs` **18/18**, `repro-demo` **69/69**, tsc/eslint/build czysto.
+Po drodze znaleziony i naprawiony realny regres `moduleReachability.test.ts` (7 modułów
+stało się osiągalnych z `main.tsx` przez nowy import w `scienceMemory.ts` — usunięto
+nieaktualne wpisy `ALLOWED_ORPHANS`, zgodnie z własną instrukcją testu, nie stłumiono) oraz
+brakujący wpis `GENESIS_A1_FIXTURE_DIR` w `.env.example` (złapany przez `envContract.test.mjs`).
+
+Commit`y: `7c16dfd`/`5a5ae4b`/`6f73afe` (fetch+pin), `0e26c6f` (potok analizy + naprawy).

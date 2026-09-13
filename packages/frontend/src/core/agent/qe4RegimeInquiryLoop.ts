@@ -33,13 +33,27 @@
  * around a `candidateVariable` sweep against a runnable model, not a
  * multi-point curve fit against a pinned CSV. This module is a fourth,
  * narrow, QE4-scoped loop — not a generalization of any of them, and not the
- * generic `DatasetLaboratory` seam (`docs/DISCOVERY_ENGINE_FINAL_CLASSIFICATION_2026-09-12.md`
- * §4, unbuilt as of this module's authorship) that would let 17 domains share
- * one shape. Reuses, unmodified: `runQe4BrydgesAnalysis` (real bootstrap over
- * the pinned CSVs), `weightedLinearFit`/`weightedResidualSumOfSquares`
- * (`qe4BrydgesEstimator.ts`), `createHypothesis`/`updateConfidence`
- * (`beliefRevision.ts`), `checkAntiHarkingAnchor` (`hypothesisLoop.ts`), and
- * `fnv1a`/`canonicalJson` (`events/hash.ts`). Zero new engines.
+ * generic `DatasetLaboratory` seam (`core/agent/datasetLaboratory.ts`) that
+ * would let 17 domains share one shape. Reuses, unmodified:
+ * `runQe4BrydgesAnalysis` (real bootstrap over the pinned CSVs),
+ * `weightedLinearFit`/`weightedResidualSumOfSquares` (`qe4BrydgesEstimator.ts`),
+ * `createHypothesis`/`updateConfidence` (`beliefRevision.ts`),
+ * `checkAntiHarkingAnchor` (`hypothesisLoop.ts`), and `fnv1a`/`canonicalJson`
+ * (`events/hash.ts`). Zero new engines.
+ *
+ * RELATIONSHIP TO `DatasetLaboratory`: this module was authored concurrently
+ * with, and started before, `core/agent/datasetLaboratory.ts` /
+ * `core/biotechData/qe4DatasetLaboratory.ts` landed — both sides read the
+ * SAME underlying `runQe4BrydgesAnalysis()` bootstrap, just through different
+ * facades (this module filters `disorderPoints` directly; `DatasetLaboratory`
+ * exposes the same points one at a time via `observableSpec()`/`run()`), so
+ * there is no science-level duplication, only two access patterns over one
+ * computation. A natural, NOT-YET-DONE follow-up: refactor
+ * `runQe4DisorderRegimeInquiry` to source its points through
+ * `QE4_DATASET_LABORATORY.observableSpec()`/`.run()` instead of calling
+ * `runQe4BrydgesAnalysis()` directly, so this loop demonstrates consuming the
+ * generic seam rather than bypassing it. Deliberately left for a separate,
+ * fully re-verified change rather than rushed in here.
  */
 
 import { runQe4BrydgesAnalysis, type Qe4PointResult } from '../biotechData/qe4BrydgesAnalysis';

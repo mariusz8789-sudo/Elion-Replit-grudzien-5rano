@@ -143,3 +143,22 @@ podłącz `causalInference.ts` do realnych danych i uruchom właściwą analizę
 konkurencyjnych liczony z siatki `(T,k)` przypiętego zbioru QE4 (reżimy liniowy/logarytmiczny/
 saturujący), z `parentHypothesisId`/`generatedBy` przez `beliefRevision.ts::createHypothesis`,
 zasilany przez `QE4_DATASET_LABORATORY.observableSpec()` — nie z literału.
+
+**KOREKTA (C3, tuż po powyższym wpisie) — P0-2/P0-3/P0-5 JUŻ SĄ ZROBIONE, nie zaczynaj ich
+drugi raz.** W chwili powyższego wpisu C3 był już w trakcie tego samego zadania (przydzielonego
+w oryginalnym podziale wyżej), z dokładnie tym samym `git fetch` bazowym sprzed lądowania
+`f268cdc` — stąd kolizja przydziału, nie błąd nikogo. C3 dokończył I wypchnął pełną,
+przetestowaną implementację ZANIM zobaczył ten wpis: `core/agent/qe4RegimeInquiryLoop.ts`
+(P0-2: generator hipotez z siatki + operator hipotezy rezydualnej; P0-3: słownik stopu z
+`CONVERGENCE`/`NO_INFORMATION_GAIN`; P0-5: obowiązkowa, DZIAŁAJĄCA kotwica anty-HARK), 15 nowych
+testów, pełna bramka zielona, `repro-demo.mjs` 27/27. Zbudowana PRZED `DatasetLaboratory` (bo ten
+jeszcze nie istniał, gdy C3 zaczynał) — czyta `runQe4BrydgesAnalysis()` bezpośrednio, nie przez
+`QE4_DATASET_LABORATORY`. Pełny opis i dowód: `docs/MASTER_PRIORITY_GENESIS.md`, sekcja „C3:
+P0-2/P0-3/P0-5 — QE4 Regime Inquiry Loop". Sugerowane przekierowanie zamiast powtarzania tej
+pracy: (a) P0-4 (truth-schema) albo P0-6 (odcisk prowieniencji/replay na rundę — już częściowo
+pokryty tu przez odciski rund, ale nie w kanonicznym `ExperimentProvenance`), (b) opcjonalnie
+mały refaktor `qe4RegimeInquiryLoop.ts`, żeby pobierał punkty przez świeżo wypchnięty
+`QE4_DATASET_LABORATORY.observableSpec()`/`run()` zamiast bezpośrednio przez
+`runQe4BrydgesAnalysis()` — nazwane wprost jako naturalny follow-up w komentarzu modułu, nie
+zrobione tutaj celowo (uniknięcie pośpiesznego refaktoru pod koniec zadania bez ponownej pełnej
+weryfikacji).

@@ -84,6 +84,9 @@ const EXPECTED = {
   discoveryKeplerSlope: 1.49987,
   discoveryKeplerFingerprint: '2d6ce643',
   discoveryDerivedWinnerFingerprint: '315b1877',
+  gapTrigger: 'LOW_DISCRIMINABILITY',
+  gapStopReason: 'OBSERVATION_GAP',
+  gapThreshold: 1,
   qe4RegimeFingerprints: ['e7b90572', '3c3e9083', 'c82210fb', '67711185', 'cc3e4323', 'bb6aec30', '2d470070'],
 };
 
@@ -150,7 +153,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived;
+let dQe4, dKepler, dDerived, dGap;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -169,6 +172,7 @@ try {
   qe4 = science.reproQe4BrydgesAnalysis();
   qe4Regime = science.reproQe4RegimeInquiry();
   dQe4 = science.reproDiscoveryCampaignQe4();
+  dGap = science.reproObservationGap();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
 } finally {
@@ -253,6 +257,23 @@ record('Discovery engine: model B wyprowadzony z RESIDUUM modelu A wygrywa kampa
 record('Discovery engine: kotwica anty-HARK nienaruszona we wszystkich trzech kampaniach',
   dQe4.antiHarkingIntactEveryRound && dKepler.antiHarkingIntactEveryRound && dDerived.antiHarkingIntactEveryRound,
   `qe4=${dQe4.antiHarkingIntactEveryRound} kepler=${dKepler.antiHarkingIntactEveryRound} derived=${dDerived.antiHarkingIntactEveryRound}`);
+
+// --- M1: ObservationGapRequest (realne dane, realny brak rozroznialnosci) ----
+record('M1: silnik ODMAWIA uruchomienia eksperymentu, ktory nie rozroznia zywych modeli',
+  dGap.trigger === EXPECTED.gapTrigger && dGap.stopReason === EXPECTED.gapStopReason && dGap.selectedAnyExperimentAfterGap === false,
+  `trigger=${dGap.trigger} stop=${dGap.stopReason} wybrany eksperyment po luce=${dGap.selectedAnyExperimentAfterGap} (oczekiwane ${EXPECTED.gapTrigger} / ${EXPECTED.gapStopReason} / false)`);
+record('M1: rozroznialnosc realnie zmierzona i ponizej progu 1 sigma (nie zero, tylko za malo)',
+  dGap.discriminability !== null && dGap.discriminability > 0 && dGap.discriminability < EXPECTED.gapThreshold,
+  `discriminability=${dGap.discriminability}x sigma, prog=${dGap.threshold}x sigma; nieobserwowanych eksperymentow zostalo: ${dGap.experimentsLeftUnobserved}`);
+record('M1: request nazywa BRAKUJACY pomiar i przyrzad, nie zmyslajac kosztu',
+  dGap.instrumentClass.includes('trapped-ion') && dGap.costEstimate === null && dGap.statusAtEmission === 'OPEN',
+  `"${dGap.requiredObservable}" / ${dGap.instrumentClass} / do: ${dGap.requestedFrom} / koszt=${dGap.costEstimate === null ? 'NIEZADEKLAROWANY' : dGap.costEstimate} / status=${dGap.statusAtEmission}`);
+record('M1: odcisk luki (replay) i spelnienie z lancuchem opieki wchodzi jako OBSERVATION, nie FACT',
+  dGap.replay === 'MATCH' && dGap.fulfilledEpistemicStatus === 'OBSERVATION' && dGap.fulfilledStatus === 'FULFILLED' && dGap.custodySteps === 2,
+  `${dGap.gapFingerprint} / ${dGap.replay} / ${dGap.fulfilledEpistemicStatus} / ${dGap.fulfilledStatus} / krokow opieki=${dGap.custodySteps}`);
+record('M1: istniejace kampanie NIETKNIETE — Kepler zbiega bez luki, QE4 zachowuje odcisk',
+  dKepler.observationGapTriggers.length === 0 && dQe4.campaignFingerprint === EXPECTED.discoveryQe4Fingerprint && dQe4.observationGapTriggers.join(',') === 'NO_ATTACHED_EXPERIMENT',
+  `kepler luki=${dKepler.observationGapTriggers.length}, qe4 odcisk=${dQe4.campaignFingerprint}, qe4 luka=${dQe4.observationGapTriggers.join(',') || 'brak'}`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

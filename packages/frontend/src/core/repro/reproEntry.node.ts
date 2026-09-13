@@ -158,8 +158,10 @@ export function reproQe4RegimeInquiry(): ReproQe4RegimeInquiryReport {
   };
 }
 
-import { runDiscoveryCampaign } from '../agent/discoveryCampaign';
+import { runDiscoveryCampaign, type CampaignLaboratory } from '../agent/discoveryCampaign';
 import { makeKeplerCampaignLab, makeQe4CampaignLab } from '../biotechData/campaignLabs';
+import { pointsForGrid } from '../biotechData/qe4DatasetLaboratory';
+import { fulfilObservationGap, type ObservationGapTrigger } from '../agent/observationGap';
 
 export interface ReproDiscoveryCampaignReport {
   readonly labId: string;
@@ -172,6 +174,9 @@ export interface ReproDiscoveryCampaignReport {
   readonly winnerWasDerivedAtRound: number;
   readonly antiHarkingIntactEveryRound: boolean;
   readonly campaignFingerprint: string;
+  /** M1: gaps this campaign raised instead of running an experiment that could not discriminate. */
+  readonly observationGapTriggers: readonly ObservationGapTrigger[];
+  readonly gapLedgerFingerprint: string;
 }
 
 function report(result: ReturnType<typeof runDiscoveryCampaign>): ReproDiscoveryCampaignReport {
@@ -190,6 +195,8 @@ function report(result: ReturnType<typeof runDiscoveryCampaign>): ReproDiscovery
     winnerWasDerivedAtRound: result.discovery.winningModel?.enteredAtRound ?? 0,
     antiHarkingIntactEveryRound: result.rounds.every((r) => r.antiHarking.intact),
     campaignFingerprint: result.campaignFingerprint,
+    observationGapTriggers: result.observationGaps.map((g) => g.trigger),
+    gapLedgerFingerprint: result.gapLedgerFingerprint,
   };
 }
 
@@ -206,4 +213,97 @@ export function reproDiscoveryCampaignKepler(): ReproDiscoveryCampaignReport {
 /** CASE A with LOG removed from the grammar: the engine must rebuild the true shape from residual structure. */
 export function reproDiscoveryCampaignQe4WithoutLog(): ReproDiscoveryCampaignReport {
   return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 7, maxTerms: 2, excludeBases: ['LOG'] }));
+}
+
+// --- M1: ObservationGapRequest, on real pinned data -------------------------
+
+/**
+ * The real degenerate case. Same Brydges disorder dataset, same real per-point
+ * bootstrap sigmas — but with the grammar restricted to two competing growth
+ * laws (`c·log T` against `c·T`), the two survivors predict the next real time
+ * point to within a fraction of that measurement's own error bar. No attached
+ * experiment can separate them, so the engine must ask for one it does not have
+ * rather than spend a measurement that cannot settle anything.
+ */
+function qe4TwoLawWindow(): CampaignLaboratory {
+  const window = [4, 6, 10, 16, 20];
+  const points = pointsForGrid('disorder', 5).filter((p) => window.includes(p.t));
+  const byX = new Map(points.map((p) => [p.t, { x: p.t, y: p.s2, sigma: p.sigma }]));
+  const xs = points.map((p) => p.t);
+  return {
+    labId: 'qe4-brydges-disorder-k5-window',
+    problem: 'Does S2 grow logarithmically or linearly in time, judged over this window of the pinned disorder dataset?',
+    candidateX: xs,
+    observe: (x) => byX.get(x) ?? null,
+    xRange: { min: Math.min(...xs), max: Math.max(...xs) },
+    xLabel: 'T[ms]',
+    yLabel: 'S2',
+    declareObservable: () => ({
+      quantity: 'second Rényi entropy S2 at a time outside this pinned window',
+      unit: 'dimensionless (S2)',
+      instrumentClass: 'trapped-ion quantum simulator with randomized-measurement readout',
+    }),
+    gapRecipient: 'LABORATORY',
+  };
+}
+
+export interface ReproObservationGapReport {
+  readonly stopReason: string;
+  readonly trigger: string;
+  readonly discriminability: number | null;
+  readonly threshold: number;
+  readonly selectedAnyExperimentAfterGap: boolean;
+  readonly experimentsLeftUnobserved: number;
+  readonly requiredObservable: string;
+  readonly instrumentClass: string;
+  readonly requestedFrom: string;
+  readonly statusAtEmission: string;
+  readonly costEstimate: number | null;
+  readonly gapFingerprint: string;
+  readonly replay: 'MATCH' | 'DRIFT';
+  readonly fulfilledEpistemicStatus: string;
+  readonly fulfilledStatus: string;
+  readonly custodySteps: number;
+}
+
+/** M1 runtime evidence: the engine declines a real experiment and states what it needs instead. */
+export function reproObservationGap(): ReproObservationGapReport {
+  const options = { maxRounds: 5, maxTerms: 1, excludeBases: ['CONSTANT', 'POWER', 'EXP_SATURATION', 'RECIPROCAL'] } as const;
+  const result = runDiscoveryCampaign(qe4TwoLawWindow(), options);
+  const replayed = runDiscoveryCampaign(qe4TwoLawWindow(), options);
+  const gap = result.observationGaps[0]!;
+  const lastRound = result.rounds[result.rounds.length - 1]!;
+
+  const fulfilled = fulfilObservationGap(gap, {
+    custody: {
+      steps: [
+        { handledBy: 'external trapped-ion group', action: 'measured the requested time point', at: '2026-09-13T09:00:00Z' },
+        { handledBy: 'campaign operator', action: 'transcribed value and bootstrap sigma', at: '2026-09-13T10:00:00Z' },
+      ],
+      provenance: 'REAL_EXPERIMENTAL',
+      dataset: null,
+    },
+    value: 1.95,
+    sigma: 0.12,
+    at: 24,
+  });
+
+  return {
+    stopReason: result.stopReason,
+    trigger: gap.trigger,
+    discriminability: gap.discriminability === null ? null : Number(gap.discriminability.toFixed(4)),
+    threshold: gap.threshold,
+    selectedAnyExperimentAfterGap: lastRound.selectedNextX !== null,
+    experimentsLeftUnobserved: 5 - lastRound.admittedX.length,
+    requiredObservable: gap.requiredObservable.quantity,
+    instrumentClass: gap.requiredObservable.instrumentClass,
+    requestedFrom: gap.requestedFrom,
+    statusAtEmission: gap.status,
+    costEstimate: gap.feasibility.costEstimate,
+    gapFingerprint: gap.fingerprint,
+    replay: gap.fingerprint === replayed.observationGaps[0]!.fingerprint ? 'MATCH' : 'DRIFT',
+    fulfilledEpistemicStatus: 'ok' in fulfilled ? 'REFUSED' : fulfilled.epistemicStatus,
+    fulfilledStatus: 'ok' in fulfilled ? 'REFUSED' : fulfilled.request.status,
+    custodySteps: 'ok' in fulfilled ? 0 : (fulfilled.request.custody?.steps.length ?? 0),
+  };
 }

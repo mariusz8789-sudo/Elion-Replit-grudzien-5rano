@@ -26,6 +26,7 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | §8 PracticalCandidate safety gate | **ZROBIONE** | C1, wcześniej ta sesja | `core/agent/practicalCandidateGate.ts` — reużyty (nie napisano drugiego) przez A1, patrz niżej |
 | **§7 A1 GLP-1** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realne dane, realny werdykt, bramka bezpieczeństwa |
 | **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **ZROBIONE (Opcja A)** | C1 | patrz niżej |
+| **A2 — autonomiczny dobór kandydata na zamiennik Ozempicu (nowy mandat)** | **BIORĘ TERAZ** | **C1, ta sesja** | rozszerzenie A1: `CandidateGenerator` ma SAM zbudować przestrzeń kandydatów z mechanizmu (GLP-1R + GIPR + GCGR w ChEMBL — dual/triple agonists jak tirzepatyd), nie tylko liraglutyd. Realne dane: ChEMBL + ClinicalTrials.gov (w tym `adverseEventsModule` dla bezpieczeństwa). PubMed/FDA/EMA: świadomie pominięte na start (deklarowana luka, nie zmyślone), dodam tylko jeśli tania integracja się znajdzie. Dozwolone wyniki: BEST_SUPPORTED_CANDIDATE / PROMISING_BUT_UNCERTAIN / NO_SUPERIOR_CANDIDATE / NO_SAFE_SUPERIOR_CANDIDATE / CONFLICTING_EVIDENCE / INSUFFICIENT_EVIDENCE — bez wymuszania pozytywnego wyniku. *(w trakcie)*
 
 ## Detektor residuum: znaleziona, niezałatana wada specyficzności
 

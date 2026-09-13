@@ -360,31 +360,6 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
-  a2-semaglutide-safety-reference-pin:
-    name: "A2 (temporary): fetch+pin real semaglutide safety-reference trial (NCT03987919)"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    # Small, targeted follow-up to the main A2 pin (docs/DECISIONS.md
-    # D-029): none of the 12 real candidate trials pinned there contain a
-    # semaglutide arm, so no candidate's adverse-event categories could be
-    # numerically compared to semaglutide. NCT03987919 was already
-    # confirmed (by A2's own first recon round, before any candidate
-    # result existed) to carry real semaglutide-arm safety data — this
-    # supplies it. No preregistered criterion changes; only the reference
-    # data an already-sealed rule needs. Remove once downloaded and
-    # committed under packages/frontend/src/core/biotechData/a2-ozempic-substitute/.
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: Fetch + pin real semaglutide safety-reference trial
-        env:
-          GENESIS_A2_FIXTURE_DIR: artifacts/a2-ozempic-substitute
-        run: node scripts/fetch-a2-semaglutide-safety-reference.mjs
-
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

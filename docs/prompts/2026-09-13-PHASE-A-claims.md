@@ -27,6 +27,7 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | **§7 A1 GLP-1** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realne dane, realny werdykt, bramka bezpieczeństwa |
 | **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **ZROBIONE (Opcja A)** | C1 | patrz niżej |
 | **A2 — autonomiczny dobór kandydata na zamiennik Ozempicu (nowy mandat)** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realna, mechanizm-owa przestrzeń kandydatów, realny werdykt `CONFLICTING_EVIDENCE`, bramka bezpieczeństwa |
+| **A3 — Genesis Government Research: rekomendacja zamiennika Ozempicu dla rządu (nowy mandat)** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — twarda bramka populacji trafiona przez własne żądanie mandatu (`REQUIRED_POLICY_INPUT`), realny błąd regexu populacji naprawiony przed użyciem, kandydat bez skuteczności usunięty ze zwycięzców rankingu |
 
 ## Detektor residuum: znaleziona, niezałatana wada specyficzności
 
@@ -210,3 +211,71 @@ czysto.
 
 Commit`y: `1cd65eb` (preregestracja), `905e097`/`0c8a0a0`/`5d61a0b`/`1550e54` (fetch+pin),
 kolejny commit tej sesji (potok analizy + demonstrator + Science Memory + dokumentacja).
+
+## §A3 — ZROBIONE: Genesis Government Research, twarda bramka populacji trafiona przez
+własne żądanie, realny błąd regexu naprawiony przed użyciem
+
+Nowy mandat: rekomendacja zamiennika semaglutydu DLA RZĄDU, nad już realną, już
+przypiętą przestrzenią kandydatów A2 — bez nowego fetchu, bez nowego kandydata, bez
+przeliczania żadnej liczby skuteczności/bezpieczeństwa na nowo. Preregestracja przypięta
+PRZED nowym fetchem (`a3GovernmentPreregistration.ts`, odcisk `2b32c0a8` — patrz D-031
+po co do naprawy regexu, commit `7626c23`/naprawa po tym).
+
+**Twarda bramka trafiona przez WŁASNE żądanie mandatu.** Sam mandat rządowy w tej sesji
+nie podał populacji — zgodnie z jego własną regułą §1 ("NIE ZGADUJ. Zwróć
+REQUIRED_POLICY_INPUT"), `runA3GovernmentRecommendation()` wywołane bez argumentu
+zwraca **`REQUIRED_POLICY_INPUT` i nie uruchamia analizy A2 w ogóle** — to jest
+dosłowna, poprawna odpowiedź na to konkretne żądanie, nie placeholder czekający na
+"prawdziwą" implementację.
+
+**Realny błąd regexu znaleziony i naprawiony PRZED pierwszym użyciem w analizie
+(D-031).** Sealed pattern `type\s*2\s*diabetes` pomijał **18 z 31** realnych wartości
+`conditions` z ClinicalTrials.gov, bo używały odwróconej kolejności słów
+(`"Diabetes Mellitus, Type 2"`, w tym oba badania liraglutydu) — znalezione przez
+wypisanie realnego dopasowania na wszystkich 31 wartościach przed napisaniem testów.
+Naprawione ogólnym wzorcem obsługującym oba porządki słów i "2"/"II" rzymskie,
+zweryfikowanym na całym zbiorze przed ponownym zapieczętowaniem. Zmieniło odcisk
+preregestracji (nie ranking/werdykt A2, który liczy się niezależnie) — udokumentowane
+jawnie jako korekta dopasowania, nie poluzowanie kryterium po wyniku.
+
+**Realny problem znaleziony testowaniem: kandydat bez ŻADNYCH danych o skuteczności
+(MK-0893, 0 badań skuteczności, ale 8 korzystnych kategorii bezpieczeństwa) miał
+najwyższy nieprzefiltrowany `weightedScore` (1.100)** — bez poprawki zostałby nazwany
+"SCIENTIFIC WINNER"/"BEST OVERALL OPTION" mimo że jego skuteczność względem
+semaglutydu jest całkowicie nieznana. Naprawione filtrowaniem rankingu do kandydatów z
+≥1 realnym dowodem skuteczności (ten sam warunek, którego A2 już używa we własnym
+`decideA2Verdict`) — MK-0893 pozostaje w pełni widoczny jako "SAFEST SUPPORTED OPTION"
+(osobne, uczciwe pytanie), tylko nie jako zwycięzca substytucji.
+
+**§9 wynik decyzyjny rządu trzymany OSOBNO od naukowego**, ale obecnie numerycznie mu
+równy — ujawniony FAKT (brak zintegrowanego realnego źródła kosztu/dostępności/
+łańcucha dostaw/produkcji w tej sesji — nazwane jawnie jako `INSUFFICIENT_EVIDENCE` z
+wkładem 0, nigdy nie ukryte ani nie zmyślone), nie założenie. `rankingsDiverge` liczone
+programowo, nie zaszyte.
+
+**§7 kontrolowane słownictwo bezpieczeństwa** — nigdy gołego "safe": wetowany kandydat
+→ `null` (bez euforii, liczby podane wprost), brak porównania → `INSUFFICIENT_SAFETY_
+EVIDENCE`, realna przewaga → `LOWER_OBSERVED_RISK`, wszystko ściśle korzystne →
+`SAFE_RELATIVE_TO_X` (ścieżka zweryfikowana jednostkowo na syntetycznym przykładzie).
+
+**AnswerRecord (PRAWDA) / ActionRecord (POLITYKA)** — ActionRecord to bezpośrednie
+ponowne użycie bramki A1/A2 (`practicalCandidateGate.ts`); dla realnego werdyktu
+`CONFLICTING_EVIDENCE` ActionRecord to `NONE`, ale wszystkie 12 `candidateViews`
+zostają w pełni widoczne w AnswerRecord niezależnie.
+
+Dowód uruchamialny: `npm run a3:demo` → **13/13** (obie ścieżki: `REQUIRED_POLICY_INPUT`
+i pełna odpowiedź dla `T2D_AND_OBESITY`). Testy: `a3GovernmentPreregistration.test.ts`
+→ **10/10**, `a3GovernmentDrugRecommendation.test.ts` → **25/25**.
+
+Pełna bramka: frontend **5626 passed/1 skip** (ten sam niezwiązany flaky timeout),
+backend **396/396**, `m3-demonstrator.mjs` **18/18**, `repro-demo` **69/69**,
+`a1:demo` **14/14**, `a2:demo` **14/14** (bez regresji), `a3:demo` **13/13**,
+tsc/eslint/build czysto. Po drodze znalezione i naprawione: `moduleReachability.test.ts`
+oznaczył oba nowe moduły A3 jako nieosiągalne — naprawione realnym wpięciem
+`saveA3GovernmentRecommendationToMemory` do `scienceMemory.ts` (nie przez
+`ALLOWED_ORPHANS`); brakujący wpis `GENESIS_A3_FIXTURE_DIR` w `.env.example`
+złapany przez `envContract.test.mjs`.
+
+Commit`y: preregestracja (odcisk `e458d17b` → naprawiony do `2b32c0a8`), fetch+pin
+`trial-conditions.json` (odcisk `fbae6c68...4ee1c`), moduł analizy + drukarka raportu
+14 sekcji + testy + demonstrator + dokumentacja (ta sesja).

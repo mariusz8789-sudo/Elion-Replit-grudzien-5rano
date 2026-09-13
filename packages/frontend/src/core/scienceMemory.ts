@@ -9,6 +9,7 @@ import { compareCandidateDiscoveryReports, type CandidateComparison } from './bi
 import { canonicalJson, fnv1a } from './events/hash';
 import type { A1AnalysisReport } from './biotechData/a1Glp1Analysis';
 import type { A2AnalysisReport } from './biotechData/a2OzempicSubstitute';
+import type { A3Report } from './biotechData/a3GovernmentDrugRecommendation';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
@@ -3483,6 +3484,92 @@ export function saveA2OzempicSubstituteToMemory(report: A2AnalysisReport): Saved
       'Przestrzen kandydatow jest wyprowadzona z mechanizmu (ChEMBL, wiazanie GLP-1R/GIPR/GCGR) i realnego rozwoju klinicznego (max_phase>=2), nie z listy nazw.',
       'Bez bezposredniego badania semaglutyd-vs-kandydat w tym samym RCT, porownanie jest NAIWNYM posrednim porownaniem (miedzy roznymi badaniami) — slabsza klasa dowodu, jawnie oznaczona.',
       'Kategorie bezpieczenstwa i weto egzystencjalne zostaly ustalone PRZED pobraniem jakichkolwiek danych kandydatow.',
+    ],
+    epistemicStatus,
+  });
+}
+
+/**
+ * Writes an A3 Government Research recommendation
+ * (`biotechData/a3GovernmentDrugRecommendation.ts`) to Science Memory.
+ * Handles BOTH branches: the hard REQUIRED_POLICY_INPUT gate (no candidate
+ * analysis ran) and a full ANSWERED recommendation — never silently
+ * upgrades the former to look like the latter.
+ */
+export function saveA3GovernmentRecommendationToMemory(report: A3Report): SavedExperiment {
+  if (report.status === 'REQUIRED_POLICY_INPUT') {
+    return saveExperiment({
+      labId: 'government-research-a3-drug-recommendation',
+      experimentId: `a3-government-drug-recommendation:required-policy-input:${report.preregistrationFingerprint}`,
+      experimentName: 'A3 — Genesis Government Research: rekomendacja zamiennika semaglutydu',
+      params: {},
+      stats: {},
+      analysis: [
+        {
+          title: 'Brakujacy wymagany parametr polityki',
+          body: `REQUIRED_POLICY_INPUT: ${report.reason} Wymagany format: ${report.requiredInput}`,
+          kind: 'a3-government-required-policy-input',
+        },
+      ],
+      honesty: 'exact',
+      honestyNote: 'Populacja nie zostala podana przez rzad — system NIE zgaduje; zwraca REQUIRED_POLICY_INPUT i nie uruchamia zadnej analizy kandydatow.',
+      assumptions: ['Zaden kandydat nie zostal oceniony: analiza A2 nie zostala uruchomiona.'],
+      epistemicStatus: 'INCONCLUSIVE',
+    });
+  }
+
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    report.answerRecord.recommendation.label === 'BEST_SUPPORTED_CANDIDATE' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : report.answerRecord.recommendation.label === 'PROMISING_BUT_UNCERTAIN' ? 'CANDIDATE'
+    : report.answerRecord.recommendation.label === 'NO_SUPERIOR_CANDIDATE' || report.answerRecord.recommendation.label === 'NO_SAFE_SUPERIOR_CANDIDATE' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : 'INCONCLUSIVE';
+
+  return saveExperiment({
+    labId: 'government-research-a3-drug-recommendation',
+    experimentId: `a3-government-drug-recommendation:${report.decisionFingerprint}`,
+    experimentName: `A3 — rekomendacja rzadowa zamiennika semaglutydu (populacja: ${report.populationDescription})`,
+    params: {
+      totalCandidatesInSpace: report.answerRecord.totalCandidatesInSpace,
+      candidatesWithEfficacyEvidence: report.answerRecord.scientificRanking.length,
+    },
+    stats: {
+      totalCandidatesInSpace: report.answerRecord.totalCandidatesInSpace,
+      candidatesWithEfficacyEvidence: report.answerRecord.scientificRanking.length,
+      rankingsDiverge: report.answerRecord.rankingsDiverge ? 1 : 0,
+    },
+    analysis: [
+      {
+        title: 'Rekomendacja rzadowa',
+        body: `${report.answerRecord.recommendation.label}: ${report.answerRecord.recommendation.reason}`,
+        kind: 'a3-government-recommendation',
+      },
+      {
+        title: 'Najlepsza skutecznosc vs najbezpieczniejsza wspierana opcja vs najlepsza ogolna',
+        body: `Skutecznosc: ${report.answerRecord.bestEfficacyCandidate?.report.summary.prefName ?? 'brak'}${report.answerRecord.bestEfficacyCandidate?.report.score.vetoed ? ' (WETOWANY na bezpieczenstwie)' : ''}. Bezpieczenstwo: ${report.answerRecord.safestSupportedCandidate?.report.summary.prefName ?? 'INSUFFICIENT_EVIDENCE'}. Ogolna: ${report.answerRecord.bestOverallCandidate?.report.summary.prefName ?? 'brak'}.`,
+        kind: 'a3-government-best-options',
+      },
+      {
+        title: 'Luki danych politycznych (koszt/dostepnosc/produkcja)',
+        body: `Brak zintegrowanego realnego zrodla dla: ${report.policyDimensionsWithoutSource.join(', ')}. Wynik rzadowy obecnie rowny wynikowi naukowemu — ujawniony fakt, nie zalozenie.`,
+        kind: 'a3-government-policy-gaps',
+      },
+      {
+        title: 'AnswerRecord (PRAWDA) vs ActionRecord (POLITYKA)',
+        body: `Powierzchnia: ${report.actionRecord.surface}. ${report.actionRecord.gateDecision === null ? 'Zaden kandydat nie zostal zaproponowany do dzialania.' : `Wynik bramki: ${report.actionRecord.gateDecision.outcome}.`} Wszystkie ${report.answerRecord.candidateViews.length} widokow kandydatow pozostaja widoczne niezaleznie od dzialania.`,
+        kind: 'a3-government-answer-vs-action',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${report.preregistrationFingerprint} (przypieta PRZED fetchem warunkow per-badanie), odcisk decyzji ${report.decisionFingerprint}.`,
+        kind: 'a3-government-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Rekomendacja dla rzadu na realnych, przypietych danych. Nie jest dyrektywa kliniczna dla zadnego pacjenta — tylko populacyjna rekomendacja badawcza z jawnym oddzieleniem prawdy od polityki.',
+    assumptions: [
+      'Ranking naukowy i rzadowy uzywaja identycznych wag naukowych; wymiary czysto polityczne (koszt/dostepnosc/skalowalnosc/bezpieczenstwo dostaw/mozliwosci produkcyjne/pokrycie populacji) sa INSUFFICIENT_EVIDENCE, nie zalozone.',
+      'Dopasowanie populacji per-badanie pochodzi z realnego, strukturalnego pola ClinicalTrials.gov conditions, nie z domyslu na podstawie tytulu.',
+      'Kandydat bez zadnego dowodu skutecznosci nie moze zostac zwyciezca naukowym/ogolnym, nawet przy wysokim wyniku samego bezpieczenstwa.',
     ],
     epistemicStatus,
   });

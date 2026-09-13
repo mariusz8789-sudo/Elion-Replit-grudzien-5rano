@@ -1074,3 +1074,122 @@ bezpieczeństwa, po czym sprawdza 14 realnych właściwości wyniku (w tym obie
 poprawki wyżej, weto tirzepatydu, i że werdykt to uczciwe
 `CONFLICTING_EVIDENCE`, nie wymuszony zwycięzca) — 14/14 potwierdzone przy
 uruchomieniu.
+
+## D-031 (2026-09-13, A3) — Twarda bramka populacji trafiona przez WŁASNE
+żądanie mandatu; realny błąd regexu dopasowania populacji znaleziony i
+naprawiony PRZED pierwszym użyciem; kandydat bez danych o skuteczności
+usunięty ze zwycięzców rankingu, nie ukryty
+
+**Decyzja.** A3 (Genesis Government Research) to warstwa DECYZYJNA nad już
+realną, już przypiętą przestrzenią kandydatów i analizą A2 — nie uruchamia
+ponownego fetchu, nie dodaje kandydata, nie przelicza żadnej liczby
+skuteczności/bezpieczeństwa na nowo. Dodaje: wymaganą populację (twardo
+odmawia bez niej), realne tagowanie populacji per-badanie, wynik decyzyjny
+rządu trzymany OSOBNO od rankingu naukowego, kontrolowane słownictwo
+bezpieczeństwa i podział AnswerRecord (PRAWDA) / ActionRecord (POLITYKA).
+
+**Twarda bramka trafiona przez własne żądanie.** Mandat rządowy w TEJ
+sesji nie podał populacji (cukrzyca typu 2 / otyłość / oba / grupa
+ryzyka) — zgodnie z jego własną regułą §1 ("Jeżeli populacja nie została
+podana: NIE ZGADUJ. Zwróć REQUIRED_POLICY_INPUT"),
+`runA3GovernmentRecommendation()` wywołane bez argumentu zwraca
+`REQUIRED_POLICY_INPUT` i **nie uruchamia analizy A2 w ogóle** — to jest
+dosłowna, poprawna odpowiedź na to konkretne żądanie, zweryfikowana testem
+i demonstratorem, nie placeholder.
+
+**Realny błąd regexu znaleziony i naprawiony PRZED pierwszym użyciem w
+analizie.** Preregestracja sealed pattern `type\s*2\s*diabetes` dla
+populacji T2D — po realnym fetchu `conditions` z ClinicalTrials.gov
+(31 badań, zobacz niżej) okazało się, że **18 z 31 realnych wartości**
+używa odwróconej kolejności słów: `"Diabetes Mellitus, Type 2"`, nie
+`"Type 2 Diabetes Mellitus"` — oryginalny wzorzec dopasowywał tylko
+kolejność "Type 2 ... Diabetes", więc milcząco pomijał większość realnych
+badań (w tym oba badania liraglutydu). Znalezione przez wypisanie
+rzeczywistego dopasowania na wszystkich 31 realnych wartościach PRZED
+napisaniem testów — nie zgadnięte. Naprawione wzorcem
+`diabetes.{0,20}type\s*(2|ii)\b|type\s*(2|ii)\b.{0,20}diabetes` (obsługuje
+też rzymskie "II" — `"Diabetes Mellitus, Type II"`, `NCT02175121`),
+zweryfikowanym na wszystkich 31 realnych wartościach `conditions` przed
+zapieczętowaniem. To zmieniło odcisk preregestracji (`e458d17b` →
+`2b32c0a8`) — dozwolone i udokumentowane tu, bo poprawka jest korektą
+BŁĘDU DOPASOWANIA tego samego, niezmienionego pola źródłowego, nie
+poluzowaniem kryterium po zobaczeniu wyniku: nie zmienia, który kandydat
+wygrywa ranking/werdykt A2 (te liczą się wyłącznie z A2, niezależnie od
+A3), wpływa tylko na ujawnianą adnotację dopasowania populacji.
+
+**Ekstrakcja `conditions` per-badanie: mały, celowany fetch nad JUŻ
+znanym zestawem 31 NCT id A2** (nie nowe wyszukiwanie, nie nowy
+kandydat) — `scripts/fetch-a3-trial-conditions.mjs`, ten sam wzorzec
+dump-w-logu-CI + weryfikacja SHA-256 co każda wcześniejsza kotwica.
+Realne odkrycie potwierdzające D-029 z innego, niezależnego pola: badanie
+perfenazyny (`NCT00806234`) ma `conditions=["Psychotic Disorders"]` —
+strukturalnie, nie tylko po tytule, potwierdzone jako niezwiązane z
+leczeniem cukrzycy/otyłości.
+
+**Realny problem znaleziony testowaniem: kandydat bez ŻADNYCH danych o
+skuteczności może wygrać ranking wyłącznie na bezpieczeństwie.** MK-0893
+(prawdziwy antagonista GCGR) ma 0 badań skuteczności względem semaglutydu,
+ale 8 kategorii bezpieczeństwa — wszystkie korzystne — co samo w sobie dało
+mu **najwyższy `weightedScore` (1.100)** w nieprzefiltrowanym rankingu A2
+(widoczne już w demonstratorze A2 jako "MK-0893 ... eff_n=0"). Bez
+poprawki A3 nazwałoby to "SCIENTIFIC WINNER"/"BEST OVERALL OPTION" —
+błędne dla pytania o ZAMIENNIK, bo skuteczność względem semaglutydu jest
+całkowicie nieznana. Naprawione filtrowaniem `scientificRanking`/
+`governmentRanking`/`bestOverallCandidate` do kandydatów z ≥1 realnym
+dowodem skuteczności (dokładnie ten sam warunek `withEvidence`, którego
+A2 już używa we własnym `decideA2Verdict`) — MK-0893 pozostaje w pełni
+widoczny jako `candidateViews` i jako "SAFEST SUPPORTED OPTION" (to
+osobne, uczciwe pytanie o samo bezpieczeństwo), tylko nie jako zwycięzca
+substytucji. Znalezione przez inspekcję realnego wyjścia PRZED napisaniem
+testów, nie zgadnięte.
+
+**§9 wynik decyzyjny rządu.** Wymiary naukowe (efficacy/safety/
+evidenceStrength/uncertaintyPenalty/conflictPenalty) używają IDENTYCZNYCH
+wag co A2 nad tymi samymi dowodami — to nie przeliczenie, to ten sam
+wynik A2 przeniesiony dalej. Wymiary czysto polityczne (cost/
+availability/scalability/supplySecurity/manufacturingFeasibility/
+populationCoverage) nie mają w tej sesji zintegrowanego realnego źródła —
+zapisane jawnie jako `INSUFFICIENT_EVIDENCE` z wkładem 0, nigdy nie
+ukryte ani nie zmyślone. Efekt: `governmentWeightedScore` obecnie równa
+się `scientificWeightedScore` dla każdego kandydata — to jest ujawniony
+FAKT o brakujących danych politycznych, nie założenie, że koszt/
+dostępność faworyzują kogokolwiek. `rankingsDiverge` liczone programowo
+(porównanie kolejności), nie zaszyte jako `false`.
+
+**§7 kontrolowane słownictwo bezpieczeństwa.** Nigdy nie zwraca gołego
+"safe". Kandydat wetowany dostaje `null` (żadna etykieta uspokajająca się
+nie stosuje — realny gorszy sygnał jest podany wprost liczbami), brak
+porównania liczbowego → `INSUFFICIENT_SAFETY_EVIDENCE`, realna mieszana
+przewaga → `LOWER_OBSERVED_RISK`, wszystkie zmierzone kategorie ściśle
+korzystne → `SAFE_RELATIVE_TO_X` (ścieżka zweryfikowana testem
+jednostkowym na syntetycznym przykładzie — żaden realny kandydat w tym
+zbiorze jej nie trafił).
+
+**AnswerRecord (PRAWDA) / ActionRecord (POLITYKA).** ActionRecord to
+bezpośrednie ponowne użycie bramki A1/A2 (`practicalCandidateGate.ts`,
+`GOVERNMENT_RESEARCH`/`GOVERNMENT_ACTION`) — dla `CONFLICTING_EVIDENCE`
+`gatedCandidate`/`gateDecision` to `null`, `surface: 'NONE'`, ale
+wszystkie 12 `candidateViews` z pełnymi dowodami pozostają w raporcie
+niezależnie (polityka ogranicza działanie, nigdy prawdę).
+
+Dowód uruchamialny: `npm run a3:demo` → **13/13** (obie ścieżki:
+`REQUIRED_POLICY_INPUT` bez populacji i pełna odpowiedź dla
+`T2D_AND_OBESITY`). Testy: `a3GovernmentPreregistration.test.ts` →
+**10/10**, `a3GovernmentDrugRecommendation.test.ts` → **25/25**.
+
+**Dwie realne luki złapane dopiero pełną bramką, naprawione nie
+stłumione.** `moduleReachability.test.ts` oznaczył oba nowe moduły A3 jako
+nowo-nieosiągalne z `main.tsx` — naprawione nie przez dopisanie do
+`ALLOWED_ORPHANS`, tylko przez dodanie realnego
+`saveA3GovernmentRecommendationToMemory` (ósma/dziewiąta funkcja zapisu do
+Science Memory, ten sam wzorzec co A1/A2, dwie gałęzie:
+`REQUIRED_POLICY_INPUT` i odpowiedź pełna) do `scienceMemory.ts`, które
+JEST osiągalne — moduły A3 stały się prawdziwie używane, nie tylko
+odhaczone. `envContract.test.mjs` (backend) złapał brakujący wpis
+`GENESIS_A3_FIXTURE_DIR` w `.env.example` mimo że skrypt fetch go czyta —
+dopisany.
+
+Commit'y: preregestracja + odcisk `2b32c0a8` po naprawie regexu, fetch+pin
+`trial-conditions.json` (odcisk `fbae6c68...4ee1c`), moduł analizy +
+drukarka raportu + testy + demonstrator + zapis Science Memory + naprawa
+`.env.example`.

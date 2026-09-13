@@ -19,17 +19,17 @@ import {
  */
 describe('A3 government preregistration — sealed before data pull', () => {
   it('fingerprint is exactly this literal', () => {
-    expect(A3_PREREGISTRATION_FINGERPRINT).toBe('e458d17b');
-    expect(A3_PREREGISTRATION.fingerprint).toBe('e458d17b');
+    expect(A3_PREREGISTRATION_FINGERPRINT).toBe('2b32c0a8');
+    expect(A3_PREREGISTRATION.fingerprint).toBe('2b32c0a8');
   });
 
   it('the government question is fixed', () => {
     expect(A3_PREREGISTRATION.governmentQuestion).toContain('semaglutydu');
   });
 
-  it('the population-condition patterns are fixed and do not include a guessed synonym list', () => {
+  it('the population-condition patterns handle both real word orders and both "2"/"II" spellings seen in the pinned data', () => {
     expect(A3_PREREGISTRATION.populationConditionPatterns).toEqual({
-      T2D: 'type\\s*2\\s*diabetes',
+      T2D: 'diabetes.{0,20}type\\s*(2|ii)\\b|type\\s*(2|ii)\\b.{0,20}diabetes',
       OBESITY: 'obesity',
     });
   });

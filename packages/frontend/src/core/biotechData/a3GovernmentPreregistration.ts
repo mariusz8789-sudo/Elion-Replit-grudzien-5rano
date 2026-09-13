@@ -60,8 +60,19 @@ export type A3PopulationSpec =
   | { readonly kind: 'T2D_AND_OBESITY' }
   | { readonly kind: 'RISK_GROUP'; readonly conditionKeywords: readonly string[] };
 
+/**
+ * Real ClinicalTrials.gov `conditions` values in this dataset use BOTH word
+ * orders for type 2 diabetes ("Type 2 Diabetes Mellitus" AND "Diabetes
+ * Mellitus, Type 2") and both "2" and the roman numeral "II" ("Diabetes
+ * Mellitus, Type II") — verified against all 31 real, pinned condition
+ * strings before this pattern was sealed (see docs/DECISIONS.md D-031).
+ * `type\s*2\s*diabetes` alone would silently miss every "Diabetes Mellitus,
+ * Type 2" trial (18 of 31 in this dataset) — a real matching gap, not a
+ * convenience fix: this does not touch which candidate wins A2's own
+ * ranking/verdict, only the disclosed population-match annotation.
+ */
 export const A3_POPULATION_CONDITION_PATTERNS: Record<'T2D' | 'OBESITY', string> = {
-  T2D: 'type\\s*2\\s*diabetes',
+  T2D: 'diabetes.{0,20}type\\s*(2|ii)\\b|type\\s*(2|ii)\\b.{0,20}diabetes',
   OBESITY: 'obesity',
 };
 

@@ -32,7 +32,8 @@
     "csrn:demo:federation": "npm run demo:federation --workspace=packages/csrn",
     "m3:demo": "node scripts/m3-demonstrator.mjs",
     "a1:demo": "node scripts/a1-glp1-demonstrator.mjs",
-    "a2:demo": "node scripts/a2-ozempic-substitute-demonstrator.mjs"
+    "a2:demo": "node scripts/a2-ozempic-substitute-demonstrator.mjs",
+    "a3:demo": "node scripts/a3-government-drug-recommendation-demonstrator.mjs"
   },
   "keywords": [
     "genesis-os",

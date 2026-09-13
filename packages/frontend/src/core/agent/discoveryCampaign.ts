@@ -13,6 +13,7 @@ import {
   type ModelSpaceConstraints,
 } from './modelSpace';
 import { analyzeResidualStructure, proposeModelsFromResiduals, type ResidualFinding } from './residualStructure';
+import { consultFalsifiedModelRegistry, recordFalsification, type RegistryConsultation } from './falsifiedModelRegistry';
 
 /**
  * GENERIC AUTONOMOUS DISCOVERY CAMPAIGN — one loop, many laboratories.
@@ -141,6 +142,14 @@ export interface CampaignResult {
   readonly stopReason: CampaignStopReason;
   readonly discovery: Discovery;
   readonly campaignFingerprint: string;
+  /**
+   * Every model this campaign refused to admit because M2's
+   * `falsifiedModelRegistry.ts` already had a standing verdict on it — only
+   * ever populated when `CampaignOptions.respectFalsifiedModelRegistry` is
+   * true. Never a silent skip: each entry names the fingerprint and the real
+   * reason `consultFalsifiedModelRegistry` returned.
+   */
+  readonly registrySkips: readonly { readonly fingerprint: string; readonly reason: string }[];
 }
 
 export interface CampaignOptions {
@@ -149,6 +158,19 @@ export interface CampaignOptions {
   readonly excludeBases?: ModelSpaceConstraints['excludeBases'];
   /** Fingerprints the caller already knew before the campaign began (anti-HARK anchor). */
   readonly alreadyKnownFingerprints?: readonly string[];
+  /**
+   * M2 — Global Falsified-Model Registry integration. Off by default (every
+   * existing caller, and every existing test's determinism/independence
+   * assumptions, keep their exact current behaviour unchanged). When true:
+   * a candidate model is consulted against `falsifiedModelRegistry.ts`
+   * before being admitted — both at initial enumeration and at
+   * residual-derived proposal — and this campaign's own newly-falsified
+   * models are recorded back into the registry (scope `VARIANT_ONLY`,
+   * carrying the real `Hypothesis` that earned the verdict) so a LATER
+   * campaign on the same laboratory does not have to re-derive and re-fit
+   * the same already-settled model.
+   */
+  readonly respectFalsifiedModelRegistry?: boolean;
 }
 
 /** A model is "decisively best" at no more than half the runner-up's weighted RSS — the same ratio the QE4 loop already uses. */
@@ -220,13 +242,23 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     excludeBases: options.excludeBases,
   };
 
-  const live: LiveModel[] = generateModelSpace(constraints).map((spec) => ({
-    spec,
-    fingerprint: modelSpecFingerprint(spec),
-    enteredAtRound: 0,
-    derivedFrom: null,
-    derivationOperator: null,
-  }));
+  const registrySkips: { fingerprint: string; reason: string }[] = [];
+  const admitOrSkip = (spec: ModelSpec): RegistryConsultation => {
+    if (!options.respectFalsifiedModelRegistry) return { allowed: true, reason: 'Registry consultation not requested.', matchedEntry: null };
+    const consultation = consultFalsifiedModelRegistry(lab.labId, spec);
+    if (!consultation.allowed) registrySkips.push({ fingerprint: modelSpecFingerprint(spec), reason: consultation.reason });
+    return consultation;
+  };
+
+  const live: LiveModel[] = generateModelSpace(constraints)
+    .filter((spec) => admitOrSkip(spec).allowed)
+    .map((spec) => ({
+      spec,
+      fingerprint: modelSpecFingerprint(spec),
+      enteredAtRound: 0,
+      derivedFrom: null,
+      derivationOperator: null,
+    }));
 
   const beliefs = new Map<string, Hypothesis>();
   for (const model of live) {
@@ -296,6 +328,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     )) {
       const print = modelSpecFingerprint(proposal.spec);
       if (live.some((m) => m.fingerprint === print)) continue;
+      if (!admitOrSkip(proposal.spec).allowed) continue;
       const entering: LiveModel = {
         spec: proposal.spec,
         fingerprint: print,
@@ -386,6 +419,22 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
   const surviving = finalRound === null ? [] : finalRound.models.filter((m) => (beliefs.get(m.fingerprint)?.confidence ?? 0) >= 0.5);
   const falsified = finalRound === null ? [] : finalRound.models.filter((m) => (beliefs.get(m.fingerprint)?.confidence ?? 0) < 0.5);
 
+  if (options.respectFalsifiedModelRegistry && finalRound !== null) {
+    for (const view of falsified) {
+      const hypothesis = beliefs.get(view.fingerprint);
+      const model = live.find((m) => m.fingerprint === view.fingerprint);
+      if (!hypothesis || !model || hypothesis.status !== 'FALSIFIED_WITHIN_PROTOCOL') continue;
+      if (!consultFalsifiedModelRegistry(lab.labId, model.spec).allowed) continue; // already standing — append-only, but no need to pile up a duplicate entry every re-run.
+      recordFalsification({
+        labId: lab.labId,
+        spec: model.spec,
+        scope: 'VARIANT_ONLY',
+        evidence: hypothesis,
+        evidenceRoundFingerprint: finalRound.roundFingerprint,
+      });
+    }
+  }
+
   const winningFormulaWithCoefficients = winnerModel === null || winnerFit === null
     ? null
     : `${renderModelSpec(winnerModel.spec)}   with  [${winnerFit.coefficients.map((c) => c.toPrecision(6)).join(', ')}]`;
@@ -443,5 +492,6 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     stopReason,
     discovery,
     campaignFingerprint: fnv1a(canonicalJson({ labId: lab.labId, rounds: rounds.map((r) => r.roundFingerprint), stopReason, winner })),
+    registrySkips,
   };
 }

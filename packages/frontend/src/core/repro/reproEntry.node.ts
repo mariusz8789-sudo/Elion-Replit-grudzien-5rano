@@ -316,8 +316,9 @@ export function reproObservationGap(): ReproObservationGapReport {
 }
 
 // --- A8: Conformal Uncertainty Layer, on the real pinned Kepler dataset -----
+// (fitModelSpec/ModelPoint/ModelSpec are imported once, further down, by the
+// M3 structural-discovery section below — reused here rather than re-imported.)
 
-import { fitModelSpec, type ModelPoint, type ModelSpec } from '../agent/modelSpace';
 import { computeReplayVerdict } from '../matrixFoundation/replayVerdict';
 import {
   CONFORMAL_SPLIT_SEED,

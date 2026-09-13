@@ -73,6 +73,10 @@ const EXPECTED = {
   qe4Tautology: 'EMPIRICAL_TEST',
   qe4Fingerprint: 'a6578ae8',
   qe4Doi: '10.5281/zenodo.2527010',
+  qe4RegimeRounds: 7,
+  qe4RegimeStopReason: 'ROUND_BUDGET_EXHAUSTED',
+  qe4RegimeWinner: 'qe4-regime-logarithmic-k5',
+  qe4RegimeFingerprints: ['e7b90572', '3c3e9083', 'c82210fb', '67711185', 'cc3e4323', 'bb6aec30', '2d470070'],
 };
 
 const checks = [];
@@ -137,6 +141,7 @@ let anchor;
 let keplerAnchor;
 let qe3;
 let qe4;
+let qe4Regime;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -153,6 +158,7 @@ try {
   keplerAnchor = science.reproExternalAnchor(science.KEPLER_MARS_ANCHOR_ID);
   qe3 = science.reproQe3Inquiry();
   qe4 = science.reproQe4BrydgesAnalysis();
+  qe4Regime = science.reproQe4RegimeInquiry();
 } finally {
   rmSync(bundleDir, { recursive: true, force: true });
 }
@@ -199,6 +205,15 @@ record('QE4: P4 integralność (0 punktów poza pasmem ±3σ)', qe4.p4FailingCou
 record('QE4: odcisk wyniku (replay)', qe4.resultFingerprint === EXPECTED.qe4Fingerprint,
   `${qe4.resultFingerprint} (oczekiwane ${EXPECTED.qe4Fingerprint})`);
 record('QE4: tożsamość zbioru', qe4.datasetDoi === EXPECTED.qe4Doi, `DOI ${qe4.datasetDoi} (oczekiwane ${EXPECTED.qe4Doi})`);
+
+record('QE4 regime inquiry (P0-2/P0-3/P0-5): przebieg i stop', qe4Regime.rounds === EXPECTED.qe4RegimeRounds && qe4Regime.stopReason === EXPECTED.qe4RegimeStopReason,
+  `${qe4Regime.rounds} rund, stop=${qe4Regime.stopReason} (oczekiwane ${EXPECTED.qe4RegimeRounds} / ${EXPECTED.qe4RegimeStopReason})`);
+record('QE4 regime inquiry: zwycięska hipoteza (wyliczona z siatki, nie literał)', qe4Regime.winningHypothesisId === EXPECTED.qe4RegimeWinner,
+  `${qe4Regime.winningHypothesisId} (oczekiwane ${EXPECTED.qe4RegimeWinner})`);
+record('QE4 regime inquiry: kotwica anty-HARK nienaruszona w KAŻDEJ rundzie', qe4Regime.antiHarkingIntactEveryRound === true,
+  `antiHarkingIntactEveryRound=${qe4Regime.antiHarkingIntactEveryRound}`);
+record('QE4 regime inquiry: odciski rund (replay)', eq(qe4Regime.roundFingerprints, EXPECTED.qe4RegimeFingerprints),
+  `[${qe4Regime.roundFingerprints.join(', ')}] (oczekiwane [${EXPECTED.qe4RegimeFingerprints.join(', ')}])`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

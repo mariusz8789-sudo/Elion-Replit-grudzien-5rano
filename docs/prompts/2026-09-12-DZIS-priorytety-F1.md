@@ -52,6 +52,15 @@ na realnych danych DEFRA). To już ma pełną specyfikację, nic tu nie zmieniam
    rezydualna wygenerowana), bez wymyślania nowego formatu — reużyj `nextQuestion.ts`'ego
    wzorca zadeklarowanej kaskady, tylko zasilonej stanem, nie stałym switchem.
 
+**STATUS (2026-09-13): P0-2, P0-3, P0-5 GOTOWE.** `DatasetLaboratory` (P0.1),
+od którego formalnie zależały, jeszcze nie istniał (zweryfikowane bezpośrednio
+w kodzie) — zbudowano zamiast tego wąską, jednorazową
+`core/agent/qe4RegimeInquiryLoop.ts` (nie generalizację, nie
+`DatasetLaboratory`), reużywającą istniejące prymitywy bez zmian. Pełny opis,
+dowód i zastrzeżenia: `docs/MASTER_PRIORITY_GENESIS.md`, sekcja „C3: P0-2/
+P0-3/P0-5 — QE4 Regime Inquiry Loop". Punkt 4 (next-question) NIE ruszony —
+zabrakło czasu po głównych trzech, zostaje jako osobne, nazwane zadanie.
+
 ### Qwen — dwa zadania badawcze
 1. **PILNE, odblokuj A1**: brakujący pakiet badawczy GLP-1 (semaglutyd↔liraglutyd) dla
    `docs/prompts/C1-A1-glp1-substitution.md` — to jest bloker, który druga instancja C1

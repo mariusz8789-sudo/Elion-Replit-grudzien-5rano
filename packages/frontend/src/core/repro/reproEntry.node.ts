@@ -16,6 +16,7 @@ import { runExternalAnchor, MOLECULAR_WEIGHT_ANCHOR_ID, KEPLER_MARS_ANCHOR_ID } 
 import { qe3BoundEntanglementInquiry } from '../agent/entanglementInquiry';
 import { inquiryResultFingerprint, runAutonomousInquiry } from '../agent/inquiryLoop';
 import { runQe4BrydgesAnalysis } from '../biotechData/qe4BrydgesAnalysis';
+import { runQe4DisorderRegimeInquiry } from '../agent/qe4RegimeInquiryLoop';
 
 export { MOLECULAR_WEIGHT_ANCHOR_ID, KEPLER_MARS_ANCHOR_ID };
 
@@ -126,5 +127,33 @@ export function reproQe4BrydgesAnalysis(): ReproQe4Report {
     p4FailingCount: result.p4Deltas.filter((d) => !d.withinBand).length,
     datasetDoi: result.provenance.datasetDoi,
     resultFingerprint: result.resultFingerprint,
+  };
+}
+
+export interface ReproQe4RegimeInquiryReport {
+  readonly rounds: number;
+  readonly stopReason: string;
+  readonly winningHypothesisId: string | null;
+  readonly antiHarkingIntactEveryRound: boolean;
+  readonly residualHypothesisId: string | null;
+  readonly roundFingerprints: readonly string[];
+}
+
+/**
+ * QE4 REGIME INQUIRY LOOP (P0-2/P0-3/P0-5) — same facade pattern as the two
+ * reports above: no local computation, just calls `runQe4DisorderRegimeInquiry`
+ * and reports what it returned, so `scripts/repro-demo.mjs` can assert replay
+ * MATCH on `roundFingerprints`/`stopReason`/`winningHypothesisId` exactly like
+ * it already does for `resultFingerprint` above.
+ */
+export function reproQe4RegimeInquiry(): ReproQe4RegimeInquiryReport {
+  const result = runQe4DisorderRegimeInquiry(5);
+  return {
+    rounds: result.rounds.length,
+    stopReason: result.stopReason,
+    winningHypothesisId: result.winningHypothesisId,
+    antiHarkingIntactEveryRound: result.rounds.every((r) => r.antiHarking.intact),
+    residualHypothesisId: result.residual.hypothesis?.id ?? null,
+    roundFingerprints: result.rounds.map((r) => r.runFingerprint),
   };
 }

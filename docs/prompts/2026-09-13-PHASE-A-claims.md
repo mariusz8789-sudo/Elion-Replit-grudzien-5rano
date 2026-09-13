@@ -47,6 +47,38 @@ przechodzą przez ten sam detektor. Wymaga to:
 Nie jest to „dokończenie M3" — to osobna, świadomie odłożona poprawka fundamentu, na którym
 stoi M3, QE4 i Kepler jednocześnie.
 
+### Materiał dowodowy do decyzji A/B/C/D (zmierzone, nie zaimplementowane)
+
+Poniższe liczby są zmierzone read-only (bez zmian w repo) przeciwko realnym, obecnym
+przypadkom — po to, żeby decyzja A/B/C/D nie była zgadywaniem. **Decyzja pozostaje OPEN.**
+Nic z tego nie zostało wdrożone do kodu.
+
+Testowana kandydacka reguła (Opcja A): zamiast stałego `ratio < 0.5`, dopasowanie kwadratowe
+do residuum wygrywa z liniowym tylko gdy `ΔRSS > Δk·ln(n)` — bezpośrednie ponowne użycie
+`modelSelectionScore` (już zweryfikowanego w `modelSpace.ts` do dokładnie tego problemu),
+z `Δk=1` (kwadratowe ma 3 wyrazy, liniowe 2).
+
+| Przypadek | n | ratio (stara reguła) | stara reguła `ratio<0.5` | ΔRSS vs ln(n) | reguła BIC-style |
+|---|---|---|---|---|---|
+| QE4, LOG odebrane, **runda 4** (load-bearing dla M1/§15) | 6 | 0.4721 | **ODPALA** | 2.1136 > ln(6)=1.7918 | **ODPALA** |
+| QE4, LOG odebrane, **runda 5** (load-bearing dla M1/§15) | 7 | 0.4558 | **ODPALA** | 2.2821 > ln(7)=1.9459 | **ODPALA** |
+| M3, kontrola negatywna, czysty szum | 16 | 0.4978 | **ODPALA** (fałszywy alarm) | 1.3886 < ln(16)=2.7726 | **NIE ODPALA** |
+
+**Sprawdzone i odrzucone jako niebezpieczne:** podniesienie `MIN_POINTS_FOR_STRUCTURE` z 5 na
+np. 8 (tania łatka bez zmiany matematyki) **zabiłoby load-bearing przypadek** — ten sam, który
+odpala przy n=6 i n=7 powyżej. To gorsze niż stan obecny, nie lepsze.
+
+**Rekomendacja z tej analizy: Opcja A** (BIC-style, reuse `modelSelectionScore`) — jedyna
+zbadana reguła, która jednocześnie: (a) nie odpala na czystym szumie przy n=16, (b) nie rusza
+znaleziska load-bearing dla `§15`/M1 przy n=6/7, (c) nie wprowadza nowej maszynerii
+statystycznej (Opcja B — test F — wymagałby dystrybuanty rozkładu F, nowego kodu numerycznego),
+(d) nie łamie determinizmu kalibracją symulacyjną (Opcja C).
+
+**Skutek uboczny, niezależnie od wyboru A/B/C/D:** zmiana wspólnego detektora wymaga ponownej
+weryfikacji i re-pin fingerprintów QE4/Kepler oraz potwierdzenia §15/§9.
+
+**C1 nic jeszcze nie implementuje.** Decyzja A/B/C/D zapada najpierw.
+
 ## §7 A1 — dlaczego jest zablokowane, a nie „niezrobione"
 
 W repo **nie ma żadnych danych GLP-1**. Sprawdzone grepem: `semaglutide`, `liraglutide`,

@@ -14,6 +14,17 @@ import {
   type ModelSpaceConstraints,
 } from './modelSpace';
 import { analyzeResidualStructure, proposeModelsFromResiduals, type ResidualFinding } from './residualStructure';
+import {
+  classifyObservationGap,
+  createObservationGapRequest,
+  observationGapLedgerFingerprint,
+  undeclaredFeasibility,
+  TAU_DISCRIMINABILITY,
+  type ObservationGapFeasibility,
+  type ObservationGapRecipient,
+  type ObservationGapRequest,
+  type RequiredObservable,
+} from './observationGap';
 
 /**
  * GENERIC AUTONOMOUS DISCOVERY CAMPAIGN — one loop, many laboratories.
@@ -98,6 +109,17 @@ export interface CampaignLaboratory {
   /** Human-facing names for the axes, used only in rendering. */
   readonly xLabel: string;
   readonly yLabel: string;
+  /**
+   * OPTIONAL, and only ever read when the engine has to raise an
+   * `ObservationGapRequest`. The engine knows WHAT quantity is missing; only
+   * the laboratory knows what instrument would measure it, what that costs and
+   * what rules constrain it. A laboratory that declares nothing gets a request
+   * whose feasibility fields are explicitly unknown — which is the truth, and
+   * more useful than an invented number.
+   */
+  readonly declareObservable?: () => RequiredObservable;
+  readonly declareFeasibility?: (trigger: string) => ObservationGapFeasibility;
+  readonly gapRecipient?: ObservationGapRecipient;
 }
 
 export interface CampaignModelView {
@@ -132,6 +154,13 @@ export interface CampaignRound {
   readonly beliefs: readonly Hypothesis[];
   readonly antiHarking: AntiHarkingCheck;
   readonly roundFingerprint: string;
+  /**
+   * Raised instead of a selection when no attached experiment can separate the
+   * live models. When this is non-null, `selectedNextX` is null BY
+   * CONSTRUCTION: the engine declined to run something worthless rather than
+   * picking the least bad option.
+   */
+  readonly observationGap: ObservationGapRequest | null;
 }
 
 export type CampaignStopReason =
@@ -140,7 +169,9 @@ export type CampaignStopReason =
   | 'EXPERIMENT_SPACE_EXHAUSTED'
   | 'ROUND_BUDGET_EXHAUSTED'
   | 'ANTI_HARKING_VIOLATION'
-  | 'ALL_MODELS_UNFITTABLE';
+  | 'ALL_MODELS_UNFITTABLE'
+  /** Stopped holding an open request for a measurement this laboratory does not offer. Not a failure — a question put to the outside. */
+  | 'OBSERVATION_GAP';
 
 /**
  * §12's contract, kept honest: `proposedProtocol` is null unless the domain
@@ -181,6 +212,14 @@ export interface CampaignResult {
   readonly stopReason: CampaignStopReason;
   readonly discovery: Discovery;
   readonly campaignFingerprint: string;
+  /**
+   * Every gap this campaign raised, in order. Fingerprinted SEPARATELY from
+   * `campaignFingerprint` on purpose: adding the gap ledger left every
+   * pre-existing campaign replay fingerprint byte-identical, which is the
+   * evidence that M1 changed nothing about how non-degenerate campaigns run.
+   */
+  readonly observationGaps: readonly ObservationGapRequest[];
+  readonly gapLedgerFingerprint: string;
 }
 
 export interface CampaignOptions {
@@ -344,6 +383,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
   const candidateSpan = Math.max(...lab.candidateX) - Math.min(...lab.candidateX);
 
   const rounds: CampaignRound[] = [];
+  const observationGaps: ObservationGapRequest[] = [];
   const priorFingerprints: string[] = [...(options.alreadyKnownFingerprints ?? [])];
   let stopReason: CampaignStopReason = 'ROUND_BUDGET_EXHAUSTED';
   let previousWinner: string | null = null;
@@ -419,6 +459,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     let plannerScore: number | null = null;
     let selectionReason = 'No unobserved experiment remains in this laboratory.';
     const unobserved = remaining.filter((x) => !admitted.some((p) => p.x === x));
+    let bestCandidateX: number | null = null;
     if (unobserved.length > 0) {
       const sigmaGuess = admitted.reduce((acc, p) => acc + p.sigma, 0) / admitted.length;
       const admittedX = admitted.map((p) => p.x);
@@ -433,7 +474,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
         const combined = sep * (1 + REFINEMENT_WEIGHT * fals) * (1 - REFINEMENT_WEIGHT * redund);
         if (combined > bestScore) {
           bestScore = combined;
-          selectedNextX = x;
+          bestCandidateX = x;
           bestSep = sep;
           bestFals = fals;
           bestRedund = redund;
@@ -443,9 +484,51 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       falsificationScore = Number.isFinite(bestFals) ? bestFals : null;
       redundancyScore = Number.isFinite(bestRedund) ? bestRedund : null;
       plannerScore = Number.isFinite(bestScore) ? bestScore : null;
-      selectionReason = selectedNextX === null
-        ? 'No candidate experiment produced a finite planner score.'
-        : `Chose ${lab.xLabel}=${selectedNextX}: live models' predictions disagree there by ${discriminationScore?.toFixed(3)}× the typical observation sigma (Sep), ${((falsificationScore ?? 0) * 100).toFixed(0)}% of live-model pairs would be separated at ${FALSIFICATION_SIGMA_THRESHOLD}σ if observed here (Fals), and it sits ${((redundancyScore ?? 0) * 100).toFixed(0)}% of the candidate span's worth of redundancy from the nearest admitted point (Redund) — combined planner score ${plannerScore?.toFixed(3)} was the highest among ${unobserved.length} unobserved candidate(s).`;
+    }
+
+    /*
+     * M1 — the level-3 boundary. Before accepting the best remaining
+     * experiment, ask whether it is worth running at all. If the widest
+     * disagreement among live models there is under one observation's own
+     * sigma — or if the models agree exactly, or nothing is left — then
+     * selecting it would spend an experiment that cannot discriminate.
+     * The engine raises a request for the measurement it does not have
+     * instead, and does NOT choose. It never obtains that measurement itself.
+     * Gated on Sep (`discriminationScore`) alone, not the C3-1 planner score:
+     * whether an experiment can discriminate AT ALL is a property of raw
+     * measurement uncertainty, not of how novel or falsifying it also is.
+     */
+    const gapTrigger = classifyObservationGap({ unobservedCount: unobserved.length, bestDiscriminability: discriminationScore });
+    let observationGap: ObservationGapRequest | null = null;
+    if (gapTrigger !== null) {
+      // Converged questions need no further measurement: the models already separated.
+      const alreadySettled = decisive && best.model.fingerprint === previousWinner && beliefs.get(best.model.fingerprint)!.confidence >= CONVERGENCE_CONFIDENCE;
+      if (!alreadySettled) {
+        observationGap = createObservationGapRequest({
+          campaignId: lab.labId,
+          round,
+          liveHypothesisIds: fitted.map((f) => f.model.fingerprint),
+          unobservedCount: unobserved.length,
+          bestDiscriminability: discriminationScore,
+          trigger: gapTrigger,
+          requiredObservable: lab.declareObservable?.() ?? {
+            quantity: lab.yLabel,
+            unit: 'UNDECLARED',
+            instrumentClass: 'UNDECLARED',
+          },
+          feasibility: lab.declareFeasibility?.(gapTrigger)
+            ?? undeclaredFeasibility(`Laboratory "${lab.labId}" declares no instrument feasibility, so cost, lead time and availability are unknown rather than estimated.`),
+          requestedFrom: lab.gapRecipient ?? 'HUMAN',
+        });
+        selectionReason = observationGap.rationale;
+      }
+    }
+
+    if (observationGap === null && bestCandidateX !== null) {
+      selectedNextX = bestCandidateX;
+      selectionReason = `Chose ${lab.xLabel}=${selectedNextX}: live models' predictions disagree there by ${discriminationScore?.toFixed(3)}× the typical observation sigma (Sep, above the ${TAU_DISCRIMINABILITY}σ floor below which an experiment cannot discriminate), ${((falsificationScore ?? 0) * 100).toFixed(0)}% of live-model pairs would be separated at ${FALSIFICATION_SIGMA_THRESHOLD}σ if observed here (Fals), and it sits ${((redundancyScore ?? 0) * 100).toFixed(0)}% of the candidate span's worth of redundancy from the nearest admitted point (Redund) — combined planner score ${plannerScore?.toFixed(3)} was the highest among ${unobserved.length} unobserved candidate(s).`;
+    } else if (observationGap === null && unobserved.length > 0) {
+      selectionReason = 'No candidate experiment produced a finite planner score.';
     }
 
     const roundFingerprint = fnv1a(canonicalJson({
@@ -475,8 +558,10 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       beliefs: [...beliefs.values()],
       antiHarking,
       roundFingerprint,
+      observationGap,
     });
     priorFingerprints.push(roundFingerprint);
+    if (observationGap !== null) observationGaps.push(observationGap);
 
     if (!antiHarking.intact) { stopReason = 'ANTI_HARKING_VIOLATION'; break; }
 
@@ -488,6 +573,14 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       stopReason = 'NO_INFORMATION_GAIN';
       break;
     }
+    /*
+     * A gap raised over a NON-EMPTY remaining space is the new stop: there are
+     * experiments left, and the engine is declining all of them because none
+     * discriminates. Exhaustion keeps its own long-standing reason — "nothing
+     * left to run" and "what is left is worthless" are different facts and are
+     * reported as different facts.
+     */
+    if (observationGap !== null && unobserved.length > 0) { stopReason = 'OBSERVATION_GAP'; break; }
     if (selectedNextX === null) { stopReason = 'EXPERIMENT_SPACE_EXHAUSTED'; break; }
 
     const observed = lab.observe(selectedNextX);
@@ -549,7 +642,18 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       'Each basis term is linear in its coefficient; nonlinear shape parameters were enumerated, not optimised.',
     ],
     residualFindings: lastResidualFindings,
-    nextExperiment: finalRound?.selectedNextX === null || finalRound === null ? null : `${lab.xLabel} = ${finalRound.selectedNextX} (${finalRound.selectionReason})`,
+    /*
+     * When the campaign ended holding an open gap, the honest answer to "what
+     * next?" is the MISSING MEASUREMENT, not null and not an experiment from a
+     * list that cannot settle anything.
+     */
+    nextExperiment: finalRound === null
+      ? null
+      : finalRound.observationGap !== null
+        ? `REQUESTED OBSERVATION (not available in this laboratory): ${finalRound.observationGap.requiredObservable.quantity} [${finalRound.observationGap.requiredObservable.unit}] via ${finalRound.observationGap.requiredObservable.instrumentClass} — ${finalRound.observationGap.rationale}`
+        : finalRound.selectedNextX === null
+          ? null
+          : `${lab.xLabel} = ${finalRound.selectedNextX} (${finalRound.selectionReason})`,
     practicalCandidate,
     decisionBasis: finalRound === null
       ? 'No round completed.'
@@ -564,5 +668,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     stopReason,
     discovery,
     campaignFingerprint: fnv1a(canonicalJson({ labId: lab.labId, rounds: rounds.map((r) => r.roundFingerprint), stopReason, winner })),
+    observationGaps,
+    gapLedgerFingerprint: observationGapLedgerFingerprint(observationGaps),
   };
 }

@@ -1,0 +1,15 @@
+{
+  "fixtureId": "fixture_injected_counterevidence",
+  "purpose": "ADVERSARIAL SELF-FALSIFICATION (FLIP) sub-case. Counterevidence is injected against whichever candidate the run would otherwise lead with, to prove the system attacks its own conclusion and REVISES it rather than defending it. The injected record is clearly labelled SYNTHETIC and is never mixed into the real evidence set of the main run.",
+  "syntheticNotRealEvidence": true,
+  "appliesTo": "TOP_RANKED_NON_VETOED_CANDIDATE",
+  "injectedCounterevidence": {
+    "attack": "SAFETY",
+    "claim": "A larger post-marketing cohort reports a serious-adverse-event rate above the semaglutide reference arm, with the 95% CI excluding 1.",
+    "riskRatio": 2.4,
+    "riskRatioCi95": { "low": 1.35, "high": 4.27 },
+    "unresolved": true,
+    "evidenceRef": "SYNTHETIC:fixture_injected_counterevidence",
+    "expectedEffect": "The run must not keep this candidate as WINNER. Outcome must revise to NO_WINNER or CONFLICTING_EVIDENCE or NO_SAFE_WINNER."
+  }
+}

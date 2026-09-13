@@ -1,0 +1,55 @@
+{
+  "fixtureId": "fixture_presupplied_candidates",
+  "purpose": "NEGATIVE CONTROL ONLY for T1. This is A2 pinned candidate list (the 12 molecules that had real posted-result trials). If the generated set equals this set, generation did not happen and T1 FAILS.",
+  "neverUsedAsInput": true,
+  "candidates": [
+    {
+      "moleculeChemblId": "CHEMBL414357",
+      "prefName": "EXENATIDE"
+    },
+    {
+      "moleculeChemblId": "CHEMBL5314341",
+      "prefName": "GLUCAGON"
+    },
+    {
+      "moleculeChemblId": "CHEMBL1240772",
+      "prefName": "GLP-1"
+    },
+    {
+      "moleculeChemblId": "CHEMBL2381848",
+      "prefName": "PF-06291874"
+    },
+    {
+      "moleculeChemblId": "CHEMBL4084119",
+      "prefName": "LIRAGLUTIDE"
+    },
+    {
+      "moleculeChemblId": "CHEMBL4518483",
+      "prefName": "DANUGLIPRON"
+    },
+    {
+      "moleculeChemblId": "CHEMBL4446782",
+      "prefName": "ORFORGLIPRON"
+    },
+    {
+      "moleculeChemblId": "CHEMBL567",
+      "prefName": "PERPHENAZINE"
+    },
+    {
+      "moleculeChemblId": "CHEMBL4297630",
+      "prefName": "COTADUTIDE"
+    },
+    {
+      "moleculeChemblId": "CHEMBL4297839",
+      "prefName": "TIRZEPATIDE"
+    },
+    {
+      "moleculeChemblId": "CHEMBL1933349",
+      "prefName": "MK-0893"
+    },
+    {
+      "moleculeChemblId": "CHEMBL3707351",
+      "prefName": "ADOMEGLIVANT"
+    }
+  ]
+}

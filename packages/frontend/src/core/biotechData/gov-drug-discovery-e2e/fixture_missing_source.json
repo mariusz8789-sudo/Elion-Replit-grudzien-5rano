@@ -1,0 +1,24 @@
+{
+  "fixtureId": "fixture_missing_source",
+  "purpose": "NO_ACCESS_DECLARED sub-case. Names sources this scenario genuinely requires to answer the government question fully but which are NOT reachable or integrated in this run. The output must DECLARE each as NO_ACCESS_DECLARED and must not fill the gap from the model's own prior.",
+  "requiredButUnavailableSources": [
+    {
+      "sourceId": "national-procurement-pricing",
+      "whatItWouldAnswer": "Per-unit acquisition cost and national procurement volume for each surviving candidate.",
+      "whyUnavailable": "No public, per-candidate, machine-readable national procurement or ex-factory pricing source was integrated in this session.",
+      "governmentDimensionsBlocked": ["cost", "availability", "scalability", "supplySecurity", "manufacturingFeasibility"]
+    },
+    {
+      "sourceId": "post-marketing-pharmacovigilance",
+      "whatItWouldAnswer": "Long-term and rare adverse-event signal beyond the randomized trial window.",
+      "whyUnavailable": "No pharmacovigilance database (e.g. a public spontaneous-report system) was integrated in this session.",
+      "governmentDimensionsBlocked": ["longTermSafety"]
+    },
+    {
+      "sourceId": "regulatory-label-status",
+      "whatItWouldAnswer": "Current regulatory approval status and indication wording per jurisdiction.",
+      "whyUnavailable": "No FDA/EMA label source was integrated in this session; ChEMBL max_phase is used as a development-stage proxy and is labelled as such.",
+      "governmentDimensionsBlocked": ["regulatoryStatus"]
+    }
+  ]
+}

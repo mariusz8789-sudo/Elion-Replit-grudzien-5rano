@@ -30,7 +30,8 @@
     "csrn:test": "npm run test --workspace=packages/csrn",
     "csrn:demo": "npm run demo --workspace=packages/csrn",
     "csrn:demo:federation": "npm run demo:federation --workspace=packages/csrn",
-    "m3:demo": "node scripts/m3-demonstrator.mjs"
+    "m3:demo": "node scripts/m3-demonstrator.mjs",
+    "a1:demo": "node scripts/a1-glp1-demonstrator.mjs"
   },
   "keywords": [
     "genesis-os",

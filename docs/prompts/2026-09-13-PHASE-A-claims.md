@@ -21,10 +21,10 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | **M3 strukturalne odkrycie — demonstrator end-to-end** | **ZROBIONE** | C1 (`826916d`) | `node scripts/m3-demonstrator.mjs` → **18/18**; `repro-demo` **60/60**; frontend **5495 passed**; backend **396/396**; tsc/eslint/build czysto. Nie ruszać ponownie tego kodu — patrz otwarty punkt niżej. |
 | Planner Redund + Fals | **ZROBIONE**, skanonikalizowane | dwie sesje → D-027 | `Sep × (1+w·Fals) × (1−w·Redund)` |
 | §6 Government / Sovereign plane | **W TOKU** | sesja `eaa9ab8` | `core/agent/sovereignTruthAnswer.ts` |
-| **§5 Discovery Graph + memory transfer** | **BIORĘ TERAZ** | **C1, ta sesja** | *(w trakcie)* |
-| **§9 Frontier acceptance E2E** | **BIORĘ TERAZ** | **C1, ta sesja** | *(w trakcie)* |
-| §8 PracticalCandidate safety gate | WOLNE | — | reużyć `core/governance/` (jest gotowe), nie pisać drugiego |
-| §7 A1 GLP-1 | **ZABLOKOWANE DANYMI** | — | patrz niżej |
+| **§5 Discovery Graph + memory transfer** | **ZROBIONE** | C1, ta sesja | `core/agent/discoveryGraph.ts` |
+| **§9 Frontier acceptance E2E** | **ZROBIONE** | C1, ta sesja | `docs/PHASE_A_C1_REPORT_2026-09-13.md` |
+| §8 PracticalCandidate safety gate | **ZROBIONE** | C1, wcześniej ta sesja | `core/agent/practicalCandidateGate.ts` — reużyty (nie napisano drugiego) przez A1, patrz niżej |
+| **§7 A1 GLP-1** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realne dane, realny werdykt, bramka bezpieczeństwa |
 | **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **ZROBIONE (Opcja A)** | C1 | patrz niżej |
 
 ## Detektor residuum: znaleziona, niezałatana wada specyficzności
@@ -101,21 +101,43 @@ Pełna bramka po zmianie: `repro-demo` 69/69, `m3-demonstrator.mjs` 18/18, front
 5543 passed/1 skip (jeden niezwiązany flaky timeout w `nextActionSelectors.test.ts` —
 15/15 w izolacji), backend 396/396, tsc/eslint/build czysto.
 
-## §7 A1 — dlaczego jest zablokowane, a nie „niezrobione"
+## §7 A1 — ZROBIONE: realne dane, realny werdykt, bramka bezpieczeństwa
 
-W repo **nie ma żadnych danych GLP-1**. Sprawdzone grepem: `semaglutide`, `liraglutide`,
-`GLP-1` — zero trafień w `.ts`, `.json`, `.csv`. Przypięte payloady ChEMBL dotyczą
-adenozyny i teofiliny, nie GLP-1R.
+Preregestracja przypięta PRZED pobraniem danych (`a1Glp1Preregistration.ts`, odcisk
+`5882c619`, commit `e63fb89`). Realne dane pobrane i zweryfikowane bajt-po-bajcie z CI
+(commit `6f73afe`, patrz D-028): target GLP-1R `CHEMBL1784`, 3 związki rozwiązane NA ŻYWO
+(nie zaszyte), aktywności ChEMBL (semaglutyd 21, liraglutyd 29, metformina 0 — oczekiwany
+wynik kontroli negatywnej), 4 badania ClinicalTrials.gov z pełnymi polami wyniku HbA1c.
 
-Egress do ChEMBL i ClinicalTrials.gov jest z sandboxa zablokowany — ustalony wzorzec repo
-to pobranie na runnerze GitHub Actions i przypięcie pliku z sha256 (tak powstały QE4,
-Kepler, PubChem, DEFRA). **Dopóki ten fetch nie wyląduje, każdy „wynik A1" byłby zmyślony.**
+**Potok**: `core/biotechData/a1Glp1Analysis.ts` — analiza kandydatów (mediana potencji
+ChEMBL + delta HbA1c z realnych badań) → deterministyczny werdykt §8 (reguła
+egzystencjalna, dosłowna z preregestracji) → rewizja przekonań i ranking (reużyte
+`experimentFabric/beliefRevision.ts`, bez drugiej implementacji) → bramka bezpieczeństwa
+§8/§14 (reużyty `core/agent/practicalCandidateGate.ts`, bez drugiej bramki) → zapis do
+Science Memory (`saveA1Glp1AnalysisToMemory`, reużyty `saveExperiment`).
 
-Kolejność dla tego, kto weźmie A1:
-1. skrypt `scripts/fetch-a1-glp1-fixture.mjs` + workflow CI (wzorzec: `fetch-b1-defra-aurn-fixture.mjs`),
-2. przypięcie payloadu z sha256 i licencją,
-3. **dopiero potem** kampania — jako trzeci adapter `CampaignLaboratory`, pierwsza domena INTERWENCYJNA,
-4. wynik wyłącznie w warstwie Government/Sovereign Research, nigdy w warstwie obywatelskiej.
+**Realny wynik, niewymyślony:** stosunek potencji GLP-1R liraglutyd/semaglutyd = **1.599**
+(w oknie preregestrowanym [0.1, 10]). Ale realne badanie head-to-head SUSTAIN 7
+(`NCT03191396`, sema 1.0mg vs lira 1.2mg) daje deltę HbA1c **-0.60pp**, 95% CI
+**[-0.76, -0.44]** — CAŁKOWICIE poza preregestrowanym marginesem ±0.4pp. Werdykt §8:
+**H2_NOT_SUPPORTED** (nie rozcieńczony przez dwa mniejsze badania, które same w sobie
+mieszczą się w marginesie). Ranking rewizji przekonań (sekwencyjny log-odds nad tymi
+samymi dowodami) stawia H1 najwyżej — **realna, ujawniona niezgodność** między regułą
+egzystencjalną a heurystyką uśredniającą (`verdictDisagreesWithRanking: true`), nie
+cicho rozstrzygnięta. Bramka bezpieczeństwa odmawia (`REFUSE`) dopóki ta niezgodność
+stoi — kandydat NIE opuszcza warstwy badawczej, powierzchnia `NONE`. Ustalenie negatywne
+NIE zostało ukryte: pełny werdykt, wszystkie 3 delty i stosunek potencji pozostają w
+pełni widoczne w raporcie niezależnie od wyniku bramki (POLICY MAY LIMIT ACTION. POLICY
+MUST NOT ALTER TRUTH). Obie kontrole negatywne §13 przeszły: metformina — zero sygnału
+wiązania GLP-1R; semaglutyd vs insulina glargine (SUSTAIN 4) — realna duża różnica
+(-0.81pp), margines nie jest pusty.
 
-Granica medyczna z `docs/A1_GLP1_EXECUTION_HANDOFF.md` §14 obowiązuje w warstwie **wyniku**,
-nie w promptcie: nigdy recepta, nigdy dawka dla osoby, nigdy „zatwierdzony zamiennik".
+Granica medyczna §14 wymuszona na warstwie WYNIKU (nie promptu): `proposedProtocol: null`
+zawsze, skan `CLINICAL_DIRECTIVE_PATTERNS` na treści kandydata (reużyty, nie
+zduplikowany), `candidateClass: 'intervention'` (zawsze wymaga zatwierdzenia człowieka,
+nigdy auto-aktywacji).
+
+Dowód uruchamialny: `npm run a1:demo` → **14/14**. Testy: `a1Glp1Analysis.test.ts` →
+**19/19** (potencja, ekstrakcja badań, werdykt, rewizja przekonań, Science Memory,
+granica bezpieczeństwa, jednostkowe na syntetycznych danych). tsc/eslint czysto.
+Commit`y: `7c16dfd`/`5a5ae4b`/`6f73afe` (fetch+pin), reszta w tej samej sesji.

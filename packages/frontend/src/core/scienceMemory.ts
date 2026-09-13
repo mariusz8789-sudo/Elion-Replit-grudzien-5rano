@@ -7,6 +7,7 @@ import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
 import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
 import { canonicalJson, fnv1a } from './events/hash';
+import type { A1AnalysisReport } from './biotechData/a1Glp1Analysis';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
@@ -3328,5 +3329,78 @@ export function saveDiscoveryCampaignToMemory(saved: SavedDiscoveryCampaign): Sa
       'Prawdziwa zaleznosc lezy w zadeklarowanej gramatyce modeli.',
     ],
     epistemicStatus: 'PREDICTION',
+  });
+}
+
+/**
+ * Writes a finished A1 GLP-1 substitution analysis (`biotechData/a1Glp1Analysis.ts`)
+ * to Science Memory through the SAME `saveExperiment` path every other record
+ * uses — no second store. `epistemicStatus` reuses `HypothesisAssessment`
+ * verbatim (already a member of `SavedExperimentEpistemicStatus`): the
+ * deterministic §8 verdict IS a falsification verdict on H1 (substitution
+ * supported), so it is stored in that real, existing vocabulary rather than
+ * inventing a parallel one. `honesty: 'exact'` because every number here
+ * traces to a real, pinned ChEMBL/ClinicalTrials.gov fixture and a
+ * preregistered, disclosed decision rule — nothing simplified for display.
+ */
+export function saveA1Glp1AnalysisToMemory(report: A1AnalysisReport): SavedExperiment {
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    report.verdict.hypothesisId === 'H1_SUBSTITUTION_SUPPORTED' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : report.verdict.hypothesisId === 'H2_NOT_SUPPORTED' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : report.verdict.hypothesisId === 'H0_NULL' ? 'INCONCLUSIVE'
+    : 'CANDIDATE';
+  return saveExperiment({
+    labId: 'government-research-a1-glp1',
+    experimentId: `a1-glp1-substitution:${report.analysisFingerprint}`,
+    experimentName: 'A1 — semaglutyd/liraglutyd, substytucja GLP-1R w niedoborze',
+    params: {
+      potencyRatioLiraOverSema: report.potency.ratioLiraOverSema ?? Number.NaN,
+      qualifyingTrials: report.trials.length,
+      qualifyingAssaysSemaglutide: report.potency.semaglutide.qualifyingCount,
+      qualifyingAssaysLiraglutide: report.potency.liraglutide.qualifyingCount,
+    },
+    stats: {
+      potencyRatioLiraOverSema: report.potency.ratioLiraOverSema ?? Number.NaN,
+      trialsWithinMargin: report.trials.filter((t) => t.withinMargin).length,
+      trialsWithCiOutsideMargin: report.trials.filter((t) => t.diffCiEntirelyOutsideMargin).length,
+      negativeControlsPassed: report.negativeControls.filter((c) => c.passed).length,
+    },
+    analysis: [
+      {
+        title: 'Werdykt (regula preregestracyjna §8, dosłowna)',
+        body: `${report.verdict.hypothesisId}: ${report.verdict.reason}`,
+        kind: 'a1-glp1-verdict',
+      },
+      {
+        title: 'Rewizja przekonan i ranking — NIE zawsze zgodne z werdyktem',
+        body: report.verdictDisagreesWithRanking
+          ? `Werdykt (${report.verdict.hypothesisId}) NIE zgadza sie z rankingiem sekwencyjnej rewizji przekonan (najwyzej: ${report.beliefRevision.ranked[0].id}). Ta niezgodnosc jest realna i celowo nie jest cicho rozstrzygana — patrz gatedCandidate.evidence.unresolvedContradictions.`
+          : `Werdykt i ranking rewizji przekonan sa zgodne: oba wskazuja ${report.verdict.hypothesisId}.`,
+        kind: 'a1-glp1-belief-revision',
+      },
+      {
+        title: 'Bramka bezpieczenstwa §8/§14 (Government Research/Action)',
+        body: `Wynik bramki: ${report.gateDecision.outcome} (${report.gateDecision.reason}). Powierzchnia: ${report.surface}. Ustalenie negatywne/kontrowersyjne NIE zostalo ukryte — pelny werdykt i dowody pozostaja widoczne w tym rekordzie niezaleznie od wyniku bramki.`,
+        kind: 'a1-glp1-safety-gate',
+      },
+      {
+        title: 'Kontrole negatywne (§13)',
+        body: report.negativeControls.map((c) => `${c.name}: ${c.passed ? 'PASSED' : 'FAILED'} — ${c.detail}`).join(' | '),
+        kind: 'a1-glp1-negative-controls',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${report.preregistrationFingerprint} (przypieta PRZED pobraniem danych), odcisk analizy ${report.analysisFingerprint}. Realne dane: ChEMBL target ${report.target.targetChemblId}, ${report.trials.length} badan ClinicalTrials.gov — pelna proweniencja w a1-glp1/meta.json.`,
+        kind: 'a1-glp1-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Populacyjne porownanie farmakologiczne na realnych, przypietych danych ChEMBL i ClinicalTrials.gov wedlug regul preregestrowanych przed pobraniem danych. To NIE jest dyrektywa kliniczna dla zadnego pacjenta.',
+    assumptions: [
+      'Mediana potencji z kwalifikujacych sie testow ChEMBL reprezentuje wiazanie z GLP-1R.',
+      'Pierwszorzedowy wynik HbA1c przy najwyzszej testowanej/zarejestrowanej dawce reprezentuje skutecznosc kliniczna.',
+      'Progi decyzyjne (okno potencji, margines skutecznosci, minimalna liczba dowodow) zostaly ustalone PRZED pobraniem jakichkolwiek danych.',
+    ],
+    epistemicStatus,
   });
 }

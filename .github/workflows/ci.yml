@@ -360,6 +360,33 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
+  a3-trial-conditions-pin:
+    name: "A3 (temporary): fetch+pin real per-trial conditions for the exact 31 A2 NCT ids"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Government Research (A3) needs REAL per-trial population tags
+    # (ClinicalTrials.gov's own structured conditionsModule.conditions
+    # field) to match a requested population without guessing from
+    # briefTitle text. A2's pin (D-029) never retained this field. This
+    # job re-fetches ONLY it, for the exact 31 NCT ids A2 already
+    # analyzed (no new trial search, no new candidate). See
+    # docs/DECISIONS.md D-031 and
+    # a3GovernmentPreregistration.ts A3_TRIAL_CONDITIONS_SOURCE (sealed
+    # before this job's output is read). Remove once downloaded and
+    # committed under
+    # packages/frontend/src/core/biotechData/a3-government/.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + pin real per-trial conditions
+        env:
+          GENESIS_A3_FIXTURE_DIR: artifacts/a3-government
+        run: node scripts/fetch-a3-trial-conditions.mjs
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

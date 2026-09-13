@@ -1495,3 +1495,78 @@ produkcyjnym UI. Kanoniczne klucze/tłumaczenia nie zostały rozszerzone na
 istniejące etykiety A1-A3/E2E-01. Tłumaczenia arabskie są profesjonalnym
 MSA napisanym przez C1, jawnie oznaczone `UNVERIFIED` — nie mają
 potwierdzenia native speakera.
+
+## D-034 (2026-09-13, PHASE F Kroki 1-3) — Genuine Discovery Layer:
+kontrakty, bateria anty-oszukańcza, silnik replikacji
+
+Drugi mandat po Phase E, dostarczony jako gotowy pakiet projektowy
+(design/research, zero kodu) przez inną sesję/model ("Qwen"), z jawnym
+statusem "NOT IMPLEMENTED" i naczelnym invariantem: **Genesis musi
+preferować NO_DISCOVERY nad fałszywe odkrycie; miarą sukcesu jest
+poprawność klasyfikacji, NIGDY liczba odkryć.**
+
+**Audyt Kroku 0 znalazł realną rozbieżność**: pakiet odwoływał się do
+checkpointu `dd59aef` (Krok 6 Phase E), a repo było już o jeden krok dalej
+(`0948e34`, Krok 7 gotowy) — zgłoszone użytkownikowi, nie zamiecione.
+**Drugie, poważniejsze znalezisko**: bezpośredni test sieci pokazał, że
+`api.openalex.org`, `api.crossref.org`, a nawet `www.ebi.ac.uk` (ChEMBL) i
+`clinicaltrials.gov` — które wcześniej w tej samej sesji działały przez
+osobny CI job (A1-A3) — są **zablokowane** w tym interaktywnym środowisku
+(polityka sieci przepuszcza tylko npm/pypi/crates/Anthropic). To uderzało
+w sedno warstwy L5 (żywe wyszukiwanie literatury) i w propozycję "świeżego
+snapshotu Exoplanet Archive" dla E2E-01. Zamiast cicho budować coś, co
+zawsze zwróci `NO_ACCESS`, zapytano użytkownika wprost — wybrał: buduj
+wszystko poza L5, L5 dostaje realny adapter, ale w tym środowisku uczciwie
+zwraca `NO_ACCESS`; E2E-01 użyje już przypiętych danych (QE4/Kepler)
+zamiast świeżego zewnętrznego snapshotu.
+
+**Krok 1 — kontrakty** (`core/agent/discoveryContracts.ts`, NOWY):
+`DiscoveryStatus` — nadzbiór `noveltyGate.ts::ResultLabel`
+(REPRODUCTION/UNKNOWN/NO_ACCESS mapują się wprost) plus KNOWN_RESULT/
+EXTENSION/NOVEL_HYPOTHESIS/DISCOVERY_CANDIDATE/CONFLICTING_EVIDENCE/
+FAILED_DISCOVERY, których E2 nie miało. Brak w repo generycznego
+`EvidenceRef` potwierdzony rekonesansem — pierwszy taki typ. Rozróżnienie
+REPRODUCTION vs KNOWN_RESULT: dopasowanie do zadeklarowanej kotwicy
+publicznej (L4 — jak Kepler w TE5) = REPRODUCTION znanego publicznie
+prawa; dopasowanie tylko do pamięci wewnętrznej/prerejestracji (L1/L2) =
+węższe roszczenie KNOWN_RESULT. `classifyDiscoveryStatus` +
+`assertValidDiscoveryStatus` — druga asercja rzucająca, dokładnie ten sam
+podział derive/assert co `noveltyGate.ts`.
+
+**Krok 2 — bateria AC1-AC13** (`discoveryContracts.test.ts`, TDD PRZED
+resztą silnika, zgodnie z jawnym wymogiem kolejności): AC1 (Kepler-style →
+REPRODUCTION), AC2/AC3 (dopasowanie do pamięci/prerejestracji →
+KNOWN_RESULT, nigdy DISCOVERY), AC4 (niezweryfikowalne → UNKNOWN), AC5
+(identyczny dataset replikacji → odrzucone), AC8/AC9 (sonda
+self-falsyfikacji FAIL → pułap DISCOVERY_CANDIDATE), AC10 (brak L5 →
+`assertNoveltyEvidenceHonest` odrzuca NO_KNOWN_PRIOR_FOUND), AC11 (brak
+dostępu → NO_ACCESS), AC12 (konflikt → CONFLICTING_EVIDENCE), AC13
+(replikacja FAILED → FAILED_DISCOVERY). **19/19 przeszło.** AC6/AC7
+świadomie odłożone do Kroku 3 (potrzebują realnej maszynerii datasetów) —
+nie pominięte po cichu, udokumentowane wprost w pliku testowym.
+
+**Krok 3 — silnik replikacji** (`core/agent/discoveryReplicationEngine.ts`,
+NOWY, reużywa `modelSpace.ts::fitModelSpec` bez zmian — brak drugiego
+silnika dopasowania): `freezeBeforeReplication` PRZED odczytem danych
+replikacyjnych; **AC5 i AC6 wymuszone mechanicznie, nie tylko
+udokumentowane** — identyczny fingerprint datasetu ORAZ częściowe
+nakładanie się punktów (nawet przy różnych `datasetId`) są odrzucane;
+**AC7 wymuszone przez `assertFreezePrecedesDataset`** — hipoteza
+"zamrożona" o czasie równym lub późniejszym niż pobranie danych
+replikacyjnych = odrzucona jako ukryty HARK. Dwa realne, deterministyczne
+ataki adwersarialne (bez `Math.random` — powtarzalne w replay):
+label-shuffle (refit na przetasowanych y — prawdziwy efekt się zapada) i
+half-split (refit na połowie punktów — prawdziwy efekt zachowuje znak).
+Dowiedzione na syntetycznych, ale realnie dopasowywanych danych: czysta
+replikacja realnego nachylenia → REPLICATED, oba ataki WITHSTOOD; czysty
+szum jako "replikacja" → FAILED przez niezgodność efektu. **12/12
+przeszło.**
+
+Pełna bramka: frontend **5763/5764** (1 skipped), backend **396/396**,
+tsc/eslint czyste, build OK, `repro-demo` **69/69** — zero regresji.
+
+**Co pozostaje nieukończone (Kroki 4-10, uczciwie)**: warstwa L5/L6
+(wyszukiwanie literatury), bateria self-falsyfikacji (13 sond — kontrakt
+gotowy w Kroku 1, silnik jeszcze nie), OpenEndedDirectionFinder/
+NovelHypothesisGenerator, strategie odkrywania A-G, ślad w state machine
+kampanii, benchmark L0-L5, i sam GENUINE-AUTONOMOUS-DISCOVERY-E2E-01.

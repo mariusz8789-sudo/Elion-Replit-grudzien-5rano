@@ -1,277 +1,325 @@
-import { canonicalJson, fnv1a } from '../events/hash';
+import { fnv1a, canonicalJson } from '../events/hash';
+import type { Hypothesis } from '../experimentFabric/beliefRevision';
+import { modelSpecFingerprint, normalizeModelSpec, renderModelSpec, type ModelSpec } from './modelSpace';
 
 /**
- * M2 — THE GLOBAL FALSIFIED-MODEL REGISTRY.
+ * M2 — GLOBAL FALSIFIED-MODEL REGISTRY.
  *
- * A model killed by real observations in campaign A should not be quietly
- * re-proposed in campaign B as though nothing had happened. Until now nothing
- * remembered across campaigns: each run enumerated its grammar from scratch,
- * so the same dead model could be reborn indefinitely, and the work that
- * killed it was spent again every time.
+ * Genesis must remember which models were REALLY falsified, and refuse to
+ * re-propose them in a later, unrelated campaign without an explicit
+ * justification and new evidence. This module is that memory: a durable,
+ * cross-campaign, append-only record of falsified model FINGERPRINTS
+ * (`modelSpace.ts::modelSpecFingerprint`, reused verbatim — no second
+ * fingerprint scheme), consulted before a candidate model is admitted into a
+ * live campaign.
  *
- * WHAT THIS IS: an append-only INDEX over verdicts other modules already
- * reached. It is emphatically NOT a second source of truth about what is true.
- * It stores no confidence, recomputes no fit, and overrides no belief — every
- * record points back at the campaign, round and observations that produced the
- * FALSIFIED verdict, and a reader who distrusts the index can go check them.
- * The registry's only authority is over MODEL EMISSION: it answers "has this
- * exact model already been killed, and under what assumptions?".
+ * NO SECOND TRUTH SYSTEM. Audited before writing a line of this file:
+ * `scienceMemory.ts` is per-BROWSER-user `localStorage`, capped at the 100
+ * most recent UI-history records, with no cross-campaign consultation
+ * semantics — the wrong shape entirely. `packages/backend/src/campaign/
+ * persistence.mjs` is cross-campaign dedup too, but for a DIFFERENT engine
+ * (drug-candidate SMILES across chemistry campaigns, keyed by canonical
+ * SMILES) — a real prior-art pattern for "don't re-explore what a sibling
+ * campaign already exhausted", confirming the shape of this problem, but not
+ * a store this module can reuse (different identity key, different domain).
+ * This module is the one and only falsified-MODEL-fingerprint store; nothing
+ * else in the repo tracks this.
  *
- * WHY SCOPE MATTERS MORE THAN THE VERDICT. A model is never falsified in the
- * abstract — it is falsified against a domain, under assumptions, within a
- * boundary. `y = c·log x` failing on trapped-ion entanglement says nothing
- * about `y = c·log x` in planetary dynamics. So a record carries its scope, and
- * a lookup that does not match the scope does not block. Blocking across
- * unrelated science would be the most damaging thing this module could do:
- * it would silently shrink the hypothesis space using evidence that does not
- * apply. That is what T5 (no false-positive blocking) exists to prevent.
+ * "FALSIFIED tylko z rzeczywistej ścieżki epistemicznej": `recordFalsification`
+ * REQUIRES the caller's actual `Hypothesis` (from `beliefRevision.ts`,
+ * unmodified) and refuses unless its `status` is literally
+ * `'FALSIFIED_WITHIN_PROTOCOL'` — the same verdict
+ * `discoveryCampaign.ts::runDiscoveryCampaign` already computes from a real
+ * weighted-RSS comparison. No code path records a falsification from an
+ * asserted string.
  *
- * THE THREE REUSE CLASSES are a judgement about WHAT WAS KILLED, made when the
- * record is written:
- *  - NEVER          the functional form itself failed → BLOCK.
- *  - VARIANT_ONLY   this parameterisation failed, the family might not
- *                   → REQUIRE_OVERRIDE: a human may proceed, but must say why
- *                     and must attach the new evidence that justifies it.
- *  - COMPONENT      it failed alone but may still be a term inside a bigger
- *                   model → ALLOW_WITH_TAG.
+ * APPEND-ONLY. Entries are never mutated or deleted. `overrideFalsification`
+ * appends a new `OverrideEntry` that references the `FalsifiedModelRecord` it
+ * counters; the original record's own stored fields never change. Every
+ * `FalsifiedModelRecord` returned by a query is a freshly computed VIEW with
+ * `supersededBy` filled in from the override log — never a mutated stored
+ * value.
+ *
+ * CONSULTATION VERDICT is three-valued, not a boolean, because "falsified
+ * relative to what" matters:
+ *   - `BLOCK` — `reusableAs: 'NEVER'`, consulted in the SAME scope (domain +
+ *     assumptions + boundary) it was recorded in. The strongest verdict.
+ *   - `REQUIRE_OVERRIDE` — either (a) `reusableAs: 'VARIANT_ONLY'` or
+ *     `'COMPONENT'`, in ANY scope, with no standing override yet, or (b) a
+ *     `NEVER` record consulted from a MATERIALLY DIFFERENT scope than it was
+ *     recorded in. Silently blocking (a) would treat one lab's finding as
+ *     universal; silently allowing (b) would ignore a real prior finding just
+ *     because the context moved. Neither extreme is honest, so both land here
+ *     instead: a human or a later explicit override decides, the registry
+ *     does not.
+ *   - `ALLOW` — no standing (non-superseded) record matches this model's
+ *     fingerprint, or the standing record has been overridden with real new
+ *     evidence.
+ *
+ * A model that merely shares ONE basis term with a falsified model (T5: "a
+ * shared subexpression, a different core") is a DIFFERENT `ModelSpec`, hence
+ * a DIFFERENT `modelSpecFingerprint`, hence matches no record at all and
+ * resolves to `ALLOW` — consultation keys on the FULL model's identity, never
+ * on partial structural overlap. `COMPONENT` scope exists to let a caller
+ * RECORD which piece of a model it blames (for audit, and to inform a later
+ * campaign's own `ModelSpaceConstraints.excludeBases` choice by hand); it
+ * does not make this registry reach into OTHER models that happen to share
+ * that piece — that reach is exactly what T5 forbids.
+ *
+ * F1 — CANONICALIZE BEFORE FINGERPRINTING, ALWAYS, EXPLICITLY. Every path
+ * into or out of this registry (`recordFalsification`, `consultFalsifiedModelRegistry`)
+ * runs `canonicalizeModel` — `modelSpace.ts::normalizeModelSpec` re-exposed
+ * under this file's own name — BEFORE ever calling `modelSpecFingerprint`:
+ * `model -> canonicalize -> fingerprint -> check registry`, never
+ * `model -> fingerprint -> check registry`. This is stated as its own step
+ * here, not left as an invisible implementation detail inside
+ * `modelSpecFingerprint` (which already canonicalizes internally — this is
+ * belt-and-suspenders, not a second normalization scheme), because a reader
+ * of THIS file must be able to see the property directly: reordering a
+ * model's terms, or repeating one, cannot manufacture a new identity that
+ * slips past a standing record. Concretely, `normalizeModelSpec` sorts terms
+ * into one canonical order and drops exact duplicates, so `[LOG, LINEAR]`
+ * and `[LINEAR, LOG]` — or `[LOG, LOG, LINEAR]` — all fingerprint identically
+ * (see `falsifiedModelRegistry.test.ts`'s own F1 tests). One caveat stated
+ * plainly: `ModelTerm` (`modelSpace.ts`) is a closed enum with no free
+ * variable names — there is no "rename x to y" attack surface in THIS
+ * model representation, only term order and duplication, both of which
+ * canonicalization already closes.
  */
 
-export const FALSIFIED_MODEL_REGISTRY_CONTRACT_VERSION = '1.0.0';
+export const FALSIFIED_MODEL_REGISTRY_CONTRACT_VERSION = '2.0.0';
 
-/** How a killed model may be reused, decided from WHAT the observations actually refuted. */
-export type FalsifiedModelReuse = 'NEVER' | 'VARIANT_ONLY' | 'COMPONENT';
+export type ReusableAs = 'NEVER' | 'VARIANT_ONLY' | 'COMPONENT';
 
-/** What a lookup permits. Mirrors the reuse classes but names the ACTION rather than the judgement. */
-export type RegistryGateOutcome = 'ALLOW' | 'ALLOW_WITH_TAG' | 'REQUIRE_OVERRIDE' | 'BLOCK';
+export interface FalsificationProvenance {
+  readonly observationIds: readonly string[];
+  readonly verdict: 'FALSIFIED';
+  readonly campaignId: string;
+  readonly round: number;
+}
 
-/**
- * The circumstances under which the model died. Two records with the same
- * model and different scopes are different facts, and are stored as such.
- */
-export interface FalsifiedModelScope {
+/** What this falsification actually establishes "relative to" — a lab/problem, the assumptions in force, and the observed-range boundary. */
+export interface FalsificationScope {
   readonly domain: string;
-  /** Assumptions in force when the verdict was reached. A different assumption set is a different scope. */
   readonly assumptions: readonly string[];
-  /** The range/conditions the verdict covers. Outside it, the record says nothing. */
   readonly boundary: string;
 }
 
 export interface FalsifiedModelRecord {
-  readonly contractVersion: string;
   readonly recordId: string;
   readonly modelId: string;
   readonly modelFingerprint: string;
-  readonly falsifiedBy: {
-    /** The real observations behind the verdict. Empty is refused: a verdict with no observations is not a falsification. */
-    readonly observationIds: readonly string[];
-    readonly verdict: 'FALSIFIED';
-    readonly campaignId: string;
-    readonly round: number;
-  };
-  readonly scope: FalsifiedModelScope;
-  readonly reusableAs: FalsifiedModelReuse;
-  /** Set when a later, better-scoped record replaces this one. The superseded record is NEVER deleted. */
+  readonly falsifiedBy: FalsificationProvenance;
+  readonly scope: FalsificationScope;
+  readonly reusableAs: ReusableAs;
+  /** DERIVED at query time from the override log; never a stored, mutated field. `null` while the record stands unchallenged. */
   readonly supersededBy: string | null;
-  readonly recordedAt: number;
+  readonly recordedAt: string;
+  /** Content fingerprint of this record's own identity fields (excludes `recordId`/`fingerprint` themselves). */
   readonly fingerprint: string;
 }
 
-export interface RegistryLookup {
-  readonly outcome: RegistryGateOutcome;
-  /** Records that actually matched the scope — the evidence for the outcome. */
-  readonly matched: readonly FalsifiedModelRecord[];
-  /** Records for the same model that did NOT match scope, so a reader can see what was considered and rejected. */
-  readonly outOfScope: readonly FalsifiedModelRecord[];
+export interface OverrideEntry {
+  readonly overrideId: string;
+  readonly overriddenRecordId: string;
+  /** The new Hypothesis's own id — logged explicitly, never just a free-text claim. */
+  readonly newEvidenceId: string;
+  readonly newEvidenceStatus: Hypothesis['status'];
   readonly reason: string;
+  readonly recordedAt: string;
 }
 
-/** An explicit, evidence-backed decision to emit a model the registry did not clear. */
-export interface RegistryOverride {
-  readonly recordId: string;
-  readonly authorizedBy: string;
-  readonly rationale: string;
-  /** New evidence justifying the override. Without it the override is refused — "I disagree" is not evidence. */
-  readonly newEvidenceIds: readonly string[];
-  readonly at: number;
-}
+type LogEntry =
+  | { readonly entryType: 'RECORD'; readonly record: Omit<FalsifiedModelRecord, 'supersededBy'> }
+  | { readonly entryType: 'OVERRIDE'; readonly override: OverrideEntry };
 
-export interface RegistryWriteRefusal {
-  readonly ok: false;
-  readonly reason: string;
-}
+// Append-only, process-lifetime log. See module doc for exactly what this is
+// (and is not) a substitute for.
+let LOG: LogEntry[] = [];
 
-function recordFingerprint(core: Omit<FalsifiedModelRecord, 'fingerprint' | 'recordId' | 'supersededBy' | 'contractVersion'>): string {
-  return fnv1a(canonicalJson({
-    modelFingerprint: core.modelFingerprint,
-    falsifiedBy: {
-      observationIds: [...core.falsifiedBy.observationIds].sort(),
-      verdict: core.falsifiedBy.verdict,
-      campaignId: core.falsifiedBy.campaignId,
-      round: core.falsifiedBy.round,
-    },
-    scope: { domain: core.scope.domain, assumptions: [...core.scope.assumptions].sort(), boundary: core.scope.boundary },
-    reusableAs: core.reusableAs,
-  }));
+/** Test-only escape hatch — production code has no reason to ever call this. */
+export function resetFalsifiedModelRegistryForTests(): void {
+  LOG = [];
 }
 
 /**
- * APPEND-ONLY BY CONSTRUCTION. Every mutator returns a NEW registry; there is
- * no method that removes or rewrites a record, and `supersede` adds a pointer
- * rather than editing history. A caller holding an old reference still sees
- * exactly what it saw before.
+ * The record's fingerprint covers the SCIENTIFIC FACT and nothing else: which
+ * model, killed by which observations, in which campaign and round, under which
+ * scope, and how reusable the verdict leaves it.
+ *
+ * `recordedAt` is deliberately EXCLUDED. It was originally inside this payload,
+ * and because it is wall-clock time that made the fingerprint
+ * non-deterministic: recording the identical falsification twice produced two
+ * different fingerprints, which defeats the replay guarantee the rest of this
+ * codebase is built on (demonstrated before the fix — same inputs, fingerprints
+ * e070289f and dfbba267). When this file says two records are the same fact, it
+ * now means the same fact, not the same millisecond.
+ *
+ * `sequence` stays in: two genuinely separate falsifications of the same model
+ * under the same scope are distinct entries in an append-only log, and the log
+ * position is what distinguishes them.
  */
-export class FalsifiedModelRegistry {
-  private readonly records: readonly FalsifiedModelRecord[];
+function storedRecordFingerprint(input: Omit<FalsifiedModelRecord, 'recordId' | 'fingerprint' | 'supersededBy' | 'recordedAt'>, sequence: number): string {
+  return fnv1a(canonicalJson({ ...input, sequence }));
+}
 
-  constructor(records: readonly FalsifiedModelRecord[] = []) {
-    this.records = records;
-  }
+/**
+ * F1's explicit step: `model -> canonicalize -> fingerprint`. Delegates to
+ * `modelSpace.ts::normalizeModelSpec` (no second canonicalization scheme) —
+ * this wrapper exists so the pipeline is visible and testable IN THIS FILE,
+ * not something a reader has to trust modelSpace.ts to be doing correctly.
+ */
+function canonicalizeModel(spec: ModelSpec): ModelSpec {
+  return normalizeModelSpec(spec);
+}
 
-  all(): readonly FalsifiedModelRecord[] {
-    return this.records;
-  }
+/** The identity this registry actually keys on: the model, canonicalized, then fingerprinted. Never call `modelSpecFingerprint` on a raw, un-canonicalized spec from this file. */
+function identityOf(spec: ModelSpec): { readonly modelId: string; readonly modelFingerprint: string } {
+  const canonical = canonicalizeModel(spec);
+  return { modelId: renderModelSpec(canonical), modelFingerprint: modelSpecFingerprint(canonical) };
+}
 
-  size(): number {
-    return this.records.length;
-  }
+export interface RecordFalsificationInput {
+  readonly spec: ModelSpec;
+  readonly scope: FalsificationScope;
+  readonly reusableAs: ReusableAs;
+  /** The real Hypothesis whose status must be `'FALSIFIED_WITHIN_PROTOCOL'` — the real epistemic path this record traces to. */
+  readonly evidence: Hypothesis;
+  readonly campaignId: string;
+  readonly round: number;
+  readonly observationIds: readonly string[];
+}
 
-  /**
-   * Writes a falsification. Refuses anything that is not ACTUALLY a
-   * falsification — a verdict with no observations behind it, or an
-   * unfalsified status dressed up as one. The registry is only as trustworthy
-   * as its admission rule, so the rule is enforced here rather than assumed of
-   * callers.
-   */
-  record(input: {
-    readonly modelId: string;
-    readonly modelFingerprint: string;
-    readonly observationIds: readonly string[];
-    readonly verdict: string;
-    readonly campaignId: string;
-    readonly round: number;
-    readonly scope: FalsifiedModelScope;
-    readonly reusableAs: FalsifiedModelReuse;
-    readonly recordedAt: number;
-  }): { readonly ok: true; readonly registry: FalsifiedModelRegistry; readonly record: FalsifiedModelRecord } | RegistryWriteRefusal {
-    if (input.verdict !== 'FALSIFIED' && input.verdict !== 'FALSIFIED_WITHIN_PROTOCOL') {
-      return { ok: false, reason: `Refused: only a falsified model enters the registry; this verdict was "${input.verdict}".` };
-    }
-    if (input.observationIds.length === 0) {
-      return { ok: false, reason: 'Refused: a falsification with no observations behind it is a claim, not evidence.' };
-    }
-    if (input.modelFingerprint.length === 0) {
-      return { ok: false, reason: 'Refused: a record without a model fingerprint cannot be looked up.' };
-    }
-    const core = {
-      modelId: input.modelId,
-      modelFingerprint: input.modelFingerprint,
-      falsifiedBy: {
-        observationIds: input.observationIds,
-        verdict: 'FALSIFIED' as const,
-        campaignId: input.campaignId,
-        round: input.round,
-      },
-      scope: input.scope,
-      reusableAs: input.reusableAs,
-      recordedAt: input.recordedAt,
-    };
-    const fingerprint = recordFingerprint(core);
-    const record: FalsifiedModelRecord = {
-      contractVersion: FALSIFIED_MODEL_REGISTRY_CONTRACT_VERSION,
-      ...core,
-      recordId: `falsified:${fingerprint}`,
-      supersededBy: null,
-      fingerprint,
-    };
-    // An identical record already present is not an error and is not duplicated: the fact is already held.
-    if (this.records.some((r) => r.fingerprint === fingerprint)) {
-      return { ok: true, registry: this, record };
-    }
-    return { ok: true, registry: new FalsifiedModelRegistry([...this.records, record]), record };
-  }
-
-  /** Adds a supersession POINTER. The superseded record stays readable, exactly as written. */
-  supersede(recordId: string, bySupersedingRecordId: string): FalsifiedModelRegistry {
-    return new FalsifiedModelRegistry(
-      this.records.map((r) => (r.recordId === recordId && r.supersededBy === null ? { ...r, supersededBy: bySupersedingRecordId } : r)),
+export function recordFalsification(input: RecordFalsificationInput): FalsifiedModelRecord {
+  if (input.evidence.status !== 'FALSIFIED_WITHIN_PROTOCOL') {
+    throw new Error(
+      `falsifiedModelRegistry.recordFalsification: refusing to record — evidence Hypothesis status is "${input.evidence.status}", not "FALSIFIED_WITHIN_PROTOCOL". A record must trace to a real falsification verdict, never be asserted.`,
     );
   }
+  const base = {
+    ...identityOf(input.spec),
+    falsifiedBy: {
+      observationIds: input.observationIds,
+      verdict: 'FALSIFIED' as const,
+      campaignId: input.campaignId,
+      round: input.round,
+    },
+    scope: input.scope,
+    reusableAs: input.reusableAs,
+  };
+  const fingerprint = storedRecordFingerprint(base, LOG.length);
+  const recordedAt = new Date().toISOString();
+  const recordId = fingerprint;
+  const stored: Omit<FalsifiedModelRecord, 'supersededBy'> = { recordId, fingerprint, ...base, recordedAt };
+  LOG.push({ entryType: 'RECORD', record: stored });
+  return { ...stored, supersededBy: null };
+}
 
-  /**
-   * THE GATE. Called before a model is emitted, with the scope the emitting
-   * campaign is working under. A record only counts when its scope matches:
-   * same domain, and an assumption set the new campaign has not changed.
-   * Changing an assumption is precisely how a falsified model may honestly
-   * return, so a changed assumption set puts the record out of scope and the
-   * emission is allowed — that is T3, not a loophole.
-   */
-  check(modelFingerprint: string, scope: FalsifiedModelScope): RegistryLookup {
-    const forModel = this.records.filter((r) => r.modelFingerprint === modelFingerprint && r.supersededBy === null);
-    const matched = forModel.filter((r) => sameScope(r.scope, scope));
-    const outOfScope = forModel.filter((r) => !sameScope(r.scope, scope));
+export interface OverrideFalsificationInput {
+  readonly recordId: string;
+  /** New evidence that counts AGAINST the standing falsification — must NOT itself be another FALSIFIED_WITHIN_PROTOCOL verdict. */
+  readonly newEvidence: Hypothesis;
+  readonly reason: string;
+}
 
-    if (matched.length === 0) {
-      return {
-        outcome: 'ALLOW',
-        matched: [],
-        outOfScope,
-        reason: forModel.length === 0
-          ? 'No falsification is on record for this model.'
-          : `This model was falsified ${forModel.length} time(s), but never under this domain and assumption set, so those verdicts do not apply here.`,
+/** "Jawnie logować override + nowe evidence ID": appends a new entry; never mutates or removes the record it counters. */
+export function overrideFalsification(input: OverrideFalsificationInput): OverrideEntry {
+  const target = LOG.find((e): e is Extract<LogEntry, { entryType: 'RECORD' }> => e.entryType === 'RECORD' && e.record.recordId === input.recordId);
+  if (target === undefined) {
+    throw new Error(`falsifiedModelRegistry.overrideFalsification: no falsification record with recordId "${input.recordId}" exists — nothing to override.`);
+  }
+  if (input.newEvidence.status === 'FALSIFIED_WITHIN_PROTOCOL') {
+    throw new Error(
+      'falsifiedModelRegistry.overrideFalsification: newEvidence must not itself be a FALSIFIED_WITHIN_PROTOCOL verdict — an override requires evidence that counts AGAINST the standing falsification, not another instance of it.',
+    );
+  }
+  const overrideId = fnv1a(canonicalJson({ recordId: input.recordId, newEvidenceId: input.newEvidence.id, reason: input.reason, sequence: LOG.length }));
+  const override: OverrideEntry = {
+    overrideId,
+    overriddenRecordId: input.recordId,
+    newEvidenceId: input.newEvidence.id,
+    newEvidenceStatus: input.newEvidence.status,
+    reason: input.reason,
+    recordedAt: new Date().toISOString(),
+  };
+  LOG.push({ entryType: 'OVERRIDE', override });
+  return override;
+}
+
+/** All RECORD entries, most recent last, as fully-derived views (`supersededBy` resolved). */
+export function listFalsifiedModelRecords(): readonly FalsifiedModelRecord[] {
+  return LOG.filter((e): e is Extract<LogEntry, { entryType: 'RECORD' }> => e.entryType === 'RECORD')
+    .map((e) => resolveRecordView(e.record));
+}
+
+export function listOverrides(): readonly OverrideEntry[] {
+  return LOG.filter((e): e is Extract<LogEntry, { entryType: 'OVERRIDE' }> => e.entryType === 'OVERRIDE').map((e) => e.override);
+}
+
+function resolveRecordView(record: Omit<FalsifiedModelRecord, 'supersededBy'>): FalsifiedModelRecord {
+  const overridingEntry = LOG.find((e): e is Extract<LogEntry, { entryType: 'OVERRIDE' }> => e.entryType === 'OVERRIDE' && e.override.overriddenRecordId === record.recordId);
+  return { ...record, supersededBy: overridingEntry?.override.overrideId ?? null };
+}
+
+/** Every un-superseded RECORD matching `modelFingerprint`, in log order. A superseded record contributes nothing to consultation. */
+function standingRecordsFor(modelFingerprint: string): readonly FalsifiedModelRecord[] {
+  return listFalsifiedModelRecords().filter((r) => r.modelFingerprint === modelFingerprint && r.supersededBy === null);
+}
+
+function sameAssumptionSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((value, i) => value === sortedB[i]);
+}
+
+/** Strict equality on all three scope facets — anything less is "materially different" (T3). */
+function scopesMatch(a: FalsificationScope, b: FalsificationScope): boolean {
+  return a.domain === b.domain && a.boundary === b.boundary && sameAssumptionSet(a.assumptions, b.assumptions);
+}
+
+export type ConsultationVerdict = 'ALLOW' | 'BLOCK' | 'REQUIRE_OVERRIDE';
+
+export interface RegistryConsultation {
+  readonly verdict: ConsultationVerdict;
+  readonly reason: string;
+  readonly matchedRecord: FalsifiedModelRecord | null;
+}
+
+export interface ConsultFalsifiedModelRegistryInput {
+  readonly spec: ModelSpec;
+  /** The scope this candidate model is being considered IN — compared against each standing record's own recorded scope. */
+  readonly scope: FalsificationScope;
+}
+
+/**
+ * "Konsultuj model PRZED jego emisją": call before admitting `input.spec` as
+ * a live candidate. See the module doc for the full verdict semantics.
+ */
+export function consultFalsifiedModelRegistry(input: ConsultFalsifiedModelRegistryInput): RegistryConsultation {
+  const { modelFingerprint } = identityOf(input.spec);
+  const standing = standingRecordsFor(modelFingerprint);
+  if (standing.length === 0) {
+    return { verdict: 'ALLOW', reason: 'No standing falsification record matches this model.', matchedRecord: null };
+  }
+  // Most recent standing record for this fingerprint governs.
+  const record = standing[standing.length - 1]!;
+  const sameScope = scopesMatch(record.scope, input.scope);
+
+  if (record.reusableAs === 'NEVER') {
+    return sameScope
+      ? { verdict: 'BLOCK', reason: `Model permanently excluded (reusableAs NEVER, recorded in domain "${record.scope.domain}", campaign ${record.falsifiedBy.campaignId} round ${record.falsifiedBy.round}).`, matchedRecord: record }
+      : {
+        verdict: 'REQUIRE_OVERRIDE',
+        reason: `Model was recorded NEVER in a materially different scope (domain "${record.scope.domain}" vs "${input.scope.domain}"); this finding is not silently extended into a different context, but it is not ignored either — an explicit override is required.`,
+        matchedRecord: record,
       };
-    }
-    // The strictest matching record decides: one NEVER outweighs any number of softer verdicts.
-    const strictest = matched.some((r) => r.reusableAs === 'NEVER')
-      ? 'NEVER'
-      : matched.some((r) => r.reusableAs === 'VARIANT_ONLY')
-        ? 'VARIANT_ONLY'
-        : 'COMPONENT';
-    const cite = matched.map((r) => `${r.falsifiedBy.campaignId}#${r.falsifiedBy.round}`).join(', ');
-    switch (strictest) {
-      case 'NEVER':
-        return { outcome: 'BLOCK', matched, outOfScope, reason: `Blocked: this model's functional form was falsified in ${cite} under the same assumptions, and recorded as NEVER reusable.` };
-      case 'VARIANT_ONLY':
-        return { outcome: 'REQUIRE_OVERRIDE', matched, outOfScope, reason: `This parameterisation was falsified in ${cite}. The family may still be viable, so emission requires an explicit override citing new evidence.` };
-      case 'COMPONENT':
-        return { outcome: 'ALLOW_WITH_TAG', matched, outOfScope, reason: `Falsified standalone in ${cite}, but recorded as reusable as a COMPONENT — allowed here, and tagged so the record follows it.` };
-    }
   }
 
-  /**
-   * Applies an override to a lookup. An override can lift REQUIRE_OVERRIDE and
-   * nothing else: a NEVER record stays blocked, because the point of NEVER is
-   * that no amount of authorisation makes refuted physics work again. Lifting
-   * it would need a NEW record under changed assumptions, which `check` already
-   * treats as a different scope.
-   */
-  applyOverride(lookup: RegistryLookup, override: RegistryOverride | null): RegistryLookup {
-    if (override === null) return lookup;
-    if (lookup.outcome !== 'REQUIRE_OVERRIDE') {
-      return { ...lookup, reason: `${lookup.reason} An override was supplied but does not apply to a ${lookup.outcome} outcome.` };
-    }
-    if (override.newEvidenceIds.length === 0) {
-      return { ...lookup, reason: `${lookup.reason} Override REFUSED: it cites no new evidence, and disagreement is not evidence.` };
-    }
-    if (override.rationale.trim().length === 0) {
-      return { ...lookup, reason: `${lookup.reason} Override REFUSED: an override with no stated rationale is not auditable.` };
-    }
-    return {
-      ...lookup,
-      outcome: 'ALLOW_WITH_TAG',
-      reason: `Override by ${override.authorizedBy}: ${override.rationale} (new evidence: ${override.newEvidenceIds.join(', ')}). The original falsification stays on record.`,
-    };
-  }
-}
-
-/** Same domain AND same assumption set: change either and the old verdict no longer speaks to the new question. */
-function sameScope(a: FalsifiedModelScope, b: FalsifiedModelScope): boolean {
-  if (a.domain !== b.domain) return false;
-  const left = [...a.assumptions].sort();
-  const right = [...b.assumptions].sort();
-  return left.length === right.length && left.every((v, i) => v === right[i]);
-}
-
-/** One deterministic fingerprint over the whole registry, in write order, for replay. */
-export function registryFingerprint(registry: FalsifiedModelRegistry): string {
-  return fnv1a(canonicalJson(registry.all().map((r) => r.fingerprint)));
+  // VARIANT_ONLY / COMPONENT: always requires an explicit override before reuse, whatever the scope.
+  return {
+    verdict: 'REQUIRE_OVERRIDE',
+    reason: `Model already falsified (reusableAs ${record.reusableAs}${sameScope ? ', same scope' : ', different scope'}) in domain "${record.scope.domain}", campaign ${record.falsifiedBy.campaignId} round ${record.falsifiedBy.round}: no override is on record.`,
+    matchedRecord: record,
+  };
 }

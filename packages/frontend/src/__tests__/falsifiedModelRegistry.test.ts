@@ -1,205 +1,220 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createHypothesis, updateConfidence, type Hypothesis } from '../core/experimentFabric/beliefRevision';
+import type { FalsificationCriterion } from '../core/experimentFabric/scientificDiscovery';
+import type { ModelSpec } from '../core/agent/modelSpace';
 import {
-  FalsifiedModelRegistry,
-  registryFingerprint,
-  type FalsifiedModelScope,
+  consultFalsifiedModelRegistry,
+  listFalsifiedModelRecords,
+  listOverrides,
+  overrideFalsification,
+  recordFalsification,
+  resetFalsifiedModelRegistryForTests,
+  type FalsificationScope,
 } from '../core/agent/falsifiedModelRegistry';
 
-const QUANTUM: FalsifiedModelScope = {
-  domain: 'trapped-ion entanglement growth',
-  assumptions: ['independent observations', 'reported sigmas correct'],
-  boundary: 'T in [1,20] ms, 10-ion disordered chain',
-};
-
-const ASTRO: FalsifiedModelScope = {
-  domain: 'planetary orbital dynamics',
-  assumptions: ['two-body approximation'],
-  boundary: 'nine Sun-orbiting bodies',
-};
-
-function seeded(reusableAs: 'NEVER' | 'VARIANT_ONLY' | 'COMPONENT' = 'NEVER', scope = QUANTUM) {
-  const written = new FalsifiedModelRegistry().record({
-    modelId: 'model:linear',
-    modelFingerprint: 'fp-linear',
-    observationIds: ['obs-1', 'obs-2', 'obs-3'],
-    verdict: 'FALSIFIED',
-    campaignId: 'qe4-brydges-disorder-k5',
-    round: 4,
-    scope,
-    reusableAs,
-    recordedAt: 1,
-  });
-  if (!written.ok) throw new Error(written.reason);
-  return written;
+function criterion(metric: string): FalsificationCriterion {
+  return { metric, relation: 'less-than', rationale: 'test fixture' };
 }
 
-describe('M2 T1 — cross-campaign block', () => {
-  it('blocks a model in campaign B that campaign A falsified under the same assumptions', () => {
-    const { registry } = seeded('NEVER');
-    const lookup = registry.check('fp-linear', QUANTUM);
-    expect(lookup.outcome).toBe('BLOCK');
-    expect(lookup.matched).toHaveLength(1);
-    expect(lookup.reason).toContain('qe4-brydges-disorder-k5#4');
+function spec(...bases: ('LINEAR' | 'LOG' | 'RECIPROCAL' | 'CONSTANT' | 'POWER')[]): ModelSpec {
+  return {
+    id: 'test',
+    terms: bases.map((basis) => (basis === 'CONSTANT' ? { basis } : basis === 'POWER' ? { basis: 'POWER' as const, variable: 'x', exponent: 2 } : { basis, variable: 'x' })),
+    lineage: null,
+  };
+}
+
+function falsifiedHypothesis(id: string): Hypothesis {
+  const h = createHypothesis(id, criterion(id), 0.5);
+  return updateConfidence(h, 'FALSIFIED_WITHIN_PROTOCOL', 0.9, 'Round 1: decisively beaten by a rival model.', 1);
+}
+
+function supportedHypothesis(id: string): Hypothesis {
+  const h = createHypothesis(id, criterion(id), 0.5);
+  return updateConfidence(h, 'SUPPORTED_WITHIN_PROTOCOL', 0.9, 'Round 2: new observations vindicate the model.', 2);
+}
+
+function scopeA(): FalsificationScope {
+  return { domain: 'campaign-A-lab', assumptions: ['iid noise', 'linear grammar'], boundary: 'x in [1, 10]' };
+}
+
+function scopeB(): FalsificationScope {
+  return { domain: 'campaign-B-lab', assumptions: ['iid noise', 'linear grammar'], boundary: 'x in [1, 10]' };
+}
+
+beforeEach(() => {
+  resetFalsifiedModelRegistryForTests();
+});
+
+describe('falsifiedModelRegistry — FALSIFIED only from a real epistemic path', () => {
+  it('refuses to record a falsification whose evidence Hypothesis is not FALSIFIED_WITHIN_PROTOCOL', () => {
+    const active = createHypothesis('h1', criterion('h1'), 0.5);
+    expect(() => recordFalsification({
+      spec: spec('LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence: active, campaignId: 'campaign-A', round: 1, observationIds: ['obs-1'],
+    })).toThrow(/FALSIFIED_WITHIN_PROTOCOL/);
   });
 
-  it('cites the observations that killed it, so the block is auditable rather than asserted', () => {
-    const { registry } = seeded('NEVER');
-    expect(registry.check('fp-linear', QUANTUM).matched[0]!.falsifiedBy.observationIds).toEqual(['obs-1', 'obs-2', 'obs-3']);
+  it('refuses to record a falsification from a SUPPORTED hypothesis', () => {
+    const supported = supportedHypothesis('h2');
+    expect(() => recordFalsification({
+      spec: spec('LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence: supported, campaignId: 'campaign-A', round: 1, observationIds: ['obs-1'],
+    })).toThrow(/FALSIFIED_WITHIN_PROTOCOL/);
+  });
+
+  it('accepts a real FALSIFIED_WITHIN_PROTOCOL hypothesis and carries its provenance verbatim', () => {
+    const evidence = falsifiedHypothesis('h3');
+    const record = recordFalsification({ spec: spec('LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 3, observationIds: ['obs-1', 'obs-2'] });
+    expect(record.falsifiedBy).toEqual({ observationIds: ['obs-1', 'obs-2'], verdict: 'FALSIFIED', campaignId: 'campaign-A', round: 3 });
+    expect(record.modelId).toContain('x');
+    expect(record.modelFingerprint).toEqual(expect.any(String));
+    expect(record.supersededBy).toBeNull();
   });
 });
 
-describe('M2 T2 — variant-only override', () => {
-  it('requires an override rather than blocking outright', () => {
-    const { registry } = seeded('VARIANT_ONLY');
-    expect(registry.check('fp-linear', QUANTUM).outcome).toBe('REQUIRE_OVERRIDE');
+describe('falsifiedModelRegistry — T1: falsified in campaign A blocks reuse in campaign B', () => {
+  it('a model falsified in one campaign is refused (not ALLOW) when a later, different campaign in the same domain considers it', () => {
+    const evidence = falsifiedHypothesis('t1');
+    recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+
+    const consultation = consultFalsifiedModelRegistry({ spec: spec('LOG'), scope: scopeA() });
+    expect(consultation.verdict).not.toBe('ALLOW');
+    expect(consultation.matchedRecord?.falsifiedBy.campaignId).toBe('campaign-A');
   });
 
-  it('lifts to ALLOW_WITH_TAG only for an override that names new evidence and a rationale', () => {
-    const { registry } = seeded('VARIANT_ONLY');
-    const lookup = registry.check('fp-linear', QUANTUM);
-    const allowed = registry.applyOverride(lookup, {
-      recordId: lookup.matched[0]!.recordId,
-      authorizedBy: 'principal investigator',
-      rationale: 'A re-analysis at finer time resolution changes which parameterisation is being proposed.',
-      newEvidenceIds: ['obs-11', 'obs-12'],
-      at: 2,
-    });
-    expect(allowed.outcome).toBe('ALLOW_WITH_TAG');
-    expect(allowed.reason).toContain('principal investigator');
-  });
-
-  it('refuses an override that cites no new evidence — disagreement is not evidence', () => {
-    const { registry } = seeded('VARIANT_ONLY');
-    const lookup = registry.check('fp-linear', QUANTUM);
-    const refused = registry.applyOverride(lookup, {
-      recordId: lookup.matched[0]!.recordId, authorizedBy: 'someone', rationale: 'I think it is fine.', newEvidenceIds: [], at: 2,
-    });
-    expect(refused.outcome).toBe('REQUIRE_OVERRIDE');
-    expect(refused.reason).toContain('not evidence');
-  });
-
-  it('an override cannot resurrect a NEVER record, however it is authorized', () => {
-    const { registry } = seeded('NEVER');
-    const lookup = registry.check('fp-linear', QUANTUM);
-    const stillBlocked = registry.applyOverride(lookup, {
-      recordId: lookup.matched[0]!.recordId, authorizedBy: 'owner', rationale: 'override it', newEvidenceIds: ['obs-9'], at: 2,
-    });
-    expect(stillBlocked.outcome).toBe('BLOCK');
+  it('with no standing record at all, consultation is ALLOW', () => {
+    const consultation = consultFalsifiedModelRegistry({ spec: spec('RECIPROCAL'), scope: scopeA() });
+    expect(consultation.verdict).toBe('ALLOW');
+    expect(consultation.matchedRecord).toBeNull();
   });
 });
 
-describe('M2 T3 — assumption-scope handling', () => {
-  it('does not block when the new campaign changed an assumption: that is a different question', () => {
-    const { registry } = seeded('NEVER');
-    const relaxed = { ...QUANTUM, assumptions: ['independent observations'] };
-    const lookup = registry.check('fp-linear', relaxed);
-    expect(lookup.outcome).toBe('ALLOW');
-    // The non-matching record is still surfaced, so nobody can claim it was hidden.
-    expect(lookup.outOfScope).toHaveLength(1);
-    expect(lookup.reason).toContain('never under this domain and assumption set');
+describe('falsifiedModelRegistry — T2: VARIANT_ONLY requires an explicit override', () => {
+  it('without an override: REQUIRE_OVERRIDE (never silently ALLOW, never a bare unconditional BLOCK)', () => {
+    const evidence = falsifiedHypothesis('t2a');
+    recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    const consultation = consultFalsifiedModelRegistry({ spec: spec('LOG'), scope: scopeA() });
+    expect(consultation.verdict).toBe('REQUIRE_OVERRIDE');
   });
 
-  it('records the same model separately per scope, and each blocks only its own', () => {
-    const first = seeded('NEVER', QUANTUM);
-    const second = first.registry.record({
-      modelId: 'model:linear', modelFingerprint: 'fp-linear', observationIds: ['obs-7'], verdict: 'FALSIFIED',
-      campaignId: 'nasa-nssdc-planetary-orbits', round: 2, scope: ASTRO, reusableAs: 'COMPONENT', recordedAt: 3,
-    });
-    if (!second.ok) throw new Error(second.reason);
-    expect(second.registry.size()).toBe(2);
-    expect(second.registry.check('fp-linear', QUANTUM).outcome).toBe('BLOCK');
-    expect(second.registry.check('fp-linear', ASTRO).outcome).toBe('ALLOW_WITH_TAG');
-  });
-});
-
-describe('M2 T4 — append-only', () => {
-  it('every write returns a NEW registry and leaves the previous one exactly as it was', () => {
-    const empty = new FalsifiedModelRegistry();
-    const { registry } = seeded();
-    expect(empty.size()).toBe(0);
-    expect(registry.size()).toBe(1);
-    expect(empty.check('fp-linear', QUANTUM).outcome).toBe('ALLOW');
+  it('with a valid override: ALLOW', () => {
+    const evidence = falsifiedHypothesis('t2b');
+    const record = recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    overrideFalsification({ recordId: record.recordId, newEvidence: supportedHypothesis('t2b-new'), reason: 'A wider dataset in the same domain now supports this model.' });
+    const consultation = consultFalsifiedModelRegistry({ spec: spec('LOG'), scope: scopeA() });
+    expect(consultation.verdict).toBe('ALLOW');
   });
 
-  it('supersession adds a pointer and never deletes: the original stays readable', () => {
-    const { registry, record } = seeded('NEVER');
-    const after = registry.supersede(record.recordId, 'falsified:newer');
-    expect(after.size()).toBe(1);
-    expect(after.all()[0]!.supersededBy).toBe('falsified:newer');
-    // Superseded records stop gating, but the history is intact.
-    expect(after.check('fp-linear', QUANTUM).outcome).toBe('ALLOW');
-    expect(registry.all()[0]!.supersededBy).toBeNull();
+  it('refuses to override with another FALSIFIED_WITHIN_PROTOCOL verdict as "new evidence"', () => {
+    const evidence = falsifiedHypothesis('t2c');
+    const record = recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    expect(() => overrideFalsification({ recordId: record.recordId, newEvidence: falsifiedHypothesis('t2c-2'), reason: 'bad override' }))
+      .toThrow(/must not itself be/);
   });
 
-  it('exposes no mutator that could rewrite or drop a record', () => {
-    const { registry } = seeded();
-    const names = Object.getOwnPropertyNames(Object.getPrototypeOf(registry));
-    expect(names).not.toContain('delete');
-    expect(names).not.toContain('remove');
-    expect(names).not.toContain('update');
-    expect(names).not.toContain('clear');
-  });
-
-  it('re-writing an identical fact is idempotent rather than duplicated', () => {
-    const { registry } = seeded('NEVER');
-    const again = registry.record({
-      modelId: 'model:linear', modelFingerprint: 'fp-linear', observationIds: ['obs-1', 'obs-2', 'obs-3'],
-      verdict: 'FALSIFIED', campaignId: 'qe4-brydges-disorder-k5', round: 4, scope: QUANTUM, reusableAs: 'NEVER', recordedAt: 9,
-    });
-    if (!again.ok) throw new Error(again.reason);
-    expect(again.registry.size()).toBe(1);
+  it('refuses to override a recordId that does not exist', () => {
+    expect(() => overrideFalsification({ recordId: 'no-such-record', newEvidence: supportedHypothesis('t2d'), reason: 'no-op' }))
+      .toThrow(/no falsification record/);
   });
 });
 
-describe('M2 T5 — no false-positive blocking', () => {
-  it('never blocks a model nobody falsified', () => {
-    const { registry } = seeded('NEVER');
-    expect(registry.check('fp-logarithmic', QUANTUM).outcome).toBe('ALLOW');
-    expect(registry.check('fp-logarithmic', QUANTUM).matched).toHaveLength(0);
+describe('falsifiedModelRegistry — T3: materially different assumptions require override, not an automatic BLOCK', () => {
+  it('NEVER consulted from the SAME scope it was recorded in: BLOCK', () => {
+    const evidence = falsifiedHypothesis('t3a');
+    recordFalsification({ spec: spec('RECIPROCAL'), scope: scopeA(), reusableAs: 'NEVER', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    expect(consultFalsifiedModelRegistry({ spec: spec('RECIPROCAL'), scope: scopeA() }).verdict).toBe('BLOCK');
   });
 
-  it('never blocks across unrelated science: a quantum falsification says nothing about orbits', () => {
-    const { registry } = seeded('NEVER');
-    expect(registry.check('fp-linear', ASTRO).outcome).toBe('ALLOW');
+  it('NEVER consulted from a MATERIALLY DIFFERENT scope (different domain): REQUIRE_OVERRIDE, not an automatic BLOCK', () => {
+    const evidence = falsifiedHypothesis('t3b');
+    recordFalsification({ spec: spec('RECIPROCAL'), scope: scopeA(), reusableAs: 'NEVER', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    const consultation = consultFalsifiedModelRegistry({ spec: spec('RECIPROCAL'), scope: scopeB() });
+    expect(consultation.verdict).toBe('REQUIRE_OVERRIDE');
+    expect(consultation.verdict).not.toBe('BLOCK');
   });
 
-  it('an empty registry blocks nothing at all', () => {
-    const empty = new FalsifiedModelRegistry();
-    for (const fp of ['fp-a', 'fp-b', 'fp-linear']) expect(empty.check(fp, QUANTUM).outcome).toBe('ALLOW');
+  it('NEVER consulted with materially different assumptions (same domain, different assumption set): REQUIRE_OVERRIDE', () => {
+    const evidence = falsifiedHypothesis('t3c');
+    recordFalsification({ spec: spec('RECIPROCAL'), scope: scopeA(), reusableAs: 'NEVER', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    const differentAssumptions: FalsificationScope = { ...scopeA(), assumptions: ['heteroscedastic noise'] };
+    expect(consultFalsifiedModelRegistry({ spec: spec('RECIPROCAL'), scope: differentAssumptions }).verdict).toBe('REQUIRE_OVERRIDE');
   });
 });
 
-describe('M2 — admission rule: only a real falsification gets in', () => {
-  it('refuses a non-falsified verdict', () => {
-    for (const verdict of ['SUPPORTED_WITHIN_PROTOCOL', 'INCONCLUSIVE', 'UNRESOLVED', '']) {
-      const result = new FalsifiedModelRegistry().record({
-        modelId: 'm', modelFingerprint: 'fp', observationIds: ['o'], verdict,
-        campaignId: 'c', round: 1, scope: QUANTUM, reusableAs: 'NEVER', recordedAt: 1,
-      });
-      expect(result.ok).toBe(false);
-    }
+describe('falsifiedModelRegistry — T4: append-only', () => {
+  it('overriding never mutates or removes the original record; both remain in the log', () => {
+    const evidence = falsifiedHypothesis('t4');
+    const record = recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    const override = overrideFalsification({ recordId: record.recordId, newEvidence: supportedHypothesis('t4-new'), reason: 'reconsidered' });
+
+    const records = listFalsifiedModelRecords();
+    const overrides = listOverrides();
+    expect(records).toHaveLength(1);
+    expect(overrides).toHaveLength(1);
+    // The stored record's own identity fields are untouched — only the
+    // DERIVED `supersededBy` view changes, computed from the override log,
+    // never written back onto the original entry.
+    expect(records[0]!.recordId).toBe(record.recordId);
+    expect(records[0]!.fingerprint).toBe(record.fingerprint);
+    expect(records[0]!.falsifiedBy).toEqual(record.falsifiedBy);
+    expect(records[0]!.supersededBy).toBe(override.overrideId);
+    expect(overrides[0]!.newEvidenceId).toBe('t4-new');
+    expect(overrides[0]!.overriddenRecordId).toBe(record.recordId);
   });
 
-  it('refuses a falsification with no observations behind it', () => {
-    const result = new FalsifiedModelRegistry().record({
-      modelId: 'm', modelFingerprint: 'fp', observationIds: [], verdict: 'FALSIFIED',
-      campaignId: 'c', round: 1, scope: QUANTUM, reusableAs: 'NEVER', recordedAt: 1,
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.reason).toContain('not evidence');
+  it('re-falsifying after an override appends a NEW, independent record — history is never overwritten', () => {
+    const evidence = falsifiedHypothesis('t4b');
+    const first = recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    overrideFalsification({ recordId: first.recordId, newEvidence: supportedHypothesis('t4b-new'), reason: 'reconsidered' });
+    expect(consultFalsifiedModelRegistry({ spec: spec('LOG'), scope: scopeA() }).verdict).toBe('ALLOW');
+
+    const second = recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence: falsifiedHypothesis('t4b-again'), campaignId: 'campaign-B', round: 2, observationIds: ['b1'] });
+    expect(second.recordId).not.toBe(first.recordId);
+    expect(listFalsifiedModelRecords()).toHaveLength(2);
+    expect(consultFalsifiedModelRegistry({ spec: spec('LOG'), scope: scopeA() }).verdict).toBe('REQUIRE_OVERRIDE');
+  });
+});
+
+describe('falsifiedModelRegistry — T5: a shared subexpression with a different core is ALLOW', () => {
+  it('a model sharing one basis term, but with additional/different terms, does not match the falsified fingerprint', () => {
+    const evidence = falsifiedHypothesis('t5');
+    recordFalsification({ spec: spec('LOG'), scope: scopeA(), reusableAs: 'COMPONENT', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+
+    // Same falsified core: still governed.
+    expect(consultFalsifiedModelRegistry({ spec: spec('LOG'), scope: scopeA() }).verdict).not.toBe('ALLOW');
+
+    // Shares the LOG term (the "subexpression") but has a genuinely different
+    // core (LOG + POWER, a different model altogether) — a different
+    // modelSpecFingerprint, hence no relationship to the falsified record.
+    expect(consultFalsifiedModelRegistry({ spec: spec('LOG', 'POWER'), scope: scopeA() }).verdict).toBe('ALLOW');
+    expect(consultFalsifiedModelRegistry({ spec: spec('POWER'), scope: scopeA() }).verdict).toBe('ALLOW');
+  });
+});
+
+describe('falsifiedModelRegistry — F1: canonicalize BEFORE fingerprinting, so reordering or duplicating terms cannot dodge a standing record', () => {
+  it('recording with terms in one order is caught by consulting the SAME model with its terms reordered', () => {
+    const evidence = falsifiedHypothesis('f1a');
+    recordFalsification({ spec: spec('LOG', 'LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+
+    // The "reordered operators" attack: same two terms, opposite literal order.
+    const reordered: ModelSpec = { id: 'reordered', terms: [{ basis: 'LINEAR', variable: 'x' }, { basis: 'LOG', variable: 'x' }], lineage: null };
+    expect(consultFalsifiedModelRegistry({ spec: reordered, scope: scopeA() }).verdict).not.toBe('ALLOW');
   });
 
-  it('accepts the engine\'s own FALSIFIED_WITHIN_PROTOCOL vocabulary without renaming anything stored', () => {
-    const result = new FalsifiedModelRegistry().record({
-      modelId: 'm', modelFingerprint: 'fp', observationIds: ['o'], verdict: 'FALSIFIED_WITHIN_PROTOCOL',
-      campaignId: 'c', round: 1, scope: QUANTUM, reusableAs: 'NEVER', recordedAt: 1,
-    });
-    expect(result.ok).toBe(true);
+  it('a spec with a term repeated is caught by consulting its deduplicated equivalent, and vice versa', () => {
+    const evidence = falsifiedHypothesis('f1b');
+    const withDuplicate: ModelSpec = { id: 'dup', terms: [{ basis: 'LOG', variable: 'x' }, { basis: 'LOG', variable: 'x' }, { basis: 'LINEAR', variable: 'x' }], lineage: null };
+    recordFalsification({ spec: withDuplicate, scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+
+    expect(consultFalsifiedModelRegistry({ spec: spec('LOG', 'LINEAR'), scope: scopeA() }).verdict).not.toBe('ALLOW');
   });
 
-  it('is replay-deterministic: identical facts produce an identical registry fingerprint', () => {
-    expect(registryFingerprint(seeded().registry)).toBe(registryFingerprint(seeded().registry));
-    expect(registryFingerprint(seeded('NEVER').registry)).not.toBe(registryFingerprint(seeded('COMPONENT').registry));
+  it('the record itself stores the CANONICAL fingerprint, not one that depends on the caller\'s literal term order', () => {
+    const evidence = falsifiedHypothesis('f1c');
+    const orderOne = recordFalsification({ spec: spec('LOG', 'LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    resetFalsifiedModelRegistryForTests();
+    const reordered: ModelSpec = { id: 'reordered', terms: [{ basis: 'LINEAR', variable: 'x' }, { basis: 'LOG', variable: 'x' }], lineage: null };
+    const orderTwo = recordFalsification({ spec: reordered, scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence: falsifiedHypothesis('f1c-2'), campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
+    expect(orderTwo.modelFingerprint).toBe(orderOne.modelFingerprint);
+    expect(orderTwo.modelId).toBe(orderOne.modelId);
   });
 });

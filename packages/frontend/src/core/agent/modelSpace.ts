@@ -34,31 +34,52 @@ import { fnv1a, canonicalJson } from '../events/hash';
 
 export const MODEL_SPACE_CONTRACT_VERSION = '1.0.0';
 
+/**
+ * MULTI-VARIABLE MODELS (C3-2). Every single-variable basis now names WHICH
+ * declared variable it operates on (`variable: string`) instead of an
+ * implicit, unnamed `x` — required so a model can combine terms over more
+ * than one independent variable (e.g. A1's potency ratio AND efficacy delta,
+ * or a genomics problem with several covariates), which the previous shape
+ * could not express at all. `INTERACTION` is the one genuinely new basis: a
+ * plain product of two named variables' raw values, the minimal cross term a
+ * declared grammar needs to represent "these two axes don't act
+ * independently" without inventing a general expression search.
+ *
+ * BACKWARD COMPATIBILITY, load-bearing: `basisValue`/`ModelPoint`/`ModelFit.predict`
+ * all still accept a bare `number` (see `ModelInput` below) — every existing
+ * single-variable caller (`discoveryCampaign.ts`, both real laboratories,
+ * every existing test) is unchanged, because a bare number is treated as the
+ * value of `DEFAULT_VARIABLE` ('x'), exactly what it always implicitly meant.
+ * Multi-variable use is opt-in: declare `variables`/`includeInteractions` on
+ * `ModelSpaceConstraints`, or pass a `Record<string, number>` point/input.
+ */
+export const DEFAULT_VARIABLE = 'x';
+
 export type ModelBasis = 'CONSTANT' | 'LINEAR' | 'LOG' | 'POWER' | 'EXP_SATURATION' | 'RECIPROCAL' | 'INTERACTION';
 
-/**
- * M3 — WHICH VARIABLE A TERM ACTS ON.
- *
- * `dim` is the index into the observation's variable vector. It is OPTIONAL and
- * absent means dimension 0, which is what every model written before M3 meant
- * by "x". That is not a convenience: `termKey` below emits the identical string
- * for an absent `dim` and for `dim: 0`, so every fingerprint, every stored
- * model identity and every replay from before M3 is bit-for-bit unchanged.
- */
 export type ModelTerm =
   | { readonly basis: 'CONSTANT' }
-  | { readonly basis: 'LINEAR'; readonly dim?: number }
-  | { readonly basis: 'LOG'; readonly dim?: number }
-  | { readonly basis: 'RECIPROCAL'; readonly dim?: number }
-  | { readonly basis: 'POWER'; readonly exponent: number; readonly dim?: number }
-  | { readonly basis: 'EXP_SATURATION'; readonly tau: number; readonly dim?: number }
-  /**
-   * The product of two distinct variables — the term that makes
-   * `y = a·x1 + b·x2 + c·x1·x2` expressible. An interaction says the effect of
-   * one variable DEPENDS on another, which is a different scientific claim
-   * from either main effect and is therefore its own term, never implied.
-   */
-  | { readonly basis: 'INTERACTION'; readonly dims: readonly [number, number] };
+  | { readonly basis: 'LINEAR'; readonly variable: string }
+  | { readonly basis: 'LOG'; readonly variable: string }
+  | { readonly basis: 'RECIPROCAL'; readonly variable: string }
+  | { readonly basis: 'POWER'; readonly variable: string; readonly exponent: number }
+  | { readonly basis: 'EXP_SATURATION'; readonly variable: string; readonly tau: number }
+  /** Plain product of two named variables' raw values — the minimal cross term for "these two axes interact". */
+  | { readonly basis: 'INTERACTION'; readonly variables: readonly [string, string] };
+
+/**
+ * A point/candidate can be given either as a bare number (the legacy,
+ * single-variable case — treated as `{ [DEFAULT_VARIABLE]: value }`) or as a
+ * named-variable record for a genuinely multi-variable model. Every function
+ * below that used to take `x: number` now takes `ModelInput`, and every
+ * existing call site that passes a bare number keeps compiling and behaving
+ * identically.
+ */
+export type ModelInput = number | Readonly<Record<string, number>>;
+
+function inputVars(input: ModelInput): Readonly<Record<string, number>> {
+  return typeof input === 'number' ? { [DEFAULT_VARIABLE]: input } : input;
+}
 
 /** How a model came to exist. `null` for a model the generator enumerated rather than derived. */
 export interface ModelLineage {
@@ -77,63 +98,47 @@ export interface ModelPoint {
   readonly x: number;
   readonly y: number;
   readonly sigma: number;
+  /**
+   * Named variable values for a multi-variable model. Absent for the
+   * single-variable case (the overwhelming majority of callers today), which
+   * uses `x` under `DEFAULT_VARIABLE` — see `pointInput`. When present, `x`
+   * is still required (kept as a stable, human-facing axis for rendering/
+   * sorting/`xRange` purposes) but evaluation reads from `vars` instead.
+   */
+  readonly vars?: Readonly<Record<string, number>>;
 }
 
-/** M3: an observation over n independent variables. A 1D `ModelPoint` is the `xs.length === 1` case. */
-export interface ModelPointMulti {
-  readonly xs: readonly number[];
-  readonly y: number;
-  readonly sigma: number;
+function pointInput(point: ModelPoint): ModelInput {
+  return point.vars ?? point.x;
 }
-
-export type ModelFitMulti =
-  | {
-      readonly ok: true;
-      readonly coefficients: readonly number[];
-      readonly rss: number;
-      readonly predictAt: (xs: readonly number[]) => number;
-    }
-  | { readonly ok: false; readonly reason: string };
 
 export type ModelFit =
   | {
       readonly ok: true;
       readonly coefficients: readonly number[];
       readonly rss: number;
-      readonly predict: (x: number) => number;
+      readonly predict: (input: ModelInput) => number;
     }
   | { readonly ok: false; readonly reason: string };
 
 // --- basis evaluation --------------------------------------------------------
 
 /**
- * Value of one basis function at `x`. Returns a NON-FINITE value where the
- * basis is genuinely undefined (log of a non-positive number, 1/0) rather than
- * substituting a fallback — callers must refuse such a fit, not paper over it.
+ * Value of one basis function at `input`. Returns a NON-FINITE value where the
+ * basis is genuinely undefined (log of a non-positive number, 1/0, a variable
+ * the input does not declare) rather than substituting a fallback — callers
+ * must refuse such a fit, not paper over it.
  */
-export function basisValue(term: ModelTerm, x: number): number {
-  return basisValueAt(term, [x]);
-}
-
-/**
- * M3: value of one basis function over a whole variable VECTOR. This is the
- * single implementation — `basisValue` above is the one-variable case of it, so
- * 1D and multivariate models can never drift apart in how they are evaluated.
- *
- * A term addressing a dimension the observation does not carry returns NaN
- * rather than 0: a missing variable is unknown, not zero, and `fitModelSpec`
- * refuses a design containing it.
- */
-export function basisValueAt(term: ModelTerm, xs: readonly number[]): number {
+export function basisValue(term: ModelTerm, input: ModelInput): number {
+  const vars = inputVars(input);
   if (term.basis === 'CONSTANT') return 1;
   if (term.basis === 'INTERACTION') {
-    const [i, j] = term.dims;
-    const a = xs[i];
-    const b = xs[j];
-    if (a === undefined || b === undefined) return Number.NaN;
-    return a * b;
+    const [v1, v2] = term.variables;
+    const a = vars[v1];
+    const b = vars[v2];
+    return a === undefined || b === undefined ? Number.NaN : a * b;
   }
-  const x = xs[term.dim ?? 0];
+  const x = vars[term.variable];
   if (x === undefined) return Number.NaN;
   switch (term.basis) {
     case 'LINEAR': return x;
@@ -146,15 +151,18 @@ export function basisValueAt(term: ModelTerm, xs: readonly number[]): number {
 
 // --- identity, normalization, complexity -------------------------------------
 
-/** Total order over terms, so one model has exactly one canonical spelling. */
-function termKey(term: ModelTerm): string {
-  if (term.basis === 'INTERACTION') return `INTERACTION:${term.dims[0]}x${term.dims[1]}`;
-  // Dimension 0 is spelled exactly as it was before M3 existed, so every
-  // fingerprint written by an earlier version still names the same model.
-  const suffix = term.basis === 'CONSTANT' || (term.dim ?? 0) === 0 ? '' : `@${term.dim}`;
-  if (term.basis === 'POWER') return `POWER:${term.exponent}${suffix}`;
-  if (term.basis === 'EXP_SATURATION') return `EXP_SATURATION:${term.tau}${suffix}`;
-  return `${term.basis}${suffix}`;
+/**
+ * Total order over terms, so one model has exactly one canonical spelling.
+ * Exported so `residualStructure.ts` reuses this exact identity rather than
+ * maintaining its own, second copy of the same key format (it did, until this
+ * change — a real duplication risk the two files could silently drift on).
+ */
+export function termKey(term: ModelTerm): string {
+  if (term.basis === 'CONSTANT') return term.basis;
+  if (term.basis === 'INTERACTION') return `INTERACTION:${[...term.variables].sort().join('*')}`;
+  if (term.basis === 'POWER') return `POWER:${term.variable}:${term.exponent}`;
+  if (term.basis === 'EXP_SATURATION') return `EXP_SATURATION:${term.variable}:${term.tau}`;
+  return `${term.basis}:${term.variable}`;
 }
 
 /** Sorts terms into canonical order and drops exact duplicates (a repeated term is one column, not two). */
@@ -174,7 +182,9 @@ export function compareModelSpecs(a: ModelSpec, b: ModelSpec): boolean {
   return modelSpecFingerprint(a) === modelSpecFingerprint(b);
 }
 
-/** Extra cost of a basis beyond the one free coefficient every term already carries. */
+/** Extra cost of a basis beyond the one free coefficient every term already carries.
+ * `INTERACTION` is surcharged like a nonlinear-shape basis: it is a claim
+ * about how two variables relate, not just one more additive axis. */
 const BASIS_SURCHARGE: Readonly<Record<ModelBasis, number>> = {
   CONSTANT: 0,
   LINEAR: 0,
@@ -182,8 +192,6 @@ const BASIS_SURCHARGE: Readonly<Record<ModelBasis, number>> = {
   RECIPROCAL: 0.5,
   POWER: 1,
   EXP_SATURATION: 1,
-  // An interaction claims two variables are not separable — a stronger claim
-  // than either main effect, so it costs more than a plain extra coefficient.
   INTERACTION: 1,
 };
 
@@ -196,22 +204,17 @@ export function modelComplexity(spec: ModelSpec): number {
   return normalizeModelSpec(spec).terms.reduce((acc, t) => acc + 1 + BASIS_SURCHARGE[t.basis], 0);
 }
 
-/** Dimension 0 renders as plain `x`, exactly as before M3; higher dimensions as `x2`, `x3`, … */
-function v(dim: number | undefined): string {
-  return (dim ?? 0) === 0 ? 'x' : `x${(dim ?? 0) + 1}`;
-}
-
 export function renderModelSpec(spec: ModelSpec): string {
   const parts = normalizeModelSpec(spec).terms.map((t, i) => {
     const c = `c${i}`;
     switch (t.basis) {
       case 'CONSTANT': return c;
-      case 'LINEAR': return `${c}·${v(t.dim)}`;
-      case 'LOG': return `${c}·log(${v(t.dim)})`;
-      case 'RECIPROCAL': return `${c}/${v(t.dim)}`;
-      case 'POWER': return `${c}·${v(t.dim)}^${t.exponent}`;
-      case 'EXP_SATURATION': return `${c}·(1 − exp(−${v(t.dim)}/${t.tau}))`;
-      case 'INTERACTION': return `${c}·x${t.dims[0] + 1}·x${t.dims[1] + 1}`;
+      case 'LINEAR': return `${c}·${t.variable}`;
+      case 'LOG': return `${c}·log(${t.variable})`;
+      case 'RECIPROCAL': return `${c}/${t.variable}`;
+      case 'POWER': return `${c}·${t.variable}^${t.exponent}`;
+      case 'EXP_SATURATION': return `${c}·(1 − exp(−${t.variable}/${t.tau}))`;
+      case 'INTERACTION': return `${c}·(${t.variables[0]}·${t.variables[1]})`;
     }
   });
   return `y = ${parts.join(' + ')}`;
@@ -248,26 +251,14 @@ function solveLinearSystem(matrix: number[][], rhs: number[]): number[] | null {
  * degenerate design — e.g. two bases that coincide on this particular x-grid).
  */
 export function fitModelSpec(spec: ModelSpec, points: readonly ModelPoint[]): ModelFit {
-  const multi = fitModelSpecMulti(spec, points.map((p) => ({ xs: [p.x], y: p.y, sigma: p.sigma })));
-  if (!multi.ok) return multi;
-  return { ok: true, coefficients: multi.coefficients, rss: multi.rss, predict: (x: number) => multi.predictAt([x]) };
-}
-
-/**
- * M3 — the real fit, over any number of independent variables. `fitModelSpec`
- * above is this function with each observation wrapped as a one-element
- * vector, so there is exactly ONE weighted-least-squares implementation in the
- * engine and the 1D and multivariate paths cannot diverge.
- */
-export function fitModelSpecMulti(spec: ModelSpec, points: readonly ModelPointMulti[]): ModelFitMulti {
   const terms = normalizeModelSpec(spec).terms;
   if (terms.length === 0) return { ok: false, reason: 'Model has no terms, so there is nothing to fit.' };
 
   const design: number[][] = [];
   for (const p of points) {
-    const row = terms.map((t) => basisValueAt(t, p.xs));
-    if (row.some((value) => !Number.isFinite(value)) || !Number.isFinite(p.y) || !(p.sigma > 0)) {
-      return { ok: false, reason: `Model "${renderModelSpec(spec)}" is undefined at x=${p.xs.length === 1 ? p.xs[0] : `[${p.xs.join(', ')}]`} (or that point has a non-positive sigma) — refusing to fit rather than substituting a value.` };
+    const row = terms.map((t) => basisValue(t, pointInput(p)));
+    if (row.some((v) => !Number.isFinite(v)) || !Number.isFinite(p.y) || !(p.sigma > 0)) {
+      return { ok: false, reason: `Model "${renderModelSpec(spec)}" is undefined at x=${p.x} (or that point has a non-positive sigma) — refusing to fit rather than substituting a value.` };
     }
     design.push(row);
   }
@@ -291,38 +282,38 @@ export function fitModelSpecMulti(spec: ModelSpec, points: readonly ModelPointMu
     return { ok: false, reason: `Normal equations for "${renderModelSpec(spec)}" are singular on these points — the terms are not independent on this x-grid.` };
   }
 
-  const predictAt = (xs: readonly number[]): number => terms.reduce((acc, t, i) => acc + coefficients[i]! * basisValueAt(t, xs), 0);
+  const predict = (input: ModelInput): number => terms.reduce((acc, t, i) => acc + coefficients[i]! * basisValue(t, input), 0);
   const rss = points.reduce((acc, p) => {
-    const r = p.y - predictAt(p.xs);
+    const r = p.y - predict(pointInput(p));
     return acc + (r * r) / (p.sigma * p.sigma);
   }, 0);
-  return { ok: true, coefficients, rss, predictAt };
+  return { ok: true, coefficients, rss, predict };
 }
 
 // --- M3: parsimony and out-of-sample ------------------------------------------
 
 /**
- * PARSIMONY. Weighted RSS alone always prefers the more complex model: an
- * extra free coefficient can only ever lower it. This is the BIC form for a
- * chi-square with KNOWN variances — the residuals are already divided by each
- * point's own sigma, so `rss` is that chi-square and the penalty is simply
+ * PARSIMONY. Weighted RSS alone always prefers the more complex model: an extra
+ * free coefficient can only ever lower it, which is how an engine talks itself
+ * into an elaborate model that has merely absorbed noise. This is the BIC form
+ * for a chi-square with KNOWN variances — the residuals are already divided by
+ * each point's own sigma, so `rss` IS that chi-square and the penalty is simply
  * `k·ln(n)` added to it.
  *
  * `k` IS THE NUMBER OF ESTIMATED COEFFICIENTS — one per term — and deliberately
- * NOT `modelComplexity`. Complexity carries a surcharge for nonlinear bases
- * that exists to break ties between equally good fits; folding it into k would
- * charge BIC for freedom the fit never spends. A LOG term estimates exactly one
+ * NOT `modelComplexity`. Complexity carries a surcharge for nonlinear bases that
+ * exists to break ties between equally good fits; folding it into k would charge
+ * BIC for freedom the fit never spends. A LOG term estimates exactly one
  * coefficient: its shape is fixed by the grammar, not fitted.
  *
  * WHAT THIS DOES NOT ACCOUNT FOR, stated rather than hidden: the engine
- * enumerates many candidate models and picks the best, and that selection over
- * a grid is itself a source of optimism which a per-model information criterion
- * does not correct. `holdoutScore` below is the answer to that, because
- * out-of-sample error is not flattered by how many models were tried.
+ * enumerates many candidate models and picks the best, and that selection is
+ * itself a source of optimism which a per-model information criterion does not
+ * correct. `holdoutScore` below is the answer to that, because out-of-sample
+ * error is not flattered by how many models were tried.
  *
  * LOWER IS BETTER. A more complex model wins only when it lowers chi-square by
- * more than `Δk·ln(n)` — which is exactly "not without informational
- * justification".
+ * more than `Δk·ln(n)` — exactly "not without informational justification".
  */
 export function modelSelectionScore(rss: number, estimatedCoefficients: number, pointCount: number): number {
   if (!Number.isFinite(rss) || pointCount <= 0) return Number.POSITIVE_INFINITY;
@@ -344,22 +335,22 @@ export function holdoutSplit<T>(points: readonly T[], stride = 3): { readonly fi
 
 /**
  * OUT-OF-SAMPLE CHECK. Fits on part of the data and scores the chi-square on
- * points the fit never saw — the one measurement that overfitting cannot
- * flatter, because a model bent to pass through its own residuals does worse
- * here, not better.
+ * points the fit never saw — the one measurement overfitting cannot flatter,
+ * because a model bent to pass through its own residuals does worse here, not
+ * better.
  *
  * Returns `null`, never a number, when the split leaves too little to fit or
- * nothing to test on. A hold-out score computed from an inadequate split would
- * look like evidence while carrying none.
+ * nothing to test on. A hold-out score from an inadequate split would look like
+ * evidence while carrying none.
  */
-export function holdoutScore(spec: ModelSpec, points: readonly ModelPointMulti[], stride = 3): number | null {
+export function holdoutScore(spec: ModelSpec, points: readonly ModelPoint[], stride = 3): number | null {
   const { fit, heldOut } = holdoutSplit(points, stride);
   if (heldOut.length === 0) return null;
-  const fitted = fitModelSpecMulti(spec, fit);
+  const fitted = fitModelSpec(spec, fit);
   if (!fitted.ok) return null;
   let score = 0;
   for (const p of heldOut) {
-    const predicted = fitted.predictAt(p.xs);
+    const predicted = fitted.predict(pointInput(p));
     if (!Number.isFinite(predicted)) return null;
     const r = p.y - predicted;
     score += (r * r) / (p.sigma * p.sigma);
@@ -376,6 +367,23 @@ export interface ModelSpaceConstraints {
   readonly xRange: { readonly min: number; readonly max: number };
   /** Bases the domain declares meaningless here (e.g. LOG where x can be 0). */
   readonly excludeBases?: readonly ModelBasis[];
+  /**
+   * Named independent variables this space builds single-variable terms
+   * over. Defaults to `[DEFAULT_VARIABLE]` ('x') — the single-variable case
+   * every existing caller relies on, unchanged when this field is omitted.
+   * A multi-variable domain (A1's potency ratio + efficacy delta, a
+   * genomics problem with several covariates) declares its real variable
+   * names here instead.
+   */
+  readonly variables?: readonly string[];
+  /**
+   * Also enumerate pairwise `INTERACTION` terms (`v1 · v2`) between declared
+   * `variables`. Meaningless, and ignored, with fewer than two variables.
+   * Defaults to false: an interaction is a real structural claim about how
+   * two variables relate, so it is opt-in, never assumed — a univariate
+   * space's enumerated pool is unaffected unless a caller asks for this.
+   */
+  readonly includeInteractions?: boolean;
 }
 
 const POWER_EXPONENTS = [0.5, 2, 3] as const;
@@ -388,13 +396,23 @@ function saturationTaus(xRange: ModelSpaceConstraints['xRange']): readonly numbe
 
 function candidateTerms(constraints: ModelSpaceConstraints): readonly ModelTerm[] {
   const excluded = new Set(constraints.excludeBases ?? []);
+  const variables = constraints.variables ?? [DEFAULT_VARIABLE];
   const pool: ModelTerm[] = [];
   if (!excluded.has('CONSTANT')) pool.push({ basis: 'CONSTANT' });
-  if (!excluded.has('LINEAR')) pool.push({ basis: 'LINEAR' });
-  if (!excluded.has('LOG')) pool.push({ basis: 'LOG' });
-  if (!excluded.has('RECIPROCAL')) pool.push({ basis: 'RECIPROCAL' });
-  if (!excluded.has('POWER')) for (const exponent of POWER_EXPONENTS) pool.push({ basis: 'POWER', exponent });
-  if (!excluded.has('EXP_SATURATION')) for (const tau of saturationTaus(constraints.xRange)) pool.push({ basis: 'EXP_SATURATION', tau });
+  for (const variable of variables) {
+    if (!excluded.has('LINEAR')) pool.push({ basis: 'LINEAR', variable });
+    if (!excluded.has('LOG')) pool.push({ basis: 'LOG', variable });
+    if (!excluded.has('RECIPROCAL')) pool.push({ basis: 'RECIPROCAL', variable });
+    if (!excluded.has('POWER')) for (const exponent of POWER_EXPONENTS) pool.push({ basis: 'POWER', variable, exponent });
+    if (!excluded.has('EXP_SATURATION')) for (const tau of saturationTaus(constraints.xRange)) pool.push({ basis: 'EXP_SATURATION', variable, tau });
+  }
+  if (constraints.includeInteractions && !excluded.has('INTERACTION')) {
+    for (let i = 0; i < variables.length; i += 1) {
+      for (let j = i + 1; j < variables.length; j += 1) {
+        pool.push({ basis: 'INTERACTION', variables: [variables[i]!, variables[j]!] });
+      }
+    }
+  }
   return pool;
 }
 
@@ -416,62 +434,6 @@ export function generateModelSpace(constraints: ModelSpaceConstraints): readonly
     out.push({ ...spec, id: `model:${print}` });
   };
 
-  const build = (start: number, chosen: ModelTerm[]): void => {
-    if (chosen.length > 0) emit(chosen);
-    if (chosen.length >= constraints.maxTerms) return;
-    for (let i = start; i < pool.length; i += 1) build(i + 1, [...chosen, pool[i]!]);
-  };
-  build(0, []);
-
-  return out.sort((a, b) => modelComplexity(a) - modelComplexity(b) || modelSpecFingerprint(a).localeCompare(modelSpecFingerprint(b)));
-}
-
-/**
- * M3 — MULTIVARIATE MODEL SPACE.
- *
- * Enumerates models over `dimensions` independent variables: main effects on
- * each dimension, plus pairwise INTERACTION terms, so
- * `y = a·x1 + b·x2 + c·x1·x2` is reachable by enumeration rather than needing
- * to be written by hand.
- *
- * Deliberately NOT a general symbolic search. The space is the cross-product
- * of a declared basis set with a declared dimension count, capped by
- * `maxTerms` — enumerable, replayable and finite, which is the property the
- * rest of the engine depends on. An open-ended CAS would buy expressiveness at
- * the cost of every guarantee around it.
- *
- * `dimensions: 1` returns exactly what `generateModelSpace` returns, because
- * dimension 0 spells its terms identically. That is checked by test, not
- * assumed.
- */
-export function generateModelSpaceMulti(
-  constraints: ModelSpaceConstraints & { readonly dimensions: number; readonly includeInteractions?: boolean },
-): readonly ModelSpec[] {
-  const dimensions = Math.max(1, Math.floor(constraints.dimensions));
-  const base = candidateTerms(constraints);
-  const pool: ModelTerm[] = [];
-  for (const term of base) {
-    if (term.basis === 'CONSTANT') {
-      pool.push(term);
-      continue;
-    }
-    for (let dim = 0; dim < dimensions; dim += 1) pool.push({ ...term, dim } as ModelTerm);
-  }
-  if (constraints.includeInteractions !== false) {
-    for (let i = 0; i < dimensions; i += 1) {
-      for (let j = i + 1; j < dimensions; j += 1) pool.push({ basis: 'INTERACTION', dims: [i, j] as const });
-    }
-  }
-
-  const out: ModelSpec[] = [];
-  const seen = new Set<string>();
-  const emit = (terms: readonly ModelTerm[]): void => {
-    const spec = normalizeModelSpec({ id: '', terms, lineage: null });
-    const print = modelSpecFingerprint(spec);
-    if (seen.has(print)) return;
-    seen.add(print);
-    out.push({ ...spec, id: `model:${print}` });
-  };
   const build = (start: number, chosen: ModelTerm[]): void => {
     if (chosen.length > 0) emit(chosen);
     if (chosen.length >= constraints.maxTerms) return;
@@ -539,13 +501,13 @@ export function mutateModelSpec(parent: ModelSpec, constraints: Omit<ModelSpaceC
     if (term.basis === 'POWER') {
       for (const exponent of POWER_EXPONENTS) {
         if (exponent === term.exponent) continue;
-        emit([...normalized.terms.filter((t) => termKey(t) !== termKey(term)), { basis: 'POWER', exponent }], 'TUNE_SHAPE', `power exponent ${term.exponent} → ${exponent}`);
+        emit([...normalized.terms.filter((t) => termKey(t) !== termKey(term)), { basis: 'POWER', variable: term.variable, exponent }], 'TUNE_SHAPE', `power exponent ${term.exponent} → ${exponent}`);
       }
     }
     if (term.basis === 'EXP_SATURATION') {
       for (const tau of saturationTaus(constraints.xRange)) {
         if (tau === term.tau) continue;
-        emit([...normalized.terms.filter((t) => termKey(t) !== termKey(term)), { basis: 'EXP_SATURATION', tau }], 'TUNE_SHAPE', `saturation tau ${term.tau} → ${tau}`);
+        emit([...normalized.terms.filter((t) => termKey(t) !== termKey(term)), { basis: 'EXP_SATURATION', variable: term.variable, tau }], 'TUNE_SHAPE', `saturation tau ${term.tau} → ${tau}`);
       }
     }
   }

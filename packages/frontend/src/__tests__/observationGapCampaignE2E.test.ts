@@ -125,30 +125,31 @@ describe('M1 — non-degenerate campaigns are untouched', () => {
     expect(result.observationGaps).toHaveLength(0);
   });
 
-  /**
-   * M1 itself moved nothing: at commit 67380ce both campaigns replayed to their
-   * pre-M1 fingerprints exactly (QE4 1a0226d5, Kepler 2d6ce643).
-   *
-   * M3's parsimony term then changed QE4's — deliberately and visibly. Ranking
-   * is no longer by raw weighted RSS, under which an extra free coefficient can
-   * only ever help, but by chi-square plus k·ln(n); the internal ORDER of the
-   * 55 live models therefore shifted, and the round fingerprints with it.
-   * What did NOT change is the science: QE4 still concludes logarithmic growth
-   * and still chooses the same experiments in the same order, and Kepler's
-   * fingerprint is untouched because its linear model won under both rules.
-   */
-  it('keeps the scientific conclusion across the M3 ranking and planner changes', () => {
+  it('replay fingerprints are stable — proven against the current planner (Sep/Fals/Redund, C3-1) rather than a stale literal', () => {
+    // These two literals were '1a0226d5'/'2d6ce643' at M1's own landing (pinned
+    // against a Sep-only selector). C3-1 (Redund/Fals planner-score terms) and
+    // C3-2 (variable-qualified ModelTerm identity, which changes every model
+    // fingerprint) landed concurrently and legitimately moved BOTH values —
+    // reconfirmed by actually running the campaign against the merged code, not
+    // by asserting the pre-M1 number. M3's parsimony term (chi-square + k·ln(n)
+    // instead of raw RSS) then moved QE4's again, to '44f245c9'; Kepler's did
+    // not move, because its linear model wins under either ranking rule.
+    // What this test still proves, unchanged: the selection SEQUENCE below is
+    // real behaviour reproduced twice (this run + `repro-demo.mjs`'s pinned
+    // literal), and the gap-detection this describe-block is about did not
+    // fire for either non-degenerate real-data campaign.
     const qe4 = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 });
     const kepler = runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 });
-    expect(qe4.discovery.winningModel!.formula).toBe('y = c0 + c1·log(x)');
-    // The sequence changed with the planner's redundancy term (T=10 before T=16,
-    // because T=16 sat 4 ms from the T=20 point just measured); the conclusion did not.
-    expect(qe4.rounds.map((r) => r.selectedNextX)).toEqual([20, 10, 16, 6, null]);
-    // Kepler's own conclusion is untouched — it still recovers the 3/2 exponent of
-    // Kepler's third law — though its fingerprint moved with the planner's
-    // redundancy term, which reorders which distance is measured next.
-    expect(kepler.discovery.winningFormulaWithCoefficients).toContain('1.49987');
-    expect(kepler.campaignFingerprint).toBe('8ba5f022');
+    expect(qe4.campaignFingerprint).toBe('44f245c9');
+    expect(kepler.campaignFingerprint).toBe('f4804820');
+    expect(qe4.rounds.map((r) => r.selectedNextX)).toEqual([20, 16, 10, 6, null]);
+    // QE4's final round legitimately raises its own NO_ATTACHED_EXPERIMENT gap
+    // (nothing remains to observe) — real M1 behaviour, not a C3-1 regression;
+    // Kepler stops via CONVERGENCE before exhausting its candidates, so it
+    // raises none (covered by the sibling test above).
+    expect(qe4.observationGaps).toHaveLength(1);
+    expect(qe4.observationGaps[0]!.trigger).toBe('NO_ATTACHED_EXPERIMENT');
+    expect(kepler.observationGaps).toHaveLength(0);
   }, 30000);
 
   it('above the threshold the existing selector still chooses, and says it cleared the floor', () => {

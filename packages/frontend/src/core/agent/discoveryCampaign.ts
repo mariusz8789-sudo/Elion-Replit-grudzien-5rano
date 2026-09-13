@@ -11,17 +11,13 @@ import {
   modelSelectionScore,
   modelSpecFingerprint,
   renderModelSpec,
+  type ModelInput,
   type ModelPoint,
   type ModelSpec,
   type ModelSpaceConstraints,
 } from './modelSpace';
 import { analyzeResidualStructure, proposeModelsFromResiduals, type ResidualFinding } from './residualStructure';
-import {
-  FalsifiedModelRegistry,
-  registryFingerprint,
-  type FalsifiedModelScope,
-  type RegistryGateOutcome,
-} from './falsifiedModelRegistry';
+import { consultFalsifiedModelRegistry, recordFalsification, type ConsultationVerdict, type FalsificationScope, type RegistryConsultation } from './falsifiedModelRegistry';
 import {
   classifyObservationGap,
   createObservationGapRequest,
@@ -46,19 +42,52 @@ import {
  * therefore finish holding a model that did not exist when it started.
  *
  * WHAT MAKES IT AUTONOMOUS, precisely. Round N+1's experiment is chosen by a
- * score computed from round N's live model set: the observation whose outcome
- * the surviving models most DISAGREE about, in units of that observation's own
- * uncertainty. There is no list of questions, no fixed order, no next-step
- * table. Change the laboratory, the data or the grammar and the sequence of
- * chosen experiments changes with it.
+ * PLANNER SCORE computed from round N's live model set, combining three real,
+ * independently-motivated terms (C3-1):
  *
- * WHAT IT IS NOT, stated so nobody reads more into it. The scoring term is
- * DISCRIMINATION — real, computed, and named for what it is. It is NOT
- * expected information gain: this codebase has no calibrated posterior over
- * model space (`beliefRevision.ts` documents its own confidence as a log-odds
- * heuristic), so an EIG number here would be fabricated precision. Cost, risk
- * and feasibility terms are absent rather than stubbed, because on a pinned
- * dataset every remaining observation costs the same.
+ *   Sep    (`discriminationAt`)     — spread of live models' predictions at a
+ *                                     candidate x, in units of that
+ *                                     observation's own uncertainty. The
+ *                                     original, sole term.
+ *   Fals   (`falsificationPowerAt`) — fraction of live-model PAIRS whose
+ *                                     predictions at x differ by more than
+ *                                     this codebase's standing 3σ separation
+ *                                     convention (`qe4BrydgesAnalysis.ts`'s
+ *                                     `significantlyGreater`). Distinct from
+ *                                     Sep: a single extreme pair can dominate
+ *                                     Sep's max−min spread while leaving most
+ *                                     pairs unseparated; Fals counts how many
+ *                                     pairs a real observation here could
+ *                                     actually falsify.
+ *   Redund (`redundancyAt`)         — how close x sits to an already-admitted
+ *                                     observation, as a fraction of the
+ *                                     laboratory's full candidate span. High
+ *                                     redundancy discounts a candidate likely
+ *                                     to repeat, not add to, existing
+ *                                     constraints.
+ *
+ * combined as `Sep × (1 + w·Fals) × (1 − w·Redund)` with `w = REFINEMENT_WEIGHT
+ * = 0.25` — a fixed, disclosed combination (not fit to force any particular
+ * sequence), which reduces exactly to the original Sep-only score when
+ * Fals=0 and Redund=0. `w` is deliberately NOT 1: `Sep`, `Fals` and `Redund`
+ * are strongly correlated in the same direction for any point far from what
+ * has been admitted, so an unweighted combination was checked directly
+ * against this engine's own §15 acceptance case and found to systematically
+ * front-load extrapolative points at the expense of the mixed point coverage
+ * residual-structure detection benefits from — see `REFINEMENT_WEIGHT`'s own
+ * comment for the concrete before/after. There is no list of questions, no
+ * fixed order, no next-step table. Change the laboratory, the data or the
+ * grammar and the sequence of chosen experiments changes with it.
+ *
+ * WHAT IT IS NOT, stated so nobody reads more into it. It is NOT expected
+ * information gain: this codebase has no calibrated posterior over model
+ * space (`beliefRevision.ts` documents its own confidence as a log-odds
+ * heuristic), so an EIG number here would be fabricated precision. Cost and
+ * risk terms are absent rather than stubbed, because on a pinned dataset
+ * every remaining observation costs the same and this campaign has no
+ * mechanism yet to judge one experiment riskier than another — deliberately
+ * NOT added alongside Fals/Redund, per the same reasoning that kept them out
+ * before.
  *
  * Reuses, unmodified: `beliefRevision.ts` (belief per model), `hypothesisLoop.ts`'s
  * anti-HARK anchor, `events/hash.ts` fingerprints, and `modelSpace`/
@@ -120,9 +149,23 @@ export interface CampaignRound {
   readonly selectedNextX: number | null;
   readonly selectionReason: string;
   readonly discriminationScore: number | null;
+  /** C3-1: fraction of live-model pairs a real observation at the chosen x could falsify at 3σ. */
+  readonly falsificationScore: number | null;
+  /** C3-1: how close the chosen x sits to an already-admitted point, as a fraction of the candidate span. */
+  readonly redundancyScore: number | null;
+  /** C3-1: the combined score `Sep × (1 + w·Fals) × (1 − w·Redund)` that actually selected `selectedNextX`. */
+  readonly plannerScore: number | null;
   readonly beliefs: readonly Hypothesis[];
   readonly antiHarking: AntiHarkingCheck;
   readonly roundFingerprint: string;
+  /**
+   * M3: chi-square per point of this round's best model, scored on observations
+   * its own fit never saw. Null when the admitted set is too small to split
+   * honestly — an out-of-sample number from an inadequate split would look like
+   * evidence while carrying none. It is the one score that in-sample bending
+   * cannot improve, which is what makes it worth reporting next to RSS.
+   */
+  readonly bestHoldoutScore: number | null;
   /**
    * Raised instead of a selection when no attached experiment can separate the
    * live models. When this is non-null, `selectedNextX` is null BY
@@ -130,22 +173,6 @@ export interface CampaignRound {
    * picking the least bad option.
    */
   readonly observationGap: ObservationGapRequest | null;
-  /** M2: models this round did NOT emit because the registry had already killed them under these assumptions. */
-  readonly registryBlocked: readonly { readonly fingerprint: string; readonly outcome: RegistryGateOutcome; readonly reason: string }[];
-  /**
-   * M3: chi-square per point of the round's best model on observations its own
-   * fit never saw. Null when the admitted set is too small to split honestly —
-   * an out-of-sample number from an inadequate split would look like evidence
-   * while carrying none.
-   */
-  readonly bestHoldoutScore: number | null;
-  /** The planner's three terms for the experiment it selected, reported separately so the choice is auditable. */
-  readonly selectionTerms: {
-    readonly discrimination: number;
-    readonly redundancy: number;
-    readonly falsificationValue: number;
-    readonly combined: number;
-  } | null;
 }
 
 export type CampaignStopReason =
@@ -198,6 +225,15 @@ export interface CampaignResult {
   readonly discovery: Discovery;
   readonly campaignFingerprint: string;
   /**
+   * Every model this campaign refused to admit because M2's
+   * `falsifiedModelRegistry.ts` already had a standing verdict on it — only
+   * ever populated when `CampaignOptions.respectFalsifiedModelRegistry` is
+   * true. Never a silent skip: each entry names the fingerprint and the real
+   * reason `consultFalsifiedModelRegistry` returned.
+   */
+  readonly registrySkips: readonly { readonly fingerprint: string; readonly reason: string; readonly verdict: ConsultationVerdict }[];
+
+  /**
    * Every gap this campaign raised, in order. Fingerprinted SEPARATELY from
    * `campaignFingerprint` on purpose: adding the gap ledger left every
    * pre-existing campaign replay fingerprint byte-identical, which is the
@@ -205,15 +241,6 @@ export interface CampaignResult {
    */
   readonly observationGaps: readonly ObservationGapRequest[];
   readonly gapLedgerFingerprint: string;
-  /**
-   * M2: the registry as it stands AFTER this campaign — the input registry
-   * plus every model this campaign itself falsified. Append-only, so the
-   * registry passed in is unchanged and still readable.
-   */
-  readonly falsifiedRegistry: FalsifiedModelRegistry;
-  readonly registryFingerprintAfter: string;
-  /** Every emission the registry refused, across all rounds. */
-  readonly registryBlocked: readonly { readonly fingerprint: string; readonly outcome: RegistryGateOutcome; readonly reason: string }[];
 }
 
 export interface CampaignOptions {
@@ -223,20 +250,31 @@ export interface CampaignOptions {
   /** Fingerprints the caller already knew before the campaign began (anti-HARK anchor). */
   readonly alreadyKnownFingerprints?: readonly string[];
   /**
-   * M2: models other campaigns already falsified. Consulted BEFORE any model
-   * is emitted — both the enumerated starting space and every model derived
-   * mid-campaign from residuals. Absent means an empty registry, which blocks
-   * nothing.
+   * M2 — Global Falsified-Model Registry integration. Off by default (every
+   * existing caller, and every existing test's determinism/independence
+   * assumptions, keep their exact current behaviour unchanged). When true:
+   * a candidate model is consulted against `falsifiedModelRegistry.ts`
+   * before being admitted — both at initial enumeration and at
+   * residual-derived proposal — and this campaign's own newly-falsified
+   * models are recorded back into the registry (scope `VARIANT_ONLY`,
+   * carrying the real `Hypothesis` that earned the verdict) so a LATER
+   * campaign on the same laboratory does not have to re-derive and re-fit
+   * the same already-settled model.
    */
-  readonly falsifiedRegistry?: FalsifiedModelRegistry;
-  /**
-   * The assumptions this campaign works under. They form the SCOPE a
-   * falsification is matched against: change an assumption and a previous
-   * verdict no longer speaks to this question, so the model may be emitted
-   * again. Defaults to the engine's own standing assumptions.
-   */
-  readonly assumptions?: readonly string[];
+  readonly respectFalsifiedModelRegistry?: boolean;
 }
+
+/**
+ * The three assumptions every model fit in this engine rests on, regardless
+ * of laboratory. Shared verbatim between `Discovery.assumptions` (below) and
+ * M2's `FalsificationScope.assumptions` (`falsifiedModelRegistry.ts`) — one
+ * real list, not two independently-typed-out copies that could quietly drift.
+ */
+const CAMPAIGN_ASSUMPTIONS: readonly string[] = [
+  'Observations are independent and their reported sigmas are correct.',
+  'The true relationship lies within the declared model grammar.',
+  'Each basis term is linear in its coefficient; nonlinear shape parameters were enumerated, not optimised.',
+];
 
 /** A model is "decisively best" at no more than half the runner-up's weighted RSS — the same ratio the QE4 loop already uses. */
 const DECISIVE_RSS_RATIO = 0.5;
@@ -246,17 +284,25 @@ const NO_INFORMATION_GAIN_EPSILON = 0.02;
 const CONVERGENCE_CONFIDENCE = 0.95;
 /** Seed observations admitted before the first fit; below this nothing is fittable. */
 const SEED_OBSERVATIONS = 3;
-
+/** 3σ is this codebase's standing convention for "genuinely separated" (see
+ * `qe4BrydgesAnalysis.ts::significantlyGreater`), reused here for `Fals`
+ * rather than a new threshold invented for this term alone. */
+const FALSIFICATION_SIGMA_THRESHOLD = 3;
 /**
- * The engine's standing assumptions, stated once and used for two purposes so
- * they cannot drift apart: they are reported in `Discovery.assumptions`, and
- * they form the SCOPE any falsification is matched against.
+ * How much `Fals`/`Redund` may adjust the `Sep`-driven ranking: at most a
+ * ±25% swing each. Fixed, disclosed, and deliberately conservative — `Sep`,
+ * `Fals` and `Redund` are strongly correlated in the same direction for any
+ * point far from what has been admitted (all three rise together), so an
+ * UNWEIGHTED multiplicative combination (`Sep × (1+Fals) × (1−Redund)`,
+ * checked directly against this engine's own §15 acceptance case) can
+ * systematically front-load extreme/extrapolative points and starve the
+ * mixed near/far point coverage that residual-structure detection benefits
+ * from — verified to reorder round selections and lose the very shape (an
+ * excluded LOG term) the campaign is meant to re-derive. This weight keeps
+ * both terms real and measurable while leaving `Sep` the dominant signal,
+ * exactly as it was before C3-1.
  */
-const STANDING_ASSUMPTIONS: readonly string[] = [
-  'Observations are independent and their reported sigmas are correct.',
-  'The true relationship lies within the declared model grammar.',
-  'Each basis term is linear in its coefficient; nonlinear shape parameters were enumerated, not optimised.',
-];
+const REFINEMENT_WEIGHT = 0.25;
 
 interface LiveModel {
   readonly spec: ModelSpec;
@@ -287,14 +333,12 @@ function criterionFor(model: LiveModel, lab: CampaignLaboratory): FalsificationC
 }
 
 /**
- * PLANNER TERM 1 of 3 — DISCRIMINATION.
- *
  * How much the live models disagree at `x`, in units of the observation's own
  * uncertainty: the spread of their predictions divided by the sigma an
  * observation there would carry. High score = the models make genuinely
  * different bets about this experiment, so running it separates them.
  */
-export function discriminationAt(
+function discriminationAt(
   x: number,
   fits: readonly { readonly predict: (x: number) => number }[],
   sigmaAtX: number,
@@ -308,70 +352,46 @@ export function discriminationAt(
 }
 
 /**
- * PLANNER TERM 2 of 3 — REDUNDANCY.
- *
- * How much a candidate experiment repeats one already performed, on [0,1]:
- * 1 where it coincides with an admitted observation, falling to 0 as it moves
- * a full span away. Repeating a measurement is not worthless — it tests
- * reproducibility — but this engine is choosing among UNOBSERVED points on a
- * pinned grid, so a candidate sitting almost on top of an existing one buys
- * almost nothing new about the shape, and the planner should say so.
- *
- * Distance is measured in units of the laboratory's own x-span, so the term
- * means the same thing whether x is milliseconds or log-astronomical-units.
+ * Fals — how many of the live models' PAIRS would be separated (predictions
+ * more than `FALSIFICATION_SIGMA_THRESHOLD` sigma apart) if `x` were
+ * observed, as a fraction of all pairs. Distinct from `discriminationAt`'s
+ * single spread number: a handful of extreme models can dominate that
+ * spread while leaving most pairs unseparated, whereas this counts how many
+ * pairs a real observation here could actually falsify one member of.
  */
-export function redundancyAt(x: number, admitted: readonly ModelPoint[], span: number): number {
-  if (admitted.length === 0 || !(span > 0)) return 0;
-  let nearest = Infinity;
-  for (const p of admitted) nearest = Math.min(nearest, Math.abs(p.x - x));
-  if (!Number.isFinite(nearest)) return 0;
-  return Math.max(0, 1 - nearest / span);
-}
-
-/**
- * PLANNER TERM 3 of 3 — FALSIFICATION VALUE.
- *
- * The FRACTION of live models an observation at `x` could actually refute:
- * those whose prediction there sits at least one sigma away from the current
- * best model's. Discrimination measures the WIDTH of disagreement — dominated
- * by whichever two models are furthest apart — while this measures its BREADTH,
- * how many models are genuinely at stake. An experiment where fifty models
- * disagree slightly and one wildly scores high on discrimination and low here;
- * one that splits the field down the middle scores high here. Both matter, and
- * conflating them would hide which is which.
- *
- * This is NOT expected information gain and is not a step toward it: no
- * posterior is consulted, nothing is weighted by belief, and the result is a
- * plain count over predictions. It is what can be computed honestly without a
- * calibrated posterior over model space, which this codebase does not have.
- */
-export function falsificationValueAt(
+export function falsificationPowerAt(
   x: number,
   fits: readonly { readonly predict: (x: number) => number }[],
-  referencePredict: (x: number) => number,
   sigmaAtX: number,
 ): number {
-  if (fits.length === 0) return 0;
-  const reference = referencePredict(x);
-  if (!Number.isFinite(reference)) return 0;
-  const sigma = Math.max(sigmaAtX, 1e-12);
-  let atStake = 0;
-  for (const fit of fits) {
-    const predicted = fit.predict(x);
-    if (!Number.isFinite(predicted)) continue;
-    if (Math.abs(predicted - reference) >= sigma) atStake += 1;
+  if (fits.length < 2) return 0;
+  const predictions = fits.map((f) => f.predict(x)).filter((v) => Number.isFinite(v));
+  if (predictions.length < 2) return 0;
+  let pairs = 0;
+  let separated = 0;
+  for (let i = 0; i < predictions.length; i += 1) {
+    for (let j = i + 1; j < predictions.length; j += 1) {
+      pairs += 1;
+      if (Math.abs(predictions[i]! - predictions[j]!) > FALSIFICATION_SIGMA_THRESHOLD * Math.max(sigmaAtX, 1e-12)) separated += 1;
+    }
   }
-  return atStake / fits.length;
+  return pairs === 0 ? 0 : separated / pairs;
 }
 
 /**
- * How much weight the breadth term carries against the width term. Held
- * deliberately below 1: discrimination is the term with a measurement-theoretic
- * meaning (can this observation tell two models apart at all?), and breadth
- * refines the choice among experiments that already pass that bar rather than
- * overturning it.
+ * Redund — how close `x` sits to an already-admitted observation, as a
+ * fraction of the laboratory's full candidate span: 0 = as far as any
+ * candidate can be from what has already been observed, 1 = adjacent to (or
+ * coincident with) an admitted point. High redundancy means observing here
+ * would likely repeat, rather than add to, what admitted points already
+ * constrain — a SOFTER notion than the hard exact-value filter (`unobserved`
+ * below) that only blocks re-selecting the identical x already admitted.
  */
-export const FALSIFICATION_WEIGHT = 0.5;
+export function redundancyAt(x: number, admittedX: readonly number[], candidateSpan: number): number {
+  if (admittedX.length === 0 || candidateSpan <= 0) return 0;
+  const nearest = Math.min(...admittedX.map((a) => Math.abs(a - x)));
+  return Math.max(0, 1 - nearest / candidateSpan);
+}
 
 /**
  * Runs one full autonomous campaign against `lab`. Deterministic: same
@@ -386,31 +406,22 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     excludeBases: options.excludeBases,
   };
 
-  const assumptions = options.assumptions ?? STANDING_ASSUMPTIONS;
-  const scope: FalsifiedModelScope = {
+  const scopeForLab: FalsificationScope = {
     domain: lab.labId,
-    assumptions,
+    assumptions: CAMPAIGN_ASSUMPTIONS,
     boundary: `${lab.xLabel} in [${lab.xRange.min}, ${lab.xRange.max}]`,
   };
-  let registry = options.falsifiedRegistry ?? new FalsifiedModelRegistry();
-  const registryBlocked: { fingerprint: string; outcome: RegistryGateOutcome; reason: string }[] = [];
 
-  /**
-   * M2 GATE — the single place a model becomes live. Every emission goes
-   * through here: the enumerated starting space AND anything derived from a
-   * residual later. BLOCK and REQUIRE_OVERRIDE keep the model out (no override
-   * is supplied by an autonomous run — an override is a human act, by
-   * construction); ALLOW and ALLOW_WITH_TAG let it in.
-   */
-  const admit = (spec: ModelSpec, fingerprint: string): boolean => {
-    const lookup = registry.check(fingerprint, scope);
-    if (lookup.outcome === 'ALLOW' || lookup.outcome === 'ALLOW_WITH_TAG') return true;
-    registryBlocked.push({ fingerprint, outcome: lookup.outcome, reason: `${renderModelSpec(spec)}: ${lookup.reason}` });
-    return false;
+  const registrySkips: { fingerprint: string; reason: string; verdict: ConsultationVerdict }[] = [];
+  const admitOrSkip = (spec: ModelSpec): RegistryConsultation => {
+    if (!options.respectFalsifiedModelRegistry) return { verdict: 'ALLOW', reason: 'Registry consultation not requested.', matchedRecord: null };
+    const consultation = consultFalsifiedModelRegistry({ spec, scope: scopeForLab });
+    if (consultation.verdict !== 'ALLOW') registrySkips.push({ fingerprint: modelSpecFingerprint(spec), reason: consultation.reason, verdict: consultation.verdict });
+    return consultation;
   };
 
   const live: LiveModel[] = generateModelSpace(constraints)
-    .filter((spec) => admit(spec, modelSpecFingerprint(spec)))
+    .filter((spec) => admitOrSkip(spec).verdict === 'ALLOW')
     .map((spec) => ({
       spec,
       fingerprint: modelSpecFingerprint(spec),
@@ -431,6 +442,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     if (observed !== null) admitted.push(observed);
   }
   const remaining = ordered.filter((x) => !admitted.some((p) => p.x === x));
+  const candidateSpan = Math.max(...lab.candidateX) - Math.min(...lab.candidateX);
 
   const rounds: CampaignRound[] = [];
   const observationGaps: ObservationGapRequest[] = [];
@@ -439,10 +451,10 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
   let previousWinner: string | null = null;
   let previousRatio: number | null = null;
   let lastResidualFindings: readonly ResidualFinding[] = [];
-  let lastFitByFingerprint = new Map<string, { rss: number; predict: (x: number) => number; coefficients: readonly number[] }>();
+  let lastFitByFingerprint = new Map<string, { rss: number; predict: (input: ModelInput) => number; coefficients: readonly number[] }>();
 
   for (let round = 1; round <= maxRounds; round += 1) {
-    const fitted: { model: LiveModel; rss: number; predict: (x: number) => number; coefficients: readonly number[] }[] = [];
+    const fitted: { model: LiveModel; rss: number; predict: (input: ModelInput) => number; coefficients: readonly number[] }[] = [];
     for (const model of live) {
       const fit = fitModelSpec(model.spec, admitted);
       if (fit.ok) fitted.push({ model, rss: fit.rss, predict: fit.predict, coefficients: fit.coefficients });
@@ -453,18 +465,21 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     }
     lastFitByFingerprint = new Map(fitted.map((f) => [f.model.fingerprint, { rss: f.rss, predict: f.predict, coefficients: f.coefficients }]));
 
+    // Rank: lowest weighted RSS wins; a tie is broken toward the simpler model.
     /*
      * M3 PARSIMONY. Ranking by raw weighted RSS always favours the more complex
      * model, because an extra free coefficient can only lower it — which is how
      * an engine talks itself into an elaborate model that has merely absorbed
      * noise. Ranking is therefore by `modelSelectionScore` (chi-square plus
-     * k·ln(n)): a more complex model wins only when it buys more chi-square than
-     * its extra freedom costs. RSS is still reported unchanged, so the raw fit
-     * quality remains visible next to the penalised comparison.
+     * k·ln(n)); RSS is still reported unchanged, so raw fit quality stays
+     * visible next to the penalised comparison, and `modelComplexity` remains
+     * the final tie-break it always was.
      */
-    const scoreOf = (entry: { model: LiveModel; rss: number }): number =>
+    const selectionScoreOf = (entry: { model: LiveModel; rss: number }): number =>
       modelSelectionScore(entry.rss, estimatedCoefficientCount(entry.model.spec), admitted.length);
-    const ranked = [...fitted].sort((a, b) => scoreOf(a) - scoreOf(b) || a.rss - b.rss || modelComplexity(a.model.spec) - modelComplexity(b.model.spec));
+    const ranked = [...fitted].sort(
+      (a, b) => selectionScoreOf(a) - selectionScoreOf(b) || a.rss - b.rss || modelComplexity(a.model.spec) - modelComplexity(b.model.spec),
+    );
     const best = ranked[0]!;
     const runnerUp = ranked[1] ?? null;
     const rssRatio = runnerUp === null ? null : best.rss === runnerUp.rss ? 1 : best.rss / Math.max(runnerUp.rss, 1e-12);
@@ -498,8 +513,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     )) {
       const print = modelSpecFingerprint(proposal.spec);
       if (live.some((m) => m.fingerprint === print)) continue;
-      // M2: a model derived from a residual is still an emission, and is gated identically.
-      if (!admit(proposal.spec, print)) continue;
+      if (admitOrSkip(proposal.spec).verdict !== 'ALLOW') continue;
       const entering: LiveModel = {
         spec: proposal.spec,
         fingerprint: print,
@@ -512,45 +526,40 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       derivedThisRound.push(viewOf(entering, null));
     }
 
-    // --- choose the next experiment by real discrimination among live fits ---
+    // --- choose the next experiment: planner score = Sep × (1 + Fals) × (1 − Redund) ---
     const predictors = fitted.map((f) => ({ predict: f.predict }));
     let selectedNextX: number | null = null;
     let discriminationScore: number | null = null;
+    let falsificationScore: number | null = null;
+    let redundancyScore: number | null = null;
+    let plannerScore: number | null = null;
     let selectionReason = 'No unobserved experiment remains in this laboratory.';
     const unobserved = remaining.filter((x) => !admitted.some((p) => p.x === x));
     let bestCandidateX: number | null = null;
-    let selectionTerms: CampaignRound['selectionTerms'] = null;
     if (unobserved.length > 0) {
       const sigmaGuess = admitted.reduce((acc, p) => acc + p.sigma, 0) / admitted.length;
-      const span = Math.max(lab.xRange.max - lab.xRange.min, 1e-12);
+      const admittedX = admitted.map((p) => p.x);
       let bestScore = -Infinity;
+      let bestSep = 0;
+      let bestFals = 0;
+      let bestRedund = 0;
       for (const x of unobserved) {
-        /*
-         * THE PLANNER'S SCORE. Discrimination discounted by how much the
-         * candidate repeats an observation already made, plus a weighted share
-         * for how many live models the measurement puts at stake. Redundancy
-         * discounts rather than subtracts, so it can never turn a
-         * well-discriminating experiment negative — only rank it behind an
-         * equally discriminating one that covers new ground.
-         */
-        const discrimination = discriminationAt(x, predictors, sigmaGuess);
-        const redundancy = redundancyAt(x, admitted, span);
-        const falsification = falsificationValueAt(x, predictors, best.predict, sigmaGuess);
-        const combined = discrimination * (1 - redundancy) + FALSIFICATION_WEIGHT * falsification;
+        const sep = discriminationAt(x, predictors, sigmaGuess);
+        const fals = falsificationPowerAt(x, predictors, sigmaGuess);
+        const redund = redundancyAt(x, admittedX, candidateSpan);
+        const combined = sep * (1 + REFINEMENT_WEIGHT * fals) * (1 - REFINEMENT_WEIGHT * redund);
         if (combined > bestScore) {
           bestScore = combined;
           bestCandidateX = x;
-          selectionTerms = { discrimination, redundancy, falsificationValue: falsification, combined };
+          bestSep = sep;
+          bestFals = fals;
+          bestRedund = redund;
         }
       }
-      /*
-       * The GAP test below is judged on DISCRIMINATION alone, never on the
-       * combined score. A gap means "no experiment can tell these models
-       * apart", which is a statement about discrimination; letting the
-       * redundancy discount push a genuinely discriminating experiment under
-       * the threshold would raise a gap that the physics does not justify.
-       */
-      discriminationScore = selectionTerms === null ? null : selectionTerms.discrimination;
+      discriminationScore = Number.isFinite(bestSep) ? bestSep : null;
+      falsificationScore = Number.isFinite(bestFals) ? bestFals : null;
+      redundancyScore = Number.isFinite(bestRedund) ? bestRedund : null;
+      plannerScore = Number.isFinite(bestScore) ? bestScore : null;
     }
 
     /*
@@ -561,6 +570,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
      * selecting it would spend an experiment that cannot discriminate.
      * The engine raises a request for the measurement it does not have
      * instead, and does NOT choose. It never obtains that measurement itself.
+     * Gated on Sep (`discriminationScore`) alone, not the C3-1 planner score:
+     * whether an experiment can discriminate AT ALL is a property of raw
+     * measurement uncertainty, not of how novel or falsifying it also is.
      */
     const gapTrigger = classifyObservationGap({ unobservedCount: unobserved.length, bestDiscriminability: discriminationScore });
     let observationGap: ObservationGapRequest | null = null;
@@ -590,9 +602,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
 
     if (observationGap === null && bestCandidateX !== null) {
       selectedNextX = bestCandidateX;
-      selectionReason = `Chose ${lab.xLabel}=${selectedNextX}: the ${fitted.length} live models' predictions disagree there by ${discriminationScore?.toFixed(3)}× the typical observation sigma (above the ${TAU_DISCRIMINABILITY}σ floor), it repeats an existing observation by ${((selectionTerms?.redundancy ?? 0) * 100).toFixed(1)}%, and it puts ${((selectionTerms?.falsificationValue ?? 0) * 100).toFixed(1)}% of the live models at stake — the best combined score among ${unobserved.length} unobserved candidate(s).`;
+      selectionReason = `Chose ${lab.xLabel}=${selectedNextX}: live models' predictions disagree there by ${discriminationScore?.toFixed(3)}× the typical observation sigma (Sep, above the ${TAU_DISCRIMINABILITY}σ floor below which an experiment cannot discriminate), ${((falsificationScore ?? 0) * 100).toFixed(0)}% of live-model pairs would be separated at ${FALSIFICATION_SIGMA_THRESHOLD}σ if observed here (Fals), and it sits ${((redundancyScore ?? 0) * 100).toFixed(0)}% of the candidate span's worth of redundancy from the nearest admitted point (Redund) — combined planner score ${plannerScore?.toFixed(3)} was the highest among ${unobserved.length} unobserved candidate(s).`;
     } else if (observationGap === null && unobserved.length > 0) {
-      selectionReason = 'No candidate experiment produced a finite discrimination score.';
+      selectionReason = 'No candidate experiment produced a finite planner score.';
     }
 
     const roundFingerprint = fnv1a(canonicalJson({
@@ -616,13 +628,14 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       selectedNextX,
       selectionReason,
       discriminationScore,
+      falsificationScore,
+      redundancyScore,
+      plannerScore,
       beliefs: [...beliefs.values()],
       antiHarking,
       roundFingerprint,
       observationGap,
-      registryBlocked: [...registryBlocked],
-      selectionTerms,
-      bestHoldoutScore: holdoutScore(best.model.spec, admitted.map((p) => ({ xs: [p.x], y: p.y, sigma: p.sigma }))),
+      bestHoldoutScore: holdoutScore(best.model.spec, admitted),
     });
     priorFingerprints.push(roundFingerprint);
     if (observationGap !== null) observationGaps.push(observationGap);
@@ -664,33 +677,30 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
   const surviving = finalRound === null ? [] : finalRound.models.filter((m) => (beliefs.get(m.fingerprint)?.confidence ?? 0) >= 0.5);
   const falsified = finalRound === null ? [] : finalRound.models.filter((m) => (beliefs.get(m.fingerprint)?.confidence ?? 0) < 0.5);
 
-  /*
-   * M2 WRITE-BACK. Only models the campaign actually ENDED holding as
-   * falsified are recorded — not every loser of a single round, which would
-   * flood the registry with verdicts the campaign itself later revisited.
-   *
-   * Every record is written VARIANT_ONLY, deliberately. This campaign
-   * established that a specific parameterisation lost to a better model on
-   * this data; it did NOT establish that the functional family is dead
-   * everywhere, and NEVER is a stronger claim than the evidence supports.
-   * Promoting a record to NEVER is a human judgement made against the record,
-   * not an inference the engine may draw on its own.
-   */
-  const observationIds = admitted.map((p) => `${lab.labId}:${lab.xLabel}=${p.x}`);
-  if (observationIds.length > 0) {
-    for (const model of falsified) {
-      const written = registry.record({
-        modelId: `model:${model.fingerprint}`,
-        modelFingerprint: model.fingerprint,
-        observationIds,
-        verdict: 'FALSIFIED',
-        campaignId: lab.labId,
-        round: rounds.length,
-        scope,
-        reusableAs: 'VARIANT_ONLY',
-        recordedAt: rounds.length,
-      });
-      if (written.ok) registry = written.registry;
+  // Computed here (not only in the return statement below) so M2 can log the
+  // real run identity as `falsifiedBy.campaignId` — the SAME fingerprint the
+  // caller receives on `CampaignResult.campaignFingerprint`, not a second one.
+  const campaignFingerprint = fnv1a(canonicalJson({ labId: lab.labId, rounds: rounds.map((r) => r.roundFingerprint), stopReason, winner }));
+
+  if (options.respectFalsifiedModelRegistry && finalRound !== null) {
+    for (const view of falsified) {
+      const hypothesis = beliefs.get(view.fingerprint);
+      const model = live.find((m) => m.fingerprint === view.fingerprint);
+      if (!hypothesis || !model || hypothesis.status !== 'FALSIFIED_WITHIN_PROTOCOL') continue;
+      if (consultFalsifiedModelRegistry({ spec: model.spec, scope: scopeForLab }).verdict === 'ALLOW') {
+        recordFalsification({
+          spec: model.spec,
+          scope: scopeForLab,
+          // A single campaign's own RSS comparison only supports "worse than
+          // its rivals in THIS laboratory" — never a universal claim — so
+          // automatic recording never reaches for NEVER or COMPONENT.
+          reusableAs: 'VARIANT_ONLY',
+          evidence: hypothesis,
+          campaignId: campaignFingerprint,
+          round: finalRound.round,
+          observationIds: finalRound.admittedX.map((x) => `${lab.labId}:x=${x}`),
+        });
+      } // else: already standing (append-only, no need to pile up a duplicate entry every re-run).
     }
   }
 
@@ -730,7 +740,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     uncertainty: winnerFit === null
       ? 'No fittable model, so no uncertainty statement is meaningful.'
       : `Weighted RSS ${winnerFit.rss.toFixed(6)} over ${admitted.length} points; per-point sigma came from the laboratory, not from this engine.`,
-    assumptions,
+    assumptions: CAMPAIGN_ASSUMPTIONS,
     residualFindings: lastResidualFindings,
     /*
      * When the campaign ended holding an open gap, the honest answer to "what
@@ -757,11 +767,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     rounds,
     stopReason,
     discovery,
-    campaignFingerprint: fnv1a(canonicalJson({ labId: lab.labId, rounds: rounds.map((r) => r.roundFingerprint), stopReason, winner })),
+    campaignFingerprint,
+    registrySkips,
     observationGaps,
     gapLedgerFingerprint: observationGapLedgerFingerprint(observationGaps),
-    falsifiedRegistry: registry,
-    registryFingerprintAfter: registryFingerprint(registry),
-    registryBlocked,
   };
 }

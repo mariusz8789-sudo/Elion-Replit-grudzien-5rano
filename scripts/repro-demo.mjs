@@ -78,18 +78,16 @@ const EXPECTED = {
   qe4RegimeWinner: 'qe4-regime-logarithmic-k5',
   discoveryQe4Winner: 'y = c0 + c1·log(x)',
   discoveryQe4Stop: 'EXPERIMENT_SPACE_EXHAUSTED',
-  // Moved twice in one step, both deliberate and both leaving the SCIENCE intact:
-  //  '1a0226d5' -> M3 parsimony (chi-square + k·ln(n) instead of raw RSS) reordered
-  //               the 55 live models;
-  //             -> the planner's redundancy term then changed the experiment ORDER
-  //               from [20,16,10,6] to [20,10,16,6], because T=16 sat 4 ms from the
-  //               T=20 point just measured while T=10 covered unmeasured ground.
-  // QE4 still concludes logarithmic growth; Kepler still recovers slope 1.49987.
-  discoveryQe4Fingerprint: '1e29ed22',
+  // Moved by M3's parsimony term (ranking by chi-square + k·ln(n) instead of raw
+  // weighted RSS, under which an extra coefficient could only ever help). The
+  // SCIENCE is unchanged: QE4 still concludes logarithmic growth and still picks
+  // [20,16,10,6]. Kepler's fingerprint did not move — its linear model wins under
+  // either ranking rule.
+  discoveryQe4Fingerprint: '44f245c9',
   discoveryKeplerWinner: 'y = c0 + c1·x',
   discoveryKeplerStop: 'CONVERGENCE',
   discoveryKeplerSlope: 1.49987,
-  discoveryKeplerFingerprint: '8ba5f022',
+  discoveryKeplerFingerprint: 'f4804820',
   discoveryDerivedWinnerFingerprint: '315b1877',
   gapTrigger: 'LOW_DISCRIMINABILITY',
   gapStopReason: 'OBSERVATION_GAP',

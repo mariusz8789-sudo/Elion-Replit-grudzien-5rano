@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runDiscoveryCampaign, type CampaignLaboratory } from '../core/agent/discoveryCampaign';
+import { falsificationPowerAt, redundancyAt, runDiscoveryCampaign, type CampaignLaboratory } from '../core/agent/discoveryCampaign';
 import { makeKeplerCampaignLab, makeQe4CampaignLab } from '../core/biotechData/campaignLabs';
 
 /**
@@ -87,6 +87,61 @@ describe('discoveryCampaign — autonomous experiment selection', () => {
     const b = runDiscoveryCampaign(syntheticQuadraticLab(), { maxRounds: 5, maxTerms: 2 });
     expect(a.campaignFingerprint).toBe(b.campaignFingerprint);
     expect(a.rounds.map((r) => r.roundFingerprint)).toEqual(b.rounds.map((r) => r.roundFingerprint));
+  });
+});
+
+describe('discoveryCampaign — C3-1: Fals and Redund planner-score terms', () => {
+  it('reports Fals, Redund and a combined planner score alongside Sep for every real choice, never EIG/Cost/Risk', () => {
+    const result = runDiscoveryCampaign(syntheticQuadraticLab(), { maxRounds: 5, maxTerms: 2 });
+    const withChoice = result.rounds.filter((r) => r.selectedNextX !== null);
+    expect(withChoice.length).toBeGreaterThan(0);
+    for (const round of withChoice) {
+      expect(round.falsificationScore).not.toBeNull();
+      expect(round.falsificationScore!).toBeGreaterThanOrEqual(0);
+      expect(round.falsificationScore!).toBeLessThanOrEqual(1);
+      expect(round.redundancyScore).not.toBeNull();
+      expect(round.redundancyScore!).toBeGreaterThanOrEqual(0);
+      expect(round.redundancyScore!).toBeLessThanOrEqual(1);
+      expect(round.plannerScore).not.toBeNull();
+    }
+    expect(JSON.stringify(result)).not.toMatch(/\bEIG\b/);
+  });
+
+  it('the reported plannerScore is exactly Sep × (1 + w·Fals) × (1 − w·Redund) for its own reported Sep/Fals/Redund', () => {
+    const REFINEMENT_WEIGHT = 0.25;
+    const result = runDiscoveryCampaign(syntheticQuadraticLab(), { maxRounds: 5, maxTerms: 2 });
+    for (const round of result.rounds.filter((r) => r.selectedNextX !== null)) {
+      const expected = round.discriminationScore! * (1 + REFINEMENT_WEIGHT * round.falsificationScore!) * (1 - REFINEMENT_WEIGHT * round.redundancyScore!);
+      expect(round.plannerScore!).toBeCloseTo(expected, 9);
+    }
+  });
+
+  it('Redund: 0 with no admitted points, 1 at an admitted point, and strictly decreasing with distance from the nearest one', () => {
+    expect(redundancyAt(5, [], 10)).toBe(0);
+    expect(redundancyAt(5, [5], 10)).toBe(1);
+    const near = redundancyAt(6, [5], 10);
+    const far = redundancyAt(15, [5], 10);
+    expect(near).toBeGreaterThan(far);
+    expect(near).toBeGreaterThan(0);
+    expect(far).toBeGreaterThanOrEqual(0);
+  });
+
+  it('Fals: 0 for fewer than two finite predictions, 1 when every pair is separated well past 3σ, 0 when every pair agrees', () => {
+    expect(falsificationPowerAt(5, [{ predict: () => 1 }], 0.1)).toBe(0);
+    const allSeparated = [{ predict: () => 0 }, { predict: () => 100 }, { predict: () => -100 }];
+    expect(falsificationPowerAt(5, allSeparated, 0.1)).toBe(1);
+    const allAgree = [{ predict: () => 5 }, { predict: () => 5.001 }, { predict: () => 4.999 }];
+    expect(falsificationPowerAt(5, allAgree, 1)).toBe(0);
+  });
+
+  it('Fals distinguishes a case one extreme pair dominates from one where every pair is genuinely separated — Sep alone cannot', () => {
+    // Same max−min spread (100) in both cases, so Sep is IDENTICAL; only Fals tells them apart.
+    const oneOutlierPair = [{ predict: () => 0 }, { predict: () => 1 }, { predict: () => 100 }];
+    const everyPairSeparated = [{ predict: () => 0 }, { predict: () => 50 }, { predict: () => 100 }];
+    const sigma = 1;
+    const spread = (fits: typeof oneOutlierPair) => Math.max(...fits.map((f) => f.predict())) - Math.min(...fits.map((f) => f.predict()));
+    expect(spread(oneOutlierPair)).toBe(spread(everyPairSeparated));
+    expect(falsificationPowerAt(0, oneOutlierPair, sigma)).toBeLessThan(falsificationPowerAt(0, everyPairSeparated, sigma));
   });
 });
 

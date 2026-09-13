@@ -32,31 +32,27 @@
  * `executePreregisteredHypotheses` is single-shot (no rounds) and is built
  * around a `candidateVariable` sweep against a runnable model, not a
  * multi-point curve fit against a pinned CSV. This module is a fourth,
- * narrow, QE4-scoped loop — not a generalization of any of them, and not the
- * generic `DatasetLaboratory` seam (`core/agent/datasetLaboratory.ts`) that
- * would let 17 domains share one shape. Reuses, unmodified:
- * `runQe4BrydgesAnalysis` (real bootstrap over the pinned CSVs),
- * `weightedLinearFit`/`weightedResidualSumOfSquares` (`qe4BrydgesEstimator.ts`),
- * `createHypothesis`/`updateConfidence` (`beliefRevision.ts`),
- * `checkAntiHarkingAnchor` (`hypothesisLoop.ts`), and `fnv1a`/`canonicalJson`
- * (`events/hash.ts`). Zero new engines.
+ * narrow, QE4-scoped loop — not a generalization of any of them. It CONSUMES
+ * the generic `DatasetLaboratory` seam (`core/agent/datasetLaboratory.ts`)
+ * rather than bypassing it. Reuses, unmodified:
+ * `pointsForGrid` (`qe4DatasetLaboratory.ts`, the P0.1 seam over the real
+ * bootstrap), `weightedLinearFit`/`weightedResidualSumOfSquares`
+ * (`qe4BrydgesEstimator.ts`), `createHypothesis`/`updateConfidence`
+ * (`beliefRevision.ts`), `checkAntiHarkingAnchor` (`hypothesisLoop.ts`), and
+ * `fnv1a`/`canonicalJson` (`events/hash.ts`). Zero new engines.
  *
- * RELATIONSHIP TO `DatasetLaboratory`: this module was authored concurrently
- * with, and started before, `core/agent/datasetLaboratory.ts` /
- * `core/biotechData/qe4DatasetLaboratory.ts` landed — both sides read the
- * SAME underlying `runQe4BrydgesAnalysis()` bootstrap, just through different
- * facades (this module filters `disorderPoints` directly; `DatasetLaboratory`
- * exposes the same points one at a time via `observableSpec()`/`run()`), so
- * there is no science-level duplication, only two access patterns over one
- * computation. A natural, NOT-YET-DONE follow-up: refactor
- * `runQe4DisorderRegimeInquiry` to source its points through
- * `QE4_DATASET_LABORATORY.observableSpec()`/`.run()` instead of calling
- * `runQe4BrydgesAnalysis()` directly, so this loop demonstrates consuming the
- * generic seam rather than bypassing it. Deliberately left for a separate,
- * fully re-verified change rather than rushed in here.
+ * CANONICALIZATION (2026-09-13): this module and
+ * `biotechData/qe4RegimeHypotheses.ts` + `biotechData/qe4RegimeRound.ts` were
+ * authored concurrently as two competing P0-2 implementations and both landed
+ * on the shared branch. This one was established as canonical — it is a real
+ * multi-round loop with a residual-derived hypothesis, acted-on stop rules, an
+ * anti-HARK gate that actually halts the run, and `repro-demo.mjs` runtime
+ * verification, all of which the other lacked; the other's only advantage was
+ * sourcing through the `DatasetLaboratory` seam, which is now folded in here
+ * (`pointsForGrid`) and the duplicate retired. See `docs/DECISIONS.md` D-026.
  */
 
-import { runQe4BrydgesAnalysis, type Qe4PointResult } from '../biotechData/qe4BrydgesAnalysis';
+import { pointsForGrid, type Qe4GridPoint } from '../biotechData/qe4DatasetLaboratory';
 import { weightedLinearFit, weightedResidualSumOfSquares } from '../biotechData/qe4BrydgesEstimator';
 import { createHypothesis, updateConfidence, type Hypothesis } from '../experimentFabric/beliefRevision';
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
@@ -180,7 +176,7 @@ function fitSaturating(t: readonly number[], y: readonly number[], sigma: readon
   return { regime: 'SATURATING', rss: chosen.rss, coefficients: { a: chosen.a, c: chosen.c, tau: chosen.tau }, predict };
 }
 
-function fitAllRegimes(points: readonly Qe4PointResult[]): readonly InternalFit[] {
+function fitAllRegimes(points: readonly Qe4GridPoint[]): readonly InternalFit[] {
   const t = points.map((p) => p.t);
   const y = points.map((p) => p.s2);
   const sigma = points.map((p) => p.sigma);
@@ -215,7 +211,7 @@ function regimeLabel(regime: Qe4Regime): string {
 export function deriveResidualHypothesis(
   regime: Qe4Regime,
   predict: (t: number) => number,
-  points: readonly Qe4PointResult[],
+  points: readonly Qe4GridPoint[],
   k: number,
   parentHypothesisId: string,
 ): Qe4ResidualHypothesisResult {
@@ -263,7 +259,7 @@ export function deriveResidualHypothesis(
  * HARK-ing scenario, not a mocked one.
  */
 export function runRegimeInquiryCore(
-  points: readonly Qe4PointResult[],
+  points: readonly Qe4GridPoint[],
   options: { readonly k: number; readonly alreadyKnownFingerprints?: readonly string[]; readonly maxRounds?: number },
 ): Qe4RegimeInquiryResult {
   const { k } = options;
@@ -388,7 +384,5 @@ export function runRegimeInquiryCore(
  * `qe4BrydgesAnalysis.ts`'s own P2 verdict already uses for this comparison.
  */
 export function runQe4DisorderRegimeInquiry(k: 5 | 10 = 5): Qe4RegimeInquiryResult {
-  const analysis = runQe4BrydgesAnalysis();
-  const points = analysis.disorderPoints.filter((p) => p.k === k).sort((a, b) => a.t - b.t);
-  return runRegimeInquiryCore(points, { k });
+  return runRegimeInquiryCore(pointsForGrid('disorder', k), { k });
 }

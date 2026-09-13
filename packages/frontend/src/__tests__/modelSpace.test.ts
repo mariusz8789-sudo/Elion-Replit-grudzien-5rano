@@ -14,10 +14,10 @@ import {
 } from '../core/agent/modelSpace';
 
 const CONST: ModelTerm = { basis: 'CONSTANT' };
-const LIN: ModelTerm = { basis: 'LINEAR' };
-const LOG: ModelTerm = { basis: 'LOG' };
-const SAT = (tau: number): ModelTerm => ({ basis: 'EXP_SATURATION', tau });
-const POW = (p: number): ModelTerm => ({ basis: 'POWER', exponent: p });
+const LIN: ModelTerm = { basis: 'LINEAR', variable: 'x' };
+const LOG: ModelTerm = { basis: 'LOG', variable: 'x' };
+const SAT = (tau: number): ModelTerm => ({ basis: 'EXP_SATURATION', variable: 'x', tau });
+const POW = (p: number): ModelTerm => ({ basis: 'POWER', variable: 'x', exponent: p });
 
 const spec = (terms: readonly ModelTerm[], id = 'm'): ModelSpec => normalizeModelSpec({ id, terms, lineage: null });
 
@@ -175,5 +175,75 @@ describe('modelSpace — mutation and lineage', () => {
     const kids = mutateModelSpec(spec([CONST, LIN]), { xRange: { min: 1, max: 20 } });
     const prints = kids.map(modelSpecFingerprint);
     expect(new Set(prints).size).toBe(prints.length);
+  });
+});
+
+describe('modelSpace — multi-variable models and interaction terms (C3-2)', () => {
+  it('a single-variable basis reads its NAMED variable from a Record input, not an implicit x', () => {
+    const onA: ModelTerm = { basis: 'LINEAR', variable: 'a' };
+    expect(basisValue(onA, { a: 5, b: 100 })).toBe(5);
+    expect(basisValue(onA, { b: 100 })).toBeNaN();
+    expect(Number.isFinite(basisValue(onA, { b: 100 }))).toBe(false);
+  });
+
+  it('INTERACTION evaluates the plain product of its two named variables, and is undefined when either is missing', () => {
+    const cross: ModelTerm = { basis: 'INTERACTION', variables: ['a', 'b'] };
+    expect(basisValue(cross, { a: 3, b: 4 })).toBe(12);
+    expect(Number.isFinite(basisValue(cross, { a: 3 }))).toBe(false);
+  });
+
+  it('a bare number is still accepted everywhere — the legacy single-variable call shape is unchanged', () => {
+    expect(basisValue(LIN, 7)).toBe(7);
+    expect(basisValue(POW(2), 3)).toBe(9);
+  });
+
+  it('recovers exact coefficients of a genuine two-variable model with an interaction term', () => {
+    // y = 1 + 2*a + 3*b + 4*(a*b), exact — a real fit must recover all four coefficients.
+    const points = [
+      { a: 1, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 1 }, { a: 2, b: 2 }, { a: 3, b: 3 },
+    ].map(({ a, b }) => ({ x: a, y: 1 + 2 * a + 3 * b + 4 * a * b, sigma: 1, vars: { a, b } }));
+    const twoVarSpec = spec([
+      { basis: 'CONSTANT' },
+      { basis: 'LINEAR', variable: 'a' },
+      { basis: 'LINEAR', variable: 'b' },
+      { basis: 'INTERACTION', variables: ['a', 'b'] },
+    ]);
+    const fit = fitModelSpec(twoVarSpec, points);
+    expect(fit.ok).toBe(true);
+    if (!fit.ok) return;
+    // Verify via `predict` at held-out points rather than coefficient array
+    // indices — `normalizeModelSpec` sorts terms canonically, so which index
+    // holds which coefficient is an implementation detail, not a contract.
+    expect(fit.rss).toBeCloseTo(0, 6);
+    expect(fit.predict({ a: 2, b: 2 })).toBeCloseTo(1 + 2 * 2 + 3 * 2 + 4 * 2 * 2, 6);
+    expect(fit.predict({ a: 5, b: 1 })).toBeCloseTo(1 + 2 * 5 + 3 * 1 + 4 * 5 * 1, 6);
+    expect(fit.predict({ a: 0, b: 7 })).toBeCloseTo(1 + 2 * 0 + 3 * 7 + 4 * 0 * 7, 6);
+  });
+
+  it('generateModelSpace enumerates per-variable terms across every declared variable', () => {
+    const space = generateModelSpace({ maxTerms: 1, xRange: { min: 1, max: 10 }, variables: ['a', 'b'] });
+    const hasLinearOn = (v: string) => space.some((m) => m.terms.some((t) => t.basis === 'LINEAR' && t.variable === v));
+    expect(hasLinearOn('a')).toBe(true);
+    expect(hasLinearOn('b')).toBe(true);
+  });
+
+  it('INTERACTION terms are opt-in: absent unless includeInteractions is set, present when it is', () => {
+    const without = generateModelSpace({ maxTerms: 2, xRange: { min: 1, max: 10 }, variables: ['a', 'b'] });
+    expect(without.some((m) => m.terms.some((t) => t.basis === 'INTERACTION'))).toBe(false);
+    const withIt = generateModelSpace({ maxTerms: 2, xRange: { min: 1, max: 10 }, variables: ['a', 'b'], includeInteractions: true });
+    expect(withIt.some((m) => m.terms.some((t) => t.basis === 'INTERACTION'))).toBe(true);
+  });
+
+  it('a term on one variable is a genuinely different model from the same basis on another variable', () => {
+    const onA = spec([{ basis: 'CONSTANT' }, { basis: 'LINEAR', variable: 'a' }]);
+    const onB = spec([{ basis: 'CONSTANT' }, { basis: 'LINEAR', variable: 'b' }]);
+    expect(modelSpecFingerprint(onA)).not.toBe(modelSpecFingerprint(onB));
+  });
+
+  it('omitting `variables`/`includeInteractions` reproduces the exact single-variable space every existing caller relies on', () => {
+    const legacy = generateModelSpace({ maxTerms: 2, xRange: { min: 1, max: 20 } });
+    const explicit = generateModelSpace({ maxTerms: 2, xRange: { min: 1, max: 20 }, variables: ['x'] });
+    expect(legacy.map(modelSpecFingerprint)).toEqual(explicit.map(modelSpecFingerprint));
+    expect(legacy.every((m) => m.terms.every((t) => t.basis === 'CONSTANT' || t.basis === 'INTERACTION' || t.variable === 'x'))).toBe(true);
   });
 });

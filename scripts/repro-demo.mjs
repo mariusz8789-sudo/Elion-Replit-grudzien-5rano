@@ -78,11 +78,11 @@ const EXPECTED = {
   qe4RegimeWinner: 'qe4-regime-logarithmic-k5',
   discoveryQe4Winner: 'y = c0 + c1·log(x)',
   discoveryQe4Stop: 'EXPERIMENT_SPACE_EXHAUSTED',
-  discoveryQe4Fingerprint: '1a0226d5',
+  discoveryQe4Fingerprint: '60309677',
   discoveryKeplerWinner: 'y = c0 + c1·x',
   discoveryKeplerStop: 'CONVERGENCE',
   discoveryKeplerSlope: 1.49987,
-  discoveryKeplerFingerprint: '2d6ce643',
+  discoveryKeplerFingerprint: 'f4804820',
   discoveryDerivedWinnerFingerprint: '315b1877',
   qe4RegimeFingerprints: ['e7b90572', '3c3e9083', 'c82210fb', '67711185', 'cc3e4323', 'bb6aec30', '2d470070'],
 };

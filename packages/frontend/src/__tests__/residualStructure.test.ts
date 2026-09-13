@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { analyzeResidualStructure, proposeModelsFromResiduals } from '../core/agent/residualStructure';
 import { fitModelSpec, modelSpecFingerprint, normalizeModelSpec, type ModelPoint, type ModelSpec } from '../core/agent/modelSpace';
 
-const LINE: ModelSpec = normalizeModelSpec({ id: 'line', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR' }], lineage: null });
+const LINE: ModelSpec = normalizeModelSpec({ id: 'line', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR', variable: 'x' }], lineage: null });
 const X_RANGE = { min: 1, max: 10 };
 
 function fitOf(spec: ModelSpec, points: readonly ModelPoint[]) {

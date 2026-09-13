@@ -1,9 +1,11 @@
 import {
   basisValue,
+  DEFAULT_VARIABLE,
   fitModelSpec,
   modelSpecFingerprint,
   normalizeModelSpec,
   renderModelSpec,
+  termKey,
   type ModelFit,
   type ModelPoint,
   type ModelSpec,
@@ -84,8 +86,8 @@ function pearson(xs: readonly number[], ys: readonly number[]): number {
   return denom < 1e-12 ? 0 : sxy / denom;
 }
 
-const RESIDUAL_LINE: ModelSpec = { id: 'residual-line', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR' }], lineage: null };
-const RESIDUAL_QUADRATIC: ModelSpec = { id: 'residual-quadratic', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR' }, { basis: 'POWER', exponent: 2 }], lineage: null };
+const RESIDUAL_LINE: ModelSpec = { id: 'residual-line', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR', variable: DEFAULT_VARIABLE }], lineage: null };
+const RESIDUAL_QUADRATIC: ModelSpec = { id: 'residual-quadratic', terms: [{ basis: 'CONSTANT' }, { basis: 'LINEAR', variable: DEFAULT_VARIABLE }, { basis: 'POWER', variable: DEFAULT_VARIABLE, exponent: 2 }], lineage: null };
 
 /**
  * Names what, if anything, is structurally wrong with `fit`'s residuals.
@@ -159,13 +161,21 @@ export function analyzeResidualStructure(
   return findings;
 }
 
-/** Which extra basis terms each kind of structure motivates trying. */
+/**
+ * Which extra basis terms each kind of structure motivates trying. Always
+ * over `DEFAULT_VARIABLE`: residual structure here is detected along the
+ * ONE axis this module analyzes (`p.x`), not a multi-variable extension —
+ * see `modelSpace.ts`'s own doc comment on `DEFAULT_VARIABLE` for the
+ * single- vs multi-variable boundary this file deliberately stays on the
+ * single-variable side of.
+ */
 function termsForFinding(kind: ResidualStructureKind): readonly ModelTerm[] {
+  const v = DEFAULT_VARIABLE;
   switch (kind) {
-    case 'CURVATURE': return [{ basis: 'POWER', exponent: 2 }, { basis: 'LOG' }, { basis: 'POWER', exponent: 0.5 }];
-    case 'TREND': return [{ basis: 'LINEAR' }, { basis: 'POWER', exponent: 2 }];
+    case 'CURVATURE': return [{ basis: 'POWER', variable: v, exponent: 2 }, { basis: 'LOG', variable: v }, { basis: 'POWER', variable: v, exponent: 0.5 }];
+    case 'TREND': return [{ basis: 'LINEAR', variable: v }, { basis: 'POWER', variable: v, exponent: 2 }];
     case 'LOCALIZED_ANOMALY': return [];
-    case 'HETEROSCEDASTICITY': return [{ basis: 'LOG' }, { basis: 'RECIPROCAL' }];
+    case 'HETEROSCEDASTICITY': return [{ basis: 'LOG', variable: v }, { basis: 'RECIPROCAL', variable: v }];
   }
 }
 
@@ -190,14 +200,14 @@ export function proposeModelsFromResiduals(
   const normalized = normalizeModelSpec(parent);
   const parentPrint = modelSpecFingerprint(normalized);
   const maxTerms = constraints.maxTerms ?? normalized.terms.length + 2;
-  const present = new Set(normalized.terms.map((t) => (t.basis === 'POWER' ? `POWER:${t.exponent}` : t.basis === 'EXP_SATURATION' ? `EXP_SATURATION:${t.tau}` : t.basis)));
+  const present = new Set(normalized.terms.map(termKey));
 
   const out: ModelProposal[] = [];
   const seen = new Set<string>([parentPrint]);
 
   for (const finding of analyzeResidualStructure(normalized, fit, points)) {
     for (const term of termsForFinding(finding.kind)) {
-      const key = term.basis === 'POWER' ? `POWER:${term.exponent}` : term.basis;
+      const key = termKey(term);
       if (present.has(key)) continue;
       if (normalized.terms.length + 1 > maxTerms) continue;
       const spec = normalizeModelSpec({

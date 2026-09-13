@@ -360,6 +360,26 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
+  a1-glp1-recon:
+    name: "A1 (temporary): recon real ChEMBL + ClinicalTrials.gov API shapes"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    # One-off, mirroring the B1 DEFRA recon's own lifecycle: confirms the
+    # REAL field shapes of both APIs before scripts/fetch-a1-glp1-fixture.mjs
+    # is written, so that script does not guess at field names it has never
+    # actually seen. The sandbox itself cannot reach either host (confirmed
+    # blocked via curl and WebFetch — see A1 preregistration commit), so this
+    # has to run here. Remove once its findings have informed the fetch script.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Recon ChEMBL target/molecule/activity + ClinicalTrials.gov study shapes
+        run: node scripts/recon-a1-glp1.mjs
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

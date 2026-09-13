@@ -360,39 +360,6 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
-  a2-ozempic-substitute-pin:
-    name: "A2 (temporary): fetch+pin real mechanism-derived candidate space + trials"
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    permissions:
-      contents: read
-    # One-off, mirroring A1's own pin lifecycle. Two recon rounds (now
-    # removed — see docs/DECISIONS.md) confirmed the real target ids, the
-    # real page_meta.next pagination cursor, and the real molecule_chembl_id__in
-    # batch-resolution shape. This job runs the full mechanism-derived
-    # candidate search: no drug name is ever the input query for candidate
-    # DISCOVERY (only for the unavoidable per-candidate ClinicalTrials.gov
-    # lookup, since trials are not indexed by ChEMBL id). Generous timeout:
-    # full pagination across 3 targets plus per-candidate trial search is a
-    # few dozen to ~150 sequential real HTTP requests. Remove once its
-    # output has been downloaded and committed under
-    # packages/frontend/src/core/biotechData/a2-ozempic-substitute/.
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: Fetch + pin real mechanism-derived candidate space and trials
-        env:
-          GENESIS_A2_FIXTURE_DIR: artifacts/a2-ozempic-substitute
-        run: node scripts/fetch-a2-ozempic-substitute-fixture.mjs
-      - name: Upload immutable A2 candidate-space fixture
-        uses: actions/upload-artifact@v7
-        with:
-          name: a2-ozempic-substitute-${{ github.sha }}
-          path: artifacts/a2-ozempic-substitute
-          retention-days: 90
-
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

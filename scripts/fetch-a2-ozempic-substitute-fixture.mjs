@@ -231,12 +231,12 @@ async function main() {
   for (const [id, potencies] of byMolecule) {
     const info = resolvedMolecules.get(id);
     if (info === undefined) continue;
-    if (!(info.maxPhase >= MIN_MAX_PHASE)) continue;
+    if (!(Number(info.maxPhase) >= MIN_MAX_PHASE)) continue;
     survivingCandidates.push({
       moleculeChemblId: id,
       prefName: info.prefName,
       moleculeType: info.moleculeType,
-      maxPhase: info.maxPhase,
+      maxPhase: Number(info.maxPhase),
       medianPotencyNMByTarget: {
         glp1r: potencies.glp1r.length > 0 ? median([...potencies.glp1r].sort((a, b) => a - b)) : null,
         gipr: potencies.gipr.length > 0 ? median([...potencies.gipr].sort((a, b) => a - b)) : null,
@@ -262,7 +262,8 @@ async function main() {
     }
     if (trials.length > 0) {
       candidatesWithTrials.push({ moleculeChemblId: candidate.moleculeChemblId, prefName: candidate.prefName, trialNctIds: nctIds });
-      await writeFixtureFile(`trials-${candidate.moleculeChemblId}.json`, trials);
+      const trialsFileName = `trials-${candidate.moleculeChemblId}.json`;
+      meta.files[trialsFileName] = { narrowSha256: await writeFixtureFile(trialsFileName, trials) };
     }
   }
   meta.files['candidates-with-trials.json'] = { narrowSha256: await writeFixtureFile('candidates-with-trials.json', candidatesWithTrials) };

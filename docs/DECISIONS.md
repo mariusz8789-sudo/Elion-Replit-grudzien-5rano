@@ -960,3 +960,60 @@ zapisał na runnerze CI, nie z odczytu loga na oko.
 (ten sam cykl życia co `qe4-brydges-pin-measured-states` i
 `b1-defra-aurn-pin-narrow`). `scripts/recon-a1-glp1.mjs` również usunięty — jego
 ustalenia są już wcielone w `fetch-a1-glp1-fixture.mjs`.
+
+---
+
+## D-029 (2026-09-13, A2) — Mechanizm-owy dobór kandydatów: realne dane, w tym realny "szum"
+
+**Decyzja.** A2 (autonomiczny dobór zamiennika Ozempicu) rozszerza A1 z ustalonej
+pary lek-na-lek na przestrzeń kandydatów wyprowadzoną z mechanizmu: KAŻDA
+cząsteczka z realnymi, kwalifikującymi się danymi wiązania w ChEMBL przy
+GLP-1R/GIPR/GCGR i `max_phase>=2` weszła do przestrzeni — żadna nazwa leku nie
+była zapytaniem przy GENEROWANIU kandydatów (tylko przy nieuniknionym
+wyszukiwaniu badań klinicznych PO NAZWIE, bo ClinicalTrials.gov nie indeksuje
+po ChEMBL id).
+
+**Realny wynik z 21 kandydatów spełniających `max_phase>=2`, 12 ma realne
+badania T2DM/otyłość z opublikowanymi wynikami:** EXENATIDE, GLUCAGON, GLP-1
+(natywny), PF-06291874, LIRAGLUTIDE, DANUGLIPRON, ORFORGLIPRON, PERPHENAZINE,
+COTADUTIDE, TIRZEPATIDE, MK-0893, ADOMEGLIVANT (LY2409021).
+
+**Świadomie NIE dodano retroaktywnego filtra "min. 2 testy wiążące", mimo że
+zmniejszyłby "szum".** PERPHENAZINE i ADOMEGLIVANT trafiły do listy z tylko 1
+kwalifikującym się testem każdy — a po realnym sprawdzeniu ich badań okazało
+się: PERPHENAZINE (`NCT00806234`) to badanie przyrostu wagi u dzieci na
+antypsychotykach, nie badanie leczenia cukrzycy — 0 wyników HbA1c/wagi,
+odrzucone przez ISTNIEJĄCĄ, przypiętą PRZED danymi regułę "brak użytecznego
+dowodu skuteczności", nie przez nowy filtr. Dodanie takiego filtra TERAZ, po
+zobaczeniu, że wygodnie usunąłby te dwa przypadki, byłoby dokładnie tym HARK-
+owaniem, przed którym chroni preregestracja — więc tego nie zrobiono.
+
+**Realne odkrycie mechanistyczne, do ujawnienia w raporcie, nie do ukrycia:**
+MK-0893 i ADOMEGLIVANT (LY2409021) to prawdziwe, kliniczne (fazy 2) ANTAGONISTY
+receptora glukagonu (GCGR) — obniżają glikemię BLOKUJĄC glukagon, nie przez
+agonizm receptora inkretynowego jak semaglutyd (GLP-1R). To realna różnica
+mechanistyczna warta jawnego zaznaczenia w werdykcie, nie powód do wykluczenia
+z przestrzeni (mandat wprost każe szukać w całym mechanizmie GLP-1R+GIPR+GCGR).
+
+**Realna luka pokrycia ekstrakcji, ujawniona nie ukryta:** wszystkie trzy
+badania MK-0893 mają 0 dopasowanych `hba1cOutcomes` mimo że HbA1c jest ich
+oczywistym punktem końcowym — regex tytułu (`hba1c|glycated haemoglobin|
+glycosylated hemoglobin`) najwyraźniej nie pasuje do rzeczywistego frazowania
+tytułu w tych trzech badaniach (możliwe warianty jak „glycosylated
+haemoglobin" — brytyjska pisownia „haemoglobin" połączona z „glycosylated",
+której nie było w liście wzorców). Nieprzefiltrowane surowe dane już nie
+istnieją (przypięto tylko wąski wyciąg) — luka zgłoszona jako ograniczenie w
+raporcie końcowym, nie cicho zignorowana.
+
+**Realna wada znaleziona i naprawiona w skrypcie fetch (nie w danych):**
+`writeFixtureFile('trials-<id>.json', ...)` zapisywał plik i liczył odcisk, ale
+odcisk był odrzucany, nigdy nie trafiał do `meta.files` — 12 z 16 przypiętych
+plików nie miało własnego `narrowSha256` do niezależnej weryfikacji. Naprawione
+w skrypcie na przyszłość; dla TEGO zestawu odciski dopisane post-hoc,
+policzone wprost z już zweryfikowanych (dump z loga = plik bajt-w-bajt) plików.
+`maxPhase` z ChEMBL API przychodzi jako STRING (`"4.0"`), nie liczba — filtr
+`>=2` zadziałał poprawnie dzięki luźnemu porównaniu JS, ale zapis do
+`candidates.json` też był stringiem; naprawione (`Number(...)`) w skrypcie.
+
+**Job CI `a2-ozempic-substitute-pin` usunięty** z `ci.yml` po ściągnięciu i
+przypięciu danych, ten sam cykl życia co poprzednie kotwice.

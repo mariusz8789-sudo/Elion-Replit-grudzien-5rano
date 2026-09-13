@@ -158,7 +158,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier;
+let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier, dGate;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -180,6 +180,7 @@ try {
   dGap = science.reproObservationGap();
   dGraph = science.reproDiscoveryGraph();
   dFrontier = science.reproFrontierAcceptance();
+  dGate = science.reproPracticalCandidateGate();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
 } finally {
@@ -312,6 +313,20 @@ record('§9 WARUNEK 2: gdy zaden eksperyment nie rozroznia modeli — OBSERVATIO
 record('§9 WARUNEK 3: replay == MATCH dla kampanii i dla grafu odkrycia',
   dFrontier.replay === 'MATCH' && dFrontier.graphReplay === 'MATCH',
   `kampania=${dFrontier.replay}, graf=${dFrontier.graphReplay}`);
+
+// --- §8: bramka PracticalCandidate (egzekwowana maszynowo) -------------------
+record('§8: bramka PRZEPUSZCZA opisowego kandydata z realnej kampanii, do warstwy Government Research',
+  dGate.realCandidateOutcome === 'ACTIVATE' && dGate.realCandidateSurface === 'GOVERNMENT_RESEARCH',
+  `werdykt=${dGate.realCandidateOutcome}, warstwa=${dGate.realCandidateSurface}`);
+record('§8: granica medyczna dziala na TEKSCIE WYNIKU, nie w promptcie — jezyk recepty jest odrzucony',
+  dGate.clinicalTextRefused === true && dGate.clinicalTextCriterion.includes('NO_CLINICAL_DIRECTIVE_LANGUAGE') && dGate.clinicalBlockedRefused === true,
+  `tekst z recepta odrzucony przez: ${dGate.clinicalTextCriterion}; klasa CLINICAL_BLOCKED odrzucona=${dGate.clinicalBlockedRefused}`);
+record('§8: kandydat bez dowodow i bez zadeklarowanych granic nie wychodzi z warstwy badawczej',
+  dGate.thinEvidenceRefused === true && dGate.noLimitsRefused === true,
+  `za malo obserwacji → REFUSE=${dGate.thinEvidenceRefused}; pusta lista "czego NIE dowiedziono" → REFUSE=${dGate.noLimitsRefused}`);
+record('§8: DZIALANIE wymaga czlowieka, a wynik NIEWYGODNY nie jest blokowany (policy ogranicza dzialanie, nie prawde)',
+  dGate.interventionNeedsHuman === true && dGate.negativeFindingStillActivates === true && dGate.citizenSurfaceEverReachable === false,
+  `interwencja → REQUIRES_HUMAN_APPROVAL=${dGate.interventionNeedsHuman}; wynik negatywny/worst-case dalej ACTIVATE=${dGate.negativeFindingStillActivates}; warstwa obywatelska osiagalna=${dGate.citizenSurfaceEverReachable}`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

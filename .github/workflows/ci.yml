@@ -360,6 +360,26 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
+  a2-ozempic-substitute-recon:
+    name: "A2 (temporary): recon GIPR/GCGR ChEMBL targets, dual/triple agonists, CT.gov adverseEventsModule shape"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    # One-off, mirroring A1's own recon lifecycle: confirms real target ids
+    # and the real adverseEventsModule shape before scripts/fetch-a2-ozempic-substitute-fixture.mjs
+    # is written, so that script does not guess at fields it has never seen.
+    # The sandbox itself cannot reach either host (confirmed blocked for A1
+    # — see docs/DECISIONS.md D-028), so this has to run here. Remove once
+    # its findings have informed the fetch script.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Recon GIPR/GCGR targets, dual/triple agonists, adverse-events module shape
+        run: node scripts/recon-a2-ozempic-substitute.mjs
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

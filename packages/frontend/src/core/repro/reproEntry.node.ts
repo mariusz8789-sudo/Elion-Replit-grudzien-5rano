@@ -157,3 +157,53 @@ export function reproQe4RegimeInquiry(): ReproQe4RegimeInquiryReport {
     roundFingerprints: result.rounds.map((r) => r.runFingerprint),
   };
 }
+
+import { runDiscoveryCampaign } from '../agent/discoveryCampaign';
+import { makeKeplerCampaignLab, makeQe4CampaignLab } from '../biotechData/campaignLabs';
+
+export interface ReproDiscoveryCampaignReport {
+  readonly labId: string;
+  readonly rounds: number;
+  readonly stopReason: string;
+  readonly winningFormula: string | null;
+  readonly winningCoefficients: readonly number[];
+  readonly selectedExperiments: readonly (number | null)[];
+  readonly derivedModelFormulas: readonly string[];
+  readonly winnerWasDerivedAtRound: number;
+  readonly antiHarkingIntactEveryRound: boolean;
+  readonly campaignFingerprint: string;
+}
+
+function report(result: ReturnType<typeof runDiscoveryCampaign>): ReproDiscoveryCampaignReport {
+  const formula = result.discovery.winningFormulaWithCoefficients;
+  const coefficients = formula === null
+    ? []
+    : formula.slice(formula.indexOf('[') + 1, formula.indexOf(']')).split(',').map((s) => Number(s.trim()));
+  return {
+    labId: result.labId,
+    rounds: result.rounds.length,
+    stopReason: result.stopReason,
+    winningFormula: result.discovery.winningModel?.formula ?? null,
+    winningCoefficients: coefficients,
+    selectedExperiments: result.rounds.map((r) => r.selectedNextX),
+    derivedModelFormulas: result.rounds.flatMap((r) => r.derivedThisRound.map((d) => d.formula)),
+    winnerWasDerivedAtRound: result.discovery.winningModel?.enteredAtRound ?? 0,
+    antiHarkingIntactEveryRound: result.rounds.every((r) => r.antiHarking.intact),
+    campaignFingerprint: result.campaignFingerprint,
+  };
+}
+
+/** CASE A — real pinned quantum data (Brydges 2019 disorder chain). */
+export function reproDiscoveryCampaignQe4(): ReproDiscoveryCampaignReport {
+  return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 7, maxTerms: 2 }));
+}
+
+/** CASE B — real pinned astronomy data (NASA NSSDC planetary fact sheet), a different science entirely. */
+export function reproDiscoveryCampaignKepler(): ReproDiscoveryCampaignReport {
+  return report(runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 }));
+}
+
+/** CASE A with LOG removed from the grammar: the engine must rebuild the true shape from residual structure. */
+export function reproDiscoveryCampaignQe4WithoutLog(): ReproDiscoveryCampaignReport {
+  return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 7, maxTerms: 2, excludeBases: ['LOG'] }));
+}

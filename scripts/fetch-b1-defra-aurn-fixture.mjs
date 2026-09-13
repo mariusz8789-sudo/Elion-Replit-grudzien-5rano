@@ -17,22 +17,29 @@
  * negative-control pollutants) brings one site-year down to ~350KB, small
  * enough to freeze in ONE job log with no sharding.
  *
- * This is a disclosed, deterministic, TESTED reduction, not a silent
- * one: `manifest.json` records the ORIGINAL full CSV's own SHA-256 (computed
- * at fetch time, from the complete un-truncated response body) alongside the
- * extracted narrow file's SHA-256, and the ongoing CI verify job re-fetches
- * the full file, re-runs the IDENTICAL extraction function, and compares the
- * extracted result to the committed copy -- catching drift in the columns
- * this experiment actually reads, exactly as the byte-identical comparisons
- * do for the other anchors' full files.
+ * This is a disclosed, deterministic, TESTED reduction, not a silent one:
+ * the per-site-year `<SITE>_<YEAR>.meta.json` records the ORIGINAL full
+ * CSV's own SHA-256 (computed at fetch time, from the complete
+ * un-truncated response body) alongside the extracted narrow file's
+ * SHA-256, and the ongoing CI verify job re-fetches the full file, re-runs
+ * the IDENTICAL extraction function, and compares the extracted result to
+ * the committed copy -- catching drift in the columns this experiment
+ * actually reads, exactly as the byte-identical comparisons do for the
+ * other anchors' full files.
  *
  * Usage: SITE=<code> YEAR=<year> node scripts/fetch-b1-defra-aurn-fixture.mjs
- * Prints the extracted CSV + both SHA-256 hashes with QE4/CMS-style markers
- * for job-log read-back; writes nothing to disk (this runs on an ephemeral
- * GitHub Actions runner with real internet access, not this sandbox).
+ * Writes `<SITE>_<YEAR>.csv` (narrow extraction) and `<SITE>_<YEAR>.meta.json`
+ * (hashes/provenance) under $GENESIS_B1_FIXTURE_DIR (default
+ * artifacts/b1-defra-aurn/<SITE>_<YEAR>) and prints one short summary line —
+ * NOT the full CSV, because GitHub's job-log read-back API silently caps
+ * returned content under one site-year's row count (discovered empirically),
+ * which would corrupt the frozen data. The written files travel back via
+ * actions/upload-artifact, like every other pinned fixture in this repo.
  */
 
 import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 function sha256(text) {
   return createHash('sha256').update(text, 'utf8').digest('hex');
@@ -122,19 +129,40 @@ async function main() {
   const narrowCsv = rowsToNarrowCsv(rows);
   const narrowSha256 = sha256(narrowCsv);
 
-  console.log(`B1-FETCH BEGIN ${SITE}_${YEAR}`);
-  console.log(`B1-FETCH URL ${SITE}_${YEAR} ${url}`);
-  console.log(`B1-FETCH ORIGINAL-SHA256 ${SITE}_${YEAR} ${originalSha256}`);
-  console.log(`B1-FETCH ORIGINAL-BYTES ${SITE}_${YEAR} ${Buffer.byteLength(rawCsv, 'utf8')}`);
-  console.log(`B1-FETCH HAS-NO2 ${SITE}_${YEAR} ${hasNo2}`);
-  console.log(`B1-FETCH HAS-SO2 ${SITE}_${YEAR} ${hasSo2}`);
-  console.log(`B1-FETCH ROW-COUNT ${SITE}_${YEAR} ${rows.length}`);
-  console.log(`B1-FETCH NARROW-SHA256 ${SITE}_${YEAR} ${narrowSha256}`);
-  console.log(`B1-FETCH NARROW-BYTES ${SITE}_${YEAR} ${Buffer.byteLength(narrowCsv, 'utf8')}`);
-  console.log(`B1-FETCH NARROW-CSV-BEGIN ${SITE}_${YEAR}`);
-  console.log(narrowCsv);
-  console.log(`B1-FETCH NARROW-CSV-END ${SITE}_${YEAR}`);
-  console.log(`B1-FETCH END ${SITE}_${YEAR}`);
+  // The full narrow CSV (~300-400KB) is written to disk and uploaded as a
+  // build artifact rather than dumped to the job log: GitHub's job-log
+  // read-back API silently caps returned content well under one site-year's
+  // worth of rows (discovered empirically -- a Kepler/CMS-style stdout dump
+  // got truncated to its last ~5000 lines), which would corrupt exactly the
+  // data this experiment depends on. Only small, fully-reliable summary
+  // lines go to stdout; the real payload travels through the artifact
+  // upload path every other pinned fixture in this repo already uses.
+  const outDir = process.env.GENESIS_B1_FIXTURE_DIR ?? `artifacts/b1-defra-aurn/${SITE}_${YEAR}`;
+  await mkdir(outDir, { recursive: true });
+  await writeFile(join(outDir, `${SITE}_${YEAR}.csv`), narrowCsv, 'utf8');
+  await writeFile(
+    join(outDir, `${SITE}_${YEAR}.meta.json`),
+    JSON.stringify(
+      {
+        site: SITE,
+        year: Number(YEAR),
+        url,
+        originalSha256,
+        originalBytes: Buffer.byteLength(rawCsv, 'utf8'),
+        hasNo2,
+        hasSo2,
+        rowCount: rows.length,
+        narrowSha256,
+        narrowBytes: Buffer.byteLength(narrowCsv, 'utf8'),
+        retrievedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
+  console.log(`B1-FETCH SUMMARY ${SITE}_${YEAR} url=${url} originalSha256=${originalSha256} narrowSha256=${narrowSha256} rowCount=${rows.length} hasNo2=${hasNo2} hasSo2=${hasSo2}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

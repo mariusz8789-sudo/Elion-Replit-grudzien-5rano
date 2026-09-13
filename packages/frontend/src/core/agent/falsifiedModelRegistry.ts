@@ -1,6 +1,6 @@
 import { fnv1a, canonicalJson } from '../events/hash';
 import type { Hypothesis } from '../experimentFabric/beliefRevision';
-import { modelSpecFingerprint, renderModelSpec, type ModelSpec } from './modelSpace';
+import { modelSpecFingerprint, normalizeModelSpec, renderModelSpec, type ModelSpec } from './modelSpace';
 
 /**
  * M2 — GLOBAL FALSIFIED-MODEL REGISTRY.
@@ -65,6 +65,26 @@ import { modelSpecFingerprint, renderModelSpec, type ModelSpec } from './modelSp
  * campaign's own `ModelSpaceConstraints.excludeBases` choice by hand); it
  * does not make this registry reach into OTHER models that happen to share
  * that piece — that reach is exactly what T5 forbids.
+ *
+ * F1 — CANONICALIZE BEFORE FINGERPRINTING, ALWAYS, EXPLICITLY. Every path
+ * into or out of this registry (`recordFalsification`, `consultFalsifiedModelRegistry`)
+ * runs `canonicalizeModel` — `modelSpace.ts::normalizeModelSpec` re-exposed
+ * under this file's own name — BEFORE ever calling `modelSpecFingerprint`:
+ * `model -> canonicalize -> fingerprint -> check registry`, never
+ * `model -> fingerprint -> check registry`. This is stated as its own step
+ * here, not left as an invisible implementation detail inside
+ * `modelSpecFingerprint` (which already canonicalizes internally — this is
+ * belt-and-suspenders, not a second normalization scheme), because a reader
+ * of THIS file must be able to see the property directly: reordering a
+ * model's terms, or repeating one, cannot manufacture a new identity that
+ * slips past a standing record. Concretely, `normalizeModelSpec` sorts terms
+ * into one canonical order and drops exact duplicates, so `[LOG, LINEAR]`
+ * and `[LINEAR, LOG]` — or `[LOG, LOG, LINEAR]` — all fingerprint identically
+ * (see `falsifiedModelRegistry.test.ts`'s own F1 tests). One caveat stated
+ * plainly: `ModelTerm` (`modelSpace.ts`) is a closed enum with no free
+ * variable names — there is no "rename x to y" attack surface in THIS
+ * model representation, only term order and duplication, both of which
+ * canonicalization already closes.
  */
 
 export const FALSIFIED_MODEL_REGISTRY_CONTRACT_VERSION = '2.0.0';
@@ -126,6 +146,22 @@ function storedRecordFingerprint(input: Omit<FalsifiedModelRecord, 'recordId' | 
   return fnv1a(canonicalJson({ ...input, sequence }));
 }
 
+/**
+ * F1's explicit step: `model -> canonicalize -> fingerprint`. Delegates to
+ * `modelSpace.ts::normalizeModelSpec` (no second canonicalization scheme) —
+ * this wrapper exists so the pipeline is visible and testable IN THIS FILE,
+ * not something a reader has to trust modelSpace.ts to be doing correctly.
+ */
+function canonicalizeModel(spec: ModelSpec): ModelSpec {
+  return normalizeModelSpec(spec);
+}
+
+/** The identity this registry actually keys on: the model, canonicalized, then fingerprinted. Never call `modelSpecFingerprint` on a raw, un-canonicalized spec from this file. */
+function identityOf(spec: ModelSpec): { readonly modelId: string; readonly modelFingerprint: string } {
+  const canonical = canonicalizeModel(spec);
+  return { modelId: renderModelSpec(canonical), modelFingerprint: modelSpecFingerprint(canonical) };
+}
+
 export interface RecordFalsificationInput {
   readonly spec: ModelSpec;
   readonly scope: FalsificationScope;
@@ -144,8 +180,7 @@ export function recordFalsification(input: RecordFalsificationInput): FalsifiedM
     );
   }
   const base = {
-    modelId: renderModelSpec(input.spec),
-    modelFingerprint: modelSpecFingerprint(input.spec),
+    ...identityOf(input.spec),
     falsifiedBy: {
       observationIds: input.observationIds,
       verdict: 'FALSIFIED' as const,
@@ -245,7 +280,7 @@ export interface ConsultFalsifiedModelRegistryInput {
  * a live candidate. See the module doc for the full verdict semantics.
  */
 export function consultFalsifiedModelRegistry(input: ConsultFalsifiedModelRegistryInput): RegistryConsultation {
-  const modelFingerprint = modelSpecFingerprint(input.spec);
+  const { modelFingerprint } = identityOf(input.spec);
   const standing = standingRecordsFor(modelFingerprint);
   if (standing.length === 0) {
     return { verdict: 'ALLOW', reason: 'No standing falsification record matches this model.', matchedRecord: null };

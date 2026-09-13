@@ -18,12 +18,34 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | M2 rejestr sfalsyfikowanych | **ZROBIONE**, skanonikalizowane | dwie sesje → D-027 | `core/agent/falsifiedModelRegistry.ts` |
 | M3 modele strukturalne/wielozmiennowe | **ZROBIONE**, skanonikalizowane | dwie sesje → D-027 | `core/agent/modelSpace.ts` (zmienne nazwane) |
 | M3 parsymonia + hold-out | **ZROBIONE** | ta sesja | `modelSelectionScore`, `holdoutScore` |
+| **M3 strukturalne odkrycie — demonstrator end-to-end** | **ZROBIONE** | C1 (`826916d`) | `node scripts/m3-demonstrator.mjs` → **18/18**; `repro-demo` **60/60**; frontend **5495 passed**; backend **396/396**; tsc/eslint/build czysto. Nie ruszać ponownie tego kodu — patrz otwarty punkt niżej. |
 | Planner Redund + Fals | **ZROBIONE**, skanonikalizowane | dwie sesje → D-027 | `Sep × (1+w·Fals) × (1−w·Redund)` |
 | §6 Government / Sovereign plane | **W TOKU** | sesja `eaa9ab8` | `core/agent/sovereignTruthAnswer.ts` |
 | **§5 Discovery Graph + memory transfer** | **BIORĘ TERAZ** | **C1, ta sesja** | *(w trakcie)* |
 | **§9 Frontier acceptance E2E** | **BIORĘ TERAZ** | **C1, ta sesja** | *(w trakcie)* |
 | §8 PracticalCandidate safety gate | WOLNE | — | reużyć `core/governance/` (jest gotowe), nie pisać drugiego |
 | §7 A1 GLP-1 | **ZABLOKOWANE DANYMI** | — | patrz niżej |
+| **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **OTWARTE / NIEPRZYPISANE** | — | patrz niżej |
+
+## Detektor residuum: znaleziona, niezałatana wada specyficzności
+
+Demonstrator M3 (`826916d`) znalazł to podczas własnej kontroli negatywnej i **zgłosił, nie
+naprawił po cichu**: na czystym szumie (proces bez żadnej krzywizny) `CURVATURE` odpala się
+przy stosunku RSS **0.4978**, tuż poniżej progu **0.5**. Selekcja modelu i tak odrzuca każdego
+wygenerowanego kandydata, więc do wyniku naukowego nic zmyślonego nie trafia — ale sam próg
+jest ślepy na liczność próby (nie skaluje się z `n`), więc przy innych danych ten sam mechanizm
+może dać fałszywy alarm, który TYM RAZEM zostanie wybrany.
+
+**Kto to bierze, musi wiedzieć:** naprawienie progu (np. uzależnienie go od `n` albo test
+istotności zamiast stałego stosunku RSS) zmienia zachowanie `residualStructure.ts` **globalnie**
+— nie tylko dla demonstratora M3. To **zmieni odciski replay kampanii QE4 i Kepler**, bo obie
+przechodzą przez ten sam detektor. Wymaga to:
+1. jawnej decyzji (nie cichej edycji stałej),
+2. ponownego przeliczenia i przypięcia nowych `EXPECTED` w `scripts/repro-demo.mjs`,
+3. re-weryfikacji, że §15/§9 (model wyprowadzony z residuum, wygrywa kampanię) nadal działa.
+
+Nie jest to „dokończenie M3" — to osobna, świadomie odłożona poprawka fundamentu, na którym
+stoi M3, QE4 i Kepler jednocześnie.
 
 ## §7 A1 — dlaczego jest zablokowane, a nie „niezrobione"
 

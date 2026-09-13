@@ -360,25 +360,41 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
-  a1-glp1-recon:
-    name: "A1 (temporary): recon real ChEMBL + ClinicalTrials.gov API shapes"
+  a1-glp1-pin:
+    name: "A1 (temporary): fetch+pin real ChEMBL activities + ClinicalTrials.gov trials"
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
-    # One-off, mirroring the B1 DEFRA recon's own lifecycle: confirms the
-    # REAL field shapes of both APIs before scripts/fetch-a1-glp1-fixture.mjs
-    # is written, so that script does not guess at field names it has never
-    # actually seen. The sandbox itself cannot reach either host (confirmed
-    # blocked via curl and WebFetch — see A1 preregistration commit), so this
-    # has to run here. Remove once its findings have informed the fetch script.
+    # Recon (2 rounds, now removed — see docs/DECISIONS.md and
+    # docs/prompts/2026-09-13-PHASE-A-claims.md) confirmed the real GLP-1R
+    # target id, the 3 compounds' ChEMBL ids, the ChEMBL activity record
+    # shape, the correct ClinicalTrials.gov query syntax, and 4 qualifying
+    # trials' real outcome-measure field shapes. scripts/fetch-a1-glp1-fixture.mjs
+    # re-resolves the target/compound ids LIVE (never hardcodes them) and
+    # freezes narrow extractions + SHA-256 provenance of the ChEMBL activities
+    # and the 4 trials' HbA1c outcome measures. The sandbox itself cannot
+    # reach either host (confirmed blocked via curl and WebFetch), so this
+    # has to run here. This is a ONE-OFF pinning job: remove once its
+    # artifact has been downloaded and committed under
+    # packages/frontend/src/core/biotechData/a1-glp1/, mirroring
+    # qe4-brydges-pin-measured-states' and b1-defra-aurn-pin-narrow's own
+    # lifecycle.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Recon ChEMBL target/molecule/activity + ClinicalTrials.gov study shapes
-        run: node scripts/recon-a1-glp1.mjs
+      - name: Fetch + pin real ChEMBL activities and ClinicalTrials.gov trials
+        env:
+          GENESIS_A1_FIXTURE_DIR: artifacts/a1-glp1
+        run: node scripts/fetch-a1-glp1-fixture.mjs
+      - name: Upload immutable A1 GLP-1 candidate fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: a1-glp1-${{ github.sha }}
+          path: artifacts/a1-glp1
+          retention-days: 90
 
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera

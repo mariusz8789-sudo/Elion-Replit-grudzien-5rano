@@ -43,6 +43,7 @@ const EngineeringNavigator = lazy(() => import('./components/EngineeringNavigato
 const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').then((m) => ({ default: m.ModelConflictPanel })));
 const ModelTournamentPanel = lazy(() => import('./components/ModelTournamentPanel').then((m) => ({ default: m.ModelTournamentPanel })));
 const ProtectionPriorityScreen = lazy(() => import('./components/ProtectionPriorityScreen').then((m) => ({ default: m.ProtectionPriorityScreen })));
+const GovDrugCampaignScreen = lazy(() => import('./components/GovDrugCampaignScreen').then((m) => ({ default: m.GovDrugCampaignScreen })));
 const GeodesicWorldScreen = lazy(() => import('./components/GeodesicWorldScreen').then((m) => ({ default: m.GeodesicWorldScreen })));
 const WorldProposalScreen = lazy(() => import('./components/WorldProposalScreen').then((m) => ({ default: m.WorldProposalScreen })));
 const CalibrationInquiryScreen = lazy(() => import('./components/CalibrationInquiryScreen').then((m) => ({ default: m.CalibrationInquiryScreen })));
@@ -119,6 +120,7 @@ type Route =
   | { kind: 'projects' }
   | { kind: 'cde' }
   | { kind: 'drug' }
+  | { kind: 'gov-campaign' }
   | { kind: 'campaign' }
   | { kind: 'generate' }
   | { kind: 'compare' }
@@ -167,6 +169,7 @@ function parseHash(): Route {
   if (h === '#/projects') return { kind: 'projects' };
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug' || h.startsWith('#/drug?')) return { kind: 'drug' };
+  if (h === '#/gov-campaign') return { kind: 'gov-campaign' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
@@ -381,6 +384,18 @@ export default function App() {
         <div className="app">
           <TopBar title="🌍 Kopuła vs kula — falsyfikacja" onSearch={() => setSearchOpen(true)} />
           <DomeWorldScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'gov-campaign') {
+      return (
+        <div className="app">
+          <TopBar title="🏛 Government Drug Discovery" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GovDrugCampaignScreen />
+          </HeavyRoute>
           {overlays}
         </div>
       );
@@ -939,6 +954,14 @@ export default function App() {
                 <span className="timeline-cta-text">
                   <span className="timeline-cta-title">Kampania naukowa</span>
                   <span className="timeline-cta-sub">Wielofidelitowe kampanie na realnych silnikach (RDKit → ADMET → dokowanie → chemia kwantowa) z pełną prowieniencją i weryfikacją odtwarzalności.</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/gov-campaign'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">🏛</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Government Drug Discovery</span>
+                  <span className="timeline-cta-sub">Pełna kampania na realnej, wygenerowanej z mechanizmu puli kandydatów: screening, TOP 10, TOP 2, głęboka falsyfikacja, bramka bezpieczeństwa i werdykt — łącznie z uczciwym brakiem zwycięzcy.</span>
                 </span>
                 <span className="timeline-cta-arrow" aria-hidden="true">→</span>
               </button>

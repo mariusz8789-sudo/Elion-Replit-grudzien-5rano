@@ -283,13 +283,23 @@ export interface E2E01Top3Entry {
   readonly whySurvived: string;
 }
 
-export function selectTop3(tier2SurvivorIds: readonly string[], candidateViews: readonly A3CandidateView[]): readonly E2E01Top3Entry[] {
+/**
+ * `size` defaults to the sealed `top3Size`, so every existing caller keeps its
+ * exact behaviour. GOV-DRUG-DISCOVERY-CAMPAIGN-01 passes a larger cap to build
+ * its shortlist without editing the sealed preregistration — see
+ * govDrugDiscoveryCampaignPreregistration.ts for why that seal is untouchable.
+ */
+export function selectTop3(
+  tier2SurvivorIds: readonly string[],
+  candidateViews: readonly A3CandidateView[],
+  size: number = E2E01_TIER_CRITERIA.top3Size,
+): readonly E2E01Top3Entry[] {
   const viewById = new Map(candidateViews.map((v) => [v.report.summary.moleculeChemblId, v]));
   const ranked = tier2SurvivorIds
     .map((id) => viewById.get(id))
     .filter((v): v is A3CandidateView => v !== undefined)
     .sort((a, b) => b.report.score.weightedScore - a.report.score.weightedScore)
-    .slice(0, E2E01_TIER_CRITERIA.top3Size);
+    .slice(0, size);
 
   return ranked.map((v, i) => {
     const efficacy = v.report.efficacy.filter((e) => e.deltaVsSemaglutidePp !== null);

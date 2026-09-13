@@ -1708,6 +1708,29 @@ mogłaby po cichu nigdy nie odpalić) zgłaszany jest realny
 `createObservationGapRequest`, `undeclaredFeasibility` z
 `observationGap.ts`, bez zmian).
 
+**REUSE vs własna implementacja — jednoznacznie (pytanie recenzenta):**
+G2 **reużywa bezpośrednio z M1 `observationGap.ts`**: stałą progu
+`TAU_DISCRIMINABILITY = 1` (import, nie redefinicja) oraz funkcje
+`classifyObservationGap`, `createObservationGapRequest`,
+`undeclaredFeasibility`. G2 **liczy natomiast sam statystykę
+discriminability** — `pairwiseDiscriminability`
+(`differentiatingExperimentGenerator.ts:105`), jako
+`|predykcjaA − predykcjaB| / sigma`.
+
+**Uzasadnienie własnego liczenia (bo to nie jest duplikacja):** w M1 nie
+było czego reużyć. `classifyObservationGap` **konsumuje** liczbę
+`bestDiscriminability` podaną przez wywołującego — nigdy jej nie
+produkuje; w M1 liczyła ją kampania, dla dokładnie DWÓCH żywych modeli na
+jednym eksperymencie. G2 potrzebuje pełnej macierzy par N×N hipotez na
+wielu obserwablach, co nie ma odpowiednika w M1. Miara jest ta sama
+(|Δ|/σ, „ile sigma od siebie"), próg jest dosłownie tą samą
+zaimportowaną stałą — więc nie powstała druga statystyka ani drugi próg,
+tylko uogólnienie tej samej miary z 2 hipotez na N. Świadomie NIE użyto
+`conformalPrediction.ts::discriminabilityFromConformalIntervals`, bo ta
+działa na skalibrowanych przedziałach dwóch modeli, a G2 dostaje
+punktowe przewidywania z zadeklarowaną sigmą — użycie jej wymagałoby
+zmyślenia kalibracji, której wywołujący nie dostarczył.
+
 **Dwa błędy znalezione i naprawione przez faktyczne uruchomienie testów
 (nie założone jako poprawne z projektu):**
 1. Pierwsza wersja bramkowała wybór DOWOLNEJ obserwabli przez
@@ -1746,7 +1769,127 @@ cichym pominięciem.
 Pełna bramka: frontend **5821/5822** (1 skipped), backend **396/396**,
 tsc/eslint czyste, build OK, `repro-demo` **69/69** — zero regresji.
 
-**Co pozostaje jawnie nierozstrzygnięte:** decyzja G0 (merge do main,
+## D-038 (2026-09-13, PHASE G — GOV-DRUG-DISCOVERY-CAMPAIGN-01) — martwa
+bramka bezpieczeństwa ożywiona, i pierwszy werdykt, który zmienił się przez
+SZERSZĄ kontrolę, a nie przez obniżony próg
+
+**Audyt, od którego zaczęto (trzy równoległe przebiegi, przed linijką
+kodu):** ustalił, że rządowy łańcuch lekowy jest zbudowany w ~85% —
+`govDrugDiscoveryE2E.ts` realnie generuje 2671 cząsteczek z mechanizmu
+(ChEMBL GLP-1R/GIPR/GCGR, zapytanie nigdy po nazwie leku), przepuszcza je
+przez Tier-1 (2671→20) i Tier-2 (20→8) z powodem i dowodem przy każdej
+eliminacji, prowadzi 6 preregistrowanych ataków falsyfikacyjnych i kończy
+jednym z 5 werdyktów. Znaleziono natomiast trzy realne luki, z czego
+jedną będącą **błędem, nie brakiem funkcji**.
+
+**LUKA 1 (BŁĄD) — bramka bezpieczeństwa była martwym kodem na tej
+ścieżce.** `practicalCandidateGate.ts` ma kryterium
+`NO_UNRESOLVED_CRITICAL_CONTRADICTION`, ale (a) `govDrugDiscoveryE2E.ts`
+nigdy tej bramki nie wołał, a (b) jedyne istniejące wywołanie w
+`a2OzempicSubstitute.ts:809` przekazywało `unresolvedContradictions: []`
+jako literał — więc to kryterium **nie mogło odpalić nigdy**, w żadnym
+przebiegu. Naprawione: `runSafetyGate` w nowym module zasila bramkę
+sprzecznościami, które TEN przebieg faktycznie znalazł
+(`E2E01DeepFalsification.unresolvedCounterevidence` + powód existential
+safety veto). Na realnych danych bramka **odmawia obu finalistom**
+(`REFUSE` na `NO_UNRESOLVED_CRITICAL_CONTRADICTION` i
+`EVIDENCE_SUFFICIENT`), a osobny test negatywny pokazuje, że kandydat
+identyczny pod każdym innym względem, ale bez nierozstrzygniętej
+sprzeczności, przechodzi — czyli bramka realnie rozróżnia, a nie stempluje.
+
+**LUKA 2 — `NO_WINNER` był jednoprzebiegowym stopem.** Dodano
+`GDD_EXHAUSTION_PATHS` i maszynowo egzekwowaną regułę: werdykt bez
+zwycięzcy jest akceptowany **tylko** gdy każda zadeklarowana ścieżka
+została przejściem rozstrzygnięta na `EXHAUSTED` / `RESOLVED` /
+`BLOCKED_NO_ACCESS`; ścieżka `NOT_ATTEMPTED` powoduje **throw**. Selekcja
+biegnie dwuprzebiegowo (`provisionalDecision` → wyczerpanie → `decision`),
+a `exhaustionChangedVerdict` mówi wprost, czy przejście czegokolwiek
+zmieniło — w tym środowisku nie, bo zgłoszonej luki nie da się tu
+wypełnić, i to jest zapisane, a nie ukryte.
+
+**LUKA 3 — zero UI.** Żaden plik `.tsx` nie importował tego łańcucha;
+jedyną wizualizacją był statyczny `report.html` z capture'a.
+
+**Zbudowane (wszystko REUSE, zero drugiego silnika):**
+- `core/agent/trialRegistry.ts` (G6.1, NOWY): append-only rejestr każdej
+  próby; próba bez podmiotu lub bez powodu jest **odrzucana** (throw);
+  `assertRegistryComplete` rzuca w OBIE strony (cicha utrata prób i
+  podwójne liczenie to różne błędy, oba realne);
+  `correctForMultiplicity` przyjmuje **rejestr, nigdy liczbę** i rzuca
+  przy zerze zamiast zwrócić nominalną alfę. **15/15 testów.**
+- `core/biotechData/govDrugDiscoveryCampaignPreregistration.ts` (NOWY):
+  osobna pieczęć dla lejka TOP10→TOP2.
+- `core/biotechData/govDrugDiscoveryCampaign.ts` (NOWY): kampania
+  składająca `runTier1`/`runTier2`/`selectTop3`/`deepFalsify`/
+  `selectWinner`/`generateResearchRecipe`/A3 — żadna liczba naukowa nie
+  jest tu liczona od nowa. **27/27 testów.**
+- `components/GovDrugCampaignScreen.tsx` (NOWY) + trasa `#/gov-campaign`.
+
+**DLACZEGO NIE ZMIENIONO `E2E01_TIER_CRITERIA.top3Size`.** To pole siedzi
+wewnątrz `E2E01_PREREGISTRATION_FINGERPRINT`, zapieczętowanego ZANIM
+przestrzeń kandydatów została pobrana. Dane są już znane (E2E-01 =
+`NO_WINNER`), więc edycja rozmiaru etapu w tym obiekcie byłaby
+podręcznikowym HARKingiem — dokładnie tym, czemu ta pieczęć ma
+zapobiegać. E2E-01 pozostaje bajt w bajt nietknięte (nadal **18/18**,
+nadal `NO_WINNER`, odcisk `f528c881`); `selectTop3` dostało wyłącznie
+opcjonalny parametr `size` z domyślną wartością = starej stałej, więc
+zachowanie każdego istniejącego wywołania jest identyczne.
+
+**Linia, która została narysowana:** KSZTAŁT LEJKA zmieniony (to wymóg
+prezentacyjny, zadeklarowany jawnie). KRYTERIA ZWYCIĘZCY nie —
+`winnerRules` to `E2E01_WINNER_RULES` zaimportowane dosłownie, nie
+przepisane własnymi słowami. Dwie z trzech zmian kształtu **zaostrzają**
+przebieg: falsyfikacja biegnie po CAŁYM shortliście (8 kandydatów ×
+6 ataków = 48) zamiast po TOP3, a decyzja o zwycięzcy jest liczona po
+całym shortliście, nie po dwóch finalistach — zawężenie pola mogłoby
+ukryć niezgodność między kandydatami.
+
+**REALNY WYNIK — i najważniejsza obserwacja tego kroku.** Kampania
+kończy się `CONFLICTING_EVIDENCE`, podczas gdy E2E-01 na tych samych
+danych kończy `NO_WINNER`. **Werdykt zmienił się dlatego, że pod
+kontrolę trafiło WIĘCEJ kandydatów, a nie dlatego, że poprzeczka
+spadła.** Przy shortliście 8 (zamiast TOP3) w sprawdzeniu kierunku
+efektu znalazły się cztery niezawetowane cząsteczki wskazujące w
+przeciwne strony względem semaglutydu (GLP-1 +0.29pp, PF-06291874
++0.78pp, ADOMEGLIVANT +0.78pp, LIRAGLUTIDE −0.01pp) — i reguła, ta sama
+co w E2E-01, odmawia nazwania kogokolwiek bez zatajenia tej
+niezgodności. Oba werdykty są uczciwymi brakami zwycięzcy; szerszy
+przebieg jest po prostu bardziej wprost co do POWODU.
+
+Dodatkowo: eksperyment różnicujący (G2) na finalistach wychodzi
+`EFFICACY_DELTA_PP` z mocą falsyfikacyjną 100% (dane, które przebieg ma,
+rozdzielają finalistów), więc luka obserwacyjna nie była tu potrzebna —
+zgłoszona natomiast została ścieżka `REVIVABLE_ELIMINATED_CANDIDATES`
+jako `BLOCKED_NO_ACCESS`: **12 kandydatów odpadło z powodu BRAKU
+dowodów, nie z powodu przegranej na dowodach**, i to jest realna rzecz,
+którą więcej danych mogłoby odwrócić.
+
+Korekta na wielokrotne testowanie liczona z rejestru: α 0.05 / 48
+ataków = **1.042e-3**, przy **2744** zarejestrowanych próbach.
+
+**DOWÓD, ŻE EKRAN NIE JEST ATRAPĄ:** `npm run e2e:gov-campaign:browser`
+otwiera produkcyjny build w Chromium, klika przycisk i **porównuje
+liczby odczytane z DOM z niezależnym uruchomieniem tego samego silnika w
+Node** — werdykt, wszystkie liczby lejka (2671/20/8/8/2), odcisk
+kampanii, statusy wszystkich ścieżek wyczerpania i wyniki bramki.
+**12/12.** Werdykt nie jest w tym teście asertowany jako konkretna
+wartość, tylko jako „ta sama obiema drogami" — test przechodzi niezależnie
+od tego, co silnik zwróci.
+
+`moduleReachability.test.ts` sam wykrył, że
+`differentiatingExperimentGenerator.ts` ma teraz realnego wywołującego, i
+kazał usunąć jego wpis z `ALLOWED_ORPHANS` — wpis usunięty. Żaden z
+czterech nowych modułów nie potrzebował wpisu sieroty.
+
+**Świadomie POZA zakresem tego kroku (nie pominięte po cichu):** G3.2-G3.7
+(9 detektorów kierunków — substrat numeryczny/fizyczny, lejek lekowy ich
+nie konsumuje), G6.2 (12 fixture'ów L0-L5 — waliduje silnik odkryć, nie
+lejek lekowy), G6.3, pełne G3.8/G3.9. **BLOCKED: production network:** G1,
+G5, G7-live, G8-publikacja.
+
+## Co pozostaje jawnie nierozstrzygnięte (Phase G)
+
+Decyzja G0 (merge do main,
 deploy produkcyjny) — użytkownik przekierował pytanie o nią na inny tor
 (podział 20/80) zamiast na nią odpowiedzieć; pozostaje otwarta i nie
 zostanie ruszona bez wyraźnej zgody. G1, G3-G8 z mandatu Qwena czekają na

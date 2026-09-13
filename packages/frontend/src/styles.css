@@ -4745,3 +4745,51 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 @media (max-width: 520px) {
   .lab-env-head { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
 }
+
+/* ---------------------------------------------------------------------------
+   Government Drug Discovery campaign (#/gov-campaign)
+   Every value this screen renders comes from a real in-browser engine run, so
+   the styling stays deliberately plain: a table, a log-scaled funnel and status
+   chips. Nothing here animates progress, because there is no progress to show —
+   the run is synchronous and either has a result or does not.
+   --------------------------------------------------------------------------- */
+.gdd-screen .gdd-problem { font-size: 1.05rem; line-height: 1.5; color: var(--text); }
+.gdd-screen .gdd-error { color: var(--red); font-family: var(--font-mono); font-size: 0.85rem; margin-top: 12px; }
+.gdd-screen .gdd-dim { color: var(--text-dim); font-size: 0.85rem; }
+.gdd-screen code { font-family: var(--font-mono); font-size: 0.85em; color: var(--cyan); }
+
+.gdd-funnel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.gdd-funnel-row { display: flex; flex-direction: column; gap: 4px; }
+.gdd-funnel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.gdd-funnel-label { font-size: 0.9rem; color: var(--text); }
+.gdd-funnel-count { font-family: var(--font-mono); font-size: 1.15rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+.gdd-funnel-track { height: 8px; background: var(--bg-raised); border-radius: 4px; overflow: hidden; }
+.gdd-funnel-bar { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+.gdd-funnel-note { font-size: 0.78rem; color: var(--text-faint); }
+
+.gdd-table-wrap { overflow-x: auto; }
+.gdd-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.gdd-table th { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-strong); color: var(--text-dim); font-weight: 600; white-space: nowrap; }
+.gdd-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.gdd-table .gdd-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gdd-veto { color: var(--red); }
+
+.gdd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.gdd-list > li { padding: 10px 12px; background: var(--bg-raised); border-radius: 6px; border-left: 3px solid var(--border-strong); }
+.gdd-list > li.gdd-blocked { border-left-color: var(--red); }
+.gdd-fail { color: var(--red); font-family: var(--font-mono); font-size: 0.8rem; margin-top: 4px; }
+.gdd-audit > li { border-left-color: var(--cyan); }
+
+.gdd-status { font-family: var(--font-mono); font-size: 0.8rem; padding: 1px 6px; border-radius: 3px; background: var(--bg-panel); }
+.gdd-status-RESOLVED { color: var(--green); }
+.gdd-status-EXHAUSTED { color: var(--text-dim); }
+.gdd-status-BLOCKED_NO_ACCESS { color: var(--gold); }
+.gdd-status-NOT_ATTEMPTED { color: var(--red); }
+
+.gdd-verdict { font-family: var(--font-mono); font-size: 1.5rem; color: var(--gold); margin: 0 0 8px; letter-spacing: 0.02em; }
+.gdd-reason { line-height: 1.55; color: var(--text); }
+
+@media (max-width: 560px) {
+  .gdd-funnel-head { flex-direction: column; gap: 2px; }
+  .gdd-verdict { font-size: 1.15rem; }
+}

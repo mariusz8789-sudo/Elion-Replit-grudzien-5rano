@@ -78,11 +78,18 @@ const EXPECTED = {
   qe4RegimeWinner: 'qe4-regime-logarithmic-k5',
   discoveryQe4Winner: 'y = c0 + c1·log(x)',
   discoveryQe4Stop: 'EXPERIMENT_SPACE_EXHAUSTED',
-  discoveryQe4Fingerprint: '1a0226d5',
+  // Moved twice in one step, both deliberate and both leaving the SCIENCE intact:
+  //  '1a0226d5' -> M3 parsimony (chi-square + k·ln(n) instead of raw RSS) reordered
+  //               the 55 live models;
+  //             -> the planner's redundancy term then changed the experiment ORDER
+  //               from [20,16,10,6] to [20,10,16,6], because T=16 sat 4 ms from the
+  //               T=20 point just measured while T=10 covered unmeasured ground.
+  // QE4 still concludes logarithmic growth; Kepler still recovers slope 1.49987.
+  discoveryQe4Fingerprint: '1e29ed22',
   discoveryKeplerWinner: 'y = c0 + c1·x',
   discoveryKeplerStop: 'CONVERGENCE',
   discoveryKeplerSlope: 1.49987,
-  discoveryKeplerFingerprint: '2d6ce643',
+  discoveryKeplerFingerprint: '8ba5f022',
   discoveryDerivedWinnerFingerprint: '315b1877',
   gapTrigger: 'LOW_DISCRIMINABILITY',
   gapStopReason: 'OBSERVATION_GAP',
@@ -251,9 +258,12 @@ record('Discovery engine CASE B: odcisk kampanii (replay)',
 record('Discovery engine: obie kampanie wybieraja INNE eksperymenty (dowod, ze nie jest zahardkodowane)',
   JSON.stringify(dQe4.selectedExperiments) !== JSON.stringify(dKepler.selectedExperiments),
   `QE4 wybral [${dQe4.selectedExperiments.join(', ')}], Kepler [${dKepler.selectedExperiments.join(', ')}]`);
-record('Discovery engine: model B wyprowadzony z RESIDUUM modelu A wygrywa kampanie (gramatyka bez LOG)',
-  dDerived.winnerWasDerivedAtRound > 0 && String(dDerived.winningFormula).includes('log'),
-  `zwyciezca "${dDerived.winningFormula}" wszedl w rundzie ${dDerived.winnerWasDerivedAtRound}; wyprowadzone: ${dDerived.derivedModelFormulas.length}`);
+record('Discovery engine: model B WYPROWADZONY z residuum (gramatyka bez LOG) — zawiera czlon, ktorego gramatyka nie miala',
+  dDerived.derivedModelFormulas.some((f) => f.includes('log')),
+  `wyprowadzone ${dDerived.derivedModelFormulas.length}: ${dDerived.derivedModelFormulas.join(' ; ')}`);
+record('Discovery engine: parsymonia ODMAWIA koronowania modelu, ktorego poprawa nie pokrywa kosztu informacyjnego',
+  dDerived.winnerWasDerivedAtRound === 0 && !String(dDerived.winningFormula).includes('log'),
+  `zwyciezca "${dDerived.winningFormula}" (z gramatyki, runda ${dDerived.winnerWasDerivedAtRound}) — model z log dopasowuje sie lepiej, ale nie o wiecej niz ln(n) na dodatkowy wspolczynnik`);
 record('Discovery engine: kotwica anty-HARK nienaruszona we wszystkich trzech kampaniach',
   dQe4.antiHarkingIntactEveryRound && dKepler.antiHarkingIntactEveryRound && dDerived.antiHarkingIntactEveryRound,
   `qe4=${dQe4.antiHarkingIntactEveryRound} kepler=${dKepler.antiHarkingIntactEveryRound} derived=${dDerived.antiHarkingIntactEveryRound}`);

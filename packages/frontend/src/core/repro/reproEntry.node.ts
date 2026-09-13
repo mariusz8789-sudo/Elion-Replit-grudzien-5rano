@@ -210,9 +210,14 @@ export function reproDiscoveryCampaignKepler(): ReproDiscoveryCampaignReport {
   return report(runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 }));
 }
 
-/** CASE A with LOG removed from the grammar: the engine must rebuild the true shape from residual structure. */
+/**
+ * CASE A with LOG removed from the grammar: the engine must rebuild the true
+ * shape from residual structure. `maxTerms: 1` keeps the starting space to
+ * single-term models, so the derived two-term model is unambiguously something
+ * the grammar could not enumerate.
+ */
 export function reproDiscoveryCampaignQe4WithoutLog(): ReproDiscoveryCampaignReport {
-  return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 7, maxTerms: 2, excludeBases: ['LOG'] }));
+  return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 8, maxTerms: 1, excludeBases: ['LOG'] }));
 }
 
 // --- M1: ObservationGapRequest, on real pinned data -------------------------

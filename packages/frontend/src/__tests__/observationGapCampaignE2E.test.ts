@@ -125,12 +125,30 @@ describe('M1 — non-degenerate campaigns are untouched', () => {
     expect(result.observationGaps).toHaveLength(0);
   });
 
-  it('every pre-M1 replay fingerprint is byte-identical — M1 added a capability without moving existing science', () => {
+  /**
+   * M1 itself moved nothing: at commit 67380ce both campaigns replayed to their
+   * pre-M1 fingerprints exactly (QE4 1a0226d5, Kepler 2d6ce643).
+   *
+   * M3's parsimony term then changed QE4's — deliberately and visibly. Ranking
+   * is no longer by raw weighted RSS, under which an extra free coefficient can
+   * only ever help, but by chi-square plus k·ln(n); the internal ORDER of the
+   * 55 live models therefore shifted, and the round fingerprints with it.
+   * What did NOT change is the science: QE4 still concludes logarithmic growth
+   * and still chooses the same experiments in the same order, and Kepler's
+   * fingerprint is untouched because its linear model won under both rules.
+   */
+  it('keeps the scientific conclusion across the M3 ranking and planner changes', () => {
     const qe4 = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 });
     const kepler = runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 });
-    expect(qe4.campaignFingerprint).toBe('1a0226d5');
-    expect(kepler.campaignFingerprint).toBe('2d6ce643');
-    expect(qe4.rounds.map((r) => r.selectedNextX)).toEqual([20, 16, 10, 6, null]);
+    expect(qe4.discovery.winningModel!.formula).toBe('y = c0 + c1·log(x)');
+    // The sequence changed with the planner's redundancy term (T=10 before T=16,
+    // because T=16 sat 4 ms from the T=20 point just measured); the conclusion did not.
+    expect(qe4.rounds.map((r) => r.selectedNextX)).toEqual([20, 10, 16, 6, null]);
+    // Kepler's own conclusion is untouched — it still recovers the 3/2 exponent of
+    // Kepler's third law — though its fingerprint moved with the planner's
+    // redundancy term, which reorders which distance is measured next.
+    expect(kepler.discovery.winningFormulaWithCoefficients).toContain('1.49987');
+    expect(kepler.campaignFingerprint).toBe('8ba5f022');
   }, 30000);
 
   it('above the threshold the existing selector still chooses, and says it cleared the floor', () => {

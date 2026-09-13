@@ -44,23 +44,28 @@ describe('M2 cross-campaign: falsified models are not silently re-derived by a l
     expect(freshFingerprints).toEqual(neverFilteredFingerprints);
   });
 
-  it('a VARIANT_ONLY falsification from one laboratory does not leak into a campaign on a DIFFERENT, unrelated laboratory', () => {
+  it('T3: a model falsified in one laboratory, consulted from a DIFFERENT laboratory (materially different scope), still shows up — as REQUIRE_OVERRIDE, never silently ALLOWED and never an automatic hard block', () => {
     const qe4Campaign = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, respectFalsifiedModelRegistry: true });
     expect(qe4Campaign.discovery.falsifiedModels.length).toBeGreaterThan(0);
     const qe4FalsifiedFingerprints = new Set(qe4Campaign.discovery.falsifiedModels.map((m) => m.fingerprint));
 
     const keplerCampaign = runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 6, respectFalsifiedModelRegistry: true });
 
-    // None of Kepler's round-1 skips can be attributed to QE4's VARIANT_ONLY
-    // entries — VARIANT_ONLY is scoped to the laboratory it was recorded in.
-    for (const skip of keplerCampaign.registrySkips) {
-      if (qe4FalsifiedFingerprints.has(skip.fingerprint)) {
-        expect(skip.reason).not.toContain('qe4-brydges-disorder-k5');
-      }
+    // Genuine cross-domain memory: any of Kepler's own skips that happen to
+    // match a fingerprint QE4 already falsified are reported as
+    // REQUIRE_OVERRIDE (M2's registered VARIANT_ONLY default), never a
+    // silent ALLOW and never treated as an unconditional block — the
+    // laboratory swap alone is not grounds to pretend the finding never
+    // happened, but it also does not settle the question for Kepler on its
+    // own.
+    const crossDomainSkips = keplerCampaign.registrySkips.filter((s) => qe4FalsifiedFingerprints.has(s.fingerprint));
+    for (const skip of crossDomainSkips) {
+      expect(skip.verdict).toBe('REQUIRE_OVERRIDE');
     }
-    // And re-running the SAME QE4 laboratory a second time still sees its own
-    // falsifications — proving the isolation above is laboratory scope, not a
-    // registry that silently failed to record anything at all.
+
+    // Re-running the SAME QE4 laboratory a second time still sees its own
+    // falsifications — proving the registry genuinely persisted them, not
+    // that this test's earlier assertion was vacuous.
     const qe4CampaignAgain = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, respectFalsifiedModelRegistry: true });
     const stillSkipped = qe4CampaignAgain.registrySkips.some((s) => qe4FalsifiedFingerprints.has(s.fingerprint));
     expect(stillSkipped).toBe(true);

@@ -88,13 +88,27 @@ export interface RunAutonomousOrchestratorInput {
    * `OBSERVATION_GAP_FOLLOWUP` direction stop the loop at `INSUFFICIENT_DATA`.
    */
   readonly gapResolver?: (gap: ObservationGapRequest) => { readonly registry: readonly DatasetLaboratory[]; readonly pointId: string; readonly atX: number } | null;
+  /**
+   * Domain-specific, caller-declared check for whether a winning model
+   * matches an already-published public relation (e.g. the existing
+   * `externalAnchor.ts::KEPLER_MARS_ANCHOR_ID` for Kepler's third law).
+   * NEVER inferred by this orchestrator — asserting "this is centuries-old
+   * public knowledge" is exactly the kind of claim `noveltyGate.ts` refuses
+   * to guess, and skipping it here would be the novelty-inflation failure
+   * mode the whole Phase E mandate is built to catch. Omit only for a
+   * genuinely UNKNOWN/unseeded domain with no declarable prior anchor.
+   */
+  readonly declaredPublicAnchorResolver?: (spec: ModelSpec) => { readonly anchorId: string; readonly summary: string } | null;
 }
 
 function findSpecForFingerprint(specs: readonly ModelSpec[], fingerprint: string): ModelSpec | null {
   return specs.find((s) => modelSpecFingerprint(normalizeModelSpec(s)) === fingerprint) ?? null;
 }
 
-function labelCampaign(result: CampaignResult): { readonly label: ResultLabel; readonly assessment: NoveltyAssessment } {
+function labelCampaign(
+  result: CampaignResult,
+  declaredPublicAnchorResolver?: (spec: ModelSpec) => { readonly anchorId: string; readonly summary: string } | null,
+): { readonly label: ResultLabel; readonly assessment: NoveltyAssessment } {
   const winner = result.discovery.winningModel;
   if (winner === null) {
     const assessment: NoveltyAssessment = {
@@ -119,10 +133,15 @@ function labelCampaign(result: CampaignResult): { readonly label: ResultLabel; r
     return { label: 'HYPOTHESIS_UNKNOWN', assessment };
   }
 
+  const declaredPublicAnchorMatch = declaredPublicAnchorResolver ? declaredPublicAnchorResolver(spec) : null;
+
   const assessment = assessNovelty({
     spec,
     scope: { domain: result.labId, assumptions: [], boundary: result.problem },
-    checkedCorpus: ['falsifiedModelRegistry(M2)', 'knownFindingsRegistry'],
+    declaredPublicAnchorMatch,
+    checkedCorpus: declaredPublicAnchorResolver
+      ? ['falsifiedModelRegistry(M2)', 'knownFindingsRegistry', 'declaredPublicAnchorResolver']
+      : ['falsifiedModelRegistry(M2)', 'knownFindingsRegistry'],
   });
 
   const decision = classifyResultLabel({
@@ -193,7 +212,7 @@ export function runAutonomousOrchestrator(input: RunAutonomousOrchestratorInput)
       }
     }
 
-    const { label, assessment } = labelCampaign(result);
+    const { label, assessment } = labelCampaign(result, input.declaredPublicAnchorResolver);
     campaigns.push({ campaignIndex: i, result, resultLabel: label, noveltyAssessment: assessment, direction, launchedAutonomously: i > 0 });
 
     // CONVERGED: an autonomous relaunch that reproduced the same winning model made no progress.

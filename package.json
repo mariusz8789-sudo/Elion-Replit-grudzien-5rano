@@ -35,7 +35,8 @@
     "a2:demo": "node scripts/a2-ozempic-substitute-demonstrator.mjs",
     "a3:demo": "node scripts/a3-government-drug-recommendation-demonstrator.mjs",
     "e2e:gov-drug": "node scripts/gov-drug-discovery-e2e-scenario.mjs",
-    "e2e:gov-drug:demo": "node scripts/gov-drug-discovery-e2e-demo-capture.mjs"
+    "e2e:gov-drug:demo": "node scripts/gov-drug-discovery-e2e-demo-capture.mjs",
+    "te5:demo": "node scripts/te5-autonomous-discovery-demonstrator.mjs"
   },
   "keywords": [
     "genesis-os",

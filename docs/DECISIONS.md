@@ -1375,13 +1375,7 @@ rejestru Novelty Gate — powtórzenie identycznego ziarna czyta `NOT_NEW` /
 `REPRODUCTION`, dowiedzione testem. 6/6 testów, w tym replay: dwa
 niezależne przebiegi tego samego ziarna dają identyczne odciski kampanii.
 
-**Co pozostaje UNKNOWN / nieukończone (uczciwie, nie "completed"):** Krok 6
-(pełne TE5 end-to-end na fixture Keplera, demonstrator Node, przechwycenie
-Chromium, weryfikacja replay) i Krok 7 (E6 wielojęzyczność PL/AR/EN,
-odświeżenie kluczy kanonicznych, RTL, TE7) NIE są jeszcze zbudowane —
-`campaignOrchestrator.ts` jest osiągalny dziś tylko przez własny zestaw
-testów, bez jeszcze jednego demonstratora Node/Chromium. Orchestrator
-potrafi autonomicznie kontynuować TYLKO kierunek
+Orchestrator potrafi autonomicznie kontynuować TYLKO kierunek
 `RESIDUAL_STRUCTURE_UNEXPLAINED` (ta sama domena, rozluźniona gramatyka) i
 `OBSERVATION_GAP_FOLLOWUP` (tylko z jawnie dostarczonym `gapResolver`) —
 `UNRESOLVED_SURVIVORS` i `CROSS_CAMPAIGN_TRANSFER` są świadomie
@@ -1389,6 +1383,54 @@ NIGDY nie realizowane autonomicznie, bo żaden kod w repo nie potrafi
 skonstruować nowego eksperymentu różnicującego ani pogodzić zmiany
 założeń między kampaniami — pętla uczciwie zatrzymuje się zamiast to
 udawać.
+
+**Krok 6 — TE5 Full Autonomous Discovery E2E, dokładnie na fixture z
+mandatu.** `node scripts/te5-autonomous-discovery-demonstrator.mjs`
+(`npm run te5:demo`) i odpowiadające testy w `campaignOrchestrator.test.ts`
+(TE5 describe block). Ziarno podane człowiekiem — dokładnie tekst z
+mandatu: *"Characterize the relation between orbital period and
+semi-major axis in the pinned Kepler/Mars dataset WITHOUT assuming the
+functional form."* Bez podania odpowiedzi.
+
+**Warunek dokładnie taki, jaki mandat nazwał PASS:** wynik to
+`REPRODUCTION`, NIE zmyślone `DISCOVERY`. Odzyskane nachylenie **1.49987**
+(3/2, III prawo Keplera) — identyczne z już zweryfikowanym odciskiem
+kampanii Keplera w `repro-demo` (`f4804820` — TA SAMA liczba, dowód że
+`domainAdapterRegistry.ts` nie duplikuje `campaignLabs.ts`, tylko go
+owija). Orchestrator zatrzymuje się `NO_INFORMATION_GAIN` po dokładnie
+jednej kampanii.
+
+**Kotwica publiczna jako dowód, nie deklaracja.** `noveltyGate.ts` nie ma
+własnej wiedzy, że III prawo Keplera jest wiedzą publiczną sprzed XVII
+wieku — musi to dostać jawnie. `campaignOrchestrator.ts` rozszerzony o
+`declaredPublicAnchorResolver` (nowe pole, wątek Kroku 5 dokończony tu),
+zasilany istniejącym `externalAnchor.ts::KEPLER_MARS_ANCHOR_ID` (audyt
+Phase 0 już go znalazł — nie nowa kotwica, ta sama). **Drugi test
+udowadnia, że kotwica jest NOŚNA, nie dekoracyjna**: bez niej dokładnie te
+same realne dane Keplera dają `noveltyLevel=NOVEL_WITHIN_CHECKED_CORPUS`
+i `resultLabel=DISCOVERY` — czyli TO SAMO odkrycie w takim samym pipeline
+zostałoby błędnie oznaczone jako naukowa nowość, gdyby wywołujący
+zapomniał zadeklarować kotwicę. To jest realny przypadek inflacji
+nowości (nie syntetyczny test jednostkowy z Kroku 1), złapany przez
+architekturę TE5/TE6 na prawdziwych danych.
+
+**Replay i Node≡Chromium (kryteria K, L, M).** Dwa niezależne przebiegi
+Node (osobne bundle'e, osobne instancje modułu) dają identyczny odcisk
+kampanii `f4804820`. Ten sam bundle przeglądarkowy uruchomiony w
+prawdziwym Chromium (`/opt/pw-browsers/chromium`) daje **identyczny**
+odcisk, etykietę wyniku i powód zatrzymania — zero błędów strony.
+**13/13 sprawdzeń przeszło.**
+
+Pełna bramka po Kroku 6: frontend **5714/5715** (1 skipped), backend
+**396/396**, tsc/eslint czyste, build OK, `repro-demo` **69/69** bez
+regresji.
+
+**Co pozostaje UNKNOWN / nieukończone (uczciwie, nie "completed"):** Krok 7
+(E6 wielojęzyczność PL/AR/EN, odświeżenie kluczy kanonicznych, RTL, TE7)
+NIE jest jeszcze zbudowany. `campaignOrchestrator.ts` jest dziś osiągalny
+tylko przez własny zestaw testów i `scripts/te5-autonomous-discovery-
+demonstrator.mjs` — żaden ekran w przeglądarce go jeszcze nie renderuje
+(nie było to w zakresie mandatu Phase E).
 
 Pełna bramka: frontend **5712/5712** (1 skipped), backend **396/396**,
 tsc czysty, eslint czysty, build OK, `repro-demo` **69/69** bez regresji.

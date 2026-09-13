@@ -17,7 +17,11 @@ function criterion(metric: string): FalsificationCriterion {
 }
 
 function spec(...bases: ('LINEAR' | 'LOG' | 'RECIPROCAL' | 'CONSTANT' | 'POWER')[]): ModelSpec {
-  return { id: 'test', terms: bases.map((basis) => (basis === 'POWER' ? { basis: 'POWER' as const, exponent: 2 } : { basis })), lineage: null };
+  return {
+    id: 'test',
+    terms: bases.map((basis) => (basis === 'CONSTANT' ? { basis } : basis === 'POWER' ? { basis: 'POWER' as const, variable: 'x', exponent: 2 } : { basis, variable: 'x' })),
+    lineage: null,
+  };
 }
 
 function falsifiedHypothesis(id: string): Hypothesis {
@@ -192,13 +196,13 @@ describe('falsifiedModelRegistry — F1: canonicalize BEFORE fingerprinting, so 
     recordFalsification({ spec: spec('LOG', 'LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
 
     // The "reordered operators" attack: same two terms, opposite literal order.
-    const reordered: ModelSpec = { id: 'reordered', terms: [{ basis: 'LINEAR' }, { basis: 'LOG' }], lineage: null };
+    const reordered: ModelSpec = { id: 'reordered', terms: [{ basis: 'LINEAR', variable: 'x' }, { basis: 'LOG', variable: 'x' }], lineage: null };
     expect(consultFalsifiedModelRegistry({ spec: reordered, scope: scopeA() }).verdict).not.toBe('ALLOW');
   });
 
   it('a spec with a term repeated is caught by consulting its deduplicated equivalent, and vice versa', () => {
     const evidence = falsifiedHypothesis('f1b');
-    const withDuplicate: ModelSpec = { id: 'dup', terms: [{ basis: 'LOG' }, { basis: 'LOG' }, { basis: 'LINEAR' }], lineage: null };
+    const withDuplicate: ModelSpec = { id: 'dup', terms: [{ basis: 'LOG', variable: 'x' }, { basis: 'LOG', variable: 'x' }, { basis: 'LINEAR', variable: 'x' }], lineage: null };
     recordFalsification({ spec: withDuplicate, scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
 
     expect(consultFalsifiedModelRegistry({ spec: spec('LOG', 'LINEAR'), scope: scopeA() }).verdict).not.toBe('ALLOW');
@@ -208,7 +212,7 @@ describe('falsifiedModelRegistry — F1: canonicalize BEFORE fingerprinting, so 
     const evidence = falsifiedHypothesis('f1c');
     const orderOne = recordFalsification({ spec: spec('LOG', 'LINEAR'), scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence, campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
     resetFalsifiedModelRegistryForTests();
-    const reordered: ModelSpec = { id: 'reordered', terms: [{ basis: 'LINEAR' }, { basis: 'LOG' }], lineage: null };
+    const reordered: ModelSpec = { id: 'reordered', terms: [{ basis: 'LINEAR', variable: 'x' }, { basis: 'LOG', variable: 'x' }], lineage: null };
     const orderTwo = recordFalsification({ spec: reordered, scope: scopeA(), reusableAs: 'VARIANT_ONLY', evidence: falsifiedHypothesis('f1c-2'), campaignId: 'campaign-A', round: 1, observationIds: ['a1'] });
     expect(orderTwo.modelFingerprint).toBe(orderOne.modelFingerprint);
     expect(orderTwo.modelId).toBe(orderOne.modelId);

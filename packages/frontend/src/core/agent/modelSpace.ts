@@ -407,8 +407,17 @@ function candidateTerms(constraints: ModelSpaceConstraints): readonly ModelTerm[
     if (!excluded.has('EXP_SATURATION')) for (const tau of saturationTaus(constraints.xRange)) pool.push({ basis: 'EXP_SATURATION', variable, tau });
   }
   if (constraints.includeInteractions && !excluded.has('INTERACTION')) {
+    // Dimensional filter (F2/F5-4): an INTERACTION is a claim that two
+    // DISTINCT axes act jointly. `i < j` already visits each unordered pair
+    // once; the extra `variables[i] === variables[j]` guard catches a caller
+    // that (accidentally or otherwise) repeats a name in `variables` — two
+    // equal names would otherwise mint a same-variable "interaction" that is
+    // really `variable²`, already covered honestly by the POWER basis, and
+    // would silently double-count that one axis under a false cross-term
+    // label rather than a real second dimension.
     for (let i = 0; i < variables.length; i += 1) {
       for (let j = i + 1; j < variables.length; j += 1) {
+        if (variables[i] === variables[j]) continue;
         pool.push({ basis: 'INTERACTION', variables: [variables[i]!, variables[j]!] });
       }
     }
@@ -417,9 +426,23 @@ function candidateTerms(constraints: ModelSpaceConstraints): readonly ModelTerm[
 }
 
 /**
- * Every distinct model of up to `maxTerms` terms over the declared pool.
- * Deterministic in both membership and order: same constraints in, same space
- * out, so a campaign that enumerates the space is replayable.
+ * Beam limit (F2/F5-5): the total number of models one `generateModelSpace`
+ * call will enumerate before it stops, regardless of how large `maxTerms` and
+ * the declared pool (bases × variables × shape grids) make the combinatorial
+ * space. `maxTerms` already bounds DEPTH (how many terms one model may carry);
+ * this bounds BREADTH at a fixed depth, the same role `MAX_MUTATIONS` plays
+ * for `mutateModelSpec` below — so a laboratory that declares many variables
+ * or leaves every basis enabled cannot make one campaign round enumerate an
+ * unbounded space. Enumeration order is `build`'s own fixed traversal, so
+ * which models survive the cap is deterministic, not first-come noise.
+ */
+const MAX_GENERATED_MODELS = 500;
+
+/**
+ * Every distinct model of up to `maxTerms` terms over the declared pool, up to
+ * `MAX_GENERATED_MODELS` of them. Deterministic in both membership and order:
+ * same constraints in, same space out, so a campaign that enumerates the
+ * space is replayable.
  */
 export function generateModelSpace(constraints: ModelSpaceConstraints): readonly ModelSpec[] {
   const pool = candidateTerms(constraints);
@@ -427,6 +450,7 @@ export function generateModelSpace(constraints: ModelSpaceConstraints): readonly
   const seen = new Set<string>();
 
   const emit = (terms: readonly ModelTerm[]): void => {
+    if (out.length >= MAX_GENERATED_MODELS) return;
     const spec = normalizeModelSpec({ id: '', terms, lineage: null });
     const print = modelSpecFingerprint(spec);
     if (seen.has(print)) return;
@@ -435,9 +459,13 @@ export function generateModelSpace(constraints: ModelSpaceConstraints): readonly
   };
 
   const build = (start: number, chosen: ModelTerm[]): void => {
+    if (out.length >= MAX_GENERATED_MODELS) return;
     if (chosen.length > 0) emit(chosen);
     if (chosen.length >= constraints.maxTerms) return;
-    for (let i = start; i < pool.length; i += 1) build(i + 1, [...chosen, pool[i]!]);
+    for (let i = start; i < pool.length; i += 1) {
+      if (out.length >= MAX_GENERATED_MODELS) return;
+      build(i + 1, [...chosen, pool[i]!]);
+    }
   };
   build(0, []);
 

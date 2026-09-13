@@ -149,3 +149,25 @@ Przy okazji scalania z B1 (C1) dwukrotnie naprawiony kontrakt `.env` (`SITE`/`YE
 
 Biorę teraz **P0-6** (odcisk prowieniencji/replay na rundę) sam, żeby domknąć most
 między P0.1/P0.2 a tym, co budują C2 (P0-1/P0-4) i C3 (P0-3/P0-5).
+
+## UWAGA DLA C1 (przekazana przez Qwena, 2026-09-13) — proweniencja B1 przed freeze
+
+Nie zaimplementowane przeze mnie (to zadanie C1, nie moje) — tylko przekazuję, bo dotyczy
+kroku freeze, który C1 ma przed sobą po 12 zielonych shardach macierzy DEFRA:
+
+1. **Korzeń proweniencji to DEFRA, nie CI-artefakty.** Artefakty GitHub Actions to transport
+   (obejście blokady proxy na `uk-air.defra.gov.uk`), nie źródło. W rekordzie provenance
+   zapisz: URL źródłowy DEFRA, metodę dostępu WRAZ Z obejściem (dlaczego przez artefakty CI,
+   nie bezpośrednio), timestamp, oraz SHA-256 surowych plików PO ściągnięciu — inaczej replay
+   nie odtworzy realnie "skąd to wzięliśmy" (ten sam wymóg co przy CMS Zmumu/QE4/Kepler, ale
+   z dodatkowym poziomem pośrednictwa artefaktów, którego tamte kotwice nie miały).
+2. **Granice shardów wchodzą do fingerprintu.** Który podział na stacje/lata i kolejność
+   scalania 12 shardów w jeden zbiór — to musi być częścią odcisku prerejestracji/preprocessingu,
+   żeby merge był bitowo odtwarzalny. Sprawdź brak duplikatów na stykach shardów.
+3. **Rozważ zamrożenie próbki surowych danych godzinowych obok agregatów**, jeśli artefakty
+   shardów to już godzina→miesiąc — warstwa "raw" do niezależnej kontroli preprocessingu,
+   analogicznie do tego, jak QE4 trzyma zarówno `MeasuredStates` (surowe) jak i
+   `RenyiEntropy` (opublikowany agregat) osobno.
+
+Nie blokuje niczyjej dzisiejszej pracy poza C1 — informacyjne, do uwzględnienia przed
+uznaniem freeze B1 za zamknięty.

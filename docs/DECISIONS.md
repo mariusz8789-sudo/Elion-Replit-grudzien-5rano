@@ -1425,12 +1425,73 @@ Pełna bramka po Kroku 6: frontend **5714/5715** (1 skipped), backend
 **396/396**, tsc/eslint czyste, build OK, `repro-demo` **69/69** bez
 regresji.
 
-**Co pozostaje UNKNOWN / nieukończone (uczciwie, nie "completed"):** Krok 7
-(E6 wielojęzyczność PL/AR/EN, odświeżenie kluczy kanonicznych, RTL, TE7)
-NIE jest jeszcze zbudowany. `campaignOrchestrator.ts` jest dziś osiągalny
-tylko przez własny zestaw testów i `scripts/te5-autonomous-discovery-
-demonstrator.mjs` — żaden ekran w przeglądarce go jeszcze nie renderuje
-(nie było to w zakresie mandatu Phase E).
+**Krok 7 — E6 Multilingual (PL/AR/EN).** Kolejność DOKŁADNIE taka, jaką
+mandat wymusił: NAJPIERW klucze kanoniczne, DOPIERO POTEM tłumaczenia.
 
-Pełna bramka: frontend **5712/5712** (1 skipped), backend **396/396**,
-tsc czysty, eslint czysty, build OK, `repro-demo` **69/69** bez regresji.
+`core/agent/phaseELabels.ts` (NOWY, Rule 1): `renderLabel`/
+`checkCompleteness` nad DOKŁADNIE tym samym unijnym typem, który Phase E
+już produkuje — `ResultLabel | NoveltyLevel | OrchestratorStopReason |
+DirectionGenerationMethod`, zaimportowanym jako TYPY, nie skopiowanym —
+więc `Record<CanonicalLabelKey, ...>` sprawia, że TypeScript **odmawia
+kompilacji** niekompletnego słownika (build-failing z samego mandatu,
+nie tylko test). Żaden moduł obliczeniowy (noveltyGate.ts,
+directionFinder.ts, campaignOrchestrator.ts) nie importuje tego pliku ani
+nie przyjmuje parametru języka — architektura sama gwarantuje, że język
+nigdy nie dotyka werdyktu/odcisku.
+
+**Dowód TE7.1 na realnym przebiegu, nie na atrapie**: jedna prawdziwa
+kampania Keplera wyrenderowana w EN/PL/AR trzyma dokładnie ten sam
+`campaignFingerprint`/`resultLabel` — sprawdzone w teście na poziomie
+danych (`phaseELabels.test.ts`) I na poziomie DOM w prawdziwym Chromium
+(`scripts/te7-multilingual-rtl-demo.mjs`).
+
+`core/agent/bannedStringScanner.ts` (NOWY, Rule 2, krytyczny): audyt
+potwierdził, że jedyny istniejący skaner (`govDrugDiscoveryE2E.ts`) jest
+lokalny i tylko EN/PL — pozostawiony NIETKNIĘTY (żywa, przetestowana
+funkcja rządowa, poza zakresem tego mandatu). Nowy, generyczny skaner
+sprawdza TRZY języki tą samą funkcją: PL "bezpieczny"/"bez skutków
+ubocznych"/"cudowny lek"; EN "safe"/"no side effects"/"miracle
+cure"/"approved replacement"; AR "آمن"/"بدون آثار جانبية"/"دواء
+معجزة"/"بديل معتمد". **Dowód, że dziura w JEDNYM języku nie umyka**:
+tekst zakazanego zwrotu ukryty WYŁĄCZNIE w arabskiej wersji, z czystym
+EN/PL, i tak zostaje złapany przez `scanAllLocales`.
+
+**Rule 3 (RTL) i Rule 6 (AR niezweryfikowany) na realnym Chromium.**
+`scripts/te7-multilingual-rtl-demo.mjs` renderuje jedną prawdziwą kampanię
+w trzech sekcjach; sekcja arabska ma `dir="rtl"`, a `getComputedStyle`
+potwierdza `direction: rtl` (nie tylko atrybut — mogłby go nadpisać
+arkusz stylów). Odcisk kampanii wewnątrz arabskiej sekcji dostaje
+`direction:ltr; unicode-bidi:isolate` — lekcja z wcześniejszej pracy tej
+sesji nad filmem inwestorskim (licznik scen odwrócił się w RTL bez tego
+zabezpieczenia). Każdy render arabski niesie
+`arabicVerificationStatus: 'UNVERIFIED'` — jawnie, nigdy po cichu jako
+zweryfikowany. **9/9 sprawdzeń, zero błędów strony.**
+
+**Rule 4 (kompletność) dowiedziona typem, nie tylko testem**: 19/19
+kluczy kanonicznych (4 ResultLabel + 4 NoveltyLevel + 7
+OrchestratorStopReason + 4 DirectionGenerationMethod) ma en/pl/ar,
+zweryfikowane `checkCompleteness()`. Brakujące tłumaczenie (`TE7.4`,
+testowane osobną funkcją `lookupTranslation` na SYNTETYCZNYM niekompletnym
+słowniku, żeby nie psuć prawdziwego) daje jawnie oflagowany fallback do
+EN, nigdy ciche puste pole.
+
+**Świadome ograniczenie zakresu, ujawnione, nie ukryte**: kanoniczne
+klucze/tłumaczenia obejmują TYLKO słownictwo, które Phase E (Kroki 1-6)
+samo produkuje — NIE rozszerzono na etykiety A1-A3/E2E-01
+(`NO_WINNER`/`SAFE_RELATIVE_TO_X`/itd.), które są osobnym, wcześniejszym
+mandatem i osobną pracą.
+
+18 nowych testów jednostkowych Kroku 7 (8 `phaseELabels.test.ts` + 10
+`bannedStringScanner.test.ts`), plus dwa uruchamialne demonstratory
+(`npm run te5:demo` **13/13**, `npm run te7:demo` **9/9**). Pełna bramka:
+frontend **5732/5733** (1 skipped), backend **396/396**, tsc/eslint
+czyste, build OK, `repro-demo` **69/69** — zero regresji.
+
+**Co pozostaje UNKNOWN / nieukończone (uczciwie, nie "completed"):**
+żaden ekran w przeglądarce nie renderuje jeszcze Phase E (ani
+`campaignOrchestrator.ts`, ani `phaseELabels.ts`) — cały dowód
+runtime'owy jest dziś po stronie Node/Chromium (skrypty + testy), nie w
+produkcyjnym UI. Kanoniczne klucze/tłumaczenia nie zostały rozszerzone na
+istniejące etykiety A1-A3/E2E-01. Tłumaczenia arabskie są profesjonalnym
+MSA napisanym przez C1, jawnie oznaczone `UNVERIFIED` — nie mają
+potwierdzenia native speakera.

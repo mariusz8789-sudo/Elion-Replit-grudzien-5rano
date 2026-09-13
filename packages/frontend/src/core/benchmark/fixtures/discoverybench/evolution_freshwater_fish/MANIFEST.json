@@ -1,0 +1,65 @@
+{
+  "benchmarkId": "discoverybench",
+  "benchmarkVersion": "DB-REAL-train@c31fcf01",
+  "source": {
+    "repo": "https://github.com/allenai/discoverybench",
+    "commit": "c31fcf011e070f021a5f5b906896d0821f6880e8",
+    "commitDate": "2025-06-08T22:42:01-06:00",
+    "originalPathPrefix": "discoverybench/real/train/evolution_freshwater_fish/",
+    "license": "ODC-By 1.0 (Open Data Commons Attribution License)",
+    "paper": "Domain: evolutionary biology / freshwater fish body-size evolution and speciation rates, South America (BAMM/DR diversification analysis)."
+  },
+  "dataset": {
+    "path": "body-size-evolution-in-south-american-freshwater-fishes.csv",
+    "sha256": "d2498eaafba0a583f3a434e53eec682b3a58cddc16c6fd3d70cc49e5cd645d57",
+    "byteLength": 140981,
+    "rowCount": 460,
+    "targetVariable": "BAMM_speciation",
+    "declaredIndependentVariables": ["RML_evol", "MBL_evol", "OGP_evol", "BEL_evol", "diversity", "runoff", "Elevation", "sgr", "soil_div", "area"]
+  },
+  "cases": [
+    {
+      "caseId": "evolution_freshwater_fish/metadata_0",
+      "metadataFile": "metadata_0.json",
+      "metadataSha256": "0debacd967a8141d91ec2e4c7262d603f9c51513ea67259b86ee7c5a96d1f7ee",
+      "task": "What are the factors most influential in explaining spatial variation in speciation rates?",
+      "goldHypothesisText": "The rate of maximum body length evolution emerged as the most influential factor explaining spatial variation in speciation rates. The relationship is positive with linear coefficient 0.82.",
+      "claims": [
+        { "variable": "MBL_evol", "sign": "POSITIVE", "claimedCoefficient": 0.82 }
+      ]
+    },
+    {
+      "caseId": "evolution_freshwater_fish/metadata_1",
+      "metadataFile": "metadata_1.json",
+      "metadataSha256": "356dd249dba26088336bb69c7f45449cae8e1105d0ee0047ed069bf89a2e0c82",
+      "task": "How are evolutionary rates of oral gape position and relative maxillary length related to speciation rates?",
+      "goldHypothesisText": "Evolutionary rates of oral gape position and relative maxillary length both exhibited a negative relationship with speciation rates. Their respective coefficient of relation is -4.6 and -4.9.",
+      "claims": [
+        { "variable": "OGP_evol", "sign": "NEGATIVE", "claimedCoefficient": -4.6 },
+        { "variable": "RML_evol", "sign": "NEGATIVE", "claimedCoefficient": -4.9 }
+      ]
+    },
+    {
+      "caseId": "evolution_freshwater_fish/metadata_2",
+      "metadataFile": "metadata_2.json",
+      "metadataSha256": "30bcd26f66ea3a62a57d0379493ecc285f94193c07341d14ca95d25217a377d9",
+      "task": "Is the rate of body elongation evolution associated with speciation rates?",
+      "goldHypothesisText": "The rate of body elongation evolution has no significant association with speciation rates.",
+      "claims": [
+        { "variable": "BEL_evol", "sign": "NOT_SIGNIFICANT", "claimedCoefficient": null }
+      ]
+    },
+    {
+      "caseId": "evolution_freshwater_fish/metadata_3",
+      "metadataFile": "metadata_3.json",
+      "metadataSha256": "7bec14fc170b825bb90b52c7e3d577182db622542f1ec640c7edcf819cc6468d",
+      "task": "Is species diversity related to speciation rates?",
+      "goldHypothesisText": "There is a weak but significant, positive relationship between speciation rates and species diversity. The weak relationship is determined by a very small coefficient 0.00003018.",
+      "claims": [
+        { "variable": "diversity", "sign": "POSITIVE", "claimedCoefficient": 0.00003018 }
+      ]
+    }
+  ],
+  "notCoveredByThisManifest": "Only 4 of DiscoveryBench's real train-split cases for this task family are frozen here (an explicit, disclosed MVP subset, not the full 144-task DB-REAL set or the held-out test split). Every OTHER DiscoveryBench domain/task in the upstream repo is out of scope for this run and must be reported as NOT_ATTEMPTED, never fabricated as PASS or FAIL.",
+  "officialScoringNote": "DiscoveryBench's own discovery_eval.py / eval/new_eval.py (run_eval_gold_vs_gen_NL_hypo_workflow) requires a live call to an external LLM API (OpenAI/Anthropic/Google — no rule-based fallback exists in the upstream code) to compute context/variable/relation facet scores and the final HMS. This sandbox has no configured private LLM API key for scripted use, so the OFFICIAL metric is NO_ACCESS by construction here — see docs/A10_BENCHMARK_SELECTION.md. The claims[] above are a disclosed, rule-based substitute: sign and (for evolution_freshwater_fish) rough coefficient-magnitude / t-statistic-significance checks against the REAL published values, independently re-derived from this exact CSV via ordinary least squares before this manifest was written."
+}

@@ -93,6 +93,13 @@ const EXPECTED = {
   gapStopReason: 'OBSERVATION_GAP',
   gapThreshold: 1,
   qe4RegimeFingerprints: ['e7b90572', '3c3e9083', 'c82210fb', '67711185', 'cc3e4323', 'bb6aec30', '2d470070'],
+  // A10 — DiscoveryBench (DB-REAL, evolution_freshwater_fish, 4 frozen real
+  // cases; allenai/discoverybench @ c31fcf01). See docs/A10_BENCHMARK_SELECTION.md.
+  a10DatasetFingerprint: 'fad0d6e8',
+  a10RunFingerprint: '095d5136',
+  a10TotalCases: 4,
+  a10Correct: 4,
+  a10UnknownOrNoAccess: 0,
 };
 
 const checks = [];
@@ -158,7 +165,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier, dGate;
+let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier, dGate, dA10;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -183,6 +190,7 @@ try {
   dGate = science.reproPracticalCandidateGate();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
+  dA10 = science.reproA10DiscoveryBenchBenchmark();
 } finally {
   rmSync(bundleDir, { recursive: true, force: true });
 }
@@ -327,6 +335,20 @@ record('§8: kandydat bez dowodow i bez zadeklarowanych granic nie wychodzi z wa
 record('§8: DZIALANIE wymaga czlowieka, a wynik NIEWYGODNY nie jest blokowany (policy ogranicza dzialanie, nie prawde)',
   dGate.interventionNeedsHuman === true && dGate.negativeFindingStillActivates === true && dGate.citizenSurfaceEverReachable === false,
   `interwencja → REQUIRES_HUMAN_APPROVAL=${dGate.interventionNeedsHuman}; wynik negatywny/worst-case dalej ACTIVATE=${dGate.negativeFindingStillActivates}; warstwa obywatelska osiagalna=${dGate.citizenSurfaceEverReachable}`);
+
+// --- A10: zewnetrzny benchmark (DiscoveryBench, DB-REAL) ---------------------
+record('A10: DiscoveryBench — odcisk zamrozonego zbioru (4 realne przypadki, evolution_freshwater_fish)',
+  dA10.datasetFingerprint === EXPECTED.a10DatasetFingerprint && dA10.totalCases === EXPECTED.a10TotalCases,
+  `${dA10.datasetFingerprint} / ${dA10.totalCases} przypadkow (oczekiwane ${EXPECTED.a10DatasetFingerprint} / ${EXPECTED.a10TotalCases})`);
+record('A10: DiscoveryBench — Facet A (fitModelSpec na pelnym zbiorze kowariant) odtwarza realne opublikowane wspolczynniki',
+  dA10.correctCount === EXPECTED.a10Correct && dA10.unknownOrNoAccessCount === EXPECTED.a10UnknownOrNoAccess,
+  `${dA10.correctCount}/${dA10.totalCases} CORRECT, ${dA10.unknownOrNoAccessCount} UNKNOWN/NO_ACCESS (oczekiwane ${EXPECTED.a10Correct} / ${EXPECTED.a10UnknownOrNoAccess})`);
+record('A10: DiscoveryBench — odcisk wyniku i replay',
+  dA10.runFingerprint === EXPECTED.a10RunFingerprint && dA10.replay === 'MATCH',
+  `${dA10.runFingerprint} / replay=${dA10.replay} (oczekiwane ${EXPECTED.a10RunFingerprint} / MATCH)`);
+record('A10: oficjalna metryka DiscoveryBench (HMS) jest jawnie NO_ACCESS, nie zmyslona',
+  dA10.officialMetricStatus.startsWith('NO_ACCESS'),
+  dA10.officialMetricStatus);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

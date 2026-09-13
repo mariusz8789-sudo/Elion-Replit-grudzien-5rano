@@ -503,3 +503,51 @@ export function reproPracticalCandidateGate(): ReproCandidateGateReport {
     citizenSurfaceEverReachable: citizenReachable,
   };
 }
+
+// --- A10: external benchmark harness (DiscoveryBench) -----------------------
+
+import { runDiscoveryBenchEvolutionFishBenchmark } from '../benchmark/discoveryBenchRun';
+import { compareReplay } from '../benchmark/benchmarkRunner';
+
+export interface ReproA10BenchmarkReport {
+  readonly benchmarkId: string;
+  readonly benchmarkVersion: string;
+  readonly totalCases: number;
+  readonly correctCount: number;
+  readonly incorrectCount: number;
+  readonly unknownOrNoAccessCount: number;
+  readonly scientificCorrectnessRate: number | null;
+  readonly reasoningValidityRate: number | null;
+  readonly datasetFingerprint: string;
+  readonly runFingerprint: string;
+  readonly replay: 'MATCH' | 'MISMATCH';
+  readonly officialMetricStatus: string;
+}
+
+/**
+ * A10 — the one real, public, external benchmark run this codebase performs
+ * end to end: DiscoveryBench (DB-REAL, `evolution_freshwater_fish`, 4 frozen
+ * cases) against Genesis's own `fitModelSpec`/`runDiscoveryCampaign`, scored
+ * by a disclosed rule-based substitute for the official (private-LLM-gated)
+ * HMS metric. See `core/benchmark/discoveryBenchManifest.ts` and
+ * `docs/A10_BENCHMARK_SELECTION.md` for why this benchmark and not the other
+ * two candidates, and exactly what the official metric's NO_ACCESS means.
+ */
+export function reproA10DiscoveryBenchBenchmark(): ReproA10BenchmarkReport {
+  const first = runDiscoveryBenchEvolutionFishBenchmark();
+  const second = runDiscoveryBenchEvolutionFishBenchmark();
+  return {
+    benchmarkId: first.benchmarkId,
+    benchmarkVersion: first.benchmarkVersion,
+    totalCases: first.summary.totalCases,
+    correctCount: first.summary.byOutcome.CORRECT,
+    incorrectCount: first.summary.byOutcome.INCORRECT,
+    unknownOrNoAccessCount: first.summary.unknownOrNoAccessCount,
+    scientificCorrectnessRate: first.summary.scientificCorrectnessRate,
+    reasoningValidityRate: first.summary.reasoningValidityRate,
+    datasetFingerprint: first.datasetFingerprint,
+    runFingerprint: first.runFingerprint,
+    replay: compareReplay(first, second),
+    officialMetricStatus: 'NO_ACCESS: DiscoveryBench\'s own HMS metric requires a private LLM API key this sandbox does not have.',
+  };
+}

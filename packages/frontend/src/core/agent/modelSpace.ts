@@ -118,6 +118,17 @@ export type ModelFit =
       readonly coefficients: readonly number[];
       readonly rss: number;
       readonly predict: (input: ModelInput) => number;
+      /**
+       * Classical weighted-least-squares coefficient standard errors,
+       * `sqrt(σ̂² · diag((XᵀWX)⁻¹))` with `σ̂² = rss / (n − k)` — the same
+       * formula ordinary least squares reduces to when every `sigma` is a
+       * uniform placeholder rather than a calibrated measurement error. Only
+       * used as a real significance check (e.g. an external-benchmark
+       * comparison — see `core/benchmark/`), never to alter fitting or
+       * ranking. `null` when there are no spare degrees of freedom
+       * (`n ≤ k`) — an estimate a fit that exact could not honestly support.
+       */
+      readonly standardErrors: readonly number[] | null;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -241,6 +252,25 @@ function solveLinearSystem(matrix: number[][], rhs: number[]): number[] | null {
 }
 
 /**
+ * The diagonal of `M⁻¹`, without forming the full inverse: solving `M x = eᵢ`
+ * for each standard basis vector gives column `i` of `M⁻¹`, and its own `i`-th
+ * entry is `(M⁻¹)ᵢᵢ`. `n` here is `fitModelSpec`'s term count (rarely double
+ * digits), so `n` extra eliminations cost nothing next to the fit itself.
+ */
+function inverseDiagonal(matrix: readonly (readonly number[])[]): number[] | null {
+  const n = matrix.length;
+  const diag: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const e = new Array<number>(n).fill(0);
+    e[i] = 1;
+    const column = solveLinearSystem(matrix as number[][], e);
+    if (column === null) return null;
+    diag.push(column[i]!);
+  }
+  return diag;
+}
+
+/**
  * Exact weighted least squares of `spec` against `points`, weighting each point
  * by `1/sigma²` exactly as `qe4BrydgesEstimator.ts::weightedLinearFit` does.
  * Deterministic: no seed, no iteration, no starting guess.
@@ -287,7 +317,12 @@ export function fitModelSpec(spec: ModelSpec, points: readonly ModelPoint[]): Mo
     const r = p.y - predict(pointInput(p));
     return acc + (r * r) / (p.sigma * p.sigma);
   }, 0);
-  return { ok: true, coefficients, rss, predict };
+
+  const degreesOfFreedom = points.length - n;
+  const diag = degreesOfFreedom > 0 ? inverseDiagonal(matrix) : null;
+  const standardErrors = diag === null ? null : diag.map((d) => Math.sqrt(Math.max((rss / degreesOfFreedom) * d, 0)));
+
+  return { ok: true, coefficients, rss, predict, standardErrors };
 }
 
 // --- M3: parsimony and out-of-sample ------------------------------------------

@@ -139,6 +139,21 @@ export interface CampaignLaboratory {
   readonly declareObservable?: () => RequiredObservable;
   readonly declareFeasibility?: (trigger: string) => ObservationGapFeasibility;
   readonly gapRecipient?: ObservationGapRecipient;
+  /**
+   * OPTIONAL, and only meaningful for a multi-variable laboratory (C3-2's
+   * `variables`/`includeInteractions` on `CampaignOptions`, threaded to
+   * `ModelSpaceConstraints`). In a real, already-collected observational
+   * dataset (e.g. the A10 external-benchmark harness's DiscoveryBench
+   * adapter), every independent variable's value is known BEFORE "observing"
+   * an experiment — only the dependent variable is revealed by `observe`.
+   * Selection scoring (`discriminationAt`/`falsificationPowerAt`, which must
+   * evaluate live models' PREDICTIONS at a candidate before it is observed)
+   * needs those independent-variable values to evaluate a multi-variable
+   * model at all; without this, they would silently treat every candidate as
+   * a single bare `x`, undefined on every other declared variable. Absent
+   * (the default), selection behaves exactly as it always has: a bare `x`.
+   */
+  readonly candidateVars?: (x: number) => Readonly<Record<string, number>> | undefined;
 }
 
 export interface CampaignModelView {
@@ -286,6 +301,19 @@ export interface CampaignOptions {
   readonly maxRounds?: number;
   readonly maxTerms?: number;
   readonly excludeBases?: ModelSpaceConstraints['excludeBases'];
+  /**
+   * C3-2's multi-variable model grammar (`modelSpace.ts`'s `variables`/
+   * `includeInteractions`), threaded through to the campaign's own
+   * `ModelSpaceConstraints` for the first time by a real caller (the A10
+   * external-benchmark harness, `core/benchmark/discoveryBenchAdapter.ts`):
+   * a laboratory whose `ModelPoint`s carry `vars` for more than one named
+   * variable needs this to be searched over anything but the single default
+   * `x` axis. Omitted (the default) reproduces every existing caller's exact
+   * prior behaviour unchanged — `modelSpace.ts` already defaults `variables`
+   * to `[DEFAULT_VARIABLE]` when this is absent.
+   */
+  readonly variables?: ModelSpaceConstraints['variables'];
+  readonly includeInteractions?: ModelSpaceConstraints['includeInteractions'];
   /** Fingerprints the caller already knew before the campaign began (anti-HARK anchor). */
   readonly alreadyKnownFingerprints?: readonly string[];
   /**
@@ -378,12 +406,12 @@ function criterionFor(model: LiveModel, lab: CampaignLaboratory): FalsificationC
  * different bets about this experiment, so running it separates them.
  */
 function discriminationAt(
-  x: number,
-  fits: readonly { readonly predict: (x: number) => number }[],
+  input: ModelInput,
+  fits: readonly { readonly predict: (input: ModelInput) => number }[],
   sigmaAtX: number,
 ): number {
   if (fits.length < 2) return 0;
-  const predictions = fits.map((f) => f.predict(x)).filter((v) => Number.isFinite(v));
+  const predictions = fits.map((f) => f.predict(input)).filter((v) => Number.isFinite(v));
   if (predictions.length < 2) return 0;
   const max = Math.max(...predictions);
   const min = Math.min(...predictions);
@@ -403,12 +431,12 @@ function discriminationAt(
  * here", built from the same predictions `discriminationAt` already uses.
  */
 export function falsificationPowerAt(
-  x: number,
-  fits: readonly { readonly predict: (x: number) => number }[],
+  input: ModelInput,
+  fits: readonly { readonly predict: (input: ModelInput) => number }[],
   sigmaAtX: number,
 ): number {
   if (fits.length < 2) return 0;
-  const predictions = fits.map((f) => f.predict(x)).filter((v) => Number.isFinite(v));
+  const predictions = fits.map((f) => f.predict(input)).filter((v) => Number.isFinite(v));
   if (predictions.length < 2) return 0;
   for (let i = 0; i < predictions.length; i += 1) {
     for (let j = i + 1; j < predictions.length; j += 1) {
@@ -475,6 +503,8 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     maxTerms: options.maxTerms ?? 2,
     xRange: lab.xRange,
     excludeBases: options.excludeBases,
+    variables: options.variables,
+    includeInteractions: options.includeInteractions,
   };
 
   const scopeForLab: FalsificationScope = {
@@ -578,7 +608,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     }
 
     // --- residual structure of the CURRENT best, and models derived from it ---
-    const residualFindings = analyzeResidualStructure(best.model.spec, { ok: true, rss: best.rss, predict: best.predict, coefficients: best.coefficients }, admitted);
+    const residualFindings = analyzeResidualStructure(best.model.spec, { ok: true, rss: best.rss, predict: best.predict, coefficients: best.coefficients, standardErrors: null }, admitted);
     lastResidualFindings = residualFindings;
     const derivedThisRound: CampaignModelView[] = [];
     const integrityFlagsThisRound: IntegrityFlag[] = [];
@@ -586,7 +616,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     const residualObservationRound = Math.max(0, ...admitted.map((p) => admittedAtRound.get(p.x) ?? 0));
     for (const proposal of proposeModelsFromResiduals(
       best.model.spec,
-      { ok: true, rss: best.rss, predict: best.predict, coefficients: best.coefficients },
+      { ok: true, rss: best.rss, predict: best.predict, coefficients: best.coefficients, standardErrors: null },
       admitted,
       { xRange: lab.xRange, maxTerms: constraints.maxTerms + 1 },
     )) {
@@ -633,7 +663,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     const discriminationScore: number | null = unobserved.length === 0
       ? null
       : (() => {
-        const maxSep = Math.max(...unobserved.map((x) => discriminationAt(x, predictors, sigmaGuess)));
+        const maxSep = Math.max(...unobserved.map((x) => discriminationAt(lab.candidateVars?.(x) ?? x, predictors, sigmaGuess)));
         return Number.isFinite(maxSep) ? maxSep : null;
       })();
 
@@ -676,8 +706,9 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       let bestFals = 0;
       let bestRedund = 0;
       for (const x of unobserved) {
-        const sep = discriminationAt(x, predictors, sigmaGuess);
-        const fals = falsificationPowerAt(x, predictors, sigmaGuess);
+        const input = lab.candidateVars?.(x) ?? x;
+        const sep = discriminationAt(input, predictors, sigmaGuess);
+        const fals = falsificationPowerAt(input, predictors, sigmaGuess);
         const redund = redundancyAt(x, admitted, candidateSpan);
         const combined = sep * (1 + REFINEMENT_WEIGHT * fals) * (1 - REFINEMENT_WEIGHT * redund);
         if (combined > bestScore) {

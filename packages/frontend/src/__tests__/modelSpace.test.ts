@@ -85,6 +85,29 @@ describe('modelSpace — fitting', () => {
     // The two tight points at y=0 dominate; the loose outlier barely moves it.
     expect(Math.abs(fit.predict(1))).toBeLessThan(1);
   });
+
+  it('standardErrors: null when exactly determined (no spare degrees of freedom)', () => {
+    const fit = fitModelSpec(spec([CONST, LIN]), LINE_POINTS.slice(0, 2));
+    expect(fit.ok).toBe(true);
+    if (!fit.ok) return;
+    expect(fit.standardErrors).toBeNull();
+  });
+
+  it('standardErrors match an independent OLS computation (numpy lstsq + classical WLS covariance) on real noisy data', () => {
+    // y = 3 + 2x + noise; cross-checked independently: beta=[3.07857143, 1.98809524], se=[0.16500017, 0.0326749].
+    const pts = [
+      { x: 1, y: 5.1, sigma: 1 }, { x: 2, y: 6.9, sigma: 1 }, { x: 3, y: 9.2, sigma: 1 }, { x: 4, y: 10.8, sigma: 1 },
+      { x: 5, y: 13.3, sigma: 1 }, { x: 6, y: 14.9, sigma: 1 }, { x: 7, y: 17.2, sigma: 1 }, { x: 8, y: 18.8, sigma: 1 },
+    ];
+    const fit = fitModelSpec(spec([CONST, LIN]), pts);
+    expect(fit.ok).toBe(true);
+    if (!fit.ok) return;
+    expect(fit.coefficients[0]).toBeCloseTo(3.07857143, 6);
+    expect(fit.coefficients[1]).toBeCloseTo(1.98809524, 6);
+    expect(fit.standardErrors).not.toBeNull();
+    expect(fit.standardErrors![0]).toBeCloseTo(0.16500017, 6);
+    expect(fit.standardErrors![1]).toBeCloseTo(0.0326749, 6);
+  });
 });
 
 describe('modelSpace — identity, normalization, dedup', () => {

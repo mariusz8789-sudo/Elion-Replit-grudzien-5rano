@@ -290,6 +290,74 @@ export function fitModelSpec(spec: ModelSpec, points: readonly ModelPoint[]): Mo
   return { ok: true, coefficients, rss, predict };
 }
 
+// --- M3: parsimony and out-of-sample ------------------------------------------
+
+/**
+ * PARSIMONY. Weighted RSS alone always prefers the more complex model: an extra
+ * free coefficient can only ever lower it, which is how an engine talks itself
+ * into an elaborate model that has merely absorbed noise. This is the BIC form
+ * for a chi-square with KNOWN variances — the residuals are already divided by
+ * each point's own sigma, so `rss` IS that chi-square and the penalty is simply
+ * `k·ln(n)` added to it.
+ *
+ * `k` IS THE NUMBER OF ESTIMATED COEFFICIENTS — one per term — and deliberately
+ * NOT `modelComplexity`. Complexity carries a surcharge for nonlinear bases that
+ * exists to break ties between equally good fits; folding it into k would charge
+ * BIC for freedom the fit never spends. A LOG term estimates exactly one
+ * coefficient: its shape is fixed by the grammar, not fitted.
+ *
+ * WHAT THIS DOES NOT ACCOUNT FOR, stated rather than hidden: the engine
+ * enumerates many candidate models and picks the best, and that selection is
+ * itself a source of optimism which a per-model information criterion does not
+ * correct. `holdoutScore` below is the answer to that, because out-of-sample
+ * error is not flattered by how many models were tried.
+ *
+ * LOWER IS BETTER. A more complex model wins only when it lowers chi-square by
+ * more than `Δk·ln(n)` — exactly "not without informational justification".
+ */
+export function modelSelectionScore(rss: number, estimatedCoefficients: number, pointCount: number): number {
+  if (!Number.isFinite(rss) || pointCount <= 0) return Number.POSITIVE_INFINITY;
+  return rss + estimatedCoefficients * Math.log(pointCount);
+}
+
+/** The number of coefficients a fit of this model actually estimates: one per canonical term. */
+export function estimatedCoefficientCount(spec: ModelSpec): number {
+  return normalizeModelSpec(spec).terms.length;
+}
+
+/** Deterministic split: every `stride`-th point is held out, never a random or seeded draw. */
+export function holdoutSplit<T>(points: readonly T[], stride = 3): { readonly fit: readonly T[]; readonly heldOut: readonly T[] } {
+  const fit: T[] = [];
+  const heldOut: T[] = [];
+  points.forEach((p, i) => ((i + 1) % stride === 0 ? heldOut : fit).push(p));
+  return { fit, heldOut };
+}
+
+/**
+ * OUT-OF-SAMPLE CHECK. Fits on part of the data and scores the chi-square on
+ * points the fit never saw — the one measurement overfitting cannot flatter,
+ * because a model bent to pass through its own residuals does worse here, not
+ * better.
+ *
+ * Returns `null`, never a number, when the split leaves too little to fit or
+ * nothing to test on. A hold-out score from an inadequate split would look like
+ * evidence while carrying none.
+ */
+export function holdoutScore(spec: ModelSpec, points: readonly ModelPoint[], stride = 3): number | null {
+  const { fit, heldOut } = holdoutSplit(points, stride);
+  if (heldOut.length === 0) return null;
+  const fitted = fitModelSpec(spec, fit);
+  if (!fitted.ok) return null;
+  let score = 0;
+  for (const p of heldOut) {
+    const predicted = fitted.predict(pointInput(p));
+    if (!Number.isFinite(predicted)) return null;
+    const r = p.y - predicted;
+    score += (r * r) / (p.sigma * p.sigma);
+  }
+  return score / heldOut.length;
+}
+
 // --- generation ---------------------------------------------------------------
 
 export interface ModelSpaceConstraints {

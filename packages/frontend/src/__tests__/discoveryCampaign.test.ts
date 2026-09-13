@@ -264,35 +264,72 @@ describe('discoveryCampaign — CASE B: planetary orbits (real pinned NASA data,
   });
 });
 
-describe('discoveryCampaign — §15 on REAL data: the engine re-derives a shape its grammar was denied', () => {
+describe('discoveryCampaign — §15 on REAL data: a structurally new model, derived after observation', () => {
   /**
-   * The strongest form of the acceptance criterion. The QE4 disorder data is
-   * genuinely logarithmic in T, so LOG is excluded from the grammar up front:
-   * the true shape is NOT reachable by enumeration. The engine must therefore
-   * either settle for a worse model, or notice the structure its best model
-   * leaves behind and build the missing term itself.
+   * The QE4 disorder data is genuinely logarithmic in T, so LOG is excluded from
+   * the grammar up front: the true shape is NOT reachable by enumeration. The
+   * engine must notice the structure its best model leaves behind and build the
+   * missing term itself.
+   *
+   * WHAT CHANGED WITH M3, AND WHY IT IS NOT A REGRESSION. Before M3, ranking was
+   * by raw weighted RSS, under which the derived three-term model won outright.
+   * Under M3's parsimony it does not: on these seven points it improves
+   * chi-square by 1.82 while one extra estimated coefficient costs ln(7) ≈ 1.95.
+   * A 1.82 improvement for one degree of freedom is p ≈ 0.18 — not compelling —
+   * so the engine now DERIVES the model, records it, and declines to crown it.
+   * That is precisely the overfitting guard parsimony exists to provide, and the
+   * test below asserts the whole of that behaviour rather than only the half
+   * that used to look impressive. The companion test at the end of this file
+   * shows a derived model still winning where the evidence genuinely justifies it.
    */
-  const denyLog = { maxRounds: 7, maxTerms: 2, excludeBases: ['LOG'] as const };
+  const denyLog = { maxRounds: 8, maxTerms: 1, excludeBases: ['LOG'] as const };
 
-  it('derives a model containing the excluded LOG term, from residual structure alone', () => {
+  it('derives a model containing the excluded LOG term, from real residual structure alone', () => {
     const result = runDiscoveryCampaign(makeQe4CampaignLab(5), denyLog);
     const derived = result.rounds.flatMap((r) => r.derivedThisRound);
     expect(derived.some((m) => m.formula.includes('log'))).toBe(true);
   }, 30000);
 
-  it('that derived model goes on to WIN the campaign, beating everything the starting space contained', () => {
+  it('gives every derived model a real lineage: the parent it came from and the finding that motivated it', () => {
     const result = runDiscoveryCampaign(makeQe4CampaignLab(5), denyLog);
-    const winner = result.discovery.winningModel;
-    expect(winner).not.toBeNull();
-    expect(winner!.enteredAtRound).toBeGreaterThan(0);
-    expect(winner!.derivedFrom).not.toBeNull();
-    expect(winner!.formula).toContain('log');
+    const derived = result.rounds.flatMap((r) => r.derivedThisRound);
+    expect(derived.length).toBeGreaterThan(0);
+    for (const model of derived) {
+      expect(model.enteredAtRound).toBeGreaterThan(0);
+      expect(model.derivedFrom).not.toBeNull();
+      expect(model.derivationOperator).toContain('RESIDUAL_');
+    }
+    // The motivating finding is a named structure, measured on the parent's own residuals.
+    expect(result.rounds.flatMap((r) => r.residualFindings).some((f) => f.kind === 'CURVATURE')).toBe(true);
   }, 30000);
 
-  it('the winning derived model fits strictly better than the best model the grammar could enumerate', () => {
+  it('fits better yet does NOT win: parsimony refuses an improvement smaller than its information cost', () => {
     const result = runDiscoveryCampaign(makeQe4CampaignLab(5), denyLog);
-    const roundThatDerived = result.rounds.find((r) => r.derivedThisRound.length > 0)!;
-    const later = result.rounds[result.rounds.length - 1]!;
-    expect(later.models[0]!.rss!).toBeLessThan(roundThatDerived.models[0]!.rss!);
+    const final = result.rounds[result.rounds.length - 1]!;
+    const winner = result.discovery.winningModel!;
+    const derivedLog = final.models.find((m) => m.formula.includes('log'))!;
+    // The derived model genuinely fits the data better...
+    expect(derivedLog.rss!).toBeLessThan(winner.rss!);
+    // ...and is still not crowned, because the gain does not clear ln(n) per added coefficient.
+    expect(winner.formula).not.toContain('log');
+    expect(winner.rss! - derivedLog.rss!).toBeLessThan(Math.log(final.admittedX.length));
   }, 30000);
+});
+
+describe('discoveryCampaign — a derived model DOES win when the evidence justifies its complexity', () => {
+  /**
+   * The other side of the parsimony rule, on a laboratory whose truth needs
+   * three terms. Here the structure the starting grammar cannot express is
+   * large, the derived model's improvement dwarfs its cost, and the engine
+   * finishes holding a model that did not exist when the campaign began.
+   */
+  it('finishes holding a model built mid-campaign from a residual finding', () => {
+    const result = runDiscoveryCampaign(syntheticQuadraticLab(), { maxRounds: 6, maxTerms: 2 });
+    const winner = result.discovery.winningModel!;
+    expect(winner.enteredAtRound).toBeGreaterThan(0);
+    expect(winner.derivedFrom).not.toBeNull();
+    expect(winner.derivationOperator).toContain('RESIDUAL_');
+    // It was not in the starting space: nobody enumerated it before the data arrived.
+    expect(result.rounds[0]!.models.map((m) => m.fingerprint)).not.toContain(winner.fingerprint);
+  });
 });

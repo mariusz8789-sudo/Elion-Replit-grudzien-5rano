@@ -873,3 +873,45 @@ niepewność nachylenia WLS z własnymi testami — przyda się przy skorowaniu 
 **Zasada na przyszłość:** jeden właściciel na komponent. Ta kolizja kosztowała dwie
 niezależne implementacje tego samego, bo dwie sesje ruszyły równolegle bez sprawdzenia,
 czy ktoś już nie zaczął.
+
+## D-027 — Kanonikalizacja M2/M3/plannera po drugiej równoległej implementacji (2026-09-13)
+
+**Kolizja.** Dwie sesje zaimplementowały M2 (rejestr sfalsyfikowanych modeli),
+C3-1 (człony plannera Redund/Fals) i C3-2 (modele wielozmiennowe) **równolegle**,
+niezależnie, w tych samych plikach. To dokładnie powtórka D-026, tylko na trzech
+komponentach naraz. Werdykt jest **mieszany** — żadna strona nie wygrała wszystkiego.
+
+| Komponent | Kanoniczny | Dlaczego |
+|---|---|---|
+| `modelSpace.ts` — model wielozmiennowy | **wariant z `variable: string`** (sesja `6830575`) | zmienne **nazwane** zamiast indeksu pozycyjnego: samodokumentujące, odporne na kolejność, `INTERACTION` sortuje nazwy więc `a*b` ≡ `b*a`. Dla A1 („potencyRatio", „efficacyDelta") czytelniejsze niż `dim: 0/1`. Wariant z `dim` **wycofany**. |
+| planner Redund/Fals | **wariant `Sep × (1 + w·Fals) × (1 − w·Redund)`** (sesja `6830575`) | multiplikatywny, więc przy Fals=0 i Redund=0 redukuje się **dokładnie** do Sep; `Fals` liczy rozdzielone PARY modeli (>3σ), nie ułamek względem jednego modelu odniesienia — nie uprzywilejowuje żadnego modelu. Wariant addytywny **wycofany**. |
+| `falsifiedModelRegistry.ts` | **wariant z globalnym logiem** (sesja `3ed3ff8`/`4d870c1`) + **poprawka** | jest już zintegrowany z pętlą, dosłownie realizuje słowo „GLOBAL" z kontraktu, a `evidence: Hypothesis` ze sprawdzeniem statusu wiąże rekord z realnym obiektem epistemicznym zamiast ze stringiem werdyktu. Wariant niemutowalny **wycofany**. |
+| parsymonia + hold-out | **wariant z `modelSelectionScore`/`holdoutScore`** (ta sesja) | drugi wariant **nie miał ich w ogóle**, a kontrakt wymaga obu. Przeniesione na kanoniczny `modelSpace.ts`. |
+
+**Realna wada znaleziona w kanonicznym rejestrze i naprawiona (nie zadeklarowana — zmierzona):**
+`recordedAt: new Date().toISOString()` znajdowało się **wewnątrz odcisku** rekordu
+(`storedRecordFingerprint` brał `{...input, sequence}`). Skutek: zapis **tej samej**
+falsyfikacji dwa razy dawał **różne odciski** — zmierzone `e070289f` vs `dfbba267` przy
+identycznych faktach. To łamie gwarancję replay, na której opiera się cała reszta repo.
+Naprawa: `recordedAt` **wyłączone z odcisku** (zostaje na rekordzie jako metadana);
+`sequence` zostaje, bo dwie naprawdę osobne falsyfikacje tego samego modelu w tym samym
+zakresie to dwa wpisy w logu append-only i to pozycja w logu je rozróżnia.
+
+**Zastrzeżenie zapisane, nie ukryte:** kanoniczny rejestr trzyma stan w module
+(`let LOG` + `resetFalsifiedModelRegistryForTests()`). Dla „globalnej" pamięci
+międzykampanijnej to obrona do przyjęcia, ale globalny stan mutowalny w silniku,
+którego wartością jest deterministyczny replay, pozostaje ryzykiem: dwie kampanie
+w jednym procesie dzielą go niejawnie, a kolejność testów może wpływać na wynik.
+Nie przepisywałem tego — to decyzja architektoniczna drugiej sesji i pętla już na niej
+stoi — ale zgłaszam to jako otwarty dług, nie jako rzecz rozwiązaną.
+
+**Co zmieniło odciski kampanii i dlaczego to nie jest dryf:**
+`1a0226d5` → (C3-2 zmienił tożsamość każdego modelu: `LINEAR` → `LINEAR:x`) → `60309677`
+→ (parsymonia: ranking po chi² + k·ln(n) zamiast po surowym RSS) → **`44f245c9`**.
+Kepler: `2d6ce643` → `f4804820`, dalej bez zmian — jego model liniowy wygrywa przy obu
+regułach rankingu. **Nauka się nie zmieniła**: QE4 nadal daje wzrost logarytmiczny,
+Kepler nadal odtwarza nachylenie 1.49987.
+
+**Zasada na przyszłość, powtórzona bo znowu kosztowała:** jeden właściciel na komponent.
+Trzy komponenty zrobione dwa razy, bo dwie sesje ruszyły równolegle bez sprawdzenia
+`git fetch`, czy ktoś już nie zaczął.

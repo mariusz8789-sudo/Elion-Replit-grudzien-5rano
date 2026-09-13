@@ -3,9 +3,12 @@ import { createHypothesis, updateConfidence, type Hypothesis } from '../experime
 import type { FalsificationCriterion } from '../experimentFabric/scientificDiscovery';
 import { checkAntiHarkingAnchor, type AntiHarkingCheck } from '../experimentFabric/hypothesisLoop';
 import {
+  estimatedCoefficientCount,
   fitModelSpec,
   generateModelSpace,
+  holdoutScore,
   modelComplexity,
+  modelSelectionScore,
   modelSpecFingerprint,
   renderModelSpec,
   type ModelInput,
@@ -171,6 +174,14 @@ export interface CampaignRound {
   readonly antiHarking: AntiHarkingCheck;
   readonly roundFingerprint: string;
   /**
+   * M3: chi-square per point of this round's best model, scored on observations
+   * its own fit never saw. Null when the admitted set is too small to split
+   * honestly — an out-of-sample number from an inadequate split would look like
+   * evidence while carrying none. It is the one score that in-sample bending
+   * cannot improve, which is what makes it worth reporting next to RSS.
+   */
+  readonly bestHoldoutScore: number | null;
+  /**
    * Raised instead of a selection when no attached experiment can separate the
    * live models. When this is non-null, `selectedNextX` is null BY
    * CONSTRUCTION: the engine declined to run something worthless rather than
@@ -252,6 +263,7 @@ export interface CampaignResult {
    * reason `consultFalsifiedModelRegistry` returned.
    */
   readonly registrySkips: readonly { readonly fingerprint: string; readonly reason: string; readonly verdict: ConsultationVerdict }[];
+
   /**
    * Every gap this campaign raised, in order. Fingerprinted SEPARATELY from
    * `campaignFingerprint` on purpose: adding the gap ledger left every
@@ -530,7 +542,20 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     lastFitByFingerprint = new Map(fitted.map((f) => [f.model.fingerprint, { rss: f.rss, predict: f.predict, coefficients: f.coefficients }]));
 
     // Rank: lowest weighted RSS wins; a tie is broken toward the simpler model.
-    const ranked = [...fitted].sort((a, b) => a.rss - b.rss || modelComplexity(a.model.spec) - modelComplexity(b.model.spec));
+    /*
+     * M3 PARSIMONY. Ranking by raw weighted RSS always favours the more complex
+     * model, because an extra free coefficient can only lower it — which is how
+     * an engine talks itself into an elaborate model that has merely absorbed
+     * noise. Ranking is therefore by `modelSelectionScore` (chi-square plus
+     * k·ln(n)); RSS is still reported unchanged, so raw fit quality stays
+     * visible next to the penalised comparison, and `modelComplexity` remains
+     * the final tie-break it always was.
+     */
+    const selectionScoreOf = (entry: { model: LiveModel; rss: number }): number =>
+      modelSelectionScore(entry.rss, estimatedCoefficientCount(entry.model.spec), admitted.length);
+    const ranked = [...fitted].sort(
+      (a, b) => selectionScoreOf(a) - selectionScoreOf(b) || a.rss - b.rss || modelComplexity(a.model.spec) - modelComplexity(b.model.spec),
+    );
     const best = ranked[0]!;
     const runnerUp = ranked[1] ?? null;
     const rssRatio = runnerUp === null ? null : best.rss === runnerUp.rss ? 1 : best.rss / Math.max(runnerUp.rss, 1e-12);
@@ -705,6 +730,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
       observationGap,
       integrityFlags: integrityFlagsThisRound,
       holdout,
+      bestHoldoutScore: holdoutScore(best.model.spec, admitted),
     });
     priorFingerprints.push(roundFingerprint);
     if (observationGap !== null) observationGaps.push(observationGap);

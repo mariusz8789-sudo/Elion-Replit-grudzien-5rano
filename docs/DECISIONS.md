@@ -1673,3 +1673,81 @@ mechanism/temporal-spatial jako osobne detektory); benchmark L0-L5 z
 wszczepioną prawdą (planted fixtures). Oba wymagałyby realnego,
 osobnego nakładu projektowego porównywalnego z tym, co już zbudowano —
 zdecydowano nie budować ich płytko tylko po to, by "odhaczyć" liczbę.
+
+## D-037 (2026-09-13, PHASE G — G2) — DifferentiatingExperimentGenerator:
+selekcja przez falsificationPower, nie przez najgorszy przypadek
+
+**Kontekst:** po raporcie stanu dla Qwena (stan po `22996e8`) i recenzji
+zwrotnej Qwena ("GENESIS — REAL-WORLD GENUINE DISCOVERY ENGINE", Phase G,
+G0-G8), użytkownik ustalił podział pracy 20%/80%: C1 buduje od razu to,
+co nie wymaga sieci/produkcji/merge do main; Qwen dopracowuje resztę
+(G1, G3-G8) do tego samego poziomu szczegółu. G2 —
+`DifferentiatingExperimentGenerator` — wybrano jako "20%", bo to jedyny
+mechanizm, który zarówno własny audyt C1, jak i niezależna recenzja
+Qwena wskazały jako najkonkretniejszy brakujący element: gdy
+`UNRESOLVED_SURVIVORS` zostawia >1 żywy model, silnik nie miał sposobu
+zaprojektować eksperymentu, który by je realnie rozróżnił — tylko sam
+stop.
+
+**`core/agent/differentiatingExperimentGenerator.ts`** (NOWY): dla danego
+zestawu żywych hipotez (z deklarowanymi przewidywaniami) i kandydackich
+obserwabli (dostępnych i niedostępnych), buduje pełną macierz
+przewidywań, liczy dla każdej obserwabli **`falsificationPower`** (frakcja
+par hipotez realnie rozdzielonych o >1 sigma) obok already-istniejącego
+`discriminability` (najgorszy przypadek pairwise, ta sama stała
+`TAU_DISCRIMINABILITY` z `observationGap.ts`, nie druga statystyka) i
+wybiera do wykonania obserwablę z najwyższym `falsificationPower > 0`
+spośród DOSTĘPNYCH — nigdy tę, która nie rozdziela żadnej pary. Reguła
+decyzyjna (`expectedOutcomePerHypothesis`) jest zamrażana
+(`decisionRuleFingerprint`, fnv1a) PRZED jakąkolwiek realną obserwacją.
+Jeśli wybrany eksperyment i tak zostawia parę nierozstrzygniętą — a w
+fixture DD-EXP tak jest (H2 vs H3 różnią się tylko na niedostępnej Y) —
+w TYM SAMYM wywołaniu (`followUpGapRequest`, nie osobna ścieżka, która
+mogłaby po cichu nigdy nie odpalić) zgłaszany jest realny
+`ObservationGapRequest` (REUSE `classifyObservationGap`,
+`createObservationGapRequest`, `undeclaredFeasibility` z
+`observationGap.ts`, bez zmian).
+
+**Dwa błędy znalezione i naprawione przez faktyczne uruchomienie testów
+(nie założone jako poprawne z projektu):**
+1. Pierwsza wersja bramkowała wybór DOWOLNEJ obserwabli przez
+   `discriminability >= TAU_DISCRIMINABILITY` (najgorszy przypadek) —
+   to błędnie odrzucało X w fixture DD-EXP, bo X remisuje H2/H3
+   (worst-case=0), mimo że czysto rozdziela H1 od obu. Naprawiono
+   zmieniając kryterium wyboru na `falsificationPower > 0`
+   (worst-case zostaje tylko jako tie-breaker/pole raportowane).
+2. Pierwsza wersja zgłaszała `ObservationGapRequest` tylko w gałęzi
+   "nic nie wybrano" — pomijając wymóg, że nawet WYBRANY eksperyment
+   zostawiający pary nierozstrzygnięte musi RÓWNIEŻ zgłosić lukę w tym
+   samym wywołaniu. Naprawiono dodając `followUpGapRequest` do
+   `DiscriminatingExperimentSpec`, liczone przez
+   `findResolvingUnavailableObservable` (dopasowuje niedostępną
+   obserwablę po tym, ile z KONKRETNYCH nierozstrzygniętych par ONA
+   sama rozwiązuje — nie po jej własnym globalnym najgorszym przypadku,
+   ten sam błąd co #1 w innym miejscu).
+
+Fixture DD-EXP (dokładnie jak w mandacie Qwena: H1/H2 różnią się na
+dostępnej X, H2/H3 różnią się TYLKO na niedostępnej Y) przechodzi w
+całości: wybrane X, H1 rozdzielone od H2/H3 o >1 sigma, H2-vs-H3 uczciwie
+zgłoszone jako nierozstrzygnięte, realny gap request na Y w tym samym
+wywołaniu, odcisk reguły decyzyjnej deterministyczny. Plus przypadki
+FAIL (wszystko remisuje → gap request; nic nigdzie nie rozróżnia →
+`gapRequest: null`, uczciwie, bez zmyślania) i przypadek czysty (brak
+nierozstrzygniętych par → `followUpGapRequest: null`). **9/9 testów**
+(`differentiatingExperimentGenerator.test.ts`).
+
+Zamierzony przyszły wywołujący — jeszcze nie zbudowana polityka
+długo-horyzontalnej kampanii (Phase G, dalsza część Kroku 4 z mandatu
+Qwena) — nie istnieje jeszcze w tej sesji, więc moduł jest dziś
+osiągalny tylko przez własne testy; udokumentowane w
+`moduleReachability.test.ts::ALLOWED_ORPHANS` z prawdziwym powodem, nie
+cichym pominięciem.
+
+Pełna bramka: frontend **5821/5822** (1 skipped), backend **396/396**,
+tsc/eslint czyste, build OK, `repro-demo` **69/69** — zero regresji.
+
+**Co pozostaje jawnie nierozstrzygnięte:** decyzja G0 (merge do main,
+deploy produkcyjny) — użytkownik przekierował pytanie o nią na inny tor
+(podział 20/80) zamiast na nią odpowiedzieć; pozostaje otwarta i nie
+zostanie ruszona bez wyraźnej zgody. G1, G3-G8 z mandatu Qwena czekają na
+dalsze doprecyzowanie przez Qwena (przekazany osobny prompt).

@@ -127,12 +127,21 @@ export interface Qe4AnalysisResult {
   readonly resultFingerprint: string;
 }
 
-function significantlyGreater(a: number, sigmaA: number, b: number, sigmaB: number): boolean {
+/** Exported for reuse by other QE4-substrate modules needing the same 3σ comparison (e.g. `qe4RegimeHypotheses.ts`'s SATURATING check). */
+export function significantlyGreater(a: number, sigmaA: number, b: number, sigmaB: number): boolean {
   const combined = Math.sqrt(sigmaA * sigmaA + sigmaB * sigmaB);
   return a - b > 3 * combined;
 }
 
-function buildEmpiricalComponent(componentId: string, predictionModelId: string, observationModelId: string): TautologyComponent {
+/**
+ * Exported so other QE4-substrate modules testing a DIFFERENT structural
+ * hypothesis over the SAME raw measured shots (e.g. `qe4RegimeHypotheses.ts`
+ * fitting growth across time rather than across partition size) declare the
+ * identical epistemic pairing P1/P2/P4 already use here, rather than each
+ * re-deriving its own justification for why prediction and observation are
+ * independent.
+ */
+export function buildEmpiricalComponent(componentId: string, predictionModelId: string, observationModelId: string): TautologyComponent {
   return {
     componentId,
     prediction: {

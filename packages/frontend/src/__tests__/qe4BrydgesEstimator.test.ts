@@ -197,6 +197,42 @@ describe('QE4 estimator — regression/fit helpers', () => {
     expect(intercept).toBeCloseTo(1, 9);
   });
 
+  it('weightedLinearFit slopeSigma is propagated from the DECLARED per-point sigma, not from how well the fit happens to match -- a perfect-looking fit built from noisy-uncertainty inputs still carries that uncertainty forward', () => {
+    const x = [1, 2, 3, 4, 5];
+    const y = x.map((xi) => 2 * xi + 1);
+    const declaredSigma = 3; // the points landed exactly on the line, but each was DECLARED this uncertain
+    const sigma = x.map(() => declaredSigma);
+    const xbar = x.reduce((a, b) => a + b, 0) / x.length;
+    const sumSqDev = x.reduce((acc, xi) => acc + (xi - xbar) ** 2, 0);
+    const expectedSlopeSigma = Math.sqrt((declaredSigma * declaredSigma) / sumSqDev);
+    const { slopeSigma } = weightedLinearFit(x, y, sigma);
+    expect(slopeSigma).toBeCloseTo(expectedSlopeSigma, 9);
+    expect(slopeSigma).toBeGreaterThan(0);
+  });
+
+  it('weightedLinearFit slopeSigma matches the textbook equal-weight OLS slope-variance formula', () => {
+    // Var(slope) = sigma^2 / sum((x - xbar)^2) for equal per-point sigma -- a
+    // known closed form independent of this module's own implementation, so
+    // this checks the analytic formula itself, not just internal consistency.
+    const x = [1, 2, 3, 4, 6];
+    const y = [2.1, 3.9, 6.2, 7.8, 12.1];
+    const sigmaValue = 0.5;
+    const sigma = x.map(() => sigmaValue);
+    const xbar = x.reduce((a, b) => a + b, 0) / x.length;
+    const sumSqDev = x.reduce((acc, xi) => acc + (xi - xbar) ** 2, 0);
+    const expectedSlopeSigma = Math.sqrt((sigmaValue * sigmaValue) / sumSqDev);
+    const { slopeSigma } = weightedLinearFit(x, y, sigma);
+    expect(slopeSigma).toBeCloseTo(expectedSlopeSigma, 9);
+  });
+
+  it('weightedLinearFit slopeSigma grows when per-point sigma grows, all else equal', () => {
+    const x = [1, 2, 3, 4, 5];
+    const y = [1, 2, 3, 4, 5];
+    const tight = weightedLinearFit(x, y, x.map(() => 0.1));
+    const loose = weightedLinearFit(x, y, x.map(() => 10));
+    expect(loose.slopeSigma).toBeGreaterThan(tight.slopeSigma);
+  });
+
   it('weightedResidualSumOfSquares is zero for a perfect fit and positive otherwise', () => {
     const x = [1, 2, 3];
     const y = [3, 5, 7];

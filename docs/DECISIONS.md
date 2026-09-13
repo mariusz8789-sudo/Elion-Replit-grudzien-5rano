@@ -1017,3 +1017,60 @@ policzone wprost z już zweryfikowanych (dump z loga = plik bajt-w-bajt) plików
 
 **Job CI `a2-ozempic-substitute-pin` usunięty** z `ci.yml` po ściągnięciu i
 przypięciu danych, ten sam cykl życia co poprzednie kotwice.
+
+## D-030 (2026-09-13, A2) — Trzy realne błędy ekstrakcji w warstwie analizy,
+znalezione przez testowanie na realnych przypiętych danych, nie zgadnięte
+
+**Decyzja.** Po zbudowaniu `a2OzempicSubstitute.ts` nad przypiętym zestawem z
+D-029 i uruchomieniu go na realnych danych (nie na syntetycznym przykładzie),
+trzy realne rozbieżności między oczekiwaną a faktyczną liczbą wyekstrahowanych
+dowodów doprowadziły do trzech konkretnych poprawek w kodzie ekstrakcji —
+żadna z nich nie zmienia żadnego przypieczętowanego kryterium/progu z
+preregestracji, każda jest korektą sposobu CZYTANIA już przypiętych,
+niezmienionych danych źródłowych.
+
+1. **Badanie jednoramienne bez nazwy leku w tytule grupy** (EXENATIDE,
+   `NCT02533453`, Bydureon, otwarte badanie): dopasowanie ramienia kandydata po
+   regexie nazwy leku dawało 0 dopasowań, bo jedyna grupa badania nazywa się
+   „12/24 Weeks Treatment" — bez nazwy leku. Naprawione przez
+   `pickCandidateGroup`/`pickCandidateAeGroupTitle`: gdy dokładnie jedna grupa
+   pozostaje po odfiltrowaniu grup zawierających `placebo`/`comparator`, jest
+   przyjmowana jako ramię kandydata. Celowo NIE zastosowano tego fallbacku do
+   `pickHighestDoseGroup` (identyfikacja semaglutydu jako komparatora) — tam
+   fallback mógłby ZMYŚLIĆ obecność semaglutydu w badaniu, gdzie go nie ma.
+
+2. **Kodowe nazwy sponsora różne od `pref_name` w ChEMBL** (ADOMEGLIVANT =
+   LY2409021, DANUGLIPRON = PF-06882961, COTADUTIDE = MEDI0382): trzy realne
+   badania ADOMEGLIVANT (`NCT01241448`, `NCT00871572`, `NCT02091362`) tytułują
+   swoje ramiona „LY2409021", nie „ADOMEGLIVANT" — zweryfikowane wprost z
+   przypiętego `briefTitle` każdego badania. Regex po samym `pref_name` dawał 0
+   dopasowań. Naprawione małą mapą `KNOWN_DEVELOPMENT_CODE_NAMES`, zasilającą
+   wzorzec OR do dopasowania ramienia — udokumentowane jako korekta
+   TOŻSAMOŚCI (ten sam związek chemiczny, inna etykieta), nie jako zmiana
+   kryterium.
+
+3. **Rozrzut raportowany jako nazwany przedział ufności, nie SD/SE**
+   (ADOMEGLIVANT, `NCT01241448`): `dispersionType: "90% Confidence Interval"`
+   z polami `lowerLimit`/`upperLimit` zamiast zwykłego `spread`. `armStats`
+   czytał tylko `spread` — zwracał `null` dla tych pomiarów. Przepisane, by
+   zwracać ujednolicone `{mean, se, n}`, obsługując obie rodziny: SD/SE przez
+   `spread` (z konwersją SD→SE przez `/sqrt(n)` gdy trzeba) i CI przez
+   `se=(upper-lower)/(2*z)` z `zFromConfidenceLevel` parsującym 90/95/99% z
+   napisu `dispersionType` (domyślnie z=1.96).
+
+**Efekt łączny widoczny w realnych liczbach:** ADOMEGLIVANT poszedł z 0 do 3
+realnych badań skuteczności po połączeniu poprawek 2 i 3 — obie były
+niezbędne jednocześnie (bez poprawki 2 badania w ogóle się nie dopasowywały po
+nazwie; bez poprawki 3 dopasowane badanie i tak zwracałoby `null` z powodu
+nieobsłużonego rozrzutu). Zweryfikowane przez tymczasowy plik diagnostyczny
+zrzucający realny obliczony wynik do inspekcji przed napisaniem poprawki — nie
+zgadnięte z przeglądu kodu.
+
+**Runnable demonstrator:** `scripts/a2-ozempic-substitute-demonstrator.mjs`
+(`npm run a2:demo`) bunduje `a2OzempicSubstitute.ts` przez esbuild i uruchamia
+`runA2Analysis()` na realnych przypiętych danych, drukując pełny łańcuch
+mechanizm→przestrzeń kandydatów→ranking→samo-falsyfikacja→werdykt→brama
+bezpieczeństwa, po czym sprawdza 14 realnych właściwości wyniku (w tym obie
+poprawki wyżej, weto tirzepatydu, i że werdykt to uczciwe
+`CONFLICTING_EVIDENCE`, nie wymuszony zwycięzca) — 14/14 potwierdzone przy
+uruchomieniu.

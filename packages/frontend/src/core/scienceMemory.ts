@@ -8,6 +8,7 @@ import { compareAme2020Observations } from './observation/nuclearAme2020';
 import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
 import { canonicalJson, fnv1a } from './events/hash';
 import type { A1AnalysisReport } from './biotechData/a1Glp1Analysis';
+import type { A2AnalysisReport } from './biotechData/a2OzempicSubstitute';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
@@ -3400,6 +3401,88 @@ export function saveA1Glp1AnalysisToMemory(report: A1AnalysisReport): SavedExper
       'Mediana potencji z kwalifikujacych sie testow ChEMBL reprezentuje wiazanie z GLP-1R.',
       'Pierwszorzedowy wynik HbA1c przy najwyzszej testowanej/zarejestrowanej dawce reprezentuje skutecznosc kliniczna.',
       'Progi decyzyjne (okno potencji, margines skutecznosci, minimalna liczba dowodow) zostaly ustalone PRZED pobraniem jakichkolwiek danych.',
+    ],
+    epistemicStatus,
+  });
+}
+
+/**
+ * Writes a finished A2 autonomous Ozempic-substitute analysis
+ * (`biotechData/a2OzempicSubstitute.ts`) to Science Memory through the
+ * SAME `saveExperiment` path every other record uses. `epistemicStatus`
+ * reuses `HypothesisAssessment` verbatim, same convention as A1: the
+ * verdict IS a real epistemic state about the candidate space, not a new
+ * vocabulary. CONFLICTING_EVIDENCE/INSUFFICIENT_EVIDENCE map to
+ * 'INCONCLUSIVE' (a genuinely undecided result, not a failure); a real
+ * winner (BEST_SUPPORTED_CANDIDATE) maps to 'SUPPORTED_WITHIN_PROTOCOL';
+ * NO_SUPERIOR_CANDIDATE/NO_SAFE_SUPERIOR_CANDIDATE map to
+ * 'FALSIFIED_WITHIN_PROTOCOL' (the hypothesis "a better/safer candidate
+ * exists in this space" was tested and failed); PROMISING_BUT_UNCERTAIN
+ * maps to 'CANDIDATE' (real signal, not yet a supported claim).
+ */
+export function saveA2OzempicSubstituteToMemory(report: A2AnalysisReport): SavedExperiment {
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    report.verdict.label === 'BEST_SUPPORTED_CANDIDATE' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : report.verdict.label === 'PROMISING_BUT_UNCERTAIN' ? 'CANDIDATE'
+    : report.verdict.label === 'NO_SUPERIOR_CANDIDATE' || report.verdict.label === 'NO_SAFE_SUPERIOR_CANDIDATE' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : 'INCONCLUSIVE';
+
+  const rankedWithEvidence = report.rankedByScore.filter((r) => r.efficacy.length > 0);
+  const vetoedCount = report.candidateReports.filter((r) => r.score.vetoed).length;
+
+  return saveExperiment({
+    labId: 'government-research-a2-ozempic-substitute',
+    experimentId: `a2-ozempic-substitute:${report.analysisFingerprint}`,
+    experimentName: 'A2 — autonomiczny dobor kandydata na zamiennik semaglutydu',
+    params: {
+      totalCandidatesInSpace: report.totalCandidatesInSpace,
+      candidatesWithTrialEvidence: report.candidateReports.length,
+      candidatesWithEfficacyEvidence: rankedWithEvidence.length,
+      candidatesVetoedOnSafety: vetoedCount,
+    },
+    stats: {
+      totalCandidatesInSpace: report.totalCandidatesInSpace,
+      candidatesWithEfficacyEvidence: rankedWithEvidence.length,
+      candidatesVetoedOnSafety: vetoedCount,
+      selfFalsificationFindingCount: report.selfFalsification?.findings.length ?? 0,
+    },
+    analysis: [
+      {
+        title: 'Werdykt koncowy',
+        body: `${report.verdict.label}: ${report.verdict.reason}`,
+        kind: 'a2-ozempic-substitute-verdict',
+      },
+      {
+        title: 'Przestrzen kandydatow — z mechanizmu, nie z listy nazw',
+        body: `${report.totalCandidatesInSpace} czasteczek z realnym wiazaniem przy GLP-1R/GIPR/GCGR i max_phase>=2; ${report.candidateReports.length} ma realne, opublikowane badania T2DM/otylosc. Ranking pelny: ${report.rankedByScore.map((r) => `${r.summary.prefName}=${r.score.weightedScore.toFixed(3)}`).join(', ')}.`,
+        kind: 'a2-ozempic-substitute-candidate-space',
+      },
+      {
+        title: 'Self-falsyfikacja rundy 2',
+        body: report.selfFalsification === null
+          ? 'Brak kandydata z realnym dowodem skutecznosci do self-falsyfikacji.'
+          : `Kandydat ${report.selfFalsification.candidateId}: ${report.selfFalsification.findings.length} realne zastrzezenie(a) znalezione aktywnie, nie zalozone: ${report.selfFalsification.findings.join(' | ') || '(brak)'}.`,
+        kind: 'a2-ozempic-substitute-self-falsification',
+      },
+      {
+        title: 'Bramka bezpieczenstwa (Government Research/Action)',
+        body: report.gateDecision === null
+          ? 'Zaden kandydat nie zostal zaproponowany jako PracticalCandidate — werdykt nie wskazuje zwyciezcy do bramkowania.'
+          : `Wynik bramki: ${report.gateDecision.outcome}. Powierzchnia: ${report.surface}.`,
+        kind: 'a2-ozempic-substitute-safety-gate',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${report.preregistrationFingerprint} (przypieta PRZED pobraniem danych kandydatow), odcisk analizy ${report.analysisFingerprint}. Cele mechanizmu: GLP-1R ${report.targets.glp1r.chemblId}, GIPR ${report.targets.gipr.chemblId}, GCGR ${report.targets.gcgr.chemblId}.`,
+        kind: 'a2-ozempic-substitute-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Populacyjne, autonomiczne porownanie farmakologiczne na realnych, przypietych danych ChEMBL i ClinicalTrials.gov. Werdykt nie zostal wymuszony do bycia pozytywnym — CONFLICTING_EVIDENCE/NO_SUPERIOR_CANDIDATE/INSUFFICIENT_EVIDENCE sa realnymi, dozwolonymi wynikami. To NIE jest dyrektywa kliniczna dla zadnego pacjenta.',
+    assumptions: [
+      'Przestrzen kandydatow jest wyprowadzona z mechanizmu (ChEMBL, wiazanie GLP-1R/GIPR/GCGR) i realnego rozwoju klinicznego (max_phase>=2), nie z listy nazw.',
+      'Bez bezposredniego badania semaglutyd-vs-kandydat w tym samym RCT, porownanie jest NAIWNYM posrednim porownaniem (miedzy roznymi badaniami) — slabsza klasa dowodu, jawnie oznaczona.',
+      'Kategorie bezpieczenstwa i weto egzystencjalne zostaly ustalone PRZED pobraniem jakichkolwiek danych kandydatow.',
     ],
     epistemicStatus,
   });

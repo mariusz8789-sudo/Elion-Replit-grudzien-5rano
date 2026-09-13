@@ -26,7 +26,7 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | §8 PracticalCandidate safety gate | **ZROBIONE** | C1, wcześniej ta sesja | `core/agent/practicalCandidateGate.ts` — reużyty (nie napisano drugiego) przez A1, patrz niżej |
 | **§7 A1 GLP-1** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realne dane, realny werdykt, bramka bezpieczeństwa |
 | **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **ZROBIONE (Opcja A)** | C1 | patrz niżej |
-| **A2 — autonomiczny dobór kandydata na zamiennik Ozempicu (nowy mandat)** | **BIORĘ TERAZ** | **C1, ta sesja** | rozszerzenie A1: `CandidateGenerator` ma SAM zbudować przestrzeń kandydatów z mechanizmu (GLP-1R + GIPR + GCGR w ChEMBL — dual/triple agonists jak tirzepatyd), nie tylko liraglutyd. Realne dane: ChEMBL + ClinicalTrials.gov (w tym `adverseEventsModule` dla bezpieczeństwa). PubMed/FDA/EMA: świadomie pominięte na start (deklarowana luka, nie zmyślone), dodam tylko jeśli tania integracja się znajdzie. Dozwolone wyniki: BEST_SUPPORTED_CANDIDATE / PROMISING_BUT_UNCERTAIN / NO_SUPERIOR_CANDIDATE / NO_SAFE_SUPERIOR_CANDIDATE / CONFLICTING_EVIDENCE / INSUFFICIENT_EVIDENCE — bez wymuszania pozytywnego wyniku. *(w trakcie)*
+| **A2 — autonomiczny dobór kandydata na zamiennik Ozempicu (nowy mandat)** | **ZROBIONE** | **C1, ta sesja** | patrz niżej — realna, mechanizm-owa przestrzeń kandydatów, realny werdykt `CONFLICTING_EVIDENCE`, bramka bezpieczeństwa |
 
 ## Detektor residuum: znaleziona, niezałatana wada specyficzności
 
@@ -151,3 +151,62 @@ nieaktualne wpisy `ALLOWED_ORPHANS`, zgodnie z własną instrukcją testu, nie s
 brakujący wpis `GENESIS_A1_FIXTURE_DIR` w `.env.example` (złapany przez `envContract.test.mjs`).
 
 Commit`y: `7c16dfd`/`5a5ae4b`/`6f73afe` (fetch+pin), `0e26c6f` (potok analizy + naprawy).
+
+## §A2 — ZROBIONE: autonomiczny dobór kandydata na zamiennik Ozempicu, realny werdykt CONFLICTING_EVIDENCE
+
+Preregestracja przypięta PRZED pobraniem danych (`a2OzempicSubstitutePreregistration.ts`,
+odcisk `4642088a`, commit `1cd65eb`). Przestrzeń kandydatów zbudowana z MECHANIZMU, nie z
+nazwy leku: KAŻDA cząsteczka z realnymi kwalifikującymi się danymi wiązania w ChEMBL przy
+GLP-1R (`CHEMBL1784`)/GIPR (`CHEMBL4383`)/GCGR (`CHEMBL1985`) i `max_phase>=2` weszła do
+przestrzeni. Realne dane pobrane i zweryfikowane bajt-po-bajcie z CI (patrz D-029): **20
+realnych kandydatów**, **12 z realnymi badaniami T2DM/otyłość z opublikowanymi wynikami**
+(EXENATIDE, GLUCAGON, GLP-1 natywny, PF-06291874, LIRAGLUTIDE, DANUGLIPRON, ORFORGLIPRON,
+PERPHENAZINE, COTADUTIDE, TIRZEPATIDE, MK-0893, ADOMEGLIVANT/LY2409021).
+
+**Potok**: `core/biotechData/a2OzempicSubstitute.ts` — ekstrakcja skuteczności (HbA1c,
+DIRECT_HEAD_TO_HEAD vs NAIVE_INDIRECT) i bezpieczeństwa (7 kategorii AE, ryzyko względne
+metodą Katza) per kandydat → falsyfikacja → rewizja przekonań H1-H4 (reużyte
+`experimentFabric/beliefRevision.ts`) → ranking ważony (EFFICACY+SAFETY+EVIDENCE_STRENGTH+
+UNCERTAINTY+REPLICATION+PENALTY_FOR_CONFLICT) → **samo-falsyfikacja rundy 2** na
+zwycięzcy → deterministyczny werdykt (jeden z 6 prerejestrowanych etykiet) → bramka
+bezpieczeństwa §8/§14 (reużyty `core/agent/practicalCandidateGate.ts`) → zapis do Science
+Memory (`saveA2OzempicSubstituteToMemory`, reużyty `saveExperiment`).
+
+**Realny wynik, niewymyślony:** żadne z 12 realnych badań kandydatów nie zawiera ramienia
+semaglutydu — KAŻDE porównanie skuteczności w zestawie jest `NAIVE_INDIRECT`, jawnie
+oznaczone jako słabsza klasa dowodu, nigdy po cichu podniesione. TIRZEPATIDE pokazuje
+realną przewagę skuteczności (delta HbA1c **-0.79pp** względem przypiętego semaglutydu z
+A1), ale zostaje **WETOWANY** przez egzystencjalną bramkę bezpieczeństwa na realnym,
+zmierzonym sygnale: ryzyko względne biegunki **2.71** względem semaglutydu (referencja
+bezpieczeństwa: NCT03987919/SURPASS-2, jedyne realne badanie head-to-head semaglutyd vs
+kandydat w całym zestawie), 95% CI wyklucza 1. Samo-falsyfikacja rundy 2 na tirzepatydzie
+znajduje **2 realne, ujawnione zastrzeżenia** (brak bezpośredniego head-to-head, mniej niż
+2 niezależne badania skuteczności) — nie zakłada braku zastrzeżeń. Werdykt końcowy:
+**CONFLICTING_EVIDENCE** — uczciwie, nie wymuszony pozytywny wynik. Dwaj realni
+antagoniści receptora glukagonu (MK-0893, ADOMEGLIVANT/LY2409021) — mechanistycznie
+odmienni od agonizmu GLP-1R semaglutydu — są jawnie ujawnieni w werdykcie, nie po cichu
+wykluczeni z przestrzeni.
+
+Bramka bezpieczeństwa nie proponuje żadnego `PracticalCandidate` dla wyniku
+`CONFLICTING_EVIDENCE` (`gatedCandidate: null`, `surface: 'NONE'`) — ale pełna leżąca u
+podstaw ewidencja (wszystkie 12 raportów kandydatów) pozostaje w pełni widoczna w raporcie
+niezależnie od werdyktu (POLICY MAY LIMIT ACTION. POLICY MUST NOT ALTER TRUTH).
+
+**Trzy realne błędy ekstrakcji** znalezione i naprawione przez testowanie na realnych
+danych (nie zgadnięte) — patrz D-030: badanie jednoramienne bez nazwy leku w tytule grupy
+(EXENATIDE), kodowa nazwa sponsora różna od `pref_name` ChEMBL (ADOMEGLIVANT=LY2409021),
+rozrzut jako nazwany przedział ufności zamiast SD/SE. Łączny efekt: ADOMEGLIVANT poszedł z
+0 do 3 realnych badań skuteczności.
+
+Dowód uruchamialny: `npm run a2:demo` → **14/14**. Testy: `a2OzempicSubstitute.test.ts` →
+**23/23** (przestrzeń kandydatów, obie poprawki ekstrakcji, weto tirzepatydu,
+samo-falsyfikacja, werdykt, ujawnienie GCGR-antagonistów, determinizm, Science Memory,
+granica bezpieczeństwa, jednostkowe na syntetycznych danych).
+
+Pełna bramka po zmianie: frontend **5591 passed/1 skip** (ten sam niezwiązany flaky
+timeout w `nextActionSelectors.test.ts`), backend **396/396**, `m3-demonstrator.mjs`
+**18/18**, `repro-demo` **69/69**, `a1:demo` **14/14** (bez regresji), tsc/eslint/build
+czysto.
+
+Commit`y: `1cd65eb` (preregestracja), `905e097`/`0c8a0a0`/`5d61a0b`/`1550e54` (fetch+pin),
+kolejny commit tej sesji (potok analizy + demonstrator + Science Memory + dokumentacja).

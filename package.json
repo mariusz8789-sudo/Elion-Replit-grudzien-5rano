@@ -37,7 +37,8 @@
     "e2e:gov-drug": "node scripts/gov-drug-discovery-e2e-scenario.mjs",
     "e2e:gov-drug:demo": "node scripts/gov-drug-discovery-e2e-demo-capture.mjs",
     "te5:demo": "node scripts/te5-autonomous-discovery-demonstrator.mjs",
-    "te7:demo": "node scripts/te7-multilingual-rtl-demo.mjs"
+    "te7:demo": "node scripts/te7-multilingual-rtl-demo.mjs",
+    "genuine-discovery:e2e01": "node scripts/genuine-discovery-e2e-01.mjs"
   },
   "keywords": [
     "genesis-os",

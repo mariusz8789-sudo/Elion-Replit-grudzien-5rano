@@ -1612,3 +1612,64 @@ Zostaje (Kroki 6-10): rozszerzenie generatora kierunków/hipotez, strategie
 odkrywania A-G, ślad w state machine kampanii + węzły DiscoveryGraph,
 benchmark L0-L5, i sam GENUINE-AUTONOMOUS-DISCOVERY-E2E-01 na już
 przypiętych danych QE4/Kepler.
+
+## D-036 (2026-09-13, PHASE F Kroki 6, 8+10) — CAPSTONE: realny przypadek,
+w którym warstwa Phase F łapie własną inflację nowości Phase E
+
+**Krok 6 — `core/agent/novelHypothesisGenerator.ts`** (NOWY, świadomie
+zwężony wobec mandatu — ujawnione, nie upiększone): pełne 13 źródeł
+`OpenEndedDirectionFinder` NIE zostało zbudowane — `directionFinder.ts` z
+Fazy E (4 źródła) użyty bez zmian. Zbudowano za to solidnie samą
+generację hipotezy: `generateNovelHypothesis` owija prawdziwy
+`beliefRevision.ts::Hypothesis` (`createHypothesis`, niezmieniony) i
+**odmawia** skonstruowania hipotezy bez mechanizmu, bez co najmniej
+jednego konkurencyjnego wyjaśnienia, bez falsyfikatora lub bez wymaganego
+eksperymentu. Pułap: `NOVEL_HYPOTHESIS`, nigdy więcej. **8/8 testów.**
+
+**Krok 8+10 — `core/agent/genuineDiscoveryOrchestrator.ts`** (NOWY,
+CAPSTONE): składa Kroki 1/3/4/5 wokół prawdziwego
+`OrchestratorCampaignRecord` z Fazy E w ślad odkrycia: nowość (L1-L6) →
+replikacja → self-falsyfikacja → `DiscoveryStatus`. Ten plik nie liczy
+żadnej nauki sam — każda liczba, której dotyka, była już policzona w
+poprzednim Kroku.
+
+**Rdzeń realnego dowodu — dwa scenariusze, jedno realne porównanie:**
+
+- **Kepler** (istnieje zadeklarowana kotwica publiczna): pipeline
+  dochodzi do `REPRODUCTION`, `overall=KNOWN`, dokładnie jak w TE5 Fazy E.
+  Odcisk kampanii `f4804820` — identyczny z już zweryfikowanym w
+  `repro-demo`.
+
+- **QE4** (brak kotwicy publicznej): **Faza E SAMA (`noveltyGate.ts`,
+  tylko sprawdzenia wewnętrzne) etykietuje to jako `DISCOVERY`** —
+  `noveltyLevel=NOVEL_WITHIN_CHECKED_CORPUS`, ale bramka E2 z Kroku 1
+  Fazy E i tak przepuszcza to do DISCOVERY, bo korpus sprawdzony wewnątrz
+  jest kompletny wg JEJ WŁASNYCH kryteriów. **Faza F, wymagając
+  zewnętrznej weryfikacji L5/L6 PRZED DISCOVERY, obniża TĘ SAMĄ kampanię
+  do `UNKNOWN`**, gdy tylko potwierdzi się, że wyszukiwanie literaturowe
+  jest realnie nieosiągalne (polityka sieci tego środowiska — ustalenie
+  Kroku 0, potwierdzone tu jeszcze raz na żywo). Odcisk kampanii
+  `44f245c9` — również identyczny z już zweryfikowanym w `repro-demo`.
+
+To jest najkonkretniejszy dowód, jaki ten plik mógł wyprodukować:
+**Genesis woli `UNKNOWN` (brak odkrycia) niż niezweryfikowane odkrycie —
+nawet gdy wcześniejsza, mniej rygorystyczna warstwa TEGO SAMEGO systemu
+powiedziała co innego.** Nie jest to test syntetyczny — to prawdziwa
+kampania na prawdziwych danych, gdzie dwie realne warstwy tego samego
+kodu NIE ZGADZAJĄ SIĘ, a Faza F wygrywa uczciwie.
+
+**5/5 testów** (`genuineDiscoveryOrchestrator.test.ts`, w tym dowód
+determinizmu i obsługa kampanii bez zwycięskiego modelu → `null`, nigdy
+zmyślone) plus **`npm run genuine-discovery:e2e01` → 8/8** (skrypt
+uruchamialny, Node-only, reprodukowalny).
+
+Pełna bramka: frontend **5812/5813** (1 skipped), backend **396/396**,
+tsc/eslint czyste, build OK, `repro-demo` **69/69** — zero regresji.
+
+**Co jawnie NIE zostało zbudowane w tej sesji (Kroki 7 i 9, ujawnione, nie
+pominięte po cichu):** strategie odkrywania A-G poza istniejącym
+residualnym źródłem z Fazy E (anomaly/scaling/cross-domain/contradiction/
+mechanism/temporal-spatial jako osobne detektory); benchmark L0-L5 z
+wszczepioną prawdą (planted fixtures). Oba wymagałyby realnego,
+osobnego nakładu projektowego porównywalnego z tym, co już zbudowano —
+zdecydowano nie budować ich płytko tylko po to, by "odhaczyć" liczbę.

@@ -1570,3 +1570,45 @@ tsc/eslint czyste, build OK, `repro-demo` **69/69** — zero regresji.
 gotowy w Kroku 1, silnik jeszcze nie), OpenEndedDirectionFinder/
 NovelHypothesisGenerator, strategie odkrywania A-G, ślad w state machine
 kampanii, benchmark L0-L5, i sam GENUINE-AUTONOMOUS-DISCOVERY-E2E-01.
+
+## D-035 (2026-09-13, PHASE F Kroki 4-5) — L5/L6 sieć: rzeczywiste
+klienty, uczciwy NO_ACCESS; bateria 13 sond self-falsyfikacji
+
+**Krok 4 — `core/agent/literatureNoveltyAdapter.ts`** (NOWY): realne
+klienty OpenAlex i Crossref (prawdziwe endpointy, realny parsing odpowiedzi
+API) — działałyby gdziekolwiek polityka sieci na to pozwala, ale w tym
+środowisku genuinie zawodzą (ustalenie Kroku 0 zweryfikowane PONOWNIE tu,
+programistycznie w vitest, nie tylko przez `curl`: test wywołuje
+`makeOpenAlexClient()` z prawdziwym globalnym `fetch`, bez żadnego mocka, i
+potwierdza `NO_ACCESS` end-to-end). Logika agregacji/parsowania w pełni
+przetestowana przez wstrzyknięte fałszywe klienty z realistycznymi
+danymi — `similarity` to jawnie ujawniona heurystyka nakładania się słów
+kluczowych, nigdy roszczenie o prawdziwym podobieństwie semantycznym
+(w repo nie ma modelu embeddingów). **14/14 testów.**
+
+**Krok 5 — `core/agent/selfFalsificationBattery.ts`** (NOWY, zawsze
+wszystkie 13 sond razem, nigdy podzbiór): cztery sondy to CZYSTY reuse
+istniejącej infrastruktury — TAUTOLOGY (`tautologyGate.ts::
+assessTautology`), OVERFITTING (`modelSpace.ts::holdoutScore`),
+DATASET_CONTAMINATION (`discoveryReplicationEngine.ts::
+detectDatasetOverlap`, zbudowane w Kroku 3), HIDDEN_PREREG (dokładnie ta
+sama kontrola czasu zamrożenia co AC7). Dwie nowe, ale mechaniczne:
+ALTERNATIVE_MODEL (porównanie RSS z zadeklarowanym modelem rywalizującym —
+jeśli prostszy model pasuje niemal tak samo dobrze, "nowa" struktura nie
+była potrzebna) i MULTIPLE_TESTING (sprawdzenie zadeklarowanej korekty przy
+&gt;1 testowanej hipotezie). **Pozostałych 7 sond świadomie zaprojektowano
+jako STRUCTURAL_REVIEW nad polami jawnie deklarowanymi przez
+wywołującego** — nic w tym repo nie potrafi wywnioskować z dopasowanej
+krzywej, czy pomiar był skażony albo próba reprezentatywna, więc próba
+zmyślenia statystyki udającej taki test byłaby dokładnie tym zmyślaniem,
+któremu cała Faza F ma zapobiegać. Niezadeklarowane pole → `UNRESOLVED`,
+nigdy ciche założenie "czyste" — a `allPassed` (Krok 1) traktuje
+UNRESOLVED tak samo jak FAIL przy wejściu do DISCOVERY. **22/22 testów.**
+
+Pełna bramka: frontend **5799/5800** (1 skipped), backend **396/396**,
+tsc/eslint czyste, build OK, `repro-demo` **69/69** — zero regresji.
+
+Zostaje (Kroki 6-10): rozszerzenie generatora kierunków/hipotez, strategie
+odkrywania A-G, ślad w state machine kampanii + węzły DiscoveryGraph,
+benchmark L0-L5, i sam GENUINE-AUTONOMOUS-DISCOVERY-E2E-01 na już
+przypiętych danych QE4/Kepler.

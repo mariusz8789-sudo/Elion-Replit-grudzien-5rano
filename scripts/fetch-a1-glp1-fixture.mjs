@@ -27,9 +27,16 @@
  *
  * Usage: node scripts/fetch-a1-glp1-fixture.mjs
  * Writes narrow JSON + one meta.json under $GENESIS_A1_FIXTURE_DIR (default
- * artifacts/a1-glp1) and prints short summary lines only — never the full
- * fetched bodies, per the same job-log truncation risk documented in
- * fetch-b1-defra-aurn-fixture.mjs.
+ * artifacts/a1-glp1) AND prints every written file's exact content into the
+ * job log between `-----BEGIN A1 FILE <name>-----` / `-----END A1 FILE
+ * <name>-----` markers. This dump is the real transport: `a4f4314` (the
+ * Kepler fixture) found the CI artifact-upload blob storage URL is not
+ * reachable from the sandbox that later reconstructs these files either, so
+ * — unlike fetch-b1-defra-aurn-fixture.mjs's ~300-400KB/site-year CSVs,
+ * which truly need the artifact path — this fixture (12 small JSON files,
+ * well under 50KB total) is printed verbatim instead. It is still uploaded
+ * as a build artifact too (belt-and-suspenders for anyone who CAN reach
+ * blob storage), but reconstruction from the job log is the documented path.
  */
 
 import { createHash } from 'node:crypto';
@@ -161,30 +168,42 @@ async function main() {
   await mkdir(outDir, { recursive: true });
 
   const meta = { retrievedAt: new Date().toISOString(), files: {} };
+  // The whole fixture is well under 50KB (12 small JSON files) — unlike the
+  // B1 DEFRA CSVs (~300-400KB/site-year, needed the artifact-upload path)
+  // this is small enough to print verbatim into the job log and reconstruct
+  // from log text, the same fallback `a4f4314` used for the Kepler fixture
+  // after finding the artifact blob storage URL is unreachable from the
+  // sandbox that later reads these logs back.
+  const dumpEntries = [];
+
+  async function writeFixtureFile(fileName, content) {
+    await writeFile(join(outDir, fileName), content, 'utf8');
+    dumpEntries.push([fileName, content]);
+    return sha256(content);
+  }
 
   console.log('=== A1 FETCH: resolving target ===');
   const target = await resolveTarget();
-  await writeFile(join(outDir, 'target.json'), JSON.stringify(target.narrow, null, 2), 'utf8');
-  meta.files['target.json'] = { url: target.url, rawSha256: target.rawSha256, rawBytes: target.rawBytes, narrowSha256: sha256(JSON.stringify(target.narrow, null, 2)) };
+  const targetJson = JSON.stringify(target.narrow, null, 2);
+  meta.files['target.json'] = { url: target.url, rawSha256: target.rawSha256, rawBytes: target.rawBytes, narrowSha256: await writeFixtureFile('target.json', targetJson) };
   console.log(`  target resolved: ${target.narrow.targetChemblId} "${target.narrow.prefName}"`);
 
   console.log('=== A1 FETCH: resolving compounds + activities ===');
   for (const compound of COMPOUNDS) {
     const resolved = await resolveCompound(compound);
     const fileName = `compound-${compound.key}.json`;
-    await writeFile(join(outDir, fileName), JSON.stringify(resolved.narrow, null, 2), 'utf8');
-    meta.files[fileName] = { url: resolved.url, rawSha256: resolved.rawSha256, rawBytes: resolved.rawBytes, narrowSha256: sha256(JSON.stringify(resolved.narrow, null, 2)) };
+    const compoundJson = JSON.stringify(resolved.narrow, null, 2);
+    meta.files[fileName] = { url: resolved.url, rawSha256: resolved.rawSha256, rawBytes: resolved.rawBytes, narrowSha256: await writeFixtureFile(fileName, compoundJson) };
     console.log(`  ${compound.key} resolved: ${resolved.narrow.moleculeChemblId}`);
 
     const activities = await fetchActivities(target.narrow.targetChemblId, resolved.narrow.moleculeChemblId);
     const activitiesFileName = `activities-${compound.key}.json`;
     const activitiesJson = JSON.stringify(activities.narrow, null, 2);
-    await writeFile(join(outDir, activitiesFileName), activitiesJson, 'utf8');
     meta.files[activitiesFileName] = {
       url: activities.url,
       rawSha256: activities.rawSha256,
       rawBytes: activities.rawBytes,
-      narrowSha256: sha256(activitiesJson),
+      narrowSha256: await writeFixtureFile(activitiesFileName, activitiesJson),
       totalCount: activities.totalCount,
       extractedCount: activities.narrow.length,
     };
@@ -196,14 +215,24 @@ async function main() {
     const trial = await fetchTrial(nctId);
     const fileName = `trial-${nctId}.json`;
     const trialJson = JSON.stringify(trial.narrow, null, 2);
-    await writeFile(join(outDir, fileName), trialJson, 'utf8');
-    meta.files[fileName] = { url: trial.url, rawSha256: trial.rawSha256, rawBytes: trial.rawBytes, narrowSha256: sha256(trialJson), hba1cOutcomeCount: trial.narrow.hba1cOutcomes.length };
+    meta.files[fileName] = { url: trial.url, rawSha256: trial.rawSha256, rawBytes: trial.rawBytes, narrowSha256: await writeFixtureFile(fileName, trialJson), hba1cOutcomeCount: trial.narrow.hba1cOutcomes.length };
     console.log(`  ${nctId}: "${trial.narrow.briefTitle}" — ${trial.narrow.hba1cOutcomes.length} HbA1c outcome measure(s)`);
   }
 
-  await writeFile(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+  const metaJson = JSON.stringify(meta, null, 2);
+  await writeFile(join(outDir, 'meta.json'), metaJson, 'utf8');
+  dumpEntries.push(['meta.json', metaJson]);
+
   console.log('=== A1 FETCH DONE ===');
-  console.log(`A1-FETCH SUMMARY files=${Object.keys(meta.files).length} outDir=${outDir}`);
+  console.log(`A1-FETCH SUMMARY files=${dumpEntries.length} outDir=${outDir}`);
+
+  console.log('=== A1 FIXTURE DUMP (for reconstruction from job log — see fetch-a1-glp1-fixture.mjs header) ===');
+  for (const [fileName, content] of dumpEntries) {
+    console.log(`-----BEGIN A1 FILE ${fileName}-----`);
+    console.log(content);
+    console.log(`-----END A1 FILE ${fileName}-----`);
+  }
+  console.log('=== A1 FIXTURE DUMP END ===');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

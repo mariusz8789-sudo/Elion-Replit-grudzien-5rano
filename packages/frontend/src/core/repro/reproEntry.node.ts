@@ -162,6 +162,7 @@ import { runDiscoveryCampaign, type CampaignLaboratory } from '../agent/discover
 import { makeKeplerCampaignLab, makeQe4CampaignLab } from '../biotechData/campaignLabs';
 import { pointsForGrid } from '../biotechData/qe4DatasetLaboratory';
 import { fulfilObservationGap, type ObservationGapTrigger } from '../agent/observationGap';
+import { buildDiscoveryGraph, compareDiscoveryGraphReplay, transferKnowledge } from '../agent/discoveryGraph';
 
 export interface ReproDiscoveryCampaignReport {
   readonly labId: string;
@@ -310,5 +311,55 @@ export function reproObservationGap(): ReproObservationGapReport {
     fulfilledEpistemicStatus: 'ok' in fulfilled ? 'REFUSED' : fulfilled.epistemicStatus,
     fulfilledStatus: 'ok' in fulfilled ? 'REFUSED' : fulfilled.request.status,
     custodySteps: 'ok' in fulfilled ? 0 : (fulfilled.request.custody?.steps.length ?? 0),
+  };
+}
+
+// --- §5: Discovery Graph + cross-campaign memory transfer --------------------
+
+export interface ReproDiscoveryGraphReport {
+  readonly qe4Nodes: number;
+  readonly qe4Edges: number;
+  readonly kinds: readonly string[];
+  readonly replay: 'MATCH' | 'DRIFT';
+  readonly importedCount: number;
+  readonly statusPreserved: boolean;
+  readonly falsifiedRefusedWithoutAssumptionChange: number;
+  readonly falsifiedAdmittedAfterAssumptionChange: number;
+  readonly statusStillBlockedAfterImport: boolean;
+  readonly secondImportAddedNothing: boolean;
+}
+
+/**
+ * Runtime evidence for §5: knowledge moves between two REAL campaigns over
+ * unrelated pinned datasets, and the epistemic rules survive the move.
+ */
+export function reproDiscoveryGraph(): ReproDiscoveryGraphReport {
+  const source = buildDiscoveryGraph(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 }));
+  const sourceAgain = buildDiscoveryGraph(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 }));
+  const target = buildDiscoveryGraph(runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 }));
+
+  const plain = transferKnowledge(target, source);
+  const withChange = transferKnowledge(target, source, {
+    changedAssumptions: ['sigmas are no longer assumed independent across time points'],
+  });
+  const twice = transferKnowledge(plain.graph, source);
+
+  const statusPreserved = plain.imported.every((n) => {
+    const original = source.nodes.find((s) => s.nodeId === n.nodeId);
+    return original !== undefined && original.epistemicStatus === n.epistemicStatus;
+  });
+  const revived = withChange.imported.filter((n) => n.epistemicStatus === 'BLOCKED');
+
+  return {
+    qe4Nodes: source.nodes.length,
+    qe4Edges: source.edges.length,
+    kinds: [...new Set(source.nodes.map((n) => n.kind))].sort(),
+    replay: compareDiscoveryGraphReplay(source, sourceAgain),
+    importedCount: plain.imported.length,
+    statusPreserved,
+    falsifiedRefusedWithoutAssumptionChange: plain.refused.filter((r) => r.reason === 'FALSIFIED_WITHOUT_ASSUMPTION_CHANGE').length,
+    falsifiedAdmittedAfterAssumptionChange: revived.length,
+    statusStillBlockedAfterImport: revived.length > 0 && revived.every((n) => n.epistemicStatus === 'BLOCKED'),
+    secondImportAddedNothing: twice.imported.length === 0,
   };
 }

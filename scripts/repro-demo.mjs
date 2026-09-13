@@ -158,7 +158,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap;
+let dQe4, dKepler, dDerived, dGap, dGraph;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -178,6 +178,7 @@ try {
   qe4Regime = science.reproQe4RegimeInquiry();
   dQe4 = science.reproDiscoveryCampaignQe4();
   dGap = science.reproObservationGap();
+  dGraph = science.reproDiscoveryGraph();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
 } finally {
@@ -279,6 +280,20 @@ record('M1: request nazywa BRAKUJACY pomiar i przyrzad, nie zmyslajac kosztu',
 record('M1: odcisk luki (replay) i spelnienie z lancuchem opieki wchodzi jako OBSERVATION, nie FACT',
   dGap.replay === 'MATCH' && dGap.fulfilledEpistemicStatus === 'OBSERVATION' && dGap.fulfilledStatus === 'FULFILLED' && dGap.custodySteps === 2,
   `${dGap.gapFingerprint} / ${dGap.replay} / ${dGap.fulfilledEpistemicStatus} / ${dGap.fulfilledStatus} / krokow opieki=${dGap.custodySteps}`);
+// --- §5: Discovery Graph + transfer miedzy kampaniami ------------------------
+record('§5: graf odkrycia obejmuje caly lancuch rozumowania kampanii i jest deterministyczny',
+  dGraph.replay === 'MATCH' && dGraph.kinds.includes('OBSERVATION') && dGraph.kinds.includes('DISCOVERY') && dGraph.kinds.includes('REVISION'),
+  `${dGraph.qe4Nodes} wezlow / ${dGraph.qe4Edges} krawedzi, replay=${dGraph.replay}, rodzaje: ${dGraph.kinds.join(', ')}`);
+record('§5: wiedza przechodzi miedzy DWIEMA realnymi kampaniami bez podnoszenia statusu epistemicznego',
+  dGraph.importedCount > 0 && dGraph.statusPreserved === true,
+  `zaimportowano ${dGraph.importedCount} wezlow z QE4 do kampanii Keplera; status zachowany 1:1 = ${dGraph.statusPreserved}`);
+record('§5: model SFALSYFIKOWANY nie wraca bez jawnej zmiany zalozen — a po zmianie wraca NADAL jako BLOCKED',
+  dGraph.falsifiedRefusedWithoutAssumptionChange > 0 && dGraph.falsifiedAdmittedAfterAssumptionChange > 0 && dGraph.statusStillBlockedAfterImport === true,
+  `odrzucone bez zmiany zalozen: ${dGraph.falsifiedRefusedWithoutAssumptionChange}; wpuszczone po nazwaniu zmiany: ${dGraph.falsifiedAdmittedAfterAssumptionChange}, wszystkie dalej BLOCKED=${dGraph.statusStillBlockedAfterImport}`);
+record('§5: import jest idempotentny — drugi transfer tego samego grafu nie dokłada nic',
+  dGraph.secondImportAddedNothing === true,
+  `drugi import dodal 0 wezlow = ${dGraph.secondImportAddedNothing}`);
+
 record('M1: istniejace kampanie NIETKNIETE — Kepler zbiega bez luki, QE4 zachowuje odcisk',
   dKepler.observationGapTriggers.length === 0 && dQe4.campaignFingerprint === EXPECTED.discoveryQe4Fingerprint && dQe4.observationGapTriggers.join(',') === 'NO_ATTACHED_EXPERIMENT',
   `kepler luki=${dKepler.observationGapTriggers.length}, qe4 odcisk=${dQe4.campaignFingerprint}, qe4 luka=${dQe4.observationGapTriggers.join(',') || 'brak'}`);

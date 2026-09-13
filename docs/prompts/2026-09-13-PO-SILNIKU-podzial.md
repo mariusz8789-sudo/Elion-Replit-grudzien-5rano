@@ -72,3 +72,41 @@ i da się go wyrazić jako `y = f(x)` albo `y = f(x₁..xₙ)`, i dostarcz pakie
 `docs/prompts/`: dokładny URL, licencja, sha256 jeśli znasz, kształt danych, co jest osią X,
 co osią Y, jakie modele konkurują, co by je sfalsyfikowało. Jeden taki pakiet jest wart
 więcej niż sto problemów bez danych.
+
+## WIZJA „AUTOMATYCZNE LABORATORIUM" — co się z niej nadaje, a co nie
+
+Wizja zapisana dosłownie w `docs/GENESIS_AUTOMATIC_LABORATORY_VISION.md`
+(mikroskop = oczy, discovery engine = mózg, scientific memory = pamięć,
+laboratorium = ręce). Werdykt wdrożeniowy, per poziom z sześciostopniowego
+podziału „znajdź szczepionkę", który sam użytkownik narzucił:
+
+| Poziom | Co to znaczy | Czy silnik z `166665f` to potrafi |
+|---|---|---|
+| 1. Discovery | z danych wyłonić hipotezę/zależność i ją sfalsyfikować | **TAK** — to dokładnie `discoveryCampaign.ts`, udowodnione na dwóch domenach |
+| 2. Computational validation | policzyć własności kandydata na przypiętych danych publicznych | **CZĘŚCIOWO** — istnieje jako `externalDatasetCase`/kotwice; brak członów wielowymiarowych blokuje realne domeny biologiczne |
+| 3. Experimental design | zaprojektować NASTĘPNY eksperyment, który rozstrzyga | **TAK, ale wąsko** — planer skoruje rozróżnialność nad już przypiętym zbiorem; nie projektuje eksperymentu, którego danych jeszcze nie ma |
+| 4. Laboratory | wykonać pomiar w mokrej pracowni | **NIE i nie będzie** — to sprzęt, nie kod |
+| 5. Validation | powtórzyć niezależnie, in vivo / RCT | **NIE** |
+| 6. Candidate | ogłosić kandydata do dalszych badań | **warunkowo** — dopiero po 4–5, i zawsze z listą tego, czego nie dowiedziono |
+
+**Co bierzemy z wizji jako zadanie:**
+- Poziom 3 w wersji mocniejszej: planer, który potrafi powiedzieć „potrzebuję obserwacji,
+  której NIE MAM" — dziś `candidateX` jest domknięte zbiorem. To jest realna luka i realne zadanie.
+- Mapowanie „mikroskop = kolejny adapter `CampaignLaboratory`, nie nowy silnik" —
+  to zostaje jako wiążąca zasada architektury, nawet zanim jakikolwiek sprzęt istnieje.
+
+**Czego NIE bierzemy:**
+- „Modułu Ebola", „modułu szczepionek", „modułu odcisków palców". Cytat z wizji jest tu
+  rozstrzygający: *„Ebola będzie tylko jednym z problemów, które można mu postawić,
+  a nie osobnym «modułem Ebola»."* Każda taka domena wchodzi jako adapter albo nie wchodzi.
+- Integracji ze sprzętem (mikroskop, kamera, sekwencer) — dopóki nie ma urządzenia,
+  kod do niego jest mockiem, a mocków nie budujemy.
+
+**Granica bezpieczeństwa (wiążąca, egzekwowana w warstwie wyniku/rekordu, nie w promptcie):**
+nigdy recepta; nigdy dawka dla konkretnej osoby; nigdy indywidualna porada medyczna;
+nigdy „zatwierdzony zamiennik"/„substytucja kliniczna"/„terapia równoważna"; wyłącznie
+dowody na poziomie populacyjnym. Genesis nie generuje instrukcji tworzenia, hodowli,
+modyfikowania ani wzmacniania patogenów, ani instrukcji modyfikacji ludzkiego DNA.
+Związki naturalne traktowane identycznie jak syntetyczne — „naturalne" nie znaczy „bezpieczne".
+Każde rozszerzenie zakresu (nowe pary leków, receptory, dawkowanie, interakcje, ADME/Tox)
+wymaga jawnej autoryzacji użytkownika tej samej rangi co zgoda na zbudowanie eksperymentu.

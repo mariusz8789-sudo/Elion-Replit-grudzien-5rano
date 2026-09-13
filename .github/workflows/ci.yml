@@ -360,6 +360,33 @@ jobs:
           path: artifacts/b1-defra-aurn
           retention-days: 90
 
+  e2e01-generated-space-pin:
+    name: "E2E-01 (temporary): fetch+pin the FULL generated candidate space (pre-max_phase)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    # GOV-DRUG-DISCOVERY-E2E-01's T1 assertion is that the candidate space
+    # is GENERATED from mechanism, not selected from a pinned list. A2's
+    # fetch (D-029) computed exactly this set as an intermediate step and
+    # discarded it, keeping only the 20 molecules past max_phase>=2. This
+    # job re-runs A2's identical mechanism query (same targets, same sealed
+    # assay rule, same pagination) and pins EVERY distinct qualifying
+    # molecule with provenance, before any clinical-development gate. No
+    # new criterion, no drug name in the generation path. Criteria sealed
+    # in govDrugDiscoveryE2EPreregistration.ts (f528c881) BEFORE this ran.
+    # Remove once downloaded and committed under
+    # packages/frontend/src/core/biotechData/gov-drug-discovery-e2e/.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + pin the generated candidate space
+        env:
+          GENESIS_E2E01_FIXTURE_DIR: artifacts/gov-drug-discovery-e2e
+        run: node scripts/fetch-gov-drug-discovery-generated-space.mjs
+
   docker-image:
     name: Obraz produkcyjny — build i realny smoke test kontenera
     runs-on: ubuntu-latest

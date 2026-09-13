@@ -384,9 +384,16 @@ record('M3: zwyciezca bije rodzica NA TRENINGU i NA DANYCH ODLOZONYCH, i przecho
 record('M3: przekonanie zmienione przez istniejacy BeliefRevision, a przebieg jest odtwarzalny',
   dM3.beliefBefore === 0.5 && dM3.beliefAfter > 0.5 && dM3.replayMatches === true,
   `${dM3.beliefBefore} → ${dM3.beliefAfter.toFixed(4)} (${dM3.beliefStatus}); replay ${dM3.main.reportFingerprint} == ${dM3.replayReportFingerprint}`);
-record('M3 kontrola negatywna: brak realnej struktury → NIC wymyslonego nie trafia do wyniku, a detekcja jest AUDYTOWANA',
-  dM3.noStructure.winnerWasPreregistered === true && dM3.noStructure.winnerEnteredAtRound === 0 && dM3.noStructure.specificityFlag !== null,
-  `zwyciezca "${dM3.noStructure.winner?.formula}" z zestawu prerejestrowanego; ${dM3.noStructure.generatedCandidates.length} kandydatow odrzuconych, flaga audytowa podniesiona`);
+// Po naprawie detektora residuum (docs/prompts/2026-09-13-PHASE-A-claims.md,
+// "Detektor residuum", Opcja A — CURVATURE porownuje teraz modelSelectionScore
+// zamiast stalego progu na stosunku RSS) CURVATURE juz NIE odpala na tym szumie
+// (wczesniej: stosunek 0.4978 < 0.5, falszywy alarm zlapany dopiero downstream
+// przez parsymonie i AUDYTOWANY flaga). Silniejszy, prawdziwy stan: zero
+// znalezisk juz na etapie detekcji residuum, nie tylko zero przetrwalych kandydatow.
+record('M3 kontrola negatywna: brak realnej struktury → detektor NIE ZNAJDUJE niczego (falszywy alarm zapobiegniety u zrodla)',
+  dM3.noStructure.winnerWasPreregistered === true && dM3.noStructure.winnerEnteredAtRound === 0
+    && dM3.noStructure.residualFindingKinds.length === 0 && dM3.noStructure.specificityFlag === null,
+  `zwyciezca "${dM3.noStructure.winner?.formula}" z zestawu prerejestrowanego; znaleziska residuum: [${dM3.noStructure.residualFindingKinds.join(', ')}] (puste = brak falszywego alarmu)`);
 record('M3 kontrola negatywna: model bardziej zlozony wygrywa trening, ale PRZEGRYWA parsymonie i nie zostaje wybrany',
   dM3.overfit.overComplexFitsTrainingAtLeastAsWell && dM3.overfit.overComplexLosesOnParsimony && dM3.overfit.engineDidNotSelectIt,
   `"${dM3.overfit.overComplexFormula}": trening ${dM3.overfit.overComplexTrainingRss?.toFixed(4)} vs ${dM3.overfit.winnerTrainingRss?.toFixed(4)}, parsymonia ${dM3.overfit.overComplexParsimony?.toFixed(4)} vs ${dM3.overfit.winnerParsimony?.toFixed(4)}`);

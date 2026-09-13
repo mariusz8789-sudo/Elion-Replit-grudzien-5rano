@@ -25,7 +25,7 @@ Commit z samym oświadczeniem kosztuje minutę. Zdublowany komponent kosztuje go
 | **§9 Frontier acceptance E2E** | **BIORĘ TERAZ** | **C1, ta sesja** | *(w trakcie)* |
 | §8 PracticalCandidate safety gate | WOLNE | — | reużyć `core/governance/` (jest gotowe), nie pisać drugiego |
 | §7 A1 GLP-1 | **ZABLOKOWANE DANYMI** | — | patrz niżej |
-| **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **OTWARTE / NIEPRZYPISANE** | — | patrz niżej |
+| **Detektor residuum — próg czuły na szum / świadomość liczności próby** | **ZROBIONE (Opcja A)** | C1 | patrz niżej |
 
 ## Detektor residuum: znaleziona, niezałatana wada specyficzności
 
@@ -77,7 +77,29 @@ statystycznej (Opcja B — test F — wymagałby dystrybuanty rozkładu F, noweg
 **Skutek uboczny, niezależnie od wyboru A/B/C/D:** zmiana wspólnego detektora wymaga ponownej
 weryfikacji i re-pin fingerprintów QE4/Kepler oraz potwierdzenia §15/§9.
 
-**C1 nic jeszcze nie implementuje.** Decyzja A/B/C/D zapada najpierw.
+**DECYZJA PODJĘTA I ZAIMPLEMENTOWANA: Opcja A.** Commit: `881bb9d`.
+
+`CURVATURE` w `residualStructure.ts` porównuje teraz `modelSelectionScore` (dokładne ponowne
+użycie reguły parsymonii z `modelSpace.ts`) zamiast stałego `ratio < 0.5`.
+
+**Zmierzony wynik po wdrożeniu — niespodzianka warta zapisania:** re-pin fingerprintów
+QE4/Kepler **NIE był potrzebny**. Oba realne, load-bearing przypadki (n=6 i n=7, `§15`/M1)
+odpalają pod nową regułą z tym samym werdyktem co pod starą — pełny `repro-demo` **69/69**,
+odciski `44f245c9` (QE4) i `f4804820` (Kepler) **bez zmian**, „model B WYPROWADZONY z residuum"
+nadal generuje te same trzy kandydaty. Ryzyko ze skutku ubocznego było realne i słusznie
+zgłoszone z góry — po prostu nie zmaterializowało się dla akurat tych dwóch przypiętych
+przypadków, bo oba odpalają wyraźnie powyżej nowej granicy, nie na jej krawędzi.
+
+Jedyna rzecz, która się zmieniła: kontrola negatywna M3 na czystym szumie (n=16) **przestała
+fałszywie odpalać** — `residualFindingKinds: []` zamiast wcześniejszego fałszywego alarmu
+(`ratio 0.4978`, złapanego dopiero downstream przez parsymonię). Test `N1b` i odpowiedni
+check w `repro-demo.mjs` zostały przepisane na silniejsze, prawdziwe twierdzenie („zero
+znalezisk", nie „flaga audytowa podniesiona") — nie wymyślono sztucznego scenariusza, żeby
+utrzymać stary check zielonym.
+
+Pełna bramka po zmianie: `repro-demo` 69/69, `m3-demonstrator.mjs` 18/18, frontend
+5543 passed/1 skip (jeden niezwiązany flaky timeout w `nextActionSelectors.test.ts` —
+15/15 w izolacji), backend 396/396, tsc/eslint/build czysto.
 
 ## §7 A1 — dlaczego jest zablokowane, a nie „niezrobione"
 

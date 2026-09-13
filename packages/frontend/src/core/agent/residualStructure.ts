@@ -1,7 +1,9 @@
 import {
   basisValue,
   DEFAULT_VARIABLE,
+  estimatedCoefficientCount,
   fitModelSpec,
+  modelSelectionScore,
   modelSpecFingerprint,
   normalizeModelSpec,
   renderModelSpec,
@@ -51,8 +53,37 @@ export interface ModelProposal {
 /** Below this many points, no detector can distinguish structure from noise, so none reports any. */
 const MIN_POINTS_FOR_STRUCTURE = 5;
 
-/** Adding a curvature column must cut the residual-of-residual RSS by at least half to count as real curvature. */
-const CURVATURE_RSS_IMPROVEMENT = 0.5;
+/*
+ * CURVATURE used to fire on a fixed ratio (`quadRSS/lineRSS < 0.5`), independent
+ * of how many points the ratio was computed from. That threshold is blind to
+ * sample size: at small n a run of ordinary noise can push the ratio below 0.5
+ * by chance, and the fixed number cannot tell the difference between "the data
+ * says so" and "there wasn't enough data to say otherwise".
+ *
+ * MEASURED CONSEQUENCE (docs/prompts/2026-09-13-PHASE-A-claims.md — the
+ * "Detektor residuum" decision record). On the M3 structural-discovery
+ * demonstrator's own pure-noise negative control (n=16), the fixed ratio fired
+ * at 0.4978 — a false positive, caught downstream only because parsimony then
+ * rejected every model it motivated. On the real, load-bearing QE4-without-LOG
+ * case that §15/M1 depends on (n=6 and n=7), the same fixed ratio fires
+ * correctly (0.4721 and 0.4558).
+ *
+ * THE FIX, chosen and recorded in that decision as Option A: CURVATURE now
+ * fires by the SAME rule the campaign already uses to rank whole models
+ * (`modelSelectionScore` — chi-square plus one ln(n) per added coefficient,
+ * `modelSpace.ts`), applied here to the two-term line-on-residual versus the
+ * three-term quadratic-on-residual. This is not new statistical machinery: it
+ * is the identical, already-vetted parsimony rule, so the extra column has to
+ * earn its place by more than sampling noise on THESE points would explain,
+ * and the requirement scales up with n instead of staying fixed.
+ *
+ * Verified before adopting it (same decision record): re-run against both
+ * cases above, the new rule agrees with the correct verdict in each — it does
+ * NOT fire on the n=16 noise control, and DOES still fire on the n=6/n=7
+ * load-bearing case. Raising `MIN_POINTS_FOR_STRUCTURE` instead (a cheaper
+ * fix) was considered and rejected: it would have suppressed the load-bearing
+ * case outright rather than judging it correctly.
+ */
 
 /** |weighted correlation| of standardized residual with x, above which a systematic trend is reported. */
 const TREND_CORRELATION = 0.7;
@@ -106,18 +137,21 @@ export function analyzeResidualStructure(
   const xs = residuals.map((r) => r.x);
   const findings: ResidualFinding[] = [];
 
-  // --- CURVATURE: does a quadratic in x explain the residuals far better than a line? ---
+  // --- CURVATURE: does a quadratic in x explain the residuals better than a line EARNS its extra coefficient? ---
   const asPoints: ModelPoint[] = residuals.map((r) => ({ x: r.x, y: r.z, sigma: 1 }));
   const lineOnResidual = fitModelSpec(RESIDUAL_LINE, asPoints);
   const quadOnResidual = fitModelSpec(RESIDUAL_QUADRATIC, asPoints);
   if (lineOnResidual.ok && quadOnResidual.ok && lineOnResidual.rss > 1e-12) {
-    const ratio = quadOnResidual.rss / lineOnResidual.rss;
-    if (ratio < CURVATURE_RSS_IMPROVEMENT) {
+    const n = asPoints.length;
+    const lineScore = modelSelectionScore(lineOnResidual.rss, estimatedCoefficientCount(RESIDUAL_LINE), n);
+    const quadScore = modelSelectionScore(quadOnResidual.rss, estimatedCoefficientCount(RESIDUAL_QUADRATIC), n);
+    if (quadScore < lineScore) {
+      const ratio = quadOnResidual.rss / lineOnResidual.rss;
       findings.push({
         kind: 'CURVATURE',
-        strength: 1 - ratio,
+        strength: lineScore - quadScore,
         atX: null,
-        evidence: `Residuals of "${renderModelSpec(parent)}" are themselves curved: a quadratic in x explains them with RSS ${quadOnResidual.rss.toFixed(6)} against ${lineOnResidual.rss.toFixed(6)} for a straight line (ratio ${ratio.toFixed(4)} < ${CURVATURE_RSS_IMPROVEMENT}).`,
+        evidence: `Residuals of "${renderModelSpec(parent)}" are themselves curved: a quadratic in x explains them with RSS ${quadOnResidual.rss.toFixed(6)} against ${lineOnResidual.rss.toFixed(6)} for a straight line (ratio ${ratio.toFixed(4)}), and the quadratic's information-criterion score ${quadScore.toFixed(6)} beats the line's ${lineScore.toFixed(6)} on these ${n} points — the extra coefficient earns more than its ln(${n}) cost.`,
       });
     }
   }

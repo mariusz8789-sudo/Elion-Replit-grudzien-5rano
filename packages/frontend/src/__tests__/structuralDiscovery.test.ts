@@ -174,14 +174,29 @@ describe('M3 — negative control: no real structure', () => {
     expect(report.winner!.formula).not.toContain('^2');
   });
 
-  it('AUDITS the near-threshold detection instead of hiding it or tuning it away', () => {
+  /**
+   * BEFORE the residual-detector fix (docs/prompts/2026-09-13-PHASE-A-claims.md
+   * — "Detektor residuum", Option A), CURVATURE fired on this exact dataset at
+   * ratio 0.4978 against its fixed 0.5 threshold: a genuine false positive,
+   * caught only because parsimony then rejected every candidate it motivated.
+   * `specificityFlag` existed to AUDIT that situation rather than hide it —
+   * Government Research rule: flag, never suppress.
+   *
+   * AFTER the fix — CURVATURE now compares `modelSelectionScore` (the same
+   * chi-square-plus-ln(n) rule the campaign already uses for whole models)
+   * instead of a fixed ratio — the detector no longer mistakes this noise for
+   * structure at all: zero findings, not three findings later rejected. That is
+   * a genuine improvement, not a relaxed test: it is now checked at the point
+   * of detection rather than caught downstream. `specificityFlag` stays null
+   * here for that reason, and stays in the contract for detector kinds this
+   * decision did not touch (TREND, HETEROSCEDASTICITY, LOCALIZED_ANOMALY),
+   * where the same class of false positive remains possible.
+   */
+  it('finds NO structure at all in pure noise — the false positive this control caught is now prevented at the source', () => {
     const report = flatRun();
-    // The detector fires on this noise (measured ratio 0.4978 against a 0.5
-    // threshold). Selection rejects everything it proposed, and the flag says so
-    // with the evidence attached — Government Research rules: flag, never hide.
-    expect(report.specificityFlag).not.toBeNull();
-    expect(report.specificityFlag!).toContain('AUDIT');
-    expect(report.specificityFlag!).toContain('rejected every one');
+    expect(report.residualFindingKinds).toEqual([]);
+    expect(report.generatedCandidates).toEqual([]);
+    expect(report.specificityFlag).toBeNull();
   });
 });
 

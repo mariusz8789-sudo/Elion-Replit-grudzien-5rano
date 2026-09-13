@@ -134,11 +134,18 @@ console.log('\nNEGATIVE CONTROLS\n');
 
 record('N1. no real structure → Genesis does NOT put an invented model into the scientific record',
   r.noStructure.winnerWasPreregistered === true && r.noStructure.winnerEnteredAtRound === 0,
-  `straight-line process: winner "${r.noStructure.winner?.formula}" is the PREREGISTERED model; ${r.noStructure.generatedCandidates.length} candidate(s) were proposed and every one was rejected by parsimony/hold-out`);
+  `straight-line process: winner "${r.noStructure.winner?.formula}" is the PREREGISTERED model; ${r.noStructure.generatedCandidates.length} candidate(s) were proposed`);
 
-record('N1b. the near-threshold detection is AUDITED, not hidden and not silently tuned away',
-  r.noStructure.specificityFlag !== null && r.noStructure.specificityFlag.includes('AUDIT'),
-  r.noStructure.specificityFlag ?? '(no flag raised)');
+// The residual-detector fix (docs/prompts/2026-09-13-PHASE-A-claims.md,
+// "Detektor residuum", Option A — CURVATURE now compares modelSelectionScore
+// instead of a fixed RSS ratio) changed what THIS check demonstrates. Before
+// the fix, CURVATURE fired on this exact noise at ratio 0.4978 against its 0.5
+// threshold — a genuine false positive, caught only downstream by parsimony,
+// and AUDITED via specificityFlag rather than hidden. After the fix, the
+// detector no longer mistakes this noise for structure in the first place.
+record('N1b. the false positive this control used to catch downstream is now prevented AT THE DETECTOR',
+  r.noStructure.residualFindingKinds.length === 0 && r.noStructure.specificityFlag === null,
+  `residual findings: [${r.noStructure.residualFindingKinds.join(', ')}] (empty = no false positive to catch)`);
 
 record('N2. a more complex model fits training at least as well but LOSES on parsimony and hold-out, and is not selected',
   r.overfit.overComplexFitsTrainingAtLeastAsWell && r.overfit.overComplexLosesOnParsimony && r.overfit.engineDidNotSelectIt,

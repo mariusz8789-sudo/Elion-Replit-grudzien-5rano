@@ -14,6 +14,7 @@ import {
   type ModelSpaceConstraints,
 } from './modelSpace';
 import { analyzeResidualStructure, proposeModelsFromResiduals, type ResidualFinding } from './residualStructure';
+import { consultFalsifiedModelRegistry, recordFalsification, type ConsultationVerdict, type FalsificationScope, type RegistryConsultation } from './falsifiedModelRegistry';
 import {
   classifyObservationGap,
   createObservationGapRequest,
@@ -213,6 +214,14 @@ export interface CampaignResult {
   readonly discovery: Discovery;
   readonly campaignFingerprint: string;
   /**
+   * Every model this campaign refused to admit because M2's
+   * `falsifiedModelRegistry.ts` already had a standing verdict on it — only
+   * ever populated when `CampaignOptions.respectFalsifiedModelRegistry` is
+   * true. Never a silent skip: each entry names the fingerprint and the real
+   * reason `consultFalsifiedModelRegistry` returned.
+   */
+  readonly registrySkips: readonly { readonly fingerprint: string; readonly reason: string; readonly verdict: ConsultationVerdict }[];
+  /**
    * Every gap this campaign raised, in order. Fingerprinted SEPARATELY from
    * `campaignFingerprint` on purpose: adding the gap ledger left every
    * pre-existing campaign replay fingerprint byte-identical, which is the
@@ -228,7 +237,32 @@ export interface CampaignOptions {
   readonly excludeBases?: ModelSpaceConstraints['excludeBases'];
   /** Fingerprints the caller already knew before the campaign began (anti-HARK anchor). */
   readonly alreadyKnownFingerprints?: readonly string[];
+  /**
+   * M2 — Global Falsified-Model Registry integration. Off by default (every
+   * existing caller, and every existing test's determinism/independence
+   * assumptions, keep their exact current behaviour unchanged). When true:
+   * a candidate model is consulted against `falsifiedModelRegistry.ts`
+   * before being admitted — both at initial enumeration and at
+   * residual-derived proposal — and this campaign's own newly-falsified
+   * models are recorded back into the registry (scope `VARIANT_ONLY`,
+   * carrying the real `Hypothesis` that earned the verdict) so a LATER
+   * campaign on the same laboratory does not have to re-derive and re-fit
+   * the same already-settled model.
+   */
+  readonly respectFalsifiedModelRegistry?: boolean;
 }
+
+/**
+ * The three assumptions every model fit in this engine rests on, regardless
+ * of laboratory. Shared verbatim between `Discovery.assumptions` (below) and
+ * M2's `FalsificationScope.assumptions` (`falsifiedModelRegistry.ts`) — one
+ * real list, not two independently-typed-out copies that could quietly drift.
+ */
+const CAMPAIGN_ASSUMPTIONS: readonly string[] = [
+  'Observations are independent and their reported sigmas are correct.',
+  'The true relationship lies within the declared model grammar.',
+  'Each basis term is linear in its coefficient; nonlinear shape parameters were enumerated, not optimised.',
+];
 
 /** A model is "decisively best" at no more than half the runner-up's weighted RSS — the same ratio the QE4 loop already uses. */
 const DECISIVE_RSS_RATIO = 0.5;
@@ -360,13 +394,29 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     excludeBases: options.excludeBases,
   };
 
-  const live: LiveModel[] = generateModelSpace(constraints).map((spec) => ({
-    spec,
-    fingerprint: modelSpecFingerprint(spec),
-    enteredAtRound: 0,
-    derivedFrom: null,
-    derivationOperator: null,
-  }));
+  const scopeForLab: FalsificationScope = {
+    domain: lab.labId,
+    assumptions: CAMPAIGN_ASSUMPTIONS,
+    boundary: `${lab.xLabel} in [${lab.xRange.min}, ${lab.xRange.max}]`,
+  };
+
+  const registrySkips: { fingerprint: string; reason: string; verdict: ConsultationVerdict }[] = [];
+  const admitOrSkip = (spec: ModelSpec): RegistryConsultation => {
+    if (!options.respectFalsifiedModelRegistry) return { verdict: 'ALLOW', reason: 'Registry consultation not requested.', matchedRecord: null };
+    const consultation = consultFalsifiedModelRegistry({ spec, scope: scopeForLab });
+    if (consultation.verdict !== 'ALLOW') registrySkips.push({ fingerprint: modelSpecFingerprint(spec), reason: consultation.reason, verdict: consultation.verdict });
+    return consultation;
+  };
+
+  const live: LiveModel[] = generateModelSpace(constraints)
+    .filter((spec) => admitOrSkip(spec).verdict === 'ALLOW')
+    .map((spec) => ({
+      spec,
+      fingerprint: modelSpecFingerprint(spec),
+      enteredAtRound: 0,
+      derivedFrom: null,
+      derivationOperator: null,
+    }));
 
   const beliefs = new Map<string, Hypothesis>();
   for (const model of live) {
@@ -438,6 +488,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     )) {
       const print = modelSpecFingerprint(proposal.spec);
       if (live.some((m) => m.fingerprint === print)) continue;
+      if (admitOrSkip(proposal.spec).verdict !== 'ALLOW') continue;
       const entering: LiveModel = {
         spec: proposal.spec,
         fingerprint: print,
@@ -600,6 +651,33 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
   const surviving = finalRound === null ? [] : finalRound.models.filter((m) => (beliefs.get(m.fingerprint)?.confidence ?? 0) >= 0.5);
   const falsified = finalRound === null ? [] : finalRound.models.filter((m) => (beliefs.get(m.fingerprint)?.confidence ?? 0) < 0.5);
 
+  // Computed here (not only in the return statement below) so M2 can log the
+  // real run identity as `falsifiedBy.campaignId` — the SAME fingerprint the
+  // caller receives on `CampaignResult.campaignFingerprint`, not a second one.
+  const campaignFingerprint = fnv1a(canonicalJson({ labId: lab.labId, rounds: rounds.map((r) => r.roundFingerprint), stopReason, winner }));
+
+  if (options.respectFalsifiedModelRegistry && finalRound !== null) {
+    for (const view of falsified) {
+      const hypothesis = beliefs.get(view.fingerprint);
+      const model = live.find((m) => m.fingerprint === view.fingerprint);
+      if (!hypothesis || !model || hypothesis.status !== 'FALSIFIED_WITHIN_PROTOCOL') continue;
+      if (consultFalsifiedModelRegistry({ spec: model.spec, scope: scopeForLab }).verdict === 'ALLOW') {
+        recordFalsification({
+          spec: model.spec,
+          scope: scopeForLab,
+          // A single campaign's own RSS comparison only supports "worse than
+          // its rivals in THIS laboratory" — never a universal claim — so
+          // automatic recording never reaches for NEVER or COMPONENT.
+          reusableAs: 'VARIANT_ONLY',
+          evidence: hypothesis,
+          campaignId: campaignFingerprint,
+          round: finalRound.round,
+          observationIds: finalRound.admittedX.map((x) => `${lab.labId}:x=${x}`),
+        });
+      } // else: already standing (append-only, no need to pile up a duplicate entry every re-run).
+    }
+  }
+
   const winningFormulaWithCoefficients = winnerModel === null || winnerFit === null
     ? null
     : `${renderModelSpec(winnerModel.spec)}   with  [${winnerFit.coefficients.map((c) => c.toPrecision(6)).join(', ')}]`;
@@ -636,11 +714,7 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     uncertainty: winnerFit === null
       ? 'No fittable model, so no uncertainty statement is meaningful.'
       : `Weighted RSS ${winnerFit.rss.toFixed(6)} over ${admitted.length} points; per-point sigma came from the laboratory, not from this engine.`,
-    assumptions: [
-      'Observations are independent and their reported sigmas are correct.',
-      'The true relationship lies within the declared model grammar.',
-      'Each basis term is linear in its coefficient; nonlinear shape parameters were enumerated, not optimised.',
-    ],
+    assumptions: CAMPAIGN_ASSUMPTIONS,
     residualFindings: lastResidualFindings,
     /*
      * When the campaign ended holding an open gap, the honest answer to "what
@@ -667,7 +741,8 @@ export function runDiscoveryCampaign(lab: CampaignLaboratory, options: CampaignO
     rounds,
     stopReason,
     discovery,
-    campaignFingerprint: fnv1a(canonicalJson({ labId: lab.labId, rounds: rounds.map((r) => r.roundFingerprint), stopReason, winner })),
+    campaignFingerprint,
+    registrySkips,
     observationGaps,
     gapLedgerFingerprint: observationGapLedgerFingerprint(observationGaps),
   };

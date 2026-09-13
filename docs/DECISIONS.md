@@ -1288,3 +1288,107 @@ Dowód uruchamialny: `npm run e2e:gov-drug` → **18/18**,
 `npm run e2e:gov-drug:demo` → nagrany przebieg + zgodność Node/Chromium.
 Testy: `govDrugDiscoveryE2EPreregistration.test.ts` → **12/12**,
 `govDrugDiscoveryE2E.test.ts` → **37/37**.
+
+## D-033 (2026-09-13, PHASE E Kroki 1-5) — E1-E5: silnik autonomicznego
+wielodomenowego odkrycia, ZBUDOWANY PRZEZ ROZSZERZENIE, nie od nowa
+
+**Audyt PRZED kodem (Phase 0/1), tabela 20 pozycji EXISTING/REUSE/EXTEND/
+NEW/UNKNOWN ze ścieżkami plików** — patrz raport C1 w sesji. Kluczowe
+ustalenia audytu, które ukształtowały projekt: (1) D-021 już wcześniej
+świadomie odrzucił jedną kanoniczną pętlę odkrycia — Phase E NIE tworzy
+drugiej, tylko rozszerza `discoveryCampaign.ts::runDiscoveryCampaign` jako
+backbone; (2) `falsifiedModelRegistry.ts` (M2) jest jedynym istniejącym
+rejestrem cross-campaign, i jego własny komentarz mówi wprost, że
+`scienceMemory.ts` (per-przeglądarkowy localStorage, capped 100) jest złym
+kształtem do tej roli — więc rejestr "znanych ustaleń" dla Novelty Gate
+musiał być NOWY, ale skopiowany 1:1 ze sprawdzonego wzorca M2, nie
+wynaleziony od zera; (3) żaden wspólny kontrakt adaptera domeny nie
+istniał (audyt pkt 14) — E4 musiał go zaprojektować; (4) i18n istnieje
+jako pusty szkielet (`core/i18n.ts`, tylko PL, 6 kluczy) — odłożone do
+Kroku 7 (E6).
+
+**Krok 1 — E2 Novelty Gate** (`core/agent/noveltyGate.ts`, NOWY, wzorowany
+1:1 na `falsifiedModelRegistry.ts`): `assessNovelty`/`classifyResultLabel`/
+`assertValidResultLabel` — asercja maszynowo wymuszona (TE6), NIE opcja:
+znane ustalenie (NOT_NEW) oznaczone DISCOVERY **rzuca wyjątek**;
+NO_ACCESS oznaczony DISCOVERY **rzuca wyjątek**; model zablokowany przez
+M2 oznaczony DISCOVERY **rzuca wyjątek**; pusty `checkedCorpus` ogranicza
+poziom do `POSSIBLY_NOVEL`, który też nie może stać się DISCOVERY —
+"nie ma w naszej bazie" ≠ "naukowo nowe", roszczenie zawsze ograniczone do
+faktycznie sprawdzonego korpusu. 11/11 testów, testy TE6 napisane PRZED
+logiką.
+
+**Krok 2 — E1 Direction Finder** (`core/agent/directionFinder.ts`, NOWY,
+dyscyplina pożyczona z `nextQuestion.ts` — nigdy nie wynajduje tematu z
+niczego, tylko przeformułowuje to, co skończona kampania sama ustaliła):
+`findNextDirections` czyta zakończony `CampaignResult` i proponuje kierunek
+z czterech ugruntowanych źródeł (otwarta luka obserwacyjna,
+nierozstrzygnięci przetrwańcy, niewyjaśnione residuum, odrzucenie
+transferu między kampaniami), z deklarowaną kaskadą priorytetów (nigdy
+liczbowym wynikiem). Kryterium A dowiedzione wprost testem:
+`generatedDirection !== seededQuestion`. 7/7 testów, w tym na realnych
+`makeQe4CampaignLab`/`makeKeplerCampaignLab`.
+
+**Krok 3 — E5 Self-Directed Experiment Fulfillment**
+(`core/agent/experimentFulfillment.ts`, NOWY, rozszerza `observationGap.ts`
+(M1) + `datasetLaboratory.ts` o dokładnie to, czego M1 świadomie nie robi):
+`findQualifiedSource` wymaga DOKŁADNEGO dopasowania punktu w siatce
+źródła — nigdy dopasowania rozmytego po tekście; `fulfillExperimentGap`
+weryfikuje determinizm DRUGIM, niezależnym uruchomieniem przed zaufaniem
+wynikowi; `resumeCampaignWithFulfilment` odpala PRAWDZIWY,
+niezmodyfikowany silnik na wzbogaconym zbiorze punktów i raportuje, czy
+werdykt się zmienił. Brak pasującego źródła → `NO_ACCESS_DECLARED`, nigdy
+zmyślona obserwacja. 6/6 testów na realnych przypiętych danych QE4.
+
+**Krok 4 — E4 Cross-Domain Execution** (`core/agent/domainAdapter.ts` +
+`core/biotechData/domainAdapterRegistry.ts`, NOWY kontrakt — audyt
+potwierdził, że żaden wspólny nie istniał): `DomainAdapter` to cienki
+wrapper nad istniejącym `CampaignLaboratory`/`runDiscoveryCampaign` — brak
+drugiego silnika. `meetsProductionContract` wymaga tylko >=2 adapterów i
+nie nazywa żadnej domeny; demonstrator QE4+Kepler jest wyborem, nie
+wymogiem kontraktu — dowiedzione testem z RĘCZNIE zbudowanym trzecim,
+syntetycznym adapterem, który przechodzi przez te same funkcje bez zmian w
+`domainAdapter.ts`. 7/7 testów.
+
+**Krok 5 — E3 Autonomous Campaign Orchestrator, CAPSTONE**
+(`core/agent/campaignOrchestrator.ts`, NOWY, składa E1+E2+E4+E5 +
+niezmodyfikowany silnik w pętlę): `runAutonomousOrchestrator` — człowiek
+podaje TYLKO ziarno (`seedAdapter`), dalej kierunek → kampania → wynik →
+pamięć → następny kierunek → następna kampania dzieje się bez człowieka.
+**Realny, uruchamialny dowód autonomii (nie deklaracja w dokumencie):**
+syntetyczna kampania z zamrożoną gramatyką (1 term, bez POWER) znajduje
+zwycięski model `y = c0·x + c1·x²` (bez wyrazu wolnego — gramatyka go nie
+widziała), residuum to flaguje, orchestrator SAM odpala drugą kampanię z
+rozluźnioną gramatyką (`maxTerms+1`, `excludeBases` wyczyszczone,
+`respectFalsifiedModelRegistry: true`) i ta znajduje PRAWDZIWY model
+`y = c0 + c1·x²` — po czym uczciwie zatrzymuje się `NO_INFORMATION_GAIN`,
+bo nic więcej nie zostało do wyjaśnienia. `autonomyProven: true`, każdy
+`CandidateDirection` niesie provenance + powód. Reguły stopu nazwane i
+uczciwe, nigdy nie wymuszają nieskończonej autonomii:
+`NO_INFORMATION_GAIN`/`NO_FEASIBLE_EXPERIMENT`/`REDUNDANT_DIRECTION`/
+`FALSIFIED_DIRECTION`/`INSUFFICIENT_DATA`/`CONVERGED`/
+`MAX_CAMPAIGNS_REACHED` — dowiedzione osobnymi testami na realnym QE4
+(luka obserwacyjna bez resolvera → `INSUFFICIENT_DATA`, nigdy zmyślona
+obserwacja) i realnym Kepler (czysta zbieżność → `NO_INFORMATION_GAIN` po
+dokładnie jednej kampanii). DISCOVERY z sesji orchestratora zapisywane do
+rejestru Novelty Gate — powtórzenie identycznego ziarna czyta `NOT_NEW` /
+`REPRODUCTION`, dowiedzione testem. 6/6 testów, w tym replay: dwa
+niezależne przebiegi tego samego ziarna dają identyczne odciski kampanii.
+
+**Co pozostaje UNKNOWN / nieukończone (uczciwie, nie "completed"):** Krok 6
+(pełne TE5 end-to-end na fixture Keplera, demonstrator Node, przechwycenie
+Chromium, weryfikacja replay) i Krok 7 (E6 wielojęzyczność PL/AR/EN,
+odświeżenie kluczy kanonicznych, RTL, TE7) NIE są jeszcze zbudowane —
+`campaignOrchestrator.ts` jest osiągalny dziś tylko przez własny zestaw
+testów, bez jeszcze jednego demonstratora Node/Chromium. Orchestrator
+potrafi autonomicznie kontynuować TYLKO kierunek
+`RESIDUAL_STRUCTURE_UNEXPLAINED` (ta sama domena, rozluźniona gramatyka) i
+`OBSERVATION_GAP_FOLLOWUP` (tylko z jawnie dostarczonym `gapResolver`) —
+`UNRESOLVED_SURVIVORS` i `CROSS_CAMPAIGN_TRANSFER` są świadomie
+NIGDY nie realizowane autonomicznie, bo żaden kod w repo nie potrafi
+skonstruować nowego eksperymentu różnicującego ani pogodzić zmiany
+założeń między kampaniami — pętla uczciwie zatrzymuje się zamiast to
+udawać.
+
+Pełna bramka: frontend **5712/5712** (1 skipped), backend **396/396**,
+tsc czysty, eslint czysty, build OK, `repro-demo` **69/69** bez regresji.

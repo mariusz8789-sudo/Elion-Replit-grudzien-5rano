@@ -181,7 +181,29 @@ export async function runGenuineDiscoveryPipeline(input: GenuineDiscoveryPipelin
     graphRootId: campaign.result.campaignFingerprint,
     externalValidation: 'NOT_SOUGHT',
   };
-  const outcomeFingerprint = fnv1a(canonicalJson(record));
+  /**
+   * WALL CLOCK EXCLUDED FROM THE FINGERPRINT. `noveltyEvidence.searchedCorpus`
+   * carries a real `timestamp` per corpus entry (set by
+   * `literatureNoveltyAdapter.ts` from `new Date().toISOString()`) — genuine
+   * audit data, kept in the record, but it must not enter the hash: two runs
+   * of the SAME campaign that straddle a millisecond would otherwise produce
+   * different `outcomeFingerprint`s and the record would not replay.
+   *
+   * This was a latent bug, not a theoretical one: the determinism test in
+   * `genuineDiscoveryOrchestrator.test.ts` only passed because both runs
+   * usually landed inside the same millisecond, and it failed the moment the
+   * machine was loaded enough to push them apart. Same discipline as every
+   * other fingerprint in this codebase (`trialRegistry`, `predictionRegistry`,
+   * `discoveryCertificate`): record the time, never hash it.
+   */
+  const fingerprintView = {
+    ...record,
+    noveltyEvidence: {
+      ...record.noveltyEvidence,
+      searchedCorpus: record.noveltyEvidence.searchedCorpus.map(({ timestamp, ...rest }) => { void timestamp; return rest; }),
+    },
+  };
+  const outcomeFingerprint = fnv1a(canonicalJson(fingerprintView));
 
   return { ...record, recordId: outcomeFingerprint, outcomeFingerprint, replayHandle: campaign.result.campaignFingerprint };
 }

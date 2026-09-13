@@ -1887,6 +1887,130 @@ nie konsumuje), G6.2 (12 fixture'ów L0-L5 — waliduje silnik odkryć, nie
 lejek lekowy), G6.3, pełne G3.8/G3.9. **BLOCKED: production network:** G1,
 G5, G7-live, G8-publikacja.
 
+## D-039 (2026-09-13, PHASE G — SCIENTIFIC PROOF LADDER P0-P10) — drabina
+dwugałęziowa, realna bramka blind-access, i złapany latentny bug zegara w
+odcisku Fazy F
+
+**Audyt przed kodem (dwa równoległe przebiegi) obalił trzy założenia
+pakietu projektowego:**
+1. `DiscoveryStatus` **już ma** dokładnie tę taksonomię, o którą prosił
+   pakiet (REPRODUCTION/KNOWN_RESULT/EXTENSION/NOVEL_HYPOTHESIS/
+   DISCOVERY_CANDIDATE/DISCOVERY/UNKNOWN/NO_ACCESS/CONFLICTING_EVIDENCE/
+   FAILED_DISCOVERY), a status **już jest liczony, nigdy wpisywany** —
+   `classifyDiscoveryStatus` + `assertValidDiscoveryStatus` rzucają
+   wyjątkiem. Nie było czego budować od nowa, tylko czym to owinąć.
+2. Metody wnioskowania przyczynowego **już istnieją i są realne** —
+   `causalInference.ts` (CAP-2) ma DiD z dwukierunkowymi efektami stałymi,
+   interrupted time series i synthetic control, z permutacyjnymi błędami
+   standardowymi i testami placebo/trendów równoległych. Brakowało
+   **wyłącznie uporządkowanego słownika**, nie metod.
+3. `independenceGrade` (WEAK/MEDIUM/STRONG) i R1/R2/R3 **nie istnieją
+   nigdzie** — istnieje `IndependentReplicationRecord.result`
+   (REPLICATED/PARTIAL/FAILED) + `DisjointnessProof`.
+
+**NAJWAŻNIEJSZE USTALENIE MAPOWANIA.** Istniejąca bramka `DISCOVERY` w
+Genesis **już wymaga** replikacji na rozłącznym zbiorze, zamrożonej przed
+dostępem (`disjointnessProof` + `frozenBeforeReplicationAccess`), plus
+wszystkich 13 sond samofalsyfikacji. To jest dowód **klasy P6**
+(niezależne potwierdzenie na innym zbiorze), nie P1 — pakiet projektowy
+zakładał płycej, bo pisał bez dostępu do repo. Drabina to ujawnia zamiast
+zaniżać.
+
+**BŁĄD PROJEKTOWY W PAKIECIE, ZNALEZIONY PRZEZ URUCHOMIENIE TESTÓW.**
+Pierwsza implementacja robiła jedną liniową sekwencję P0→P10 ze
+zatrzymaniem na pierwszym nie-PASS. To **łamie się natychmiast**: P1
+(odtworzenie znanego) dotyczy wyłącznie ścieżki reprodukcji, więc dla
+hipotezy genuinely nowej `P1 = NOT_ATTEMPTED` blokowało wejście na P3+,
+dając P0 dla wszystkiego. Naprawione przez **dwie rozłączne gałęzie**:
+- ścieżka REPRODUKCJI: P0 → P1, **koniec**;
+- ścieżka NOWOŚCI: P0 → P3 → P4 → (P2 **i** P5 razem bramkują) → P6 →
+  P7 → P8 → P9 → P10, każdy z ostatnich czterech pojedynczo.
+
+**Odpowiedź na pytanie recenzenta — czy gałąź reprodukcji może awansować
+do nowości bez ponownego wejścia w P3?** NIE, i jest to strukturalnie
+niemożliwe, nie tylko niezalecane: `if (P1 === 'PASS') ... else if (P3
+=== 'PASS')` — gałąź nowości nigdy nie jest ewaluowana dla rekordu
+REPRODUCTION/KNOWN_RESULT. Test dowodzi tego wprost: rekord REPRODUCTION
+z **wszystkimi** sygnałami ścieżki nowości ustawionymi na PASS nadal
+kończy na P1, a P3/P4/P6 raportowane są jako `NOT_ATTEMPTED`. Żeby
+twierdzić nowość, trzeba nowego rekordu sklasyfikowanego od zera.
+
+**Odpowiedź na drugie pytanie — luka AT31 (surowe statusy w output).**
+Potwierdzona i zamknięta na warstwie prezentacji, zgodnie z rekomendacją:
+pięciu istniejących emisji gołego `'DISCOVERY'` **nie ruszono** (są
+wpieczone w zweryfikowane odciski), a granicę postawiono w
+`assertTieredStatusText(text, context)` — rzuca wyjątkiem, gdy tekst dla
+człowieka zawiera `DISCOVERY` bez następującego `(Tier `. Dopuszcza
+dłuższe nazwy statusów (`DISCOVERY_CANDIDATE`, `FAILED_DISCOVERY`) i stały
+tytuł produktu, bo żadne z nich nie jest werdyktem. **Wpięta realnie** w
+`printCertificate`, która uruchamia ją na gotowym tekście — nie na polach
+— więc goły status przeciekający DOWOLNĄ linią jest łapany, a nie
+zakładany że nie wystąpi. Pozostała jawna luka: `scripts/
+genuine-discovery-e2e-01.mjs` drukuje surowe `phaseF_status` w zrzucie
+JSON — to wyjście maszynowe/dowodowe, nie powierzchnia twierdzeń dla
+czytelnika, i świadomie zostaje surowe.
+
+**ZŁAPANY LATENTNY BUG W FAZIE F (nie w nowym kodzie).** Pełny przebieg
+testów pod obciążeniem wywalił test determinizmu
+`genuineDiscoveryOrchestrator`: dwa uruchomienia tej samej kampanii
+Keplera dawały różne `outcomeFingerprint`. Przyczyna:
+`literatureNoveltyAdapter.ts:121` robi `new Date().toISOString()`, co
+trafia do `noveltyEvidence.searchedCorpus[].timestamp`, a stamtąd **do
+hasha**. Test przechodził dotąd **wyłącznie przez szczęście** — oba
+uruchomienia zwykle mieściły się w tej samej milisekundzie. Naprawione:
+`outcomeFingerprint` liczony z widoku, z którego usunięto `timestamp`
+(dane zostają w rekordzie do audytu, nie wchodzą do hasha) — ta sama
+dyscyplina co w każdym nowym module tej sesji. **Dodano test regresyjny,
+który łapie to deterministycznie**: `vi.useFakeTimers` przesuwa zegar o
+pełną dobę między dwoma uruchomieniami. **Zweryfikowano, że test realnie
+łapie bug** — tymczasowe cofnięcie poprawki powoduje jego padnięcie
+(`e710ddf7` vs `9e70da4d`), przywrócenie naprawia. Żadna przypięta
+wartość nie ucierpiała: `outcomeFingerprint` nie jest nigdzie
+zahardkodowany (sprawdzone), a odciski kampanii `f4804820`/`44f245c9`
+liczy `campaignOrchestrator`, nie ten kod.
+
+**Zbudowane (REUSE/EXTEND/NEW per moduł):**
+- `core/agent/proofLadder.ts` — **NEW, czysto addytywny** nad
+  `discoveryContracts.ts` (zero zmian w nim). **23/23 testów.**
+- `core/agent/predictionRegistry.ts` — **NEW**. Odrzuca pustą tezę, pusty
+  `discriminatesAgainst` (predykcja nieodróżniająca od niczego jest
+  trywialna), ponowną rejestrację tego samego id, i sprawdzenie wyniku
+  wobec nigdy nierejestrowanej predykcji. **11/11 testów.**
+- `core/agent/blindDataset.ts` — **NEW**. Realna bramka dostępu, nie
+  konwencja: dane są nieosiągalne inaczej niż przez `.read(freezeToken)`,
+  zły token rzuca, a konstrukcja z freeze'em późniejszym niż pobranie
+  danych rzuca od razu. **9/9 testów.**
+- `core/agent/causalLadder.ts` — **EXTEND** nad istniejącym
+  `causalInference.ts`. „CAUSAL" wyłącznie przy realnym estymacie z CI
+  wykluczającym zero, zadeklarowanych założeniach identyfikacyjnych i —
+  dla DiD — zdanym własnym teście trendów równoległych. **10/10 testów.**
+- `core/agent/discoveryCertificate.ts` — **NEW**, kompozycja (nic nie
+  przelicza). Append-only: brak funkcji edycji, nowa ocena to nowy
+  certyfikat z `supersedes`. **11/11 testów.**
+
+**Runtime evidence:** `npm run proof-ladder:demo` (nowy) wystawia realne
+certyfikaty dla kampanii Keplera i QE4, weryfikując ich odciski wobec
+już-ustalonych `f4804820`/`44f245c9`, rejestruje predykcję, sprawdza jej
+kolejność i **odmawia dostępu do realnych punktów QE4 przy złym tokenie**
+— **10/10**. Wynik uczciwy i zgodny z Fazą F: Kepler = `REPRODUCTION
+(Tier A_COMPUTATIONAL, max P1)`, QE4 = `UNKNOWN (Tier A_COMPUTATIONAL,
+max P0)` — drabina **nie cofa** lekcji QE4, tylko ją potwierdza.
+
+Dodatkowo złapany własny dryf kontraktu `.env`: `GDD_PORT` z poprzedniego
+kroku był nieudokumentowany, `repro-demo` zgłaszał 1 rozbieżność —
+uzupełnione, **69/69**.
+
+Pełna bramka: frontend **5928/5929** (1 skipped, 523 pliki), backend
+**396/396**, tsc/eslint czyste, build OK, `repro-demo` **69/69**,
+`e2e:gov-drug` **18/18**, `e2e:gov-campaign` **16/16**,
+`proof-ladder:demo` **10/10**.
+
+**Świadomie POZA tym krokiem:** prior-art v2 (AdversarialQueryExpansion +
+EquivalenceClass), benchmark L0-L5 + fixture REDISCOVERY/tier-mislabel,
+G7-DR z etykietami drabiny, R3, macierz ortogonalności, audyt 15 klas,
+generator pakietu publikacyjnego, Discovery #001. **BLOCKED: production
+network:** live L5/L6, G1 recheck `44f245c9`, Discovery #001 live.
+
 ## Co pozostaje jawnie nierozstrzygnięte (Phase G)
 
 Decyzja G0 (merge do main,

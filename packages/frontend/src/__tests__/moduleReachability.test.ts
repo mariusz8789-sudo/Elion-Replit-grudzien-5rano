@@ -198,6 +198,21 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/world/moleculeWorldAdapter.ts': 'Third-domain proof of the generic WorldState contract; no screen drives a molecular run through the world layer yet.',
   'core/world/particleWorldAdapter.ts': 'Needs a DivergenceSweepResult, which only modelVsModelCompare produces — blocked behind that module.',
   'core/world/scienceDirector.ts': 'Camera/observation director over WorldState; no screen drives a world through it yet.',
+
+  // --- Phase G, Scientific Proof Ladder (P0-P10): NOT wired into the React
+  // app yet — no screen renders a certificate. Real runtime evidence exists
+  // via `npm run proof-ladder:demo` (scripts/proof-ladder-demonstrator.mjs),
+  // which issues real certificates for the already-verified Kepler
+  // (f4804820) and QE4 (44f245c9) campaigns, exercises the prediction
+  // registry and the blind-dataset access guard against real QE4 point data,
+  // and prints both certificates -- 10/10 properties held. Intended future
+  // caller: a screen or the GDD/genuine-discovery orchestrators issuing a
+  // certificate as part of their own output, not yet built.
+  'core/agent/proofLadder.ts': 'Phase G Proof Ladder P0-P10 status computer; runtime evidence via npm run proof-ladder:demo, not yet wired into a screen.',
+  'core/agent/predictionRegistry.ts': 'Phase G Proof Ladder P5 (Prospective Prediction); runtime evidence via npm run proof-ladder:demo, not yet wired into a screen.',
+  'core/agent/blindDataset.ts': 'Phase G blind-access enforcement (the real access-layer freeze-token guard the design called for); runtime evidence via npm run proof-ladder:demo, not yet wired into a screen.',
+  'core/agent/causalLadder.ts': 'Phase G Proof Ladder P9 (causal gate over the real causalInference.ts DiD/ITS/synthetic-control methods); covered by 10 unit tests against real CausalFitResult shapes, not yet wired into a live causal claim.',
+  'core/agent/discoveryCertificate.ts': 'Phase G GenesisDiscoveryCertificate v2; runtime evidence via npm run proof-ladder:demo, not yet wired into a screen.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

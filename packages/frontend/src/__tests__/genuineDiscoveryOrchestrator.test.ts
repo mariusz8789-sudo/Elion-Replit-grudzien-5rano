@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { runAutonomousOrchestrator } from '../core/agent/campaignOrchestrator';
 import { makeKeplerDomainAdapter, makeQe4DomainAdapter } from '../core/biotechData/domainAdapterRegistry';
 import { KEPLER_MARS_ANCHOR_ID } from '../core/biotechData/externalAnchor';
@@ -101,6 +101,40 @@ describe('determinism — the same campaign produces the same outcome fingerprin
     const b = await runGenuineDiscoveryPipeline(input);
     expect(a!.outcomeFingerprint).toBe(b!.outcomeFingerprint);
     expect(a!.status).toBe(b!.status);
+  });
+
+  /**
+   * REGRESSION, and the test that should have existed from the start. The
+   * check above only compares two back-to-back runs, so it passes by luck
+   * whenever both land inside the same millisecond — which is why a real
+   * wall-clock leak into `outcomeFingerprint` (via
+   * `noveltyEvidence.searchedCorpus[].timestamp`, set from
+   * `new Date().toISOString()` in `literatureNoveltyAdapter.ts`) sat here
+   * undetected until a loaded machine pushed the two runs apart.
+   *
+   * This one forces the clock forward between the runs, so it fails
+   * deterministically if any wall-clock value ever re-enters the hash.
+   */
+  it('two runs a FULL DAY apart still agree — no wall-clock value may enter the fingerprint', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const trace = runAutonomousOrchestrator({
+        seedAdapter: makeKeplerDomainAdapter(), options: { maxRounds: 7, maxTerms: 2 }, maxCampaigns: 1,
+        declaredPublicAnchorResolver: () => ({ anchorId: KEPLER_MARS_ANCHOR_ID, summary: 'x' }),
+      });
+      const campaign = trace.campaigns[0]!;
+      const input: GenuineDiscoveryPipelineInput = { campaign, literatureClients: [], matchThreshold: 0.5, discoveryDataset: { datasetId: 'd', points: [] }, replicationDataset: null, ...baseFields() };
+
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      const a = await runGenuineDiscoveryPipeline(input);
+      vi.setSystemTime(new Date('2026-01-02T00:00:00.000Z'));
+      const b = await runGenuineDiscoveryPipeline(input);
+
+      expect(a!.outcomeFingerprint).toBe(b!.outcomeFingerprint);
+      expect(a!.recordId).toBe(b!.recordId);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

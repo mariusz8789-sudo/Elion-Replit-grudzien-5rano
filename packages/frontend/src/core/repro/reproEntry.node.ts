@@ -162,6 +162,8 @@ import { runDiscoveryCampaign, type CampaignLaboratory } from '../agent/discover
 import { makeKeplerCampaignLab, makeQe4CampaignLab } from '../biotechData/campaignLabs';
 import { pointsForGrid } from '../biotechData/qe4DatasetLaboratory';
 import { fulfilObservationGap, type ObservationGapTrigger } from '../agent/observationGap';
+import { buildDiscoveryGraph, compareDiscoveryGraphReplay, transferKnowledge } from '../agent/discoveryGraph';
+import { evaluatePracticalCandidate, surfaceFor } from '../agent/practicalCandidateGate';
 
 export interface ReproDiscoveryCampaignReport {
   readonly labId: string;
@@ -210,9 +212,14 @@ export function reproDiscoveryCampaignKepler(): ReproDiscoveryCampaignReport {
   return report(runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 }));
 }
 
-/** CASE A with LOG removed from the grammar: the engine must rebuild the true shape from residual structure. */
+/**
+ * CASE A with LOG removed from the grammar: the engine must rebuild the true
+ * shape from residual structure. `maxTerms: 1` keeps the starting space to
+ * single-term models, so the derived two-term model is unambiguously something
+ * the grammar could not enumerate.
+ */
 export function reproDiscoveryCampaignQe4WithoutLog(): ReproDiscoveryCampaignReport {
-  return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 7, maxTerms: 2, excludeBases: ['LOG'] }));
+  return report(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 8, maxTerms: 1, excludeBases: ['LOG'] }));
 }
 
 // --- M1: ObservationGapRequest, on real pinned data -------------------------
@@ -431,5 +438,194 @@ export function reproConformalPrediction(): ReproConformalReport {
     heldOutCovered: heldOut.y >= heldOutInterval.lo && heldOut.y <= heldOutInterval.hi,
     rivalDiscriminability,
     rivalGapTrigger,
+  };
+}
+
+// --- §5: Discovery Graph + cross-campaign memory transfer --------------------
+
+export interface ReproDiscoveryGraphReport {
+  readonly qe4Nodes: number;
+  readonly qe4Edges: number;
+  readonly kinds: readonly string[];
+  readonly replay: 'MATCH' | 'DRIFT';
+  readonly importedCount: number;
+  readonly statusPreserved: boolean;
+  readonly falsifiedRefusedWithoutAssumptionChange: number;
+  readonly falsifiedAdmittedAfterAssumptionChange: number;
+  readonly statusStillBlockedAfterImport: boolean;
+  readonly secondImportAddedNothing: boolean;
+}
+
+/**
+ * Runtime evidence for §5: knowledge moves between two REAL campaigns over
+ * unrelated pinned datasets, and the epistemic rules survive the move.
+ */
+export function reproDiscoveryGraph(): ReproDiscoveryGraphReport {
+  const source = buildDiscoveryGraph(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 }));
+  const sourceAgain = buildDiscoveryGraph(runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 }));
+  const target = buildDiscoveryGraph(runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 }));
+
+  const plain = transferKnowledge(target, source);
+  const withChange = transferKnowledge(target, source, {
+    changedAssumptions: ['sigmas are no longer assumed independent across time points'],
+  });
+  const twice = transferKnowledge(plain.graph, source);
+
+  const statusPreserved = plain.imported.every((n) => {
+    const original = source.nodes.find((s) => s.nodeId === n.nodeId);
+    return original !== undefined && original.epistemicStatus === n.epistemicStatus;
+  });
+  const revived = withChange.imported.filter((n) => n.epistemicStatus === 'BLOCKED');
+
+  return {
+    qe4Nodes: source.nodes.length,
+    qe4Edges: source.edges.length,
+    kinds: [...new Set(source.nodes.map((n) => n.kind))].sort(),
+    replay: compareDiscoveryGraphReplay(source, sourceAgain),
+    importedCount: plain.imported.length,
+    statusPreserved,
+    falsifiedRefusedWithoutAssumptionChange: plain.refused.filter((r) => r.reason === 'FALSIFIED_WITHOUT_ASSUMPTION_CHANGE').length,
+    falsifiedAdmittedAfterAssumptionChange: revived.length,
+    statusStillBlockedAfterImport: revived.length > 0 && revived.every((n) => n.epistemicStatus === 'BLOCKED'),
+    secondImportAddedNothing: twice.imported.length === 0,
+  };
+}
+
+// --- §9: AUTONOMOUS_FRONTIER_ACCEPTANCE -------------------------------------
+
+export interface ReproFrontierAcceptanceReport {
+  readonly stopReason: string;
+  readonly rounds: number;
+  readonly observationsAdmitted: number;
+  readonly derivedCount: number;
+  readonly derivedContainsDeniedBasis: boolean;
+  readonly derivedAfterObservation: boolean;
+  readonly derivedWasPreRegistered: boolean;
+  readonly derivedBlockedByRegistry: boolean;
+  readonly hasLineageToResidual: boolean;
+  readonly residualFindingKinds: readonly string[];
+  readonly beliefsMovedUp: number;
+  readonly beliefsMovedDown: number;
+  readonly replay: 'MATCH' | 'DRIFT';
+  readonly graphReplay: 'MATCH' | 'DRIFT';
+  readonly gapOnDegenerate: string;
+}
+
+/**
+ * The §9 chain, end to end, on the pinned Brydges dataset with LOG denied:
+ * question -> competing models -> planner -> experiment -> observation ->
+ * residual -> structurally NEW model -> belief revision -> falsification ->
+ * stop -> replay. Plus the degenerate case, where the honest answer is to ask.
+ */
+export function reproFrontierAcceptance(): ReproFrontierAcceptanceReport {
+  const options = { maxRounds: 8, maxTerms: 2, excludeBases: ['LOG'] } as const;
+  const result = runDiscoveryCampaign(makeQe4CampaignLab(5), options);
+  const replayed = runDiscoveryCampaign(makeQe4CampaignLab(5), options);
+
+  const derived = result.rounds.flatMap((r) => r.derivedThisRound);
+  const preRegistered = new Set(result.rounds[0]!.models.map((m) => m.fingerprint));
+  const skipped = new Set(result.registrySkips.map((s) => s.fingerprint));
+  const finalRound = result.rounds[result.rounds.length - 1]!;
+
+  const degenerate = runDiscoveryCampaign(makeQe4CampaignLab(5), {
+    maxRounds: 5,
+    maxTerms: 1,
+    excludeBases: ['CONSTANT', 'LINEAR', 'POWER', 'EXP_SATURATION', 'RECIPROCAL'],
+  });
+
+  return {
+    stopReason: result.stopReason,
+    rounds: result.rounds.length,
+    observationsAdmitted: finalRound.admittedX.length,
+    derivedCount: derived.length,
+    derivedContainsDeniedBasis: derived.some((m) => m.formula.includes('log')),
+    derivedAfterObservation: derived.length > 0 && derived.every((m) => m.enteredAtRound > 0),
+    derivedWasPreRegistered: derived.some((m) => preRegistered.has(m.fingerprint)),
+    derivedBlockedByRegistry: derived.some((m) => skipped.has(m.fingerprint)),
+    hasLineageToResidual: derived.length > 0 && derived.every((m) => m.derivedFrom !== null && (m.derivationOperator ?? '').includes('RESIDUAL_')),
+    residualFindingKinds: [...new Set(result.rounds.flatMap((r) => r.residualFindings.map((f) => f.kind)))].sort(),
+    beliefsMovedUp: finalRound.beliefs.filter((h) => h.confidence > 0.5).length,
+    beliefsMovedDown: finalRound.beliefs.filter((h) => h.confidence < 0.5).length,
+    replay: result.campaignFingerprint === replayed.campaignFingerprint ? 'MATCH' : 'DRIFT',
+    graphReplay: compareDiscoveryGraphReplay(buildDiscoveryGraph(result), buildDiscoveryGraph(replayed)),
+    gapOnDegenerate: degenerate.observationGaps.length > 0 ? degenerate.stopReason : 'NO_GAP_RAISED',
+  };
+}
+
+// --- §8: PracticalCandidate safety gate -------------------------------------
+
+export interface ReproCandidateGateReport {
+  readonly realCandidateOutcome: string;
+  readonly realCandidateSurface: string;
+  readonly clinicalTextRefused: boolean;
+  readonly clinicalTextCriterion: string;
+  readonly clinicalBlockedRefused: boolean;
+  readonly thinEvidenceRefused: boolean;
+  readonly noLimitsRefused: boolean;
+  readonly interventionNeedsHuman: boolean;
+  readonly negativeFindingStillActivates: boolean;
+  readonly citizenSurfaceEverReachable: boolean;
+}
+
+/**
+ * §8 runtime evidence: the gate accepts the descriptive candidate a REAL
+ * campaign produces, refuses the five ways a candidate can overclaim, holds the
+ * medical boundary on the candidate's own OUTPUT TEXT, and never routes
+ * anything to a citizen-facing plane.
+ */
+export function reproPracticalCandidateGate(): ReproCandidateGateReport {
+  const result = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 });
+  const candidate = result.discovery.practicalCandidate!;
+  const observationIds = result.rounds[result.rounds.length - 1]!.admittedX.map((x) => `qe4:T=${x}`);
+  const evidence = {
+    observationIds,
+    replayFingerprint: result.campaignFingerprint,
+    provenance: { sourceUrl: 'https://zenodo.org/record/2527010', sourceVersion: '10.5281/zenodo.2527010' },
+    unresolvedContradictions: [] as readonly string[],
+    epistemicStatus: 'PREDICTION',
+  };
+  const base = {
+    candidate,
+    candidateClass: 'equation' as const,
+    safetyClass: 'DESCRIPTIVE' as const,
+    notProven: [...candidate.requiredValidation],
+    handoff: { recipient: 'INSTITUTION' as const, boundary: 'Research result over a pinned public dataset.' },
+    evidence,
+  };
+
+  const real = evaluatePracticalCandidate(base);
+  const clinical = evaluatePracticalCandidate({
+    ...base,
+    safetyClass: 'POPULATION',
+    candidate: { ...candidate, statement: 'Prescribe the alternative at an equivalent dose for the patient.' },
+  });
+  const blocked = evaluatePracticalCandidate({ ...base, safetyClass: 'CLINICAL_BLOCKED' });
+  const thin = evaluatePracticalCandidate({ ...base, evidence: { ...evidence, observationIds: ['one'] } });
+  const noLimits = evaluatePracticalCandidate({ ...base, notProven: [] });
+  const intervention = evaluatePracticalCandidate({ ...base, candidateClass: 'intervention' });
+  const negative = evaluatePracticalCandidate({
+    ...base,
+    candidate: { ...candidate, statement: 'No measurable benefit; the worst-case population estimate is a net harm.' },
+  });
+
+  let citizenReachable = false;
+  for (const outcome of ['ACTIVATE', 'REQUIRES_HUMAN_APPROVAL', 'REFUSE'] as const) {
+    for (const safety of ['DESCRIPTIVE', 'POPULATION', 'CLINICAL_BLOCKED'] as const) {
+      const surface = surfaceFor(outcome, safety);
+      if (surface !== 'GOVERNMENT_RESEARCH' && surface !== 'GOVERNMENT_ACTION' && surface !== 'NONE') citizenReachable = true;
+    }
+  }
+
+  return {
+    realCandidateOutcome: real.outcome,
+    realCandidateSurface: surfaceFor(real.outcome, 'DESCRIPTIVE'),
+    clinicalTextRefused: clinical.outcome === 'REFUSE',
+    clinicalTextCriterion: clinical.failures.map((f) => f.criterion).join(','),
+    clinicalBlockedRefused: blocked.outcome === 'REFUSE',
+    thinEvidenceRefused: thin.outcome === 'REFUSE',
+    noLimitsRefused: noLimits.outcome === 'REFUSE',
+    interventionNeedsHuman: intervention.outcome === 'REQUIRES_HUMAN_APPROVAL' && intervention.requiresCapability === 'candidate.activate',
+    negativeFindingStillActivates: negative.outcome === 'ACTIVATE',
+    citizenSurfaceEverReachable: citizenReachable,
   };
 }

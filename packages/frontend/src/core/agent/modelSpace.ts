@@ -290,6 +290,74 @@ export function fitModelSpec(spec: ModelSpec, points: readonly ModelPoint[]): Mo
   return { ok: true, coefficients, rss, predict };
 }
 
+// --- M3: parsimony and out-of-sample ------------------------------------------
+
+/**
+ * PARSIMONY. Weighted RSS alone always prefers the more complex model: an extra
+ * free coefficient can only ever lower it, which is how an engine talks itself
+ * into an elaborate model that has merely absorbed noise. This is the BIC form
+ * for a chi-square with KNOWN variances — the residuals are already divided by
+ * each point's own sigma, so `rss` IS that chi-square and the penalty is simply
+ * `k·ln(n)` added to it.
+ *
+ * `k` IS THE NUMBER OF ESTIMATED COEFFICIENTS — one per term — and deliberately
+ * NOT `modelComplexity`. Complexity carries a surcharge for nonlinear bases that
+ * exists to break ties between equally good fits; folding it into k would charge
+ * BIC for freedom the fit never spends. A LOG term estimates exactly one
+ * coefficient: its shape is fixed by the grammar, not fitted.
+ *
+ * WHAT THIS DOES NOT ACCOUNT FOR, stated rather than hidden: the engine
+ * enumerates many candidate models and picks the best, and that selection is
+ * itself a source of optimism which a per-model information criterion does not
+ * correct. `holdoutScore` below is the answer to that, because out-of-sample
+ * error is not flattered by how many models were tried.
+ *
+ * LOWER IS BETTER. A more complex model wins only when it lowers chi-square by
+ * more than `Δk·ln(n)` — exactly "not without informational justification".
+ */
+export function modelSelectionScore(rss: number, estimatedCoefficients: number, pointCount: number): number {
+  if (!Number.isFinite(rss) || pointCount <= 0) return Number.POSITIVE_INFINITY;
+  return rss + estimatedCoefficients * Math.log(pointCount);
+}
+
+/** The number of coefficients a fit of this model actually estimates: one per canonical term. */
+export function estimatedCoefficientCount(spec: ModelSpec): number {
+  return normalizeModelSpec(spec).terms.length;
+}
+
+/** Deterministic split: every `stride`-th point is held out, never a random or seeded draw. */
+export function holdoutSplit<T>(points: readonly T[], stride = 3): { readonly fit: readonly T[]; readonly heldOut: readonly T[] } {
+  const fit: T[] = [];
+  const heldOut: T[] = [];
+  points.forEach((p, i) => ((i + 1) % stride === 0 ? heldOut : fit).push(p));
+  return { fit, heldOut };
+}
+
+/**
+ * OUT-OF-SAMPLE CHECK. Fits on part of the data and scores the chi-square on
+ * points the fit never saw — the one measurement overfitting cannot flatter,
+ * because a model bent to pass through its own residuals does worse here, not
+ * better.
+ *
+ * Returns `null`, never a number, when the split leaves too little to fit or
+ * nothing to test on. A hold-out score from an inadequate split would look like
+ * evidence while carrying none.
+ */
+export function holdoutScore(spec: ModelSpec, points: readonly ModelPoint[], stride = 3): number | null {
+  const { fit, heldOut } = holdoutSplit(points, stride);
+  if (heldOut.length === 0) return null;
+  const fitted = fitModelSpec(spec, fit);
+  if (!fitted.ok) return null;
+  let score = 0;
+  for (const p of heldOut) {
+    const predicted = fitted.predict(pointInput(p));
+    if (!Number.isFinite(predicted)) return null;
+    const r = p.y - predicted;
+    score += (r * r) / (p.sigma * p.sigma);
+  }
+  return score / heldOut.length;
+}
+
 // --- generation ---------------------------------------------------------------
 
 export interface ModelSpaceConstraints {
@@ -339,8 +407,17 @@ function candidateTerms(constraints: ModelSpaceConstraints): readonly ModelTerm[
     if (!excluded.has('EXP_SATURATION')) for (const tau of saturationTaus(constraints.xRange)) pool.push({ basis: 'EXP_SATURATION', variable, tau });
   }
   if (constraints.includeInteractions && !excluded.has('INTERACTION')) {
+    // Dimensional filter (F2/F5-4): an INTERACTION is a claim that two
+    // DISTINCT axes act jointly. `i < j` already visits each unordered pair
+    // once; the extra `variables[i] === variables[j]` guard catches a caller
+    // that (accidentally or otherwise) repeats a name in `variables` — two
+    // equal names would otherwise mint a same-variable "interaction" that is
+    // really `variable²`, already covered honestly by the POWER basis, and
+    // would silently double-count that one axis under a false cross-term
+    // label rather than a real second dimension.
     for (let i = 0; i < variables.length; i += 1) {
       for (let j = i + 1; j < variables.length; j += 1) {
+        if (variables[i] === variables[j]) continue;
         pool.push({ basis: 'INTERACTION', variables: [variables[i]!, variables[j]!] });
       }
     }
@@ -349,9 +426,23 @@ function candidateTerms(constraints: ModelSpaceConstraints): readonly ModelTerm[
 }
 
 /**
- * Every distinct model of up to `maxTerms` terms over the declared pool.
- * Deterministic in both membership and order: same constraints in, same space
- * out, so a campaign that enumerates the space is replayable.
+ * Beam limit (F2/F5-5): the total number of models one `generateModelSpace`
+ * call will enumerate before it stops, regardless of how large `maxTerms` and
+ * the declared pool (bases × variables × shape grids) make the combinatorial
+ * space. `maxTerms` already bounds DEPTH (how many terms one model may carry);
+ * this bounds BREADTH at a fixed depth, the same role `MAX_MUTATIONS` plays
+ * for `mutateModelSpec` below — so a laboratory that declares many variables
+ * or leaves every basis enabled cannot make one campaign round enumerate an
+ * unbounded space. Enumeration order is `build`'s own fixed traversal, so
+ * which models survive the cap is deterministic, not first-come noise.
+ */
+const MAX_GENERATED_MODELS = 500;
+
+/**
+ * Every distinct model of up to `maxTerms` terms over the declared pool, up to
+ * `MAX_GENERATED_MODELS` of them. Deterministic in both membership and order:
+ * same constraints in, same space out, so a campaign that enumerates the
+ * space is replayable.
  */
 export function generateModelSpace(constraints: ModelSpaceConstraints): readonly ModelSpec[] {
   const pool = candidateTerms(constraints);
@@ -359,6 +450,7 @@ export function generateModelSpace(constraints: ModelSpaceConstraints): readonly
   const seen = new Set<string>();
 
   const emit = (terms: readonly ModelTerm[]): void => {
+    if (out.length >= MAX_GENERATED_MODELS) return;
     const spec = normalizeModelSpec({ id: '', terms, lineage: null });
     const print = modelSpecFingerprint(spec);
     if (seen.has(print)) return;
@@ -367,9 +459,13 @@ export function generateModelSpace(constraints: ModelSpaceConstraints): readonly
   };
 
   const build = (start: number, chosen: ModelTerm[]): void => {
+    if (out.length >= MAX_GENERATED_MODELS) return;
     if (chosen.length > 0) emit(chosen);
     if (chosen.length >= constraints.maxTerms) return;
-    for (let i = start; i < pool.length; i += 1) build(i + 1, [...chosen, pool[i]!]);
+    for (let i = start; i < pool.length; i += 1) {
+      if (out.length >= MAX_GENERATED_MODELS) return;
+      build(i + 1, [...chosen, pool[i]!]);
+    }
   };
   build(0, []);
 

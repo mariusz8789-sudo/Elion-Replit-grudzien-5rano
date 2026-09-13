@@ -78,7 +78,12 @@ const EXPECTED = {
   qe4RegimeWinner: 'qe4-regime-logarithmic-k5',
   discoveryQe4Winner: 'y = c0 + c1·log(x)',
   discoveryQe4Stop: 'EXPERIMENT_SPACE_EXHAUSTED',
-  discoveryQe4Fingerprint: '60309677',
+  // Moved by M3's parsimony term (ranking by chi-square + k·ln(n) instead of raw
+  // weighted RSS, under which an extra coefficient could only ever help). The
+  // SCIENCE is unchanged: QE4 still concludes logarithmic growth and still picks
+  // [20,16,10,6]. Kepler's fingerprint did not move — its linear model wins under
+  // either ranking rule.
+  discoveryQe4Fingerprint: '44f245c9',
   discoveryKeplerWinner: 'y = c0 + c1·x',
   discoveryKeplerStop: 'CONVERGENCE',
   discoveryKeplerSlope: 1.49987,
@@ -167,7 +172,7 @@ let keplerAnchor;
 let qe3;
 let qe4;
 let qe4Regime;
-let dQe4, dKepler, dDerived, dGap, conformal;
+let dQe4, dKepler, dDerived, dGap, dGraph, dFrontier, dGate, conformal;
 try {
   const out = path.join(bundleDir, 'repro.mjs');
   execFileSync(path.join(REPO, 'node_modules/.bin/esbuild'), [
@@ -187,6 +192,9 @@ try {
   qe4Regime = science.reproQe4RegimeInquiry();
   dQe4 = science.reproDiscoveryCampaignQe4();
   dGap = science.reproObservationGap();
+  dGraph = science.reproDiscoveryGraph();
+  dFrontier = science.reproFrontierAcceptance();
+  dGate = science.reproPracticalCandidateGate();
   dKepler = science.reproDiscoveryCampaignKepler();
   dDerived = science.reproDiscoveryCampaignQe4WithoutLog();
   conformal = science.reproConformalPrediction();
@@ -266,9 +274,12 @@ record('Discovery engine CASE B: odcisk kampanii (replay)',
 record('Discovery engine: obie kampanie wybieraja INNE eksperymenty (dowod, ze nie jest zahardkodowane)',
   JSON.stringify(dQe4.selectedExperiments) !== JSON.stringify(dKepler.selectedExperiments),
   `QE4 wybral [${dQe4.selectedExperiments.join(', ')}], Kepler [${dKepler.selectedExperiments.join(', ')}]`);
-record('Discovery engine: model B wyprowadzony z RESIDUUM modelu A wygrywa kampanie (gramatyka bez LOG)',
-  dDerived.winnerWasDerivedAtRound > 0 && String(dDerived.winningFormula).includes('log'),
-  `zwyciezca "${dDerived.winningFormula}" wszedl w rundzie ${dDerived.winnerWasDerivedAtRound}; wyprowadzone: ${dDerived.derivedModelFormulas.length}`);
+record('Discovery engine: model B WYPROWADZONY z residuum (gramatyka bez LOG) — zawiera czlon, ktorego gramatyka nie miala',
+  dDerived.derivedModelFormulas.some((f) => f.includes('log')),
+  `wyprowadzone ${dDerived.derivedModelFormulas.length}: ${dDerived.derivedModelFormulas.join(' ; ')}`);
+record('Discovery engine: parsymonia ODMAWIA koronowania modelu, ktorego poprawa nie pokrywa kosztu informacyjnego',
+  dDerived.winnerWasDerivedAtRound === 0 && !String(dDerived.winningFormula).includes('log'),
+  `zwyciezca "${dDerived.winningFormula}" (z gramatyki, runda ${dDerived.winnerWasDerivedAtRound}) — model z log dopasowuje sie lepiej, ale nie o wiecej niz ln(n) na dodatkowy wspolczynnik`);
 record('Discovery engine: kotwica anty-HARK nienaruszona we wszystkich trzech kampaniach',
   dQe4.antiHarkingIntactEveryRound && dKepler.antiHarkingIntactEveryRound && dDerived.antiHarkingIntactEveryRound,
   `qe4=${dQe4.antiHarkingIntactEveryRound} kepler=${dKepler.antiHarkingIntactEveryRound} derived=${dDerived.antiHarkingIntactEveryRound}`);
@@ -286,6 +297,20 @@ record('M1: request nazywa BRAKUJACY pomiar i przyrzad, nie zmyslajac kosztu',
 record('M1: odcisk luki (replay) i spelnienie z lancuchem opieki wchodzi jako OBSERVATION, nie FACT',
   dGap.replay === 'MATCH' && dGap.fulfilledEpistemicStatus === 'OBSERVATION' && dGap.fulfilledStatus === 'FULFILLED' && dGap.custodySteps === 2,
   `${dGap.gapFingerprint} / ${dGap.replay} / ${dGap.fulfilledEpistemicStatus} / ${dGap.fulfilledStatus} / krokow opieki=${dGap.custodySteps}`);
+// --- §5: Discovery Graph + transfer miedzy kampaniami ------------------------
+record('§5: graf odkrycia obejmuje caly lancuch rozumowania kampanii i jest deterministyczny',
+  dGraph.replay === 'MATCH' && dGraph.kinds.includes('OBSERVATION') && dGraph.kinds.includes('DISCOVERY') && dGraph.kinds.includes('REVISION'),
+  `${dGraph.qe4Nodes} wezlow / ${dGraph.qe4Edges} krawedzi, replay=${dGraph.replay}, rodzaje: ${dGraph.kinds.join(', ')}`);
+record('§5: wiedza przechodzi miedzy DWIEMA realnymi kampaniami bez podnoszenia statusu epistemicznego',
+  dGraph.importedCount > 0 && dGraph.statusPreserved === true,
+  `zaimportowano ${dGraph.importedCount} wezlow z QE4 do kampanii Keplera; status zachowany 1:1 = ${dGraph.statusPreserved}`);
+record('§5: model SFALSYFIKOWANY nie wraca bez jawnej zmiany zalozen — a po zmianie wraca NADAL jako BLOCKED',
+  dGraph.falsifiedRefusedWithoutAssumptionChange > 0 && dGraph.falsifiedAdmittedAfterAssumptionChange > 0 && dGraph.statusStillBlockedAfterImport === true,
+  `odrzucone bez zmiany zalozen: ${dGraph.falsifiedRefusedWithoutAssumptionChange}; wpuszczone po nazwaniu zmiany: ${dGraph.falsifiedAdmittedAfterAssumptionChange}, wszystkie dalej BLOCKED=${dGraph.statusStillBlockedAfterImport}`);
+record('§5: import jest idempotentny — drugi transfer tego samego grafu nie dokłada nic',
+  dGraph.secondImportAddedNothing === true,
+  `drugi import dodal 0 wezlow = ${dGraph.secondImportAddedNothing}`);
+
 record('M1: istniejace kampanie NIETKNIETE — Kepler zbiega bez luki, QE4 zachowuje odcisk',
   dKepler.observationGapTriggers.length === 0 && dQe4.campaignFingerprint === EXPECTED.discoveryQe4Fingerprint && dQe4.observationGapTriggers.join(',') === 'NO_ATTACHED_EXPERIMENT',
   `kepler luki=${dKepler.observationGapTriggers.length}, qe4 odcisk=${dQe4.campaignFingerprint}, qe4 luka=${dQe4.observationGapTriggers.join(',') || 'brak'}`);
@@ -307,6 +332,34 @@ record('A8 conformal: pokrycie zgłoszone WPROST — nominał vs zaobserwowane, 
 record('A8 conformal + M1: rywalizujące modele (liniowy vs płaski) na TYCH SAMYCH danych kalibracyjnych dają realną rozróżnialność',
   Math.abs(conformal.rivalDiscriminability - EXPECTED.conformalRivalDiscriminability) < 1e-9 && conformal.rivalGapTrigger === EXPECTED.conformalRivalGapTrigger,
   `dyskryminowalność=${conformal.rivalDiscriminability.toFixed(4)} (oczekiwane ${EXPECTED.conformalRivalDiscriminability.toFixed(4)}), trigger=${conformal.rivalGapTrigger ?? 'null (wystarczająco rozróżnialne, brak luki)'} — TA SAMA klasyfikacja co M1 (classifyObservationGap), żaden nowy silnik`);
+
+// --- §9: AUTONOMOUS_FRONTIER_ACCEPTANCE --------------------------------------
+record('§9: pelny lanccuch — pytanie → modele → planner → eksperyment → obserwacja → residuum → NOWY model → rewizja → stop',
+  dFrontier.derivedCount > 0 && dFrontier.residualFindingKinds.length > 0 && dFrontier.beliefsMovedUp > 0 && dFrontier.beliefsMovedDown > 0,
+  `${dFrontier.rounds} rund, ${dFrontier.observationsAdmitted} obserwacji, residua: ${dFrontier.residualFindingKinds.join('+')}, przekonania w gore/w dol: ${dFrontier.beliefsMovedUp}/${dFrontier.beliefsMovedDown}, stop=${dFrontier.stopReason}`);
+record('§9 WARUNEK 1: nowy model powstal PO obserwacji, nie byl prerejestrowany, ma rodowod do residuum, nie zostal zablokowany przez M2',
+  dFrontier.derivedAfterObservation === true && dFrontier.derivedWasPreRegistered === false && dFrontier.hasLineageToResidual === true && dFrontier.derivedBlockedByRegistry === false,
+  `wyprowadzono ${dFrontier.derivedCount} (zawiera odebrany gramatyce log: ${dFrontier.derivedContainsDeniedBasis}); po obserwacji=${dFrontier.derivedAfterObservation}, prerejestrowany=${dFrontier.derivedWasPreRegistered}, rodowod=${dFrontier.hasLineageToResidual}, zablokowany przez rejestr=${dFrontier.derivedBlockedByRegistry}`);
+record('§9 WARUNEK 2: gdy zaden eksperyment nie rozroznia modeli — OBSERVATION_GAP zamiast zgadywania',
+  dFrontier.gapOnDegenerate === 'OBSERVATION_GAP',
+  `przypadek zdegenerowany zatrzymal sie z: ${dFrontier.gapOnDegenerate}`);
+record('§9 WARUNEK 3: replay == MATCH dla kampanii i dla grafu odkrycia',
+  dFrontier.replay === 'MATCH' && dFrontier.graphReplay === 'MATCH',
+  `kampania=${dFrontier.replay}, graf=${dFrontier.graphReplay}`);
+
+// --- §8: bramka PracticalCandidate (egzekwowana maszynowo) -------------------
+record('§8: bramka PRZEPUSZCZA opisowego kandydata z realnej kampanii, do warstwy Government Research',
+  dGate.realCandidateOutcome === 'ACTIVATE' && dGate.realCandidateSurface === 'GOVERNMENT_RESEARCH',
+  `werdykt=${dGate.realCandidateOutcome}, warstwa=${dGate.realCandidateSurface}`);
+record('§8: granica medyczna dziala na TEKSCIE WYNIKU, nie w promptcie — jezyk recepty jest odrzucony',
+  dGate.clinicalTextRefused === true && dGate.clinicalTextCriterion.includes('NO_CLINICAL_DIRECTIVE_LANGUAGE') && dGate.clinicalBlockedRefused === true,
+  `tekst z recepta odrzucony przez: ${dGate.clinicalTextCriterion}; klasa CLINICAL_BLOCKED odrzucona=${dGate.clinicalBlockedRefused}`);
+record('§8: kandydat bez dowodow i bez zadeklarowanych granic nie wychodzi z warstwy badawczej',
+  dGate.thinEvidenceRefused === true && dGate.noLimitsRefused === true,
+  `za malo obserwacji → REFUSE=${dGate.thinEvidenceRefused}; pusta lista "czego NIE dowiedziono" → REFUSE=${dGate.noLimitsRefused}`);
+record('§8: DZIALANIE wymaga czlowieka, a wynik NIEWYGODNY nie jest blokowany (policy ogranicza dzialanie, nie prawde)',
+  dGate.interventionNeedsHuman === true && dGate.negativeFindingStillActivates === true && dGate.citizenSurfaceEverReachable === false,
+  `interwencja → REQUIRES_HUMAN_APPROVAL=${dGate.interventionNeedsHuman}; wynik negatywny/worst-case dalej ACTIVATE=${dGate.negativeFindingStillActivates}; warstwa obywatelska osiagalna=${dGate.citizenSurfaceEverReachable}`);
 
 // --- Raport ------------------------------------------------------------------
 const failed = checks.filter((c) => !c.ok);

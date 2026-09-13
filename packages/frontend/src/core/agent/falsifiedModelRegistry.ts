@@ -142,7 +142,24 @@ export function resetFalsifiedModelRegistryForTests(): void {
   LOG = [];
 }
 
-function storedRecordFingerprint(input: Omit<FalsifiedModelRecord, 'recordId' | 'fingerprint' | 'supersededBy'>, sequence: number): string {
+/**
+ * The record's fingerprint covers the SCIENTIFIC FACT and nothing else: which
+ * model, killed by which observations, in which campaign and round, under which
+ * scope, and how reusable the verdict leaves it.
+ *
+ * `recordedAt` is deliberately EXCLUDED. It was originally inside this payload,
+ * and because it is wall-clock time that made the fingerprint
+ * non-deterministic: recording the identical falsification twice produced two
+ * different fingerprints, which defeats the replay guarantee the rest of this
+ * codebase is built on (demonstrated before the fix — same inputs, fingerprints
+ * e070289f and dfbba267). When this file says two records are the same fact, it
+ * now means the same fact, not the same millisecond.
+ *
+ * `sequence` stays in: two genuinely separate falsifications of the same model
+ * under the same scope are distinct entries in an append-only log, and the log
+ * position is what distinguishes them.
+ */
+function storedRecordFingerprint(input: Omit<FalsifiedModelRecord, 'recordId' | 'fingerprint' | 'supersededBy' | 'recordedAt'>, sequence: number): string {
   return fnv1a(canonicalJson({ ...input, sequence }));
 }
 
@@ -189,11 +206,11 @@ export function recordFalsification(input: RecordFalsificationInput): FalsifiedM
     },
     scope: input.scope,
     reusableAs: input.reusableAs,
-    recordedAt: new Date().toISOString(),
   };
   const fingerprint = storedRecordFingerprint(base, LOG.length);
+  const recordedAt = new Date().toISOString();
   const recordId = fingerprint;
-  const stored: Omit<FalsifiedModelRecord, 'supersededBy'> = { recordId, fingerprint, ...base };
+  const stored: Omit<FalsifiedModelRecord, 'supersededBy'> = { recordId, fingerprint, ...base, recordedAt };
   LOG.push({ entryType: 'RECORD', record: stored });
   return { ...stored, supersededBy: null };
 }

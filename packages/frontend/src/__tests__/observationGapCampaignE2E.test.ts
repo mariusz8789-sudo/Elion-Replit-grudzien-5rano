@@ -130,15 +130,17 @@ describe('M1 — non-degenerate campaigns are untouched', () => {
     // against a Sep-only selector). C3-1 (Redund/Fals planner-score terms) and
     // C3-2 (variable-qualified ModelTerm identity, which changes every model
     // fingerprint) landed concurrently and legitimately moved BOTH values —
-    // reconfirmed here as '60309677'/'f4804820' by actually running the
-    // campaign against the merged code, not by asserting the pre-M1 number.
+    // reconfirmed by actually running the campaign against the merged code, not
+    // by asserting the pre-M1 number. M3's parsimony term (chi-square + k·ln(n)
+    // instead of raw RSS) then moved QE4's again, to '44f245c9'; Kepler's did
+    // not move, because its linear model wins under either ranking rule.
     // What this test still proves, unchanged: the selection SEQUENCE below is
     // real behaviour reproduced twice (this run + `repro-demo.mjs`'s pinned
     // literal), and the gap-detection this describe-block is about did not
     // fire for either non-degenerate real-data campaign.
     const qe4 = runDiscoveryCampaign(makeQe4CampaignLab(5), { maxRounds: 6, maxTerms: 2 });
     const kepler = runDiscoveryCampaign(makeKeplerCampaignLab(), { maxRounds: 7, maxTerms: 2 });
-    expect(qe4.campaignFingerprint).toBe('60309677');
+    expect(qe4.campaignFingerprint).toBe('44f245c9');
     expect(kepler.campaignFingerprint).toBe('f4804820');
     expect(qe4.rounds.map((r) => r.selectedNextX)).toEqual([20, 16, 10, 6, null]);
     // QE4's final round legitimately raises its own NO_ATTACHED_EXPERIMENT gap

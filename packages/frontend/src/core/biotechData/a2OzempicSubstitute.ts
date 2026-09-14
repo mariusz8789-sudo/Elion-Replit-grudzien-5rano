@@ -658,7 +658,15 @@ interface A2RawCandidate {
   readonly qualifyingAssayCounts: { readonly glp1r: number; readonly gipr: number; readonly gcgr: number };
 }
 
-function loadCandidateSummaries(): readonly A2CandidateSummary[] {
+/**
+ * EXPORTED (was module-private) for D-058's Winner Promotion Gate E2E
+ * wiring: `core/orchestrator/govLowerHarmAdapters.ts::generate()` needs the
+ * FULL real 20-candidate, mechanism-derived space (not just the 12 with
+ * trial evidence that `runA2Analysis()` reports on) to satisfy the mandate's
+ * "generate a non-trivial candidate set" stage honestly. Zero change in
+ * behaviour for every existing call site in this file.
+ */
+export function loadCandidateSummaries(): readonly A2CandidateSummary[] {
   return (candidatesRaw as readonly A2RawCandidate[]).map((c) => ({ ...c, maxPhase: Number(c.maxPhase) }));
 }
 

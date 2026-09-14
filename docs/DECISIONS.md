@@ -3845,3 +3845,217 @@ failures.** tsc clean, eslint clean on every file this entry touched (4
 pre-existing, unrelated lint errors remain in 3 `scripts/*.mjs` files this
 entry never touched — confirmed via `git diff`/`git status` showing zero
 changes to those files). Frontend production build clean.
+
+## D-058 (2026-09-14) — Genesis Scientific Discovery E2E completion: the
+## real LOWER-HARM pipeline wired through the real, unmodified orchestrator
+
+CONNECTS, HARDENS, EXECUTES, TESTS AND VERIFIES existing machinery — builds
+NO second ranking, adjudication, falsification, evidence, or recipe engine.
+Every decision-making call in this entry is an existing, unmodified
+function (`runA2Analysis`, `rankForLowerHarm`, `checkDiversity`,
+`freezeFalsificationCriteria`/`runG2Falsification`,
+`runAdjudication`/`decideFunnelVerdict` — all D-050 —, plus the D-057
+Winner Promotion Gate already sitting inside `orchestrator.ts`, untouched).
+This entry supplies only the glue mapping those real functions onto
+`OrchestratorAdapters`' generic port shapes, exactly the role
+`toyAdapters.ts` (D-055, synthetic) already plays against the identical
+contract — and a genuine, structured public entry point.
+
+### 1. Inspection first
+
+Read before writing any code: `orchestrator.ts`/`contracts.ts` (D-055),
+`winnerGate.ts` (D-057), `govDrugLowerHarmFunnel.ts`/
+`govDrugLowerHarmRanking.ts`/`govDrugLowerHarmPreregistration.ts` (D-050),
+`a2OzempicSubstitute.ts` (A2), `practicalCandidateGate.ts`,
+`evidenceProvenance.ts`, `differentiatingExperimentGenerator.ts` (G2),
+`govDrugDiscoveryE2E.ts::generateResearchRecipe` (E2E-01's own recipe
+builder), `physicsWorld/backends.ts`/`backendRegistry.ts` (D-052/D-057).
+Found that `govDrugLowerHarmFunnel.ts::runLowerHarmFunnel()` ALREADY
+implements the entire TOP10→TOP2→frozen-falsification→G2→adjudication→
+comparison→WINNER|NO_WINNER flow end to end over the real 12-with-trials
+A2 candidate space — the missing piece was wiring, not logic.
+
+### 2. Target public entry point
+
+`core/orchestrator/govLowerHarmDiscovery.ts::runGovLowerHarmDiscovery(opts)`
+— the one canonical entry point. NL text in; a structured, frozen,
+auditable result out with an explicit terminal state: `{kind:'RUN', ...DiscoveryRun}`
+(verdict `WINNER`|`NO_WINNER`|`CONFLICTING_EVIDENCE`|`INSUFFICIENT_EVIDENCE`|`ABORTED`)
+or `{kind:'EXECUTION_BLOCKED', error, code, fingerprint}` — the mandate's
+missing third terminal case for a port-level fail-closed refusal (e.g. TOP2
+has fewer than 2 real candidates), converted from an adapter's thrown
+`LowerHarmFailClosedError` rather than left as an uncaught exception.
+`runScientificDiscovery` itself (D-055) is completely unmodified — every
+existing D-055/D-057 test keeps passing unchanged.
+
+### 3-4. Full pipeline + candidate generation
+
+`core/orchestrator/govLowerHarmAdapters.ts::createLowerHarmAdapters(opts)`
+implements every `OrchestratorAdapters` port. `generate()` returns
+`loadCandidateSummaries()`'s real, mechanism-derived space — exported from
+`a2OzempicSubstitute.ts` for this reuse (was module-private; zero behaviour
+change at every existing call site). Verified: **20 real candidates, 5
+distinct real mechanism classes** (GLP-1R-only ×13, GCGR+GLP-1R ×3,
+GIPR+GLP-1R ×1, GCGR+GIPR ×1, GCGR-only ×2 — computed structurally from
+each candidate's own real ChEMBL `medianPotencyNMByTarget`, never renamed
+to fake diversity) — meets the mandate's floor exactly, without padding.
+`hardFilter()` calls `rankForLowerHarm` (real ranking + safety veto +
+efficacy floor) and additionally, honestly, reports the 8-of-20 candidates
+with no trial data at all as `INSUFFICIENT_EVIDENCE`-eliminated before
+ranking even runs. No cost/funding/public-value/ROI field exists anywhere
+in `Candidate`, `A2CandidateReport`, or any ranking function — the firewall
+(mandate item 15) is structural, not a filter bolted on top; proven by
+test (below).
+
+`generate()` always returns the SAME fixed candidate space regardless of
+the `StructuredExperimentRequest` — disclosed limitation, not silently
+implied: this adapter is scenario-bound to the LOWER-HARM investigation,
+mirroring `runA2Analysis()`'s own existing no-argument signature. It is not
+a general NL-to-candidate-generation engine; building one would itself be
+"a new generation engine," which this entry does not do.
+
+### 5-10. Ranking, freeze, execution, evidence, falsification, adjudication
+
+All reused verbatim. `seal()`/`verifySealUnchanged()` wrap the real
+`freezeFalsificationCriteria` — genuinely HARK-sensitive: a test (below)
+freezes real state, then re-derives TOP2 from a changed candidate set (a
+3rd, stronger synthetic candidate added) and proves `verifySealUnchanged`
+correctly flips to `false` against the ORIGINAL seal — no fake hook, the
+real fingerprint mechanism catches it. `execute()` runs the real G2
+falsification (`runG2Falsification`) once and derives each TOP2 candidate's
+`ExecutedExperiment.evidenceClass` from its OWN real `A2ComparisonType`
+(`DIRECT_HEAD_TO_HEAD`→`DIRECT_RANDOMISED`, `NAIVE_INDIRECT`→`INDIRECT_RANDOMISED`,
+else `UNVERIFIED` — audit-layer only, decision-inert, same posture
+`a2AdjudicationReferenceImplementation.ts` already established for
+`evidenceProvenance.ts`) and `observationCount` from its real efficacy-
+evidence count. `adjudicate()` runs the real `runAdjudication`/
+`decideFunnelVerdict` (the real safety/governance gate,
+`evaluatePracticalCandidate`, per TOP2 candidate) and maps a WINNER verdict
+into a real `WinnerRecordRef` — which then, unmodified, passes through
+`orchestrator.ts`'s own D-057 Winner Promotion Gate exactly as it would
+for any other adapter, before `buildRecipe` is ever called.
+
+Real backend fail-closed (PYTHIA/Geant4/external-matter, mandate item 7) is
+proven separately by the EXISTING, unmodified `physicsBackendRegistry.test.ts`
+(D-057) and `physicsWorld.test.ts` (D-052) — re-run this gate, not
+duplicated here (this domain has no external physics backend). The
+LOWER-HARM domain's own analogue is tested directly: an empty
+`candidateReports()` provider (the data source "unavailable") produces zero
+qualifying candidates and `top2()` fails closed.
+
+### 11. Research Recipe — a third instance of the existing per-domain pattern
+
+`core/biotechData/govLowerHarmRecipe.ts::buildLowerHarmRecipe` — the SAME
+shape (`mechanism`/`formulationConcept`/`conceptualSynthesisRoute`/
+`requiredProperties`/`materialClasses`/`provenance`/`sources`/`identifiers`/
+`evidence`/`replay`/`dualUseGuard`) `physicsRecipe.ts` (D-052) and
+`govDrugDiscoveryE2E.ts::generateResearchRecipe` (E2E-01) already
+established as the convention — not reused directly, because
+`generateResearchRecipe`'s own `A3CandidateView` parameter cannot accept
+the LOWER-HARM shape without fabricating fields it does not carry, and not
+a shared cross-domain engine either, matching both existing builders' own
+stated rationale for staying domain-scoped. `orchestrator.ts`'s own
+`RecipeOutcome` contract is just `{recipeFingerprint}`; `buildRecipe()`
+returns `null` (LOCKED) whenever the winner's own `conjunctionOk` is false
+or its report cannot be found — no recipe without every real precondition.
+
+### 12-13. NO_WINNER and WINNER, both through the same real path
+
+**Negative E2E (real data)**: `runGovLowerHarmDiscovery({mode:'PRODUCTION'})`
+— real ChEMBL/ClinicalTrials.gov pinned data, run through the real
+pipeline — reaches `NO_WINNER` honestly (same structural finding D-050
+already documented: G2 favours the candidate that is NOT pre-rank #1, and
+the funnel's own safety gate independently refuses on `EVIDENCE_SUFFICIENT`
+for both TOP2 candidates). `recipeFingerprint` is `undefined`, stage
+`18_RECIPE_OR_LOCK` is `LOCKED`. This is Genesis's real, current answer —
+not dressed up, not hidden.
+
+**Positive E2E (SYNTHETIC_TEST_ONLY evidence, real decision functions)**:
+`core/orchestrator/syntheticWinnerFixture.ts` builds two candidates'
+worth of hand-authored, structurally-valid `A2EfficacyEvidence[]` and runs
+it through the REAL, unmodified `falsifyCandidate`/`runCandidateBeliefRevision`/
+`scoreCandidate` to get real `A2CandidateReport`s — nothing about the
+verdict, `WinnerRecordRef`, or `Recipe` is asserted; every one is computed
+by the real pipeline from these numbers. `runGovLowerHarmDiscovery({mode:
+'SYNTHETIC_TEST_ONLY'})` genuinely reaches `WINNER` → a real
+`WinnerRecordRef` (`conjunctionOk: true`, all 3 real conjuncts —
+`G2_SEPARATES_TOP2`, `AGREES_WITH_PRE_EXPERIMENT_RANK`,
+`FAVOURED_CANDIDATE_PASSES_SAFETY_GATE` — genuinely held, verified by
+reading the real `decideFunnelVerdict` output, not asserted) → a real
+Recipe with a real fingerprint. No shortcut: no test ever constructs a
+`WinnerRecordRef` or `Recipe` by hand — `govLowerHarmDiscovery.test.ts`'s
+own "the winner genuinely comes from decideFunnelVerdict" test walks every
+port individually to prove this.
+
+### 14-15. Replay and the economic firewall
+
+`replayGovLowerHarmDiscovery` re-invokes the SAME public entry point twice
+(fresh adapters each time, as any real caller would) and requires an
+identical `auditFingerprint`+`verdict` (RUN) or `fingerprint` (EXECUTION_BLOCKED)
+— proven for both PRODUCTION and SYNTHETIC_TEST_ONLY, and proven to
+correctly report `ok:false` for two genuinely different runs (never
+assumes success). The economic/ROI/public-value firewall (mandate item 15,
+absolute rule) is proven structurally: injecting `costEUR`/`roiScore`/
+`publicValueScore`/`fundingReadiness`/`commercializationScore` fields onto
+a real `A2CandidateReport` and re-running `computeLowerHarmScore`/
+`rankForLowerHarm` produces a byte-identical score and ranked order —
+these fields are never read by any ranking function, so injecting them is
+structurally inert, not merely untested.
+
+### 18. Minimal UI (not the majority of this pass)
+
+`GenesisConsole.tsx` (`#/research-console`, D-055) extended, not replaced:
+a 3-way source selector — `SANDBOX` (unchanged `toyAdapters`), `REAL —
+LOWER-HARM (production data)`, `REAL — LOWER-HARM (synthetic winner demo)`
+— all rendering through the SAME existing generic stage-list projection
+(which already shows every stage name, including `08_TOP10`/`09_TOP2`/
+`10_FREEZE_PREREG`/`15_ADJUDICATE_D047`/`18_RECIPE_OR_LOCK`, so no new
+per-stage UI was needed). A real adapter's `EXECUTION_BLOCKED` result
+renders explicitly (a locked panel with the real code/error/fingerprint),
+never silently dropped. The screen fabricates nothing: every value shown
+is read directly off the real `DiscoveryRun`/`ExecutionBlockedResult`.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881` unchanged, 18/18. `npm run
+e2e:gov-campaign`: `5179c99f` unchanged, 16/16. `npm run a2:demo`:
+`CONFLICTING_EVIDENCE`, 14/14, fingerprints `a5e0f164`/`4642088a`
+unchanged. `npm run lower-harm-funnel:demo`: 5/5 invariants unchanged.
+`npm run physics-world:demo`: all 5 demos unchanged (M-COUL-001 still
+`thetaNumeric=0.9253`/`validationDelta=0.00196`, D-053's repair intact).
+
+### A genuine, positive reachability side effect
+
+`core/biotechData/govDrugLowerHarmFunnel.ts` and
+`govDrugLowerHarmRanking.ts` (D-050) were reached only by their own tests
+and demonstrator scripts since D-050 — their own `ALLOWED_ORPHANS` entries
+said so. Both are now reached from `main.tsx` for the first time via
+`govLowerHarmAdapters.ts` → `govLowerHarmDiscovery.ts` → `GenesisConsole.tsx`.
+Both stale entries were removed, not left inaccurate.
+
+### What this entry does NOT do
+
+Does not build a second ranking, adjudication, falsification, evidence, or
+recipe engine — every decision function reused is pre-existing and
+unmodified. Does not touch `orchestrator.ts`'s own `runScientificDiscovery`,
+D-047, D-048, or Genesis Core. Does not generalize candidate generation to
+an arbitrary NL problem — `generate()` is scenario-bound, disclosed.
+`create*LowerHarmAdapters` is domain-scoped to LOWER-HARM only; wiring a
+SECOND real domain (e.g. the physics-world DEMO5 path, or the full A3/E2E-01
+government funnel) through this same orchestrator is real, explicit future
+work, not attempted here — doing each one well means re-verifying "no
+second engine" against that domain's own real functions individually, the
+same discipline this entry followed for LOWER-HARM. Does not add a live,
+generative candidate search; the 20-candidate space is a fixed, real, pinned
+dataset. Does not change what "PRODUCTION READY" means for PYTHIA/Geant4 —
+still NOT_INSTALLED, unchanged from D-052/D-057.
+
+Gate: **6266 frontend tests (1 skipped), 0 failures** (20 new tests in
+`govLowerHarmDiscovery.test.ts`, full suite clean on this run — no load
+flake this time). **402 backend tests, 0 failures.** tsc clean. eslint
+clean on every file this entry touched (4 pre-existing, unrelated lint
+errors remain in 3 untouched `scripts/*.mjs` files — confirmed via `git
+diff` showing zero changes there). Frontend production build clean.
+`moduleReachability.test.ts`: zero new undocumented orphans; two stale
+entries removed (`govDrugLowerHarmFunnel.ts`/`govDrugLowerHarmRanking.ts`,
+now genuinely reached from `main.tsx` for the first time).

@@ -22,7 +22,15 @@ export interface RunResearchOptions {
   readonly maxRounds: number;
   /** Provenance only (D-040 clock rule). */
   readonly now: () => string;
-  readonly makeRoundOptions: (round: number, log: ResearchStateLog) => RunMindDiscoveryOptions;
+  /**
+   * Builds round N's options. `previous` is round N-1's real result, so a
+   * round can genuinely act on what the last one learned — excluding forms it
+   * falsified, re-weighting which observation is still worth making. A loop
+   * that ignores `previous` is re-running the same experiment and is not
+   * multi-round research; `runResearch` cannot enforce that for the caller,
+   * but it guarantees the state is there to use.
+   */
+  readonly makeRoundOptions: (round: number, log: ResearchStateLog, previous: MindDiscoveryResult | null) => RunMindDiscoveryOptions;
   /** The caller's own next-experiment decision, normally delegating to `agent/nextAction.ts`. */
   readonly shouldContinue: (result: MindDiscoveryResult, round: number) => { readonly continue: boolean; readonly reason: string };
 }
@@ -43,9 +51,11 @@ export async function runResearch(options: RunResearchOptions): Promise<RunResea
   let terminal: MindTerminal = 'SCIENTIFIC_STOP';
   let stopReason = `round budget of ${options.maxRounds} exhausted without a terminal verdict`;
 
+  let previous: MindDiscoveryResult | null = null;
   for (let round = 0; round < options.maxRounds; round += 1) {
-    const result = await runMindDiscovery(options.makeRoundOptions(round, log));
+    const result = await runMindDiscovery(options.makeRoundOptions(round, log, previous));
     rounds.push(result);
+    previous = result;
     await log.append('EXPERIMENT_HANDOFF', options.now(), {
       round,
       kind: result.kind,

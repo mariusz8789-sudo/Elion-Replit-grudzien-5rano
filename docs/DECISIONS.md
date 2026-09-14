@@ -4405,3 +4405,109 @@ Gate: **6339 frontend tests (1 skipped), 0 failures** (40 new in
 `genesisMind.test.ts`; baseline was 6299). **402 backend tests, 0 failures**
 (untouched). tsc clean. eslint clean. Production build clean.
 `moduleReachability.test.ts` green with two stale entries removed.
+
+## D-061 (2026-09-14) — Genesis Mind run against real NASA data: what it
+## actually did, and the precise reason it is not yet a Discovery Engine
+
+D-060 built the bridge. This entry RUNS it on real, pinned, external data and
+reports what came back — including three defects the run exposed in D-060's own
+code, and one architectural limitation that no amount of code fixes.
+
+### The discovery target, and why this one
+
+`scripts/genesis-mind-e2e.mjs` runs the Mind over
+`biotechData/campaignLabs.ts::makeKeplerCampaignLab()` — the NASA NSSDC
+planetary fact sheet, SHA-256 `42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c`,
+nine published Sun-orbiting bodies, distance against orbital period in log-log
+space. Chosen because it has real data, real provenance, a measurable outcome,
+multiple plausible functional forms, and a ground truth that is NOT in the model
+grammar: in log-log space Kepler's third law is `CONSTANT + LINEAR` whose LINEAR
+coefficient IS the exponent, so the engine must FIT 1.5 rather than select it
+from an enumerated grid. It was not chosen because a WINNER was easy — it is not.
+
+### What the run demonstrates (18/18 properties, by execution)
+
+Real pinned data in; a model space GENERATED from constraints (55 forms, not
+supplied); **Kepler's third law recovered as a fitted coefficient: 1.506447
+against a true 1.5, 0.43% error**; three rounds in which each round's candidate
+pool was determined by the previous round's outcome; an append-only,
+chain-verified research state; and a fail-closed refusal to promote a winner the
+evidence does not support.
+
+### Three defects the run found in D-060's own code
+
+1. **`mindAdapters.rank` sorted backwards.** `modelSelectionScore` is
+   `rss + k·ln(n)` and `holdoutScore` is a mean weighted squared residual —
+   BOTH lower-is-better. D-060 sorted descending, i.e. it ranked the WORST model
+   first, and seeded unfitted models with `-Infinity` so they sorted best. Fixed:
+   ascending, with `+Infinity` for a failed fit so it ranks last.
+2. **Rounds were not actually stateful.** D-060's `runResearch` looped without
+   handing a round anything from the previous one. Fixed by passing the previous
+   result into `makeRoundOptions` AND adding
+   `MindGeneratorInput.excludeFingerprints`, so a round can genuinely retire what
+   the last round failed to separate. The demonstrator now examines a different
+   competing pair each round (`r0=[94a6ab,1e5561] r1=[c1fd2c,0ff77a]
+   r2=[753c92,ddac50]`), over a shrinking pool.
+3. **L2 novelty was claimed on a synthetic lineage array, not a real run.** On
+   this real space `mutateModelSpec` produced ZERO forms absent from the
+   enumerated space — at `maxTerms=2` the space is closed under that operator.
+   The run reports **L1**, and the check now asserts the level actually reached
+   rather than the level hoped for.
+
+### Two honest negatives the run reports rather than hides
+
+- **Model SELECTION does not identify the correct law.** The Kepler form ranks
+  **3 of 55**. NASA's published precision gives sigma in [5.5e-6, 5.7e-3], so
+  chi-square is ~1e6 for EVERY form in the grammar: no 2-term model is
+  statistically adequate at that precision, and the ranking gaps between the top
+  forms are not meaningful discriminations. The law is recovered by FITTING, not
+  by RANKING. Both facts are printed.
+- **Self-falsification coverage remains 2 of 13 probes** (D-060's disclosed gap).
+
+### THE ARCHITECTURAL FINDING — why this domain can never promote
+
+The D-057 Winner Promotion Gate requires at least one observation at or above
+`INDIRECT_RANDOMISED` (rank 9). NASA planetary observations are honestly
+`OBSERVATIONAL` (rank 6). The evidence-strength axis in
+`agent/evidenceProvenance.ts` is CLINICAL-EVIDENCE-SHAPED — `DIRECT_RANDOMISED`,
+`POOLED_META`, `REGULATORY_LABEL`, `POST_MARKETING` — and a randomised
+controlled trial is not a concept that applies to planetary orbits. **So a
+non-clinical domain structurally cannot reach `WinnerRecord`, no matter how good
+its evidence is.** The fix is NOT to relabel NASA data as `DIRECT_RANDOMISED` —
+that would be fabrication of exactly the kind this repo exists to refuse. It is
+either a per-domain promotion threshold or a second, non-clinical strength axis.
+Neither is attempted here; it is named as the blocker.
+
+### Section-36 verdict, stated plainly
+
+**Genesis is TODAY a Candidate/Model Generation Engine with a verified,
+fail-closed execution and adjudication backbone. It is NOT YET a Scientific
+Discovery Engine.** No path in this run reaches `WinnerRecord` → `ResearchRecipe`
+on real evidence, for two compounding reasons: `mindPorts`'s adjudicator returns
+`INSUFFICIENT_EVIDENCE` by construction (a deliberate refusal to mint winners out
+of curve fitting), and the promotion gate's strength axis excludes this domain's
+evidence class entirely. The repo's ONE demonstrated `WINNER → WinnerRecord →
+Recipe` path remains D-058's LOWER-HARM `SYNTHETIC_TEST_ONLY` fixture.
+
+### Recipe-shape gap against the mandate's section 32
+
+The orchestrator contract's `RecipeOutcome` is only `{recipeFingerprint}`; the
+rich record lives in each domain's builder. The most complete existing one,
+`govDrugDiscoveryE2E.ts::E2E01ResearchRecipe`, carries mechanism,
+formulationConcept, conceptualSynthesisRoute, requiredProperties,
+materialClasses, provenance, sources, identifiers, evidence, replay and
+dualUseGuard — about 11 of the ~18 fields section 32 asks for. Absent:
+`discoveryId`, `problemFingerprint`, `winnerRecordRef`, `model`/`modelFingerprint`,
+`parameters`/`parameterConstraints`, `initialConditions`, `frozenPredictionRefs`,
+`experimentRefs`, `falsificationResults`, `researchStateHead`,
+`applicabilityConditions`, `reproducibilityInstructions`. Documented, not built —
+extending a domain recipe is only worth doing once a domain can legitimately
+reach promotion.
+
+### Gate
+
+`node scripts/genesis-mind-e2e.mjs`: **18/18 properties held, OUTCOME NO_WINNER
+after 3 rounds.** Frontend **6339 tests (1 skipped), 0 failures**, 546 files.
+tsc clean. eslint clean. Anchors unchanged: `399221f5`/`f528c881` 18/18,
+`5179c99f` 16/16, `a5e0f164`/`4642088a` 14/14, lower-harm 5/5, M-COUL-001
+`validationDelta=0.0019597568167155632`.

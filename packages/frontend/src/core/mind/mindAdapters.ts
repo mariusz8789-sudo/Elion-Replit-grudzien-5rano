@@ -86,6 +86,14 @@ export interface MindGeneratorInput {
   /** L0 control: forms handed in from a list, so the novelty harness can tell retrieval from generation. */
   readonly fixedRetrievalList: readonly ModelSpec[];
   readonly symbolicCandidates: readonly ModelSpec[];
+  /**
+   * Fingerprints this round must NOT reconsider — normally the forms a
+   * previous round's real falsification pass eliminated. This is what makes
+   * round N+1 genuinely different from round N rather than a re-run of the
+   * same experiment; `runResearch` hands the caller the previous result so it
+   * can populate this honestly.
+   */
+  readonly excludeFingerprints?: readonly string[];
   readonly gains: readonly DiscriminationGainRecord[];
   readonly novelty: NoveltyLevelReport;
   readonly knowledgeSnapshotFingerprint: string;
@@ -139,7 +147,10 @@ export function createMindAdapters(options: CreateMindAdaptersOptions): MindAdap
   const mutatedFingerprints = new Set(mutated.map(modelSpecFingerprint));
   const symbolicFingerprints = new Set(gen.symbolicCandidates.map(modelSpecFingerprint));
 
-  const pool: readonly ModelSpec[] = [...gen.fixedRetrievalList, ...initialSpace, ...mutated, ...gen.symbolicCandidates];
+  const excluded = new Set(gen.excludeFingerprints ?? []);
+  const pool: readonly ModelSpec[] = [...gen.fixedRetrievalList, ...initialSpace, ...mutated, ...gen.symbolicCandidates].filter(
+    (spec) => !excluded.has(modelSpecFingerprint(spec)),
+  );
   const specByFingerprint = new Map(pool.map((spec) => [modelSpecFingerprint(spec), spec]));
 
   // Lineage is decided by real fingerprint-set membership, in strictly increasing
@@ -171,11 +182,14 @@ export function createMindAdapters(options: CreateMindAdaptersOptions): MindAdap
     const cached = scoreCache.get(fingerprint);
     if (cached !== undefined) return cached;
     const points = observedPoints();
-    let score = Number.NEGATIVE_INFINITY;
+    // LOWER IS BETTER for both terms: `modelSelectionScore` is `rss + k·ln(n)`
+    // (a BIC-style penalty, +Infinity on failure) and `holdoutScore` is a mean
+    // weighted squared residual on held-out points. A model that cannot be
+    // fitted scores +Infinity and therefore ranks last, never first.
+    let score = Number.POSITIVE_INFINITY;
     if (points.length > 0) {
       const fit = fitModelSpec(spec, points);
       if (fit.ok) {
-        // Both terms are real model-fit quality measures from modelSpace.ts. No economic input exists on this path.
         score = modelSelectionScore(fit.rss, estimatedCoefficientCount(spec), points.length) + (holdoutScore(spec, points) ?? 0);
       }
     }
@@ -184,7 +198,7 @@ export function createMindAdapters(options: CreateMindAdaptersOptions): MindAdap
   };
   const scoreOfCandidate = (candidate: Candidate): number => {
     const spec = specByFingerprint.get(candidate.candidateId);
-    return spec === undefined ? Number.NEGATIVE_INFINITY : scoreSpec(spec);
+    return spec === undefined ? Number.POSITIVE_INFINITY : scoreSpec(spec);
   };
 
   /** Mechanism identity is the REAL rendered form — never a renamed variant, so diversity cannot be faked. */
@@ -221,7 +235,8 @@ export function createMindAdapters(options: CreateMindAdaptersOptions): MindAdap
     // govE2E01Adapters.ts already use. The real count is in diagnostics.
     diversity: (candidates) => candidates,
 
-    rank: (candidates) => [...candidates].sort((a, b) => scoreOfCandidate(b) - scoreOfCandidate(a)),
+    // Ascending: the lowest penalised residual ranks first.
+    rank: (candidates) => [...candidates].sort((a, b) => scoreOfCandidate(a) - scoreOfCandidate(b)),
 
     top10: (candidates) => candidates.slice(0, 10),
     top2: (candidates) => candidates.slice(0, 2),

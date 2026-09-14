@@ -2478,3 +2478,107 @@ gdzie Genesis użył pomiaru, nie zmienia pomiaru. Test pinuje jedno i drugie �
 kontekst dociera nienaruszony, odcisk się nie rusza.
 
 Gate: **5995 testów, 0 awarii**.
+
+## D-046 (2026-09-14) — RE-ADJUDICATION: SURPASS-2 direct evidence, safety
+## only. Diarrhea veto superseded; candidate stays vetoed on a different,
+## independently-direct category. Overall verdict unchanged.
+
+**Mandate step 8/9, closed as its own commit, exactly as required.** Scope
+frozen before execution and never widened: safety only, for tirzepatide's
+diarrhea category. Efficacy, the dose-selection rule, the 1.0 threshold,
+`scoreCandidate`, `decideA2Verdict` — all called unmodified.
+
+### The frozen record (declared before evaluation)
+
+```json
+{
+  "reAdjudicationId": "GOV-DRUG-A2-REJUDGE-TIRZEPATIDE-DIARRHEA-SURPASS2-01",
+  "candidateId": "CHEMBL4297839",
+  "category": "diarrhea",
+  "doseSelectionRule": "HIGHEST_DOSE (pickCandidateAeGroupTitle, unmodified, pre-existing since before D-042)",
+  "evidencePolicy": "EVIDENCE_CLASS_GATED",
+  "safetyRiskRatioMeaningfulDeviation": 1.0,
+  "sourceStudyId": "NCT03987919",
+  "sourceStudySha256": "385c58a1b7a19bedac0bb303846a8cffb23242d912edd7fc91fa93d5b278a8b0",
+  "ruleFingerprint": "de5bffe9"
+}
+inputFingerprint: fa35e2c2
+```
+
+**Why the dose rule was not chosen now.** `pickCandidateAeGroupTitle`
+("highest parsed mg wins") predates D-042 by multiple commits and is called
+**unmodified, unparameterised** — this file cannot select a different arm even
+if it wanted to. Both possible outcomes of applying that pre-existing rule to
+SURPASS-2 were written into the conversation record **before** this module was
+executed: veto lifts if the rule picks 15 mg, veto holds if it picks 10 mg. The
+rule was not written to land on a preferred outcome.
+
+### OLD (historical — `runA2Analysis()`, unmodified)
+
+| | |
+|---|---|
+| dose | n=16 cohort, NCT03322631, cohort-2 pooled group |
+| RR / CI | 2.7141 / [1.2581, 5.8553] |
+| n/N | 5/16 |
+| evidencePolicy | `HISTORICAL_NO_EVIDENCE_CLASS` |
+| candidate vetoed | **true** — diarrhea |
+| overall A2 verdict | `CONFLICTING_EVIDENCE` |
+
+### NEW (`EVIDENCE_CLASS_GATED`, SURPASS-2 direct evidence merged into safety only)
+
+| | |
+|---|---|
+| dose (diarrhea) | 15 mg arm, SURPASS-2, `DIRECT_HEAD_TO_HEAD` |
+| RR / CI (diarrhea) | 1.2011 / [0.8571, 1.6833] — **includes 1** |
+| n/N | 65/470 |
+| diarrhea veto | **superseded** — recorded in `supersededByStrongerEvidence`, not deleted |
+| evidencePolicy | `EVIDENCE_CLASS_GATED` |
+| candidate vetoed | **still true** — different category |
+| driving category | `serious_adverse_events` (structural), 27/470 vs 13/469, RR 2.0725, CI [1.0828, 3.9667], also `DIRECT_HEAD_TO_HEAD` |
+| overall A2 verdict | `CONFLICTING_EVIDENCE` — **unchanged** |
+
+### The honest, unselected finding
+
+Lifting the diarrhea veto does **not** clear the candidate. SURPASS-2 supplies
+a direct within-trial comparison of the **same** 15 mg arm for **structural
+serious adverse events** (27/470 vs 13/469), and that independently clears the
+threshold — CI [1.08, 3.97] excludes 1. Both rows come from calling the single,
+unmodified `extractCandidateSafety` once on SURPASS-2; nothing was engineered
+to produce this. It is reported in full, not summarized away, because the
+diarrhea result alone would have been a misleading headline.
+
+### Invariants, verified by running (script `gov-drug-a2-surpass2-readjudication.mjs`, 6/6)
+
+threshold read from the sealed preregistration equals 1.0 · dose-selection
+rule is the pre-existing unparameterised HIGHEST_DOSE rule · efficacy array
+byte-identical old vs new · every historical safety row survives unremoved
+into the merged array · new policy is `EVIDENCE_CLASS_GATED` · old policy is
+untouched `HISTORICAL_NO_EVIDENCE_CLASS`.
+
+### Self-correction on module wiring, stated plainly
+
+The safety-veto gate actually running in production
+(`a2OzempicSubstitute.ts::falsifyCandidate`, `EVIDENCE_CLASS_GATED`) does
+**not** call `evidenceProvenance.ts`. It reuses the pre-existing
+`A2ComparisonType`/`comparisonType` vocabulary `extractCandidateSafety` already
+computed — the right call, since it avoids a second decision engine, but it
+means `evidenceProvenance.ts` remained genuinely unwired dead code through
+D-043–D-045. This step's script and `a2Surpass2ReAdjudication.ts` now reach
+`surpass2DirectEvidence.ts` (for `SURPASS2_STUDY` identity/hash) and
+transitively `evidenceProvenance.ts`, but **no production decision path calls
+`evidenceProvenance.ts`'s own functions yet** — `moduleReachability.test.ts`
+is updated to say exactly that, not to overstate integration.
+
+### Historical run verified untouched by RUNNING it, not reading code
+
+`npm run a2:demo` on this commit: `f528c881`-derived output, `CONFLICTING_EVIDENCE`
+label, `risk ratio 2.71` line — all present, byte-for-byte as before this step.
+
+### What this commit does NOT do
+
+Does not touch the 1.0 threshold. Does not touch dose selection. Does not
+touch `scoreCandidate`. Does not touch efficacy. Does not modify
+`a2OzempicSubstitute.ts`. Does not start LOWER-HARM (mandate step 10) or any
+further refactor — stopping here as instructed.
+
+Gate: **6007 frontend tests, 0 failures.** tsc clean, eslint clean.

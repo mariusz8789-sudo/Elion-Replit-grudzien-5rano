@@ -1,4 +1,5 @@
 import type { DiscoveryRun, OrchestratorAdapters, ProblemRecord, StageId, StageRecord, StructuredExperimentRequest } from './contracts';
+import { asEvidenceClass, canPromoteToWinnerRecord } from './winnerGate';
 
 /**
  * The 20-stage sequence, in order. Exported for documentation/test use;
@@ -101,10 +102,27 @@ export function runScientificDiscovery(problem: ProblemRecord, A: OrchestratorAd
   let winner = undefined;
   let recipeFingerprint: string | undefined;
   if (adj.verdict === 'WINNER' && adj.winner) {
-    const r = A.buildRecipe(adj.winner);
-    winner = adj.winner;
-    recipeFingerprint = r?.recipeFingerprint;
-    push('18_RECIPE_OR_LOCK', r ? 'OK' : 'LOCKED', r ?? 'RecipeBuilder gates LOCKED despite WINNER ref');
+    // WINNER PROMOTION GATE (D-057): a WINNER verdict from adjudication is
+    // necessary but not sufficient. Reuses the REAL evidence-minimum
+    // constant (core/agent/practicalCandidateGate.ts::MINIMUM_OBSERVATIONS)
+    // through winnerGate.ts's own contract — no duplicated, hardcoded
+    // scientific policy here. A WinnerRecordRef only reaches `buildRecipe`
+    // when this promotion actually clears; otherwise the run's own
+    // `winner`/`recipeFingerprint` stay unset even though the adjudicator
+    // itself returned WINNER, and the recipe stays locked.
+    const inventory = ex.map((e) => {
+      const declared = e.summary.observationCount;
+      return { evidenceClass: asEvidenceClass(e.evidenceClass), observationCount: Number.isFinite(declared) && declared > 0 ? declared : 1 };
+    });
+    const promotion = canPromoteToWinnerRecord({ adjudicationVerdict: adj.verdict, inventory });
+    if (promotion.outcome === 'PROMOTE') {
+      const r = A.buildRecipe(adj.winner);
+      winner = adj.winner;
+      recipeFingerprint = r?.recipeFingerprint;
+      push('18_RECIPE_OR_LOCK', r ? 'OK' : 'LOCKED', r ?? 'RecipeBuilder gates LOCKED despite WINNER ref');
+    } else {
+      push('18_RECIPE_OR_LOCK', 'LOCKED', promotion, `NO_PROMOTION: ${promotion.reasons.join('; ')}`);
+    }
   } else {
     push('18_RECIPE_OR_LOCK', 'LOCKED', `NO_RECIPE_WITHOUT_WINNER: verdict=${adj.verdict}`);
   }

@@ -3619,3 +3619,229 @@ regression.
 
 Gate: **6198 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
 failures.** tsc clean, eslint clean, frontend build clean.
+
+## D-057 (2026-09-14) — "DOBUDOWANIE RESZTY MASZYNY": Evidence Connectors,
+## Commercial Layer, Physics Backend version registry, Winner Promotion Gate
+
+Integrates the owner-supplied "DOBUDOWANIE RESZTY MASZYNY" bundle: plumbing
+and integration across four areas that close out items #4 (Evidence
+Connectors), #5 (Physics Backend framework), #6 (Winner Promotion Gate) and
+#7 (Commercial Skeleton) from the earlier gap audit — WITHOUT claiming real
+PYTHIA/Geant4, a real Stripe integration, or paid clients now exist. None of
+those four do; see "What this entry does NOT do" below, which the owner's
+own instruction required stated explicitly rather than implied by omission.
+
+As with every bundle this session, the source code was a specification, not
+permission to copy paths/types verbatim: every module below was re-homed
+under `packages/frontend/src/core/` (this repo's only actual layout — see
+D-052 through D-056's own note on this) and re-typed against this repo's
+real contracts, not the bundle's own.
+
+### A) Evidence Connectors — `core/evidenceConnectors/`
+
+`contracts.ts` + `store.ts` (`EvidenceConnectorStore`) + `registry.ts` +
+`hashing.ts` + `httpConnectorPort.ts` + `testFixtures.ts`. An append-only
+ingest history per external `SourceConfig`: `ingest()` freezes a real
+`FrozenArtifact` (hash + length + retrieval URL), never fabricates a
+`FROZEN` record on a fetch failure (a real `FETCH_FAILED` record instead),
+and a hash that differs from the last frozen artifact supersedes it
+WITHOUT deleting the old record (`HASH_MISMATCH_SUPERSEDED`, `append-only`
+— `allRecords()` proves the prior entry is untouched).
+
+**The owner's one explicit, binding correction, applied**: `hashPolicy` is
+declared per `SourceConfig` (`'sha256' | 'fnv1a-canonical'`) and carried
+onto every `FrozenArtifact`. `replay()` reads the ARTIFACT'S OWN recorded
+`hashPolicy` and re-hashes with that — it does not hardcode `'sha256'` the
+way the source bundle's own `replay()` did. `evidenceConnectors.test.ts`
+tests this directly: an `fnv1a-canonical` artifact's replay is proven to
+differ from what an sha256 digest of the same bytes would be, so a
+regression back to a hardcoded algorithm would fail loudly.
+
+Hash primitives: NOT a third hash system. This repo already has two —
+`core/events/hash.ts::fnv1a` (every other module built this session) and
+`core/discovery/evidenceCrypto.ts::sha256Hex` (the browser's real Web
+Crypto SHA-256, used where a digest must be handed to someone outside the
+app). `hashing.ts::hashBytes` is the one honest bridge from a byte array to
+each, reused as-is.
+
+`REGISTRY` names 7 real public sources (CMS Open Data, ClinicalTrials.gov,
+DailyMed, OpenAlex, NOAA, FAERS, ChEMBL) — configuration only, no
+`ConnectorPort` attached, so importing the registry performs no network
+call and produces no fake successful ingest. `httpConnectorPort.ts` is a
+real `fetch()` implementation (same honesty as `scripts/fetch-real-data.mjs`:
+this sandbox's own network policy blocks most of these hosts, so a
+`FETCH_FAILED` result in this environment is the expected, disclosed
+outcome, not a bug). `testFixtures.ts`'s `fixedBytesPort`/`alwaysFailingPort`
+are explicitly named TEST-ONLY, mirroring `orchestrator/toyAdapters.ts`'s
+`SYNTHETIC_TEST_ONLY` naming convention — no test claims a fake fixture's
+result as a "REAL_RUN".
+
+Storage reuses the existing `core/provenance/recordStore.ts::KeyedRecordStore`
+(the same primitive `core/discovery/evidenceStore.ts` and hazard
+provenance already share) — not a new storage mechanism. The class is
+named `EvidenceConnectorStore`, deliberately NOT `EvidenceStore`: that name
+is already owned by `core/discovery/evidenceStore.ts` for a different job
+(persisting `DiscoveryCase` results), and reusing it would have been
+confusing in a way this repo's own naming discipline exists to avoid.
+
+### B) Commercial Layer — `core/commercial/`
+
+`contracts.ts` + `ledger.ts` (`CommercialLedger`) + `compliance.ts` +
+`sharedLedger.ts` + `testFixtures.ts`. A real legal state machine
+(`QUOTED -> ACCEPTED -> IN_PROGRESS -> DELIVERED -> AWAITING_PAYMENT ->
+PAID|DISPUTED`, `DISPUTED -> AWAITING_PAYMENT`) enforced against a fixed
+transition table — any other transition throws `FailClosedError('ILLEGAL_TRANSITION')`
+and records nothing (no partial transition). `PAID` requires a real
+`PaymentAdapter` AND a `confirmed: true` response from it: no adapter
+throws `NO_PAYMENT_ADAPTER`; an adapter that returns `confirmed: false`
+throws `PAYMENT_NOT_CONFIRMED` — there is no code path to `PAID` without a
+positively-confirming adapter, and none ships in this pass (no Stripe, no
+anything). `issueLicense()` computes a fingerprint only from a `PAID`
+engagement. Every state change appends a `LedgerEntry` (append-only,
+verified by test: entry count only grows, prior entries `toEqual` after a
+new transition). Tenant isolation is enforced on every read and write that
+names an `engagementId` — a mismatched `tenantId` throws
+`TENANT_MISMATCH`, proven for both `transition`/`ledgerFor` and the list
+projection `engagementsForTenant`. `compliance.ts::complianceNotes(vertical)`
+is static informational text, explicitly disclaimed as not legal advice,
+not wired into any transition check.
+
+### C) Physics Backend version registry — `core/physicsWorld/backendRegistry.ts`
+
+Extends `backends.ts` (D-052), does not replace it. `detectBackends()`
+stays the SINGLE source of truth for "is this backend available at all" —
+it still always reports `PYTHIA_ADAPTER`/`GEANT4_ADAPTER`/`EXTERNAL_MATTER`
+unavailable (no adapter for any of them exists; per the mandate, none is
+installed in this pass either). `backendRegistry.ts` adds a version floor
+on top: `BackendDescriptor` (kind + `minVersion` + `execCommand`, reusing
+the existing 3 external `BackendKind`s, not a 4th vocabulary),
+`detectWithVersion()`/`requireBackendVersion()`, and `evaluateAvailability()`
+as a pure, directly-unit-tested comparison function (`OK`/`NOT_INSTALLED`/
+`VERSION_LOW`/`TIMEOUT`/`EXEC_ERROR`). ZERO toy fallback, provably:
+`detectWithVersion` only calls an injected `ExecPort` when `detectBackends()`
+already reports the backend available — since that is never true today,
+`physicsBackendRegistry.test.ts` proves a test double claiming version
+`99.0.0` is never even consulted, and `requireBackendVersion` still throws
+`FailClosedError('ADAPTER_UNAVAILABLE')`. Reuses the existing
+`FailClosedError` class (`contracts.ts`), not a second error hierarchy.
+
+### D) Winner Promotion Gate — `core/orchestrator/winnerGate.ts`, wired into `orchestrator.ts`
+
+`canPromoteToWinnerRecord` imports `MINIMUM_OBSERVATIONS` from the REAL,
+existing gate (`core/agent/practicalCandidateGate.ts`) rather than
+redeclaring the number, and reuses `core/agent/evidenceProvenance.ts::DEFAULT_EVIDENCE_CLASS_RANK`
+for "how strong is this evidence" (strong = ranked at or above
+`INDIRECT_RANDOMISED`) rather than a bundled hand-picked class list.
+`winnerGate.test.ts` asserts `result.minimumObservations === MINIMUM_OBSERVATIONS`
+directly, so a future change to the real constant is provably not
+duplicated into a second, silently-diverging number.
+
+Wired into `orchestrator.ts::runScientificDiscovery` at stage
+`18_RECIPE_OR_LOCK`, between the adjudicator's `AdjudicationOutcome` and
+`A.buildRecipe`: a `WINNER` verdict now ALSO has to clear
+`canPromoteToWinnerRecord` (built from the executed experiments' own
+`evidenceClass`/observation counts) before its `WinnerRecordRef` reaches
+`buildRecipe` at all — otherwise the run's own `winner`/`recipeFingerprint`
+stay unset (even though the adjudicator itself said WINNER) and the stage
+is logged `LOCKED` with the real refusal reasons. This is not a parallel
+adjudication engine: it takes an already-decided `Verdict` as input and
+never overturns it, it only decides whether promotion may proceed — the
+real, unmodified flow is now ADJUDICATION -> existing evidence-minimum
+gate -> `canPromoteToWinnerRecord` -> `WinnerRecordRef` -> `RecipeBuilder`.
+
+**Regression fix required by this change**: `orchestrator.test.ts`'s own
+WINNER-path fixture previously supplied only 2 thin `SYNTHETIC_TEST_ONLY`
+experiments (1 observation each) — below the real `MINIMUM_OBSERVATIONS`
+(3). That fixture now supplies real `DIRECT_RANDOMISED` evidence with 3
+total observations (so the existing "WINNER -> recipe built" test still
+demonstrates what it always meant to), and a NEW `weakEvidence` fixture
+variant reproduces the old thin shape to prove the gate genuinely refuses
+promotion despite a WINNER verdict in that case (`orchestrator.test.ts`'s
+new "insufficient observations" test) — this mirrors, at the orchestrator
+level, the exact structural finding D-050's `govDrugLowerHarmFunnel.ts`
+already documented in production ("BOTH TOP2 candidates independently fail
+EVIDENCE_SUFFICIENT... a genuine structural finding about this candidate
+space's evidence depth, not a bug").
+
+**A genuine, positive reachability side effect**: `core/agent/evidenceProvenance.ts`
+was previously reached only by test suites and script-only callers (its own
+`ALLOWED_ORPHANS` entry said so, since D-046). It is now reached from
+`main.tsx` for the first time — via `winnerGate.ts` -> `orchestrator.ts` ->
+`GenesisConsole.tsx` — because a real evidence-ranking constant it defines
+now genuinely gates a production decision path. That `ALLOWED_ORPHANS`
+entry was removed, not left stale.
+
+### Integration (read-only status; no business field enters ranking)
+
+`components/genesis-ui/EvidenceSourceStatusPanel.tsx` — a read-only
+projection of `EvidenceConnectorStore.driftReport()` per registered source
+("FROZEN n / drift m / fetch-failed k"), wired onto BOTH `/gov-campaign`
+(`GovDrugCampaignScreen.tsx`) and `/research-console` (`GenesisConsole.tsx`)
+as required. Its "Check now" button performs a real `httpConnectorPort`
+fetch — never a fabricated success — and this sandbox's network policy is
+expected to make most of those return `FETCH_FAILED`, same disclosed
+caveat as `scripts/fetch-real-data.mjs`.
+
+`components/MonetizeScreen.tsx`, wired as `#/monetize` (hash-only, same
+convention as `/research-console`/`/sim-world` — no home-menu tile). A real
+projection + driver of `CommercialLedger`: opens engagements, walks legal
+transitions, and its "Attempt PAID" button demonstrates the real
+`FailClosedError` (no adapter is wired into this screen) rather than
+simulating either a payment success or a scripted failure message.
+
+Neither panel, nor any field either reads, is passed into any
+`core/agent/*` or `core/orchestrator/*` ranking, adjudication, or
+evidence-minimum call — verified by inspection (`EvidenceSourceStatusPanel.tsx`/
+`MonetizeScreen.tsx` import nothing from those directories) and by the
+unchanged history-check fingerprints below.
+
+### Tests
+
+49 new tests across 4 new files (`evidenceConnectors.test.ts` 13,
+`commercial.test.ts` 12, `physicsBackendRegistry.test.ts` 11,
+`winnerGate.test.ts` 11) plus 2 new + 1 rewritten in the existing
+`orchestrator.test.ts` — all real `async`/`await` (no fire-and-forget
+promises), negative-first: connector freeze, hash drift
+(`HASH_MISMATCH_SUPERSEDED`), fetch failure (`FETCH_FAILED`), replay
+(match + drift + unknown-artifact + fetch-failure-during-replay),
+commercial illegal transition, PAID without adapter, PAID with a refusing
+adapter, backend missing, backend version too low, no-toy-fallback
+(proven via a spy `ExecPort` that is never called), winner gate success,
+computational-only failure, insufficient observations, conflicting
+evidence, and Recipe blocked without a promoted WinnerRecord.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881` unchanged, 18/18. `npm run
+e2e:gov-campaign`: `5179c99f` unchanged, 16/16. `npm run a2:demo`:
+`CONFLICTING_EVIDENCE`, 14/14, fingerprints `a5e0f164`/`4642088a`
+unchanged.
+
+`src/__tests__/nextActionSelectors.test.ts` (unrelated to this module — an
+RDKit compound-transport test) timed out once during the full parallel
+suite run under load and passed 15/15 in an isolated re-run immediately
+after — the same load-induced-flake pattern disclosed in D-054/D-055/D-056,
+not a regression.
+
+### What this entry does NOT do
+
+Does not install PYTHIA. Does not install Geant4. Does not implement a
+Stripe (or any other) `PaymentAdapter`. Does not add production
+multi-tenant hardening (auth, rate limiting, real persistence) beyond the
+in-memory `tenantId` isolation check `ledger.ts` enforces today. Does not
+run any paid pilot. None of these four are complete merely because their
+interfaces/contracts now exist — each is explicitly a fail-closed contract
+or plumbing layer, same posture as `backends.ts`'s own PYTHIA/Geant4
+contracts since D-052. Does not touch Genesis Core, D-047, D-048, or D-050.
+Does not create a second hash system, a second adjudication engine, a
+second evidence-minimum rule, or a second physics-backend-detection
+authority — each of the four areas above extends or calls through an
+existing one. Does not mutate any historical record — every store here is
+append-only, proven by test.
+
+Gate: **6246 frontend tests (1 skipped), 0 failures (1 unrelated transient
+timeout under load, confirmed passing in isolation). 402 backend tests, 0
+failures.** tsc clean, eslint clean on every file this entry touched (4
+pre-existing, unrelated lint errors remain in 3 `scripts/*.mjs` files this
+entry never touched — confirmed via `git diff`/`git status` showing zero
+changes to those files). Frontend production build clean.

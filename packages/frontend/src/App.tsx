@@ -44,6 +44,7 @@ const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').
 const ModelTournamentPanel = lazy(() => import('./components/ModelTournamentPanel').then((m) => ({ default: m.ModelTournamentPanel })));
 const ProtectionPriorityScreen = lazy(() => import('./components/ProtectionPriorityScreen').then((m) => ({ default: m.ProtectionPriorityScreen })));
 const GovDrugCampaignScreen = lazy(() => import('./components/GovDrugCampaignScreen').then((m) => ({ default: m.GovDrugCampaignScreen })));
+const MonetizeScreen = lazy(() => import('./components/MonetizeScreen').then((m) => ({ default: m.MonetizeScreen })));
 const GeodesicWorldScreen = lazy(() => import('./components/GeodesicWorldScreen').then((m) => ({ default: m.GeodesicWorldScreen })));
 const WorldProposalScreen = lazy(() => import('./components/WorldProposalScreen').then((m) => ({ default: m.WorldProposalScreen })));
 const CalibrationInquiryScreen = lazy(() => import('./components/CalibrationInquiryScreen').then((m) => ({ default: m.CalibrationInquiryScreen })));
@@ -125,6 +126,7 @@ type Route =
   | { kind: 'cde' }
   | { kind: 'drug' }
   | { kind: 'gov-campaign' }
+  | { kind: 'monetize' }
   | { kind: 'physics-cms-z' }
   | { kind: 'virtual-bio' }
   | { kind: 'research-console' }
@@ -178,6 +180,7 @@ function parseHash(): Route {
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug' || h.startsWith('#/drug?')) return { kind: 'drug' };
   if (h === '#/gov-campaign') return { kind: 'gov-campaign' };
+  if (h === '#/monetize') return { kind: 'monetize' };
   if (h === '#/physics/cms-z') return { kind: 'physics-cms-z' };
   if (h === '#/virtual-bio') return { kind: 'virtual-bio' };
   if (h === '#/research-console') return { kind: 'research-console' };
@@ -407,6 +410,18 @@ export default function App() {
           <TopBar title="🏛 Government Drug Discovery" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GovDrugCampaignScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'monetize') {
+      return (
+        <div className="app">
+          <TopBar title="💼 Monetize" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <MonetizeScreen />
           </HeavyRoute>
           {overlays}
         </div>

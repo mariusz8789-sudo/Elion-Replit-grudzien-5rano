@@ -3,6 +3,7 @@ import {
   runGovDrugDiscoveryCampaign,
   type GddCampaignResult,
 } from '../core/biotechData/govDrugDiscoveryCampaign';
+import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPanel';
 
 /**
  * The Government Drug Discovery campaign, on screen, from the real runtime.
@@ -222,6 +223,8 @@ export function GovDrugCampaignScreen(): React.ReactElement {
           </section>
         </>
       )}
+
+      <EvidenceSourceStatusPanel />
     </div>
   );
 }

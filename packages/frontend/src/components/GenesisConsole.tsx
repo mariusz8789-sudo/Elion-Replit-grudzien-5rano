@@ -6,6 +6,7 @@ import { toyAdapters } from '../core/orchestrator/toyAdapters';
 import type { DiscoveryRun } from '../core/orchestrator/contracts';
 import { VerdictBanner } from './genesis-ui/VerdictBanner';
 import { FingerprintChip } from './genesis-ui/FingerprintChip';
+import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPanel';
 
 /**
  * GENESIS RESEARCH CONSOLE — a read-only projection of one
@@ -113,6 +114,8 @@ export function GenesisConsole(): React.ReactElement {
           </section>
         </>
       )}
+
+      <EvidenceSourceStatusPanel />
     </div>
   );
 }

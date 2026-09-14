@@ -31,7 +31,7 @@ const WINNER_REF: WinnerRecordRef = {
   fingerprints: { g: '1', r: '1', e: '1', v: '1', a: '1' },
 };
 
-function mkAdapters(verdict: Verdict, opts: { readonly hark?: boolean; readonly recipeNull?: boolean } = {}): OrchestratorAdapters {
+function mkAdapters(verdict: Verdict, opts: { readonly hark?: boolean; readonly recipeNull?: boolean; readonly weakEvidence?: boolean } = {}): OrchestratorAdapters {
   return {
     generate: () => toyCandidates(24),
     normalizeDedup: (cs) => cs.slice(0, 20),
@@ -43,7 +43,16 @@ function mkAdapters(verdict: Verdict, opts: { readonly hark?: boolean; readonly 
     seal: (p) => ({ decisionRule: 'frozen', falsificationCriteria: 'frozen', evidenceMinimum: p.evidenceMinimum, comparisonRule: 'frozen', sealFingerprint: H(p), sealedAt: '1970' }),
     verifySealUnchanged: () => !opts.hark,
     planExperiments: (t2) => t2.map((c) => `exp-${c.candidateId}`),
-    execute: (plan) => plan.map((p) => ({ experimentId: p, evidenceClass: 'SYNTHETIC_TEST_ONLY', summary: { v: 1 } })),
+    // Winner Promotion Gate (D-057) needs real evidence behind a WINNER verdict to
+    // actually promote: by default this fixture supplies enough (DIRECT_RANDOMISED,
+    // 3+ observations) to clear core/agent/practicalCandidateGate.ts's real
+    // MINIMUM_OBSERVATIONS. `weakEvidence` reverts to the old thin (2x1,
+    // SYNTHETIC_TEST_ONLY) shape to exercise NO_PROMOTION despite a WINNER verdict.
+    execute: (plan) => plan.map((p, i) => ({
+      experimentId: p,
+      evidenceClass: opts.weakEvidence ? 'SYNTHETIC_TEST_ONLY' : 'DIRECT_RANDOMISED',
+      summary: { v: 1, observationCount: opts.weakEvidence ? 1 : (i === 0 ? 2 : 1) },
+    })),
     ingestEvidence: (ex) => ex.map((_, i) => ({ ref: `e${i}`, provenance: 'synthetic' })),
     falsify: (t2) => ({ survived: t2.map(() => true), note: 'synthetic' }),
     adjudicate: () => (verdict === 'WINNER' ? { verdict, winner: WINNER_REF } : { verdict }),
@@ -105,11 +114,21 @@ describe('runScientificDiscovery — fail-closed, HARK-stop, recipe gate', () =>
     expect(run.stages.find((s) => s.stage === '18_RECIPE_OR_LOCK')?.status).toBe('LOCKED');
   });
 
-  it('WINNER ⇒ RecipeBuilder called, recipe fingerprint present, all 20 stages logged', () => {
+  it('WINNER with sufficient real evidence ⇒ promotion gate PROMOTEs, RecipeBuilder called, recipe fingerprint present, all 20 stages logged', () => {
     const run = runScientificDiscovery(goodProblem(), mkAdapters('WINNER'));
     expect(run.verdict).toBe('WINNER');
+    expect(run.winner).toBeDefined();
     expect(run.recipeFingerprint).toBeDefined();
     expect(run.stages.length).toBe(20);
+  });
+
+  it('WINNER verdict but insufficient observations ⇒ D-057 promotion gate refuses, recipe stays LOCKED and no winner is exposed (adjudication alone is never sufficient)', () => {
+    const run = runScientificDiscovery(goodProblem(), mkAdapters('WINNER', { weakEvidence: true }));
+    expect(run.verdict).toBe('WINNER');
+    expect(run.winner).toBeUndefined();
+    expect(run.recipeFingerprint).toBeUndefined();
+    expect(run.stages.find((s) => s.stage === '18_RECIPE_OR_LOCK')?.status).toBe('LOCKED');
+    expect(run.stages.find((s) => s.stage === '18_RECIPE_OR_LOCK')?.note).toMatch(/NO_PROMOTION/);
   });
 
   it('RecipeBuilder\'s own internal gates can still LOCK a WINNER ref (never bypassed)', () => {

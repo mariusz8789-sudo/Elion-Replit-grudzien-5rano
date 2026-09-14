@@ -10,6 +10,7 @@ import type { DiscoveryRun } from '../core/orchestrator/contracts';
 import { VerdictBanner } from './genesis-ui/VerdictBanner';
 import { FingerprintChip } from './genesis-ui/FingerprintChip';
 import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPanel';
+import { MindPanel } from '../core/mind/ui/MindPanel';
 
 /**
  * GENESIS RESEARCH CONSOLE — a read-only projection of one discovery-run
@@ -232,6 +233,7 @@ export function GenesisConsole(): React.ReactElement {
         </>
       )}
 
+      <MindPanel />
       <EvidenceSourceStatusPanel />
     </div>
   );

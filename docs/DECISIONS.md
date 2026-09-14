@@ -4267,3 +4267,141 @@ tsc clean. eslint clean on every file this entry touched. Frontend
 production build clean. `moduleReachability.test.ts`: zero new
 undocumented orphans — every new file is reached from tests and/or
 `GenesisConsole.tsx`.
+
+## D-060 (2026-09-14) — Genesis Mind: the bridge from the reasoning layer to
+## the execution backbone, plus the three genuinely absent primitives
+
+WIRES AND FILLS GAPS — builds no second ranking, adjudication, falsification,
+evidence or recipe engine. `orchestrator.ts`'s decision logic, D-047, D-048,
+D-050, and every historical campaign and anchor are untouched.
+
+### The finding that set the scope
+
+The mission arrived framed as "build the missing Genesis Mind." Reading the
+repository at C2 (`62bfcb2`) showed that framing was wrong and would have been
+destructive. `core/agent/` already holds **89 modules** implementing almost
+every Mind capability with real code and real tests: model-form generation AND
+mutation (`modelSpace.ts`), hypothesis generation (`novelHypothesisGenerator.ts`,
+`experimentFabric/hypothesisLoop.ts::generateCompetingHypotheses`), mechanism
+generation, prediction freeze-ordering (`predictionRegistry.ts`), a 13-probe
+self-falsification battery, a novelty gate, an epistemic state graph, and five
+next-experiment selectors unified behind `nextAction.ts`.
+
+The defect was that none of it reached the execution backbone. Verified
+mechanically: `core/agent/**` imported **nothing** from `core/orchestrator/**`,
+and the orchestrator imported only four small constants back. Worse, the
+autonomous loop counted as "reachable" only through an `import type` in an i18n
+label table — `runAutonomousOrchestrator`, `findNextDirections`, `assessNovelty`
+and `fulfillExperimentGap` had **zero runtime callers** anywhere in the app.
+
+So this entry builds the bridge, gives orphaned organs a real caller, and adds
+only what repo-wide grep proved absent.
+
+### What is NEW, and why each one is justified
+
+**1. `core/mind/informationGain.ts` — expected discrimination gain.** Grep for
+`informationGain|expectedInformationGain|infoGain|entropyReduction|
+mutualInformation` matched only `agent/cyberTestPlanner.ts` (a cyber-domain
+planner, unrelated). `'NO_INFORMATION_GAIN'` in `CampaignStopReason` is a
+STRING LABEL, not a computed quantity. Built on top of the existing σ-unit
+`discriminability` convention rather than beside it. `INFORMATION_GAIN_METRIC_DOC`
+states in the code what the number is NOT: not bits, not entropy reduction, not
+mutual information, not a candidate ranking. It ranks EXPERIMENTS only.
+
+**2. `core/mind/researchState.ts` — an append-only, hash-chained transition
+log.** No `ResearchState` module existed; state was split across
+`scienceMemory.ts`, `discoveryStrategy.ts::StrategyRun` and
+`epistemicStateGraph.ts`. Each event's fingerprint covers the previous head, so
+editing, reordering or dropping any event breaks `verifyChain()`. Persistence is
+the existing `provenance/recordStore.ts::KeyedRecordStore` — no new store.
+
+**3. `core/mind/mathExprModelBridge.ts` — the symbolic route.** `core/mathExpr.ts`
+(parse/simplify/differentiate/compile) and `agent/modelSpace.ts` (term-list model
+forms) both existed and had never been connected: one is an AST, the other a term
+list. This joins them, and is the only route to a form the `ModelBasis` vocabulary
+cannot express. Anything it produces is a `MODEL_CANDIDATE` until tested.
+
+**4. `core/mind/knowledgeIndex.ts` — the fact/claim level.** EXTENDS the existing
+`knowledge/supplementalRegistry.ts::KnowledgeEpistemicStatus` axis with two
+values rather than introducing a parallel one, and keeps it orthogonal to
+`EvidenceClass` (strength) and `DataProvenance` (origin). Weakest-link support is
+the minimum `provenanceRank`, order-isomorphic to folding
+`engineeringGraph/provenance.ts::weakerProvenance`. **An LLM statement is never a
+FACT** — enforced structurally: `llmAssisted` content offered as `FACT` is
+downgraded to `HYPOTHESIS` on the way in, and the downgrade is inside the
+fingerprint.
+
+### The bridge
+
+`core/mind/mindAdapters.ts` projects `ModelSpec`s onto `Candidate`s
+(`candidateId` = real `modelSpecFingerprint`, `mechanismClass` = real
+`renderModelSpec` — never a renamed variant, so diversity cannot be faked) and
+implements every `OrchestratorAdapters` port by delegation. Rich state travels on
+a diagnostics side-channel, the pattern D-058/D-059 established;
+`orchestrator.ts` never reads it. `seal`/`verifySealUnchanged` reuse the D-047
+`preRegister`/`freeze` protocol and inherit its HARK and reproducibility guards
+rather than inventing a freeze. Ports are synchronous, as the contract requires;
+custody runs in `mindDiscovery.ts` before the pipeline starts, exactly as D-059
+did. Custody travels as the STABLE `hash`+`hashPolicy` — never `artifactId`,
+which the D-057 store re-mints on every ingest and which silently broke replay
+once already in C2.
+
+`core/mind/runResearch.ts` is the outer multi-round loop. It re-implements none
+of the 20 stages; it calls `runScientificDiscovery` once per round and decides
+whether another round is justified. Terminals: `WINNER` | `NO_WINNER` |
+`SCIENTIFIC_STOP` | `EXECUTION_BLOCKED`. Exhausting the round budget is
+`SCIENTIFIC_STOP`, not a verdict about the science.
+
+### THE PROPERTY THIS ENTRY EXISTS TO DEMONSTRATE
+
+A Mind run cannot mint a winner out of model fitting. `mindPorts.ts`'s default
+adjudicator returns `INSUFFICIENT_EVIDENCE` by construction, and — proven by
+test — even when a caller injects an adjudicator that returns `WINNER`, the
+run reaches a WINNER *verdict* and the existing D-057 Winner Promotion Gate
+**still refuses promotion**, because `COMPUTATIONAL` evidence ranks 2 against
+the gate's `INDIRECT_RANDOMISED` threshold of 9. `winner` stays unset, stage
+`18_RECIPE_OR_LOCK` is `LOCKED`, and the note reads `NO_PROMOTION:
+EVIDENCE_STRENGTH`. The gate is genuinely in the Mind's path.
+
+### Orphans retired
+
+Wiring `MindPanel` into `GenesisConsole.tsx` gave two long-orphaned modules
+their first runtime caller from `main.tsx`: `agent/genesisAdjudicationProtocol.ts`
+(D-047, orphaned since it was built) and `agent/predictionRegistry.ts`. Both
+`ALLOWED_ORPHANS` entries were deleted, not left inaccurate.
+
+### Honest limitations, disclosed not papered over
+
+- **Self-falsification coverage is PARTIAL: 2 of 13 probes.**
+  `selfFalsificationBattery.runSelfFalsificationBattery` requires a disjoint
+  replication dataset, a freeze taken before that dataset was touched, and seven
+  declared structural facts. The Mind domain has no replication dataset, so the
+  full battery cannot be run honestly from here. `mindPorts.ts` runs the two
+  probes it genuinely can (tautology gate, falsified-model registry) and names
+  the gap in `MIND_SELF_FALSIFICATION_COVERAGE`.
+- **The novelty prior-art axis is NOT RUN** in the panel — it needs
+  `noveltyGate.assessNovelty` against a real corpus. The lineage axis (L0–L3) IS
+  computed, from real fingerprint-set membership, never asserted.
+- **Symbolic (L3) forms are shown, not run.** The orchestrator's candidate shape
+  is `ModelSpec`-backed; feeding symbolic-only forms end to end is real future
+  work.
+- **The panel is SYNTHETIC_TEST_ONLY.** It runs real generation, fitting and
+  ranking over computed points on a declared law. PRODUCTION is structurally
+  refused: it requires a custody-verified source and a real backend, and returns
+  `EXECUTION_BLOCKED` without them.
+- The Mind domain is **not** registered in `GENESIS_DOMAINS`. Its options type is
+  domain-specific rather than structurally identical to the two existing domains,
+  so forcing it into that registry would have meant weakening the registry's
+  types. Deliberate, not overlooked.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881`, 18/18, NO_WINNER. `npm run
+e2e:gov-campaign`: 16/16. `npm run a2:demo`: 14/14. `npm run
+lower-harm-funnel:demo`: 5/5. `npm run physics-world:demo`: M-COUL-001
+`validationDelta=0.0019597568167155632`, unchanged.
+
+Gate: **6339 frontend tests (1 skipped), 0 failures** (40 new in
+`genesisMind.test.ts`; baseline was 6299). **402 backend tests, 0 failures**
+(untouched). tsc clean. eslint clean. Production build clean.
+`moduleReachability.test.ts` green with two stale entries removed.

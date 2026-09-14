@@ -3358,3 +3358,109 @@ instead of the D-052 defect value.
 
 Gate: **6156 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
 failures.** tsc clean, eslint clean, frontend build clean.
+
+## D-054 (2026-09-14) — Virtual Bio / Virtual Microscope: an in-silico
+## hypothesis-generation module, its own visual provenance, read-only UI
+
+Integrates an externally authored "Virtual Bio / Virtual Microscope"
+bundle as its own narrowly scoped module, per the owner's explicit mandate:
+audit first, no expansion of scope, no new ranking/adjudication/
+falsification engine, `IN_SILICO_MODEL` evidence never satisfies
+evidence-minimum for a WINNER.
+
+### Audit findings (presented to the owner before implementation; no
+### blocking conflicts)
+
+1. **Hash provider** — same resolution as D-052/D-053: the bundle assumed
+   SHA-256; the real shared provider is `core/events/hash.ts`'s
+   `fnv1a`+`canonicalJson`, reused directly (8-hex-char fingerprints).
+2. **Package layout** — `packages/virtual-bio` doesn't fit this repo's
+   three workspaces (frontend/backend/csrn); landed at
+   `packages/frontend/src/core/virtualBio/`, matching `physicsWorld/`'s
+   own precedent.
+3. **Evidence-minimum gate already exists**
+   (`core/agent/practicalCandidateGate.ts::MINIMUM_OBSERVATIONS`/
+   `EVIDENCE_SUFFICIENT`). Not wired to — PILLARS stay taxonomy-only (item
+   14), so `IN_SILICO_MODEL` evidence never reaches that gate at all; a
+   defensive `inSilicoOnlyInsufficient()` assertion is added and tested
+   anyway, matching the bundle's own intent.
+4. **`EvidenceClass` union exists** (`evidenceProvenance.ts`). `IN_SILICO_MODEL`
+   is kept LOCAL to this module (a new literal on `BioExperimentRecord`),
+   not injected into that shared union — same precedent as physics-world's
+   own local evidence-class field.
+5. **No existing Public Value / G1-G4 pillar concept** — genuinely new
+   (confirmed by search before writing `gov.ts`/`publicValue.ts`).
+   `core/generator/recipe.ts`'s `SimulationRecipe`/`EpistemicStatus` is a
+   different, unrelated concept (a catalogue of registered visual
+   simulations with an epistemic-support label) — no collision, no reuse.
+6. **No new npm dependency** — the microscope UI is plain 2D canvas, not
+   three.js, so it fits the existing direct-client-side-import pattern
+   (`GovDrugCampaignScreen.tsx`) with no build-config change.
+
+### What was built
+
+`core/virtualBio/{contracts,core,models,experiment,microscope,publicValue,gov}.ts`
+— four toy models (`B-CELL-001` cell population, `B-PBPK-001` 3-compartment
+PK, `B-RECEPTOR-001` opioid receptor occupancy, `B-AMR-001` antibiotic
+resistance emergence), each `toy: true`, each `evidenceClass:
+'IN_SILICO_MODEL'` unconditionally, each carrying an explicit disclosure of
+what it is NOT (wet-lab/animal/human/clinical/medical-advice — mandate item
+13). `runBioExperiment`/`runBioSafe` mirror `physicsWorld/experiment.ts`'s
+already-hardened pattern (D-052): the model's own `run()` is wrapped so any
+raw `Error` it throws surfaces as `FailClosedError('PARAMS', ...)`, not an
+untyped exception — applying the same fix found there, not a new defect.
+`renderMicroscopeFrame` computes `viewFingerprint` from exactly `record
+fingerprint + seed + zoom + fieldIndex + stain` (item 9), tested for
+seed-sensitivity (item 10): each of the four view parameters independently
+changes the fingerprint, held record fixed, and zoom is verified to
+genuinely change the rendered cell radii, not only the hash.
+`draftPublicValue` (G4) emits only `NO_DATA`/`ASSUMPTION`/`MODEL_OUTPUT`-
+tagged fields — zero fabricated numbers — and is read-only, downstream,
+called from nowhere in the decision path. `gov.ts::PILLARS` is a plain data
+array naming, per pillar, which EXISTING Genesis mechanism a real decision
+would flow through (`decisionHook` strings, not function calls) — item 6
+(`therapeuticIndexToy`) is explicitly documented as a toy receptor-response
+separation metric, zero clinical safety/therapeutic-index claim.
+
+`VirtualMicroscope.tsx`/`VirtualLabDashboard.tsx` — read-only projections
+only (item 7): the dashboard builds a `BioExperimentDefinition` from the
+on-screen parameters and calls the real `runBioSafe()`; a `FAILED_CLOSED`
+record renders a `.gu-locked-panel` banner, visibly (item 12), never a
+silent empty screen. Wired into `App.tsx` as `#/virtual-bio`.
+
+`bannedStringScanner.ts`'s existing `BANNED_STRINGS` (not a second
+scanner — item 11) extended with `cure`/`harmless` (EN) and
+`leczy`/`uzdrawia` (PL, matching terms already independently used in
+`govDrugLowerHarmPreregistration.ts`'s own domain-specific banned list, so
+this addition is consistent with existing vocabulary, not novel) plus
+Arabic equivalents (`يشفي`/`غير ضار`) for the same Rule-2 reason every
+other banned term here is checked in all three locales.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881` unchanged, 18/18. `npm run
+e2e:gov-campaign`: `5179c99f` unchanged, 16/16. `npm run a2:demo`:
+`CONFLICTING_EVIDENCE`, 14/14, fingerprints `a5e0f164`/`4642088a`
+unchanged.
+
+### What this entry does NOT do
+
+Does not wire any pillar's `decisionHook` into a live call
+(`runGovDrugDiscoveryCampaign`, `runLowerHarmFunnel`,
+`generateDifferentiatingExperiment`, `genesisAdjudicationProtocol`) —
+`gov.ts`'s own header names this explicit future work, and doing it is
+exactly where "no second ranking/adjudication/falsification engine" would
+need re-verifying against a real call site, not a taxonomy string. Does
+not touch Genesis Core, `evidenceProvenance.ts`'s `EvidenceClass` union, or
+`practicalCandidateGate.ts`.
+
+One frontend test file (`proteinFoldingInquiry.test.ts`, unrelated to this
+module) timed out twice during the full parallel suite run under load and
+passed 18/18 in isolation immediately after — a load-induced flake, not a
+regression; disclosed rather than silently re-run away.
+
+Gate: **6175 frontend tests (1 skipped), 0 failures — 2 timed out during
+the full parallel run under load (`proteinFoldingInquiry.test.ts`,
+unrelated) and passed 18/18 in an isolated re-run immediately after. 402
+backend tests, 0 failures.** tsc clean, eslint clean, frontend build
+clean.

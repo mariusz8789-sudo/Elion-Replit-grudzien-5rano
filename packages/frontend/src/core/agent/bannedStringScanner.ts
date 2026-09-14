@@ -25,9 +25,13 @@ import type { SupportedLocale } from './phaseELabels';
 export const BANNED_STRING_SCANNER_CONTRACT_VERSION = '1.0.0';
 
 export const BANNED_STRINGS: Readonly<Record<SupportedLocale, readonly string[]>> = {
-  en: ['safe', 'no side effects', 'miracle cure', 'approved replacement'],
-  pl: ['bezpieczny', 'bez skutków ubocznych', 'cudowny lek'],
-  ar: ['آمن', 'بدون آثار جانبية', 'دواء معجزة', 'بديل معتمد'],
+  // 'cure'/'harmless' (and PL/AR equivalents) added for the Virtual Bio
+  // integration (docs/DECISIONS.md D-054, mandate item 11) — the SAME
+  // scanner, not a second one, since these are the same category of
+  // clinical-claim comfort language as the rest of this list.
+  en: ['safe', 'no side effects', 'miracle cure', 'approved replacement', 'cure', 'harmless'],
+  pl: ['bezpieczny', 'bez skutków ubocznych', 'cudowny lek', 'leczy', 'uzdrawia'],
+  ar: ['آمن', 'بدون آثار جانبية', 'دواء معجزة', 'بديل معتمد', 'يشفي', 'غير ضار'],
 };
 
 export interface BannedStringHit {

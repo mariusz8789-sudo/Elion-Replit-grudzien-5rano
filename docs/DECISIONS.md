@@ -4915,3 +4915,83 @@ fail-closed codes both as a pure function and wired live inside
 `runCampaign`; confirmation the real `DEFAULT_OBJECTIVES` (2 terms) is not
 rejected, driving one real end-to-end campaign run to a real stop reason.
 eslint clean on all new/changed files.
+
+---
+
+## D-070 — CLOSES THE REPLAY GAP: the campaign's own RDKit runs are now real `science_runs` rows
+
+D-069's audit found that the campaign's flagship computation — the RDKit
+descriptor run made once per generated candidate — was invisible to
+`verify.mjs`'s replay machinery: it persisted to the general-purpose `runs`
+table (`store.mjs::saveRun`, no `capability` column, no `campaign_id`/
+`candidate_id` linkage) while `replayScienceRun`/`getScienceRun` query the
+disjoint `science_runs` table, written only by `multiFidelity.mjs`'s four
+heavy-engine stages. `getScienceRun` against a real candidate's `runId`
+returned `null` — not even `REPLAY_UNSUPPORTED`. This closes it, with the
+`candidateId` binding the user chose explicitly (real, post-insert — never
+`null`) over the simpler-but-weaker alternative.
+
+### What changed — two existing mechanisms connected, nothing new invented
+
+`orchestrator.mjs::persistDescriptorScienceRun` (new, ~35 lines) persists
+the SAME `run` object `describeAsRun` already computed — no second RDKit
+invocation — as a real `science_runs` row via the pre-existing
+`store.mjs::saveScienceRun` (previously called only from `multiFidelity.mjs`).
+`makeCandidateRecord` now carries `run` through on its return value
+(`scienceRun`); `store.addCandidate` ignores the extra key (it destructures
+named fields), so this is additive. Both call sites in `runCampaign` — the
+generation-0 starting-SMILES loop and the per-proposal generation loop — call
+`persistDescriptorScienceRun` immediately AFTER `store.addCandidate` returns,
+so `candidateId` is the REAL id, never `null`. The third call site (the
+`seenCanonical` duplicate-SMILES branch) is deliberately untouched: a
+duplicate has no new RDKit computation to persist.
+
+Two provenance details worth recording because they were the actual
+substance of the fix, not incidental:
+
+- **`inputHash`/`outputHash`** use `provenance.mjs::sha256Hex16` — the SAME
+  hash provider `verify.mjs`'s own docking/QM/ADMET replayers already use.
+- **`engine`** is taken from `run.provenance.engine` — the RDKit worker's OWN
+  reported engine string (`registry.mjs`'s `chem-rdkit-descriptors` compute
+  function sets `provenance: { engine: r.engine, ... }` from the real
+  `rdkitAdapter.mjs` call) — NOT `run.engine` (`genesis-compute@1.0.0`, the
+  generic model-runner wrapper) and NOT `run.modelVersion` (`'1.0.0'`, the
+  static registry entry version). This is the EXACT SAME field the new
+  `verify.mjs` replayer reads at replay time via `descriptors(...).engine`.
+  Storing anything else would compare two different kinds of version string
+  and report `ENGINE_VERSION_CHANGED` on every single replay — a real defect
+  that would have made this look fixed while still returning nothing useful.
+- **`evidenceClass: 'COMPUTATIONAL'`**, not `saveScienceRun`'s documented
+  default of `'MODEL_ESTIMATE'`: RDKit descriptors are exact deterministic
+  chemistry, not a fitted model's estimate — the same COMPUTATIONAL/
+  MODEL_ESTIMATE distinction D-069 already drew between real computed values
+  and `multiFidelity.mjs`'s ADMET/docking predictions.
+
+`verify.mjs` gained one `REPLAYERS['molecular-descriptors']` entry (re-runs
+`descriptors(inputs.smiles)`, the exact real call the write side made) and
+`TOLERANCE['molecular-descriptors'] = 0` (RDKit 2D descriptors are exact
+deterministic arithmetic — no batched-inference floating-point
+non-associativity like ADMET-AI's, so MATCH requires bit-exact reproduction,
+same as docking/QM). No second replay-verdict mechanism: MATCH/DRIFT is
+still decided exclusively by `verify.mjs:134-143`, unchanged.
+
+### A second real defect found while gating this: `.env.example` drift
+
+D-069's `predictionHardFilters.mjs` reads `process.env.GENESIS_PREDICTION_THRESHOLDS`
+and was committed without documenting it — `envContract.test.mjs`'s P0.4
+check (`.env.example` must document every env var the code reads) caught
+this on the full-suite re-run for this entry. Fixed: documented in
+`.env.example` with the same fail-closed framing as the code itself (no
+file = `RULE_NOT_FROZEN`, never "no filter").
+
+### Gate
+
+`node --test src/*.test.mjs` (backend): **459 tests, 426 passed, 0 failed,
+33 skipped** (pre-existing, unrelated). 4 new tests
+(`campaignScienceRunReplay.test.mjs`, RDKit-gated like the repo's existing
+real-campaign tests): a real minicampaign binds exactly one `science_runs`
+row per retained candidate with the real `candidateId`; a rejected candidate
+(malformed SMILES) leaves no row (no fabricated computation); the real
+`REPLAYERS['molecular-descriptors']` entry replays a real bound run to
+**MATCH**; replay is deterministic across two independent calls. eslint
+clean on all changed/new files.

@@ -9,7 +9,8 @@
  */
 import { createHash } from 'node:crypto';
 import { runModel } from '../compute/engine.mjs';
-import { saveRun } from '../store.mjs';
+import { saveRun, saveScienceRun } from '../store.mjs';
+import { sha256Hex16 as sha16 } from '../provenance.mjs';
 import * as store from './persistence.mjs';
 import * as adapter from './drugAdapter.mjs';
 import { paretoFrontIndices, hypervolume2D, bestScalar } from './pareto.mjs';
@@ -26,6 +27,57 @@ function describeAsRun(db, projectId, smiles) {
   const run = runModel('chem-rdkit-descriptors', { smiles });
   if (run.status === 'ok') { try { saveRun(db, run, { projectId }); } catch { /* audyt best-effort */ } }
   return run;
+}
+
+/**
+ * REPLAY GAP CLOSED (docs/DECISIONS.md D-069 follow-up). `describeAsRun`'s
+ * own `saveRun` write above goes to the general-purpose `runs` table --
+ * real, unmodified, kept exactly as it was. But `campaign/verify.mjs`'s
+ * `replayScienceRun`/`getScienceRun` read a DIFFERENT table, `science_runs`
+ * (capability/campaignId/candidateId-shaped), written only by
+ * `multiFidelity.mjs`'s four heavy-engine stages -- so the campaign's own
+ * flagship computation (its RDKit descriptor run, made once per generated
+ * candidate) was never independently replayable. This persists the SAME
+ * real computation `describeAsRun` already made -- same `run` object, no
+ * second RDKit invocation, no second engine -- as a REAL `science_runs` row,
+ * called AFTER `store.addCandidate` so it carries the REAL `candidateId`
+ * (never `null`: a fabricated or omitted link would be exactly the kind of
+ * broken provenance this whole persistence layer exists to refuse).
+ *
+ * `inputHash`/`outputHash` use `provenance.mjs::sha256Hex16` -- the SAME
+ * hash provider `verify.mjs`'s own replayers already use, so a later
+ * `replayScienceRun` compares like with like.
+ *
+ * `engine` is taken from `run.provenance.engine`, NOT `run.engine`
+ * (`genesis-compute@1.0.0`, the generic model-runner wrapper string) and
+ * NOT `run.modelVersion` (`'1.0.0'`, the static registry entry version).
+ * `run.provenance.engine` is the RDKit worker's OWN reported engine string
+ * (`registry.mjs`'s `chem-rdkit-descriptors` compute function sets
+ * `provenance: { engine: r.engine, ... }` from the real `rdkitAdapter.mjs`
+ * call) -- the EXACT SAME field the new `REPLAYERS['molecular-descriptors']`
+ * entry in `verify.mjs` reads at replay time via `descriptors(...).engine`.
+ * Storing anything else here would compare two different kinds of version
+ * strings and report `ENGINE_VERSION_CHANGED` on every single replay.
+ *
+ * `evidenceClass: 'COMPUTATIONAL'`, not `saveScienceRun`'s documented
+ * default of `'MODEL_ESTIMATE'`: RDKit descriptors are exact deterministic
+ * chemistry, not a fitted model's estimate -- the same COMPUTATIONAL/
+ * MODEL_ESTIMATE distinction this repo's own evidence-class taxonomy
+ * already draws between real computed values and multiFidelity.mjs's
+ * ADMET/docking predictions.
+ */
+function persistDescriptorScienceRun(db, { campaignId, candidateId, projectId, run }) {
+  if (!run || run.status !== 'ok') return; // no real computation to persist -- a rejected run leaves no science_runs row
+  try {
+    saveScienceRun(db, {
+      projectId, campaignId, candidateId,
+      engine: run.provenance?.engine ?? null, capability: 'molecular-descriptors', method: 'RDKit',
+      status: run.status, evidenceClass: 'COMPUTATIONAL',
+      inputs: run.inputs, outputs: run.outputs, units: run.units, warnings: run.warnings, provenance: run.provenance,
+      inputHash: sha16(run.inputs), outputHash: sha16(run.outputs), artifacts: [],
+      durationMs: run.durationMs,
+    });
+  } catch { /* audyt best-effort, same discipline as describeAsRun's own saveRun call */ }
 }
 
 function makeCandidateRecord(db, campaignId, projectId, generation, proposal, objectives, constraints) {
@@ -46,6 +98,11 @@ function makeCandidateRecord(db, campaignId, projectId, generation, proposal, ob
     descriptors: desc,
     objectiveVector,
     constraintViolations: violations,
+    // Carried through, never persisted directly by addCandidate (extra keys
+    // on the spread object are ignored there) -- the caller uses this to
+    // bind persistDescriptorScienceRun to the REAL candidateId once
+    // store.addCandidate has returned one.
+    scienceRun: run,
   };
 }
 
@@ -107,6 +164,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
     const rec = makeCandidateRecord(db, campaignId, projectId, 0, { canonicalSmiles: canon.canonicalSmiles }, objectives, constraints);
     totalGenerated++;
     const id = store.addCandidate(db, { campaignId, generation: 0, canonicalSmiles: canon.canonicalSmiles, ...rec });
+    persistDescriptorScienceRun(db, { campaignId, candidateId: id, projectId, run: rec.scienceRun });
     if (rec.status === 'retained') retained.push({ id, canonicalSmiles: canon.canonicalSmiles, objectiveVector: rec.objectiveVector, transformation: null });
   }
   recomputePareto(db, campaignId, retained);
@@ -160,6 +218,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
         coParentSmiles: prop.coParentSmiles ?? null,
         transformation: prop.transformation, canonicalSmiles: prop.canonicalSmiles, ...rec,
       });
+      persistDescriptorScienceRun(db, { campaignId, candidateId: id, projectId, run: rec.scienceRun });
       if (rec.status === 'retained') {
         genRetained.push({ id, canonicalSmiles: prop.canonicalSmiles, objectiveVector: rec.objectiveVector, transformation: prop.transformation });
         retained.push({ id, canonicalSmiles: prop.canonicalSmiles, objectiveVector: rec.objectiveVector, transformation: prop.transformation });

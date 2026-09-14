@@ -4794,3 +4794,124 @@ comes back NOT_TRIGGERED.
 negative-first tests. `moduleReachability` clean — `GovServicesPanel.tsx`
 mounted in `GenesisConsole.tsx` gives all five new modules a real runtime
 caller; nothing added to `ALLOWED_ORPHANS`.
+
+---
+
+## D-069 — OPTION A (frozen): MODEL_ESTIMATE predictions are hard filters, never objectives
+
+Three audit rounds (Claude↔Qwen↔Claude, all repo-grounded, none implemented
+until verified) preceded this entry. The user resolved the one open design
+question explicitly: **predictions from `multiFidelity.mjs` (ADMET-AI/
+Chemprop, docking) may reject a candidate but may never enter the campaign's
+`objectiveVector`.** Reasoning, verbatim from the decision: folding a model
+estimate into the optimization target is Goodharting on the model, not
+discovering anything real; a model's honest epistemic role is to rule
+candidates OUT, not rank them IN. Option B (an n-dimensional hypervolume with
+predictions as objectives) remains explicitly out of scope, deferred behind
+its own three conditions if ever revisited (a frozen n-D hypervolume module
+with monotonicity tests, ≥1 grounded term per added axis, its own D-entry).
+
+### What landed this pass (two independent, self-contained modules)
+
+**`campaign/predictionHardFilters.mjs`** — `applyPredictionHardFilters`
+partitions a candidate list into survivors/rejections against frozen
+threshold terms, reading the REAL `splitAdmetPrediction` output shape
+(`multiFidelity.mjs`: `admetOut`/`toxOut` are `{ [endpointKey]: number }`,
+units held separately) rather than the `{value, unit}` shape an earlier
+draft assumed — that earlier shape would have made every candidate reject on
+`TERM_MISSING`, a fail-closed result for the wrong reason. Candidates that
+pass come back as the SAME object reference; the function never touches a
+descriptor, `objectiveVector`, or score. `loadFrozenPredictionThresholds`
+reads the threshold file's `ruleFingerprint` and compares it to the value the
+caller froze via `genesisAdjudicationProtocol.ts::freeze` — the same real,
+unmodified D-047 mechanism every other domain in this repo uses. An earlier
+draft invented its own `sha1`-based fingerprint as a second, parallel freeze
+mechanism; removed.
+
+**`campaign/objectiveGuardD069.mjs`** — `assertCampaignObjectivesD069`,
+wired as a REAL caller inside `orchestrator.mjs::runCampaign` (not an
+orphaned module). It closes a concrete way Option A could be defeated
+without touching any code: `campaign.objectiveVector` is read from the
+DATABASE (`persistence.mjs`'s `objective_vector_json`), so a caller could set
+a prediction term as an objective, or set three-or-more objectives, purely
+through campaign-creation data. Two real, previously-silent failure modes:
+`pareto.mjs::hypervolume2D` reads `p[0]`/`p[1]` only — a campaign with more
+than two objectives does not error, it silently truncates the stopping
+criterion to its first two dimensions. The guard fails closed on both
+(`OBJECTIVE_IS_PREDICTION_TERM`, `OBJECTIVE_COUNT_NOT_TWO`) with a
+`FAIL_CLOSED[...]` thrown `Error` — the same convention `campaign_not_found`
+already uses, caught by `jobs.mjs::runJob` and recorded as a failed job.
+Verified against a real, previously-existing test
+(`apiCampaign.test.mjs`'s `P-NL-0`, a genuinely persisted 1-objective
+campaign) that the guard's `runCampaign`-time enforcement does not collide
+with any existing behavior: that test never calls `runCampaign`, so it is
+unaffected; a new test proves a campaign built the same way WOULD now fail
+closed if it were run.
+
+The prediction-term vocabulary the guard checks against is derived from the
+real endpoint registry (`multiFidelity.mjs::endpointCategories()`, backed by
+`admet.listEndpoints()`) plus `'bestAffinityKcalMol'` — never a hand-typed
+list that could silently drift from the real one.
+
+### What did NOT land: the `verify.mjs` replayer — blocked by a real, deeper defect
+
+The prior audit round's plan (add a `'molecular-descriptors'` entry to
+`verify.mjs`'s `REPLAYERS` map) rested on an unverified assumption: that the
+campaign's own RDKit descriptor runs are `science_runs` rows `verify.mjs`
+can look up. Tracing the actual persistence path disproves this:
+
+- The campaign's per-candidate descriptor computation
+  (`orchestrator.mjs::describeAsRun` → `compute/engine.mjs::runModel` →
+  `store.mjs::saveRun`) writes to the **`runs`** table — a general-purpose
+  table with **no `capability` column at all**, and no `campaign_id`/
+  `candidate_id` linkage.
+- `verify.mjs`'s `replayScienceRun`/`getScienceRun` query the **`science_runs`**
+  table (`capability`, `campaign_id`, `candidate_id`, `evidence_class`), which
+  is written ONLY by `store.mjs::saveScienceRun`, called ONLY from
+  `multiFidelity.mjs`'s four heavy-engine stages (docking, QM, ADMET,
+  toxicity).
+
+So a `'molecular-descriptors'` `REPLAYERS` entry would be unreachable code:
+no row with that capability, or with that campaign's descriptor runs at all,
+ever exists in the table `replayScienceRun` reads. `getScienceRun(db, runId)`
+against one of the campaign's real `runIds` returns `null`
+(`run_not_found`), not even the `REPLAY_UNSUPPORTED` verdict the earlier
+audit assumed was the honest current state. Writing the planned replayer
+would have been exactly the class of defect this whole audit chain exists to
+refuse: code that looks like a fix and changes nothing.
+
+Closing this gap for real means either (a) making `describeAsRun` also
+persist to `science_runs` via `saveScienceRun` with a real `capability:
+'molecular-descriptors'` — touching the orchestrator's per-candidate hot
+path, called once per generated candidate — or (b) accepting these runs are
+genuinely a different kind of artifact than a "Scientific Run" in
+`verify.mjs`'s sense. Neither is a small patch; both are a real design
+decision this entry does not make unilaterally. Deferred pending a decision.
+
+### What also did NOT land: `d047Bridge.ts` / BRICS domain adjudication
+
+The domenowa decision function (`computeDomainVerdict`, resolved by the user
+as: parametric over the evidence inventory, `NO_WINNER` with reasons computed
+from evidence-class rank when the inventory tops out at `COMPUTATIONAL`,
+capable of `WINNER` given real ≥`INDIRECT_RANDOMISED` evidence) is a correct
+design but was written against a `bricsChallenge/` package that does not
+exist in this repository — `ls` confirms `core/discovery/molecular/
+bricsChallenge/` is absent. Three real bugs were also found in that draft
+before it could be considered landable (custody-record index wraps via `%`,
+fabricating source attribution for evidence past the custody array's length;
+tie-detection reads the first two `Object.entries()` results rather than the
+actual top-2 by margin; the `reasons` computed outside `execute()`'s
+reproducibility guard, unprotected by the same bajt-identical-twice check
+that covers `result`). Deferred until the BRICS foundation itself is decided.
+
+### Gate
+
+`node --test src/*.test.mjs` (backend): **455 tests, 422 passed, 0 failed,
+33 skipped** (pre-existing, unrelated). 20 new negative-first tests
+(`campaignD069.test.mjs`) covering: real `splitAdmetPrediction` shape
+(bare-number endpoints, not `{value,unit}`); `RULE_NOT_FROZEN`/`RULE_MISMATCH`
+against a real D-047-shaped `ruleFingerprint`; the objective guard's two
+fail-closed codes both as a pure function and wired live inside
+`runCampaign`; confirmation the real `DEFAULT_OBJECTIVES` (2 terms) is not
+rejected, driving one real end-to-end campaign run to a real stop reason.
+eslint clean on all new/changed files.

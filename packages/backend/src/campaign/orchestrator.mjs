@@ -13,6 +13,8 @@ import { saveRun } from '../store.mjs';
 import * as store from './persistence.mjs';
 import * as adapter from './drugAdapter.mjs';
 import { paretoFrontIndices, hypervolume2D, bestScalar } from './pareto.mjs';
+import { assertCampaignObjectivesD069 } from './objectiveGuardD069.mjs';
+import { endpointCategories } from './multiFidelity.mjs';
 import { analyzeAndDecide, isStop } from './nextExperiment.mjs';
 
 const scalar = (vec) => Object.values(vec).reduce((a, b) => a + b, 0);
@@ -66,6 +68,13 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
   if (!campaign) throw new Error('campaign_not_found');
   const { projectId } = campaign;
   const objectives = campaign.objectiveVector.length ? campaign.objectiveVector : adapter.DEFAULT_OBJECTIVES;
+  // D-069 OPTION A, enforced in code (not left to convention): predictions
+  // are frozen hard filters, never objectives, and hypervolume2D silently
+  // truncates past two dimensions — a mis-set campaign.objectiveVector row
+  // in the database could otherwise defeat both without any error.
+  const predictionTerms = [...Object.keys(endpointCategories()), 'bestAffinityKcalMol'];
+  const objectivesGuard = assertCampaignObjectivesD069(objectives, predictionTerms);
+  if (!objectivesGuard.ok) throw new Error(`FAIL_CLOSED[${objectivesGuard.code}]: ${objectivesGuard.reason}`);
   const constraints = campaign.constraints.length ? campaign.constraints : adapter.DEFAULT_CONSTRAINTS;
   const budget = { maxGenerations: 6, maxGeneratedCandidates: 400, ...campaign.budget };
   const stopping = { patience: 2, minImprovement: 1e-3, diversityFloor: 0.15, ...campaign.stopping };

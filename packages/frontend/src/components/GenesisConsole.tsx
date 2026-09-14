@@ -129,7 +129,13 @@ export function GenesisConsole(): React.ReactElement {
         {source !== 'SANDBOX' && (
           <>
             <div className="gu-locale-switch" style={{ margin: '4px 0', flexWrap: 'wrap' }}>
-              {GENESIS_DOMAINS.map((d) => (
+              {/* This screen only ever constructs the LOWER_HARM/E2E01 shared options shape
+                  (mode/nl/problemInput below) — MIND's RunResearchOptions (problem/maxRounds/
+                  makeRoundOptions/shouldContinue) has no source here, so it is excluded from this
+                  selector rather than offered and then failing closed on every click. MIND already
+                  has its own real, working entry point: the MindPanel section rendered further
+                  down this console. */}
+              {GENESIS_DOMAINS.filter((d) => d.domainId !== 'MIND').map((d) => (
                 <button key={d.domainId} type="button" className={domainId === d.domainId ? 'chip-btn primary' : 'chip-btn'} onClick={() => setDomainId(d.domainId)} title={d.label}>
                   {d.domainId}
                 </button>

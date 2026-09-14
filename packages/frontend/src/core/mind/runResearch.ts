@@ -43,6 +43,26 @@ export interface RunResearchResult {
   readonly chainVerified: boolean;
 }
 
+export interface ReplayResearchResult {
+  readonly ok: boolean;
+  readonly first: RunResearchResult;
+  readonly second: RunResearchResult;
+}
+
+/**
+ * Real re-run through the SAME entry point (mirrors `mindDiscovery.ts::replayMindDiscovery`'s
+ * pattern one level up). Fails closed (`ok:false`) on any mismatch rather than assuming success.
+ * `stateHead` is the log's own hash-chained fingerprint (`ResearchStateLog::verifyChain` already
+ * ran inside each `runResearch` call) — together with `terminal`, this is the honest determinism
+ * proxy for a multi-round result, the same role `auditFingerprint`/`verdict` play for a single round.
+ */
+export async function replayResearch(options: RunResearchOptions): Promise<ReplayResearchResult> {
+  const first = await runResearch(options);
+  const second = await runResearch(options);
+  const ok = first.terminal === second.terminal && first.stateHead === second.stateHead;
+  return Object.freeze({ ok, first, second });
+}
+
 export async function runResearch(options: RunResearchOptions): Promise<RunResearchResult> {
   const log = new ResearchStateLog();
   await log.append('PROBLEM_FORMALIZED', options.now(), { problemId: options.problem.problemId, problemFingerprint: options.problem.fingerprint });

@@ -5089,3 +5089,121 @@ Frontend: **549 test files, 6432 tests passed, 0 failed, 1 skipped**
 `INSUFFICIENT_EVIDENCE` → `NO_PROMOTION`, never `WINNER`). tsc clean.
 eslint clean. `moduleReachability` clean — one new, deliberately documented
 orphan entry (caller wiring is the next step, not this one).
+
+## D-072 — MIND registered as a third `GenesisDomainRegistry` domain (discriminated union); `mindPromotionCaller.ts` lands, still orphaned
+
+Follow-up to D-071. A collaborator delivered `mindPromotionCaller.ts` (the
+one real caller `discoveryRecordBridge.ts` was missing) plus `PATCH-E`
+(register `'MIND'` in `genesisDomainRegistry.ts`) and `TABELA-G` (a
+7-entry `ALLOWED_ORPHANS` removal list). Audited against the live repo
+before landing anything, per this session's standing rule — three rounds
+of correction, not one:
+
+### Round 1 — `mindPromotionCaller.ts` as first delivered: two real defects
+
+1. `EvidenceInventoryItem` imported from `orchestrator/contracts.ts` —
+   wrong module; it is exported from `orchestrator/winnerGate.ts`
+   (confirmed by reading `winnerGate.ts` directly). Would not compile.
+2. **The exact anti-pattern D-071 was built to refuse, reintroduced one
+   layer up.** The `NOT_APPLICABLE` branch called
+   `canPromoteToWinnerRecord({adjudicationVerdict:'NO_WINNER',
+   inventory:[]})` — substituting a verdict no adjudicator ever computed,
+   for statuses the bridge explicitly refused to evaluate
+   (REPRODUCTION/KNOWN_RESULT/NO_ACCESS/EXTENSION/NOVEL_HYPOTHESIS). Fixed
+   by making `promotion: PromotionResult | null`, `null` on
+   `NOT_APPLICABLE`, no gate call at all.
+
+### Round 2 — PATCH-E as first delivered, then as "fixed": still broken
+
+First draft poszerzał `GenesisDomainResult` z niezweryfikowanymi typami
+(`RunResult | ExecutionBlockedResult`) i wrapperem, który nie podawał
+wymaganych `problem`/`ports`/`gen`. A follow-up "fix" claimed byte-for-byte
+type names and a "thin wrapper" — both still false on inspection:
+`mindDiscovery.ts` actually exports `MindRunResult | MindExecutionBlocked`,
+not the claimed names, and the wrapper still constructed
+`runMindDiscovery({mode, nl, problemInput, evidenceStore,
+evidenceConnectorPort})` — none of `nl`/`problemInput`/`evidenceStore`/
+`evidenceConnectorPort` are fields of `RunMindDiscoveryOptions` (its only
+optional field is `evidence?`), and `problem`/`ports`/`gen` (all required,
+`CreateMindAdaptersOptions`) were never supplied. Two structurally
+incompatible proposals in a row — not a typo to patch, a genuine contract
+mismatch between MIND's real shape and LOWER_HARM/E2E01's shared shape.
+
+**Resolution, designed and landed by Claude, not the delivered patch:**
+`genesisDomainRegistry.ts`'s `GenesisDomainDescriptor` became a
+discriminated union — `GenesisSharedDomainDescriptor` (LOWER_HARM/E2E01,
+unchanged signature) and `GenesisMindDomainDescriptor` (MIND, honestly
+`run(opts: RunResearchOptions)` — no `?`, no fabricated optionality).
+`runGenesisDomainDiscovery`/`replayGenesisDomainDiscovery` are overloaded:
+a call written with the literal `'MIND'` argument returns
+`RunResearchResult`; every other call (including the existing
+`GenesisConsole.tsx`/`govE2E01Discovery.test.ts` call sites, whose
+`domainId` is typed `GenesisDomainId` but never statically `'MIND'`) keeps
+the pre-existing `GenesisDomainResult` return type unchanged. Selecting
+`domainId:'MIND'` with a LOWER_HARM-shaped `opts` throws a named
+`MindOptionsRequiredError` — fail-closed, never a fabricated run.
+
+**Which MIND entry point, and why `runResearch` not `runMindDiscovery`.**
+`core/mind/mindDiscovery.ts` exposes both a single-round
+`runMindDiscovery` and the multi-round `runResearch` loop over it;
+`MindPanel.tsx:105` already calls `runResearch` in production. Registering
+`runMindDiscovery` directly (what PATCH-E proposed) would have been a
+second, parallel MIND entry point bypassing the one already wired and
+tested. `runResearch.ts` gained one new function, `replayResearch` —
+mirrors `mindDiscovery.ts::replayMindDiscovery`'s pattern one level up (two
+real re-runs, compares `terminal`+`stateHead`, fails closed on mismatch) —
+needed because `GenesisDomainDescriptor.replay` is a required field and no
+determinism-check existed yet for the multi-round result.
+
+**Scope, chosen explicitly by the user over building UI wiring too:**
+registry-contract-only. `GenesisConsole.tsx`'s domain selector (line ~132)
+now filters `GENESIS_DOMAINS` to exclude `'MIND'` — without this, adding
+MIND to the array would have silently broken that already-shipped screen
+(every existing call there constructs only the LOWER_HARM/E2E01 shared
+options shape, so selecting MIND and clicking run would throw
+`MindOptionsRequiredError` with no catch block to render it). MIND's own
+real UI entry point remains the `MindPanel` section already rendered
+further down the same console.
+
+### Round 3 — `TABELA-G`'s 7-entry orphan-removal list: 2 confirmed false, 2 already moot, rest unstarted
+
+Direct grep of `core/mind/*.ts` against all 7 claimed names:
+
+- **`noveltyGate.ts`, `novelHypothesisGenerator.ts` — confirmed FALSE.**
+  Neither is imported anywhere in `core/mind/*`; both appear only inside
+  comment strings (or not at all). `noveltyHarness.ts::computeNoveltyLevel`
+  never touches `noveltyGate.ts`.
+- **`genesisAdjudicationProtocol.ts`, `predictionRegistry.ts` — the claim
+  was moot, not merely wrong.** Both are already genuinely imported in
+  `mindAdapters.ts` (`freeze, preRegister` / `createPredictionRegistry,
+  registerPrediction, registryFingerprint`) and already reachable via
+  `MindPanel.tsx`. Grepping `moduleReachability.test.ts` for either name as
+  an `ALLOWED_ORPHANS` key returns zero matches — there was never an entry
+  to remove for these two, then or later.
+- **`selfFalsificationBattery.ts`, `discoveryContracts.ts`,
+  `literatureNoveltyAdapter.ts`** — still genuinely orphaned; TABELA-G's
+  claimed removal trigger (`runGenuineDiscoveryToPromotion`, a name that
+  matches nothing `mindPromotionCaller.ts` actually exports, and returns
+  zero grep matches anywhere in `packages/frontend/src`) does not exist.
+  `mindPromotionCaller.ts` itself has no runtime caller in this commit
+  (wiring it into `mindAdapters.ts`/`MindPanel.tsx` is out of scope, per
+  the explicit "registry-contract-only" choice above) — so landing it adds
+  a new orphan rather than resolving any of these three. Left untouched.
+
+**Net orphan-list change this commit: `+1` (`mindPromotionCaller.ts`
+itself), `0` removed** — not the 7 TABELA-G claimed, not even the 1 the
+"v2" self-correction narrowed to (that narrowed claim's own trigger
+function does not exist).
+
+### Gate
+
+Frontend: tsc clean, eslint clean. `mindPromotionCaller.test.ts`: 9/9 new
+tests (NOT_APPLICABLE → `promotion: null` for every refused status;
+`DISCOVERY_CANDIDATE`/`CONFLICTING_EVIDENCE`/`DISCOVERY` PROMOTION_INPUT
+paths forward the bridge's `Verdict` into a real `canPromoteToWinnerRecord`
+call; `decideFromAdjudication`'s direct path proven for both `PROMOTE` and
+`NO_PROMOTION`). `moduleReachability`, `discoveryRecordBridge.test.ts`,
+`genesisMind.test.ts`, `govE2E01Discovery.test.ts`,
+`govLowerHarmDiscovery.test.ts` all still pass unchanged — 128/128 across
+the six targeted files. Full suite: **550 test files, 6444 tests passed, 1
+skipped (pre-existing, unrelated), 0 failed**.

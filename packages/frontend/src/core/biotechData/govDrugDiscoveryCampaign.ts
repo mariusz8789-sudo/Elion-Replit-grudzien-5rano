@@ -48,6 +48,7 @@ import {
   type E2E01NoAccessDeclaration,
   type E2E01BannedStringHit,
 } from './govDrugDiscoveryE2E';
+import type { A2CandidateReport } from './a2OzempicSubstitute';
 import { runA3GovernmentRecommendation, type A3CandidateView } from './a3GovernmentDrugRecommendation';
 import type { A3PopulationSpec } from './a3GovernmentPreregistration';
 import {
@@ -232,15 +233,26 @@ export interface GddExhaustionReport {
   readonly observationGapRequest: ObservationGapRequest | null;
 }
 
+/** The minimal shape `buildFinalistPredictions` actually reads — narrower than `A3CandidateView`, so any caller holding a real `A2CandidateReport` (not just an A3 view wrapping one) can reuse this without constructing the A3-specific fields it never touches. */
+export interface CandidateReportView {
+  readonly report: A2CandidateReport;
+}
+
 /**
- * Turns the finalists into the shape G2 reasons over. Each finalist is a
- * hypothesis ("this candidate is the better alternative"); each observable is
- * a quantity the run genuinely measured, with a sigma derived from the
- * PUBLISHED confidence interval — never invented. A candidate with no interval
- * at an observable predicts `null` there, which G2 reports as a real gap
- * rather than silently skipping.
+ * Turns a pair (or more) of candidates into the shape G2 reasons over. Each
+ * candidate is a hypothesis ("this candidate is the better alternative");
+ * each observable is a quantity the run genuinely measured, with a sigma
+ * derived from the PUBLISHED confidence interval — never invented. A
+ * candidate with no interval at an observable predicts `null` there, which
+ * G2 reports as a real gap rather than silently skipping.
+ *
+ * EXPORTED (was campaign-local) so the LOWER-HARM funnel
+ * (govDrugLowerHarmFunnel.ts) reuses this exact sigma-derivation, rather
+ * than re-deriving it — a pure widening of this function's stated
+ * dependency to what it already reads; zero change in behaviour for this
+ * campaign's own call site.
  */
-function buildFinalistPredictions(views: readonly A3CandidateView[]): {
+export function buildFinalistPredictions(views: readonly CandidateReportView[]): {
   readonly hypotheses: readonly HypothesisPrediction[];
   readonly observables: readonly CandidateObservable[];
 } {

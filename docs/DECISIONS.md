@@ -2916,3 +2916,113 @@ retroactively apply D-046's gate to any candidate other than the one it was
 already verified for.
 
 Gate: **6085 frontend tests, 0 failures.** tsc clean, eslint clean.
+
+## D-050 (2026-09-14) — LOWER-HARM full funnel: TOP10 -> TOP2 -> frozen
+## falsification -> G2 -> adjudication -> comparison -> WINNER | NO_WINNER
+## (mandate step 10, part 3). Real, honest NO_WINNER on this dataset.
+
+`core/biotechData/govDrugLowerHarmFunnel.ts` completes the E2E requested:
+12 real candidates -> hard filter -> diversity check -> TOP10 -> TOP2 ->
+frozen falsification criteria -> G2 -> adjudication -> WINNER/NO_WINNER,
+every conjunct traced.
+
+### No second engine — every decision function is an existing one, reused
+
+- Hard filter / ranking: `rankForLowerHarm` (D-049), unchanged.
+- Falsification: `generateDifferentiatingExperiment` (Phase G, G2), unchanged;
+  `TAU_DISCRIMINABILITY` imported from `observationGap.ts`, never redefined.
+- The CI→sigma glue: `buildFinalistPredictions`, exported from
+  `govDrugDiscoveryCampaign.ts` for this reuse rather than re-derived — its
+  parameter type was narrowed from `A3CandidateView[]` to the minimal shape
+  it actually reads (`{report: A2CandidateReport}[]`), a pure widening of a
+  stated dependency, zero behaviour change for the campaign's own call site
+  (verified: 27/27 campaign tests, `5179c99f`/`f528c881` unchanged after the
+  export).
+- Safety/governance adjudication: `evaluatePracticalCandidate` / `surfaceFor`
+  — the SAME gate A2's own winner path uses, unchanged.
+
+This file supplies only the glue: diversity check, TOP10/TOP2 selection,
+frozen-criteria record, and the WINNER conjunction.
+
+### Diversity/redundancy check — honest, not a collapse mechanism
+
+All three qualifiers (native GLP-1, liraglutide, exenatide) share the
+**identical** mechanism signature: GLP-1R-only, no GIPR/GCGR engagement.
+`checkDiversity` does **not** collapse them — sharing a primary target does
+not make three real, pharmacologically distinct molecules the same
+candidate. It reports the honest limit instead: `distinctMechanismClasses:
+1`. Every multi-target candidate (tirzepatide, orforglipron, cotadutide) was
+already eliminated upstream by the safety veto or efficacy floor, not by
+this check.
+
+### The WINNER conjunction — three named criteria, none skippable
+
+```
+G2_SEPARATES_TOP2  ∧  AGREES_WITH_PRE_EXPERIMENT_RANK  ∧  FAVOURED_CANDIDATE_PASSES_SAFETY_GATE
+```
+
+`AGREES_WITH_PRE_EXPERIMENT_RANK` is the mandate's own rule made numeric:
+G2 may confirm which of the frozen pre-experiment TOP2 is better, but it may
+never **promote** a candidate the ranking did not already prefer — G2
+falsifies, it does not re-rank.
+
+### The real result on the real 12-candidate space
+
+```
+TOP2: native GLP-1 (#1 pre-rank, score 1.2750) vs liraglutide (#2, score -0.0457)
+G2: selects EFFICACY_DELTA_PP, separates the pair fully (100% falsificationPower, 0 unresolved)
+    — G2 favours liraglutide (expected -0.01 vs GLP-1's +0.29)
+Gate: BOTH candidates independently REFUSE on EVIDENCE_SUFFICIENT
+      (1 and 2 efficacy observations; minimum is 3)
+VERDICT: NO_WINNER
+```
+
+Two independent, honest reasons, neither engineered:
+
+1. **G2 disagrees with the pre-rank.** G2's rigorous discriminability
+   computation confirms, on a *different* method, the same tension the
+   ranking stage's raw-dimension check already found (D-049): liraglutide's
+   efficacy margin is genuinely better than GLP-1's, even though GLP-1's
+   *safety-weighted composite* is higher. Two independent methods agreeing
+   is a real cross-check, not a coincidence engineered for this report.
+2. **Governance readiness, independently.** `MINIMUM_OBSERVATIONS = 3` (an
+   existing, unmodified constant) is not cleared by either candidate in this
+   pinned dataset — each candidate here rests on 1–2 real trials. This is a
+   genuine structural limit of the current candidate space's evidence
+   depth, disclosed rather than worked around by loosening what counts as
+   an observation (which would only ever be considered as a separate,
+   explicit, frozen-before-the-fact policy decision — not something this
+   commit does by fiat).
+
+### `unresolvedContradictions` are real G2 findings, never `[]`
+
+D-038 flagged a dead gate elsewhere in this codebase where
+`unresolvedContradictions` was hardcoded to an empty array. This funnel
+feeds the gate the **actual** G2 `unresolvedPairs` naming this candidate —
+empty exactly when G2 genuinely found none (the real case here), non-empty
+and specific when it didn't (tested with a synthetic stuck pair). Evidence-
+quality caveats (e.g. "single-study, fragile") are deliberately **not**
+folded into `unresolvedContradictions` — that field means contradictory
+evidence, not weak evidence, and conflating the two would be a real category
+error.
+
+### Tests: 20/20
+
+Real numbers pinned for the real run (TOP2 identities, G2's exact expected
+outcomes, both REFUSE reasons, the diversity signature groups). Since the
+real data only ever exercises the NO_WINNER branch, `decideFunnelVerdict`
+is exported and driven with synthetic G2/adjudication inputs to prove the
+WINNER path is genuinely reachable and that each of the three conjuncts
+independently blocks it when false — not just theoretically present in the
+code.
+
+### What this commit does NOT do
+
+Does not touch efficacy, thresholds, or A2/campaign/E2E-01 historical logic
+— verified by re-running `a2:demo` (RR 2.71, CONFLICTING_EVIDENCE unchanged),
+`e2e:gov-campaign` (`5179c99f`/`f528c881` unchanged), `e2e:gov-drug`
+(`399221f5`/`f528c881` unchanged), and both prior LOWER-HARM/adjudication
+demo scripts (still pass). Does not build Public Value/ROI/Funding layers or
+any UI — explicitly deferred.
+
+Gate: **6105 frontend tests, 0 failures.** tsc clean, eslint clean.

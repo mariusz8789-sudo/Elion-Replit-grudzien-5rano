@@ -80,6 +80,7 @@ const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m)
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
 const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard').then((m) => ({ default: m.VirtualLabDashboard })));
 const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
+const SimWorldDashboard = lazy(() => import('./components/SimWorldDashboard').then((m) => ({ default: m.SimWorldDashboard })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -127,6 +128,7 @@ type Route =
   | { kind: 'physics-cms-z' }
   | { kind: 'virtual-bio' }
   | { kind: 'research-console' }
+  | { kind: 'sim-world' }
   | { kind: 'campaign' }
   | { kind: 'generate' }
   | { kind: 'compare' }
@@ -179,6 +181,7 @@ function parseHash(): Route {
   if (h === '#/physics/cms-z') return { kind: 'physics-cms-z' };
   if (h === '#/virtual-bio') return { kind: 'virtual-bio' };
   if (h === '#/research-console') return { kind: 'research-console' };
+  if (h === '#/sim-world') return { kind: 'sim-world' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
@@ -440,6 +443,18 @@ export default function App() {
           <TopBar title="🧭 Genesis Research Console" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GenesisConsole />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'sim-world') {
+      return (
+        <div className="app">
+          <TopBar title="🪐 Sim World" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <SimWorldDashboard />
           </HeavyRoute>
           {overlays}
         </div>

@@ -391,12 +391,60 @@ export function extractCandidateSafety(
 // Falsification (§9) + existential safety veto
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether a safety veto may be drawn without regard to how the comparison was
+ * obtained. Named so the legacy branch is impossible to select by accident.
+ *
+ * `HISTORICAL_NO_EVIDENCE_CLASS` reproduces the behaviour every frozen run in
+ * this repository was computed under, including the veto documented in
+ * docs/DECISIONS.md D-042. It exists so those runs stay byte-reproducible,
+ * not because it is correct.
+ *
+ * `EVIDENCE_CLASS_GATED` enforces the D-042 invariant: within one safety
+ * category, only the best-supported comparison may veto. A cross-trial
+ * comparison cannot veto while a same-trial randomised one is present, and
+ * when it vetoes because nothing better exists, the failure message says so.
+ */
+export type A2EvidencePolicy = 'HISTORICAL_NO_EVIDENCE_CLASS' | 'EVIDENCE_CLASS_GATED';
+
+/** Higher is stronger. Mirrors `evidenceProvenance.ts::EVIDENCE_CLASS_RANK` in this file's own vocabulary. */
+const COMPARISON_RANK: Readonly<Record<A2ComparisonType, number>> = {
+  DIRECT_HEAD_TO_HEAD: 3,
+  NAIVE_INDIRECT: 2,
+  NO_COMPARISON: 1,
+};
+
 export interface A2FalsificationResult {
   readonly failures: readonly string[];
   readonly worseSafetySignal: A2SafetyCategoryResult | null;
+  readonly evidencePolicy: A2EvidencePolicy;
+  /** Audit trail: comparisons that WOULD have vetoed but were outranked. Empty under the historical policy. */
+  readonly supersededByStrongerEvidence: readonly string[];
 }
 
-export function falsifyCandidate(efficacy: readonly A2EfficacyEvidence[], safety: readonly A2SafetyCategoryResult[]): A2FalsificationResult {
+/**
+ * Of the rows sharing one safety category key, the ones a veto may rest on:
+ * every row at the strongest available comparison type. Rows of that category
+ * obtained more weakly are returned separately so the caller can record what
+ * it declined to act on rather than discarding it silently.
+ */
+function partitionByEvidenceStrength(safety: readonly A2SafetyCategoryResult[]): { readonly admissible: readonly A2SafetyCategoryResult[]; readonly superseded: readonly A2SafetyCategoryResult[] } {
+  const strongestByKey = new Map<string, number>();
+  for (const s of safety) {
+    const rank = COMPARISON_RANK[s.comparisonType];
+    const current = strongestByKey.get(s.key);
+    if (current === undefined || rank > current) strongestByKey.set(s.key, rank);
+  }
+  const admissible: A2SafetyCategoryResult[] = [];
+  const superseded: A2SafetyCategoryResult[] = [];
+  for (const s of safety) {
+    if (COMPARISON_RANK[s.comparisonType] === strongestByKey.get(s.key)) admissible.push(s);
+    else superseded.push(s);
+  }
+  return { admissible, superseded };
+}
+
+export function falsifyCandidate(efficacy: readonly A2EfficacyEvidence[], safety: readonly A2SafetyCategoryResult[], evidencePolicy: A2EvidencePolicy): A2FalsificationResult {
   const failures: string[] = [];
   if (efficacy.length === 0) failures.push('No usable efficacy evidence at all.');
   if (efficacy.every((e) => e.comparisonType === 'NO_COMPARISON')) failures.push('No trial permits any numeric comparison to semaglutide.');
@@ -405,17 +453,29 @@ export function falsifyCandidate(efficacy: readonly A2EfficacyEvidence[], safety
   }
   if (efficacy.length === 1 && efficacy[0].comparisonType !== 'DIRECT_HEAD_TO_HEAD') failures.push('Single-study evidence with no direct head-to-head trial: fragile, not independently replicated.');
 
+  const gated = evidencePolicy === 'EVIDENCE_CLASS_GATED';
+  const { admissible, superseded } = gated ? partitionByEvidenceStrength(safety) : { admissible: safety, superseded: [] as readonly A2SafetyCategoryResult[] };
+
+  const wouldHaveVetoed = (s: A2SafetyCategoryResult): boolean =>
+    s.riskRatio !== null && s.riskRatioCi95 !== null && s.riskRatio > A2_PREREGISTRATION.effectSizeThresholds.safetyRiskRatioMeaningfulDeviation && s.riskRatioCi95.low > 1;
+
+  const supersededByStrongerEvidence = superseded
+    .filter(wouldHaveVetoed)
+    .map((s) => `Safety category "${s.label}": a ${s.comparisonType} comparison (RR ${(s.riskRatio ?? 0).toFixed(2)}) would have vetoed, but a better-supported comparison of the same category is available and was used instead.`);
+
   let worseSafetySignal: A2SafetyCategoryResult | null = null;
-  for (const s of safety) {
+  for (const s of admissible) {
     if (s.riskRatio === null || s.riskRatioCi95 === null) continue;
-    const meaningfullyWorse = s.riskRatio > A2_PREREGISTRATION.effectSizeThresholds.safetyRiskRatioMeaningfulDeviation && s.riskRatioCi95.low > 1;
-    if (meaningfullyWorse) {
-      failures.push(`Safety category "${s.label}": risk ratio ${s.riskRatio.toFixed(2)} (95% CI [${s.riskRatioCi95.low.toFixed(2)}, ${s.riskRatioCi95.high.toFixed(2)}]) vs semaglutide — worse, CI excludes 1.`);
-      if (worseSafetySignal === null || (s.riskRatio ?? 0) > (worseSafetySignal.riskRatio ?? 0)) worseSafetySignal = s;
-    }
+    if (!wouldHaveVetoed(s)) continue;
+    // Under the gated policy an indirect veto survives only because nothing
+    // stronger exists for this category — which the message must state, since
+    // a reader of the verdict cannot otherwise tell.
+    const qualifier = gated && s.comparisonType !== 'DIRECT_HEAD_TO_HEAD' ? ` [rests on ${s.comparisonType} evidence; no direct comparison available for this category]` : '';
+    failures.push(`Safety category "${s.label}": risk ratio ${s.riskRatio.toFixed(2)} (95% CI [${s.riskRatioCi95.low.toFixed(2)}, ${s.riskRatioCi95.high.toFixed(2)}]) vs semaglutide — worse, CI excludes 1.${qualifier}`);
+    if (worseSafetySignal === null || (s.riskRatio ?? 0) > (worseSafetySignal.riskRatio ?? 0)) worseSafetySignal = s;
   }
 
-  return { failures, worseSafetySignal };
+  return { failures, worseSafetySignal, evidencePolicy, supersededByStrongerEvidence };
 }
 
 // ---------------------------------------------------------------------------
@@ -648,7 +708,11 @@ function buildCandidateReport(summary: A2CandidateSummary): A2CandidateReport {
     break; // first usable AE-bearing trial only — documented limitation, not silently aggregated across differently-dosed trials.
   }
 
-  const falsification = falsifyCandidate(efficacy, safety);
+  // The frozen A2/A3/E2E-01/campaign runs were all computed under this policy.
+  // Changing it here would rewrite history; the evidence-class-gated path is
+  // exercised by the re-adjudication, which is a separate run with its own
+  // fingerprint (docs/DECISIONS.md D-042, D-043).
+  const falsification = falsifyCandidate(efficacy, safety, 'HISTORICAL_NO_EVIDENCE_CLASS');
   const belief = runCandidateBeliefRevision(summary.moleculeChemblId, efficacy, safety);
   const score = scoreCandidate(summary, efficacy, safety, falsification);
 

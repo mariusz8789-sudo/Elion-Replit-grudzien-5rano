@@ -2357,3 +2357,60 @@ Nie dotyka `a2OzempicSubstitute.ts`. Nie zmienia progu. Nie wiąże niczego z
 `falsifyCandidate`. Nie rusza `5179c99f` ani `399221f5`/`f528c881`/
 `f4804820`/`44f245c9`. Testy `DEFECT:` z D-042 nadal przechodzą, bo defekt
 nadal tam jest — usunięcie go jest krokiem 5.
+
+## D-044 (2026-09-14) — krok 5 mandatu: klasa dowodu przestaje być etykietą
+## i wchodzi do bramki decyzyjnej. Historia bez zmian.
+
+**Zamrożone przebiegi są nietknięte i to jest zweryfikowane uruchomieniem**, nie
+przeczytaniem kodu: `399221f5`, `f528c881`, `5179c99f` identyczne, werdykty
+`CONFLICTING_EVIDENCE`/`NO_WINNER` identyczne, veto `Diarrhea risk ratio 2.71`
+nadal obecne w przebiegu historycznym.
+
+### Polityka jest parametrem WYMAGANYM, nie domyślnym
+
+`falsifyCandidate(efficacy, safety, evidencePolicy)` — trzeci argument bez
+wartości domyślnej. Gdyby był domyślny, każdy nowy kod dziedziczyłby po cichu
+zachowanie, które D-042 udokumentowało jako wadliwe. Dwie wartości:
+
+- **`HISTORICAL_NO_EVIDENCE_CLASS`** — odtwarza dokładnie to, czym policzone są
+  wszystkie zamrożone przebiegi. Nazwa mówi wprost, że to tryb zastany.
+  Istnieje po to, żeby historia była odtwarzalna, **nie dlatego, że jest
+  poprawny**. `buildCandidateReport` przekazuje go jawnie, z komentarzem
+  w miejscu wywołania.
+- **`EVIDENCE_CLASS_GATED`** — w obrębie jednej kategorii bezpieczeństwa veto
+  może wyjść **tylko z najlepiej udokumentowanego porównania**.
+
+### Bramka jest dwustronna — i to jest w niej najważniejsze
+
+Bramka tłumi słabszy dowód **na rzecz mocniejszego**. Nie tłumi dowodu **za to,
+że jest słaby**. Bez tego drugiego warunku byłaby narzędziem do znikania
+niewygodnych wyników, a nie mechanizmem jakości. Oba kierunki mają test:
+
+1. gdy dla kategorii istnieje porównanie `DIRECT_HEAD_TO_HEAD`, porównanie
+   `NAIVE_INDIRECT` **nie może** wywołać veta — RR 2.71 znika z listy failures;
+2. gdy nic mocniejszego nie istnieje, `NAIVE_INDIRECT` **nadal** wywołuje veto,
+   ale komunikat mówi wprost `[rests on NAIVE_INDIRECT evidence; no direct
+   comparison available for this category]`. Czytelnik werdyktu inaczej nie ma
+   jak tego rozpoznać.
+
+### Nic nie jest wyrzucane po cichu
+
+`supersededByStrongerEvidence` to ślad audytowy: porównania, które **by
+zawetowały**, ale zostały przebite. Milczące odrzucenie dowodu i jawne
+odnotowanie, że się go nie użyło, to dwie różne rzeczy — pierwsza jest tym,
+co wyprodukowało D-042.
+
+### Przepowiednia z D-042 się spełniła i o to chodziło
+
+Testy `DEFECT:` w `sourceTrialMismatch.test.ts` **padły** przy tej zmianie
+i zostały świadomie zaktualizowane — dokładnie tak, jak zapowiadał komentarz
+w nagłówku tego pliku. Naprawa jest widocznym, recenzowanym diffem, nie cichą
+zmianą werdyktu. Test historyczny zachowano pod nazwą
+`DEFECT (historical policy)`, bo defekt nadal tam jest — tyle że teraz wiadomo,
+pod którą polityką.
+
+### Czego ten commit NIE robi
+
+Nie zmienia progu `safetyRiskRatioMeaningfulDeviation: 1.0`. Nie przełącza
+żadnego istniejącego przebiegu na nową politykę. Nie wykonuje re-adjudykacji —
+to osobny krok, z osobnym identyfikatorem i osobnym odciskiem.

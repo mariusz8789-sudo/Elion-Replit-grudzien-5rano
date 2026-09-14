@@ -178,7 +178,7 @@ describe('A3 — §7 controlled safety-language vocabulary, never a bare "safe" 
       safety: [
         { key: 'nausea', label: 'Nausea', candidate: { numAffected: 5, numAtRisk: 100 }, reference: { numAffected: 20, numAtRisk: 100 }, riskRatio: 0.25, riskRatioCi95: { low: 0.1, high: 0.6 }, comparisonType: 'NAIVE_INDIRECT' as const },
       ],
-      falsification: { failures: [], worseSafetySignal: null },
+      falsification: { failures: [], worseSafetySignal: null, evidencePolicy: 'HISTORICAL_NO_EVIDENCE_CLASS' as const, supersededByStrongerEvidence: [] },
       belief: {} as A2CandidateReport['belief'],
       score: { moleculeChemblId: 'TEST', prefName: 'TEST', efficacyScore: 0, safetyScore: 0.8, evidenceStrengthScore: 0.2, uncertaintyPenalty: 0, conflictPenalty: 0, weightedScore: 1, vetoed: false, vetoReason: null },
     };

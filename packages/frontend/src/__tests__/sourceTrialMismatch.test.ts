@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractCandidateSafety,
   falsifyCandidate,
+  type A2SafetyCategoryResult,
   type A2TrialRecord,
 } from '../core/biotechData/a2OzempicSubstitute';
 import tirzepatideTrialsRaw from '../core/biotechData/a2-ozempic-substitute/trials-CHEMBL4297839.json';
@@ -125,22 +126,61 @@ describe('SOURCE_TRIAL_MISMATCH — the higher-quality evidence that exists and 
     expect(TIRZEPATIDE_TRIALS.some((t) => t.nctId === 'NCT03987919')).toBe(false);
   });
 
-  it('DEFECT: the comparison is labelled NAIVE_INDIRECT and vetoes anyway', () => {
+  it('DEFECT (historical policy): the comparison is labelled NAIVE_INDIRECT and vetoes anyway', () => {
     const trial = TIRZEPATIDE_TRIALS.find((t) => t.nctId === 'NCT03322631')!;
     const safety = extractCandidateSafety(trial, '5 mg/10 mg/15 mg Tirzepatide (Cohort 2)', SURPASS_2, REFERENCE_GROUP_TITLE);
 
     // The engine knows the comparison is weak...
     for (const s of safety) expect(s.comparisonType).toBe('NAIVE_INDIRECT');
 
-    // ...and the veto fires regardless: `falsifyCandidate` never reads comparisonType.
-    const { failures, worseSafetySignal } = falsifyCandidate([], safety);
+    // ...and under the policy every frozen run in this repository was computed
+    // with, the veto fires regardless: comparisonType is never read.
+    const { failures, worseSafetySignal, supersededByStrongerEvidence } = falsifyCandidate([], safety, 'HISTORICAL_NO_EVIDENCE_CLASS');
     expect(failures.some((f) => /Diarrhea.*2\.71.*worse, CI excludes 1/.test(f))).toBe(true);
     expect(worseSafetySignal).not.toBeNull();
+    expect(supersededByStrongerEvidence).toEqual([]);
+  });
 
-    // The invariant this violates, stated so the fix has something to satisfy:
-    // a safety veto must not be drawn from lower-quality evidence while
-    // higher-quality direct evidence is available, without recording why the
-    // direct evidence could not be used.
+  it('GATED: the same indirect veto is suppressed once a direct comparison of that category exists', () => {
+    const trial = TIRZEPATIDE_TRIALS.find((t) => t.nctId === 'NCT03322631')!;
+    const indirect = extractCandidateSafety(trial, '5 mg/10 mg/15 mg Tirzepatide (Cohort 2)', SURPASS_2, REFERENCE_GROUP_TITLE);
+
+    // The same diarrhoea category, measured inside SURPASS-2 itself, at the
+    // dose the historical selection rule would pick (highest mg).
+    const direct: A2SafetyCategoryResult = {
+      key: 'diarrhea',
+      label: 'Diarrhea',
+      candidate: { numAffected: 65, numAtRisk: 470 },
+      reference: { numAffected: 54, numAtRisk: 469 },
+      riskRatio: 1.2011,
+      riskRatioCi95: { low: 0.8571, high: 1.6833 },
+      comparisonType: 'DIRECT_HEAD_TO_HEAD',
+    };
+
+    const gated = falsifyCandidate([], [...indirect, direct], 'EVIDENCE_CLASS_GATED');
+
+    // The 2.71 no longer appears among the failures...
+    expect(gated.failures.some((f) => /2\.71/.test(f))).toBe(false);
+    // ...and the direct one does not veto either, because its interval includes 1.
+    expect(gated.failures.some((f) => /Diarrhea/.test(f))).toBe(false);
+    // What it did instead of vetoing is on the record, not discarded.
+    expect(gated.supersededByStrongerEvidence.some((m) => /NAIVE_INDIRECT.*2\.71.*better-supported/.test(m))).toBe(true);
+    expect(gated.evidencePolicy).toBe('EVIDENCE_CLASS_GATED');
+  });
+
+  it('GATED: an indirect veto still fires when nothing stronger exists, and says so', () => {
+    // The gate suppresses weaker evidence in favour of stronger evidence. It
+    // does NOT suppress evidence for being weak. Without this case the gate
+    // would be a way to make inconvenient findings disappear.
+    const trial = TIRZEPATIDE_TRIALS.find((t) => t.nctId === 'NCT03322631')!;
+    const indirect = extractCandidateSafety(trial, '5 mg/10 mg/15 mg Tirzepatide (Cohort 2)', SURPASS_2, REFERENCE_GROUP_TITLE);
+
+    const gated = falsifyCandidate([], indirect, 'EVIDENCE_CLASS_GATED');
+    const diarrheaFailure = gated.failures.find((f) => /Diarrhea/.test(f));
+    expect(diarrheaFailure).toBeDefined();
+    expect(diarrheaFailure).toMatch(/2\.71/);
+    expect(diarrheaFailure).toMatch(/rests on NAIVE_INDIRECT evidence; no direct comparison available/);
+    expect(gated.supersededByStrongerEvidence).toEqual([]);
   });
 
   it('DEFECT: an all-DIRECT comparison of the same two drugs does not clear the veto threshold', () => {

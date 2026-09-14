@@ -2011,6 +2011,69 @@ G7-DR z etykietami drabiny, R3, macierz ortogonalności, audyt 15 klas,
 generator pakietu publikacyjnego, Discovery #001. **BLOCKED: production
 network:** live L5/L6, G1 recheck `44f245c9`, Discovery #001 live.
 
+## D-040 (2026-09-14, PHASE G) — audyt KLASY „zegar w odcisku": 13 modułów
+zbadanych, 1 realny przeciek (już naprawiony), strażnik behawioralny
+
+**Powód:** recenzja postawiła słuszną tezę — skoro jeden `new Date()`
+przeciekł do inputu hashowania (D-039), **założeniem roboczym jest, że są
+następne**. Audyt wykonany, nie zadeklarowany.
+
+**Metoda:** 138 plików importuje `events/hash`; z nich **13** dotyka
+`new Date(` / `Date.now(` / `Math.random(` / `performance.now(`. Każdy z
+13 zbadany ręcznie pod kątem **przepływu** wartości do hasha (nie samego
+sąsiedztwa w pliku).
+
+**Wynik: 12 czystych, 1 przeciek — ten z D-039, już naprawiony.**
+Wzorce, które okazały się poprawne:
+- `discoveryReplicationEngine.ts` — `frozenAt: Date.now()` istnieje, ale
+  `base` hashowany zawiera wyłącznie `{discoveryDatasetFingerprint,
+  replicationDatasetFingerprint, disjointnessProof,
+  frozenBeforeReplicationAccess}`. Czas służy **wyłącznie asercji
+  kolejności** (`assertFreezePrecedesDataset`) — dokładnie tak, jak
+  reguła wymaga. Seeded-PRNG w atakach adwersarialnych wyprowadzony z
+  `fnv1a(seed)`, nie z `Math.random`.
+- `noveltyGate.ts`, `sovereignTruthAnswer.ts`, `scienceMemory.ts` —
+  odcisk liczony **przed** dopisaniem `recordedAt`/`createdAt`.
+- `hypothesisLoop.ts`, `worldCounterfactual.ts` — **wstrzykiwalny zegar**
+  (`now: () => Date = () => new Date()`), a `createdAt` jawnie poza
+  hashem.
+- `earthquakeEvidence.ts` — w ogóle nie hashuje.
+- `evidenceGuidedChat.ts`, `ScienceChat.tsx` — czas tylko w etykietach/
+  identyfikatorach UI, nie w odcisku.
+
+**Najmocniejszy dowód, że to KLASA, nie incydent:** cztery z czystych
+modułów niosą **jawne komentarze o dokładnie tej regule**, w tym
+`falsifiedModelRegistry.ts`, który dokumentuje **ten sam bug znaleziony i
+naprawiony tam wcześniej** — z zapisanymi odciskami sprzed naprawy
+(`e070289f` vs `dfbba267`). Reguła była już zasadą domu; D-039 był
+miejscem, gdzie się wyłamała.
+
+**REGUŁA, zapisana raz, wprost:** timestamp jest **proweniencją** — należy
+do rekordu i **może bramkować kolejność**. Nigdy nie jest inputem hasha.
+Jeśli odcisk naprawdę potrzebuje czasu, bierze **przypięty** czas z freeze
+tokenu, nigdy zegar z chwili liczenia.
+
+**Strażnik: behawioralny, nie lexykalny — i to jest istotne.**
+`fingerprintClockIndependence.test.ts` (**7/7**) uruchamia każdy punkt
+wejścia produkujący odcisk **dwa razy, z zegarem przesuniętym o pół
+roku**, i wymaga identycznego odcisku. Powód wyboru zapisany w pliku:
+**skaner lexykalny („żaden `Date.now()` w tej samej linii co `fnv1a`")
+NIE złapałby buga z D-039** — wywołanie zegara i wywołanie hasha były w
+różnych plikach, połączone wartością przechodzącą przez dwie warstwy.
+Pokryte punkty: TrialRegistry, PredictionRegistry, falsifiedModelRegistry,
+noveltyGate, GOV-DRUG-E2E-01 (`runFingerprint`),
+GOV-DRUG-CAMPAIGN-01 (`campaignFingerprint` + `trialRegistryFingerprint`),
+GenesisDiscoveryCertificate. Test certyfikatu asertuje **obie strony**:
+`issuedAt` realnie się różni między przebiegami, a `fingerprint` i
+`certificateId` nie. **Jawne ograniczenie zapisane w pliku:** pokrywa
+wymienione punkty, nie każdy hash w repo — nowa ścieżka odcisku nie jest
+chroniona automatycznie, trzeba ją tu dopisać.
+
+**Potwierdzenie stabilności historii (warunek zamknięcia recenzji):**
+wszystkie przypięte odciski **bez dryfu** po naprawie —
+`399221f5` (GOV-DRUG-E2E-01 replay), `f528c881` (prerejestracja E2E-01),
+`f4804820` (Kepler), `44f245c9` (QE4). Żaden nie drgnął.
+
 ## Co pozostaje jawnie nierozstrzygnięte (Phase G)
 
 Decyzja G0 (merge do main,

@@ -4674,3 +4674,123 @@ every new module wired to a real caller (`ChallengePanel.tsx`, mounted in
 `399221f5`/`f528c881` 18/18, `5179c99f` 16/16, `a5e0f164`/`4642088a` 14/14,
 lower-harm funnel `2e6eb55e` 5/5, `LOWER_HARM_PREREGISTRATION.fingerprint`
 still `c827c79c`, `genesis-mind-e2e.mjs` still 18/18 `NO_WINNER`.
+
+---
+
+## D-063 — THE BASELINE-COMPARISON PRIMITIVE + TWO GOVERNMENT SERVICES
+
+Three modules landed as WIP in `b8e7c17` (tsc/eslint clean, but **no tests, no
+E2E, no DECISIONS entry, no runtime caller**). This entry closes them. Before
+writing a line, the real state of every claimed element was verified against
+the repo rather than against the delivery note; the three "MISSING" findings
+below came out of that pass, and two of them are defects in my own code.
+
+### What this is, and what it deliberately is not
+
+`discoveryChallenge/baselineComparison.ts` extracts the "does candidate X beat
+baseline B on a counted outcome" primitive as its own independently-tested
+function. `compareCountedOutcomes` (the real Katz log-risk-ratio estimator)
+and `classifyComparisonEvidenceClass` (the real same-trial-vs-different-trial
+computed classification) are called UNMODIFIED — this file only assembles
+their output into a `BetterRule` input and a real `EvidenceInventoryItem[]`
+for `winnerGate.ts`. ZERO new science.
+
+`govServices/govClaimAudit.ts` and `govServices/govParametricTrigger.ts`
+answer "is this claim substantiated" and "did the pre-agreed condition occur".
+They return `AuditCertificate`/`TriggerCertificate`. **Neither is a
+`WinnerRecord`, and neither ever touches a Recipe Engine** — a claim is a
+statement about the world and a trigger is an event, not a candidate proposing
+to leave the research layer. `ResearchRecipeFull` remains reserved for a
+promoted WINNER.
+
+### Three defects found by writing the tests, not by reading the code
+
+1. **`MALFORMED_PROBLEM` was unreachable dead code.** `runClaimAudit` gated on
+   `parseProblem(...).status !== 'FORMALIZED'`. Reading `orchestrator/nl.ts`
+   (rather than assuming its contract) shows `parseProblem` inspects
+   `objectives` and `evidenceMinimum` and **never looks at `input.text`** —
+   and `runClaimAudit` supplies both as constants. So the gate could never
+   fire: a blank or whitespace-only claim parsed as FORMALIZED and, with one
+   strong-for item, would have been issued a SUBSTANTIATED certificate for
+   nothing at all. The claim text is this module's own required input, so the
+   guard now lives here. `parseProblem` is untouched — its contract is correct
+   for its own job.
+2. **The contradiction veto was conditional on support.** The verdict fired
+   `CONTRADICTED` only when `strongFor > 0 && strongAgainst > 0`, so a claim
+   that one randomised trial refutes and *nothing* supports was reported as
+   `INSUFFICIENT_EVIDENCE` — "we don't know yet" instead of "we know, and it's
+   false", the most consequential misreport a substantiation audit can make.
+   It also left the frozen rule's own `contradictionVeto: true` term doing
+   nothing. The veto is now unconditional and reads that term.
+3. **A failed fetch was reported as `AMBIGUOUS_TERMINAL`.** Both services
+   awaited `port.fetchBytes` outside any mapped try, so a network failure —
+   the single most common real failure — escaped to the outer catch and
+   returned the one code that tells an auditor nothing. Now classified
+   `INVALID_EVIDENCE_PROVENANCE` in both.
+
+### Two corrections of the integration plan TO the repo
+
+The delivery's closing checklist asked for two things that the real contracts
+refuse. Correcting the plan to the repo, not the repo to the plan:
+
+- **"Wire `baselineComparison` into `runDiscoveryChallenge` in place of the
+  margin mapping" — REFUSED, it would be a regression.** D-062's harm axis is
+  `-scoreCandidate(...).safetyScore`, an aggregate over eight declared harm
+  axes (nausea, vomiting, diarrhea, pancreatitis, gallbladder, hypoglycemia,
+  renal, serious AEs). `compareAgainstBaseline` takes ONE counted term.
+  Substituting it would silently narrow the decision to a single adverse-event
+  term and drop seven axes — the same "one synthetic margin replacing the
+  whole comparison" failure, inverted. Instead
+  `discoveryChallenge/d063DoseBaselineComparisons.ts` makes the per-term
+  arithmetic explicit and auditable across the trial's **whole** declared term
+  set, beside the decision path rather than inside it. `runDiscoveryChallenge`
+  is unchanged.
+- **"Register `CLAIM_AUDIT`/`PARAMETRIC_TRIGGER` in the domain registry" —
+  REFUSED, it is a category error.** `orchestrator/genesisDomainRegistry.ts`
+  dispatches **discovery pipelines**; every entry must return a
+  `GenesisDomainResult` (verdict/winner/recipe). Registering a claim audit
+  there would need either a cast or a widened discovery-result union that lets
+  a non-discovery object flow into discovery consumers — precisely the
+  `AuditCertificate ≠ ResearchRecipe` line this entry exists to hold. Precedent
+  in-repo: `runD062Discovery` is not registered there either. The services get
+  their own real surface instead (`govServices/ui/GovServicesPanel.tsx`,
+  mounted in `GenesisConsole.tsx`; `scripts/gov-wow-services-e2e.mjs`).
+
+### The real runs, on real pinned bytes
+
+All three read the SAME pinned SURPASS-2 (NCT03987919) record this repository
+has held since `2026-09-13T13:45:36Z`, through the same D-057 custody chain.
+`govServices/govServiceRuns.ts` is their real caller: real parsers computing
+from the fetched bytes, `supports` DERIVED from the risk ratio (never
+declared), evidence class from `classifyComparisonEvidenceClass`.
+
+- **BASELINE COMPARISON** — 21 real comparisons, 3 dose strata × the trial's
+  own ≥5% adverse-event term set, in registry order, no term selected or
+  dropped. Worst harm RR per dose: 5mg **1.3970** (Decreased appetite), 10mg
+  **1.4259** (Diarrhoea), 15mg **1.6764** (Decreased appetite). No dose clears
+  the frozen `harm < baseline` rule on its worst term — an independent,
+  per-term confirmation of D-062's NO_WINNER, computed by a different path.
+  `efficacy` is reported `null`, never fabricated as zero: SURPASS-2's efficacy
+  endpoint is a continuous HbA1c mean and supports no risk ratio.
+- **CLAIM AUDIT** — claim: *"Tirzepatide 15 mg is better tolerated than
+  semaglutide 1 mg on diarrhoea…"*. Real counts give RR **1.2011** against.
+  Verdict **CONTRADICTED**, no certificate.
+- **PARAMETRIC TRIGGER** — max serious-AE rate across the four randomised arms
+  is **0.07021**, below the threshold. Verdict **NOT_TRIGGERED**. The
+  threshold (0.08) is a STATED DEMONSTRATION CONTRACT PARAMETER, labelled as
+  such in the module, the panel and the E2E output — not a regulatory or
+  derived number. Everything else is computed from the pinned counts;
+  the series is participant-level (`seriousNumAffected`/`seriousNumAtRisk`),
+  never a sum over per-term rows that would count one participant once per
+  event.
+
+Two of the three answers are unfavourable. That is the demonstration: a claim
+the counts refuse comes back CONTRADICTED, and a condition that did not occur
+comes back NOT_TRIGGERED.
+
+### Gate
+
+`node scripts/gov-wow-services-e2e.mjs`: **22/22 properties held**. 37 new
+negative-first tests. `moduleReachability` clean — `GovServicesPanel.tsx`
+mounted in `GenesisConsole.tsx` gives all five new modules a real runtime
+caller; nothing added to `ALLOWED_ORPHANS`.

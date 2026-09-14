@@ -108,6 +108,17 @@ export async function runClaimAudit(opts: RunClaimAuditOptions): Promise<ClaimAu
   );
 
   try {
+    // THE CLAIM TEXT IS THIS MODULE'S OWN REQUIRED INPUT, AND ONLY THIS
+    // MODULE CAN CHECK IT. `parseProblem` (read, not assumed) inspects
+    // `objectives` and `evidenceMinimum` and never looks at `input.text` —
+    // and this function supplies both of those as constants. So the
+    // `NEEDS_INPUT` branch below can never fire here: without this guard a
+    // blank or whitespace-only claim parsed as FORMALIZED and could be
+    // issued a SUBSTANTIATED certificate for nothing at all. A claim audit
+    // with no claim is malformed by definition, so it fails closed here.
+    if (opts.claimText.trim().length === 0) {
+      throw new ClaimAuditFailClosedError('claim text is empty — there is nothing to substantiate', 'MALFORMED_PROBLEM');
+    }
     if (problem.status !== 'FORMALIZED') {
       throw new ClaimAuditFailClosedError(`claim is NEEDS_INPUT: ${problem.missingInputs.join('; ')}`, 'MALFORMED_PROBLEM');
     }
@@ -130,7 +141,17 @@ export async function runClaimAudit(opts: RunClaimAuditOptions): Promise<ClaimAu
         // the custody store, so the same real bytes are both hashed/frozen
         // AND parsed — never two independent fetches that could silently
         // diverge.
-        const bytes = await opts.port.fetchBytes(source);
+        // A FETCH THAT NEVER PRODUCED BYTES IS AN EVIDENCE-PROVENANCE
+        // FAILURE, NOT AN "AMBIGUOUS TERMINAL". Left unwrapped, the raw
+        // network error escaped to the outer catch and was reported as
+        // AMBIGUOUS_TERMINAL — the one code that tells an auditor nothing
+        // about what went wrong, for the single most common real failure.
+        let bytes: Uint8Array;
+        try {
+          bytes = await opts.port.fetchBytes(source);
+        } catch (fetchError) {
+          throw new ClaimAuditFailClosedError(`could not retrieve ${source.sourceId}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`, 'INVALID_EVIDENCE_PROVENANCE');
+        }
         const replayPort: ConnectorPort = { fetchBytes: async () => bytes };
         const custody = await verifyEvidenceCustody(opts.store, source, replayPort);
         custodyResults.push(custody);
@@ -149,9 +170,17 @@ export async function runClaimAudit(opts: RunClaimAuditOptions): Promise<ClaimAu
     const strongFor = evidence.filter((e) => e.supports === 'for' && isStrong(e.evidenceClass));
     const strongAgainst = evidence.filter((e) => e.supports === 'against' && isStrong(e.evidenceClass));
 
+    // THE CONTRADICTION VETO IS UNCONDITIONAL — it does not require the claim
+    // to also have support. An earlier draft fired CONTRADICTED only when
+    // `strongFor > 0 && strongAgainst > 0`, which reported a claim that ONE
+    // randomised trial refutes and NOTHING supports as INSUFFICIENT_EVIDENCE
+    // ("we don't know yet") instead of CONTRADICTED ("we know, and it's
+    // false") — the single most consequential misreport a substantiation
+    // audit can make, and it also left the frozen rule's own
+    // `contradictionVeto: true` term doing nothing. Strong evidence against a
+    // claim is decisive regardless of what stands beside it.
     let verdict: ClaimVerdict;
-    if (evidence.length === 0) verdict = 'INSUFFICIENT_EVIDENCE';
-    else if (strongFor.length > 0 && strongAgainst.length > 0) verdict = 'CONTRADICTED';
+    if (rule.contradictionVeto && strongAgainst.length > 0) verdict = 'CONTRADICTED';
     else if (strongFor.length >= rule.minStrongFor) verdict = 'SUBSTANTIATED';
     else verdict = 'INSUFFICIENT_EVIDENCE';
     // UNVERIFIABLE_PROVENANCE is reachable only by a caller that skips the

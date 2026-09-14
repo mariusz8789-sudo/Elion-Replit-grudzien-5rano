@@ -110,7 +110,16 @@ export async function runParametricTrigger(opts: RunTriggerOptions): Promise<Tri
         if (opts.store === undefined || opts.port === undefined) {
           throw new TriggerFailClosedError('PRODUCTION mode requires a custody-verified evidence source; none was supplied', 'INVALID_EVIDENCE_PROVENANCE');
         }
-        const bytes = await opts.port.fetchBytes(source);
+        // Same classification fix as `govClaimAudit.ts`: a fetch that never
+        // produced bytes is an evidence-provenance failure, not an
+        // "ambiguous terminal". An unwrapped network error escaping to the
+        // outer catch reports the one code that tells an auditor nothing.
+        let bytes: Uint8Array;
+        try {
+          bytes = await opts.port.fetchBytes(source);
+        } catch (fetchError) {
+          throw new TriggerFailClosedError(`could not retrieve ${source.sourceId}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`, 'INVALID_EVIDENCE_PROVENANCE');
+        }
         const replayPort: ConnectorPort = { fetchBytes: async () => bytes };
         const custody = await verifyEvidenceCustody(opts.store, source, replayPort);
         custodyResults.push(custody);

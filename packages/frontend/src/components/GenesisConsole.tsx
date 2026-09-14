@@ -12,6 +12,7 @@ import { FingerprintChip } from './genesis-ui/FingerprintChip';
 import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPanel';
 import { MindPanel } from '../core/mind/ui/MindPanel';
 import { ChallengePanel } from '../core/discoveryChallenge/ui/ChallengePanel';
+import { GovServicesPanel } from '../core/govServices/ui/GovServicesPanel';
 
 /**
  * GENESIS RESEARCH CONSOLE — a read-only projection of one discovery-run
@@ -236,6 +237,7 @@ export function GenesisConsole(): React.ReactElement {
 
       <MindPanel />
       <ChallengePanel />
+      <GovServicesPanel />
       <EvidenceSourceStatusPanel />
     </div>
   );

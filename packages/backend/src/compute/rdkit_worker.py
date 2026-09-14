@@ -247,6 +247,63 @@ def main():
         }))
         return
 
+    # STRUCTURAL LIABILITY / DRUG-LIKENESS PANEL (D-074).
+    #
+    # Every number below is computed by RDKit itself from published, citable
+    # rule sets -- no fitted model of ours, no new dependency, no invented
+    # biology:
+    #   qed                  -> Bickerton et al., Nat Chem 2012 (rdkit.Chem.QED)
+    #   PAINS                -> Baell & Holloway, J Med Chem 2010 (RDKit FilterCatalog)
+    #   BRENK                -> Brenk et al., ChemMedChem 2008 (RDKit FilterCatalog)
+    #   NIH                  -> NIH/MLSMR screening-deck filters (RDKit FilterCatalog)
+    #   veber                -> Veber et al., J Med Chem 2002 (rotB <= 10, TPSA <= 140)
+    #
+    # WHAT THESE ARE NOT: they are STRUCTURAL LIABILITY and ORAL-BIOAVAILABILITY
+    # proxies -- assay-interference motifs, known reactive/toxicophoric
+    # substructures, and general drug-likeness. They are NOT an adverse-event
+    # prediction, NOT a toxicity model, and NOT target-specific. A caller that
+    # needs a real ADMET/toxicity estimate must use `compute/admetAdapter.mjs`
+    # (ADMET-AI), which reports BLOCKED_BY_RUNTIME when that model is absent
+    # rather than being silently replaced by this panel.
+    if cmd == "liabilities":
+        try:
+            from rdkit.Chem import QED
+            from rdkit.Chem import FilterCatalog
+            from rdkit.Chem.FilterCatalog import FilterCatalogParams
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "liability_catalogs_unavailable: %s" % e}))
+            return
+        params = FilterCatalogParams()
+        catalog_names = ["PAINS", "BRENK", "NIH"]
+        for name in catalog_names:
+            params.AddCatalog(getattr(FilterCatalogParams.FilterCatalogs, name))
+        catalog = FilterCatalog.FilterCatalog(params)
+        alerts = sorted({entry.GetDescription() for entry in catalog.GetMatches(mol)})
+        rot_b = Descriptors.NumRotatableBonds(mol)
+        tpsa = Descriptors.TPSA(mol)
+        mw = Descriptors.MolWt(mol)
+        logp = Crippen.MolLogP(mol)
+        hbd = Lipinski.NumHDonors(mol)
+        hba = Lipinski.NumHAcceptors(mol)
+        lipinski_violations = sum([mw > 500, logp > 5, hbd > 5, hba > 10])
+        veber_pass = bool(rot_b <= 10 and tpsa <= 140)
+        data = {
+            "qed": round(QED.qed(mol), 4),
+            "structuralAlertCount": len(alerts),
+            "structuralAlerts": alerts,
+            "lipinskiViolations": lipinski_violations,
+            "veberPass": 1 if veber_pass else 0,
+            "veberViolations": int(rot_b > 10) + int(tpsa > 140),
+            "rotatableBonds": rot_b,
+            "tpsa": round(tpsa, 3),
+        }
+        print(json.dumps({
+            "ok": True, "data": data, "engine": "RDKit " + rdkit.__version__,
+            "catalogs": catalog_names,
+            "canonicalSmiles": Chem.MolToSmiles(mol),
+        }))
+        return
+
     if cmd == "descriptors":
         mw = Descriptors.MolWt(mol)
         logp = Crippen.MolLogP(mol)

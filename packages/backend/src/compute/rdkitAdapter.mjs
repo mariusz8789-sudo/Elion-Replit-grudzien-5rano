@@ -74,6 +74,28 @@ export function descriptors(smiles) {
   }
 }
 
+/**
+ * REALNY panel liability/drug-likeness z RDKit (D-074): QED, alerty
+ * strukturalne PAINS/BRENK/NIH (FilterCatalog), reguły Lipinskiego i Vebera.
+ *
+ * To NIE jest predykcja ADMET/toksyczności i nie zastępuje `admetAdapter.mjs`
+ * — to opublikowane, deterministyczne reguły strukturalne liczone przez sam
+ * RDKit. Ten sam silnik co `descriptors()`, nowa komenda workera, zero nowych
+ * zależności i zero zmyślonej biologii.
+ */
+export function liabilities(smiles) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'liabilities', smiles: String(smiles ?? '') });
+    return r.ok
+      ? { ok: true, data: r.data, engine: r.engine, catalogs: r.catalogs, canonicalSmiles: r.canonicalSmiles }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Walidacja struktury SMILES przez RDKit (kanonizacja). */
 export function validate(smiles) {
   const d = detect();

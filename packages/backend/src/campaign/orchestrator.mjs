@@ -17,6 +17,8 @@ import { paretoFrontIndices, hypervolume2D, bestScalar } from './pareto.mjs';
 import { assertCampaignObjectivesD069 } from './objectiveGuardD069.mjs';
 import { endpointCategories } from './multiFidelity.mjs';
 import { analyzeAndDecide, isStop } from './nextExperiment.mjs';
+import { applyPredictionHardFilters, loadFrozenPredictionThresholds } from './predictionHardFilters.mjs';
+import { createLiabilityPredictionSource, LIABILITY_TERMS } from './molecularLiabilities.mjs';
 
 const scalar = (vec) => Object.values(vec).reduce((a, b) => a + b, 0);
 const hashState = (gen, smiles, strategy) =>
@@ -80,7 +82,7 @@ function persistDescriptorScienceRun(db, { campaignId, candidateId, projectId, r
   } catch { /* audyt best-effort, same discipline as describeAsRun's own saveRun call */ }
 }
 
-function makeCandidateRecord(db, campaignId, projectId, generation, proposal, objectives, constraints) {
+function makeCandidateRecord(db, campaignId, projectId, generation, proposal, objectives, constraints, predictionGate = null) {
   const run = describeAsRun(db, projectId, proposal.canonicalSmiles);
   if (run.status !== 'ok') {
     return { valid: false, status: 'rejected', rejectedReason: `descriptors_failed:${run.error ?? run.message}`, runIds: [run.runId], descriptors: {}, objectiveVector: {}, constraintViolations: [] };
@@ -89,15 +91,45 @@ function makeCandidateRecord(db, campaignId, projectId, generation, proposal, ob
   const violations = adapter.constraintViolations(desc, constraints);
   const objVecArr = adapter.objectiveVector(desc, objectives);
   const objectiveVector = Object.fromEntries(objectives.map((o, i) => [o.id, objVecArr[i]]));
-  const rejected = violations.length > 0;
+  let rejected = violations.length > 0;
+  let rejectedReason = rejected ? `constraint:${violations.map((v) => v.constraint).join(',')}` : null;
+
+  // ---- D-069 OPTION A, NOW ACTUALLY APPLIED (D-074) ----
+  // `predictionHardFilters.mjs` was built, tested and frozen for D-069 and had
+  // ZERO production callers until this line: its designed input
+  // (multiFidelity.mjs's ADMET/docking MODEL_ESTIMATEs) is BLOCKED_BY_RUNTIME
+  // wherever those heavy models are absent, so the gate could never run and
+  // the loop silently had no prediction filter at all.
+  //
+  // The filter is applied HERE — to the candidate, before it can ever reach
+  // `retained`, `recomputePareto` or `metricsSnapshot` — which is exactly
+  // D-069's own requirement that a model estimate may rule a candidate OUT
+  // and may never rank candidates IN. Nothing below touches `descriptors` or
+  // `objectiveVector`; a rejected candidate is still persisted in full, with
+  // its reason, never silently dropped.
+  let predictionRejection = null;
+  if (predictionGate && !rejected) {
+    const { survivors, rejections } = applyPredictionHardFilters(
+      [{ canonicalSmiles: proposal.canonicalSmiles }],
+      predictionGate.predictionsFor,
+      predictionGate.thresholds,
+    );
+    if (survivors.length === 0) {
+      predictionRejection = rejections[0] ?? { canonicalSmiles: proposal.canonicalSmiles, codes: ['PREDICTION_MISSING'] };
+      rejected = true;
+      rejectedReason = `prediction:${predictionRejection.codes.join(',')}`;
+    }
+  }
+
   return {
     valid: true,
     status: rejected ? 'rejected' : 'retained',
-    rejectedReason: rejected ? `constraint:${violations.map((v) => v.constraint).join(',')}` : null,
+    rejectedReason,
     runIds: [run.runId],
     descriptors: desc,
     objectiveVector,
     constraintViolations: violations,
+    predictionRejection,
     // Carried through, never persisted directly by addCandidate (extra keys
     // on the spread object are ignored there) -- the caller uses this to
     // bind persistDescriptorScienceRun to the REAL candidateId once
@@ -120,7 +152,7 @@ function selectParents(retained, strategy, k) {
  * Wykonuje kampanię. Zwraca podsumowanie. Wszystkie kandydaci, decyzje i
  * zdarzenia są utrwalane (append-only). `log` opcjonalny: (state, info)=>void.
  */
-export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () => false, onProgress = () => {} } = {}) {
+export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () => false, onProgress = () => {}, predictionGate: gateOverride = null } = {}) {
   let campaign = store.getCampaign(db, campaignId);
   if (!campaign) throw new Error('campaign_not_found');
   const { projectId } = campaign;
@@ -129,9 +161,43 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
   // are frozen hard filters, never objectives, and hypervolume2D silently
   // truncates past two dimensions — a mis-set campaign.objectiveVector row
   // in the database could otherwise defeat both without any error.
-  const predictionTerms = [...Object.keys(endpointCategories()), 'bestAffinityKcalMol'];
+  const predictionTerms = [...Object.keys(endpointCategories()), 'bestAffinityKcalMol', ...LIABILITY_TERMS];
   const objectivesGuard = assertCampaignObjectivesD069(objectives, predictionTerms);
   if (!objectivesGuard.ok) throw new Error(`FAIL_CLOSED[${objectivesGuard.code}]: ${objectivesGuard.reason}`);
+
+  // ---- D-069 prediction gate: EXPLICIT OPT-IN, then FAIL CLOSED (D-074) ----
+  // Opt-in, because today's benchmark campaigns (scripts/campaign-demo.mjs and
+  // the existing test suites) legitimately run without a liability gate and
+  // must keep behaving byte-identically. Opted in, there is no soft path: a
+  // missing or fingerprint-mismatched threshold file aborts the campaign
+  // rather than quietly degrading to "no filter", which is precisely what
+  // `loadFrozenPredictionThresholds` was written to refuse.
+  //
+  // The config rides in `strategy` — the same persisted, free-form JSON blob
+  // `startingSmiles` already uses, so it round-trips through the DB and
+  // survives `nextExperiment`'s `{...strategy}` spread across generations
+  // without a schema migration. The frozen rule itself is recorded in the
+  // append-only event log below, which is stronger provenance than a column.
+  let predictionGate = null;
+  const gateConfig = gateOverride ?? campaign.strategy?.predictionGate ?? null;
+  if (gateConfig?.enabled) {
+    const loaded = loadFrozenPredictionThresholds(
+      gateConfig.thresholdsPath,
+      gateConfig.expectedRuleFingerprint,
+    );
+    if (!loaded.ok) throw new Error(`FAIL_CLOSED[${loaded.code}]: ${loaded.reason}`);
+    const source = createLiabilityPredictionSource();
+    predictionGate = { thresholds: loaded.thresholds, predictionsFor: source.predictionsFor, source };
+    store.addEvent(db, {
+      campaignId, generation: 0, type: 'PREDICTION_GATE_FROZEN',
+      payload: {
+        ruleFingerprint: loaded.thresholds.ruleFingerprint,
+        terms: loaded.thresholds.terms,
+        evidenceClass: loaded.thresholds.evidenceClass ?? null,
+        source: loaded.thresholds.source ?? null,
+      },
+    });
+  }
   const constraints = campaign.constraints.length ? campaign.constraints : adapter.DEFAULT_CONSTRAINTS;
   const budget = { maxGenerations: 6, maxGeneratedCandidates: 400, ...campaign.budget };
   const stopping = { patience: 2, minImprovement: 1e-3, diversityFloor: 0.15, ...campaign.stopping };
@@ -161,7 +227,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
     }
     if (seenCanonical.has(canon.canonicalSmiles)) continue;
     seenCanonical.add(canon.canonicalSmiles);
-    const rec = makeCandidateRecord(db, campaignId, projectId, 0, { canonicalSmiles: canon.canonicalSmiles }, objectives, constraints);
+    const rec = makeCandidateRecord(db, campaignId, projectId, 0, { canonicalSmiles: canon.canonicalSmiles }, objectives, constraints, predictionGate);
     totalGenerated++;
     const id = store.addCandidate(db, { campaignId, generation: 0, canonicalSmiles: canon.canonicalSmiles, ...rec });
     persistDescriptorScienceRun(db, { campaignId, candidateId: id, projectId, run: rec.scienceRun });
@@ -211,7 +277,7 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
       }
       seenCanonical.add(prop.canonicalSmiles);
       const parent = parents.find((p) => p.canonicalSmiles === prop.parentSmiles) ?? null;
-      const rec = makeCandidateRecord(db, campaignId, projectId, generation, prop, objectives, constraints);
+      const rec = makeCandidateRecord(db, campaignId, projectId, generation, prop, objectives, constraints, predictionGate);
       totalGenerated++;
       const id = store.addCandidate(db, {
         campaignId, generation, parentId: parent?.id ?? null, parentSmiles: prop.parentSmiles,

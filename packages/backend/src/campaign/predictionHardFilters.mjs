@@ -35,7 +35,15 @@ export const FROZEN_PREDICTION_THRESHOLDS_PATH = process.env.GENESIS_PREDICTION_
  */
 function readTerm(p, term) {
   if (term === 'bestAffinityKcalMol') return Number.isFinite(p?.affinityKcalMol) ? p.affinityKcalMol : null;
-  const v = p?.admet?.[term] ?? p?.tox?.[term];
+  // `liab` (D-074) is a THIRD, deliberately separate bucket: RDKit-computed
+  // deterministic structural-liability / drug-likeness rules
+  // (campaign/molecularLiabilities.mjs), evidenceClass COMPUTATIONAL. It is
+  // read alongside — never merged into — `admet`/`tox`, which carry
+  // multiFidelity.mjs's genuine MODEL_ESTIMATE output. Keeping the buckets
+  // distinct is what lets a reader of a rejection code tell which KIND of
+  // evidence rejected a candidate; collapsing them would blur a deterministic
+  // rule and a model estimate into one indistinguishable number.
+  const v = p?.admet?.[term] ?? p?.tox?.[term] ?? p?.liab?.[term];
   return Number.isFinite(v) ? v : null;
 }
 

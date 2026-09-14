@@ -2252,3 +2252,108 @@ Nie podnosi i nie obniża progu. Nie przepisuje RR ręcznie. Nie dotyka
 `5179c99f` ani odcisków `399221f5`, `f528c881`, `f4804820`, `44f245c9`.
 Nie wykonuje ingestu (krok 3) i nie wykonuje re-adjudykacji (krok 8) —
 mandat wprost zakazuje łączenia ich w jednym commicie.
+
+## D-043 (2026-09-14) — krok 3+4 mandatu: kontrakt proweniencji dowodu
+## i ingest SURPASS-2 jako DIRECT_RANDOMISED. Zero zmian werdyktu.
+
+**Ten commit nie jest podpięty do żadnej decyzji.** Nic nie woła nowego
+kontraktu w ścieżce werdyktu. Bramka wchodzi w kroku 5, re-adjudykacja w
+kroku 8 — mandat wprost zakazuje łączenia ingestu z re-adjudykacją w jednym
+commicie, i to jest respektowane.
+
+### Co powstało i dlaczego akurat tak
+
+`core/agent/evidenceProvenance.ts` — **domain-neutral**, nie biotechowy.
+Defekt z D-042 nie jest o lekach; jest o obserwacji, która przechodzi przez
+granicę modułu bez **tożsamości badania źródłowego** i bez **klasy
+dowodowej**. Każda przyszła domena powtórzy go, jeśli oba pola nie będą
+podróżować razem z liczbą.
+
+**Klasa dowodowa jest LICZONA, nie deklarowana.** `classifyComparisonEvidenceClass(a, b)`
+zwraca `DIRECT_RANDOMISED` tylko wtedy, gdy oba ramiona pochodzą z **tego
+samego** randomizowanego badania — bo tylko wtedy zostały zrandomizowane
+przeciwko sobie. Różne badania → `INDIRECT_RANDOMISED`, choćby każde z nich
+było bez zarzutu. Nierandomizowane źródło degraduje całość do
+`OBSERVATIONAL`. Ta sama dyscyplina co
+`discoveryContracts.ts::classifyDiscoveryStatus`:
+`assertComparisonEvidenceClass` przelicza i rzuca, gdy ktoś klasę *wpisał*
+zamiast *wyprowadzić*.
+
+**`yieldsRiskRatio` jest predykatem, nie rangą.** FAERS i pokrewne systemy
+zgłoszeń spontanicznych nie mają mianownika — liczba eksponowanych osób jest
+nieznana, więc *rate*, a więc i risk ratio, **nie daje się z nich utworzyć w
+ogóle**. To mocniejsze stwierdzenie niż „słaby dowód" i dlatego ma osobny
+predykat, a nie niską pozycję w rankingu.
+
+**Wybór nigdy po wielkości efektu.** `selectDecisionComparison` sortuje po
+klasie, potem po **liczbie zdarzeń**. Nigdy po RR. Selekcja po mierzonym
+efekcie to mechanizm, którym pipeline przesiewowy produkuje własne
+„odkrycia". Test dowodzi tego na przypadku, w którym większy RR ma słabszy
+dowód — czyli dokładnie na naszym.
+
+**Brak danych nie jest zerem.** `compareCountedOutcomes` zwraca `null`, gdy
+któreś ramię ma zero zdarzeń: przedział Katza jest tam nieokreślony, a
+poprawka ciągłości byłaby liczbą wymyśloną. `surpass2Observation` rzuca na
+nieopublikowanym terminie zamiast zwrócić `0/469` — milczenie rejestru nie
+jest dowodem nieobecności.
+
+**Zegar poza hashem (D-040).** `retrievedAt` jest w rekordzie jako
+proweniencja i **jest jawnie odrzucany** przy liczeniu odcisku. Test
+przesuwa zegar o rok: odcisk się nie rusza. Drugi test zmienia sha256
+źródła: odcisk **się rusza**. Obie strony, nie tylko wygodna.
+
+### Ingest: `core/biotechData/surpass2DirectEvidence.ts`
+
+Czyta **te same zapinowane bajty**, które są w repo od `2026-09-13T13:45:36Z`,
+i wystawia wszystkie cztery ramiona jako obserwacje z tożsamością. Nowych
+danych nie sprowadzono — nie było skąd, sieć jest zamknięta. Odblokowano
+**dostęp** do ramion, które już tu leżały.
+
+**Proweniencja jest weryfikowana, nie cytowana.** Test **przelicza sha256 z
+pliku na dysku** i porównuje ze stałą w module. Gdyby plik drgnął, test pada.
+Skrót surowej odpowiedzi upstream trzymany jest **osobno** od skrótu pliku
+zwężonego — to dwa różne artefakty i zlepienie ich jest sposobem, w jaki
+łańcuch proweniencji po cichu przestaje cokolwiek znaczyć.
+
+**`codingSystem: null`, nie `'MedDRA 23.1'`.** Zwężony fixture nie niesie
+wersji MedDRA. Pakiet zewnętrzny ją podaje. Przepisanie jej stąd byłoby
+dokładnie tym pożyczonym twierdzeniem, którego ten moduł odmawia.
+
+**Populacja podróżuje z liczbą** (`SURPASS2_POPULATION`, T2D na metforminie,
+40 tygodni), żeby liczba z cukrzycy nigdy nie została po cichu odczytana
+jako liczba z otyłości.
+
+### Co pokazują liczby bezpośrednie (arytmetyka, nadal nie werdykt)
+
+Trzy ramiona vs semaglutide 1 mg, biegunka, **wszystkie w jednym badaniu**:
+
+| ramię | n/N | RR | CI95 |
+|---|---|---|---|
+| 5 mg | 62/470 | 1.1457 | [0.8141, 1.6123] |
+| 10 mg | 77/469 | **1.4259** | **[1.0318, 1.9706]** |
+| 15 mg | 65/470 | 1.2011 | [0.8571, 1.6833] |
+
+Tylko przedział ramienia 10 mg przekracza 1. Porównanie napędzające obecne
+veto stoi na **59 zdarzeniach z dwóch badań**; to na **131 z jednego**.
+Mianowniki różnią się o jednego uczestnika między ramionami, więc to nie są
+proste ilorazy liczników — test pinuje wartości do sześciu miejsc.
+
+**Zapisane, bo przemawia na korzyść kandydata:** wymioty odwracają kierunek
+w porównaniu bezpośrednim (ramię 5 mg RR < 1). Dowód, który pomaga
+kandydatowi, jest dowodem.
+
+### Testy
+
+`evidenceProvenance.test.ts` (**25/25**) i `surpass2DirectEvidence.test.ts`
+(**15/15**). Negatywy napisane pierwsze: obserwacja bez badania, bez ramienia,
+z mianownikiem ramienia niezgodnym z mianownikiem wyniku, z liczbą zdarzeń
+większą niż liczba uczestników, porównanie dwóch różnych terminów, porównanie
+ramienia z samym sobą, klasa wpisana zamiast wyprowadzonej, veto ze słabszego
+dowodu bez waiveru, waiver bez powodu, waiver bez autora.
+
+### Czego ten commit NIE robi
+
+Nie dotyka `a2OzempicSubstitute.ts`. Nie zmienia progu. Nie wiąże niczego z
+`falsifyCandidate`. Nie rusza `5179c99f` ani `399221f5`/`f528c881`/
+`f4804820`/`44f245c9`. Testy `DEFECT:` z D-042 nadal przechodzą, bo defekt
+nadal tam jest — usunięcie go jest krokiem 5.

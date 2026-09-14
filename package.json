@@ -35,6 +35,8 @@
     "a2:demo": "node scripts/a2-ozempic-substitute-demonstrator.mjs",
     "a3:demo": "node scripts/a3-government-drug-recommendation-demonstrator.mjs",
     "e2e:gov-drug": "node scripts/gov-drug-discovery-e2e-scenario.mjs",
+    "genesis-adjudication:demo": "node scripts/genesis-adjudication-protocol-demo.mjs",
+    "a2-readjudication:demo": "node scripts/gov-drug-a2-surpass2-readjudication.mjs",
     "e2e:gov-campaign": "node scripts/gov-drug-discovery-campaign.mjs",
     "e2e:gov-campaign:browser": "node scripts/gov-drug-campaign-browser-e2e.mjs",
     "e2e:gov-drug:demo": "node scripts/gov-drug-discovery-e2e-demo-capture.mjs",

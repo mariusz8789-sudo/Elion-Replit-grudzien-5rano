@@ -2582,3 +2582,162 @@ touch `scoreCandidate`. Does not touch efficacy. Does not modify
 further refactor — stopping here as instructed.
 
 Gate: **6007 frontend tests, 0 failures.** tsc clean, eslint clean.
+
+## D-047 (2026-09-14) — GENESIS ADJUDICATION PROTOCOL: the discipline of
+## D-042 through D-046 made a reusable, phase-locked, fail-closed contract
+
+**Not a fix. A recipe.** D-042 through D-046 did the right thing once, by
+hand: freeze the rule, re-check it before use, never overwrite the historical
+result. This entry makes that discipline **machine-enforced and reusable**
+for the next study — a different candidate, a different trial, a different
+domain — without rebuilding it from scratch each time.
+
+### The enforced order
+
+```
+PRE_REGISTRATION -> FROZEN -> EXECUTED -> READJUDICATED -> COMPARED -> AUDITED
+```
+
+Each phase function's **input type is the previous phase's output type** —
+calling them out of order is a compile error before it is ever a runtime
+one. A runtime `assertPhase` check backs that up for anything crossing a
+type boundary (e.g. a value received from outside TypeScript's view).
+
+### This file makes NO scientific decision — verified, not just claimed
+
+`core/agent/genesisAdjudicationProtocol.ts` never computes a risk ratio,
+never picks a dose, never decides a verdict. The domain supplies its own
+rule type, its own evidence records, and a `runResult` callback; the
+protocol only enforces **when** that callback may run and preserves **what**
+it produced. `a2AdjudicationReferenceImplementation.test.ts` checks this
+against the reference implementation's own source text, not against a
+comment: asserts `falsifyCandidate`/`scoreCandidate`/`decideA2Verdict` are
+**not redefined** in that file, and that it genuinely imports the protocol
+module, `evidenceProvenance.ts`, and `a2Surpass2ReAdjudication.ts` rather
+than merely describing that it does.
+
+### Two HARK guards, doing two different jobs
+
+1. **`execute()`** re-fingerprints the rule at the moment of use and refuses
+   to run if it differs from what was frozen — catches a rule silently
+   mutated between freeze and execution.
+2. **`readjudicate()`** diffs the historical rule against the new rule
+   field-by-field and refuses unless every difference was named in advance
+   in `allowedRuleChanges` — catches a re-adjudication that changes more
+   than the one thing it declared it would ("one change at a time",
+   formalized). Both fire **live**, in this process, in
+   `scripts/genesis-adjudication-protocol-demo.mjs` — not only inside the
+   vitest suite:
+
+```
+execute() HARK guard #1 fired as expected: ...the rule supplied at
+execution (fingerprint 00633f7a) does not match the rule frozen...
+readjudicate() HARK guard #2 fired as expected: ...changed undeclared
+rule field(s): threshold. Only doseSelectionRule were declared changeable.
+```
+
+### Reproducibility is not a step to remember — it is enforced at the point of use
+
+`execute()` calls the domain's `runResult` **twice** on the identical input
+and refuses to proceed if the two runs disagree, so non-determinism is
+caught at the moment it would otherwise enter the record. For the reference
+case this means `runA2Analysis()`/`runReAdjudication()` — which re-derive
+from the pinned fixtures on every call, nothing cached — are genuinely
+re-run twice inside a single `execute()` call, not merely asked to return a
+stored value.
+
+### Evidence identity — real integration, decision-inert (finding L, closed honestly)
+
+Every `AuditedEvidenceRecord` must carry source, hash (unless custody is
+`NO_ACCESS`), custody status, evidence class, the method that computed the
+class, and a ranking fingerprint — `assertAuditedEvidenceRecord` rejects a
+record missing any of these before `execute()` will run at all.
+
+`evidenceProvenance.ts::classifyComparisonEvidenceClass` and
+`rankingFingerprint` are **genuinely called** by
+`a2AdjudicationReferenceImplementation.ts` to build these records — this is
+real, on-path integration, reached by a runnable script, not a claim.
+It is **decision-inert by design**: the label it produces is written into
+the audit report only. The actual veto/score decision still runs entirely
+on the pre-existing `A2ComparisonType` vocabulary inside
+`a2OzempicSubstitute.ts`, unchanged — avoiding exactly the second decision
+engine the mandate forbids. `moduleReachability.test.ts` states this
+distinction explicitly rather than overstating it.
+
+### OLD and NEW — never overwritten
+
+`ReAdjudicatedProtocol` holds `historical` and `reAdjudicated` as two
+distinct fields for the life of the object; `audit()` builds its report from
+the new run but the old one remains reachable through the same chain. A
+test constructs a case where `runResult` returns `{label:'OLD_RESULT'}` for
+the historical rule and `{label:'NEW_RESULT'}` for the new one and asserts
+**both** survive intact into the audited object.
+
+### The reference case, reusing existing decision functions unmodified
+
+`core/biotechData/a2AdjudicationReferenceImplementation.ts` re-runs the
+SURPASS-2/tirzepatide diarrhea case (D-042–D-046) through the protocol.
+Both the historical and gated results are asserted, field-for-field, to
+match `runReAdjudication()` called directly — this file adds no new
+number, only structure around an already-verified one.
+
+**The GENESIS ADJUDICATION REPORT for this case, printed by
+`printReport()`, in full:**
+
+```
+1. WHAT WAS TESTED: Tirzepatide (CHEMBL4297839) diarrhea safety veto vs
+   semaglutide, re-adjudicated under an evidence-class-gated policy using
+   SURPASS-2 (NCT03987919) direct within-trial arms.
+2. EVIDENCE: NCT03322631 cohort-2 (5/16) vs NCT03987919 semaglutide (54/469)
+   [PINNED_VERIFIED]; NCT03987919 15mg tirz (65/470) vs same-trial
+   semaglutide (54/469) [PINNED_VERIFIED].
+3. CLASSIFICATION: INDIRECT_RANDOMISED / DIRECT_RANDOMISED via
+   evidenceProvenance.ts::classifyComparisonEvidenceClass.
+4. RULES FROZEN: threshold=1.0, doseSelectionRule=HIGHEST_DOSE,
+   evidencePolicy=EVIDENCE_CLASS_GATED (only field declared changeable).
+5. RESULT: vetoed=true, overall verdict CONFLICTING_EVIDENCE.
+6. CHANGED: diarrhea veto superseded (RR 1.20, CI includes 1, direct)
+   replacing RR 2.71 (indirect, n=16).
+7. UNCHANGED: efficacy, dose rule, threshold, scoreCandidate/decideA2Verdict,
+   overall verdict.
+8. REMAINING VETO: structural serious AE, RR 2.0725 CI [1.0828, 3.9667],
+   DIRECT_HEAD_TO_HEAD.
+9. REMOVED VETO: diarrhea, RR 2.7141 CI [1.2581, 5.8553], NAIVE_INDIRECT.
+10. WHY: gated policy admits only the strongest comparison per category;
+    SURPASS-2 independently supplies DIRECT evidence for a different
+    category too, so the candidate stays vetoed — not engineered.
+11. REPRODUCIBILITY: reproducible=true (enforced inside execute()).
+12. AUDIT STATUS: PASS.
+```
+
+### Files
+
+`core/agent/genesisAdjudicationProtocol.ts` (30/30 tests) — the generic
+protocol. `core/biotechData/a2AdjudicationReferenceImplementation.ts`
+(10/10 tests) — reference implementation #1.
+`scripts/genesis-adjudication-protocol-demo.mjs` (runnable, `npm run
+genesis-adjudication:demo`) — prints the full report and triggers both HARK
+guards live. `moduleReachability.test.ts` updated: both new modules are
+genuinely reached (by the reference implementation and the demo script),
+not merely described as such.
+
+### GENESIS RECIPE
+
+```
+INPUT -> VERIFY -> CLASSIFY -> FREEZE -> EXECUTE -> FALSIFY
+-> RE-ADJUDICATE -> COMPARE -> AUDIT -> REPRODUCE
+```
+
+Exported as `GENESIS_RECIPE`, a literal string, so any future caller can
+assert against it rather than retype it.
+
+### What this commit does NOT do
+
+Does not touch the 1.0 threshold, dose selection, `scoreCandidate`, or
+`decideA2Verdict`. Does not modify `a2OzempicSubstitute.ts`. Does not start
+LOWER-HARM (mandate step 10). Historical `a2:demo` output verified
+byte-identical after this commit; both prior demonstrator scripts
+(`gov-drug-a2-surpass2-readjudication.mjs`, this file's own demo) still
+exit 0.
+
+Gate: **6047 frontend tests, 0 failures.** tsc clean, eslint clean.

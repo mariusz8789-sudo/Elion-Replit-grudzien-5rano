@@ -2124,3 +2124,131 @@ deploy produkcyjny) — użytkownik przekierował pytanie o nią na inny tor
 (podział 20/80) zamiast na nią odpowiedzieć; pozostaje otwarta i nie
 zostanie ruszona bez wyraźnej zgody. G1, G3-G8 z mandatu Qwena czekają na
 dalsze doprecyzowanie przez Qwena (przekazany osobny prompt).
+
+## D-042 (2026-09-14) — SOURCE_TRIAL_MISMATCH: veto „diarrhea RR 2.71"
+## pochodzi z ramienia n=16, podczas gdy bezpośrednie head-to-head tych
+## samych dwóch leków leży zapinowane obok i nigdy nie jest czytane
+
+**Status: FINDING, nie naprawa.** Ten commit nie zmienia ani jednego progu,
+ani jednej linii logiki decyzyjnej, ani jednego historycznego odcisku.
+Re-adjudykacja jest osobnym, jawnie oznaczonym krokiem i osobnym commitem —
+tak jak nakazuje mandat (pkt 6-9).
+
+### Co było hipotezą, a co jest faktem
+
+Zewnętrzna recenzja (pakiet Deep Research v2) postawiła hipotezę
+`COMPARATOR_MISMATCH`: że veto powstało z porównania tirzepatidu **do
+placebo** albo do puli non-GLP-1, bo meta-analiza vs placebo daje
+RR 2.94 — liczbę podejrzanie bliską naszemu 2.71.
+
+**Ta hipoteza jest sfalsyfikowana przez nasze własne zapinowane dane.**
+Komparatorem jest semaglutide, w badaniu randomizowanym, i w pliku
+referencyjnym nie ma ramienia placebo w ogóle.
+
+Prawdziwa przyczyna jest inna — i poważniejsza, bo nie da się jej naprawić
+wymianą źródła.
+
+### Trace (runtime, `scripts/gov-drug-discovery-campaign.mjs`)
+
+```
+licznik    NCT03322631  "A Study of Tirzepatide in Japanese Participants With T2D"
+           eventGroup EG002 "5 mg/10 mg/15 mg Tirzepatide (Cohort 2)"
+           Diarrhoea      5 / 16
+mianownik  NCT03987919  SURPASS-2
+           eventGroup EG003 "1 mg Semaglutide"
+           Diarrhoea     54 / 469
+RR = (5/16) / (54/469) = 2.7141   CI95 [1.258, 5.855]
+```
+
+Veto zapala się, bo dolna granica przedziału przekracza 1 — **na pięciu
+zdarzeniach**.
+
+### Trzy przyczyny strukturalne, każda zweryfikowana
+
+**(a) Bezpośredni dowód istnieje i jest nieosiągalny.** SURPASS-2 to
+randomizowane head-to-head dokładnie tych dwóch leków. Jego ramiona
+tirzepatidu — 62/470, 77/469, 65/470, ta sama wersja MedDRA, ten sam
+protokół, ta sama adjudykacja co mianownik — **nigdy nie trafiają na stronę
+kandydata**, bo SURPASS-2 żyje wyłącznie jako `reference-semaglutide-*.json`.
+`TRIALS_BY_MOLECULE['CHEMBL4297839']` to `[NCT03322631, NCT02759107,
+NCT04093752]`. Silnik trzyma odpowiedź w drugiej ręce i do niej nie sięga.
+
+**(b) Wybór badania jest arbitralny.** `buildCandidateReport`
+(`a2OzempicSubstitute.ts:644-650`) bierze **pierwsze** badanie z tabelą AE i
+robi `break`. Bez sortowania po N, po fazie, po jakości porównania. Wypadło
+n=16. Komentarz w tym miejscu uczciwie deklaruje, że to ograniczenie —
+deklaracja nie jest jednak bramką.
+
+**(c) Hierarchia dowodu jest etykietą, nie bramką.**
+`extractCandidateSafety` **poprawnie** oznacza wynik jako
+`comparisonType: 'NAIVE_INDIRECT'` — silnik *wie*, że porównuje między
+badaniami. `falsifyCandidate` (`:409-417`) **ani razu nie czyta
+`comparisonType`** przy nakładaniu veto. To jest sedno: system ma pojęcie
+jakości dowodu i gubi je dokładnie w punkcie, w którym zapada decyzja.
+
+### Dlaczego to jest problem klasy, a nie incydent
+
+Ten sam wzorzec powtórzy się w każdej nowej domenie, w której obserwacja
+przechodzi przez granicę modułu bez swojej **tożsamości badania źródłowego**
+i **klasy dowodowej**. Dlatego naprawa nie polega na podmianie jednego
+pliku fixture, tylko na kontrakcie obserwacji, w którym oba te pola są
+nieusuwalne — i na bramce, która je czyta. To krok 4 i 5 mandatu.
+
+**Niezmiennik do spełnienia, zapisany zanim cokolwiek go spełnia:**
+
+> Genesis nie może wyprowadzić safety veto z dowodu niższej jakości, jeżeli
+> dostępny jest bezpośredni dowód wyższej jakości, bez jawnego zapisu,
+> dlaczego bezpośredni dowód nie mógł zostać użyty.
+
+### Co mówią liczby bezpośrednie (arytmetyka, nie werdykt)
+
+Najgorsze z trzech ramion SURPASS-2 (10 mg) vs semaglutide 1 mg w tym samym
+badaniu: **RR 1.4259, CI95 [1.0318, 1.9706]**, na 131 zdarzeniach zamiast 5.
+Podaję to **wyłącznie po to, żeby rozmiar luki był na papierze**. To nie jest
+re-adjudykacja: nowy werdykt wymaga ingestu z proweniencją, bramki klasy
+dowodowej i osobnego, jawnie oznaczonego przebiegu. Stary werdykt zostaje.
+
+### Weryfikacja krzyżowa pakietu zewnętrznego — TREŚĆ zgodna, BAJTY nie
+
+Trzeba to rozdzielić, bo to dwie różne rzeczy i tylko jedna wyszła.
+
+**Treść: ZGODNA.** Surowe liczniki SURPASS-2 z pakietu v2 (62/470, 77/469,
+65/470, 54/469) są **identyczne** z plikiem zapinowanym w repozytorium od
+`2026-09-13T13:45:36Z`. Przeliczone przez nas niezależnie RR dla ramienia
+10 mg — **1.4259 [1.0318, 1.9706]** — odtwarza deklarowane przez pakiet
+**1.43 [1.03, 1.97]**. Dwa niezależne pobrania, ta sama treść.
+
+**Bajty: NIEZGODNE.** Nasze `meta.json` zapisuje dla tego samego URL-a
+`rawSha256 = 1e72fb8ddc9131e0a384d49b83ed2b5ed17915d805458fbc4c659d8c06f70f12`,
+`rawBytes = 120327`. Pakiet v2 deklaruje `683c4659…` i `120326` bajtów.
+**Różnica jednego bajtu i inny skrót** — najprawdopodobniej znak końca
+linii, ale **nie zgaduję: to jest UNVERIFIED**. Nie da się tego rozstrzygnąć
+w tej sesji, bo sieć jest zamknięta (`clinicaltrials.gov` →
+`CONNECT tunnel failed, response 403`, sprawdzone dziś). Status: **NO_ACCESS**.
+
+**Wniosek operacyjny:** pakiet v2 dostaje na tym pliku ocenę
+`CONTENT_VERIFIED / BYTES_UNVERIFIED`. Do ingestu (krok 3) używamy **naszego**
+pliku i **naszego** skrótu, bo tylko dla niego mamy własny łańcuch
+proweniencji. Skrót Qwena zapisujemy jako *deklarowany upstream*, nie jako
+potwierdzony. Pozostałe 12 plików pakietu przechodzą tę samą, osobną
+kontrolę przy swoim ingescie — żaden nie jest z góry zweryfikowany.
+
+To jest dokładnie powód, dla którego „nie przyjmuj deklaracji jako
+zweryfikowanych" jest regułą, a nie grzecznością: liczby się zgadzały,
+bajty nie, i tylko uruchomienie kontroli to pokazało.
+
+### Dowód zapisany w teście
+
+`packages/frontend/src/__tests__/sourceTrialMismatch.test.ts` (**8/8**).
+Test **charakteryzuje defekt**, nie pożądane zachowanie: pinuje 5/16, 54/469,
+2.7141, [1.258, 5.855], `NAIVE_INDIRECT` oraz nieobecność SURPASS-2 w puli
+kandydata. Cztery przypadki noszą prefiks `DEFECT:` i **mają paść**, gdy
+wejdzie bramka klasy dowodowej — to jest ich zadanie. Naprawa ma być
+widoczną, recenzowaną zmianą w tym pliku, nigdy cichą zmianą werdyktu.
+
+### Czego ten commit NIE robi
+
+Nie podnosi i nie obniża progu. Nie przepisuje RR ręcznie. Nie dotyka
+`5179c99f` ani odcisków `399221f5`, `f528c881`, `f4804820`, `44f245c9`.
+Nie wykonuje ingestu (krok 3) i nie wykonuje re-adjudykacji (krok 8) —
+mandat wprost zakazuje łączenia ich w jednym commicie.

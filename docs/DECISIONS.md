@@ -4059,3 +4059,211 @@ diff` showing zero changes there). Frontend production build clean.
 `moduleReachability.test.ts`: zero new undocumented orphans; two stale
 entries removed (`govDrugLowerHarmFunnel.ts`/`govDrugLowerHarmRanking.ts`,
 now genuinely reached from `main.tsx` for the first time).
+
+## D-059 (2026-09-14) — Genesis C2: problem-in generality + a second real
+## domain (E2E-01) + evidence custody for real runs, over the D-058 orchestrator
+
+A Qwen-authored gap analysis of D-058 identified exactly two real gaps and
+issued a scoped, binding mandate ("C2") to close them — nothing else. Scope
+lock (respected throughout): no second ranking/adjudication/falsification/
+recipe engine; `orchestrator.ts` decision logic untouched (ports/adapters
+only); Genesis Core/D-047/D-048/D-050/historical campaigns/anchors
+untouched; no threshold/veto/evidence-rule changes; no manufactured WINNER
+anywhere — `NO_WINNER`/`CONFLICTING_EVIDENCE` remain valid, expected
+outputs.
+
+### Gap 1a — problem-in generality: NL → StructuredExperimentRequest, fail-closed
+
+Both entry points (`govLowerHarmDiscovery.ts`, and the new
+`govE2E01Discovery.ts` below) accept an optional `problemInput` passed
+AS-IS to the EXISTING, unmodified `parseProblem` (D-055) — no defaults
+merged in when supplied. Before this, the structured `ProblemRecord` fields
+were always hardcoded regardless of caller input, so `parseProblem`'s own
+real fail-closed `NEEDS_INPUT` path was real code but structurally
+unreachable in practice. Verified by execution for BOTH domains: submitting
+free text only (no objectives/evidenceMinimum) reaches a real
+`verdict:'ABORTED'`, `abortReason:'NEEDS_INPUT'` — visible on the run
+record and, via `GenesisConsole.tsx`'s new "submit as a vague problem"
+checkbox, in the UI. Omitting `problemInput` keeps each domain's existing,
+fully-specified default problem — fully backward compatible with every
+D-058 caller/test.
+
+### Gap 1b — a second real domain, through the SAME orchestrator
+
+`core/orchestrator/govE2E01Adapters.ts` (NEW) wraps the E2E-01 domain
+(`core/biotechData/govDrugDiscoveryE2E.ts` — the real, 2671-candidate
+generated space, GENERATION→TIER_1→TIER_2→TOP3→six-attack deep
+falsification→`selectWinner`, historically verified by the pre-existing
+`npm run e2e:gov-drug` scenario, D-032) as a second, independent
+`OrchestratorAdapters` implementation — proving `runScientificDiscovery`
+(D-055) is a genuine engine, not a single hardcoded scenario. Every
+decision call is an EXISTING, unmodified function: `loadGeneratedCandidates`,
+`checkGenerationNotPinned`, `runTier1`, `runTier2`, `selectTop3`,
+`deepFalsify`, `selectWinner`, `generateResearchRecipe` (reused directly —
+its `A3CandidateView` parameter fits this domain exactly, unlike LOWER-HARM's
+`A2CandidateReport`, which is why D-058 needed a third domain-scoped
+recipe builder and this domain does not), plus `runA3GovernmentRecommendation`
+(the real population-gated candidate-view builder, A3/D-031) for
+`hardFilter()`.
+
+**TOP2 port, real TOP3 size.** `OrchestratorAdapters.top2()`'s signature
+(`contracts.ts`) is `(cs: readonly Candidate[]): readonly Candidate[]` —
+genuinely generic, no length-2 constraint anywhere in the type or in
+`orchestrator.ts`'s own stage logic; "TOP2" is a stage-name convention, not
+a runtime contract. This adapter's `top2()` calls the real `selectTop3` at
+its own real default size (3) rather than truncating to a pair, which would
+have risked changing this domain's own real, historically-verified
+dynamics for no reason.
+
+**Outcome mapping, disclosed.** `E2E01Outcome` has 5 values (adds
+`NO_SAFE_WINNER`); the generic `Verdict` union has 4. `NO_SAFE_WINNER`
+(every TOP3 candidate blocked by the existential safety veto) maps to the
+generic `NO_WINNER` — no candidate is named either way — with the real
+reason string preserved via `compare()`/`E2E01AdapterDiagnostics`, never
+silently dropped.
+
+`core/orchestrator/govE2E01Discovery.ts` (NEW) mirrors
+`govLowerHarmDiscovery.ts`'s exact shape (`runGovE2E01Discovery`/
+`replayGovE2E01Discovery`, `{kind:'RUN',...}`/`{kind:'EXECUTION_BLOCKED',...}`).
+New `E2E01FailClosedError` (`TOP3_INCOMPLETE`/`A3_NOT_ANSWERED`/
+`PORTS_CALLED_OUT_OF_ORDER`) — same discipline as D-058's
+`LowerHarmFailClosedError`.
+
+`core/orchestrator/genesisDomainRegistry.ts` (NEW) is the mandate's "adapter
+factory": a single, real, keyed dispatch point (`GENESIS_DOMAINS`,
+`getGenesisDomain`, `runGenesisDomainDiscovery`) over the two domain entry
+points — no logic of its own. `getGenesisDomain`/`runGenesisDomainDiscovery`
+throw `UnknownGenesisDomainError` for an unregistered id rather than
+guessing which real pipeline to run (verified by test). Both domains'
+options/result shapes are structurally identical (TypeScript accepts both
+`run`/`replay` assignments with no cast), which is what makes one generic
+registry entry honest rather than a forced fit.
+
+**Verified by execution:** `runGovE2E01Discovery({mode:'PRODUCTION'})`
+reaches `NO_WINNER` — matching the historical `npm run e2e:gov-drug`
+finding exactly (same preregistration `f528c881`, same TOP3
+[TIRZEPATIDE/GLP-1/PF-06291874], same safety-veto structural reason).
+Recipe stage `18_RECIPE_OR_LOCK` is `LOCKED`. Replay (`replayGovE2E01Discovery`)
+matches. `SYNTHETIC_TEST_ONLY` uses the SAME real pipeline (this domain has
+no separate engineered winner fixture — its own real data already produces
+the historical finding; building a second, engineered E2E-01 winner fixture
+was judged to BE the duplicate-engine risk the scope lock forbids), only
+skipping the D-059 custody gate.
+
+`core/orchestrator/evidenceClassMapping.ts` (NEW) extracts the
+`evidenceClassOf`/`strongestEvidenceClassForEfficacy` audit-layer mapping
+(decision-inert, mirrors `evidenceProvenance.ts`'s own established posture)
+that was duplicated between the two adapters into one shared helper,
+imported by both — avoiding exactly the kind of accidental drift a second
+copy invites.
+
+### Gap 2 — evidence custody for real (PRODUCTION) runs
+
+`core/orchestrator/evidenceCustody.ts` (NEW) — `verifyEvidenceCustody(store,
+source, port)` — layers a stricter policy on top of the REAL, unmodified
+D-057 `EvidenceConnectorStore`: no second store, no second hash-policy
+engine. `OrchestratorAdapters` ports are synchronous by contract
+(untouched, scope lock); the D-057 store is real async I/O. Reconciled by
+running custody verification as its own async gate in each entry point,
+BEFORE the synchronous pipeline starts — the already-resolved
+`EvidenceCustodyResult` is then injected into the adapter factory as a
+plain value the synchronous ports read/embed. `SYNTHETIC_TEST_ONLY` never
+goes through this gate (no real custody to verify for engineered evidence).
+
+Fail-closed, verified by execution for BOTH domains: a fetch failure or a
+detected hash drift (`HASH_MISMATCH_SUPERSEDED` — D-057's own store keeps
+this as a legitimate, disclosed re-freeze; this gate treats it as
+disqualifying for THIS run's integrity claim) returns
+`{kind:'EXECUTION_BLOCKED', code:'EVIDENCE_CUSTODY_FAILED'}` — no fallback
+to cached/unverified bytes, no fallback to toy/synthetic evidence, and the
+OLD frozen artifact is never overwritten (the store's own append-only
+history keeps both records; proven by reading `store.allRecords()` after a
+drift). A genuinely frozen + replay-verified artifact lets the run proceed,
+and the run record embeds the real `artifactId` + `sha256` hash on
+`result.evidenceCustody.record.artifact`.
+
+**A genuine bug found and fixed in the course of this work.** The D-057
+store mints a NEW `artifactId` on every `ingest()` call — even a
+"re-affirmed" one where the content hash is unchanged (the artifactId
+formula includes the store's own growing record count). The first version
+of `ingestEvidence()`'s provenance string embedded this artifactId, which
+meant two back-to-back PRODUCTION runs over identical, undrifted evidence
+produced DIFFERENT `auditFingerprint`s — silently breaking replay
+(mandate item 14/D-058, and this mandate's own replay requirement) for
+BOTH domains. Fixed by removing the artifactId from the provenance string
+in both `govLowerHarmAdapters.ts::ingestEvidence()` and
+`govE2E01Adapters.ts::ingestEvidence()`, keeping the stable `hash`/
+`hashPolicy` (identical across re-affirmed ingests, and what actually
+identifies the bytes) — the artifactId is still recorded in full on
+`result.evidenceCustody.record.artifact.artifactId` (satisfying gap 2a),
+just not folded into the replay-sensitive audit trail. Verified by
+execution: two PRODUCTION runs over unchanged pinned data now produce
+identical `auditFingerprint`s for both LOWER-HARM and E2E-01.
+
+### Gap 1c — UI source selector
+
+`GenesisConsole.tsx` extended (not replaced): the source selector's REAL_*
+modes now show a domain chip row (`GENESIS_DOMAINS`, LOWER_HARM/E2E01) and
+route through `runGenesisDomainDiscovery(domainId, opts)` instead of
+calling one domain's entry point directly. Per run: `domain` chip,
+`mode` chip (unchanged from D-058), `prereg fp` chip (stage
+`10_FREEZE_PREREG`'s own real fingerprint — reused, not a new concept),
+`run audit` fingerprint, and the verdict banner (unchanged). Evidence
+custody status (unchanged rendering from D-058) shows FROZEN/FAILED +
+hash/hashPolicy per real PRODUCTION run.
+
+### Tests (negative-first, all mandated items)
+
+`govLowerHarmDiscovery.test.ts`: rewritten for the now-async entry points
+(31 tests, was 20) — added vague-NL→NEEDS_INPUT, custody fetch-failure/
+drift/frozen-success/SYNTHETIC-skip, synthetic-fixture-unreachable-in-
+PRODUCTION (structural: no `SYNTH-` id appears anywhere in a real
+PRODUCTION run), unknown-domain-id-fails-closed. `govE2E01Discovery.test.ts`
+(NEW, 23 tests): TOP3_INCOMPLETE/A3_NOT_ANSWERED/PORTS_CALLED_OUT_OF_ORDER
+fail-closed, EXECUTION_BLOCKED frozen results, the same vague-NL/custody
+battery, the capstone (PRODUCTION reaches the historical `NO_WINNER`,
+replay matches, recipe LOCKED), registry dispatch, diagnostics. Economic
+firewall (mandate item 15) is a LOWER-HARM-only concept — E2E-01's
+`selectWinner`/`selectTop3` take no economic input at all, so there is
+nothing to inject; already proven for LOWER-HARM in D-058 and re-verified
+unchanged here.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881` unchanged, 18/18, `NO_WINNER`.
+`npm run e2e:gov-campaign`: `5179c99f` unchanged, 16/16. `npm run a2:demo`:
+`CONFLICTING_EVIDENCE`, 14/14, `a5e0f164`/`4642088a` unchanged. `npm run
+lower-harm-funnel:demo`: 5/5 invariants unchanged. `npm run
+physics-world:demo`: all 5 demos unchanged (M-COUL-001 still
+`thetaNumeric=0.9253`/`validationDelta=0.00196`, D-053's repair intact).
+
+### What this entry does NOT do
+
+Does not build a second ranking/adjudication/falsification/recipe engine —
+every decision function reused is pre-existing and unmodified in both
+domains. Does not touch `orchestrator.ts`'s decision logic, D-047, D-048,
+D-050, or Genesis Core. Does not change any threshold, veto, or evidence
+rule. Does not manufacture a WINNER anywhere — both domains' PRODUCTION
+runs honestly reach `NO_WINNER`. Does not build a third real domain (only
+the two the mandate specified). Does not change what "PRODUCTION READY"
+means for PYTHIA/Geant4 — unchanged from D-052/D-057/D-058.
+
+### The custody table (which runs, which evidence)
+
+| Run | Domain | Mode | Verdict | Evidence source | Artifact hash policy |
+|---|---|---|---|---|---|
+| `runGovLowerHarmDiscovery({mode:'PRODUCTION'})` | LOWER_HARM | PRODUCTION | `NO_WINNER` | `LOWER_HARM_A2_PINNED_DATASET` (real ChEMBL+ClinicalTrials.gov, `a2OzempicSubstitute.ts`) | sha256, FROZEN+replay-verified |
+| `runGovLowerHarmDiscovery({mode:'SYNTHETIC_TEST_ONLY'})` | LOWER_HARM | SYNTHETIC_TEST_ONLY | `WINNER` (engineered fixture, D-058) | none — custody gate skipped | n/a |
+| `runGovE2E01Discovery({mode:'PRODUCTION'})` | E2E01 | PRODUCTION | `NO_WINNER` | `E2E01_GENERATED_CANDIDATE_SPACE` (real, pinned, 2671-molecule ChEMBL-generated space, `govDrugDiscoveryE2E.ts`) | sha256, FROZEN+replay-verified |
+| `runGovE2E01Discovery({mode:'SYNTHETIC_TEST_ONLY'})` | E2E01 | SYNTHETIC_TEST_ONLY | `NO_WINNER` (same real data, no separate fixture — see gap 1b above) | none — custody gate skipped | n/a |
+
+Gate: **6299 frontend tests (1 skipped), 0 failures** (54 new/rewritten
+tests across `govLowerHarmDiscovery.test.ts`/`govE2E01Discovery.test.ts`;
+one unrelated timeout flake in `nextActionSelectors.test.ts` under full-
+suite parallel load — RDKit WASM init, nothing this entry touches —
+confirmed passing standalone and on a clean re-run of the full suite).
+**402 backend tests, 0 failures** (backend untouched, confirmed unchanged).
+tsc clean. eslint clean on every file this entry touched. Frontend
+production build clean. `moduleReachability.test.ts`: zero new
+undocumented orphans — every new file is reached from tests and/or
+`GenesisConsole.tsx`.

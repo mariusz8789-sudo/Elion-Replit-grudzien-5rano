@@ -3,7 +3,9 @@ import type React from 'react';
 import { runScientificDiscovery } from '../core/orchestrator/orchestrator';
 import { parseProblem } from '../core/orchestrator/nl';
 import { toyAdapters } from '../core/orchestrator/toyAdapters';
-import { runGovLowerHarmDiscovery, type ExecutionBlockedResult } from '../core/orchestrator/govLowerHarmDiscovery';
+import type { ExecutionBlockedResult } from '../core/orchestrator/govLowerHarmDiscovery';
+import { GENESIS_DOMAINS, runGenesisDomainDiscovery, type GenesisDomainId } from '../core/orchestrator/genesisDomainRegistry';
+import type { EvidenceCustodyResult } from '../core/orchestrator/evidenceCustody';
 import type { DiscoveryRun } from '../core/orchestrator/contracts';
 import { VerdictBanner } from './genesis-ui/VerdictBanner';
 import { FingerprintChip } from './genesis-ui/FingerprintChip';
@@ -15,22 +17,26 @@ import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPane
  * fingerprint shown below is exactly what the real functions it calls
  * returned — it never fabricates a `WinnerRecord`, a `Recipe`, or evidence.
  *
- * THREE SOURCES, ONE RENDERER (docs/DECISIONS.md D-058, mandate item 18 —
- * minimal UI, not a new engine):
+ * SANDBOX + TWO REAL DOMAINS, ONE RENDERER (docs/DECISIONS.md D-058/D-059,
+ * mandate item 18 / C2 gap 1c — minimal UI, not a new engine):
  *  - SANDBOX: `toyAdapters` — SYNTHETIC_TEST_ONLY fixtures, no real Genesis
  *    module underneath (D-055).
- *  - REAL — LOWER-HARM (production data): `runGovLowerHarmDiscovery({mode:
- *    'PRODUCTION'})` — the real pinned ChEMBL/ClinicalTrials.gov pipeline
- *    (D-058). Its honest result is NO_WINNER; this console does not hide
- *    or dress that up.
- *  - REAL — LOWER-HARM (synthetic winner demo): the same real pipeline fed
- *    the `SYNTHETIC_TEST_ONLY`-labelled fixture engineered so a WINNER
- *    genuinely emerges (D-058) — the positive E2E demonstration.
- * All three render through the exact same stage list below; only the
- * adapters (and, for the two REAL sources, the resulting `mode` chip)
- * differ. An `EXECUTION_BLOCKED` result (a real adapter refusing to
- * proceed, e.g. no real TOP2 pair) is rendered explicitly, never silently
- * dropped.
+ *  - REAL (production data): the selected `GENESIS_DOMAINS` domain
+ *    (`genesisDomainRegistry.ts`, D-059's real adapter factory) run via
+ *    `runGenesisDomainDiscovery(domainId, {mode:'PRODUCTION'})` — the real
+ *    pinned ChEMBL/ClinicalTrials.gov pipeline for that domain. LOWER-HARM's
+ *    honest result is NO_WINNER (D-058); E2E-01's matches its own
+ *    historical `npm run e2e:gov-drug` finding (also NO_WINNER, D-032).
+ *    This console does not hide or dress either result up.
+ *  - REAL (synthetic winner demo): the same real domain pipeline fed
+ *    `SYNTHETIC_TEST_ONLY` evidence — for LOWER-HARM, the engineered
+ *    fixture where a WINNER genuinely emerges (D-058); E2E-01 has no
+ *    separate engineered fixture (its own real data is reused, custody
+ *    gate skipped) — see `govE2E01Discovery.ts`'s header.
+ * All sources render through the exact same stage list below; only the
+ * domain/adapters (and the resulting `mode` chip) differ. An
+ * `EXECUTION_BLOCKED` result (a real adapter or the D-059 custody gate
+ * refusing to proceed) is rendered explicitly, never silently dropped.
  */
 
 type Source = 'SANDBOX' | 'REAL_PRODUCTION' | 'REAL_SYNTHETIC_WINNER_DEMO';
@@ -40,12 +46,19 @@ const DEFAULT_NL = 'Find a strategy that preserves efficacy but has a better ben
 export function GenesisConsole(): React.ReactElement {
   const [nl, setNl] = useState(DEFAULT_NL);
   const [source, setSource] = useState<Source>('SANDBOX');
+  const [domainId, setDomainId] = useState<GenesisDomainId>('LOWER_HARM');
+  const [vagueProblem, setVagueProblem] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
+  const [ranDomainId, setRanDomainId] = useState<GenesisDomainId | null>(null);
   const [blocked, setBlocked] = useState<ExecutionBlockedResult | null>(null);
+  const [custody, setCustody] = useState<EvidenceCustodyResult | null>(null);
 
-  const start = (): void => {
+  const start = async (): Promise<void> => {
     setBlocked(null);
+    setCustody(null);
     if (source === 'SANDBOX') {
+      setRanDomainId(null);
       const problem = parseProblem(
         `P-${Date.now()}`,
         {
@@ -63,12 +76,29 @@ export function GenesisConsole(): React.ReactElement {
       setRun(runScientificDiscovery(problem, toyAdapters, 'SYNTHETIC_TEST_ONLY'));
       return;
     }
-    const result = runGovLowerHarmDiscovery({ mode: source === 'REAL_PRODUCTION' ? 'PRODUCTION' : 'SYNTHETIC_TEST_ONLY', nl });
-    if (result.kind === 'EXECUTION_BLOCKED') {
-      setRun(null);
-      setBlocked(result);
-    } else {
-      setRun(result);
+    setBusy(true);
+    try {
+      // vagueProblem exercises the real fail-closed NEEDS_INPUT path (D-059
+      // gap 1a): submitting only free text, no objectives/evidenceMinimum,
+      // so parseProblem's own real logic — never a UI-side shortcut —
+      // decides this is underspecified. domainId is passed through
+      // genesisDomainRegistry.ts (D-059 gap 1b) rather than calling either
+      // domain's entry point directly.
+      const result = await runGenesisDomainDiscovery(domainId, {
+        mode: source === 'REAL_PRODUCTION' ? 'PRODUCTION' : 'SYNTHETIC_TEST_ONLY',
+        nl,
+        problemInput: vagueProblem ? { text: nl } : undefined,
+      });
+      setRanDomainId(domainId);
+      setCustody(result.evidenceCustody);
+      if (result.kind === 'EXECUTION_BLOCKED') {
+        setRun(null);
+        setBlocked(result);
+      } else {
+        setRun(result);
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -93,9 +123,24 @@ export function GenesisConsole(): React.ReactElement {
             </button>
           ))}
         </div>
+        {source !== 'SANDBOX' && (
+          <>
+            <div className="gu-locale-switch" style={{ margin: '4px 0', flexWrap: 'wrap' }}>
+              {GENESIS_DOMAINS.map((d) => (
+                <button key={d.domainId} type="button" className={domainId === d.domainId ? 'chip-btn primary' : 'chip-btn'} onClick={() => setDomainId(d.domainId)} title={d.label}>
+                  {d.domainId}
+                </button>
+              ))}
+            </div>
+            <label className="gu-hint" style={{ display: 'block', margin: '4px 0' }}>
+              <input type="checkbox" checked={vagueProblem} onChange={(e) => setVagueProblem(e.target.checked)} />
+              {' '}Submit as a vague problem (text only, no objectives/evidenceMinimum) — tests the real fail-closed NEEDS_INPUT path
+            </label>
+          </>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>
-          <button type="button" className="chip-btn primary" onClick={start}>
-            Run full scientific process
+          <button type="button" className="chip-btn primary" onClick={() => void start()} disabled={busy}>
+            {busy ? 'Running…' : 'Run full scientific process'}
           </button>
           <FingerprintChip
             label="source"
@@ -108,6 +153,14 @@ export function GenesisConsole(): React.ReactElement {
             }
           />
         </div>
+        {custody !== null && (
+          <p className="gu-hint" style={{ color: custody.ok ? undefined : 'var(--gold)' }}>
+            EVIDENCE CUSTODY: {custody.ok ? 'FROZEN + replay-verified' : `FAILED — ${custody.reason}`}
+            {custody.record?.artifact !== null && custody.record?.artifact !== undefined && (
+              <> (artifactId {custody.record.artifact.artifactId}, {custody.record.artifact.hashPolicy} {custody.record.artifact.hash.slice(0, 12)}…)</>
+            )}
+          </p>
+        )}
       </section>
 
       {blocked !== null && (
@@ -116,7 +169,10 @@ export function GenesisConsole(): React.ReactElement {
             <div className="gu-locked-icon">⛔</div>
             <h3>EXECUTION_BLOCKED [{blocked.code}]</h3>
             <p>{blocked.error}</p>
-            <FingerprintChip label="fp" value={blocked.fingerprint} />
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              {ranDomainId !== null && <FingerprintChip label="domain" value={ranDomainId} />}
+              <FingerprintChip label="fp" value={blocked.fingerprint} />
+            </div>
           </div>
         </section>
       )}
@@ -165,8 +221,12 @@ export function GenesisConsole(): React.ReactElement {
             </p>
             {run.nextExperiment !== undefined && <p className="gu-hint">NEXT EXPERIMENT: {run.nextExperiment}</p>}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-              <FingerprintChip label="run audit" value={run.auditFingerprint.slice(0, 12)} />
+              {ranDomainId !== null && <FingerprintChip label="domain" value={ranDomainId} />}
               <FingerprintChip label="mode" value={run.mode} />
+              <FingerprintChip label="run audit" value={run.auditFingerprint.slice(0, 12)} />
+              {run.stages.find((s) => s.stage === '10_FREEZE_PREREG') !== undefined && (
+                <FingerprintChip label="prereg fp" value={(run.stages.find((s) => s.stage === '10_FREEZE_PREREG')?.fingerprint ?? '').slice(0, 12)} />
+              )}
             </div>
           </section>
         </>

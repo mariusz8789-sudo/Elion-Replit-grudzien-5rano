@@ -16,7 +16,10 @@ import {
   LowerHarmFailClosedError,
 } from '../core/orchestrator/govLowerHarmAdapters';
 import { SYNTHETIC_WINNER_REPORTS, SYNTHETIC_WINNER_SUMMARIES } from '../core/orchestrator/syntheticWinnerFixture';
-import { runGovLowerHarmDiscovery, replayGovLowerHarmDiscovery } from '../core/orchestrator/govLowerHarmDiscovery';
+import { runGovLowerHarmDiscovery, replayGovLowerHarmDiscovery, LOWER_HARM_EVIDENCE_SOURCE } from '../core/orchestrator/govLowerHarmDiscovery';
+import { EvidenceConnectorStore } from '../core/evidenceConnectors/store';
+import type { ConnectorPort } from '../core/evidenceConnectors/contracts';
+import { getGenesisDomain, UnknownGenesisDomainError } from '../core/orchestrator/genesisDomainRegistry';
 import { parseProblem } from '../core/orchestrator/nl';
 import { canonicalJson, fnv1a } from '../core/events/hash';
 import type { ProblemRecord } from '../core/orchestrator/contracts';
@@ -207,9 +210,140 @@ describe('runGovLowerHarmDiscovery — EXECUTION_BLOCKED terminal state', () => 
     }).toThrow(LowerHarmFailClosedError);
   });
 
-  it('results are frozen — an EXECUTION_BLOCKED or RUN result can never be mutated after the fact', () => {
-    const prod = runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+  it('results are frozen — an EXECUTION_BLOCKED or RUN result can never be mutated after the fact', async () => {
+    const prod = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(Object.isFrozen(prod)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-059 gap 1a: a genuinely vague/underspecified problem reaches the real
+// fail-closed NEEDS_INPUT path — not silently filled in with defaults.
+// ---------------------------------------------------------------------------
+describe('D-059 gap 1a — problem-in generality: vague NL reaches real NEEDS_INPUT (negative-first)', () => {
+  it('submitting free text only (no objectives/evidenceMinimum) via problemInput aborts NEEDS_INPUT, visible on the run record', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION', problemInput: { text: 'find something better' } });
+    expect(result.kind).toBe('RUN');
+    if (result.kind !== 'RUN') return;
+    expect(result.verdict).toBe('ABORTED');
+    expect(result.abortReason).toContain('NEEDS_INPUT');
+  });
+
+  it('omitting problemInput keeps the default, fully-specified LOWER-HARM problem — NOT NEEDS_INPUT', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+    expect(result.kind).toBe('RUN');
+    if (result.kind !== 'RUN') return;
+    expect(result.verdict).not.toBe('ABORTED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-059 gap 2 — evidence custody for real runs (negative-first).
+// ---------------------------------------------------------------------------
+describe('D-059 gap 2 — evidence custody for PRODUCTION runs (negative-first)', () => {
+  it('a fetch failure fails the run closed: EXECUTION_BLOCKED, never a fallback to cached/toy evidence', async () => {
+    const store = new EvidenceConnectorStore();
+    const port: ConnectorPort = { fetchBytes: () => { throw new Error('network down'); } };
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION', evidenceStore: store, evidenceConnectorPort: port });
+    expect(result.kind).toBe('EXECUTION_BLOCKED');
+    if (result.kind !== 'EXECUTION_BLOCKED') return;
+    expect(result.code).toBe('EVIDENCE_CUSTODY_FAILED');
+    expect(result.evidenceCustody?.ok).toBe(false);
+  });
+
+  it('a tampered/drifted artifact fails the run closed, the OLD frozen artifact is preserved (append-only), never silently overwritten', async () => {
+    const store = new EvidenceConnectorStore();
+    let call = 0;
+    const port: ConnectorPort = {
+      async fetchBytes() {
+        call++;
+        const runIdx = Math.ceil(call / 2); // ingest+replay share one run's bytes; only flips between runs
+        return new TextEncoder().encode(runIdx === 1 ? 'ORIGINAL' : 'TAMPERED');
+      },
+    };
+    const first = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION', evidenceStore: store, evidenceConnectorPort: port });
+    expect(first.kind).toBe('RUN');
+
+    const second = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION', evidenceStore: store, evidenceConnectorPort: port });
+    expect(second.kind).toBe('EXECUTION_BLOCKED');
+    if (second.kind !== 'EXECUTION_BLOCKED') return;
+    expect(second.evidenceCustody?.record?.status).toBe('HASH_MISMATCH_SUPERSEDED');
+
+    const records = await store.allRecords(LOWER_HARM_EVIDENCE_SOURCE.sourceId);
+    expect(records.length).toBe(2);
+    expect(records[0]!.status).toBe('FROZEN'); // the original artifact — untouched, still in the append-only history
+    expect(records[1]!.status).toBe('HASH_MISMATCH_SUPERSEDED');
+  });
+
+  it('drift is reported explicitly in the replay result, never silently accepted', async () => {
+    const store = new EvidenceConnectorStore();
+    let call = 0;
+    const port: ConnectorPort = {
+      async fetchBytes() {
+        call++;
+        return new TextEncoder().encode(call === 1 ? 'ORIGINAL' : 'DRIFTED-DURING-REPLAY');
+      },
+    };
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION', evidenceStore: store, evidenceConnectorPort: port });
+    expect(result.kind).toBe('EXECUTION_BLOCKED');
+    if (result.kind !== 'EXECUTION_BLOCKED') return;
+    expect(result.evidenceCustody?.replay?.ok).toBe(false);
+    expect(result.evidenceCustody?.reason).toContain('replay did not reproduce');
+  });
+
+  it('a genuinely frozen + replay-verified artifact lets the run proceed, and the run record embeds artifactId + sha256 hash', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION', evidenceStore: new EvidenceConnectorStore() });
+    expect(result.kind).toBe('RUN');
+    if (result.kind !== 'RUN') return;
+    expect(result.evidenceCustody?.ok).toBe(true);
+    expect(result.evidenceCustody?.record?.artifact?.artifactId.length).toBeGreaterThan(0);
+    expect(result.evidenceCustody?.record?.artifact?.hashPolicy).toBe('sha256');
+    expect(result.evidenceCustody?.record?.artifact?.hash.length).toBeGreaterThan(0);
+  });
+
+  it('SYNTHETIC_TEST_ONLY never goes through the custody gate — evidenceCustody is null', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
+    expect(result.kind).toBe('RUN');
+    if (result.kind !== 'RUN') return;
+    expect(result.evidenceCustody).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C2 mandate: the engineered SYNTHETIC_TEST_ONLY winner fixture must be
+// genuinely unreachable from a PRODUCTION run — not merely "not used by
+// convention", but structurally absent from the candidate set PRODUCTION
+// mode ever sees.
+// ---------------------------------------------------------------------------
+describe('synthetic winner fixture is unreachable in PRODUCTION mode', () => {
+  it('none of the SYNTH- fixture candidate ids appear anywhere in a real PRODUCTION run\'s stages', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+    expect(result.kind).toBe('RUN');
+    if (result.kind !== 'RUN') return;
+    const synthIds = new Set(SYNTHETIC_WINNER_SUMMARIES.map((s) => s.moleculeChemblId));
+    const serialized = JSON.stringify(result.stages);
+    for (const id of synthIds) expect(serialized.includes(id)).toBe(false);
+  });
+
+  it('createProductionLowerHarmAdapters() never reads from the synthetic fixture module — real loadCandidateSummaries()/candidate reports only', () => {
+    const { adapters } = createProductionLowerHarmAdapters();
+    const generated = adapters.generate({ problemId: 'P', modelFamilies: [], seedBase: 0, paramGridNote: '' });
+    const ids = new Set(generated.map((c) => c.candidateId));
+    for (const s of SYNTHETIC_WINNER_SUMMARIES) expect(ids.has(s.moleculeChemblId)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-059 gap 1b/registry — unknown domain id fails closed (negative-first).
+// ---------------------------------------------------------------------------
+describe('D-059 gap 1b — genesisDomainRegistry: unknown domain id fails closed', () => {
+  it('an unregistered domain id throws UnknownGenesisDomainError rather than guessing which pipeline to run', () => {
+    expect(() => getGenesisDomain('NOT_A_REAL_DOMAIN')).toThrow(UnknownGenesisDomainError);
+  });
+
+  it('the real LOWER_HARM domain id resolves to this same entry point', () => {
+    const domain = getGenesisDomain('LOWER_HARM');
+    expect(domain.run).toBe(runGovLowerHarmDiscovery);
   });
 });
 
@@ -217,8 +351,8 @@ describe('runGovLowerHarmDiscovery — EXECUTION_BLOCKED terminal state', () => 
 // Item 13: NO_WINNER -> no Recipe (LOCKED)
 // ---------------------------------------------------------------------------
 describe('NO_WINNER never produces a Recipe (mandate item 13)', () => {
-  it('the real production run (honest NO_WINNER) has no recipeFingerprint and stage 18 is LOCKED', () => {
-    const result = runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+  it('the real production run (honest NO_WINNER) has no recipeFingerprint and stage 18 is LOCKED', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(result.kind).toBe('RUN');
     if (result.kind !== 'RUN') return;
     expect(result.verdict).toBe('NO_WINNER');
@@ -231,21 +365,21 @@ describe('NO_WINNER never produces a Recipe (mandate item 13)', () => {
 // Item 14: replay mismatch fails closed / replay match is proven, not assumed
 // ---------------------------------------------------------------------------
 describe('replay (mandate item 14)', () => {
-  it('PRODUCTION replays to an identical verdict and audit fingerprint', () => {
-    const { ok, first, second } = replayGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+  it('PRODUCTION replays to an identical verdict and audit fingerprint', async () => {
+    const { ok, first, second } = await replayGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(ok).toBe(true);
     expect(first.kind).toBe('RUN');
     expect(second.kind).toBe('RUN');
   });
 
-  it('SYNTHETIC_TEST_ONLY (the WINNER path) also replays deterministically', () => {
-    const { ok } = replayGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
+  it('SYNTHETIC_TEST_ONLY (the WINNER path) also replays deterministically', async () => {
+    const { ok } = await replayGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
     expect(ok).toBe(true);
   });
 
-  it('a genuinely mismatched pair of results is honestly reported as NOT ok — replayGovLowerHarmDiscovery does not assume success', () => {
-    const prod = runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
-    const synth = runGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
+  it('a genuinely mismatched pair of results is honestly reported as NOT ok — replayGovLowerHarmDiscovery does not assume success', async () => {
+    const prod = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+    const synth = await runGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
     expect(prod.kind).toBe('RUN');
     expect(synth.kind).toBe('RUN');
     if (prod.kind === 'RUN' && synth.kind === 'RUN') {
@@ -280,8 +414,8 @@ describe('economic/public-value firewall (mandate item 15)', () => {
 // hand-constructed.
 // ---------------------------------------------------------------------------
 describe('E2E — positive path: WINNER emerges from the real pipeline (mandate item 13/16)', () => {
-  it('SYNTHETIC_TEST_ONLY evidence, run through the real orchestrator, reaches WINNER -> WinnerRecordRef -> Recipe with a real fingerprint', () => {
-    const result = runGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
+  it('SYNTHETIC_TEST_ONLY evidence, run through the real orchestrator, reaches WINNER -> WinnerRecordRef -> Recipe with a real fingerprint', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
     expect(result.kind).toBe('RUN');
     if (result.kind !== 'RUN') return;
     expect(result.mode).toBe('SYNTHETIC_TEST_ONLY');
@@ -319,8 +453,8 @@ describe('E2E — positive path: WINNER emerges from the real pipeline (mandate 
 });
 
 describe('E2E — negative path: real pinned data honestly produces NO_WINNER (mandate item 17)', () => {
-  it('PRODUCTION mode, run through the real orchestrator, reaches NO_WINNER with a locked Recipe — no fabricated consensus', () => {
-    const result = runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+  it('PRODUCTION mode, run through the real orchestrator, reaches NO_WINNER with a locked Recipe — no fabricated consensus', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(result.kind).toBe('RUN');
     if (result.kind !== 'RUN') return;
     expect(result.mode).toBe('PRODUCTION');
@@ -330,8 +464,8 @@ describe('E2E — negative path: real pinned data honestly produces NO_WINNER (m
     expect(result.stages.length).toBe(20);
   });
 
-  it('every stage of the real run carries a real, non-empty fingerprint (append-only audit)', () => {
-    const result = runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+  it('every stage of the real run carries a real, non-empty fingerprint (append-only audit)', async () => {
+    const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(result.kind).toBe('RUN');
     if (result.kind !== 'RUN') return;
     expect(result.stages.every((s) => s.fingerprint.length > 0)).toBe(true);

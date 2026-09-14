@@ -1,12 +1,12 @@
 import { canonicalJson, fnv1a } from '../events/hash';
-import type { EvidenceClass } from '../agent/evidenceProvenance';
 import {
   runA2Analysis,
   loadCandidateSummaries,
   type A2CandidateReport,
   type A2CandidateSummary,
-  type A2ComparisonType,
 } from '../biotechData/a2OzempicSubstitute';
+import { strongestEvidenceClassForEfficacy } from './evidenceClassMapping';
+import type { EvidenceCustodyResult } from './evidenceCustody';
 import { rankForLowerHarm, type LowerHarmCandidateResult } from '../biotechData/govDrugLowerHarmRanking';
 import {
   checkDiversity,
@@ -106,27 +106,6 @@ function engagedTargetsSignature(summary: A2CandidateSummary): string {
   return [...engaged].sort().join('+') || '(none)';
 }
 
-/** Audit-layer classification only (mirrors `a2AdjudicationReferenceImplementation.ts`'s own "decision-inert" evidenceProvenance annotation, D-047): maps A2's own comparison-type vocabulary onto the shared `EvidenceClass` union for the orchestrator's evidence inventory. Never fed back into `falsifyCandidate`/`scoreCandidate`. */
-function evidenceClassOf(comparisonType: A2ComparisonType): EvidenceClass {
-  if (comparisonType === 'DIRECT_HEAD_TO_HEAD') return 'DIRECT_RANDOMISED';
-  if (comparisonType === 'NAIVE_INDIRECT') return 'INDIRECT_RANDOMISED';
-  return 'UNVERIFIED';
-}
-
-/** The strongest evidence class among a candidate's own efficacy entries. */
-function strongestEvidenceClassFor(report: A2CandidateReport): EvidenceClass {
-  const RANK: Readonly<Record<EvidenceClass, number>> = {
-    DIRECT_RANDOMISED: 10, INDIRECT_RANDOMISED: 9, POOLED_META: 8, NETWORK_META: 7, OBSERVATIONAL: 6,
-    REGULATORY_LABEL: 5, POST_MARKETING: 4, MECHANISTIC: 3, COMPUTATIONAL: 2, UNVERIFIED: 1,
-  };
-  let best: EvidenceClass = 'UNVERIFIED';
-  for (const e of report.efficacy) {
-    const cls = evidenceClassOf(e.comparisonType);
-    if (RANK[cls] > RANK[best]) best = cls;
-  }
-  return best;
-}
-
 function toGeneratedCandidate(summary: A2CandidateSummary): Candidate {
   return {
     candidateId: summary.moleculeChemblId,
@@ -155,6 +134,8 @@ export interface LowerHarmAdapterDiagnostics {
   adjudicated(): readonly AdjudicatedCandidate[];
   recipe(): LowerHarmResearchRecipe | null;
   runFingerprint(): string | null;
+  /** The custody verification this run was built with (PRODUCTION only, D-059) — null for SYNTHETIC_TEST_ONLY. */
+  evidenceCustody(): EvidenceCustodyResult | null;
 }
 
 export interface LowerHarmAdapterBundle {
@@ -167,6 +148,15 @@ export interface CreateLowerHarmAdaptersOptions {
   readonly allCandidateSummaries: () => readonly A2CandidateSummary[];
   /** The evidence-augmented reports `hardFilter()` onward actually ranks/falsifies/adjudicates. */
   readonly candidateReports: () => readonly A2CandidateReport[];
+  /**
+   * The ALREADY-RESOLVED custody verification for this run's real evidence
+   * (D-059, C2 gap 2) — resolved BEFORE this factory is called, since
+   * `EvidenceConnectorStore` is real async I/O and every
+   * `OrchestratorAdapters` port is synchronous by contract (see
+   * `evidenceCustody.ts`'s own header for why). `null` for
+   * `SYNTHETIC_TEST_ONLY` runs, which have no real custody to verify.
+   */
+  readonly evidenceCustody?: EvidenceCustodyResult | null;
 }
 
 /**
@@ -290,16 +280,30 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
       });
       return top2State.candidates.map((c) => ({
         experimentId: `lower-harm-g2::${c.report.summary.moleculeChemblId}`,
-        evidenceClass: strongestEvidenceClassFor(c.report),
+        evidenceClass: strongestEvidenceClassForEfficacy(c.report.efficacy),
         summary: { observationCount: c.report.efficacy.length, lowerHarmScore: c.lowerHarmScore ?? 0 },
       }));
     },
 
     ingestEvidence(_executed: readonly ExecutedExperiment[]): readonly IngestedEvidence[] {
       if (top2State === null) return [];
+      const custody = opts.evidenceCustody ?? null;
+      // Deliberately NOT including `custody.record.artifact.artifactId` here: the
+      // D-057 store mints a fresh artifactId on every ingest call even when the
+      // content is unchanged ("re-affirmed"), so embedding it here would make two
+      // back-to-back PRODUCTION runs over identical, undrifted evidence fingerprint
+      // as different audit trails — silently breaking replay (mandate item 14).
+      // `hash`/`hashPolicy` are stable across re-affirmed ingests and are what
+      // actually identifies the bytes; the (changing) artifactId is still recorded,
+      // in full, on the run's own `evidenceCustody.record.artifact.artifactId`
+      // (D-059 gap 2a: "run record embeds artifactId + sha256") — just not folded
+      // into this replay-sensitive provenance string.
+      const custodySuffix = custody === null
+        ? ''
+        : ` [custody: ${custody.ok ? 'FROZEN+replay-verified' : 'FAILED'} hash=${custody.record?.artifact?.hash ?? 'n/a'} hashPolicy=${custody.record?.artifact?.hashPolicy ?? 'n/a'}]`;
       return top2State.candidates.flatMap((c) => c.report.efficacy.map((e) => ({
         ref: `ctgov:${e.nctId}`,
-        provenance: 'ChEMBL Web Services + ClinicalTrials.gov API v2 (a2-ozempic-substitute pinned dataset)',
+        provenance: `ChEMBL Web Services + ClinicalTrials.gov API v2 (a2-ozempic-substitute pinned dataset)${custodySuffix}`,
       })));
     },
 
@@ -371,16 +375,24 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
     adjudicated: () => adjudicatedCache,
     recipe: () => recipeCache,
     runFingerprint: () => runFingerprintCache,
+    evidenceCustody: () => opts.evidenceCustody ?? null,
   };
 
   return { adapters, diagnostics };
 }
 
-/** The real, pinned-data adapters — see this module's header for why its honest result is NO_WINNER. */
-export function createProductionLowerHarmAdapters(): LowerHarmAdapterBundle {
+/**
+ * The real, pinned-data adapters — see this module's header for why its
+ * honest result is NO_WINNER. `evidenceCustody` is the already-resolved
+ * D-059 custody verification for this run's real evidence (see
+ * `evidenceCustody.ts`); pass `null` only when the caller has deliberately
+ * decided not to gate on custody (never the default for a real run).
+ */
+export function createProductionLowerHarmAdapters(evidenceCustody: EvidenceCustodyResult | null = null): LowerHarmAdapterBundle {
   return createLowerHarmAdapters({
     allCandidateSummaries: loadCandidateSummaries,
     candidateReports: () => runA2Analysis().candidateReports,
+    evidenceCustody,
   });
 }
 

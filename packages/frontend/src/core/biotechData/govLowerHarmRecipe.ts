@@ -76,11 +76,32 @@ export interface LowerHarmResearchRecipe {
 }
 
 /**
+ * Real provenance already computed by the caller's own pipeline run
+ * (`govLowerHarmAdapters.ts::buildRecipe`) — never fabricated here, and
+ * every field optional: a caller with no G2/verdict/problem context on
+ * hand (any test constructing a recipe directly from a report) gets the
+ * exact same base recipe this function always produced. Folded into the
+ * SAME fingerprint computation as the base fields below (never bolted on
+ * afterward), matching `discoveryChallenge/recipeExtension.ts`'s own
+ * one-pass discipline — a fingerprint computed before these fields are
+ * set would silently go stale the moment they are added.
+ */
+export interface LowerHarmRecipeExtension {
+  readonly problemFingerprint?: string;
+  readonly winnerRecordRef?: string;
+  readonly hypothesisId?: string;
+  readonly experimentRefs?: readonly string[];
+  readonly falsificationResults?: readonly { readonly probe: string; readonly outcome: string }[];
+  readonly limitations?: readonly string[];
+  readonly reproducibilityInstructions?: readonly string[];
+}
+
+/**
  * Builds the recipe for a winning candidate's real report. Returns null if
  * the report carries no usable mechanism target at all — a recipe with an
  * empty mechanism description would be worse than no recipe.
  */
-export function buildLowerHarmRecipe(winner: A2CandidateReport, replayFingerprint: string): LowerHarmResearchRecipe | null {
+export function buildLowerHarmRecipe(winner: A2CandidateReport, replayFingerprint: string, extension: LowerHarmRecipeExtension = {}): LowerHarmResearchRecipe | null {
   const s = winner.summary;
   const targets: string[] = [];
   if (s.medianPotencyNMByTarget.glp1r !== null) targets.push(`GLP-1R (median ${s.medianPotencyNMByTarget.glp1r} nM)`);
@@ -105,6 +126,14 @@ export function buildLowerHarmRecipe(winner: A2CandidateReport, replayFingerprin
     evidence: winner.efficacy.map((e) => `${e.nctId} (${e.comparisonType}): delta=${e.deltaVsSemaglutidePp?.toFixed(2) ?? 'n/a'}pp vs reference`),
     replay: replayFingerprint,
     dualUseGuard: 'ASSERTED',
+
+    problemFingerprint: extension.problemFingerprint,
+    winnerRecordRef: extension.winnerRecordRef,
+    hypothesisId: extension.hypothesisId,
+    experimentRefs: extension.experimentRefs,
+    falsificationResults: extension.falsificationResults,
+    limitations: extension.limitations,
+    reproducibilityInstructions: extension.reproducibilityInstructions,
   };
 
   return { ...recipe, recipeFingerprint: fnv1a(canonicalJson(recipe)) };

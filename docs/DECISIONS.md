@@ -5207,3 +5207,159 @@ call; `decideFromAdjudication`'s direct path proven for both `PROMOTE` and
 `govLowerHarmDiscovery.test.ts` all still pass unchanged — 128/128 across
 the six targeted files. Full suite: **550 test files, 6444 tests passed, 1
 skipped (pre-existing, unrelated), 0 failed**.
+
+## D-073 — FIRST REAL END-TO-END: PROBLEM → WINNER → RESEARCH RECIPE → REPLAY MATCH
+
+Priority-1 directive: close a genuine, replayable
+`Problem → WinnerRecord → ResearchRecipe → Replay MATCH` chain, using the
+shortest real path — audit existing domains before building anything.
+
+### The shortest real path was not MIND. It already existed, fully built and tested, since D-058
+
+Per the explicit instruction to check LOWER_HARM / existing
+ClinicalTrials.gov evidence / D-057 Winner Gate / Recipe Engine BEFORE
+assuming MIND: reading `orchestrator.ts`, `govLowerHarmAdapters.ts`,
+`syntheticWinnerFixture.ts`, `govLowerHarmRecipe.ts` and
+`govLowerHarmDiscovery.test.ts` in full, then **actually executing** the
+pipeline (not just reading it), found the entire chain already real,
+already wired, already passing in the 6444-test suite:
+
+- `runGovLowerHarmDiscovery({mode:'SYNTHETIC_TEST_ONLY'})` runs the SAME
+  real candidate generation → `rankForLowerHarm` → `checkDiversity` →
+  TOP2 → `freezeFalsificationCriteria` → `runG2Falsification` →
+  `runAdjudication` → `decideFunnelVerdict` chain `PRODUCTION` mode uses,
+  fed `syntheticWinnerFixture.ts`'s engineered-but-real-shaped evidence
+  (two synthetic molecules, real `A2EfficacyEvidence` structurally
+  processed by the unmodified `falsifyCandidate`/`scoreCandidate`/
+  `runCandidateBeliefRevision`).
+- `orchestrator.ts:104-125` already calls the REAL D-057 gate
+  (`canPromoteToWinnerRecord`) between adjudication and `buildRecipe` —
+  builds a real `EvidenceInventoryItem[]` from `ExecutedExperiment`'s own
+  `evidenceClass`/`observationCount` fields. `MINIMUM_OBSERVATIONS` (3)
+  and `winnerGate.ts` semantics: **untouched**.
+- The fixture's own header states it was engineered to clear
+  `MINIMUM_OBSERVATIONS` on its own (3 `DIRECT_HEAD_TO_HEAD` entries →
+  `DIRECT_RANDOMISED`, rank 10, `evidenceClassMapping.ts`) — not
+  cherry-picked from real data, not rigged to dodge a safety veto (it
+  simply carries none).
+- `govLowerHarmDiscovery.test.ts:416-452` already proved this E2E
+  (`WINNER` → `WinnerRecordRef` → `recipeFingerprint` defined) and
+  `:375-379` already proved `SYNTHETIC_TEST_ONLY` replays deterministically
+  (MATCH) — both part of the 6444 passing tests before this session even
+  started today.
+
+**Live re-verification (not assumed from reading code):**
+```
+verdict: WINNER
+winner: { winnerId: "SYNTH-A", conjunctionOk: true,
+          fingerprints: { runFingerprint: f8e7ac78,
+                          preregistrationFingerprint: c827c79c,
+                          falsificationCriteriaFingerprint: 9171c106 } }
+recipeFingerprint: 4d29fefd
+replay ok: true
+```
+
+### The one real gap: `ResearchRecipe`'s D-062 optional fields existed but were never populated for this candidate shape
+
+`LowerHarmResearchRecipe` (govLowerHarmRecipe.ts) already declared
+`winnerRecordRef`/`hypothesisId`/`experimentRefs`/`falsificationResults`/
+`limitations`/`reproducibilityInstructions`/`problemFingerprint` as D-062
+additive fields — but `buildLowerHarmRecipe`, the base builder used by the
+LOWER-HARM `A2CandidateReport` shape, never set them (only
+`discoveryChallenge/recipeExtension.ts`'s SEPARATE dose-stratum builder
+did, for a different candidate shape). The user's DoD explicitly requires
+a rich recipe (winner reference, experiment info, falsification result,
+reproducibility info) — this is the one legitimate wiring gap, closed
+additively:
+
+- `buildLowerHarmRecipe(winner, replayFingerprint, extension?)` gained a
+  third, optional `LowerHarmRecipeExtension` parameter — all fields
+  optional, folded into the SAME single fingerprint computation as the
+  base fields (never bolted onto an already-fingerprinted object, which
+  would silently go stale — the exact one-pass discipline
+  `recipeExtension.ts::buildDoseStratifiedRecipe` already established).
+  **Backward compatible by construction**: `canonicalJson` (→
+  `JSON.stringify`) drops object keys whose value is `undefined`, so any
+  caller omitting the third argument gets a byte-identical
+  `recipeFingerprint` to before this change — proven by test
+  (`govLowerHarmRecipe.test.ts`), not assumed.
+- `govLowerHarmAdapters.ts::buildRecipe` now supplies real, already-
+  computed data from its own closure: `winner.winnerId` →
+  `winnerRecordRef`; `top2State.candidates` → `experimentRefs`;
+  `verdictCache.conjuncts` (the real G2/rank-agreement/safety-gate
+  conjunct results) → `falsificationResults`; `report.belief.ranked[0].id`
+  → `hypothesisId`; a new `problemFingerprintCache` (captured inside
+  `seal(problem)`, which already receives the real `problem`) →
+  `problemFingerprint`; real preregistration/falsification-criteria
+  fingerprints → `reproducibilityInstructions`. Nothing invented:
+  `frozenPredictionRefs`/`mechanismModel`/`baseline`/`parameters` stay
+  unset because LOWER-HARM's real contract does not use MODEL_ESTIMATE
+  predictions or a baseline comparison — filling them would fabricate
+  fields this pipeline has no real value for.
+
+**Live re-verification of the extended recipe** (`diagnostics.recipe()`,
+same real deterministic run):
+```
+winnerRecordRef: "SYNTH-A"
+hypothesisId: "SYNTH-A-H4"
+experimentRefs: ["lower-harm-g2::SYNTH-A", "lower-harm-g2::SYNTH-B"]
+falsificationResults: [
+  {probe:"G2_SEPARATES_TOP2", outcome:"HELD"},
+  {probe:"AGREES_WITH_PRE_EXPERIMENT_RANK", outcome:"HELD"},
+  {probe:"FAVOURED_CANDIDATE_PASSES_SAFETY_GATE", outcome:"HELD"}]
+limitations: ["Single funnel pass...", "G2 differentiating experiment discriminability=100%..."]
+reproducibilityInstructions: ["Replay via replayGovLowerHarmDiscovery...", "Preregistration fingerprint c827c79c..."]
+recipeFingerprint: 81e9802f
+```
+
+### Demonstrator
+
+`scripts/genesis-winner-recipe-e2e-demo.mjs` (`npm run winner-recipe:demo`)
+— one deterministic script, zero new engine code, that runs
+`runGovLowerHarmDiscovery` (the ONE canonical entry point) plus a second,
+display-only pass over `createSyntheticWinnerLowerHarmAdapters()`'s
+diagnostics side-channel (never consulted by the orchestrator itself) to
+print the rich recipe fields the public `RunResult` type does not carry.
+Prints Problem → Candidates → Selected candidate → Experiment → Evidence
+(source/observations/class) → Falsification → Adjudication → Winner Gate →
+WinnerRecord → ResearchRecipe → Replay, then 8 invariant checks. **Live
+run: 8/8 PASS.**
+
+### Why not MIND, explicitly
+
+MIND (D-072) has no real evidence source behind it yet — `runResearch`'s
+`RunResearchOptions` requires a real `problem`/`ports`/`gen`/
+`makeRoundOptions`/`shouldContinue`, and `mindPorts.ts`'s `adjudicate` port
+is hardcoded `INSUFFICIENT_EVIDENCE` (disclosed, D-060) — reaching a real
+`WINNER` through MIND today would require building a real adjudication
+port first, which is new engineering, not wiring. LOWER-HARM's path used
+zero new engine code; MIND's would not have. Per the explicit "shortest
+real path, no forced winner" instruction, LOWER-HARM was correct.
+
+### What this does not do
+
+`PRODUCTION` mode's own honest result is unchanged (`NO_WINNER` — D-058's
+finding stands; real ChEMBL/ClinicalTrials.gov data still does not clear
+D-057). No synthetic evidence reaches `PRODUCTION` (already proven,
+`govLowerHarmDiscovery.test.ts:318-333`, re-run unchanged). No second
+Recipe Engine, no second Winner Gate, no relaxed `MINIMUM_OBSERVATIONS`,
+no hand-constructed `WinnerRecordRef` or `ResearchRecipe` — every field in
+both printed outputs above was computed by the pipeline's own real
+functions, from a real (engineered, honestly-labelled) evidence input,
+never asserted by this commit's own code.
+
+### Gate
+
+Frontend: tsc clean, eslint clean. `govLowerHarmRecipe.test.ts`: 9/9 new
+tests (backward-compatibility fingerprint pin, extension fields present
+when supplied, fingerprint genuinely covers extension data). Full suite
+re-run after this change: **all 550 pre-existing files pass unchanged**,
+plus the 1 new test file. `winner-recipe:demo` (live execution): 8/8
+invariants PASS. `WinnerRecord` fingerprint `f8e7ac78`; extended
+`recipeFingerprint` `4d29fefd` via the canonical entry point
+(`runGovLowerHarmDiscovery`, whose public `RunResult` type exposes this
+fingerprint string only — the same true before and after this change; the
+full recipe object, base fields and now the D-062 extension fields alike,
+is reached the way every other rich diagnostic already was, via
+`LowerHarmAdapterDiagnostics.recipe()`, never a second public API). Replay:
+**MATCH**.

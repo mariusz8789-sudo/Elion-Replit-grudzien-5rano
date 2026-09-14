@@ -179,6 +179,7 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
   let adjudicatedCache: readonly AdjudicatedCandidate[] = [];
   let verdictCache: LowerHarmFunnelVerdict | null = null;
   let recipeCache: LowerHarmResearchRecipe | null = null;
+  let problemFingerprintCache: string | null = null;
 
   const adapters: OrchestratorAdapters = {
     generate(_req: StructuredExperimentRequest): readonly Candidate[] {
@@ -246,6 +247,7 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
 
     seal(problem): FreezeSeal {
       if (top2State === null) throw new LowerHarmFailClosedError('seal() called before top2() produced a real pair', 'PORTS_CALLED_OUT_OF_ORDER');
+      problemFingerprintCache = problem.fingerprint;
       const criteria = freezeFalsificationCriteria(top2State);
       frozenCriteria = criteria;
       return {
@@ -350,7 +352,24 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
       if (!winner.conjunctionOk) return null;
       const report = reportById.get(winner.winnerId);
       if (report === undefined) return null;
-      const recipe = buildLowerHarmRecipe(report, runFingerprintCache ?? winner.fingerprints.runFingerprint ?? '');
+      const topHypothesisId = report.belief.ranked[0]?.id;
+      const recipe = buildLowerHarmRecipe(report, runFingerprintCache ?? winner.fingerprints.runFingerprint ?? '', {
+        problemFingerprint: problemFingerprintCache ?? undefined,
+        winnerRecordRef: winner.winnerId,
+        hypothesisId: topHypothesisId,
+        experimentRefs: top2State?.candidates.map((c) => `lower-harm-g2::${c.report.summary.moleculeChemblId}`),
+        falsificationResults: verdictCache?.conjuncts.map((c) => ({ probe: c.criterion, outcome: c.held ? 'HELD' : 'FAILED' })),
+        limitations: [
+          'Single funnel pass: no independent replication in a disjoint trial population has been performed.',
+          g2Cache?.outcome === 'EXPERIMENT_SELECTED'
+            ? `G2 differentiating experiment discriminability=${(g2Cache.spec.falsificationPower * 100).toFixed(0)}% — a real, but single, discriminating observation.`
+            : 'No G2 differentiating experiment was available for this pair.',
+        ],
+        reproducibilityInstructions: [
+          'Replay via replayGovLowerHarmDiscovery with the same mode — auditFingerprint and verdict must match across two independent runs.',
+          `Preregistration fingerprint ${LOWER_HARM_PREREGISTRATION.fingerprint} and falsification-criteria fingerprint ${frozenCriteria?.fingerprint ?? 'n/a'} were both frozen BEFORE this experiment executed.`,
+        ],
+      });
       if (recipe === null) return null;
       recipeCache = recipe;
       return { recipeFingerprint: recipe.recipeFingerprint };

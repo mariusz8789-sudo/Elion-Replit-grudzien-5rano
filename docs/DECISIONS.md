@@ -2741,3 +2741,96 @@ byte-identical after this commit; both prior demonstrator scripts
 exit 0.
 
 Gate: **6047 frontend tests, 0 failures.** tsc clean, eslint clean.
+
+## D-048 (2026-09-14) — LOWER-HARM: sealed preregistration only
+## (mandate step 10, part 1). New scenario id, new fingerprint,
+## new provenance chain — no candidate re-ranked yet.
+
+`GOV-DRUG-DISCOVERY-E2E-02-LOWER-HARM`. This is the seal only — exactly the
+same discipline as A1/A2/A3/E2E-01 before it: fixed before any candidate is
+read against it. It does not run, and does not need, the Genesis
+Adjudication Protocol closed in D-047 — that protocol governs
+*re*-adjudication of an existing result; this is a first-time seal.
+
+### Why the question is different from A2, not a rename of it
+
+A2 asks "which candidate is strongest, non-inferior within a tight margin".
+LOWER-HARM asks "which candidate achieves the required effect at the lowest
+achievable harm — retaining a somewhat weaker candidate on purpose, so long
+as it clears a floor". Same mechanistic candidate space (imported verbatim:
+`A2_MECHANISM_TARGETS`, `A2_REFERENCE_DRUG`, `A2_SAFETY_CATEGORIES`,
+`REFERENCE_HBA1C_DELTA_PP`), genuinely different decision rule.
+
+**The efficacy floor** (`minFractionOfReferenceEffect: 0.7`) is a hard gate
+evaluated *before* ranking — a candidate below it is eliminated regardless
+of safety; a candidate above it is never eliminated for scoring below #1 on
+efficacy. Both halves of "safety is not an excuse for too-low efficacy" and
+"stronger is not automatically better" made numeric.
+
+**The ranking weights** (`safety: 2, efficacyMarginAboveFloor: 0.25, ...`)
+reuse A2's per-dimension scores unmodified but weight them so safety
+dominates among floor-qualifying candidates — the opposite emphasis from
+A2's `{efficacy: 1, safety: 1}`. `assertSafetyDominatesRanking` checks this
+structurally against the *actual* frozen constant, not a comment: it throws
+if `safety <= efficacyMarginAboveFloor`, and a test proves it rejects a
+would-be A2-in-disguise weighting.
+
+**Naturalness neutrality is machine-checked, not narrated.**
+`assertNoNaturalnessBias` walks the frozen record's *keys* (never string
+values, so prose discussing natural-origin candidates never false-trips)
+and throws if any scoring field is named after naturalness. Run once at
+module load against the actual frozen view, and covered by both a positive
+and a negative test.
+
+### Every mandate-named axis is declared, none silently dropped
+
+Eight axes, each `EVALUATED` / `DEFERRED_SEPARATE_WORK` /
+`NOT_CENTRAL_TO_DOMAIN`, each with a stated rationale:
+
+| axis | status | why |
+|---|---|---|
+| toxicity/organ burden | EVALUATED | reuses `A2_SAFETY_CATEGORIES` unmodified |
+| severe adverse events | EVALUATED | reuses the existing structural serious-AE comparison |
+| GI burden | EVALUATED | reuses nausea/vomiting/diarrhea/hypoglycemia categories |
+| discontinuation rate | DEFERRED | field not yet surfaced by `A2SafetyCategoryResult` |
+| administration burden/route | EVALUATED | already on `A2CandidateSummary.moleculeType` |
+| **dependence/addiction/abuse/withdrawal** | **NOT_CENTRAL_TO_DOMAIN** | GLP-1/GIP/GCG agonism has no established liability; the mandate's own opioid-class demonstrator is the correct locus, explicitly out of this seal's scope |
+| psychiatric/cognitive | DEFERRED | literature signal exists, no pinned term set to extract it from yet |
+| long-term risk | DEFERRED | no pinned trial runs beyond ~72 weeks — a genuine gap, not an access gap |
+
+`evaluatedAxes()` drives `MULTIPLE_COMPARISON_POLICY.familySize` — the
+Bonferroni family counts only what is actually tested, never the full
+declared list, verified by a test that the two numbers differ.
+
+### Provenance chain, deliberately not linked to A2/E2E-01/campaign
+
+The campaign (`5179c99f`) chained to E2E-01's fingerprint because it
+declared itself, in its own text, a re-analysis of data already observed
+under that seal. This is a different act: a new research question asked
+for the first time. The imported constants (targets, reference drug, safety
+patterns, HbA1c benchmark) *are* part of this file's own frozen view and do
+affect `LOWER_HARM_PREREGISTRATION_FINGERPRINT` — they are simply not
+chained via an `inheritedFromFingerprint` field, and a test asserts the
+fingerprint differs from all three prior ones (A2, E2E-01, campaign).
+
+### Tests: 19/19, negative-first
+
+Rejects weights where efficacy-margin is not dominated by safety; rejects a
+naturalness-named scoring key; proves prose mentioning "natural" never
+false-trips the same check; proves the efficacy floor is neither 0 (no
+floor) nor 1 (A2's non-inferiority rule again); proves the dependence axis
+is explicitly `NOT_CENTRAL_TO_DOMAIN` rather than silently `EVALUATED` with
+no data; proves the Bonferroni family size tracks evaluated axes, not the
+full declared list.
+
+### What this commit does NOT do
+
+Does not generate a single candidate. Does not fetch data — none is needed
+yet, everything reused is already pinned from A2. Does not touch
+`a2OzempicSubstitute.ts`, the campaign, E2E-01, or any historical
+fingerprint. Does not build `LOWER_HARM_CANDIDATE_GENERATOR`, the funnel, or
+falsification — those are the next parts of mandate step 10, each their own
+commit. `moduleReachability.test.ts` documents this file as reached only by
+its own test, honestly, with the real future caller named.
+
+Gate: **6066 frontend tests, 0 failures.** tsc clean, eslint clean.

@@ -4995,3 +4995,97 @@ row per retained candidate with the real `candidateId`; a rejected candidate
 `REPLAYERS['molecular-descriptors']` entry replays a real bound run to
 **MATCH**; replay is deterministic across two independent calls. eslint
 clean on all changed/new files.
+
+---
+
+## D-071 — DISCOVERY → PROMOTION BRIDGE: `DiscoveryStatus` finally speaks D-057's language
+
+D-070's follow-up audit found the sharpest real severance in Genesis's own
+problem→hypothesis→experiment→evidence→falsification→adjudication→replay
+chain: `genuineDiscoveryOrchestrator.ts` (Phase F's capstone — real novelty
+L1-L6, real independent replication, real 13-probe self-falsification,
+proven on pinned Kepler/QE4 data) produces `DiscoveryStatus`, a vocabulary
+D-057's `canPromoteToWinnerRecord` has never heard of. Zero import of
+`winnerGate.ts`/`genesisAdjudicationProtocol.ts` anywhere in the module —
+confirmed by reading it in full, not by absence-of-grep. This closes the
+gap with a pure translation, not a second adjudicator.
+
+### The design constraint that shaped this: no naive label lookup
+
+The obvious shortcut — `DISCOVERY_CANDIDATE → WINNER` — was explicitly
+rejected before any code was written. Reading `classifyDiscoveryStatus` in
+full shows `DISCOVERY_CANDIDATE` is reached by definition whenever
+replication is absent or `PARTIAL`, or any of the 13 self-falsification
+probes failed — the literal opposite of a winner. Only `DISCOVERY` (the one
+status `assertValidDiscoveryStatus` refuses to let exist without a
+`REPLICATED` result on a disjoint, frozen-before-access dataset AND 13/13
+probes passing) maps to `WINNER`. `core/orchestrator/discoveryRecordBridge.ts`
+never recomputes novelty, replication, or self-falsification — it trusts
+`classifyDiscoveryStatus`'s already-real decision and only translates the
+word.
+
+### Mapping table (final, after two rounds of correction)
+
+| `DiscoveryStatus` | `Verdict` | Why |
+|---|---|---|
+| `DISCOVERY` | `WINNER` | the one status with `assertValidDiscoveryStatus`'s full guard behind it |
+| `DISCOVERY_CANDIDATE` | `NO_WINNER` | "not yet" by definition — never a winner |
+| `FAILED_DISCOVERY` | `NO_WINNER` | replication actively `FAILED` — a negative result, stated as such |
+| `CONFLICTING_EVIDENCE` | `CONFLICTING_EVIDENCE` | direct match |
+| `UNKNOWN` | `INSUFFICIENT_EVIDENCE` | **unresolved prior-art** (L5/L6 unreachable), explicitly never confused with experimental weakness in the `reasons` text |
+| `REPRODUCTION`, `KNOWN_RESULT` | refused (`NOT_APPLICABLE`) | confirms *already-known* science — not a promotion question |
+| `NO_ACCESS` | refused | `accessDeclared` was false — no basis for any verdict |
+| `EXTENSION`, `NOVEL_HYPOTHESIS` | refused | declared in the `DiscoveryStatus` type but **never returned by `classifyDiscoveryStatus`** (verified by reading the full function body) — fail-closed rather than guessing an unverified producer's semantics |
+
+Four corrections applied on review, all present in the shipped module: (1)
+every `PROMOTION_INPUT` result's `reasons` ends with a fixed annotation —
+`"promotion decided by D-057; pipeline evidence class COMPUTATIONAL
+declared once, never argued upward"` — so no caller can read `WINNER`
+without that qualifier attached; (2) the `UNKNOWN` reason text explicitly
+names "unresolved prior-art", and a test asserts it does NOT match
+`/experimental evidence weak/i`; (3) the `DISCOVERY`→`NO_PROMOTION` test
+asserts the double wall by name — `strongCount === 0` (evidence strength)
+**and** `totalObservations === 2 < MINIMUM_OBSERVATIONS === 3` (evidence
+volume) — neither wall alone is load-bearing; (4) documented as a caller
+obligation in the module's own header: any UI/audit surface must render
+`PromotionOutcome` next to a bridged `WINNER`, never `WINNER` alone.
+
+### Evidence class and observation count — declared, not computed upward
+
+`DISCOVERY_PIPELINE_EVIDENCE_CLASS = 'COMPUTATIONAL'` is a fixed constant,
+never derived from a record's contents — this pipeline's evidence is
+model-fit + replication over pinned datasets plus structural probes, real
+but never clinical or randomised. `observationCount = 1 +
+(replication.result === 'REPLICATED' ? 1 : 0)` — the discovery dataset,
+plus the replication dataset only when replication genuinely succeeded;
+never the 13 self-falsification probes counted as observations (the exact
+inflation `baselineComparison.ts` already refused once for D-059).
+
+### The honest structural finding this bridge surfaces
+
+Even a fully-earned `DISCOVERY` status, mapped honestly to `WINNER`, still
+clears `canPromoteToWinnerRecord` to **`NO_PROMOTION`** — `COMPUTATIONAL`
+(rank 2) sits below `INDIRECT_RANDOMISED` (rank 9), and 2 observations sit
+below `MINIMUM_OBSERVATIONS` (3). This is not a defect of the bridge; it is
+the same class of honest, disclosed wall D-062 found for LOWER-HARM — a
+real discovery pipeline CAN structurally reach the gate, and the gate still
+says no, for a real, named reason.
+
+### What this does not do (by design, per explicit instruction)
+
+No changes to `winnerGate.ts`, `discoveryContracts.ts`, or
+`genuineDiscoveryOrchestrator.ts`. No wiring of a runtime caller yet —
+integration (the module that would call `runGenuineDiscoveryPipeline`, then
+this bridge, then `canPromoteToWinnerRecord`) is a deliberately separate
+next step, documented as such in `moduleReachability.test.ts`'s
+`ALLOWED_ORPHANS` rather than forced through prematurely.
+
+### Gate
+
+Frontend: **549 test files, 6432 tests passed, 0 failed, 1 skipped**
+(pre-existing, unrelated). 20 new negative-first tests
+(`discoveryRecordBridge.test.ts`), including a real QE4 regression through
+`genuineDiscoveryOrchestrator.ts`'s own pinned campaign (`UNKNOWN` →
+`INSUFFICIENT_EVIDENCE` → `NO_PROMOTION`, never `WINNER`). tsc clean.
+eslint clean. `moduleReachability` clean — one new, deliberately documented
+orphan entry (caller wiring is the next step, not this one).

@@ -2834,3 +2834,85 @@ commit. `moduleReachability.test.ts` documents this file as reached only by
 its own test, honestly, with the real future caller named.
 
 Gate: **6066 frontend tests, 0 failures.** tsc clean, eslint clean.
+
+## D-049 (2026-09-14) — LOWER-HARM: real re-ranking over the real A2 candidate
+## space (mandate step 10, part 2). Honest CONFLICTING_EVIDENCE, not forced.
+
+`core/biotechData/govDrugLowerHarmRanking.ts` consumes `runA2Analysis()`'s
+real, **unmodified** output and re-ranks it under the seal from D-048. No
+new candidate, no new fetch, no new veto — verified by a test that the
+veto reason a LOWER-HARM elimination carries is **byte-identical** to A2's
+own `score.vetoReason`.
+
+### The efficacy floor reads the candidate's OWN effect, not its delta vs reference
+
+`evaluateEfficacyFloor` uses `candidateArm.meanChangePp` — the candidate's
+absolute HbA1c change — divided by the pinned reference effect
+(`-1.7`pp), not `deltaVsSemaglutidePp` (which answers "is it better than
+the reference", a different question from "how much of the reference's own
+effect does it retain"). Three real, distinct states, never collapsed into
+two: `MEETS_FLOOR` / `BELOW_FLOOR` / `NO_HBA1C_EVIDENCE` — the last one
+being **insufficient evidence**, not a silent pass or fail.
+
+### The real run on the real pinned space
+
+```
+node scripts/gov-drug-lower-harm-demonstrator.mjs
+```
+
+Of 12 real candidates, **3 clear both the efficacy floor and the safety
+veto**: native GLP-1, liraglutide, exenatide. Elimination reasons, verbatim:
+
+| candidate | why eliminated |
+|---|---|
+| PF-06291874, adomeglivant, cotadutide | efficacy floor (54.1% of reference, floor is 70%) |
+| glucagon, perphenazine, MK-0893 | `NO_HBA1C_EVIDENCE` |
+| danuglipron | safety veto: vomiting RR 3.05 |
+| orforglipron | safety veto: serious AE RR 3.93 |
+| tirzepatide | safety veto: diarrhea RR 2.71 (the D-042 finding, unchanged) |
+
+### The honest, unforced result — mandate success criterion #9, demonstrated not coded
+
+Among the three qualifiers, **no candidate dominates both raw dimensions**:
+native GLP-1 has the best safety score (0.678) but liraglutide has the
+better raw efficacy-margin score (-0.4875 vs -0.725). The verdict is
+**`CONFLICTING_EVIDENCE`** — even though GLP-1's *weighted* composite score
+(1.275) clearly beats liraglutide's (-0.046), because
+`hasConflictingEvidence` checks the raw dimensions, deliberately upstream of
+the weights. This is a design choice, stated plainly: **a composite score
+must never be allowed to manufacture a false consensus that the underlying
+dimensions don't actually show.** Two tests pin this exact real case,
+including one asserting the weighted ordering explicitly (GLP-1 does
+outrank liraglutide once weighted) *and* the unweighted conflict
+independently (liraglutide's raw efficacy score is genuinely higher).
+
+### Disclosed limitation, not silently accepted
+
+`runA2Analysis()` computes every candidate's veto under
+`HISTORICAL_NO_EVIDENCE_CLASS` — including tirzepatide's diarrhea veto,
+which D-046 showed rests on weaker evidence than what's available. This
+file does **not** retroactively apply the D-046 gated re-adjudication here.
+Doing so only for the one candidate where it happens to help would be
+exactly the "pick the rule that produces a preferable outcome" failure the
+mandate forbids. Applying the same rigour to every candidate — finding and
+verifying comparable direct evidence for each — is real future work, stated
+as such in the module's own header, not done by fiat.
+
+### Tests: 19/19
+
+Real numbers pinned throughout, none guessed: floor fractions (82.9%,
+54.1%, 146.5%…), the exact three qualifiers, the exact elimination-reason
+priority (veto beats floor when a candidate fails both), sort-order
+invariant, the composite-vs-raw-dimension distinction, determinism across
+two independent calls, and the naturalness guard run against the real full
+report.
+
+### What this commit does NOT do
+
+Does not build the TOP10/TOP2 funnel, deep falsification, or a Research
+Recipe path — those remain. Does not touch A2, the campaign, E2E-01, or any
+historical fingerprint (verified by re-running `a2:demo`). Does not
+retroactively apply D-046's gate to any candidate other than the one it was
+already verified for.
+
+Gate: **6085 frontend tests, 0 failures.** tsc clean, eslint clean.

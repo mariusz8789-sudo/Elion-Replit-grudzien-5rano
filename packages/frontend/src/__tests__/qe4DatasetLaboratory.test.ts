@@ -9,13 +9,27 @@ import { QE4_EVIDENCE_CASE_ID } from '../core/biotechData/qe4EvidenceCase';
  * verified `runQe4BrydgesAnalysis()`, not a second, parallel computation that
  * could silently drift from it.
  */
+/**
+ * COMPUTED ONCE FOR THE WHOLE FILE, deliberately.
+ *
+ * `runQe4BrydgesAnalysis()` is a deterministic pure function over a pinned
+ * dataset (its own module doc, and `qe4DatasetLaboratory.ts` itself caches it
+ * at module level for exactly this reason). Calling it fresh inside five
+ * separate `it()` blocks cost ~2s EACH and pushed the heaviest test to 3677ms
+ * against vitest's default 5000ms timeout — a 1.36x margin on an idle machine,
+ * which is how this file timed out for real under CPU contention. Hoisting
+ * changes no assertion: every test still compares the laboratory's output
+ * against the analysis's output, exactly as before.
+ */
+const ANALYSIS = runQe4BrydgesAnalysis();
+
 describe('qe4DatasetLaboratory — DatasetLaboratory contract over the pinned QE4 dataset', () => {
   it('declares its labId as the same identity qe4EvidenceCase.ts already uses', () => {
     expect(QE4_DATASET_LABORATORY.labId).toBe(QE4_EVIDENCE_CASE_ID);
   });
 
   it('observableSpec() enumerates exactly the real (dataset,T,k) grid the analysis already computed — clean and disorder both', () => {
-    const analysis = runQe4BrydgesAnalysis();
+    const analysis = ANALYSIS;
     const spec = QE4_DATASET_LABORATORY.observableSpec();
     expect(spec).toHaveLength(analysis.cleanPoints.length + analysis.disorderPoints.length);
     for (const p of analysis.cleanPoints) {
@@ -27,7 +41,7 @@ describe('qe4DatasetLaboratory — DatasetLaboratory contract over the pinned QE
   });
 
   it('run() for a real clean point returns exactly the s2/sigma qe4BrydgesAnalysis.ts already computed for it, never recomputed independently', () => {
-    const analysis = runQe4BrydgesAnalysis();
+    const analysis = ANALYSIS;
     const point = analysis.cleanPoints.find((p) => p.t === 5 && p.k === 5)!;
     const result = QE4_DATASET_LABORATORY.run({ pointId: 'clean:T=5:k=5' });
     expect(result.status).toBe('completed');
@@ -38,7 +52,7 @@ describe('qe4DatasetLaboratory — DatasetLaboratory contract over the pinned QE
   });
 
   it('run() for a real disorder point returns exactly the analysis-computed value', () => {
-    const analysis = runQe4BrydgesAnalysis();
+    const analysis = ANALYSIS;
     const point = analysis.disorderPoints.find((p) => p.t === 10 && p.k === 5)!;
     const result = QE4_DATASET_LABORATORY.run({ pointId: 'disorder:T=10:k=5' });
     expect(result.status).toBe('completed');
@@ -55,7 +69,7 @@ describe('qe4DatasetLaboratory — DatasetLaboratory contract over the pinned QE
   });
 
   it('carries the same dataset provenance (DOI, license, archive checksum) qe4EvidenceCase.ts already carries', () => {
-    const analysis = runQe4BrydgesAnalysis();
+    const analysis = ANALYSIS;
     const result = QE4_DATASET_LABORATORY.run({ pointId: 'clean:T=5:k=5' });
     expect(result.provenance.archiveSha256).toBe(analysis.provenance.archiveSha256);
     expect(result.provenance.license).toBe(analysis.provenance.datasetLicense);
@@ -63,7 +77,7 @@ describe('qe4DatasetLaboratory — DatasetLaboratory contract over the pinned QE
   });
 
   it('reports the real literal bootstrap seed the analysis actually used, and ignores a caller-supplied seed rather than fabricating seeded behavior it does not have', () => {
-    const analysis = runQe4BrydgesAnalysis();
+    const analysis = ANALYSIS;
     const withoutSeed = QE4_DATASET_LABORATORY.run({ pointId: 'clean:T=5:k=5' });
     const withSeed = QE4_DATASET_LABORATORY.run({ pointId: 'clean:T=5:k=5' }, 12345);
     expect(withoutSeed.replay.seed).toBe(analysis.provenance.bootstrapSeed);

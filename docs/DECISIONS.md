@@ -2074,6 +2074,49 @@ wszystkie przypięte odciski **bez dryfu** po naprawie —
 `399221f5` (GOV-DRUG-E2E-01 replay), `f528c881` (prerejestracja E2E-01),
 `f4804820` (Kepler), `44f245c9` (QE4). Żaden nie drgnął.
 
+## D-041 (2026-09-14) — polowanie na flaky test: nie znaleziono regresji,
+znaleziono zmierzoną kruchość czasową i usunięto jej przyczynę
+
+**Powód:** jeden pełny przebieg zgłosił `1 failed / 5936`, a moje własne
+`| tail -12` i `| grep` **obcięły listę failujących testów** — nazwy nie
+było. To był błąd metody po mojej stronie, nie brak danych.
+
+**Eksperyment:** 5 pełnych, niezależnych przebiegów z reporterem **JSON do
+pliku** (ekstrakcja nazw + komunikatów po każdym; JSON kasowany, ~20MB/
+przebieg). Wynik: **5/5 czystych, 0 awarii** (plus 2 wcześniejsze
+ad-hoc czyste = **7 z rzędu**). Wniosek: **brak deterministycznej
+regresji z `e775b45`**.
+
+**Co za to zmierzono — na bezczynnej maszynie:**
+`qe4DatasetLaboratory.test.ts` → najcięższy test **3677 ms** przy
+domyślnym limicie vitest **5000 ms**, czyli margines **1.36×**. Cztery
+kolejne testy w tym pliku: 2519/2518/2304/1802 ms. To jest dokładnie ten
+plik, który **realnie wywalił się wcześniej w tej sesji** z
+`Test timed out in 5000ms` — pod kontencją, gdy równolegle biegł suite
+backendu. 36% spowolnienia wystarczy.
+
+**Przyczyna:** `qe4DatasetLaboratory.ts` **ma już cache** na poziomie
+modułu (`cachedAnalysis`), ale **plik testowy wołał
+`runQe4BrydgesAnalysis()` bezpośrednio 5×**, omijając ten cache — każde
+wywołanie to świeże ~2s liczenie bootstrapów.
+
+**Poprawka (czysto testowa, zero zmian w kodzie produkcyjnym, zero
+zmienionych asercji):** wyniesienie analizy do jednego `const ANALYSIS`
+na plik. Funkcja jest deterministyczna i czysta — to dokładnie ta
+własność, którą ten plik asertuje, i dla której produkcyjne laboratorium
+samo ją cache'uje. Każdy test nadal porównuje wyjście laboratorium z
+wyjściem analizy, identycznie jak wcześniej.
+
+**Efekt zmierzony:** najcięższy test **3677 → 1935 ms** (margines
+**1.36× → 2.58×**), suma testów w pliku **12.83 → 1.95 s**, **9/9**
+nadal zielone. Pozostałe 1935 ms to pierwsze wywołanie laboratorium
+zapełniające jego własny cache — nieuniknione i poprawne.
+
+**Czego NIE zrobiono:** nie osłabiono żadnej asercji, nie podniesiono
+limitu czasu, nie oznaczono niczego jako `skip` ani `flaky`.
+
+Pełny przebieg po poprawce: **5936 testów, 0 awarii**.
+
 ## Co pozostaje jawnie nierozstrzygnięte (Phase G)
 
 Decyzja G0 (merge do main,

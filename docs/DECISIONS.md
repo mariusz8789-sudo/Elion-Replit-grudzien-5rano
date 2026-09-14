@@ -3025,6 +3025,8 @@ Does not touch efficacy, thresholds, or A2/campaign/E2E-01 historical logic
 demo scripts (still pass). Does not build Public Value/ROI/Funding layers or
 any UI — explicitly deferred.
 
+Gate: **6105 frontend tests, 0 failures.** tsc clean, eslint clean.
+
 ## D-051 (2026-09-14) — GENESIS VISUAL COMPLETION: CMS Open Data gets a real
 ## read-only HTTP surface and a real screen; no SEED_*, no mocks
 
@@ -3270,4 +3272,89 @@ build a UI for physics-world (no screen calls `runExperiment` or
 Gate: **6150 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
 failures.** tsc clean, eslint clean, frontend build clean.
 
-Gate: **6105 frontend tests, 0 failures.** tsc clean, eslint clean.
+## D-053 (2026-09-14) — M-COUL-001 repair: repulsive-positive Coulomb
+## scattering, the D-052 sign defect fixed under an exact, pinned patch
+
+D-052 disclosed a real physics defect and deliberately did not fix it
+(out of that pass's scope). This entry applies the owner's own, fully
+specified patch — convention, constants, and required regression coverage
+all given in advance — to `M-COUL-001` only.
+
+### Root cause (confirmed against the bundle's own source, not a
+### transcription error)
+
+Convention: `r` = vector from the origin to the projectile, `F = (k/r^2) *
+r_hat`, `k = q1q2` (k > 0 repulsive, k < 0 attractive), `theta =
+atan2(vy_final, vx_final)`, entering along +x, `b > 0`. The acceleration
+`RUN_COULOMB` applied was `a * (-r_hat)` — toward the origin for k > 0
+(attractive) — while `thetaAnalytic` is the standard closed-form Rutherford
+angle for REPULSIVE scattering. The trajectory and its own cross-check
+disagreed by construction; the disagreement did not shrink as step size
+shrank (a convergence sweep at the old sign, run before this patch, held at
+~1.86 rad regardless of dt).
+
+### The patch, exactly as specified
+
+`CARD_COULOMB.modelVersion` -> `0.2.1`. Acceleration sign corrected to
+`ax = +(k/(m r^2)) x/r, ay = +(k/(m r^2)) y/r` — repulsive for k > 0. Flight
+path extended (`x0 = -50 -> -200`, exit radius `200 -> 600`) so the toy
+model's reported angle is closer to the asymptotic scattering angle the
+analytic formula describes, not one read mid-flight. `dt`/`maxSteps` become
+OPTIONAL parameters (default `0.05`/`20000`, sized to comfortably complete
+the extended flight path) added only so the convergence test can exercise a
+finer step size — no existing `ExperimentDefinition` sets them, so every
+pre-existing caller (q1q2/E/b/m only) is unaffected beyond the sign and
+flight-path fix itself. `thetaAnalytic`'s formula, the velocity-Verlet
+integration structure, every other Physics World model, `core/physicsWorld/
+core.ts`/`backends.ts`/`experiment.ts`/`genesisAdapter.ts`, D-047, D-048,
+D-050, and Genesis Core are untouched.
+
+### Regression coverage added (`physicsWorld.test.ts`, describe block
+### renamed to name the fix)
+
+1. Repulsive benchmark (k=+1, b=1, E=1, m=1): `thetaAnalytic` computed from
+   the formula inline in the test (not hardcoded), `thetaNumeric > 0`,
+   `|thetaNumeric - thetaAnalytic| < 0.05`.
+2. Attractive benchmark (k=-1): `thetaAnalytic < 0`, `thetaNumeric < 0`,
+   same agreement bound.
+3. Regression: the old ~1.86 rad defect asserted absent (`validationDelta`
+   under 0.01, explicitly not close to the old value).
+4. Convergence: `dt=0.05/0.025/0.0125` (maxSteps scaled 20000/40000/80000
+   to cover the same physical flight path) — delta stabilizes rather than
+   diverging.
+5. Replay/determinism: the same `ExperimentDefinition` run twice yields an
+   identical `reproducibilityFingerprint`, plus the existing `replay()`
+   real-re-run check.
+6. Provenance: the record's `modelVersion` is `'0.2.1'`.
+   Plus: a compatibility check that a definition without `dt`/`maxSteps`
+   (every real caller) is unaffected by their presence in the contract.
+
+### The `< 0.05` bound was never touched to force a pass
+
+The threshold in every new assertion is the same `0.05` rad the source
+bundle's own (previously failing) test used — never widened, never
+calibrated to the result, never replaced by the analytic formula computing
+`thetaNumeric` itself (which remains the independent cross-check it always
+was).
+
+### Verified numbers (real run on this commit)
+
+Repulsive (k=+1,b=1,E=1,m=1): `thetaAnalytic = 0.9272952180016122`,
+`thetaNumeric = 0.9253354611848966`, `delta = 0.0019597568167155632`.
+Attractive (k=-1,b=1,E=1,m=1): `thetaAnalytic = -0.9272952180016122`,
+`thetaNumeric = -0.9282327879032978`, `delta = 0.0009375699016855865`.
+Convergence (`dt` 0.05 -> 0.025 -> 0.0125): delta `0.0019597568 ->
+0.0019902579 -> 0.0019978821` — stabilizes near ~0.002 rad, does not
+diverge.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881` unchanged, 18/18. `npm run
+e2e:gov-campaign`: `5179c99f` unchanged, 16/16. `npm run a2:demo`:
+`CONFLICTING_EVIDENCE`, 14/14, fingerprints `a5e0f164`/`4642088a`
+unchanged. `npm run physics-world:demo`: DEMO1/2/4/5 output byte-identical
+to D-052 (same fingerprints); DEMO3 now reports `validationDelta ≈ 0.00196`
+instead of the D-052 defect value.
+
+Gate: **6156 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
+failures.** tsc clean, eslint clean, frontend build clean.

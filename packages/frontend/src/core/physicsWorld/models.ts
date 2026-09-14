@@ -48,7 +48,7 @@ export const CARD_ATOM: ModelCard = {
 
 export const CARD_COULOMB: ModelCard = {
   modelId: 'M-COUL-001',
-  modelVersion: '0.2.0',
+  modelVersion: '0.2.1',
   family: 'PARTICLE_TRANSPORT',
   backend: 'NATIVE_TOY',
   toy: true,
@@ -80,6 +80,12 @@ function P(def: ExperimentDefinition, name: string): number {
   const p = def.parameters.find((x) => x.name === name);
   if (!p) throw new Error(`missing param ${name}`);
   return p.value;
+}
+
+/** Like `P`, but returns `fallback` when the param is absent — for optional, backward-compatible knobs (e.g. M-COUL-001's `dt`/`maxSteps`, used only by the convergence test). Existing definitions that never set these are unaffected. */
+function POpt(def: ExperimentDefinition, name: string, fallback: number): number {
+  const p = def.parameters.find((x) => x.name === name);
+  return p ? p.value : fallback;
 }
 
 export const RUN_TRANSPORT: ModelRun = (def) => {
@@ -140,25 +146,57 @@ export const RUN_ATOM: ModelRun = (def) => {
   };
 };
 
+/**
+ * M-COUL-001 (v0.2.1) — repulsive-positive classical Coulomb (Rutherford)
+ * scattering off a fixed charge at the origin. Sign convention: `r` is the
+ * vector from the origin to the projectile, `F = (k / r^2) * r_hat` where
+ * `k = q1q2`; k > 0 -> repulsion (F points away from the origin), k < 0 ->
+ * attraction. The projectile enters along +x from `x0 = -200` with impact
+ * parameter `b > 0`; `theta = atan2(vy_final, vx_final)`. Integrated by
+ * velocity-Verlet until `hypot(x, y) >= EXIT_R = 600` (both far enough from
+ * the origin that the asymptotic scattering angle this toy model reports is
+ * a good approximation, not a value read off mid-flight).
+ *
+ * SIGN FIX (docs/DECISIONS.md D-053, patch applied over the D-052 finding):
+ * the acceleration is `a * r_hat` — for k > 0 this pushes the projectile
+ * away from the origin (repulsive), matching `thetaAnalytic`, the standard
+ * closed-form Rutherford deflection angle for repulsive scattering. The
+ * prior version applied `a * (-r_hat)` (always toward the origin for
+ * k > 0 — attractive) while still comparing against the repulsive analytic
+ * formula, and used a much shorter flight path (`x0 = -50`, exit at
+ * `r = 200`) that additionally understated the asymptotic angle even under
+ * the wrong sign. Only this function's sign and flight-path extent changed;
+ * `thetaAnalytic` (independent validation, never used to produce
+ * `thetaNumeric`) and every other model are untouched.
+ *
+ * `dt`/`maxSteps` are OPTIONAL parameters (default 0.05 / 20000, sized to
+ * comfortably complete the default flight path) added ONLY so the
+ * convergence test can exercise a finer step size — no existing
+ * `ExperimentDefinition` sets them, so production behaviour for
+ * q1q2/E/b/m is otherwise unaffected by their presence.
+ */
 export const RUN_COULOMB: ModelRun = (def) => {
   const k = P(def, 'q1q2');
   const E = P(def, 'E');
   const b = P(def, 'b');
   const m = P(def, 'm');
+  const dt = POpt(def, 'dt', 0.05);
+  const maxSteps = Math.floor(POpt(def, 'maxSteps', 20000));
+  const X0 = -200;
+  const EXIT_R = 600;
   const v0 = Math.sqrt((2 * E) / m);
-  let x = -50;
+  let x = X0;
   let y = b;
   let vx = v0;
   let vy = 0;
-  const dt = 0.05;
   const acc = (): { ax: number; ay: number } => {
     const r2 = x * x + y * y;
     const r = Math.sqrt(r2);
     const a = k / (m * r2);
-    return { ax: (-a * x) / r, ay: (-a * y) / r };
+    return { ax: (a * x) / r, ay: (a * y) / r };
   };
   let a = acc();
-  for (let i = 0; i < 4000 && Math.hypot(x, y) < 200; i++) {
+  for (let i = 0; i < maxSteps && Math.hypot(x, y) < EXIT_R; i++) {
     x += vx * dt + 0.5 * a.ax * dt * dt;
     y += vy * dt + 0.5 * a.ay * dt * dt;
     const a2 = acc();

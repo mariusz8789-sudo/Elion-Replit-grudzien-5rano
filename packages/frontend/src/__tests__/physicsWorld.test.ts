@@ -155,47 +155,99 @@ describe('R7/R8 — model card disclosures name what each toy is NOT', () => {
   });
 });
 
-describe('M-COUL-001 — Rutherford scattering cross-check', () => {
+describe('M-COUL-001 v0.2.1 — Rutherford scattering cross-check (repaired, docs/DECISIONS.md D-053)', () => {
   /**
-   * DEFECT (found while integrating, not introduced by this pass): the
-   * source bundle's own `physicsTests()` asserted
-   * `coul.result.summary.validationDelta < 0.05`. Running the model exactly
-   * as ported (verified against the bundle's own RUN_COULOMB source
-   * character-for-character) produces validationDelta ≈ 1.86 rad, not < 0.05.
+   * FIXED DEFECT (D-052 found it, D-053 repairs it, patch applied exactly
+   * as specified). Convention: `r` = vector from the origin to the
+   * projectile, `F = (k / r^2) * r_hat`, `k = q1q2` (k > 0 repulsive, k < 0
+   * attractive), `theta = atan2(vy_final, vx_final)`, entering along +x
+   * from `x0 = -200`, impact parameter `b > 0`, exiting at `EXIT_R = 600`.
    *
-   * The acceleration in RUN_COULOMB (`ax: -a*x/r, ay: -a*y/r` with
-   * `a = k/(m*r^2)`) points TOWARD the origin for a positive k (like
-   * charges), i.e. an ATTRACTIVE force — but `thetaAnalytic` is the standard
-   * Rutherford formula for REPULSIVE scattering. The numeric trajectory and
-   * the analytic cross-check it is compared against assume opposite force
-   * directions, so they disagree by design, not by a transcription error.
-   *
-   * Per the integration mandate ("Nie dodawaj nowych funkcji naukowych" —
-   * do not add new scientific functions), this pass does NOT flip the sign
-   * to "fix" the physics; that is a scientific change outside this pass's
-   * scope and is flagged to the user instead. This test characterizes the
-   * REAL, current behaviour (pinned exactly, matching this session's
-   * established convention for a known, disclosed defect) rather than
-   * asserting the bundle's own untested claim, which does not hold.
+   * The prior version applied the acceleration toward the origin for
+   * k > 0 (attractive) while comparing against `thetaAnalytic`, the
+   * REPULSIVE-scattering Rutherford formula, over a much shorter flight
+   * path (`x0 = -50`, exit at `r = 200`) — both the wrong sign and a flight
+   * path too short to reach the asymptotic angle this toy model reports.
+   * `thetaAnalytic` was NOT touched and is never used to produce
+   * `thetaNumeric` — this describe block proves the independently
+   * integrated numeric trajectory now agrees with that unchanged formula.
    */
-  it('DEFECT: validationDelta is far larger than the bundle\'s own <0.05 claim — numeric (attractive) and analytic (repulsive) trajectories disagree in sign', () => {
-    const rec = runExperiment(
-      def({
-        experimentId: 'T3',
-        modelId: 'M-COUL-001',
-        observable: 'angle',
-        parameters: [
-          { name: 'q1q2', value: 1, unit: 'arb', min: 0.01, max: 10, required: true },
-          { name: 'E', value: 1, unit: 'arb', min: 0.01, max: 100, required: true },
-          { name: 'b', value: 1, unit: 'arb', min: 0.1, max: 50, required: true },
-          { name: 'm', value: 1, unit: 'arb', min: 0.1, max: 100, required: true },
-        ],
-      }),
-    );
-    expect(rec.result.summary.thetaNumeric).toBeCloseTo(-0.9342359879961979, 10);
-    expect(rec.result.summary.thetaAnalytic).toBeCloseTo(0.9272952180016122, 10);
-    expect(rec.result.summary.validationDelta).toBeCloseTo(1.8615312059978102, 10);
-    expect(rec.result.summary.validationDelta).toBeGreaterThan(0.05);
+  const repulsiveParams = () => [
+    { name: 'q1q2', value: 1, unit: 'arb', min: -10, max: 10, required: true },
+    { name: 'E', value: 1, unit: 'arb', min: 0.01, max: 100, required: true },
+    { name: 'b', value: 1, unit: 'arb', min: 0.1, max: 50, required: true },
+    { name: 'm', value: 1, unit: 'arb', min: 0.1, max: 100, required: true },
+  ];
+
+  // 1. Repulsive benchmark: k=+1, b=1, E=1, m=1.
+  it('1. repulsive benchmark (k=+1,b=1,E=1,m=1): thetaNumeric > 0 and agrees with thetaAnalytic = 2*atan(k/(2*b*E))', () => {
+    const rec = runExperiment(def({ experimentId: 'T3-repulsive', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }));
+    const { thetaNumeric, thetaAnalytic, validationDelta } = rec.result.summary;
+    expect(thetaAnalytic).toBeCloseTo(2 * Math.atan(1 / (2 * 1 * 1)), 12);
+    expect(thetaNumeric).toBeGreaterThan(0);
+    expect(thetaNumeric).toBeCloseTo(0.9253354611848966, 8);
+    expect(validationDelta).toBeLessThan(0.05);
+  });
+
+  // 2. Attractive benchmark: k=-1, b=1, E=1, m=1.
+  it('2. attractive benchmark (k=-1,b=1,E=1,m=1): thetaAnalytic < 0, thetaNumeric < 0, numeric/analytic agree', () => {
+    const rec = runExperiment(def({ experimentId: 'T3-attractive', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams().map((p) => (p.name === 'q1q2' ? { ...p, value: -1 } : p)) }));
+    const { thetaNumeric, thetaAnalytic, validationDelta } = rec.result.summary;
+    expect(thetaAnalytic).toBeLessThan(0);
+    expect(thetaAnalytic).toBeCloseTo(2 * Math.atan(-1 / (2 * 1 * 1)), 12);
+    expect(thetaNumeric).toBeLessThan(0);
+    expect(thetaNumeric).toBeCloseTo(-0.9282327879032978, 8);
+    expect(validationDelta).toBeLessThan(0.05);
+  });
+
+  // 3. Regression: the old defect (~1.86 rad delta) no longer occurs.
+  it('3. regression: the old ~1.86 rad defect is gone — validationDelta is two orders of magnitude smaller', () => {
+    const rec = runExperiment(def({ experimentId: 'T3-regression', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }));
+    expect(rec.result.summary.validationDelta).toBeLessThan(0.01);
+    expect(rec.result.summary.validationDelta).not.toBeCloseTo(1.8615312059978102, 1);
+  });
+
+  // 4. Convergence: dt=0.05 vs dt=0.025 (maxSteps scaled to cover the same physical flight path) — delta stabilizes, does not diverge.
+  it('4. convergence: halving dt stabilizes validationDelta rather than diverging', () => {
+    const at = (dt: number, maxSteps: number) =>
+      runExperiment(
+        def({
+          experimentId: `T3-conv-${dt}`,
+          modelId: 'M-COUL-001',
+          observable: 'angle',
+          parameters: [...repulsiveParams(), { name: 'dt', value: dt, unit: 'arb', min: 0.0001, max: 0.5, required: false }, { name: 'maxSteps', value: maxSteps, unit: '-', min: 100, max: 400000, required: false }],
+        }),
+      ).result.summary.validationDelta;
+
+    const d1 = at(0.05, 20000);
+    const d2 = at(0.025, 40000);
+    const d3 = at(0.0125, 80000);
+    expect(Math.abs(d2 - d1)).toBeLessThan(5e-5);
+    expect(Math.abs(d3 - d2)).toBeLessThanOrEqual(Math.abs(d2 - d1) + 1e-6);
+    expect(d1).toBeLessThan(0.05);
+    expect(d2).toBeLessThan(0.05);
+    expect(d3).toBeLessThan(0.05);
+  });
+
+  // 5. Replay/determinism: the same definition produces an identical fingerprint and result.
+  it('5. replay/determinism: the same ExperimentDefinition twice yields an identical fingerprint and result', () => {
+    const rec = runExperiment(def({ experimentId: 'T3-replay', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }));
+    const again = runExperiment(def({ experimentId: 'T3-replay', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }));
+    expect(again.reproducibilityFingerprint).toBe(rec.reproducibilityFingerprint);
+    expect(replay(def({ experimentId: 'T3-replay', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }), rec)).toBe(true);
+  });
+
+  // 6. Provenance: modelVersion 0.2.1 and the new card are recorded.
+  it('6. provenance: the record carries modelVersion 0.2.1 (the repaired card)', () => {
+    const rec = runExperiment(def({ experimentId: 'T3-provenance', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }));
+    expect(rec.modelVersion).toBe('0.2.1');
+    expect(rec.toy).toBe(true);
+    expect(rec.disclosure.length).toBeGreaterThan(0);
+  });
+
+  it('an ExperimentDefinition without dt/maxSteps (every pre-existing caller) is unaffected by their presence in the contract', () => {
+    const rec = runExperiment(def({ experimentId: 'T3-compat', modelId: 'M-COUL-001', observable: 'angle', parameters: repulsiveParams() }));
+    expect(rec.parameters.some((p) => p.name === 'dt' || p.name === 'maxSteps')).toBe(false);
   });
 });
 

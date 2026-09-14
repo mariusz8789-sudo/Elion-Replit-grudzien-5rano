@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EVIDENCE_CLASS_RANK,
+  DEFAULT_EVIDENCE_CLASS_RANK,
+  assertRankingUsable,
+  rankingFingerprint,
+  type EvidenceRanking,
   assertComparisonEvidenceClass,
   assertVetoEvidenceIsStrongest,
   classifyComparisonEvidenceClass,
@@ -51,11 +54,11 @@ describe('evidence class is computed, never declared', () => {
     expect(classifyComparisonEvidenceClass(obs(COHORT, 'C1', 10, 100), obs(STUDY_A, 'EG003', 5, 100))).toBe('OBSERVATIONAL');
   });
 
-  it('DIRECT outranks INDIRECT outranks POOLED outranks NETWORK', () => {
-    expect(EVIDENCE_CLASS_RANK.DIRECT_RANDOMISED).toBeGreaterThan(EVIDENCE_CLASS_RANK.INDIRECT_RANDOMISED);
-    expect(EVIDENCE_CLASS_RANK.INDIRECT_RANDOMISED).toBeGreaterThan(EVIDENCE_CLASS_RANK.POOLED_META);
-    expect(EVIDENCE_CLASS_RANK.POOLED_META).toBeGreaterThan(EVIDENCE_CLASS_RANK.NETWORK_META);
-    expect(EVIDENCE_CLASS_RANK.NETWORK_META).toBeGreaterThan(EVIDENCE_CLASS_RANK.OBSERVATIONAL);
+  it('the DEFAULT ranking orders DIRECT > INDIRECT > POOLED > NETWORK > OBSERVATIONAL', () => {
+    expect(DEFAULT_EVIDENCE_CLASS_RANK.DIRECT_RANDOMISED).toBeGreaterThan(DEFAULT_EVIDENCE_CLASS_RANK.INDIRECT_RANDOMISED);
+    expect(DEFAULT_EVIDENCE_CLASS_RANK.INDIRECT_RANDOMISED).toBeGreaterThan(DEFAULT_EVIDENCE_CLASS_RANK.POOLED_META);
+    expect(DEFAULT_EVIDENCE_CLASS_RANK.POOLED_META).toBeGreaterThan(DEFAULT_EVIDENCE_CLASS_RANK.NETWORK_META);
+    expect(DEFAULT_EVIDENCE_CLASS_RANK.NETWORK_META).toBeGreaterThan(DEFAULT_EVIDENCE_CLASS_RANK.OBSERVATIONAL);
   });
 
   it('spontaneous-report evidence cannot yield a risk ratio at all', () => {
@@ -189,5 +192,79 @@ describe('THE GATE: no veto from weaker evidence while stronger evidence exists'
     // than merely as unusable evidence.
     const faers = { ...weak, evidenceClass: 'POST_MARKETING' as const };
     expect(() => assertVetoEvidenceIsStrongest(faers, [faers], null, 'safety gate')).toThrow(/computed, never declared/);
+  });
+});
+
+describe('the evidence ranking is a preregistrable default, not a universal order of truth', () => {
+  it('a campaign may declare its own order — a regulatory label can outrank a cohort', () => {
+    // For "what is the excess risk" a pooled label table is the weaker
+    // instrument. For "what warning does the authority require" the label is
+    // the primary source and no cohort outranks it. The default must not
+    // silently decide that for every question.
+    const regulatoryFirst: EvidenceRanking = { ...DEFAULT_EVIDENCE_CLASS_RANK, REGULATORY_LABEL: 7, OBSERVATIONAL: 5 };
+    expect(() => assertRankingUsable(regulatoryFirst, 'test')).not.toThrow();
+    expect(regulatoryFirst.REGULATORY_LABEL).toBeGreaterThan(regulatoryFirst.OBSERVATIONAL);
+    expect(DEFAULT_EVIDENCE_CLASS_RANK.REGULATORY_LABEL).toBeLessThan(DEFAULT_EVIDENCE_CLASS_RANK.OBSERVATIONAL);
+  });
+
+  it('but no ranking may put DIRECT at or below INDIRECT — that is design, not policy', () => {
+    const inverted: EvidenceRanking = { ...DEFAULT_EVIDENCE_CLASS_RANK, DIRECT_RANDOMISED: 1 };
+    expect(() => assertRankingUsable(inverted, 'test')).toThrow(/fact about randomisation, not a policy choice/);
+    const tied: EvidenceRanking = { ...DEFAULT_EVIDENCE_CLASS_RANK, DIRECT_RANDOMISED: DEFAULT_EVIDENCE_CLASS_RANK.INDIRECT_RANDOMISED };
+    expect(() => assertRankingUsable(tied, 'test')).toThrow(/at or below/);
+  });
+
+  it('rejects a partial ranking rather than treating a missing class as rank zero', () => {
+    const partial = { DIRECT_RANDOMISED: 10, INDIRECT_RANDOMISED: 9 } as unknown as EvidenceRanking;
+    expect(() => assertRankingUsable(partial, 'test')).toThrow(/missing a finite rank for "POOLED_META"/);
+  });
+
+  it('ties are allowed — declaring two classes equally strong is a position', () => {
+    const tiedMetas: EvidenceRanking = { ...DEFAULT_EVIDENCE_CLASS_RANK, NETWORK_META: DEFAULT_EVIDENCE_CLASS_RANK.POOLED_META };
+    expect(() => assertRankingUsable(tiedMetas, 'test')).not.toThrow();
+  });
+
+  it('a declared ranking actually changes which comparison a decision rests on', () => {
+    const cohort: SourceStudyIdentity = { ...STUDY_A, studyId: 'COHORT-1', randomised: false, contentSha256: 'dddd' };
+    const observational = compareCountedOutcomes(obs(cohort, 'C1', 40, 200), obs(cohort, 'C2', 20, 200))!;
+    const direct = compareCountedOutcomes(obs(STUDY_A, 'EG000', 10, 100), obs(STUDY_A, 'EG001', 5, 100))!;
+    expect(observational.evidenceClass).toBe('OBSERVATIONAL');
+    expect(selectDecisionComparison([observational, direct])).toBe(direct);
+
+    const observationalFirst: EvidenceRanking = { ...DEFAULT_EVIDENCE_CLASS_RANK, OBSERVATIONAL: 11 };
+    expect(selectDecisionComparison([observational, direct], observationalFirst)).toBe(observational);
+  });
+
+  it('the ranking applied is identified, so an audit never has to assume the default', () => {
+    const other: EvidenceRanking = { ...DEFAULT_EVIDENCE_CLASS_RANK, REGULATORY_LABEL: 7 };
+    expect(rankingFingerprint(other)).not.toBe(rankingFingerprint(DEFAULT_EVIDENCE_CLASS_RANK));
+    expect(rankingFingerprint(DEFAULT_EVIDENCE_CLASS_RANK)).toBe(rankingFingerprint({ ...DEFAULT_EVIDENCE_CLASS_RANK }));
+  });
+});
+
+describe('observation identity survives into the comparison (audit addendum 10A.B)', () => {
+  it('flattens source and comparator study/arm ids onto the comparison itself', () => {
+    const c = compareCountedOutcomes(obs(STUDY_A, 'EG000', 10, 100), obs(STUDY_B, 'EG003', 5, 100))!;
+    expect(c.sourceStudyId).toBe('NCT00000001');
+    expect(c.sourceArmId).toBe('EG000');
+    expect(c.comparatorStudyId).toBe('NCT00000002');
+    expect(c.comparatorArmId).toBe('EG003');
+    expect(c.derivationMethod).toBe('KATZ_LOG_RISK_RATIO');
+  });
+
+  it('names its own fingerprint inputs instead of making an auditor read the source', () => {
+    const c = compareCountedOutcomes(obs(STUDY_A, 'EG000', 10, 100), obs(STUDY_A, 'EG001', 5, 100))!;
+    expect(c.fingerprintInputs).toEqual(['contractVersion', 'evidenceClass', 'exposed', 'reference', 'studyIds', 'term']);
+    // retrievedAt is deliberately absent (D-040).
+    expect(c.fingerprintInputs).not.toContain('retrievedAt');
+  });
+
+  it('carries Genesis-side context without letting it touch the number', () => {
+    const context = { experimentId: 'GOV-DRUG-CAMPAIGN-01', campaignId: '5179c99f', candidateId: 'CHEMBL4297839' };
+    const plain = compareCountedOutcomes(obs(STUDY_A, 'EG000', 10, 100), obs(STUDY_A, 'EG001', 5, 100))!;
+    const withContext = compareCountedOutcomes({ ...obs(STUDY_A, 'EG000', 10, 100), context }, obs(STUDY_A, 'EG001', 5, 100))!;
+    expect(withContext.exposed.context).toEqual(context);
+    // Where Genesis used a number is provenance about Genesis, not about the number.
+    expect(withContext.fingerprint).toBe(plain.fingerprint);
   });
 });

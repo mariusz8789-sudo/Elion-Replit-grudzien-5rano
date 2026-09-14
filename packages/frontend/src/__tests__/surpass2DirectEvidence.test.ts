@@ -13,7 +13,7 @@ import {
   surpass2Observation,
   surpass2OutcomeTerms,
 } from '../core/biotechData/surpass2DirectEvidence';
-import { EVIDENCE_CLASS_RANK, assertComparisonEvidenceClass, compareCountedOutcomes, selectDecisionComparison } from '../core/agent/evidenceProvenance';
+import { DEFAULT_EVIDENCE_CLASS_RANK, assertComparisonEvidenceClass, compareCountedOutcomes, selectDecisionComparison } from '../core/agent/evidenceProvenance';
 
 const FIXTURE = fileURLToPath(new URL('../core/biotechData/a2-ozempic-substitute/reference-semaglutide-NCT03987919.json', import.meta.url));
 const SEMAGLUTIDE_ARM = '1 mg Semaglutide';
@@ -128,7 +128,7 @@ describe('SURPASS-2 ingest — every within-trial comparison classifies as DIREC
     expect(indirect.evidenceClass).toBe('INDIRECT_RANDOMISED');
     expect(indirect.riskRatio).toBeCloseTo(2.7141, 4);
     for (const c of comparisons) {
-      expect(EVIDENCE_CLASS_RANK[c.evidenceClass]).toBeGreaterThan(EVIDENCE_CLASS_RANK[indirect.evidenceClass]);
+      expect(DEFAULT_EVIDENCE_CLASS_RANK[c.evidenceClass]).toBeGreaterThan(DEFAULT_EVIDENCE_CLASS_RANK[indirect.evidenceClass]);
     }
     expect(selectDecisionComparison([...comparisons, indirect])!.evidenceClass).toBe('DIRECT_RANDOMISED');
   });

@@ -2414,3 +2414,67 @@ pod którą polityką.
 Nie zmienia progu `safetyRiskRatioMeaningfulDeviation: 1.0`. Nie przełącza
 żadnego istniejącego przebiegu na nową politykę. Nie wykonuje re-adjudykacji —
 to osobny krok, z osobnym identyfikatorem i osobnym odciskiem.
+
+## D-045 (2026-09-14) — hierarchia dowodu jest prerejestrowalna, nie uniwersalna.
+## Plus pełna tożsamość obserwacji wg §10A.B.
+
+### Poprawka przyjęta od recenzenta, bo jest słuszna
+
+W D-043 zaszyłem `EVIDENCE_CLASS_RANK` jako **stałą globalną**, w której
+`REGULATORY_LABEL` (5) stoi **poniżej** `OBSERVATIONAL` (6). To nie jest fakt,
+to twierdzenie — i twierdzenie prawdziwe tylko dla pewnej klasy pytań.
+
+Dla pytania „jakie jest nadmiarowe ryzyko tego zdarzenia" zbiorcza tabela z
+etykiety rzeczywiście jest słabszym narzędziem niż dobrze zaprojektowana
+kohorta. Dla pytania „co ten produkt ma prawo twierdzić" albo „jakiego
+ostrzeżenia wymaga organ rejestracyjny" **etykieta jest źródłem pierwotnym i
+żadna kohorta jej nie przebija**. To samo dotyczy `MECHANISTIC` przy pytaniu o
+mechanizm.
+
+Zaszycie jednego porządku dla wszystkich pytań to ta sama klasa błędu co D-042:
+decyzja podjęta w miejscu, w którym nikt jej potem nie widzi.
+
+### Co się zmieniło
+
+`EVIDENCE_CLASS_RANK` → **`DEFAULT_EVIDENCE_CLASS_RANK`**, jawnie opisany jako
+porządek, który kampania dostaje, **jeśli nie zadeklaruje własnego**. Każda
+funkcja porządkująca (`selectDecisionComparison`, `strongestEvidenceClass`,
+`assertVetoEvidenceIsStrongest`) przyjmuje `ranking: EvidenceRanking`.
+`rankingFingerprint` identyfikuje, **pod którym porządkiem** zapadła decyzja —
+audytor nie musi zakładać domyślnego.
+
+### Co pozostaje nienegocjowalne — i dlaczego to nie jest ranga
+
+`assertRankingUsable` odrzuca porządek stawiający `DIRECT_RANDOMISED` na równi
+z `INDIRECT_RANDOMISED` lub niżej. **To nie jest preferencja polityczna, tylko
+fakt o projekcie badania**: dwa ramiona zrandomizowane przeciwko sobie to co
+innego niż dwa ramiona, które nigdy nie były. Żadne pytanie tego nie odwraca.
+
+Drugi nienegocjowalny element w ogóle nie jest wyrażony rangą: `yieldsRiskRatio`
+jest **predykatem**. Źródło bez mianownika nie utworzy *rate* na żadnej pozycji
+w rankingu, więc nie może być „nisko" — musi być poza.
+
+**Porządek częściowy jest odrzucany**, nie uzupełniany zerami: brakująca klasa
+oznacza, że ktoś jej nie rozważył, a nie że uznał ją za najsłabszą.
+**Remisy są dozwolone** — uznanie dwóch klas za równie mocne dla danego pytania
+jest stanowiskiem; ciche pominięcie jednej nie jest.
+
+Test dowodzi, że to nie jest kosmetyka: ten sam zestaw porównań daje **inne**
+`selectDecisionComparison` pod zadeklarowanym porządkiem stawiającym
+`OBSERVATIONAL` najwyżej.
+
+### Tożsamość obserwacji (§10A.B)
+
+Dodane, bo konsument niosący samo porównanie nadal nie może zgubić źródła:
+`sourceStudyId`, `sourceArmId`, `comparatorStudyId`, `comparatorArmId`
+spłaszczone na `RiskRatioComparison`; `derivationMethod:
+'KATZ_LOG_RISK_RATIO'`, żeby estymatora nie trzeba było zgadywać z wartości;
+`fingerprintInputs`, żeby audytor wiedział, **co** odcisk pokrywa, bez czytania
+źródła — i widział, że `retrievedAt` tam nie ma.
+
+`ObservationContext` (`experimentId`, `campaignId`, `candidateId`) jest
+**opcjonalny i celowo poza hashem**. To proweniencja o Genesis, nie o liczbie:
+gdzie Genesis użył pomiaru, nie zmienia pomiaru. Test pinuje jedno i drugie —
+kontekst dociera nienaruszony, odcisk się nie rusza.
+
+Gate: **5995 testów, 0 awarii**.

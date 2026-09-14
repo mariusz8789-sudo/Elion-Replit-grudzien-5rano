@@ -54,7 +54,32 @@ export type EvidenceClass =
   | 'UNVERIFIED';
 
 /** Higher is stronger. Used for ordering only — never as a weight in a score. */
-export const EVIDENCE_CLASS_RANK: Readonly<Record<EvidenceClass, number>> = {
+export type EvidenceRanking = Readonly<Record<EvidenceClass, number>>;
+
+/**
+ * A PREREGISTRABLE DEFAULT, NOT A UNIVERSAL ORDER OF TRUTH.
+ *
+ * This is the ordering a campaign gets if it does not declare its own, and it
+ * encodes contestable claims. The clearest is `REGULATORY_LABEL` sitting below
+ * `OBSERVATIONAL`: for "what is the excess risk of this event" a pooled label
+ * table really is a weaker instrument than a well-designed cohort, but for
+ * "what is this product approved to claim" or "what warning does the authority
+ * require" the label is the primary source and no cohort outranks it. The same
+ * goes for `MECHANISTIC` on a question about mechanism.
+ *
+ * So an experiment that cares about the order must FREEZE its own ranking in
+ * its preregistration and pass it in, and every gate below records which
+ * ranking it applied (`rankingFingerprint`) so an auditor can see the order
+ * that was actually used rather than assume this one.
+ *
+ * What is NOT negotiable, and therefore not expressed as a rank:
+ *  - `DIRECT_RANDOMISED` above `INDIRECT_RANDOMISED`. Two arms randomised
+ *    against each other versus two arms that never were is a fact about the
+ *    design, not a policy preference.
+ *  - `yieldsRiskRatio`. Denominator-free sources cannot produce a rate at any
+ *    rank, which is why that is a predicate rather than a position.
+ */
+export const DEFAULT_EVIDENCE_CLASS_RANK: EvidenceRanking = {
   DIRECT_RANDOMISED: 10,
   INDIRECT_RANDOMISED: 9,
   POOLED_META: 8,
@@ -66,6 +91,28 @@ export const EVIDENCE_CLASS_RANK: Readonly<Record<EvidenceClass, number>> = {
   COMPUTATIONAL: 2,
   UNVERIFIED: 1,
 };
+
+/**
+ * A declared ranking must cover every class and must keep the two
+ * non-negotiables above. Ties are allowed: declaring two classes equally
+ * strong for a given question is a legitimate position; silently dropping one
+ * is not.
+ */
+export function assertRankingUsable(ranking: EvidenceRanking, context: string): void {
+  for (const cls of Object.keys(DEFAULT_EVIDENCE_CLASS_RANK) as EvidenceClass[]) {
+    if (typeof ranking[cls] !== 'number' || !Number.isFinite(ranking[cls])) {
+      throw new Error(`${context}: declared evidence ranking is missing a finite rank for "${cls}". A partial ranking silently drops a class instead of taking a position on it.`);
+    }
+  }
+  if (ranking.DIRECT_RANDOMISED <= ranking.INDIRECT_RANDOMISED) {
+    throw new Error(`${context}: a ranking may not place DIRECT_RANDOMISED at or below INDIRECT_RANDOMISED. That is a fact about randomisation, not a policy choice.`);
+  }
+}
+
+/** Identifies which ordering a decision was made under, so an audit never has to assume the default. */
+export function rankingFingerprint(ranking: EvidenceRanking): string {
+  return fnv1a(canonicalJson(ranking));
+}
 
 /**
  * Spontaneous-report systems (FAERS and kin) have no denominator: the number
@@ -98,9 +145,26 @@ export interface ArmIdentity {
   readonly nAtRisk: number;
 }
 
+/**
+ * Where in Genesis's own work an observation was used. Separate from the study
+ * identity above, which says where the NUMBER came from: an auditor asking
+ * "why did this campaign veto this candidate" needs both, and they are not the
+ * same question.
+ *
+ * Optional because the same observation is legitimately read outside any
+ * campaign (a demonstrator, a test, an ingest). Present or absent, it never
+ * changes the number.
+ */
+export interface ObservationContext {
+  readonly experimentId: string;
+  readonly campaignId: string;
+  readonly candidateId: string;
+}
+
 /** One counted outcome in one arm of one study — the atom this file protects. */
 export interface CountedOutcomeObservation {
   readonly observationId: string;
+  readonly context?: ObservationContext;
   readonly study: SourceStudyIdentity;
   readonly arm: ArmIdentity;
   readonly term: string;
@@ -116,6 +180,9 @@ export interface Ci95 {
   readonly high: number;
 }
 
+/** How a derived number was produced. Named so a reader never has to infer the estimator from the value. */
+export type DerivationMethod = 'KATZ_LOG_RISK_RATIO';
+
 export interface RiskRatioComparison {
   /** COMPUTED from the two observations. Never supplied by a caller. */
   readonly evidenceClass: EvidenceClass;
@@ -124,10 +191,18 @@ export interface RiskRatioComparison {
   readonly term: string;
   readonly exposed: CountedOutcomeObservation;
   readonly reference: CountedOutcomeObservation;
+  /** Flattened arm/study identity, so a consumer that carries only the comparison still cannot lose it. */
+  readonly sourceStudyId: string;
+  readonly sourceArmId: string;
+  readonly comparatorStudyId: string;
+  readonly comparatorArmId: string;
   readonly riskRatio: number;
   readonly ci95: Ci95;
+  readonly derivationMethod: DerivationMethod;
   /** Events, not participants — the quantity a confidence interval actually rests on. */
   readonly totalEvents: number;
+  /** The field names that went into `fingerprint`, so an auditor never has to read this file to know what it covers. */
+  readonly fingerprintInputs: readonly string[];
   readonly fingerprint: string;
 }
 
@@ -197,9 +272,15 @@ export function compareCountedOutcomes(exposed: CountedOutcomeObservation, refer
     term: exposed.term,
     exposed,
     reference,
+    sourceStudyId: exposed.study.studyId,
+    sourceArmId: exposed.arm.groupId,
+    comparatorStudyId: reference.study.studyId,
+    comparatorArmId: reference.arm.groupId,
     riskRatio: rr,
     ci95,
+    derivationMethod: 'KATZ_LOG_RISK_RATIO',
     totalEvents: exposed.numAffected + reference.numAffected,
+    fingerprintInputs: Object.keys(hashable).sort(),
     fingerprint: fnv1a(canonicalJson(hashable)),
   };
 }
@@ -212,10 +293,11 @@ export function assertComparisonEvidenceClass(comparison: RiskRatioComparison, c
   }
 }
 
-export function strongestEvidenceClass(comparisons: readonly RiskRatioComparison[]): EvidenceClass | null {
+export function strongestEvidenceClass(comparisons: readonly RiskRatioComparison[], ranking: EvidenceRanking = DEFAULT_EVIDENCE_CLASS_RANK): EvidenceClass | null {
+  assertRankingUsable(ranking, 'strongestEvidenceClass');
   let best: EvidenceClass | null = null;
   for (const c of comparisons) {
-    if (best === null || EVIDENCE_CLASS_RANK[c.evidenceClass] > EVIDENCE_CLASS_RANK[best]) best = c.evidenceClass;
+    if (best === null || ranking[c.evidenceClass] > ranking[best]) best = c.evidenceClass;
   }
   return best;
 }
@@ -226,11 +308,12 @@ export function strongestEvidenceClass(comparisons: readonly RiskRatioComparison
  * largest risk ratio — selecting on the effect being measured is how a
  * screening pipeline manufactures its own findings.
  */
-export function selectDecisionComparison(comparisons: readonly RiskRatioComparison[]): RiskRatioComparison | null {
+export function selectDecisionComparison(comparisons: readonly RiskRatioComparison[], ranking: EvidenceRanking = DEFAULT_EVIDENCE_CLASS_RANK): RiskRatioComparison | null {
+  assertRankingUsable(ranking, 'selectDecisionComparison');
   let best: RiskRatioComparison | null = null;
   for (const c of comparisons) {
     if (best === null) { best = c; continue; }
-    const rank = EVIDENCE_CLASS_RANK[c.evidenceClass] - EVIDENCE_CLASS_RANK[best.evidenceClass];
+    const rank = ranking[c.evidenceClass] - ranking[best.evidenceClass];
     if (rank > 0 || (rank === 0 && c.totalEvents > best.totalEvents)) best = c;
   }
   return best;
@@ -253,7 +336,9 @@ export function assertVetoEvidenceIsStrongest(
   available: readonly RiskRatioComparison[],
   waiver: WeakerEvidenceWaiver | null,
   context: string,
+  ranking: EvidenceRanking = DEFAULT_EVIDENCE_CLASS_RANK,
 ): void {
+  assertRankingUsable(ranking, context);
   assertComparisonEvidenceClass(chosen, context);
   // Currently unreachable through `compareCountedOutcomes`, whose output can
   // only classify as DIRECT/INDIRECT/OBSERVATIONAL - a relabelled class is
@@ -264,12 +349,12 @@ export function assertVetoEvidenceIsStrongest(
     throw new Error(`${context}: ${chosen.evidenceClass} evidence has no denominator and cannot yield a risk ratio, let alone a veto.`);
   }
   const sameTerm = available.filter((c) => c.term === chosen.term);
-  const stronger = sameTerm.filter((c) => EVIDENCE_CLASS_RANK[c.evidenceClass] > EVIDENCE_CLASS_RANK[chosen.evidenceClass]);
+  const stronger = sameTerm.filter((c) => ranking[c.evidenceClass] > ranking[chosen.evidenceClass]);
   if (stronger.length === 0) return;
   if (waiver === null || waiver.reason.trim() === '') {
     const names = stronger.map((c) => `${c.evidenceClass} from ${c.studyIds.join('+')} (${c.totalEvents} events)`).join('; ');
     throw new Error(
-      `${context}: refusing to veto on ${chosen.evidenceClass} evidence from ${chosen.studyIds.join('+')} (${chosen.totalEvents} events) for "${chosen.term}" while stronger evidence is available: ${names}. ` +
+      `${context}: refusing to veto on ${chosen.evidenceClass} evidence from ${chosen.studyIds.join('+')} (${chosen.totalEvents} events) for "${chosen.term}" while stronger evidence is available under ranking ${rankingFingerprint(ranking)}: ${names}. ` +
         'Use the stronger comparison, or record a WeakerEvidenceWaiver saying why it cannot be used.',
     );
   }

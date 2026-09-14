@@ -4789,6 +4789,60 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .gdd-verdict { font-family: var(--font-mono); font-size: 1.5rem; color: var(--gold); margin: 0 0 8px; letter-spacing: 0.02em; }
 .gdd-reason { line-height: 1.55; color: var(--text); }
 
+/* genesis-ui — VerdictBanner / ProvenancePanel / FingerprintChip (real, shared, built once). */
+.gu-verdict-banner { border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; border: 1px solid var(--border-strong); background: var(--bg-raised); }
+.gu-verdict-label { font-family: var(--font-mono); font-size: 1.3rem; letter-spacing: 0.03em; }
+.gu-verdict-reason { margin: 8px 0 0; line-height: 1.5; color: var(--text-dim); font-size: 0.88rem; }
+.gu-verdict-winner { border-left: 4px solid var(--green); }
+.gu-verdict-winner .gu-verdict-label { color: var(--green); }
+.gu-verdict-no-winner { border-left: 4px solid var(--text-dim); }
+.gu-verdict-no-winner .gu-verdict-label { color: var(--text-dim); }
+.gu-verdict-conflicting { border-left: 4px solid var(--gold); }
+.gu-verdict-conflicting .gu-verdict-label { color: var(--gold); }
+.gu-verdict-insufficient { border-left: 4px solid var(--red); }
+.gu-verdict-insufficient .gu-verdict-label { color: var(--red); }
+.gu-verdict-unknown { border-left: 4px solid var(--border-strong); }
+
+.gu-provenance-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.gu-provenance-item { display: flex; gap: 10px; align-items: baseline; font-size: 0.85rem; }
+.gu-provenance-key { font-family: var(--font-mono); color: var(--cyan); min-width: 140px; }
+.gu-provenance-value { color: var(--text-dim); word-break: break-word; }
+
+.gu-fingerprint-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 2px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--bg-panel); margin: 2px 6px 2px 0; }
+.gu-fingerprint-chip-label { color: var(--text-faint); }
+.gu-fingerprint-chip-value { font-family: var(--font-mono); color: var(--cyan); }
+
+.gu-conjunct-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gu-conjunct-item { padding: 8px 10px; border-radius: 6px; background: var(--bg-raised); border-left: 3px solid var(--border-strong); font-size: 0.85rem; }
+.gu-conjunct-item.gu-conjunct-held { border-left-color: var(--green); }
+.gu-conjunct-item.gu-conjunct-failed { border-left-color: var(--red); }
+.gu-conjunct-name { font-family: var(--font-mono); font-weight: 600; }
+.gu-conjunct-detail { color: var(--text-dim); margin-top: 2px; }
+
+.gu-locked-panel { border: 1px dashed var(--border-strong); border-radius: 8px; padding: 20px; text-align: center; color: var(--text-dim); }
+.gu-locked-icon { font-size: 1.8rem; margin-bottom: 8px; }
+
+.gu-offline-banner { border: 1px solid var(--gold); color: var(--gold); background: var(--bg-raised); border-radius: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.82rem; margin-bottom: 16px; letter-spacing: 0.02em; }
+
+.gu-histogram { width: 100%; height: 220px; background: var(--bg-panel); border-radius: 6px; }
+.gu-histogram-bar { fill: var(--cyan); opacity: 0.6; }
+.gu-histogram-bar.gu-histogram-bar-window { fill: var(--green); opacity: 0.9; }
+.gu-histogram-label { fill: var(--text-faint); font-size: 9px; }
+
+.gu-screen { padding: 16px; max-width: 980px; margin: 0 auto; }
+.gu-hint { color: var(--text-faint); font-size: 0.82rem; margin: 4px 0 16px; }
+.gu-panel { background: var(--bg-panel); border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+.gu-panel-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.gu-whatis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.gu-whatis-col { border: 1px solid var(--border-strong); border-radius: 6px; padding: 10px 12px; font-size: 0.85rem; }
+.gu-whatis-col ul { margin: 6px 0 0; padding-inline-start: 18px; color: var(--text-dim); line-height: 1.7; }
+.gu-locale-switch { display: flex; gap: 6px; margin-bottom: 14px; }
+.gu-locale-btn { font-family: var(--font-mono); font-size: 0.75rem; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--bg-panel); color: var(--text-dim); cursor: pointer; }
+.gu-locale-btn-active { color: var(--cyan); border-color: var(--cyan); }
+@media (max-width: 620px) {
+  .gu-whatis-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 560px) {
   .gdd-funnel-head { flex-direction: column; gap: 2px; }
   .gdd-verdict { font-size: 1.15rem; }

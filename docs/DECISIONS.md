@@ -3025,4 +3025,249 @@ Does not touch efficacy, thresholds, or A2/campaign/E2E-01 historical logic
 demo scripts (still pass). Does not build Public Value/ROI/Funding layers or
 any UI — explicitly deferred.
 
+## D-051 (2026-09-14) — GENESIS VISUAL COMPLETION: CMS Open Data gets a real
+## read-only HTTP surface and a real screen; no SEED_*, no mocks
+
+A UI mockup was pasted (SEED_FUNNEL/SEED_FALS/SEED_VERDICT/SEED_CERN
+placeholders and mockup `VerdictBanner`/`ProvenancePanel`/`FingerprintChip`
+components) as a reference for design shape only, not as something to ship.
+Nothing from the mockup's placeholder data reached committed code — grepped
+before writing anything, confirmed absent after.
+
+### The one architectural decision: a genuine read-only HTTP API for CERN
+
+Every other Government Drug Discovery screen calls its pure-TypeScript
+engine directly in the browser (`GovDrugCampaignScreen.tsx`'s
+`runGovDrugDiscoveryCampaign()` pattern) — no HTTP needed for pure
+computation over already-pinned data. CMS Open Data is different: the real,
+checksum-verified data only exists backend-side, read by a Python worker
+(`cmsOpenDataAdapter.mjs` / `cms_zmumu_worker.py`, already real and tested
+before this entry). The owner's explicit choice (asked via AskUserQuestion,
+verbatim, kept in full): *"Wybieram pełną integrację przez READ-ONLY HTTP
+API. Nie chcę snapshotu jako źródła produkcyjnego UI... UI ma czytać
+rzeczywisty aktualny rekord backendu... nie twórz mocków ani seedów..."*
+
+`GET /api/physics/cms-z` (public, read-only) wraps `zMuMuInvariantMassStats()`
+unchanged — zero new scientific logic. Returns the real dataset provenance
+(sha256, license, recordUrl), the real event/mass statistics, and the full
+5 GeV histogram (`histogram5GeV60To120`), plus `resultOrigin: 'real-engine'`,
+`dataProvenance: 'REAL_EXTERNAL_DATASET'`, `offline: true`, `live: false`,
+`simulation: false` — or an honest `503 BLOCKED_BY_RUNTIME` when the pinned
+CSV is unavailable, never a substitute. A config-only default
+(`GENESIS_CERN_OPEN_DATA_DIR`) was added to `cmsOpenDataAdapter.mjs` so a
+fresh deployment finds its own already-committed CSV without operator setup
+— it never overrides an explicit value, and `detect()` still verifies the
+SHA-256 before ever reporting availability, so a wrong or tampered path
+still fails honestly. Verified: the adapter's existing honest-refusal test
+still passes (the Python subprocess re-reads `process.env` fresh on each
+call, so deleting the env var still triggers `DATA_REQUIRED`).
+
+Mid-integration the route's path changed from an initial `/api/compute/cern/zmumu`
+to the final `GET /api/physics/cms-z`, at the owner's explicit later
+request — same handler, same adapter call, renamed once before anything
+using the old path was committed.
+
+### Shared UI components, built once (nothing existed to extend)
+
+`grep -rl` for `VerdictBanner`/`ProvenancePanel`/`FingerprintChip` across
+`components/` returned nothing before this entry — there was nothing to
+extend, confirming the mockup's own claim ("extend, don't duplicate") was
+about a REAL future obligation, not an existing one. Built as generic,
+reusable projections that render exactly what they are given and invent no
+default label, no fallback text, no interpretation of a score:
+`VerdictBanner` (a label + optional reason), `ProvenancePanel` (a titled
+key/value list), `FingerprintChip` (one labelled hash). CSS added under the
+existing `.gu-*` prefix, reusing existing design tokens only.
+
+### `/physics/cms-z` screen — real fetch, mandatory OFFLINE framing
+
+`PhysicsCmsZScreen.tsx` fetches the real endpoint (`useEffect` + relative
+`fetch('/api/physics/cms-z')`, cancelled-flag pattern matching
+`GenesisDashboard.tsx`'s existing convention) and renders three states
+honestly: loading, unavailable (503 -> a locked panel, no synthetic
+substitute), and ready (the real histogram drawn from
+`invariantMassGeV.histogram5GeV60To120`, real provenance, a real
+sha256-match badge). An `OFFLINE ANALYSIS OF HISTORICAL OPEN DATA — NOT A
+LIVE COLLIDER / NOT A SIMULATION` banner is mandatory on the ready state; a
+"what this IS / what this is NOT" section (6 items) states plainly that
+this is not a collider simulation, not live, and not a new discovery — 2011
+data, published 2019. An "audit annotation" section cites the real,
+already-committed `docs/HADRON_COLLIDER_CAPABILITY_AUDIT.md` (26 Aug 2026)
+and states honestly what it found that this pipeline supersedes (there was
+no real CERN pipeline when that audit ran) and what remains true (no beam
+model, no event generator, no detector reconstruction). Wired into
+`App.tsx` as `#/physics/cms-z`, `HeavyRoute`-wrapped like every other lazy
+screen.
+
+### i18n (PL/EN/AR + RTL) and the negation-aware scanner
+
+`core/agent/lowerHarmLabels.ts` (built for the still-in-progress LOWER-HARM
+screens; extended here for `/physics/cms-z`) follows `phaseELabels.ts`'s
+exact E6 pattern: `SupportedLocale`/`isRtl`/`SUPPORTED_LOCALES` imported, not
+redefined; a closed `Record<CanonicalKey, LocaleEntry>` TypeScript enforces
+complete; every `ar` string flagged `UNVERIFIED` (Rule 6). Tested for
+completeness and for zero banned comfort-language hits
+(`scanAllLocales(allLowerHarmTextsByLocale())`).
+
+A genuine finding surfaced while writing that scan: `bannedStringScanner.ts`
+matched `"safe"` as a plain substring, so `"passes the safety gate"` (an
+existing, correct LOWER-HARM string, unrelated to this task) false-positived.
+Fixed with a word-boundary check (`includesAtWordBoundary`, Unicode
+letter/number aware) for the Latin-script locales — deliberately NOT applied
+to Arabic, where a clitic like the definite article "ال" attaches to a noun
+with no space (`"البديل"` contains `"بديل"` with no boundary), so a strict
+boundary rule would have silently stopped catching real Arabic hits; Arabic
+keeps its original substring match. Verified against the full existing
+`bannedStringScanner.test.ts` (all pass unchanged) plus new coverage.
+
+Separately, the owner asked for a scanner that flags an UNNEGATED claim that
+Genesis is a live/active collider or is running a simulation, without
+flagging the mandatory disclosure banner itself (which must contain the
+words "live"/"simulation" to deny them). `scanForActiveColliderClaims` is a
+second, clearly distinct function (not a variant of the comfort-language
+scanner — a different question entirely): for each trigger word
+("live", "simulation", "aktywny zderzacz", "مباشر", "محاكاة", ...) it checks
+a 40-character window immediately before the match for a negation marker in
+the same locale ("not a", "nie", "ليس", ...); unnegated, it is a hit.
+Verified against the real banner text in all three locales (zero hits) and
+against constructed positive claims in EN/PL/AR (all caught), including one
+case where an unrelated earlier "not" in the same string does NOT suppress
+a later, real unnegated claim (window-bounded, not string-bounded).
+
+### What this entry does NOT do
+
+Does not touch `zMuMuInvariantMassStats()`, the Python worker, or any
+existing scientific decision logic. Does not complete the LOWER-HARM screens
+(Funnel/Falsification/Verdict/Recipe) — `VerdictBanner.tsx` remains an
+honestly-documented orphan in `moduleReachability.test.ts` until those are
+built; deferred to a follow-up. Does not add a Playwright capture script for
+the new screen in this entry — deferred alongside the LOWER-HARM screens so
+one capture script covers all of them together.
+
+Gate: **6150 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
+failures.** tsc clean, eslint clean, frontend build clean.
+
+## D-052 (2026-09-14) — Physics World v2 / Recipe Engine v2: hardening +
+## integration of an externally authored bundle, not a redesign
+
+An external design package ("Physics World Engine v2 / Recipe Engine v2")
+arrived with its own internal audit already attached (rules R1-R15, an
+A/B/C map of accepted/corrected/rejected decisions from a v1 draft) and an
+explicit instruction to C1: integrate, don't redesign. The mandate's own
+scope, verbatim: (1) integrate with the existing Genesis hash provider, (2)
+rewire its DEMO5 hypothesis test onto the existing D-047 Genesis
+Adjudication Protocol — no second adjudication engine, (3) port the missing
+vitest coverage (R4-R15), (4) confirm there is no silent toy fallback, (5)
+TESTS -> TSC -> ESLINT -> BUILD -> E2E -> FULL GATE, (6) history check by
+RUNNING `399221f5`/`f528c881`/`5179c99f`/A2/D-048/D-050, (7) one commit. No
+new scientific functions; PYTHIA/Geant4 stay fail-closed adapter contracts.
+
+Landed under `packages/frontend/src/core/physicsWorld/` (contracts, core,
+backends, models, experiment, genesisAdapter, physicsRecipe) — the repo's
+existing convention (all scientific/agent code lives under
+`packages/frontend/src/core/`), not a new top-level workspace package, so
+this integrates into the SAME build/lint/test pipeline as everything else
+rather than standing up parallel infrastructure.
+
+### Decision 1 — the hash provider is NOT SHA-256
+
+The bundle asked for a swappable `HashProvider` defaulting to `node:crypto`
+SHA-256, "to be replaced in-repo by the existing Genesis hash module". That
+module, `core/events/hash.ts`, is FNV-1a (8 hex chars) — every fingerprint
+already in this codebase (A2, G2, D-042 through D-050, D-047's own
+`ruleFingerprint`/`inputFingerprint`) is `fnv1a(canonicalJson(...))`. Adding
+a real SHA-256 provider "for physics only" would be a second, parallel
+crypto system living beside the one every other fingerprint already uses —
+exactly the "second engine" the mandate forbids, one layer down. `core.ts`
+drops the `HashProvider` abstraction entirely and calls
+`fnv1a(canonicalJson(...))` directly, like every other domain.
+`reproducibilityFingerprint`/`modelCardHash`/`recipeFingerprint` are
+therefore 8 hex chars, not 64 — the ported R9 test asserts the real format,
+not the bundle's own untested assumption.
+
+### Decision 2 — DEMO5 rewired onto D-047, phases `preRegister -> freeze -> execute` only
+
+The bundle's own `demo5GenesisLoop` decided WINNER/NO_WINNER with a bespoke
+one-line threshold comparison — exactly the un-audited decision path this
+whole session has been removing everywhere else. `genesisAdapter.ts` now
+freezes each hypothesis's threshold rule (`PhysicsSweepRule`, via
+`preRegister`/`freeze`) BEFORE computing the ratio, and only computes it
+inside `execute()`'s `runResult` callback — which gets, for free, D-047's
+two guarantees the bundle's version lacked: the rule cannot have changed
+since freeze (HARK guard), and the decision function is run twice and must
+agree (reproducibility guard). Both hypotheses (H1: dE/dx proportional to
+z^2; H2: proportional to z) are evaluated independently through their own
+frozen rule; WINNER requires exactly one to hold and the other not to —
+both holding or neither is NO_WINNER, never forced. Real result on the real
+toy transport model: H1 holds (ratio 4.1597, in [3.5,4.5]), H2 does not,
+verdict WINNER/H1 — the physically expected Bethe-like z² scaling.
+`readjudicate`/`compare`/`audit` are deliberately NOT invoked: those three
+phases exist specifically to compare a NEW adjudication against a
+HISTORICAL one, and DEMO5 is a first-time decision with no prior verdict to
+compare against — forcing it through those phases would mean faking a
+self-vs-self "re-adjudication" for no real comparison, which is worse than
+using only the phases that apply.
+
+### Decision 3 — Recipe stays domain-scoped, not a shared cross-domain engine
+
+`physicsRecipe.ts` ports the bundle's `WinnerRecord`/`ResearchRecipe`/gate
+machinery (G1-G9, `buildPhysicsRecipe`, `replayPhysicsRecipe`, export/import
+with fingerprint verification on import) but lives under
+`core/physicsWorld/`, not as a generic module other domains would migrate
+onto. The repo already has two other domain-specific "build a recipe from a
+winning decision" modules
+(`govDrugDiscoveryE2E.ts::generateResearchRecipe`, and the unrelated
+simulation-catalogue `core/generator/recipe.ts`) — neither is a shared
+engine; each domain owns its own. A generic cross-domain recipe engine would
+itself be the "second engine" this mandate forbids, at a different layer.
+
+### Two real defects found while porting the R-test suite, handled differently
+
+1. **Hardening, fixed.** `validateParams` only checks params that ARE
+   present; a param a model needs but the caller omitted entirely slipped
+   past it and surfaced as a raw, untyped `Error` from inside the model's
+   own run function — breaking the "every failure is a `FailClosedError`"
+   contract the mandate exists to guarantee (its own R-test expected this,
+   and would have failed against the bundle's own unmodified code too).
+   Fixed in `experiment.ts` by wrapping the model's `run()` call and
+   re-surfacing any non-`FailClosedError` as `FailClosedError('PARAMS', ...)`
+   — plumbing/robustness, not new physics, squarely inside "hardening".
+2. **Physics, NOT fixed — flagged instead.** `RUN_COULOMB`'s acceleration
+   (`ax: -a*x/r, ay: -a*y/r` with `a = k/(m*r²)`) points TOWARD the origin
+   for `k > 0` (an ATTRACTIVE force for like charges), while the
+   `thetaAnalytic` cross-check it is compared against is the standard
+   REPULSIVE-scattering Rutherford formula — verified character-for-
+   character against the bundle's own source, not a transcription error.
+   The bundle's own test asserted `validationDelta < 0.05`; the real,
+   faithfully-ported value is `1.8615312059978102` (pinned exactly). Per
+   the mandate's own "Nie dodawaj nowych funkcji naukowych", this is NOT
+   silently flipped to make the test pass — it is characterized as a
+   `DEFECT:`-labelled test (this session's established convention for a
+   disclosed, unfixed finding) and reported to the owner, who can choose
+   whether to authorize the one-line sign fix.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5` (replay fingerprint), `f528c881`
+(preregistration) — unchanged, 18/18. `npm run e2e:gov-campaign`:
+`5179c99f` unchanged, 16/16. `npm run a2:demo`: CONFLICTING_EVIDENCE,
+14/14, analysis fingerprint `a5e0f164` on preregistration `4642088a` —
+unchanged. `npm run lower-harm:demo` (D-048/D-049): CONFLICTING_EVIDENCE,
+4/4 — unchanged. `npm run lower-harm-funnel:demo` (D-050): NO_WINNER,
+runFingerprint `2e6eb55e`, 5/5 — unchanged. All five verified by executing
+the real script on this commit, not by reading prior output.
+
+### What this entry does NOT do
+
+Does not implement PYTHIA or Geant4 — `detectBackends()` reports both
+(and `EXTERNAL_MATTER`) permanently unavailable; `requireBackend()` fails
+closed on any request for one, with no fallback to the toy model. Does not
+change `RUN_TRANSPORT`/`RUN_ATOM`/`RUN_HE`'s numerical methods. Does not
+build a UI for physics-world (no screen calls `runExperiment` or
+`buildPhysicsRecipe` yet — reached today only by its own vitest suites and
+`npm run physics-world:demo`, documented in `moduleReachability.test.ts`).
+
+Gate: **6150 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
+failures.** tsc clean, eslint clean, frontend build clean.
+
 Gate: **6105 frontend tests, 0 failures.** tsc clean, eslint clean.

@@ -77,6 +77,7 @@ const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
+const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -121,6 +122,7 @@ type Route =
   | { kind: 'cde' }
   | { kind: 'drug' }
   | { kind: 'gov-campaign' }
+  | { kind: 'physics-cms-z' }
   | { kind: 'campaign' }
   | { kind: 'generate' }
   | { kind: 'compare' }
@@ -170,6 +172,7 @@ function parseHash(): Route {
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug' || h.startsWith('#/drug?')) return { kind: 'drug' };
   if (h === '#/gov-campaign') return { kind: 'gov-campaign' };
+  if (h === '#/physics/cms-z') return { kind: 'physics-cms-z' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
@@ -395,6 +398,18 @@ export default function App() {
           <TopBar title="🏛 Government Drug Discovery" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GovDrugCampaignScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'physics-cms-z') {
+      return (
+        <div className="app">
+          <TopBar title="⚛ Physics / CMS Z→μμ" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <PhysicsCmsZScreen />
           </HeavyRoute>
           {overlays}
         </div>

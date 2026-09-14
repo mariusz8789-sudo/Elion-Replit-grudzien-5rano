@@ -3464,3 +3464,86 @@ the full parallel run under load (`proteinFoldingInquiry.test.ts`,
 unrelated) and passed 18/18 in an isolated re-run immediately after. 402
 backend tests, 0 failures.** tsc clean, eslint clean, frontend build
 clean.
+
+## D-055 (2026-09-14) — Genesis Research Orchestrator: closes the loop
+## PROBLEM -> WINNER/NO_WINNER -> RECIPE with sequencing only, zero new science
+
+Integrates an externally authored "Genesis Research Orchestrator" bundle.
+Its own premise, verified true by this session's history: Genesis already
+has every piece of the scientific decision loop (campaigns, D-047
+Adjudication Protocol, D-048/D-050 LOWER-HARM, G2 falsification, per-domain
+recipe builders, provenance, replay, fail-closed) but no single module
+sequences them end to end. This entry adds ONLY that sequencing — zero new
+ranking, adjudication, falsification, or recipe logic.
+
+### What was built
+
+`core/orchestrator/{contracts,nl,orchestrator,toyAdapters}.ts`.
+`OrchestratorAdapters` is a set of PORTS (`generate`, `hardFilter`, `rank`,
+`seal`, `verifySealUnchanged`, `falsify`, `adjudicate`, `buildRecipe`, ...)
+— `orchestrator.ts::runScientificDiscovery` calls them in a fixed 20-stage
+order and records what each returned; it computes no candidate, verdict, or
+recipe itself. `nl.ts::parseProblem` is fail-closed: an NL description
+alone is never treated as a metric or an evidence-minimum rule — anything
+not explicitly supplied lands in `missingInputs` and the record's `status`
+is `NEEDS_INPUT`, which the orchestrator refuses to run past stage 1.
+A HARK-stop sits right after the freeze: if `A.verifySealUnchanged(seal)`
+reports the rule changed since sealing, the run aborts with
+`HARK_DETECTED` rather than continuing on a silently mutated rule. A
+recipe is built only for a real `WINNER` verdict, and even then the real
+`RecipeBuilder`'s own gates (see D-052/D-053's `physicsRecipe.ts` pattern)
+can still lock it — the orchestrator never overrides that. Every stage and
+the whole run carry a fingerprint (`core/events/hash.ts`'s `fnv1a`, same
+provider as D-052/D-053/D-054 — not a bundled hand-rolled hash), and
+`replayRunDeterministic` proves re-running the identical problem against
+the identical adapters produces an identical `auditFingerprint`.
+
+**Hardening over the source bundle** (sequencing-only cleanup, not new
+logic): the bundle's own `orchestrator.ts` built the stage list with a
+`stages.splice(18, 0, {...AUDIT_REPLAY...})` after already pushing
+`18_RECIPE_OR_LOCK` and `20_NEXT_EXPERIMENT` — inserting stage 19 into the
+middle of an array that already contained stage 20. This version pushes
+`18_RECIPE_OR_LOCK -> 19_AUDIT_REPLAY -> 20_NEXT_EXPERIMENT` in the actual
+order the stage IDs name, which is what a sequencer's own output should be.
+
+`toyAdapters.ts` implements every port with `SYNTHETIC_TEST_ONLY` fixtures
+— `adjudicate` always returns `NO_WINNER` (a sandbox default is never a
+forced WINNER; a real `WINNER` path only ever appears in this module's own
+unit tests, via a distinct test-only adapter). `GenesisConsole.tsx` is a
+read-only projection wired to `toyAdapters` with a mandatory, visible
+`SANDBOX: SYNTHETIC_TEST_ONLY` chip — never presented as a real run.
+Reuses `VerdictBanner`/`FingerprintChip` (built for D-051, previously
+unwired for the verdict banner — now genuinely reachable through this
+screen) and the `.gu-*`/`.gu-conjunct-*` styling already in `styles.css`.
+Wired into `App.tsx` as `#/research-console`.
+
+### History check — run, not read
+
+`npm run e2e:gov-drug`: `399221f5`/`f528c881` unchanged, 18/18. `npm run
+e2e:gov-campaign`: `5179c99f` unchanged, 16/16. `npm run a2:demo`:
+`CONFLICTING_EVIDENCE`, 14/14, fingerprints `a5e0f164`/`4642088a`
+unchanged.
+
+### What this entry does NOT do
+
+Does not wire any `OrchestratorAdapters` port to a real Genesis module for
+a `PRODUCTION`-mode run — `generate`/`hardFilter`/`rank` do not call
+`runGovDrugDiscoveryCampaign`/`govDrugLowerHarmFunnel.ts`,
+`falsify`/`adjudicate` do not call `generateDifferentiatingExperiment` or
+`genesisAdjudicationProtocol.ts`, and `buildRecipe` does not call a real
+RecipeBuilder. Every port in this pass is a sandbox/test fixture. Wiring a
+real port is explicit future work: doing it requires re-verifying "no
+second ranking/adjudication/falsification engine" against an actual live
+call site for each port individually, not a taxonomy string — the same
+caveat `core/virtualBio/gov.ts` (D-054) states for its own pillar hooks.
+Does not touch Genesis Core, D-047, D-048, D-050, or any existing engine.
+
+Two frontend test files unrelated to this module
+(`proteinFoldingInquiry.test.ts`, `lookingGlassScenario.test.ts`) each
+timed out once during the full parallel suite run under load and passed
+in full (18/18, 112/112) in an isolated re-run immediately after —
+load-induced flakes, not regressions; disclosed rather than silently
+re-run away.
+
+Gate: **6187 frontend tests (1 skipped), 0 failures. 402 backend tests, 0
+failures.** tsc clean, eslint clean, frontend build clean.

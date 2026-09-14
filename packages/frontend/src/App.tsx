@@ -79,6 +79,7 @@ const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorksp
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
 const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard').then((m) => ({ default: m.VirtualLabDashboard })));
+const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -125,6 +126,7 @@ type Route =
   | { kind: 'gov-campaign' }
   | { kind: 'physics-cms-z' }
   | { kind: 'virtual-bio' }
+  | { kind: 'research-console' }
   | { kind: 'campaign' }
   | { kind: 'generate' }
   | { kind: 'compare' }
@@ -176,6 +178,7 @@ function parseHash(): Route {
   if (h === '#/gov-campaign') return { kind: 'gov-campaign' };
   if (h === '#/physics/cms-z') return { kind: 'physics-cms-z' };
   if (h === '#/virtual-bio') return { kind: 'virtual-bio' };
+  if (h === '#/research-console') return { kind: 'research-console' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
@@ -425,6 +428,18 @@ export default function App() {
           <TopBar title="🧫 Virtual Bio Lab" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <VirtualLabDashboard />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'research-console') {
+      return (
+        <div className="app">
+          <TopBar title="🧭 Genesis Research Console" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GenesisConsole />
           </HeavyRoute>
           {overlays}
         </div>

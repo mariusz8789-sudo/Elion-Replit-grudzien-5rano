@@ -230,7 +230,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/physicsWorld/experiment.ts': 'Physics World integration (D-052); same reach as contracts.ts.',
   'core/physicsWorld/genesisAdapter.ts': 'Physics World integration (D-052); DEMO5 rewired through core/agent/genesisAdjudicationProtocol.ts (D-047) rather than a bespoke verdict function -- no second adjudication engine. Same reach as contracts.ts.',
   'core/physicsWorld/physicsRecipe.ts': 'Physics World integration (D-052); domain-scoped Research Recipe projection (WinnerRecord + gates G1-G9), matching the existing per-domain pattern (govDrugDiscoveryE2E.ts::generateResearchRecipe is the other one) rather than a shared cross-domain recipe engine. Same reach as contracts.ts.',
-  'components/genesis-ui/VerdictBanner.tsx': 'GENESIS VISUAL COMPLETION UI task, in progress: the shared verdict banner for the LOWER-HARM screens (Funnel/Falsification/Verdict/Recipe). ProvenancePanel.tsx and FingerprintChip.tsx (built alongside it) are already reached via PhysicsCmsZScreen.tsx; this one is used only by the LOWER-HARM screens, not yet wired into App.tsx. Remove this entry once those screens are built.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

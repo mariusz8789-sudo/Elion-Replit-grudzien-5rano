@@ -38,6 +38,41 @@ export interface LowerHarmResearchRecipe {
   readonly replay: string;
   readonly dualUseGuard: 'ASSERTED';
   readonly recipeFingerprint: string;
+
+  // -------------------------------------------------------------------------
+  // D-062 EXTENSION — all OPTIONAL, additive only (docs/DECISIONS.md D-062,
+  // brief §12.2). `buildLowerHarmRecipe` above never sets these, so its
+  // existing callers and its `recipeFingerprint` are byte-unchanged. A
+  // second builder for a candidate shape `A2CandidateReport` cannot express
+  // (a dose stratum, not a molecule) populates them directly — see
+  // `discoveryChallenge/recipeExtension.ts::buildDoseStratifiedRecipe`. This
+  // is NOT a second recipe engine: same interface, same field-assembly
+  // discipline, a second real candidate shape.
+  // -------------------------------------------------------------------------
+  readonly discoveryId?: string;
+  readonly problemFingerprint?: string;
+  readonly baseline?: {
+    readonly identity: string;
+    readonly armId: string;
+    readonly studyId: string;
+    readonly contentSha256: string;
+    readonly outcomeMetrics: Readonly<Record<string, number>>;
+    readonly applicabilityConditions: readonly string[];
+  };
+  readonly winnerRecordRef?: string;
+  readonly hypothesisId?: string;
+  readonly mechanismModel?: { readonly rendered: string; readonly fingerprint: string };
+  readonly parameters?: Readonly<Record<string, number>>;
+  readonly parameterConstraints?: readonly string[];
+  readonly initialConditions?: readonly string[];
+  readonly frozenPredictionRefs?: readonly string[];
+  readonly experimentRefs?: readonly string[];
+  readonly falsificationResults?: readonly { readonly probe: string; readonly outcome: string }[];
+  readonly researchStateHead?: string;
+  readonly improvementVsBaseline?: readonly { readonly metric: string; readonly candidate: number; readonly baseline: number }[];
+  readonly applicabilityConditions?: readonly string[];
+  readonly limitations?: readonly string[];
+  readonly reproducibilityInstructions?: readonly string[];
 }
 
 /**

@@ -4511,3 +4511,166 @@ after 3 rounds.** Frontend **6339 tests (1 skipped), 0 failures**, 546 files.
 tsc clean. eslint clean. Anchors unchanged: `399221f5`/`f528c881` 18/18,
 `5179c99f` 16/16, `a5e0f164`/`4642088a` 14/14, lower-harm 5/5, M-COUL-001
 `validationDelta=0.0019597568167155632`.
+
+## D-062 (2026-09-14) — the A2/LOWER-HARM Discovery Challenge: dose strata as
+## the first real, non-synthetic candidates a domain can legitimately promote
+
+D-061 named the wall: NASA planetary data is honestly `OBSERVATIONAL` (rank 6),
+below D-057's `INDIRECT_RANDOMISED` (rank 9) strength floor, so no non-clinical
+domain can ever promote. This entry names and tries the domain that CAN: the
+existing LOWER-HARM/A2 substrate already carries real randomised clinical
+evidence. The mission (docs/QWEN-A2-DISCOVERY-CHALLENGE-BRIEF.md) was to find
+something Genesis has never seen before, inside that domain, with real evidence,
+and let it try to beat a frozen baseline through the real, unmodified D-057
+gate — never fabricating a winner if it cannot.
+
+### The Qwen round, and why it stopped at one
+
+Per the user's mandate, Qwen was sent a repo-grounded brief (REAL FILE /
+EXPORTED CONTRACT / CURRENT FUNCTION / USED BY / DO NOT MODIFY format, ~850
+lines) naming the exact discovery target, the frozen baseline, the
+better-than-baseline rule, and a REUSE/EXTEND/NEW table. Qwen's delivery
+supplied a genuinely well-shaped design (a thin `A2DomainPorts` seam,
+baseline/rule freezing via the real `genesisAdjudicationProtocol`, lineage
+classification, an additive Recipe extension) but, having no repo access,
+could not itself build the real per-dose data wiring. Confronting the package
+against the real repo found: a wrong import path
+(`agent/experimentFabric/beliefRevision` → `experimentFabric/beliefRevision`);
+an invalid `FalsificationCriterion.relation` literal; mixed type/value imports
+that compile under `tsc` but break `esbuild` bundling under this repo's
+`isolatedModules`; and — the one that mattered — the D-057 evidence inventory
+built from the FROZEN BASELINE's own evidence class/count instead of the real
+WINNING CANDIDATE's, exactly the kind of silent mis-binding that could have
+let a weak candidate borrow the baseline's strong evidence class. Per the D-061
+mandate ("don't go back to Qwen for another round unless integration finds a
+genuinely large architectural gap"), none of this was — it was fixed here, and
+the real per-dose data wiring (the part Qwen could not do at all) was built
+from scratch against the real functions.
+
+### The discovery target: dose STRATA, not molecules
+
+`extractCandidateSafety`'s candidate-arm selection (`pickCandidateAeGroupTitle`,
+pre-existing, unmodified) always picks the HIGHEST parsed dose in a trial's
+title — so every dose below a trial's maximum has been invisible to Genesis
+since A1. SURPASS-2 (NCT03987919, sha256
+`385c58a1b7a19bedac0bb303846a8cffb23242d912edd7fc91fa93d5b278a8b0`) randomised
+tirzepatide at THREE doses (5/10/15mg) against 1mg semaglutide in the SAME
+trial. Reading each dose separately — via `extractCandidateEfficacy` called
+with an EXACT per-dose title regex (10mg/15mg reachable through the trial's
+PRIMARY hba1c outcome object; 5mg lives in a disjoint SECONDARY outcome object
+that function's own single-PRIMARY-outcome resolution cannot reach, so the
+identical DIRECT_HEAD_TO_HEAD delta/CI formula was applied directly to that
+second outcome object rather than editing the function) and
+`extractCandidateSafety` called with each exact arm title — produces three
+real candidates that are genuinely absent from the fixed 12-molecule A2 space,
+each backed by real, same-trial, `DIRECT_RANDOMISED` evidence (computed by
+`classifyComparisonEvidenceClass`, never asserted).
+
+### The frozen baseline and the frozen better-than-baseline rule
+
+Baseline: the SURPASS-2 1mg semaglutide arm itself (`knownOutcomeMetrics =
+{efficacy: 0, harm: 0}` — the zero point every dose stratum's own "vs
+semaglutide" scores are already expressed relative to, since `scoreCandidate`
+is reused unmodified). Rule: `efficacy >= baseline AND harm < baseline AND
+observations >= MINIMUM_OBSERVATIONS AND >=1 observation at
+INDIRECT_RANDOMISED or above` — every numeric term inherited from
+`LOWER_HARM_PREREGISTRATION.fingerprint` (`c827c79c`) and
+`A2_PREREGISTRATION.fingerprint` (`4642088a`), recorded as `inheritedFrom`,
+never re-tuned. Both baseline and rule are frozen through the real, unmodified
+`genesisAdjudicationProtocol.ts::preRegister`/`freeze` before any candidate is
+scored.
+
+### Maximal reuse, one legitimate departure named and justified
+
+`rankForLowerHarm` (hard-filter + safety-dominant rank), `checkDiversity`,
+`freezeFalsificationCriteria`, `runG2Falsification`, `decideFunnelVerdict`,
+`falsifyCandidate`, `scoreCandidate`, `runCandidateBeliefRevision` are all
+called UNMODIFIED — full, real `A2CandidateReport`s are built for the dose
+strata too (via `runCandidateBeliefRevision` on their own real efficacy/
+safety), so the SAME elimination+ranking function that already governs the
+12-molecule space governs the combined 15-candidate pool. The one departure:
+`runAdjudication`'s private `buildGatedCandidate` derives `observationIds`
+from `efficacy` rows ONLY (`ctgov:${nctId}`) — correct for A2's one-row-per-
+trial space, but every dose stratum shares ONE trial id, so that path would
+silently undercount the (larger) real safety-comparison evidence. This run
+calls `evaluatePracticalCandidate`/`surfaceFor` DIRECTLY — both exported,
+unmodified — with ARM-LEVEL `observationIds` built from each candidate's own
+evidence refs, then hands the result to the real, unmodified
+`decideFunnelVerdict` for the WINNER/NO_WINNER conjunction. Not a second gate:
+the same one, fed correctly for a candidate shape A2 never had.
+
+### Three genuinely different rounds, by construction
+
+With only 3 real qualifying candidates most rounds, "exclude the falsified
+half of TOP2" would exhaust after 2 rounds — short of the mandated minimum.
+Instead, round `r` leaves out the `r`-th ranked qualifier and pairs the two
+highest-ranked of the rest: round 0 tests the funnel's own top-ranked pair
+(GLP-1/liraglutide — the SAME pair `runLowerHarmFunnel()`'s own test already
+asserts), round 1 and 2 rotate in the third-ranked challenger. Three
+candidates give exactly the three distinct pairs C(3,2) allows, each a real
+`runScientificDiscovery` pass, never a repeat. A rotation that runs out of a
+real pair to examine is caught per-round and treated as an honest
+`SCIENTIFIC_STOP`, never an `EXECUTION_BLOCKED` abort of the whole run.
+
+### What the real run found (by execution, `npm run e2e:d062`)
+
+All three real tirzepatide dose strata are eliminated by the EXISTING
+existential safety veto — at EVERY dose, not just the trial's maximum:
+5mg on serious-adverse-event risk ratio 2.53, 10mg on diarrhea risk ratio
+1.43, 15mg on serious-adverse-event risk ratio 2.07 (all CIs exclude 1 in the
+worse direction). This is a real, disclosed falsification of the discovery
+hypothesis (`H-SEPARATION`: some dose retains efficacy while lowering harm) —
+`H-NO-SEPARATION` (the safety signal tracks the molecule, not the dose) is
+what survives. With the dose strata eliminated at hard-filter, the funnel's
+TOP2 falls back to the fixed A2 space, and the SAME real blocker D-058 already
+found reappears exactly: `AGREES_WITH_PRE_EXPERIMENT_RANK` / safety-gate
+disagreement between G2's favoured candidate and the frozen pre-experiment
+rank. `PASSED: 8/8 properties held. OUTCOME: NO_WINNER after 3 round(s).`
+`WHAT DID GENESIS INVENT? NOTHING — this run produced no candidate outside its
+fixed set.` Replay: two independent PRODUCTION runs produce an identical audit
+fingerprint (`a60b6b3a`).
+
+### THE SECTION-36-STYLE VERDICT
+
+Genesis tried a real, disclosed discovery strategy — dose-stratifying a trial
+it had only ever read at its maximum dose — with real per-dose extraction,
+real falsification, and the real, unmodified D-057 gate never bypassed. The
+strategy failed for a real, named, mechanistic reason (the safety signal is a
+property of the molecule across its whole dose range, not something dosing
+around), not for "insufficient evidence". **D-062 does not close the gap
+D-061 named — no non-clinical WINNER path exists yet, and this domain's own
+honest result is still NO_WINNER — but it does establish, by execution, that
+a domain with real `DIRECT_RANDOMISED` evidence and a real domain adjudicator
+CAN structurally reach the D-057 gate; this run's blocker is a real safety
+finding, not a structural evidence-class wall.** The one wall D-061 named is
+gone; a different, real, evidence-grounded one replaced it.
+
+### Recipe extension, built but unexercised this run
+
+`govLowerHarmRecipe.ts::LowerHarmResearchRecipe` gained 13 ADDITIVE optional
+fields (`discoveryId`, `baseline`, `winnerRecordRef`, `mechanismModel`,
+`parameters`, `frozenPredictionRefs`, `experimentRefs`, `falsificationResults`,
+`researchStateHead`, `improvementVsBaseline`, `applicabilityConditions`,
+`limitations`, `reproducibilityInstructions`) — `buildLowerHarmRecipe`'s
+existing behaviour and fingerprint are byte-unchanged (a test asserts this).
+`discoveryChallenge/recipeExtension.ts::buildDoseStratifiedRecipe` is a FOURTH
+instance of the "domain-scoped Research Recipe projection" convention
+(`physicsRecipe.ts`, `govDrugDiscoveryE2E.ts`, `govLowerHarmRecipe.ts` are the
+first three) — same interface, same non-negotiables, a candidate shape
+(`ChallengeCandidate`, a dose stratum) `A2CandidateReport` cannot express. It
+was never called this run: no WINNER, no recipe. Ready for the day a strategy
+survives the safety veto.
+
+### Gate
+
+`node scripts/genesis-d062-discovery-challenge.mjs`: **8/8 properties held,
+OUTCOME NO_WINNER after 3 rounds**, replay `a60b6b3a` == `a60b6b3a`. Frontend
+**583 test files, 6411 tests passed (1 skipped), 0 failures** — 36 new,
+negative-first, including a regression guard on the real safety-veto finding
+and a real word-boundary banned-strings scan (`agent/bannedStringScanner.ts`,
+reused, not reinvented). tsc clean. eslint clean. `moduleReachability` clean —
+every new module wired to a real caller (`ChallengePanel.tsx`, mounted in
+`GenesisConsole.tsx`), none added to `ALLOWED_ORPHANS`. Anchors unchanged:
+`399221f5`/`f528c881` 18/18, `5179c99f` 16/16, `a5e0f164`/`4642088a` 14/14,
+lower-harm funnel `2e6eb55e` 5/5, `LOWER_HARM_PREREGISTRATION.fingerprint`
+still `c827c79c`, `genesis-mind-e2e.mjs` still 18/18 `NO_WINNER`.

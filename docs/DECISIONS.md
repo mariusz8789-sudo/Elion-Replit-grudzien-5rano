@@ -6925,3 +6925,104 @@ toward but not past.
 
 **NO_WINNER stands. Recipe LOCKED. No threshold, gate or pin moved.**
 
+
+## D-089 DIAGNOSTIC-0 — the bottleneck is the target variable, not the chemistry
+
+Measurement only. No model selected, no representation chosen, **no test row
+read**, **0 of the remaining D-088 attempt budget consumed**. Diagnostic
+fingerprint `0347e0564ba0f5bb`, dataset pin `5533d8b8…`.
+
+### The measurements
+
+| metric | value |
+|---|---|
+| unique Murcko scaffolds | **89** over 287 rows |
+| top-10 scaffold concentration | **57.5%** of rows |
+| largest single scaffold | 15.3% |
+| peptide-like (≥6 residues) | **75.6%** |
+| nearest-neighbour Tanimoto, median / p95 | **1.00 / 1.00** |
+| molecules with a ≥0.7 neighbour | **92.0%** |
+| endpoint types | EC50 194, IC50 89, Ki 4 |
+| molecules measured on ≥2 endpoint types | **65** |
+| **median EC50 vs IC50/Ki gap for the same molecule** | **1.7618 pActivity** |
+| true same-endpoint replicate groups | 6 → noise floor `NOT_MEASURED` |
+| learning curve (calibration) | 45→2.8932, 89→1.0909, 134→0.9843, 178→**0.8164** |
+| final slope | +0.1679, still improving |
+| PMID overlap detection | `NOT_MEASURED` — the pin has no publication field |
+
+### The finding
+
+**The model is being judged on a target variable that contradicts itself.**
+Sixty-five molecules carry both a functional potency (EC50) and a binding
+affinity (IC50/Ki), and those two numbers differ by a median of **1.76
+pActivity** — roughly 58-fold in concentration. The V2 test MAE is 1.0425. The
+dataset's own internal disagreement, for molecules it measured both ways, is
+**70% larger than the error the model is being failed on**.
+
+That is not a modelling problem and it is not a chemical-diversity problem. A
+single `pActivity` axis is being asked to represent two different physical
+quantities at once.
+
+### And the dilemma this creates is exact
+
+Restricting to one endpoint family makes the target coherent — and drops every
+subset below the frozen size floors (`MIN_TRAIN=150`, `MIN_TEST=40`), measured:
+
+| subset | rows | train | test | gate size |
+|---|---|---|---|---|
+| all endpoints (current) | 287 | 178 ✓ | 45 ✓ | **satisfied** |
+| EC50 only (functional) | 194 | 118 ✗ | 32 ✗ | **fails** |
+| IC50 only (binding) | 89 | 56 ✗ | 13 ✗ | **fails** |
+| IC50 + Ki (binding) | 93 | 60 ✗ | 13 ✗ | **fails** |
+
+**On this dataset, under the frozen rules, there is no configuration that is
+both endpoint-coherent and large enough to be gated.** Keep all 287 rows and
+the target is incoherent; make it coherent and the gate refuses the size. That
+is a rigorous answer to D-089's research question — *can 1.0425 be improved
+under frozen rules?* — and the answer is **not by any model, representation or
+scaffold change on this data**.
+
+### Why Strategy A as specified is NOT justified
+
+The package recommended Strategy A (more scaffolds, criterion "≥40 new
+scaffolds") on the hypothesis that narrow diversity plus domain shift set the
+ceiling. Diversity is indeed narrow — 92% of molecules have a ≥0.7 neighbour
+and the nearest-neighbour Tanimoto p95 is 1.00, meaning exact duplicates exist
+— but that is not what caps the error. Forty new scaffolds carrying the same
+EC50/IC50 mixture would inherit the same 1.76 contradiction.
+
+The package's own hypothesis **E (label noise)** was ranked likely and is
+`NOT_MEASURED`: only 6 molecule-groups have two assays of the SAME endpoint
+type, far below a usable floor. A first version of this diagnostic reported a
+"noise floor" of 1.1212 by grouping replicates on molecule alone — which put a
+molecule's EC50 and its IC50 in one bucket and called their difference noise.
+That would have supported a confident, wrong conclusion ("the gate sits below
+the noise floor, no model can pass"). Grouping by molecule **and** endpoint
+type is what separated the two, and it changed the answer.
+
+### The measured extension requirement, replacing "≥40 new scaffolds"
+
+To make the EC50-only configuration gateable, the extension must lift EC50-only
+from 118/32 to ≥150/≥40. At the split's ~60/20/20 shape that is approximately
+**≥53 new human GLP-1R EC50 rows on new Murcko scaffolds** — endpoint-
+homogeneous, not merely novel. Novel-but-mixed rows do not help. This
+supersedes the package's count, and it is derived from measurement rather than
+chosen.
+
+### Package audit findings
+
+- `metricClaim` fingerprints with **fnv1a**. Backend scientific provenance is
+  sha256 (`provenance.mjs::canonicalHash`); fnv1a appears once in the backend,
+  for OSM spatial ingestion, never for science. Adopting it would create the
+  parallel fingerprint system the mandate forbids. **Not landed as specified.**
+- `emitMetric` computes `runFingerprint` **at emission, from caller-supplied
+  `runInputs`** — provenance constructed in the reporting layer, which is the
+  thing the defect class is about. A claim must carry the run's own identity,
+  not one minted where it is printed.
+- The gate string `UNCHANGED:150/40/1.0/25` carries a typo. Canonical
+  `MIN_R2 = 0.25`. Not propagated.
+- `P43220` (human GLP-1R) vs `P43119` (prostacyclin receptor) is correctly
+  called out and matches D-087a.
+
+**NO_WINNER stands. Recipe LOCKED. Attempt budget still 1 of 2 remaining.**
+

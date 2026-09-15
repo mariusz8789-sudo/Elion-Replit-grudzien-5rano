@@ -20,33 +20,15 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalHash } from '../provenance.mjs';
+import { loadValidationGate } from './validationGate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** Resolved relative to THIS FILE (not cwd) — same self-sufficiency `glp1rDataset.mjs`'s PIN_PATH uses, so `probeCapabilities()` can stay a zero-arg call. */
 export const GLP1R_GATE_PATH = process.env.GENESIS_GLP1R_GATE ?? path.join(HERE, 'glp1r-validation-gate.json');
 
-/** Loads + verifies the frozen validation gate. Fail-closed: missing/tampered file blocks, never falls back to a default gate. */
+/** Loads + verifies the frozen GLP-1R validation gate — the GLP-1R binding of the one generic gate loader (`validationGate.mjs`, D-081). Fail-closed: missing/tampered file blocks, never falls back to a default gate. */
 export function loadGlp1rValidationGate(gatePath = GLP1R_GATE_PATH, expectedRuleFingerprint) {
-  if (!existsSync(gatePath)) {
-    return { ok: false, code: 'GATE_NOT_FROZEN', reason: 'GLP-1R validation gate file missing — refusing to validate a model against an unfrozen gate' };
-  }
-  let raw;
-  try {
-    raw = JSON.parse(readFileSync(gatePath, 'utf8'));
-  } catch {
-    return { ok: false, code: 'GATE_NOT_FROZEN', reason: 'GLP-1R validation gate file unreadable' };
-  }
-  if (typeof raw.ruleFingerprint !== 'string' || raw.ruleFingerprint === '') {
-    return { ok: false, code: 'GATE_NOT_FROZEN', reason: 'gate file carries no ruleFingerprint — was never produced by a real freeze' };
-  }
-  const actual = canonicalHash(raw.gate).slice(0, 16);
-  if (actual !== raw.ruleFingerprint) {
-    return { ok: false, code: 'GATE_TAMPERED', reason: `gate file ruleFingerprint (${raw.ruleFingerprint}) does not match its own gate object's hash (${actual}) — the file was edited without re-freezing` };
-  }
-  if (expectedRuleFingerprint !== undefined && raw.ruleFingerprint !== expectedRuleFingerprint) {
-    return { ok: false, code: 'GATE_MISMATCH', reason: `gate ruleFingerprint (${raw.ruleFingerprint}) does not match the frozen rule (${expectedRuleFingerprint}) — a gate may not change after freeze` };
-  }
-  return { ok: true, gate: raw.gate, ruleFingerprint: raw.ruleFingerprint };
+  return loadValidationGate(gatePath, { targetLabel: 'GLP-1R', expectedRuleFingerprint });
 }
 
 const NBITS = 512;

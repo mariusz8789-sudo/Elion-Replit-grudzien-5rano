@@ -1,0 +1,29 @@
+{
+  "ruleId": "GIPR-QSAR-VALIDATION-GATE",
+  "frozenFor": "docs/DECISIONS.md D-081 (GIPR efficacy axis, the second half of the tirzepatide dual-agonist mechanism) — sealed BEFORE any human GIPR activity data was pulled, trained on, or even located",
+  "ruleFingerprint": "e648580eeec19aab",
+  "fingerprintMethod": "provenance.mjs::canonicalHash(gate).slice(0,16) — derived from the `gate` object below ONLY, so editing any field changes this value",
+  "gate": {
+    "algorithm": "dense-ridge-hybrid-morgan512-plus-descriptors",
+    "lambda": 1.0,
+    "conformalAlpha": 0.1,
+    "splitMethod": "scaffold-hash-mod10",
+    "MIN_TRAIN": 150,
+    "MIN_TEST": 40,
+    "MAX_MAE": 1.0,
+    "MIN_R2": 0.25
+  },
+  "rationale": {
+    "whyIdenticalToGlp1r": "Every threshold here equals the D-077 GLP-1R gate, and that is the principled choice rather than a copy-paste: the estimator is the same (dense ridge, lambda=1.0), the target variable is on the same pActivity scale, and the split is the same scaffold-hash-mod10. What makes an MAE of 1.0 pActivity the edge of 'estimate rather than noise', or 40 held-out compounds the smallest honest test set, does not depend on WHICH class-B GPCR the assay measured. Public human GIPR bioactivity is known to be far scarcer than GLP-1R, which is a reason this gate may be HARD TO CLEAR — it is not a reason to lower it. Relaxing a gate because the data behind it is thin is precisely the move D-069/D-074/D-077 exist to forbid, and D-077a already demonstrated the discipline by leaving GLP-1R BLOCKED at MAE 1.0425 rather than moving MAX_MAE by 4.25%.",
+    "MIN_TRAIN": "150 compounds is a conservative floor for a ridge model over a 512-bit fingerprint plus descriptors; below it the coefficients are dominated by the lambda=1.0 prior rather than by data.",
+    "MIN_TEST": "40 held-out compounds is the smallest set this project accepts a scaffold-split MAE/R2 estimate from without it being dominated by 1-2 outlier scaffolds.",
+    "MAX_MAE": "1.0 pActivity unit (~10x in raw potency) is the outer bound of a QSAR estimate this project will call 'validated' rather than 'noise'.",
+    "MIN_R2": "0.25 rules out a model no better than predicting the training mean, without pretending a small single-target dataset should clear a benchmark-sized R2 bar."
+  },
+  "targetResolution": {
+    "rule": "The human GIPR target id is NEVER hardcoded in code. It must arrive from a resolver artifact or human/CI recon against the live API, and human specificity is decided per row from that row's own target_organism === 'Homo sapiens'. This is the same rule D-076 adopted after CHEMBL5862 turned out to be the RAT GLP-1R rather than the human one.",
+    "resolvedTargetIds": [],
+    "whyEmpty": "no GIPR target has been resolved against a live API from this runtime; the egress proxy refuses CONNECT to www.ebi.ac.uk (organization policy, verified live for D-081). An empty list here is the honest record of that, not a placeholder to be filled in from memory."
+  },
+  "changeRequiresNewDEntry": "any edit to `gate` (including relaxing a threshold after seeing a training run's numbers) invalidates ruleFingerprint and requires a new DECISIONS.md D-entry, per the rule D-069/D-074/D-077 already established"
+}

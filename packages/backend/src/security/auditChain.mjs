@@ -108,3 +108,66 @@ export function chainOverAuditRows(rows, { at = (r) => r.createdAt } = {}) {
   }
   return chain;
 }
+
+/* ------------------------------------------------------------------------ */
+/* D-086 — DURABLE CHAIN                                                     */
+/*                                                                           */
+/* An in-memory chain dies with the process, and a tamper-evident log that   */
+/* does not survive a restart cannot evidence anything about yesterday. This */
+/* appends one JSON object per line (JSONL) so a partial write damages one   */
+/* record rather than the file, and so appending never rewrites history.     */
+/*                                                                           */
+/* THE START IS FAIL-CLOSED. `loadChain` verifies before returning, and      */
+/* `openDurableChain` REFUSES to start on a broken chain. Continuing to      */
+/* append onto a log that was edited would produce a file whose later        */
+/* entries verify perfectly and whose earlier ones are a lie — the worst of  */
+/* both, because it looks verified.                                          */
+/* ------------------------------------------------------------------------ */
+
+import { appendFileSync, readFileSync, existsSync } from 'node:fs';
+
+/** Reads a JSONL chain from disk and verifies it. Never returns an unverified chain. */
+export function loadChain(filePath) {
+  if (!existsSync(filePath)) return Object.freeze({ ok: true, chain: Object.freeze([]), fresh: true });
+  let lines;
+  try {
+    lines = readFileSync(filePath, 'utf8').split('\n').filter((l) => l.trim() !== '');
+  } catch {
+    return Object.freeze({ ok: false, code: 'AUDIT_UNREADABLE', chain: Object.freeze([]), reason: `${filePath} could not be read` });
+  }
+  const chain = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    try {
+      chain.push(Object.freeze(JSON.parse(lines[i])));
+    } catch {
+      return Object.freeze({ ok: false, code: `AUDIT_MALFORMED_AT_${i}`, chain: Object.freeze([]), reason: `line ${i + 1} of ${filePath} is not valid JSON; a damaged record is not a missing record` });
+    }
+  }
+  const v = verifyChain(chain);
+  if (!v.ok && !(chain.length === 0 && v.code === 'CHAIN_EMPTY')) {
+    return Object.freeze({ ok: false, code: v.code, chain: Object.freeze([]), reason: v.reason });
+  }
+  return Object.freeze({ ok: true, chain: Object.freeze(chain), fresh: chain.length === 0 });
+}
+
+/**
+ * Opens a durable chain, refusing to start if what is on disk does not verify.
+ * Returns an appender that writes through to the file on every record.
+ */
+export function openDurableChain(filePath) {
+  const loaded = loadChain(filePath);
+  if (!loaded.ok) {
+    throw new Error(`FAIL_CLOSED[AUDIT_CHAIN_BROKEN]: ${loaded.code} — ${loaded.reason}. Refusing to append onto a log whose history cannot be trusted.`);
+  }
+  let chain = loaded.chain;
+  return Object.freeze({
+    get chain() { return chain; },
+    append(record) {
+      const next = chainAppend(chain, record);
+      appendFileSync(filePath, `${JSON.stringify(next[next.length - 1])}\n`);
+      chain = next;
+      return next[next.length - 1];
+    },
+    verify() { return verifyChain(chain); },
+  });
+}

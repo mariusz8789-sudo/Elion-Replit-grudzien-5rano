@@ -6668,3 +6668,89 @@ No threshold, no gate, no pin. The Mounjaro verdict is untouched: GIPR
 `INSUFFICIENT_DATA` at 146 train rows against 150, GLP-1R over its gate at MAE
 1.0425, **NO_WINNER**, recipe **LOCKED**.
 
+
+## D-086 — durable audit, lockfile provenance, and two guards deliberately NOT built
+
+Four security items were outstanding as `PENDING_EXECUTION`. Two were built and
+measured. Two were refused, because each would have guarded a hole that does
+not exist in this repository, and speculative infrastructure is the thing this
+codebase is meant to be free of.
+
+### Built: the audit chain now survives a restart, fail-closed
+
+An in-memory chain dies with the process, so a tamper-evident log that cannot
+outlive a restart cannot evidence anything about yesterday. `openDurableChain`
+appends one JSON object per line, so a partial write damages a single record
+rather than the file, and appending never rewrites history.
+
+The important part is the START. `openDurableChain` VERIFIES what is on disk
+before it will append, and throws `AUDIT_CHAIN_BROKEN` if it does not verify.
+Appending onto an edited log would produce a file whose later entries verify
+perfectly and whose earlier ones are a lie — the worst possible outcome,
+because it looks verified.
+
+Measured against a real file: persists; survives reopen with payloads intact;
+an edit to `"u":"x"` on disk raises `CHAIN_TAMPERED_AT_0`; deleting the first
+record raises `CHAIN_SEQ_GAP_AT_0`; a malformed line is reported as a damaged
+record rather than treated as absent; and a fresh file opens clean while its
+empty chain still does not count as "verified".
+
+### Built: lockfile provenance, measured on the real 258-package tree
+
+`security/dependencyAudit.mjs` already runs `npm audit`, which answers "does
+anything here have a known CVE". `verifyLockfileProvenance` answers a different
+question: "did every package come from where it claims, at a version that
+cannot move". A package can be perfectly CVE-free and still be fetched from an
+attacker's registry, so these are complementary, not duplicates.
+
+Run against the repository's own `package-lock.json`: **251 registry packages,
+6 local/workspace entries, zero findings** — every `resolved` points at
+`registry.npmjs.org`, every version is an exact semver, every registry package
+declares an integrity hash. That is now a measured fact with a regression test,
+where before it was an assumption.
+
+It deliberately does NOT re-verify integrity hashes against bytes on disk. npm
+does that at install time, and a second verifier that can disagree with the
+first is worse than one.
+
+The secret scanner reports the pattern id and the LINE NUMBER, never the
+matched text. A scanner that echoes what it found into a log has moved the
+secret rather than caught it; there is a test asserting the finding does not
+contain the credential.
+
+### NOT built: a path jail
+
+The proposal included `pathJailSafe` with realpath and symlink rejection. It is
+correct code for the problem it solves. Checked against HEAD, `api.mjs` has no
+route that accepts a caller-supplied path — no `readFileSync` on request data,
+no filename or path parameter anywhere in the router. A jail with no sink
+protects nothing, and shipping it would create the impression that a class of
+attack is defended when what actually defends it is the absence of the feature.
+
+If an upload or ingest endpoint is ever added, the jail is required BEFORE that
+endpoint merges, and the reviewed implementation (realpath on the parent when
+the target does not yet exist, plus an explicit `lstat` symlink check) is the
+right shape. Recorded here so the next person does not have to rediscover it.
+
+### NOT built: a resource governor
+
+The proposal included a governor enforcing `maxInFlight`, `maxMemoryMb` and
+`taskTimeoutMs`. Checked against HEAD, there is no worker pool and no async
+concurrency to govern: the compute path runs RDKit through `execFileSync`, a
+synchronous subprocess call, and no module in the backend declares
+`maxWorkers`, `poolSize` or a concurrency limit. A limiter for a pool that does
+not exist would be configuration that looks like protection.
+
+The honest status of the underlying concern is that BACKPRESSURE IS UNSOLVED,
+not that it is solved. That is a real gap and it is recorded as one here rather
+than papered over with an unreachable limiter.
+
+### The pattern in both refusals
+
+Two of the four items were well-written code for problems this repository does
+not have. Landing them would have raised the apparent security posture while
+changing nothing an attacker could reach — and would have left two more modules
+to keep in sync with reality. The scorecard number would have gone up. That is
+exactly the failure mode that makes a number worth less than the measurement
+behind it.
+

@@ -5776,3 +5776,104 @@ sizes, the passing R2 and the failing MAE. Frontend 6452 pass / 0 fail. tsc,
 eslint, build clean. `scripts/glp1r-e2e.mjs` on real RDKit: 9/9 invariants,
 honest BLOCKED. `.env.example` documents `GENESIS_GLP1R_GATE` (the repo's own
 P0.4 guard caught it missing).
+
+---
+
+## D-078 — batch RDKit: 12.9x by deleting process startup, not by changing chemistry
+
+Qwen delivered a compute package (worker pool, content-addressed cache,
+early stop, execution manifest, replay, benchmark harness) to make the
+campaign faster. **Its central design — a worker pool that forks a Node child
+per task — was rejected on measurement.** What landed instead is one small
+addition that is 12.9x faster than the code it replaces.
+
+### The measurement that decided it
+
+| | measured here |
+|---|---|
+| bare python startup | 42 ms |
+| python + RDKit import | 154 ms (paid ONCE per process) |
+| per-molecule compute | 15.5 ms (287 real GLP-1R molecules) |
+| **287 molecules, one process** | **4.6 s** |
+| **287 molecules, spawn-per-call** | **~97 s** |
+
+~95% of the old cost was process startup, not chemistry.
+
+### Why fork-per-task is worse than doing nothing
+
+`rdkitAdapter` already spawns a python process per call (`execFileSync`).
+Qwen's `runOne()` forks a **Node** child which then makes that same python
+spawn — **two** process creations per molecule where there was one. Four
+workers in parallel cannot buy back an overhead the design just doubled, and
+even at perfect scaling it would land around 24 s against batching's 4.6 s.
+
+Worse, Qwen's own "batch" in the second package is not a batch:
+`batch_fingerprint` maps `fingerprint()` over the list, and `fingerprint()`
+spawns python per molecule. It moves the spawns inside a persistent Node
+worker without removing a single one.
+
+### What landed
+
+`rdkit_worker.py` gains a real `batch_fingerprint` command (one process, one
+RDKit import, N molecules) and `rdkitAdapter.fingerprintBatch()` calls it,
+chunked at 500 with a raised maxBuffer because 512 bits serialize to ~1 kB
+per molecule and the default 4 MB would throw ENOBUFS mid-batch.
+`glp1rEfficacyAdapter.buildFeatures()` uses it by default; an injected
+`fingerprintFn` still takes the per-molecule path so tests stay off RDKit.
+
+**The invariant that makes this legitimate:** batched output is byte-identical
+to the per-molecule path — same bits, same Murcko scaffold, same canonical
+SMILES — and a test asserts it element by element. An unparseable molecule
+fails IN ITS OWN SLOT so indices never shift, and a batch that returns the
+wrong length fails closed with every row unfingerprintable rather than
+pairing a row with someone else's fingerprint.
+
+Real effect on the D-077 path: model training 65 345 ms -> 5 062 ms, with
+nTrain/nCalib/nTest 178/64/45, MAE 1.1726, RMSE 1.4534, R2 0.4820 and
+`GATE_NOT_MET` all unchanged to the digit. **GENESIS-MOL-01 stays NO_WINNER.**
+
+### A cache bug this work exposed in D-077a's own memoization
+
+The memo key included `fingerprintFn` identity but not `batchFn`, so
+injecting a batch function silently received the cached production model —
+exactly the staleness the key was supposed to prevent. My own new test caught
+it. Fixed by memoizing **only** the default production path; any injected
+feature extractor bypasses the cache rather than sharing a key with it.
+Feature-extraction identity is part of model identity.
+
+### Defects found in the delivered package (not integrated)
+
+1. **Wrong import path, every file.** `../campaign/provenance.mjs` does not
+   exist; it is `src/provenance.mjs`. Assumption G-1 is false.
+2. **`sha256Hex` is not exported by `provenance.mjs`** (only `sha256Hex16`,
+   `canonicalHash`, `maxRelativeDiff`, `snapshotEnvironment`). Every file
+   imports it. Also `sha256Hex(canonicalHash(x))` double-hashes: `canonicalHash`
+   already returns a full sha256 hex.
+3. **Replay can never return MATCH.** `deterministicMerge` fingerprints
+   `{f, h, ok}` per row; `executionReplay` recomputes over `{f, h}` — no `ok`.
+   The two hashes cannot agree, so every replay would report MISMATCH.
+4. **The benchmark does not measure what it prints.** Serial and parallel runs
+   pass `cache: null` while the "cached" run uses a persistent on-disk cache,
+   so `cacheHitRate` is 0% on a cold run and 100% on a warm one — the number
+   depends on whether the script ran before, not on the code under test.
+5. **E2E reads the wrong pin filename** (`glp1rActivity.pin.json`; the real
+   file is `glp1rActivity.json`), so it would always fall through to the
+   synthetic fixture and never touch real data.
+6. **Dead worker reuse.** The persistent pool respawns on exit but never
+   removes the dead child from `children`, so round-robin keeps selecting a
+   killed process.
+7. `retryFailed` reads `r._task`, which `submit` never sets.
+
+Not integrated for the same reason: the superlab package (`worldModels.ts`,
+`virtualHuman.ts`, `experimentGraph.ts`) has syntax errors that prevent it
+parsing at all — an unterminated `switch` where a `}` sits inside a line
+comment, a malformed generic in `arenaRank`, `done.add(n.id)` referencing an
+undefined `n`, and `.ts` files imported from a plain-node `.mjs` script. That
+package needs its own pass; it is not covered by this entry.
+
+### Gate
+
+Backend 564 tests / 531 pass / 0 fail / 33 skipped; glp1rQsar 53/53 including
+four new batch-equivalence tests. tsc, eslint clean. `glp1r-e2e.mjs` on real
+RDKit: 9/9 invariants, unchanged BLOCKED. D-057, D-069, the frozen gate and
+every scientific threshold untouched.

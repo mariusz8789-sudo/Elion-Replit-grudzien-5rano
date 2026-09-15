@@ -37,7 +37,7 @@ import {
 } from './campaign/glp1rEfficacyAdapter.mjs';
 import { efficacyAxis } from './campaign/tirzepatideBaseline.mjs';
 import { probeCapabilities, comparableAxes } from './campaign/molecularMission.mjs';
-import { detect as rdkitDetect, fingerprint as rdkitFingerprint } from './compute/rdkitAdapter.mjs';
+import { detect as rdkitDetect, fingerprint as rdkitFingerprint, fingerprintBatch as rdkitFingerprintBatch } from './compute/rdkitAdapter.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const GATE_PATH = join(SRC, 'campaign/glp1r-validation-gate.json');
@@ -589,6 +589,52 @@ describe('REAL RDKit — the engine itself, not a stub', () => {
 
     const again = rdkitFingerprint('CC(=O)Oc1ccccc1C(=O)O');
     assert.deepEqual(again.bits, aspirin.bits, 'the same molecule must fingerprint identically across calls');
+  });
+
+  test('D-078 BATCH: batched fingerprints are byte-identical to the per-molecule path', () => {
+    // THE SCIENTIFIC INVARIANT OF THE WHOLE PERFORMANCE LAYER. Batching is only
+    // allowed to delete process-startup overhead; if it changed a single bit,
+    // it would be a second chemistry implementation and must be reverted.
+    const smiles = ['CCO', 'c1ccccc1', 'CC(=O)Oc1ccccc1C(=O)O', 'c1ccncc1', 'CC(C)Cc1ccc(cc1)C(C)C(=O)O'];
+    const perMolecule = smiles.map((s) => rdkitFingerprint(s));
+    const batch = rdkitFingerprintBatch(smiles);
+    assert.equal(batch.ok, true);
+    assert.equal(batch.n, smiles.length);
+    for (let i = 0; i < smiles.length; i += 1) {
+      assert.equal(batch.results[i].ok, perMolecule[i].ok, `ok differs at ${i}`);
+      assert.deepEqual(batch.results[i].bits, perMolecule[i].bits, `bits differ at ${i}`);
+      assert.equal(batch.results[i].scaffold, perMolecule[i].scaffold, `scaffold differs at ${i}`);
+      assert.equal(batch.results[i].canonicalSmiles, perMolecule[i].canonicalSmiles, `canonical differs at ${i}`);
+      assert.equal(batch.results[i].fingerprint, perMolecule[i].fingerprint);
+    }
+  });
+
+  test('D-078 BATCH: an unparseable molecule fails IN ITS OWN SLOT — indices never shift', () => {
+    const smiles = ['CCO', 'not-a-molecule', 'c1ccccc1'];
+    const batch = rdkitFingerprintBatch(smiles);
+    assert.equal(batch.ok, true);
+    assert.equal(batch.n, 3, 'a bad row must not shorten the result array');
+    assert.equal(batch.results[0].ok, true);
+    assert.equal(batch.results[1].ok, false, 'the bad molecule is the one that failed');
+    assert.equal(batch.results[2].ok, true);
+    // The surviving rows must still be the RIGHT molecules, not shifted up by one.
+    assert.equal(batch.results[0].canonicalSmiles, rdkitFingerprint('CCO').canonicalSmiles);
+    assert.equal(batch.results[2].canonicalSmiles, rdkitFingerprint('c1ccccc1').canonicalSmiles);
+  });
+
+  test('D-078 BATCH: an empty list is a valid empty batch, not an error', () => {
+    const batch = rdkitFingerprintBatch([]);
+    assert.equal(batch.ok, true);
+    assert.equal(batch.n, 0);
+    assert.deepEqual(batch.results, []);
+  });
+
+  test('D-078 BATCH: a misaligned batch response fails closed — no row is reinterpreted', () => {
+    // Inject a batch fn that returns the wrong number of results. Every row must
+    // become unfingerprintable rather than being paired with someone else's bits.
+    const trained = trainGlp1rModel({ batchFn: () => ({ ok: true, results: [{ ok: true, bits: new Array(512).fill(0), scaffold: 'x' }] }) });
+    assert.equal(trained.ok, false);
+    assert.equal(trained.code, 'NO_FINGERPRINTABLE_ROWS');
   });
 
   test('an unparseable SMILES fails closed — never an all-zero vector passed off as a molecule', () => {

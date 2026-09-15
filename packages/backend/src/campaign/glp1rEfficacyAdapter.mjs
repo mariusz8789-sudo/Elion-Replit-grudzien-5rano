@@ -15,7 +15,7 @@
 
 import { loadGlp1rPin } from './glp1rDataset.mjs';
 import { loadGlp1rValidationGate, trainAndValidate, predictQsar } from './glp1rQsar.mjs';
-import { fingerprint as rdkitFingerprint, detect as rdkitDetect } from '../compute/rdkitAdapter.mjs';
+import { fingerprint as rdkitFingerprint, fingerprintBatch as rdkitFingerprintBatch, detect as rdkitDetect } from '../compute/rdkitAdapter.mjs';
 import { canonicalHash } from '../provenance.mjs';
 
 export const GLP1R_EFFICACY_TARGET = 'GLP1R';
@@ -32,13 +32,33 @@ export const MODEL_ESTIMATE_NOTE =
  * were already RDKit-validated at ingestion). The count is reported, never
  * silently absorbed.
  */
-function buildFeatures(rows, fingerprintFn) {
+function buildFeatures(rows, fingerprintFn, batchFn) {
+  /**
+   * D-078 — BATCHED BY DEFAULT. Fingerprinting the 287-row pin one molecule at
+   * a time spawns 287 python processes and costs ~65 s, of which ~95% is
+   * RDKit import and process startup. One batched process does the identical
+   * chemistry in ~5 s. When a caller injects its own per-molecule
+   * `fingerprintFn` (the tests do, to stay off RDKit), we keep the original
+   * loop — the batch is an execution path, not a second implementation, and a
+   * test asserts the two produce identical features.
+   */
+  const results = batchFn
+    ? (() => {
+        const batch = batchFn(rows.map((r) => r.canonicalSmiles));
+        // Fail-closed: a batch that did not come back aligned is not silently
+        // reinterpreted — every row is marked unfingerprintable instead.
+        return batch?.ok && Array.isArray(batch.results) && batch.results.length === rows.length
+          ? batch.results
+          : rows.map(() => ({ ok: false }));
+      })()
+    : rows.map((r) => fingerprintFn(r.canonicalSmiles));
+
   const withFeatures = [];
   let unfingerprintable = 0;
-  for (const r of rows) {
-    const fp = fingerprintFn(r.canonicalSmiles);
+  for (let i = 0; i < rows.length; i += 1) {
+    const fp = results[i];
     if (!fp?.ok || !Array.isArray(fp.bits)) { unfingerprintable += 1; continue; }
-    withFeatures.push({ canonicalSmiles: r.canonicalSmiles, scaffold: fp.scaffold, bits: fp.bits, y: r.pActivity });
+    withFeatures.push({ canonicalSmiles: rows[i].canonicalSmiles, scaffold: fp.scaffold, bits: fp.bits, y: rows[i].pActivity });
   }
   return { withFeatures, unfingerprintable };
 }
@@ -56,7 +76,7 @@ export function _resetGlp1rModelCache() {
   modelCache = null;
 }
 
-export function trainGlp1rModel({ pinOpts, gatePath, expectedGateFingerprint, fingerprintFn = rdkitFingerprint } = {}) {
+export function trainGlp1rModel({ pinOpts, gatePath, expectedGateFingerprint, fingerprintFn = rdkitFingerprint, batchFn } = {}) {
   const rd = rdkitDetect();
   if (!rd.available) return { ok: false, code: 'BLOCKED_BY_RUNTIME', reason: rd.reason, trainingDataHash: null };
 
@@ -77,11 +97,21 @@ export function trainGlp1rModel({ pinOpts, gatePath, expectedGateFingerprint, fi
    * so drifted, replaced or deleted pinned data misses the cache (or fails
    * closed) rather than being served stale. It changes performance only,
    * never a result.
+   *
+   * ONLY THE PRODUCTION PATH IS MEMOIZED. An injected `fingerprintFn` or
+   * `batchFn` bypasses the cache entirely rather than sharing a key with it.
+   * An earlier version keyed only on `fingerprintFn` identity, so injecting a
+   * `batchFn` silently received the cached production model — a test caught
+   * it. Feature-extraction identity is part of the model's identity, and the
+   * safe way to express that is to not cache a path we cannot key exactly.
    */
-  const cacheKey = `${pin.contentSha256}|${gateResult.ruleFingerprint}|${rd.version}|${fingerprintFn === rdkitFingerprint ? 'rdkit' : 'injected'}`;
-  if (modelCache && modelCache.key === cacheKey) return modelCache.value;
+  const usingDefaultFeatures = fingerprintFn === rdkitFingerprint && batchFn === undefined;
+  const cacheKey = `${pin.contentSha256}|${gateResult.ruleFingerprint}|${rd.version}`;
+  if (usingDefaultFeatures && modelCache && modelCache.key === cacheKey) return modelCache.value;
 
-  const { withFeatures, unfingerprintable } = buildFeatures(pin.rows, fingerprintFn);
+  // Use the batched RDKit path unless the caller injected its own per-molecule fn.
+  const effectiveBatchFn = batchFn ?? (fingerprintFn === rdkitFingerprint ? rdkitFingerprintBatch : null);
+  const { withFeatures, unfingerprintable } = buildFeatures(pin.rows, fingerprintFn, effectiveBatchFn);
   if (withFeatures.length === 0) {
     return { ok: false, code: 'NO_FINGERPRINTABLE_ROWS', reason: `all ${pin.rows.length} pinned row(s) failed RDKit fingerprinting`, trainingDataHash: pin.contentSha256 };
   }

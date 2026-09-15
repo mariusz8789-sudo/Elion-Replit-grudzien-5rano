@@ -7933,3 +7933,51 @@ unverified text.
 
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
 rule, ingest policy or Winner Gate touched.**
+
+---
+
+## D-100 — A3 resend: chunk 3 drift is reproducible, not a slip; four proposed seal points recorded (not yet sealed)
+
+### Resend result
+
+Chunks 2 and 4 resent byte-identical to what was already verified — no new
+information. **Chunk 3 resent byte-identical to the first (mismatched)
+transcription** — two independently-typed passes over the same source text
+converge on the same bytes, and neither reproduces the declared hash. This
+rules out a one-off typo on either side of the channel. Left unresolved;
+further resends over this channel are not expected to change the outcome (see
+`data/transcription/glp1r-a3/README.md`).
+
+### Four proposed preregistration points — RECOMMENDATIONS, not a seal
+
+Received via the same channel, explicitly framed by the sender as
+recommendations for the human to seal, not as decisions. Recorded here
+verbatim so they are visible to whoever seals them, and left **unsealed**:
+this repository's rule is that these branches lock on human confirmation, and
+a recommendation relayed through the data-transcription channel is not that
+confirmation, however well-reasoned.
+
+1. `action_type` — keep as a covariate, not a filter (matches the existing
+   mandate: pass the field through unfiltered).
+2. Readout family — define preregistration-time from `bao_label`/A3
+   descriptions as {cAMP accumulation/production}, {β-arrestin recruitment},
+   {calcium mobilisation}, {internalisation}, {binding displacement} — for
+   **noise-floor stratification only**, never as a row filter.
+3. HSA condition (`CHEMBL4704627` 0% vs `CHEMBL4704628` 4.4%) — treat as
+   distinct assay conditions within the cAMP family; neither merge nor split
+   out of stratification.
+4. Flat-value assays (`CHEMBL6113416`/`CHEMBL6113417`) — exclude only from
+   noise-floor spread estimation, keep in the training set, tag provenance
+   `SUSPECT_FLAT_VALUE`.
+
+None of these four are applied to any code or data in this commit. They are
+recorded as a draft the account owner can accept, amend, or reject.
+
+### Status unchanged
+
+A1 complete and verified (757/757). A3 87/90 verified, chunk 3 (3 assays)
+reproducibly unverified. A2 0/8.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
+rule, ingest policy, Winner Gate — or the four proposed seal points above —
+has been applied.**

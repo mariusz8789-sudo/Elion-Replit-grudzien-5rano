@@ -41,6 +41,19 @@ the description, not as a verified provenance record. A clean re-transmission
 of chunk 3 alone, with its own sha256, would resolve this without redoing
 chunks 1/2/4.
 
+**Update: a full resend of chunks 2-4 was received and checked.** Chunks 2 and
+4 are byte-identical to the already-verified copies (no new information).
+Chunk 3 is **byte-identical to the FIRST mismatched attempt** — same
+`dd8bf5c5…`, still not `e5bb6931…`. Two independently-typed transmissions of
+the same source text converging on identical bytes rules out a one-off
+transcription slip on either end. This now looks like either (a) a
+normalisation this text channel applies consistently and invisibly to both
+attempts, or (b) an error in the declared hash itself. Not diagnosable further
+from inside this container — no resend over this channel is expected to
+change the outcome. Left as unresolved drift; the pinned bytes are the best
+available record of the three assay descriptions, used as a reading aid, not
+as verified provenance.
+
 ```
 assay_chembl_id|target_chembl_id|assay_type|bao_format|bao_label|assay_description
 ```

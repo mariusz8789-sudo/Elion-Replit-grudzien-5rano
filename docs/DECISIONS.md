@@ -6568,3 +6568,103 @@ correct result, and the shortest honest path to the next experiment is knowing
 exactly which data does not exist, why, and where the data that does exist
 physically lives.
 
+
+## D-085 — a composer instead of a bridge, a redirect hole closed, and a "duplicate" that was not one
+
+Three items arrived as a corrected integration package. Two landed. One was
+refused, and refusing it required correcting a claim this repository's own
+previous report had made.
+
+### The composer: the proposed bridge would have closed an import cycle
+
+The package proposed wiring the four canonical agent modules into
+`experimentFabric/hypothesisLoop` via injected callbacks, on the stated premise
+that `core/agent/**` is unreachable from the loop. Checked against HEAD, the
+premise is inverted. `core/agent/nextAction.ts:94` already reads:
+
+    import { selectNextHypothesisExperiment, type HypothesisLoopResult }
+      from '../experimentFabric/hypothesisLoop';
+
+The dependency already runs `agent -> experimentFabric`. Installing callbacks
+that make the loop call back into the agent closes
+`experimentFabric -> agent -> experimentFabric`, which under ESM resolves to
+`undefined` at one of the two import sites depending on evaluation order — a
+defect that appears at runtime rather than at compile time.
+
+So `agentBridge.ts` is a COMPOSER sitting above both, not a bridge injected
+into either. `hypothesisLoop` is untouched and keeps its own anti-HARK and
+preregistration machinery (`verifyAntiHarkingAnchor`,
+`verifyPreregistrationIntact`), which also makes the package's claim that
+"falsification was incomplete" inapplicable here. `agentBridge.test.ts` asserts
+the direction stays one-way and that the composer installs no callbacks, so a
+future attempt to add them fails a test rather than a deployment.
+
+The package's port signatures also did not match the real exports, so the
+composer is typed against them instead: `assessNovelty` (not `noveltyGate`),
+`runSelfFalsificationBattery`, the THREE functions
+`buildPredictionMatrix`/`experimentGaps`/`assessObservable` (not one
+`differentiate`), and the SELECTOR FAMILY in `nextAction.ts` (not a single
+`nextAction`). Each module's `*_CONTRACT_VERSION` is checked at construction, so
+a module changing shape underneath the composer raises
+`CONTRACT_VERSION_MISMATCH` rather than being used on an assumption.
+
+### The refusal: `noveltyHarness` is not a duplicate novelty scorer
+
+An earlier report from this repository stated that
+`core/mind/noveltyHarness.ts::computeNoveltyLevel` was "a genuine second
+novelty scorer, independent of the canonical gate", and recommended delegating
+it to `assessNovelty`. **That claim was wrong, and it was reached by grepping
+for the word "novelty" and reading an import list rather than reading the
+module.** Reading it:
+
+`computeNoveltyLevel` measures STRUCTURAL LINEAGE PROVENANCE — where a
+candidate's FORM came from in the generator (L0 FIXED_LIST, L1 INITIAL_SPACE,
+L2 MUTATED, L3 SYMBOLIC_COMPOSITION), derived from real
+`modelSpecFingerprint` set membership. `assessNovelty` measures PRIOR-ART
+NOVELTY — whether the finding is new to the world (UNKNOWN, NOT_NEW,
+POSSIBLY_NOVEL, NOVEL_WITHIN_CHECKED_CORPUS). These are orthogonal axes, and
+the module's own docstring says so explicitly, ending: "A high level here with
+NOT_NEW there is an entirely coherent — and honest — outcome." The contract
+carries `priorArtAxis` precisely so the gate's verdict travels ALONGSIDE the
+lineage level rather than replacing it.
+
+The proposed delegation would therefore have deleted a real measurement and
+replaced it with a mapped copy of a different one. The proposed mapping was
+also broken on its own terms: `MIND_SCALE_FROM_ASSESSMENT[Math.max(0, a.level ?? 0)]`
+treats `a.level` as a number, but `NoveltyLevel` is a string union, so
+`Math.max(0, 'NOT_NEW')` is `NaN` and the index is `undefined`.
+
+REFUSED. Two measurements that answer different questions are not two sources
+of truth; collapsing them would have been the actual loss of information. The
+lesson is the same one the import-direction finding taught: a name collision
+plus an import graph is a hypothesis, not a finding, and the cost of not
+reading the module was a recommendation that would have destroyed working
+science.
+
+### The redirect hole: a real one, in code this repository already trusted
+
+`fetchBiotechSource` validated its URL against the exact-host allowlist and
+then called `fetch` — whose default is `redirect: 'follow'`. The allowlist was
+therefore checked ONCE, on a URL the remote server was then free to redirect
+anywhere. An allowlisted PubChem URL answering `302 Location:
+http://169.254.169.254/latest/meta-data/` would have been followed.
+
+Now `redirect: 'manual'`, with every hop re-validated through the SAME
+`allowlistedBiotechUrl` from scratch, capped at `MAX_REDIRECT_HOPS = 3`, and a
+redirect without a `Location` failing closed. Measured: the metadata-endpoint
+redirect is refused with the target NEVER REQUESTED (one fetch call, not two);
+an in-allowlist redirect is followed; a redirect loop terminates at the cap.
+
+This is the shape the hardening should take generally — the reviewed package
+proposed a NEW `ssrfGuardDeep` module, but a second egress entry point beside
+an existing one is how the two drift apart. The existing guard was extended.
+Its `ipIsUnsafe` work is genuinely better than what was here before and is the
+right thing to adopt IF a second egress path is ever actually needed; today
+there is one, and it now validates every hop.
+
+### What did NOT change
+
+No threshold, no gate, no pin. The Mounjaro verdict is untouched: GIPR
+`INSUFFICIENT_DATA` at 146 train rows against 150, GLP-1R over its gate at MAE
+1.0425, **NO_WINNER**, recipe **LOCKED**.
+

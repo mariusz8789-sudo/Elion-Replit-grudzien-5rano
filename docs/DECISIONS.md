@@ -7405,3 +7405,108 @@ can answer has been answered; nothing further is establishable without bytes.
 Backend suite 748 tests, 715 pass, 0 fail, 33 skipped.
 
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. READY_FOR_PREREG NOT granted.**
+
+---
+
+## D-092b — the blocker is a channel shape, not a failed step
+
+Round 3 of the acquisition returned `NOT_RETRIEVED`: four fetch attempts, all
+read-timeout on `www.ebi.ac.uk`, no bytes produced. Recorded in the D-092
+artifact as `acquisitionRounds`.
+
+Across three rounds the shape is now clear, and it is structural:
+
+| capability | this container | supplier |
+|---|---|---|
+| reach EBI / UniProt | **no** — 403 CONNECT, network policy | intermittent (worked in rounds 1–2, timed out in round 3) |
+| push to the branch | yes | **no** — no credentials, no repo path |
+
+**No number of retries by either party can close this.** The two capabilities
+have to meet on one machine, or a human carries the bytes across. Asking the
+supplier to commit was never a task it could perform; that was a mandate
+defect, not a supplier failure, and it is recorded as `CHANNEL_CONSTRAINT`.
+
+Everything a declaration can settle is settled (D-092a). What remains needs
+bytes, and bytes need a channel that currently does not exist.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Unchanged.**
+
+---
+
+## D-093 — VIRTUAL SPLIT-BRAIN LAB (SIMULATION / TOY)
+
+New: `core/neuro/splitBrain.ts`, `core/neuro/splitBrainExperiments.ts`,
+`__tests__/splitBrain.test.ts` (15 tests), `scripts/splitbrain-e2e.mjs`.
+
+A toy simulator of the commissurotomy paradigms: hemifield routing, lateralised
+response channels, the left-hemisphere interpreter, and an intact control that
+works as a falsification hook on the toy itself.
+
+### Audit of the reviewed package — four defects, one of them scientific
+
+**1. It did not compile.** `narrative = LH-narrative: "…${leftHand}?" (…)` is a
+bare expression with no backticks. Proven by running `tsc`: three `TS1005`
+errors. Not a style note — the module could not load.
+
+**2. The test referenced an identifier that does not exist.** The export is
+`CONSCIOUSNESS_ARENA`; the assertions read `CONSCIOUSNESSARENA`. The test file
+could not compile either, so the suite it claimed to pass never ran.
+
+**3. `expChimeric` had an unreachable branch.** Its condition began
+`routeStimulus({content: lvf, field: 'LVF'}, cfg).RH.length` — always ≥ 1 for a
+non-empty string, so the `||` was never evaluated and the alternative branch was
+dead. The intact case happened to work by accident. Replaced with `routeStimuli`,
+which handles multi-stimulus presentation directly, and the INTACT chimeric case
+now has its own test.
+
+**4. The scientific defect: the verdicts were string literals.** The shipped
+`CONSCIOUSNESS_ARENA` froze the canonical account as `'CONTRADICTED'` and the
+Pinto account as `'SUPPORTED'`. Nothing computed them. That is a verdict
+asserted rather than derived — the same defect class as `winner = candidate` —
+and it would have had Genesis publish an adjudication of a live dispute on the
+authority of a toy containing no evidence about it.
+
+### Why this simulator cannot adjudicate that dispute, and how the code says so
+
+The circularity is mechanical, not philosophical. `splitBrain.ts` **implements**
+the canonical disconnection account; its output under any probe is a
+deterministic function of `callosumIntact`, a switch we set. So the "evidence" an
+arena would weigh is the input, restated.
+
+`probeCircularity()` demonstrates this rather than asserting it: it runs the
+discriminating probe under both configurations and reports that the result
+follows the switch (`determinedByConfigAlone: true`). A test pins that.
+
+`adjudicateConsciousness()` therefore returns
+`NOT_ADJUDICABLE_BY_THIS_SIMULATION` for **both** hypotheses, and the value is
+computed: every branch that could yield SUPPORTED or CONTRADICTED is gated on
+`SPLIT_BRAIN_LABEL.canAdjudicateConsciousness`, which is permanently `false`.
+There is no reachable path to a verdict, and an edit that wanted one would have
+to change the label and trip the test that pins it.
+
+Both sides of the dispute are **retained**, neither deleted — the same treatment
+Genesis gives flat earth beside spherical: carried for study, not for belief.
+
+### No second hypothesis engine
+
+The reviewed package's arena duplicated `experimentFabric/hypothesisLoop.ts`.
+It was not re-implemented and it was not force-fitted either: `hypothesisLoop`
+is bound to parametric model runs through `getRouterModel` /
+`StructuredExperimentRequest`, and split-brain paradigms are categorical, so
+wiring them through it would have meant registering a fake router model. The
+toy instead exposes `checkToyConsistency()` — four internal checks that can
+genuinely fail — and leaves preregistered competing hypotheses to the engine
+that actually implements them, if and when a parametric variant exists.
+
+### Provenance
+
+Marked `NOT_PINNED`. This runtime has no egress, so no byte of Sperry,
+Gazzaniga or Pinto et al. was retrieved or hashed. The entries name where the
+paradigms come from and say plainly that Genesis has not verified them. No DOI
+was invented to make the list look stronger.
+
+### Boundaries
+
+`epistemic: 'SIMULATION'`, `class: 'TOY'`, `clinical: false`,
+`canAdjudicateConsciousness: false`. Not a model of any patient, not a clinical
+instrument, and not evidence about consciousness.

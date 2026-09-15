@@ -240,11 +240,39 @@ const ingestPolicyResolved = Object.freeze({
   ]),
 });
 
+/**
+ * Round-by-round record of the acquisition itself. Kept because the blocker
+ * turned out to be structural rather than a one-off failure, and a structural
+ * blocker is only visible across rounds.
+ */
+export const ACQUISITION_ROUNDS = Object.freeze([
+  Object.freeze({ round: 1, outcome: 'EGRESS_BLOCKED_HERE', detail: 'this container: 403 CONNECT to every scientific host; supplier reported a successful fetch in its own sandbox' }),
+  Object.freeze({ round: 2, outcome: 'DECLARATION_ONLY', detail: 'manifest v2 supplied and self-consistent; still no bytes in this container' }),
+  Object.freeze({ round: 3, outcome: 'NOT_RETRIEVED', detail: 'supplier reported 4 fetch attempts, all read-timeout on www.ebi.ac.uk; no bytes produced in that round either' }),
+]);
+
+/**
+ * THE BLOCKER IS A CHANNEL SHAPE, NOT A FAILED STEP.
+ *
+ * Two capabilities are needed at once and no party in this loop has both:
+ *   - reach EBI/UniProt  -> this container cannot (network policy, 403 CONNECT)
+ *   - push to the branch -> the supplier cannot (no credentials, no repo path)
+ *
+ * So no number of retries by either party can close it. It closes when ONE
+ * machine holds both, or when a human carries the bytes across.
+ */
+export const CHANNEL_CONSTRAINT = Object.freeze({
+  requiredTogether: Object.freeze(['egress to www.ebi.ac.uk / rest.uniprot.org', 'git push to the working branch']),
+  thisContainer: Object.freeze({ egress: false, gitPush: true }),
+  supplier: Object.freeze({ egress: 'intermittent — succeeded in earlier rounds, read-timeout in round 3', gitPush: false }),
+  consequence: 'retrying on either side alone cannot resolve it; the two capabilities must meet on one machine, or a human moves the bytes',
+});
+
 function main() {
   const startedAt = new Date().toISOString();
   const egress = DECLARED_ENDPOINTS.map(probe);
   // The proxy states WHY, which a bare 000 does not: policy denial vs transient failure.
-  let proxyFailures = [];
+  let proxyFailures;
   try {
     const st = JSON.parse(execFileSync('/bin/sh', ['-c', `curl -s --max-time 20 "$HTTPS_PROXY/__agentproxy/status"`], { encoding: 'utf8' }));
     proxyFailures = (st.recentRelayFailures ?? []).map((f) => `${f.host}: ${f.kind} — ${f.detail}`);
@@ -339,6 +367,8 @@ function main() {
     existingPolicyProjection: projection,
     ingestPolicyResolved,
     // ---- outcome ----
+    acquisitionRounds: ACQUISITION_ROUNDS,
+    channelConstraint: CHANNEL_CONSTRAINT,
     blockers,
     decision,
     whatWouldUnblock: [
@@ -375,6 +405,10 @@ function main() {
   console.log(`  branch RETAIN_NONE_WITH_FLAG: ${projection.branches.RETAIN_NONE_WITH_FLAG.rows} rows, groups ${projection.branches.RETAIN_NONE_WITH_FLAG.replicateGroups}`);
   console.log('\nblockers:');
   for (const b of blockers) { console.log(`  [${b.code}] ${b.detail}`); for (const e of b.evidence) console.log(`      - ${e}`); }
+  console.log('\nacquisition rounds:');
+  for (const r of ACQUISITION_ROUNDS) console.log(`  round ${r.round}: ${r.outcome} — ${r.detail}`);
+  console.log(`\nchannel constraint: egress here=${CHANNEL_CONSTRAINT.thisContainer.egress}, gitPush here=${CHANNEL_CONSTRAINT.thisContainer.gitPush}; supplier gitPush=${CHANNEL_CONSTRAINT.supplier.gitPush}`);
+  console.log(`  ${CHANNEL_CONSTRAINT.consequence}`);
   console.log(`\nDECISION: ${decision}`);
   console.log(`sealed -> ${path.relative(path.join(HERE, '..'), OUT)}  hash ${sealed.artifactHash.slice(0, 16)}…`);
   return decision === 'READY_FOR_PREREG' ? 0 : 0; // measurement script: a BLOCKED finding is a successful measurement

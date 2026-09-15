@@ -3,7 +3,7 @@
     "id": "D-092-INGEST-READINESS",
     "kind": "SEALED_RESEARCH_ARTIFACT",
     "question": "Does the offered EC50 dataset actually enter Genesis, and does it unblock attempt 2/2?",
-    "startedAt": "2026-09-15T16:26:18.979Z",
+    "startedAt": "2026-09-15T17:01:56.166Z",
     "gateConstantsChanged": false,
     "pinsChanged": false,
     "winnerGateChanged": false,
@@ -14,7 +14,7 @@
     "representationAttemptsConsumed": 0,
     "attemptBudgetAfterThisRun": "1/2 consumed — unchanged",
     "egressMeasurement": {
-      "probedAt": "2026-09-15T16:26:18.979Z",
+      "probedAt": "2026-09-15T17:01:56.166Z",
       "allReachable": false,
       "probes": [
         {
@@ -391,6 +391,38 @@
         }
       ]
     },
+    "acquisitionRounds": [
+      {
+        "round": 1,
+        "outcome": "EGRESS_BLOCKED_HERE",
+        "detail": "this container: 403 CONNECT to every scientific host; supplier reported a successful fetch in its own sandbox"
+      },
+      {
+        "round": 2,
+        "outcome": "DECLARATION_ONLY",
+        "detail": "manifest v2 supplied and self-consistent; still no bytes in this container"
+      },
+      {
+        "round": 3,
+        "outcome": "NOT_RETRIEVED",
+        "detail": "supplier reported 4 fetch attempts, all read-timeout on www.ebi.ac.uk; no bytes produced in that round either"
+      }
+    ],
+    "channelConstraint": {
+      "requiredTogether": [
+        "egress to www.ebi.ac.uk / rest.uniprot.org",
+        "git push to the working branch"
+      ],
+      "thisContainer": {
+        "egress": false,
+        "gitPush": true
+      },
+      "supplier": {
+        "egress": "intermittent — succeeded in earlier rounds, read-timeout in round 3",
+        "gitPush": false
+      },
+      "consequence": "retrying on either side alone cannot resolve it; the two capabilities must meet on one machine, or a human moves the bytes"
+    },
     "blockers": [
       {
         "code": "EGRESS_BLOCKED",
@@ -414,10 +446,10 @@
           "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
           "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
           "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
-          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
-          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
-          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
           "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
           "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
           "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
           "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
@@ -446,6 +478,6 @@
     ],
     "scientificStateUnchanged": "NO_WINNER · Recipe LOCKED · CONSTRAINT_CONFLICT · attempts 1/2 · gates, pins, split rule and Winner Gate untouched"
   },
-  "artifactHash": "5bf61178f5a7d0d97c1eea48c7eab544f46018c2754aabcc9a78c3cfeb9b7945",
-  "sealedAt": "2026-09-15T16:26:20.393Z"
+  "artifactHash": "ea3df532eafa503d5ba7ef7f5ef626edfe5fcf9719949f0e89656a80b91d7e6d",
+  "sealedAt": "2026-09-15T17:01:57.587Z"
 }

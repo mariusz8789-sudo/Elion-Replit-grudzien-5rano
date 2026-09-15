@@ -50,6 +50,10 @@ import { loadFrozenPredictionThresholds } from './predictionHardFilters.mjs';
 import { createLiabilityPredictionSource } from './molecularLiabilities.mjs';
 import { detect as rdkitDetect } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
+import {
+  loadPinnedActives, computeChemotypeSimilarity, axisContribution,
+  CHEMOTYPE_SIMILARITY_AXIS, CHEMOTYPE_HONESTY_NOTE,
+} from './chemotypeSimilarityAxis.mjs';
 
 export const MISSION_ID = 'GENESIS-MOL-01';
 export const MISSION_CONTRACT_VERSION = '1.0.0';
@@ -84,7 +88,7 @@ export function missionObjective() {
  * comparison is possible AT ALL — empty here, and empty because of data, not
  * because of a rule.
  */
-export function comparableAxes(baseline, capabilities) {
+export function comparableAxes(baseline, capabilities, chemotype = null) {
   const baselineMeasurable = [];
   const candidateMeasurable = [];
 
@@ -97,6 +101,20 @@ export function comparableAxes(baseline, capabilities) {
   // Candidate: structure is real and RDKit is live -> computed axes available; measured activity is not.
   if (capabilities.rdkit) candidateMeasurable.push('LIABILITY_BURDEN', 'STRUCTURAL_VALIDITY');
   if (capabilities.activityPredictor) candidateMeasurable.push('TARGET_RELEVANT_ACTIVITY');
+
+  // D-075 chemotype screening proxy. It joins the axis sets ONLY when it is
+  // genuinely AVAILABLE on that side, and `axisContribution` refuses to emit
+  // it under the decisive activity axis's name. It is added to the baseline
+  // side only when the baseline has a structure to compare — which it does
+  // not in this runtime — so today it changes nothing. Crucially it is NOT
+  // decisive: `decide()` reads `efficacy.available` separately, so this axis
+  // can never clear EFFICACY_AXIS_UNAVAILABLE.
+  if (chemotype?.candidate) {
+    for (const c of axisContribution(chemotype.candidate)) candidateMeasurable.push(c.axis);
+  }
+  if (chemotype?.baseline) {
+    for (const c of axisContribution(chemotype.baseline)) baselineMeasurable.push(c.axis);
+  }
 
   const shared = baselineMeasurable.filter((a) => candidateMeasurable.includes(a));
   return Object.freeze({
@@ -328,7 +346,20 @@ export function runMolecularMission(db, opts) {
   const summary = runCampaign(db, campaign.id, { log });
   const candidates = store.listCandidates(db, campaign.id);
 
-  const axes = comparableAxes(base.baseline, capabilities);
+  // D-075 chemotype screening proxy. BLOCKED in this runtime (no pinned
+  // actives artifact — ChEMBL is unreachable), so it contributes nothing
+  // today; it is computed and recorded anyway so its BLOCKED state is a
+  // visible fact in the recipe rather than an unexplained absence. The
+  // baseline side stays null because the baseline has no structure to
+  // compare, which is the same limit recorded on the baseline itself.
+  const pinnedActives = loadPinnedActives();
+  const firstRetained = candidates.find((c) => c.status === 'retained') ?? null;
+  const chemotype = {
+    candidate: firstRetained ? computeChemotypeSimilarity(firstRetained.canonicalSmiles, pinnedActives) : null,
+    baseline: null,
+  };
+
+  const axes = comparableAxes(base.baseline, capabilities, chemotype);
   const falsification = falsifyRun(summary, candidates, rule.thresholds);
   const novelty = assessNovelty(candidates, capabilities);
   const efficacy = efficacyAxis();
@@ -376,6 +407,15 @@ export function runMolecularMission(db, opts) {
     },
     paretoFront,
     comparableAxes: axes,
+    chemotypeScreeningProxy: chemotype.candidate
+      ? {
+          axis: CHEMOTYPE_SIMILARITY_AXIS, status: chemotype.candidate.status,
+          value: chemotype.candidate.value, nearest: chemotype.candidate.nearest,
+          blockedReason: chemotype.candidate.blockedReason ?? null,
+          evidenceClass: chemotype.candidate.evidenceClass,
+          isEfficacyPredictor: false, honestyNote: CHEMOTYPE_HONESTY_NOTE,
+        }
+      : { axis: CHEMOTYPE_SIMILARITY_AXIS, status: 'BLOCKED', value: null, nearest: null, blockedReason: 'NO_RETAINED_CANDIDATE', evidenceClass: 'COMPUTATIONAL', isEfficacyPredictor: false, honestyNote: CHEMOTYPE_HONESTY_NOTE },
     falsification,
     novelty,
     decision,
@@ -383,6 +423,7 @@ export function runMolecularMission(db, opts) {
     limitations: [
       base.baseline.structureAbsentReason,
       ...efficacy.reasons,
+      `${CHEMOTYPE_SIMILARITY_AXIS} is a COMPUTATIONAL SCREENING PROXY and never closes EFFICACY_AXIS_UNAVAILABLE: the GLP-1R efficacy predictor remains a separate, open blocker`,
       `seed provenance: ${seedProvenance}`,
       'ADMET-AI, AutoDock Vina and PySCF are absent from this runtime; their adapters report BLOCKED_BY_RUNTIME and nothing substitutes for them',
     ],

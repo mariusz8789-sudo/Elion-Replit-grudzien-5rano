@@ -96,6 +96,43 @@ export function liabilities(smiles) {
   }
 }
 
+/**
+ * Podobieństwo strukturalne Tanimoto (Morgan r=2, 2048 bitów) + porównanie
+ * szkieletu Murcko (D-075).
+ *
+ * KOMENDA `similarity` ISTNIAŁA W WORKERZE OD POCZĄTKU i nie miała po stronie
+ * Node ŻADNEGO eksportu — potwierdzone grepem: żaden `.mjs` nie wywoływał
+ * `cmd: 'similarity'`. To jedyna brakująca część: silnik liczył, tylko nikt
+ * nie mógł go zawołać. Nie dodajemy tu nowej chemii ani drugiej implementacji
+ * (frontendowy `core/discovery/molecular/structuralSimilarity.ts` robi to samo
+ * po swojej stronie) — wystawiamy istniejącą zdolność.
+ *
+ * Zwracany kształt jest DOKŁADNIE tym, co worker już drukuje (pola na
+ * najwyższym poziomie, nie pod `data`).
+ */
+export function similarity(smiles, reference) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'similarity', smiles: String(smiles ?? ''), reference: String(reference ?? '') });
+    return r.ok
+      ? {
+          ok: true,
+          tanimoto: r.tanimoto,
+          fingerprint: r.fingerprint,
+          sameScaffold: r.sameScaffold,
+          candidateCanonical: r.candidateCanonical,
+          referenceCanonical: r.referenceCanonical,
+          scaffoldCandidate: r.scaffoldCandidate,
+          scaffoldReference: r.scaffoldReference,
+          engine: d.engine,
+        }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Walidacja struktury SMILES przez RDKit (kanonizacja). */
 export function validate(smiles) {
   const d = detect();

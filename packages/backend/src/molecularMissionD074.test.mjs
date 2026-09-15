@@ -1,6 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -432,5 +433,116 @@ describe('GENESIS-MOL-01 end to end on the real engines', skipNoRdkit, () => {
     const c = probeCapabilities();
     assert.equal(c.activityPredictor, false);
     assert.equal(c.rdkit, RDKIT);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-075 — GLP1R_CHEMOTYPE_SIMILARITY is a SCREENING PROXY and nothing more.
+// ---------------------------------------------------------------------------
+import {
+  loadPinnedActives, computeChemotypeSimilarity, applyChemotypeGate, axisContribution,
+  assertNotEfficacyAxis, CHEMOTYPE_SIMILARITY_AXIS, TARGET_RELEVANT_ACTIVITY_AXIS,
+} from './campaign/chemotypeSimilarityAxis.mjs';
+import { similarity as rdkitSimilarity } from './compute/rdkitAdapter.mjs';
+
+const pinnedOk = (labels) => ({
+  ok: true,
+  actives: labels.map((l) => ({ label: l, canonicalSmiles: l, potencyNm: null, sourceId: 'X', sourceUrl: 'u', fetchedAt: 't' })),
+  contentSha256: 'x',
+});
+const fakeSim = (map) => (a, b) => {
+  const v = a === b ? 1 : map[`${a}|${b}`];
+  return v === undefined ? { ok: false, error: 'invalid_smiles' } : { ok: true, tanimoto: v, sameScaffold: v === 1 };
+};
+
+describe('D-075 the chemotype proxy can never masquerade as efficacy', () => {
+  test('assertNotEfficacyAxis THROWS if anyone tries to present it as the decisive activity axis', () => {
+    assert.throws(() => assertNotEfficacyAxis(TARGET_RELEVANT_ACTIVITY_AXIS), /CHEMOTYPE_IS_NOT_EFFICACY/);
+    assert.equal(assertNotEfficacyAxis(CHEMOTYPE_SIMILARITY_AXIS), CHEMOTYPE_SIMILARITY_AXIS);
+  });
+
+  test('its contribution is explicitly non-decisive and does not close the efficacy axis', () => {
+    const r = computeChemotypeSimilarity('A', pinnedOk(['B']), { similarityFn: fakeSim({ 'A|B': 0.6 }) });
+    const [c] = axisContribution(r);
+    assert.equal(c.decisive, false);
+    assert.equal(c.closesEfficacyAxis, false);
+    assert.equal(c.evidenceClass, 'COMPUTATIONAL');
+  });
+
+  test('even with the proxy AVAILABLE on BOTH sides, EFFICACY_AXIS_UNAVAILABLE still blocks the verdict', () => {
+    const avail = computeChemotypeSimilarity('A', pinnedOk(['B']), { similarityFn: fakeSim({ 'A|B': 0.9 }) });
+    const axes = comparableAxes(
+      { measuredPotencyNM: { glp1r: 0.77 }, structureAvailable: false },
+      { rdkit: true, activityPredictor: false, priorArtSearch: false },
+      { candidate: avail, baseline: avail },
+    );
+    assert.equal(axes.disjoint, false, 'the proxy does give a shared axis');
+    assert.ok(axes.comparable.includes(CHEMOTYPE_SIMILARITY_AXIS));
+    const d = decide({
+      axes,
+      falsification: { probes: [], allPassed: true, failed: [], unresolved: [] },
+      novelty: { priorArt: { status: 'SEARCHED' }, structural: {}, lineage: {} },
+      efficacy: efficacyAxis(),
+    });
+    assert.equal(d.outcome, 'NO_WINNER', 'a screening proxy must never be enough for a winner');
+    assert.ok(d.blockers.some((b) => b.code === 'EFFICACY_AXIS_UNAVAILABLE'));
+  });
+
+  test('a structure RDKit cannot compare is UNAVAILABLE, never 0 — no-overlap and not-computable differ', () => {
+    const r = computeChemotypeSimilarity('BAD', pinnedOk(['B']), { similarityFn: fakeSim({}) });
+    assert.equal(r.status, 'UNAVAILABLE');
+    assert.equal(r.value, null);
+    assert.notEqual(r.value, 0);
+  });
+
+  test('no pinned actives => BLOCKED with the real code, and contributes no axis', () => {
+    const p = loadPinnedActives({ jsonPath: '/nope.json', metaPath: '/nope.meta.json', validateSmiles: () => true });
+    assert.equal(p.ok, false);
+    assert.equal(p.code, 'PIN_MISSING');
+    const r = computeChemotypeSimilarity('A', p);
+    assert.equal(r.status, 'BLOCKED');
+    assert.deepEqual(axisContribution(r), []);
+  });
+
+  test('hash drift in the pinned artifact fails closed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pin-'));
+    const j = join(dir, 'a.json'); const m = join(dir, 'a.meta.json');
+    writeFileSync(j, '[]'); writeFileSync(m, JSON.stringify({ sha256: 'deadbeef' }));
+    assert.equal(loadPinnedActives({ jsonPath: j, metaPath: m, validateSmiles: () => true }).code, 'PIN_HASH_DRIFT');
+  });
+
+  test('an unparseable SMILES in the pinned artifact fails closed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pin-'));
+    const j = join(dir, 'a.json'); const m = join(dir, 'a.meta.json');
+    const body = JSON.stringify([{ label: 'x', canonicalSmiles: '!!', sourceId: 's', sourceUrl: 'u', fetchedAt: 't' }]);
+    writeFileSync(j, body);
+    writeFileSync(m, JSON.stringify({ sha256: createHash('sha256').update(body).digest('hex') }));
+    assert.equal(loadPinnedActives({ jsonPath: j, metaPath: m, validateSmiles: () => false }).code, 'PIN_PARSE_FAIL');
+  });
+
+  test('the gate refuses without a frozen rule and refuses on an unavailable axis', () => {
+    const r = computeChemotypeSimilarity('A', pinnedOk(['B']), { similarityFn: fakeSim({ 'A|B': 0.21 }) });
+    assert.equal(applyChemotypeGate(r, null).code, 'RULE_MISSING');
+    assert.equal(applyChemotypeGate(r, { minTanimoto: 0.3 }).code, 'CHEMOTYPE_BELOW_FROZEN_MIN');
+    assert.equal(applyChemotypeGate(r, { minTanimoto: 0.2 }).ok, true);
+    assert.equal(applyChemotypeGate({ status: 'BLOCKED', blockedReason: 'PIN_MISSING' }, { minTanimoto: 0.2 }).code, 'AXIS_UNAVAILABLE');
+  });
+
+  test('REAL RDKit: identity is 1.0, distinct chemotypes are not, invalid is an error not a zero', skipNoRdkit, () => {
+    const same = rdkitSimilarity('CC(=O)Oc1ccccc1C(=O)O', 'CC(=O)Oc1ccccc1C(=O)O');
+    assert.equal(same.ok, true); assert.equal(same.tanimoto, 1);
+    const diff = rdkitSimilarity('CCO', 'c1ccc2[nH]ccc2c1');
+    assert.equal(diff.ok, true); assert.ok(diff.tanimoto < 0.2);
+    assert.equal(rdkitSimilarity('not-a-molecule', 'c1ccccc1').ok, false);
+  });
+
+  test('the mission records the proxy status and its honesty note in the recipe', skipNoRdkit, () => {
+    const { db, project } = setup();
+    const r = runMolecularMission(db, { ...MISSION_ARGS, projectId: project.id });
+    assert.equal(r.recipe.chemotypeScreeningProxy.axis, CHEMOTYPE_SIMILARITY_AXIS);
+    assert.equal(r.recipe.chemotypeScreeningProxy.status, 'BLOCKED');
+    assert.equal(r.recipe.chemotypeScreeningProxy.isEfficacyPredictor, false);
+    assert.match(r.recipe.chemotypeScreeningProxy.honestyNote, /not a measured or modelled potency/);
+    assert.ok(r.recipe.limitations.some((l) => /never closes EFFICACY_AXIS_UNAVAILABLE/.test(l)));
   });
 });

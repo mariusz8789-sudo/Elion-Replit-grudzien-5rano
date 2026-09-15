@@ -30,7 +30,10 @@ import { probeGiprCapability, loadGiprValidationGate, GIPR_GATE_PATH } from '../
 import { loadGlp1rValidationGate } from '../packages/backend/src/campaign/glp1rQsar.mjs';
 import { assessDualTargetAxes, rankDualTarget, dualTargetVerdict, DUAL_TARGET_OBJECTIVES } from '../packages/backend/src/campaign/dualTargetDiscovery.mjs';
 import { runExperimentDag, compareDagRuns } from '../packages/backend/src/campaign/experimentDag.mjs';
-import { generateRecombinationProposals, canonicalize } from '../packages/backend/src/campaign/drugAdapter.mjs';
+import { generateRecombinationProposals } from '../packages/backend/src/campaign/drugAdapter.mjs';
+import { runIntegrityWatchdogs } from '../packages/backend/src/security/scientificIntegrity.mjs';
+import { pinEntry, buildPinManifest } from '../packages/backend/src/campaign/pinManifest.mjs';
+import { readBasePinDigest, BASE_PIN_META, currentExtensionManifests, extensionSummary } from '../packages/backend/src/campaign/extensionManifest.mjs';
 import { tirzepatideBaseline } from '../packages/backend/src/campaign/tirzepatideBaseline.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -167,7 +170,7 @@ try {
     falsification: dag.decisiveFailures.map((f) => ({ probe: f.nodeId, result: 'FAIL', detail: f.reason ?? f.code })),
     failedAlternatives: realCandidates.slice(1).map((c) => ({ candidateId: c.canonicalSmiles, rejectedReason: 'not evaluated: the dual-target mechanism axes are unavailable, so no candidate could be ranked' })),
     knownUnknowns: [
-      'no pinned human GIPR activity data exists in this repository (2 rows total against a MIN_TRAIN of 150)',
+      `the pinned human GIPR set is below the frozen gate's floor: ${gipr.reasons?.[0] ?? gipr.code}`,
       'the GLP-1R model misses its own frozen gate at MAE 1.0425 > MAX_MAE 1.0',
       'prior-art search is unreachable from this runtime, so novelty is unverifiable rather than established',
     ],
@@ -189,13 +192,39 @@ if (recipeOutcome.status === 'RECIPE_LOCKED') {
 check('recipe is structurally absent when not promoted', recipeOutcome.status === 'RECIPE_LOCKED' ? !('recipe' in recipeOutcome) : true);
 check('winner gate used the canonical MINIMUM_OBSERVATIONS', recipeOutcome.promotion.minimumObservations === 3);
 
+// ------------------------------------------- 9b. INTEGRITY WATCHDOGS (D-084)
+// The verdict above is only worth as much as the frozen rules it was produced
+// under. These run on EVERY E2E so a moved threshold, a swapped pin or a
+// WinnerRecord without a canonical PROMOTE surfaces here rather than in a
+// review months later.
+const glp1rPinDigest = readBasePinDigest(BASE_PIN_META.GLP1R);
+const giprPinDigest = readBasePinDigest(BASE_PIN_META.GIPR);
+const pinManifest = buildPinManifest([
+  pinEntry({ pinId: 'GLP1R', role: 'base', target: 'CHEMBL1784', species: 'Homo sapiens', normalizedSha256: glp1rPinDigest.sha256, rows: glp1rPinDigest.rows ?? 0 }),
+  pinEntry({ pinId: 'GIPR', role: 'base', target: 'CHEMBL4383', species: 'Homo sapiens', normalizedSha256: giprPinDigest.sha256, rows: giprPinDigest.rows ?? 0 }),
+]);
+const watchdogs = runIntegrityWatchdogs({
+  manifest: pinManifest,
+  loadedPins: { GLP1R: glp1rPinDigest.sha256, GIPR: giprPinDigest.sha256 },
+  winnerRecord: recipeOutcome.status === 'RECIPE_ISSUED' ? recipeOutcome.recipe : null,
+  promotionOutcome: recipeOutcome.promotion.outcome,
+  promotion: { maxRank: Math.max(0, ...evidence.map((e) => e.rank ?? 0)) },
+});
+console.log(`\nintegrity watchdogs: ${watchdogs.clean ? 'CLEAN' : 'EVENTS RAISED'}`);
+for (const ev of watchdogs.events) console.log(`  ${ev.event}: ${String(ev.reason ?? ev.pinId ?? ev.code).slice(0, 120)}`);
+check('frozen gates, pins and promotion provenance pass the integrity watchdogs', watchdogs.clean);
+
+const extSummary = extensionSummary(currentExtensionManifests());
+console.log(`missing datasets   : ${extSummary.total} recorded (${Object.entries(extSummary.byStatus).map(([k, v]) => `${k}=${v.length}`).join(', ')})`);
+check('no extension manifest claims a hash for data that was never retrieved', extSummary.fabricatedHashes === 0);
+
 // ---------------------------------------------------------------- 10. VERDICT
 const finalOutcome = recipeOutcome.status === 'RECIPE_ISSUED' ? 'WINNER' : 'NO_WINNER';
 console.log(`\n=== FINAL: ${finalOutcome} ===`);
 if (finalOutcome === 'NO_WINNER') {
   console.log('WHY NO WINNER (exact, auditable):');
   console.log(`  1. GLP-1R axis  : ${glp1r.code} — the model exists and was trained on 287 real pinned human rows, but misses its own frozen gate (MAE 1.0425 > 1.0). The threshold was NOT moved.`);
-  console.log(`  2. GIPR axis    : ${gipr.code} — tirzepatide is a DUAL agonist, and this repository holds 2 GIPR activity rows against a MIN_TRAIN of 150. ChEMBL egress is refused by proxy policy, so more cannot be fetched from here.`);
+  console.log(`  2. GIPR axis    : ${gipr.code} — tirzepatide is a DUAL agonist. ${gipr.reasons?.[0] ?? 'the GIPR axis did not clear its frozen gate'}. Scientific egress is refused by proxy policy, so more rows cannot be fetched from here.`);
   console.log('  3. Mechanism    : with either receptor axis unavailable, no candidate can be compared to tirzepatide\'s mechanism at all, so the dual-target layer produced no ranking.');
   console.log('  4. Prior art    : unreachable from this runtime — novelty is UNVERIFIABLE, never assumed.');
   console.log(`  5. Evidence     : ${evidence.length} COMPUTATIONAL observation(s); the canonical gate requires >= 3 observations AND >= 1 at or above INDIRECT_RANDOMISED. In-silico work ranks COMPUTATIONAL (2) and cannot reach 9 by accumulating.`);

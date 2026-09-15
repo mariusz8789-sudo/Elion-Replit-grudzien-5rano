@@ -6429,3 +6429,142 @@ GLP-1R remains over its gate at 1.0425, the result is still NO_WINNER and the
 recipe is still LOCKED.
 
 **OUTCOME: VALIDATED.**
+
+## D-084 — the harvest that found no data, and the security layer that found four defects
+
+Two packages arrived together: a data-harvest report for the GIPR and GLP-1R
+axes, and a parallel security layer. Both were audited against live HEAD before
+any of them was written into the repository. The harvest produced **zero new
+rows** and the audit produced **four reproducible defects**, and both of those
+outcomes are the useful result of the round.
+
+### The harvest: two honest refusals worth more than the rows they cost
+
+**Finding 1 — the PubChem GIPR assays are ChEMBL under another name.** The GIPR
+axis is four training rows short of its frozen `MIN_TRAIN`. PubChem carries
+human GIPR cAMP assays, and importing them would appear to close that gap. The
+upstream probe reported that the principal such assay (AID 2240461) declares
+`aid_source.db = ChEMBL`, i.e. it is a ChEMBL deposit re-served under a PubChem
+identifier. Importing it would count observations this repository already pins,
+a second time. The dataset would cross the gate threshold **without a single new
+measurement existing anywhere in the world** — moving the threshold with extra
+steps. `campaign/sourceIndependence.mjs` refuses it, and refuses unprovenanced
+assays too: an aggregator record that does not say where it came from cannot be
+shown to be new, so unknown provenance fails the same way a known duplicate does.
+
+**Finding 2 — the 3000 reachable GLP-1R rows measure something else.** The
+ChEMBL GLP-1R activity pages past the first are reported to be 100%
+`standard_type = POTENCY`, with no EC50/IC50/Ki/Kd at all. That is more than ten
+times the current pin, sitting one HTTP call away from a model failing its gate
+by 0.0425 pActivity. It is the single most tempting cheat available in this
+track, and it is a cheat: `POTENCY` is an assay-specific readout that does not
+share a commensurable scale with a binding-affinity series, so concatenating
+them yields a larger dataset that measures a different thing, and an MAE that is
+not comparable to the number the gate was sealed against.
+`campaign/endpointFamily.mjs` refuses the mix and — deliberately — does *not*
+silently filter the offending rows: quietly dropping 3000 real rows and printing
+a clean run would hide that a large, real dataset exists. The caller is told to
+route them to their own pin. `GLP1R_POTENCY_FAMILY_V1` is recorded at status
+HOLD.
+
+**Both findings are recorded as UNVERIFIED UPSTREAM CLAIMS.** Outbound HTTPS is
+refused by proxy policy in this runtime — measured, 403 on CONNECT against
+`rest.uniprot.org`, `pubchem.ncbi.nlm.nih.gov` and `www.ebi.ac.uk` — so neither
+probe could be reproduced here. The enforcement does not depend on either claim
+being true; it reads whatever payload actually arrives. And no manifest carries
+a digest: every entry in `campaign/extensionManifest.mjs` has
+`rawSha256: null`, because a hash is a claim that specific bytes were seen and
+no bytes were seen. `extensionManifest()` throws `HASH_WITHOUT_BYTES` on any
+non-READY manifest that carries one.
+
+### The four defects, each reproduced by running the code
+
+**1. An audit log whose hash chain did not cover the payload.** The proposed
+canonicalizer was `JSON.stringify(v, Object.keys(v ?? {}).sort())`. The second
+argument of `JSON.stringify` is a **replacer array**, not a key order: it
+filters keys, and applies the same top-level key list to every nested object. So
+`payload` serialized as `{}` for every entry. Measured: appending `{u:'x'}` and
+then mutating the stored entry to `{u:'tampered'}` left `verify()` returning
+`ok: true`. The package's own test asserted the tamper *would* be caught, so
+that test fails against its own code. An audit log that does not cover the
+payload is worse than none, because it is believed.
+`security/auditChain.mjs` hashes the whole record through the existing
+`canonicalHash` (recursive key sort, provenance.mjs) — no new crypto and no
+second canonicalizer that could drift from the first — and also detects record
+deletion via sequence contiguity.
+
+**2. An SSRF guard that blocked `fda.gov` and admitted `[::1]`.** The proposed
+private-range regex ended `|fc|fd)`, intended for IPv6 unique-local addresses
+but matching any hostname *starting with those letters*: measured,
+`https://fda.gov/` returned `PRIVATE_RANGE`. In the other direction,
+`URL.hostname` returns IPv6 literals **with brackets**, so `[::1]` never matched
+the `::1` alternative and `https://[::1]/` returned `ok: true` — a live loopback
+bypass. This guard was **not landed at all**: `biotechProxy.mjs` already has an
+egress allowlist using exact-host plus path-prefix matching, which has neither
+failure mode by construction. A second, weaker guard would have been a duplicate
+engine and a downgrade. The regression test asserts the existing guard's
+behaviour on both cases.
+
+**3. The D-083 missing-pin inversion, reintroduced.** The proposed watchdog was
+`live[k] !== undefined && live[k] !== BASE_PINS[k]` — under which an *absent*
+pin passes. This is the same inversion already fixed in `pinManifest.mjs` one
+decision earlier. The same package also hardcoded the gate thresholds
+(`MIN_TRAIN: 150, MAX_MAE: 1.0`, …) as fresh constants, creating a second source
+of truth: edit the real gate and the watchdog is the only thing that disagrees;
+edit both and nothing disagrees at all. `security/scientificIntegrity.mjs`
+therefore holds **no thresholds and no row counts of its own**. It anchors on
+rule fingerprints and delegates to the existing loaders. Verified: relaxing
+`MAX_MAE` from 1.0 to 1.1 — the exact edit that would make the failing GLP-1R
+model pass — raises `GATE_TAMPERED`.
+
+**4. A BindingDB parser that failed its own test suite, and a wrong receptor.**
+Three separate defects. It read the unit from the column to the *right* of the
+value (`r[col(ep) + 1]`) when BindingDB puts the unit in the header — the column
+is named `Ki (nM)`; on the package's own fixture the adjacent column was PMID,
+so every row was rejected and the test expecting 1 surviving row got 0. Its
+UniProt regex `/^[A-Z0-9]{6}$(-\d+)?$/` has `$` in the **middle**, so the
+isoform suffix it was written to permit can never match (`P48546-1` → false) and
+every 10-character accession is dropped (`A0A024R1R8` → false). And the download
+instructions named "UniProt P48546 / P43119" as the two targets: P48546 is GIPR,
+but the human GLP-1 receptor is **P43220** — P43119 is the prostacyclin
+receptor. Harvesting it would have filled the GLP-1R pin with a different
+receptor, the same class of error as the CHEMBL5862 rat-GLP-1R mix-up this
+repository already carries scar tissue from.
+
+That last one is why `campaign/bindingDbImport.mjs` hardcodes **no** target. The
+caller must declare the accession it expects and rows are checked against that
+declaration, so a wrong declaration produces an empty import with a loud reason
+rather than a silently mis-targeted dataset. `DECLARED_TARGET_ACCESSIONS` is
+marked `verified: false` precisely because egress is refused here and the
+accessions could not be confirmed against UniProt in this runtime.
+
+### One defect of my own, again found by running it
+
+`familyOf` upper-cased its input and compared it against the mixed-case literals
+`'Ki'` and `'Kd'`, so the two commonest affinity endpoints in ChEMBL classified
+as `UNKNOWN` and would have been refused as unclassifiable. Case-folding now
+happens on both sides. This is the third decision in a row where probing my own
+code found something reading it did not.
+
+### What did NOT change
+
+No threshold moved. No gate was re-frozen. No pin was rewritten — the base-pin
+digests are read from their own meta files on disk rather than restated as
+constants, and `assertBasePinsUntouched` reports drift rather than assuming it
+away. The discovery state is exactly as D-083 left it: GIPR `INSUFFICIENT_DATA`
+(nTrain 146 against a gate of 150), GLP-1R over its gate at MAE 1.0425,
+**NO_WINNER**, recipe **LOCKED**.
+
+A stale line in the E2E summary was repaired as part of this entry: it printed
+"this repository holds 2 GIPR activity rows" long after the 233-row GIPR pin
+landed, because the count was hardcoded in the report string rather than derived
+from the run. An audit output that misstates the evidence is a defect in the
+audit even when the verdict it reports is correct.
+
+### The standing rule this round exercised
+
+Every refusal above cost rows the track badly wants. `NO_WINNER` remains the
+correct result, and the shortest honest path to the next experiment is knowing
+exactly which data does not exist, why, and where the data that does exist
+physically lives.
+

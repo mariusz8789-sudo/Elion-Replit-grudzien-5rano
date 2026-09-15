@@ -81,6 +81,127 @@ export const declaredUnverified = Object.freeze({
   }),
 });
 
+/**
+ * MANIFEST v2 — the resupplied declaration. Still a declaration: no byte of it
+ * reached this container either. What changed is that it is now SELF-CONSISTENT,
+ * which v1 was not.
+ */
+export const declaredV2Unverified = Object.freeze({
+  provenance: 'resupplied after the D-092 audit; bytes still NOT transferred; no hash here was checked against bytes',
+  supersedes: 'declaredUnverified (v1) — v1 is retained, not deleted, so the correction stays auditable',
+  pages: Object.freeze([
+    { label: 'offset=0', declaredRows: 1000, sha256: '489e0e42e2542e88392c2abc48dd280f789c785dd045b67cf126ad080f5934bf' },
+    { label: 'offset=1000', declaredRows: 1000, sha256: '4eaf816af16c7e9d3fccceb96c7456369f6a4e58134176ffa7f30eb4743df062' },
+    { label: 'offset=2000', declaredRows: 365, sha256: '3d339aec1f10d18c2469a50b01c653825d80fbbaf00d2d8685f546a1c9311ddc', declaredAs: 'partial final page' },
+    { label: 'manifest', declaredRows: null, sha256: '698d556f3b8049388e4b8585cb94a1ef08bf19551ccb2ae6feb08c17240d8c94' },
+  ]),
+  dedupedBytesSha256: '8dec7f27c50fd88120f472d3bb09f503a7026ec33ae661c99b08268dfd338dda',
+  dedupedBytesLength: 6283424,
+  dedupKey: 'activity_id',
+  counts: Object.freeze({
+    rowsTotal: 2365, rowsRelationEqual: 2181, rowsEqGoodUnits: 2173,
+    uniqueMolecules: 1586, replicateGroupsEC50: 325,
+    singleRowMolecules: 1222, sameAssayOnlyMultiRow: 39,
+    rejectedCensored: 174, rejectedNoRelation: 10, rejectedOrAnomalousUnits: 8,
+    flaggedOutsideTypicalRange: 201, flaggedPotentialDuplicate: 20,
+    assayTypeFunctional: 1549, assayTypeBinding: 624,
+    actionTypeNone: 1339, actionTypeAgonistFamily: 834,
+  }),
+});
+
+/** The v2 partition is three buckets, matching replicateGrouping.mjs, not two. */
+export function reconcileV2(c, pages) {
+  const reproducible = pages.filter((p) => typeof p.declaredRows === 'number').reduce((a, p) => a + p.declaredRows, 0);
+  const checks = [
+    { name: 'pages reproduce rowsTotal', expected: c.rowsTotal, actual: reproducible },
+    { name: 'rowsTotal - censored - noRelation = rowsRelationEqual', expected: c.rowsRelationEqual, actual: c.rowsTotal - c.rejectedCensored - c.rejectedNoRelation },
+    { name: 'rowsRelationEqual - badUnits = rowsEqGoodUnits', expected: c.rowsEqGoodUnits, actual: c.rowsRelationEqual - c.rejectedOrAnomalousUnits },
+    { name: 'groups + singleRow + sameAssayMulti = uniqueMolecules', expected: c.uniqueMolecules, actual: c.replicateGroupsEC50 + c.singleRowMolecules + c.sameAssayOnlyMultiRow,
+      note: 'the three-bucket partition replicateGrouping.mjs actually produces' },
+    { name: 'assay_type partition = rowsEqGoodUnits', expected: c.rowsEqGoodUnits, actual: c.assayTypeFunctional + c.assayTypeBinding },
+    { name: 'action_type partition = rowsEqGoodUnits', expected: c.rowsEqGoodUnits, actual: c.actionTypeNone + c.actionTypeAgonistFamily },
+  ];
+  return checks.map((k) => Object.freeze({ ...k, ok: k.expected === k.actual, delta: k.actual - k.expected }));
+}
+
+/**
+ * Checks the v1 -> v2 TRANSITION, not either declaration alone. A correction
+ * has to be a possible correction: the stated operation must be able to produce
+ * the stated change.
+ */
+export function transitionChecks(v1, v2) {
+  return [
+    {
+      name: 'dedup on activity_id cannot reduce the distinct-molecule count',
+      // Rows sharing an activity_id ARE the same record, so every molecule on a
+      // removed row is still carried by the row that was kept. The molecule set
+      // is invariant under this operation.
+      holds: v2.uniqueMolecules === v1.uniqueMolecules,
+      v1: v1.uniqueMolecules,
+      v2: v2.uniqueMolecules,
+      verdict: v2.uniqueMolecules === v1.uniqueMolecules
+        ? 'consistent'
+        : 'IMPOSSIBLE_UNDER_STATED_OPERATION — one of the two molecule counts was not computed the way it is described',
+    },
+    {
+      name: "v1's singleRecord bucket was the union of v2's singleRow and sameAssayMulti",
+      holds: v1.singleRecordMolecules === v2.singleRowMolecules + v2.sameAssayOnlyMultiRow,
+      v1: v1.singleRecordMolecules,
+      v2: v2.singleRowMolecules + v2.sameAssayOnlyMultiRow,
+      verdict: 'explains why v1 under-partitioned; corroborates 1586 from BOTH declarations independently',
+    },
+    {
+      name: 'row drop equals exactly one page',
+      holds: v1.rowsTotal - v2.rowsTotal === 1000,
+      v1: v1.rowsTotal, v2: v2.rowsTotal,
+      verdict: 'consistent with one page having been counted twice',
+    },
+  ].map((c) => Object.freeze(c));
+}
+
+/**
+ * Projects the EXISTING Genesis ingest policy onto the v2 counts. Not a new
+ * policy and not a filter run: an arithmetic consequence of the policy already
+ * in the repository, stated so the human sealing the preregistration can see
+ * what each branch costs BEFORE any model is fitted.
+ */
+export function policyProjection(c) {
+  const rejectUnion = { min: Math.max(c.flaggedOutsideTypicalRange, c.flaggedPotentialDuplicate), max: c.flaggedOutsideTypicalRange + c.flaggedPotentialDuplicate };
+  const survivingMin = c.rowsEqGoodUnits - rejectUnion.max;
+  const survivingMax = c.rowsEqGoodUnits - rejectUnion.min;
+  return Object.freeze({
+    startFrom: c.rowsEqGoodUnits,
+    rejectedByExistingPolicy: Object.freeze({
+      data_validity_comment: c.flaggedOutsideTypicalRange,
+      potential_duplicate: c.flaggedPotentialDuplicate,
+      note: 'overlap between the two sets is unknown from the declaration, so the survivor count is an interval, not a point',
+    }),
+    survivingRowsBeforeCanonicalisation: Object.freeze({ min: survivingMin, max: survivingMax }),
+    stillToApply: Object.freeze([
+      'RDKit canonicalisation (unparseable SMILES drop)',
+      'pActivity within [3, 12]',
+      'dedup on canonicalSmiles|assayId|standardType',
+      'overlap with the 194 EC50 rows already in the frozen pin',
+    ]),
+    branches: Object.freeze({
+      AGONIST_FAMILY_ONLY: Object.freeze({
+        rows: c.actionTypeAgonistFamily,
+        shareOfEqGood: Number((c.actionTypeAgonistFamily / c.rowsEqGoodUnits).toFixed(4)),
+        replicateGroups: 'NOT_MEASURED — the group count for this subset was never computed',
+        sizeFloorLikelySurvives: c.actionTypeAgonistFamily > 400,
+      }),
+      RETAIN_NONE_WITH_FLAG: Object.freeze({
+        rows: c.rowsEqGoodUnits,
+        shareOfEqGood: 1,
+        replicateGroups: c.replicateGroupsEC50,
+        caveat: `pharmacological direction unconfirmed for ${c.actionTypeNone} of ${c.rowsEqGoodUnits} rows`,
+      }),
+    }),
+    theTrapToAvoid:
+      'the two branches must NOT be compared on how many replicate groups each yields. Choosing the branch that makes the noise floor measurable would be selecting the analysis to obtain the result. The branch is sealed on pharmacological grounds BEFORE its group count is measured.',
+  });
+}
+
 /** Arithmetic the declaration must satisfy to be internally coherent. No bytes needed. */
 export function reconcile(c, pages) {
   const reproducible = pages.filter((p) => typeof p.declaredRows === 'number').reduce((a, p) => a + p.declaredRows, 0);
@@ -147,7 +268,11 @@ function main() {
   }
 
   const reconciliation = reconcile(declaredUnverified.counts, declaredUnverified.pages);
-  const failed = reconciliation.filter((r) => !r.ok);
+  const reconciliationV2 = reconcileV2(declaredV2Unverified.counts, declaredV2Unverified.pages);
+  const transition = transitionChecks(declaredUnverified.counts, declaredV2Unverified.counts);
+  const projection = policyProjection(declaredV2Unverified.counts);
+  // v1 is superseded; the live declaration is v2, so v2 decides the blocker.
+  const failed = reconciliationV2.filter((r) => !r.ok);
 
   const blockers = [];
   if (!egressOk) {
@@ -161,12 +286,25 @@ function main() {
   if (failed.length > 0) {
     blockers.push({
       code: 'DECLARED_MANIFEST_NOT_REPRODUCIBLE',
-      detail: 'independent of egress, the declaration does not reconcile with itself, so even with network access the named files could not reproduce the named counts.',
+      detail: 'independent of egress, the live declaration does not reconcile with itself, so even with network access the named files could not reproduce the named counts.',
       evidence: failed.map((f) => `${f.name}: declared ${f.expected}, implied ${f.actual} (delta ${f.delta > 0 ? '+' : ''}${f.delta})`),
     });
   }
+  const impossibleTransitions = transition.filter((t) => t.verdict.startsWith('IMPOSSIBLE'));
+  if (impossibleTransitions.length > 0) {
+    // NOT a blocker: it does not affect v2's internal coherence, and v2's own
+    // value is corroborated twice over. Recorded as an open discrepancy so the
+    // correction is not laundered into a clean history.
+    blockers.push({
+      code: 'TRANSITION_DISCREPANCY_RECORDED',
+      severity: 'NON_BLOCKING',
+      detail: 'the v1 -> v2 correction contains a step the stated operation cannot produce. v2 stays usable; the discrepancy is recorded rather than smoothed over.',
+      evidence: impossibleTransitions.map((t) => `${t.name}: v1 ${t.v1} -> v2 ${t.v2} — ${t.verdict}`),
+    });
+  }
 
-  const decision = blockers.length === 0 ? 'READY_FOR_PREREG' : 'BLOCKED';
+  const hardBlockers = blockers.filter((b) => b.severity !== 'NON_BLOCKING');
+  const decision = hardBlockers.length === 0 ? 'READY_FOR_PREREG' : 'BLOCKED';
 
   const artifact = {
     id: 'D-092-INGEST-READINESS',
@@ -195,15 +333,22 @@ function main() {
     // ---- claimed, NOT measured ----
     declaredUnverified,
     declarationReconciliation: reconciliation,
+    declaredV2Unverified,
+    declarationReconciliationV2: reconciliationV2,
+    v1ToV2Transition: transition,
+    existingPolicyProjection: projection,
     ingestPolicyResolved,
     // ---- outcome ----
     blockers,
     decision,
     whatWouldUnblock: [
-      'the raw response bytes themselves, delivered by a route that preserves them (committed to the repo, or any channel that does not summarise), with one sha256 per file',
-      'the missing page: the three listed files sum to 2365 rows, not 3365 — one full 1000-row page is absent from the manifest, or the offset=2000 page is mislabelled as final',
-      'a sha256 for the manifest file, which is currently null and is the only file that could reconcile the pages',
-      'a human preregistration decision on action_type, because Genesis has no existing rule and this mandate forbids inventing one',
+      'THE ONLY REMAINING ITEM: the raw response bytes, committed to this branch. Every arithmetic objection has been answered; nothing further can be established from a declaration.',
+      'a human preregistration decision on action_type, sealed on pharmacological grounds BEFORE the replicate-group count of the chosen branch is measured',
+    ],
+    resolvedSinceV1: [
+      'the missing page — v2 states rowsTotal 2365, matching the three files it lists',
+      'the null manifest hash — v2 supplies 698d556f…',
+      'the unreported bucket — v2 reports sameAssayOnlyMultiRow = 39 and all six identities close',
     ],
     scientificStateUnchanged: 'NO_WINNER · Recipe LOCKED · CONSTRAINT_CONFLICT · attempts 1/2 · gates, pins, split rule and Winner Gate untouched',
   };
@@ -218,8 +363,16 @@ function main() {
   for (const [ep, v] of Object.entries(byEndpoint)) {
     console.log(`  ${ep.padEnd(5)} rows=${String(v.rows).padStart(3)} molecules=${String(v.molecules).padStart(3)} groups=${String(v.replicateGroups).padStart(3)} noiseFloor=${v.noiseFloor}`);
   }
-  console.log('\ndeclaration reconciliation:');
+  console.log('\ndeclaration reconciliation (v1, SUPERSEDED):');
   for (const r of reconciliation) console.log(`  ${r.ok ? 'OK      ' : 'MISMATCH'} ${r.name}: declared ${r.expected}, implied ${r.actual}`);
+  console.log('\ndeclaration reconciliation (v2, LIVE):');
+  for (const r of reconciliationV2) console.log(`  ${r.ok ? 'OK      ' : 'MISMATCH'} ${r.name}: declared ${r.expected}, implied ${r.actual}`);
+  console.log('\nv1 -> v2 transition:');
+  for (const t of transition) console.log(`  ${t.holds ? 'OK      ' : 'DISCREPANT'} ${t.name}: ${t.v1} -> ${t.v2}`);
+  console.log('\nexisting-policy projection on v2:');
+  console.log(`  eqGoodUnits ${projection.startFrom} - (validityComment ${projection.rejectedByExistingPolicy.data_validity_comment} + potentialDup ${projection.rejectedByExistingPolicy.potential_duplicate}) -> ${projection.survivingRowsBeforeCanonicalisation.min}..${projection.survivingRowsBeforeCanonicalisation.max} rows before canonicalisation`);
+  console.log(`  branch AGONIST_FAMILY_ONLY : ${projection.branches.AGONIST_FAMILY_ONLY.rows} rows, groups ${projection.branches.AGONIST_FAMILY_ONLY.replicateGroups}`);
+  console.log(`  branch RETAIN_NONE_WITH_FLAG: ${projection.branches.RETAIN_NONE_WITH_FLAG.rows} rows, groups ${projection.branches.RETAIN_NONE_WITH_FLAG.replicateGroups}`);
   console.log('\nblockers:');
   for (const b of blockers) { console.log(`  [${b.code}] ${b.detail}`); for (const e of b.evidence) console.log(`      - ${e}`); }
   console.log(`\nDECISION: ${decision}`);

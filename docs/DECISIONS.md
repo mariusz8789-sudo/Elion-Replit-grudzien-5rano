@@ -7311,3 +7311,97 @@ model was fitted. No test split was read. `representationAttemptsConsumed: 0`.
 
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. READY_FOR_PREREG is NOT
 granted.**
+
+---
+
+## D-092a — MANIFEST v2: the arithmetic objection is answered; the bytes are not
+
+**Decision: still BLOCKED, on one remaining item instead of two.**
+
+The dataset was resupplied after the D-092 audit. All six identities now close:
+
+| identity | declared | implied | |
+|---|---|---|---|
+| pages reproduce `rowsTotal` | 2365 | 2365 | ✔ |
+| `rowsTotal − censored − noRelation` | 2181 | 2181 | ✔ |
+| `rowsRelationEqual − badUnits` | 2173 | 2173 | ✔ |
+| `groups + singleRow + sameAssayMulti` | 1586 | 1586 | ✔ |
+| `assay_type` partition | 2173 | 2173 | ✔ |
+| `action_type` partition | 2173 | 2173 | ✔ |
+
+The missing page is resolved in the direction the audit implied: the three
+files were right and the row count was wrong. `rowsTotal` is **2365**, not
+3365. The manifest hash is no longer null (`698d556f…`), and the bucket that
+was absent from v1 is reported: `sameAssayOnlyMultiRow = 39`.
+
+### A correction to D-092 that I owe
+
+D-092 said the −134 gap "is the `sameAssayOnly` bucket". **That attribution was
+wrong.** The bucket is 39. What actually happened is that v1's `singleRecord`
+was a *union* of two of `replicateGrouping.mjs`'s three buckets
+(1222 + 39 = 1261, exactly v1's figure), and v1's `uniqueMolecules: 1720` was
+simply the wrong number. The identity check fired correctly; my explanation of
+why it fired did not. The check that fired was also under-specified — it used a
+two-bucket partition where the module produces three. `reconcileV2` uses all
+three.
+
+### New discrepancy, recorded and deliberately NON-blocking
+
+Dedup on `activity_id` **cannot reduce the distinct-molecule count**: rows
+sharing an `activity_id` are the same record, so every molecule carried by a
+removed row is still carried by the row that was kept. The molecule set is
+invariant under that operation. So `1720 → 1586` cannot be a consequence of the
+dedup it is attributed to — one of the two molecule counts was not computed the
+way it is described.
+
+This does not undermine v2, and it is not treated as a blocker, because **1586
+is corroborated twice, independently**: v2 measures it directly, and v1's own
+figures give `325 + 1261 = 1586`. The outlier is v1's 1720. Recorded rather
+than smoothed over, so the correction does not get laundered into a clean
+history.
+
+### The existing policy, projected onto the measured numbers
+
+Not a new policy — arithmetic on the one already in the repo:
+
+```
+eqGoodUnits                      2173
+− data_validity_comment           201   (REJECTED by existing policy)
+− potential_duplicate              20   (REJECTED by existing policy)
+                                 ----
+surviving, pre-canonicalisation  1952 … 1972   (interval: set overlap unknown)
+```
+
+Still to apply: RDKit canonicalisation, `pActivity ∈ [3,12]`, dedup on
+`canonicalSmiles|assayId|standardType`, and overlap with the 194 EC50 rows
+already pinned.
+
+**The size floor is no longer the binding constraint.** D-089 required ≥53 new
+EC50 rows; ~1950 are on offer before canonicalisation. What is now binding is
+whether the replicate groups survive the `action_type` decision.
+
+### The `action_type` decision is not cosmetic, and has a trap in it
+
+| branch | rows | replicate groups |
+|---|---|---|
+| AGONIST-family only | 834 / 2173 (38.4%) | **NOT_MEASURED** |
+| retain `None` with a flag | 2173 | 325 |
+
+Both clear the size floor. Only one has a measured group count, and the strict
+branch's count was never computed.
+
+**The branches must not be compared on which yields more replicate groups.**
+Choosing the branch that makes the noise floor measurable is selecting the
+analysis to obtain the result — the same defect class as moving a threshold.
+The branch is sealed on pharmacological grounds *before* its group count is
+measured, or both are preregistered with the primary fixed in advance.
+
+### What remains
+
+One item: **the raw bytes, committed to this branch.** Egress re-probed and
+still `http=000` on every scientific host. Every objection that a declaration
+can answer has been answered; nothing further is establishable without bytes.
+
+Backend suite 748 tests, 715 pass, 0 fail, 33 skipped.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. READY_FOR_PREREG NOT granted.**

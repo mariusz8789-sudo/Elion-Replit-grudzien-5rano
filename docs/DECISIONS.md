@@ -8026,3 +8026,97 @@ descriptions remain pinned-but-unverified, cause unknown. A2 0/8.
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
 rule, ingest policy, Winner Gate, or any of the four proposed seal points has
 been applied.**
+
+---
+
+## D-102 — the four D-100 points SEALED by direct instruction from the account owner; readout-stratified noise floor measured PROVISIONALLY
+
+**Seal:** account owner, direct message: *"Pieczętuję cztery punkty z D-100."*
+This is the human seal the four rules were waiting for — not a relayed
+recommendation, a first-person instruction to Claude. Recorded as
+`D-102-READOUT-FAMILY-PREREG`, fingerprint `f475467a12dff413`
+(`scripts/d102-readout-family-prereg.mjs`).
+
+### The four rules, now executable
+
+1. **`action_type` is a covariate, never a filter.**
+2. **Readout family** — derived from the `assessed as …` clause of the A3
+   description (the D-096 fix, carried over unchanged), classified into
+   `{CAMP, ARRESTIN, CALCIUM, INTERNALIZATION, BINDING}` plus `OTHER` for
+   anything matching none. Used only to stratify the spread computation,
+   never to drop a row.
+3. **HSA condition** stays inside the `CAMP` family — never a separate
+   top-level family, never merged away; recorded as group metadata.
+4. **Suspect-flat-value assays** (`CHEMBL6113416`, `CHEMBL6113417`) excluded
+   only from the spread computation, kept everywhere else, tagged
+   `SUSPECT_FLAT_VALUE`.
+
+The classifier (`scripts/d102-readout-classifier.mjs`) was written once,
+against this rule text, and tested against **fixtures built from the rule**
+(`d102ReadoutClassifier.test.mjs`, 5/5) — including a regression pinning the
+D-096 fix (a cell-line mention like "coexpressing beta-arrestin-2" is not a
+readout) and confirming ERK phosphorylation matches none of the five sealed
+families and is correctly `OTHER`, not force-fit. Run once against the real
+data; not adjusted afterward.
+
+### A defect in my own prior work, found and named before running this
+
+D-096's readout-stratified computation grouped by `molecule_chembl_id`
+(`groups(lambda r:(r['mol'],))`). `replicateGrouping.mjs`'s canonical identity
+is `canonicalSmiles`, by design, for exactly the reason the Qwen transcription
+brief (§3) gave for requiring A2: grouping on the bare ChEMBL molecule id
+risks splitting replicate groups that a real structure comparison would
+merge (salts, unspecified stereochemistry, duplicate deposits) — a falsely
+**LOW** spread, the dangerous direction. D-096 used the wrong identity and did
+not flag it at the time. This entry names that now, before running the sealed
+measurement, rather than repeating it silently.
+
+### Consequence: this measurement is labelled PROVISIONAL, not final
+
+A2 is still 0/8. `scripts/d102-noise-floor-provisional.mjs` runs the sealed
+rules with `molecule_chembl_id` as an explicit, loudly-labelled substitute for
+structure identity — every output field and the sealed artifact itself say
+`PROVISIONAL`. **The final, sealed noise-floor number still requires A2.**
+This entry does not claim otherwise, and does not quietly promote a
+provisional number to a final one.
+
+### What the provisional pass shows
+
+`packages/backend/src/campaign/glp1r-d102-noise-floor-provisional.json`
+(hash `22c1c901…`), 757 A1 rows, 90 A3 assays. **190 rows (all on the three
+A3-chunk-3, custody-unverified assays) are excluded from classification
+entirely** — not filtered by rule, but because the rule requires a verified
+`bao_label`/description and D-101 established none is available for those
+three. This is the single largest cost of the still-open chunk-3 drift: a
+quarter of A1's rows cannot be readout-classified until it resolves.
+
+| family | rows | rows ex-flat | molecules | groups | status | median spread |
+|---|---|---|---|---|---|---|
+| CAMP | 203 | 203 | 121 | **55** | **MEASURED** | **1.4260** |
+| ARRESTIN | 134 | 68 (66 on suspect-flat assays) | 46 | 13 | NOT_MEASURED | — |
+| CALCIUM | 201 | 201 | 181 | 3 | NOT_MEASURED | — |
+| OTHER (incl. ERK) | 24 | 24 | 20 | 3 | NOT_MEASURED | — |
+| BINDING | 2 | 2 | 2 | 0 | NOT_MEASURED | — |
+| INTERNALIZATION | 3 | 3 | 3 | 0 | NOT_MEASURED | — |
+
+The CAMP family clears `minGroupsForNoiseFloor = 20` even under this
+provisional identity, with a large margin (55 groups). Read with the
+PROVISIONAL caveat above: this median could move — likely downward, per the
+same-direction risk this entry names — once A2 lets `replicateGroups` use
+real structure identity. It is evidence the readout-family stratification is
+workable and CAMP-family data is plentiful, not yet the sealed number.
+
+Note on ARRESTIN: removing the two suspect-flat assays cuts its usable rows
+from 134 to 68 (from 8 assays to 6), and it still falls short of the 20-group
+floor — the flat-value question from D-098/D-099 remains genuinely open and
+material, not resolved by exclusion alone.
+
+### Status
+
+A1 complete (757/757). A3 87/90 verified, chunk 3 still pinned-but-unverified
+(D-101). A2 0/8 — still the binding blocker for a final measurement. Backend
+suite 760 tests, 727 pass, 0 fail, 33 skipped.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Gates, pins, split rule,
+ingest policy and Winner Gate untouched. No attempt 2/2 was run — this seal
+authorised measurement preparation, not the frozen model attempt.**

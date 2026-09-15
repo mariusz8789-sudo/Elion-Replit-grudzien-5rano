@@ -46,13 +46,31 @@ chunks 1/2/4.
 Chunk 3 is **byte-identical to the FIRST mismatched attempt** — same
 `dd8bf5c5…`, still not `e5bb6931…`. Two independently-typed transmissions of
 the same source text converging on identical bytes rules out a one-off
-transcription slip on either end. This now looks like either (a) a
-normalisation this text channel applies consistently and invisibly to both
-attempts, or (b) an error in the declared hash itself. Not diagnosable further
-from inside this container — no resend over this channel is expected to
-change the outcome. Left as unresolved drift; the pinned bytes are the best
-available record of the three assay descriptions, used as a reading aid, not
-as verified provenance.
+transcription slip on either end.
+
+**A specific, testable hypothesis was proposed and falsified.** The claim: the
+source contains `Flp-In™ T-Rex™ System` (U+2122 TRADEMARK SIGN, twice), and
+this text channel silently strips it to `Flp-In T-Rex System`, which would
+explain why chunks 2/4 (no trademark symbols) matched and chunk 3 (one
+trademark symbol pair) did not. Tested directly: inserted U+2122 at both
+specified positions and recomputed the sha256 — **no match**
+(`46876689a2ae91c4818a9107d65209d9594618dab25691c765231ddf77689738`). Tested
+nine further variants (ThermoFisher's actual product capitalisation
+`T-REx` vs `T-Rex`, `®` instead of `™`, the symbol on only one of the two
+words, a third symbol after `System`) — **none matched the declared hash**.
+The U+2122 hypothesis is therefore falsified, not confirmed, and no further
+guess-and-check against the target hash was attempted: that search pattern
+(propose a variant, test it, propose another) is the same shape of tuning
+toward a result already named and refused in D-096/D-099/D-100, and refusing
+it does not depend on whose hypothesis is being tested.
+
+**Cause remains unidentified.** Not diagnosable further from inside this
+container. Left as unresolved drift; the pinned bytes (`dd8bf5c5…`) are the
+best available record of the three assay descriptions, used as a reading aid,
+not as verified provenance. No provenance label asserting a specific cause
+(e.g. `CHANNEL_NORMALIZED_U2122`) is applied, because the one specific cause
+proposed did not hold up when tested — labelling a cause that was falsified
+would misstate what is known.
 
 ```
 assay_chembl_id|target_chembl_id|assay_type|bao_format|bao_label|assay_description

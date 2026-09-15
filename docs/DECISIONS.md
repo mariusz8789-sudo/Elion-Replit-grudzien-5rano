@@ -7981,3 +7981,48 @@ reproducibly unverified. A2 0/8.
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
 rule, ingest policy, Winner Gate — or the four proposed seal points above —
 has been applied.**
+
+---
+
+## D-101 — the ™ hypothesis for A3 chunk 3 was tested directly, and falsified
+
+D-100 recorded chunk 3's drift as reproducible across two independent
+transcription passes. A specific, testable diagnosis was then proposed: the
+source text contains `Flp-In™ T-Rex™ System` (U+2122, twice), and this text
+channel silently strips the trademark symbol, which would explain why chunks
+2 and 4 (no `™` in source) matched and chunk 3 (one `™` pair) did not.
+
+**Tested exactly as specified.** Inserted U+2122 at both named positions in
+the saved chunk 3 text and recomputed sha256:
+`46876689a2ae91c4818a9107d65209d9594618dab25691c765231ddf77689738` — **not**
+`e5bb6931568d9694a3a58eebb9aa6f6f2d904ce1166cf5688ddabc044f471e38`. No match.
+
+Before concluding, nine further variants were checked in one pass rather than
+one at a time: ThermoFisher's actual product capitalisation (`T-REx`, not
+`T-Rex`) with the trademark symbol on both, either, or neither word; `®`
+substituted for `™`; a third symbol appended after `System`. **None matched.**
+
+**The hypothesis is falsified, not confirmed.** No tenth variant was tried.
+Continuing to propose and test variants against a known target hash is the
+same search shape as tuning an analysis toward a result — the exact pattern
+D-096 refused for the noise-floor readout classifier and D-099/D-100 already
+named for this same chunk. Refusing it here holds regardless of whose
+hypothesis produced the candidate.
+
+**Consequence for provenance labelling:** no cause-specific tag (such as
+`CHANNEL_NORMALIZED_U2122`) is applied to the pinned bytes, because the one
+specific, falsifiable cause that was proposed did not survive the test.
+Asserting a cause that failed its own test would misstate what is actually
+known. The bytes stay pinned as received (`dd8bf5c5…`), the cause of the
+mismatch stays **unidentified**, and this is recorded as closed-for-now: no
+further diagnostic attempt is planned without new information (e.g. a
+byte-for-byte export of the source rather than a re-typed transmission).
+
+### Status unchanged
+
+A1 complete and verified (757/757). A3 87/90 verified; chunk 3's three assay
+descriptions remain pinned-but-unverified, cause unknown. A2 0/8.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
+rule, ingest policy, Winner Gate, or any of the four proposed seal points has
+been applied.**

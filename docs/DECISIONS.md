@@ -7857,3 +7857,79 @@ before any noise-floor number is sealed.
 
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
 rule, ingest policy or Winner Gate touched.**
+
+---
+
+## D-099 — A3 assay dictionary complete (90/90); one chunk fails custody; flat-value mystery resolved to "real assay, mechanism unexplained"
+
+### Custody: 3 of 4 chunks verified, 1 recorded as drift
+
+| chunk | assays | status |
+|---|---|---|
+| 01 | 45 | VERIFIED, hash match |
+| 02 | 19 | VERIFIED, hash match |
+| 03 | 3 | **MISMATCH** — investigated, not resolved (see `data/transcription/glp1r-a3/README.md`) |
+| 04 | 23 | VERIFIED, hash match |
+
+**87 of 90 assay descriptions are custody-verified.** Chunk 3 (`CHEMBL5732843`,
+`CHEMBL5734588`, `CHEMBL5734589`) is not: row count is right, text was
+transcribed faithfully as received, but the sha256 of the saved bytes does not
+reproduce the declared value. Diagnosed — every non-ASCII character checked
+and found plausible (`×`, `°`, `μ`, `é` in expected lab-protocol positions),
+three concrete hypotheses tested (mu vs micro sign, trailing newline, CRLF),
+none matched. The search was stopped there rather than continued as
+guess-and-check against the target hash, which is the same shape of defect
+D-096 already named and refused to repeat: tuning toward a result, whether the
+result is a scientific number or a hash match. Recorded as drift with both
+hashes pinned, exactly as the accepted transfer rule requires, rather than
+silently accepted.
+
+### The flat-value question from D-098: now has a name, not yet an explanation
+
+`CHEMBL6113416` and `CHEMBL6113417` are real, distinctly described assays —
+**not** a duplicated or placeholder entry: β-arrestin-2 and β-arrestin-1
+recruitment respectively, human GLP-1R in HEK293, bioluminescence-based
+Envision plate reader, 5-minute incubation. This rules out the "phantom assay"
+reading of D-098's flag.
+
+It does not explain the 31-of-33 identical-value pattern. The sibling assay in
+the same document, `CHEMBL6113405` (cAMP accumulation, 30 min, microplate
+reader — a different readout on the same molecule set), has 32 distinct values
+in 33 rows. So the flatness is specific to the arrestin-recruitment readout in
+this document, not to the document as a whole. A 5-minute arrestin assay
+reading near a detection floor for most compounds (only the most potent
+agonists resolve a fitted EC50 before quench) is a plausible mechanism, but it
+is a hypothesis, not a finding — I am not asserting it. **Still open, now
+better specified**: it is a readout-specific artefact candidate, to be weighed
+when the readout-family rule is sealed, not resolved by this diagnostic.
+
+### The user's own observation, checked rather than assumed
+
+`CHEMBL5732842`/`CHEMBL5732843` are confirmed by A3 to be the identical HTRF
+cAMP protocol run on two CHO clones differing only in receptor density (Clone
+H6, Kd 0.4 nM, Bmax 1900 fmol/mg; Clone C6, Kd 0.3 nM, Bmax 240 fmol/mg — an
+~8x density difference). Comparing the 90 paired rows sharing both assays in
+A1 directly:
+
+- median shift (H6 minus C6, in pActivity): **[left to the readout-family
+  seal to compute and weigh — not computed here to avoid pre-empting that
+  decision with a number generated outside the sealed procedure]**
+
+This is exactly the kind of pair the readout-family branch must classify: same
+`assay_type` (B), same molecule, same document, same chemistry (HTRF cAMP),
+differing only in receptor reserve. Whether "receptor density variant" counts
+as the same readout family or a separate one is a pharmacological judgment,
+not an arithmetic one — recorded as a named open question for the seal, not
+decided here.
+
+### Status
+
+A1 complete (757/757, 7/7 chunks verified). A3 87/90 verified (3/4 chunks; one
+drift, not silently accepted). A2 0/8 — still to come. Human seal still
+required on four items now: `action_type` branch, readout-family definition
+(now including the H6/C6 density-variant question and the arrestin
+flat-value question), HSA-condition split, and disposition of A3 chunk 3's
+unverified text.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
+rule, ingest policy or Winner Gate touched.**

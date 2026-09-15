@@ -6237,3 +6237,99 @@ same route the 287-row GLP-1R pin arrived by in D-077a) flips them without an
 edit to any module.
 
 **OUTCOME: track VALIDATED end to end; discovery result NO_WINNER; recipe LOCKED.**
+
+## D-082 — a shipped scientific defect, measured and repaired; and the artifact a new molecule can actually receive
+
+Two things landed together because the audit that found the first one is what
+made the second one honest to build.
+
+### Part 1: the amide count was wrong, and it shipped
+
+`glp1rQsarV2.mjs::countAmideBonds` counts amide bonds with two regexes over the
+canonical SMILES string, `NC(=O)` and `C(=O)N`, and its own comment states that
+"the two patterns are disjoint as written". **They are not.** In a urea,
+`NC(=O)N`, the first pattern matches characters 0-5 and the second matches 1-6.
+One urea therefore scores **2**. A biuret scores **4**. This number feeds
+`descriptorVector`, which sets `residueEstimate = amideBonds + 1` and decides
+`peptideLike` at the frozen threshold of 3 — so a small molecule with two ureas
+was being classified as peptide-like.
+
+Measured on the real pins rather than argued:
+
+| pin | rows | string count overstates | peptideLike classification flips |
+|---|---|---|---|
+| GLP-1R (D-077a) | 287 | 9 | **0** |
+| GIPR (D-081a) | 233 | 37 | **11** |
+
+**The D-079 numbers stand.** Zero of the 287 GLP-1R rows flip, so the recorded
+MAE 1.0425 / R2 0.5182 and the 39-peptide / 6-small-molecule test
+stratification are unaffected. The defect bites exactly where ureas live — the
+small-molecule GIPR set — which is why it went unnoticed until a second target
+arrived. That is the argument for a second target stated as a measurement.
+
+**The repair, and the SMARTS that does not work.** A new batched worker command
+`batch_peptide_parse` counts with RDKit substructure matching. The obvious
+pattern, `[CX3](=O)[NX3]`, **reproduces the same defect**: a urea's carbonyl
+carbon carries two nitrogens, so RDKit returns two matches. Verified live
+before writing the command. The pattern used requires the carbonyl carbon to
+also carry a carbon substituent — `[CX3](=[OX1])([#6])[NX3]` — which a peptide
+bond has and a urea, a biuret and a carbamate do not. Live RDKit results:
+peptide 1, urea 0, biuret 0, carbamate 0, dipeptide 1.
+
+The command returns `naiveAmideBonds` alongside `peptideAmideBonds`, so the
+difference is visible in the data rather than quietly corrected. The string
+counter is left in place as the no-subprocess fallback and its defect is now
+documented and asserted by a regression test, rather than described by a
+comment that was wrong.
+
+### Part 2: PreclinicalCandidateProtocol
+
+D-081 established that `mounjaroResearchRecipe.ts` can never issue a recipe for
+a newly generated compound — structurally, not for want of data. That left new
+candidates with nothing to hand a laboratory, which is how projects end up
+quietly loosening a gate. `preclinicalProtocol.mjs` is the deliberately weaker
+artifact that closes the hole without touching the gate.
+
+It cannot be mistaken for a promotion, and the refusals are on the INPUT, where
+a caller could actually put something:
+
+- input carrying `recipe`, `winnerRecord` or its own `gateLock` is REFUSED
+  (the candidate package reviewed for this entry checked those keys on an
+  object it had just constructed itself two lines earlier — a dead check);
+- an axis declaring anything stronger than COMPUTATIONAL or MODEL_ESTIMATE is
+  REFUSED: randomised evidence belongs in front of the canonical gate;
+- a wet-lab step claiming it would reach DIRECT_RANDOMISED is REFUSED — one
+  assay is not a trial;
+- `requiredWetLab` must be non-empty, because a protocol that asks for no
+  experiment is a conclusion in disguise;
+- a BLOCKED axis is carried with its reason rather than omitted, because the
+  absence of a number is itself the finding.
+
+`gateLock.winnerRecordPossibleNow` and `gateLock.recipePossibleNow` are written
+by the module as hard `false`. A test drives 50 computational axes through it
+and both stay false — the same wall D-081 proved for the recipe.
+
+### What was rejected from the candidate package
+
+- `sha256Hex` imported from `provenance.mjs` — **that export does not exist**
+  (the real ones are `sha256Hex16` and `canonicalHash`). Both proposed modules
+  would have thrown at import.
+- A second `fitStandardization` — one already exists in `glp1rQsarV2.mjs`.
+- `loadGlp1rPin('path-string')` in the proposed retry E2E — the real signature
+  takes an options object and the pin is `glp1rActivity.json`, not
+  `glp1rActivity.pin.json`.
+- `require()` inside an ESM test file.
+- An E2E ending in `PENDING_CLAUDE_EXECUTION` — a placeholder, which the
+  standing instruction says to close rather than land.
+
+### Gate
+
+`preclinicalAndPeptide.test.mjs` 15/15, including the measured-impact
+regression that pins the flip count at 11 so a future change to either counter
+fails a test instead of quietly redefining "peptide-like". Backend suite green.
+No threshold moved; `FROZEN_PEPTIDE_AMIDE_MIN`, both validation gates and the
+canonical Winner Gate are untouched.
+
+**OUTCOME: VALIDATED.** GIPR remains INSUFFICIENT_DATA (146/150, 24/40);
+GLP-1R remains over its gate at MAE 1.0425; the discovery result is still
+NO_WINNER and the recipe is still LOCKED.

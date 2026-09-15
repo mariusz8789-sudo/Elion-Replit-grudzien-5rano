@@ -239,6 +239,55 @@ def main():
         print(json.dumps({"ok": True, "results": results, "n": len(results), "engine": "RDKit " + rdkit.__version__}))
         return
 
+    # D-082 — batched PEPTIDE PARSE. Exists because the string-based
+    # `countAmideBonds` in glp1rQsarV2.mjs double counts a urea: the SMILES
+    # `NC(=O)N` matches BOTH `NC(=O)` and `C(=O)N`, so one urea scores 2 and a
+    # biuret scores 4. Measured on the real pins: 0 of 287 GLP-1R rows affected
+    # (so the D-079 numbers stand) but 11 of 233 GIPR rows, every one of which
+    # flipped across the peptideLike>=3 boundary.
+    #
+    # THE SMARTS MATTERS AND THE OBVIOUS ONE IS WRONG. `[CX3](=O)[NX3]` — the
+    # naive amide pattern — reproduces the same defect in RDKit form: it
+    # returns 2 matches for a urea, because the carbonyl carbon carries two
+    # nitrogens and each is a separate match. The pattern used here requires
+    # the carbonyl carbon to ALSO carry a carbon substituent, which is what a
+    # peptide bond has and a urea, biuret and carbamate do not. Verified live
+    # against RDKit on all four cases before this command was written.
+    if cmd == "batch_peptide_parse":
+        smiles_list = req.get("smilesList")
+        if not isinstance(smiles_list, list):
+            print(json.dumps({"ok": False, "error": "smilesList_required"}))
+            return
+        # Compiled once per process, not per molecule — the whole point of batching.
+        pep_amide = Chem.MolFromSmarts("[CX3](=[OX1])([#6])[NX3]")
+        any_amide = Chem.MolFromSmarts("[CX3](=[OX1])[NX3]")
+        nterm = Chem.MolFromSmarts("[NX3;H2]")
+        cterm = Chem.MolFromSmarts("[CX3](=[OX1])[OX2H1]")
+        out_rows = []
+        for s in smiles_list:
+            m = Chem.MolFromSmiles(s) if isinstance(s, str) else None
+            if m is None:
+                out_rows.append({"ok": False, "error": "invalid_smiles"})
+                continue
+            pep = m.GetSubstructMatches(pep_amide)
+            backbone = set()
+            for idx in pep:
+                backbone.update(idx)
+            heavy = m.GetNumHeavyAtoms()
+            out_rows.append({"ok": True, "data": {
+                # The authoritative count: peptide-type amides only.
+                "peptideAmideBonds": len(pep),
+                # Reported alongside so the difference is visible rather than hidden.
+                # naiveAmideBonds - peptideAmideBonds is exactly the urea/carbamate excess.
+                "naiveAmideBonds": len(m.GetSubstructMatches(any_amide)),
+                "residueEstimate": len(pep) + 1 if len(pep) > 0 else 0,
+                "backboneFraction": round(len(backbone) / heavy, 6) if heavy else 0.0,
+                "terminalGroups": len(m.GetSubstructMatches(nterm)) + len(m.GetSubstructMatches(cterm)),
+                "cyclicCount": m.GetRingInfo().NumRings(),
+            }})
+        print(json.dumps({"ok": True, "results": out_rows, "n": len(out_rows), "engine": "RDKit " + rdkit.__version__}))
+        return
+
     # D-079 — batched descriptors, same one-process-per-list rule as
     # `batch_fingerprint`. Each molecule runs the identical descriptor block as
     # the single-molecule `descriptors` command; a molecule RDKit cannot parse

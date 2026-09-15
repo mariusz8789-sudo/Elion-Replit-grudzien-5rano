@@ -59,11 +59,22 @@ describe('D-081 GIPR track — fail-closed, gate frozen before data', () => {
     });
   });
 
-  it('negative: there is no GIPR pin in this runtime, and that is reported as PIN_MISSING, not as an empty dataset', () => {
+  it('the real GIPR pin loads and re-verifies its own sha256 (D-081a: 233 human rows arrived)', () => {
     const pin = loadGiprPin();
-    assert.equal(pin.ok, false);
-    assert.equal(pin.code, 'PIN_MISSING');
-    assert.match(pin.reason, /GIPR/);
+    assert.equal(pin.ok, true);
+    assert.equal(pin.n, 233);
+    // Custody is re-checked on every read, not trusted from pin time.
+    assert.match(pin.contentSha256, /^[0-9a-f]{64}$/);
+    assert.ok(pin.rows.every((r) => r.targetOrganism === 'Homo sapiens'));
+  });
+
+  it('negative: where there genuinely is no pin, the loader still says PIN_MISSING rather than returning an empty dataset', () => {
+    withTempDir((dir) => {
+      const r = loadGiprPin({ jsonPath: path.join(dir, 'nope.json'), metaPath: path.join(dir, 'nope.meta.json') });
+      assert.equal(r.ok, false);
+      assert.equal(r.code, 'PIN_MISSING');
+      assert.match(r.reason, /GIPR/);
+    });
   });
 
   it('negative: a tiny GIPR pin is refused as INSUFFICIENT_DATA — the frozen gate is NOT relaxed to fit it', () => {
@@ -98,10 +109,17 @@ describe('D-081 GIPR track — fail-closed, gate frozen before data', () => {
     assert.equal(censored.dropped.missingValue, 1);
   });
 
-  it('the GIPR capability is COMPUTED from a real training attempt, not asserted', () => {
+  it('the GIPR capability is COMPUTED from a real training attempt — and with real data it now fails on SIZE, not absence', () => {
     const cap = probeGiprCapability();
     assert.equal(cap.available, false);
-    assert.equal(cap.code, 'PIN_MISSING');
+    // The code moved from PIN_MISSING to INSUFFICIENT_DATA when 233 real rows
+    // arrived. That transition is the whole point of computing the capability
+    // instead of asserting it, and this test is what detected it.
+    assert.equal(cap.code, 'INSUFFICIENT_DATA');
+    // 146 of a required 150. Pinned here so that closing the gap by relaxing
+    // the gate — rather than by adding compounds — fails this test.
+    assert.match(cap.reasons[0], /nTrain=146 \(gate requires >= 150\)/);
+    assert.match(cap.reasons[0], /NOT relaxed/);
     assert.equal(cap.gateFingerprint, loadGiprValidationGate(GIPR_GATE_PATH).ruleFingerprint);
   });
 });

@@ -242,6 +242,44 @@ export function descriptorsBatch(smilesList, { chunkSize = 500 } = {}) {
   return { ok: true, results, n: results.length, engine: d.engine };
 }
 
+/**
+ * D-082 — batched peptide parse. Same one-process-per-chunk contract as
+ * `descriptorsBatch`/`fingerprintBatch` (D-078/D-079): results are aligned by
+ * index and a molecule RDKit cannot parse fails in its own slot.
+ *
+ * This is the AUTHORITATIVE peptide-bond count. The string-based
+ * `glp1rQsarV2.mjs::countAmideBonds` double counts ureas and remains only as
+ * a no-subprocess fallback; where both are available this one wins, because
+ * it distinguishes a peptide bond from a urea, a biuret and a carbamate.
+ */
+export function peptideParseBatch(smilesList, { chunkSize = 500 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  const list = Array.isArray(smilesList) ? smilesList.map((s) => String(s ?? '')) : [];
+  if (list.length === 0) return { ok: true, results: [], n: 0, engine: d.engine };
+  const results = [];
+  try {
+    for (let offset = 0; offset < list.length; offset += chunkSize) {
+      const chunk = list.slice(offset, offset + chunkSize);
+      const out = execFileSync(PYTHON, [WORKER, JSON.stringify({ cmd: 'batch_peptide_parse', smilesList: chunk })], {
+        timeout: Math.max(TIMEOUT_MS, 1_000 * chunk.length),
+        maxBuffer: 256 * 1024 * 1024,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const r = JSON.parse(out);
+      if (!r.ok) return { ok: false, error: r.error };
+      if (!Array.isArray(r.results) || r.results.length !== chunk.length) {
+        return { ok: false, error: 'BATCH_LENGTH_MISMATCH' };
+      }
+      results.push(...r.results);
+    }
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+  return { ok: true, results, n: results.length, engine: d.engine };
+}
+
 /** Walidacja struktury SMILES przez RDKit (kanonizacja). */
 export function validate(smiles) {
   const d = detect();

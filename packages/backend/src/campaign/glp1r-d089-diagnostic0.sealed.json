@@ -1,0 +1,210 @@
+{
+  "artifact": {
+    "id": "D-089-DIAGNOSTIC-0",
+    "kind": "SEALED_RESEARCH_ARTIFACT",
+    "datasetPinSha256": "5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244",
+    "datasetRows": 287,
+    "gateRuleFingerprint": "d2f77a7e6042f0fc",
+    "gateConstants": {
+      "MIN_TRAIN": 150,
+      "MIN_TEST": 40,
+      "MAX_MAE": 1,
+      "MIN_R2": 0.25
+    },
+    "gateConstantsChanged": false,
+    "rdkitVersion": "2026.03.6",
+    "testSplitRead": false,
+    "representationAttemptsConsumed": 0,
+    "splitRule": "scaffold-hash-mod10 (djb2 over the Murcko scaffold, buckets 0-1 test, 2-3 calib, 4-9 train)",
+    "endpointFamilyDefinitions": {
+      "EC50": "functional potency — concentration producing 50% of maximal biological response in a cell-based assay",
+      "IC50": "binding/inhibition — concentration producing 50% inhibition in the assay as reported",
+      "KI": "equilibrium inhibition constant",
+      "AFFINITY_FAMILY_AS_SEALED": [
+        "EC50",
+        "IC50",
+        "Ki",
+        "Kd"
+      ],
+      "comparisonMade": "EC50 (functional) vs IC50+Ki (binding) for the SAME canonicalSmiles",
+      "whyThisMatters": "these are different physical quantities; a single pActivity axis representing both is internally inconsistent by construction"
+    },
+    "measurements": {
+      "unique_murcko_scaffolds": 89,
+      "top10_scaffold_concentration": 0.5749,
+      "largest_single_scaffold_fraction": 0.1533,
+      "peptide_like_fraction": 0.7561,
+      "nn_similarity_median": 1,
+      "nn_similarity_p95": 1,
+      "fraction_with_nn_above_0_7": 0.9199,
+      "endpoint_counts": {
+        "EC50": 194,
+        "IC50": 89,
+        "KI": 4
+      },
+      "molecules_with_multiple_endpoint_types": 65,
+      "cross_endpoint_gap_median": 1.7618,
+      "true_replicate_groups": 6,
+      "learning_curve_calibration": [
+        {
+          "nTrain": 45,
+          "calibMAE": 2.8932
+        },
+        {
+          "nTrain": 89,
+          "calibMAE": 1.0909
+        },
+        {
+          "nTrain": 134,
+          "calibMAE": 0.9843
+        },
+        {
+          "nTrain": 178,
+          "calibMAE": 0.8164
+        }
+      ],
+      "learning_curve_final_slope": 0.1679
+    },
+    "notMeasured": {
+      "true_replicate_sd_median": "only 6 same-endpoint replicate groups exist (floor for a usable estimate: 20). The assay noise floor is NOT established. An earlier version of this diagnostic reported 1.1212 by grouping replicates on molecule alone, which put a molecule's EC50 and IC50 in one bucket and called their difference noise; that number is WITHDRAWN and must not be quoted.",
+      "publication_overlap_pmid": "the frozen pin carries no PMID/publication field, so PMID-level duplicate detection against any extension is impossible from this pin alone"
+    },
+    "exhaustiveEndpointSubsetScan": {
+      "method": "all 7 non-empty subsets of {EC50, IC50, KI}, each scaffold-split under the frozen rule, compared against MIN_TRAIN=150 and MIN_TEST=40",
+      "results": [
+        {
+          "subset": [
+            "EC50"
+          ],
+          "rows": 194,
+          "train": 118,
+          "test": 32,
+          "sizeOk": false,
+          "homogeneous": true
+        },
+        {
+          "subset": [
+            "IC50"
+          ],
+          "rows": 89,
+          "train": 56,
+          "test": 13,
+          "sizeOk": false,
+          "homogeneous": true
+        },
+        {
+          "subset": [
+            "KI"
+          ],
+          "rows": 4,
+          "train": 4,
+          "test": 0,
+          "sizeOk": false,
+          "homogeneous": true
+        },
+        {
+          "subset": [
+            "EC50",
+            "IC50"
+          ],
+          "rows": 283,
+          "train": 174,
+          "test": 45,
+          "sizeOk": true,
+          "homogeneous": false
+        },
+        {
+          "subset": [
+            "EC50",
+            "KI"
+          ],
+          "rows": 198,
+          "train": 122,
+          "test": 32,
+          "sizeOk": false,
+          "homogeneous": false
+        },
+        {
+          "subset": [
+            "IC50",
+            "KI"
+          ],
+          "rows": 93,
+          "train": 60,
+          "test": 13,
+          "sizeOk": false,
+          "homogeneous": false
+        },
+        {
+          "subset": [
+            "EC50",
+            "IC50",
+            "KI"
+          ],
+          "rows": 287,
+          "train": 178,
+          "test": 45,
+          "sizeOk": true,
+          "homogeneous": false
+        }
+      ],
+      "anyHomogeneousSubsetSatisfyingFloors": false
+    },
+    "status": "CONSTRAINT_CONFLICT",
+    "statusRationale": {
+      "whatIsFormallyESTABLISHED": "Over an EXHAUSTIVE enumeration of all 7 endpoint-family subsets of THIS pin, under THIS split rule and THESE gate constants, no endpoint-homogeneous subset satisfies MIN_TRAIN=150 AND MIN_TEST=40. Both subsets that satisfy the size floors are endpoint-MIXED. This is a finite, checked enumeration, not an extrapolation.",
+      "whatIsNOTEstablished": "That MAE <= 1.0 is unachievable. That would require a bound on achievable error — e.g. an assay noise floor — and the noise floor is NOT_MEASURED (6 replicate groups). No IMPOSSIBILITY_PROOF is claimed.",
+      "whyNotCalledImpossibilityProof": "Calling a measured constraint conflict a mathematical impossibility would be an overclaim of exactly the kind this repository refuses. CONSTRAINT_CONFLICT states precisely what was checked and precisely what was not."
+    },
+    "extensionRequirement": {
+      "status": "PROPOSED — HUMAN DECISION REQUIRED, not a diagnostic result",
+      "derivation": {
+        "measuredAllocationEC50Only": {
+          "rows": 194,
+          "train": 118,
+          "calib": 44,
+          "test": 32,
+          "pTrain": 0.6082,
+          "pCalib": 0.2268,
+          "pTest": 0.1649
+        },
+        "note": "the observed allocation is NOT the nominal 60/20/20: scaffold-hash-mod10 allocates by scaffold, so row proportions follow scaffold sizes",
+        "trainConstraint": "118 + 0.6082*N >= 150  =>  N >= 52.6",
+        "testConstraint": "32 + 0.1649*N >= 40  =>  N >= 48.5",
+        "bindingConstraint": "TRAIN",
+        "N": 53
+      },
+      "caveat": "N=53 is an EXPECTATION under the observed proportions. Each new scaffold lands in bucket djb2(scaffold)%10, deterministic but unknowable before the scaffolds exist, so the realised allocation may differ. 53 is therefore PROPOSED, never a measured guarantee, and it supersedes the reviewed package's '>=40 rows' only as a better-derived proposal.",
+      "qualitativeRequirement": "the extension must be endpoint-HOMOGENEOUS (EC50-only) human GLP-1R on NEW Murcko scaffolds. Novel-but-mixed rows inherit the same 1.7618 contradiction and do not help."
+    },
+    "acquisitionStatus": {
+      "checkedAt": "this run",
+      "method": "real HTTP reachability check, no fabrication",
+      "results": [
+        {
+          "source": "bindingdb.org (root)",
+          "http": "000",
+          "status": "EGRESS_BLOCKED"
+        },
+        {
+          "source": "bindingdb.org SDFdownload",
+          "http": "000",
+          "status": "EGRESS_BLOCKED"
+        },
+        {
+          "source": "rest.uniprot.org P43220",
+          "http": "000",
+          "status": "EGRESS_BLOCKED"
+        },
+        {
+          "source": "surechembl.org",
+          "http": "000",
+          "status": "EGRESS_BLOCKED"
+        }
+      ],
+      "conclusion": "EGRESS_BLOCKED for every named source. No rows retrieved, no hashes computed, no scaffold counts derived, no independence claimed. Target identity P43220 (human GLP-1R) could NOT be validated against UniProt from this runtime and remains a declaration, not a verified fact."
+    }
+  },
+  "artifactHash": "dd782ef2a4bab906a0b5869242861a840d32a28957782e57bc59a8d979f56190",
+  "sealedAt": "2026-09-15T12:53:56.201Z"
+}

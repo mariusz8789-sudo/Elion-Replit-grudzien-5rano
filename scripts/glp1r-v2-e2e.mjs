@@ -11,6 +11,7 @@
  * here. Two honest outcomes: VALIDATED or BLOCKED with exact reasons.
  */
 
+import { trainGlp1rModel } from '../packages/backend/src/campaign/glp1rEfficacyAdapter.mjs';
 import { loadGlp1rPin } from '../packages/backend/src/campaign/glp1rDataset.mjs';
 import { loadGlp1rValidationGate } from '../packages/backend/src/campaign/glp1rQsar.mjs';
 import {
@@ -117,7 +118,13 @@ const fingerprint = modelFingerprintV2({
 });
 
 console.log('\n--- V1 vs V2 on the same pin, same split policy, same frozen gate ---');
-console.log('V1  morgan-512 + sparse binary ridge : MAE 1.1726  R2 0.4820  -> BLOCKED (D-077a, measured)');
+// D-090: the V1 figures are read from the live V1 run, not restated. They were
+// correct as literals, but a correct literal is still a number without its
+// provenance — which is precisely how arm B's 1.0425 ended up describing the
+// V1 axis (D-088).
+const v1 = trainGlp1rModel({});
+const v1m = v1.validation?.metrics ?? null;
+console.log(`V1  morgan-512 + sparse binary ridge : ${v1m ? `MAE ${v1m.mae.toFixed(4)}  R2 ${v1m.r2.toFixed(4)}` : 'NO METRICS'}  -> ${v1.ok ? 'PASSED' : 'BLOCKED'} (measured this run)`);
 console.log(`V2  ${chosen.id.padEnd(1)} + dense ridge                  : MAE ${m.mae.toFixed(4)}  R2 ${m.r2.toFixed(4)}  -> ${decision.status}`);
 
 console.log(`\nmodelFingerprint  : ${fingerprint}`);

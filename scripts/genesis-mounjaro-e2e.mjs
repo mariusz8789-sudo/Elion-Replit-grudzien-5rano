@@ -172,7 +172,13 @@ try {
     failedAlternatives: realCandidates.slice(1).map((c) => ({ candidateId: c.canonicalSmiles, rejectedReason: 'not evaluated: the dual-target mechanism axes are unavailable, so no candidate could be ranked' })),
     knownUnknowns: [
       `the pinned human GIPR set is below the frozen gate's floor: ${gipr.reasons?.[0] ?? gipr.code}`,
-      'the GLP-1R model misses its own frozen gate at MAE 1.0425 > MAX_MAE 1.0',
+      // D-090: this line used to assert "MAE 1.0425". D-088 proved that number
+      // is arm B's (the V2 engine); the live V1 axis measures 1.1726. D-087
+      // fixed the printed summary and MISSED this one, which is why the
+      // defect class needs a mechanism rather than a sweep.
+      glp1r.metrics
+        ? `the GLP-1R model misses its own frozen gate: measured MAE ${glp1r.metrics.mae.toFixed(4)} (R2 ${glp1r.metrics.r2.toFixed(4)}, nTest ${glp1r.metrics.n}) against MAX_MAE 1.0`
+        : 'the GLP-1R model did not clear its frozen gate and produced no metrics',
       'prior-art search is unreachable from this runtime, so novelty is unverifiable rather than established',
     ],
     reproducibility: { deterministic: replay.verdict === 'MATCH', replayVerdict: replay.verdict },

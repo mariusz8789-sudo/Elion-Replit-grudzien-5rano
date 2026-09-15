@@ -7026,3 +7026,107 @@ chosen.
 
 **NO_WINNER stands. Recipe LOCKED. Attempt budget still 1 of 2 remaining.**
 
+
+## D-090 — metric claims, a sealed diagnostic, and the constraint named honestly
+
+Final hardening pass over the D-089 package. Audit first, then minimal fixes.
+No threshold, gate, pin or sealed D-088 artifact was touched, and the last
+representation attempt was not spent.
+
+### The audit found three things in the proposal and one in this repository
+
+**1. `sha256Hex` does not exist.** The proposal fingerprinted with
+`sha256Hex(canonicalHash(r))`. Measured against HEAD, `provenance.mjs` exports
+`canonicalHash`, `sha256Hex16`, `maxRelativeDiff`, `snapshotEnvironment` — no
+`sha256Hex`. And `canonicalHash` already returns a full 64-character sha256
+hex, so the expression is an import error that would be a double hash if it
+resolved. One canonical hash, applied once.
+
+**2. Provenance was minted in the reporting layer.** `emitMetric` took a
+caller-supplied `identity` and hashed it at emission. That is the defect class
+itself: a number accompanied by a fingerprint of whatever the caller happened
+to pass. In `security/metricClaim.mjs` both the identity AND THE VALUE are read
+out of the sealed artifact. `emitMetricClaim(artifact, 'MAE')` takes a metric
+NAME; there is no argument through which a wrong number can enter, so "emit
+MAE = 1.0425 for arm A" is not expressible.
+
+**3. The gate typo `1.0/25`** was not propagated. Canonical `MIN_R2 = 0.25`,
+asserted in a test that also rejects `25`.
+
+**4. A live instance of the defect, in this repository, that D-087 missed.**
+`scripts/genesis-mounjaro-e2e.mjs` still carried
+`'the GLP-1R model misses its own frozen gate at MAE 1.0425 > MAX_MAE 1.0'` in
+the `knownUnknowns` handed to the recipe builder. D-087 fixed the printed
+summary and did not fix this one. `scripts/glp1r-v2-e2e.mjs` likewise restated
+`MAE 1.1726 R2 0.4820` as a literal. Both now read from the live run.
+
+That miss is the argument for the mechanism. A sweep for literals finds what
+the sweeper thought to look at; a claim that cannot be printed without
+resolving to its run finds the rest.
+
+### The negative tests the hardening required
+
+- arm B's real 1.0425 **fails** when presented as arm A's number, while both
+  honest pairings verify
+- same dataset with a changed `engineVersion` / `modelConfigFingerprint` /
+  `seed` / `armId` / `splitFingerprint` yields a different run identity
+- an edited artifact raises `ARTIFACT_TAMPERED`; **re-sealing the forgery**
+  gives it a valid self-hash and the claim still fails with
+  `METRIC_WITHOUT_PROVENANCE` — a claim cannot be its own witness
+- a report with no resolving claim throws rather than printing a placeholder
+
+### CONSTRAINT_CONFLICT, not an impossibility proof
+
+The status is deliberately **`CONSTRAINT_CONFLICT`**.
+
+**Formally established**, by exhaustive enumeration of all 7 non-empty subsets
+of {EC50, IC50, Ki} on this pin under the frozen split rule and constants:
+**no endpoint-homogeneous subset satisfies `MIN_TRAIN=150` ∧ `MIN_TEST=40`.**
+Both subsets that satisfy the floors are endpoint-MIXED. That is a finite,
+checked enumeration.
+
+**NOT established**: that `MAE ≤ 1.0` is unachievable. That needs a bound on
+achievable error — an assay noise floor — and the noise floor is
+`NOT_MEASURED`: only 6 molecule-groups carry two assays of the same endpoint
+type, against a floor of 20. Calling a measured constraint conflict a
+mathematical impossibility would be precisely the overclaim this repository
+refuses.
+
+The earlier `1.1212` "noise floor" is recorded as **WITHDRAWN** inside the
+sealed artifact, with the reason, so it cannot be quoted as a result.
+
+### The extension size is PROPOSED, with its derivation shown
+
+`N = 53` is not a diagnostic output. Derived from the MEASURED allocation —
+EC50-only splits 118 train / 44 calib / 32 test, i.e. pTrain 0.6082 and pTest
+0.1649, **not** the nominal 60/20/20, because scaffold-hash-mod10 allocates by
+scaffold rather than by row:
+
+    train:  118 + 0.6082·N ≥ 150  ⇒  N ≥ 52.6   ← binding
+    test:    32 + 0.1649·N ≥ 40   ⇒  N ≥ 48.5
+
+Each new scaffold lands in bucket `djb2(scaffold) % 10`, deterministic but
+unknowable before the scaffolds exist, so this is an EXPECTATION. Status:
+**PROPOSED — HUMAN DECISION REQUIRED**. The qualitative half is firmer than the
+count: the extension must be endpoint-HOMOGENEOUS EC50-only on new Murcko
+scaffolds, because novel-but-mixed rows inherit the same 1.7618 contradiction.
+
+### Acquisition: EGRESS_BLOCKED, and stop
+
+Real reachability check, four sources, all `http=000`: bindingdb.org root,
+the BindingDB SDF download endpoint, `rest.uniprot.org/uniprotkb/P43220`, and
+surechembl.org. **No rows retrieved, no hashes computed, no scaffold counts
+derived, no independence claimed.** Target identity P43220 could not be
+validated against UniProt from this runtime and is recorded as a declaration,
+not a verified fact.
+
+### Firewall
+
+Tests assert that Diagnostic-0 consumed **0** representation attempts, that the
+D-088 seal still hashes to `fc6cf73e63a9e569`, that its `sealedBy` is `HUMAN`
+with `agentMayNotSelfApprove`, and that the budget arithmetic leaves exactly
+**1 of 2**. Strategy A and Strategy B both require a new human seal; the
+diagnostic authorises neither.
+
+**NO_WINNER. Recipe LOCKED. Gate constants UNCHANGED.**
+

@@ -135,11 +135,21 @@ export function comparableAxes(baseline, capabilities, chemotype = null) {
  * `activityPredictor` (D-076/077) is now COMPUTED, not asserted: it is true
  * only when `glp1rEfficacyAdapter.trainGlp1rModel()` actually loads a
  * hash-verified human GLP-1R pin, loads the frozen validation gate, trains,
- * and clears every gate threshold. It is false in this runtime because no
- * such pin exists (ChEMBL egress is HTTP 403 here) — but it is false as the
- * OUTPUT of that check, not as a constant, so the day a real dataset is
- * ingested this flips without an edit to this file. `glp1rBlockedReason`
- * carries exactly why it is false.
+ * and clears every gate threshold. It is false as the OUTPUT of that check,
+ * not as a constant, so the day the model clears the gate this flips without
+ * an edit to this file. `glp1rBlockedReason` carries exactly why it is false.
+ *
+ * D-087 — THE REASON IT IS FALSE CHANGED, AND THIS COMMENT HAD NOT. It used
+ * to read "no such pin exists (ChEMBL egress is HTTP 403 here)". A real
+ * 287-row human pin landed in D-076/077; the model now trains and MISSES the
+ * frozen gate on accuracy. Egress is still refused, but that is no longer why
+ * this flag is false, and a stale explanation in a capability probe is the
+ * kind of thing a reader trusts precisely because it looks specific.
+ *
+ * `glp1rMetrics` carries the MEASURED numbers so a caller can report the real
+ * MAE instead of restating a literal that drifts — see D-087, where the E2E
+ * summary was found printing a hardcoded "MAE 1.0425" against a measured
+ * 1.1726.
  */
 export function probeCapabilities() {
   const rd = rdkitDetect();
@@ -152,6 +162,10 @@ export function probeCapabilities() {
     quantum: capabilityAvailable('quantum-chemistry') === true,
     activityPredictor: glp1r.ok === true,
     glp1rBlockedReason: glp1r.ok ? null : (glp1r.code ?? 'UNKNOWN'),
+    glp1rBlockedDetail: glp1r.ok ? null : (glp1r.reason ?? glp1r.validation?.reasons?.[0] ?? null),
+    glp1rMetrics: glp1r.validation?.metrics
+      ? Object.freeze({ ...glp1r.validation.metrics, split: glp1r.validation.split ?? null })
+      : null,
     priorArtSearch: false,
   });
 }

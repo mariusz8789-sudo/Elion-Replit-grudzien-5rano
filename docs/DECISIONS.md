@@ -6754,3 +6754,100 @@ to keep in sync with reality. The scorecard number would have gone up. That is
 exactly the failure mode that makes a number worth less than the measurement
 behind it.
 
+
+## D-087 — the E2E was printing a number it had not measured, and a watchdog cried wolf on the correct answer
+
+Three defects, all on the Mounjaro critical path, all found by running things
+rather than reading them.
+
+### The headline number in the audit summary was a literal
+
+The E2E's NO_WINNER explanation read: *"misses its own frozen gate (MAE 1.0425
+> 1.0)"*. That figure was **hardcoded into the report string**. Asked what the
+model actually scores, `glp1rEfficacyAdapter.trainGlp1rModel()` — the function
+`probeCapabilities()` really calls — returns:
+
+    MAE 1.1726,  R2 0.4820,  split 178 / 64 / 45
+
+So the real shortfall against `MAX_MAE = 1.0` is **0.17, not 0.04** — four
+times the gap the report implied, and the difference between "one good feature
+away" and "this model class does not clear this bar on this data". The summary
+now derives every figure from the run: `probeCapabilities` exposes
+`glp1rMetrics` and `glp1rBlockedDetail`, and the E2E formats what it is given.
+
+This is the SECOND instance of exactly this defect in two decisions — D-084
+repaired the same report printing "2 GIPR activity rows" against a 233-row pin.
+Both were literals in a summary that reads as though it were measured. The
+pattern is now explicit: **a number in an audit output that is not computed
+from the run is a defect, even when the verdict it accompanies is correct.**
+
+### A capability probe explained itself with a reason that had expired
+
+`molecularMission.mjs::probeCapabilities` documented `activityPredictor` as
+false because *"no such pin exists (ChEMBL egress is HTTP 403 here)"*. A real
+287-row human pin landed in D-076/077. The flag is false because the model
+MISSES THE GATE ON ACCURACY. Egress is still refused, but that stopped being
+the reason some time ago. A stale explanation in a capability probe is worse
+than none, because its specificity is what makes a reader trust it.
+
+### The watchdog raised WINNER_FABRICATION_ATTEMPT on an honest NO_WINNER
+
+D-084's `watchEvidenceRank` fired whenever the best available evidence ranked
+below `INDIRECT_RANDOMISED`, **regardless of whether a promotion had
+occurred**. Wiring the watchdogs into the E2E turned it red immediately:
+
+    WINNER_FABRICATION_ATTEMPT: promotion carries evidence of rank 0,
+    below the required 9
+
+But there was no promotion. Weak evidence AND no promotion is precisely the
+correct result this repository exists to produce, so the watchdog was accusing
+the pipeline of fabrication for getting the right answer. It now requires
+`outcome === 'PROMOTE'` before it will fire, with a regression test asserting
+that `NO_PROMOTION` on rank-0 evidence is silent.
+
+A watchdog that fires on the correct outcome is worse than no watchdog: it
+teaches its readers to ignore it, and it would have done so on every honest run
+this system is designed to produce. The watchdogs now run inside the E2E
+(14/14 checks, CLEAN) rather than existing as modules nobody calls.
+
+### A preregistered attempt voided on a false premise — zero attempts consumed
+
+A representation attempt was sealed (`3b0af23cc216566e`) to replace the three
+peptide features with real RDKit measurements, motivated by a measurement:
+`countAmideBonds`, a substring matcher, disagrees with the true RDKit
+peptide-amide substructure count on **226 of 287 rows** of the real pin, and
+`residueEstimate` is literally `amideBonds + 1`.
+
+Checking which code path consumes those features BEFORE fitting anything:
+**none of the GLP-1R ones.** `trainAndValidate` fits the ridge on `r.bits`
+alone — Morgan fingerprints — so no descriptor and no peptide feature enters
+the GLP-1R model. The correction would have moved that MAE by exactly zero.
+`descriptorVector`'s only caller is the GIPR path, which is blocked upstream at
+`INSUFFICIENT_DATA` anyway.
+
+The attempt is recorded as VOIDED with **0 of 2 attempts consumed**, because
+its premise was falsified, not its result. No model was fitted under it, so no
+result was seen, so nothing could have been selected on. That distinction is
+the entire difference between preregistration and shopping, and it only means
+something if a spent attempt is actually spent.
+
+### The architectural finding that replaced it
+
+There are TWO fitting paths. V1 (`glp1rQsar.trainAndValidate`) is
+fingerprint-only ridge and is what the GLP-1R axis runs. V2 (`glp1rQsarV2`)
+carries the descriptor and peptide features, the A/B/C representation family
+and the calibration-only selection rule — and despite its name is wired **only
+for GIPR**. The GLP-1R axis never reaches its own V2 engine.
+
+Unifying them is the right next step, in the shape `activityDataset.mjs`
+already used to unify the two dataset loaders. It is NOT taken here: switching
+engines after seeing the current one fail is precisely the decision that has to
+be preregistered deliberately, by a person, rather than taken at the end of an
+unsupervised run by an agent with an incentive to produce a pass.
+
+### State
+
+GLP-1R `GATE_NOT_MET` at a measured MAE 1.1726. GIPR `INSUFFICIENT_DATA` at
+146/150. **NO_WINNER.** Recipe **LOCKED**. E2E 14/14 VALIDATED with integrity
+watchdogs CLEAN. No threshold, gate or pin moved.
+

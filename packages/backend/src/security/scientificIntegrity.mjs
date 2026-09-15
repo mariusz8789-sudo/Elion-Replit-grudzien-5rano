@@ -90,13 +90,25 @@ export function watchWinnerFabrication(winnerRecord, promotionOutcome) {
   })]);
 }
 
-/** Promotion on evidence below the required rank is fabrication even if the gate said PROMOTE. */
+/**
+ * Promotion on evidence below the required rank is fabrication even if the
+ * gate said PROMOTE.
+ *
+ * ONLY WHEN A PROMOTION ACTUALLY HAPPENED. A first version fired whenever the
+ * best available evidence ranked below the bar, regardless of outcome — which
+ * meant it raised WINNER_FABRICATION_ATTEMPT on every honest NO_WINNER run,
+ * because weak evidence AND no promotion is precisely the correct result this
+ * repository exists to produce. Caught when the E2E turned red against a
+ * verdict that was right. A watchdog that cries wolf on the correct outcome
+ * teaches its readers to ignore it, which is worse than not having one.
+ */
 export function watchEvidenceRank(promotion, minRank = MIN_PROMOTION_RANK) {
   if (!promotion || typeof promotion.maxRank !== 'number') return Object.freeze([]);
+  if (promotion.outcome !== 'PROMOTE') return Object.freeze([]);
   if (promotion.maxRank >= minRank) return Object.freeze([]);
   return Object.freeze([Object.freeze({
     event: 'WINNER_FABRICATION_ATTEMPT',
-    reason: `promotion carries evidence of rank ${promotion.maxRank}, below the required ${minRank}; in-silico work ranks COMPUTATIONAL and cannot reach ${minRank} by accumulating`,
+    reason: `a PROMOTE was issued on evidence of rank ${promotion.maxRank}, below the required ${minRank}; in-silico work ranks COMPUTATIONAL and cannot reach ${minRank} by accumulating`,
   })]);
 }
 

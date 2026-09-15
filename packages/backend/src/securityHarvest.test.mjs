@@ -92,9 +92,16 @@ test('WATCHDOG: a WinnerRecord without a canonical PROMOTE is a fabrication atte
   assert.equal(watchWinnerFabrication({ id: 'w' }, 'NO_PROMOTION')[0].event, 'WINNER_FABRICATION_ATTEMPT');
 });
 
-test('WATCHDOG: promotion below the required evidence rank is a fabrication attempt', () => {
-  assert.deepEqual(watchEvidenceRank({ maxRank: 10 }), []);
-  assert.equal(watchEvidenceRank({ maxRank: 2 })[0].event, 'WINNER_FABRICATION_ATTEMPT');
+test('WATCHDOG: a PROMOTE below the required evidence rank is a fabrication attempt', () => {
+  assert.deepEqual(watchEvidenceRank({ outcome: 'PROMOTE', maxRank: 10 }), []);
+  assert.equal(watchEvidenceRank({ outcome: 'PROMOTE', maxRank: 2 })[0].event, 'WINNER_FABRICATION_ATTEMPT');
+});
+
+test('WATCHDOG: weak evidence WITHOUT a promotion is the correct outcome, not an alarm', () => {
+  // The first version fired here, turning the E2E red against a verdict that
+  // was right. NO_WINNER on COMPUTATIONAL-only evidence is the designed result.
+  assert.deepEqual(watchEvidenceRank({ outcome: 'NO_PROMOTION', maxRank: 2 }), []);
+  assert.deepEqual(watchEvidenceRank({ outcome: 'NO_PROMOTION', maxRank: 0 }), []);
 });
 
 test('WATCHDOG: analysis diverging from the sealed preregistration is HARKing', () => {

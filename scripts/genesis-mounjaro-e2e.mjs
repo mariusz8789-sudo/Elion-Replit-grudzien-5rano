@@ -71,8 +71,9 @@ console.log(`\nRDKit              : ${rd.available ? `LIVE ${rd.version}` : 'UNA
 const caps = probeCapabilities();
 const glp1rProbe = () => ({
   available: caps.activityPredictor === true,
-  code: caps.activityPredictor ? 'MODEL_VALIDATED' : (caps.glp1rBlockedReason?.code ?? 'BLOCKED'),
-  reasons: [caps.glp1rBlockedReason?.reason ?? caps.glp1rBlockedReason?.reasons?.[0] ?? 'GLP-1R model did not clear its frozen gate'],
+  code: caps.activityPredictor ? 'MODEL_VALIDATED' : (caps.glp1rBlockedReason ?? 'BLOCKED'),
+  reasons: [caps.glp1rBlockedDetail ?? 'GLP-1R model did not clear its frozen gate'],
+  metrics: caps.glp1rMetrics ?? null,
 });
 const glp1r = glp1rProbe();
 const gipr = probeGiprCapability();
@@ -197,18 +198,27 @@ check('winner gate used the canonical MINIMUM_OBSERVATIONS', recipeOutcome.promo
 // under. These run on EVERY E2E so a moved threshold, a swapped pin or a
 // WinnerRecord without a canonical PROMOTE surfaces here rather than in a
 // review months later.
+// D-087 — the EXPECTED digests are constants sealed when each pin was
+// ingested (D-076/077 for GLP-1R, D-081a for GIPR). A first version built both
+// the manifest AND the "loaded" map from the same readBasePinDigest call, so
+// the drift check compared a value against itself and could never fail. A
+// check that cannot fail is not a check.
+const EXPECTED_PIN_SHA = Object.freeze({
+  GLP1R: '5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244',
+  GIPR: '24bac802ce9a65a6c83bb7e4dbe4567aff97f9a5eecf99c26c369876426b87ba',
+});
 const glp1rPinDigest = readBasePinDigest(BASE_PIN_META.GLP1R);
 const giprPinDigest = readBasePinDigest(BASE_PIN_META.GIPR);
 const pinManifest = buildPinManifest([
-  pinEntry({ pinId: 'GLP1R', role: 'base', target: 'CHEMBL1784', species: 'Homo sapiens', normalizedSha256: glp1rPinDigest.sha256, rows: glp1rPinDigest.rows ?? 0 }),
-  pinEntry({ pinId: 'GIPR', role: 'base', target: 'CHEMBL4383', species: 'Homo sapiens', normalizedSha256: giprPinDigest.sha256, rows: giprPinDigest.rows ?? 0 }),
+  pinEntry({ pinId: 'GLP1R', role: 'base', target: 'CHEMBL1784', species: 'Homo sapiens', normalizedSha256: EXPECTED_PIN_SHA.GLP1R, rows: glp1rPinDigest.rows ?? 0 }),
+  pinEntry({ pinId: 'GIPR', role: 'base', target: 'CHEMBL4383', species: 'Homo sapiens', normalizedSha256: EXPECTED_PIN_SHA.GIPR, rows: giprPinDigest.rows ?? 0 }),
 ]);
 const watchdogs = runIntegrityWatchdogs({
   manifest: pinManifest,
   loadedPins: { GLP1R: glp1rPinDigest.sha256, GIPR: giprPinDigest.sha256 },
   winnerRecord: recipeOutcome.status === 'RECIPE_ISSUED' ? recipeOutcome.recipe : null,
   promotionOutcome: recipeOutcome.promotion.outcome,
-  promotion: { maxRank: Math.max(0, ...evidence.map((e) => e.rank ?? 0)) },
+  promotion: { outcome: recipeOutcome.promotion.outcome, maxRank: Math.max(0, ...evidence.map((e) => e.rank ?? 0)) },
 });
 console.log(`\nintegrity watchdogs: ${watchdogs.clean ? 'CLEAN' : 'EVENTS RAISED'}`);
 for (const ev of watchdogs.events) console.log(`  ${ev.event}: ${String(ev.reason ?? ev.pinId ?? ev.code).slice(0, 120)}`);
@@ -223,7 +233,11 @@ const finalOutcome = recipeOutcome.status === 'RECIPE_ISSUED' ? 'WINNER' : 'NO_W
 console.log(`\n=== FINAL: ${finalOutcome} ===`);
 if (finalOutcome === 'NO_WINNER') {
   console.log('WHY NO WINNER (exact, auditable):');
-  console.log(`  1. GLP-1R axis  : ${glp1r.code} — the model exists and was trained on 287 real pinned human rows, but misses its own frozen gate (MAE 1.0425 > 1.0). The threshold was NOT moved.`);
+  const m = glp1r.metrics;
+  const glp1rMeasured = m
+    ? `measured MAE ${m.mae.toFixed(4)} (R2 ${m.r2.toFixed(4)}, nTest ${m.n}) against the frozen MAX_MAE of 1.0`
+    : 'no metrics were produced';
+  console.log(`  1. GLP-1R axis  : ${glp1r.code} — the model trains on the real pinned human rows but misses its own frozen gate: ${glp1rMeasured}. The threshold was NOT moved.`);
   console.log(`  2. GIPR axis    : ${gipr.code} — tirzepatide is a DUAL agonist. ${gipr.reasons?.[0] ?? 'the GIPR axis did not clear its frozen gate'}. Scientific egress is refused by proxy policy, so more rows cannot be fetched from here.`);
   console.log('  3. Mechanism    : with either receptor axis unavailable, no candidate can be compared to tirzepatide\'s mechanism at all, so the dual-target layer produced no ranking.');
   console.log('  4. Prior art    : unreachable from this runtime — novelty is UNVERIFIABLE, never assumed.');

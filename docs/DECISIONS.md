@@ -6851,3 +6851,77 @@ GLP-1R `GATE_NOT_MET` at a measured MAE 1.1726. GIPR `INSUFFICIENT_DATA` at
 146/150. **NO_WINNER.** Recipe **LOCKED**. E2E 14/14 VALIDATED with integrity
 watchdogs CLEAN. No threshold, gate or pin moved.
 
+
+## D-088 — GLP-1R engine unification: BOTH ARMS BLOCKED, and where "1.0425" came from
+
+Human-sealed preregistration `fc6cf73e63a9e569`, executed once, replayed
+deterministically. **Outcome: `BOTH_ARMS_BLOCKED`.** DecisionRecord
+`973db9cf615bf8b2`.
+
+### The result
+
+| arm | engine | split | test MAE | test R2 | gate |
+|---|---|---|---|---|---|
+| A | V1 — Morgan-only ridge (the live axis) | 178/64/45 | **1.1726** | 0.4820 | BLOCKED |
+| B | V2 — the shared engine GIPR already uses | 178/64/45 | **1.0425** | 0.5182 | BLOCKED |
+
+Arm B's representation was chosen on CALIBRATION only — A 1.0016, B 1.0773,
+**C 0.8164** → C selected. The test split was read exactly once per arm, after
+selection was permanently closed. HARK status CLEAN. Replay MATCH.
+
+**The V2 engine is genuinely better on this dataset** — 0.13 lower MAE, higher
+R2 — **and still misses the frozen bar by 0.0425.** Being better than the
+incumbent is not the bar; the bar is the gate. Nothing was relaxed to close
+that remaining gap, and per the preregistration there is no arm C without a
+new human seal.
+
+### Where the hardcoded 1.0425 actually came from
+
+D-087 found the E2E printing "MAE 1.0425" while the live axis measured 1.1726,
+and recorded it as a hardcoded literal. This experiment shows what that literal
+really was: **1.0425 is arm B's genuine, reproducible number.** It was never
+invented. Someone ran the V2 engine, got a real measurement, and quoted it in a
+report describing the V1 axis.
+
+That is a more instructive failure than a typed-in number, and a worse one. A
+fabricated figure is caught by anyone who re-runs the pipeline. A REAL figure
+from the WRONG CODE PATH survives re-running, because it reproduces perfectly —
+it is simply an answer to a different question than the one the report was
+asking. The defect class is not "numbers get typed in", it is **"a number is
+quoted without its provenance"**, and only tying each figure to the run that
+produced it catches it.
+
+### What was built, and what was deliberately not
+
+`campaign/activityQsarV2.mjs` is now the ONE V2 engine, extracted
+behaviour-for-behaviour from `giprQsar.mjs` — which was its only caller — in the
+same shape `activityDataset.mjs` used to unify the two dataset loaders. GIPR
+rebinds to it (21/21 unchanged, including the exact `INSUFFICIENT_DATA` reason
+string); GLP-1R reaches it for the first time. Every V2 primitive `giprQsar`
+used to import directly went dead in the process, which is the evidence the
+extraction was complete rather than partial.
+
+The GLP-1R binding deliberately does NOT live in `glp1rQsar.mjs`:
+`activityQsarV2` imports `scaffoldSplit`/`metrics` from there, so a binding in
+that file would close an import cycle — the same defect refused for the agent
+composer in D-085. The experiment composes gate + pin + engine at the call
+site instead.
+
+Two guarantees are now enforced in the engine rather than trusted:
+`assertSplitIsolation` aborts on any molecule or scaffold bucket shared between
+train/calib/test, checked BEFORE any fit; and the gate's size thresholds are
+still checked before any metric exists, so a dataset too small to trust cannot
+produce a number that later gets quoted.
+
+### Why BOTH_ARMS_BLOCKED is the successful outcome
+
+The preregistration said so before the run, and it says so now for the same
+reason: the question was "does the GLP-1R axis clear its gate once it reaches
+its own V2 engine", and the answer is no. That closes a real architectural gap
+(the axis had never reached V2) AND establishes that closing it is not enough.
+The remaining deficit is data, not engineering: 287 rows, ~70% mutually similar
+GLP-1 analogue peptides, against a bar that a richer representation moved
+toward but not past.
+
+**NO_WINNER stands. Recipe LOCKED. No threshold, gate or pin moved.**
+

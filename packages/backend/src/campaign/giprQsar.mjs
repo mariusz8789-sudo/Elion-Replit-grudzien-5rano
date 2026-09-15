@@ -41,12 +41,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeActivityRows, writeActivityPin, loadActivityPin } from './activityDataset.mjs';
 import { loadValidationGate } from './validationGate.mjs';
-import {
-  descriptorVector, fitStandardization, applyStandardization, denseRidge, densePredict,
-  representationVector, selectRepresentation, conformalHalfWidth, applyFrozenGate,
-  modelFingerprintV2, scaffoldSplit, metrics,
-} from './glp1rQsarV2.mjs';
-import { fingerprintBatch, descriptorsBatch, detect as rdkitDetect } from '../compute/rdkitAdapter.mjs';
+// D-088: every V2 primitive this module used to import directly is now reached
+// through the shared engine. The imports going dead is the evidence that the
+// extraction was complete rather than partial.
+import { trainActivityModelV2 } from './activityQsarV2.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -84,84 +82,18 @@ export function loadGiprValidationGate(gatePath = GIPR_GATE_PATH, expectedRuleFi
  * trained on whatever happened to be available.
  */
 export function trainGiprModel({ pinOpts = null, gatePath = GIPR_GATE_PATH, fingerprintFn = null, batchFn = null, descriptorFn = null } = {}) {
-  const rd = rdkitDetect();
-  if (!rd.available) return { ok: false, code: 'RDKIT_UNAVAILABLE', reasons: ['RDKit is not available in this runtime; no structure can be featurised'] };
-
-  const gateResult = loadGiprValidationGate(gatePath);
-  if (!gateResult.ok) return { ok: false, code: gateResult.code, reasons: [gateResult.reason] };
-  const gate = gateResult.gate;
-
-  const pin = loadGiprPin(pinOpts ?? {});
-  if (!pin.ok) return { ok: false, code: pin.code, reasons: [pin.reason], gateFingerprint: gateResult.ruleFingerprint };
-
-  const smiles = pin.rows.map((r) => r.canonicalSmiles);
-  const fps = batchFn ? batchFn(smiles) : fingerprintBatch(smiles);
-  const descs = descriptorFn ? descriptorFn(smiles) : descriptorsBatch(smiles);
-  if (!fps?.ok || !descs?.ok) return { ok: false, code: 'FEATURISATION_FAILED', reasons: ['batch fingerprint/descriptor extraction failed for the GIPR pin'] };
-
-  const rows = [];
-  for (let i = 0; i < pin.rows.length; i += 1) {
-    const fp = fps.results[i];
-    const de = descs.results[i];
-    if (!fp?.ok || !de?.ok) continue;
-    const dv = descriptorVector(pin.rows[i].canonicalSmiles, de.data);
-    if (!dv.ok) continue;
-    rows.push({ canonicalSmiles: pin.rows[i].canonicalSmiles, scaffold: fp.scaffold, bits: fp.bits, raw: dv.vector, y: pin.rows[i].pActivity });
-  }
-
-  const { train, calib, test } = scaffoldSplit(rows);
-  // The gate is checked BEFORE any metric is computed, so a dataset too small
-  // to be trustworthy can never produce a number that later gets quoted.
-  if (train.length < gate.MIN_TRAIN || test.length < gate.MIN_TEST) {
-    return {
-      ok: false,
-      code: 'INSUFFICIENT_DATA',
-      reasons: [`nTrain=${train.length} (gate requires >= ${gate.MIN_TRAIN}), nTest=${test.length} (gate requires >= ${gate.MIN_TEST}) — the frozen gate was NOT relaxed to fit this dataset`],
-      gateFingerprint: gateResult.ruleFingerprint,
-      nUsable: rows.length,
-    };
-  }
-
-  const std = fitStandardization(train.map((r) => r.raw));
-  const stdOf = new Map(rows.map((r) => [r.canonicalSmiles, applyStandardization(r.raw, std)]));
-  const vecOf = (rep, r) => representationVector(rep, r.bits, stdOf.get(r.canonicalSmiles));
-
-  const candidates = ['A', 'B', 'C'].map((rep) => {
-    const w = denseRidge(train.map((r) => ({ x: vecOf(rep, r), y: r.y })), gate.lambda ?? 1.0);
-    const calibResiduals = calib.map((r) => Math.abs(r.y - densePredict(w, vecOf(rep, r))));
-    const calibMAE = calibResiduals.reduce((a, b) => a + b, 0) / Math.max(1, calibResiduals.length);
-    return { id: rep, calibMAE, _w: w, _calibResiduals: calibResiduals };
+  // D-088: the V2 flow this function used to inline now lives in
+  // activityQsarV2.mjs, target-agnostic, so the GLP-1R axis can reach the SAME
+  // engine instead of a copy of it. Behaviour here is unchanged — the
+  // extraction was line-for-line, and the GIPR suite asserts the same codes
+  // and the same INSUFFICIENT_DATA reason string as before.
+  return trainActivityModelV2({
+    gateResult: loadGiprValidationGate(gatePath),
+    pin: loadGiprPin(pinOpts ?? {}),
+    targetLabel: TARGET_LABEL,
+    fingerprintFn: batchFn ?? fingerprintFn,
+    descriptorFn,
   });
-
-  // Selection on calibration error only — `selectRepresentation` structurally
-  // refuses any candidate carrying a test metric, so selecting on the test
-  // split is impossible rather than merely discouraged.
-  const sel = selectRepresentation(candidates.map(({ id, calibMAE }) => ({ id, calibMAE })));
-  if (!sel.ok) return { ok: false, code: sel.code, reasons: ['representation selection refused'], gateFingerprint: gateResult.ruleFingerprint };
-  const chosen = candidates.find((c) => c.id === sel.selected.id);
-
-  const testPreds = test.map((r) => densePredict(chosen._w, vecOf(chosen.id, r)));
-  const m = metrics(testPreds, test.map((r) => r.y));
-  const conf = conformalHalfWidth(chosen._calibResiduals, gate.conformalAlpha ?? 0.1);
-  const decision = applyFrozenGate(gate, { nTrain: train.length, nTest: test.length, mae: m.mae, r2: m.r2, halfWidth: conf.ok ? conf.halfWidth : null });
-
-  const modelFingerprint = modelFingerprintV2({
-    representation: chosen.id, lambda: gate.lambda ?? 1.0,
-    standardization: { mean: std.mean, sd: std.sd, dropped: std.dropped },
-    splitPolicy: gate.splitMethod, trainingDataHash: pin.contentSha256,
-    gateFingerprint: gateResult.ruleFingerprint, rdkitVersion: rd.version, schema: chosen.id,
-  });
-
-  if (decision.status === 'BLOCKED') {
-    return { ok: false, code: 'GATE_BLOCKED', reasons: decision.reasons, metrics: m, modelFingerprint, gateFingerprint: gateResult.ruleFingerprint };
-  }
-  return {
-    ok: true, target: TARGET_LABEL, representation: chosen.id, metrics: m,
-    conformalHalfWidth: conf.ok ? conf.halfWidth : null,
-    modelFingerprint, gateFingerprint: gateResult.ruleFingerprint,
-    trainingDataHash: pin.contentSha256, nTrain: train.length, nTest: test.length,
-    predict: (bits, rawDescriptors) => densePredict(chosen._w, representationVector(chosen.id, bits, applyStandardization(rawDescriptors, std))),
-  };
 }
 
 /**

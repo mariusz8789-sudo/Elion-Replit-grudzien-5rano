@@ -1,0 +1,66 @@
+{
+  "prereg": {
+    "id": "D-088-GLP1R-ENGINE-UNIFICATION",
+    "sealedBy": "HUMAN",
+    "approvalProvenance": {
+      "how": "the repository owner pasted an explicit approval into the session: 'D-088 V1/V2 GLP1R HUMAN PREREGISTRATION IS APPROVED'",
+      "why_this_is_recorded": "the preregistration's own rule requires a human seal. The approval arrived as a chat message, not a signature, so the exact form it took is written down here rather than asserted as a signature. A reader who disagrees that this constitutes a human seal can see precisely what was relied on.",
+      "agentMayNotSelfApprove": true
+    },
+    "sealedBeforeAnyV2RunOnGLP1R": true,
+    "motivation": "ARCHITECTURAL_WIRING_GAP",
+    "motivationDetail": "Found by code inspection, NOT by the V1 result. glp1rQsarV2.mjs carries the descriptor + peptide features, the A/B/C representation family and the calibration-only selection rule, but is reached ONLY by giprQsar.mjs. The GLP-1R axis runs glp1rQsar.trainAndValidate, which fits the ridge on Morgan bits alone. The GLP-1R axis has never reached its own V2 engine. This gap exists independently of how V1 scored.",
+    "priorEvidence": {
+      "v1TestMAE": 1.1726,
+      "v1TestR2": 0.482,
+      "v1Split": {
+        "nTrain": 178,
+        "nCalib": 64,
+        "nTest": 45
+      },
+      "usedAsSelectionInput": false,
+      "note": "recorded as prior evidence for the reader. It is NOT an input to arm selection, and the selection code cannot see it."
+    },
+    "arms": {
+      "A": "V1 — Morgan-only ridge, exactly as glp1rQsar.trainAndValidate runs today. Unchanged; re-run only to report it alongside B.",
+      "B": "V2 — the SAME engine giprQsar already uses, bound to the GLP-1R pin and the GLP-1R frozen gate. Descriptors + peptide features + Morgan bits, representation family A/B/C, selection on calibration MAE only."
+    },
+    "armsAreExhaustive": "No arm C. If neither clears the gate the result is BLOCKED, and a further arm requires a NEW human-sealed preregistration.",
+    "selectionRule": {
+      "criterion": "calibration MAE only",
+      "mechanism": "selectRepresentation() structurally refuses any candidate object carrying a test metric — selecting on test is impossible, not merely forbidden",
+      "testMetricsReadOnce": "exactly once, AFTER selection is permanently closed; reported, never fed back",
+      "harkGuard": "any read of a test metric during the selection phase raises HARK_MISMATCH and ABORTS the experiment"
+    },
+    "splitIsolation": {
+      "requirement": "train, calib and test must be pairwise disjoint by canonicalSmiles AND by scaffold bucket",
+      "enforcement": "asserted at runtime before any fit; a violation ABORTS rather than warns",
+      "standardization": "fitted on TRAIN rows only; calib and test are transformed with train statistics and never contribute to them"
+    },
+    "frozenGateUntouched": {
+      "ruleFingerprint": "d2f77a7e6042f0fc",
+      "MIN_TRAIN": 150,
+      "MIN_TEST": 40,
+      "MAX_MAE": 1,
+      "MIN_R2": 0.25,
+      "statement": "NOT ONE OF THESE MOVES. This experiment changes which ENGINE the axis runs, never what it must BEAT."
+    },
+    "attemptBudget": {
+      "max": 2,
+      "consumedByThisExperiment": 1
+    },
+    "voidingRule": "if the premise is falsified before any model is fitted (e.g. the V2 path turns out not to consume what it is believed to), the attempt is VOID with 0 consumed — the D-087 precedent",
+    "predictionsBeforeRunning": {
+      "direction": "UNKNOWN. More features is not automatically better: V2 adds descriptor columns to a 178-row training set, and a richer representation on a small peptide-heavy dataset can easily overfit and score WORSE on a scaffold-held-out test.",
+      "explicitlyNotPredicted": "that arm B clears the gate",
+      "bothFailIsValid": "BOTH ARMS FAILING IS A VALID AND SUCCESSFUL SCIENTIFIC OUTCOME. It would establish that this dataset and this model class do not meet the frozen bar, which is information, not defeat."
+    },
+    "decisionRule": {
+      "outcome": "whatever applyFrozenGate returns for the selected arm stands",
+      "onFailure": "the GLP-1R axis remains BLOCKED, NO_WINNER stands, and the honest conclusion is that the axis needs more human peptide rows rather than more engines",
+      "forbidden": "re-running with a third representation, a different lambda, a different split seed, or any other knob, in search of a pass"
+    }
+  },
+  "preregFingerprint": "fc6cf73e63a9e569",
+  "sealedAt": "2026-09-15T12:15:12.538Z"
+}

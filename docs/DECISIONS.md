@@ -8666,3 +8666,166 @@ stands unedited as the record of what was true when written, and every A3
 chunk-3 check in that file is still live and still passing.
 
 **C1 CLOSED. Trial 2/2 NOT run — awaiting the owner. NO_WINNER. Recipe LOCKED.**
+
+---
+
+## D-108 — per-row custody converges A2 to 131/300; trial-interpretation and identity-key monitors built; done entirely in-house, no further Qwen delivery
+
+**Date:** 2026-09-15
+**Context:** Qwen proposed sending per-row SHA256 hashes for the five still-failing
+A2 chunks, plus two reporting modules (`trialInterpretation`,
+`identityKeyMonitor`). The account owner's direct instruction: build everything
+Qwen offered to build, but do it directly — no further round-trip to Qwen, no
+silent repair of the `Cb3cccc(` corruption, and per-row correctness must be
+demonstrable without trusting Qwen's declared hashes where none were sent.
+
+Everything below was built and verified inside this container. Qwen's message
+supplied real per-row hashes for chunks 1, 2 and a partial chunk 4 (37 rows) —
+those are used, checked, and pinned. For chunks 7 and 8, no per-row hashes were
+requested or received; those chunks were resolved instead from evidence already
+in hand: two independent transmission attempts already on disk, RDKit, and the
+D-076/077 pin.
+
+### 1. Per-row custody (`d108-per-row-custody.mjs`) — the mechanism converges
+
+A chunk-level hash over ~100 rows never lands once single-row corruption is
+non-deterministic (D-107): one bad row condemns the whole chunk and says
+nothing about which. Hashing per row converges instead — a verified row stays
+verified across every future re-transmission, so the failing set can only
+shrink.
+
+Applied to the 46 rows Qwen supplied hashes for (chunks 1, 2, chunk 4 partial):
+**37 RAW_VERIFIED, 4 FAILED, 5 NOT_DECLARED** (chunk 4's un-hashed remainder).
+The 4 still-bad rows are now named exactly, not hidden inside a chunk-wide
+FAILED: `CHEMBL4065403`, `CHEMBL4087789`, `CHEMBL4093072` (chunk 1),
+`CHEMBL414357` (chunk 2 — the same row D-107 already flagged from the
+frozen-pin cross-check).
+
+### 2. The declared channel correction — quarantined, never silently applied
+
+Qwen proposed auto-applying `Cb3cccc(` → `Cc3cccc(` before re-checking. Built
+exactly as the account owner required: the correction is one literal pair,
+declared in a named constant (`DECLARED_CHANNEL_CORRECTION`), applied to a
+COPY, never in place. A row that only verifies after correction gets its own
+status, `VERIFIED_AFTER_CHANNEL_CORRECTION`, distinct from `RAW_VERIFIED`, and
+`rawVerifiedRows()` — the only function any measurement is allowed to read —
+iterates `RAW_VERIFIED` rows exclusively. Both byte sequences (received,
+corrected) are retained for any row that goes through this path. Today: **zero**
+rows required the correction among the hashes actually supplied; the
+quarantine mechanism is proven by test but has nothing in it yet.
+
+### 3. Chunks 7 and 8 — resolved from evidence already on disk, not from Qwen
+
+No per-row hashes exist for these chunks. Instead of waiting, every row where
+the two already-received transmission attempts disagree was inspected directly:
+
+- **`CHEMBL6150767`, `CHEMBL6167903`** (chunk 8): attempt 1 is clean of the
+  known `Cb3cccc(` pattern; attempt 2 has it. One transmission is simply
+  correct — but per the same discipline as everywhere else in this campaign,
+  this is NOT promoted to custody-verified without a declared hash to check
+  against. It is recorded as evidence, not treated as a check.
+- **`CHEMBL6162510`, `CHEMBL6174707`** (chunk 8): the boron artifact appears
+  **identically in both** attempts — corrupted in both deliveries, and no
+  clean copy of either exists anywhere in this repository.
+- **`CHEMBL585195`** (chunk 7): a different, non-boron defect — a deleted
+  ~25-character run, the same signature D-107 found in `CHEMBL414357`.
+- **`CHEMBL5952331`** (chunk 7): a real structural difference (an oxetane
+  ring in one attempt, a cyclopentyl ring in the other) — not a known
+  corruption pattern at all, genuinely ambiguous between two deliveries.
+
+None of these four rows are used. Chunks 7 and 8 remain FAILED at both the
+chunk level and (absent declared hashes) the row level.
+
+### 4. Combined measurement (`d108-noise-floor-per-row.mjs`) — C1 unaffected, more solid
+
+D-105/106/107's sealed measurement (`d105-noise-floor-verified.mjs`,
+`glp1r-d105-noise-floor-verified.json`) is left **completely untouched** — a
+separate, additive script layers the 37 raw-verified rows on top of the
+chunk-level identity map (pin wins where both apply, same precedence rule as
+`usableSmiles()`).
+
+**Combined coverage: 99 (chunk-level) + 32 (new, from per-row custody, after
+dedup with the pin) = 131 of 300 A1 molecules.**
+
+| family | rows | molecules | groups | status |
+|---|---|---|---|---|
+| **CAMP** | 134 | 72 | **43** | **MEASURED** — medianSpread 1.4301, medianSd **1.0005** |
+| ARRESTIN | 66 | 42 | 13 | NOT_MEASURED |
+| CALCIUM | 78 | 67 | 3 | NOT_MEASURED |
+| OTHER | 20 | 17 | 2 | NOT_MEASURED |
+| BINDING | 2 | 2 | 0 | NOT_MEASURED |
+| INTERNALIZATION | 3 | 3 | 0 | NOT_MEASURED |
+
+CAMP: 28 groups (D-106/107) → **43**, against the sealed minimum of 20. **C1
+remains CLOSED**, now on a wider base. The medianSd is **unchanged to four
+decimal places: 1.0005**, still sitting on the frozen `MAX_MAE` of 1.0 —
+adding 32 more custody-verified structures did not move the finding from
+D-106/107 at all. Sealed artifact `glp1r-d108-noise-floor-per-row.json`, hash
+`a150f151…`.
+
+### 5. Identity-key monitor — run on the real combined set, still zero collisions
+
+`identityKeyMonitor.ts` (frontend, pure, monitor-only) and its backend runner
+`scripts/d108-identity-key-check.mjs` (real RDKit InChIKeys via
+`rdkitAdapter.descriptors`) checked the full combined usable set. Result:
+**338 structures checked in total (the full usable pool, pin included), 131 in
+the A1-scoped subset that the measurement actually uses — zero collisions in
+both.** No InChIKey spans more than one canonicalSmiles anywhere in this
+repository's current data. The identity key remains `canonicalSmiles`, per the
+same reasoning as D-107: switching to InChIKey now, with nothing forcing it,
+would itself be a methodology change made while a threshold is in view.
+Report `glp1r-d108-identity-key-report.json`, hash `155af59e…`.
+
+### 6. Trial interpretation module — a real bug in the first draft, caught by its own tests
+
+`trialInterpretation.ts` was rewritten from the proposed draft. The draft
+conflated two different questions: "is the gate threshold itself resolvable by
+the data" (a static fact about `MAX_MAE` vs the noise floor) and "is this
+specific trial result distinguishable from noise" (depends on the actual
+`testMae`). The first version of this module's own test file exposed the bug —
+a "clear pass, well below the noise floor" test failed because the module only
+ever checked the gate, never the result. Fixed: `classifyGateAgainstNoiseFloor`
+answers the first question now (usable before Trial 2/2 runs at all — and on
+the real frozen numbers, returns `AT_NOISE_FLOOR`); `interpretTrialResult`
+answers the second, checking the actual `testMae` against the floor
+independently, and only sets `requiresHumanNote` when a pass's own error is
+not clearly below the floor.
+
+Both modules remain strictly reporting: neither touches
+`glp1r-validation-gate.json`, neither calls `replicateGroups` or
+`noiseFloorStatus`, and neither has a code path that could promote a
+candidate — that stays entirely inside `orchestrator/winnerGate.ts`.
+
+### 7. Tests
+
+`d108PerRowCustody.test.mjs` (backend, 15/15), `trialInterpretation.test.ts`
+(frontend, 9/9), `identityKeyMonitor.test.ts` (frontend, 6/6, including the
+real D-107 tautomer pair as a fixture and a read of the sealed D-108 artifact,
+not a re-asserted literal). TSC clean, ESLint clean on every new file.
+
+### 8. What is still genuinely unresolved, stated plainly
+
+- **4 named rows** (`CHEMBL4065403`, `CHEMBL4087789`, `CHEMBL4093072`,
+  `CHEMBL414357`) have a declared hash and still fail it. A clean
+  retransmission of exactly these 4 rows — nothing else — would close them.
+- **Chunks 7 and 8** have no declared per-row hashes at all. The 4 disputed
+  rows identified in §3 are characterized, not resolved.
+- **169 of 300 A1 molecules** still have no custody-verified structure by any
+  mechanism in this repository.
+- None of this reopens C1. It bears on how much more of A1 could eventually
+  enter other readout families (ARRESTIN at 13 groups, CALCIUM at 3 — neither
+  near the sealed minimum of 20), not on the CAMP result already measured.
+
+### 9. Trial 2/2 — still NOT run, unchanged from D-107
+
+C1's status did not change (CLOSED before, CLOSED after — on a wider base).
+The blocking fact from D-106/107 §5 is unchanged and slightly sharper: the
+measured CAMP noise floor is now backed by 43 groups instead of 28, and still
+reads medianSd 1.0005 against MAX_MAE 1.0. D-088 remains human-sealed with
+`agentMayNotSelfApprove: true`; the owner's standing instruction not to run the
+last attempt stands. Budget 1 of 2, unconsumed. No candidate. NO_WINNER.
+Recipe LOCKED. No threshold, prereg, split, classifier, gate, or identity key
+was moved to produce any number in this entry.
+
+**C1 CLOSED (now on 131/300, CAMP 43 groups). Trial 2/2 NOT run — awaiting the
+owner. NO_WINNER. Recipe LOCKED.**

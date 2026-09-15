@@ -69,12 +69,33 @@ try {
 }
 
 const rowsIn = Array.isArray(parsed) ? parsed : (parsed.activities ?? []);
-const expectedTargetId = typeof args['target-id'] === 'string' ? args['target-id'] : null;
 
-const { rows, dropped, resolvedTargetIds, kept, seen } = normalizeGlp1rRows(rowsIn, { expectedTargetId });
+/**
+ * The target id is resolved FROM THE ARTIFACT, never from a conversation.
+ * `--target-id` overrides only if the operator states one explicitly. Either
+ * way `normalizeGlp1rRows` still enforces `target_organism === 'Homo sapiens'`
+ * per row, so a wrong id cannot smuggle a non-human row through.
+ */
+const artifactTarget = typeof parsed?.target_resolution?.resolved_target_chembl_id === 'string'
+  ? parsed.target_resolution.resolved_target_chembl_id
+  : null;
+const expectedTargetId = typeof args['target-id'] === 'string' ? args['target-id'] : artifactTarget;
+
+const datasetProvenance = {
+  sourceUrl: typeof parsed?.source === 'string' ? parsed.source : null,
+  fetchedAt: typeof parsed?.fetchedAt === 'string' ? parsed.fetchedAt : null,
+};
+
+const { rows, dropped, resolvedTargetIds, kept, seen } = normalizeGlp1rRows(rowsIn, { expectedTargetId, datasetProvenance });
 
 console.log('=== GLP-1R ACTIVITY INGESTION (D-076/077) ===');
 console.log(`source artifact : ${rawPath}`);
+console.log(`dataset source  : ${datasetProvenance.sourceUrl ?? '(none stated)'}`);
+console.log(`fetchedAt       : ${datasetProvenance.fetchedAt ?? '(none stated)'}`);
+if (parsed?.target_resolution) {
+  console.log(`target resolved : ${artifactTarget} (${parsed.target_resolution.organism ?? '?'}) — FROM THE ARTIFACT`);
+  console.log(`target rejected : ${(parsed.target_resolution.rejected ?? []).join(', ') || '(none listed)'}`);
+}
 console.log(`rows in         : ${seen}`);
 console.log(`rows kept       : ${kept}`);
 console.log(`rejected        : ${JSON.stringify(dropped)}`);

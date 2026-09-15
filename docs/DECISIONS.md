@@ -5660,3 +5660,119 @@ Backend 555 tests / 522 pass / 0 fail / 33 skipped (runtime-gated engines);
 new `glp1rQsar.test.mjs` 44/44. Frontend 6452 pass / 0 fail. tsc, eslint, build
 clean. `scripts/glp1r-e2e.mjs` runs on **real RDKit fingerprints, no stub**:
 12/12 invariants, honest BLOCKED.
+
+---
+
+## D-077a — the human GLP-1R dataset arrived, the model trained, and the frozen gate refused it
+
+D-077 sealed the gate and reported `PIN_MISSING`. A real human GLP-1R activity
+artifact has since been supplied, ingested and pinned. The seam ran end to end
+on real data for the first time. **The axis is still BLOCKED — but for a
+completely different, and much more informative, reason.**
+
+### The data
+
+Transfer verified before anything else: the supplied artifact's sha256 is
+`856cadeb82b3a34ffe5ac52fae4e446c008aa2c90eed13e78cf12c2375b00ace`, matching
+what was stated with it.
+
+Target resolved **from the artifact**, never from a conversation: the artifact's
+own `target_resolution` block names `CHEMBL1784` (*Homo sapiens*) and records
+three explicitly rejected non-human receptors — `CHEMBL5862` (*Rattus
+norvegicus*, the one D-076 was built to keep out), `CHEMBL1075290` (*Mus
+musculus*) and `CHEMBL4295545` (*Macaca fascicularis*).
+
+`normalizeGlp1rRows()` kept **287 of 287** rows with **zero** rejections on
+every counter. That is a meaningful cross-check rather than a formality: the
+artifact had already been filtered to the same standard upstream, and an
+independent re-application of the human/type/unit/range/duplicate rules agreed
+exactly. RDKit canonicalized all 287 SMILES; 214 are distinct, across 25 assays.
+
+Pin sha256 (computed from our own normalized bytes, not from the transfer
+hash): `5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244`.
+
+### Two ingestion defects the real data exposed
+
+Both were in our reader, not in the data, and neither touches a threshold:
+
+1. **ChEMBL serializes numbers as JSON strings** (`"0.055"`, not `0.055`).
+   `Number.isFinite("0.055")` is false, so all 287 rows would have been
+   rejected as `missingValue` — a real dataset refused over a wire format.
+   Fixed with `strictNumeric()`, which admits only a string that is entirely a
+   plain decimal, so `>100`, `<1`, `~5`, `5 nM`, `1-2` and `""` are all still
+   rejected. (`Number('')` is 0 and `Number(' 5 ')` is 5, so a bare coercion
+   would have silently invented values — hence the regex, not a cast.)
+2. **Provenance is carried once per artifact, not per row.** Rows inherit the
+   dataset's `sourceUrl`/`fetchedAt` when they state none. The requirement that
+   every KEPT row ends up with provenance is unchanged; an artifact that states
+   no source still satisfies it for no row.
+
+### The result
+
+| Gate condition | Frozen value | Actual | |
+|---|---|---|---|
+| `MIN_TRAIN` | 150 | **178** | pass |
+| `MIN_TEST` | 40 | **45** | pass |
+| `MIN_R2` | 0.25 | **0.4820** | pass |
+| `MAX_MAE` | 1.0 | **1.1726** | **FAIL** |
+
+nTrain/nCalib/nTest = 178/64/45 over 54 distinct training scaffolds;
+RMSE 1.4534; `trainingDataHash` `5533d8b8…`; every one of the 287 molecules
+fingerprinted by real RDKit 2026.03.6 (`unfingerprintable: 0`).
+
+**Exactly one condition failed, and it is the accuracy one.** This is not a
+"not enough data" outcome — the quantity bars were cleared. The model explains
+**48% of held-out variance on a scaffold-disjoint split**, nearly double its
+bar, so it is learning something real; its typical error is simply 1.17 log
+units (~15x in potency), above the one-log-unit line this project draws for
+calling a QSAR validated.
+
+### Why, most likely — stated as a hypothesis, not a finding
+
+**70% of the pinned rows (201/287) are peptide-like** — median 19 amide bonds,
+median SMILES length 568 characters. These are GLP-1 analogue peptides, and a
+Morgan r=2 512-bit fingerprint is a poor representation for a 30-residue
+peptide: the backbone dominates the bit vector, so very different peptides look
+nearly identical to the model. That is a plausible and testable explanation for
+the error floor, and it is **not** something more rows of the same kind would
+fix. It has not been tested here, so it is recorded as a hypothesis.
+
+### What was NOT done
+
+`MAX_MAE` was not raised. The gate's `ruleFingerprint` is still
+`d2f77a7e6042f0fc`, and a test asserts the four thresholds are still exactly
+150/40/1.0/0.25 — so a later edit to admit this model changes the fingerprint
+and fails `GATE_TAMPERED` loudly. No row was dropped to improve the metric, no
+split was re-drawn, no second model was tried and cherry-picked.
+
+`probeCapabilities().activityPredictor` is therefore still `false`, now with
+`glp1rBlockedReason: 'GATE_NOT_MET'` instead of `'PIN_MISSING'` — the axis set
+stays disjoint and **GENESIS-MOL-01 remains NO_WINNER**.
+
+### Performance, because correctness made it necessary
+
+Fingerprinting the pin spawns one RDKit process per molecule: 65 s, and
+`probeCapabilities()` is called on every mission run and every test. Training
+is now memoized per process, keyed on (pinned bytes sha256, gate fingerprint,
+engine version) — all three re-read before the cache is consulted, so drifted,
+replaced or deleted pinned data misses the cache or fails closed rather than
+being served stale. 65 s to 1 ms; changes performance only, never a result.
+
+### What would actually close this axis
+
+In order of expected value: (1) a **peptide-appropriate representation** —
+sequence descriptors or a protein language model embedding — since the
+hypothesis above says the featurization, not the sample size, is the binding
+constraint; (2) **small-molecule-only stratification**, training where Morgan
+fingerprints are the right tool and declaring the peptide subset out of domain;
+(3) more human rows beyond this artifact's first 1000-activity page. Each is a
+new D-entry, not an edit to this one.
+
+### Gate
+
+Backend 560 tests / 527 pass / 0 fail / 33 skipped; `glp1rQsar.test.mjs` 49/49
+including a real-data regression block that pins the artifact hash, the split
+sizes, the passing R2 and the failing MAE. Frontend 6452 pass / 0 fail. tsc,
+eslint, build clean. `scripts/glp1r-e2e.mjs` on real RDKit: 9/9 invariants,
+honest BLOCKED. `.env.example` documents `GENESIS_GLP1R_GATE` (the repo's own
+P0.4 guard caught it missing).

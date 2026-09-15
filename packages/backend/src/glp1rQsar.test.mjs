@@ -393,7 +393,10 @@ describe('the MODEL_ESTIMATE label survives every path', () => {
   test('in this runtime the axis is genuinely BLOCKED, and says exactly why', () => {
     const trained = trainGlp1rModel();
     assert.equal(trained.ok, false);
-    assert.equal(trained.code, 'PIN_MISSING');
+    // The real human pin IS present (D-076), so the model trains and is then
+    // refused by the frozen gate on accuracy — a different, stronger BLOCKED
+    // than the absent-data one this suite originally asserted.
+    assert.equal(trained.code, 'GATE_NOT_MET');
   });
 
   test('a BLOCKED prediction is still evidenceClass MODEL_ESTIMATE with a null value', () => {
@@ -470,7 +473,7 @@ describe('the efficacy axis and the mission stay honest', () => {
   test('probeCapabilities().activityPredictor is COMPUTED — false here, with the reason attached', () => {
     const c = probeCapabilities();
     assert.equal(c.activityPredictor, false);
-    assert.equal(c.glp1rBlockedReason, 'PIN_MISSING');
+    assert.equal(c.glp1rBlockedReason, 'GATE_NOT_MET', 'the pin exists; the model is refused on accuracy, not on absence');
     assert.equal(c.rdkit, true, 'RDKit must be live for this suite to mean anything');
   });
 
@@ -498,6 +501,73 @@ describe('the efficacy axis and the mission stay honest', () => {
     for (const line of objectiveLines) {
       assert.equal(line.includes('GLP1R'), false, 'the predicted-activity axis leaked into an objective vector');
     }
+  });
+});
+
+// =========================================================================
+describe('REAL PINNED HUMAN DATA — the D-076 artifact, end to end', () => {
+  test('the pinned artifact is human GLP-1R, hash-verified, and the rat receptor is absent from it', () => {
+    const pin = loadGlp1rPin();
+    assert.equal(pin.ok, true, pin.reason);
+    assert.equal(pin.n, 287);
+    assert.equal(pin.contentSha256, '5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244');
+    assert.ok(pin.rows.every((r) => r.targetOrganism === HUMAN_ORGANISM), 'every pinned row must be Homo sapiens');
+    assert.equal(new Set(pin.rows.map((r) => r.targetId)).size, 1, 'the pin must hold exactly one resolved target');
+    assert.equal(pin.rows[0].targetId, 'CHEMBL1784', 'the human GLP-1R target resolved from the artifact');
+    assert.ok(pin.rows.every((r) => r.targetId !== 'CHEMBL5862'), 'the RAT receptor must never appear in a human pin');
+    assert.ok(pin.rows.every((r) => Number.isFinite(r.pActivity) && r.pActivity >= 3 && r.pActivity <= 12));
+    assert.ok(pin.rows.every((r) => r.sourceUrl && r.sourceId), 'every kept row carries provenance');
+  });
+
+  test('on the real data the model TRAINS and is then REFUSED by the frozen gate on accuracy', () => {
+    const trained = trainGlp1rModel();
+    assert.equal(trained.ok, false);
+    assert.equal(trained.code, 'GATE_NOT_MET');
+    assert.equal(trained.unfingerprintable, 0, 'RDKit fingerprinted every pinned molecule');
+
+    const v = trained.validation;
+    // The QUANTITY thresholds are met — this is not a "not enough data" failure.
+    assert.ok(v.split.nTrain >= 150, `nTrain=${v.split.nTrain} should clear MIN_TRAIN`);
+    assert.ok(v.split.nTest >= 40, `nTest=${v.split.nTest} should clear MIN_TEST`);
+    // R2 clears its bar comfortably: the model is learning real signal...
+    assert.ok(v.metrics.r2 >= 0.25, `R2=${v.metrics.r2} should clear MIN_R2`);
+    // ...but its typical error exceeds one log unit, and that is the refusal.
+    assert.ok(v.metrics.mae > 1.0, `MAE=${v.metrics.mae} is the reason this is BLOCKED`);
+    assert.equal(v.reasons.length, 1, `exactly one gate condition should fail: ${v.reasons.join('; ')}`);
+    assert.match(v.reasons[0], /MAE/);
+    assert.equal(v.weights, null, 'a refused model hands out no weights');
+  });
+
+  test('the frozen thresholds are still exactly what D-077 sealed — nothing was relaxed to pass', () => {
+    const g = loadGlp1rValidationGate(GATE_PATH);
+    assert.equal(g.ok, true);
+    assert.equal(g.ruleFingerprint, 'd2f77a7e6042f0fc');
+    assert.equal(g.gate.MAX_MAE, 1.0, 'MAX_MAE must not be raised to admit the real-data model');
+    assert.equal(g.gate.MIN_R2, 0.25);
+    assert.equal(g.gate.MIN_TRAIN, 150);
+    assert.equal(g.gate.MIN_TEST, 40);
+  });
+
+  test('a refused model still produces no efficacy axis and no prediction value', () => {
+    const trained = trainGlp1rModel();
+    const pin = loadGlp1rPin();
+    const p = glp1rEfficacyPrediction(pin.rows[0].canonicalSmiles, trained);
+    assert.equal(p.status, 'BLOCKED');
+    assert.equal(p.value, null);
+    assert.equal(p.uncertainty, null);
+    assert.equal(p.evidenceClass, 'MODEL_ESTIMATE');
+    assert.equal(efficacyAxis(p).available, false);
+    assert.equal(efficacyAxis(p).code, 'EFFICACY_AXIS_UNAVAILABLE');
+  });
+
+  test('training is memoized but the memo is keyed on the pinned bytes, so drift cannot be served stale', () => {
+    const a = trainGlp1rModel();
+    const b = trainGlp1rModel();
+    assert.equal(a, b, 'same pin + same gate + same engine => memoized');
+    // A different pin path is a different key: an absent pin fails closed rather than returning the cached model.
+    const elsewhere = trainGlp1rModel({ pinOpts: { jsonPath: join(tmpdir(), 'nope.json'), metaPath: join(tmpdir(), 'nope.meta.json') } });
+    assert.equal(elsewhere.ok, false);
+    assert.equal(elsewhere.code, 'PIN_MISSING');
   });
 });
 

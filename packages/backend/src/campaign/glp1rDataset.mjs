@@ -58,20 +58,47 @@ function sha256Hex(buf) {
 }
 
 /**
+ * Accepts a number, or a string that is ENTIRELY a plain decimal number —
+ * because the real ChEMBL REST API serializes numeric fields as JSON strings
+ * ("0.055", not 0.055), and refusing them would reject real data over a wire
+ * format rather than over anything scientific.
+ *
+ * STRICT ON PURPOSE. `Number('>100')` is NaN but `Number(' 5 ')` is 5 and
+ * `Number('')` is 0, so a bare coercion would silently admit padded junk and
+ * turn an empty field into a real-looking zero. The regex admits only
+ * `-?digits[.digits][e±digits]`, so a censored value (`>100`, `<1`, `~5`), a
+ * value with a unit glued on (`5 nM`), a range (`1-2`) or an empty string all
+ * still return null and are counted as rejections.
+ *
+ * WHAT THIS CANNOT DO: this artifact carries no `standard_relation` column, so
+ * a value that was censored UPSTREAM and stored as a bare number is
+ * indistinguishable from an exact measurement here. That limit is recorded in
+ * D-077 rather than papered over.
+ */
+export function strictNumeric(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  if (!/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * Converts one (standardType, standardValue, standardUnits) triple to a
  * pActivity (-log10 of the molar concentration). Types already on a log
  * scale (P-prefixed) pass through as-is. Returns null — never a fabricated
  * number — for anything this function cannot convert unambiguously.
  */
 export function toPActivity(standardType, standardValue, standardUnits) {
-  if (!Number.isFinite(standardValue)) return null;
+  const value = strictNumeric(standardValue);
+  if (value === null) return null;
   const type = String(standardType ?? '').toUpperCase();
-  if (type.startsWith('P')) return standardValue;
+  if (type.startsWith('P')) return value;
   const unit = String(standardUnits ?? '').toUpperCase();
   const molarPerUnit = { NM: 1e-9, UM: 1e-6, 'µM': 1e-6, MM: 1e-3, M: 1 };
   const factor = molarPerUnit[unit];
   if (factor === undefined) return null;
-  const molar = standardValue * factor;
+  const molar = value * factor;
   if (!(molar > 0)) return null;
   // `+ 0` normalizes the IEEE-754 negative zero that -log10(1) produces.
   // JSON.stringify writes -0 as "0", so leaving it would make an in-memory
@@ -94,6 +121,8 @@ export function normalizeGlp1rRows(
   {
     humanOnly = true,
     expectedTargetId = null,
+    /** Provenance the whole artifact carries (`{ sourceUrl, fetchedAt }`); individual rows override it when they state their own. */
+    datasetProvenance = {},
     canonicalize = (s) => {
       const r = rdkitValidate(s);
       return r.ok ? r.canonicalSmiles : null;
@@ -125,12 +154,17 @@ export function normalizeGlp1rRows(
     const pActivity = toPActivity(type, r?.standard_value, r?.standard_units);
     if (pActivity === null) {
       // Distinguish "no numeric value at all" from "value present but units unrecognized" for an honest dropped count.
-      if (!Number.isFinite(r?.standard_value)) dropped.missingValue += 1; else dropped.badUnits += 1;
+      if (strictNumeric(r?.standard_value) === null) dropped.missingValue += 1; else dropped.badUnits += 1;
       continue;
     }
     if (pActivity < PACTIVITY_MIN || pActivity > PACTIVITY_MAX) { dropped.outOfRange += 1; continue; }
 
-    const sourceUrl = typeof r?.sourceUrl === 'string' ? r.sourceUrl : null;
+    // Provenance may be carried per row OR inherited from the dataset the rows
+    // came in (a fetched artifact normally states its source once, at the top,
+    // not on all 287 rows). Inheriting is not a relaxation: the requirement
+    // that every KEPT row ends up with a sourceUrl and a sourceId is unchanged,
+    // and a dataset that states no source cannot satisfy it for any row.
+    const sourceUrl = typeof r?.sourceUrl === 'string' ? r.sourceUrl : datasetProvenance.sourceUrl;
     const sourceId = typeof r?.sourceId === 'string' ? r.sourceId : (r?.assay_chembl_id ?? null);
     if (!sourceUrl || !sourceId) { dropped.missingProvenance += 1; continue; }
 
@@ -146,10 +180,10 @@ export function normalizeGlp1rRows(
       targetOrganism: organism,
       assayId: r?.assay_chembl_id ?? null,
       standardType: type,
-      standardValue: r.standard_value,
+      standardValue: strictNumeric(r.standard_value),
       standardUnits: r?.standard_units ?? null,
       pActivity,
-      pchemblValue: Number.isFinite(r?.pchembl_value) ? r.pchembl_value : null,
+      pchemblValue: strictNumeric(r?.pchembl_value),
       sourceId,
       sourceUrl,
       // A provenance LABEL on this row, not a new epistemic taxonomy: it says
@@ -157,7 +191,7 @@ export function normalizeGlp1rRows(
       // honest default in this runtime, where ChEMBL egress is blocked and a
       // human hands over the artifact.
       sourceKind: typeof r?.sourceKind === 'string' ? r.sourceKind : 'user-supplied-reference',
-      fetchedAt: typeof r?.fetchedAt === 'string' ? r.fetchedAt : null,
+      fetchedAt: typeof r?.fetchedAt === 'string' ? r.fetchedAt : (datasetProvenance.fetchedAt ?? null),
     }));
   }
 

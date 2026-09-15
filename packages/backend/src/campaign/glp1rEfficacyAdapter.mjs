@@ -49,6 +49,13 @@ function buildFeatures(rows, fingerprintFn) {
  * call repeatedly when the pin is absent (a single `existsSync`); the only
  * expensive path (a real ridge solve) only runs once real human data exists.
  */
+let modelCache = null;
+
+/** Test hook: drops the memoized model (mirrors `rdkitAdapter._resetDetect`). */
+export function _resetGlp1rModelCache() {
+  modelCache = null;
+}
+
 export function trainGlp1rModel({ pinOpts, gatePath, expectedGateFingerprint, fingerprintFn = rdkitFingerprint } = {}) {
   const rd = rdkitDetect();
   if (!rd.available) return { ok: false, code: 'BLOCKED_BY_RUNTIME', reason: rd.reason, trainingDataHash: null };
@@ -59,13 +66,28 @@ export function trainGlp1rModel({ pinOpts, gatePath, expectedGateFingerprint, fi
   const gateResult = loadGlp1rValidationGate(gatePath, expectedGateFingerprint);
   if (!gateResult.ok) return { ok: false, code: gateResult.code, reason: gateResult.reason, trainingDataHash: pin.contentSha256 };
 
+  /**
+   * MEMOIZED PER PROCESS. Fingerprinting the pinned set spawns one RDKit
+   * process per molecule — 65s for the 287-row human GLP-1R pin — and
+   * `probeCapabilities()` calls this on every mission run and every test.
+   *
+   * Caching is safe because the model is a PURE FUNCTION of (pinned bytes,
+   * frozen gate, engine version), and all three are in the key: the pin is
+   * re-read and re-hashed above on every call before the cache is consulted,
+   * so drifted, replaced or deleted pinned data misses the cache (or fails
+   * closed) rather than being served stale. It changes performance only,
+   * never a result.
+   */
+  const cacheKey = `${pin.contentSha256}|${gateResult.ruleFingerprint}|${rd.version}|${fingerprintFn === rdkitFingerprint ? 'rdkit' : 'injected'}`;
+  if (modelCache && modelCache.key === cacheKey) return modelCache.value;
+
   const { withFeatures, unfingerprintable } = buildFeatures(pin.rows, fingerprintFn);
   if (withFeatures.length === 0) {
     return { ok: false, code: 'NO_FINGERPRINTABLE_ROWS', reason: `all ${pin.rows.length} pinned row(s) failed RDKit fingerprinting`, trainingDataHash: pin.contentSha256 };
   }
 
   const validation = trainAndValidate(withFeatures, gateResult.gate, gateResult.ruleFingerprint, pin.contentSha256, rd.version);
-  return {
+  const result = Object.freeze({
     ok: validation.ok,
     code: validation.ok ? null : 'GATE_NOT_MET',
     reason: validation.ok ? null : validation.reasons.join('; '),
@@ -75,7 +97,9 @@ export function trainGlp1rModel({ pinOpts, gatePath, expectedGateFingerprint, fi
     rdkitVersion: rd.version,
     nPinnedRows: pin.rows.length,
     unfingerprintable,
-  };
+  });
+  modelCache = { key: cacheKey, value: result };
+  return result;
 }
 
 /**

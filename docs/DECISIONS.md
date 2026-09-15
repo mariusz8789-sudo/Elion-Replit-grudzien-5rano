@@ -8829,3 +8829,72 @@ was moved to produce any number in this entry.
 
 **C1 CLOSED (now on 131/300, CAMP 43 groups). Trial 2/2 NOT run — awaiting the
 owner. NO_WINNER. Recipe LOCKED.**
+
+## D-109 — Winner Gate / ResearchRecipe bypass audit; the D-081a header comment goes stale, fixed
+
+### 1. Stale comment, fixed (not a code change)
+
+`giprQsar.mjs`'s module header was written in D-081, before D-081a pinned the
+real 233-row GIPR artifact — it still said "no pinned human GIPR activity
+artifact in this runtime… two rows [that] cannot train anything." That went
+stale the moment D-081a landed and was never touched again (only D-088's
+behaviour-preserving extraction touched this file afterward, per `git log`).
+Rewritten to state the actual current numbers, re-verified live in this
+session with real RDKit (2026.03.6, freshly installed) rather than trusted
+from a doc: pin **233 rows / 219 distinct structures / 72 scaffolds**,
+scaffold split **nTrain=146 (need ≥150, 4 short)**, **nTest=24 (need ≥40, 16
+short)**, `probeGiprCapability()` returns `INSUFFICIENT_DATA`,
+`gateFingerprint` `e648580eeec19aab` — matching `FROZEN_GATE_FINGERPRINTS.GIPR`
+in `security/scientificIntegrity.mjs` untampered. No threshold, pin or gate
+was touched; only the comment now matches the artifact it describes.
+
+### 2. Bypass audit — every WinnerRecord/ResearchRecipe minting site traced
+
+Method: enumerated every file referencing `WinnerRecord`/`ResearchRecipe`
+across both packages, then for each minting/persistence site checked whether
+it reaches `winnerGate.ts::canPromoteToWinnerRecord` before a trusted record
+is produced. Cross-checked with a second, independent pass (a fresh
+Explore-only agent with no access to the first pass's conclusions).
+
+**Result: no live bypass.** `canPromoteToWinnerRecord` is called exactly once
+inside `orchestrator.ts::runScientificDiscovery`, gating the only call to
+`A.buildRecipe`; every domain adapter (`govLowerHarmAdapters.ts`,
+`govE2E01Adapters.ts`, `d062Ports.ts`, `mindPromotionCaller.ts`) only ever
+produces an unvetted `WinnerRecordRef` that is meaningless until it survives
+that one gate call. The molecular domain's `mounjaroResearchRecipe.ts` calls
+the same canonical gate directly (it cannot reach the orchestrator from a
+`.mjs` backend module, so it imports the real TypeScript gate instead of
+duplicating `MINIMUM_OBSERVATIONS`). `syntheticWinnerFixture.ts`
+(SYNTHETIC_TEST_ONLY, wired only through `GenesisConsole.tsx`'s explicitly
+labeled demo mode) still routes its engineered evidence through the same real
+gate — it is a shortcut around which evidence is supplied, never around the
+gate itself. No API route or DB/store module anywhere in `packages/backend`
+references a winner or recipe at all: there is currently no persistence layer
+for either, so "direct DB write" and "missing provenance on a stored record"
+are not live attack surfaces — there is nothing to write to.
+
+**One documented, non-live finding:** `core/physicsWorld/physicsRecipe.ts`
+implements its own 9-gate check (`PHYSICS_RECIPE_GATES`) against a
+locally-defined `PhysicsWinnerRecord`, rather than importing
+`winnerGate.ts`. This is an existing, deliberate per-domain pattern (its own
+header cites `govDrugDiscoveryE2E.ts::generateResearchRecipe` as the same
+convention), and — separately from that intent — the repo's own mechanical
+`moduleReachability.test.ts` (walks the real import graph from the real entry
+point) confirms it is reached by nothing but its own test suite: no screen
+constructs a `PhysicsWinnerRecord` today, so there is no live path to bypass.
+Left unchanged: rewriting a physics-domain gate to import a
+biotech-evidence-class gate would be a scientific-domain conflation, not a
+security fix, and the module is already inert.
+
+### 3. Full suites, run for real in this session
+
+Backend (`node --test src/*.test.mjs`, real RDKit installed, no other
+optional engines): **810 tests, 777 pass, 0 fail, 33 skip.** Frontend
+(`vitest run`, full suite): **558 files, 6522 tests, 6521 pass, 1 skip, 0
+fail.** Nothing was skipped to make this pass; the skips are pre-existing
+(engines this sandbox does not have installed — PySCF/OpenMM/Vina/Meeko/etc.,
+per `requirements-compute.txt`'s own "optional" framing).
+
+**OUTCOME: audit CLEAN. No Winner Gate or ResearchRecipe bypass found. One
+stale comment corrected. Zero thresholds, pins, gates or scientific rules
+touched.**

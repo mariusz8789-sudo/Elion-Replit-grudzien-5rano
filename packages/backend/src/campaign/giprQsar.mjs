@@ -23,18 +23,24 @@
  *                                takes (fingerprint bits, descriptors, y) and
  *                                returns a fitted model.
  *
- * WHAT IS HONEST ABOUT THE DATA. There is no pinned human GIPR activity
- * artifact in this runtime. The ONLY GIPR numbers anywhere in this repository
- * are two rows inside the A2 pinned candidate table (tirzepatide, 0.03 nM;
- * MK-0893, 1019 nM — `qualifyingAssayCounts.gipr` sums to 2 across all 20
- * candidates), and two rows cannot train anything: the frozen gate requires
- * MIN_TRAIN=150. Fetching more is not possible from here — the agent proxy
- * refuses CONNECT to www.ebi.ac.uk by organization policy, re-verified live
- * while writing this module. So `trainGiprModel()` returns BLOCKED with the
- * exact code and count, and `probeGiprCapability()` is COMPUTED from that
- * call rather than asserted. The day a real GIPR pin is ingested, both flip
- * without an edit to this file — exactly as the GLP-1R axis did when its
- * 287-row pin arrived in D-077a.
+ * WHAT IS HONEST ABOUT THE DATA (updated post-D-081a). A pinned human GIPR
+ * activity artifact IS in this runtime: 233 rows, 219 distinct structures,
+ * 72 distinct scaffolds, all "Homo sapiens", all resolved to CHEMBL4383,
+ * sha256-verified on every read (see `giprActivity.json` / `.meta.json`,
+ * ingested by `scripts/ingest-gipr-activity.mjs`). That is no longer the
+ * blocker. The scaffold split over those 233 rows yields nTrain=146 against
+ * MIN_TRAIN=150 (4 compounds short) and nTest=24 against MIN_TEST=40 (16
+ * compounds short), so `trainGiprModel()` returns INSUFFICIENT_DATA — an
+ * improvement over the earlier PIN_MISSING, but still not a pass. Fetching
+ * more rows is not possible from here — the agent proxy refuses CONNECT to
+ * www.ebi.ac.uk by organization policy, re-verified live at pin time. Both
+ * `trainGiprModel()`'s code and `probeGiprCapability()`'s COMPUTED result
+ * flip the moment a larger real GIPR pin is ingested, without an edit to
+ * this file — exactly as the GLP-1R axis did when its 287-row pin arrived
+ * in D-077a. The gate itself (MIN_TRAIN=150, MIN_TEST=40) has not moved and
+ * must not move to close this gap; only more real rows on new scaffolds
+ * close it (D-081a estimated roughly 156 more, since the test bucket is
+ * scaffold-assigned at ~10.3%).
  */
 
 import path from 'node:path';

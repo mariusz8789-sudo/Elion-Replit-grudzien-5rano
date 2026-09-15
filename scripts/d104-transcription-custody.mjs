@@ -1,6 +1,15 @@
 /**
- * D-104 — custody arithmetic for the A2 structure dictionary and the third
- * attempt at A3 chunk 3.
+ * D-104 — custody arithmetic for the third attempt at A3 chunk 3.
+ *
+ * SCOPE NARROWED, NOT RELAXED. This module also carried the A2 custody
+ * arithmetic when A2 stood at 1 of 8 chunks. A2 has since been delivered in
+ * full and re-transmitted once, so those figures are no longer the state of the
+ * world and `d105-a2-custody.mjs` computes them from the current bytes under a
+ * stricter rule. The A2 parts were removed from here because a later delivery
+ * changed the facts — NOT to make a failing assertion go away. The D-104
+ * decision record in docs/DECISIONS.md stands unedited as the account of what
+ * was true when it was written; nothing about A3 chunk 3 has changed, and every
+ * check for it below is still live.
  *
  * Every number here is RECOMPUTED from the pinned bytes under
  * data/transcription/. Nothing is restated from a delivery note: a declaration
@@ -12,39 +21,14 @@
  * is a custody hash rather than a scientific threshold.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const A1_DIR = join(ROOT, 'data/transcription/glp1r-a1');
-const A2_DIR = join(ROOT, 'data/transcription/glp1r-a2');
 const A3_DIR = join(ROOT, 'data/transcription/glp1r-a3');
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
-
-/** The convention under which all seven A1 chunks verified byte-exactly. */
-export const CHUNK_HASH_CONVENTION = Object.freeze({
-  content: 'data rows only, no header lines',
-  separator: 'LF',
-  trailingNewline: true,
-});
-
-/** What the supplier declared for A2. Claims, not findings. */
-export const A2_DECLARED = Object.freeze({
-  chunks: Object.freeze([
-    Object.freeze({ n: 1, rows: 18, firstKey: 'CHEMBL2108724', lastKey: 'CHEMBL4098061', sha256: '0ee287d34316b4e222982e1daa3c7be0e4aab897a09be1e763e3dee9d6b36340', delivered: true }),
-    Object.freeze({ n: 2, rows: 17, firstKey: 'CHEMBL4098545', lastKey: 'CHEMBL4533613', sha256Prefix: '73d267bd', delivered: false }),
-    Object.freeze({ n: 3, rows: 12, firstKey: 'CHEMBL4556788', lastKey: 'CHEMBL4757461', sha256Prefix: 'ab509947', delivered: false }),
-    Object.freeze({ n: 4, rows: 11, firstKey: 'CHEMBL4757600', lastKey: 'CHEMBL4787910', sha256Prefix: '58fea53f', delivered: false }),
-    Object.freeze({ n: 5, rows: 15, firstKey: 'CHEMBL4788056', lastKey: 'CHEMBL5183336', sha256Prefix: '32c6d9e6', delivered: false }),
-    Object.freeze({ n: 6, rows: 68, firstKey: 'CHEMBL5187044', lastKey: 'CHEMBL5840270', sha256Prefix: 'd27693d5', delivered: false }),
-    Object.freeze({ n: 7, rows: 106, firstKey: 'CHEMBL5844419', lastKey: 'CHEMBL6039318', sha256Prefix: '11fb6869', delivered: false }),
-    Object.freeze({ n: 8, rows: 53, firstKey: 'CHEMBL6041508', lastKey: 'CHEMBL6176273', sha256Prefix: '37946708', delivered: false }),
-  ]),
-  totalRows: 300,
-  notRetrieved: Object.freeze(['CHEMBL2108724', 'CHEMBL5314341']),
-});
 
 /** Per-piece declarations for the third A3 chunk-3 attempt. */
 export const A3_C3_DECLARED = Object.freeze({
@@ -64,78 +48,6 @@ export const A3_C3_DECLARED = Object.freeze({
   /** What attempts 1-3 all claim the chunk hashes to. */
   originalChunkSha256: 'e5bb6931568d9694a3a58eebb9aa6f6f2d904ce1166cf5688ddabc044f471e38',
 });
-
-/** Every distinct molecule_chembl_id in the byte-verified A1 chunks. */
-export function a1MoleculeIds() {
-  const ids = new Set();
-  for (const file of readdirSync(A1_DIR).filter((f) => f.endsWith('.psv'))) {
-    for (const line of readFileSync(join(A1_DIR, file), 'utf8').split('\n')) {
-      if (line.trim()) ids.add(line.split('|')[1]);
-    }
-  }
-  return ids;
-}
-
-/**
- * Check a delivered A2 chunk against its declaration AND against A1.
- *
- * The A1 cross-check is what makes a row-count discrepancy diagnosable rather
- * than merely visible: A1 is frozen and byte-verified, so the set of ids that
- * belong in a chunk's [firstKey, lastKey] range is a fact, and any id in that
- * range missing from the delivery is a transmission loss — established without
- * testing a single hypothesis against the declared hash.
- */
-export function checkA2Chunk(declared, bytes) {
-  const rows = bytes.toString('utf8').split('\n').filter((l) => l.length > 0);
-  const ids = rows.map((r) => r.split('|')[0]);
-  const a1 = a1MoleculeIds();
-  const inRange = [...a1].sort().filter((id) => id >= declared.firstKey && id <= declared.lastKey);
-  const got = new Set(ids);
-
-  return {
-    chunk: declared.n,
-    declaredRows: declared.rows,
-    receivedRows: rows.length,
-    rowCountMatch: rows.length === declared.rows,
-    firstKeyMatch: ids[0] === declared.firstKey,
-    lastKeyMatch: ids[ids.length - 1] === declared.lastKey,
-    declaredSha256: declared.sha256,
-    receivedSha256: sha256(bytes),
-    hashMatch: sha256(bytes) === declared.sha256,
-    /** A1 ids in the declared key range that the delivery does not carry. */
-    missingFromDelivery: inRange.filter((id) => !got.has(id)),
-    /** Delivered ids that are not in A1 at all — would mean a wrong source. */
-    foreignToA1: ids.filter((id) => !a1.has(id)),
-    /** Rows whose SMILES field is empty; the spec asked for `||notRetrieved`. */
-    emptySmiles: rows.filter((r) => r.split('|')[1] === '').map((r) => r.split('|')[0]),
-    withSmiles: rows.filter((r) => r.split('|')[1]).length,
-    custody: rows.length === declared.rows && sha256(bytes) === declared.sha256 ? 'VERIFIED' : 'FAILED',
-  };
-}
-
-export function checkDeliveredA2Chunk1() {
-  return checkA2Chunk(
-    A2_DECLARED.chunks[0],
-    readFileSync(join(A2_DIR, 'A2-chunk-01.received.psv')),
-  );
-}
-
-/** Rows the A2 delivery still owes, counted against A1's frozen 300. */
-export function a2Coverage() {
-  const c1 = checkDeliveredA2Chunk1();
-  const delivered = A2_DECLARED.chunks.filter((c) => c.delivered);
-  return {
-    a1Molecules: a1MoleculeIds().size,
-    declaredTotal: A2_DECLARED.totalRows,
-    declaredSum: A2_DECLARED.chunks.reduce((n, c) => n + c.rows, 0),
-    chunksDelivered: delivered.length,
-    chunksInventoryOnly: A2_DECLARED.chunks.length - delivered.length,
-    rowsDelivered: c1.receivedRows,
-    structuresDelivered: c1.withSmiles,
-    custodyVerifiedStructures: 0, // no delivered chunk passed custody
-    complete: false,
-  };
-}
 
 /**
  * Check the seven base64 pieces and the structural validity of their
@@ -188,23 +100,4 @@ export function decodeTestsRunnable() {
     blockers.push(`base64 padding appears mid-stream at offsets ${r.interiorPadding.join(', ')}`);
   }
   return { runnable: blockers.length === 0, blockers, custody: 'UNKNOWN' };
-}
-
-/**
- * C1 is gated on data volume, and A2 is the only route to that volume. This
- * states the gate; it does not adjust it.
- */
-export function c1Status() {
-  const cov = a2Coverage();
-  return {
-    status: 'NOT_CLOSED',
-    reason: 'data volume, not methodology',
-    a2Complete: cov.complete,
-    custodyVerifiedStructuresAvailable: cov.custodyVerifiedStructures,
-    structuresFrozenInRepo: 7, // D-076/077 pin
-    structuresNeeded: cov.a1Molecules,
-    thresholdsChanged: false,
-    preregChanged: false,
-    winnerGateChanged: false,
-  };
 }

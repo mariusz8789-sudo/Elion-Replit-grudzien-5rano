@@ -97,6 +97,7 @@ export function measure() {
       groups: g.groups.length,
       status: status.status,
       medianSpread: status.status === 'MEASURED' ? status.medianSpread : null,
+      medianSd: status.status === 'MEASURED' ? status.medianSd : null,
     };
   }
 
@@ -132,7 +133,7 @@ function main() {
 
   console.log(`per-family (identity = real canonicalSmiles via replicateGrouping.mjs):`);
   for (const [family, v] of Object.entries(m.perFamily)) {
-    console.log(`  ${family.padEnd(16)} rows=${String(v.rows).padStart(3)}  molecules=${String(v.molecules).padStart(3)}  groups=${String(v.groups).padStart(3)}  ${v.status}${v.medianSpread !== null ? `  medianSpread=${v.medianSpread.toFixed(4)}` : ''}`);
+    console.log(`  ${family.padEnd(16)} rows=${String(v.rows).padStart(3)}  molecules=${String(v.molecules).padStart(3)}  groups=${String(v.groups).padStart(3)}  ${v.status}${v.medianSpread !== null ? `  medianSpread=${v.medianSpread.toFixed(4)}  medianSd=${v.medianSd.toFixed(4)}` : ''}`);
   }
 
   const artifact = {

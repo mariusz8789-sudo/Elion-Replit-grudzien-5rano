@@ -1,12 +1,21 @@
 /**
- * D-104 — negative-first custody tests for the A2 delivery and the third
- * attempt at A3 chunk 3.
+ * D-104 — negative-first custody tests for the third attempt at A3 chunk 3.
  *
- * These assert FAILURE, on purpose. Two deliveries did not survive the channel,
- * and the point of pinning that in a test is that a later change which quietly
- * starts reporting them as verified — a relaxed convention, a "repair" step, a
- * decoder that tolerates mid-stream padding — breaks the suite instead of
- * sliding past review.
+ * These assert FAILURE, on purpose: the point of pinning it is that a later
+ * change which quietly starts reporting the chunk as verified — a relaxed
+ * convention, a "repair" step, a decoder that tolerates mid-stream padding —
+ * breaks the suite instead of sliding past review.
+ *
+ * SCOPE NARROWED, NOT RELAXED. This file also covered A2 when A2 stood at 1 of
+ * 8 chunks: that chunk 1 held 17 rows, that `CHEMBL4088708` was missing, that
+ * no structure was custody-verified, that C1 was NOT_CLOSED. A2 has since
+ * arrived in full and been re-transmitted, so those assertions describe a world
+ * that no longer exists; `d105A2Custody.test.mjs` asserts the current state,
+ * more strictly and over more chunks. They were removed because the facts
+ * changed, NOT because they had become inconvenient — the D-104 entry in
+ * docs/DECISIONS.md stands unedited as the record of what was true then.
+ *
+ * Nothing about A3 chunk 3 changed. Every check below is live.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,48 +25,6 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MOD = path.join(HERE, '../../../scripts/d104-transcription-custody.mjs');
 const custody = await import(MOD);
-
-test('A2 chunk 1 fails custody: neither row count nor sha256 matches the declaration', () => {
-  const r = custody.checkDeliveredA2Chunk1();
-  assert.equal(r.custody, 'FAILED');
-  assert.equal(r.rowCountMatch, false);
-  assert.equal(r.hashMatch, false);
-  assert.equal(r.declaredRows, 18);
-  assert.equal(r.receivedRows, 17);
-});
-
-test('the declared row count is vindicated by A1, so the channel lost the row', () => {
-  const r = custody.checkDeliveredA2Chunk1();
-  // A1 is frozen and byte-verified, so the ids belonging in the declared
-  // [firstKey, lastKey] range are a fact, not a hypothesis.
-  assert.deepEqual(r.missingFromDelivery, ['CHEMBL4088708']);
-  assert.equal(r.firstKeyMatch, true);
-  assert.equal(r.lastKeyMatch, true);
-});
-
-test('no delivered row is foreign to A1', () => {
-  assert.deepEqual(custody.checkDeliveredA2Chunk1().foreignToA1, []);
-});
-
-test('the structure-less row deviates from the ||notRetrieved spec and is recorded, not rewritten', () => {
-  const r = custody.checkDeliveredA2Chunk1();
-  assert.deepEqual(r.emptySmiles, ['CHEMBL2108724']);
-  assert.equal(r.withSmiles, 16);
-});
-
-test('A2 is not complete: one chunk delivered, seven declared only as inventory', () => {
-  const cov = custody.a2Coverage();
-  assert.equal(cov.complete, false);
-  assert.equal(cov.chunksDelivered, 1);
-  assert.equal(cov.chunksInventoryOnly, 7);
-  assert.equal(cov.a1Molecules, 300);
-  // The inventory's own arithmetic does check out — that much is true.
-  assert.equal(cov.declaredSum, cov.declaredTotal);
-});
-
-test('no structure is custody-verified, so none may enter a provenance-bearing measurement', () => {
-  assert.equal(custody.a2Coverage().custodyVerifiedStructures, 0);
-});
 
 test('A3 chunk 3: five of seven pieces verify, two do not', () => {
   const r = custody.checkA3Chunk3Pieces();
@@ -85,17 +52,6 @@ test('TEST 1 and TEST 2 are not runnable, and custody stays UNKNOWN', () => {
   assert.ok(d.blockers.length >= 3);
   // Not "the tests failed" — the tests have no valid input.
   assert.ok(d.blockers.some((b) => b.includes('not a multiple of 4')));
-});
-
-test('C1 stays NOT_CLOSED and no threshold, prereg or gate moved', () => {
-  const c1 = custody.c1Status();
-  assert.equal(c1.status, 'NOT_CLOSED');
-  assert.equal(c1.reason, 'data volume, not methodology');
-  assert.equal(c1.thresholdsChanged, false);
-  assert.equal(c1.preregChanged, false);
-  assert.equal(c1.winnerGateChanged, false);
-  assert.equal(c1.structuresNeeded, 300);
-  assert.equal(c1.structuresFrozenInRepo, 7);
 });
 
 test('the module exposes no repair or variant-search helper', () => {

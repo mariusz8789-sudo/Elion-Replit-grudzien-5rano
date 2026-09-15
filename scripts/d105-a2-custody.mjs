@@ -94,15 +94,44 @@ export function pinnedSmiles() {
   });
 }
 
+/**
+ * Attempts are numbered in delivery order. A chunk may be re-sent any number of
+ * times; each attempt is pinned under its own name and none is ever edited.
+ */
+export function attemptsOf(n) {
+  return readdirSync(A2_DIR)
+    .filter((f) => f.startsWith(`A2-chunk-0${n}.attempt`) && f.endsWith('.psv'))
+    .sort()
+    .map((f) => {
+      const bytes = readFileSync(join(A2_DIR, f));
+      return { file: f, bytes, rows: bytes.toString('utf8').split('\n').filter((l) => l.length > 0) };
+    });
+}
+
+/**
+ * Which attempt counts, if any. The rule is the hash and nothing else: an
+ * attempt is adopted iff its bytes hash to the declared value. When no attempt
+ * matches, NONE is adopted — picking the one that "looks better" (longer rows,
+ * more parseable structures) would be choosing a result rather than verifying
+ * one, and two attempts can disagree in both directions on the same row.
+ */
+function adoptedAttempt(declared) {
+  return attemptsOf(declared.n).find((a) => sha256(a.bytes) === declared.sha256) ?? null;
+}
+
 function readChunk(n) {
-  const bytes = readFileSync(join(A2_DIR, `A2-chunk-0${n}.received.psv`));
-  const rows = bytes.toString('utf8').split('\n').filter((l) => l.length > 0);
-  return { bytes, rows };
+  const declared = A2_DECLARED.find((d) => d.n === n);
+  const adopted = adoptedAttempt(declared);
+  if (adopted) return adopted;
+  const attempts = attemptsOf(n);
+  return attempts[attempts.length - 1]; // latest, for damage reporting only
 }
 
 /** Per-chunk custody: hash, declared shape, and what A1 says belongs here. */
 export function checkChunk(declared) {
-  const { bytes, rows } = readChunk(declared.n);
+  const attempts = attemptsOf(declared.n);
+  const adopted = adoptedAttempt(declared);
+  const { bytes, rows } = adopted ?? attempts[attempts.length - 1];
   const ids = rows.map((r) => r.split('|')[0]);
   const sorted = [...a1MoleculeIds()].sort()
     .filter((id) => id >= declared.firstKey && id <= declared.lastKey);
@@ -111,6 +140,11 @@ export function checkChunk(declared) {
 
   return {
     chunk: declared.n,
+    attempts: attempts.length,
+    /** Distinct byte-sequences seen across attempts. Two identical attempts
+     *  mean the channel's corruption is reproducible, not random noise. */
+    distinctAttemptBytes: new Set(attempts.map((a) => sha256(a.bytes))).size,
+    adoptedAttempt: adopted ? adopted.file : null,
     declaredRows: declared.rows,
     receivedRows: rows.length,
     rowCountMatch: rows.length === declared.rows,
@@ -248,4 +282,100 @@ export function usableSmiles() {
   const map = new Map(verifiedSmiles());
   for (const [id, smiles] of pinnedSmiles()) map.set(id, smiles);
   return map;
+}
+
+/**
+ * Where two transmissions of the same chunk disagree — and in which direction.
+ *
+ * This is the sharpest evidence available about the channel, because it needs
+ * no external ground truth at all. Two cases, and they mean opposite things:
+ *
+ *   - IDENTICAL attempts that still miss the declared hash: the corruption is
+ *     REPRODUCIBLE. Re-sending will not fix it (cf. A3 chunk 3, D-101).
+ *   - DIFFERING attempts, with row lengths moving in BOTH directions: neither
+ *     transmission is the source. For those rows the true value is unknown, and
+ *     preferring the longer or the parseable one would be guessing.
+ */
+export function attemptDisagreements() {
+  const out = [];
+  for (const d of A2_DECLARED) {
+    const attempts = attemptsOf(d.n);
+    if (attempts.length < 2) continue;
+    const [a, b] = [attempts[0], attempts[attempts.length - 1]];
+    if (sha256(a.bytes) === sha256(b.bytes)) {
+      out.push({ chunk: d.n, verdict: 'IDENTICAL_ACROSS_ATTEMPTS', rows: [] });
+      continue;
+    }
+    const rows = [];
+    const byId = (list) => new Map(list.map((r) => [r.split('|')[0], r]));
+    const [ma, mb] = [byId(a.rows), byId(b.rows)];
+    for (const id of new Set([...ma.keys(), ...mb.keys()])) {
+      const ra = ma.get(id);
+      const rb = mb.get(id);
+      if (ra === rb) continue;
+      rows.push({
+        id,
+        attempt1Length: ra === undefined ? null : ra.length - id.length - 1,
+        attempt2Length: rb === undefined ? null : rb.length - id.length - 1,
+      });
+    }
+    rows.sort((x, y) => (x.id < y.id ? -1 : 1));
+    const longer = rows.filter((r) => r.attempt2Length > r.attempt1Length).length;
+    const shorter = rows.filter((r) => r.attempt2Length < r.attempt1Length).length;
+    out.push({
+      chunk: d.n,
+      verdict: 'DIFFERING_ATTEMPTS',
+      rows,
+      attempt2Longer: longer,
+      attempt2Shorter: shorter,
+      /** Both directions ⇒ neither attempt can be the source. */
+      disagreesInBothDirections: longer > 0 && shorter > 0,
+    });
+  }
+  return out;
+}
+
+/**
+ * A channel signature worth naming: lowercase `b` is AROMATIC BORON in SMILES,
+ * and it is vanishingly rare in drug-like ChEMBL space. Every occurrence in this
+ * delivery sits in the identical local context `Cb3cccc(`, where the source
+ * plainly reads `Cc3cccc(` — a one-character `c` → `b` substitution that turns
+ * an aromatic carbon into boron.
+ *
+ * Reported, never repaired. Two reasons, and the second is the load-bearing one:
+ *
+ *   1. Editing delivered bytes ends custody, whatever the edit's merit.
+ *   2. It would not be sufficient anyway. Chunk 7 carries ZERO boron artifacts
+ *      and still misses its declared hash, so `c`→`b` is demonstrably not the
+ *      only thing this channel does. Patching the damage that happens to be
+ *      visible would leave the invisible damage in place while making the data
+ *      look repaired — strictly worse than leaving it plainly broken.
+ */
+export function aromaticBoronArtifacts() {
+  const hits = [];
+  for (const d of A2_DECLARED) {
+    for (const attempt of attemptsOf(d.n)) {
+      for (const row of attempt.rows) {
+        const i = row.indexOf('|');
+        const smiles = row.slice(i + 1);
+        if (!/b/.test(smiles)) continue;
+        hits.push({
+          chunk: d.n,
+          file: attempt.file,
+          id: row.slice(0, i),
+          context: (smiles.match(/.{0,6}b.{0,6}/) ?? [''])[0],
+        });
+      }
+    }
+  }
+  return {
+    hits,
+    count: hits.length,
+    contexts: [...new Set(hits.map((h) => h.context))],
+    /** A failed chunk with no boron at all proves this is not the only defect. */
+    failedChunksWithNoBoronArtifact: A2_DECLARED
+      .filter((d) => !hits.some((h) => h.chunk === d.n))
+      .map((d) => d.n)
+      .filter((n) => checkAllChunks().find((c) => c.chunk === n).custody !== 'VERIFIED'),
+  };
 }

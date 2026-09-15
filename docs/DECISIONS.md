@@ -8455,3 +8455,214 @@ export nothing matching repair/reconstruct/strip/variants.
 
 **NO_WINNER. Recipe LOCKED. C1 NOT_CLOSED at 16/20. Nothing was moved to make
 any of those read differently.**
+
+---
+
+## D-106 — C1 CLOSED on CAMP (28 groups ≥ 20); the measured noise floor lands on MAX_MAE; Trial 2/2 NOT run
+
+**Date:** 2026-09-15
+**Context:** Chunks 1-4 of A2 were re-transmitted. Same instruction as D-105:
+verify byte-wise, use only verified `canonicalSmiles`, run `replicateGrouping.mjs`,
+determine C1, and only if C1 closes properly proceed to authorization of Trial 2/2.
+
+### 1. Re-transmission: chunk 3 verifies; 1, 2, 4 still do not
+
+Every attempt is pinned under its own name and none is edited. A chunk is adopted
+**iff its bytes hash to the declared value**. Result: **chunks 3, 5, 6 VERIFIED;
+1, 2, 4, 7, 8 FAILED.** All 300 declared rows have now arrived — `CHEMBL4088708`
+included — but chunk 1 still fails, so that row is delivered, not verified.
+
+### 2. What comparing two transmissions proved — no external ground truth needed
+
+- **Chunk 2 returned byte-identical** and still misses its hash: the corruption
+  is **reproducible**, not random. Re-sending will not fix it. Same signature as
+  A3 chunk 3 (D-101).
+- **Chunk 4 disagrees with itself in both directions** — two rows shorter in
+  attempt 2, two longer. Neither transmission is the source; those rows are
+  unknown.
+- **Chunk 3's VERIFIED attempt is the SHORTER one.** `CHEMBL4753375`: 938 chars
+  in attempt 2 against 951 in attempt 1, and attempt 2 is what hashes correctly.
+  So "prefer the longer string" is not merely an unprincipled repair heuristic —
+  **on this data it is wrong.** Adoption by hash is the only rule that survives
+  the evidence, and this is now pinned in a test.
+- **Chunk 1 carries an equal-length divergence.** `CHEMBL3616718`, 572 chars in
+  both attempts, differs in a 6-character window: `Cc1c[nH]cn1` vs
+  `Cc1cnc[nH]1` — the histidine imidazole N-H on the other ring nitrogen. Both
+  parse; identical formula C152H230N42O47; **identical InChIKey**
+  `LQBSSRMCYDZQLJ-WDOXRSBNSA-N`; different RDKit canonical SMILES.
+
+### 3. An identity-key question, measured and deliberately NOT acted on
+
+`replicateGroups()` keys on the canonical SMILES **string**, so two rows for one
+compound written with different histidine tautomers would fall into different
+groups — the same group-splitting bias that disqualified `molecule_chembl_id`.
+
+Measured across the 306 usable structures: **306 distinct canonical SMILES, 306
+distinct InChIKeys, zero InChIKeys spanning more than one canonical SMILES.** The
+current measurement is unaffected.
+
+The identity key was **not changed**. Swapping to InChIKey would alter sealed
+methodology in the direction of *more* groups — precisely the change that must
+not be made while a threshold is in view. Recorded as an open question requiring
+a human seal, exactly as the D-100 points were.
+
+### 4. C1 — CLOSED
+
+99 of A1's 300 molecules now carry a custody-verified structure (94 from verified
+chunks + 7 from the frozen pin, 2 overlapping). Same prereg `f475467a12dff413`,
+same `REPLICATE_RULE`, same classifier, same exclusions. 205 rows measured:
+
+| family | rows | molecules | groups | status |
+|---|---|---|---|---|
+| **CAMP** | 82 | 41 | **28** | **MEASURED** |
+| ARRESTIN | 35 | 24 | 7 | NOT_MEASURED |
+| OTHER | 19 | 16 | 2 | NOT_MEASURED |
+| CALCIUM | 67 | 65 | 1 | NOT_MEASURED |
+| INTERNALIZATION | 1 | 1 | 0 | NOT_MEASURED |
+| BINDING | 1 | 1 | 0 | NOT_MEASURED |
+
+CAMP: 5 groups (D-103) → 16 (D-105 first delivery) → **28** against a sealed
+minimum of 20. **C1 is CLOSED**, on CAMP alone, reached by adding data — no
+threshold, prereg, split, classifier or gate was touched at any point.
+
+Sealed artifact `glp1r-d105-noise-floor-verified.json`, hash `7595bba1…`.
+
+### 5. The number itself: **medianSd 1.0005 against MAX_MAE 1.0**
+
+The CAMP noise floor is medianSpread **1.4949**, medianSd **1.0005** pActivity
+units.
+
+The frozen gate's rationale defines MAX_MAE 1.0 as "the outer bound of a QSAR
+estimate this project will call 'validated' rather than 'noise'". Sealed a priori,
+before any GLP-1R data was pulled. Measured now against real replicates, the
+endpoint's own noise is **1.0005** — the a-priori boundary and the empirical floor
+agree to within 0.0005.
+
+Consequence, stated plainly: **a model that just clears MAX_MAE is predicting CAMP
+EC50 about as precisely as two independent assays measure the same compound.**
+Such a result would sit at the limit of what this data can distinguish.
+
+This is a finding about the data, not a reason to move anything. It is recorded
+because it makes a future passing result *harder* to interpret, not easier, and
+because the last remaining attempt should not be spent without it on the table.
+
+### 6. Trial 2/2 — precondition met, authorization NOT given, NOT run
+
+C1 closing satisfies the precondition. It does not supply the authorization.
+
+- D-088 is **HUMAN-sealed** and carries `agentMayNotSelfApprove: true`. Arm B is
+  the final arm; `armsAreExhaustive` states that if neither arm clears the gate
+  the result is BLOCKED and any further arm needs a NEW human-sealed prereg.
+- The account owner's standing instruction in this session is explicit:
+  **"Nie uruchamiaj ostatniej próby D-088."**
+- The instruction that followed said to proceed "do **autoryzacji** próby 2/2" —
+  to authorization, which is the owner's act, not the agent's.
+
+So Trial 2/2 is **NOT run**. Budget remains 1 of 2, unconsumed. What is now true
+that was not before: the precondition is satisfied, and §5 is the material fact
+the owner should weigh before spending the last attempt.
+
+### 7. Candidate, Winner, Recipe
+
+No trial was run, so no candidate was generated, and none is reported. **NO_WINNER.
+Recipe LOCKED** (`canPromoteToWinnerRecord` → `NO_PROMOTION`;
+`buildMounjaroResearchRecipe` → `RECIPE_LOCKED`).
+
+`MIN_TRAIN 150 / MIN_TEST 40 / MAX_MAE 1.0 / MIN_R2 0.25`, `ruleFingerprint
+d2f77a7e6042f0fc`, the D-102 prereg, `REPLICATE_RULE`, the scaffold split, the
+ingest policy and the Winner Gate are untouched.
+
+### 8. Tests
+
+`d105A2Custody.test.mjs` (20/20). Load-bearing: adoption is by hash and a failed
+chunk adopts nothing; chunk 2's identical-across-attempts corruption; chunk 4's
+both-directions disagreement; **chunk 3's verified attempt being the shorter one**;
+`CHEMBL4088708` arrived but is asserted NOT usable; CAMP pinned at 28 groups and
+MEASURED; C1 pinned CLOSED on CAMP alone; and the noise floor asserted `>= MAX_MAE`
+read live from the frozen gate file, so neither number can drift unnoticed.
+
+**C1 CLOSED. Trial 2/2 NOT run — awaiting the owner's authorization. NO_WINNER.
+Recipe LOCKED. Nothing was moved to reach any of this.**
+
+---
+
+## D-107 — chunks 1,2,4,7,8 re-transmitted again and still fail; the channel signature identified as `c`→`b`; C1 stays CLOSED
+
+**Date:** 2026-09-15
+**Context:** Chunks 7 and 8 were re-sent, completing a second pass over every
+chunk that had failed. The delivery note claimed all six re-sent chunks carried
+hashes "zgodne z deklarowanymi".
+
+### 1. That claim does not hold
+
+Recomputed from the received bytes: **chunk 3 matches. Chunks 1, 2, 4, 7 and 8
+do not.** Recorded as claimed and as measured, with neither adjusted. Custody is
+unchanged: **VERIFIED 3, 5, 6; FAILED 1, 2, 4, 7, 8.** 300 rows delivered, 99 of
+A1's 300 molecules with a custody-verified structure.
+
+### 2. Chunk 8 got worse, and the signature is now identified
+
+Lowercase `b` is **aromatic boron** in SMILES — vanishingly rare in drug-like
+ChEMBL space. Every occurrence across this entire delivery sits in the identical
+context **`Cb3cccc(`**, where the source reads `Cc3cccc(`: a one-character `c`→`b`
+substitution turning an aromatic carbon into boron.
+
+Chunk 8 attempt 1 carried two such rows. Attempt 2 carries **four** — the same
+two plus `CHEMBL6150767` and `CHEMBL6167903`. **Re-sending damaged rows that had
+previously arrived intact.**
+
+### 3. Why the signature is reported and not repaired
+
+Two reasons; the second is load-bearing:
+
+1. Editing delivered bytes ends custody, whatever the edit's merit.
+2. **It would not be sufficient.** Chunk 7 contains **zero** boron artifacts and
+   still misses its declared hash. So `c`→`b` is demonstrably not the only thing
+   this channel does. Patching the damage that happens to be visible would leave
+   the invisible damage in place while making the data *look* repaired — strictly
+   worse than leaving it plainly broken.
+
+Actionable for whoever re-sends: grep the source for `Cb3cccc(`; it should read
+`Cc3cccc(`. That fixes chunk 8's visible damage and nothing else.
+
+### 4. What five transmissions have established about this channel
+
+Each of these needed no external ground truth — only two copies of the same chunk:
+
+- **deterministic corruption** (chunk 2: byte-identical across attempts, still wrong)
+- **non-deterministic corruption** (chunk 4: disagrees with itself in both directions)
+- **regression on re-send** (chunk 8: two corrupted rows became four)
+- **corruption that still parses** (`CHEMBL414357`: a deleted 28-char run, valid molecule)
+- **equal-length corruption** (`CHEMBL3616718`: histidine tautomer, same length, same InChIKey)
+- **"longer is truer" is false** (chunk 3's VERIFIED attempt is the shorter one)
+
+The only rule that survives all six is the one in force: **adopt a chunk iff its
+bytes hash to the declared value.**
+
+### 5. C1, Trial 2/2, Winner, Recipe — unchanged from D-106
+
+**C1 CLOSED** on CAMP: 82 rows, 41 molecules, **28 groups** against a sealed
+minimum of 20; medianSpread 1.4949, medianSd **1.0005** against the frozen
+MAX_MAE of **1.0**. Two further re-transmissions did not move this, because none
+of them verified.
+
+**Trial 2/2: NOT run.** The precondition is met; the authorization is not. D-088
+is human-sealed with `agentMayNotSelfApprove: true`, and the owner's standing
+instruction is "Nie uruchamiaj ostatniej próby D-088." Budget 1 of 2, unconsumed.
+
+**No candidate. NO_WINNER. Recipe LOCKED.** No threshold, prereg, split, gate or
+identity key moved.
+
+### 6. D-104's A2 assertions superseded — scope narrowed, not relaxed
+
+`d104-transcription-custody.mjs` and its test also carried the A2 arithmetic from
+when A2 stood at 1 of 8 chunks: 17 rows, `CHEMBL4088708` missing, zero verified
+structures, C1 NOT_CLOSED. A2 has since arrived in full and been re-transmitted
+twice, so those assertions describe a world that no longer exists, and
+`d105A2Custody.test.mjs` now asserts the current state over more chunks and more
+strictly. The A2 parts were removed from D-104's module and test **because the
+facts changed, not because they had become inconvenient**; the D-104 entry above
+stands unedited as the record of what was true when written, and every A3
+chunk-3 check in that file is still live and still passing.
+
+**C1 CLOSED. Trial 2/2 NOT run — awaiting the owner. NO_WINNER. Recipe LOCKED.**

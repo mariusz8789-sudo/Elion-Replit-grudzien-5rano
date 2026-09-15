@@ -8337,3 +8337,121 @@ verified breaks the suite rather than sliding past review.
 
 **NO_WINNER. Recipe LOCKED. C1 NOT_CLOSED. Nothing was moved to make any of
 those read differently.**
+
+---
+
+## D-105 — A2 arrives 8/8: 2 chunks verify, 6 fail, and one failure is silently chemistry-valid; C1 NOT_CLOSED at 16/20 groups
+
+**Date:** 2026-09-15
+**Context:** The full A2 structure dictionary was delivered. Instruction: verify
+all 8 chunks byte-wise against declared SHA256, check completeness against A1 and
+the two `notRetrieved` molecules, join A1 + A2, use **only verified**
+`canonicalSmiles`, run `replicateGrouping.mjs`, compute the final noise floor,
+determine C1. No `molecule_chembl_id` substitute, no guessing the 2 missing
+structures, no change to thresholds, prereg, split or Winner Gate, no Trial 2/2
+until C1 closes properly.
+
+### 1. A2 custody — 2 of 8 verified
+
+299 rows received against a declared 300. Every chunk is correctly sorted,
+carries its declared first and last key, and contains no id foreign to A1. Under
+the convention that verified all seven A1 chunks byte-exactly (rows only, LF, one
+trailing LF), **chunks 5 and 6 match; chunks 1, 2, 3, 4, 7 and 8 do not.**
+
+Chunks 5 and 6 matching under exactly that convention is the control: it proves
+the reading convention is right, so the other six mismatches are the delivery's.
+
+Chunk 1 is also one row short. The declared count is **correct** — A1 holds 300
+distinct molecule ids, exactly 18 sort into the declared key range, and exactly
+one, **`CHEMBL4088708`**, is absent. Established from frozen data, not by testing
+hypotheses against the declared hash. Its structure was not reconstructed.
+
+### 2. The failure mode is silent, and that decides everything downstream
+
+Three checks over all 299 rows:
+
+- **RDKit rejects 4 structures** (`CHEMBL4079909`, `CHEMBL4753375`,
+  `CHEMBL6162510`, `CHEMBL6174707`). All four sit in chunks that already failed
+  on hash. Two carry `Cb3cccc` — a boron atom where a carbon belongs.
+- **6 of 7 structures cross-checked against the frozen D-076/077 pin are
+  byte-identical.** The delivery is genuine ChEMBL data, not invention. Said
+  plainly, because it is true and it matters.
+- **The 7th is corrupted invisibly.** `CHEMBL414357` (chunk 2) is 672 chars
+  against the pin's 700. Common prefix 359, common suffix 313, and between them
+  a contiguous run — `H](CCC(=O)O)NC(=O)CNC(=O)[C@` — is **absent**, with
+  nothing put in its place. **The shortened string still parses as a valid
+  molecule.**
+
+So this channel can delete characters from a SMILES and leave a chemically valid
+but structurally *different* molecule, which would then enter a replicate group
+it does not belong to, with nothing anywhere raising an error. **"It parses" is
+not weak custody; it is no custody.** A chunk whose hash does not match is
+unknown in full, and no spot-check can rescue part of it. The six failed chunks
+are excluded entirely — 283 rows, of which 293-across-the-delivery parse cleanly
+and are nonetheless unusable.
+
+That corruption was caught only because the pin happened to contain that one
+molecule. How many more sit in the failed chunks is unknown and unknowable from
+inside this container.
+
+### 3. Verified structures
+
+- 82 from byte-verified chunks 5 and 6
+- 7 from the frozen D-076/077 pin (2 overlap)
+- **87 of A1's 300 molecules** carry a custody-verified structure; **213 do not**
+
+`notRetrieved`: `CHEMBL2108724`, `CHEMBL5314341` — both delivered with an empty
+field rather than the specified `||notRetrieved`. Recorded, not rewritten.
+
+### 4. Final noise floor — real structure identity, 87 molecules
+
+Same prereg (`f475467a12dff413`), same `REPLICATE_RULE`, same readout classifier,
+same exclusions. Only the SMILES source grew. 386 rows excluded for no verified
+structure, 190 for unverified assay label (D-101), **181 rows measured**:
+
+| family | rows | molecules | groups | status |
+|---|---|---|---|---|
+| CAMP | 58 | 29 | **16** | NOT_MEASURED |
+| ARRESTIN | 35 | 24 | 7 | NOT_MEASURED |
+| OTHER | 19 | 16 | 2 | NOT_MEASURED |
+| CALCIUM | 67 | 65 | 1 | NOT_MEASURED |
+| INTERNALIZATION | 1 | 1 | 0 | NOT_MEASURED |
+| BINDING | 1 | 1 | 0 | NOT_MEASURED |
+
+Sealed artifact `glp1r-d105-noise-floor-verified.json`, hash `f29109c8…`.
+
+### 5. C1 — NOT_CLOSED at 16 of 20
+
+CAMP moved from 5 groups (D-103) to **16**. The sealed minimum is **20**.
+
+16 < 20. **C1 is NOT_CLOSED.** The threshold is not moved, and 16 is not
+described as "effectively 20". This is the exact situation the standing rule was
+written for: a result close enough to make relaxing the gate tempting, and
+therefore the one place where the gate must hold. The blocker remains data
+volume, not methodology — and it is now near enough that a clean re-transmission
+of the six failed chunks would plausibly settle it.
+
+### 6. Trial 2/2, candidate, Winner, Recipe
+
+C1 open ⇒ the ordering in the instruction blocks everything downstream.
+**Trial 2/2 not authorized; budget 1 of 2, unconsumed. No candidate generated, so
+none is reported. NO_WINNER. Recipe LOCKED** (`canPromoteToWinnerRecord` returns
+`NO_PROMOTION`; `buildMounjaroResearchRecipe` returns `RECIPE_LOCKED`).
+
+`MIN_TRAIN 150 / MIN_TEST 40 / MAX_MAE 1.0 / MIN_R2 0.25`, `ruleFingerprint
+d2f77a7e6042f0fc`, `REPLICATE_RULE`, the scaffold split, the ingest policy and
+the Winner Gate are untouched.
+
+### 7. Tests
+
+`d105A2Custody.test.mjs` (15/15). The load-bearing ones: chunks 5 and 6 verify
+and 1/2/3/4/7/8 do not; `CHEMBL4088708` is named as the lost row and is NOT in
+the usable map; the `CHEMBL414357` deletion is pinned exactly, **including
+`deliveredStillParses === true`**, so no later change can quietly adopt
+parse-success as a custody substitute; every structure from a failed chunk is
+asserted absent from `verifiedSmiles()`; CAMP is pinned at 16 groups AND at
+`NOT_MEASURED`, with an explicit `groups < 20`; the custody module is asserted to
+export nothing matching repair/reconstruct/strip/variants.
+
+**NO_WINNER. Recipe LOCKED. C1 NOT_CLOSED at 16/20. Nothing was moved to make
+any of those read differently.**

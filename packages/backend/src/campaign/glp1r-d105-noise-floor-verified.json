@@ -1,0 +1,86 @@
+{
+  "id": "D-105-NOISE-FLOOR-VERIFIED",
+  "kind": "SEALED_MEASUREMENT",
+  "supersedes": "D-103-NOISE-FLOOR-FINAL (coverage only; methodology unchanged)",
+  "identityKey": "canonicalSmiles (real, via replicateGrouping.mjs — no substitute)",
+  "prereg": {
+    "id": "D-102-READOUT-FAMILY-PREREG",
+    "fingerprint": "f475467a12dff413"
+  },
+  "a2Status": "8/8 chunks delivered; 2/8 byte-verified (chunks 5, 6); chunks 1, 2, 3, 4, 7, 8 failed custody and are excluded in full",
+  "coverage": {
+    "a1Molecules": 300,
+    "chunksVerified": [
+      5,
+      6
+    ],
+    "chunksFailed": [
+      1,
+      2,
+      3,
+      4,
+      7,
+      8
+    ],
+    "rowsDelivered": 299,
+    "declaredTotalRows": 300,
+    "structuresFromVerifiedChunks": 82,
+    "structuresFromFrozenPin": 7,
+    "countedInBothSources": 2,
+    "custodyVerifiedStructures": 87,
+    "moleculesStillWithoutVerifiedStructure": 213,
+    "complete": false
+  },
+  "rowsExcludedNoVerifiedSmiles": 386,
+  "rowsExcludedUnverifiedLabel": 190,
+  "rowsInMeasurement": 181,
+  "perFamily": {
+    "OTHER": {
+      "rows": 19,
+      "molecules": 16,
+      "groups": 2,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "CAMP": {
+      "rows": 58,
+      "molecules": 29,
+      "groups": 16,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "ARRESTIN": {
+      "rows": 35,
+      "molecules": 24,
+      "groups": 7,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "CALCIUM": {
+      "rows": 67,
+      "molecules": 65,
+      "groups": 1,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "INTERNALIZATION": {
+      "rows": 1,
+      "molecules": 1,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "BINDING": {
+      "rows": 1,
+      "molecules": 1,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    }
+  },
+  "minGroupsForNoiseFloor": 20,
+  "c1Status": "NOT_CLOSED",
+  "c1Reason": "no readout family reached 20 groups under real structure identity — data volume, not methodology (87/300 molecules carry a custody-verified structure)",
+  "computedAt": "2026-09-15T20:51:28.233Z",
+  "artifactHash": "f29109c87d173c1acb2a9ffb89c1a6fd07a3795f99a4bcb6fb19dbc9481fab7a"
+}

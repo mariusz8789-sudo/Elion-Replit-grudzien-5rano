@@ -5877,3 +5877,103 @@ Backend 564 tests / 531 pass / 0 fail / 33 skipped; glp1rQsar 53/53 including
 four new batch-equivalence tests. tsc, eslint clean. `glp1r-e2e.mjs` on real
 RDKit: 9/9 invariants, unchanged BLOCKED. D-057, D-069, the frozen gate and
 every scientific threshold untouched.
+
+---
+
+## D-079 — the D-077a hypothesis, tested: featurization was part of it, but not all of it
+
+D-077a said, explicitly as a hypothesis and not a finding, that MAE 1.1726 was
+held up by the FEATURISATION (70% of the pin is GLP-1 analogue peptides, which
+Morgan r=2 represents poorly) rather than by sample size. This entry tests it
+on the same pinned data, the same split policy and the same frozen gate.
+
+### The audit killed most of the proposed package before any of it ran
+
+| Assumption | Reality |
+|---|---|
+| `provenance.mjs` at `campaign/` | it is at `src/`; every file's import was wrong |
+| `sha256Hex` exported there | it is not — only `sha256Hex16`, `canonicalHash`, `maxRelativeDiff`, `snapshotEnvironment` |
+| 12 descriptor field names | **7 of 12 do not exist** (`heavyAtoms`, `hBondDonors`, `hBondAcceptors`, `aromaticFraction`, `heteroCount`, `logP`, `fractionCSP3`) — every feature vector would have returned MISSING_FEATURE |
+| `splitByScaffold` export | it is `scaffoldSplit` |
+| gate thresholds at the file's top level | they are nested under `.gate`; the proposed mirror check would have compared `undefined` and blocked every run |
+| pin at `glp1rActivity.pin.json` | it is `glp1rActivity.json` |
+| `PersistentWorkerPool` / `ContentAddressedCache` importable | they do not exist — D-078 rejected that design on measurement |
+
+### The finding that mattered most
+
+The proposal fed continuous descriptors into `glp1rQsar.mjs::trainRidge`.
+That function accumulates `XtX[i][j] += 1` and `Xty[i] += y` over nonzero
+indices — it is a **sparse BINARY** ridge, correct only for 0/1 features. On
+continuous input it does not error; it silently fits "is this feature
+nonzero", discarding the value. Measured: on a perfectly linear continuous
+target a correct ridge fits to ~0, it returns **MAE 1.5031**. It also pins the
+intercept at index 512, so the 527-wide hybrid would have overwritten the bias.
+
+So reps B and C would have produced meaningless models with no error raised.
+`denseRidge` is therefore a missing capability, not a duplicate: proper
+`x_i * x_j` accumulation, an explicit trailing intercept column that cannot
+collide with a feature, and no regularization on the bias. V1 keeps its own
+ridge untouched and still produces the identical V1 numbers.
+
+### The result
+
+Three representations, all fitted with the dense ridge, chosen on
+**calibration error alone** — the selection function refuses any candidate
+carrying a test metric, so selecting on test is structurally impossible, not
+merely discouraged. The test split was scored exactly once, afterwards.
+
+| Representation | width | calib MAE |
+|---|---|---|
+| A morgan-512 | 512 | 1.0016 |
+| B descriptors + peptide counts | 15 | 1.0773 |
+| **C hybrid** | **527** | **0.8164** |
+| D sequence-aware | — | NOT_IMPLEMENTED (no SMILES->residue parser here; not faked) |
+
+Selected C. Held-out test: **MAE 1.0425, RMSE 1.4016, R2 0.5182** (n=45),
+conformal 90% half-width ±1.9675, fingerprint `17008d2b12430c6a`.
+
+**V1 1.1726 -> V2 1.0425 (-11%), R2 0.4820 -> 0.5182. Still BLOCKED: 1.0425 > 1.0.**
+
+### What this does and does not establish
+
+The clean comparison is across A/B/C on calibration, where the ridge is held
+constant: the hybrid beats Morgan-only by 18%. So **representation genuinely
+matters** — the D-077a hypothesis is supported on that axis.
+
+The V1-to-V2 headline number is NOT a clean test of it, because it changes two
+things at once (sparse-binary ridge -> dense ridge, and Morgan -> hybrid). I
+did not score rep A on test to separate them, because touching the test split
+a second time to satisfy curiosity is exactly the leakage this design forbids.
+That separation needs its own pre-registered run.
+
+The stratified test numbers locate the remaining error precisely: **peptide
+subset MAE 1.1373 (n=39), small-molecule MAE 0.4265 (n=6)**. The error lives in
+the peptides, as D-077a predicted. (The small-molecule R2 of -5.08 is not
+meaningful at n=6 — with six points and little spread, R2 is unstable; the MAE
+is the trustworthy number there.)
+
+### What was NOT done
+
+MAX_MAE was not moved. This run missed by 4.25% — the single most tempting
+moment in this whole mission to "round" a threshold — and a test now asserts
+that the real measured 1.0425 evaluates to BLOCKED against the frozen gate.
+V2 does not hardcode any threshold: it reads the gate through the existing
+loader, and a test greps the module to prove no threshold constant hides in it.
+D-057, D-069 and V1 are untouched; `probeCapabilities().activityPredictor`
+stays false and **GENESIS-MOL-01 remains NO_WINNER**.
+
+### What would actually close the axis now
+
+The gap is 4.25% and it is concentrated in peptides, so: a genuine
+sequence-aware representation (rep D, needs a residue parser); or more human
+peptide rows, since the peptide subset is where variance is unexplained; or an
+explicitly peptide-only model with small molecules declared out of domain.
+Each is a new pre-registered run with its own D-entry, not an edit to this one.
+
+### Gate
+
+Backend 586 tests / 553 pass / 0 fail / 33 skipped; new `glp1rQsarV2.test.mjs`
+22/22 including the dense-vs-sparse proof, the leakage refusal and the
+"1.0425 is BLOCKED" assertion. tsc, eslint clean. V1 E2E re-run unchanged
+(9/9, MAE 1.1726, BLOCKED). `batch_descriptors` added alongside
+`batch_fingerprint`, verified identical to the per-molecule path.

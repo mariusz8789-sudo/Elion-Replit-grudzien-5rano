@@ -239,6 +239,42 @@ def main():
         print(json.dumps({"ok": True, "results": results, "n": len(results), "engine": "RDKit " + rdkit.__version__}))
         return
 
+    # D-079 — batched descriptors, same one-process-per-list rule as
+    # `batch_fingerprint`. Each molecule runs the identical descriptor block as
+    # the single-molecule `descriptors` command; a molecule RDKit cannot parse
+    # yields {"ok": false} IN ITS OWN SLOT so indices never shift.
+    if cmd == "batch_descriptors":
+        smiles_list = req.get("smilesList")
+        if not isinstance(smiles_list, list):
+            print(json.dumps({"ok": False, "error": "smilesList_required"}))
+            return
+        out_rows = []
+        for s in smiles_list:
+            m = Chem.MolFromSmiles(s) if isinstance(s, str) else None
+            if m is None:
+                out_rows.append({"ok": False, "error": "invalid_smiles"})
+                continue
+            mw = Descriptors.MolWt(m)
+            logp = Crippen.MolLogP(m)
+            hbd = Lipinski.NumHDonors(m)
+            hba = Lipinski.NumHAcceptors(m)
+            out_rows.append({"ok": True, "data": {
+                "molWt": round(mw, 4),
+                "heavyAtomCount": m.GetNumHeavyAtoms(),
+                "hbd": hbd,
+                "hba": hba,
+                "rotatableBonds": Descriptors.NumRotatableBonds(m),
+                "ringCount": rdMolDescriptors.CalcNumRings(m),
+                "aromaticRings": rdMolDescriptors.CalcNumAromaticRings(m),
+                "fractionCsp3": round(Descriptors.FractionCSP3(m), 4),
+                "tpsa": round(Descriptors.TPSA(m), 3),
+                "crippenLogP": round(logp, 4),
+                "formalCharge": Chem.GetFormalCharge(m),
+                "heteroatomCount": rdMolDescriptors.CalcNumHeteroatoms(m),
+            }})
+        print(json.dumps({"ok": True, "results": out_rows, "n": len(out_rows), "engine": "RDKit " + rdkit.__version__}))
+        return
+
     smiles = req.get("smiles", "")
     mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else None
     if mol is None:

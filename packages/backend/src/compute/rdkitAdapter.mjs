@@ -208,6 +208,40 @@ export function fingerprintBatch(smilesList, { chunkSize = 500 } = {}) {
   return { ok: true, results, n: results.length, engine: d.engine };
 }
 
+/**
+ * Batched descriptors (D-079) — one process for the whole list, identical
+ * per-molecule output to `descriptors()`. Returns `{ ok, results, n }` with
+ * `results[i]` aligned to `smilesList[i]`; an unparseable molecule is
+ * `{ ok: false }` in its own slot.
+ */
+export function descriptorsBatch(smilesList, { chunkSize = 500 } = {}) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  const list = Array.isArray(smilesList) ? smilesList.map((s) => String(s ?? '')) : [];
+  if (list.length === 0) return { ok: true, results: [], n: 0, engine: d.engine };
+  const results = [];
+  try {
+    for (let offset = 0; offset < list.length; offset += chunkSize) {
+      const chunk = list.slice(offset, offset + chunkSize);
+      const out = execFileSync(PYTHON, [WORKER, JSON.stringify({ cmd: 'batch_descriptors', smilesList: chunk })], {
+        timeout: Math.max(TIMEOUT_MS, 1_000 * chunk.length),
+        maxBuffer: 256 * 1024 * 1024,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const r = JSON.parse(out);
+      if (!r.ok) return { ok: false, error: r.error };
+      if (!Array.isArray(r.results) || r.results.length !== chunk.length) {
+        return { ok: false, error: 'BATCH_LENGTH_MISMATCH' };
+      }
+      results.push(...r.results);
+    }
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+  return { ok: true, results, n: results.length, engine: d.engine };
+}
+
 /** Walidacja struktury SMILES przez RDKit (kanonizacja). */
 export function validate(smiles) {
   const d = detect();

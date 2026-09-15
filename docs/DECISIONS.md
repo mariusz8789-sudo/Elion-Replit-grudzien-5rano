@@ -7210,3 +7210,104 @@ reasons, point at one acquisition.
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Gates, pins and Winner Gate
 UNCHANGED.**
 
+
+---
+
+## D-092 — DATA INGEST READINESS: the offered EC50 dataset did not reach Genesis
+
+**Decision: BLOCKED. Two independent blockers, either of which is sufficient.**
+
+Artifact: `packages/backend/src/campaign/glp1r-d092-ingest-readiness.sealed.json`
+Script: `scripts/d092-ingest-readiness.mjs` · Tests: `packages/backend/src/d092Reconciliation.test.mjs`
+
+The mandate for this step opened with "you now have egress". That premise was
+measured rather than assumed, and it is false for this container.
+
+### Blocker 1 — EGRESS_BLOCKED (measured, not inferred)
+
+Every host the dataset offer names answers `http=000`, `curlExit=56`, and the
+agent proxy states the reason itself: `connect_rejected — gateway answered 403
+to CONNECT (policy denial)`. Probed hosts: `www.ebi.ac.uk`, `rest.uniprot.org`,
+and additionally `pubchem.ncbi.nlm.nih.gov`, `eutils.ncbi.nlm.nih.gov`,
+`www.bindingdb.org`, `ftp.ebi.ac.uk`, `www.uniprot.org`. `github.com` and
+`registry.npmjs.org` resolve normally, so this is a selective network policy,
+not a broken container. A second, independent route (`WebFetch`) returns
+`EGRESS_BLOCKED` for the same host.
+
+Consequence: mandate steps 1 and 2 — refetch, then verify sha256 — cannot
+execute. Steps 4 through 7 depend on bytes that cannot arrive. **No number from
+the offer was promoted to a measurement.** All of them are recorded inside the
+seal under `declaredUnverified`, with the standing of a claim in an email.
+
+### Blocker 2 — DECLARED_MANIFEST_NOT_REPRODUCIBLE (independent of egress)
+
+Six arithmetic identities were checked against the declaration itself. This
+needs no network, and it is the part of the mandate's "do not trust any number"
+that *could* be executed. Four pass; two fail:
+
+| check | declared | implied by the declaration | delta |
+|---|---|---|---|
+| listed source files reproduce `rowsTotal` | 3365 | **2365** | **−1000** |
+| `replicateGroups + singleRecord = uniqueMolecules` | 1720 | **1586** | **−134** |
+| `rowsTotal − censored − noRelation = rowsRelationEqual` | 3100 | 3100 | 0 |
+| `rowsRelationEqual − badUnits = rowsEqGoodUnits` | 3084 | 3084 | 0 |
+| `action_type` partition | 3084 | 3084 | 0 |
+| `assay_type` partition | 3084 | 3084 | 0 |
+
+The three listed pages are `offset=0` (1000 rows), `offset=1000` (1000 rows)
+and `offset=2000`, the last declared as a partial final page of 365 rows. Those
+sum to 2365. A partial page at `offset=2000` means the result set ENDS at 2365;
+a total of 3365 requires a full page at `offset=2000` and a partial one at
+`offset=3000`. The shortfall is exactly 1000 — one whole page. So either the
+row count is wrong or the manifest omits a file. The one file that could settle
+it, `glp1r_ec50_manifest.json`, carries `sha256: null` and is therefore the only
+unpinned item in the list.
+
+The −134 gap is the `sameAssayOnly` bucket — molecules with several EC50 rows
+that all come from one assay. The declaration does not report it. That bucket is
+precisely the one whose mishandling produced the withdrawn 1.1212 "noise floor"
+in D-089, so its absence is not a cosmetic omission.
+
+**Neither finding is an accusation of fabrication.** The filter arithmetic is
+coherent, which is what a real extraction looks like. The manifest is simply not
+yet in a state that could be reproduced, and reproduction is the whole point.
+
+### Mandate step 9, answered from existing code rather than invented
+
+`action_type=None` and `Outside typical range` were to be handled "per existing
+Genesis ingest policy". That policy was located, not designed:
+`scripts/fetch-gov-drug-discovery-generated-space.mjs:198` states
+`organism=Homo sapiens, standard_units=nM, standard_relation="=", no
+data_validity_comment, no potential_duplicate`.
+
+Applied to the offer, existing policy gives:
+- the 222 `Outside typical range` rows are **REJECTED**, not flagged;
+- the 35 `potential_duplicate` rows are **REJECTED**;
+- the 1774 `action_type=None` rows are **ADMITTED**, because no Genesis rule
+  mentions `action_type` at all. Writing one now would be a NEW policy, which
+  this mandate forbids. Pharmacological direction therefore becomes an **open
+  preregistration question for a human**, not a silent default chosen by me.
+
+### A gap found in our own loader while answering that question
+
+`normalizeActivityRows` enforces organism, target id, accepted endpoint type,
+pActivity range and dedup — but **not** `standard_relation`,
+`data_validity_comment` or `potential_duplicate`. Those live only in the fetch
+scripts. The frozen pin carries no `standardRelation` column, so **for the pin
+already in the repository, relation is `NOT_MEASURED`**: censored rows cannot be
+excluded after the fact. This is recorded, not silently repaired — changing the
+loader would change ingest policy, which this step forbids.
+
+### Frozen-pin baseline, re-measured through the canonical loader
+
+287 rows · 214 unique molecules · EC50 194/189, IC50 89/86, Ki 4/4 ·
+replicate groups EC50 4, IC50 2, Ki 0 · noise floor `NOT_MEASURED` on every
+axis. Unchanged from D-091, and now re-derived rather than quoted.
+
+### What this run did NOT do
+
+No threshold, pin, split rule, Winner Gate or ingest policy was touched. No
+model was fitted. No test split was read. `representationAttemptsConsumed: 0`.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. READY_FOR_PREREG is NOT
+granted.**

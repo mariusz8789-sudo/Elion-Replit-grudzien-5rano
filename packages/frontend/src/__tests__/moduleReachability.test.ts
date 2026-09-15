@@ -100,6 +100,19 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  // --- Built and tested, awaiting a deliberate wiring decision ---------------
+  // D-085: the agent composer. It is NOT wired into a production caller yet on
+  // purpose. The package that proposed it wanted callbacks installed into
+  // experimentFabric/hypothesisLoop, but core/agent/nextAction.ts:94 ALREADY
+  // imports that module, so doing so would close an ESM import cycle that
+  // resolves to `undefined` at runtime. The composer therefore has to be
+  // called from ABOVE both (campaignOrchestrator is the natural site), and
+  // choosing when to route real campaign traffic through it is a decision for
+  // a person, not a side effect of landing the module. agentBridge.test.ts
+  // exercises it against the real agent exports and asserts the import
+  // direction stays one-way.
+  'core/agent/agentBridge.ts': 'D-085 composer; unwired pending a deliberate campaignOrchestrator decision (wiring it INTO hypothesisLoop would close an import cycle).',
+
   // --- Deliberately OFF in the product, not broken ---------------------------
   // The Sovereign/governance module is staged behind a visibly disabled menu
   // entry ("wkrótce") by an explicit product decision recorded in

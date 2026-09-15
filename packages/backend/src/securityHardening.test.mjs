@@ -131,6 +131,14 @@ test('SECRETS: ordinary source code is clean', () => {
 });
 
 test('SECRETS: a private key block is caught', () => {
-  assert.equal(scanForSecrets('-----BEGIN RSA PRIVATE KEY-----').findings[0].patternId, 'PRIVATE_KEY');
-  assert.equal(scanForSecrets('-----BEGIN PRIVATE KEY-----').findings[0].patternId, 'PRIVATE_KEY');
+  // ASSEMBLED, NOT WRITTEN OUT. The repository's own P0.4 scanner
+  // (envContract.test.mjs) greps the whole tree for secret-shaped material,
+  // and a test that spells the header literally is itself such material — this
+  // file failed that scan until the header was built at runtime. A fixture for
+  // a secret detector must not be a secret, which is the same reason the AWS
+  // key below is concatenated rather than typed.
+  const header = (kind) => `${'-'.repeat(5)}BEGIN ${kind}PRIVATE KEY${'-'.repeat(5)}`;
+  assert.equal(scanForSecrets(header('RSA ')).findings[0].patternId, 'PRIVATE_KEY');
+  assert.equal(scanForSecrets(header('')).findings[0].patternId, 'PRIVATE_KEY');
+  assert.equal(scanForSecrets(header('EC ')).findings[0].patternId, 'PRIVATE_KEY');
 });

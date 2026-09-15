@@ -7510,3 +7510,106 @@ was invented to make the list look stronger.
 `epistemic: 'SIMULATION'`, `class: 'TOY'`, `clinical: false`,
 `canAdjudicateConsciousness: false`. Not a model of any patient, not a clinical
 instrument, and not evidence about consciousness.
+
+---
+
+## D-094 — first bytes arrive and immediately falsify the measurement plan
+
+Set A1, chunks 1–2 of 7: **233 of 757 declared rows.**
+Artifacts: `data/transcription/glp1r-a1/`, `scripts/d094-verify-transcription.mjs`.
+
+### Custody: VERIFIED, byte for byte
+
+| chunk | rows | declared sha256 | recomputed |
+|---|---|---|---|
+| 01 | 121/121 | `5cba441b…` | **MATCH** |
+| 02 | 112/112 | `371521e2…` | **MATCH** |
+
+`FIRST_KEY`/`LAST_KEY` match, `activity_id` strictly ascending, no duplicates.
+The text channel carried the bytes intact — the transcription protocol works.
+
+### Policy: CLEAN on all eight checks
+
+EC50 only, relation `=`, units present, no `data_validity_comment`, no
+`potential_duplicate`, `pActivity ∈ [3,12]`, ordering intact — and
+`pchembl_value` agrees with `standard_value` to 0.02 in **233 of 233** rows.
+That last one is the strongest available evidence that these are real ChEMBL
+records rather than invention: reproducing 233 independent −log₁₀ values to two
+decimals by fabrication is not a thing that happens.
+
+### The finding: "EC50" does not name a readout
+
+Within-group spread on the received rows has a median of **1.8999 pActivity**.
+Taken as a noise floor, that figure would sit **above the gate's MAX_MAE of
+1.0** and would license the conclusion: *"the model at MAE 1.0425 is already
+below the data's own noise; the gate is unachievable; stop tuning."*
+
+**That conclusion would be an artifact, and this entry exists to stop it.**
+The number is recorded **WITHDRAWN as a noise floor.**
+
+The spread is not measurement error. Decomposed:
+
+| stratum | groups | median spread |
+|---|---|---|
+| all | 79 | 1.8999 |
+| mixing functional (F) and binding (B) assays | 23 | 2.0645 |
+| single assay_type | 56 | 1.7409 |
+| entirely within ONE paper | 68 | **1.7991** |
+
+The last row is decisive. Restricting to one paper — same lab, same compounds,
+same `standard_type`, same `action_type` — barely moves the number. So this is
+not between-lab variation.
+
+The mechanism is visible in one document, `CHEMBL5126621`, whose four assays
+all pass the filter and stratify by assay, not by compound:
+
+| assay | n | median |
+|---|---|---|
+| `CHEMBL5130383` | 7 | **0.0398 nM** |
+| `CHEMBL5130385` | 14 | 63.1 nM |
+| `CHEMBL5130386` | 14 | 158.5 nM |
+| `CHEMBL5130384` | 13 | **1000 nM** |
+
+`CHEMBL5182066` appears in all four: 0.01995, 63.1, 199.53, 1258.93 nM — a
+**4.8 log** range for one molecule, one paper, one endpoint label, one
+`action_type`. No measurement noise does that. These are different readouts
+(the sub-nM/high-nM split is the signature of cAMP versus a recruitment or
+secondary assay) or different receptors in a selectivity panel.
+
+This is D-089 recurring one level deeper. D-089 found EC50 and IC50 disagree by
+1.7618 and concluded endpoint homogeneity was required. **Endpoint homogeneity
+is not sufficient**: two rows can share `standard_type = EC50`, target, species,
+paper and `action_type` and still measure different quantities.
+
+Note the direction. D-091 guarded against a falsely **LOW** floor, which makes
+data look more reliable than it is. This is the opposite failure: a falsely
+**HIGH** floor excuses a model that is not good enough. Both are ways of
+producing a Winner that the data does not support.
+
+### Two defects in my own acquisition brief
+
+The brief specified the A1 column list. Both omissions are mine:
+
+1. **`target_chembl_id` is absent**, so the single most important filter —
+   target identity — **cannot be verified per row**. I checked seven policy
+   clauses and had to take the eighth on trust. A format that makes the
+   load-bearing criterion unverifiable is a badly designed format.
+2. **No readout descriptor.** `assay_type` (F/B) is too coarse: the worst group
+   in the set is homogeneous under it. Distinguishing cAMP from arrestin needs
+   `bao_format` / `bao_label` / `assay_description`, none of which I asked for.
+
+Fix, costed: add `target_chembl_id` to A1 (13 characters per row), and add a
+new **set A3** — one row per distinct assay, not per activity:
+`assay_chembl_id|target_chembl_id|assay_type|bao_format|bao_label|assay_description`.
+The received rows contain 60 distinct assays in 233 rows, extrapolating to
+**~195 assays** for all of A1: roughly **34 KB, one or two chunks.** Cheap, and
+without it set A cannot answer the question it was built to answer.
+
+### Status
+
+Custody VERIFIED · policy CLEAN · **A1 INCOMPLETE (233/757)** ·
+**noise floor NOT_MEASURED**, now for a reason that is about the data's
+structure rather than about how much of it we hold.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Thresholds, pins, split rule
+and Winner Gate untouched.**

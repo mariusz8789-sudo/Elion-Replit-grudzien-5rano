@@ -6333,3 +6333,99 @@ canonical Winner Gate are untouched.
 **OUTCOME: VALIDATED.** GIPR remains INSUFFICIENT_DATA (146/150, 24/40);
 GLP-1R remains over its gate at MAE 1.0425; the discovery result is still
 NO_WINNER and the recipe is still LOCKED.
+
+## D-083 — the ten-point execution mandate: four real defects found by running the code, not reading it
+
+The instruction was a numbered list: remove duplicate engines, connect the real
+RDKit/BRICS, connect the canonical Winner Gate, remove any manual PROMOTE, fix
+null handling in Pareto, fix global provenance, verify the canonical scaffold
+split, connect real GLP-1R/GIPR prediction, connect real falsification, and
+only then run E2E. Working through it turned up four defects. Two were in the
+reviewed candidate package. **Two were mine.**
+
+### The two that were mine, found by probing rather than reading
+
+`dualTargetDiscovery.mjs::rankDualTarget` coerced axis values with `Number()`:
+
+- **`null` became `0`.** A missing measurement silently became a real
+  measurement of zero. On a *minimize* axis — LIABILITY_BURDEN, DEVELOPABILITY,
+  STRUCTURAL_FEASIBILITY — a candidate with no data would have been the best
+  possible candidate on that axis and could have taken the Pareto front.
+- **`NaN` was never dominated.** Every comparison against `NaN` is false, so
+  `dominates()` could never eliminate it and a garbage value entered the front
+  unbeaten.
+
+Both now return `NON_FINITE_AXIS_VALUE` naming the candidate and the axis.
+Missing data blocks a ranking; it does not score anywhere in one. `Infinity`
+and numeric strings are refused on the same rule.
+
+### The two in the candidate package
+
+**The missing-pin bug.** The proposed `verifyPinDrift` filtered on
+`loaded[id] !== undefined && loaded[id] !== expected`. A pin that never loaded
+fails the first clause, so it was not a mismatch and the manifest reported OK —
+a manifest REQUIRING the GIPR pin, checked against an empty set, passed. The
+package's own test asserted that inversion as correct. `pinManifest.mjs` keeps
+the three states distinct and only one passes: MISSING fails, DRIFTED fails,
+VERIFIED passes; an empty manifest fails too, because verifying nothing is not
+verification, and a required role with no verified pin fails as well.
+
+**The reaction SMARTS.** `[C:1](=O)[OH:2].[NH3:3]>>[C:1](=O)[N:3]`, run on live
+RDKit against real substrates: ammonia gave one product *and an RDKit warning
+that mapped atom 2 is unmapped in the product*; methylamine, aniline and a
+secondary amine each gave **zero**. It works only for literal ammonia. It was
+not landed.
+
+### What was NOT built, and why that is the point
+
+The candidate package proposed `core/mounjaro/candidateGen.ts` building
+molecules by `parents[0] + fragment` — string concatenation. **The repository
+already contains a real BRICS engine**: `rdkit_worker.py` implements
+`BRICS.BRICSDecompose`/`BRICSBuild` (Degen et al. 2008) behind
+`rdkitAdapter.bricsRecombine`, wrapped by
+`drugAdapter.generateRecombinationProposals`, and already driving the D-081
+E2E. Building a second generator would have been the duplicate engine item 1
+forbids, and a worse one. Likewise `globalEvidenceSet.ts`, `dualTarget.ts`,
+`falsification.ts` and `preclinicalProtocol.ts` all duplicate modules that
+exist. None were landed. A test now greps for `BRICSDecompose`/`BRICSBuild` and
+asserts a generated product is not the two parents glued together.
+
+Item 4 — manual PROMOTE — was already satisfied structurally and is now
+enforced: a test asserts `winnerGate.ts` derives the outcome from an empty
+reason list rather than assigning it, and that the recipe builder never
+constructs a `PROMOTE` outcome, only reads one.
+
+### Item 7: verifying the scaffold split, and refusing the result
+
+The frozen gates use `scaffold-hash-mod10` as their OOD proxy, and
+Bemis-Murcko scaffolds can be nearly identical across the train/test line. So
+`clusterSplit.mjs` adds a harder confirmatory split: whole Tanimoto clusters
+move together at a frozen threshold of 0.35.
+
+Run on the real 287-row GLP-1R pin it produced **9 clusters, one holding 217 of
+287 molecules**, train=51 against a frozen MIN_TRAIN of 150, and MAE 26.20
+against the scaffold split's 1.0425 — a gap of 25.16, far past the flag delta.
+
+**That flag was suppressed, and suppressing it is the finding.** An MAE of 26
+from a model fitted on 51 rows measures the split, not the chemistry: roughly
+70% of that pin is GLP-1 analogue peptides that are mutually similar well above
+0.35 Tanimoto, so a similarity clustering cannot separate them. Reporting
+GENERALIZATION_OVERESTIMATED from a collapsed split would have been an
+impressive-looking, meaningless result — the exact failure mode this repository
+exists to refuse. `clusterSplitViability` now gates the comparison on the
+frozen MIN_TRAIN/MIN_TEST and on no single cluster exceeding half the dataset,
+and returns `UNMEASURED` with both reasons instead.
+
+The confirmatory split never feeds a gate. It is a warning to the reader; the
+frozen gate still reads the scaffold-split numbers it was sealed against.
+
+### Gate
+
+`executionMandate.test.mjs` 20/20, including both probed Pareto defects, all
+four pin-manifest states, the degenerate-split suppression pinned to the real
+measured numbers, and live-RDKit BRICS assertions. Full backend suite green.
+No threshold moved; GIPR remains INSUFFICIENT_DATA at 146/150 and 24/40,
+GLP-1R remains over its gate at 1.0425, the result is still NO_WINNER and the
+recipe is still LOCKED.
+
+**OUTCOME: VALIDATED.**

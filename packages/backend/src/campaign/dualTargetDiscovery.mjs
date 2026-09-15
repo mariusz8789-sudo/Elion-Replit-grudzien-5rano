@@ -145,8 +145,29 @@ export function rankDualTarget(candidates, assessment) {
     }
   }
 
+  // NON-FINITE VALUES ARE REFUSED, NOT COERCED. Two real defects were found
+  // here by probing rather than reading: `Number(null)` is 0, so a missing
+  // measurement silently became a real measurement of zero (and on a minimize
+  // axis it would have WON); and `NaN` makes every comparison false, so a
+  // garbage value was never dominated and entered the Pareto front unbeaten.
+  // A value that is not a finite number is missing data, and missing data
+  // blocks the ranking rather than scoring anywhere in it.
+  for (const c of candidates) {
+    for (const o of decisive) {
+      const raw = c.objectives?.[o.id]?.value;
+      if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+        return Object.freeze({
+          ok: false,
+          code: 'NON_FINITE_AXIS_VALUE',
+          reasons: Object.freeze([`candidate "${c.id}" carries ${raw === null ? 'null' : String(raw)} on axis ${o.id}; a missing or non-finite value is missing data, never a score of zero`]),
+          front: Object.freeze([]),
+        });
+      }
+    }
+  }
+
   const vectors = candidates.map((c) => decisive.map((o) => {
-    const v = Number(c.objectives[o.id].value);
+    const v = c.objectives[o.id].value;
     return o.direction === 'maximize' ? -v : v;
   }));
   const frontIdx = paretoFrontIndices(vectors);

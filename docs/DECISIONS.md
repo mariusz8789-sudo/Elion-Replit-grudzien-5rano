@@ -8898,3 +8898,154 @@ per `requirements-compute.txt`'s own "optional" framing).
 **OUTCOME: audit CLEAN. No Winner Gate or ResearchRecipe bypass found. One
 stale comment corrected. Zero thresholds, pins, gates or scientific rules
 touched.**
+
+## D-110 — LOWER_HARM external-evidence readiness: a hard, fail-closed acceptance gate, built before any external data arrived
+
+While external evidence for the LOWER_HARM (A2) 1-observation gap was being
+searched for elsewhere, this entry made the repository READY_TO_INGEST and
+READY_TO_RUN the moment a real record arrives — no threshold, pin,
+preregistration, evidence-ranking rule or Winner Gate criterion was touched.
+
+### What was found (current state, verified against executable code, not comments)
+
+`a2OzempicSubstitute.ts`'s TOP2 favourite Liraglutide (CHEMBL4084119) carries
+2 real trial-derived efficacy observations (NCT03172494, NCT00518882 —
+NCT01373450 has zero HbA1c/weight outcomes and contributes none), against
+the frozen `MINIMUM_OBSERVATIONS = 3` in `agent/practicalCandidateGate.ts`.
+`decideFunnelVerdict` (`govDrugLowerHarmFunnel.ts`) fails on exactly that
+count plus a rank disagreement with the pre-experiment favourite (native
+GLP-1). `winnerGate.ts::canPromoteToWinnerRecord` is never reached — the
+funnel returns NO_WINNER one stage earlier.
+
+`scripts/fetch-a2-ozempic-substitute-fixture.mjs` was NOT sufficient for
+this: it is a full self-refetch of the entire mechanism-derived candidate
+space from live ChEMBL/ClinicalTrials.gov, not a path for accepting one
+externally-sourced record for an already-pinned candidate.
+
+### What was built (purely technical, additive only)
+
+- `scripts/lib/a2TrialNarrowing.mjs` — the ClinicalTrials.gov study ->
+  `A2TrialRecord` narrowing logic, extracted (not duplicated) out of the
+  fetch script so both the full refetch and the new single-record path share
+  ONE implementation.
+- `packages/backend/src/campaign/a2TrialEvidenceGate.mjs` — the hard
+  acceptance gate (`validateIncomingTrialPackage`), pure and unit-testable:
+  rejects on `HASH_MISMATCH`, `STUDY_JSON_UNPARSEABLE`, `MISSING_NCT_ID`,
+  `NCT_ID_MISMATCH`, `UNKNOWN_CANDIDATE` (not one of the already-pinned,
+  mechanism-qualified A2 candidates — this gate can add evidence to an
+  EXISTING candidate only, never mint a new one), `A1_EVIDENCE_REJECTED`
+  (an A1-pinned NCT id, read live from `a1-glp1/meta.json`'s own file list,
+  never hand-copied), `DUPLICATE_OBSERVATION`, `POPULATION_MISMATCH`,
+  `RESULTS_NOT_POSTED`, `NO_USABLE_OUTCOME`, `MISSING_PROVENANCE`. It decides
+  acceptance of raw bytes only — it never computes efficacy, comparison
+  type, or a verdict; `extractCandidateEfficacy`/`extractCandidateSafety`
+  stay exactly where they are, unmodified.
+- `scripts/ingest-a2-trial-evidence.mjs` — the CLI wrapper (same shape as
+  `ingest-gipr-activity.mjs`): never fetches, takes a manifest already on
+  disk, hashes+validates+narrows, writes ONLY to a new additive supplement
+  store, and self-verifies every base pin file's sha256 is unchanged before
+  exiting (`assertBaseUnchanged` — aborts loudly if it ever isn't).
+- `packages/frontend/src/core/biotechData/a2-ozempic-substitute/external-supplement/{trials,meta}.supplement.json`
+  — two new, currently-empty (`{}`) pin files. `a2OzempicSubstitute.ts`'s
+  `TRIALS_BY_MOLECULE` now merges `BASE_TRIALS_BY_MOLECULE` (renamed,
+  byte-for-byte identical content) with this supplement additively; with an
+  empty supplement the merge is a proven no-op (every existing test,
+  including the literal-locked `a2OzempicSubstitute.test.ts` counts, passes
+  unchanged).
+
+### Tests
+
+`a2TrialEvidenceGate.test.mjs` (17/17, in-memory, TEST_FIXTURE-labelled
+synthetic study JSON only, never written anywhere real): valid package
+accepted; wrong SHA rejected; bytes tampered after hashing rejected; missing
+provenance rejected (two variants); wrong/unusable endpoint rejected; wrong
+candidate rejected; duplicate rejected; A1 evidence rejected; malformed
+observation rejected (three variants); population mismatch rejected; results-
+not-posted rejected. `a2TrialIngestionCli.test.mjs` (4/4) runs the real CLI
+script end-to-end against a throwaway sandbox copy of the real pin directory
+(`GENESIS_A2_DIR`/`GENESIS_A1_META_PATH` env overrides — the real repo pins
+are never touched by this test): valid package written ONLY to the
+supplement files with every base pin file's sha256 proven unchanged;
+`--dry-run` writes nothing; an A1-pinned NCT id is rejected end-to-end;
+re-ingesting the same nctId is rejected as a duplicate.
+
+Full suites after this change: backend 831 tests (798 pass, 0 fail, 33 skip
+— +21 over D-109), frontend 6522 tests (6521 pass, 1 skip, 0 fail —
+unchanged). TSC and ESLint clean on every touched/new file.
+
+**OUTCOME: TECHNICALLY READY — WAITING FOR EXTERNAL EVIDENCE. No threshold,
+pin, preregistration, evidence class, or Winner Gate rule was touched.**
+
+## D-111 — Qwen's SUSTAIN 10 candidate, run through the D-110 gate: REJECTED, A1_EVIDENCE_REJECTED — and a real mislabel it surfaced, fixed
+
+An external search (Qwen) proposed SUSTAIN 10 (Capehorn et al. 2020,
+Diabetes & Metabolism; PMID 31539622) — liraglutide 1.2mg OD vs semaglutide
+1.0mg OW, 577 randomised, HbA1c ETD -0.69pp (95% CI -0.82 to -0.56,
+P<0.0001) — as a possible new Liraglutide observation for LOWER_HARM/A2.
+Qwen could not independently confirm the NCT id from its own search and
+correctly flagged the finding `POSSIBLE`, not `VERIFIED`.
+
+### Source verification (against real, already-pinned bytes, not the scraped page)
+
+The trial's own text names its NCT id: `NCT03191396`. That id is already
+present in this repository's real, previously-fetched, hash-provenanced A1
+pin (`a1-glp1/trial-NCT03191396.json`). Reading that file directly: `nctId:
+"NCT03191396"`, `briefTitle: "Research Study Comparing a New Medicine
+Semaglutide to Liraglutide in People With Type 2 Diabetes"`, arms
+`["Semaglutide", "Liraglutide"]`, an 8-entry `hba1cOutcomes` array headed by
+"Change in HbA1c" — an exact, unambiguous match to SUSTAIN 10 as described
+by Qwen and by the paper itself. **This is not a new discovery: the trial is
+already in the repository.**
+
+### Duplication / eligibility check
+
+Confirmed directly against the real A2 pin (`trials-CHEMBL4084119.json` —
+Liraglutide's own base file): its 3 trials are NCT03172494, NCT01373450,
+NCT00518882. NCT03191396 is NOT among them, so this is not a same-file
+duplicate inside A2. It IS, however, one of A1's own independently-
+preregistered trial records (D-028) — and A2 already reuses THIS EXACT
+trial's semaglutide arm as its fixed `REFERENCE_HBA1C_DELTA_PP`/`_SD`/`_N`
+baseline (the one, explicitly-cited precedent for crossing the A1/A2
+boundary — a single fixed reference number, not a new per-candidate
+observation). Counting it AGAIN as a new Liraglutide efficacy observation
+would (a) inject evidence into A2 that A2 never preregistered reading this
+way, the same after-the-fact-evidence risk `watchHark` exists to catch, and
+(b) compare Liraglutide's real arm from this trial against a reference
+baseline computed from the SAME trial's semaglutide arm — a circular,
+double-counted comparison, not an independent second observation.
+
+### Run through the real gate (not just reasoned about — executed)
+
+A manifest (`candidateChemblId: CHEMBL4084119`, `nctId: NCT03191396`) was
+built from the verified facts above and run through
+`scripts/ingest-a2-trial-evidence.mjs --dry-run` against the real repository
+paths (no sandbox, no override — a dry run makes no writes either way):
+
+```
+OUTCOME: REJECTED — code=A1_EVIDENCE_REJECTED
+reason: NCT03191396 is one of A1's own independently-preregistered trial
+records (a1-glp1/) — reusing it inside A2 would be evidence injected across
+two separately-preregistered analyses, refused regardless of scientific merit
+```
+
+`git status` after the run shows zero change to any pin file — nothing was
+ever at risk of being written; `--dry-run` and the gate's own structure both
+refused before any filesystem write was attempted.
+
+### A real defect this surfaced, fixed (documentation only)
+
+Three comments (`a2OzempicSubstitutePreregistration.ts`,
+`a2OzempicSubstitute.ts` x2) mislabelled NCT03191396 as "SUSTAIN 7" — an
+error inherited from an earlier session, now corrected to SUSTAIN 10 with
+the trial's own pinned `briefTitle` cited as evidence. No number, threshold,
+gate, or preregistered value changed; `A2_PREREGISTRATION_FINGERPRINT` is
+computed only from `frozenView()`'s structured data, never from source
+comments, and is unchanged (re-verified: `a2OzempicSubstitutePreregistration.test.ts`
+passes unmodified).
+
+**OUTCOME: SUSTAIN 10 is INELIGIBLE for LOWER_HARM/A2 — REJECTED,
+A1_EVIDENCE_REJECTED, real gate, real run, nothing ingested. LOWER_HARM
+remains NO_WINNER, 1 observation short. Documentation mislabel fixed. No
+threshold, pin, preregistration, or Winner Gate rule touched. Still
+TECHNICALLY READY — WAITING FOR EXTERNAL EVIDENCE that is NOT already
+inside A1.**

@@ -34,7 +34,7 @@ export const A2_PREREGISTRATION_CONTRACT_VERSION = '1.0.0';
 export const A2_REFERENCE_DRUG = {
   name: 'semaglutide',
   moleculeChemblId: 'CHEMBL2108724',
-  /** Real subcutaneous T2DM head-to-head evidence already established and pinned for A1 (SUSTAIN 7, NCT03191396) — reused, not re-derived, as the reference arm wherever a candidate's own trial does not include semaglutide directly. */
+  /** Real subcutaneous T2DM head-to-head evidence already established and pinned for A1 (SUSTAIN 10 — Capehorn et al. 2020 — NCT03191396; the "SUSTAIN 7" label used here in earlier revisions was a documentation error, fixed D-111: the trial's own pinned briefTitle is "Research Study Comparing a New Medicine Semaglutide to Liraglutide in People With Type 2 Diabetes", i.e. SUSTAIN 10, not SUSTAIN 7 — no data, number or rule changed) — reused, not re-derived, as the reference arm wherever a candidate's own trial does not include semaglutide directly. */
   referenceTrialNctId: 'NCT03191396',
 } as const;
 

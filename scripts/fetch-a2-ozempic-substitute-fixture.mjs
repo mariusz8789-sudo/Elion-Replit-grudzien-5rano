@@ -34,6 +34,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { narrowTrialDetail } from './lib/a2TrialNarrowing.mjs';
 
 const CHEMBL_BASE = 'https://www.ebi.ac.uk/chembl/api/data';
 const CTGOV_BASE = 'https://clinicaltrials.gov/api/v2';
@@ -137,47 +138,8 @@ async function searchTrialsByDrugName(name) {
 async function fetchTrialDetail(nctId) {
   const url = `${CTGOV_BASE}/studies/${nctId}`;
   const { json, rawSha256, rawBytes } = await getJson(url);
-  const identification = json.protocolSection?.identificationModule ?? {};
-  const arms = json.protocolSection?.armsInterventionsModule?.armGroups ?? [];
-  const outcomes = json.resultsSection?.outcomeMeasuresModule?.outcomeMeasures ?? [];
-  const hba1cOutcomes = outcomes.filter((o) => /hba1c|glycated haemoglobin|glycosylated hemoglobin/i.test(o.title ?? ''));
-  const weightOutcomes = outcomes.filter((o) => /body weight|weight loss|change in weight/i.test(o.title ?? ''));
-  const aem = json.resultsSection?.adverseEventsModule;
-  const narrow = {
-    nctId: identification.nctId,
-    briefTitle: identification.briefTitle,
-    arms: arms.map((a) => ({ label: a.label, type: a.type })),
-    hba1cOutcomes: hba1cOutcomes.map(narrowOutcome),
-    weightOutcomes: weightOutcomes.map(narrowOutcome),
-    adverseEvents: aem === undefined ? null : {
-      frequencyThreshold: aem.frequencyThreshold ?? null,
-      eventGroups: (aem.eventGroups ?? []).map((g) => ({ id: g.id, title: g.title, deathsNumAffected: g.deathsNumAffected ?? null, seriousNumAffected: g.seriousNumAffected ?? null, seriousNumAtRisk: g.seriousNumAtRisk ?? null, otherNumAffected: g.otherNumAffected ?? null, otherNumAtRisk: g.otherNumAtRisk ?? null })),
-      seriousEvents: (aem.seriousEvents ?? []).map(narrowEvent),
-      otherEvents: (aem.otherEvents ?? []).map(narrowEvent),
-    },
-  };
+  const narrow = narrowTrialDetail(json);
   return { narrow, url, rawSha256, rawBytes };
-}
-
-function narrowOutcome(o) {
-  return {
-    title: o.title,
-    type: o.type,
-    paramType: o.paramType ?? null,
-    dispersionType: o.dispersionType ?? null,
-    unitOfMeasure: o.unitOfMeasure ?? null,
-    groups: (o.groups ?? []).map((g) => ({ id: g.id, title: g.title })),
-    denoms: o.denoms ?? [],
-    classes: (o.classes ?? []).slice(0, 1),
-  };
-}
-
-function narrowEvent(e) {
-  return {
-    term: e.term,
-    organSystem: e.organSystem ?? null,
-    stats: (e.stats ?? []).map((s) => ({ groupId: s.groupId, numEvents: s.numEvents ?? null, numAffected: s.numAffected ?? null, numAtRisk: s.numAtRisk ?? null })),
-  };
 }
 
 function median(sorted) {

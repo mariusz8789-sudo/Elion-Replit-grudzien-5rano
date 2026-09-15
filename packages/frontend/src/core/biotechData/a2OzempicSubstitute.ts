@@ -20,6 +20,7 @@ import trialsCotadutide from './a2-ozempic-substitute/trials-CHEMBL4297630.json'
 import trialsTirzepatide from './a2-ozempic-substitute/trials-CHEMBL4297839.json';
 import trialsMk0893 from './a2-ozempic-substitute/trials-CHEMBL1933349.json';
 import trialsAdomeglivant from './a2-ozempic-substitute/trials-CHEMBL3707351.json';
+import supplementTrialsRaw from './a2-ozempic-substitute/external-supplement/trials.supplement.json';
 
 /**
  * A2 — AUTONOMOUS OZEMPIC-SUBSTITUTE DISCOVERY: candidate analysis ->
@@ -103,10 +104,10 @@ export interface A2TrialRecord {
 
 // ---------------------------------------------------------------------------
 // Reference drug (semaglutide) numbers — reused verbatim from A1's pinned
-// SUSTAIN 7 fixture, never re-derived, for candidates with no direct trial.
+// SUSTAIN 10 fixture, never re-derived, for candidates with no direct trial.
 // ---------------------------------------------------------------------------
 
-/** From A1's pinned NCT03191396 (SUSTAIN 7): semaglutide 1.0mg arm, real, already committed evidence. */
+/** From A1's pinned NCT03191396 (SUSTAIN 10 — Capehorn et al. 2020; corrected from the earlier "SUSTAIN 7" mislabel, D-111 — see a2OzempicSubstitutePreregistration.ts's own note): semaglutide 1.0mg arm, real, already committed evidence. */
 export const REFERENCE_HBA1C_DELTA_PP = -1.7;
 export const REFERENCE_HBA1C_SD = 0.9;
 export const REFERENCE_HBA1C_N = 290;
@@ -618,7 +619,7 @@ export function analysisFingerprint(candidateReports: readonly A2CandidateReport
 // Real-data loading (the pinned, mechanism-derived candidate space)
 // ---------------------------------------------------------------------------
 
-const TRIALS_BY_MOLECULE: Readonly<Record<string, readonly A2TrialRecord[]>> = {
+const BASE_TRIALS_BY_MOLECULE: Readonly<Record<string, readonly A2TrialRecord[]>> = {
   CHEMBL414357: trialsExenatide as readonly A2TrialRecord[],
   CHEMBL5314341: trialsGlucagon as readonly A2TrialRecord[],
   CHEMBL1240772: trialsNativeGlp1 as readonly A2TrialRecord[],
@@ -632,6 +633,24 @@ const TRIALS_BY_MOLECULE: Readonly<Record<string, readonly A2TrialRecord[]>> = {
   CHEMBL1933349: trialsMk0893 as readonly A2TrialRecord[],
   CHEMBL3707351: trialsAdomeglivant as readonly A2TrialRecord[],
 };
+
+/**
+ * OPTIONAL SUPPLEMENTAL EVIDENCE (D-110). Post-preregistration real trial
+ * records for an ALREADY-PINNED candidate above, added ONLY through
+ * `scripts/ingest-a2-trial-evidence.mjs`'s hard, fail-closed acceptance gate
+ * (`packages/backend/src/campaign/a2TrialEvidenceGate.mjs`) — never by hand,
+ * never by editing this file or the base pin above. Empty (`{}`) until real
+ * external evidence is ingested; `BASE_TRIALS_BY_MOLECULE` above is NEVER
+ * edited by that gate, so a diff showing zero changes to the base map is
+ * itself proof nothing already-pinned was touched. Every record here still
+ * runs through the exact same, unmodified `extractCandidateEfficacy`/
+ * `extractCandidateSafety` below as the base pin — no second scoring path.
+ */
+const supplementTrials = supplementTrialsRaw as Readonly<Record<string, readonly A2TrialRecord[]>>;
+
+const TRIALS_BY_MOLECULE: Readonly<Record<string, readonly A2TrialRecord[]>> = Object.fromEntries(
+  Object.keys(BASE_TRIALS_BY_MOLECULE).map((id) => [id, [...BASE_TRIALS_BY_MOLECULE[id], ...(supplementTrials[id] ?? [])]]),
+);
 
 const REFERENCE_TRIAL = referenceSemaglutideRaw as A2TrialRecord;
 const REFERENCE_SEMAGLUTIDE_GROUP_TITLE = '1 mg Semaglutide';

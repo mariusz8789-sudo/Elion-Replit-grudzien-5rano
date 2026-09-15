@@ -7695,3 +7695,83 @@ with assertions that can fail — including a bound on `bpSys` that the current
 model would violate.
 
 **Mounjaro track untouched: NO_WINNER · Recipe LOCKED · attempts 1/2.**
+
+---
+
+## D-096 — the readout stratification works, and the withdrawn floor inverts
+
+A1 chunks 1–3 (354/757 rows) and A3 chunk 1 (45/90 assays), all custody-verified
+byte for byte. 202 A1 rows join to a received assay record.
+
+### The target filter is recovered without re-sending anything
+
+All 45 received assays carry `target_chembl_id = CHEMBL1784`. Every joined A1
+row is confirmed on-target by join, so the D-094 format defect is repaired
+without invalidating the verified chunks.
+
+### One label, six readouts
+
+Among 202 joined rows, all labelled `standard_type = EC50`:
+
+| readout | rows | assays |
+|---|---|---|
+| cAMP | 125 | 31 |
+| β-arrestin recruitment | 39 | 5 |
+| calcium mobilisation | 21 | 5 |
+| ERK phosphorylation | 14 | 1 |
+| reporter | 2 | 2 |
+| radioligand binding | 1 | 1 |
+
+`CHEMBL5182066`, the 4.8-log outlier of D-094, resolves completely:
+
+| assay | value | readout |
+|---|---|---|
+| `CHEMBL5130383` | 0.01995 nM | cAMP |
+| `CHEMBL5130385` | 63.1 nM | ERK |
+| `CHEMBL5130386` | 199.53 nM | β-arrestin |
+| `CHEMBL5130384` | 1258.93 nM | calcium |
+
+Four signalling pathways in one paper. Not noise — biased agonism, which is the
+compound's most interesting property, destroyed by averaging.
+
+### The stratification cascade
+
+| grouping key | groups | median spread |
+|---|---|---|
+| molecule (naive, D-094) | 77 | 1.7709 |
+| molecule + readout | 47 | 1.3815 |
+| molecule + readout + mode + HSA condition | **21** | **0.9006** |
+
+**The direction of the conclusion inverts.** D-094's unstratified 1.8999 would
+have excused MAE 1.0425 as sub-noise. Stratified, the median spread falls
+**below the gate's MAX_MAE of 1.0** — so the model is *not* at the data's limit
+and 1.0425 is a real shortfall, not a ceiling.
+
+Corroboration from the cleanest comparison available: assays `CHEMBL4704627`
+and `CHEMBL4704628` differ only in 0% versus 4.4% human serum albumin. Across
+**26 molecules**: median shift **1.507 log**, sd around that shift **0.387**.
+A large, systematic, explainable offset with small residual scatter — the
+signature of pharmacology, not measurement error.
+
+### Two things this is NOT
+
+**1. Not a noise floor.** It is a median *spread* on 202 of 757 rows and 45 of
+90 assays, with `minGroupsForNoiseFloor = 20` cleared only barely at 21. The
+floor stays **NOT_MEASURED**.
+
+**2. Not a preregistered rule — and this is the part that needs a human.**
+The readout classifier is a keyword parser over free-text `assay_description`
+that I wrote *while looking at these rows*. I then found a bug in it (it read
+"coexpressing beta-arrestin-2", a cell-line property, as the readout), fixed
+it, and the median moved from 1.4150 to 0.9006 — across the threshold of
+interest.
+
+The fix was principled: the readout belongs to the `assessed as …` clause, not
+to any mention anywhere in the text. But the *sequence* — build a rule, see the
+number, adjust the rule, see a better number — is the shape of tuning an
+analysis toward a result, and it does not stop being that shape because the
+adjustment was correct. **Recorded as a provisional diagnostic. The
+readout-family rule must be preregistered and human-sealed before any number
+derived from it counts**, exactly as the `action_type` branch must be.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Nothing changed.**

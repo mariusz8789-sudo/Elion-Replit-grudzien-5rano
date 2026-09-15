@@ -7613,3 +7613,85 @@ structure rather than about how much of it we hold.
 
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Thresholds, pins, split rule
 and Winner Gate untouched.**
+
+---
+
+## D-095 — Virtual Body–Brain Lab: NOT INTEGRATED, and the reason is not scheduling
+
+The package was offered as "a coherent code package with tests and E2E", awaiting
+only the Mounjaro track. Audited against live HEAD by running it. It could not be
+integrated today at any priority.
+
+### 1. Every module it builds on is absent from the repository
+
+| claimed dependency | in repo |
+|---|---|
+| `virtualHuman` (`makeHuman`, `simulateDna`, `VirtualHuman`, `mulberry32`) | **NO** |
+| `dnaRepair` / `hallmarks` | **NO** |
+| `cognitiveSim` | **NO** |
+| `vmicro-engine` | **NO** |
+| `Lab2040` | **NO** |
+| `core/neuro` | yes — built here in D-093 |
+
+`mulberry32` exists only in `components/liveMatrix/matrixEngine.ts`, a visual
+effect, and in test files. The one real dependency is the module this repository
+wrote itself.
+
+### 2. It does not compile against the module that DOES exist
+
+Placed at its real path so imports resolve:
+
+```
+TS2305: Module '"../neuro/splitBrainExperiments"' has no exported member 'expLateralizedWord'.
+TS2305: Module '"../neuro/splitBrainExperiments"' has no exported member 'type'.
+```
+
+The first is a stale name — D-093 renamed it `runLateralisedWord`. The second,
+`import { expLateralizedWord, type }`, imports the bare `type` keyword as a
+named binding. This is the same failure as D-093 defect 2, one package later.
+
+### 3. Three of the five tests cannot fail
+
+Implemented `physiology.ts` verbatim and probed it:
+
+| test | claim | measured |
+|---|---|---|
+| SpO₂ never below 88 | physiological bound holds | equilibrium is `98 − 0.32·intensity`; at the tested `intensity 0.8` SpO₂ = **97.87**. Reaching 88 needs **intensity ≈ 63**. |
+| HR rises with exercise | model responds to load | HR reaches **exactly 190.00**, the hard clamp in `Math.min(190, …)`. The test measures the clamp. |
+| same seed → same timeline | seeded determinism | `stepPhysiology` contains **no RNG call**, and `mulberry32` is imported and never used. The test asserts that a pure function is pure. Seeded determinism is untested. |
+
+### 4. What no test covers, and what the model does there
+
+At 600 steps of `intensity 0.8`, **`bpSys` reaches 600 mmHg** — roughly four
+times the highest pressure ever recorded in a human. `bpSys` has no ceiling and
+`bpDia` has no restoring term. No test runs past 120 steps and none inspects
+blood pressure at all.
+
+`REFERENCE_RANGES` declares `bpSys: [90, 140]` and is **never enforced
+anywhere**. It appears in exactly one place: interpolated into the
+`falsifiable` **string** returned by `runExperiment`. So the falsifiability
+criterion is prose that is never evaluated — a claim shaped like a mechanism.
+
+That is the same defect class as D-093's literal verdicts and D-093's
+never-executed test file: **the third instance in three packages of a
+declaration wearing the costume of a computation.**
+
+### 5. Personalisation is mostly constants
+
+`paramsFromSubject` reads two fields from the subject (`hrRest`, and `vo2max`/
+`gfr` with fallbacks) and hardcodes the rest: `svMl: 70`, `bpSys: 120`,
+`bpDia: 80`, `insulinSens: 1`, `uncertainty: 0.1`. `uncertainty` is declared,
+documented as carrying uncertainty, and read by nothing.
+
+### Decision
+
+`PENDING_INTEGRATION` is the wrong label — it implies readiness. Recorded as
+**`BLOCKED_ON_ABSENT_DEPENDENCIES` + `UNFALSIFIABLE_TESTS`**. Nothing was
+merged. The split-brain module it imports is unaffected and stays green.
+
+Integrating it later requires, in order: the six absent modules actually
+landing; the import names corrected; and the three unfalsifiable tests replaced
+with assertions that can fail — including a bound on `bpSys` that the current
+model would violate.
+
+**Mounjaro track untouched: NO_WINNER · Recipe LOCKED · attempts 1/2.**

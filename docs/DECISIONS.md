@@ -5363,3 +5363,131 @@ full recipe object, base fields and now the D-062 extension fields alike,
 is reached the way every other rich diagnostic already was, via
 `LowerHarmAdapterDiagnostics.recipe()`, never a second public API). Replay:
 **MATCH**.
+
+## D-074 — GENESIS-MOL-01: the molecular discovery mission, and the NO_WINNER it earned
+
+Deployment-blocking mission: find a genuinely novel computational candidate
+that is a plausible next-generation alternative to tirzepatide, with
+comparable or better modelled efficacy at a meaningfully lower selected
+adverse-effect burden — or return NO_WINNER, which the brief explicitly
+declared a valid scientific outcome.
+
+### Runtime reality, probed rather than assumed
+
+| Engine | State | Consequence |
+|---|---|---|
+| RDKit 2026.03.6 | **LIVE** | generation, BRICS, validation, descriptors, 3D embed all real |
+| ADMET-AI | absent | `admetAdapter` reports BLOCKED_BY_RUNTIME; no ADMET/toxicity estimate |
+| AutoDock Vina + Meeko | absent | no docking, no affinity |
+| PySCF / OpenMM / BioPython | absent | no QM, no MD |
+| ChEMBL / PubChem egress | **HTTP 403** | no structures, no prior-art search |
+
+### The blocker the audit actually found
+
+`campaign/predictionHardFilters.mjs` (D-069 Option A) was built, tested and
+frozen — and had **zero production callers**, imported only by its own test
+file. The rule was never wrong; its INPUT was missing. Its designed source is
+`multiFidelity.mjs`'s ADMET/docking MODEL_ESTIMATEs, which report
+BLOCKED_BY_RUNTIME here, so the gate could never execute and the generation
+loop silently had no prediction filter at all.
+
+Closed with a real liability source computed by the SAME RDKit engine the
+campaign already runs per candidate — `rdkit_worker.py`'s new `liabilities`
+command: QED (Bickerton 2012), PAINS (Baell & Holloway 2010), BRENK (Brenk
+2008), NIH screening-deck alerts via RDKit FilterCatalog, plus Lipinski and
+Veber. No new dependency, no fitted model, no invented biology. Terms land in
+a dedicated `liab` bucket, never in `admet`/`tox`, so a rejection code always
+says which KIND of evidence rejected a candidate; `evidenceClass` is
+COMPUTATIONAL, never MODEL_ESTIMATE.
+
+The gate is applied in `makeCandidateRecord`, before a candidate can reach
+`retained`, `recomputePareto` or `metricsSnapshot` — D-069's own requirement
+that a model estimate may rule a candidate OUT and never rank one IN. Opt-in
+(existing benchmark campaigns stay byte-identical), then **fail closed**: a
+missing or fingerprint-mismatched rule aborts the campaign rather than
+degrading to "no filter". Proven live: gate ON rejected aniline and its
+derivatives (aniline is a Brenk toxicophore), retained 29 -> 15.
+
+### Frozen thresholds — and the one deliberately NOT frozen
+
+Three terms, each traceable to the published rule it comes from:
+`structuralAlertCount max 0`, `lipinskiViolations max 1`, `veberPass min 1`.
+`ruleFingerprint 28505cb769d5554f`, derived from the terms array so editing
+any threshold changes it.
+
+**QED is deliberately not gated.** It is a continuous desirability score with
+no canonical cut-off; choosing one would be exactly the arbitrary success
+threshold this mission's own brief forbids. It is computed and reported for
+every candidate, and gates nothing.
+
+### Why no winner is reachable here — a computed fact, not a judgement
+
+`molecularMission.mjs::comparableAxes()` intersects what is measurable on the
+baseline with what is measurable on a generated candidate:
+
+- baseline measurable on: `[TARGET_RELEVANT_ACTIVITY]` — real pinned ChEMBL
+  potencies (CHEMBL4297839, GLP-1R 0.77 nM, GIPR 0.03 nM, phase 4,
+  sha256-verified against `meta.json`'s own recorded hash). It has **no
+  SMILES** — tirzepatide is a 39-residue peptide and ChEMBL is unreachable —
+  so no descriptor or liability number is computable for it.
+- candidates measurable on: `[LIABILITY_BURDEN, STRUCTURAL_VALIDITY]` — real
+  RDKit values. They have **no measured activity**, and because the pinned
+  actives also lack structures, not even a ligand-similarity proxy can be
+  fitted.
+
+**The intersection is empty.** Not one quantity can be compared between a
+candidate and the baseline. `decide()` derives NO_WINNER from that computed
+emptiness; there is no branch that returns a winner on a judgement call, and
+a caller cannot reach one by passing different options — only by supplying
+the missing data. A test proves the converse path: given a shared axis, a
+clean run and searched prior art, the same function returns
+COMPUTATIONAL_CANDIDATE — so the NO_WINNER is earned, not hardcoded.
+
+### E2E result (live, `npm run mol-01:demo`)
+
+```
+generated 60, retained 41, Pareto 8, stop=STOP_RESOURCE_LIMIT after 3 generations
+falsification: 5 PASS, 1 FAIL (BASELINE_COMPARISON_POSSIBLE)
+novelty: structural NEW_TO_THIS_CORPUS (38 derived) | lineage FULLY_TRACED | prior art NO_ACCESS
+OUTCOME: NO_WINNER
+  NO_COMPARABLE_AXIS / EFFICACY_AXIS_UNAVAILABLE / PRIOR_ART_UNVERIFIABLE
+  / FALSIFICATION_FAILED:BASELINE_COMPARISON_POSSIBLE
+recipeFingerprint 2a4f2b1f36241385 — replay MATCH — 9/9 invariants PASS
+```
+
+Novelty is reported as three separate questions and never collapsed into one
+word: structural novelty is scoped to this corpus only, lineage is fully
+traced through real parents/co-parents and transformations, and prior art is
+**NO_ACCESS** — an absence of a hit was never observed, so novelty is
+UNVERIFIABLE rather than established.
+
+### Mind: what is missing and what to do next, computed
+
+`nextAction()` ranks candidate actions by how many of the run's ACTUAL open
+blockers each would clear — it is not a script. With all four blockers open it
+selects "obtain SMILES for tirzepatide and the pinned GLP-1R actives"
+(clears 2 of 4); given only a prior-art blocker it switches to the egress
+action; given none it recommends nothing. Tests pin all three behaviours.
+
+### Seed honesty
+
+The seed set is benzene/phenol/aniline/toluene — documented non-novel
+reference chemicals, **not** target-derived, because no GLP-1R-active
+structure is obtainable in this runtime. `runMolecularMission` refuses to run
+without both `seeds` and a stated `seedProvenance`, and that provenance is
+carried into the recipe as a limitation.
+
+### What may NOT be claimed
+
+Every decision carries a `claimBoundary`: this is a COMPUTATIONAL research
+result; it is not a clinical finding, not a validated drug, carries no
+evidence of efficacy or safety in any organism, and nothing here may be
+described as a tirzepatide replacement.
+
+### Gate
+
+Backend campaign suites 41 pass / 0 fail / 9 skipped (runtime-gated on the
+absent engines). New `molecularMissionD074.test.mjs`: negative-first across
+frozen-rule tampering, fail-closed gating, Goodhart leakage, unverifiable
+prior art, determinism and no-timestamp recipe identity. eslint clean.
+Demo: 9/9 invariants, replay MATCH.

@@ -49,7 +49,8 @@
     "te7:demo": "node scripts/te7-multilingual-rtl-demo.mjs",
     "genuine-discovery:e2e01": "node scripts/genuine-discovery-e2e-01.mjs",
     "proof-ladder:demo": "node scripts/proof-ladder-demonstrator.mjs",
-    "winner-recipe:demo": "node scripts/genesis-winner-recipe-e2e-demo.mjs"
+    "winner-recipe:demo": "node scripts/genesis-winner-recipe-e2e-demo.mjs",
+    "mol-01:demo": "node scripts/genesis-molecular-mission-demo.mjs"
   },
   "keywords": [
     "genesis-os",

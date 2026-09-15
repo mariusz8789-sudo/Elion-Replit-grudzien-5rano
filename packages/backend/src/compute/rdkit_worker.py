@@ -297,6 +297,18 @@ def main():
             "rotatableBonds": rot_b,
             "tpsa": round(tpsa, 3),
         }
+        # Molecular identity travels with the liability panel because the
+        # registry's `chem-rdkit-descriptors` projection drops InChI, and a
+        # candidate without a structure-derived identifier cannot be checked
+        # for accidental duplication against anything outside this campaign.
+        # Same molecule, same worker invocation -- no second RDKit call.
+        inchi_key = None
+        try:
+            from rdkit.Chem import inchi as rd_inchi
+            inchi_key = rd_inchi.MolToInchiKey(mol) or None
+        except Exception:  # noqa: BLE001 — no InChI module => no identifier, never a fabricated one
+            inchi_key = None
+        data["inchiKey"] = inchi_key
         print(json.dumps({
             "ok": True, "data": data, "engine": "RDKit " + rdkit.__version__,
             "catalogs": catalog_names,

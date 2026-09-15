@@ -8120,3 +8120,107 @@ suite 760 tests, 727 pass, 0 fail, 33 skipped.
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Gates, pins, split rule,
 ingest policy and Winner Gate untouched. No attempt 2/2 was run — this seal
 authorised measurement preparation, not the frozen model attempt.**
+
+---
+
+## D-103 — "CONTINUE — A2 + FINALIZE C1": A2 checked exhaustively, not delivered; C1 measured on real structure identity, NOT_CLOSED
+
+Direct instruction from the account owner: check every source this container
+can reach for A2, close C1 on real identity if the data allows it, decide
+2/2 only after that, run the full pipeline only if C1 closes, never fabricate
+a candidate.
+
+### 1–3. A2 search — exhaustive, before anything else
+
+Checked, in order:
+- `data/transcription/` for any A2 chunk — none.
+- every `.smi`/`.sdf`/SMILES-named file anywhere in the repo outside the
+  frozen pin — none.
+- egress re-probed to every chemistry-relevant host (EBI, UniProt, PubChem,
+  NCBI eutils, BindingDB, NCI cactus resolver, OPSIN) — all `http=000`,
+  `gateway answered 403 to CONNECT (policy denial)`, unchanged from
+  D-092b's `CHANNEL_CONSTRAINT`.
+- RDKit — installed locally (`2026.03.6`) and used elsewhere in this
+  repository, but it is a cheminformatics **toolkit** (canonicalisation,
+  fingerprints, Murcko scaffolds), not a structure **database**. It cannot
+  supply a SMILES for a `molecule_chembl_id` it was never given one for.
+- `npm`/pip caches — no chemical data found.
+
+**Found:** 7 of A1's 300 unique molecules already have a real,
+previously-ingested, custody-verified `canonicalSmiles`, because they also
+appear in the frozen GLP-1R pin from D-076/077
+(`packages/backend/src/campaign/glp1rActivity.json`). This is real data
+already in the repository — used exactly as far as it goes.
+
+**Not found, and not guessed:** the other 293 molecules have no
+`canonicalSmiles` anywhere this container can reach. No structure was
+invented for any of them. **A2 status: NOT_DELIVERED — 0/8 chunks, 7/300
+molecules incidentally covered.**
+
+### 4–5. Final measurement — real `canonicalSmiles`, no substitute
+
+`scripts/d103-noise-floor-final.mjs` reuses `replicateGrouping.mjs` directly
+(no wrapper, no substitute field) against the 41 A1 rows whose molecule has a
+real SMILES and whose assay label is custody-verified (D-101 excludes the
+190 rows on the still-unverified A3 chunk-3 assays). The same sealed D-102
+rules (readout family, HSA-in-CAMP, suspect-flat-value exclusion) apply
+unchanged — the identity key is the only thing this entry changes relative to
+D-102's provisional pass.
+
+`packages/backend/src/campaign/glp1r-d103-noise-floor-final.json`
+(hash `4cb0dd1c…`):
+
+| family | rows | molecules | groups | status |
+|---|---|---|---|---|
+| CAMP | 21 | 7 | 5 | NOT_MEASURED |
+| OTHER (incl. ERK) | 7 | 4 | 2 | NOT_MEASURED |
+| ARRESTIN | 9 | 3 | 2 | NOT_MEASURED |
+| CALCIUM | 3 | 2 | 1 | NOT_MEASURED |
+| INTERNALIZATION | 1 | 1 | 0 | NOT_MEASURED |
+
+### 6. C1 status: NOT_CLOSED
+
+No family reaches `minGroupsForNoiseFloor = 20` on real structure identity.
+**This is a data-volume result, not a methodology failure**: the CAMP family
+alone reached 55 groups under D-102's provisional (molecule-id) pass, so the
+readout-stratification method works — it simply has almost nothing to work
+with once restricted to molecules with a verified structure (7 of 300).
+D-102's provisional 55-group CAMP result is exactly the kind of number this
+entry's own header warned could move once real identity applies: it does,
+and it moves to `NOT_MEASURED`, in the safe direction the whole campaign has
+been guarding against (a falsely LOW spread from proxy identity, not a
+falsely HIGH one).
+
+### 7. Attempt 2/2 — decision: NOT AUTHORISED
+
+C1 did not close. Per the account owner's own ordering ("Dopiero po
+prawidłowym C1 zdecyduj, czy system może przejść do próby 2/2"), attempt 2/2
+does not run. No threshold, prereg, split rule, Winner Gate, or scientific
+policy was touched to reach this decision or avoid it.
+
+### 8–9. Downstream pipeline: not run, because its precondition failed
+
+Candidate generation, scoring, and a new adjudication were **not** run — item
+8's own text makes them conditional on C1 closing. `mounjaroResearchRecipe.test.ts`
+(10/10, reconfirmed before writing this entry) shows the promotion chain's
+structural state is unchanged: no `WINNER` verdict exists, so
+`canPromoteToWinnerRecord` still returns `NO_PROMOTION`, and
+`buildMounjaroResearchRecipe` still returns `RECIPE_LOCKED`. No candidate is
+reported, because none was generated — inventing one to answer item 9 would
+be exactly the fabrication this whole campaign exists to refuse.
+
+### 10. Tests, lint, full suite
+
+`d103NoiseFloorFinal.test.mjs` (7/7): identity key is real `canonicalSmiles`
+with no "provisional"/"substitute" language; A2 status states `NOT_DELIVERED`,
+`0/8`, sources the 7/300 to D-076/077; the 300/7/293 counts; `C1Status =
+NOT_CLOSED` for a stated data-volume reason; every family `NOT_MEASURED`; the
+D-102 prereg fingerprint carried through unchanged (no new, unsealed rule);
+artifact hash present. ESLint clean on all new files. Backend suite run in
+full.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2 — unchanged, unconsumed.
+Gates, pins, split rule, ingest policy and Winner Gate untouched. C1 remains
+open: closing it requires either the remaining ~293 SMILES (A2) or the A3
+chunk-3 custody drift resolving (190 rows currently unusable regardless of
+SMILES availability).**

@@ -7130,3 +7130,83 @@ diagnostic authorises neither.
 
 **NO_WINNER. Recipe LOCKED. Gate constants UNCHANGED.**
 
+
+## D-091 — DIAGNOSTIC-1: the noise floor is NOT_MEASURED on every axis, and why
+
+Sealed artifact `e965ac46535375996fe7b34a8b6cbf047466da98eb7f781b2126a08dbcd242f5`.
+No model fitted, no test split read, **0 attempts consumed**, no threshold,
+pin or Winner Gate touched.
+
+### Verified rather than assumed
+
+The reviewed correction was right about the rule and wrong about where the
+repository stood. Checked against the code and the data:
+
+- **The sealed Diagnostic-0 already required ≥2 distinct assays.**
+  `d089-diagnostic0.mjs:123` reads
+  `rows.length < 2 || new Set(rows.map((r) => r.assayId)).size < 2`. The
+  proposed fix was to a rule this repository was already applying.
+- **`assayId` is a sound discriminator on this pin, measured:** 25 distinct
+  ChEMBL assay ids, **0 null or empty**, all strings, **0 assays carrying more
+  than one endpoint type**, **0 (molecule, assay) pairs appearing twice**.
+
+That last number matters: because no molecule repeats inside one assay, the
+distinct-assay condition is **currently redundant on this pin** — `length ≥ 2`
+already implies it. So the proposed defect is real but **inert here**, and
+would only fire once an extension lands, since bulk sources routinely carry
+several rows per assay.
+
+The condition is kept regardless. A guard that is currently inert is not a
+guard that is unnecessary, and the redundancy is a property of today's data
+rather than of the rule.
+
+### The measurement
+
+`campaign/replicateGrouping.mjs` is now the ONE definition of a replicate —
+same molecule, same endpoint, ≥2 distinct assays — so the rule is not
+re-implemented ad hoc at each call site.
+
+| endpoint | molecules | replicate groups | rejected: single record | rejected: same assay | status |
+|---|---|---|---|---|---|
+| EC50 | 189 | **4** | 185 | 0 | NOT_MEASURED |
+| IC50 | 86 | **2** | 84 | 0 | NOT_MEASURED |
+| Ki | 4 | **0** | 4 | 0 | NOT_MEASURED |
+
+Total **6**, reconciling exactly with the aggregate sealed in D-089 — a real
+cross-check between the shared module and the existing seal.
+
+The floor for a usable estimate is 20. The EC50 axis — the one that would
+matter, being both the largest and the homogeneous one — has **4**.
+
+### Why the direction of the error mattered
+
+Counting same-assay duplicates as replicates would produce a spread near zero
+and therefore a falsely **LOW** noise floor. That is the dangerous direction:
+it makes the data look *more* reliable than it is, and would have supported
+"the model is far from the noise floor, so keep tuning". The rule refuses
+before that can happen, and a test asserts the refusal on three identical
+same-assay records.
+
+### What this settles
+
+**The research question — can the D-088 ceiling of MAE 1.0425 be improved
+under frozen rules — is UNDECIDABLE FROM THIS PIN.** Deciding it requires
+knowing how much of the error is irreducible label noise, and that quantity
+cannot be measured here. This outcome is implementation-independent: the data
+physically contains 6 repeat measurements; no grouping rule recovers a floor
+from that.
+
+D-089's `CONSTRAINT_CONFLICT` therefore **stands unchanged and is NOT upgraded
+to an impossibility claim**.
+
+### The converging conclusion
+
+Endpoint-homogeneous EC50-only human GLP-1R rows on new Murcko scaffolds now
+answer *both* open questions at once: they lift the size floor that
+`CONSTRAINT_CONFLICT` records, and they create the replicate groups that make
+the noise floor measurable. Two independent diagnostics, run for different
+reasons, point at one acquisition.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Gates, pins and Winner Gate
+UNCHANGED.**
+

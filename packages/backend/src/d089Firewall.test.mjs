@@ -122,3 +122,52 @@ test('ITEM 6: every acquisition source is EGRESS_BLOCKED with no fabricated coun
   // and target identity must NOT be asserted as verified
   assert.match(acq.conclusion, /remains a declaration, not a verified fact/);
 });
+
+/* ------------------------------------- D-091: SEALED DIAGNOSTIC-1 ARTIFACT */
+
+test('D-091 Diagnostic-1 is sealed and its hash re-verifies', () => {
+  const sealed = read('glp1r-d091-diagnostic1.sealed.json');
+  assert.equal(canonicalHash(sealed.artifact), sealed.artifactHash, 'the sealed artifact was edited after sealing');
+});
+
+test('D-091 consumed no attempt, read no test split, fitted no model', () => {
+  const a = read('glp1r-d091-diagnostic1.sealed.json').artifact;
+  assert.equal(a.representationAttemptsConsumed, 0);
+  assert.equal(a.testSplitRead, false);
+  assert.equal(a.modelFitted, false);
+  assert.equal(a.gateConstantsChanged, false);
+  assert.equal(a.pinsChanged, false);
+  assert.equal(a.winnerGateChanged, false);
+});
+
+test('D-091 reconciles with the D-089 seal and reports NOT_MEASURED everywhere', () => {
+  const a = read('glp1r-d091-diagnostic1.sealed.json').artifact;
+  assert.equal(a.measurements.EC50.replicateGroups, 4);
+  assert.equal(a.measurements.IC50.replicateGroups, 2);
+  assert.equal(a.measurements.KI.replicateGroups, 0);
+  assert.equal(a.measurements.totalReplicateGroups, 6);
+  for (const ep of ['EC50', 'IC50', 'KI']) assert.equal(a.measurements[ep].status, 'NOT_MEASURED');
+  assert.equal(a.result.status, 'NOT_MEASURED');
+  // the D-089 aggregate it must agree with
+  const d089 = read('glp1r-d089-diagnostic0.sealed.json').artifact;
+  assert.equal(d089.measurements.true_replicate_groups, a.measurements.totalReplicateGroups);
+});
+
+test('D-091 does NOT upgrade CONSTRAINT_CONFLICT into an impossibility claim', () => {
+  const a = read('glp1r-d091-diagnostic1.sealed.json').artifact;
+  assert.match(a.consequenceForTheResearchQuestion.answer, /UNDECIDABLE FROM THIS PIN/);
+  assert.match(a.consequenceForTheResearchQuestion.answer, /NOT upgraded to an impossibility claim/);
+  assert.equal(a.scientificStateUnchanged.NO_WINNER, true);
+  assert.equal(a.scientificStateUnchanged.recipe, 'LOCKED');
+  assert.equal(a.scientificStateUnchanged.d088AttemptBudget, '1 of 2 remaining');
+});
+
+test('D-091 records the assayId provenance it verified, including the inert-guard reasoning', () => {
+  const v = read('glp1r-d091-diagnostic1.sealed.json').artifact.assayIdProvenanceVerification;
+  assert.equal(v.distinctAssayIds, 25);
+  assert.equal(v.nullOrEmptyAssayIds, 0);
+  assert.equal(v.assaysCarryingMoreThanOneEndpointType, 0);
+  assert.equal(v.moleculeAssayPairsAppearingMoreThanOnce, 0);
+  assert.match(v.consequence, /currently REDUNDANT/);
+  assert.match(v.consequence, /inert is not a guard that is unnecessary/);
+});

@@ -5977,3 +5977,142 @@ Backend 586 tests / 553 pass / 0 fail / 33 skipped; new `glp1rQsarV2.test.mjs`
 "1.0425 is BLOCKED" assertion. tsc, eslint clean. V1 E2E re-run unchanged
 (9/9, MAE 1.1726, BLOCKED). `batch_descriptors` added alongside
 `batch_fingerprint`, verified identical to the per-molecule path.
+
+## D-080 — Chaos-Aware Ensemble: audited, VALIDATED, no new physics engine
+
+A "Qwen" package proposed a chaos-ensemble module (Lorenz + N-body predictability
+horizon, ensemble spread, empirical Lyapunov estimate) with its own RK4 stepper,
+its own N-body integrator, a `mulberry32` import from a path that does not exist
+in this repo, and reference numbers claimed but not reproducible from the repo
+as given. Per instruction, it was treated only as a candidate implementation,
+never as ground truth, and checked point by point against the real repo before
+a line was written.
+
+### Reuse-first audit, before any code
+
+- **RNG**: the proposed `mulberry32` import path does not exist anywhere in this
+  repo (confirmed by grep across `packages/`). The real canonical PRNG for
+  scientific work is `core/epidemic/agents.ts::makeRng` (mulberry32-based) — used
+  as-is, no new RNG written.
+- **Lorenz integrator**: `core/physics.ts::stepLorenzRK4` already exists, is
+  already the integrator behind the shipped `labs/experiments/universe-lorenz3d.ts`
+  lab (same `dt=0.01`, `sigma=10`, `beta=8/3`, same `{x:0.1,y:0,z:0}` initial
+  condition), and is reused unchanged. The proposal's own RK4 Lorenz stepper was
+  a duplicate and was not built.
+- **N-body integrator**: `labs/experiments/universe-threebody.ts::stepVerlet`
+  (symplectic velocity-Verlet, softening baked in at `SOFT2=1e-6`) already
+  exists, already ships `figure8Bodies()` (Moore 1993 / Chenciner-Montgomery
+  2000) and `pythagoreanBodies()` (Burrau 1913), and is reused unchanged. The
+  proposal's own N-body stepper was RK4, which is the numerically WRONG choice
+  for long-horizon gravitational dynamics (secular energy drift vs. Verlet's
+  bounded oscillation) — not just a duplicate but a regression, and was not
+  built. This module never introduces a second softening constant.
+- **Fingerprinting**: `core/events/hash.ts::fnv1a` / `canonicalJson`, reused
+  unchanged for `chaosReport().fingerprint`.
+- **Worker pool (checklist #7, #9)**: no generic worker pool exists in this
+  repo. D-078's batching solved a real problem — each RDKit call was a separate
+  Python subprocess spawn — by amortizing that spawn cost across many molecules
+  per process. This module has no such boundary: every ensemble seed already
+  runs in the same process, in the same synchronous call, with no subprocess to
+  amortize. `ensembleBatchTasks` "using D-078" would have been a seam over
+  nothing, so it was not built. This is the honest answer to #7 and #9, not a
+  gap plastered over with a fake comparison.
+
+Net: one genuinely new stepper was written — an exact closed-form rotation for
+a non-chaotic harmonic-oscillator control case (`harmonic2d`), because no
+existing harmonic-oscillator lab was found in this repo and a control case is
+needed to show the ensemble machinery does NOT flag a non-chaotic system as
+chaotic. Zero new physics for the two real chaos step ids.
+
+### What the negative-first tests caught (checklist items 1-6)
+
+1. **TS vs "Python reference" (#1)**: no Python reference implementation exists
+   in this repo to compare against; the proposal's reference numbers were
+   unverifiable and were not used. Instead, a direct delegation test asserts
+   the ensemble's first stepped point matches `stepLorenzRK4` called directly,
+   bit for bit (12 decimal places) — proving this module calls the real
+   integrator rather than a private copy with the same name.
+2. **Lorenz horizon / monotonicity (#2)**: real, but the DEFAULT test window
+   (`steps: 3000`) initially produced 5 failures. Traced with throwaway debug
+   scripts: this module's Lorenz initial condition sits close to the saddle
+   fixed point at the origin, so the ensemble spends a genuine, measured
+   ~20-30 time-unit near-flat transient before the chaotic attractor's
+   exponential growth takes over — a real physical effect, not a bug. Fixed by
+   widening the test window to `steps: 6000`. Measured horizon crossings
+   (tolerance=1.0, 16 seeds): **t=29.94 at perturbation 1e-4, t=33.12 at 1e-6,
+   t=41.61 at 1e-8** — larger perturbation reaches the tolerance boundary
+   earlier, confirmed monotonic.
+3. **nbody3-planar / EPS2 (#3)**: `stepVerlet`'s existing `SOFT2=1e-6` is
+   reused unchanged and never reinterpreted; a new `energyDriftFor()` function
+   was added specifically to check conservation for THIS module's own step
+   count/dt rather than trusting the reused module's own test suite to cover
+   this exact configuration. Measured: relative energy drift **2.36e-7** over
+   5000 fixed-`dt=0.001` Verlet steps (t=5.0) on `figure8Bodies()` — about
+   1000x tighter than the shipped `universeThreeBody.test.ts`'s own accepted
+   1%-5% bound for the same integrator under adaptive stepping.
+4. **lyapunovEstimate honesty (#4)**: labeled `EMPIRICAL_ESTIMATE_NOT_RIGOROUS_EXPONENT`
+   on every `ChaosReport`, never presented as the rigorous exponent. The
+   estimator's default regression window was wrong TWICE, both caught by this
+   suite: first `hi = 0.5 * max(curve)` spanned both the pre-chaotic transient
+   and the post-crossing saturation plateau (measured slope 0.36, biased);
+   then anchoring `lo` to `10 * perturbation` floored at only `1e-4` still sat
+   inside the noisy pre-chaotic transient at this module's default
+   perturbation (measured slope 0.16, still biased). Point-by-point tracing
+   showed real exponential growth only begins once spread exceeds ~1e-3.
+   Final window: `lo = max(1e-3, 10*perturbation)`, `hi = tolerance`. Measured
+   **λ ≈ 0.78**, consistent with the textbook maximal Lyapunov exponent for
+   these Lorenz parameters (σ=10, ρ=28, β=8/3), ≈0.90.
+5. **NO_DIVERGENCE_WITHIN_WINDOW fail-safe (#5)**: the `harmonic2d` control
+   case (exact rotation, non-chaotic by construction) never crosses tolerance
+   within the test window and correctly reports `NO_DIVERGENCE_WITHIN_WINDOW`;
+   its report statement explicitly claims NEITHER non-chaoticity NOR that a
+   longer window would hold — only that divergence was not observed.
+6. **replay/fingerprint determinism (#6)**: same spec -> identical trajectories
+   (`toEqual`) and identical `chaosReport().fingerprint`, every time; different
+   seeds -> different fingerprint and different individual trajectories (not
+   an artifact of a fixed perturbation direction).
+
+### Benchmark (checklist #8)
+
+Real wall-clock, `lorenz63`, `steps=600`, `dt=0.01`, single process, no mocks:
+
+| seeds | ms | ms/seed |
+|---|---|---|
+| 16 | 12.07 | 0.755 (JIT warm-up dominates) |
+| 100 | 11.06 | 0.111 |
+| 1,000 | 104.35 | 0.104 |
+| 10,000 | 1,266.25 | 0.127 |
+
+Scales linearly with seed count once past JIT warm-up (~0.1-0.13 ms/seed),
+consistent with pure in-process float arithmetic and no external process
+boundary — the answer to #9 above.
+
+### Engine duplication (#10)
+
+None. `runEnsemble` calls exactly one of `stepLorenzRK4`, the new exact
+rotation, or `stepVerlet` per `stepId`; no second Lorenz derivative, no second
+N-body stepper exists anywhere in `core/chaos/`.
+
+### Frozen gates
+
+D-057 (Winner Gate) and D-069 (Objective Guard) were not touched — this module
+adds no `WinnerRecord`, no gate, no threshold; it is a standalone chaos-ensemble
+utility with its own `ChaosReport` output type. D-056's 3D deferral is honored:
+no 3D visualization was built for this work.
+
+### Closure fingerprint (reproducible from the spec alone)
+
+`{stepId: 'lorenz63', seeds: [0..15], perturbation: 1e-6, steps: 6000,
+tolerance: 1.0}` -> `horizonT=33.12`, `lyapunovEstimate=0.7781026789638072`,
+`finalSpread=16.19238...`, **`fingerprint: 5f571803`**.
+
+### Gate
+
+New files only: `packages/frontend/src/core/chaos/ensemble.ts`,
+`packages/frontend/src/__tests__/chaosEnsemble.test.ts` (18 tests, negative-first
++ delegation + chaos-measurement + control-case + determinism/replay),
+`packages/frontend/src/__tests__/chaosEnsembleBenchmark.test.ts` (1 test, real
+wall-clock table). tsc clean, eslint clean on all three files. No existing file
+was modified.
+
+**OUTCOME: VALIDATED.**

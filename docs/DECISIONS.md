@@ -8224,3 +8224,116 @@ Gates, pins, split rule, ingest policy and Winner Gate untouched. C1 remains
 open: closing it requires either the remaining ~293 SMILES (A2) or the A3
 chunk-3 custody drift resolving (190 rows currently unusable regardless of
 SMILES availability).**
+
+---
+
+## D-104 — A2 arrives 1/8 and fails custody; A3 chunk 3's third attempt is not decodable; C1 unchanged
+
+**Date:** 2026-09-15
+**Context:** A third delivery of A3 chunk 3 (base64, 7 pieces, per-piece hashes)
+plus the first chunk of the A2 structure dictionary. The instruction: verify all
+hashes, verify A2's completeness against A1, run the final grouping on real
+`canonicalSmiles` only, then close or leave C1 — and only if closed, proceed to
+Trial 2/2. No artificial candidate, no artificial Winner, no threshold moved.
+
+### 1. A3 chunk 3, third attempt — five of seven pieces verify
+
+| piece | declared LEN / sha256 | received | verdict |
+|---|---|---|---|
+| 1 | 1779 / `726c5764…` | 1779 / same | MATCH |
+| 2 | 1779 / `bd63dcc7…` | **1781** / `f89b3297…` | MISMATCH |
+| 3 | 1779 / `34f1c9f3…` | **1782** / `51767107…` | MISMATCH |
+| 4-7 | 1779,1779,1779,1774 | same | MATCH |
+
+Concatenation: 12453 bytes, `9cb972c7…`, against a declared 12448 / `b1c7b235…`.
+
+**TEST 1 and TEST 2 were not run, because they have no valid input.** Two
+structural facts settle it without testing anything against a target hash: 12453
+is not a multiple of 4, so the stream cannot be a complete base64 encoding; and
+`=` padding occurs at offsets 3558, 3559, 5340 and 5341 — pieces 2 and 3 each
+end in terminal padding *mid-stream*, meaning they were encoded as self-contained
+strings while pieces 1 and 4-7 are slices of one encoding. A strict decoder
+rejects both. Decoding anyway would hash bytes this channel never carried and
+call the result custody.
+
+No repair was attempted. Dropping the stray `==`, shifting boundaries, or
+re-slicing until the concatenation hashes to `b1c7b235…` is guess-and-check
+against a known target — the search shape already refused in D-099 and D-101 —
+and it does not become acceptable because the fix looks obvious. **Chunk 3
+custody: UNKNOWN, third attempt.** Received bytes pinned as
+`A3-chunk-03.piece-0N.b64` so a fourth attempt can be diffed rather than
+restarted.
+
+### 2. A2 chunk 1/8 — custody FAILED, and the defect is identified from A1
+
+Declared: 18 rows, `CHEMBL2108724`→`CHEMBL4098061`, sha256 `0ee287d3…`.
+Received: **17 rows**, both keys matching, sha256 `b5285da5…` under the same
+convention that verified all seven A1 chunks byte-exactly (rows only, LF, one
+trailing LF).
+
+The declared row count is **correct**; the channel lost a row. That is decided
+by frozen data, not by hypothesis: A1 holds 300 distinct `molecule_chembl_id`,
+exactly 18 of them sort into the declared key range, and exactly one —
+**`CHEMBL4088708`** — is absent from the delivery, sorting between the delivered
+`CHEMBL4087789` and `CHEMBL4091638`. All 17 delivered ids are in A1; none is
+foreign. So: clean single-row loss.
+
+`CHEMBL4088708`'s SMILES is **not** reconstructed. It is not in the D-076/077
+pin, every chemistry host is egress-blocked (D-092b), and inventing a structure
+is the fabrication the standing rules forbid.
+
+Also recorded, not corrected: the structure-less row arrived as
+`CHEMBL2108724|` rather than the specified `CHEMBL2108724||notRetrieved`.
+Rewriting delivered bytes is how a custody record stops being one.
+
+### 3. A2 completeness against A1 — **not 8/8**
+
+Chunks 2-8 arrived as a single inventory line declaring 283 further rows. A
+declared hash over bytes that were never sent is not a delivery (D-095: a
+declaration is never promoted to a measurement). The inventory's arithmetic does
+check out — 18+17+12+11+15+68+106+53 = 300 — and two structures are declared
+`notRetrieved` (`CHEMBL2108724`, `CHEMBL5314341`). Those are claims awaiting
+delivery.
+
+**A2 status: 1 of 8 chunks delivered, 0 of 8 custody-verified, 0 custody-verified
+structures available.**
+
+### 4. Final grouping — not run, precondition unmet
+
+The instruction was to run `replicateGrouping.mjs` on **verified**
+`canonicalSmiles` only. There are none. Running it on the 16 delivered-but-
+unverified SMILES would mean a measurement whose provenance record says
+`custody: FAILED`, and `molecule_chembl_id` as a substitute is forbidden by the
+same instruction (correctly — it biases the floor downward, which is the
+direction that falsely excuses a model's MAE; that is why D-102's provisional
+run was withdrawn in D-103).
+
+Even setting custody aside, the arithmetic does not reach the gate: 16 delivered
++ 7 frozen in the D-076/077 pin = at most 23 of 300, against a prereg requiring
+`minGroupsForNoiseFloor: 20` per readout family and a D-103 measurement of 5 CAMP
+groups. Nothing about this delivery could have closed C1.
+
+### 5. C1, Trial 2/2, candidate, Winner, Recipe
+
+**C1: NOT_CLOSED.** Reason unchanged from D-103 — data volume, not methodology.
+
+Because C1 is open, the user's own ordering ("tylko jeśli C1 jest zamknięte")
+blocks everything downstream: **Trial 2/2 not authorized, budget still 1 of 2,
+unconsumed. No candidate generated — so none is reported. NO_WINNER. Recipe
+LOCKED** (`buildMounjaroResearchRecipe` returns `RECIPE_LOCKED` because
+`canPromoteToWinnerRecord` returns `NO_PROMOTION`; no `WINNER` verdict exists).
+
+`MIN_TRAIN 150 / MIN_TEST 40 / MAX_MAE 1.0 / MIN_R2 0.25`, `ruleFingerprint
+d2f77a7e6042f0fc`, the D-102 prereg `f475467a12dff413`, `REPLICATE_RULE`, the
+scaffold split, the ingest policy and the Winner Gate are all untouched.
+
+### 6. Tests
+
+`d104TranscriptionCustody.test.mjs` (11/11) — negative-first by construction:
+it asserts that A2 chunk 1 FAILS, that the concatenation is NOT valid base64,
+that TEST 1/2 are NOT runnable, and that the module exports no repair or
+variant-search helper. A later change that quietly starts reporting these as
+verified breaks the suite rather than sliding past review.
+
+**NO_WINNER. Recipe LOCKED. C1 NOT_CLOSED. Nothing was moved to make any of
+those read differently.**

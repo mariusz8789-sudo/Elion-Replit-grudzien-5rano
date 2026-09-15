@@ -82,3 +82,67 @@ joins is confirmed on-target. The D-094 format defect is repaired without
 invalidating the byte-verified A1 chunks.
 
 Provenance class: `user-supplied-reference`. See D-092a.
+
+---
+
+## Chunk 3, third attempt: byte export as 7 base64 pieces (D-104)
+
+A third delivery of chunk 3 arrived, this time as the chunk's **base64** split
+into 7 pieces, each with its own declared `LEN` and `SHA256`, plus a declared
+sha256 over the concatenation
+(`b1c7b2351518ee5d513d40d6bc6e166255c20688bb32dbe1d8008f2a5306a0e2`, LEN 12448).
+The protocol agreed in advance was: verify the pieces, concatenate, then run
+TEST 1 (decode → sha256 must equal the declared `e5bb6931…` → custody ORIGINAL)
+and TEST 2 (strip U+0080–U+009F → must equal the pinned `dd8bf5c5…` →
+`CHANNEL_STRIPPED_C1`); if neither matches, the cause stays UNKNOWN and no
+further variants are tried.
+
+**Five of seven pieces verify byte-exactly. Two do not.**
+
+| piece | declared LEN | received LEN | declared sha256 | result |
+|---|---|---|---|---|
+| 1/7 | 1779 | 1779 | `726c5764…` | **MATCH** |
+| 2/7 | 1779 | **1781** | `bd63dcc7…` | **MISMATCH** (`f89b3297…`) |
+| 3/7 | 1779 | **1782** | `34f1c9f3…` | **MISMATCH** (`51767107…`) |
+| 4/7 | 1779 | 1779 | `7630dba1…` | **MATCH** |
+| 5/7 | 1779 | 1779 | `7d81c5e8…` | **MATCH** |
+| 6/7 | 1779 | 1779 | `335cbca9…` | **MATCH** |
+| 7/7 | 1774 | 1774 | `5147564c…` | **MATCH** |
+
+Concatenation: 12453 bytes, sha256
+`9cb972c79628ea99d550c61bfd47f7727b2b3b95c16645c3aade8a1b06d3ce32` — not the
+declared `b1c7b235…`. The excess is exactly 5 bytes (2 in piece 2, 3 in piece 3),
+matching 12453 − 12448.
+
+### TEST 1 and TEST 2 were not run, because the input is not decodable base64
+
+Not a judgement call — two structural facts decide it, and neither involves
+testing a hypothesis against a target hash:
+
+1. **12453 is not a multiple of 4.** A base64 stream's length always is. The
+   declared 12448 is (12448 = 4 × 3112). So the received stream cannot be a
+   complete base64 encoding of anything.
+2. **There is base64 terminal padding in the middle of the stream.** `=` occurs
+   at offsets 3558, 3559, 5340, 5341 and 12452 — i.e. pieces 2 and 3 each end in
+   `==`, exactly as a *self-contained* base64 string would, while pieces 1 and
+   4-7 end mid-alphabet as slices of one stream do. A strict decoder rejects
+   padding anywhere but the end.
+
+So the seven pieces are not seven slices of one encoding; pieces 2 and 3 are
+separately terminated. Decoding the concatenation would silently produce bytes
+that are not the sender's bytes, and hashing those would be a custody claim
+about a file this channel never carried. TEST 1 and TEST 2 have no valid input
+and were therefore not executed.
+
+No repair was attempted. Dropping the stray `==`, shifting the piece
+boundaries, or re-slicing until the concatenation hashes to `b1c7b235…` is
+guess-and-check against a known target — the same search pattern refused for
+the U+2122 hypothesis in D-101, and refusing it does not depend on how plausible
+the fix looks.
+
+**Chunk 3 custody: still UNKNOWN.** Three transmissions, none verified. The
+received pieces are pinned above as `A3-chunk-03.piece-0N.b64` and
+`A3-chunk-03.retransmit.b64` with their real hashes, so a future attempt can be
+diffed against them rather than starting over. The three assay descriptions
+remain a reading aid, not verified provenance, and remain excluded from the
+D-102/D-103 measurements via `UNVERIFIED_LABEL_ASSAYS`.

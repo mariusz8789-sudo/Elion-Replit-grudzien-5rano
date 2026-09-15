@@ -143,8 +143,45 @@ export function tirzepatideBaseline() {
 /**
  * The efficacy axis, stated as data rather than left implicit. A decision
  * function reads this and fails closed; it never has to infer from an absence.
+ *
+ * D-076/077 — ADDITIVE OPTIONAL ARGUMENT. Called with no argument (its three
+ * pre-existing call sites, and every D-074 test) it behaves EXACTLY as before:
+ * UNAVAILABLE, with the reasons that would close it. Passed a
+ * `GLP1REfficacyPrediction` whose status is AVAILABLE — which
+ * `glp1rEfficacyAdapter.mjs` only ever produces from a model that cleared the
+ * frozen D-077 validation gate on a hash-verified human GLP-1R pin — it
+ * reports the axis as available on a MODEL_ESTIMATE basis.
+ *
+ * WHAT THAT DOES AND DOES NOT MEAN. It closes the TECHNICAL absence of a
+ * prediction axis, so `decide()` stops listing EFFICACY_AXIS_UNAVAILABLE as a
+ * blocker. It does NOT make the candidate's activity a measurement, and it
+ * does NOT entitle anything to a WinnerRecord: D-057 adjudicates promotion on
+ * evidence class, and MODEL_ESTIMATE is not a member of
+ * `core/agent/evidenceProvenance.ts`'s `EvidenceClass` union at all — it
+ * degrades to UNVERIFIED (rank 1), far below the INDIRECT_RANDOMISED (rank 9)
+ * the Winner Gate requires. A validated QSAR earns a COMPUTATIONAL result,
+ * never a clinical one.
  */
-export function efficacyAxis() {
+export function efficacyAxis(qsarPrediction = null) {
+  if (qsarPrediction && qsarPrediction.status === 'AVAILABLE') {
+    return Object.freeze({
+      axis: 'TARGET_RELEVANT_ACTIVITY',
+      targets: Object.freeze(['GLP1R']),
+      available: true,
+      code: 'MODEL_ESTIMATE_AVAILABLE',
+      evidenceClass: 'MODEL_ESTIMATE',
+      isMeasurement: false,
+      prediction: qsarPrediction,
+      reasons: Object.freeze([
+        `GLP-1R activity is available as a MODEL_ESTIMATE from QSAR model ${qsarPrediction.modelVersion} (fingerprint ${qsarPrediction.modelFingerprint}, training data ${qsarPrediction.trainingDataHash}), which cleared the frozen D-077 validation gate`,
+        'this is a predicted value with a conformal interval, NOT a measured potency — the baseline side of this axis is real measured bioactivity and the candidate side is a model output, and that asymmetry travels with the comparison',
+        'GIPR activity remains unavailable: this model covers GLP-1R only',
+      ]),
+      whatWouldCloseIt: Object.freeze([
+        'a measured GLP-1R potency for the candidate (a real assay) would replace this MODEL_ESTIMATE with an observation and is the only thing that can raise the evidence class',
+      ]),
+    });
+  }
   return Object.freeze({
     axis: 'TARGET_RELEVANT_ACTIVITY',
     targets: Object.freeze(['GLP1R', 'GIPR']),

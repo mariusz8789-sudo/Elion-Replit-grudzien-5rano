@@ -10,6 +10,7 @@ Commands:
   descriptors {smiles}   -> { ok, data: {...real descriptors...} }
   validate {smiles}      -> { ok, valid, canonicalSmiles? }
   similarity {smiles, reference} -> { ok, tanimoto, scaffold* }
+  fingerprint {smiles}   -> { ok, bits, scaffold, canonicalSmiles }  (D-076/077)
 """
 import sys
 import json
@@ -171,6 +172,31 @@ def main():
             "scaffoldCandidate": scaffold_cand,
             "scaffoldReference": scaffold_ref,
             "sameScaffold": scaffold_cand == scaffold_ref,
+        }))
+        return
+
+    # D-076/077 GLP1R QSAR — dense Morgan bit vector for one molecule (not a
+    # pairwise comparison, unlike `similarity` above). 512 bits, not the 2048
+    # `similarity` uses: with typical human-activity pin sizes in the low
+    # hundreds of rows, a 2048+1-coefficient ridge would be heavily
+    # underdetermined even regularised: 512 keeps folded-collision noise low
+    # while staying well inside a plausible training-set size. Same Morgan
+    # r=2 radius as `similarity`, so a candidate's OOD check (Tanimoto against
+    # training fingerprints) stays comparable in kind, not just in name.
+    if cmd == "fingerprint":
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+        mol = Chem.MolFromSmiles(req.get("smiles", "")) if isinstance(req.get("smiles"), str) else None
+        if mol is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=512)
+        print(json.dumps({
+            "ok": True,
+            "bits": list(fp),
+            "nBits": 512,
+            "fingerprint": "morgan_r2_512",
+            "scaffold": Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(mol)),
+            "canonicalSmiles": Chem.MolToSmiles(mol),
         }))
         return
 

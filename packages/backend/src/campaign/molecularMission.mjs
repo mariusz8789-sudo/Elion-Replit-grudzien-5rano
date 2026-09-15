@@ -54,6 +54,10 @@ import {
   loadPinnedActives, computeChemotypeSimilarity, axisContribution,
   CHEMOTYPE_SIMILARITY_AXIS, CHEMOTYPE_HONESTY_NOTE,
 } from './chemotypeSimilarityAxis.mjs';
+import {
+  trainGlp1rModel, glp1rEfficacyPrediction, glp1rAxisContribution,
+  GLP1R_EFFICACY_AXIS, MODEL_ESTIMATE_NOTE,
+} from './glp1rEfficacyAdapter.mjs';
 
 export const MISSION_ID = 'GENESIS-MOL-01';
 export const MISSION_CONTRACT_VERSION = '1.0.0';
@@ -125,17 +129,29 @@ export function comparableAxes(baseline, capabilities, chemotype = null) {
   });
 }
 
-/** Real runtime capability probe — never a remembered answer. */
+/**
+ * Real runtime capability probe — never a remembered answer.
+ *
+ * `activityPredictor` (D-076/077) is now COMPUTED, not asserted: it is true
+ * only when `glp1rEfficacyAdapter.trainGlp1rModel()` actually loads a
+ * hash-verified human GLP-1R pin, loads the frozen validation gate, trains,
+ * and clears every gate threshold. It is false in this runtime because no
+ * such pin exists (ChEMBL egress is HTTP 403 here) — but it is false as the
+ * OUTPUT of that check, not as a constant, so the day a real dataset is
+ * ingested this flips without an edit to this file. `glp1rBlockedReason`
+ * carries exactly why it is false.
+ */
 export function probeCapabilities() {
   const rd = rdkitDetect();
+  const glp1r = trainGlp1rModel();
   return Object.freeze({
     rdkit: rd.available === true,
     rdkitVersion: rd.version ?? null,
     admet: capabilityAvailable('admet-estimation') === true,
     docking: capabilityAvailable('molecular-docking') === true,
     quantum: capabilityAvailable('quantum-chemistry') === true,
-    /** No module in this repository predicts GLP-1R/GIPR activity; asserted by audit and re-checked by the mission test. */
-    activityPredictor: false,
+    activityPredictor: glp1r.ok === true,
+    glp1rBlockedReason: glp1r.ok ? null : (glp1r.code ?? 'UNKNOWN'),
     priorArtSearch: false,
   });
 }
@@ -257,10 +273,10 @@ export const AVAILABLE_ACTIONS = Object.freeze([
     cost: 'one CI fetch job against ChEMBL from a network-enabled runner; the repo already has this pattern for the A2 dataset',
   },
   {
-    id: 'FIT_LIGAND_SIMILARITY_BASELINE',
-    action: 'With those structures, compute a ligand-similarity activity proxy (RDKit fingerprints, already available) against the measured-potency actives',
+    id: 'INGEST_HUMAN_GLP1R_ACTIVITY_DATASET',
+    action: 'Supply a human GLP-1R activity artifact (ChEMBL/BindingDB export, target_organism = Homo sapiens, target id resolved at ingestion — CHEMBL5862 is the RAT receptor and must not be used) and pin it with scripts/ingest-glp1r-activity.mjs; the D-076/077 QSAR seam then trains and validates itself against the frozen gate with no further code change',
     clears: ['EFFICACY_AXIS_UNAVAILABLE'],
-    cost: 'no new dependency — RDKit is live; requires the structures above first',
+    cost: 'no new dependency and no new code — RDKit is live and the ingestion/training/validation path already exists; it needs ≥150 train and ≥40 test human rows after scaffold-disjoint splitting, or the frozen gate will (correctly) refuse the model',
   },
   {
     id: 'INSTALL_ACTIVITY_OR_DOCKING_ENGINE',
@@ -359,10 +375,18 @@ export function runMolecularMission(db, opts) {
     baseline: null,
   };
 
+  // D-076/077 GLP-1R QSAR efficacy axis. `trainGlp1rModel()` is fail-closed:
+  // with no hash-verified human pin (this runtime) it returns PIN_MISSING and
+  // the prediction below is BLOCKED, so `efficacyAxis()` keeps reporting
+  // EFFICACY_AXIS_UNAVAILABLE exactly as before. A BLOCKED model is NEVER
+  // wired in as an available axis — only a gate-clearing one is.
+  const glp1rModel = trainGlp1rModel();
+  const glp1rPrediction = firstRetained ? glp1rEfficacyPrediction(firstRetained.canonicalSmiles, glp1rModel) : null;
+
   const axes = comparableAxes(base.baseline, capabilities, chemotype);
   const falsification = falsifyRun(summary, candidates, rule.thresholds);
   const novelty = assessNovelty(candidates, capabilities);
-  const efficacy = efficacyAxis();
+  const efficacy = efficacyAxis(glp1rPrediction);
   const decision = decide({ axes, falsification, novelty, efficacy });
   const plan = nextAction(decision);
 
@@ -416,6 +440,31 @@ export function runMolecularMission(db, opts) {
           isEfficacyPredictor: false, honestyNote: CHEMOTYPE_HONESTY_NOTE,
         }
       : { axis: CHEMOTYPE_SIMILARITY_AXIS, status: 'BLOCKED', value: null, nearest: null, blockedReason: 'NO_RETAINED_CANDIDATE', evidenceClass: 'COMPUTATIONAL', isEfficacyPredictor: false, honestyNote: CHEMOTYPE_HONESTY_NOTE },
+    /**
+     * D-076/077. Unlike the chemotype proxy above, this axis MAY close
+     * EFFICACY_AXIS_UNAVAILABLE — but only via a model that cleared the frozen
+     * validation gate, and even then it stays MODEL_ESTIMATE and never
+     * decisive. Recorded on every run (including BLOCKED) so its state is a
+     * visible fact in the recipe rather than an unexplained absence.
+     */
+    glp1rEfficacyAxis: {
+      axis: GLP1R_EFFICACY_AXIS,
+      status: glp1rPrediction?.status ?? 'BLOCKED',
+      value: glp1rPrediction?.value ?? null,
+      unit: glp1rPrediction?.unit ?? null,
+      uncertainty: glp1rPrediction?.uncertainty ?? null,
+      outOfDomain: glp1rPrediction?.outOfDomain ?? null,
+      evidenceClass: 'MODEL_ESTIMATE',
+      isMeasurement: false,
+      modelVersion: glp1rPrediction?.modelVersion ?? null,
+      modelFingerprint: glp1rPrediction?.modelFingerprint ?? null,
+      trainingDataHash: glp1rPrediction?.trainingDataHash ?? null,
+      inputFingerprint: glp1rPrediction?.inputFingerprint ?? null,
+      outputHash: glp1rPrediction?.outputHash ?? null,
+      blockedReason: glp1rPrediction?.blockedReason ?? (firstRetained ? null : 'NO_RETAINED_CANDIDATE'),
+      contribution: glp1rAxisContribution(glp1rPrediction),
+      honestyNote: MODEL_ESTIMATE_NOTE,
+    },
     falsification,
     novelty,
     decision,
@@ -423,7 +472,10 @@ export function runMolecularMission(db, opts) {
     limitations: [
       base.baseline.structureAbsentReason,
       ...efficacy.reasons,
-      `${CHEMOTYPE_SIMILARITY_AXIS} is a COMPUTATIONAL SCREENING PROXY and never closes EFFICACY_AXIS_UNAVAILABLE: the GLP-1R efficacy predictor remains a separate, open blocker`,
+      `${CHEMOTYPE_SIMILARITY_AXIS} is a COMPUTATIONAL SCREENING PROXY and never closes EFFICACY_AXIS_UNAVAILABLE: structural resemblance is not activity`,
+      glp1rPrediction?.status === 'AVAILABLE'
+        ? `${GLP1R_EFFICACY_AXIS} is a MODEL_ESTIMATE from a QSAR model, not a measured potency; the baseline side of this axis is real measured bioactivity and the candidate side is a model output, and that asymmetry is part of every comparison made on it`
+        : `${GLP1R_EFFICACY_AXIS} is BLOCKED (${glp1rPrediction?.blockedReason ?? 'NO_RETAINED_CANDIDATE'}): no hash-verified human GLP-1R activity pin exists in this runtime, so no QSAR model could be trained or validated against the frozen D-077 gate`,
       `seed provenance: ${seedProvenance}`,
       'ADMET-AI, AutoDock Vina and PySCF are absent from this runtime; their adapters report BLOCKED_BY_RUNTIME and nothing substitutes for them',
     ],

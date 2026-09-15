@@ -5491,3 +5491,172 @@ absent engines). New `molecularMissionD074.test.mjs`: negative-first across
 frozen-rule tampering, fail-closed gating, Goodhart leakage, unverifiable
 prior art, determinism and no-timestamp recipe identity. eslint clean.
 Demo: 9/9 invariants, replay MATCH.
+
+---
+
+## D-075 — GLP1R_CHEMOTYPE_SIMILARITY: a screening proxy, and a code guard that it never becomes efficacy
+
+*(Entry written retroactively: the code landed in commit `60f241b`; this record
+was missed at the time and is reconstructed here from that commit.)*
+
+A proposal arrived to close GENESIS-MOL-01's `EFFICACY_AXIS_UNAVAILABLE` with
+Tanimoto similarity to known GLP-1R actives. The proposal was accepted only
+after being narrowed, because **structural resemblance is not activity** —
+activity cliffs are routine, and two molecules one atom apart can differ by
+orders of magnitude at a receptor.
+
+### What was found at HEAD before writing anything
+
+| Proposal claimed | Reality at HEAD |
+|---|---|
+| a new `similarity` worker command is needed | **it already existed** (`rdkit_worker.py:154`, Morgan r2/2048 + Murcko) with no Node caller |
+| a new frontend similarity module is needed | `core/discovery/molecular/structuralSimilarity.ts` already existed |
+| `sha256Hex` is synchronous | it is **async** — the proposal would not have compiled |
+
+Only one thing was genuinely missing: a Node export for the capability the
+worker already had. `rdkitAdapter.similarity()` exposes it in the shape the
+worker actually prints, and nothing else was duplicated.
+
+### The guard is in code, not in a comment
+
+`chemotypeSimilarityAxis.mjs::assertNotEfficacyAxis()` **throws** if any caller
+tries to present this axis under `TARGET_RELEVANT_ACTIVITY`'s name, and
+`axisContribution()` returns the axis tagged `decisive: false,
+closesEfficacyAxis: false` so a consumer cannot pass a bare string around and
+lose the distinction. The pinned-actives loader fails closed on seven distinct
+codes; UNAVAILABLE is never reported as 0.
+
+**This axis cannot close `EFFICACY_AXIS_UNAVAILABLE`, and did not.** The
+GLP-1R efficacy predictor remained a separate, open blocker — which D-076/077
+below is the answer to.
+
+---
+
+## D-076 — the human GLP-1R activity dataset: ingestion, human-only filtering, fail-closed custody
+
+The efficacy blocker cannot be closed by a proxy, so it is closed the only
+honest way: real measured human GLP-1R activities, normalized deterministically
+and held under verifiable custody.
+
+### The fact that drove the design
+
+**`CHEMBL5862` is Rattus norvegicus GLP-1R, not human** (tax 10116, verified
+live against the ChEMBL API). Any pipeline that took it as "the" GLP-1R target
+would have trained a rat model and labelled it human. Therefore:
+
+- **no human target id is hardcoded anywhere in executable code** — a test
+  greps the module and fails if a `CHEMBL\d+` literal appears outside prose;
+- human specificity is decided **per row** from `target_organism ===
+  'Homo sapiens'`, exact match, because that is the field ChEMBL records
+  against the assay itself;
+- an `expectedTargetId` may be supplied **at ingestion** to narrow further,
+  resolved by a human or CI step against the live API — never from memory.
+
+### What is rejected, and counted
+
+`normalizeGlp1rRows()` keeps a row only if it can be normalized unambiguously.
+Every rejection has its own counter: `nonHuman`, `badTarget`, `missingSmiles`,
+`unparseableSmiles`, `unsupportedType`, `missingValue`, `badUnits`,
+`outOfRange`, `duplicate`, `missingProvenance`. Accepted activity types are
+EC50/IC50/Ki and their log-scale forms; nM/µM/mM/M convert to pActivity via
+−log10(molar); anything outside pActivity 3–12 is treated as a units/parsing
+error rather than biology. Dedup key is (canonical SMILES, assay, type).
+
+### Custody: fail-closed, with no middle state
+
+Raw bytes are sha256'd at pin time into a sidecar `*.meta.json`; every later
+read re-hashes the bytes on disk. `PIN_MISSING`, `PIN_UNREADABLE`,
+`PIN_UNVERIFIED`, `PIN_HASH_DRIFT`, `PIN_EMPTY`, `PIN_PROVENANCE_INCOMPLETE`
+each block. **`PINNED_UNVERIFIED_HASH` was proposed and deliberately not
+built** — a custody state that lets computation proceed on an unverified
+artifact is a hole in the gate, not a convenience, and a test asserts no module
+in this axis defines one. Hashing reuses the existing convention
+(`tirzepatideBaseline.mjs`, `chemotypeSimilarityAxis.mjs`); fingerprints reuse
+`provenance.mjs::canonicalHash`. No new hash provider.
+
+Ingestion is offline by design: `scripts/ingest-glp1r-activity.mjs` reads a
+human-supplied local artifact and **never fetches**. ChEMBL egress is HTTP 403
+at this runtime's proxy (verified live, not assumed), so a `--fetch` flag would
+be dead code pretending to be a capability.
+
+---
+
+## D-077 — GLP-1R QSAR: a frozen validation gate, sealed before any data
+
+The model that turns those activities into a prediction, and the gate it must
+clear to be believed.
+
+### Frozen before the data, not after the results
+
+`campaign/glp1r-validation-gate.json`, `ruleFingerprint`
+**`d2f77a7e6042f0fc`** = `canonicalHash(gate).slice(0,16)`:
+
+| Threshold | Value | Why |
+|---|---|---|
+| `MIN_TRAIN` | 150 | below this, 512 coefficients are dominated by the λ=1.0 prior, not the data |
+| `MIN_TEST` | 40 | smallest held-out set this project accepts a scaffold-split estimate from |
+| `MAX_MAE` | 1.0 | one pActivity unit (~10× in potency) is the outer bound of "validated" |
+| `MIN_R2` | 0.25 | low but non-trivial: rules out a model no better than the training mean |
+
+The loader recomputes the fingerprint from the file's own `gate` object and
+returns `GATE_TAMPERED` if they disagree — so editing a threshold after seeing
+a disappointing run is caught mechanically, not by good intentions. Changing
+the gate requires a new D-entry, never an edit.
+
+### The model
+
+ECFP4-style Morgan r=2 **512-bit** fingerprints (new additive `fingerprint`
+worker command — the pre-existing `similarity` command is pairwise and returns
+no bit vector; 512 rather than similarity's 2048 because a QSAR ridge needs one
+coefficient per bit). Ridge regression solved directly by Gaussian elimination
+with partial pivoting over sparse bit indices; **scaffold-disjoint** split by
+Murcko scaffold hash (buckets 0–1 test, 2–3 calibration, 4–9 train), so no
+scaffold ever crosses a split boundary and near-duplicate analogues cannot leak.
+Fully deterministic: no shuffling, no RNG.
+
+`modelFingerprint` covers algorithm, hyperparameters, the frozen gate's
+fingerprint, split policy, training-data hash **and RDKit version** — a real
+engine change is a real model change.
+
+### Uncertainty is mandatory, not nullable
+
+A first cut could return `ok: true` with a null conformal half-width when the
+calibration split came out empty. That was fixed: **an empty calibration set is
+a gate failure.** A point estimate with no interval is exactly the over-claim
+this axis exists to prevent, so it is BLOCKED rather than shipped bare.
+
+### What this axis may and may not do
+
+It **may** close the technical absence of a prediction axis, once the model
+clears the gate — unlike D-075's chemotype proxy, which may never. It **may
+not** become a measurement. `efficacyAxis()` gained an optional argument
+(zero-arg callers behave exactly as before); with an AVAILABLE prediction it
+reports `MODEL_ESTIMATE_AVAILABLE` and `isMeasurement: false`.
+
+`MODEL_ESTIMATE` is **not a member of `EvidenceClass`** — so
+`winnerGate.ts::asEvidenceClass` degrades it to `UNVERIFIED` (rank 1), far below
+the `INDIRECT_RANDOMISED` (rank 9) the D-057 Winner Gate requires. A validated
+QSAR earns a COMPUTATIONAL result and cannot promote a WinnerRecord even by
+accident. D-057, D-069, `MINIMUM_OBSERVATIONS`, `hypervolume2D` and the
+liability gate are untouched; the predicted-activity axis never enters an
+objective vector, and a test asserts it.
+
+### Outcome in this runtime
+
+**BLOCKED — `PIN_MISSING`.** No human GLP-1R activity artifact exists here
+because ChEMBL is unreachable. `probeCapabilities().activityPredictor` is now
+*computed* from a real training attempt rather than asserted as a constant, and
+it reports `false` with `glp1rBlockedReason: 'PIN_MISSING'`. The comparable-axis
+set stays empty and **GENESIS-MOL-01 remains NO_WINNER**.
+
+That NO_WINNER is still earned, not hardcoded: a test proves the same
+`comparableAxes()` opens `TARGET_RELEVANT_ACTIVITY` the moment
+`activityPredictor` is true. The seam is complete and waiting on one thing —
+data.
+
+### Gate
+
+Backend 555 tests / 522 pass / 0 fail / 33 skipped (runtime-gated engines);
+new `glp1rQsar.test.mjs` 44/44. Frontend 6452 pass / 0 fail. tsc, eslint, build
+clean. `scripts/glp1r-e2e.mjs` runs on **real RDKit fingerprints, no stub**:
+12/12 invariants, honest BLOCKED.

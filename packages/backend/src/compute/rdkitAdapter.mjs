@@ -133,6 +133,33 @@ export function similarity(smiles, reference) {
   }
 }
 
+/**
+ * Dense Morgan fingerprint (r=2, 512 bits) for ONE molecule, plus its Murcko
+ * scaffold (D-076/077 — the GLP-1R QSAR seam).
+ *
+ * This is a NEW worker command (`fingerprint`), additive next to the
+ * pre-existing pairwise `similarity` command above — confirmed by grep before
+ * writing it: no command in `rdkit_worker.py` returned a per-molecule bit
+ * vector, only a pairwise Tanimoto number. 512 bits, not `similarity`'s 2048:
+ * a QSAR ridge model needs one coefficient per bit, and a human-activity pin
+ * in the low hundreds of rows cannot support 2048+1 of them even regularised.
+ *
+ * `bits` is the RDKit bit vector as an array of 512 zeros/ones (not the
+ * sparse index list some callers may prefer — callers reduce it themselves).
+ */
+export function fingerprint(smiles) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd: 'fingerprint', smiles: String(smiles ?? '') });
+    return r.ok
+      ? { ok: true, bits: r.bits, nBits: r.nBits, fingerprint: r.fingerprint, scaffold: r.scaffold, canonicalSmiles: r.canonicalSmiles }
+      : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
 /** Walidacja struktury SMILES przez RDKit (kanonizacja). */
 export function validate(smiles) {
   const d = detect();

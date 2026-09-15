@@ -7775,3 +7775,85 @@ readout-family rule must be preregistered and human-sealed before any number
 derived from it counts**, exactly as the `action_type` branch must be.
 
 **NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. Nothing changed.**
+
+---
+
+## D-098 — A1 COMPLETE (757/757); a flat-value assay observation; promotion-chain package audit
+
+### A1 custody closed
+
+All 7 chunks received, all hashes recomputed and matched against declared
+values before acceptance:
+
+| chunk | rows | sha256 |
+|---|---|---|
+| 01 | 121 | `5cba441b…` |
+| 02 | 112 | `371521e2…` |
+| 03 | 121 | `71d2cc66…` |
+| 04 | 125 | `3a784a97…` |
+| 05 | 124 | `ca0f3f31…` |
+| 06 | 115 | `cb3d00a3…` |
+| 07 | 39 | `212c606a…` |
+
+**757/757 rows. 300 unique molecules. 90 unique assays.** `activity_id`
+strictly ascending across all chunks, zero duplicates.
+
+### New finding: two flat-value assays
+
+Scanned every assay with ≥10 rows for one value claiming ≥85% share.
+Two hit it, both in document `CHEMBL6109144`: `CHEMBL6113416` (31/33 rows =
+7.78 nM) and `CHEMBL6113417` (31/33 rows = 10.56 nM). No other assay in A1
+shows this pattern.
+
+Not acted on. Neither `data_validity_comment` nor `potential_duplicate` flags
+these rows, so existing policy cannot catch it, and inventing a filter now
+would be inventing policy — forbidden at this step. A3 chunks 2–4, not yet
+received, would carry the assay description that could explain it (a
+thresholded screening readout is a legitimate reason for a shared value; an
+imputed placeholder is not). Recorded as an open question pending that data,
+the same treatment given the same-assay duplicates in D-097.
+
+### Promotion-chain test package: audited, not landed — duplicates real coverage, incorrectly
+
+Delivered as `__tests__/promotionChain.test.ts`, intended to prove the
+candidate→recipe chain has no side door. Checked against live HEAD before
+running anything:
+
+- imports `'../campaign/mounjaroResearchRecipe.mjs'` and
+  `'../campaign/mounjaroTrack.mjs'` — **neither file exists**. The real
+  assembler is `core/discovery/molecular/mounjaroResearchRecipe.ts` (frontend
+  TypeScript, not a backend `.mjs`), for the reason stated in its own header:
+  the canonical gate lives in TypeScript, and a `.mjs` module re-implementing
+  it would be a second gate.
+- calls `assembleResearchRecipe(...)` — **this name exists nowhere in the
+  repository.** The real export is `buildMounjaroResearchRecipe`.
+- calls `canPromoteToWinnerRecord({ observations: 3, maxRank: 9 })` — the real
+  signature is `{ adjudicationVerdict, inventory: [{evidenceClass,
+  observationCount}] }`. `observations`/`maxRank` are not its parameters.
+
+The package's own comments flag two of these three with `CLAUDE MUST VERIFY`
+— it was delivered as a draft requiring confirmation, and confirmation fails
+the same way D-093 and D-095 did: wrong paths, wrong names, wrong signatures.
+
+**The coverage it wanted already exists, is more thorough, and already
+passes:** `__tests__/mounjaroResearchRecipe.test.ts`, 10 tests, run and
+confirmed green — non-WINNER locks the recipe with the field structurally
+absent from that branch; the double wall (WINNER verdict + all-COMPUTATIONAL
+evidence still fails); an invented evidence class reads as UNVERIFIED, buying
+no strength; too few observations locks even at strong evidence class; PROMOTE
+with no candidate structure is refused rather than issuing a recipe for
+nothing; and on the positive side, a WINNER verdict with real randomised
+evidence DOES issue a recipe, carrying every required field including the
+non-clinical disclaimer, with a deterministic fingerprint and no banned
+clinical phrasing. Nothing was added: the intent behind the delivered package
+is already met, correctly, in the file it misnamed.
+
+### Status
+
+A1 complete and custody-verified. A3 45/90 (chunk 1 of 4). A2 0/8. Human
+preregistration seal still required on: `action_type` branch, readout-family
+definition, HSA-condition split, and now the flat-value-assay question —
+before any noise-floor number is sealed.
+
+**NO_WINNER. Recipe LOCKED. Attempt budget 1 of 2. No threshold, pin, split
+rule, ingest policy or Winner Gate touched.**

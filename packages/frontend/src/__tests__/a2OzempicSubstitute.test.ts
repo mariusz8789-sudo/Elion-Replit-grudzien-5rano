@@ -86,7 +86,14 @@ describe('A2 Ozempic-substitute analysis — real pinned data', () => {
     const a = runA2Analysis();
     const b = runA2Analysis();
     expect(a.analysisFingerprint).toBe(b.analysisFingerprint);
-    expect(a.analysisFingerprint).toBe('a5e0f164');
+    // D-113: this literal moved from 'a5e0f164' — the only change to any
+    // candidate's data is orforglipron gaining a real second efficacy
+    // observation (NCT05048719, previously unmatched because its own arms
+    // are labelled by ChEMBL's real development code name "LY3502970", not
+    // "ORFORGLIPRON"). No other candidate's efficacy/safety/score changed —
+    // verified by diffing the full per-candidate report against the
+    // pre-D-113 run before updating this literal.
+    expect(a.analysisFingerprint).toBe('39dd0866');
   });
 });
 
@@ -226,5 +233,87 @@ describe('extractCandidateEfficacy — unit behaviour on synthetic fixtures', ()
     });
     const evidence = extractCandidateEfficacy(trial, /test drug/i, marginPp);
     expect(evidence!.fairnessFlags.some((f) => f.includes('below the preregistered minimum'))).toBe(true);
+  });
+});
+
+/**
+ * D-113 — the bare-number dose fallback (`parseBareDoseFallback`, module-
+ * private) exercised indirectly through `extractCandidateEfficacy`, whose
+ * highest-dose-arm selection is the only observable effect of dose parsing.
+ * The two "still rejected" cases reproduce REAL group titles already pinned
+ * in this dataset (cotadutide, NCT02548585/NCT03244800) — found by scanning
+ * every pinned trial for every candidate before writing the fallback, not
+ * invented for this test file.
+ */
+describe('parseDoseMg bare-number fallback — LEAD-2 shape, and two real false-positive guards', () => {
+  const marginPp = 0.4;
+
+  function trialWithGroups(groupTitles: readonly string[], values: readonly number[]) {
+    const groups = groupTitles.map((title, i) => ({ id: `OG${i}`, title }));
+    return {
+      nctId: 'NCT-TEST',
+      briefTitle: 'Synthetic test trial',
+      arms: [],
+      hba1cOutcomes: [
+        {
+          title: 'Change in HbA1c',
+          type: 'PRIMARY',
+          paramType: 'LEAST_SQUARES_MEAN',
+          dispersionType: 'Standard Error',
+          unitOfMeasure: 'pp',
+          groups,
+          denoms: [{ units: 'Participants', counts: groups.map((g) => ({ groupId: g.id, value: '100' })) }],
+          classes: [{ categories: [{ measurements: groups.map((g, i) => ({ groupId: g.id, value: String(values[i]), spread: '0.1' })) }] }],
+        },
+      ],
+      weightOutcomes: [],
+      adverseEvents: null,
+    } as Parameters<typeof extractCandidateEfficacy>[0];
+  }
+
+  it('LEAD-2 shape: picks the 1.8 mg therapeutic arm, not the 0.6 mg starting dose (real regression this fallback exists for)', () => {
+    const trial = trialWithGroups(['Lira 0.6 + Met', 'Lira 1.2 + Met', 'Lira 1.8 + Met', 'Met Mono', 'Met + Glim'], [-0.69, -0.97, -1.00, 0.09, -0.98]);
+    const evidence = extractCandidateEfficacy(trial, /LIRAGLUTIDE|Lira/i, marginPp);
+    expect(evidence).not.toBeNull();
+    expect(evidence!.candidateArm.title).toBe('Lira 1.8 + Met');
+    expect(evidence!.candidateArm.meanChangePp).toBe(-1.0);
+  });
+
+  it('real false positive #1, still guarded: a bare number followed by its OWN unit ("mcg") is never read as mg', () => {
+    const trial = trialWithGroups(['Cohort 4: MEDI0382 200 mcg', 'Cohort 5: MEDI0382 300 mcg'], [-0.5, -0.6]);
+    const evidence = extractCandidateEfficacy(trial, /MEDI0382/i, marginPp);
+    // Neither group parses to a dose, so the highest-dose reducer falls back to the FIRST match — it must not silently treat 200/300 as mg.
+    expect(evidence).not.toBeNull();
+    expect(evidence!.candidateArm.title).toBe('Cohort 4: MEDI0382 200 mcg');
+  });
+
+  it('real false positive #2, still guarded: a bare number preceded by "Cohort" is never read as a dose', () => {
+    const trial = trialWithGroups(['Placebo Cohort 1', 'MEDI0382 Cohort 1'], [0.1, -0.5]);
+    const evidence = extractCandidateEfficacy(trial, /MEDI0382/i, marginPp);
+    expect(evidence).not.toBeNull();
+    expect(evidence!.candidateArm.title).toBe('MEDI0382 Cohort 1');
+    expect(evidence!.candidateArm.meanChangePp).toBe(-0.5);
+  });
+
+  it('real false positive #3, still guarded: a bare number followed by a non-mg unit containing slashes ("Pmol/kg/Min") is never read as mg', () => {
+    const trial = trialWithGroups(['Lean GLP-1 0.5 Pmol/kg/Min', 'Type 2 DM GLP-1 4.0 Pmol/kg/Min'], [0.1, -0.5]);
+    const evidence = extractCandidateEfficacy(trial, /GLP-1/i, marginPp);
+    expect(evidence).not.toBeNull();
+    expect(evidence!.candidateArm.title).toBe('Lean GLP-1 0.5 Pmol/kg/Min');
+  });
+
+  it('an explicit "mg" unit still always wins over the bare-number fallback', () => {
+    const trial = trialWithGroups(['Drug 5', 'Drug 10 mg'], [-0.3, -0.9]);
+    const evidence = extractCandidateEfficacy(trial, /Drug/i, marginPp);
+    expect(evidence).not.toBeNull();
+    expect(evidence!.candidateArm.title).toBe('Drug 10 mg');
+  });
+});
+
+describe('D-113 real-data additions — orforglipron\'s missing development code name', () => {
+  it('KNOWN_DEVELOPMENT_CODE_NAMES now recognizes LY3502970, so NCT05048719 (previously zero matched groups) contributes real efficacy evidence', () => {
+    const report = runA2Analysis();
+    const orforglipron = report.candidateReports.find((r) => r.summary.prefName === 'ORFORGLIPRON')!;
+    expect(orforglipron.efficacy.some((e) => e.nctId === 'NCT05048719')).toBe(true);
   });
 });

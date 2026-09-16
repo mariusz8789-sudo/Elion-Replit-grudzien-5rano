@@ -328,7 +328,13 @@ describe('GOV-DRUG-DISCOVERY-E2E-01 — government output and replay', () => {
     const a = runGovDrugDiscoveryE2E();
     const b = runGovDrugDiscoveryE2E();
     expect(a.runFingerprint).toBe(b.runFingerprint);
-    expect(a.runFingerprint).toBe('399221f5');
+    // D-113: moved from '399221f5' — this run calls A3, which re-runs A2's
+    // own analysis, so orforglipron's real second efficacy observation
+    // (NCT05048719, see a2OzempicSubstitute.test.ts's D-113 note) flows
+    // through here too. The real outcome is unchanged (still NO_WINNER,
+    // asserted elsewhere in this file) — only the fingerprint, because the
+    // underlying data genuinely changed.
+    expect(a.runFingerprint).toBe('94495ec1');
     expect(a.preregistrationFingerprint).toBe('f528c881');
   });
 

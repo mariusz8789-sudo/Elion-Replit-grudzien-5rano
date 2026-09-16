@@ -118,9 +118,66 @@ const SEMAGLUTIDE_PATTERN = /semaglutide/i;
 // Efficacy extraction (generalizes A1's extractTrialEfficacy to N candidates)
 // ---------------------------------------------------------------------------
 
+/**
+ * D-113 — a bare-number fallback, guarded against the two real false-positive
+ * shapes this dataset's own pinned trials contain, checked across all 20
+ * candidates before this was written (not sized to fit one trial).
+ *
+ * WHY A FALLBACK IS NEEDED AT ALL. LEAD-2's (NCT00318461) own arm titles are
+ * "Lira 0.6 + Met" / "Lira 1.2 + Met" / "Lira 1.8 + Met" — no "mg" token
+ * anywhere in the title. The dose is real and is in mg: the SAME trial's own
+ * `armGroups[].description` field (custody-verified raw bytes, D-112) states
+ * it explicitly — "Liraglutide 0.6 mg/day", "...1.2 mg/day", "...1.8 mg/day".
+ * `parseDoseMg` reads only the short group title (the `A2TrialRecord` schema
+ * never carries `armGroups[].description`), so this fallback exists to
+ * recover that same, already-real number from the title alone.
+ *
+ * WHY A BARE "ANY NUMBER" RULE WOULD BE WRONG, WITH REAL COUNTEREXAMPLES.
+ * Scanned every group title — outcome-measure groups AND adverse-event
+ * groups, the two distinct places a group title appears in this schema —
+ * across every currently-pinned trial for every candidate before writing
+ * this function, and again after each guard was added. Three real,
+ * currently-pinned shapes would be silently corrupted by an unguarded (or
+ * under-guarded) fallback:
+ *   - "Cohort 4: MEDI0382 200 mcg" (cotadutide, NCT02548585) — 200 is a real
+ *     dose, but in MICROGRAMS. Reading it as 200 mg would overstate the dose
+ *     1000x.
+ *   - "Type 2 DM GLP-1 4.0 Pmol/kg/Min" (native GLP-1's own AE groups,
+ *     NCT01607450) — 4.0 is an INFUSION RATE (picomoles/kg/minute), not a
+ *     dose in any mass unit at all. A first version of this guard only
+ *     excluded a next-token that was ENTIRELY alphabetic, which missed
+ *     "Pmol/kg/Min" (it contains slashes) — caught by re-running this exact
+ *     scan against adverse-event groups too, not assumed safe from the
+ *     outcome-measure scan alone.
+ *   - "MEDI0382 Cohort 1" / "Placebo Cohort 1" (cotadutide, NCT03244800) — 1
+ *     is a COHORT ordinal, not a dose.
+ * Guarded by two rules: a bare number immediately followed by a token that
+ * STARTS with a letter and is not "mg" already carries its own (possibly
+ * different) unit or qualifier, so it is never reinterpreted as mg; a bare
+ * number immediately preceded by "Cohort" is never taken as a dose. Verified
+ * by re-running the same scan over the full pinned dataset after adding both
+ * guards: it now returns zero matches — this fallback is a no-op on every
+ * currently-pinned trial and activates only for a new shape like LEAD-2's.
+ */
+function parseBareDoseFallback(title: string): number | null {
+  const words = title.split(/\s+/);
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i].replace(/\+$/, '');
+    if (!/^\d+(?:\.\d+)?$/.test(word)) continue;
+    const precededByCohort = i > 0 && /^cohort:?$/i.test(words[i - 1]);
+    if (precededByCohort) continue;
+    const next = words[i + 1];
+    const followedByOtherUnit = next !== undefined && /^[a-z]/i.test(next) && !/^mg\.?$/i.test(next);
+    if (followedByOtherUnit) continue;
+    return Number(word);
+  }
+  return null;
+}
+
 function parseDoseMg(title: string): number | null {
-  const m = /([\d.]+)\s*mg/i.exec(title);
-  return m === null ? null : Number(m[1]);
+  const withUnit = /([\d.]+)\s*mg/i.exec(title);
+  if (withUnit !== null) return Number(withUnit[1]);
+  return parseBareDoseFallback(title);
 }
 
 function pickHighestDoseGroup(groups: readonly A2TrialGroup[], pattern: RegExp): A2TrialGroup | null {
@@ -699,18 +756,30 @@ const GCGR_ANTAGONIST_IDS: ReadonlySet<string> = new Set(['CHEMBL1933349', 'CHEM
  * actually appears in their arm/group titles — verifiable directly from
  * each trial's own pinned `briefTitle`: NCT03985293 "...PF-06882961..."
  * (danuglipron), NCT02548585/NCT03244800 "...MEDI0382..." (cotadutide),
- * NCT01241448/NCT00871572/NCT02091362 "...LY2409021..." (adomeglivant).
+ * NCT01241448/NCT00871572/NCT02091362 "...LY2409021..." (adomeglivant),
+ * NCT05048719/NCT04426474 "...LY3502970..." (orforglipron, found D-113 by
+ * scanning every pinned trial for every candidate for this exact pattern —
+ * not added for one candidate in isolation).
  * This is a real, externally-verifiable identity fact, not a criterion or
  * threshold change — it only affects which arm within an ALREADY-QUALIFYING
  * trial is recognized as the candidate's own, exactly like the single-arm
- * fallback above. Without it these three real candidates would show zero
- * efficacy evidence despite their own pinned trials containing real HbA1c
- * data under the code name.
+ * fallback above. Without it these real candidates would show zero or
+ * undercounted efficacy evidence despite their own pinned trials containing
+ * real HbA1c data under the code name.
+ *
+ * D-113 also adds `Lira` for liraglutide — not a development code name, but
+ * the same real, externally-verifiable category: Novo Nordisk's own LEAD
+ * trial program's short arm-label convention, verified directly in
+ * NCT00318461/LEAD-2's own pinned arm titles ("Lira 0.6 + Met", "Lira 1.2 +
+ * Met", "Lira 1.8 + Met") and confirmed by that same trial's own
+ * `armGroups[].description` field ("Liraglutide 0.6 mg/day", etc., D-112).
  */
 const KNOWN_DEVELOPMENT_CODE_NAMES: Readonly<Record<string, string>> = {
   CHEMBL4518483: 'PF-06882961', // danuglipron
   CHEMBL4297630: 'MEDI0382', // cotadutide
   CHEMBL3707351: 'LY2409021', // adomeglivant
+  CHEMBL4446782: 'LY3502970', // orforglipron
+  CHEMBL4084119: 'Lira', // liraglutide (LEAD program short arm-label convention, not a code name)
 };
 
 function buildCandidateReport(summary: A2CandidateSummary): A2CandidateReport {

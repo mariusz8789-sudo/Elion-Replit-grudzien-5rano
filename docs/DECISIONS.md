@@ -9148,3 +9148,128 @@ criterion; gate ACCEPTED in dry-run after repairing a defect in D-110's own
 matcher; NOTHING INGESTED; LOWER_HARM unchanged at NO_WINNER with
 liraglutide 2/3. No threshold, pin, preregistration, evidence class,
 extraction rule or Winner Gate criterion was changed.**
+
+## D-113 — the extractor fix authorized: LEAD-2 ingested for real; liraglutide reaches 3/3; still NO_WINNER, for a different and more fundamental reason
+
+The account owner explicitly authorized fixing the arm-label/dose-parsing
+defect D-112 identified, on four conditions: recognize "Lira 0.6/1.2/1.8 +
+Met" as liraglutide's own arms, fix `parseDoseMg` to select the 1.8 mg
+therapeutic arm, apply the fix uniformly across all 20 candidates (not
+liraglutide alone), and never touch preregistration or population criteria.
+All four were met; nothing was auto-promoted to Winner.
+
+### 1. The fix, and why "any bare number" would have been wrong
+
+`parseDoseMg` gained a fallback for a bare, unit-less dose token, used only
+when no "mg"-suffixed dose exists in the title — real provenance for
+LEAD-2's own doses: the SAME custody-verified trial's `armGroups[].description`
+states "Liraglutide 0.6 mg/day" / "1.2 mg/day" / "1.8 mg/day" explicitly, the
+short arm titles just omit the unit. A naive unguarded fallback was tested
+first and rejected: scanning every group title (outcome-measure groups AND
+adverse-event groups — a second location the schema carries them, found only
+by scanning both) across every currently-pinned trial for every candidate
+turned up three real shapes it would have silently corrupted:
+- "Cohort 4: MEDI0382 200 mcg" (cotadutide) — 200 **micrograms**, misread as
+  200 mg would overstate the dose 1000x.
+- "Type 2 DM GLP-1 4.0 Pmol/kg/Min" (native GLP-1's own adverse-event
+  groups) — an infusion RATE, not a dose in any mass unit. A first guard
+  version only excluded a next-token that was ENTIRELY alphabetic, which
+  missed this one (it contains slashes) — caught by re-running the scan
+  against adverse-event groups specifically, not assumed safe from the
+  outcome-measure scan alone. Before the guard was widened, this alone moved
+  native GLP-1's ranking score from 0.0531 to −0.675 with its efficacy data
+  completely unchanged — a real regression, caught before commit, not
+  shipped.
+- "MEDI0382 Cohort 1" / "Placebo Cohort 1" (cotadutide) — 1 is a COHORT
+  ordinal, not a dose.
+
+Final guards: a bare number immediately followed by a token starting with a
+letter that isn't "mg" already carries its own (possibly different) unit or
+qualifier and is never reinterpreted as mg; a bare number immediately
+preceded by "Cohort" is never a dose. Re-running the full scan after both
+guards: **zero matches across the entire pinned dataset** — this fallback is
+a proven no-op on every trial pinned before today and activates only for a
+genuinely new shape like LEAD-2's.
+
+### 2. Applied uniformly — found a second, independent real gap
+
+Scanning every candidate (not just liraglutide) for the same class of defect
+— a real trial whose arms are labelled by something other than the
+candidate's ChEMBL `pref_name` — turned up orforglipron (CHEMBL4446782):
+NCT05048719's own arms are labelled by its real ChEMBL development code name
+"LY3502970" (verified directly in that trial's own pinned `briefTitle`,
+"A Study of LY3502970 in Participants With Type 2 Diabetes Mellitus", and in
+a sibling trial's), exactly the same category `KNOWN_DEVELOPMENT_CODE_NAMES`
+already existed for (danuglipron/cotadutide/adomeglivant) — just never
+added. Added both `Lira` and `LY3502970` to that map, sourced the same way
+as every existing entry: from the trial's own pinned text, not guessed.
+Orforglipron's efficacy observations: 1 → 2 (NCT05048719 now contributes).
+
+### 3. Cascade, fully traced before any literal was touched
+
+Three literal-locked fingerprints moved, in a chain each hop of which was
+verified rather than assumed:
+`a2OzempicSubstitute.test.ts` (orforglipron's real second observation) →
+`a3GovernmentDrugRecommendation.ts` (re-runs A2's own analysis at runtime,
+not just its types) → `govDrugDiscoveryE2E.test.ts` (calls
+`runA3GovernmentRecommendation`). At every hop the actual VERDICT/OUTCOME
+label was confirmed unchanged (A2: still `CONFLICTING_EVIDENCE`; A3: still
+`CONFLICTING_EVIDENCE`; E2E-01: still `NO_WINNER`) — only the fingerprints,
+because the underlying orforglipron data genuinely changed. Each updated
+literal carries this exact justification inline, matching this repo's
+existing discipline for pinned-anchor tests.
+
+### 4. LEAD-2 ingested for real (not dry-run) — liraglutide reaches 3/3
+
+`scripts/ingest-a2-trial-evidence.mjs --manifest <LEAD-2 custody manifest>`
+(no `--dry-run`): `OUTCOME: ACCEPTED`, written to
+`external-supplement/{trials,meta}.supplement.json` only, `base pin
+integrity: VERIFIED UNCHANGED` (self-verified by the script, confirmed again
+independently via `git diff` on every base `a2-ozempic-substitute/*.json`
+file: empty). Liraglutide's real efficacy observations: NCT03172494,
+NCT00518882, **NCT00318461** — 3 of 3, clearing `MINIMUM_OBSERVATIONS`. The
+LEAD-2 observation resolves to the "Lira 1.8 + Met" arm (delta +0.70pp vs
+the fixed reference — arithmetically exact: candidate mean −1.00 minus
+reference −1.70), confirming the dose-parsing fix picked the therapeutic
+arm, not the 0.6 mg starting dose.
+
+### 5. Ran the real, unmodified LOWER_HARM funnel and the real orchestrator — NO_WINNER, for a NEW reason
+
+`scripts/gov-drug-lower-harm-funnel-demonstrator.mjs`: liraglutide's safety
+gate flips from `REFUSE (EVIDENCE_SUFFICIENT)` to `REQUIRES_HUMAN_APPROVAL`
+— the `FAVOURED_CANDIDATE_PASSES_SAFETY_GATE` conjunct that failed in D-109's
+roadmap now HOLDS. But `decideFunnelVerdict` still returns `NO_WINNER`,
+because a SEPARATE, independent, untouched conjunct now fails instead:
+`AGREES_WITH_PRE_EXPERIMENT_RANK` — G2 favours liraglutide (CHEMBL4084119)
+by efficacy, but the FROZEN pre-experiment ranking (computed from the
+preregistered `lowerHarmScore`, before any experiment ran) preferred native
+GLP-1 (CHEMBL1240772). The funnel refuses to promote a candidate the
+frozen pre-experiment ranking did not already prefer — exactly the
+HARK-shaped protection this rule exists for, doing its job on a real
+disagreement it was never tuned to produce. Native GLP-1 itself is still
+`REFUSE (EVIDENCE_SUFFICIENT)` at 1 of 3 real observations, so it cannot be
+promoted either.
+
+Confirmed a second, independent way — the real canonical entry point,
+`runGovLowerHarmDiscovery({ mode: 'PRODUCTION' })`, not the demonstrator
+script: `VERDICT: NO_WINNER`, `winner: undefined`, `recipeFingerprint:
+undefined`, stage `18_RECIPE_OR_LOCK: LOCKED`, `evidenceCustody.ok: true`.
+`canPromoteToWinnerRecord` was never invoked (orchestrator.ts only calls it
+when `adj.verdict === 'WINNER'`) — no Winner was computed, let alone
+promoted or fabricated.
+
+### 6. Tests, full suites
+
+New/updated: 4 fallback-behaviour tests (LEAD-2 shape, mcg guard, Cohort
+guard, Pmol/kg/Min guard) + 1 test confirming orforglipron's new LY3502970
+observation, all in `a2OzempicSubstitute.test.ts`. Full suites after every
+change in this entry: backend 835 tests (802 pass, 0 fail, 33 skip,
+unchanged from D-112 — this entry touched no backend file); frontend 6528
+tests (6527 pass, 1 skip, 0 fail). TSC and ESLint clean.
+
+**OUTCOME: liraglutide 3/3 real observations, real safety-gate conjunct now
+HOLDS. LOWER_HARM verdict remains NO_WINNER — not on evidence count anymore,
+but on a real, frozen, untouched disagreement between the experiment's own
+finding and the preregistered pre-experiment ranking. No threshold, pin,
+preregistration, evidence class, or Winner Gate rule was changed. No Winner
+was fabricated or auto-promoted.**

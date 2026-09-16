@@ -7,6 +7,8 @@ import { WinnerGateDiagram } from '../components/genesis-ui/WinnerGateDiagram';
 import { ProvenanceDag, buildProvenanceGraph, DAG_COLUMNS } from '../components/genesis-ui/ProvenanceDag';
 import { ReplayTwinPanel, compareStages } from '../components/genesis-ui/ReplayTwinPanel';
 import { VerdictWhyStrip } from '../components/genesis-ui/VerdictWhyStrip';
+import { RunVerdictHero } from '../components/genesis-ui/RunVerdictHero';
+import type { DiscoveryRun } from '../core/orchestrator/contracts';
 import type { LowerHarmRunDetail, LowerHarmWinnerRecord, NoWinnerBlocker } from '../core/orchestrator/winnerRecord';
 import type { StageRecord } from '../core/orchestrator/contracts';
 import type { GenesisDomainReplayResult } from '../core/orchestrator/genesisDomainRegistry';
@@ -183,5 +185,33 @@ describe('VerdictWhyStrip', () => {
   it('names the blocker for a NO_WINNER run', () => {
     const html = renderToStaticMarkup(<VerdictWhyStrip detail={detail} record={blocker} />);
     expect(html).toContain('blocked at ADJUDICATION_CONJUNCT');
+  });
+});
+
+describe('RunVerdictHero', () => {
+  const runLike = (verdict: DiscoveryRun['verdict']): DiscoveryRun => ({
+    verdict, mode: 'PRODUCTION', auditFingerprint: '6615057e00', stages,
+  } as unknown as DiscoveryRun);
+
+  it('answers first for the real WINNER run: name, gate outcome, three ticks, four KPIs, jump links', () => {
+    const html = renderToStaticMarkup(<RunVerdictHero run={runLike('WINNER')} detail={detail} record={record} />);
+    expect(html).toContain('data-testid="run-verdict-hero"');
+    expect(html).toContain('gu-hero-winner');
+    expect(html).toContain(`WINNER — ${record.candidateName}`);
+    expect(html).toContain('REQUIRES HUMAN APPROVAL');
+    expect((html.match(/gu-why-held/g) ?? []).length).toBe(4);
+    expect(html).toContain(`${detail.evidence.length}</b><span>realnych obserwacji`);
+    expect(html).toContain(`${detail.falsification!.discriminability!.toFixed(2)}σ`);
+    expect(html).toContain('6615057e');
+    expect(html).toContain('href="#winner-record"');
+    expect(html).toContain('href="#/discovery-hall"');
+  });
+
+  it('gives a NO_WINNER the same weight and names the blocker, with no recipe link', () => {
+    const html = renderToStaticMarkup(<RunVerdictHero run={runLike('NO_WINNER')} detail={detail} record={blocker} />);
+    expect(html).toContain('gu-hero-no-winner');
+    expect(html).toContain('NO_WINNER — zatrzymano na ADJUDICATION_CONJUNCT');
+    expect(html).not.toContain('href="#winner-record"');
+    expect(html).not.toContain('>WINNER —'); // the favourite still shows in the gate chip; the title never crowns it
   });
 });

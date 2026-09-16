@@ -18,6 +18,23 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
  * than a second router.
  */
 
+/** The Genesis mark: a ring with an orbiting node — one glyph for the sidebar, the top bar and the title card. */
+export function GenesisMark({ size = 28 }: { size?: number }): JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="genesis-mark">
+      <defs>
+        <linearGradient id="gm-ring" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#7fe3f2" />
+          <stop offset="1" stopColor="#a78bfa" />
+        </linearGradient>
+      </defs>
+      <circle cx="16" cy="16" r="11.5" fill="none" stroke="url(#gm-ring)" strokeWidth="2" />
+      <circle cx="16" cy="16" r="4.2" fill="url(#gm-ring)" />
+      <circle cx="26.2" cy="9.6" r="2.4" fill="#eef2fb" />
+    </svg>
+  );
+}
+
 function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate: () => void }): JSX.Element {
   const planned = item.status === 'planned';
   return (
@@ -29,7 +46,10 @@ function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolea
       title={planned ? item.plannedNote : undefined}
     >
       <span className="shell-nav-icon" aria-hidden="true">{item.icon}</span>
-      <span className="shell-nav-label">{item.label}</span>
+      <span className="shell-nav-text">
+        <span className="shell-nav-label">{item.label}</span>
+        {item.description !== undefined && <span className="shell-nav-desc">{item.description}</span>}
+      </span>
       {planned && <span className="shell-nav-badge">wkrótce</span>}
     </button>
   );
@@ -91,7 +111,7 @@ export function AppShell({ children, chat, chatInline = false }: {
     <div className="shell">
       <aside className="shell-sidebar" aria-label="Nawigacja Genesis">
         <button className="shell-brand" onClick={() => { window.location.hash = ''; }}>
-          <span className="shell-brand-mark" aria-hidden="true">◈</span>
+          <span className="shell-brand-mark" aria-hidden="true"><GenesisMark /></span>
           <span className="shell-brand-text">
             <strong>GENESIS</strong>
             <em>Scientific OS</em>

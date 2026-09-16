@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { WorldChrome } from '../genesis-ui/WorldChrome';
 import { registerActiveSimControls } from '../../core/activeSimControls';
 import { registerActiveObservationControl } from '../../core/activeObservationControl';
 import { registerSimContext } from '../../core/simContext';
@@ -365,34 +366,33 @@ export function City3DWebGLScreen() {
 
   return (
     <main id="main-content" tabIndex={-1} className="home city-3d-screen city-world-shell city-world-shell-v2">
-      <header className="city-world-topbar">
-        <div className="city-world-topbar-id">
-          <span className="gx-eyebrow">GENESIS OS · EPIDEMIA — MIASTO 3D</span>
-          <div className="city-world-topbar-status" aria-label="Stan epistemiczny świata">
-            <span className="gx-status real">REAL RUN</span>
-            <span className="gx-status not-modelled">FUTURE: NOT_MODELLED</span>
-            <span className="city-world-topbar-day">dzień <b>{stats.dzien ?? 0}</b> · {renderBudget}/{displayedAgentCount} agentów</span>
-            {analysis !== 'none' && <span className="city-world-topbar-day">warstwa: {analysisLabel}</span>}
-            {experimentWorld && (
-              <span className="city-world-topbar-day" title={experimentWorld.runFingerprint}>
-                real run · {experimentWorld.resultOrigin} · {experimentWorld.runId.slice(0, 12)}…
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="city-world-topbar-actions">
-          <button
-            type="button"
-            className="gx-btn city-world-drawer-btn"
-            aria-haspopup="dialog"
-            aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen(true)}
-          >
-            ☰ Panele i dane
-          </button>
-          <button className="gx-btn" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
-        </div>
-      </header>
+      <WorldChrome
+        glyph="◫"
+        domain="Epidemiology World"
+        title="Miasto epidemiologiczne"
+        purpose="Jak interwencja zmienia dynamikę zakażeń: hotspoty, przepływy, szpital — agentowy model dzień po dniu."
+        badges={[{ label: 'REAL RUN', tone: 'real' }, { label: 'FUTURE: NOT_MODELLED', tone: 'not-modelled' }, { label: 'SCENA 3D · WIZUALIZACJA', tone: 'visual' }]}
+        kpis={[
+          { label: 'dzień', value: stats.dzien ?? 0 },
+          { label: 'agentów', value: `${renderBudget}/${displayedAgentCount}` },
+          ...(analysis !== 'none' ? [{ label: 'warstwa', value: analysisLabel }] : []),
+          ...(experimentWorld ? [{ label: `real run · ${experimentWorld.resultOrigin}`, value: `${experimentWorld.runId.slice(0, 8)}…`, title: experimentWorld.runFingerprint }] : []),
+        ]}
+        actions={(
+          <>
+            <button
+              type="button"
+              className="chip-btn city-world-drawer-btn"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen}
+              onClick={() => setDrawerOpen(true)}
+            >
+              ☰ Panele i dane
+            </button>
+            <button className="chip-btn" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
+          </>
+        )}
+      />
 
       <section className="city-world-layout city-world-layout-v2">
         <section className="city-world-center" aria-label="Żywa scena miasta 3D">

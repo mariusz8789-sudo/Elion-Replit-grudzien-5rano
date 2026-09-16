@@ -36,6 +36,8 @@ export interface NavItem {
   readonly plannedNote?: string;
   /** Shown in the mobile primary bar. Exactly five items carry this. */
   readonly primary?: true;
+  /** One plain-language line under the label — what a first-time visitor finds there. */
+  readonly description?: string;
 }
 
 export interface NavSection {
@@ -45,37 +47,27 @@ export interface NavSection {
 }
 
 /**
- * THE MENU IS TEN ITEMS. That is the whole list.
+ * THE MENU IS SIX ENTRIES, in a layperson's words (D-118).
  *
- * The previous version listed every capability the system has — six sections,
- * twenty-odd entries with names like "Precision Reference" and "Konflikt
- * modeli". That is an inventory, not a menu: it asks the user to know the
- * system's internal vocabulary before they can move. Scenario, Evidence,
- * Memory, Replay, Decision, Sensitivity, Temporal Navigation and the rest are
- * NOT top-level destinations — they are things you do inside a workspace.
- *
- * Everything that left the menu is still reachable: `MORE_ITEMS` keeps the
- * full route list behind one collapsed disclosure, and every deep link still
- * resolves. Nothing was deleted; it stopped being shouted.
+ * The previous ten were the system's own vocabulary ("Matrix", "Cyber",
+ * "Simulation") — an inventory that asked the visitor to already know
+ * Genesis before moving. These six name what a person wants to DO: start,
+ * ask, see discoveries, enter the 3D worlds, check the evidence, adjust
+ * settings. Every former entry is still reachable — the ones that left the
+ * top level moved into `MORE_ITEMS` behind one disclosure. Nothing was
+ * deleted; it stopped being shouted.
  */
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'main',
     label: '',
     items: [
-      { id: 'home', label: 'Home', icon: '◉', hash: '#/', primary: true },
-      { id: 'chat', label: 'Chat', icon: '✦', kind: 'chat', primary: true },
-      { id: 'matrix', label: 'Matrix', icon: '◈', hash: '#/matrix', primary: true },
-      { id: 'world', label: 'World', icon: '🌍', hash: '#/genesis-world', primary: true },
-      { id: 'simulation', label: 'Simulation', icon: '🔭', hash: '#/generate', primary: true },
-      { id: 'science', label: 'Science', icon: '🧬', hash: '#/drug' },
-      { id: 'cyber', label: 'Cyber', icon: '🛡', hash: '#/cyber' },
-      {
-        id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
-        plannedNote: 'Profil instytucjonalny (skala miasta/energii/wody/transportu) — nie istnieje jeszcze ani jako route, ani jako model uprawnień. Wymieniony, żeby nie udawać, że go pomijamy.',
-      },
-      { id: 'projects', label: 'Projects', icon: '☁', hash: '#/projects' },
-      { id: 'settings', label: 'Settings', icon: '⚙', hash: '#/settings' },
+      { id: 'home', label: 'Start', icon: '◉', hash: '#/', primary: true, description: 'Pytanie, ostatnie odkrycia, wejścia do światów' },
+      { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', primary: true, description: 'Zadaj pytanie zwykłym językiem' },
+      { id: 'discover', label: 'Odkrycia', icon: '◎', hash: '#/research-console', primary: true, description: 'Kandydaci, dowody, falsyfikacja, Winner Gate' },
+      { id: 'worlds', label: 'Światy 3D', icon: '◈', hash: '#/worlds', primary: true, description: 'Miasto, laboratorium, molekuła, Discovery Hall' },
+      { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', primary: true, description: 'Zapisane przebiegi, evidence, replay' },
+      { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
     ],
   },
 ];
@@ -85,7 +77,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  * no capability was lost — it stopped competing with the ten that matter.
  */
 export const MORE_ITEMS: readonly NavItem[] = [
-  { id: 'memory', label: 'Pamięć Naukowa', icon: '🧠', hash: '#/memory' },
+  { id: 'matrix', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix' },
+  { id: 'world', label: 'World Engine', icon: '🌍', hash: '#/genesis-world' },
+  { id: 'simulation', label: 'Generator symulacji', icon: '🔭', hash: '#/generate' },
+  { id: 'science', label: 'Drug Discovery', icon: '🧬', hash: '#/drug' },
+  { id: 'cyber', label: 'Cyber', icon: '🛡', hash: '#/cyber' },
+  { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
+  {
+    id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
+    plannedNote: 'Profil instytucjonalny (skala miasta/energii/wody/transportu) — nie istnieje jeszcze ani jako route, ani jako model uprawnień. Wymieniony, żeby nie udawać, że go pomijamy.',
+  },
   { id: 'evidence', label: 'Evidence i Replay', icon: '📋', hash: '#/evidence' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
   { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },

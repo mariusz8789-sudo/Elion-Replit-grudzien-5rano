@@ -106,8 +106,8 @@ export function buildProvenanceGraph(
   return { nodes, edges: edges.filter((e) => known.has(e.from) && known.has(e.to)) };
 }
 
-const COL_W = 150;
-const NODE_W = 132;
+const COL_W = 170;
+const NODE_W = 154;
 const NODE_H = 46;
 const ROW_H = 58;
 const TOP = 30;
@@ -144,8 +144,8 @@ export function ProvenanceDag({ detail, record, custody }: {
             <g key={n.id} className={`gu-dag-node gu-dag-${n.kind} gu-dag-tone-${n.tone}`} data-testid={`dag-${n.id}`}>
               <title>{`${n.label} — ${n.sub}`}</title>
               <rect x={p.x} y={p.y} width={NODE_W} height={NODE_H} rx={8} className="gu-dag-box" />
-              <text x={p.x + 8} y={p.y + 18} className="gu-dag-label">{n.label.length > 20 ? `${n.label.slice(0, 19)}…` : n.label}</text>
-              <text x={p.x + 8} y={p.y + 34} className="gu-dag-sub">{n.sub.length > 24 ? `${n.sub.slice(0, 23)}…` : n.sub}</text>
+              <text x={p.x + 8} y={p.y + 18} className="gu-dag-label">{n.label.length > 24 ? `${n.label.slice(0, 23)}…` : n.label}</text>
+              <text x={p.x + 8} y={p.y + 34} className="gu-dag-sub">{n.sub.length > 28 ? `${n.sub.slice(0, 27)}…` : n.sub}</text>
             </g>
           );
         })}

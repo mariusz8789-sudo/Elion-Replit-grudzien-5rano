@@ -16,7 +16,7 @@ const CONJUNCT_LABEL: Readonly<Record<string, string>> = {
   FAVOURED_CANDIDATE_PASSES_SAFETY_GATE: 'favourite passes safety gate',
 };
 
-const GATE_W = 176;
+const GATE_W = 200;
 const GATE_H = 60;
 const GAP = 44;
 const LEFT = 16;
@@ -53,12 +53,10 @@ export function WinnerGateDiagram({ conjuncts, falsification, gateDecisions, ver
               <text x={x0 + 14} y={ROW_Y + 22} className="gu-gated-idx">{i + 1}</text>
               <text x={x0 + 34} y={ROW_Y + 22} className="gu-gated-state">{c.held ? 'HELD' : 'FAILED'}</text>
               <text x={x0 + 14} y={ROW_Y + 44} className="gu-gated-name">{CONJUNCT_LABEL[c.criterion] ?? c.criterion.toLowerCase().replace(/_/g, ' ')}</text>
-              {/* the gate "leaf": open (rotated) when held, shut across the flow when failed */}
-              <line
-                x1={x0 + GATE_W} y1={ROW_Y + GATE_H / 2}
-                x2={c.held ? x0 + GATE_W + 22 : x0 + GATE_W} y2={c.held ? ROW_Y + 8 : ROW_Y + 4}
-                className="gu-gated-leaf"
-              />
+              {/* the gate port on the box edge: an open ring when held, a closed bar across the flow when failed */}
+              {c.held
+                ? <circle cx={x0 + GATE_W} cy={ROW_Y + GATE_H / 2} r={5} className="gu-gated-port" />
+                : <line x1={x0 + GATE_W + 10} y1={ROW_Y + 10} x2={x0 + GATE_W + 10} y2={ROW_Y + GATE_H - 10} className="gu-gated-leaf" />}
             </g>
           );
         })}

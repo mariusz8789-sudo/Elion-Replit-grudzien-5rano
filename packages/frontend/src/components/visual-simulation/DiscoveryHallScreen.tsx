@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { LabScene3D } from '../../core/three/labScene3D';
 import { runGovLowerHarmDiscovery, type GovLowerHarmDiscoveryResult } from '../../core/orchestrator/govLowerHarmDiscovery';
+import { WorldChrome } from '../genesis-ui/WorldChrome';
 import { buildDiscoveryHallSequence, type HallShot } from '../../core/three/discoveryHallSequence';
 
 /**
@@ -59,14 +60,20 @@ export function DiscoveryHallScreen() {
 
   return (
     <main id="main-content" tabIndex={-1} className="hall-shell" data-testid="discovery-hall">
+      <WorldChrome
+        glyph="◈"
+        domain="Winner Gate"
+        title="Discovery Hall"
+        purpose="Jedno realne odkrycie opowiedziane w laboratorium: kustodia → G2 → bramka zwycięzcy → Winner Record."
+        badges={[{ label: 'DANE · REALNY PRZEBIEG LOWER-HARM', tone: 'real' }, { label: 'SCENA 3D · WIZUALIZACJA', tone: 'visual' }]}
+        kpis={shots.length > 0 ? [{ label: 'ujęcie', value: `${index + 1}/${shots.length}` }] : []}
+      />
       <div className="hall-stage">
         <canvas ref={canvasRef} className="hall-canvas" aria-label="Discovery Hall — the existing 3D lab scene (visualisation, not an experiment)" />
         {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
         {failed && <div className="empty-state">Nie udało się uruchomić WebGL na tym urządzeniu.</div>}
         <div className="hall-hud" data-testid="hall-hud">
           <div className="hall-hud-top">
-            <span className="hall-badge hall-badge-visual">SCENA 3D · WIZUALIZACJA</span>
-            <span className="hall-badge hall-badge-real">DANE · REALNY PRZEBIEG LOWER-HARM</span>
             {shot !== null && <span className="hall-camera">{CAMERA_LABEL[shot.kind]}</span>}
           </div>
           {error !== null && <p className="hall-error">Run failed: {error}</p>}

@@ -16,7 +16,7 @@ import { CandidateSpacePanel } from './genesis-ui/CandidateSpacePanel';
 import { PipelineTimeline } from './genesis-ui/PipelineTimeline';
 import { ProvenanceDag, type CustodyView } from './genesis-ui/ProvenanceDag';
 import { ReplayTwinPanel } from './genesis-ui/ReplayTwinPanel';
-import { VerdictWhyStrip } from './genesis-ui/VerdictWhyStrip';
+import { RunVerdictHero } from './genesis-ui/RunVerdictHero';
 import { MindPanel } from '../core/mind/ui/MindPanel';
 import { ChallengePanel } from '../core/discoveryChallenge/ui/ChallengePanel';
 import { GovServicesPanel } from '../core/govServices/ui/GovServicesPanel';
@@ -261,6 +261,8 @@ export function GenesisConsole(): React.ReactElement {
 
       {run !== null && run.verdict !== 'ABORTED' && (
         <>
+          <RunVerdictHero run={run} detail={detail} record={winnerRecord} />
+
           <section className="settings-section">
             <PipelineTimeline stages={run.stages} />
             <details className="gu-timeline-details">
@@ -282,13 +284,13 @@ export function GenesisConsole(): React.ReactElement {
           </section>
 
           {detail !== undefined && (
-            <section className="settings-section">
+            <section className="settings-section" id="candidate-space">
               <CandidateSpacePanel candidates={detail.candidates} />
             </section>
           )}
 
           {detail !== undefined && (
-            <section className="settings-section">
+            <section className="settings-section" id="winner-gate">
               <WinnerGatePanel detail={detail} record={winnerRecord} />
             </section>
           )}
@@ -300,9 +302,8 @@ export function GenesisConsole(): React.ReactElement {
             </section>
           )}
 
-          <section className="settings-section">
+          <section className="settings-section" id="winner-record">
             <VerdictBanner label={run.verdict} reason={detail?.verdictReason ?? undefined} />
-            {detail !== undefined && <VerdictWhyStrip detail={detail} record={winnerRecord} />}
             {winnerRecord?.kind === 'WINNER_RECORD' ? (
               <>
                 <ResearchRecipePanel record={winnerRecord} />
@@ -352,10 +353,15 @@ export function GenesisConsole(): React.ReactElement {
         </>
       )}
 
-      <MindPanel />
-      <ChallengePanel />
-      <GovServicesPanel />
-      <EvidenceSourceStatusPanel />
+      {/* D-118: the sandbox and service panels are still here, behind one disclosure, so the
+          page ends where the run's answer ends instead of trailing into unrelated experiments. */}
+      <details className="gu-sandbox">
+        <summary className="gu-sandbox-summary">Inne eksperymenty i usługi — Genesis Mind, Discovery Challenge, usługi rządowe, status źródeł dowodów</summary>
+        <MindPanel />
+        <ChallengePanel />
+        <GovServicesPanel />
+        <EvidenceSourceStatusPanel />
+      </details>
     </div>
   );
 }

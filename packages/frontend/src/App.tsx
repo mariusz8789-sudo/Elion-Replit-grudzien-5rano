@@ -14,6 +14,7 @@ import { WhatIfScreen } from './components/WhatIfScreen';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
+import { requestOpenScienceChat } from './core/scienceChatBridge';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
 import { getSettings } from './core/settings';
@@ -70,6 +71,8 @@ const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulatio
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
+const StartHero = lazy(() => import('./components/StartHero').then((m) => ({ default: m.StartHero })));
+const WorldsHubScreen = lazy(() => import('./components/WorldsHubScreen').then((m) => ({ default: m.WorldsHubScreen })));
 const DiscoveryHallScreen = lazy(() => import('./components/visual-simulation/DiscoveryHallScreen').then((m) => ({ default: m.DiscoveryHallScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
@@ -149,6 +152,7 @@ type Route =
   | { kind: 'looking-glass' }
   | { kind: 'investor-demo' }
   | { kind: 'discovery-hall' }
+  | { kind: 'worlds' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
@@ -207,6 +211,7 @@ function parseHash(): Route {
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/discovery-hall') return { kind: 'discovery-hall' };
+  if (h === '#/worlds') return { kind: 'worlds' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
@@ -223,6 +228,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [homeMoreOpen, setHomeMoreOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
   const lastLabId = useRef<string | null>(null);
@@ -752,7 +758,7 @@ export default function App() {
     if (route.kind === 'city3d') {
       return (
         <div className="app">
-          <TopBar title="🏙 Epidemia w małym mieście — żywa scena WebGL" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Miasto epidemiologiczne" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <City3DWebGLScreen />
           </HeavyRoute>
@@ -800,7 +806,7 @@ export default function App() {
     if (route.kind === 'first-person-lab') {
       return (
         <div className="app">
-          <TopBar title="🔬 Laboratorium pierwszoosobowe" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Wirtualne laboratorium" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <FirstPersonLabScreen />
           </HeavyRoute>
@@ -821,10 +827,22 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'worlds') {
+      return (
+        <div className="app">
+          <TopBar title="Światy 3D" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <WorldsHubScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'discovery-hall') {
       return (
         <div className="app">
-          <TopBar title="🏛 GENESIS — Discovery Hall" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Discovery Hall" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <DiscoveryHallScreen />
           </HeavyRoute>
@@ -895,7 +913,7 @@ export default function App() {
     if (route.kind === 'molecule') {
       return (
         <div className="app">
-          <TopBar title="🧪 Genesis Molecule Lab — real RDKit atoms + bonds" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Molecule World" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <MoleculeLabScreen />
           </HeavyRoute>
@@ -930,14 +948,28 @@ export default function App() {
 
     return (
       <div className="app">
+        <TopBar title="Start" onSearch={() => setSearchOpen(true)} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)
               mounted right here beside the chat. Opening a world no longer
               unmounts the conversation. */}
           <HeavyRoute>
+            <StartHero />
+          </HeavyRoute>
+          <HeavyRoute>
             <WorkspaceStage />
           </HeavyRoute>
+          {/* D-118: everything Home used to shout (launcher lists, research zone, the 3D command
+              centre, the capability showcase, the scale journey, the labs grid) stays reachable
+              behind ONE disclosure. Nothing was deleted; it stopped competing with the question box. */}
+          <div className="home-more">
+            <button type="button" className="chip-btn home-more-toggle" aria-expanded={homeMoreOpen} onClick={() => setHomeMoreOpen((v) => !v)}>
+              {homeMoreOpen ? 'Zwiń przegląd systemu' : 'Poznaj Genesis od środka — moduły, laboratoria, przegląd systemu'}
+            </button>
+          </div>
+          {homeMoreOpen && (
+          <div className="home-more-body">
           <div className="section-label">Zacznij tutaj</div>
           <div className="home-launcher">
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>
@@ -1135,6 +1167,8 @@ export default function App() {
             Genesis OS · Każda symulacja nosi etykietę uczciwości naukowej: hipotezy nigdy nie udają faktów.
             Naciśnij <kbd>/</kbd>, aby szukać, albo <kbd>?</kbd> po listę skrótów.
           </p>
+          </div>
+          )}
         </main>
         {overlays}
       </div>
@@ -1193,17 +1227,40 @@ export default function App() {
   );
 }
 
+/** Route titles were written with a leading emoji; the chrome shows the Genesis mark instead (D-118). */
+export function cleanRouteTitle(title: string): string {
+  return title.replace(/^[^\p{L}\p{N}]+\s*/u, '').trim();
+}
+
 function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
+  const [ask, setAsk] = useState('');
+  const submit = (): void => {
+    const text = ask.trim();
+    if (!text) return;
+    setAsk('');
+    requestOpenScienceChat(text);
+  };
   return (
     <header className="topbar">
-      <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
+      <button className="back" aria-label="Wróć na Start" onClick={() => { window.location.hash = ''; }}>
         ←
       </button>
       <div className="titles">
-        <h1>{title}</h1>
+        <h1>{cleanRouteTitle(title)}</h1>
       </div>
-      <button className="back" aria-label={t('nav.search')} onClick={onSearch} style={{ marginLeft: 'auto' }}>
-        🔍
+      <form className="topbar-ask" onSubmit={(e) => { e.preventDefault(); submit(); }} role="search" aria-label="Zapytaj Genesis">
+        <span className="topbar-ask-icon" aria-hidden="true">✦</span>
+        <input
+          className="topbar-ask-input"
+          value={ask}
+          onChange={(e) => setAsk(e.target.value)}
+          placeholder="Zapytaj Genesis…"
+          aria-label="Zapytaj Genesis"
+        />
+        <button type="submit" className="topbar-ask-send" disabled={!ask.trim()} aria-label="Wyślij pytanie">→</button>
+      </form>
+      <button className="back" aria-label={t('nav.search')} onClick={onSearch}>
+        ⌕
       </button>
     </header>
   );

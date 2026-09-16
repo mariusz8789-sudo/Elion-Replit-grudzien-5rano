@@ -13,6 +13,10 @@ import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPane
 import { WinnerGatePanel } from './genesis-ui/WinnerGatePanel';
 import { ResearchRecipePanel } from './genesis-ui/ResearchRecipePanel';
 import { CandidateSpacePanel } from './genesis-ui/CandidateSpacePanel';
+import { PipelineTimeline } from './genesis-ui/PipelineTimeline';
+import { ProvenanceDag, type CustodyView } from './genesis-ui/ProvenanceDag';
+import { ReplayTwinPanel } from './genesis-ui/ReplayTwinPanel';
+import { VerdictWhyStrip } from './genesis-ui/VerdictWhyStrip';
 import { MindPanel } from '../core/mind/ui/MindPanel';
 import { ChallengePanel } from '../core/discoveryChallenge/ui/ChallengePanel';
 import { GovServicesPanel } from '../core/govServices/ui/GovServicesPanel';
@@ -135,6 +139,12 @@ export function GenesisConsole(): React.ReactElement {
     }
   };
 
+  // D-117: the custody node of the provenance graph — the real custody gate result when the
+  // console has one, else the record's own custody block; null (drawn as "not recorded") otherwise.
+  const custodyView: CustodyView | null = custody !== null && custody.record?.artifact !== null && custody.record?.artifact !== undefined
+    ? { sourceId: custody.sourceId, hash: custody.record.artifact.hash, status: custody.ok ? 'FROZEN' : 'FAILED' }
+    : winnerRecord?.kind === 'WINNER_RECORD' ? winnerRecord.evidenceCustody : null;
+
   const replayCol = (label: string, r: GenesisDomainReplayResult['first']): React.ReactElement => (
     <div className="gu-replay-col">
       <h5>{label}</h5>
@@ -252,7 +262,9 @@ export function GenesisConsole(): React.ReactElement {
       {run !== null && run.verdict !== 'ABORTED' && (
         <>
           <section className="settings-section">
-            <h3 className="section-label">Stages</h3>
+            <PipelineTimeline stages={run.stages} />
+            <details className="gu-timeline-details">
+            <summary>Stage records — full fingerprints and notes</summary>
             <ul className="gu-conjunct-list">
               {run.stages.map((s) => (
                 <li key={s.stage} className={`gu-conjunct-item ${s.status === 'OK' ? 'gu-conjunct-held' : 'gu-conjunct-failed'}`}>
@@ -266,6 +278,7 @@ export function GenesisConsole(): React.ReactElement {
                 </li>
               ))}
             </ul>
+            </details>
           </section>
 
           {detail !== undefined && (
@@ -280,8 +293,16 @@ export function GenesisConsole(): React.ReactElement {
             </section>
           )}
 
+          {detail !== undefined && (
+            <section className="settings-section">
+              <h3 className="section-label">Evidence provenance — source → custody → observations → candidates → G2 → gate → outcome</h3>
+              <ProvenanceDag detail={detail} record={winnerRecord} custody={custodyView} />
+            </section>
+          )}
+
           <section className="settings-section">
             <VerdictBanner label={run.verdict} reason={detail?.verdictReason ?? undefined} />
+            {detail !== undefined && <VerdictWhyStrip detail={detail} record={winnerRecord} />}
             {winnerRecord?.kind === 'WINNER_RECORD' ? (
               <ResearchRecipePanel record={winnerRecord} />
             ) : (
@@ -318,6 +339,7 @@ export function GenesisConsole(): React.ReactElement {
                     {replayCol('RUN A', replay.first)}
                     {replayCol('RUN B', replay.second)}
                   </div>
+                  <ReplayTwinPanel replay={replay} />
                 </div>
               )}
             </section>

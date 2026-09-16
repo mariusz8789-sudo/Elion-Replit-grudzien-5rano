@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { LowerHarmRunDetail, LowerHarmWinnerRecord, NoWinnerBlocker } from '../../core/orchestrator/winnerRecord';
 import { FingerprintChip } from './FingerprintChip';
+import { WinnerGateDiagram } from './WinnerGateDiagram';
 
 /**
  * WinnerGatePanel — projects the REAL Winner Gate outcome of one run: the
@@ -20,9 +21,12 @@ const GATE_LABEL: Readonly<Record<string, string>> = {
 
 export function WinnerGatePanel({ detail, record }: { readonly detail: LowerHarmRunDetail; readonly record: LowerHarmWinnerRecord | NoWinnerBlocker | undefined }): React.ReactElement {
   const f = detail.falsification;
+  const endVerdict = record?.kind === 'WINNER_RECORD' ? 'WINNER' : record?.kind === 'NO_WINNER_BLOCKER' ? record.verdict : 'NO RECORD';
+  const candidateNames = Object.fromEntries(detail.candidates.map((c) => [c.candidateId, c.candidateName]));
   return (
     <div className="gu-gate">
       <h3 className="section-label">Winner Gate — three conjuncts, all must hold</h3>
+      <WinnerGateDiagram conjuncts={detail.conjuncts} falsification={f} gateDecisions={detail.gateDecisions} verdict={endVerdict} candidateNames={candidateNames} />
       <ol className="gu-gate-conjuncts">
         {detail.conjuncts.map((c, i) => (
           <li key={c.criterion} className={`gu-gate-conjunct ${c.held ? 'gu-gate-held' : 'gu-gate-failed'}`} data-testid={`conjunct-${c.criterion}`}>

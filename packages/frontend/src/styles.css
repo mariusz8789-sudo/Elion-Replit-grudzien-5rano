@@ -4926,3 +4926,122 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .gu-recipe-dl { grid-template-columns: 1fr; }
   .gu-replay-twin { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------------------
+ * D-117 — visual layer: pipeline timeline, candidate map, Winner Gate diagram,
+ * provenance DAG, replay twin, verdict "why" strip. All pure projections of
+ * run data; no rule or number is computed in the stylesheet.
+ * ------------------------------------------------------------------------- */
+.gu-timeline { display: grid; gap: 10px; }
+.gu-timeline-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.gu-timeline-track { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px 4px; position: relative; }
+.gu-timeline-step { position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 4px 6px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); min-width: 0; }
+.gu-timeline-step::before { content: ''; position: absolute; left: -4px; right: -4px; top: 19px; height: 2px; background: var(--border-strong); z-index: 0; }
+.gu-timeline-step:first-child::before { left: 50%; }
+.gu-timeline-step:last-child::before { right: 50%; }
+.gu-timeline-dot { position: relative; z-index: 1; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; color: var(--bg); background: var(--gold); box-shadow: 0 0 0 3px var(--bg-raised); }
+.gu-timeline-ok .gu-timeline-dot { background: var(--green); }
+.gu-timeline-aborted .gu-timeline-dot { background: var(--red); }
+.gu-timeline-locked .gu-timeline-dot { background: var(--text-faint); }
+.gu-timeline-name { font-size: 0.68rem; color: var(--text-dim); text-align: center; line-height: 1.15; letter-spacing: 0.02em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gu-timeline-fp { font-family: var(--font-mono); font-size: 0.62rem; color: var(--cyan); opacity: 0.85; }
+.gu-timeline-details { margin-top: 8px; }
+.gu-timeline-details > summary { cursor: pointer; color: var(--text-dim); font-size: 0.82rem; }
+
+.gu-cmap { margin: 0; display: grid; gap: 8px; }
+.gu-cmap-svg { width: 100%; height: auto; display: block; border-radius: 10px; background: color-mix(in srgb, var(--bg-raised) 70%, transparent); border: 1px solid var(--border); }
+.gu-cmap-plot { fill: color-mix(in srgb, var(--bg) 60%, transparent); stroke: var(--border); }
+.gu-cmap-zero { stroke: var(--border-strong); stroke-dasharray: 3 4; }
+.gu-cmap-axis { fill: var(--text-dim); font-size: 11px; letter-spacing: 0.04em; }
+.gu-cmap-tick { fill: var(--text-faint); font-family: var(--font-mono); font-size: 10px; }
+.gu-cmap-dot { fill: var(--text-faint); stroke: var(--bg); stroke-width: 1.5; }
+.gu-cmap-qualifies .gu-cmap-dot { fill: var(--cyan); }
+.gu-cmap-top2 .gu-cmap-dot { fill: var(--green); }
+.gu-cmap-safety_veto .gu-cmap-dot { fill: color-mix(in srgb, var(--red) 55%, var(--bg-raised)); stroke: var(--red); }
+.gu-cmap-below_floor .gu-cmap-dot { fill: color-mix(in srgb, var(--gold) 40%, var(--bg-raised)); stroke: var(--gold); }
+.gu-cmap-insufficient_evidence .gu-cmap-dot { fill: transparent; stroke: var(--text-faint); stroke-dasharray: 2 2; }
+.gu-cmap-ring { fill: none; stroke: var(--green); stroke-width: 1.5; opacity: 0.7; }
+.gu-cmap-label { fill: var(--text); font-size: 11px; font-weight: 600; }
+.gu-cmap-safety_veto .gu-cmap-label { fill: var(--red); font-weight: 500; }
+.gu-cmap-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.76rem; color: var(--text-dim); }
+.gu-cmap-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--text-faint); vertical-align: -1px; margin-right: 4px; }
+.gu-cmap-key.gu-cmap-qualifies i { background: var(--cyan); }
+.gu-cmap-key.gu-cmap-top2 i { background: var(--green); box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 3px var(--green); }
+.gu-cmap-key.gu-cmap-safety_veto i { background: color-mix(in srgb, var(--red) 55%, var(--bg-raised)); border: 1px solid var(--red); }
+.gu-cmap-key.gu-cmap-below_floor i { background: color-mix(in srgb, var(--gold) 40%, var(--bg-raised)); border: 1px solid var(--gold); }
+.gu-cmap-key.gu-cmap-insufficient_evidence i { background: transparent; border: 1px dashed var(--text-faint); }
+
+.gu-gated { display: grid; gap: 10px; margin-bottom: 12px; }
+.gu-gated-svg, .gu-gated-band { width: 100%; height: auto; display: block; }
+.gu-gated-box { fill: var(--bg-raised); stroke: var(--border-strong); stroke-width: 1.2; }
+.gu-gated-held .gu-gated-box { stroke: var(--green); }
+.gu-gated-failed .gu-gated-box { stroke: var(--red); fill: color-mix(in srgb, var(--red) 8%, var(--bg-raised)); }
+.gu-gated-unreached { opacity: 0.45; }
+.gu-gated-idx { fill: var(--text-faint); font-family: var(--font-mono); font-size: 12px; }
+.gu-gated-state { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.gu-gated-held .gu-gated-state { fill: var(--green); }
+.gu-gated-failed .gu-gated-state { fill: var(--red); }
+.gu-gated-name { fill: var(--text-dim); font-size: 11.5px; }
+.gu-gated-flow { stroke: var(--border-strong); stroke-width: 2; }
+.gu-gated-flow-on { stroke: var(--green); }
+.gu-gated-leaf { stroke: var(--text-dim); stroke-width: 3; stroke-linecap: round; }
+.gu-gated-held .gu-gated-leaf { stroke: var(--green); }
+.gu-gated-failed .gu-gated-leaf { stroke: var(--red); }
+.gu-gated-endcap { fill: var(--bg-raised); stroke: var(--border-strong); stroke-width: 1.5; }
+.gu-gated-end-open .gu-gated-endcap { stroke: var(--green); fill: color-mix(in srgb, var(--green) 12%, var(--bg-raised)); }
+.gu-gated-end-closed .gu-gated-endcap { stroke: var(--red); fill: color-mix(in srgb, var(--red) 10%, var(--bg-raised)); }
+.gu-gated-endtext { font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; fill: var(--text); }
+.gu-gated-end-open .gu-gated-endtext { fill: var(--green); }
+.gu-gated-end-closed .gu-gated-endtext { fill: var(--red); }
+.gu-gated-bandtitle { fill: var(--text-dim); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
+.gu-gated-axis { stroke: var(--border-strong); }
+.gu-gated-zero { stroke: var(--border-strong); stroke-dasharray: 3 4; }
+.gu-gated-bandlabel { fill: var(--text); font-size: 11px; font-weight: 600; }
+.gu-gated-bandbar { fill: color-mix(in srgb, var(--cyan) 35%, transparent); stroke: var(--cyan); }
+.gu-gated-bandbar-1 { fill: color-mix(in srgb, var(--gold) 30%, transparent); stroke: var(--gold); }
+.gu-gated-bandtick { stroke: var(--text); stroke-width: 2; }
+.gu-gated-decisions { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.gu-gated-decision { display: inline-flex; gap: 8px; align-items: baseline; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--bg-raised); font-size: 0.78rem; }
+.gu-gated-decision-outcome { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; }
+.gu-gated-decision-refuse { border-color: var(--red); } .gu-gated-decision-refuse .gu-gated-decision-outcome { color: var(--red); }
+.gu-gated-decision-requires_human_approval { border-color: var(--gold); } .gu-gated-decision-requires_human_approval .gu-gated-decision-outcome { color: var(--gold); }
+.gu-gated-decision-activate { border-color: var(--green); } .gu-gated-decision-activate .gu-gated-decision-outcome { color: var(--green); }
+
+.gu-dag { margin: 0; display: grid; gap: 6px; }
+.gu-dag-svg { width: 100%; height: auto; display: block; border-radius: 10px; background: color-mix(in srgb, var(--bg-raised) 70%, transparent); border: 1px solid var(--border); }
+.gu-dag-col { fill: var(--text-faint); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; }
+.gu-dag-edge { fill: none; stroke: var(--border-strong); stroke-width: 1.2; opacity: 0.9; }
+.gu-dag-box { fill: var(--bg-raised); stroke: var(--border-strong); }
+.gu-dag-tone-ok .gu-dag-box { stroke: var(--green); }
+.gu-dag-tone-warn .gu-dag-box { stroke: var(--gold); }
+.gu-dag-tone-fail .gu-dag-box { stroke: var(--red); fill: color-mix(in srgb, var(--red) 8%, var(--bg-raised)); }
+.gu-dag-label { fill: var(--text); font-size: 11px; font-weight: 600; }
+.gu-dag-sub { fill: var(--text-dim); font-family: var(--font-mono); font-size: 9.5px; }
+.gu-dag-record .gu-dag-label { fill: var(--green); }
+.gu-dag-blocker .gu-dag-label { fill: var(--red); }
+
+.gu-twin { display: grid; gap: 6px; margin-top: 8px; }
+.gu-twin-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; font-size: 0.82rem; }
+.gu-twin-ok { color: var(--green); font-family: var(--font-mono); }
+.gu-twin-bad { color: var(--red); font-family: var(--font-mono); }
+.gu-twin-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.gu-twin-row { display: grid; grid-template-columns: 26px 1fr 84px 20px 84px; gap: 6px; align-items: center; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; background: var(--bg-raised); }
+.gu-twin-idx { color: var(--text-faint); font-family: var(--font-mono); font-size: 0.68rem; }
+.gu-twin-stage { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gu-twin-fp { font-family: var(--font-mono); font-size: 0.72rem; color: var(--cyan); }
+.gu-twin-mark { text-align: center; font-family: var(--font-mono); font-weight: 700; }
+.gu-twin-match .gu-twin-mark { color: var(--green); }
+.gu-twin-mismatch { background: color-mix(in srgb, var(--red) 10%, var(--bg-raised)); }
+.gu-twin-mismatch .gu-twin-mark, .gu-twin-mismatch .gu-twin-fp { color: var(--red); }
+
+.gu-why { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 12px; }
+.gu-why-chip { display: inline-block; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--bg-raised); font-size: 0.74rem; font-family: var(--font-mono); letter-spacing: 0.02em; color: var(--text-dim); }
+.gu-why-held { border-color: var(--green); color: var(--green); }
+.gu-why-failed { border-color: var(--red); color: var(--red); }
+.gu-why-gate-requires_human_approval { border-color: var(--gold); color: var(--gold); }
+.gu-why-gate-refuse { border-color: var(--red); color: var(--red); }
+.gu-why-gate-activate { border-color: var(--green); color: var(--green); }
+@media (max-width: 700px) {
+  .gu-timeline-track { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
+  .gu-twin-row { grid-template-columns: 22px 1fr 64px 16px 64px; }
+}

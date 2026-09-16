@@ -167,13 +167,9 @@ say('pipeline finished');
 await sleep(600);
 await caption('2 · GENESIS PRACUJE', 'Najpierw kustodia dowodów: dane są zamrożone i zweryfikowane hashem SHA-256, zanim padnie jakakolwiek decyzja.', REAL);
 await sleep(2600);
-await scrollTo('.gu-conjunct-list');
+await scrollTo('[data-testid="pipeline-timeline"]');
 await caption('2 · GENESIS PRACUJE', 'Każdy z 20 etapów zostawia własny odcisk (fingerprint). Nic nie da się dopisać po fakcie.');
-await sleep(1800);
-for (const i of [6, 10, 14, 18]) {
-  await page.evaluate((n) => document.querySelectorAll('.gu-conjunct-list .gu-conjunct-item')[n]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), i);
-  await sleep(1100);
-}
+await sleep(3600);
 
 // candidates
 await scrollTo('[data-testid="candidate-space"]');
@@ -190,10 +186,10 @@ await caption('3 · KANDYDACI', 'Nic nie jest ukryte: kandydat z lepszą skutecz
 await sleep(3000);
 
 // 4. SCIENTIFIC EXPLANATION — falsification + winner gate
-await scrollTo('.gu-gate');
+await scrollTo('[data-testid="winner-gate-diagram"]');
 await caption('4 · FALSYFIKACJA', 'Bramka zwycięzcy: trzy warunki i wszystkie muszą zajść. Eksperyment G2 musi rozdzielić parę, wynik musi zgadzać się z rankingiem zamrożonym PRZED eksperymentem, a faworyt musi przejść bramkę bezpieczeństwa.');
 await sleep(4200);
-await scrollTo('.gu-gate-g2', 'center');
+await scrollTo('[data-testid="g2-band"], .gu-gate-g2', 'center');
 await caption('4 · FALSYFIKACJA', 'Reguła decyzyjna została zamrożona (fingerprint) zanim odczytano jakąkolwiek obserwację — Genesis nie może „dopasować zwycięzcy po fakcie”.');
 await sleep(3400);
 await scrollTo('.gu-gate-decisions', 'center');
@@ -226,12 +222,18 @@ if (hasWinner) {
   await sleep(4500);
 }
 
+// provenance graph — source → custody → observations → candidates → G2 → gate → outcome
+await scrollTo('[data-testid="provenance-dag"]', 'center');
+await caption('5 · PROWENIENCJA', 'Łańcuch dowodowy w jednym grafie: źródło → kustodia (hash) → obserwacje NCT → kandydaci → eksperyment G2 → bramka → rekord. Każdy węzeł to realny artefakt tego przebiegu.', REAL);
+await sleep(4200);
+
 // 6. REPLAY / TRUST
 await scrollTo('[data-testid="replay-section"]');
 await caption('6 · REPLAY', 'Zaufanie: Genesis odtwarza cały przebieg od zera — dwa niezależne uruchomienia — i porównuje odciski.');
 await page.getByText('Replay & verify').first().click();
 await page.waitForSelector('[data-testid="replay-result"]', { timeout: 120000 });
 await sleep(400);
+await scrollTo('[data-testid="replay-twin"]', 'center');
 const replayText = (await page.locator('.gu-replay-verdict').first().textContent()) ?? '';
 say(`replay: ${replayText}`);
 await caption('6 · REPLAY', replayText.startsWith('MATCH')

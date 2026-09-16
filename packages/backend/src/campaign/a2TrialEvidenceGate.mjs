@@ -69,6 +69,34 @@ function fail(code, reason) {
 }
 
 /**
+ * D-112 — population matching by TOKEN SUBSET, not substring.
+ *
+ * THE DEFECT THIS REPLACES. The first version asked whether a condition
+ * string CONTAINS the population string. ClinicalTrials.gov states
+ * conditions in MeSH canonical form — "Diabetes Mellitus, Type 2" — which
+ * does not contain the substring "type 2 diabetes", so the gate rejected a
+ * real, fully-qualifying type-2-diabetes trial (NCT00318461/LEAD-2) with
+ * POPULATION_MISMATCH. That was a false negative against essentially every
+ * record that uses standard MeSH naming, i.e. most of ClinicalTrials.gov.
+ *
+ * WHY THIS IS A REPAIR, NOT A RELAXATION. The preregistered criterion is
+ * `population: ['Type 2 Diabetes', 'Obesity']` — a statement about which
+ * PATIENT POPULATION qualifies, not about word order in a registry label.
+ * The original fetch script never hit this because it delegated matching to
+ * ClinicalTrials.gov's own `query.cond` search; this module re-implemented
+ * that check locally and re-implemented it more weakly. Requiring every
+ * token of the population term to be present keeps the criterion exactly as
+ * strict on what it excludes: "Diabetes Mellitus, Type 1" still fails (no
+ * "2"), bare "Diabetes" still fails (no "type", no "2"), and an unrelated
+ * indication still fails. It only stops failing on word ORDER.
+ */
+function conditionSatisfiesPopulation(condition, population) {
+  const tokens = (text) => new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t !== ''));
+  const conditionTokens = tokens(condition);
+  return [...tokens(population)].every((t) => conditionTokens.has(t));
+}
+
+/**
  * Validates an incoming manifest against every hard criterion. Returns
  * `{ ok: true, nctId, rawStudyJson, sha256 }` only when EVERY check passes;
  * the caller (the CLI script) is responsible for narrowing+writing, so this
@@ -114,7 +142,7 @@ export function validateIncomingTrialPackage(manifest, context) {
 
   const conditions = rawStudyJson?.protocolSection?.conditionsModule?.conditions;
   const conditionList = Array.isArray(conditions) ? conditions : [];
-  const populationMatches = conditionList.some((c) => TRIAL_EVIDENCE_POPULATION.some((p) => String(c).toLowerCase().includes(p.toLowerCase())));
+  const populationMatches = conditionList.some((c) => TRIAL_EVIDENCE_POPULATION.some((p) => conditionSatisfiesPopulation(String(c), p)));
   if (!populationMatches) {
     return fail('POPULATION_MISMATCH', `none of the study's declared conditions (${JSON.stringify(conditionList)}) match a preregistered A2 population (${JSON.stringify(TRIAL_EVIDENCE_POPULATION)})`);
   }

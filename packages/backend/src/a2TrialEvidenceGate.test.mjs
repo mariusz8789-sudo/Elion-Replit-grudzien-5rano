@@ -175,6 +175,36 @@ describe('a2TrialEvidenceGate — D-110 hard acceptance gate', () => {
     assert.equal(r.code, 'POPULATION_MISMATCH');
   });
 
+  // D-112: the population check matches by token subset, not substring. These
+  // four cases together prove the repair did not widen the criterion — only
+  // word ORDER stopped mattering.
+  it('D-112: the MeSH canonical form "Diabetes Mellitus, Type 2" is accepted (it IS type 2 diabetes)', () => {
+    const study = validStudyJson({ condition: 'Diabetes Mellitus, Type 2' });
+    const r = validateIncomingTrialPackage(manifestFor(study), baseContext());
+    assert.equal(r.ok, true, `unexpected rejection: ${r.code} ${r.reason ?? ''}`);
+  });
+
+  it('D-112: "Diabetes Mellitus, Type 1" is still REJECTED — the repair did not widen the criterion', () => {
+    const study = validStudyJson({ condition: 'Diabetes Mellitus, Type 1' });
+    const r = validateIncomingTrialPackage(manifestFor(study), baseContext());
+    assert.equal(r.ok, false);
+    assert.equal(r.code, 'POPULATION_MISMATCH');
+  });
+
+  it('D-112: bare "Diabetes" is still REJECTED — an unspecified diabetes label does not establish a type 2 population', () => {
+    const study = validStudyJson({ condition: 'Diabetes' });
+    const r = validateIncomingTrialPackage(manifestFor(study), baseContext());
+    assert.equal(r.ok, false);
+    assert.equal(r.code, 'POPULATION_MISMATCH');
+  });
+
+  it('D-112: "Obesity, Morbid" is accepted, "Obstructive Sleep Apnea" is not', () => {
+    assert.equal(validateIncomingTrialPackage(manifestFor(validStudyJson({ condition: 'Obesity, Morbid' })), baseContext()).ok, true);
+    const r = validateIncomingTrialPackage(manifestFor(validStudyJson({ condition: 'Obstructive Sleep Apnea' })), baseContext());
+    assert.equal(r.ok, false);
+    assert.equal(r.code, 'POPULATION_MISMATCH');
+  });
+
   it('results not posted (status not COMPLETED / no resultsSection): rejected', () => {
     const study = validStudyJson({ status: 'RECRUITING', withResults: false });
     const r = validateIncomingTrialPackage(manifestFor(study), baseContext());

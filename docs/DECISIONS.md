@@ -9049,3 +9049,102 @@ remains NO_WINNER, 1 observation short. Documentation mislabel fixed. No
 threshold, pin, preregistration, or Winner Gate rule touched. Still
 TECHNICALLY READY — WAITING FOR EXTERNAL EVIDENCE that is NOT already
 inside A1.**
+
+## D-112 — LEAD-2 arrives with real custody; the gate's own population matcher is the defect, and the extractor cannot read the trial's arms
+
+An external search supplied NCT00318461 (LEAD-2) twice: first as a
+Markdown-escaped package, then as a raw custody artifact. Both were
+validated. Nothing was ingested.
+
+### 1. Package 1 — channel corruption, characterized not repaired
+
+Six ClinicalTrials.gov records arrived with a `.md` extension but raw API v2
+JSON inside, passed through a Markdown escaper: `[`→`\[`, `]`→`\]`,
+`_`→`\_`, plus `*`, `>`, `<`, `^` — none of which is a legal JSON escape, so
+the corruption is unambiguously identifiable. Four files reverse with one
+declared rule; `NCT01272232` and `NCT00518882` carry multi-layer escaping
+(`\\\\n`, `\\\^2`) and do not parse even after two. Per the D-108 precedent
+(`VERIFIED_AFTER_CHANNEL_CORRECTION` ≠ `RAW_VERIFIED`), the un-escaped
+output is a RECONSTRUCTION whose sha256 is not the API's, so it was used to
+answer the eligibility question only, never to establish custody.
+
+### 2. Package 2 — custody VERIFIED
+
+`NCT00318461.raw.json`, 228,605 bytes, sha256
+`7d9ecf53997fe87f7e0b5aeb48f5d6bd20e6b21dda43b8561945dd33fb0df1e1` —
+recomputed here and identical to the sender's sidecar. Parses as clean JSON
+with zero Markdown artifacts (the remaining `\[`/`\]` sequences are
+legitimate JSON `\\` escapes inside a HOMA-B formula string, not escaping
+damage). Cross-check: the primary-outcome measurements and arm titles are
+byte-identical to package 1's reconstruction, which retroactively confirms
+the un-escaping in §1 was scientifically lossless.
+
+### 3. The evidence itself
+
+COMPLETED, results first posted 2010-03-12, PHASE3, enrollment 1091,
+conditions `["Diabetes","Diabetes Mellitus, Type 2"]`, primary outcome
+"Change in Glycosylated A1c (HbA1c) at Week 26", `LEAST_SQUARES_MEAN`,
+dispersion `Standard Error`, unit "Percentage point of total HbA1c":
+
+| arm | HbA1c | SE | n |
+|---|---|---|---|
+| Lira 0.6 + Met | −0.69 | 0.07 | 239 |
+| Lira 1.2 + Met | −0.97 | 0.07 | 232 |
+| Lira 1.8 + Met | −1.00 | 0.07 | 236 |
+| Met Mono | +0.09 | 0.09 | 120 |
+| Met + Glim | −0.98 | 0.07 | 234 |
+
+Not in A1's four trials, not already in A2's liraglutide pin, no semaglutide
+arm (so `NAIVE_INDIRECT` against the fixed reference — the same evidence
+class as liraglutide's existing two observations, with none of SUSTAIN 10's
+circularity). LEAD-1/4/5, supplied alongside, carry **no `resultsSection` at
+all** and fail `requirePostedResults` outright; LEAD-6 is already pinned;
+both PubMed files are secondary publications of trials already counted
+(19515413 → the pinned NCT00518882; 22985213 → LEAD-2's own 2-year
+extension, same participants).
+
+### 4. The defect this exposed was MINE, in D-110's gate
+
+The first dry-run rejected the custody package with `POPULATION_MISMATCH`.
+The reason was not the evidence: `a2TrialEvidenceGate.mjs` asked whether a
+condition string CONTAINS "type 2 diabetes", and ClinicalTrials.gov states
+conditions in MeSH canonical form — "Diabetes Mellitus, Type 2" — which does
+not contain that substring. That is a false negative against most of the
+registry. Repaired to token-subset matching (`conditionSatisfiesPopulation`)
+and proven to be a repair rather than a relaxation by four tests that pin
+what still fails: "Diabetes Mellitus, Type 1" (no "2"), bare "Diabetes" (no
+"type"/"2"), and an unrelated indication. The frozen
+`TRIAL_EVIDENCE_POPULATION` constant itself was NOT touched. After the
+repair the real gate returns ACCEPTED in `--dry-run`, sha matching, nothing
+written.
+
+### 5. And it still yields ZERO observations — the real remaining blocker
+
+Confirmed on the custody bytes, through the repo's own `narrowTrialDetail`
+and the real, unmodified `extractCandidateEfficacy`:
+
+```
+extractCandidateEfficacy(LEAD-2, /LIRAGLUTIDE/i, 0.4)  ->  null
+```
+
+LEAD-2's arm labels are "Lira 0.6 + Met", "Lira 1.2 + Met", "Lira 1.8 + Met"
+— not "Liraglutide". `pickCandidateGroup` matches by name and its
+single-group fallback cannot apply to five groups. So ingesting this record
+would add a real trial that contributes **no observation at all**;
+liraglutide would remain at 2 of the required 3.
+
+A naive widening to `/LIRAGLUTIDE|Lira/i` was tested and is worse than
+useless: it selects **"Lira 0.6 + Met" (−0.69)**, the sub-therapeutic 0.6 mg
+starting dose, not the 1.8 mg therapeutic arm (−1.00), because
+`parseDoseMg` does not parse "0.6" without a "mg" unit and the highest-dose
+selector therefore silently falls back to the first group. That change is
+NOT made here: it would alter frozen extraction behaviour that produced
+every historical A2/A3/E2E-01 result, it was identified after seeing which
+data it unlocks, and it currently picks the wrong arm. It is recorded as a
+decision for the account owner, not taken unilaterally.
+
+**OUTCOME: custody VERIFIED; evidence ELIGIBLE on every preregistered
+criterion; gate ACCEPTED in dry-run after repairing a defect in D-110's own
+matcher; NOTHING INGESTED; LOWER_HARM unchanged at NO_WINNER with
+liraglutide 2/3. No threshold, pin, preregistration, evidence class,
+extraction rule or Winner Gate criterion was changed.**

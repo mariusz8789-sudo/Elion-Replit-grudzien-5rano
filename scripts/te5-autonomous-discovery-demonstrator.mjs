@@ -147,7 +147,7 @@ const html = `<!doctype html><meta charset="utf-8"><title>TE5</title><body><scri
 const htmlPath = path.join(work, 'te5.html');
 writeFileSync(htmlPath, html);
 
-let chromiumRun = null;
+let chromiumRun;
 let pageErrors = [];
 const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
 try {

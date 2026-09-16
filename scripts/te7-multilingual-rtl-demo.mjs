@@ -101,7 +101,7 @@ writeFileSync(htmlPath, html);
 
 let pageErrors = [];
 const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
-let result = null;
+let result;
 let computedDirections = {};
 try {
   const page = await browser.newPage();
@@ -111,7 +111,7 @@ try {
   for (const locale of ['en', 'pl', 'ar']) {
     computedDirections[locale] = await page.evaluate((loc) => {
       const el = document.getElementById(`section-${loc}`);
-      return el ? getComputedStyle(el).direction : null;
+      return el ? window.getComputedStyle(el).direction : null;
     }, locale);
   }
 } finally {

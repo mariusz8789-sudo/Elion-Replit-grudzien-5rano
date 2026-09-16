@@ -75,7 +75,7 @@ function reportFor(summary: A2CandidateSummary, id: string, efficacy: A2Candidat
   const falsification = falsifyCandidate(efficacy, safety, 'EVIDENCE_CLASS_GATED');
   const score = scoreCandidate(summary, efficacy, safety, falsification);
   const belief = runCandidateBeliefRevision(id, efficacy, safety);
-  return { summary: { ...summary, moleculeChemblId: id }, efficacy, safety, falsification, belief, score };
+  return { summary: { ...summary, moleculeChemblId: id }, efficacy, safety, falsification, belief, score, identityMismatches: [] };
 }
 
 function retrievedReports(): readonly A2CandidateReport[] {

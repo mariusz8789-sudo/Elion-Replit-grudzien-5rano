@@ -76,7 +76,14 @@ describe('GOV-DRUG-DISCOVERY-E2E-01 — the funnel reduces, and logs every elimi
     expect(tier1.inputCount).toBe(2671);
     expect(tier1.outputCount).toBe(20);
     expect(tier2.inputCount).toBe(20);
-    expect(tier2.outputCount).toBe(8);
+    // D-115: moved from 8. Tier-2 requires BOTH a computable efficacy AND a
+    // computable safety comparison. Native GLP-1's (CHEMBL1240772) sole
+    // efficacy observation was really dulaglutide's own arm in
+    // NCT05659537, refused as IDENTITY_MISMATCH under the general, uniform
+    // single-arm identity rule — with 0 real efficacy observations left,
+    // native GLP-1 no longer has a computable efficacy comparison and is
+    // honestly eliminated at Tier-2. See DECISIONS.md D-115.
+    expect(tier2.outputCount).toBe(7);
     expect(tier1.outputCount).toBeLessThan(tier1.inputCount);
     expect(tier2.outputCount).toBeLessThan(tier2.inputCount);
     expect(run.top3.length).toBeLessThanOrEqual(3);
@@ -166,11 +173,19 @@ describe('GOV-DRUG-DISCOVERY-E2E-01 — winner selection is evidence-driven, and
   });
 
   it('the reason states the real direction of the evidence, not a composite score', () => {
+    // D-115: moved from GLP-1 leading at 0.29pp WORSE. Native GLP-1's sole
+    // efficacy observation was really dulaglutide's own arm in
+    // NCT05659537, refused as IDENTITY_MISMATCH under the general, uniform
+    // single-arm identity rule — with 0 real efficacy observations left,
+    // native GLP-1 no longer reaches Tier-2 (see the outputCount==7 test
+    // above), so it is no longer in TOP3 at all. The real, current leading
+    // eligible-after-veto candidate is PF-06291874, 0.78pp WORSE than
+    // semaglutide. See DECISIONS.md D-115.
     const run = runGovDrugDiscoveryE2E();
-    expect(run.decision.reason).toContain('0.29pp WORSE than semaglutide');
+    expect(run.decision.reason).toContain('0.78pp WORSE than semaglutide');
     expect(run.decision.reason).toContain('blocked by the existential safety veto');
-    const glp1 = run.top3.find((c) => c.prefName === 'GLP-1')!;
-    expect(glp1.bestEfficacyDeltaPp).toBeCloseTo(0.29, 2);
+    const pf06291874 = run.top3.find((c) => c.prefName === 'PF-06291874')!;
+    expect(pf06291874.bestEfficacyDeltaPp).toBeCloseTo(0.78, 2);
     const tirzepatide = run.top3.find((c) => c.prefName === 'TIRZEPATIDE')!;
     expect(tirzepatide.bestEfficacyDeltaPp).toBeCloseTo(-0.79, 2);
   });
@@ -225,10 +240,14 @@ describe('GOV-DRUG-DISCOVERY-E2E-01 — winner selection is evidence-driven, and
 
 describe('GOV-DRUG-DISCOVERY-E2E-01 — adversarial self-falsification (FLIP)', () => {
   it('the injected counterevidence really lands on the leading candidate\'s record in the real run', () => {
+    // D-115: moved from 'GLP-1'. Native GLP-1 no longer reaches Tier-2 (see
+    // this file's D-115 notes above), so it can no longer be the leading
+    // candidate the injector targets. The real, current leading candidate
+    // is PF-06291874. See DECISIONS.md D-115.
     const flipped = runGovDrugDiscoveryE2E({ injectCounterevidence: true });
     const touched = flipped.falsifications.filter((f) => f.unresolvedCounterevidence.some((c) => c.includes('INJECTED')));
     expect(touched).toHaveLength(1);
-    expect(touched[0].prefName).toBe('GLP-1');
+    expect(touched[0].prefName).toBe('PF-06291874');
     expect(flipped.decision.outcome).not.toBe('WINNER');
   });
 
@@ -328,13 +347,16 @@ describe('GOV-DRUG-DISCOVERY-E2E-01 — government output and replay', () => {
     const a = runGovDrugDiscoveryE2E();
     const b = runGovDrugDiscoveryE2E();
     expect(a.runFingerprint).toBe(b.runFingerprint);
-    // D-113: moved from '399221f5' — this run calls A3, which re-runs A2's
-    // own analysis, so orforglipron's real second efficacy observation
-    // (NCT05048719, see a2OzempicSubstitute.test.ts's D-113 note) flows
-    // through here too. The real outcome is unchanged (still NO_WINNER,
-    // asserted elsewhere in this file) — only the fingerprint, because the
-    // underlying data genuinely changed.
-    expect(a.runFingerprint).toBe('94495ec1');
+    // D-113/D-115: moved from '399221f5' — this run calls A3, which
+    // re-runs A2's own analysis, so every real data change flows through
+    // here too: orforglipron's second efficacy observation (NCT05048719,
+    // see a2OzempicSubstitute.test.ts's D-113 note), and D-115's general
+    // single-arm identity-mismatch rule refusing NCT05659537's
+    // "Dulaglutide" arm as native GLP-1's own observation. The real
+    // outcome is unchanged (still NO_WINNER, asserted elsewhere in this
+    // file) — only the fingerprint and TOP3 composition, because the
+    // underlying data genuinely changed. See DECISIONS.md D-115.
+    expect(a.runFingerprint).toBe('7a901584');
     expect(a.preregistrationFingerprint).toBe('f528c881');
   });
 

@@ -59,7 +59,7 @@ function buildSyntheticReport(summary: A2CandidateSummary, efficacy: readonly A2
   const falsification = falsifyCandidate(efficacy, safety, 'HISTORICAL_NO_EVIDENCE_CLASS');
   const belief = runCandidateBeliefRevision(summary.moleculeChemblId, efficacy, safety);
   const score = scoreCandidate(summary, efficacy, safety, falsification);
-  return { summary, efficacy, safety, falsification, belief, score };
+  return { summary, efficacy, safety, falsification, belief, score, identityMismatches: [] };
 }
 
 const SYNTH_A_SUMMARY: A2CandidateSummary = {

@@ -63,10 +63,18 @@ describe('A2 Ozempic-substitute analysis — real pinned data', () => {
     );
   });
 
-  it('reaches CONFLICTING_EVIDENCE honestly — no candidate is forced to win', () => {
+  it('reaches NO_SUPERIOR_CANDIDATE honestly — no candidate is forced to win', () => {
     const report = runA2Analysis();
-    expect(report.verdict.label).toBe('CONFLICTING_EVIDENCE');
-    // No PracticalCandidate is gated for a conflicting-evidence result — nothing is proposed as an actionable winner.
+    // D-115: moved from CONFLICTING_EVIDENCE. Native GLP-1's (CHEMBL1240772)
+    // sole HbA1c observation was disclosed and refused as IDENTITY_MISMATCH
+    // (it was really dulaglutide's own arm in NCT05659537, not native
+    // GLP-1's) under the general, uniform single-arm identity rule the user
+    // authorized. With that observation gone, native GLP-1 no longer has any
+    // usable efficacy evidence, so it can no longer contribute a
+    // better-than-semaglutide score to this verdict — the real, honest
+    // verdict is that no candidate beats the reference. See DECISIONS.md D-115.
+    expect(report.verdict.label).toBe('NO_SUPERIOR_CANDIDATE');
+    // No PracticalCandidate is gated for this result either — nothing is proposed as an actionable winner.
     expect(report.gatedCandidate).toBeNull();
     expect(report.gateDecision).toBeNull();
     expect(report.surface).toBe('NONE');
@@ -86,15 +94,18 @@ describe('A2 Ozempic-substitute analysis — real pinned data', () => {
     const a = runA2Analysis();
     const b = runA2Analysis();
     expect(a.analysisFingerprint).toBe(b.analysisFingerprint);
-    // D-113/D-114: moved from 'a5e0f164' in two real, disclosed steps —
+    // D-113/D-114/D-115: moved from 'a5e0f164' in three real, disclosed steps —
     // orforglipron gaining a second efficacy observation (NCT05048719, arms
-    // labelled by its real development code name "LY3502970"), and LEAD-2's
-    // custody-verified ingestion giving liraglutide its third (NCT00318461).
-    // Both are real data changes, each recorded in DECISIONS.md. D-114 note:
-    // the '39dd0866' value briefly committed in eed58c0e was computed BEFORE
-    // the ingestion and was already stale when it landed — a suite run before
-    // a data change proves nothing about the commit containing it.
-    expect(a.analysisFingerprint).toBe('22e9bdb0');
+    // labelled by its real development code name "LY3502970"), LEAD-2's
+    // custody-verified ingestion giving liraglutide its third (NCT00318461),
+    // and D-115's general single-arm identity-mismatch rule refusing
+    // NCT05659537's "Dulaglutide" arm from being counted as native GLP-1's
+    // (CHEMBL1240772) own efficacy observation. Each is a real data change,
+    // recorded in DECISIONS.md. D-114 note: the '39dd0866' value briefly
+    // committed in eed58c0e was computed BEFORE the ingestion and was
+    // already stale when it landed — a suite run before a data change
+    // proves nothing about the commit containing it.
+    expect(a.analysisFingerprint).toBe('8c99ae95');
   });
 });
 
@@ -116,7 +127,7 @@ describe('A2 Ozempic-substitute analysis — §14 safety boundary', () => {
 });
 
 describe('A2 Ozempic-substitute analysis — Science Memory', () => {
-  it('writes the analysis through the existing saveExperiment path, disclosing the conflict, not hiding it', async () => {
+  it('writes the analysis through the existing saveExperiment path, disclosing the real verdict, not hiding it', async () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('window', {
       localStorage: {
@@ -135,10 +146,14 @@ describe('A2 Ozempic-substitute analysis — Science Memory', () => {
     const record = saveA2OzempicSubstituteToMemory(report);
     expect(listExperiments().length).toBe(before + 1);
 
-    expect(record.epistemicStatus).toBe('INCONCLUSIVE');
+    // D-115: moved from 'INCONCLUSIVE'. The real verdict is now
+    // NO_SUPERIOR_CANDIDATE (see the fingerprint-cascade comment above),
+    // and saveA2OzempicSubstituteToMemory maps that label to
+    // FALSIFIED_WITHIN_PROTOCOL, not INCONCLUSIVE (core/scienceMemory.ts).
+    expect(record.epistemicStatus).toBe('FALSIFIED_WITHIN_PROTOCOL');
     const bodies = record.analysis!.map((a) => a.body).join(' ');
     expect(bodies).toContain(report.analysisFingerprint);
-    expect(bodies).toContain('CONFLICTING_EVIDENCE');
+    expect(bodies).toContain('NO_SUPERIOR_CANDIDATE');
     expect(bodies).toContain('TIRZEPATIDE');
     vi.unstubAllGlobals();
   });

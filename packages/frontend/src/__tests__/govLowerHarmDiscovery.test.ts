@@ -154,7 +154,7 @@ describe('HARK / mutation-after-freeze detection (mandate items 6-7)', () => {
     const falsification = falsifyCandidate(efficacy, safety, 'HISTORICAL_NO_EVIDENCE_CLASS');
     const belief = runCandidateBeliefRevision(summary.moleculeChemblId, efficacy, safety);
     const score = scoreCandidate(summary, efficacy, safety, falsification);
-    return { summary, efficacy, safety, falsification, belief, score };
+    return { summary, efficacy, safety, falsification, belief, score, identityMismatches: [] };
   }
   // An even stronger effect than SYNTH-A, so including it changes WHICH pair reaches TOP2.
   const SYNTH_C_REPORT = buildReport(SYNTH_C_SUMMARY, [
@@ -351,13 +351,28 @@ describe('D-059 gap 1b — genesisDomainRegistry: unknown domain id fails closed
 // Item 13: NO_WINNER -> no Recipe (LOCKED)
 // ---------------------------------------------------------------------------
 describe('NO_WINNER never produces a Recipe (mandate item 13)', () => {
-  it('the real production run (honest NO_WINNER) has no recipeFingerprint and stage 18 is LOCKED', async () => {
+  it('the real production run now honestly reaches WINNER and produces a real Recipe (D-115)', async () => {
+    // D-115: moved from NO_WINNER/LOCKED. Native GLP-1's (CHEMBL1240772)
+    // sole HbA1c observation was really dulaglutide's own arm in
+    // NCT05659537, refused as IDENTITY_MISMATCH under the general,
+    // uniform single-arm identity rule the user authorized. With native
+    // GLP-1 honestly out of the qualifying pool, the real, unmodified
+    // pipeline reaches liraglutide (CHEMBL4084119) as WINNER through the
+    // real Winner Gate (winnerGate.ts, untouched this change) — see
+    // DECISIONS.md D-115. Mandate item 13's actual contract (a non-winner
+    // never gets a Recipe) is generic orchestrator behavior, not specific
+    // to this domain's data, and remains directly proven with synthetic
+    // inputs in orchestrator.test.ts ('NO_WINNER ⇒ recipe LOCKED, no
+    // fingerprint') — this domain-level test now documents what the real
+    // pinned LOWER_HARM data honestly produces today.
     const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(result.kind).toBe('RUN');
     if (result.kind !== 'RUN') return;
-    expect(result.verdict).toBe('NO_WINNER');
-    expect(result.recipeFingerprint).toBeUndefined();
-    expect(result.stages.find((s) => s.stage === '18_RECIPE_OR_LOCK')?.status).toBe('LOCKED');
+    expect(result.verdict).toBe('WINNER');
+    expect(result.winner?.winnerId).toBe('CHEMBL4084119');
+    expect(result.recipeFingerprint).toBeDefined();
+    expect(result.recipeFingerprint!.length).toBeGreaterThan(0);
+    expect(result.stages.find((s) => s.stage === '18_RECIPE_OR_LOCK')?.status).toBe('OK');
   });
 });
 
@@ -378,13 +393,20 @@ describe('replay (mandate item 14)', () => {
   });
 
   it('a genuinely mismatched pair of results is honestly reported as NOT ok — replayGovLowerHarmDiscovery does not assume success', async () => {
+    // D-115: PRODUCTION now also reaches WINNER (see this file's own
+    // D-115 note above the positive/negative E2E paths), so `verdict`
+    // alone no longer distinguishes these two runs. `winnerId` still does
+    // — PRODUCTION's real winner is a real ChEMBL id (liraglutide,
+    // CHEMBL4084119) and SYNTHETIC_TEST_ONLY's winner is always one of
+    // SYNTHETIC_WINNER_SUMMARIES' engineered ids, which are proven
+    // (elsewhere in this file) to never overlap with real production ids.
     const prod = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     const synth = await runGovLowerHarmDiscovery({ mode: 'SYNTHETIC_TEST_ONLY' });
     expect(prod.kind).toBe('RUN');
     expect(synth.kind).toBe('RUN');
     if (prod.kind === 'RUN' && synth.kind === 'RUN') {
       expect(prod.auditFingerprint).not.toBe(synth.auditFingerprint);
-      expect(prod.verdict).not.toBe(synth.verdict);
+      expect(prod.winner?.winnerId).not.toBe(synth.winner?.winnerId);
     }
   });
 });
@@ -452,16 +474,31 @@ describe('E2E — positive path: WINNER emerges from the real pipeline (mandate 
   });
 });
 
-describe('E2E — negative path: real pinned data honestly produces NO_WINNER (mandate item 17)', () => {
-  it('PRODUCTION mode, run through the real orchestrator, reaches NO_WINNER with a locked Recipe — no fabricated consensus', async () => {
+describe('E2E — real pinned data now honestly produces WINNER through the real orchestrator (D-115, mandate item 17 updated)', () => {
+  it('PRODUCTION mode, run through the real orchestrator, reaches WINNER with a real Recipe — no fabricated consensus, no forced outcome', async () => {
+    // D-115: moved from NO_WINNER/no-Recipe. Native GLP-1's (CHEMBL1240772)
+    // sole HbA1c observation was really dulaglutide's own arm in
+    // NCT05659537, refused as IDENTITY_MISMATCH under the general, uniform
+    // single-arm identity rule the user authorized (applied to all 20 real
+    // candidates, not only native GLP-1 — see DECISIONS.md D-115). With
+    // native GLP-1 honestly out of the qualifying pool, the real,
+    // unmodified pipeline — preregistration, ranking weights, Winner Gate,
+    // all untouched by this change — reaches liraglutide (CHEMBL4084119)
+    // as a real WINNER, with all three Winner Gate conjuncts genuinely
+    // held. This was discovered as a consequence of the authorized
+    // identity-mismatch fix, not targeted or known in advance.
     const result = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
     expect(result.kind).toBe('RUN');
     if (result.kind !== 'RUN') return;
     expect(result.mode).toBe('PRODUCTION');
-    expect(result.verdict).toBe('NO_WINNER');
-    expect(result.winner).toBeUndefined();
-    expect(result.recipeFingerprint).toBeUndefined();
+    expect(result.verdict).toBe('WINNER');
+    expect(result.winner).toBeDefined();
+    expect(result.winner?.winnerId).toBe('CHEMBL4084119');
+    expect(result.winner?.conjunctionOk).toBe(true);
+    expect(result.recipeFingerprint).toBeDefined();
+    expect(result.recipeFingerprint!.length).toBeGreaterThan(0);
     expect(result.stages.length).toBe(20);
+    expect(result.stages.find((s) => s.stage === '18_RECIPE_OR_LOCK')?.status).toBe('OK');
   });
 
   it('every stage of the real run carries a real, non-empty fingerprint (append-only audit)', async () => {

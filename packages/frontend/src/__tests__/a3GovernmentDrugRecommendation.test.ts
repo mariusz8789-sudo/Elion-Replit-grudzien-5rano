@@ -39,19 +39,23 @@ describe('A3 government recommendation — real pinned data, population = T2D_AN
     expect(a.status).toBe('ANSWERED');
     if (a.status !== 'ANSWERED' || b.status !== 'ANSWERED') throw new Error('unreachable');
     expect(a.decisionFingerprint).toBe(b.decisionFingerprint);
-    // D-113/D-114: moved from 'ebf4df60' — A3 re-runs A2's own analysis, so
-    // both real data changes flow through here: orforglipron's second
-    // observation and LEAD-2's ingestion (liraglutide's third). A3's own
-    // verdict label is unchanged (still CONFLICTING_EVIDENCE, asserted
-    // below) — only the fingerprint, because the data genuinely changed.
-    expect(a.decisionFingerprint).toBe('04d11618');
+    // D-113/D-114/D-115: moved from 'ebf4df60' — A3 re-runs A2's own
+    // analysis, so every real data change flows through here: orforglipron's
+    // second observation, LEAD-2's ingestion (liraglutide's third), and
+    // D-115's general single-arm identity-mismatch rule refusing
+    // NCT05659537's "Dulaglutide" arm as native GLP-1's (CHEMBL1240772)
+    // own observation. D-115 also changes A3's own verdict label — see
+    // the next test — because native GLP-1 no longer has any efficacy
+    // evidence to contribute. See DECISIONS.md D-115.
+    expect(a.decisionFingerprint).toBe('6febb00c');
     expect(a.preregistrationFingerprint).toBe('2b32c0a8');
   });
 
-  it('honestly reuses A2\'s CONFLICTING_EVIDENCE verdict -- no rosier government vocabulary', () => {
+  it('honestly reuses A2\'s NO_SUPERIOR_CANDIDATE verdict -- no rosier government vocabulary', () => {
     const report = runA3GovernmentRecommendation({ kind: 'T2D_AND_OBESITY' });
     if (report.status !== 'ANSWERED') throw new Error('unreachable');
-    expect(report.answerRecord.recommendation.label).toBe('CONFLICTING_EVIDENCE');
+    // D-115: moved from CONFLICTING_EVIDENCE — see DECISIONS.md D-115.
+    expect(report.answerRecord.recommendation.label).toBe('NO_SUPERIOR_CANDIDATE');
   });
 
   it('excludes zero-efficacy candidates from SCIENTIFIC WINNER / BEST OVERALL, even when they score highest on safety alone', () => {
@@ -74,7 +78,13 @@ describe('A3 government recommendation — real pinned data, population = T2D_AN
     if (report.status !== 'ANSWERED') throw new Error('unreachable');
     expect(report.answerRecord.bestEfficacyCandidate?.report.summary.prefName).toBe('TIRZEPATIDE');
     expect(report.answerRecord.bestEfficacyCandidate?.report.score.vetoed).toBe(true);
-    expect(report.answerRecord.bestOverallCandidate?.report.summary.prefName).toBe('GLP-1');
+    // D-115: moved from 'GLP-1' (CHEMBL1240772). Native GLP-1's sole HbA1c
+    // observation was really dulaglutide's own arm in NCT05659537 and is now
+    // refused as IDENTITY_MISMATCH — with 0 real efficacy observations left,
+    // native GLP-1 can no longer be BEST OVERALL. PF-06291874 is the real,
+    // current best-overall under the unmodified scoring rule. See
+    // DECISIONS.md D-115.
+    expect(report.answerRecord.bestOverallCandidate?.report.summary.prefName).toBe('PF-06291874');
     expect(report.answerRecord.bestOverallCandidate?.report.score.vetoed).toBe(false);
   });
 
@@ -104,7 +114,7 @@ describe('A3 government recommendation — real pinned data, population = T2D_AN
     );
   });
 
-  it('AnswerRecord vs ActionRecord: no candidate is gated for action under a CONFLICTING_EVIDENCE recommendation', () => {
+  it('AnswerRecord vs ActionRecord: no candidate is gated for action under a NO_SUPERIOR_CANDIDATE recommendation', () => {
     const report = runA3GovernmentRecommendation({ kind: 'T2D_AND_OBESITY' });
     if (report.status !== 'ANSWERED') throw new Error('unreachable');
     expect(report.actionRecord.gatedCandidate).toBeNull();
@@ -186,6 +196,7 @@ describe('A3 — §7 controlled safety-language vocabulary, never a bare "safe" 
       falsification: { failures: [], worseSafetySignal: null, evidencePolicy: 'HISTORICAL_NO_EVIDENCE_CLASS' as const, supersededByStrongerEvidence: [] },
       belief: {} as A2CandidateReport['belief'],
       score: { moleculeChemblId: 'TEST', prefName: 'TEST', efficacyScore: 0, safetyScore: 0.8, evidenceStrengthScore: 0.2, uncertaintyPenalty: 0, conflictPenalty: 0, weightedScore: 1, vetoed: false, vetoReason: null },
+      identityMismatches: [],
     };
     expect(deriveSafetyLabel(syntheticReport)).toBe('SAFE_RELATIVE_TO_X');
   });
@@ -222,7 +233,7 @@ describe('A3 — Science Memory', () => {
     vi.unstubAllGlobals();
   });
 
-  it('writes an answered recommendation, disclosing the conflict, not hiding it', async () => {
+  it('writes an answered recommendation, disclosing the real verdict, not hiding it', async () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('window', {
       localStorage: {
@@ -240,9 +251,13 @@ describe('A3 — Science Memory', () => {
     const before = listExperiments().length;
     const record = saveA3GovernmentRecommendationToMemory(report);
     expect(listExperiments().length).toBe(before + 1);
-    expect(record.epistemicStatus).toBe('INCONCLUSIVE');
+    // D-115: moved from 'INCONCLUSIVE'. The real recommendation label is now
+    // NO_SUPERIOR_CANDIDATE (see DECISIONS.md D-115), and
+    // saveA3GovernmentRecommendationToMemory maps that to
+    // FALSIFIED_WITHIN_PROTOCOL, not INCONCLUSIVE (core/scienceMemory.ts).
+    expect(record.epistemicStatus).toBe('FALSIFIED_WITHIN_PROTOCOL');
     const bodies = record.analysis!.map((a) => a.body).join(' ');
-    expect(bodies).toContain('CONFLICTING_EVIDENCE');
+    expect(bodies).toContain('NO_SUPERIOR_CANDIDATE');
     expect(bodies).toContain('TIRZEPATIDE');
     expect(bodies).toContain('MK-0893');
     vi.unstubAllGlobals();

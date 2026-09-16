@@ -21,6 +21,8 @@ import trialsTirzepatide from './a2-ozempic-substitute/trials-CHEMBL4297839.json
 import trialsMk0893 from './a2-ozempic-substitute/trials-CHEMBL1933349.json';
 import trialsAdomeglivant from './a2-ozempic-substitute/trials-CHEMBL3707351.json';
 import supplementTrialsRaw from './a2-ozempic-substitute/external-supplement/trials.supplement.json';
+import baseMetaRaw from './a2-ozempic-substitute/meta.json';
+import supplementMetaRaw from './a2-ozempic-substitute/external-supplement/meta.supplement.json';
 
 /**
  * A2 — AUTONOMOUS OZEMPIC-SUBSTITUTE DISCOVERY: candidate analysis ->
@@ -187,6 +189,107 @@ function pickHighestDoseGroup(groups: readonly A2TrialGroup[], pattern: RegExp):
 }
 
 /**
+ * D-115 — real, self-referential identity registry: every candidate's OWN
+ * name/code-name pattern (the exact same construction `buildCandidateReport`
+ * already used inline), so "does this arm title actually name a DIFFERENT
+ * real candidate" can be checked without inventing a second name list.
+ */
+export interface A2CandidateIdentity {
+  readonly candidateId: string;
+  readonly prefName: string;
+  readonly pattern: RegExp;
+}
+
+function candidatePatternFor(summary: A2CandidateSummary): RegExp {
+  const codeName = KNOWN_DEVELOPMENT_CODE_NAMES[summary.moleculeChemblId];
+  const src = codeName === undefined ? escapeRegExp(summary.prefName) : `${escapeRegExp(summary.prefName)}|${escapeRegExp(codeName)}`;
+  return new RegExp(src, 'i');
+}
+
+/**
+ * All 20 real candidates' identities. Lazily computed (not a module-level
+ * literal) because it depends on `KNOWN_DEVELOPMENT_CODE_NAMES`, which is
+ * declared later in this file — this avoids a temporal-dead-zone failure at
+ * module load without reordering existing declarations. Memoized: real data,
+ * computed once, never recomputed per call.
+ */
+let allCandidateIdentitiesCache: readonly A2CandidateIdentity[] | null = null;
+function allCandidateIdentities(): readonly A2CandidateIdentity[] {
+  if (allCandidateIdentitiesCache === null) {
+    allCandidateIdentitiesCache = loadCandidateSummaries().map((s) => ({
+      candidateId: s.moleculeChemblId,
+      prefName: s.prefName,
+      pattern: candidatePatternFor(s),
+    }));
+  }
+  return allCandidateIdentitiesCache;
+}
+
+function otherCandidateIdentities(ownId: string): readonly A2CandidateIdentity[] {
+  return allCandidateIdentities().filter((c) => c.candidateId !== ownId);
+}
+
+/** The single source of truth for "does this arm title actually name a DIFFERENT real candidate" — used identically by the real pickers below and by the disclosure log in `buildCandidateReport`, never duplicated. */
+function crossCandidateIdentityMatch(title: string, others: readonly A2CandidateIdentity[]): A2CandidateIdentity | null {
+  return others.find((o) => o.pattern.test(title)) ?? null;
+}
+
+/**
+ * D-115 — words this dataset's real single-arm trial labels use to describe
+ * DURATION, DOSING SCHEDULE, or TRIAL STRUCTURE rather than naming a drug —
+ * calibrated against the one real generic case in this dataset
+ * (NCT02533453, "12/24 Weeks Treatment") plus the standard ClinicalTrials.gov
+ * vocabulary for the same category (run-in/extension/open-label periods,
+ * arm/cohort/phase labelling). Not a drug list — the inverse: words that are
+ * NEVER a drug name, so their presence proves nothing about identity either
+ * way and a title made ONLY of these (plus numbers/punctuation) is treated
+ * as administrative, not as naming a molecule.
+ */
+const GENERIC_ARM_LABEL_WORDS: ReadonlySet<string> = new Set([
+  'treatment', 'week', 'weeks', 'day', 'days', 'month', 'months', 'year', 'years',
+  'arm', 'arms', 'group', 'groups', 'cohort', 'cohorts', 'period', 'periods', 'phase', 'phases',
+  'overall', 'total', 'combined', 'active', 'comparator', 'comparators', 'control', 'controls', 'placebo',
+  'open', 'label', 'extension', 'baseline', 'visit', 'visits', 'dose', 'doses', 'dosing', 'part', 'parts',
+  'stage', 'stages', 'randomized', 'randomised', 'blinded', 'run', 'in', 'lead', 'follow', 'up', 'followup',
+]);
+
+/**
+ * True when EVERY alphabetic token in `title` is either a known generic
+ * structural word above or short enough (<4 letters — dose units, "OW"/"OD"
+ * frequency codes, roman numerals) to carry no drug-identity signal either
+ * way. False means at least one token reads as a specific proper-noun-like
+ * name — exactly what "Dulaglutide" is and "Weeks"/"Treatment" are not.
+ */
+function isGenericAdministrativeLabel(title: string): boolean {
+  const tokens = title.split(/[^a-zA-Z]+/).map((t) => t.toLowerCase()).filter((t) => t.length > 0);
+  return tokens.every((t) => t.length < 4 || GENERIC_ARM_LABEL_WORDS.has(t));
+}
+
+/**
+ * D-115 — the single source of truth for "may the single-arm fallback use
+ * this title", checked by both the real pickers below and the disclosure
+ * log in `buildCandidateReport`. Two independent refusal reasons, checked in
+ * order: the title names one of A2's OWN other 19 candidates (specific,
+ * named refusal), or the title simply does not read as a generic
+ * administrative label at all — i.e. it names SOME real-looking molecule,
+ * known to this dataset's candidate roster or not (the dulaglutide case:
+ * NCT05659537's sole arm is titled "Dulaglutide", which is a real,
+ * marketed GLP-1 receptor agonist that never itself qualified as an A2
+ * candidate in this ChEMBL pull, so it is invisible to the first check and
+ * caught only by the second). Returns null when the fallback may proceed.
+ */
+function singleArmFallbackRefusal(title: string, others: readonly A2CandidateIdentity[]): { readonly other: A2CandidateIdentity | null; readonly reason: string } | null {
+  const other = crossCandidateIdentityMatch(title, others);
+  if (other !== null) {
+    return { other, reason: `names ${other.prefName} (${other.candidateId}), a different real candidate in this mechanism space` };
+  }
+  if (!isGenericAdministrativeLabel(title)) {
+    return { other: null, reason: 'reads as naming a specific molecule (not a generic duration/dose/cohort/phase label) that is not this candidate — refused rather than assumed' };
+  }
+  return null;
+}
+
+/**
  * Identifies the CANDIDATE's own arm specifically (never used for finding a
  * comparator — a comparator must always be identified by an actual name
  * match, or its presence would be invented). A single-arm open-label
@@ -197,11 +300,21 @@ function pickHighestDoseGroup(groups: readonly A2TrialGroup[], pattern: RegExp):
  * Weeks Treatment". Falling back to "the only group" when there is exactly
  * one and no name match is a general, disclosed rule (never
  * candidate-specific), not a special case for that trial.
+ *
+ * D-115 — the fallback now refuses when that lone group's title names a
+ * DIFFERENT real candidate. Real regression this closes: NCT05659537's one
+ * group is titled "Dulaglutide" and was being credited to native GLP-1
+ * (CHEMBL1240772) by this exact fallback, because dulaglutide is not native
+ * GLP-1's own candidate pattern and there was nothing else to fall back to.
+ * `others` is empty by default so every existing direct caller/test is
+ * unaffected; `buildCandidateReport` below is the only call site that passes
+ * the real registry.
  */
-function pickCandidateGroup(groups: readonly A2TrialGroup[], pattern: RegExp): A2TrialGroup | null {
+function pickCandidateGroup(groups: readonly A2TrialGroup[], pattern: RegExp, others: readonly A2CandidateIdentity[] = []): A2TrialGroup | null {
   const direct = pickHighestDoseGroup(groups, pattern);
   if (direct !== null) return direct;
-  return groups.length === 1 ? groups[0] : null;
+  if (groups.length !== 1) return null;
+  return singleArmFallbackRefusal(groups[0].title, others) !== null ? null : groups[0];
 }
 
 function findCount(denoms: readonly A2TrialDenom[], groupId: string): number | null {
@@ -277,13 +390,13 @@ export interface A2EfficacyEvidence {
  * falls back to body weight only when no HbA1c outcome exists (flagged: a
  * different metric is a different question, never silently equated).
  */
-export function extractCandidateEfficacy(trial: A2TrialRecord, candidatePattern: RegExp, marginPp: number): A2EfficacyEvidence | null {
+export function extractCandidateEfficacy(trial: A2TrialRecord, candidatePattern: RegExp, marginPp: number, others: readonly A2CandidateIdentity[] = []): A2EfficacyEvidence | null {
   const outcomes = trial.hba1cOutcomes.length > 0 ? trial.hba1cOutcomes : trial.weightOutcomes;
   const metric: A2OutcomeMetric = trial.hba1cOutcomes.length > 0 ? 'HBA1C' : 'BODY_WEIGHT';
   const primary = outcomes.find((o) => o.type === 'PRIMARY') ?? outcomes[0];
   if (primary === undefined) return null;
 
-  const candidateGroup = pickCandidateGroup(primary.groups, candidatePattern);
+  const candidateGroup = pickCandidateGroup(primary.groups, candidatePattern, others);
   if (candidateGroup === null) return null;
   const candidateStats = armStats(primary, candidateGroup);
   if (candidateStats === null) return null;
@@ -652,6 +765,29 @@ export function scoreCandidate(
 // Per-candidate full evidence bundle + practical candidate gate
 // ---------------------------------------------------------------------------
 
+/**
+ * D-115 — a disclosed, non-silent refusal: an arm/intervention that would
+ * have been credited to this candidate through the single-arm fallback, but
+ * whose own title names a DIFFERENT real candidate in this same mechanism
+ * space. The observation is NOT in `efficacy`/`safety` — this record exists
+ * so the refusal is visible and auditable rather than indistinguishable from
+ * "no data at all".
+ */
+export interface A2IdentityMismatch {
+  readonly nctId: string;
+  readonly armTitle: string;
+  readonly source: 'HBA1C_OUTCOME' | 'WEIGHT_OUTCOME' | 'ADVERSE_EVENT';
+  readonly candidateId: string;
+  readonly candidatePrefName: string;
+  /** Set only when the title matches one of A2's own 20 candidates; null for a real-but-not-a-candidate molecule (e.g. dulaglutide — see D-115). */
+  readonly matchedOtherCandidateId: string | null;
+  readonly matchedOtherCandidatePrefName: string | null;
+  readonly reason: string;
+  readonly sourceFile: string;
+  readonly sourceFileHash: string;
+  readonly sourceHashGranularity: 'PER_RECORD' | 'WHOLE_FILE';
+}
+
 export interface A2CandidateReport {
   readonly summary: A2CandidateSummary;
   readonly efficacy: readonly A2EfficacyEvidence[];
@@ -659,6 +795,7 @@ export interface A2CandidateReport {
   readonly falsification: A2FalsificationResult;
   readonly belief: A2CandidateBeliefState;
   readonly score: A2CandidateScore;
+  readonly identityMismatches: readonly A2IdentityMismatch[];
 }
 
 export { evaluatePracticalCandidate, surfaceFor };
@@ -716,13 +853,14 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Candidate-side only (same single-arm fallback rationale as pickCandidateGroup) — never used to identify a comparator. */
-function pickCandidateAeGroupTitle(eventGroups: readonly A2AdverseEventGroup[], pattern: RegExp): string | null {
+/** Candidate-side only (same single-arm fallback rationale as pickCandidateGroup, including the D-115 cross-candidate-identity refusal) — never used to identify a comparator. */
+function pickCandidateAeGroupTitle(eventGroups: readonly A2AdverseEventGroup[], pattern: RegExp, others: readonly A2CandidateIdentity[] = []): string | null {
   const matches = eventGroups.filter((g) => pattern.test(g.title));
   if (matches.length > 0) {
     return matches.reduce((best, g) => ((parseDoseMg(g.title) ?? -Infinity) > (parseDoseMg(best.title) ?? -Infinity) ? g : best)).title;
   }
-  return eventGroups.length === 1 ? eventGroups[0].title : null;
+  if (eventGroups.length !== 1) return null;
+  return singleArmFallbackRefusal(eventGroups[0].title, others) !== null ? null : eventGroups[0].title;
 }
 
 interface A2RawCandidate {
@@ -782,24 +920,89 @@ const KNOWN_DEVELOPMENT_CODE_NAMES: Readonly<Record<string, string>> = {
   CHEMBL4084119: 'Lira', // liraglutide (LEAD program short arm-label convention, not a code name)
 };
 
+/**
+ * D-115 — real provenance for an identity-mismatch disclosure record.
+ * Prefers the supplement's PER-RECORD hash (real raw-bytes sha256, D-110)
+ * when the trial arrived through that path; falls back to the base pin's
+ * WHOLE-FILE `narrowSha256` from meta.json (every base-pinned trial today
+ * only has file-level provenance) — the granularity is stated explicitly in
+ * the record rather than implied as more precise than it is.
+ */
+function sourceHashFor(candidateId: string, nctId: string): { file: string; hash: string; granularity: 'PER_RECORD' | 'WHOLE_FILE' } {
+  const supplementKey = `${candidateId}/${nctId}`;
+  const supplementEntry = (supplementMetaRaw as Record<string, { sha256: string }>)[supplementKey];
+  if (supplementEntry !== undefined) {
+    return { file: `external-supplement/trials.supplement.json#${supplementKey}`, hash: supplementEntry.sha256, granularity: 'PER_RECORD' };
+  }
+  const fileName = `trials-${candidateId}.json`;
+  const baseEntry = (baseMetaRaw as { files: Record<string, { narrowSha256?: string }> }).files[fileName];
+  return { file: fileName, hash: baseEntry?.narrowSha256 ?? '(unavailable)', granularity: 'WHOLE_FILE' };
+}
+
+function identityMismatchRecord(
+  nctId: string,
+  armTitle: string,
+  source: A2IdentityMismatch['source'],
+  own: { candidateId: string; prefName: string },
+  refusal: { readonly other: A2CandidateIdentity | null; readonly reason: string },
+): A2IdentityMismatch {
+  const { file, hash, granularity } = sourceHashFor(own.candidateId, nctId);
+  return {
+    nctId,
+    armTitle,
+    source,
+    candidateId: own.candidateId,
+    candidatePrefName: own.prefName,
+    matchedOtherCandidateId: refusal.other?.candidateId ?? null,
+    matchedOtherCandidatePrefName: refusal.other?.prefName ?? null,
+    reason: `The single-arm fallback would have credited "${armTitle}" to ${own.prefName}, but that title ${refusal.reason}. Refused, not attributed.`,
+    sourceFile: file,
+    sourceFileHash: hash,
+    sourceHashGranularity: granularity,
+  };
+}
+
 function buildCandidateReport(summary: A2CandidateSummary): A2CandidateReport {
   const marginPp = A2_PREREGISTRATION.effectSizeThresholds.efficacyComparableMarginPp;
   const trials = TRIALS_BY_MOLECULE[summary.moleculeChemblId] ?? [];
-  const codeName = KNOWN_DEVELOPMENT_CODE_NAMES[summary.moleculeChemblId];
-  const patternSource = codeName === undefined ? escapeRegExp(summary.prefName) : `${escapeRegExp(summary.prefName)}|${escapeRegExp(codeName)}`;
-  const pattern = new RegExp(patternSource, 'i');
+  const pattern = candidatePatternFor(summary);
+  const others = otherCandidateIdentities(summary.moleculeChemblId);
+  const own = { candidateId: summary.moleculeChemblId, prefName: summary.prefName };
+  const identityMismatches: A2IdentityMismatch[] = [];
 
   const efficacy: A2EfficacyEvidence[] = [];
   for (const trial of trials) {
-    const e = extractCandidateEfficacy(trial, pattern, marginPp);
-    if (e !== null) efficacy.push(e);
+    const e = extractCandidateEfficacy(trial, pattern, marginPp, others);
+    if (e !== null) {
+      efficacy.push(e);
+      continue;
+    }
+    // Disclosure pass: was this trial's primary outcome a single-arm case
+    // refused by `singleArmFallbackRefusal` — the exact same check the real
+    // picker used above, never duplicated, just also logged here?
+    const outcomes = trial.hba1cOutcomes.length > 0 ? trial.hba1cOutcomes : trial.weightOutcomes;
+    const primary = outcomes.find((o) => o.type === 'PRIMARY') ?? outcomes[0];
+    if (primary !== undefined && primary.groups.length === 1 && pickHighestDoseGroup(primary.groups, pattern) === null) {
+      const refusal = singleArmFallbackRefusal(primary.groups[0].title, others);
+      if (refusal !== null) {
+        const source: A2IdentityMismatch['source'] = trial.hba1cOutcomes.length > 0 ? 'HBA1C_OUTCOME' : 'WEIGHT_OUTCOME';
+        identityMismatches.push(identityMismatchRecord(trial.nctId, primary.groups[0].title, source, own, refusal));
+      }
+    }
   }
 
   let safety: readonly A2SafetyCategoryResult[] = [];
   for (const trial of trials) {
     if (trial.adverseEvents === null) continue;
-    const candidateGroupTitle = pickCandidateAeGroupTitle(trial.adverseEvents.eventGroups, pattern);
-    if (candidateGroupTitle === null) continue;
+    const candidateGroupTitle = pickCandidateAeGroupTitle(trial.adverseEvents.eventGroups, pattern, others);
+    if (candidateGroupTitle === null) {
+      const eg = trial.adverseEvents.eventGroups;
+      if (eg.length === 1 && !pattern.test(eg[0].title)) {
+        const refusal = singleArmFallbackRefusal(eg[0].title, others);
+        if (refusal !== null) identityMismatches.push(identityMismatchRecord(trial.nctId, eg[0].title, 'ADVERSE_EVENT', own, refusal));
+      }
+      continue;
+    }
     safety = extractCandidateSafety(trial, candidateGroupTitle, REFERENCE_TRIAL, REFERENCE_SEMAGLUTIDE_GROUP_TITLE);
     break; // first usable AE-bearing trial only — documented limitation, not silently aggregated across differently-dosed trials.
   }
@@ -812,7 +1015,7 @@ function buildCandidateReport(summary: A2CandidateSummary): A2CandidateReport {
   const belief = runCandidateBeliefRevision(summary.moleculeChemblId, efficacy, safety);
   const score = scoreCandidate(summary, efficacy, safety, falsification);
 
-  return { summary, efficacy, safety, falsification, belief, score };
+  return { summary, efficacy, safety, falsification, belief, score, identityMismatches };
 }
 
 // ---------------------------------------------------------------------------

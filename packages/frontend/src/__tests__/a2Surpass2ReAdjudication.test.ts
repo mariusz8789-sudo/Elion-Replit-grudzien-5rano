@@ -92,10 +92,18 @@ describe('what the gate actually did', () => {
     expect(result.reAdjudicated.falsification.worseSafetySignal?.comparisonType).toBe('DIRECT_HEAD_TO_HEAD');
   });
 
-  it('the overall A2 verdict is unchanged (CONFLICTING_EVIDENCE either way) — reported, not assumed', () => {
+  it('the overall A2 verdict is unchanged (NO_SUPERIOR_CANDIDATE either way) — reported, not assumed', () => {
+    // D-115: moved from CONFLICTING_EVIDENCE. Both `historical` and
+    // `reAdjudicated` re-run the same real, current A2 analysis (this test
+    // is only about whether the SURPASS-2 re-adjudication of tirzepatide's
+    // safety veto changes the OVERALL verdict, not about which label it
+    // is) — so both sides move together with A2's real verdict, which is
+    // now NO_SUPERIOR_CANDIDATE after native GLP-1's misattributed
+    // dulaglutide observation was refused (see DECISIONS.md D-115). The
+    // point of this test — unchanged either way — still holds.
     const result = runReAdjudication();
-    expect(result.historical.overallVerdict).toBe('CONFLICTING_EVIDENCE');
-    expect(result.reAdjudicated.overallVerdict).toBe('CONFLICTING_EVIDENCE');
+    expect(result.historical.overallVerdict).toBe('NO_SUPERIOR_CANDIDATE');
+    expect(result.reAdjudicated.overallVerdict).toBe('NO_SUPERIOR_CANDIDATE');
     expect(result.reAdjudicated.overallVerdictChanged).toBe(false);
   });
 });

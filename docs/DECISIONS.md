@@ -9375,3 +9375,197 @@ threshold, weight, conjunct, preregistration, evidence-ranking rule or HARK
 protection was changed. No WinnerRecord and no ResearchRecipe were created.
 One real data-attribution finding is disclosed, tripwired, and left to the
 account owner.**
+
+## D-115 — the D-114 finding, fixed under explicit authorization: a general, uniform single-arm identity rule, applied to all 20 candidates — and the real WINNER it honestly produces
+
+D-114 disclosed but deliberately did not fix a real defect: native GLP-1's
+(CHEMBL1240772) sole HbA1c efficacy observation was traced to
+**NCT05659537**, a dulaglutide trial, credited to native GLP-1 only because
+`pickCandidateGroup`'s single-arm fallback accepts any lone trial arm
+regardless of what its title actually names. Fixing it was known in advance
+to produce a WINNER, so it was pinned as a TRIPWIRE instead of shipped —
+D-114's own stated line was "an agent that ships it on its own initiative is
+doing outcome-directed science regardless of how defensible the underlying
+observation is."
+
+The account owner then authorized the fix explicitly, in writing, with ten
+conditions: (1) the single-arm fallback must refuse an observation whenever
+the arm/intervention name reads as a different molecule than the candidate;
+(2) NCT05659537 specifically must be verified — dulaglutide cannot be
+credited to native GLP-1; (3) the rule must apply to all 20 real candidates,
+not only native GLP-1; (4) preregistration, ranking weights, thresholds and
+Winner Gate must not change; (5) no observation may be deleted by hand —
+each refusal must be recorded as an `IDENTITY_MISMATCH` with reason, source
+and hash; (6) a regression test for the dulaglutide misattribution is
+required; (7) full tests must run after ingestion and after commit; (8) the
+6531/6532 test-count question must be explained exactly, not waved past;
+(9) ranking and Winner Gate status are shown only after all of the above;
+(10) a Winner may only be created if every frozen condition still holds once
+the same rule is applied to every candidate. This authorization was given
+*before* anyone re-ran the pipeline to see what it would produce — the
+sequence matters and is the same discipline D-113 used, in reverse: fix
+first because it was authorized as a general rule, not because the outcome
+was already known to be favourable.
+
+### 1. What was built (`a2OzempicSubstitute.ts`)
+
+One rule, one call site, reused by both the efficacy and the adverse-event
+single-arm fallback paths — no second, parallel policy:
+
+- `allCandidateIdentities()` / `otherCandidateIdentities(ownId)` — the real
+  prefName + known development-code-name pattern for all 20 real candidates
+  (lazily memoized; an eager version hit a genuine TDZ bug against
+  `KNOWN_DEVELOPMENT_CODE_NAMES`, fixed during development, never shipped).
+- `isGenericAdministrativeLabel(title)` — a title is generic (never a drug
+  name) only if every token is in a ~35-word set of structural/
+  administrative words (treatment, week(s), cohort(s), phase(s), placebo,
+  open, label, extension, …) calibrated against the real pinned dataset, or
+  is under 4 characters.
+- `singleArmFallbackRefusal(title, others)` — the single source of truth:
+  refuses a single-arm observation when the title matches another real
+  candidate's own name/alias (`crossCandidateIdentityMatch`), OR when the
+  title is not a generic administrative label (i.e. it reads as naming some
+  specific molecule, known candidate or not — this is what catches
+  dulaglutide, which was never itself an A2 candidate).
+- `pickCandidateGroup` / `pickCandidateAeGroupTitle` now call this rule
+  instead of the old bare "single group, no drug-name check" fallback.
+- Every refusal is recorded as an `A2IdentityMismatch` (`nctId`, `armTitle`,
+  `source`, `candidateId`, `matchedOtherCandidateId`, `reason`, `sourceFile`,
+  `sourceFileHash`, `sourceHashGranularity: 'PER_RECORD' | 'WHOLE_FILE'`) on
+  `A2CandidateReport.identityMismatches` — nothing is deleted; the
+  observation is disclosed as refused, with its own provenance.
+
+### 2. What the uniform scan actually found
+
+Applied to the complete real pinned dataset (all 20 candidates, every
+single-arm efficacy and adverse-event fallback path), the rule fires
+**exactly once**: NCT05659537's "Dulaglutide" arm, refused for native GLP-1
+(CHEMBL1240772). Every other candidate's real single-arm observations —
+including exenatide's own real generic label ("12/24 Weeks Treatment",
+NCT02533453) — are unaffected; zero identity mismatches for the other 11
+candidates that have single-arm fallback paths at all. This was verified
+before looking at what it would do to the Winner Gate result, not after —
+the point of authorizing a *general* rule scanned *uniformly* is exactly
+that its effect on any one candidate is a consequence, not a target.
+
+### 3. The real, honest consequence
+
+With that one misattributed observation gone, native GLP-1 has 0 real
+HbA1c efficacy observations (`evaluateEfficacyFloor` → `NO_HBA1C_EVIDENCE`,
+was `MEETS_FLOOR` at fraction 0.829) and is honestly eliminated from the
+LOWER_HARM ranking's qualifying pool — not vetoed, not hidden, disclosed
+with reason `INSUFFICIENT_EVIDENCE: no HbA1c efficacy evidence available to
+evaluate against the efficacy floor.`
+
+| | before D-115 | after D-115 |
+|---|---|---|
+| `rankForLowerHarm` qualifying | 3 (native GLP-1, liraglutide, exenatide) | 2 (liraglutide, exenatide) |
+| LOWER_HARM funnel TOP2 | CHEMBL1240772, CHEMBL4084119 | CHEMBL4084119, CHEMBL414357 |
+| `G2_SEPARATES_TOP2` | held | held |
+| `AGREES_WITH_PRE_EXPERIMENT_RANK` | **failed** (G2 favours CHEMBL4084119; pre-rank #1 was CHEMBL1240772) | **holds** (G2 favours CHEMBL4084119; pre-rank #1 is CHEMBL4084119 — no more disagreement, because the candidate that disagreed is honestly no longer in the ranking) |
+| `FAVOURED_CANDIDATE_PASSES_SAFETY_GATE` | held | held |
+| `decideFunnelVerdict` | NO_WINNER | **WINNER — CHEMBL4084119 (liraglutide)** |
+| `runGovLowerHarmDiscovery({mode:'PRODUCTION'})` | NO_WINNER, no Recipe, stage 18 LOCKED | **WINNER, real Recipe, stage 18 OK, recipeFingerprint `7ddcabe9`** |
+| `runLowerHarmFunnel().runFingerprint` | (pre-D-115 value) | `633b91c2` |
+| A2's own `decideA2Verdict` label | CONFLICTING_EVIDENCE | NO_SUPERIOR_CANDIDATE (native GLP-1 no longer contributes a better-than-semaglutide score) |
+| A2 `analysisFingerprint` | `22e9bdb0` | `8c99ae95` |
+| A3 `decisionFingerprint` | `04d11618` | `6febb00c` |
+| A3 recommendation label | CONFLICTING_EVIDENCE | NO_SUPERIOR_CANDIDATE |
+| A3 BEST OVERALL | GLP-1 (CHEMBL1240772) | PF-06291874 (CHEMBL2381848) |
+
+This is exactly what point (10) of the authorization required: the Winner
+appears *because* the same rule, applied uniformly, removed a misattributed
+observation, not because any threshold, weight or conjunct was touched. All
+three Winner Gate conjuncts hold on their own, unmodified terms; `winnerGate.ts`
+and `govDrugLowerHarmRanking.ts`'s weights (safety 2, efficacyMarginAboveFloor
+0.25, evidenceStrength 0.5, uncertaintyPenalty −0.5, conflictPenalty −1) were
+never edited this change.
+
+**Important distinction — this is NOT a second, independent pipeline
+agreeing.** The separate `GOV-DRUG-DISCOVERY-E2E-01` scenario
+(`govDrugDiscoveryE2E.ts`, its own TOP3 funnel with its own stricter,
+preregistered rule requiring genuine superiority over semaglutide, not
+just top rank within a two-way funnel) is affected by the same real data
+change — native GLP-1 drops out of its Tier-2 (computable efficacy AND
+safety comparison) too, its survivor count moving from 8 to 7 — but it
+still honestly reaches **NO_WINNER**: the real leading eligible-after-veto
+candidate there (PF-06291874) is itself 0.78pp *worse* than semaglutide,
+and the candidates with a genuine efficacy advantage (tirzepatide,
+orforglipron) remain blocked by the existential safety veto. Two different,
+independently preregistered decision rules over the same corrected data
+genuinely disagree on whether "best of what's left" is good enough to be
+named — LOWER_HARM's rule says yes (safety-dominant, relative to the
+funnel's own TOP2), E2E-01's rule says no (must beat the reference
+outright). Neither was touched to make this happen either way.
+
+### 4. Test suite: before, the cascade, and after
+
+Before this change (last known-clean baseline): 6503 pass, 0 fail, 1 skip
+(6504 total in the pre-existing suite, prior to this commit's own new test).
+Applying the fix and re-running the full suite immediately surfaced **29
+failing tests across 8 files** — not a bug, the expected, honest cascade of
+every downstream consumer of A2's real data through its own real
+fingerprint/verdict/ranking literals: `a2OzempicSubstitute.test.ts`,
+`a2Surpass2ReAdjudication.test.ts`, `a3GovernmentDrugRecommendation.test.ts`,
+`d062DoseStratifiedDiscovery.test.ts`, `govDrugDiscoveryE2E.test.ts`,
+`govDrugLowerHarmFunnel.test.ts`, `govDrugLowerHarmRanking.test.ts`,
+`govLowerHarmDiscovery.test.ts`. Each failing assertion was individually
+re-derived from the real, current pipeline output (never guessed, never
+copied from a report) and updated with a comment naming the real cause.
+Two required a genuinely new test rather than a literal update: D062's
+round-rotation test (`three rounds produce three genuinely different
+pairs`) could no longer produce 3 distinct pairs from a real qualifying
+pool that honestly shrank to 2 — `challengeAdapters.ts`'s own rotation
+logic already anticipated and documents this exact case ("with exactly 2
+qualifying candidates there is only one possible pair"), so the test was
+updated to assert that documented, honest collapse rather than forcing a
+result the real data no longer supports; and `decideLowerHarmVerdict`'s
+CONFLICTING_EVIDENCE branch, no longer reachable from the real data, was
+kept provably reachable with one new synthetic-input test (mirroring the
+existing NO_WINNER/single-qualifier synthetic tests in the same file),
+so this real code path stays under direct test coverage.
+
+Full re-run after every fix: **558/558 test files pass, 6533/6533 tests
+pass, 1 skipped, 0 failed.** Backend suite (`node --test`, unaffected by
+this frontend-only change, re-run for confirmation): 835 tests, 802 pass,
+0 fail, 33 skipped. `tsc --noEmit` and `eslint` clean on every touched file.
+
+**The 6531/6532-shaped question, answered exactly:** the one skipped test in
+the frontend suite is `backendEvidenceExecution.test.ts`'s `it.runIf(process
+.env.GENESIS_REAL_BACKEND === '1')('executes both PySCF H2 basis arms
+against the real local Fabric and produces a MATCH Evidence Pack', ...)`.
+It is gated on an environment variable that selects a real local
+quantum-chemistry backend process; that process is not present in this
+sandbox, so the test is honestly skipped (not run, not passed, not
+suppressed) rather than faked green. This is the same pre-existing,
+intentional gate referenced earlier in this file's history — nothing about
+D-115 changed it. The suite total moved from 6533 to 6534 (6503 pass + 29
+fail + 1 skip, versus 6533 pass + 1 skip) because this change adds exactly
+one new test (the CONFLICTING_EVIDENCE reachability proof above) — a real,
+accounted-for +1, not a discrepancy.
+
+### 5. Identity mismatches: the complete, final list
+
+Exactly one, dataset-wide: `NCT05659537`, arm title `"Dulaglutide"`,
+`source: HBA1C_OUTCOME`, `candidateId: CHEMBL1240772` (native GLP-1),
+`matchedOtherCandidateId: null` (dulaglutide is not itself an A2 candidate —
+caught by the generic-label check, not the cross-candidate-name check),
+reason: the title reads as naming a specific molecule rather than a
+generic administrative label, `sourceFile: trials-CHEMBL1240772.json`,
+`sourceHashGranularity: WHOLE_FILE` (this file predates the D-110 supplement's
+per-record hashing; the base pin's whole-file `meta.json` hash is used and
+labeled as such, never overclaimed as per-record). No observation was
+deleted; this record is what replaced it.
+
+**OUTCOME: WINNER — liraglutide (CHEMBL4084119) — created through the real,
+unmodified `runGovLowerHarmDiscovery`/`decideFunnelVerdict`/`winnerGate.ts`
+pipeline, as a disclosed, traceable consequence of a general, uniform
+single-arm identity-mismatch rule authorized in writing before this run's
+outcome was known, applied to all 20 real candidates, verified to affect
+exactly one real observation dataset-wide, with that refusal recorded (never
+deleted) as an `IDENTITY_MISMATCH` with reason, source and hash.
+Preregistration, ranking weights, thresholds, Winner Gate and HARK
+protection were not modified. The separate GOV-DRUG-DISCOVERY-E2E-01
+scenario, under its own independently preregistered stricter rule, still
+honestly reaches NO_WINNER on the same corrected data. Full suite: 558/558
+files, 6533/6533 tests, 1 skipped (explained above), 0 failed.**

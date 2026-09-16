@@ -228,8 +228,23 @@ describe('10. the real safety veto still fires through the unmodified falsifyCan
   });
 });
 
-describe('11. three rounds produce three genuinely different pairs (brief §8)', () => {
-  it('round rotation over 0/1/2 visits three distinct TOP2 pairs on the real pool', () => {
+describe('11. round rotation over the real qualifying pool (brief §8)', () => {
+  it('rotation honestly collapses to one pair now that the real qualifying pool has only 2 members', () => {
+    // D-115: this test's real qualifying pool used to have 3 members
+    // (native GLP-1, liraglutide, exenatide), so rotating the "leave one
+    // out" index across rounds 0/1/2 visited 3 genuinely distinct pairs.
+    // Native GLP-1's sole efficacy observation was really dulaglutide's own
+    // arm in NCT05659537 and is now refused as IDENTITY_MISMATCH under the
+    // general, uniform single-arm identity rule — with 0 real efficacy
+    // observations left, native GLP-1 no longer clears the efficacy floor
+    // and is honestly out of the qualifying pool (see DECISIONS.md D-115).
+    // With exactly 2 real qualifying candidates left, `top2()` in
+    // challengeAdapters.ts already documents and handles this exact case:
+    // "With exactly 2 qualifying candidates there is only one possible
+    // pair — leaving one out would leave none. Rotation only applies once
+    // a real 3rd (or later) candidate exists to rotate in." This is the
+    // honest, mechanism-correct consequence, not a bug in the rotation
+    // logic — every round now reports the same real pair.
     const problem = parseProblem('TEST-D062', { text: 't', objectives: [{ metric: 'efficacy', direction: 'maximize' }], evidenceMinimum: 'x', harmAxes: [] }, H);
     const pairs: string[] = [];
     for (let round = 0; round < 3; round += 1) {
@@ -238,7 +253,7 @@ describe('11. three rounds produce three genuinely different pairs (brief §8)',
       runScientificDiscovery(problem, bundle.adapters, 'SYNTHETIC_TEST_ONLY');
       pairs.push(bundle.diagnostics.lastTop2().map((c) => c.candidateId).sort().join('+'));
     }
-    expect(new Set(pairs).size).toBe(3);
+    expect(new Set(pairs)).toEqual(new Set(['CHEMBL4084119+CHEMBL414357']));
   });
 });
 
@@ -310,9 +325,18 @@ describe('15. no banned string in any run output', () => {
 });
 
 describe("16. existing D-058/D-059 LOWER-HARM anchors are untouched by this work", () => {
-  it('the real funnel TOP2 is still the native GLP-1 / liraglutide pair this challenge itself observes in round 0', async () => {
+  it('the real funnel TOP2 is now the liraglutide / exenatide pair this challenge itself observes in round 0', async () => {
+    // D-115: moved from ['d062::CHEMBL1240772', 'd062::CHEMBL4084119']
+    // (native GLP-1 / liraglutide). Native GLP-1's sole efficacy
+    // observation was really dulaglutide's own arm in NCT05659537, refused
+    // as IDENTITY_MISMATCH under the general, uniform single-arm identity
+    // rule. With 0 real efficacy observations left, native GLP-1 no longer
+    // clears the efficacy floor, so the real TOP2 this challenge observes
+    // is now liraglutide (CHEMBL4084119) / exenatide (CHEMBL414357) — the
+    // same real pair the LOWER_HARM funnel itself now reports (see
+    // govDrugLowerHarmFunnel.test.ts's D-115 block). See DECISIONS.md D-115.
     const result = await runD062Discovery({ mode: 'SYNTHETIC_TEST_ONLY', maxRounds: 1 });
     if (result.kind !== 'RUN') return;
-    expect(result.rounds[0]?.experimentLabels).toEqual(['d062::CHEMBL1240772', 'd062::CHEMBL4084119']);
+    expect(result.rounds[0]?.experimentLabels).toEqual(['d062::CHEMBL4084119', 'd062::CHEMBL414357']);
   });
 });

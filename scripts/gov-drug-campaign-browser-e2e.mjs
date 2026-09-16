@@ -62,7 +62,7 @@ async function waitForServer(timeoutMs = 30_000) {
       const r = await fetch(BASE);
       if (r.ok) return true;
     } catch { /* not up yet */ }
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => globalThis.setTimeout(r, 250));
   }
   return false;
 }

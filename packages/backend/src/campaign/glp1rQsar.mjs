@@ -16,7 +16,6 @@
  * gate is BLOCKED; nothing here relaxes a threshold after seeing results.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalHash } from '../provenance.mjs';

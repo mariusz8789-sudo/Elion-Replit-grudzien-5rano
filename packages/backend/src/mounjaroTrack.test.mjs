@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { normalizeActivityRows, writeActivityPin, loadActivityPin } from './campaign/activityDataset.mjs';
+import { normalizeActivityRows, writeActivityPin } from './campaign/activityDataset.mjs';
 import { loadValidationGate } from './campaign/validationGate.mjs';
 import { loadGiprValidationGate, loadGiprPin, trainGiprModel, probeGiprCapability, GIPR_GATE_PATH } from './campaign/giprQsar.mjs';
 import { loadGlp1rValidationGate } from './campaign/glp1rQsar.mjs';

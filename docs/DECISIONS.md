@@ -9652,7 +9652,7 @@ proves.
 
 **Decision.** The visual layer now shows the run instead of decorating it, without touching preregistration, thresholds, weights, evidence rules, the Winner Gate or any fingerprint:
 
-1. **Digital rain removed.** `components/liveMatrix/matrixEngine.ts` renders an *evidence field* — rising nodes on three depth layers, links between neighbours, sparse 8-hex tags that are pure hashes of a node seed (never a real fingerprint) — behind the unchanged engine API, controller, adapter and boundary tests. Navy palette; zero green rain pixels verified in a real browser.
+1. **Matrix background stays.** An "evidence field" replacement was built and then reverted the same day: the product owner keeps the Matrix and wants a *premium* version of it designed first (product palette, scientific glyphs, depth, readability behind panels), not a removal. `components/liveMatrix/*` is the original digital-rain engine, unchanged.
 2. **Pipeline timeline** (`PipelineTimeline.tsx`): the 20 orchestrator stages as one track with status and fingerprint prefix; the full stage records stay available under a disclosure.
 3. **Candidate space map** (`CandidateSpaceMap.tsx`): every scored candidate on efficacy × safety, TOP2 ringed, each elimination class (safety veto / below floor / insufficient evidence) drawn from the real reason.
 4. **Winner Gate diagram** (`WinnerGateDiagram.tsx`): the three conjuncts as gates in series; the flow reaches the end-cap only when all held; the G2 band shows both candidates' expected outcome ± tolerance and the frozen decision-rule fingerprint.
@@ -9660,7 +9660,7 @@ proves.
 6. **Replay twin** (`ReplayTwinPanel.tsx`): stage-by-stage fingerprint comparison of the two independent runs; a differing stage is flagged on its row. MATCH is never assumed.
 7. **Verdict "why" strip** (`VerdictWhyStrip.tsx`): conjunct chips, favourite's gate outcome, observation count, blocker name.
 
-**Why.** The audit of the visual layer found a Matrix-cliché background that said nothing scientific, and a verdict that was shown as text while the mechanism behind it (conjuncts, G2 separation, gate, provenance, determinism) stayed invisible. Investors and reviewers must be able to *see* why a candidate won or why none did.
+**Why.** The audit of the visual layer found a verdict that was shown as text while the mechanism behind it (conjuncts, G2 separation, gate, provenance, determinism) stayed invisible. Investors and reviewers must be able to *see* why a candidate won or why none did.
 
 **What did not change.** `auditFingerprint 6615057e`, `recipeFingerprint 7ddcabe9` and the committed `artifacts/lower-harm/*` are byte-identical before and after; the D-116 artifact lock test still passes. Every component is a projection tested against that committed real-run artifact (`__tests__/genesisVisualPanels.test.tsx`), plus synthetic NO_WINNER inputs for the honest-failure paths.
 

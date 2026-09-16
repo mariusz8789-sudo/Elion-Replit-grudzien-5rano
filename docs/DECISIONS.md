@@ -9664,4 +9664,6 @@ proves.
 
 **What did not change.** `auditFingerprint 6615057e`, `recipeFingerprint 7ddcabe9` and the committed `artifacts/lower-harm/*` are byte-identical before and after; the D-116 artifact lock test still passes. Every component is a projection tested against that committed real-run artifact (`__tests__/genesisVisualPanels.test.tsx`), plus synthetic NO_WINNER inputs for the honest-failure paths.
 
-**Not done here.** The heavy 3D worlds (`#/lab-3d`, `#/city3d`) render below 0.2 fps under the software GL of the CI container, so cinematic 3D work was limited to what can be verified for runtime errors (smoke), not for look.
+8. **Discovery Hall** (`#/discovery-hall`, `DiscoveryHallScreen.tsx` + `core/three/discoveryHallSequence.ts`): the existing `LabScene3D` and its four fixed camera flights (`focusScientific`) narrate the real `runGovLowerHarmDiscovery({mode:'PRODUCTION'})` run executed on mount — opening → custody → G2 → Winner Gate → verdict — with a HUD whose every line is a value the run recorded (pure, tested shot builder). The scene is labelled as a visualisation; the data as the real run. Linked from the console after a WinnerRecord.
+
+**Not done here.** The heavy 3D worlds (`#/lab-3d`, `#/city3d`) render below 0.2 fps under the software GL of the CI container, so their look could not be reviewed here; the Discovery Hall was verified in a real browser for behaviour (pipeline result, shot advance, verdict content, zero page errors), not for frame rate.

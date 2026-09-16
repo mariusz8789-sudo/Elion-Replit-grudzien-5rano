@@ -42,7 +42,7 @@ import { kindsOf } from './GenesisMatrixHub';
  */
 export const SUPPRESSED_ROUTES: readonly string[] = [
   '#/city3d', '#/city', '#/scientific-city', '#/genesis-world', '#/first-person-lab', '#/lab-3d',
-  '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo',
+  '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo', '#/discovery-hall',
   '#/hf-slice', '#/reality', '#/prebuild', '#/timeline',
 ];
 

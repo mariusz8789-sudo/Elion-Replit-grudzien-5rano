@@ -121,7 +121,7 @@ export const PRIMARY_NAV_ITEMS: readonly NavItem[] = NAV_ITEMS.filter((item) => 
 
 /**
  * Which nav item the current hash corresponds to, or null when the route has
- * no menu entry (deep links like `#/lab/:id`, `#/investor-demo`, `#/hf-slice`
+ * no menu entry (deep links like `#/lab/:id`, `#/investor-demo`, `#/discovery-hall`, `#/hf-slice`
  * are reachable and intentionally not in the menu). Longest match wins so
  * `#/timeline?mode=place` still highlights Discovery Timeline.
  */

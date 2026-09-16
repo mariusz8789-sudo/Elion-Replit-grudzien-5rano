@@ -70,6 +70,7 @@ const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulatio
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
+const DiscoveryHallScreen = lazy(() => import('./components/visual-simulation/DiscoveryHallScreen').then((m) => ({ default: m.DiscoveryHallScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
@@ -147,6 +148,7 @@ type Route =
   | { kind: 'first-person-lab' }
   | { kind: 'looking-glass' }
   | { kind: 'investor-demo' }
+  | { kind: 'discovery-hall' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
@@ -204,6 +206,7 @@ function parseHash(): Route {
   if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
+  if (h === '#/discovery-hall') return { kind: 'discovery-hall' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
@@ -812,6 +815,18 @@ export default function App() {
           <TopBar title="🔬 GENESIS — Investor Demo" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <InvestorDemoScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'discovery-hall') {
+      return (
+        <div className="app">
+          <TopBar title="🏛 GENESIS — Discovery Hall" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <DiscoveryHallScreen />
           </HeavyRoute>
           {overlays}
         </div>

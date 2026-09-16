@@ -304,7 +304,12 @@ export function GenesisConsole(): React.ReactElement {
             <VerdictBanner label={run.verdict} reason={detail?.verdictReason ?? undefined} />
             {detail !== undefined && <VerdictWhyStrip detail={detail} record={winnerRecord} />}
             {winnerRecord?.kind === 'WINNER_RECORD' ? (
-              <ResearchRecipePanel record={winnerRecord} />
+              <>
+                <ResearchRecipePanel record={winnerRecord} />
+                <p className="gu-hint" style={{ marginTop: 10 }}>
+                  <a className="chip-btn" href="#/discovery-hall" data-testid="open-discovery-hall">Open Discovery Hall — the canonical LOWER-HARM run narrated in the 3D lab</a>
+                </p>
+              </>
             ) : (
               <p className="gu-hint">
                 {run.recipeFingerprint !== undefined

@@ -55,7 +55,7 @@ describe('MatrixDataStream — SUPPRESSED_ROUTES / isSuppressed', () => {
     const realRouteHashes = [
       '#/timeline', '#/reality', '#/prebuild', '#/city', '#/city3d', '#/scientific-city',
       '#/concept', '#/character', '#/molecule', '#/cell-lab', '#/hf-slice',
-      '#/lab-3d', '#/first-person-lab', '#/investor-demo',
+      '#/lab-3d', '#/first-person-lab', '#/investor-demo', '#/discovery-hall',
     ];
     for (const hash of realRouteHashes) {
       expect(isSuppressed(hash)).toBe(true);

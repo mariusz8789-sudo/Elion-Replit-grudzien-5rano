@@ -23,18 +23,28 @@
  *                                takes (fingerprint bits, descriptors, y) and
  *                                returns a fitted model.
  *
- * WHAT IS HONEST ABOUT THE DATA. There is no pinned human GIPR activity
- * artifact in this runtime. The ONLY GIPR numbers anywhere in this repository
- * are two rows inside the A2 pinned candidate table (tirzepatide, 0.03 nM;
- * MK-0893, 1019 nM — `qualifyingAssayCounts.gipr` sums to 2 across all 20
- * candidates), and two rows cannot train anything: the frozen gate requires
- * MIN_TRAIN=150. Fetching more is not possible from here — the agent proxy
- * refuses CONNECT to www.ebi.ac.uk by organization policy, re-verified live
- * while writing this module. So `trainGiprModel()` returns BLOCKED with the
- * exact code and count, and `probeGiprCapability()` is COMPUTED from that
- * call rather than asserted. The day a real GIPR pin is ingested, both flip
- * without an edit to this file — exactly as the GLP-1R axis did when its
- * 287-row pin arrived in D-077a.
+ * WHAT IS HONEST ABOUT THE DATA (updated D-081a, then D-109). A real,
+ * human-only, custody-verified GIPR activity pin WAS ingested in D-081a —
+ * `giprActivity.json`, 233 rows over 219 distinct molecules, target
+ * CHEMBL4383, resolved against a live ChEMBL fetch performed OUTSIDE this
+ * runtime and supplied as a local artifact (the egress proxy still refuses
+ * CONNECT to www.ebi.ac.uk from here, re-verified live in D-109). So this is
+ * NOT the "two rows" state this comment described when first written for
+ * D-081 — that state predates the D-081a ingestion and was stale.
+ *
+ * What remains true: 233 rows still is not enough. The deterministic
+ * scaffold-hash split (`scaffoldSplit`, unchanged, unweighted) yields
+ * nTrain=146 (gate requires >=150, short by 4) and nTest=24 (gate requires
+ * >=40, short by 16) — measured directly by `trainGiprModel()` below, not
+ * estimated. Because the split is a hash of each row's scaffold and not a
+ * tunable ratio, closing the gap requires MORE real, independently-sourced
+ * GIPR activity rows, not a different split — the same discipline that
+ * forbade tuning the GLP-1R split in D-069/D-074/D-077. `trainGiprModel()`
+ * returns BLOCKED (`INSUFFICIENT_DATA`) with the exact counts, and
+ * `probeGiprCapability()` is COMPUTED from that call rather than asserted.
+ * The day enough additional real rows are ingested, both flip without an
+ * edit to this file — exactly as the GLP-1R axis did when its 287-row pin
+ * arrived in D-077a.
  */
 
 import path from 'node:path';

@@ -8829,3 +8829,203 @@ was moved to produce any number in this entry.
 
 **C1 CLOSED (now on 131/300, CAMP 43 groups). Trial 2/2 NOT run — awaiting the
 owner. NO_WINNER. Recipe LOCKED.**
+
+---
+
+## D-109 — full dependency-graph audit toward the first legitimate WinnerRecord: corrected TRIAL_2_STATUS, Winner Gate bypass audit (clean), exact GIPR gap, structurally-confirmed dual-target short-circuit
+
+**Date:** 2026-09-16
+**Context:** Mandate: drive the Genesis Mounjaro/tirzepatide track to the
+furthest legal state toward a first WinnerRecord/ResearchRecipe, autonomously,
+without changing prereg/thresholds/budget/evidence-ranking/gates, without
+fabricating data, and without treating simulation as randomised evidence. Full
+audit of every stage; fix every real technical blocker in-house; report only
+the decisions that genuinely require the owner.
+
+### 1. Correction: TRIAL_2_STATUS = BLOCKED, and the earlier framing was imprecise
+
+D-106/107/108 described the remaining D-088 attempt as "awaiting one
+authorization" — implying a single approval would run an already-defined
+experiment. Re-reading D-088's own sealed prereg text precisely, that is
+wrong, and is corrected here rather than left standing.
+
+D-088 (`fc6cf73e63a9e569`) **already executed, once, both arms, deterministically
+replayed**: Arm A (V1, Morgan-only) MAE 1.1726; Arm B (V2, the shared engine)
+MAE 1.0425. Both against `MAX_MAE 1.0`. **BOTH_ARMS_BLOCKED** — recorded fully
+in D-088's own entry above. The prereg's own `decisionRule.forbidden` clause
+bars re-running under this seal "with a third representation, a different
+lambda, a different split seed, or any other knob, in search of a pass", and
+`armsAreExhaustive` states: "No arm C... a further arm requires a NEW
+human-sealed preregistration." The execution script's own rationale string
+says the same thing independently.
+
+`scripts/d109-trial2-readiness.mjs::trial2Status()` reads this directly from
+the sealed prereg's own text (not a restated copy) and returns:
+
+```
+TRIAL_2_STATUS = BLOCKED
+reason: no second experiment is currently DEFINED or sealed — D-088's own
+prereg forbids re-running under this seal with any different knob, and states
+a further arm needs a NEW human-sealed preregistration, which does not exist.
+```
+
+**What the attemptBudget field actually means.** `max: 2,
+consumedByThisExperiment: 1` records that this campaign reserved room for one
+further attempt — it is not a standing authorization to mechanically re-invoke
+D-088. The prereg's own rules define any further attempt as arm C+, which by
+its own text needs a new seal. There is nothing technically "ready to run"
+right now under the existing seal, because the existing seal's experiment is
+finished and its own decision rule forbids repeating it. What genuinely
+remains is a human decision to draft and seal a **new** preregistration — a
+different question from "press go on D-088" — informed by everything measured
+since (C1 CLOSED on CAMP at 43 groups, medianSd 1.0005 vs the frozen MAX_MAE
+1.0, meaning even a model that clears the gate would sit at the resolution
+limit of the assay's own noise).
+
+This module proposes no new prereg, no new arm, no new threshold. It reports
+the current one's status precisely.
+
+### 2. GIPR — exact gap, and why it is a pure data-volume blocker
+
+The module header comment in `giprQsar.mjs` was stale — it described "two
+rows" from before the D-081a ingestion. Fixed to describe the current state
+accurately.
+
+**Current real state, measured, not estimated:** `giprActivity.json` holds 233
+custody-verified rows (219 distinct molecules, target CHEMBL4383, human-only).
+`trainGiprModel()` on this exact pin returns:
+
+```
+nTrain=146 (need >=150, short 4)
+nTest=24  (need >=40, short 16)
+nUsable=233
+```
+
+146 + 24 + 63 (implied calib) = 233 exactly — **no row is lost to
+featurization failure**; every pinned row reaches the split. So the shortfall
+is entirely about how many real rows exist, not about anything fixable in this
+container.
+
+**Why the gap cannot be closed by adjusting the split.** `scaffoldSplit` is a
+deterministic hash of each row's Murcko scaffold (`bucket < 2 -> test,
+bucket < 4 -> calib, else -> train`), unweighted, unchanged since D-076.
+Changing that ratio to manufacture a passing count is exactly the move
+D-069/D-074/D-077 exist to forbid, so it was not done, and no change was made
+here.
+
+**Honest minimum-payload estimate (not a target to game).** The empirical
+split on this pin lands well off its ~20/20/60 nominal design — measured
+10.3% test / 27.0% calib / 62.7% train, because 233 rows over only 89-ish
+underlying Murcko scaffold families cluster unevenly across hash buckets. At
+that empirical rate, closing the **test** shortfall (the binding constraint —
+train would clear far sooner) needs on the order of **~150-160 additional
+real, independently-sourced human GIPR activity rows** landing across their
+own natural scaffold diversity — not rows selected to hit particular buckets,
+which would be the same manipulation forbidden above. This is a statistical
+estimate over a fixed, frozen rule, stated so the owner knows the rough scale
+of what closing this gap requires — it is not a promise, and the actual number
+could differ once real additional rows are supplied.
+
+**Egress re-verified live, still blocked:**
+```
+www.ebi.ac.uk:443     — connect_rejected (organization policy)
+rest.uniprot.org:443  — connect_rejected (organization policy)
+```
+No fetch is possible from inside this container. **GIPR: BLOCKED_EXTERNAL_DATA.**
+
+### 3. Dual-target discovery — pipeline confirmed structurally sound, correctly short-circuits
+
+Ran `assessDualTargetAxes` / `dualTargetVerdict` with the REAL current probes
+(not fixtures). Result: `MECHANISM_INCOMPLETE` → `NO_DUAL_TARGET_CANDIDATE`,
+with three real blockers: `GLP1R_ACTIVITY_UNAVAILABLE` (GATE_NOT_MET),
+`GIPR_ACTIVITY_UNAVAILABLE` (INSUFFICIENT_DATA, exact counts), and
+`PRIOR_ART_UNVERIFIABLE` (prior-art search is unreachable from this runtime —
+another egress-blocked capability, distinct from the two QSAR axes). No
+fabricated axis, no silent substitution, no candidate manufactured. The
+mechanism-completeness check (`REQUIRES_BOTH_RECEPTOR_AXES`) correctly refuses
+to compute a selectivity/balance number when either receptor prediction is
+missing, calling that "a balance computed against a missing number would be
+fiction" — exactly right, left unmodified.
+
+**The dual-target pipeline itself is READY** (technically sound, wired,
+tested); it is downstream-BLOCKED purely by the two axes above plus the
+egress-blocked prior-art check.
+
+### 4. Candidate → falsification → Winner Gate — full bypass audit, clean
+
+`molecularMission.mjs::decide()` — the molecular mission's sole adjudication
+function — has exactly two literal outcome strings in its body,
+`COMPUTATIONAL_CANDIDATE` and `NO_WINNER`; **no code path returns `WINNER`.**
+Confirmed by static extraction of the function body, not by reading intent.
+
+`winnerGate.ts::canPromoteToWinnerRecord` is defined in exactly one file in
+the whole repository; every caller (`orchestrator.ts`,
+`mounjaroResearchRecipe.ts`, `mindPromotionCaller.ts`) imports that same
+function — no shadow gate, no duplicated threshold. `asEvidenceClass` maps any
+unrecognized string to `UNVERIFIED` (rank 1, the lowest), never trusting an
+unknown class as strong. `STRONG_THRESHOLD_RANK` is hardcoded to
+`DEFAULT_EVIDENCE_CLASS_RANK.INDIRECT_RANDOMISED`, and `PromotionInput` has no
+`ranking` field — the strength table is not caller-injectable.
+
+Swept the whole frontend + backend source tree (excluding tests) for the
+specific bypass shapes the mandate named:
+
+- **hardcoded WINNER verdict**: zero matches outside test files.
+- **hardcoded PROMOTE outcome**: zero matches outside `winnerGate.ts` itself
+  (its own return-value construction).
+- **HTTP route for a recipe or winner**: `server.mjs` declares none — the
+  entire backend exposes no network surface for either, so there is no
+  server-side bypass at all today.
+- **SYNTHETIC_TEST_ONLY fixture reaching the real path**: `syntheticWinnerFixture.ts`
+  is imported only by its own tests, the LOWER-HARM demo script, and
+  `govLowerHarmAdapters.ts` via a separately-named
+  `createSyntheticWinnerLowerHarmAdapters()` factory, never the default and
+  never imported by `mounjaroResearchRecipe.ts` (the actual Mounjaro/GLP-1R/GIPR
+  path) at all — a different discovery domain (LOWER-HARM/nicotine), properly
+  isolated.
+- **recipe lock is structural, not a convention**: `MounjaroRecipeOutcome`'s
+  `RECIPE_LOCKED` union member carries no `recipe` field at the type level —
+  parsed from the real source, not asserted — while `RECIPE_ISSUED` does,
+  proving the union is real rather than a lock that happens to be vacuous.
+
+**No exploitable gap was found.** Eleven fail-closed regression tests
+(`winnerGateBypassAudit.test.ts`) now pin every property above, so a future
+change that reintroduces any of them (a new HTTP route, a hardcoded literal, a
+default that silently picks the synthetic path) breaks the suite instead of
+shipping quietly.
+
+### 5. ResearchRecipe — confirmed gated exclusively on a legal WinnerRecord
+
+Unchanged from D-081/D-082: `buildMounjaroResearchRecipe` calls the canonical
+gate and returns the discriminated union above; `preclinicalProtocol.mjs`
+(the deliberately weaker artifact new candidates CAN receive) refuses any
+input carrying `recipe`, `winnerRecord` or `gateLock`, and refuses any axis
+declaring stronger than `COMPUTATIONAL`/`MODEL_ESTIMATE`. No path from a
+`COMPUTATIONAL_CANDIDATE` to a `ResearchRecipe` exists anywhere in this
+repository.
+
+### 6. Tests, gate
+
+`d109Trial2Readiness.test.mjs` (backend, 5/5): pins TRIAL_2_STATUS=BLOCKED
+read from the real sealed prereg text, pins the exact GIPR counts (146/24/233),
+confirms the module proposes no new prereg itself.
+`winnerGateBypassAudit.test.ts` (frontend, 11/11): the full bypass sweep above.
+Existing suites unaffected: `mounjaroTrack.test.mjs` +
+`preclinicalAndPeptide.test.mjs` + `activityQsarV2.test.mjs` (45/45) confirm
+the GIPR comment-only edit changed no behaviour.
+
+### 7. What was NOT done, and why
+
+No new preregistration was drafted or sealed — that decision belongs to the
+owner (`agentMayNotSelfApprove: true`). No external data was fetched or
+invented — egress is confirmed blocked, live. No threshold, split, evidence
+ranking, or attempt budget was touched. No candidate was generated, because
+`assessDualTargetAxes` correctly reports `MECHANISM_INCOMPLETE` and inventing
+one to exercise the downstream pipeline would be exactly the fabrication this
+whole campaign forbids.
+
+**C1 CLOSED. GLP1R BLOCKED (exhausted seal, needs a new one to proceed further).
+GIPR BLOCKED_EXTERNAL_DATA (~150-160 more real rows, estimated). Dual-target
+MECHANISM_INCOMPLETE (correctly, given the above). Candidate: NONE. Winner
+Gate: audited clean, 11 new regression tests. NO_WINNER. Recipe LOCKED. Nothing
+was moved to make any of this read differently.**

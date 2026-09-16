@@ -9273,3 +9273,105 @@ but on a real, frozen, untouched disagreement between the experiment's own
 finding and the preregistered pre-experiment ranking. No threshold, pin,
 preregistration, evidence class, or Winner Gate rule was changed. No Winner
 was fabricated or auto-promoted.**
+
+## D-114 — is there a legal path past AGREES_WITH_PRE_EXPERIMENT_RANK? The arithmetic, the answer, and a disclosed finding that must not be acted on quietly
+
+Asked to determine whether the remaining LOWER_HARM blocker can be closed
+without touching preregistration, Winner Gate, evidence ranking or HARK
+protection, and without post-hoc selection. Answer: **not today, not from
+inside this repository.** The blocker is stated exactly below, with the
+arithmetic that makes it binding.
+
+### 1. The binding condition, mechanically
+
+`decideFunnelVerdict` requires `g2Favoured === preRankFirst`. Today:
+G2 favours **CHEMBL4084119** (liraglutide, expected EFFICACY_DELTA_PP
+−0.010 vs native GLP-1's +0.290); the frozen pre-experiment rank #1 is
+**CHEMBL1240772** (native GLP-1). They disagree, so the conjunct fails and
+no candidate is promoted on a partial case.
+
+### 2. Why the pre-experiment ranking puts native GLP-1 first
+
+Frozen weights: safety 2, efficacyMarginAboveFloor 0.25, evidenceStrength
+0.5, uncertaintyPenalty −0.5, conflictPenalty −1.
+
+| term | native GLP-1 | liraglutide | gap |
+|---|---|---|---|
+| safety × 2 | 0.6781 → **1.3562** | 0.4131 → 0.8262 | **+0.5300** |
+| efficacy × 0.25 | −0.7250 → −0.1813 | −0.6583 → −0.1646 | −0.0167 |
+| evidenceStrength × 0.5 | 0.2 → 0.1 | **0.6 → 0.3** | **−0.2000** |
+| conflictPenalty × −1 | 0 → 0 | 1 → **−1.0000** | **+1.0000** |
+| **total** | **1.2750** | **−0.0384** | **1.3134** |
+
+Two observations matter. First, **D-113 did move the term it was supposed to
+move**: liraglutide's `evidenceStrengthScore` is now the higher of the two
+(0.6 vs 0.2) because it holds 3 real observations against native GLP-1's 1.
+Second, that term carries weight 0.5, so it buys 0.2 against a 1.3134 gap
+dominated by safety (weight 2) and the conflict penalty. The evidence-count
+problem D-109 identified is genuinely solved; it was never the term that
+decides this ranking.
+
+### 3. Legal paths, and what each would require
+
+- **Path A — native GLP-1 earns the promotion.** Needs real new evidence
+  giving it ≥3 observations AND a better real efficacy delta than
+  liraglutide, so that G2 favours the candidate the pre-rank already
+  prefers. Requires external evidence nobody here can direct; the egress
+  policy still blocks every primary source.
+- **Path B — liraglutide legitimately overtakes on the frozen function.**
+  Needs real new evidence that improves its safety term or removes the
+  conflict penalty. `evidenceStrength` alone cannot do it: even a perfect
+  1.0 buys (1.0 − 0.6) × 0.5 = 0.2 more, against a 1.3134 gap.
+- **Path C — anything that edits the frozen function, the conjunct, the
+  weights, or the penalties.** Not legal. Not done.
+
+Neither A nor B is reachable from inside this container today. **NO_WINNER
+stands.**
+
+### 4. A real finding, disclosed in full, deliberately NOT acted on
+
+While decomposing the ranking, native GLP-1's single efficacy observation
+was traced to **NCT05659537 — "A Study of Dulaglutide (LY2189265) in
+Participants With Type 2 Diabetes Mellitus in India"**, whose one outcome
+group is titled **"Dulaglutide"**. It is credited to native GLP-1
+(CHEMBL1240772) by `pickCandidateGroup`'s single-arm fallback — the rule
+that exists for trials whose lone arm is named by duration rather than by
+drug (the documented exenatide/NCT02533453 case). Dulaglutide is a distinct
+molecule, so this looks like a genuine misattribution of the same class as
+the "Lira" arm-label defect fixed in D-113.
+
+**It was not fixed, and the reason is the important part.** Removing that
+observation eliminates native GLP-1 from the ranking entirely
+(`NO_HBA1C_EVIDENCE` → eliminated), which makes liraglutide pre-experiment
+#1, which makes `AGREES_WITH_PRE_EXPERIMENT_RANK` hold, which — with the
+other two conjuncts already holding — produces a **WINNER**. The defect was
+identified *after* its effect on the outcome was known. D-113's "Lira" fix
+was authorized before anyone knew whether it would produce a Winner, and in
+fact it did not; this one is the opposite shape, and an agent that ships it
+on its own initiative is doing outcome-directed science regardless of how
+defensible the underlying observation is.
+
+Pinned as a TRIPWIRE instead (`govDrugLowerHarmFunnel.test.ts`, D-114
+block): the test asserts the attribution exactly as it stands today and
+fails loudly if anyone changes it, so the change cannot happen quietly as
+an incidental cleanup. If it is ever authorized, it must be applied as a
+general rule (e.g. the single-arm fallback declining any arm whose title
+names a drug other than the candidate, checked uniformly across all 20
+candidates), and the resulting Winner must be recorded as contingent on
+that specific, dated decision.
+
+### 5. A process error of mine, corrected here
+
+D-113's full frontend suite was run *before* the LEAD-2 ingestion and then
+committed *after* it, so `eed58c0e` shipped with two stale tests still
+locking the pre-ingestion state (both TOP2 candidates refusing on
+`EVIDENCE_SUFFICIENT`, and the safety-gate conjunct failing). Both are now
+updated to the real post-ingestion state — liraglutide at 3 of 3 no longer
+refuses, only native GLP-1 does — and the lesson is the ordering: a suite
+run before a data change proves nothing about the commit that contains it.
+
+**OUTCOME: NO_WINNER stands, on AGREES_WITH_PRE_EXPERIMENT_RANK alone. No
+threshold, weight, conjunct, preregistration, evidence-ranking rule or HARK
+protection was changed. No WinnerRecord and no ResearchRecipe were created.
+One real data-attribution finding is disclosed, tripwired, and left to the
+account owner.**

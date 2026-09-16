@@ -39,13 +39,12 @@ describe('A3 government recommendation — real pinned data, population = T2D_AN
     expect(a.status).toBe('ANSWERED');
     if (a.status !== 'ANSWERED' || b.status !== 'ANSWERED') throw new Error('unreachable');
     expect(a.decisionFingerprint).toBe(b.decisionFingerprint);
-    // D-113: moved from 'ebf4df60' — A3 re-runs A2's own analysis, so
-    // orforglipron's real second efficacy observation (NCT05048719, see
-    // a2OzempicSubstitute.test.ts's D-113 note) flows through here too. A3's
-    // own verdict label is unchanged (still CONFLICTING_EVIDENCE, asserted
-    // below) — only the fingerprint, because the underlying data genuinely
-    // changed.
-    expect(a.decisionFingerprint).toBe('8c889ac6');
+    // D-113/D-114: moved from 'ebf4df60' — A3 re-runs A2's own analysis, so
+    // both real data changes flow through here: orforglipron's second
+    // observation and LEAD-2's ingestion (liraglutide's third). A3's own
+    // verdict label is unchanged (still CONFLICTING_EVIDENCE, asserted
+    // below) — only the fingerprint, because the data genuinely changed.
+    expect(a.decisionFingerprint).toBe('04d11618');
     expect(a.preregistrationFingerprint).toBe('2b32c0a8');
   });
 

@@ -45,8 +45,12 @@ describe('the real, unmodified run (mandate item: report exactly what happens)',
     expect(byName.G2_SEPARATES_TOP2.held).toBe(true);
     expect(byName.AGREES_WITH_PRE_EXPERIMENT_RANK.held).toBe(false);
     expect(byName.AGREES_WITH_PRE_EXPERIMENT_RANK.detail).toMatch(/G2 favours CHEMBL4084119.*rank #1 was CHEMBL1240772/);
-    expect(byName.FAVOURED_CANDIDATE_PASSES_SAFETY_GATE.held).toBe(false);
-    expect(byName.FAVOURED_CANDIDATE_PASSES_SAFETY_GATE.detail).toMatch(/CHEMBL4084119 gate outcome: REFUSE/);
+    // D-113/D-114: this conjunct USED to fail too, on liraglutide's 2-of-3
+    // observations. LEAD-2's custody-verified ingestion took it to 3 of 3, so
+    // the gate no longer refuses it and this conjunct now HOLDS. The verdict
+    // is still NO_WINNER — on AGREES_WITH_PRE_EXPERIMENT_RANK alone.
+    expect(byName.FAVOURED_CANDIDATE_PASSES_SAFETY_GATE.held).toBe(true);
+    expect(byName.FAVOURED_CANDIDATE_PASSES_SAFETY_GATE.detail).toMatch(/CHEMBL4084119 gate outcome: REQUIRES_HUMAN_APPROVAL/);
   });
 
   it('G2 selects EFFICACY_DELTA_PP and fully separates the real TOP2 pair (100% falsification power)', () => {
@@ -59,12 +63,17 @@ describe('the real, unmodified run (mandate item: report exactly what happens)',
     }
   });
 
-  it('both real TOP2 candidates refuse the safety gate on EVIDENCE_SUFFICIENT (1 and 2 observations, minimum is 3) — an honest structural finding, not a bug', () => {
+  it('native GLP-1 still refuses on EVIDENCE_SUFFICIENT (1 observation, minimum 3); liraglutide no longer does (3 of 3 after LEAD-2)', () => {
     const r = runLowerHarmFunnel();
-    for (const a of r.adjudicated) {
-      expect(a.decision.outcome).toBe('REFUSE');
-      expect(a.decision.failures.some((f) => f.criterion === 'EVIDENCE_SUFFICIENT')).toBe(true);
-    }
+    const byId = Object.fromEntries(r.adjudicated.map((a) => [a.candidateId, a]));
+    // D-113/D-114: this test previously asserted BOTH candidates REFUSE. That
+    // was true at 1 and 2 observations. LEAD-2's custody-verified ingestion
+    // moved liraglutide to 3 of 3, so only native GLP-1 still refuses on the
+    // evidence minimum — a real change in the data, not a relaxed assertion.
+    expect(byId.CHEMBL1240772.decision.outcome).toBe('REFUSE');
+    expect(byId.CHEMBL1240772.decision.failures.some((f) => f.criterion === 'EVIDENCE_SUFFICIENT')).toBe(true);
+    expect(byId.CHEMBL4084119.decision.outcome).toBe('REQUIRES_HUMAN_APPROVAL');
+    expect(byId.CHEMBL4084119.decision.failures.some((f) => f.criterion === 'EVIDENCE_SUFFICIENT')).toBe(false);
   });
 
   it('the diversity check honestly reports all three qualifiers as GLP-1R-only mono-agonists — one mechanism class, disclosed, not collapsed', () => {
@@ -254,5 +263,59 @@ describe('checkDiversity — structural, no invented threshold', () => {
   it('never collapses or eliminates — output length equals input length', () => {
     const qualifying = REAL_QUALIFYING();
     expect(checkDiversity(qualifying).signatures).toHaveLength(qualifying.length);
+  });
+});
+
+/**
+ * D-114 — the exact remaining blocker, pinned so it cannot move silently.
+ *
+ * After D-113 (liraglutide at 3 of 3 real observations), the funnel's
+ * evidence-count conjunct HOLDS and a different one fails instead. These
+ * tests state that arithmetic explicitly, and include a TRIPWIRE on a
+ * disclosed data-attribution finding whose "fix" would directly manufacture
+ * the Winner — so that change can never be made quietly.
+ */
+describe('D-114 — why AGREES_WITH_PRE_EXPERIMENT_RANK is the binding constraint', () => {
+  it('the safety-gate conjunct now HOLDS and the pre-rank conjunct is the only failure', () => {
+    const r = runLowerHarmFunnel();
+    const byName = Object.fromEntries(r.verdict.conjuncts.map((c) => [c.criterion, c]));
+    expect(byName.G2_SEPARATES_TOP2.held).toBe(true);
+    expect(byName.FAVOURED_CANDIDATE_PASSES_SAFETY_GATE.held).toBe(true);
+    expect(byName.AGREES_WITH_PRE_EXPERIMENT_RANK.held).toBe(false);
+    expect(r.verdict.label).toBe('NO_WINNER');
+  });
+
+  it('the pre-experiment gap is dominated by safety (weight 2), not by the evidence count D-113 closed', () => {
+    const qualifying = REAL_QUALIFYING();
+    const glp1 = qualifying.find((q) => q.report.summary.moleculeChemblId === 'CHEMBL1240772')!;
+    const lira = qualifying.find((q) => q.report.summary.moleculeChemblId === 'CHEMBL4084119')!;
+    // Native GLP-1 outranks liraglutide on the frozen ranking function.
+    expect(glp1.lowerHarmScore!).toBeGreaterThan(lira.lowerHarmScore!);
+    // Liraglutide's evidenceStrength is now the HIGHER of the two (3 observations
+    // vs 1) — the D-113 ingestion did move this term, it is simply outweighed.
+    expect(lira.report.score.evidenceStrengthScore).toBeGreaterThan(glp1.report.score.evidenceStrengthScore);
+    // Safety is where the gap actually lives, and liraglutide additionally
+    // carries the conflict penalty.
+    expect(glp1.report.score.safetyScore).toBeGreaterThan(lira.report.score.safetyScore);
+    expect(lira.report.score.conflictPenalty).toBeGreaterThan(0);
+  });
+
+  it('TRIPWIRE (D-114 disclosed finding): native GLP-1\'s only efficacy observation comes from an arm titled "Dulaglutide"', () => {
+    // NCT05659537 is "A Study of Dulaglutide (LY2189265)..." and its single
+    // outcome group is titled "Dulaglutide". It is credited to native GLP-1
+    // (CHEMBL1240772) through pickCandidateGroup's single-arm fallback.
+    //
+    // THIS TEST EXISTS TO BLOCK A QUIET FIX, NOT TO ENDORSE THE ATTRIBUTION.
+    // Removing that observation eliminates native GLP-1 from the ranking,
+    // which makes liraglutide pre-experiment #1, which makes the blocking
+    // conjunct hold, which produces a WINNER. That is precisely why this
+    // change must never be made as an incidental cleanup: it is an
+    // outcome-determining edit discovered AFTER its effect was known. If this
+    // test fails, someone changed that attribution — stop and require an
+    // explicit, recorded authorization before going further.
+    const glp1 = runA2Analysis().candidateReports.find((c) => c.summary.moleculeChemblId === 'CHEMBL1240772')!;
+    expect(glp1.efficacy).toHaveLength(1);
+    expect(glp1.efficacy[0].nctId).toBe('NCT05659537');
+    expect(glp1.efficacy[0].candidateArm.title).toBe('Dulaglutide');
   });
 });

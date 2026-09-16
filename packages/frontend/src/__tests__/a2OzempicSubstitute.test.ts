@@ -86,14 +86,15 @@ describe('A2 Ozempic-substitute analysis — real pinned data', () => {
     const a = runA2Analysis();
     const b = runA2Analysis();
     expect(a.analysisFingerprint).toBe(b.analysisFingerprint);
-    // D-113: this literal moved from 'a5e0f164' — the only change to any
-    // candidate's data is orforglipron gaining a real second efficacy
-    // observation (NCT05048719, previously unmatched because its own arms
-    // are labelled by ChEMBL's real development code name "LY3502970", not
-    // "ORFORGLIPRON"). No other candidate's efficacy/safety/score changed —
-    // verified by diffing the full per-candidate report against the
-    // pre-D-113 run before updating this literal.
-    expect(a.analysisFingerprint).toBe('39dd0866');
+    // D-113/D-114: moved from 'a5e0f164' in two real, disclosed steps —
+    // orforglipron gaining a second efficacy observation (NCT05048719, arms
+    // labelled by its real development code name "LY3502970"), and LEAD-2's
+    // custody-verified ingestion giving liraglutide its third (NCT00318461).
+    // Both are real data changes, each recorded in DECISIONS.md. D-114 note:
+    // the '39dd0866' value briefly committed in eed58c0e was computed BEFORE
+    // the ingestion and was already stale when it landed — a suite run before
+    // a data change proves nothing about the commit containing it.
+    expect(a.analysisFingerprint).toBe('22e9bdb0');
   });
 });
 

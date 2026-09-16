@@ -53,6 +53,7 @@
     "winner-record:emit": "node scripts/genesis-winner-record-emit.mjs",
     "audit:verify": "node scripts/genesis-audit-verify.mjs",
     "investor-demo:capture": "node scripts/genesis-investor-demo-capture.mjs",
+    "guide-film:capture": "node scripts/genesis-guide-film-capture.mjs",
     "voice:lines": "node scripts/genesis-voice-lines-export.mjs",
     "mol-01:demo": "node scripts/genesis-molecular-mission-demo.mjs"
   },

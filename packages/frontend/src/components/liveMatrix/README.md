@@ -1,26 +1,16 @@
-# Live Matrix Background — Evidence Field
+# Live Matrix Background
 
-Procedural, seeded background for a scientific command-center look: slowly
-rising nodes on three depth layers, thin links between neighbours (a
-provenance lattice) and sparse 8-hex "fingerprint" tags. Canvas 2D, no images,
-no video, no DOM-per-node, no external libraries.
+Procedural, seeded "data field" background for a scientific command-center look.
+Canvas 2D, no images, no video, no DOM-per-glyph, no external libraries.
 
-**D-117:** this renderer replaced the earlier "digital rain" (falling katakana
-columns). The rain said nothing about Genesis; the evidence field uses the
-product's own visual vocabulary — stage fingerprints, custody hashes, evidence
-graphs. The public engine API (`buildStreams`/`updateStreams`/`renderFrame`/
-`renderStatic`, the config vocabulary, the quality tiers, the determinism
-contract) is unchanged, so the controller and the React adapter did not move.
-The tags are pure hashes of a node seed — never a real fingerprint of anything.
-
-**Status: integrated.** `App.tsx` mounts it through `genesisVisualState.ts`
-only; nothing under this directory imports Genesis. Both facts are enforced by
-`src/__tests__/liveMatrixBoundary.test.tsx`, not by convention.
+**Status: C3 READY — STANDALONE. Not integrated with Genesis.** Nothing under
+this directory imports Genesis, and `App.tsx` does not mount it; both facts are
+enforced by `src/__tests__/liveMatrixBoundary.test.tsx`, not by convention.
 
 ## Layout
 
 ```
-matrixEngine.ts        pure functions: seeded node layout, drift/respawn, link selection, render. No React, no DOM, no globals.
+matrixEngine.ts        pure functions: seeded layout, update, render. No React, no DOM, no globals.
 matrixController.ts    animation lifecycle over an injected `MatrixHost`. No React.
 LiveMatrixBackground.tsx  thin React adapter: canvas, ResizeObserver, matchMedia, visibilitychange.
 genesisVisualState.ts  the Genesis → visual contract. Types and one pure mapping function only.
@@ -70,9 +60,9 @@ Imperative handle: `setActivityLevel()`, `setQuality()`, `getTelemetry()`.
 
 `prefers-reduced-motion` is honoured, and an explicit `reducedMotion` prop
 overrides the OS setting in both directions. In reduced motion the component
-composes **one static frame** — the full lattice with links, nodes and tags,
-glow kept, layout unchanged — and starts **no animation loop at all** (asserted
-by `framesRendered === 0`, not inferred).
+composes **one static frame** — full columns with gradient falloff, glow kept,
+layout unchanged — and starts **no animation loop at all** (asserted by
+`framesRendered === 0`, not inferred).
 
 ## Telemetry
 
@@ -82,12 +72,6 @@ when the loop stops — a paused renderer reports "not measured", never a
 comforting 60.
 
 ## Measured performance
-
-**These figures were measured for the previous (digital rain) renderer and are
-kept only as the harness description. The evidence field draws ~100 discs and
-~150 one-pixel lines per frame at 1920×1080 — a lighter command stream than
-~170 glyph columns — but it has NOT been re-measured on a GPU browser; re-run
-the harness before quoting any number below for the current renderer.**
 
 Headless Chromium (SwiftShader **software** rasterization), 3–4 s per scenario,
 `activity=RUNNING`:
@@ -118,10 +102,8 @@ claiming anything about those.
 
 ## Known limitations
 
-- Afterglow fade keeps state in the canvas bitmap, so a resize rebuilds the
-  field and clears the trails. Deliberate, and deterministic from the seed.
-- Determinism covers layout, tags and link selection, not frame timing.
-- Link selection is O(n²) per frame over ~100 nodes — well under a
-  millisecond — so there is no spatial index to keep in sync on resize.
+- Trail fade keeps state in the canvas bitmap, so a resize rebuilds the field
+  and clears the trail. Deliberate, and deterministic from the seed.
+- Determinism covers layout and glyph selection, not frame timing.
 - No WebGL fallback. Canvas 2D is sufficient at these densities on the measured
   configurations; WebGL would be a separate decision with its own evidence.

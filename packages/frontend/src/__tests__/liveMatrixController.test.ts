@@ -32,11 +32,10 @@ function fakeHost(over: Partial<MatrixHost> = {}) {
   };
 
   const ctx: RenderContext = {
-    fillStyle: '', strokeStyle: '', lineWidth: 1, shadowBlur: 0, shadowColor: '', font: '',
+    fillStyle: '', shadowBlur: 0, shadowColor: '', font: '',
     fillRect: () => { state.drawn.fillRect++; },
     fillText: () => { state.drawn.fillText++; },
     clearRect: () => { state.drawn.clearRect++; },
-    beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, arc: () => {}, fill: () => {}, stroke: () => {},
   };
 
   const host: MatrixHost = {

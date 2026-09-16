@@ -99,7 +99,7 @@ export const LiveMatrixBackground = forwardRef<LiveMatrixBackgroundHandle, LiveM
         className={className}
         aria-hidden="true"
         style={{
-          position: 'fixed', inset: 0, overflow: 'hidden', background: '#0a0e1c',
+          position: 'fixed', inset: 0, overflow: 'hidden', background: '#020604',
           pointerEvents: 'none', zIndex: 0, ...style,
         }}
       >

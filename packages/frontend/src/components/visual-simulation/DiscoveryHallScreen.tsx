@@ -4,6 +4,7 @@ import { LabScene3D } from '../../core/three/labScene3D';
 import { runGovLowerHarmDiscovery, type GovLowerHarmDiscoveryResult } from '../../core/orchestrator/govLowerHarmDiscovery';
 import { WorldChrome } from '../genesis-ui/WorldChrome';
 import { buildDiscoveryHallSequence, type HallShot } from '../../core/three/discoveryHallSequence';
+import { useVoiceEngine } from '../../core/guide/guideRuntime';
 
 /**
  * DISCOVERY HALL — the real LOWER-HARM run narrated inside the EXISTING 3D lab
@@ -42,6 +43,16 @@ export function DiscoveryHallScreen() {
 
   const shots = useMemo(() => (result !== null && result.kind === 'RUN' ? buildDiscoveryHallSequence(result) : []), [result]);
   const shot = shots[index] ?? null;
+
+  // D-119: `#/discovery-hall?tour=1` — the guide's voice narrates each shot (title + its first
+  // line, both already built from the real run); without the flag the hall stays silent.
+  const tour = typeof window !== 'undefined' && /[?&]tour=1/.test(window.location.hash);
+  const voice = useVoiceEngine();
+  useEffect(() => {
+    if (!tour || shot === null) return;
+    voice.speak({ key: `hall:${shot.id}`, text: `${shot.title}. ${shot.lines[0] ?? ''}`, lang: voice.settings.lang });
+  }, [tour, shot, voice]);
+  useEffect(() => () => { voice.stop(); }, [voice]);
 
   // Drive the existing camera flights; advance on the shot's own hold time while playing.
   useEffect(() => {
@@ -97,6 +108,7 @@ export function DiscoveryHallScreen() {
               <button type="button" className="chip-btn" onClick={() => { setPlaying(false); setIndex((i) => Math.min(shots.length - 1, i + 1)); }} disabled={index >= shots.length - 1}>Następne ▶</button>
               <button type="button" className="chip-btn gid-quiet" onClick={restart}>Od początku</button>
               <a className="chip-btn gid-quiet" href="#/research-console">Konsola badawcza</a>
+              {tour && index >= shots.length - 1 && !playing && <span className="hall-tour-end" data-testid="hall-tour-end">Koniec Genesis Tour — każdy wynik, który widziałeś, można odtworzyć i sprawdzić.</span>}
             </div>
           )}
         </div>

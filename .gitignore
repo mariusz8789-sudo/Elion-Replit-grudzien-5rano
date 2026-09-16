@@ -23,3 +23,8 @@ artifacts/genesis-investor-demo/
 # Python bytecode from compute workers (packages/backend/src/compute/*.py)
 __pycache__/
 *.pyc
+
+# Voice guide recordings are generated (npm run voice:lines + scripts/genesis_tts.py), never committed.
+packages/frontend/public/audio/*.mp3
+packages/frontend/public/audio/manifest.json
+packages/frontend/public/audio/lines.json

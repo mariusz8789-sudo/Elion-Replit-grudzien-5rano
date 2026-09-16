@@ -4,7 +4,7 @@ import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
 import { ScaleJourney } from './components/ScaleJourney';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AppShell } from './components/AppShell';
+import { AppShell, GenesisWordmark } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
@@ -153,6 +153,7 @@ type Route =
   | { kind: 'investor-demo' }
   | { kind: 'discovery-hall' }
   | { kind: 'worlds' }
+  | { kind: 'tour' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
@@ -189,7 +190,8 @@ function parseHash(): Route {
   if (h === '#/monetize') return { kind: 'monetize' };
   if (h === '#/physics/cms-z') return { kind: 'physics-cms-z' };
   if (h === '#/virtual-bio') return { kind: 'virtual-bio' };
-  if (h === '#/research-console') return { kind: 'research-console' };
+  if (h === '#/research-console' || h.startsWith('#/research-console?')) return { kind: 'research-console' };
+  if (h === '#/tour') return { kind: 'tour' };
   if (h === '#/sim-world') return { kind: 'sim-world' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
@@ -210,7 +212,7 @@ function parseHash(): Route {
   if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
-  if (h === '#/discovery-hall') return { kind: 'discovery-hall' };
+  if (h === '#/discovery-hall' || h.startsWith('#/discovery-hall?')) return { kind: 'discovery-hall' };
   if (h === '#/worlds') return { kind: 'worlds' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
@@ -464,9 +466,9 @@ export default function App() {
     if (route.kind === 'research-console') {
       return (
         <div className="app">
-          <TopBar title="🧭 Genesis Research Console" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Odkrycia — Genesis Research Console" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
-            <GenesisConsole />
+            <GenesisConsole key="console" />
           </HeavyRoute>
           {overlays}
         </div>
@@ -821,6 +823,20 @@ export default function App() {
           <TopBar title="🔬 GENESIS — Investor Demo" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <InvestorDemoScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'tour') {
+      return (
+        <div className="app">
+          <TopBar title="Genesis Tour" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            {/* Distinct key: switching between the console and the tour must remount the console,
+                so a guided session never leaks into the tour (and vice versa). */}
+            <GenesisConsole key="tour" autoplay="TOUR" />
           </HeavyRoute>
           {overlays}
         </div>
@@ -1242,8 +1258,9 @@ function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
   };
   return (
     <header className="topbar">
-      <button className="back" aria-label="Wróć na Start" onClick={() => { window.location.hash = ''; }}>
-        ←
+      {/* The logo is the way home on every page (D-120). */}
+      <button className="topbar-logo" aria-label="Genesis Physics — Start" onClick={() => { window.location.hash = ''; }}>
+        <GenesisWordmark size={26} tagline={false} />
       </button>
       <div className="titles">
         <h1>{cleanRouteTitle(title)}</h1>

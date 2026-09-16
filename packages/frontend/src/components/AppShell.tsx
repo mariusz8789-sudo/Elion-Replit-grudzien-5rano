@@ -18,20 +18,45 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
  * than a second router.
  */
 
-/** The Genesis mark: a ring with an orbiting node — one glyph for the sidebar, the top bar and the title card. */
+/**
+ * The Genesis Physics mark: an orbital ring opened like a "G" with its crossbar,
+ * a glowing nucleus, a cyan node on the orbit and one small matrix-green node —
+ * the brand's DNA in a single glyph. Used on every page (top bar, sidebar,
+ * title card) via `GenesisWordmark`.
+ */
 export function GenesisMark({ size = 28 }: { size?: number }): JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="genesis-mark">
       <defs>
         <linearGradient id="gm-ring" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#7fe3f2" />
+          <stop offset="0" stopColor="#8ee8f5" />
           <stop offset="1" stopColor="#a78bfa" />
         </linearGradient>
+        <radialGradient id="gm-core" cx="0.4" cy="0.35" r="0.8">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.45" stopColor="#8ee8f5" />
+          <stop offset="1" stopColor="#3db4ca" />
+        </radialGradient>
       </defs>
-      <circle cx="16" cy="16" r="11.5" fill="none" stroke="url(#gm-ring)" strokeWidth="2" />
-      <circle cx="16" cy="16" r="4.2" fill="url(#gm-ring)" />
-      <circle cx="26.2" cy="9.6" r="2.4" fill="#eef2fb" />
+      <path d="M 26.4 10.2 A 12 12 0 1 0 26.4 21.8" fill="none" stroke="url(#gm-ring)" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M 17.5 16 H 28" fill="none" stroke="url(#gm-ring)" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="3.9" fill="url(#gm-core)" />
+      <circle cx="24.6" cy="7.4" r="2.1" fill="#eef2fb" />
+      <circle cx="7.2" cy="24.2" r="1.6" fill="#39d97a" />
     </svg>
+  );
+}
+
+/** Mark + name, one component for every page's chrome. */
+export function GenesisWordmark({ size = 26, tagline = true }: { size?: number; tagline?: boolean }): JSX.Element {
+  return (
+    <span className="genesis-wordmark">
+      <span className="genesis-wordmark-mark"><GenesisMark size={size} /></span>
+      <span className="genesis-wordmark-text">
+        <strong>GENESIS<em>PHYSICS</em></strong>
+        {tagline && <small>Scientific OS</small>}
+      </span>
+    </span>
   );
 }
 
@@ -110,14 +135,11 @@ export function AppShell({ children, chat, chatInline = false }: {
   return (
     <div className="shell">
       <aside className="shell-sidebar" aria-label="Nawigacja Genesis">
-        <button className="shell-brand" onClick={() => { window.location.hash = ''; }}>
-          <span className="shell-brand-mark" aria-hidden="true"><GenesisMark /></span>
-          <span className="shell-brand-text">
-            <strong>GENESIS</strong>
-            <em>Scientific OS</em>
-          </span>
+        <button className="shell-brand" onClick={() => { window.location.hash = ''; }} aria-label="Genesis Physics — Start">
+          <GenesisWordmark size={30} />
         </button>
         <nav className="shell-nav">{sections}</nav>
+        <a className="shell-domain" href="https://genesis-physics.com" target="_blank" rel="noreferrer">genesis-physics.com</a>
       </aside>
 
       <div className={chatInline ? 'shell-main shell-main-split' : 'shell-main'}>

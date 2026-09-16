@@ -5352,3 +5352,78 @@ a.chip-btn { text-decoration: none; display: inline-flex; align-items: center; }
   .gu-cmap-svg, .gu-dag-svg { min-width: 640px; }
   .gu-gated-svg, .gu-gated-band { min-width: 720px; }
 }
+
+/* ---- Voice guide (D-119): overlay bar, spotlight, typed example, gates opening ---- */
+.guide {
+  position: fixed; left: 50%; bottom: calc(1rem + var(--safe-bottom)); transform: translateX(-50%); z-index: 60;
+  width: min(60rem, calc(100vw - 2rem)); display: grid; gap: 0.55rem;
+  padding: 0.8rem 1rem 0.9rem; border-radius: 18px;
+  background: rgba(7, 11, 23, 0.86); border: 1px solid rgba(92, 214, 232, 0.35);
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: 0 30px 80px -30px rgba(92, 214, 232, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: gx-rise var(--dur-slow) var(--ease-out) both;
+}
+@keyframes gx-rise { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.guide-head { display: flex; align-items: center; gap: 0.6rem; font-size: 0.74rem; color: var(--text-dim); }
+.guide-mark { color: var(--cyan); text-shadow: 0 0 12px rgba(92, 214, 232, 0.7); }
+.guide-title { font-weight: 700; color: var(--text); letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.7rem; }
+.guide-state { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-faint); letter-spacing: 0.08em; }
+.guide-source { margin-left: auto; font-size: 0.68rem; color: var(--text-faint); }
+.guide-close { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; color: var(--text-dim); border: 1px solid var(--border); }
+.guide-close:hover { color: var(--text); border-color: var(--border-strong); }
+.guide-caption { margin: 0; font-size: 1.05rem; line-height: 1.5; color: var(--text); min-height: 1.5em; text-wrap: pretty; }
+.guide-caption-plain { color: #dff4ff; }
+.guide-controls { display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center; }
+.guide-extra { display: flex; gap: 0.45rem; }
+.guide-settings { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; padding-top: 0.45rem; border-top: 1px solid var(--border); }
+.guide-levels, .guide-lang { display: flex; gap: 0.3rem; }
+.guide-volume { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); }
+.guide-volume input { width: 6rem; accent-color: var(--cyan); }
+.start-guide-row { display: flex; gap: 0.5rem; flex-wrap: wrap; position: relative; margin-top: -0.6rem; }
+.ask-mic { min-width: 2.4rem; }
+.ask-mic-on { border-color: var(--red); color: var(--red); animation: pulse 1.2s ease-in-out infinite; }
+.hall-tour-end { font-size: 0.82rem; color: var(--green); align-self: center; }
+
+.guide-spotlight {
+  position: relative; z-index: 3;
+  box-shadow: 0 0 0 3px rgba(92, 214, 232, 0.55), 0 0 0 9px rgba(92, 214, 232, 0.14), 0 0 60px -10px rgba(92, 214, 232, 0.7) !important;
+  border-radius: 14px;
+  transition: box-shadow var(--dur-base) var(--ease-out);
+  animation: guide-pulse 2.2s ease-in-out infinite;
+}
+@keyframes guide-pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(92, 214, 232, 0.55), 0 0 0 9px rgba(92, 214, 232, 0.14), 0 0 60px -10px rgba(92, 214, 232, 0.7); } 50% { box-shadow: 0 0 0 3px rgba(92, 214, 232, 0.85), 0 0 0 12px rgba(92, 214, 232, 0.08), 0 0 80px -10px rgba(92, 214, 232, 0.9); } }
+textarea.guide-typing, input.guide-typing { caret-color: var(--cyan); background: rgba(92, 214, 232, 0.06) !important; }
+
+/* Gates open one after another — but only those the run recorded as HELD. */
+.gu-gated-gate .gu-gated-box { transition: fill var(--dur-slow) var(--ease-out), stroke var(--dur-slow) var(--ease-out); }
+.gu-gated-gate .gu-gated-port { transform-box: fill-box; transform-origin: center; transform: scale(0); transition: transform 0.5s var(--ease-spring); }
+.gu-gated-gate.guide-gate-open .gu-gated-port { transform: scale(1); }
+.gu-gated-gate.guide-gate-open .gu-gated-box { fill: rgba(110, 231, 160, 0.14); }
+.gu-gated-gate.guide-gate-shut .gu-gated-box { fill: rgba(244, 124, 124, 0.18); }
+.gu-gated-gate.guide-gate-shut .gu-gated-leaf { stroke-width: 5; }
+.gu-gated-end .gu-gated-endcap { transition: fill var(--dur-slow) var(--ease-out), filter var(--dur-slow) var(--ease-out); }
+.gu-gated-end.guide-gate-end.gu-gated-end-open .gu-gated-endcap { fill: rgba(110, 231, 160, 0.24); filter: drop-shadow(0 0 10px rgba(110, 231, 160, 0.7)); }
+@media (prefers-reduced-motion: reduce) { .guide, .guide-spotlight { animation: none; } .gu-gated-gate .gu-gated-port { transition: none; } }
+@media (max-width: 700px) {
+  .guide { width: calc(100vw - 1rem); bottom: calc(4.4rem + var(--safe-bottom)); padding: 0.65rem 0.7rem; }
+  .guide-caption { font-size: 0.95rem; }
+  .guide-source { display: none; }
+}
+
+/* ---- Brand (D-120): Genesis Physics wordmark on every page ---- */
+.genesis-wordmark { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; }
+.genesis-wordmark-mark { display: grid; place-items: center; filter: drop-shadow(0 0 10px rgba(92, 214, 232, 0.5)); flex: none; }
+.genesis-wordmark-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.genesis-wordmark-text strong { font-family: var(--font-body); font-size: 0.86rem; letter-spacing: 0.22em; font-weight: 800; color: var(--text); white-space: nowrap; }
+.genesis-wordmark-text strong em { font-style: normal; font-weight: 500; color: var(--cyan); margin-left: 0.45em; letter-spacing: 0.2em; }
+.genesis-wordmark-text small { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); }
+.topbar-logo { display: inline-flex; align-items: center; padding: 0.15rem 0.4rem 0.15rem 0.1rem; border-radius: 10px; flex: none; transition: background var(--dur-fast) var(--ease-out); }
+.topbar-logo:hover { background: rgba(92, 214, 232, 0.08); }
+.topbar-logo .genesis-wordmark-text strong { font-size: 0.78rem; }
+.shell-brand .genesis-wordmark-text strong { font-size: 0.9rem; }
+.shell-domain { display: block; margin: auto 1rem 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; color: var(--text-faint); text-decoration: none; }
+.shell-domain:hover { color: var(--cyan); }
+@media (max-width: 700px) {
+  .topbar-logo .genesis-wordmark-text { display: none; }
+  .topbar-logo { padding: 0.15rem; }
+}

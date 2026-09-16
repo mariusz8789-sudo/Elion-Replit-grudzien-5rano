@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type React from 'react';
 import { runScientificDiscovery } from '../core/orchestrator/orchestrator';
 import { parseProblem } from '../core/orchestrator/nl';
@@ -17,6 +17,9 @@ import { PipelineTimeline } from './genesis-ui/PipelineTimeline';
 import { ProvenanceDag, type CustodyView } from './genesis-ui/ProvenanceDag';
 import { ReplayTwinPanel } from './genesis-ui/ReplayTwinPanel';
 import { RunVerdictHero } from './genesis-ui/RunVerdictHero';
+import { GuidedDiscovery } from './guide/GuidedDiscovery';
+import { CANONICAL_QUESTION } from '../core/guide/narrationModel';
+import type { GuideMode } from '../core/guide/guideMachine';
 import { MindPanel } from '../core/mind/ui/MindPanel';
 import { ChallengePanel } from '../core/discoveryChallenge/ui/ChallengePanel';
 import { GovServicesPanel } from '../core/govServices/ui/GovServicesPanel';
@@ -53,9 +56,26 @@ type Source = 'SANDBOX' | 'REAL_PRODUCTION' | 'REAL_SYNTHETIC_WINNER_DEMO';
 
 const DEFAULT_NL = 'Find a strategy that preserves efficacy but has a better benefit-risk profile.';
 
-export function GenesisConsole(): React.ReactElement {
-  const [nl, setNl] = useState(DEFAULT_NL);
-  const [source, setSource] = useState<Source>('SANDBOX');
+/** `#/research-console?guide=1` opens the guided mode; `#/tour` (or `?tour=1`) the autonomous tour. */
+function guideModeFromHash(hash: string): GuideMode | null {
+  if (hash === '#/tour' || /[?&]tour=1/.test(hash)) return 'TOUR';
+  if (/[?&]guide=1/.test(hash)) return 'GUIDED';
+  return null;
+}
+
+export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | null } = {}): React.ReactElement {
+  const initialGuide = autoplay !== undefined ? autoplay : (typeof window === 'undefined' ? null : guideModeFromHash(window.location.hash));
+  const [guideMode, setGuideMode] = useState<GuideMode | null>(initialGuide);
+  // `?guide=1` / `?tour=1` arriving by a hash change (Start's doors, the header buttons) starts the
+  // guide on the already-mounted console; leaving the query does not stop a session the person is in.
+  useEffect(() => {
+    if (autoplay !== undefined) return;
+    const onHash = (): void => { const m = guideModeFromHash(window.location.hash); if (m !== null) setGuideMode(m); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [autoplay]);
+  const [nl, setNl] = useState(initialGuide !== null ? CANONICAL_QUESTION : DEFAULT_NL);
+  const [source, setSource] = useState<Source>(initialGuide !== null ? 'REAL_PRODUCTION' : 'SANDBOX');
   const [domainId, setDomainId] = useState<GenesisDomainId>('LOWER_HARM');
   const [vagueProblem, setVagueProblem] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -171,6 +191,8 @@ export function GenesisConsole(): React.ReactElement {
           onChange={(e) => setNl(e.target.value)}
           rows={3}
           style={{ width: '100%', marginTop: 10 }}
+          data-guide="question"
+          aria-label="Pytanie badawcze"
         />
         <div className="gu-locale-switch" style={{ margin: '8px 0', flexWrap: 'wrap' }}>
           {([
@@ -208,6 +230,12 @@ export function GenesisConsole(): React.ReactElement {
           <button type="button" className="chip-btn primary" onClick={() => void start()} disabled={busy}>
             {busy ? 'Running…' : 'Run full scientific process'}
           </button>
+          {guideMode === null && (
+            <>
+              <button type="button" className="chip-btn" onClick={() => setGuideMode('GUIDED')} data-testid="start-guide">✦ Zobacz, jak to działa</button>
+              <button type="button" className="chip-btn" onClick={() => { window.location.hash = '#/tour'; }} data-testid="start-tour">▶ Genesis Tour</button>
+            </>
+          )}
           <FingerprintChip
             label="source"
             value={
@@ -355,6 +383,21 @@ export function GenesisConsole(): React.ReactElement {
 
       {/* D-118: the sandbox and service panels are still here, behind one disclosure, so the
           page ends where the run's answer ends instead of trailing into unrelated experiments. */}
+      {guideMode !== null && (
+        <GuidedDiscovery
+          key={guideMode}
+          autoplay={guideMode}
+          result={blocked ?? run === null ? blocked : ({ kind: 'RUN', ...run, detail, winnerRecord, evidenceCustody: custody } as unknown as RunResult)}
+          running={busy}
+          replay={replay}
+          replayBusy={replayBusy}
+          onRun={() => { void start(); }}
+          onReplay={() => { void verifyReplay(); }}
+          onPrepareTour={() => { setSource('REAL_PRODUCTION'); setDomainId('LOWER_HARM'); setNl(CANONICAL_QUESTION); }}
+          onExit={() => setGuideMode(null)}
+        />
+      )}
+
       <details className="gu-sandbox">
         <summary className="gu-sandbox-summary">Inne eksperymenty i usługi — Genesis Mind, Discovery Challenge, usługi rządowe, status źródeł dowodów</summary>
         <MindPanel />

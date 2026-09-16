@@ -77,6 +77,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  * no capability was lost — it stopped competing with the ten that matter.
  */
 export const MORE_ITEMS: readonly NavItem[] = [
+  { id: 'tour', label: 'Genesis Tour — przewodnik głosowy', icon: '▶', hash: '#/tour' },
   { id: 'matrix', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix' },
   { id: 'world', label: 'World Engine', icon: '🌍', hash: '#/genesis-world' },
   { id: 'simulation', label: 'Generator symulacji', icon: '🔭', hash: '#/generate' },

@@ -52,6 +52,7 @@
     "winner-recipe:demo": "node scripts/genesis-winner-recipe-e2e-demo.mjs",
     "winner-record:emit": "node scripts/genesis-winner-record-emit.mjs",
     "investor-demo:capture": "node scripts/genesis-investor-demo-capture.mjs",
+    "voice:lines": "node scripts/genesis-voice-lines-export.mjs",
     "mol-01:demo": "node scripts/genesis-molecular-mission-demo.mjs"
   },
   "keywords": [

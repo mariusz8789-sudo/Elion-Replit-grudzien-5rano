@@ -4,6 +4,7 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { listExperiments } from '../core/scienceMemory';
 import { getLabs } from '../core/registry';
 import { WORLDS } from './WorldsHubScreen';
+import { AskGenesisMic } from './guide/AskGenesisMic';
 
 /**
  * START HERO — the first thing a visitor sees (D-118). One question box,
@@ -48,7 +49,7 @@ export function StartHero(): React.ReactElement {
     <section className="start" aria-label="Start" data-testid="start-hero">
       <div className="start-glow" aria-hidden="true" />
       <header className="start-head">
-        <span className="gx-eyebrow">Genesis · Scientific OS</span>
+        <span className="gx-eyebrow">Genesis Physics · Scientific OS · genesis-physics.com</span>
         <h1 className="start-title">Zadaj pytanie. Genesis przeprowadzi badanie.</h1>
         <p className="start-lede">
           Kandydaci, dowody, próba obalenia własnej hipotezy, bramka zwycięzcy — w jednym przebiegu, z odciskiem każdego etapu.
@@ -65,8 +66,13 @@ export function StartHero(): React.ReactElement {
           placeholder="Zapytaj zwykłym językiem…"
           aria-label="Zapytaj Genesis"
         />
+        <AskGenesisMic lang="pl" onText={(t) => setAsk(t)} className="chip-btn start-ask-mic" />
         <button type="submit" className="chip-btn primary start-ask-send" disabled={!ask.trim()}>Zapytaj</button>
       </form>
+      <div className="start-guide-row">
+        <a className="chip-btn primary" href="#/research-console?guide=1" data-testid="start-guided">✦ Zobacz, jak to działa</a>
+        <a className="chip-btn" href="#/tour" data-testid="start-tour">▶ Genesis Tour — 3 minuty z przewodnikiem</a>
+      </div>
       <div className="start-suggest" aria-label="Przykładowe pytania">
         {SUGGESTIONS.map((s) => (
           <button key={s} type="button" className="chip-btn tiny" onClick={() => submit(s)}>{s}</button>

@@ -9684,3 +9684,22 @@ proves.
 **Why.** A visual audit (real screenshots, desktop and phone) found seven button styles, four meanings of gold, emoji in every header, mono as the default typeface, a HUD collage on each 3D screen, a Winner 3 700 px below the fold, and a lab that did not collapse on a phone. Investors and laypeople judge the product by that surface before they see the science.
 
 **What did not change.** Preregistration, thresholds, weights, evidence rules, the Winner Gate, every fingerprint (audit 6615057e / recipe 7ddcabe9), the committed `artifacts/lower-harm/*` and the D-116 lock test.
+
+## D-119 — Voice guide: Guided Discovery Mode, Genesis Tour, Follow the Evidence, Explain simpler (no scientific change)
+
+**Decision.** Genesis gets an interactive voice guide for people with no science or technology background, built as pure projections of the REAL run (`docs/VOICE_GUIDE_DESIGN.md`):
+
+- `core/guide/narrationModel.ts` — facts → beats. Every sentence is gated by a predicate over `GuideFacts` (projected from `RunResult`/`LowerHarmRunDetail`/`WinnerRecord`/replay) and every number is interpolated from those facts; a WINNER beat needs a real WinnerRecord, a NO_WINNER is narrated with its blocker, a blocked execution with its code. Three levels (EXPLORER / SCIENTIST / AUDITOR) add detail, never facts; `plain` is the "explain it simpler" variant. PL and EN.
+- `core/guide/guideMachine.ts` — deterministic session machine (INTRO → ASK → RUNNING → CANDIDATES → EVIDENCE → FALSIFICATION → GATE → VERDICT → [RECIPE] → REPLAY → WORLD → DONE; BLOCKED path). ASK never advances by itself: only a real RUN_STARTED does. GUIDED waits for the person; TOUR advances on hold times and itself triggers the real pipeline and the real replay.
+- `core/guide/voiceEngine.ts` — OFF / READY / SPEAKING / PAUSED over pluggable providers: pre-rendered recordings first, the browser's `speechSynthesis` otherwise (default, no key). A recording plays only when its recorded text equals the sentence the model wants to say now (`sameText`), so a stale file can never speak over a different result. Volume, rate, language, captions, on/off persisted per person.
+- `components/guide/*` — `GuideOverlay` (captions with `aria-live`, back / pause / repeat / next, explain simpler, level, language, volume, voice off), `guideActions` (VOICE → ACTION → VISUAL: spotlight, typed example dispatched as real input events, scroll, gates opening one by one for HELD conjuncts only — a failed gate is animated shut), `GuidedDiscovery` (controller in the Research Console), `AskGenesisMic` (🎙 where `SpeechRecognition` exists; text is always the fallback), `followEvidence.ts` (RESULT → gate → experiment → observations → source → hash → frozen artifact over the real provenance nodes).
+- Entry points: Start ("Zobacz, jak to działa", "Genesis Tour"), the console header, `#/research-console?guide=1`, `#/tour`; Discovery Hall narrates its shots on `?tour=1` and ends the tour.
+- Recordings: `npm run voice:lines` exports every sentence the model can say for the committed artifact to `public/audio/lines.json`; `scripts/genesis_tts.py` (Edge-TTS free neural voices by default, ElevenLabs with a key) renders MP3s + `manifest.json` from those lines only. Files are generated, never committed; without them the browser voice speaks.
+
+**Verified in a real browser (guided):** intro → typed example → real run → candidates (12) → evidence (4 observations) → falsification → gate (3 opened, 0 shut, end-cap lit) → verdict LIRAGLUTIDE → recipe → replay MATCH → `#/discovery-hall?tour=1`; zero page errors.
+
+**Not done here.** The investor film is deliberately not recorded (owner's instruction: after the guide is verified live). No paid TTS key is wired.
+
+## D-120 — Brand: Genesis Physics (genesis-physics.com), one mark on every page
+
+**Decision.** The product is presented as **Genesis Physics · Scientific OS** (domain `genesis-physics.com`). A new mark — an orbital ring opened like a "G" with its crossbar, a glowing nucleus, a cyan orbit node and one small matrix-green node — and the wordmark live in `AppShell.tsx` (`GenesisMark`, `GenesisWordmark`) and appear on every page: the top bar's logo is the way home on every route (phones show the mark alone), the sidebar carries the full wordmark and the domain. `index.html`, the web manifest, the onboarding card and Start use the new name. Lab copy that mentions "Genesis OS" inside experiments is unchanged (content, not chrome).

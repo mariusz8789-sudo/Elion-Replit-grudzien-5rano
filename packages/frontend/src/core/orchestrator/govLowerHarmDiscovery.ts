@@ -9,6 +9,7 @@ import type { ConnectorPort, SourceConfig } from '../evidenceConnectors/contract
 import { runA2Analysis } from '../biotechData/a2OzempicSubstitute';
 import { LOWER_HARM_SCENARIO_ID } from '../biotechData/govDrugLowerHarmPreregistration';
 import { buildLowerHarmRunDetail, buildLowerHarmWinnerRecord, type LowerHarmRunDetail, type LowerHarmWinnerRecord, type NoWinnerBlocker } from './winnerRecord';
+import { sealRun, type AuditSeal } from '../audit/cryptoAudit';
 import type { DiscoveryRun, ProblemRecord } from './contracts';
 
 /**
@@ -79,6 +80,12 @@ export type RunResult = {
   readonly detail?: LowerHarmRunDetail;
   /** The first-class WinnerRecord when the run really promoted a winner and built a recipe; otherwise the exact blocker. */
   readonly winnerRecord?: LowerHarmWinnerRecord | NoWinnerBlocker;
+  /**
+   * D-121 — SHA-256 seal over this run's verdict, record/blocker, fingerprints, custody hash and
+   * every stage fingerprint (unchained: previousSha256 null; ledgers chain it). Deterministic:
+   * the same run seals to the same digest, so replay MATCH implies seal equality.
+   */
+  readonly auditSeal?: AuditSeal;
 } & DiscoveryRun;
 export type GovLowerHarmDiscoveryResult = RunResult | ExecutionBlockedResult;
 
@@ -159,7 +166,8 @@ export async function runGovLowerHarmDiscovery(opts: RunGovLowerHarmDiscoveryOpt
     // diagnostics side-channel; never fed back into any decision, never part of auditFingerprint.
     const detail = buildLowerHarmRunDetail(LOWER_HARM_SCENARIO_ID, bundle.diagnostics);
     const winnerRecord = run.verdict === 'ABORTED' ? undefined : buildLowerHarmWinnerRecord(run, detail, evidenceCustody);
-    return Object.freeze({ kind: 'RUN', evidenceCustody, ...run, detail, winnerRecord });
+    const auditSeal = await sealRun({ ...run, scenarioId: LOWER_HARM_SCENARIO_ID, detail, winnerRecord, evidenceCustody });
+    return Object.freeze({ kind: 'RUN', evidenceCustody, ...run, detail, winnerRecord, auditSeal });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const code = err instanceof LowerHarmFailClosedError ? err.code : 'UNKNOWN_FAIL_CLOSED';

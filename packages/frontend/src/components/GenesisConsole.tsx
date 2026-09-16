@@ -16,7 +16,9 @@ import { CandidateSpacePanel } from './genesis-ui/CandidateSpacePanel';
 import { PipelineTimeline } from './genesis-ui/PipelineTimeline';
 import { ProvenanceDag, type CustodyView } from './genesis-ui/ProvenanceDag';
 import { ReplayTwinPanel } from './genesis-ui/ReplayTwinPanel';
-import { RunVerdictHero } from './genesis-ui/RunVerdictHero';
+import { RunVerdictHero, type AuditLedgerView } from './genesis-ui/RunVerdictHero';
+import type { AuditSeal } from '../core/audit/cryptoAudit';
+import { appendToLedger, verifyLedger } from '../core/audit/auditLedger';
 import { GuidedDiscovery } from './guide/GuidedDiscovery';
 import { CANONICAL_QUESTION } from '../core/guide/narrationModel';
 import type { GuideMode } from '../core/guide/guideMachine';
@@ -84,6 +86,8 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
   // gate decisions, recipe body, WinnerRecord/blocker). Undefined for SANDBOX and E2E01.
   const [detail, setDetail] = useState<RunResult['detail']>(undefined);
   const [winnerRecord, setWinnerRecord] = useState<RunResult['winnerRecord']>(undefined);
+  const [auditSeal, setAuditSeal] = useState<AuditSeal | undefined>(undefined);
+  const [ledger, setLedger] = useState<AuditLedgerView | undefined>(undefined);
   const [replay, setReplay] = useState<GenesisDomainReplayResult | null>(null);
   const [replayBusy, setReplayBusy] = useState(false);
   const [ranDomainId, setRanDomainId] = useState<GenesisDomainId | null>(null);
@@ -95,6 +99,8 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
     setCustody(null);
     setDetail(undefined);
     setWinnerRecord(undefined);
+    setAuditSeal(undefined);
+    setLedger(undefined);
     setReplay(null);
     if (source === 'SANDBOX') {
       setRanDomainId(null);
@@ -137,6 +143,17 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
         setRun(result);
         setDetail('detail' in result ? result.detail : undefined);
         setWinnerRecord('winnerRecord' in result ? result.winnerRecord : undefined);
+        // D-121: append this run's seal to the client ledger and verify the whole chain.
+        const seal = 'auditSeal' in result ? result.auditSeal : undefined;
+        setAuditSeal(seal);
+        if (seal !== undefined) {
+          const storage = ((): Storage | null => { try { return window.localStorage; } catch { return null; } })();
+          const appended = await appendToLedger(storage, seal.snapshot);
+          const check = await verifyLedger(storage);
+          setLedger({ length: appended.length, ok: check.ok, reason: check.reason });
+        } else {
+          setLedger(undefined);
+        }
       }
     } finally {
       setBusy(false);
@@ -289,7 +306,7 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
 
       {run !== null && run.verdict !== 'ABORTED' && (
         <>
-          <RunVerdictHero run={run} detail={detail} record={winnerRecord} />
+          <RunVerdictHero run={run} detail={detail} record={winnerRecord} seal={auditSeal} ledger={ledger} />
 
           <section className="settings-section">
             <PipelineTimeline stages={run.stages} />

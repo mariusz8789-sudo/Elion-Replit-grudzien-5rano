@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { runGovLowerHarmDiscovery } from '../core/orchestrator/govLowerHarmDiscovery';
 import type { LowerHarmWinnerRecord, NoWinnerBlocker } from '../core/orchestrator/winnerRecord';
+import { auditSnapshotOf, verifyAuditChain, verifyAuditSeal, type AuditSeal } from '../core/audit/cryptoAudit';
+import { canonicalJson } from '../core/events/hash';
 
 /**
  * D-116 — the COMMITTED artifact (artifacts/lower-harm/*, written by
@@ -59,5 +61,18 @@ describe('D-116 committed WinnerRecord artifact matches a live PRODUCTION run', 
     expect(live.auditFingerprint).toBe(pinned.runA.auditFingerprint);
     expect(live.recipeFingerprint ?? null).toBe(pinned.runA.recipeFingerprint);
     expect(live.winner?.winnerId ?? null).toBe(pinned.runA.winnerId);
+  });
+
+  it('audit-seal.json verifies, is chained in audit-chain.json, and commits to exactly what a live run produces (D-121)', async () => {
+    const seal = readJson<AuditSeal>('audit-seal.json');
+    const chain = readJson<AuditSeal[]>('audit-chain.json');
+    expect((await verifyAuditSeal(seal)).ok).toBe(true);
+    const chainCheck = await verifyAuditChain(chain);
+    expect(chainCheck.ok).toBe(true);
+    expect(chain[chain.length - 1]?.sha256).toBe(seal.sha256);
+    const live = await runGovLowerHarmDiscovery({ mode: 'PRODUCTION' });
+    if (live.kind !== 'RUN') throw new Error('expected RUN');
+    expect(canonicalJson(auditSnapshotOf({ ...live, scenarioId: 'GOV-DRUG-DISCOVERY-E2E-02-LOWER-HARM' }))).toBe(canonicalJson(seal.snapshot));
+    expect(live.auditSeal?.snapshot.auditFingerprint).toBe(seal.snapshot.auditFingerprint);
   });
 });

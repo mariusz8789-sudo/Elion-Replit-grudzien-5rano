@@ -2,6 +2,7 @@ import type React from 'react';
 import type { DiscoveryRun } from '../../core/orchestrator/contracts';
 import type { LowerHarmRunDetail, LowerHarmWinnerRecord, NoWinnerBlocker } from '../../core/orchestrator/winnerRecord';
 import { VerdictWhyStrip } from './VerdictWhyStrip';
+import type { AuditSeal } from '../../core/audit/cryptoAudit';
 
 /**
  * RunVerdictHero — the ONE place a finished run answers first (D-118): the
@@ -10,10 +11,15 @@ import { VerdictWhyStrip } from './VerdictWhyStrip';
  * above the timeline so the answer is never 3 700 px below the fold. Every
  * value is the run's own; a NO_WINNER gets the same visual weight as a WINNER.
  */
-export function RunVerdictHero({ run, detail, record }: {
+export interface AuditLedgerView { readonly length: number; readonly ok: boolean; readonly reason: string | null; }
+
+export function RunVerdictHero({ run, detail, record, seal, ledger }: {
   readonly run: DiscoveryRun;
   readonly detail: LowerHarmRunDetail | undefined;
   readonly record: LowerHarmWinnerRecord | NoWinnerBlocker | undefined;
+  /** D-121: the run's SHA-256 seal and the client ledger it was appended to. */
+  readonly seal?: AuditSeal;
+  readonly ledger?: AuditLedgerView;
 }): React.ReactElement {
   const winner = record?.kind === 'WINNER_RECORD' ? record : null;
   const blocker = record?.kind === 'NO_WINNER_BLOCKER' ? record : null;
@@ -43,6 +49,17 @@ export function RunVerdictHero({ run, detail, record }: {
         <li><b>{disc === null || disc === undefined ? 'n/a' : `${disc.toFixed(2)}σ`}</b><span>rozdzielczość G2</span></li>
         <li><b><code>{run.auditFingerprint.slice(0, 8)}</code></b><span>odcisk audytu · {run.stages.length} etapów</span></li>
       </ul>
+      {seal !== undefined && (
+        <p className="gu-hero-seal" data-testid="audit-seal">
+          <span className="gu-hero-seal-label">Pieczęć SHA-256</span>
+          <code title={seal.sha256}>{seal.sha256.slice(0, 16)}…</code>
+          {ledger !== undefined && (
+            <span className={ledger.ok ? 'gu-hero-seal-ok' : 'gu-hero-seal-bad'} data-testid="audit-ledger">
+              łańcuch audytu: {ledger.length} {ledger.length === 1 ? 'pieczęć' : 'pieczęci'} · {ledger.ok ? 'integralność OK' : `NARUSZONY — ${ledger.reason ?? ''}`}
+            </span>
+          )}
+        </p>
+      )}
       <div className="gu-hero-actions">
         {winner !== null && <a className="chip-btn primary" href="#winner-record">Research Recipe →</a>}
         {winner !== null && <a className="chip-btn" href="#/discovery-hall">Discovery Hall (3D)</a>}

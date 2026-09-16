@@ -5427,3 +5427,10 @@ textarea.guide-typing, input.guide-typing { caret-color: var(--cyan); background
   .topbar-logo .genesis-wordmark-text { display: none; }
   .topbar-logo { padding: 0.15rem; }
 }
+
+/* ---- D-121 audit seal line in the verdict hero ---- */
+.gu-hero-seal { position: relative; grid-column: 1 / -1; margin: 0; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: baseline; font-size: 0.8rem; color: var(--text-dim); }
+.gu-hero-seal-label { font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.68rem; }
+.gu-hero-seal code { font-family: var(--font-mono); color: var(--cyan); }
+.gu-hero-seal-ok { color: var(--green); }
+.gu-hero-seal-bad { color: var(--red); font-weight: 650; }

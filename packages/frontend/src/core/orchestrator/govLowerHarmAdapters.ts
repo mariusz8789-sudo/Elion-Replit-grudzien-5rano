@@ -128,6 +128,10 @@ function toQualifyingCandidate(r: LowerHarmCandidateResult): Candidate {
 
 export interface LowerHarmAdapterDiagnostics {
   eliminatedDetail(): readonly { readonly candidateId: string; readonly reason: string }[];
+  /** Every candidate `rankForLowerHarm` scored this run (qualifying and eliminated alike), in its own order — the read-only source for a candidate-space view. */
+  ranked(): readonly LowerHarmCandidateResult[];
+  /** The real TOP2 pair this run falsified, or null before `top2()` ran. */
+  top2(): Top2Result | null;
   diversity(): DiversityReport | null;
   g2Result(): GenerateDifferentiatingExperimentResult | null;
   verdict(): LowerHarmFunnelVerdict | null;
@@ -171,6 +175,7 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
   const reportById = new Map<string, A2CandidateReport>();
   const lowerHarmById = new Map<string, LowerHarmCandidateResult>();
   let eliminatedDetail: { candidateId: string; reason: string }[] = [];
+  let rankedCache: readonly LowerHarmCandidateResult[] = [];
   let diversityReport: DiversityReport | null = null;
   let top2State: Top2Result | null = null;
   let frozenCriteria: FrozenFalsificationCriteria | null = null;
@@ -201,6 +206,7 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
       for (const r of reports) reportById.set(r.summary.moleculeChemblId, r);
 
       const ranked = rankForLowerHarm(reports);
+      rankedCache = ranked;
       lowerHarmById.clear();
       for (const r of ranked) lowerHarmById.set(r.report.summary.moleculeChemblId, r);
 
@@ -388,6 +394,8 @@ export function createLowerHarmAdapters(opts: CreateLowerHarmAdaptersOptions): L
 
   const diagnostics: LowerHarmAdapterDiagnostics = {
     eliminatedDetail: () => eliminatedDetail,
+    ranked: () => rankedCache,
+    top2: () => top2State,
     diversity: () => diversityReport,
     g2Result: () => g2Cache,
     verdict: () => verdictCache,

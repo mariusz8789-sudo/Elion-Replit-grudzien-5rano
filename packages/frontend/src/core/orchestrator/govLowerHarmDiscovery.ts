@@ -7,6 +7,8 @@ import { EvidenceConnectorStore } from '../evidenceConnectors/store';
 import { sharedEvidenceConnectorStore } from '../evidenceConnectors/sharedStore';
 import type { ConnectorPort, SourceConfig } from '../evidenceConnectors/contracts';
 import { runA2Analysis } from '../biotechData/a2OzempicSubstitute';
+import { LOWER_HARM_SCENARIO_ID } from '../biotechData/govDrugLowerHarmPreregistration';
+import { buildLowerHarmRunDetail, buildLowerHarmWinnerRecord, type LowerHarmRunDetail, type LowerHarmWinnerRecord, type NoWinnerBlocker } from './winnerRecord';
 import type { DiscoveryRun, ProblemRecord } from './contracts';
 
 /**
@@ -64,7 +66,20 @@ export interface ExecutionBlockedResult {
   readonly evidenceCustody: EvidenceCustodyResult | null;
 }
 
-export type RunResult = { readonly kind: 'RUN'; readonly evidenceCustody: EvidenceCustodyResult | null } & DiscoveryRun;
+export type RunResult = {
+  readonly kind: 'RUN';
+  readonly evidenceCustody: EvidenceCustodyResult | null;
+  /**
+   * D-116 — read-only projection of what this run's real adapters computed
+   * (candidate space, TOP2, the three Winner Gate conjuncts, every gate
+   * decision incl. REQUIRES_HUMAN_APPROVAL, G2, evidence rows, recipe body).
+   * Optional so the E2E01 domain's structurally-identical RunResult stays
+   * assignable to the shared registry union; always present for LOWER-HARM.
+   */
+  readonly detail?: LowerHarmRunDetail;
+  /** The first-class WinnerRecord when the run really promoted a winner and built a recipe; otherwise the exact blocker. */
+  readonly winnerRecord?: LowerHarmWinnerRecord | NoWinnerBlocker;
+} & DiscoveryRun;
 export type GovLowerHarmDiscoveryResult = RunResult | ExecutionBlockedResult;
 
 export interface RunGovLowerHarmDiscoveryOptions {
@@ -140,7 +155,11 @@ export async function runGovLowerHarmDiscovery(opts: RunGovLowerHarmDiscoveryOpt
 
   try {
     const run = runScientificDiscovery(problem, bundle.adapters, mode);
-    return Object.freeze({ kind: 'RUN', evidenceCustody, ...run });
+    // Projection only — computed AFTER the unmodified orchestrator returned, from the adapters'
+    // diagnostics side-channel; never fed back into any decision, never part of auditFingerprint.
+    const detail = buildLowerHarmRunDetail(LOWER_HARM_SCENARIO_ID, bundle.diagnostics);
+    const winnerRecord = run.verdict === 'ABORTED' ? undefined : buildLowerHarmWinnerRecord(run, detail, evidenceCustody);
+    return Object.freeze({ kind: 'RUN', evidenceCustody, ...run, detail, winnerRecord });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const code = err instanceof LowerHarmFailClosedError ? err.code : 'UNKNOWN_FAIL_CLOSED';

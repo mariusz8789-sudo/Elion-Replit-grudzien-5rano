@@ -106,7 +106,7 @@ describe('EvidenceShowcaseScreen', () => {
     const markup = renderToStaticMarkup(<EvidenceShowcaseScreen />);
     expect(markup).toContain('data-testid="ecs-empty-state"');
     expect(markup).not.toContain('data-testid="ecs-case-study"');
-  });
+  }, 20_000); // first test in the file pays the cold import of the whole showcase module graph (~6 s on a loaded CI box)
 
   it('renders the QE4 multi-hypothesis external dataset case with all four independent verdicts, even with an empty Scientific Memory', async () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage(), print: () => {}, location: { hash: '' } });

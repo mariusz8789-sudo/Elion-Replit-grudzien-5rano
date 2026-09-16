@@ -9569,3 +9569,81 @@ protection were not modified. The separate GOV-DRUG-DISCOVERY-E2E-01
 scenario, under its own independently preregistered stricter rule, still
 honestly reaches NO_WINNER on the same corrected data. Full suite: 558/558
 files, 6533/6533 tests, 1 skipped (explained above), 0 failed.**
+
+## D-116 — WinnerRecord and Research Recipe as first-class, persisted, replay-verified outputs; Winner Gate visible in the product
+
+**Why.** D-115 established that the real, unmodified LOWER-HARM pipeline
+reaches WINNER (liraglutide, CHEMBL4084119). But the RUN result exposed only
+`recipeFingerprint`; the recipe body lived in an adapter cache; the three
+Winner Gate conjuncts and the governance gate's `REQUIRES_HUMAN_APPROVAL`
+were computed and then rendered nowhere; and no committed artifact existed
+that a reader could replay against. The stage was scientifically closed but
+not *delivered*. D-116 closes it — without touching any rule.
+
+**What is NOT changed (verified by `git diff --stat` and the untouched-file
+tests).** `orchestrator.ts`, `contracts.ts`, `winnerGate.ts`,
+`practicalCandidateGate.ts`, `govDrugLowerHarmRanking.ts`,
+`govDrugLowerHarmFunnel.ts`, both preregistrations, every weight, threshold,
+pin and evidence rule. `auditFingerprint` is still `fnv1a(canonicalJson(stages))`
+and is byte-identical to D-115 (`6615057e`); `recipeFingerprint` is byte-identical
+(`7ddcabe9`) because the recipe body is unchanged. A new test asserts both.
+
+**What was built.**
+1. `core/orchestrator/winnerRecord.ts` — a pure PROJECTION over the adapters'
+   existing read-only diagnostics side-channel (`ranked()`/`top2()` added to
+   `LowerHarmAdapterDiagnostics`, additive). `buildLowerHarmRunDetail`
+   produces the candidate space (every ranked candidate with its real
+   floor/veto/elimination reason), the TOP2, the three conjuncts verbatim from
+   `decideFunnelVerdict`, every `GateDecision` verbatim from
+   `evaluatePracticalCandidate`, the G2 numbers, the evidence rows (NCT id,
+   NAIVE_INDIRECT flag, delta, n, within-margin) and the recipe body.
+   `buildLowerHarmWinnerRecord` returns a `LowerHarmWinnerRecord` ONLY when
+   `orchestrator.ts` itself already set `run.winner` (D-057 promotion cleared)
+   AND the favoured candidate's gate is not REFUSE AND the recipe was really
+   built with a fingerprint equal to the run's; otherwise a `NoWinnerBlocker`
+   naming the exact stopping point (`ADJUDICATION_CONJUNCT` /
+   `PROMOTION_GATE` / `SAFETY_GATE_REFUSE` / `RECIPE_LOCKED` / `VERDICT`).
+   The record carries all fingerprints (run, prereg, falsification criteria,
+   recipe, audit, gate), FROZEN custody hash, evidence refs, the runner-up's
+   own refusal, five fixed disclosures (relative claim; NAIVE_INDIRECT; human
+   approval required; single funnel pass; research artifact) and its own
+   `recordFingerprint` (custody `artifactId` excluded — the store re-mints it
+   on every unchanged ingest, see `ingestEvidence`'s comment).
+2. `govLowerHarmDiscovery.ts` attaches `detail` + `winnerRecord` to the RUN
+   result, computed after the unmodified orchestrator returned. Optional on
+   the type so E2E01's structurally-identical RunResult stays in the registry
+   union; E2E01 carries neither (tested).
+3. UI (`components/genesis-ui/`): `CandidateSpacePanel`, `WinnerGatePanel`
+   (three numbered conjuncts, G2 numbers, per-candidate gate decision with
+   REQUIRES_HUMAN_APPROVAL rendered as "closed until a person signs off", a
+   BLOCKED-AT panel for NO_WINNER), `ResearchRecipePanel` (record, evidence
+   table, custody, recipe, disclosures), and a Replay section in
+   `GenesisConsole` that calls the real `replayGenesisDomainDiscovery` and
+   shows RUN A / RUN B side by side — MATCH is displayed, never assumed.
+4. `npm run winner-record:emit` (`scripts/genesis-winner-record-emit.mjs`)
+   runs PRODUCTION twice via `replayGovLowerHarmDiscovery`, refuses to write
+   on DRIFT, and writes `artifacts/lower-harm/{winner-record,research-recipe,
+   run-detail,replay-verification}.json`.
+   `__tests__/lowerHarmWinnerArtifact.test.ts` locks the committed artifact
+   to a live run (recordFingerprint, every fingerprint, conjuncts, gate,
+   recipe, evidence refs): any data/rule change that moves the result fails
+   the suite until the artifact is deliberately re-emitted.
+5. `__tests__/winnerRecord.test.ts` — 13 tests: full record over the real run,
+   gate = REQUIRES_HUMAN_APPROVAL with zero failures and capability
+   `candidate.activate`, runner-up REFUSE disclosed, custody FROZEN sha256,
+   candidate space complete, byte-stable across replay with a recomputable
+   fingerprint, audit fingerprint unchanged, SYNTHETIC_TEST_ONLY record with
+   custody null, E2E01 has no record, and four constructed blocker cases.
+
+**The real, current result (live, this commit):** WINNER — LIRAGLUTIDE
+(CHEMBL4084119); conjuncts G2_SEPARATES_TOP2 / AGREES_WITH_PRE_EXPERIMENT_RANK /
+FAVOURED_CANDIDATE_PASSES_SAFETY_GATE all HELD; gate REQUIRES_HUMAN_APPROVAL
+(gate fp `cf987dda`); runner-up EXENATIDE REFUSE (EVIDENCE_SUFFICIENT, 1/3);
+3 real observations (NCT03172494, NCT00518882, NCT00318461, all NAIVE_INDIRECT);
+custody FROZEN sha256 `4d63f8f0…`; run `5e341186`, prereg `c827c79c`,
+criteria `af76e28c`, recipe `7ddcabe9`, audit `6615057e`, record `b6207e9c`;
+replay MATCH. Note: the console's own default question text differs from the
+canonical LOWER-HARM problem text, so a console run shows different audit/
+recipe/record fingerprints for the same verdict — the problem fingerprint is
+part of the trail by design; replay within one question text is what MATCH
+proves.

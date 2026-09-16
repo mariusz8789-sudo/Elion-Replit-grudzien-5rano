@@ -50,6 +50,8 @@
     "genuine-discovery:e2e01": "node scripts/genuine-discovery-e2e-01.mjs",
     "proof-ladder:demo": "node scripts/proof-ladder-demonstrator.mjs",
     "winner-recipe:demo": "node scripts/genesis-winner-recipe-e2e-demo.mjs",
+    "winner-record:emit": "node scripts/genesis-winner-record-emit.mjs",
+    "investor-demo:capture": "node scripts/genesis-investor-demo-capture.mjs",
     "mol-01:demo": "node scripts/genesis-molecular-mission-demo.mjs"
   },
   "keywords": [

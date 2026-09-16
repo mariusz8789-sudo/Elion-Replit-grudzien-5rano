@@ -1,0 +1,200 @@
+{
+  "kind": "WINNER_RECORD",
+  "contractVersion": "1.0.0",
+  "scenarioId": "GOV-DRUG-DISCOVERY-E2E-02-LOWER-HARM",
+  "mode": "PRODUCTION",
+  "winnerId": "CHEMBL4084119",
+  "candidateName": "LIRAGLUTIDE",
+  "verdict": "WINNER",
+  "conjunctionOk": true,
+  "conjuncts": [
+    {
+      "criterion": "G2_SEPARATES_TOP2",
+      "held": true,
+      "detail": "\"EFFICACY_DELTA_PP\" separates the pair (0 unresolved pair(s), falsificationPower 100%)."
+    },
+    {
+      "criterion": "AGREES_WITH_PRE_EXPERIMENT_RANK",
+      "held": true,
+      "detail": "G2 favours CHEMBL4084119; pre-experiment TOP2 rank #1 was CHEMBL4084119. Agree."
+    },
+    {
+      "criterion": "FAVOURED_CANDIDATE_PASSES_SAFETY_GATE",
+      "held": true,
+      "detail": "CHEMBL4084119 gate outcome: REQUIRES_HUMAN_APPROVAL."
+    }
+  ],
+  "gate": {
+    "candidateId": "CHEMBL4084119",
+    "candidateName": "LIRAGLUTIDE",
+    "outcome": "REQUIRES_HUMAN_APPROVAL",
+    "failures": [],
+    "requiresCapability": "candidate.activate",
+    "reason": "Every criterion passes, but a intervention candidate at safety class POPULATION describes something being DONE. Activation goes through the existing approval workflow in core/governance, with separation of duties; this module does not authorise it.",
+    "fingerprint": "cf987dda"
+  },
+  "runnerUp": {
+    "candidateId": "CHEMBL414357",
+    "candidateName": "EXENATIDE",
+    "outcome": "REFUSE",
+    "failures": [
+      {
+        "criterion": "EVIDENCE_SUFFICIENT",
+        "detail": "1 observation(s) behind this candidate; the gate requires at least 3. A recommendation resting on fewer is a guess with a citation."
+      }
+    ],
+    "requiresCapability": null,
+    "reason": "Refused on 1 criterion/criteria: EVIDENCE_SUFFICIENT. Government RESEARCH may still examine this freely — what is refused is letting it leave the research layer as a candidate.",
+    "fingerprint": "45b20da3"
+  },
+  "falsification": {
+    "outcome": "EXPERIMENT_SELECTED",
+    "observableId": "EFFICACY_DELTA_PP",
+    "falsificationPower": 1,
+    "discriminability": 4.146385922304191,
+    "expectedByCandidate": [
+      {
+        "candidateId": "CHEMBL4084119",
+        "expectedOutcome": -0.010000000000000009,
+        "toleranceSigma": 1
+      },
+      {
+        "candidateId": "CHEMBL414357",
+        "expectedOutcome": 0.49,
+        "toleranceSigma": 1
+      }
+    ],
+    "unresolvedPairs": 0,
+    "decisionRuleFingerprint": "f792aec2",
+    "reason": null
+  },
+  "evidence": [
+    {
+      "candidateId": "CHEMBL4084119",
+      "nctId": "NCT03172494",
+      "comparisonType": "NAIVE_INDIRECT",
+      "evidenceBasis": "RANDOMIZED_INDIRECT",
+      "deltaVsReferencePp": -0.010000000000000009,
+      "candidateArmN": 341,
+      "withinMargin": true,
+      "fairnessFlags": [
+        "No semaglutide arm in this trial: compared against semaglutide's real arm from a DIFFERENT trial (naive indirect comparison) — population, dose, and follow-up duration may differ; not a randomized head-to-head."
+      ]
+    },
+    {
+      "candidateId": "CHEMBL4084119",
+      "nctId": "NCT00518882",
+      "comparisonType": "NAIVE_INDIRECT",
+      "evidenceBasis": "RANDOMIZED_INDIRECT",
+      "deltaVsReferencePp": 0.5799999999999998,
+      "candidateArmN": 227,
+      "withinMargin": false,
+      "fairnessFlags": [
+        "No semaglutide arm in this trial: compared against semaglutide's real arm from a DIFFERENT trial (naive indirect comparison) — population, dose, and follow-up duration may differ; not a randomized head-to-head."
+      ]
+    },
+    {
+      "candidateId": "CHEMBL4084119",
+      "nctId": "NCT00318461",
+      "comparisonType": "NAIVE_INDIRECT",
+      "evidenceBasis": "RANDOMIZED_INDIRECT",
+      "deltaVsReferencePp": 0.7,
+      "candidateArmN": 236,
+      "withinMargin": false,
+      "fairnessFlags": [
+        "No semaglutide arm in this trial: compared against semaglutide's real arm from a DIFFERENT trial (naive indirect comparison) — population, dose, and follow-up duration may differ; not a randomized head-to-head."
+      ]
+    }
+  ],
+  "evidenceRefs": [
+    "ctgov:NCT03172494",
+    "ctgov:NCT00518882",
+    "ctgov:NCT00318461"
+  ],
+  "observationCount": 3,
+  "evidenceCustody": {
+    "sourceId": "LOWER_HARM_A2_PINNED_DATASET",
+    "artifactId": "d4808ca0",
+    "hash": "4d63f8f0d24ab28b528e4c386fa01adf64d640aa7e05d410d5dc0fa9a6e36b10",
+    "hashPolicy": "sha256",
+    "status": "FROZEN"
+  },
+  "fingerprints": {
+    "runFingerprint": "5e341186",
+    "preregistrationFingerprint": "c827c79c",
+    "falsificationCriteriaFingerprint": "af76e28c",
+    "recipeFingerprint": "7ddcabe9",
+    "auditFingerprint": "6615057e",
+    "gateFingerprint": "cf987dda"
+  },
+  "recipe": {
+    "mechanism": "Incretin/glucagon-axis engagement at GLP-1R (median 4.59 nM), established from real ChEMBL binding/functional data — selected under the LOWER-HARM safety-dominant ranking rule, not the efficacy-first A2 rule.",
+    "formulationConcept": "Protein class agent intended for population-level metabolic control at the lowest achievable burden of harm; formulation strategy must be selected by a qualified team from the required properties below, not inferred from this record.",
+    "conceptualSynthesisRoute": "CONCEPTUAL ONLY: route selection is left to a qualified synthetic chemistry team working under institutional oversight. This record intentionally contains no step-level procedure, no reagent quantities, and no operational parameters.",
+    "requiredProperties": [
+      "Retained potency at the mechanism targets above (reference: the pinned ChEMBL medians for CHEMBL4084119).",
+      "Adverse-event profile at or below the reference across every preregistered LOWER-HARM safety category.",
+      "Exposure characteristics compatible with the dosing interval studied in the contributing trials.",
+      "Manufacturability at national-programme scale — UNVERIFIED in this run."
+    ],
+    "materialClasses": [
+      "Protein"
+    ],
+    "provenance": "ChEMBL Web Services (mechanism, potency, development stage) + ClinicalTrials.gov API v2 (efficacy, adverse events). Per-file URLs and hashes in the pinned a2-ozempic-substitute/meta.json.",
+    "sources": [
+      "ChEMBL Web Services",
+      "ClinicalTrials.gov API v2"
+    ],
+    "identifiers": [
+      "CHEMBL4084119",
+      "NCT03172494",
+      "NCT00518882",
+      "NCT00318461"
+    ],
+    "evidence": [
+      "NCT03172494 (NAIVE_INDIRECT): delta=-0.01pp vs reference",
+      "NCT00518882 (NAIVE_INDIRECT): delta=0.58pp vs reference",
+      "NCT00318461 (NAIVE_INDIRECT): delta=0.70pp vs reference"
+    ],
+    "replay": "5e341186",
+    "dualUseGuard": "ASSERTED",
+    "problemFingerprint": "c01b5fe3",
+    "winnerRecordRef": "CHEMBL4084119",
+    "hypothesisId": "CHEMBL4084119-H2",
+    "experimentRefs": [
+      "lower-harm-g2::CHEMBL4084119",
+      "lower-harm-g2::CHEMBL414357"
+    ],
+    "falsificationResults": [
+      {
+        "probe": "G2_SEPARATES_TOP2",
+        "outcome": "HELD"
+      },
+      {
+        "probe": "AGREES_WITH_PRE_EXPERIMENT_RANK",
+        "outcome": "HELD"
+      },
+      {
+        "probe": "FAVOURED_CANDIDATE_PASSES_SAFETY_GATE",
+        "outcome": "HELD"
+      }
+    ],
+    "limitations": [
+      "Single funnel pass: no independent replication in a disjoint trial population has been performed.",
+      "G2 differentiating experiment discriminability=100% — a real, but single, discriminating observation."
+    ],
+    "reproducibilityInstructions": [
+      "Replay via replayGovLowerHarmDiscovery with the same mode — auditFingerprint and verdict must match across two independent runs.",
+      "Preregistration fingerprint c827c79c and falsification-criteria fingerprint af76e28c were both frozen BEFORE this experiment executed."
+    ],
+    "recipeFingerprint": "7ddcabe9"
+  },
+  "disclosures": [
+    "RELATIVE CLAIM: the winner ranks best under the frozen LOWER-HARM safety-dominant rule among candidates that clear the efficacy floor and pass the safety veto. It is not a claim of superiority over the reference drug.",
+    "INDIRECT EVIDENCE: efficacy comparisons are NAIVE_INDIRECT (candidate arm vs the reference arm from a different trial) unless the evidence row says otherwise.",
+    "HUMAN APPROVAL REQUIRED: a population-level intervention candidate never activates autonomously; the governance gate outcome is recorded verbatim on this record.",
+    "SINGLE FUNNEL PASS: no independent replication in a disjoint trial population has been performed.",
+    "RESEARCH ARTIFACT: not a medical prescription, not a dosing instruction, not a synthesis procedure."
+  ],
+  "recordFingerprint": "b6207e9c"
+}

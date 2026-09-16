@@ -4847,3 +4847,82 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .gdd-funnel-head { flex-direction: column; gap: 2px; }
   .gdd-verdict { font-size: 1.15rem; }
 }
+
+/* ---------------------------------------------------------------------------
+ * D-116 — Winner Gate / WinnerRecord / Research Recipe / candidate space
+ * (components/genesis-ui/WinnerGatePanel, ResearchRecipePanel, CandidateSpacePanel)
+ * ------------------------------------------------------------------------- */
+.gu-gate { display: grid; gap: 12px; }
+.gu-gate-conjuncts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: conjunct; }
+.gu-gate-conjunct { display: grid; grid-template-columns: 28px 64px 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); }
+.gu-gate-index { grid-row: 1 / span 2; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-weight: 700; background: var(--bg-panel); border: 1px solid var(--border-strong); }
+.gu-gate-state { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 700; }
+.gu-gate-name { font-family: var(--font-mono); font-weight: 600; font-size: 0.86rem; }
+.gu-gate-detail { grid-column: 2 / span 2; color: var(--text-dim); font-size: 0.82rem; }
+.gu-gate-held { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
+.gu-gate-held .gu-gate-index { border-color: var(--green); color: var(--green); }
+.gu-gate-held .gu-gate-state { color: var(--green); }
+.gu-gate-failed { border-color: color-mix(in srgb, var(--red) 45%, var(--border)); }
+.gu-gate-failed .gu-gate-index { border-color: var(--red); color: var(--red); }
+.gu-gate-failed .gu-gate-state { color: var(--red); }
+.gu-gate-g2 { padding: 10px 12px; border-radius: 8px; background: var(--bg-panel); border: 1px dashed var(--border-strong); }
+.gu-gate-expected { margin: 4px 0 0; padding-left: 18px; font-size: 0.84rem; color: var(--text-dim); }
+.gu-gate-decisions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gu-gate-decision { padding: 10px 12px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); border-left-width: 4px; }
+.gu-gate-decision-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.gu-gate-decision-candidate { font-weight: 600; }
+.gu-gate-decision-outcome { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.05em; font-weight: 700; }
+.gu-gate-decision-reason { margin: 6px 0; color: var(--text-dim); font-size: 0.84rem; line-height: 1.45; }
+.gu-gate-decision-activate { border-left-color: var(--green); }
+.gu-gate-decision-requires_human_approval { border-left-color: var(--gold); }
+.gu-gate-decision-requires_human_approval .gu-gate-decision-outcome { color: var(--gold); }
+.gu-gate-decision-refuse { border-left-color: var(--red); }
+.gu-gate-decision-refuse .gu-gate-decision-outcome { color: var(--red); }
+.gu-gate-failures { margin: 4px 0; padding-left: 18px; font-size: 0.82rem; color: var(--text-dim); }
+.gu-gate-blocker { border: 1px solid var(--red); border-radius: 8px; padding: 12px 14px; background: color-mix(in srgb, var(--red) 8%, var(--bg-raised)); }
+.gu-gate-blocker-title { font-family: var(--font-mono); font-weight: 700; color: var(--red); letter-spacing: 0.05em; }
+
+.gu-recipe { border: 1px solid var(--border-strong); border-radius: 10px; padding: 16px; background: var(--bg-raised); display: grid; gap: 12px; }
+.gu-recipe-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.gu-recipe-eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.14em; color: var(--text-faint); }
+.gu-recipe-title { margin: 4px 0 0; font-size: 1.35rem; }
+.gu-recipe-title code { font-size: 0.85rem; color: var(--cyan); margin-left: 6px; }
+.gu-recipe-gate { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.06em; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--gold); color: var(--gold); align-self: center; }
+.gu-recipe-fps { display: flex; flex-wrap: wrap; gap: 2px; }
+.gu-recipe-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.gu-recipe-table th, .gu-recipe-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.gu-recipe-table th { color: var(--text-faint); font-weight: 600; font-size: 0.74rem; letter-spacing: 0.05em; }
+.gu-recipe-dl { margin: 0; display: grid; grid-template-columns: 160px 1fr; gap: 6px 14px; font-size: 0.86rem; }
+.gu-recipe-dl dt { color: var(--text-faint); font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 2px; }
+.gu-recipe-dl dd { margin: 0; color: var(--text); line-height: 1.5; }
+.gu-recipe-dl ul { margin: 0; padding-left: 18px; }
+.gu-recipe-id { display: inline-block; margin: 0 6px 4px 0; padding: 1px 6px; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--cyan); font-size: 0.8rem; }
+.gu-recipe-disclosures { margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--text-dim); line-height: 1.5; }
+
+.gu-cspace-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.gu-cspace-row { padding: 8px 12px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); border-left-width: 4px; border-left-color: var(--border-strong); }
+.gu-cspace-qualifies { border-left-color: var(--cyan); }
+.gu-cspace-eliminated { opacity: 0.72; }
+.gu-cspace-top2 { border-left-color: var(--green); background: color-mix(in srgb, var(--green) 6%, var(--bg-raised)); }
+.gu-cspace-main { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.gu-cspace-name { font-weight: 600; }
+.gu-cspace-name code { color: var(--cyan); font-size: 0.8rem; margin-left: 6px; }
+.gu-cspace-tag { margin-left: 8px; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.1em; color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: 0 5px; }
+.gu-cspace-score { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--gold); }
+.gu-cspace-meta { color: var(--text-faint); font-size: 0.76rem; margin-top: 2px; }
+.gu-cspace-reason { color: var(--text-dim); font-size: 0.8rem; margin-top: 4px; }
+
+.gu-replay { display: grid; gap: 8px; }
+.gu-replay-twin { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gu-replay-col { padding: 10px 12px; border-radius: 8px; background: var(--bg-raised); border: 1px solid var(--border); font-size: 0.82rem; }
+.gu-replay-col h5 { margin: 0 0 6px; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; color: var(--text-faint); }
+.gu-replay-verdict { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.08em; }
+.gu-replay-match .gu-replay-verdict { color: var(--green); }
+.gu-replay-drift .gu-replay-verdict { color: var(--red); }
+@media (max-width: 700px) {
+  .gu-gate-conjunct { grid-template-columns: 28px 1fr; }
+  .gu-gate-name { grid-column: 2; }
+  .gu-gate-detail { grid-column: 2; }
+  .gu-recipe-dl { grid-template-columns: 1fr; }
+  .gu-replay-twin { grid-template-columns: 1fr; }
+}

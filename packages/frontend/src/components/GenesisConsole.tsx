@@ -3,13 +3,16 @@ import type React from 'react';
 import { runScientificDiscovery } from '../core/orchestrator/orchestrator';
 import { parseProblem } from '../core/orchestrator/nl';
 import { toyAdapters } from '../core/orchestrator/toyAdapters';
-import type { ExecutionBlockedResult } from '../core/orchestrator/govLowerHarmDiscovery';
-import { GENESIS_DOMAINS, runGenesisDomainDiscovery, type GenesisDomainId } from '../core/orchestrator/genesisDomainRegistry';
+import type { ExecutionBlockedResult, RunResult } from '../core/orchestrator/govLowerHarmDiscovery';
+import { GENESIS_DOMAINS, runGenesisDomainDiscovery, replayGenesisDomainDiscovery, type GenesisDomainId, type GenesisDomainReplayResult } from '../core/orchestrator/genesisDomainRegistry';
 import type { EvidenceCustodyResult } from '../core/orchestrator/evidenceCustody';
 import type { DiscoveryRun } from '../core/orchestrator/contracts';
 import { VerdictBanner } from './genesis-ui/VerdictBanner';
 import { FingerprintChip } from './genesis-ui/FingerprintChip';
 import { EvidenceSourceStatusPanel } from './genesis-ui/EvidenceSourceStatusPanel';
+import { WinnerGatePanel } from './genesis-ui/WinnerGatePanel';
+import { ResearchRecipePanel } from './genesis-ui/ResearchRecipePanel';
+import { CandidateSpacePanel } from './genesis-ui/CandidateSpacePanel';
 import { MindPanel } from '../core/mind/ui/MindPanel';
 import { ChallengePanel } from '../core/discoveryChallenge/ui/ChallengePanel';
 import { GovServicesPanel } from '../core/govServices/ui/GovServicesPanel';
@@ -53,6 +56,12 @@ export function GenesisConsole(): React.ReactElement {
   const [vagueProblem, setVagueProblem] = useState(false);
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
+  // D-116: the LOWER-HARM entry point's read-only projection (candidate space, conjuncts,
+  // gate decisions, recipe body, WinnerRecord/blocker). Undefined for SANDBOX and E2E01.
+  const [detail, setDetail] = useState<RunResult['detail']>(undefined);
+  const [winnerRecord, setWinnerRecord] = useState<RunResult['winnerRecord']>(undefined);
+  const [replay, setReplay] = useState<GenesisDomainReplayResult | null>(null);
+  const [replayBusy, setReplayBusy] = useState(false);
   const [ranDomainId, setRanDomainId] = useState<GenesisDomainId | null>(null);
   const [blocked, setBlocked] = useState<ExecutionBlockedResult | null>(null);
   const [custody, setCustody] = useState<EvidenceCustodyResult | null>(null);
@@ -60,6 +69,9 @@ export function GenesisConsole(): React.ReactElement {
   const start = async (): Promise<void> => {
     setBlocked(null);
     setCustody(null);
+    setDetail(undefined);
+    setWinnerRecord(undefined);
+    setReplay(null);
     if (source === 'SANDBOX') {
       setRanDomainId(null);
       const problem = parseProblem(
@@ -99,11 +111,46 @@ export function GenesisConsole(): React.ReactElement {
         setBlocked(result);
       } else {
         setRun(result);
+        setDetail('detail' in result ? result.detail : undefined);
+        setWinnerRecord('winnerRecord' in result ? result.winnerRecord : undefined);
       }
     } finally {
       setBusy(false);
     }
   };
+
+  // D-116: real re-run through the same domain entry point (a fresh adapter bundle each time,
+  // exactly as any caller would) — the console never asserts MATCH, it shows what replay returned.
+  const verifyReplay = async (): Promise<void> => {
+    if (ranDomainId === null || source === 'SANDBOX') return;
+    setReplayBusy(true);
+    try {
+      setReplay(await replayGenesisDomainDiscovery(ranDomainId, {
+        mode: source === 'REAL_PRODUCTION' ? 'PRODUCTION' : 'SYNTHETIC_TEST_ONLY',
+        nl,
+        problemInput: vagueProblem ? { text: nl } : undefined,
+      }));
+    } finally {
+      setReplayBusy(false);
+    }
+  };
+
+  const replayCol = (label: string, r: GenesisDomainReplayResult['first']): React.ReactElement => (
+    <div className="gu-replay-col">
+      <h5>{label}</h5>
+      {r.kind === 'RUN' ? (
+        <>
+          <div>verdict <strong>{r.verdict}</strong>{r.winner !== undefined && <> · winner <code>{r.winner.winnerId}</code></>}</div>
+          <div>audit <code>{r.auditFingerprint}</code></div>
+          {r.recipeFingerprint !== undefined && <div>recipe <code>{r.recipeFingerprint}</code></div>}
+          {'winnerRecord' in r && r.winnerRecord?.kind === 'WINNER_RECORD' && <div>record <code>{r.winnerRecord.recordFingerprint}</code></div>}
+          <div>{r.stages.length} stages</div>
+        </>
+      ) : (
+        <div>EXECUTION_BLOCKED <code>{r.fingerprint}</code></div>
+      )}
+    </div>
+  );
 
   return (
     <div className="settings-view">
@@ -221,13 +268,29 @@ export function GenesisConsole(): React.ReactElement {
             </ul>
           </section>
 
+          {detail !== undefined && (
+            <section className="settings-section">
+              <CandidateSpacePanel candidates={detail.candidates} />
+            </section>
+          )}
+
+          {detail !== undefined && (
+            <section className="settings-section">
+              <WinnerGatePanel detail={detail} record={winnerRecord} />
+            </section>
+          )}
+
           <section className="settings-section">
-            <VerdictBanner label={run.verdict} />
-            <p className="gu-hint">
-              {run.recipeFingerprint !== undefined
-                ? <>RESEARCH RECIPE: READY — fp {run.recipeFingerprint.slice(0, 12)}…</>
-                : <>RESEARCH RECIPE: LOCKED — NO_RECIPE_WITHOUT_WINNER</>}
-            </p>
+            <VerdictBanner label={run.verdict} reason={detail?.verdictReason ?? undefined} />
+            {winnerRecord?.kind === 'WINNER_RECORD' ? (
+              <ResearchRecipePanel record={winnerRecord} />
+            ) : (
+              <p className="gu-hint">
+                {run.recipeFingerprint !== undefined
+                  ? <>RESEARCH RECIPE: READY — fp {run.recipeFingerprint.slice(0, 12)}…</>
+                  : <>RESEARCH RECIPE: LOCKED — NO_RECIPE_WITHOUT_WINNER</>}
+              </p>
+            )}
             {run.nextExperiment !== undefined && <p className="gu-hint">NEXT EXPERIMENT: {run.nextExperiment}</p>}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
               {ranDomainId !== null && <FingerprintChip label="domain" value={ranDomainId} />}
@@ -238,6 +301,27 @@ export function GenesisConsole(): React.ReactElement {
               )}
             </div>
           </section>
+
+          {source !== 'SANDBOX' && ranDomainId !== null && (
+            <section className="settings-section gu-replay" data-testid="replay-section">
+              <h3 className="section-label">Replay / determinism</h3>
+              <p className="gu-hint">Runs the same domain entry point twice more, from scratch, and compares the audit fingerprints. The result below is whatever replay returned — MATCH is never assumed.</p>
+              <div>
+                <button type="button" className="chip-btn primary" onClick={() => void verifyReplay()} disabled={replayBusy}>
+                  {replayBusy ? 'Replaying…' : 'Replay & verify'}
+                </button>
+              </div>
+              {replay !== null && (
+                <div className={replay.ok ? 'gu-replay-match' : 'gu-replay-drift'} data-testid="replay-result">
+                  <div className="gu-replay-verdict">{replay.ok ? 'MATCH — both independent runs produced the identical audit fingerprint and verdict' : 'DRIFT — the two runs differ; this result cannot be trusted until the cause is known'}</div>
+                  <div className="gu-replay-twin">
+                    {replayCol('RUN A', replay.first)}
+                    {replayCol('RUN B', replay.second)}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </>
       )}
 

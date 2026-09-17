@@ -3,14 +3,18 @@ export const matrixRainFragmentShader = `
 uniform float uTime; uniform float uPrompt; uniform float uMode; varying vec2 vUv;
 float hash21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 void main(){
-  vec2 uv=vUv; float columns=72.0; float x=floor(uv.x*columns); float lane=fract(uv.x*columns);
-  float speed=0.12+hash21(vec2(x,3.0)+uPrompt)*0.3; float head=fract(uv.y+uTime*speed+hash21(vec2(x,7.0)+uPrompt));
-  float glyph=step(0.7,hash21(vec2(floor(lane*6.0),floor(head*34.0)+x)));
-  float trail=smoothstep(0.34,0.0,head)*smoothstep(0.03,0.16,lane)*smoothstep(0.97,0.84,lane);
-  float core=smoothstep(0.025,0.0,abs(head-0.02))*smoothstep(0.02,0.14,lane)*smoothstep(0.98,0.86,lane);
-  float intensity=(glyph*trail*0.28)+(core*0.55);
-  vec3 color=mix(vec3(0.0,0.12,0.035),vec3(0.0,1.0,0.255),clamp(intensity*3.0,0.0,1.0));
-  gl_FragColor=vec4(color,intensity);
+  vec2 uv=vUv; float columns=48.0; float x=floor(uv.x*columns); float lane=fract(uv.x*columns+hash21(vec2(x,11.0)+uPrompt)*0.55);
+  float speed=0.10+hash21(vec2(x,3.0)+uPrompt)*0.26; float head=fract(uv.y+uTime*speed+hash21(vec2(x,7.0)+uPrompt));
+  float cell=fract(head*26.0+hash21(vec2(x,floor(head*26.0))+uPrompt)*0.3)-0.5;
+  float shapeSeed=hash21(vec2(x, floor(head*26.0)) + uPrompt);
+  float width=0.18+shapeSeed*0.10;
+  float radius=length(vec2((lane-0.5)/width, cell*2.8));
+  float droplet=1.0-smoothstep(0.18,1.0,radius);
+  float tail=smoothstep(0.42,0.0,head)*smoothstep(0.0,0.16,lane)*smoothstep(1.0,0.84,lane);
+  float core=pow(droplet,2.2)*0.72;
+  float intensity=(core+droplet*tail*0.22)*smoothstep(0.0,0.08,head);
+  vec3 color=mix(vec3(0.0,0.18,0.05),vec3(0.0,1.0,0.255),clamp(intensity*2.4,0.0,1.0));
+  gl_FragColor=vec4(color,clamp(intensity,0.0,0.72));
 }`;
 
 export const particleVertexShader = `

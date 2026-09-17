@@ -1,3 +1,4 @@
+/* Proprietary / All Rights Reserved - Genesis OS */
 import { createHash } from 'node:crypto';
 export const stableStringify = (v: unknown): string => { if (v === null) return 'null'; if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']'; if (typeof v === 'object') { const o = v as Record<string, unknown>; return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}'; } return JSON.stringify(v); };
 export const sha256hex = (t: string): string => createHash('sha256').update(t, 'utf8').digest('hex');

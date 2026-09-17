@@ -52,6 +52,7 @@
     "winner-recipe:demo": "node scripts/genesis-winner-recipe-e2e-demo.mjs",
     "winner-record:emit": "node scripts/genesis-winner-record-emit.mjs",
     "audit:verify": "node scripts/genesis-audit-verify.mjs",
+    "validate:e2e": "node scripts/validate-e2e.mjs",
     "investor-demo:capture": "node scripts/genesis-investor-demo-capture.mjs",
     "guide-film:capture": "node scripts/genesis-guide-film-capture.mjs",
     "voice:lines": "node scripts/genesis-voice-lines-export.mjs",

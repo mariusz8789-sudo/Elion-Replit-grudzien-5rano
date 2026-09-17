@@ -1,3 +1,4 @@
+/* Proprietary / All Rights Reserved - Genesis OS */
 export * as iceWall from './GenesisIceWallBeyondEngine.js';
 export * as pyramid from './GenesisPyramidInteriorEngine.js';
 export * as chronos from './GenesisChronosScaleEngine.js';

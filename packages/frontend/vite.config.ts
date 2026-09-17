@@ -27,6 +27,8 @@ export default defineConfig({
   },
   plugins: [react()],
   build: {
+    sourcemap: false,
+    minify: 'esbuild',
     // three.js (dynamically imported only by 3D eksperymenty, patrz
     // core/three/useThreeLoop.ts) tworzy własny, świadomie duży, LENIWY
     // chunk — podnosimy próg ostrzeżenia zamiast go sztucznie dzielić;

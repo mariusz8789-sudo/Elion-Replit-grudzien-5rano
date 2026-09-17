@@ -172,6 +172,10 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/worldModel/domains/genesisCityWorld2.ts': 'An earlier city composition; the live path is genesisScientificCity3/4.ts through createScientificWorld.',
   'core/events/epidemicTransmissionAnalysis.ts': 'Superseded by contacts/clusterAnalysis.ts + simulation/worldEngineContract.ts::computeHotspots, both already on City3DWebGLScreen; its infection.transmission events are never produced in production.',
   'core/knowledge/context.ts': 'A convenience wrapper that never gained a caller — experimentFabric/router.ts reads findSupplementalKnowledge directly.',
+  'core/city/CityDisasterController.ts': 'City disaster adapter package is built and unit-tested, but no production screen has been approved to expose this synthetic crisis-control surface yet.',
+  'core/city/GenesisCityDigitalTwin.ts': 'City digital-twin adapter is staged for a deliberate product wiring decision; the live city routes use the existing scientific-city runtime instead.',
+  'core/city/GenesisDisasterEngine.ts': 'City disaster engine is a tested integration seam, intentionally not connected to live routes until its synthetic-data labeling and product UX are reviewed.',
+  'core/city/index.ts': 'Re-export barrel for the staged city adapter package; concrete modules are currently reached by their dedicated tests only.',
 
   // --- Libraries waiting for a first caller -----------------------------------
   // Primitives, contracts and fingerprints. A fingerprint is never a screen's

@@ -162,6 +162,31 @@
       "files": [
         "GenesisEngineProvider.tsx"
       ]
+    },
+    "qwenExpansion": {
+      "dir": "packages/core/src",
+      "files": [
+        "expansionHash.ts",
+        "engine/hypothesisTournament.ts",
+        "evidence/evidenceContainer.ts",
+        "evidence/verifyContainer.cli.ts",
+        "reports/auditReportGenerator.ts",
+        "connectors/gisOpenUSDAdapter.ts",
+        "connectors/sensorWebhookStream.ts",
+        "glue/genesisBindings.ts",
+        "__tests__/genesisCoreExpansion.test.ts"
+      ]
+    },
+    "knowledge": {
+      "dir": "packages/core/src/knowledge",
+      "files": [
+        "evidenceTypes.ts",
+        "classifyClaim.ts",
+        "EvidenceLedger.ts",
+        "LaypersonAssistant.ts",
+        "index.ts",
+        "knowledge.test.ts"
+      ]
     }
   }
 }

@@ -12,6 +12,11 @@ import {
 import { getScientificEvidencePack, getStoredEvidencePackReplayVerdict } from '../../core/experimentFabric';
 import type { ReplayVerdict } from '../../core/matrixFoundation/replayVerdict';
 import type { DataProvenance } from '../../core/dataProvenance';
+import {
+  buildIntegrityEnvelope, signIntegrityEnvelope, generateSigningKeyPair,
+  verifyIntegrityEnvelope, verifySignedEnvelope,
+  type ExportableRecord, type IntegrityEnvelope, type SignedIntegrityEnvelope, type VerificationResult,
+} from '../../core/integrity';
 
 /**
  * EVIDENCE & REPLAY SHOWCASE — a read-only, audit-facing shaping of a `SavedExperiment` already in
@@ -377,4 +382,62 @@ export function replayCaseStudy(saved: SavedExperiment): CaseStudyReplay {
     return { status: verdict, reason, computedLive: false };
   }
   return { status: 'BLOCKED', reason: 'This record carries no recognised Evidence Bundle to replay.', computedLive: false };
+}
+
+/**
+ * SIGNING THE DOWNLOAD — wires `core/integrity`'s ECDSA signing into a real,
+ * clicked-in-the-browser production path (previously `signIntegrityEnvelope`
+ * had zero non-test callers anywhere in the app; `buildIntegrityEnvelope`
+ * alone already did, via this same download button).
+ *
+ * KEY, STATED HONESTLY: `generateSigningKeyPair` is called fresh, in this
+ * browser tab, right before signing — an EPHEMERAL key that exists only for
+ * this one download, not a durable Genesis identity. The resulting signature
+ * proves "this exact file was produced by whoever ran this download just
+ * now, and has not been altered since" — the same self-consistency-only
+ * honesty `verifySignedEnvelope`'s own doc comment states, never
+ * institutional non-repudiation. `verifySignedEnvelope` is called
+ * immediately, on the freshly-signed envelope, BEFORE returning it: a real
+ * production safety gate (never hand back a "signed" file whose own
+ * signature does not verify), not a test-only exercise of the function.
+ *
+ * KEY FORMAT, DECIDED DELIBERATELY: this reuses `core/integrity`'s own
+ * SPKI/base64 public-key format end to end (`signIntegrityEnvelope` /
+ * `verifySignedEnvelope`), never CSRN's JWK format (`packages/csrn`) — the
+ * two are separate systems signing separate payloads for separate purposes
+ * (this module: one downloaded audit file; CSRN: a discovery-loop
+ * certificate), and nothing here ever passes a key between them. If a
+ * future feature needs to move a key from one system to the other, the
+ * conversion recipe is already written down in
+ * `core/integrity/SIGNING_CONTRACT.md` §4 — this function does not need it
+ * today, so it does not invent one.
+ */
+export async function buildSignedEvidenceDownload(caseStudy: CaseStudy, saved: SavedExperiment): Promise<SignedIntegrityEnvelope> {
+  const payload: ExportableRecord = { caseStudy, record: saved };
+  const envelope = await buildIntegrityEnvelope(payload, new Date().toISOString());
+  const keyPair = await generateSigningKeyPair();
+  const signed = await signIntegrityEnvelope(envelope, keyPair);
+  const selfCheck = await verifySignedEnvelope(signed);
+  if (!selfCheck.valid) {
+    throw new Error(`Refusing to hand back a signed Evidence file that does not verify against its own signature: ${selfCheck.reason}`);
+  }
+  return signed;
+}
+
+/**
+ * VERIFYING A FILE — the other missing production caller: this app produced
+ * `IntegrityEnvelope`/`SignedIntegrityEnvelope` files but never ran either
+ * verify function outside a test. Accepts whatever `JSON.parse` produced
+ * from a file someone picked (this app's own past download, or one a
+ * recipient sends back); the shape decides which of the two verify
+ * functions actually applies — `signature` present means check it as a
+ * signed envelope, absent means check it as a bare hash-only envelope.
+ * Malformed input is handled by the two verify functions themselves
+ * (`STRUCTURALLY_INVALID`), not re-validated here.
+ */
+export async function verifyEvidenceFile(parsed: unknown): Promise<VerificationResult> {
+  if (parsed !== null && typeof parsed === 'object' && 'signature' in parsed) {
+    return verifySignedEnvelope(parsed as SignedIntegrityEnvelope);
+  }
+  return verifyIntegrityEnvelope(parsed as IntegrityEnvelope);
 }

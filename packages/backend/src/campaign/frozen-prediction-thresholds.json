@@ -1,0 +1,21 @@
+{
+  "ruleId": "GENESIS-MOL-01-LIABILITY-GATE",
+  "frozenFor": "docs/DECISIONS.md D-074 (GENESIS-MOL-01) — D-069 Option A hard filters, liability source",
+  "ruleFingerprint": "28505cb769d5554f",
+  "fingerprintMethod": "provenance.mjs::canonicalHash(terms).slice(0,16) — derived from the `terms` array below ONLY, so editing any threshold changes this value",
+  "evidenceClass": "COMPUTATIONAL",
+  "source": "campaign/molecularLiabilities.mjs (RDKit-native deterministic rules); NOT ADMET-AI, NOT a fitted model",
+  "rationale": {
+    "structuralAlertCount": "PAINS (Baell & Holloway, J Med Chem 2010), BRENK (Brenk et al., ChemMedChem 2008) and NIH/MLSMR screening-deck alerts, via RDKit FilterCatalog. Standard practice excludes alert-matching compounds from a lead series; the cut-off of 0 is the rule sets' own binary semantics, not a tuned number.",
+    "lipinskiViolations": "Lipinski et al., Adv Drug Deliv Rev 1997. The published rule itself permits at most one violation — the threshold IS the rule, not a choice of ours.",
+    "veberPass": "Veber et al., J Med Chem 2002 (rotatable bonds <= 10 AND TPSA <= 140 A^2) for oral bioavailability. Binary pass/fail as published."
+  },
+  "deliberatelyNotGated": {
+    "qed": "QED (Bickerton et al., Nat Chem 2012) is a continuous desirability score with no canonical cut-off. Choosing one would be an arbitrary success threshold, which D-074's own mission brief forbids. QED is COMPUTED AND REPORTED for every candidate as an uncertainty/confidence signal, and gates nothing."
+  },
+  "terms": [
+    { "term": "structuralAlertCount", "kind": "max", "value": 0 },
+    { "term": "lipinskiViolations", "kind": "max", "value": 1 },
+    { "term": "veberPass", "kind": "min", "value": 1 }
+  ]
+}

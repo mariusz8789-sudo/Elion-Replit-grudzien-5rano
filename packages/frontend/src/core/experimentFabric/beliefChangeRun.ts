@@ -188,7 +188,7 @@ export async function runBeliefChangeRun(problemId: string): Promise<BeliefChang
     throw new Error(`Unknown belief-change problem "${problemId}" — it must be declared in HYPOTHESIS_PROBLEMS first.`);
   }
   const set = generateCompetingHypotheses(problem);
-  const preregistration = preregisterHypotheses(set);
+  const preregistration = preregisterHypotheses(set, { priorRunFingerprints: [] });
   const loopResult = await executePreregisteredHypothesesAsync(preregistration);
   const nextExperiment = selectNextHypothesisExperiment(loopResult);
   const why = buildWhy(problem.statement, preregistration, loopResult);

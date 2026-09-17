@@ -50,7 +50,11 @@ import { buildMatrixRelationGraph, edgesFor, type MatrixEdge } from './matrixRel
  * (`predictionVerification.ts`) — literally the same `HypothesisAssessment`
  * vocabulary `hypothesisLoop.ts` uses — so `INCONCLUSIVE` here is read
  * exactly as it is read everywhere else in this module, mapped onto the same
- * `INCONCLUSIVE_HYPOTHESIS` kind.
+ * `INCONCLUSIVE_HYPOTHESIS` kind. It ALSO follows its own declared
+ * `predictionSourceExperimentId` back to the `worldDiscovery` run it
+ * verified, to catch a real cross-record `UNRESOLVED_CONFLICT`: the
+ * simulation's own belief for this hypothesis disagreeing with what the real
+ * measurement found (see that function's own doc for the exact rule).
  *
  * WHY `hypothesisLoop`/`discoveryLoop` matter most of the seven: they are
  * Genesis's FLAGSHIP scientific record. A `SavedHypothesisLoop` is a
@@ -436,26 +440,68 @@ function parameterInquiryOpenItems(record: SavedExperiment): CrossDomainOpenItem
  * Genesis's own `HypothesisAssessment` vocabulary — the SAME enum
  * `hypothesisLoop.ts` uses — so `INCONCLUSIVE` is read here exactly as it is
  * read everywhere else in this module: no test has discriminated it yet.
- * SUPPORTED_WITHIN_PROTOCOL/FALSIFIED_WITHIN_PROTOCOL stay settled.
+ *
+ * SUPPORTED_WITHIN_PROTOCOL/FALSIFIED_WITHIN_PROTOCOL are settled ON THEIR
+ * OWN — UNLESS following `predictionSourceExperimentId` (the exact same
+ * explicit, declared link `matrixRelations.ts`'s VERIFIES_PREDICTION edge
+ * already follows — never a similarity heuristic) lands on a `worldDiscovery`
+ * run whose own `loopResult.beliefs` (`HypothesisStatus`, discoveryLoop.ts)
+ * called this exact `hypothesisId` SUPPORTED, while reality's measurement of
+ * that SAME hypothesis's own predicted round FALSIFIED it. That is a real,
+ * evidence-based contradiction between two records connected by a field the
+ * schema already carries — reported as UNRESOLVED_CONFLICT, the same kind
+ * cyber/decipherment already use for a hypothesis whose own recorded history
+ * disagrees with itself.
+ *
+ * DELIBERATELY NOT SYMMETRIC: a `worldDiscovery` run can and does REFUTE a
+ * hypothesis and still leave its OWN last round's numeric prediction close to
+ * a later real measurement (checked directly against this codebase's own
+ * `realExperimentE2E.test.ts` fixture, which produces exactly that
+ * combination) — REFUTED-then-SUPPORTED_WITHIN_PROTOCOL is not evidence of
+ * anything wrong, so it is never reported here. Only the SUPPORTED-then-
+ * FALSIFIED direction is a hypothesis the simulation stood behind failing a
+ * real check.
  */
-function realExperimentVerificationOpenItems(record: SavedExperiment): CrossDomainOpenItem[] {
+function realExperimentVerificationOpenItems(record: SavedExperiment, byId: ReadonlyMap<string, SavedExperiment>): CrossDomainOpenItem[] {
   const verification = record.realExperimentVerification;
-  if (!verification || verification.verification.assessment !== 'INCONCLUSIVE') return [];
-  return [{
+  if (!verification) return [];
+  const base = {
     sourceExperimentId: record.id,
     labId: record.labId,
-    shape: 'realExperimentVerification',
-    kind: 'INCONCLUSIVE_HYPOTHESIS',
-    question: `Does the real/reference measurement for hypothesis ${verification.hypothesisId} match its frozen prediction?`,
-    detail: verification.verification.message,
+    shape: 'realExperimentVerification' as const,
     createdAt: record.createdAt,
     evidencePackId: record.evidencePackId ?? null,
+  };
+
+  if (verification.verification.assessment === 'INCONCLUSIVE') {
+    return [{
+      ...base,
+      kind: 'INCONCLUSIVE_HYPOTHESIS',
+      question: `Does the real/reference measurement for hypothesis ${verification.hypothesisId} match its frozen prediction?`,
+      detail: verification.verification.message,
+    }];
+  }
+
+  const sourceBelief = byId.get(verification.predictionSourceExperimentId)?.worldDiscovery?.loopResult?.beliefs
+    .find((belief) => belief.hypothesisId === verification.hypothesisId);
+  const flipped = sourceBelief?.status === 'SUPPORTED' && verification.verification.assessment === 'FALSIFIED_WITHIN_PROTOCOL';
+  if (!flipped) return [];
+
+  return [{
+    ...base,
+    kind: 'UNRESOLVED_CONFLICT',
+    question: sourceBelief!.statement,
+    detail: `Simulation (run ${verification.predictionSourceExperimentId}, via loopResult.beliefs) called it ${sourceBelief!.status}; the real/reference measurement calls it ${verification.verification.assessment}. History: ${sourceBelief!.status} -> ${verification.verification.assessment}.`,
   }];
 }
 
 /** Every open item across every domain — the whole point being that nothing here filters by domain first. */
 export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]): readonly CrossDomainOpenItem[] {
   const all = records ?? listExperiments();
+  // Same lookup shape as `matrixRelations.ts`'s own `byId` — built once here
+  // so `realExperimentVerificationOpenItems` can follow the declared
+  // `predictionSourceExperimentId` link without re-scanning `all` per record.
+  const byId = new Map(all.map((record) => [record.id, record]));
   const items: CrossDomainOpenItem[] = [];
   for (const record of all) {
     items.push(
@@ -467,7 +513,7 @@ export function collectCrossDomainOpenItems(records?: readonly SavedExperiment[]
       ...worldDiscoveryOpenItems(record),
       ...mechanismCompositionOpenItems(record),
       ...parameterInquiryOpenItems(record),
-      ...realExperimentVerificationOpenItems(record),
+      ...realExperimentVerificationOpenItems(record, byId),
     );
   }
   return items;
@@ -533,7 +579,9 @@ function nextTestOrExperiment(item: CrossDomainOpenItem): string {
         ? `No further round resolves this without a working executor: "${item.detail}"`
         : 'Re-enter this inquiry through its own selector: `runAutonomousInquiry` (inquiryLoop.ts) with a larger `maxRounds` — or, if the stop reason was NO_DISCRIMINATING_PROBE, a wider declared probe range, since no setting within the one already offered can separate the survivors.';
     case 'realExperimentVerification':
-      return 'A second real or reference measurement, judged against the same preregistered verificationCriterion, is the only thing that can move this past INCONCLUSIVE — re-running the simulated prediction changes nothing here.';
+      return item.kind === 'UNRESOLVED_CONFLICT'
+        ? 'A repeat real or reference measurement AND a re-examination of the simulation itself (what real-world factor did the model omit?) — reality and the simulation disagree on this hypothesis, and only new evidence or a corrected model resolves which one was wrong.'
+        : 'A second real or reference measurement, judged against the same preregistered verificationCriterion, is the only thing that can move this past INCONCLUSIVE — re-running the simulated prediction changes nothing here.';
   }
 }
 

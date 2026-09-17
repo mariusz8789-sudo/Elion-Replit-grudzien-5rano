@@ -3,5 +3,5 @@ export {
   generateSigningKeyPair, exportPublicKeySpki, importPublicKeySpki,
   signIntegrityEnvelope, verifySignedEnvelope,
   type ExportableRecord, type IntegrityEnvelope, type VerificationResult,
-  type SignedIntegrityEnvelope, type SignatureAlgorithm,
+  type SignedIntegrityEnvelope, type SignatureAlgorithm, type IntegrityCertificateStatus,
 } from './integrityEnvelope';

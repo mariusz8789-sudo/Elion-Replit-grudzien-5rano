@@ -25,7 +25,7 @@ export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timel
 
   return (
     <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Wprowadzenie do Genesis OS">
-      <span className="onboarding-brand">Genesis OS</span>
+      <span className="onboarding-brand">Genesis Physics</span>
       <span className="hud-corner hud-tl" aria-hidden="true" />
       <span className="hud-corner hud-tr" aria-hidden="true" />
       <span className="hud-corner hud-bl" aria-hidden="true" />
@@ -69,7 +69,7 @@ function StepWelcome() {
       <div className="onboarding-icons" aria-hidden="true">
         <span>🌌</span><span>⚛️</span><span>🧬</span><span>∑</span>
       </div>
-      <h2>Witaj w Genesis OS</h2>
+      <h2>Witaj w Genesis Physics</h2>
       <p>
         Interaktywna platforma naukowa — 13 laboratoriów, każde uruchamia
         prawdziwą fizykę i matematykę na żywo. To nie są animacje: liczby

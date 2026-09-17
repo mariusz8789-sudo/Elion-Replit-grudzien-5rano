@@ -35,6 +35,7 @@ import { buildGenesisMatrixView, type GenesisMatrixView } from '../../core/agent
 import { narrateIntro, narrateRound, narrateNext, narrateInvestigation, type NarrationPhase } from '../../core/agent/genesisNarration';
 import { detectRenderTier, type InteractiveRenderTier } from '../../core/three/quality';
 import { buildGenesisScientificCity4, type GenesisScientificCity4 } from '../../core/worldModel/domains/genesisScientificCity4';
+import { loadConstruct, type ConstructManifest, type ConstructRecord } from '../../core/worldModel/construct/construct';
 import { GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID } from '../../core/worldModel/domains/genesisScientificCity3';
 import { buildSyntheticTerrain, type TerrainHeightfield } from '../../core/worldModel/domains/floodInundation';
 import { buildUniformFuelBed, simulateWildfireSpread, type WildfireSpreadResult, type WindVector } from '../../core/worldModel/domains/wildfireSpread';
@@ -43,6 +44,11 @@ import {
   type SlopeStabilityField, type RunoutField,
 } from '../../core/worldModel/domains/landslide';
 import type { TemporalEngine } from '../../core/worldModel/temporal/temporalEngine';
+import { WorldRegistry } from '../../core/worldModel/persistence/worldRegistry';
+import { restoreWorld, serializeWorld } from '../../core/worldModel/persistence/worldSnapshot';
+import {
+  loadWorldSnapshotFromBackend, saveWorldSnapshotToBackend, updateWorldSnapshotOnBackend,
+} from '../../core/worldModel/persistence/worldPersistenceClient';
 import { PUMP_PIPE_DEFAULTS } from '../../core/engineeringGraph/pumpPipe';
 import { ProvenanceBadge } from './provenance';
 
@@ -379,6 +385,15 @@ export class GenesisWorldSim3D implements Sim3D {
   nearHospitalEntrance = false;
 
   readonly city: GenesisScientificCity4;
+  /**
+   * Genesis Construct's own staging record for this exact world — real
+   * provenance/fingerprint over the SAME `buildGenesisScientificCity4`
+   * output as `city` above, not a second copy of it. `city`'s own shape and
+   * every other field on this class are unchanged by Construct's presence;
+   * this is purely additive (see `construct.test.ts` /
+   * `constructGenesisScientificCity4.test.ts` for the module's own proof).
+   */
+  readonly constructRecord: ConstructRecord;
   forkEngine: TemporalEngine | null = null;
   showFork = false;
   scrubTick: number | null = null;
@@ -425,7 +440,28 @@ export class GenesisWorldSim3D implements Sim3D {
   onSelect?: (id: WorldFrameEntityId | null) => void;
 
   constructor() {
-    this.city = buildGenesisScientificCity4({ rainfallAtTick: 2, populationCount: 5000 });
+    let builtCity: GenesisScientificCity4 | undefined;
+    const manifest: ConstructManifest = {
+      constructId: 'genesis-scientific-city-4-construct',
+      seed: 4,
+      requestedBy: 'GenesisWorldSim3D',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      items: [{
+        itemId: 'city4-world', type: 'WORLD', sourceRef: 'genesis-scientific-city-4',
+        fingerprint: 'spec:genesis-scientific-city-4', epistemicStatus: 'SIMULATION', loadOrder: 0,
+      }],
+    };
+    this.constructRecord = loadConstruct(manifest, {
+      WORLD: () => {
+        builtCity = buildGenesisScientificCity4({ rainfallAtTick: 2, populationCount: 5000 });
+        const paramsHash = builtCity.base.provenance.generationEvent.provenance?.paramsHash;
+        return paramsHash === undefined ? null : { fingerprint: paramsHash };
+      },
+    });
+    if (this.constructRecord.state !== 'LOADED' || builtCity === undefined) {
+      throw new Error(`Genesis Scientific City 4.0 failed to load through Construct: ${JSON.stringify(this.constructRecord.failedItems)}`);
+    }
+    this.city = builtCity;
     this.interactableIds = [
       this.city.pumpPipeId,
       GENESIS_SCIENTIFIC_CITY_FLOODPLAIN_ID,
@@ -2190,6 +2226,79 @@ export function GenesisWorldScreen() {
   const [showLandslide, setShowLandslideState] = useState(false);
   const [landslideSummary, setLandslideSummary] = useState<LandslideFieldSummary | null>(null);
 
+  /**
+   * WORLD PERSISTENCE — the half that was missing.
+   *
+   * The backend has served `POST/GET/PUT /api/worlds` for a while, with its
+   * own passing test ("World snapshot persistence survives a real process
+   * restart"). `persistence/worldSnapshot.ts` and
+   * `persistence/worldPersistenceClient.ts` are both complete and tested. And
+   * nothing in the browser ever called any of it, so no world a user built
+   * could outlive the tab — a whole end-to-end capability, built at both
+   * ends, connected at neither.
+   *
+   * This is that connection and nothing more: no new persistence format, no
+   * second registry, no second transport. `WorldRegistry` mints the
+   * `WorldRecord`, `serializeWorld` turns record + live engine into plain
+   * JSON, the client posts it, `restoreWorld` reads it back.
+   *
+   * SCOPE, STATED HONESTLY IN THE UI: this saves the BASE branch. The
+   * counterfactual fork is an in-scene branch created directly through
+   * `engine.forkBranch` rather than through `WorldRegistry.fork`, so it has
+   * no `worldId` of its own to be saved under, and inventing one here would
+   * be inventing a persistence identity the world model never issued.
+   *
+   * "Wczytaj i zweryfikuj" does a REAL round-trip — fetch, `restoreWorld`,
+   * then report the restored engine's own tick/branch/entity/event counts
+   * beside the live ones. It does not rebuild the 3D scene from the snapshot
+   * and the status text never says it does.
+   */
+  const registry = useMemo(() => new WorldRegistry(), []);
+  const [persistenceStatus, setPersistenceStatus] = useState('');
+  const [persistenceBusy, setPersistenceBusy] = useState(false);
+
+  const handleSaveWorld = useCallback(async () => {
+    setPersistenceBusy(true);
+    try {
+      const base = sim.city.base;
+      // `WorldRegistry.save` throws on a second save of the same id, so reuse
+      // the record it already minted rather than catching its own guard.
+      const record = registry.load(base.worldId)?.record ?? registry.save(base);
+      const snapshot = serializeWorld(record, base.engine);
+      let result = await saveWorldSnapshotToBackend(snapshot);
+      // A world already saved once is an UPDATE, not an error — the client
+      // reports 409 as `conflict` precisely so a caller can tell the two apart.
+      if (!result.ok && result.reason === 'conflict') result = await updateWorldSnapshotOnBackend(snapshot);
+      setPersistenceStatus(result.ok
+        ? `Zapisano "${result.data.worldId}" @ tick ${result.data.keyframeTick} · gałąź ${result.data.branchId} · ${result.data.keyframeEntities.length} encji · ${result.data.events.length} zdarzeń`
+        : `Nie zapisano (${result.reason}): ${result.message}`);
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }, [registry, sim]);
+
+  const handleLoadWorld = useCallback(async () => {
+    setPersistenceBusy(true);
+    try {
+      const base = sim.city.base;
+      const result = await loadWorldSnapshotFromBackend(base.worldId);
+      if (!result.ok) {
+        setPersistenceStatus(`Nie wczytano (${result.reason}): ${result.message}`);
+        return;
+      }
+      const restored = restoreWorld(result.data);
+      const live = base.engine;
+      setPersistenceStatus(
+        `Wczytano "${restored.record.worldId}": tick ${restored.engine.tick} (żywy: ${live.tick}) · gałąź ${restored.engine.branchId} · ` +
+        `${restored.engine.graph.listEntities().length} encji (żywy: ${live.graph.listEntities().length}) · ` +
+        `${restored.engine.journal.allEvents().length} zdarzeń (żywy: ${live.journal.allEvents().length}). ` +
+        'Odtworzony silnik istnieje w pamięci — scena 3D nadal pokazuje świat żywy.',
+      );
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }, [sim]);
+
   useEffect(() => {
     sim.onSelect = (id: WorldFrameEntityId | null) => setSelected(id);
     return () => {
@@ -2475,18 +2584,20 @@ export function GenesisWorldScreen() {
 
         {!entered && !loading && !failed && (
           <div
-            className="fp-lab-enter"
+            className="fp-lab-enter genesis-world-enter"
             data-testid="genesis-world-enter"
             role="button"
             tabIndex={0}
             onClick={() => { setEntered(true); canvasRef.current?.requestPointerLock(); }}
             onKeyDown={(e) => { if (e.key === 'Enter') { setEntered(true); canvasRef.current?.requestPointerLock(); } }}
           >
-            <p className="fp-lab-enter-title">Tap or click to walk into Genesis World</p>
-            <p className="fp-lab-enter-hint">
-              Desktop: WASD — walk · Shift — run · mouse — look · E/1-9 — interact · F — enter/exit a
-              building · Esc — exit. Touch: drag to look · D-pad to walk · tap the prompt to interact.
-            </p>
+            <div className="fp-lab-enter-card">
+              <p className="fp-lab-enter-title">Tap or click to walk into Genesis World</p>
+              <p className="fp-lab-enter-hint">
+                Desktop: WASD — walk · Shift — run · mouse — look · E/1-9 — interact · F — enter/exit a
+                building · Esc — exit. Touch: drag to look · D-pad to walk · tap the prompt to interact.
+              </p>
+            </div>
           </div>
         )}
 
@@ -2717,7 +2828,19 @@ export function GenesisWorldScreen() {
         <button className="chip-btn" data-testid="toggle-landslide" aria-pressed={showLandslide} onClick={() => handleToggleLandslide(!showLandslide)}>
           {showLandslide ? 'Hide landslide field' : 'Show landslide field (FS + runout)'}
         </button>
+        <button className="chip-btn" data-testid="save-world" onClick={() => { void handleSaveWorld(); }} disabled={persistenceBusy}>
+          Zapisz świat (gałąź bazowa)
+        </button>
+        <button className="chip-btn" data-testid="load-world" onClick={() => { void handleLoadWorld(); }} disabled={persistenceBusy}>
+          Wczytaj i zweryfikuj
+        </button>
       </div>
+
+      {persistenceStatus !== '' && (
+        <p className="footer-note" data-testid="world-persistence-status">
+          Trwały zapis świata: {persistenceStatus}
+        </p>
+      )}
 
       <p className="footer-note" data-testid="genesis-world-status">
         Base tick: <span data-testid="base-tick">{tick}</span>

@@ -327,4 +327,78 @@ describe('evidenceShowcase — honest shaping of real Scientific Memory records'
       expect(listCaseStudyCandidates().some((c) => c.id === saved.id)).toBe(false);
     });
   });
+
+  describe('signing and verifying a downloaded Evidence file (core/integrity wiring, real production path)', () => {
+    it('buildSignedEvidenceDownload produces a SignedIntegrityEnvelope that verifies as INTEGRITY_SIGNED_VERIFIED', async () => {
+      vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+      const { saveExperiment } = await import('../core/scienceMemory');
+      const { buildCaseStudy, buildSignedEvidenceDownload, verifyEvidenceFile } = await import('../components/visual-simulation/evidenceShowcase');
+      const { verifySignedEnvelope } = await import('../core/integrity');
+
+      const pack = evidencePackFixture({ evidencePackId: 'pack-sign-1', allArmsMatched: true });
+      const { saveScientificEvidencePack } = await import('../core/experimentFabric');
+      saveScientificEvidencePack(pack);
+      const saved = saveExperiment({
+        labId: 'legacy-pilot', experimentId: 'legacy:pack-sign-1', experimentName: 'Signed download fixture',
+        params: {}, stats: {}, evidencePackId: pack.evidencePackId,
+        honesty: 'simplified', honestyNote: 'test fixture', assumptions: [], epistemicStatus: 'SIMULATION',
+      });
+      const caseStudy = buildCaseStudy(saved)!;
+
+      const signed = await buildSignedEvidenceDownload(caseStudy, saved);
+      expect(signed.signature.length).toBeGreaterThan(0);
+      expect(signed.publicKeySpki.length).toBeGreaterThan(0);
+      expect(signed.signatureAlgorithm).toBe('ECDSA-P256-SHA256');
+
+      // The same real, non-test code path a recipient would run.
+      const direct = await verifySignedEnvelope(signed);
+      expect(direct.status).toBe('INTEGRITY_SIGNED_VERIFIED');
+
+      // verifyEvidenceFile round-trips through JSON exactly like a downloaded-then-reopened file would.
+      const roundTripped: unknown = JSON.parse(JSON.stringify(signed));
+      const result = await verifyEvidenceFile(roundTripped);
+      expect(result.status).toBe('INTEGRITY_SIGNED_VERIFIED');
+      expect(result.valid).toBe(true);
+    });
+
+    it('verifyEvidenceFile reports INTEGRITY_INVALID when the downloaded file was tampered with after signing', async () => {
+      vi.stubGlobal('window', { localStorage: makeFakeStorage() });
+      const { saveExperiment } = await import('../core/scienceMemory');
+      const { buildCaseStudy, buildSignedEvidenceDownload, verifyEvidenceFile } = await import('../components/visual-simulation/evidenceShowcase');
+
+      const pack = evidencePackFixture({ evidencePackId: 'pack-sign-2', allArmsMatched: true });
+      const { saveScientificEvidencePack } = await import('../core/experimentFabric');
+      saveScientificEvidencePack(pack);
+      const saved = saveExperiment({
+        labId: 'legacy-pilot', experimentId: 'legacy:pack-sign-2', experimentName: 'Tampered download fixture',
+        params: {}, stats: {}, evidencePackId: pack.evidencePackId,
+        honesty: 'simplified', honestyNote: 'test fixture', assumptions: [], epistemicStatus: 'SIMULATION',
+      });
+      const caseStudy = buildCaseStudy(saved)!;
+      const signed = await buildSignedEvidenceDownload(caseStudy, saved);
+
+      const tampered = { ...signed, record: { ...signed.record, caseStudy: { ...caseStudy, title: 'TAMPERED TITLE' } } };
+      const result = await verifyEvidenceFile(tampered);
+      expect(result.status).toBe('INTEGRITY_INVALID');
+      expect(result.valid).toBe(false);
+    });
+
+    it('verifyEvidenceFile falls back to the unsigned check (INTEGRITY_VALID_UNSIGNED) for a bare IntegrityEnvelope with no signature field', async () => {
+      const { buildIntegrityEnvelope } = await import('../core/integrity');
+      const { verifyEvidenceFile } = await import('../components/visual-simulation/evidenceShowcase');
+
+      const envelope = await buildIntegrityEnvelope({ hello: 'world' }, new Date().toISOString());
+      const roundTripped: unknown = JSON.parse(JSON.stringify(envelope));
+      const result = await verifyEvidenceFile(roundTripped);
+      expect(result.status).toBe('INTEGRITY_VALID_UNSIGNED');
+      expect(result.valid).toBe(true);
+    });
+
+    it('verifyEvidenceFile reports STRUCTURALLY_INVALID for garbage input, never throws', async () => {
+      const { verifyEvidenceFile } = await import('../components/visual-simulation/evidenceShowcase');
+      const result = await verifyEvidenceFile({ not: 'an evidence envelope' });
+      expect(result.status).toBe('STRUCTURALLY_INVALID');
+      expect(result.valid).toBe(false);
+    });
+  });
 });

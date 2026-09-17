@@ -1,0 +1,10 @@
+{
+  "CHEMBL4084119/NCT00318461": {
+    "sourceUrl": "https://clinicaltrials.gov/api/v2/studies/NCT00318461",
+    "sha256": "7d9ecf53997fe87f7e0b5aeb48f5d6bd20e6b21dda43b8561945dd33fb0df1e1",
+    "retrievedAt": "2026-09-16T00:48:12Z",
+    "publicationDoi": null,
+    "ingestedAt": "2026-09-16T01:26:31.595Z",
+    "ingestionScript": "scripts/ingest-a2-trial-evidence.mjs"
+  }
+}

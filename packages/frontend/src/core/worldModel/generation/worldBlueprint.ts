@@ -110,6 +110,42 @@ export interface WorldBlueprint {
   seed: number;
   /** Free-text description of this blueprint's own origin (e.g. "hand-authored reference scenario", "derived from 2024 city census") — carried into the `world.generation.completed` journal event's provenance, never interpreted by the generator itself. */
   provenanceNote?: string;
+  /**
+   * Which named templates (`specification/templates.ts`) produced this
+   * blueprint, in request order — set by `compileSpecification`, never by a
+   * hand-authored blueprint (a blueprint built directly, outside the
+   * specification pipeline, simply omits this and the generation event's
+   * own `parameters.templateIds` is correspondingly absent, exactly as
+   * before this field existed).
+   *
+   * Carried into `world.generation.completed`'s `parameters.templateIds` as
+   * STRUCTURED, machine-queryable provenance — `provenanceNote` above
+   * already names these templates too, but only inside a free-text sentence
+   * a caller auditing the event stream would have to parse, and one a
+   * caller-supplied `provenanceNote` can silently omit. This field cannot be
+   * silently overridden that way: it is set once, directly from
+   * `spec.worldType`, independent of what note text a caller chooses.
+   *
+   * Deliberately typed as generic `readonly string[]`, not
+   * `specification/worldSpecification.ts`'s own `WorldTemplateId` union:
+   * `generation/` is the domain-blind layer in the declared
+   * `Specification -> Blueprint -> Generator -> World` pipeline and must not
+   * import back from `specification/`, which already imports THIS module.
+   */
+  templateIds?: readonly string[];
+  /**
+   * The specification's requested level of detail
+   * (`WorldSpecification.levelOfDetail`), when this blueprint was compiled
+   * from one — carried into `world.generation.completed`'s
+   * `parameters.levelOfDetail` for the same reason as `templateIds` above:
+   * real, structured provenance for "how coarse or fine was this world asked
+   * to be", not reconstructable from the graph's entity count alone (two
+   * different templates at the same level of detail produce different
+   * counts, and the same template at two levels produces different structure
+   * entirely — see `specification/templates.ts::CITY_TEMPLATE`'s own
+   * `districtCount`/`buildingsPerDistrict` scaling).
+   */
+  levelOfDetail?: 'LOW' | 'MEDIUM' | 'HIGH';
   /** World Generation 1.0: seeds `TemporalEngine`'s simulated clock (see temporalEngine.ts's `startSimulatedTime` option). Defaults to 0. */
   startSimulatedTime?: number;
   root: WorldBlueprintNode;

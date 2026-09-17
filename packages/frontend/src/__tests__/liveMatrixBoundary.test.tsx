@@ -19,10 +19,24 @@ import LiveMatrixBackground from '../components/liveMatrix/LiveMatrixBackground'
  * whole reason it was extracted out of the component.
  */
 
-const COMPONENT_DIR = join(process.cwd(), 'src', 'components', 'liveMatrix');
+const COMPONENT_DIR = join(process.cwd(), 'packages/frontend/src', 'components', 'liveMatrix');
 
 function readOrNull(file: string): string | null {
   try { return readFileSync(file, 'utf8'); } catch { return null; }
+}
+
+/**
+ * Comments are stripped before every "does this file name X" check in this
+ * file, on purpose and in both directions. `genesisVisualState.ts` has to be
+ * able to say "this must never take a SavedExperiment" without that sentence
+ * tripping the Genesis check, and `App.tsx` has to be able to explain WHY the
+ * background drops to the LOW tier ("no glow blur, lower device-pixel-ratio
+ * cap — matrixEngine.ts::QUALITY") without that citation reading as App.tsx
+ * importing the engine. Both rules are about what the code touches, not about
+ * which words the rationale is allowed to use.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
 function filesIn(dir: string): string[] {
@@ -88,12 +102,6 @@ describe('the component is standalone — the dependency arrow points one way', 
   });
 
   it('names no Genesis domain concept in CODE — prose explaining the boundary is allowed, using it is not', () => {
-    // Comments are stripped first, on purpose. `genesisVisualState.ts` has to
-    // be able to say "this must never take a SavedExperiment" without that
-    // sentence itself tripping the check — the rule is about what the code
-    // touches, not about which words the rationale is allowed to use.
-    const stripComments = (source: string): string =>
-      source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     const forbidden = /scienceMemory|SavedExperiment|hypothesisLoop|HypothesisAssessment|experimentFabric|crossDomainSynthesis/;
     for (const file of filesIn(COMPONENT_DIR)) {
       const code = stripComments(readFileSync(file, 'utf8'));
@@ -101,12 +109,44 @@ describe('the component is standalone — the dependency arrow points one way', 
     }
   });
 
-  it('is not wired into the application yet — integration is a separate, explicit decision', () => {
-    const appFiles = [join(process.cwd(), 'src', 'App.tsx'), join(process.cwd(), 'src', 'main.tsx')];
+  /**
+   * Integration happened (App.tsx now mounts `LiveMatrixBackground`) — the
+   * boundary this test now protects is HOW: only through the adapter, never
+   * by an app file reaching past it into `matrixEngine`/`matrixController`
+   * directly, which would let Genesis-side code start hand-rolling the
+   * translation `genesisVisualState.ts` exists to own exclusively.
+   */
+  it('the app wires the component only through the genesisVisualState adapter, never around it', () => {
+    const appFiles = [join(process.cwd(), 'packages/frontend/src', 'App.tsx'), join(process.cwd(), 'packages/frontend/src', 'main.tsx')];
+    let mountedSomewhere = false;
     for (const file of appFiles) {
-      const source = readOrNull(file);
-      if (source === null) continue;
-      expect(source.includes('liveMatrix'), `${file} already mounts the background`).toBe(false);
+      const raw = readOrNull(file);
+      if (raw === null) continue;
+      const source = stripComments(raw);
+      if (!source.includes('liveMatrix')) continue;
+      mountedSomewhere = true;
+      expect(source.includes('genesisVisualState'), `${file} mounts liveMatrix without going through genesisVisualState`).toBe(true);
+      expect(source.includes('matrixEngine'), `${file} reaches past the adapter into matrixEngine directly`).toBe(false);
+      expect(source.includes('matrixController'), `${file} reaches past the adapter into matrixController directly`).toBe(false);
     }
+    expect(mountedSomewhere, 'expected at least one app file to mount the background').toBe(true);
+  });
+
+  /**
+   * MEASURED DECISION, not a preference: the background used to be unmounted
+   * entirely on heavy-3D routes. On #/genesis-world the 3D canvas measures
+   * 1200x750 inside a 1440x900 viewport — 69% — so unmounting blanked the
+   * remaining 31% (sidebar, title strip, description block, margins) where
+   * the field is genuinely visible. The real constraint there is the frame
+   * budget, because a second rAF loop runs beside the 3D scene's own, and
+   * that is what the LOW quality tier is for. Reverting to a conditional
+   * mount would silently throw that third of the screen away again.
+   */
+  it('heavy-3D routes tier the background down to LOW quality rather than unmounting it', () => {
+    const app = readOrNull(join(process.cwd(), 'packages/frontend/src', 'App.tsx'));
+    expect(app).not.toBeNull();
+    expect(app!).toMatch(/quality=\{[^}]*\?\s*'LOW'\s*:\s*'HIGH'\}/);
+    // No conditional-render guard wrapping the background any more.
+    expect(app!).not.toMatch(/\{\s*!\w*[Ss]uppressed\w*\s*&&\s*\(/);
   });
 });

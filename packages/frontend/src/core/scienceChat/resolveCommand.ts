@@ -1,4 +1,5 @@
 import type { HonestyLevel, ParamDef, SimParams } from '../types';
+import type { ResearchChainSearchQuery } from '../scienceMemory';
 import { resolveQuery } from '../generator/resolve';
 import { epistemicStatusOf, getRecipes, type SimulationRecipe } from '../generator/recipe';
 import { normalize } from '../generator/resolve';
@@ -6,7 +7,10 @@ import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 import { parseObservationIntent } from '../lookingGlass/observationIntent';
 import { hasActiveObservationControl } from '../activeObservationControl';
-import { hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker, resolveDiscoveryQuestion } from './discoveryQuestions';
+import {
+  hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
+  hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
+} from './discoveryQuestions';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -37,7 +41,7 @@ export type ScientificIntent =
   | 'OPEN_SIMULATION' | 'CHANGE_PARAMETER' | 'WHAT_IF' | 'EXPLAIN'
   | 'SHOW_EQUATION' | 'SHOW_ASSUMPTIONS' | 'COMPARE_MODELS' | 'CREATE_TASK'
   | 'CHECK_RESULT' | 'VERIFY' | 'PROPOSE_EXPERIMENT' | 'OPEN_CAMPAIGN'
-  | 'SAVE' | 'LIST' | 'LOAD' | 'CONTROL' | 'HELP' | 'UNKNOWN';
+  | 'SAVE' | 'LIST' | 'LOAD' | 'CONTROL' | 'HELP' | 'SEARCH_RESEARCH_CHAINS' | 'UNKNOWN';
 
 export type ChatAction =
   | { type: 'open'; labId: string; experimentId?: string; params?: Partial<SimParams> }
@@ -46,6 +50,17 @@ export type ChatAction =
   | { type: 'save' }
   | { type: 'list' }
   | { type: 'load'; index: number }
+  /**
+   * A filtered read over saved research chains (`searchResearchChains`,
+   * `scienceMemory.ts`) — deliberately NOT named "campaign" (see that
+   * function's own doc: Genesis's "Campaign" already means the backend
+   * molecule-optimization workshop, a different concept, per C3's audit).
+   * `query` is parsed here from keywords in the message BEFORE this action
+   * is returned — the same discipline as `runDecipherment`'s
+   * `sequenceText` — so `ScienceChat.tsx` only has to execute the query,
+   * never re-derive it from the raw text.
+   */
+  | { type: 'searchResearchChains'; query: ResearchChainSearchQuery }
   | { type: 'compare'; a: ModelConfig; b: ModelConfig }
   | { type: 'openRoute'; hash: string }
   /** GENESIS WORLD INTERACTION — forwards one sentence to whichever real 3D scene is currently
@@ -78,7 +93,18 @@ export type ChatAction =
    * fingerprint, not a cached read. No arguments: the record is found in Memory by
    * `ScienceChat.tsx`, which is where every other Memory access in this layer lives.
    */
-  | { type: 'replayDiscoveryLoop' };
+  | { type: 'replayDiscoveryLoop' }
+  /**
+   * RESEARCH CAMPAIGN CONTINUATION — advances the last Research Cycle this
+   * conversation ran (`researchCampaign.ts::continueResearchCampaign`) by
+   * EXACTLY the request its own real `nextExperiment` proposed. No
+   * arguments: `ScienceChat.tsx` holds the last cycle in memory, the same
+   * place `lastDiscoveryLoop` already lives. If that cycle's
+   * `nextExperiment.status` is not `READY_TO_RUN`, the next cycle refuses
+   * to start (`NO_JUSTIFIED_NEXT_QUESTION`) and `ScienceChat.tsx` reports
+   * that explicitly rather than inventing a further question.
+   */
+  | { type: 'continueResearch' };
 
 export interface ChatResponse {
   text: string;
@@ -343,6 +369,30 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     }
   }
 
+  // --- Research chain search (C1: campaign search / evidence:// task) — a FILTERED
+  //     read over saved research chains, checked before the general "pamiec naukowa"
+  //     catch-all below so a more specific request does not fall into the plain list.
+  //     Deliberately not "kampani*": that word already means the backend molecule-
+  //     optimization workshop (`OPEN_CAMPAIGN` below) — a different concept per C3's audit.
+  if (has(norm, 'lancuch badawcz', 'lancuchy badawcz', 'historia lancucha badawczego', 'historia lancuchow badawczych')) {
+    const terminalStatus: ResearchChainSearchQuery['terminalStatus'] = has(norm, 'rozstrzygniet', 'osiagniet wynik')
+      ? 'SETTLED'
+      : has(norm, 'zablokowan')
+        ? 'BLOCKED'
+        : has(norm, 'niejednoznaczn', 'nierozstrzygniet')
+          ? 'INCONCLUSIVE'
+          : has(norm, 'otwart')
+            ? 'OPEN'
+            : undefined;
+    const query: ResearchChainSearchQuery = terminalStatus === undefined ? {} : { terminalStatus };
+    return {
+      text: 'Szukam zapisanych łańcuchów badawczych (Pamięć Naukowa, lokalnie w tej przeglądarce)…',
+      tag: 'SYSTEM',
+      intent: 'SEARCH_RESEARCH_CHAINS',
+      action: { type: 'searchResearchChains', query },
+    };
+  }
+
   // --- Scientific Memory history — otwiera istniejący lokalny ekran historii.
   //     Nie tworzy konta, nie synchronizuje danych i nie uruchamia modelu.
   if (has(norm, 'pamiec naukowa', 'historia eksperyment', 'historia wynik', 'przegladaj zapisane')) {
@@ -542,6 +592,18 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'MODEL',
       intent: 'VERIFY',
       action: { type: 'replayDiscoveryLoop' },
+    };
+  }
+  // --- RESEARCH CAMPAIGN CONTINUATION — advances the last Research Cycle by EXACTLY
+  //     the request its own real nextExperiment proposed (researchCampaign.ts). Checked
+  //     BEFORE the generic discovery-loop markers below so "kontynuuj badanie" never gets
+  //     read as a request to start a brand new loop instead of continuing the last one.
+  if (hasResearchCampaignContinueMarker(message)) {
+    return {
+      text: 'Kontynuuję Research Campaign: uruchamiam DOKŁADNIE ten request, który realny następny eksperyment ostatniego cyklu wskazał — nigdy nowo wygenerowane pytanie. Jeśli ostatni cykl nie ma uzasadnionego następnego kroku, powiem to wprost (NO_JUSTIFIED_NEXT_QUESTION) zamiast zgadywać.',
+      tag: 'MODEL',
+      intent: 'PROPOSE_EXPERIMENT',
+      action: { type: 'continueResearch' },
     };
   }
   if (hasDiscoveryLoopMarker(message)) {

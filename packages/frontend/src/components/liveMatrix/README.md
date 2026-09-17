@@ -1,4 +1,15 @@
-# Live Matrix Background
+# Live Matrix Background — Matrix Premium
+
+**D-118.** The rain keeps its identity (falling glyph columns, three depth
+layers, per-column respawn from above, activity tiers) and speaks the product's
+language: slower and sparser than the film cliché, scientific glyphs (hex
+fingerprint digits, Greek, calculus/statistics, units) instead of katakana, the
+navy / cyan / cool-white palette, the classic matrix green kept as a sparse
+signature on roughly one column head in eight, gold only at ATTENTION. The
+container is masked towards the edges so the field never competes with the
+content column, and it dims on phones. Engine API, controller, adapter and
+boundary tests are unchanged.
+
 
 Procedural, seeded "data field" background for a scientific command-center look.
 Canvas 2D, no images, no video, no DOM-per-glyph, no external libraries.

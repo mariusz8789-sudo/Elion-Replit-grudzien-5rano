@@ -49,6 +49,12 @@ jobs:
         run: npm run test --workspace=packages/frontend -- --maxWorkers=1
 
       - name: Testy backend
+        env:
+          # `npm run test --workspace=...` runs with cwd=packages/backend, so a
+          # RELATIVE path here would resolve as packages/backend/packages/backend/...
+          # (the test's own worker does Path(root) / 'Zmumu.csv' with no cwd
+          # normalization) -- must be absolute, from ${{ github.workspace }}.
+          GENESIS_CERN_OPEN_DATA_DIR: ${{ github.workspace }}/packages/backend/src/compute/cms-zmumu
         run: npm run test --workspace=packages/backend
 
       - name: Typecheck frontend
@@ -103,6 +109,355 @@ jobs:
           name: atom-bohr-nist-g3-${{ github.sha }}
           path: artifacts/atom-bohr-nist
           retention-days: 90
+
+  kepler-solar-system-pinned-artifact:
+    name: Kepler anchor — pinned NASA NSSDCA Solar System fact sheet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch and hash NASA NSSDCA Planetary Fact Sheet
+        env:
+          GENESIS_KEPLER_FIXTURE_DIR: artifacts/kepler-solar-system
+        run: node scripts/fetch-kepler-solar-system-fixture.mjs
+      - name: Verify manifest and raw payload hash
+        env:
+          GENESIS_KEPLER_FIXTURE_DIR: artifacts/kepler-solar-system
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          import { join } from 'node:path';
+          const dir = process.env.GENESIS_KEPLER_FIXTURE_DIR;
+          const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+          if (manifest.artifacts.length !== 1) throw new Error('Kepler fixture requires exactly B1');
+          for (const artifact of manifest.artifacts) {
+            const raw = await readFile(join(dir, artifact.file));
+            const actual = createHash('sha256').update(raw).digest('hex');
+            if (actual !== artifact.sha256) throw new Error(`${artifact.id}: SHA-256 mismatch`);
+            console.log(`Kepler VERIFIED ${artifact.id} bytes=${raw.byteLength} sha256=${actual}`);
+          }
+          NODE
+      - name: Upload immutable Kepler candidate fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: kepler-solar-system-${{ github.sha }}
+          path: artifacts/kepler-solar-system
+          retention-days: 90
+      - name: Compare fresh fetch to the committed pinned copy (drift detection)
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const fresh = await readFile('artifacts/kepler-solar-system/B1-nssdc-planetary-factsheet.html', 'utf8');
+          const committed = await readFile('packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html', 'utf8');
+          if (fresh !== committed) {
+            throw new Error(
+              'NSSDC Planetary Fact Sheet drifted from the committed, hash-pinned copy the Kepler anchor reads. ' +
+              'NASA changed the source page since this was pinned -- ' +
+              're-fetch, re-verify the extraction regex against the new content, and re-pin deliberately; ' +
+              'do not silently accept a changed value as the same observation.',
+            );
+          }
+          console.log('Kepler fixture matches the committed pinned copy — no drift.');
+          NODE
+
+  qe4-brydges-verify-pinned:
+    name: QE4 anchor — verify pinned Brydges data against live Zenodo (drift detection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Phase 0 (see docs/QE4_PREREGISTRATION.md) fetched this dataset via three
+    # bootstrapping jobs (a fetch+recon job, then a per-file matrix pin job to
+    # work around a job-log read-back truncation above ~2.5MB) and committed
+    # all 29 real data files + the Zenodo record JSON under
+    # packages/frontend/src/core/biotechData/qe4-brydges/, each byte-verified
+    # against a SHA-256 printed in that job's own log. Those bootstrapping
+    # jobs are gone now that the data is committed; this ONE ongoing job does
+    # what the Kepler/NIST anchors' own CI jobs already do: re-fetch for real
+    # on every push (this runner has ordinary internet access; the repo's own
+    # sandbox does not) and fail loudly if the live archive ever drifts from
+    # what is pinned, rather than silently trusting a fetch made once.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch Zenodo record + archive, verify checksum against Zenodo's own API
+        env:
+          GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
+        run: node scripts/fetch-qe4-brydges-fixture.mjs
+      - name: Compare every pinned file to a fresh extraction (drift detection)
+        env:
+          GENESIS_QE4_FIXTURE_DIR: artifacts/qe4-brydges
+        run: |
+          set -e
+          DIR="$GENESIS_QE4_FIXTURE_DIR"
+          mkdir -p "$DIR/extracted"
+          unzip -o "$DIR/Data_aau4963_Updated.zip" -d "$DIR/extracted" > /dev/null
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          import { join } from 'node:path';
+
+          const PINNED_ROOT = 'packages/frontend/src/core/biotechData/qe4-brydges';
+          const FRESH_ROOT = 'artifacts/qe4-brydges/extracted/Data_aau4963';
+          const FILES = [
+            '10Ions_CleanSystem/MeasuredStates_T_0ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_1ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_2ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_3ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_4ms.csv',
+            '10Ions_CleanSystem/MeasuredStates_T_5ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_0ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_1ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_2ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_3ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_4ms.csv',
+            '10Ions_CleanSystem/RenyiEntropy_T_5ms.csv',
+            '10Ions_CleanSystem/RenyiEntropyAllPartitions_T_5ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_01ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_02ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_04ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_06ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_10ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_16ms.csv',
+            '10Ions_withDisorder/MeasuredStates_T_20ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_1ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_2ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_4ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_6ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_10ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_16ms.csv',
+            '10Ions_withDisorder/RenyiEntropy_T_20ms.csv',
+            'Fig1a/PureState.csv',
+            'Fig1a/MixedState.csv',
+          ];
+          const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+          for (const rel of FILES) {
+            const pinned = await readFile(join(PINNED_ROOT, rel));
+            const fresh = await readFile(join(FRESH_ROOT, rel));
+            if (sha256(pinned) !== sha256(fresh)) {
+              throw new Error(
+                `QE4 drift: ${rel} in the live Zenodo archive no longer matches the committed pinned copy. ` +
+                'Re-fetch, re-verify the preregistration is still valid against the new content, and re-pin deliberately -- do not silently accept a changed value as the same observation.',
+              );
+            }
+            console.log(`QE4 VERIFIED ${rel} matches committed pinned copy`);
+          }
+          console.log('All 29 pinned QE4 Brydges files match the live Zenodo archive -- no drift.');
+          NODE
+
+  cms-zmumu-verify-pinned:
+    name: R-005 anchor — verify pinned CMS Zmumu.csv against live CERN Open Data (drift detection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # Phase 0 (see docs/RISKS.md R-005) fetched this dataset via a 4-shard
+    # bootstrapping matrix job -- a single-job print of the whole
+    # 970KB/10001-line file (run 34720797396, job 103626153086) was
+    # UNREADABLE: `get_job_logs` silently returned only the LAST ~5000 lines
+    # of the job's log regardless of the requested `tail_lines`, with no
+    # error, so each of the 4 shards' explicitly line-numbered row ranges
+    # was printed into its OWN job log (run 34720957684) and reassembled by
+    # line number, matching cms_zmumu_worker.py::EXPECTED_SHA256 exactly.
+    # That bootstrapping matrix is gone now that Zmumu.csv is committed
+    # under packages/backend/src/compute/cms-zmumu/; this ONE ongoing job
+    # does what the Kepler/QE4 anchors' own CI jobs already do: re-fetch for
+    # real on every push (this runner has ordinary internet access; the
+    # repo's own sandbox does not) and fail loudly if the live CERN record
+    # ever drifts from what is pinned, rather than silently trusting a
+    # fetch made once.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Cross-check fetch script's expected hash against the Python worker's
+        run: |
+          SCRIPT_HASH=$(grep -oE "EXPECTED_SHA256 = '[0-9a-f]{64}'" scripts/fetch-cms-zmumu-fixture.mjs | grep -oE '[0-9a-f]{64}')
+          WORKER_HASH=$(grep -oE "EXPECTED_SHA256 = '[0-9a-f]{64}'" packages/backend/src/compute/cms_zmumu_worker.py | grep -oE '[0-9a-f]{64}')
+          echo "fetch script: $SCRIPT_HASH"
+          echo "python worker: $WORKER_HASH"
+          if [ "$SCRIPT_HASH" != "$WORKER_HASH" ]; then
+            echo "MISMATCH: fetch script and worker disagree on the expected SHA-256 -- fix before trusting either." >&2
+            exit 1
+          fi
+      - name: Fetch and hash the real CMS Open Data Zmumu.csv
+        env:
+          GENESIS_CMS_ZMUMU_FIXTURE_DIR: artifacts/cms-zmumu
+        run: node scripts/fetch-cms-zmumu-fixture.mjs
+      - name: Compare fresh fetch to the committed pinned copy (drift detection)
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const fresh = await readFile('artifacts/cms-zmumu/Zmumu.csv', 'utf8');
+          const committed = await readFile('packages/backend/src/compute/cms-zmumu/Zmumu.csv', 'utf8');
+          if (fresh !== committed) {
+            throw new Error(
+              'CMS Open Data Zmumu.csv drifted from the committed, hash-pinned copy the CMS anchor reads. ' +
+              'CERN changed the source file since this was pinned -- ' +
+              're-fetch, re-verify the descriptive statistics, and re-pin deliberately; ' +
+              'do not silently accept a changed value as the same observation.',
+            );
+          }
+          console.log('CMS Zmumu.csv fixture matches the committed pinned copy — no drift.');
+          NODE
+      - name: Upload immutable CMS candidate fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: cms-zmumu-${{ github.sha }}
+          path: artifacts/cms-zmumu
+          retention-days: 90
+
+  b1-defra-aurn-pin-narrow:
+    name: "B1 Phase 3 (temporary): fetch+extract NO2/SO2 for one DEFRA AURN site-year"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [MY1, MAN3, LED6, SHBR]
+        year: [2022, 2023, 2024]
+    # Recon (2 rounds, now removed -- see docs/DECISIONS.md) found DEFRA's
+    # stable per-site-year download URL and confirmed its wide "all
+    # pollutants" CSV is far too large (~7-8MB/site-year) to freeze verbatim
+    # through job-log read-back the way every prior anchor's raw file was.
+    # scripts/fetch-b1-defra-aurn-fixture.mjs extracts ONLY the columns this
+    # experiment's preregistration reads (NO2 + SO2, date/time), bringing
+    # each site-year down to ~300-400KB -- one matrix shard per site-year, no
+    # further sharding needed (unlike CMS Zmumu's 4-way split for one file).
+    # The extracted CSV travels back via actions/upload-artifact (like every
+    # other pinned fixture in this workflow), NOT via stdout: job-log
+    # read-back silently caps returned content under one site-year's row
+    # count, which would corrupt the data. This is a ONE-OFF pinning job:
+    # remove once its 12 shards' artifacts have been downloaded and
+    # committed under packages/frontend/src/core/biotechData/b1-defra-aurn/,
+    # mirroring qe4-brydges-pin-measured-states' own lifecycle.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Fetch + extract NO2/SO2 for ${{ matrix.site }}_${{ matrix.year }}
+        env:
+          SITE: ${{ matrix.site }}
+          YEAR: ${{ matrix.year }}
+          GENESIS_B1_FIXTURE_DIR: artifacts/b1-defra-aurn
+        run: node scripts/fetch-b1-defra-aurn-fixture.mjs
+      - name: Upload immutable B1 DEFRA AURN candidate fixture
+        uses: actions/upload-artifact@v7
+        with:
+          name: b1-defra-aurn-${{ matrix.site }}-${{ matrix.year }}-${{ github.sha }}
+          path: artifacts/b1-defra-aurn
+          retention-days: 90
+
+  docker-image:
+    name: Obraz produkcyjny — build i realny smoke test kontenera
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # DLACZEGO TEN JOB ISTNIEJE. `Dockerfile` nigdy nie był budowany w CI —
+    # jedyna weryfikacja przed tą misją była ręczna, lokalna, zależna od tego,
+    # czy ktoś akurat miał dostęp do Dockera. P0.1-P0.3 tej misji (runtime
+    # Node, trwałość danych, tożsamość wydania) są zakodowane W TYM obrazie —
+    # `docker build --build-arg GENESIS_COMMIT=...` i cały łańcuch
+    # `nodeRuntime.mjs`/`dbDurability.mjs`/`buildInfo.mjs` nie mają żadnego
+    # dowodu wykonania na PRAWDZIWYM obrazie kontenerowym, dopóki ten job nie
+    # zaistnieje. Runner GitHub Actions ma zwykły dostęp do Docker Hub —
+    # sandbox deweloperski, w którym te pliki powstały, miał egress
+    # ograniczony do rejestrów pakietów (npm/pypi/crates), więc `docker pull
+    # node:22-slim` był tam zablokowany na poziomie CDN (production.
+    # cloudfront.docker.com → 403), niezależnie od poprawności samego
+    # Dockerfile. Ten job jest więc PIERWSZYM miejscem, gdzie obraz faktycznie
+    # się buduje i uruchamia.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Budowa obrazu z realnym identyfikatorem wydania
+        run: |
+          docker build \
+            --build-arg GENESIS_COMMIT=${{ github.sha }} \
+            --build-arg GENESIS_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            -t genesis-os:ci .
+
+      - name: Realny redeploy drill — kontener + zamontowany wolumin (P0.2, dotąd NOT VERIFIED lokalnie)
+        # Tworzy WOLUMEN NAMED (nie bind mount z runnera), uruchamia kontener,
+        # tworzy konto przez HTTP, ZABIJA kontener i USUWA go (`docker rm -f`
+        # — nie tylko stop), uruchamia NOWY kontener na tym samym woluminie i
+        # loguje się tym samym kontem. To jest dokładnie ten scenariusz, który
+        # `docs/RISKS.md` R-006 nazywał NOT VERIFIED z braku demona Dockera w
+        # sandboxie — tutaj demon jest, więc scenariusz jest wykonywany naprawdę,
+        # nie tylko deklarowany.
+        run: |
+          set -e
+          docker volume create genesis-ci-data
+
+          docker run -d --name genesis-a -p 8080:8080 \
+            -v genesis-ci-data:/data \
+            -e GENESIS_DB_PATH=/data/genesis.db \
+            -e ANTHROPIC_API_KEY= \
+            genesis-os:ci
+
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/health > /tmp/health-a.json && break
+            sleep 1
+          done
+          cat /tmp/health-a.json
+          node -e "const h=require('/tmp/health-a.json'); if(!h.ok) throw new Error('health not ok'); if(h.commit !== '${{ github.sha }}') throw new Error('commit mismatch: '+h.commit); if(h.db.durability !== 'PERSISTENT') throw new Error('db not persistent: '+h.db.durability); console.log('P0.3 OK: commit', h.commit, 'durability', h.db.durability);"
+
+          TOKEN=$(curl -sf -X POST http://127.0.0.1:8080/api/auth/register \
+            -H 'content-type: application/json' \
+            -d '{"email":"ci-redeploy-drill@genesis.local","password":"password123"}' | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).token))")
+          curl -sf -X POST http://127.0.0.1:8080/api/projects \
+            -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+            -d '{"name":"CI redeploy drill"}' > /tmp/project-a.json
+          cat /tmp/project-a.json
+
+          # Redeploy: kontener NIE zatrzymany łagodnie — zabity i USUNIĘTY,
+          # tak jak orchestrator robi to przy wymianie obrazu.
+          docker rm -f genesis-a
+
+          docker run -d --name genesis-b -p 8080:8080 \
+            -v genesis-ci-data:/data \
+            -e GENESIS_DB_PATH=/data/genesis.db \
+            -e ANTHROPIC_API_KEY= \
+            genesis-os:ci
+
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/health > /tmp/health-b.json && break
+            sleep 1
+          done
+
+          LOGIN=$(curl -sf -X POST http://127.0.0.1:8080/api/auth/login \
+            -H 'content-type: application/json' \
+            -d '{"email":"ci-redeploy-drill@genesis.local","password":"password123"}')
+          echo "$LOGIN" > /tmp/login-b.json
+          node -e "
+            const login = require('/tmp/login-b.json');
+            if (login.user.email !== 'ci-redeploy-drill@genesis.local') throw new Error('account did not survive redeploy: ' + JSON.stringify(login));
+            console.log('P0.2 OK: account created before redeploy is readable after container replacement + volume remount');
+          "
+          TOKEN_B=$(node -e "console.log(require('/tmp/login-b.json').token)")
+          curl -sf http://127.0.0.1:8080/api/projects -H "authorization: Bearer $TOKEN_B" > /tmp/projects-b.json
+          node -e "
+            const list = require('/tmp/projects-b.json');
+            const found = list.projects.some((p) => p.name === 'CI redeploy drill');
+            if (!found) throw new Error('project created before redeploy is missing after it: ' + JSON.stringify(list));
+            console.log('P0.2 OK: project created before redeploy is readable after container replacement + volume remount');
+          "
+
+          docker rm -f genesis-b
+          docker volume rm genesis-ci-data
 
   pyscf-real:
     name: Real PySCF benchmark

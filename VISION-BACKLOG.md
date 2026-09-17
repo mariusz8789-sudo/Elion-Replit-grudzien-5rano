@@ -1055,6 +1055,75 @@ twierdzenie o nowości.
   testów: napięcie odtwarza publikowane ~4,9σ, symetria, gaussianPdf
   całkuje się do 1, dodanie systematyki zawsze zmniejsza napięcie.
 
+## Earth Observatory (widok orbitalny Ziemi — dzień/noc, atmosfera, chmury)
+
+**NIE BUDOWAĆ TERAZ. Priorytet: PO GRANCIE / po zamknięciu obecnego
+freeze'u.** Źródło: zweryfikowany raport wizualny referencyjnego wideo
+(`video_JrgsSARgAPw_analysis_20260912_030417.md`) — specyfikacja sceny
+"kosmos z modelem planety i nałożonymi schematami geometrycznymi", nie
+gotowy kod do skopiowania. Przyszły element Genesis Virtual Science /
+Genesis 2050: to jest widok Ziemi Z ORBITY (na zewnątrz), komplementarny
+do „Earth Deep Systems" niżej (wnętrze Ziemi) — dwa różne kierunki tej
+samej planetarnej osi Scale Journey (ORBITA → KONTYNENT → … → JĄDRO
+WEWNĘTRZNE), nie konkurencyjne systemy.
+
+**Obiekty sceny (z raportu):** Ziemia z realistyczną teksturą, Słońce/
+kierunkowe źródło światła, gwiazdy/tło typu skybox, nachylona oś obrotu
+(~23,5°), pierścienie szerokości geograficznych, równik, zwrotniki, koła
+podbiegunowe, osobna półprzezroczysta warstwa chmur (wolniejszy obrót niż
+powierzchnia), atmosfera (shader z niebieską poświatą na krawędzi —
+Fresnel/rim glow), światła miast widoczne wyłącznie po stronie nocnej,
+etykiety zawsze zwrócone do kamery (`Equator`, `Tropic of Cancer`, `Tropic
+of Capricorn`, `Arctic Circle`, `Antarctic Circle`). Animacje: obrót Ziemi
+wokół nachylonej osi, przesuwający się terminator dnia/nocy, wolniejszy
+ruch chmur, rotacja okręgów geometrycznych, pulsowanie promieni Słońca.
+Kamera: płynna orbita wokół planety ze zmianą kąta/odległości — bez
+przełączników UI, czysto obserwacyjne demo.
+
+**Istniejące Genesis extension points do ponownego użycia (zero nowego
+silnika):**
+- `data/solarSystem.ts::PlanetData` — Ziemia ma już `axialTiltDeg` (NASA
+  Planetary Fact Sheet) gotowe do bezpośredniego użycia jako nachylenie
+  osi zamiast twardo wpisanych 23,5°.
+- `core/physics.ts::keplerPosition` — pozycja Ziemi względem Słońca, ten
+  sam solver co dziś w Universe Lab / `labs/experiments/universe-solar-system-3d.ts`.
+- `core/three/starfield.ts` — gotowe, współdzielone pole gwiazd (już
+  używane przez Universe i Einstein Lab) — dokładnie „gwiezdne tło typu
+  skybox" z raportu, nie nowy system.
+- `core/three/useThreeLoop.ts` + `core/three/quality.ts` — cykl
+  renderowania i adaptacyjne poziomy jakości (DPR/gęstość geometrii) —
+  ten sam wzorzec co reszta scen 3D. Uwaga: „linie o stałej grubości
+  niezależnej od zoomu" (screen-space line width dla równika/zwrotników/kół
+  podbiegunowych) NIE jest jeszcze rozwiązane nigdzie w `core/three` —
+  sprawdzono `core/three/graphics/materials.ts` (tylko canvas 2D
+  `lineWidth`, nie technika 3D) — to realny nowy problem do rozwiązania
+  (kandydat: `THREE.Line2`/`LineMaterial` z three/examples), nie coś do
+  podpięcia z gotowego miejsca.
+- Etykiety zwrócone do kamery — `labs/experiments/universe-solar-system-3d.ts`
+  ma już billboard/`Sprite`-owe etykiety w tej samej scenie 3D (weryfikowane
+  w kodzie) — bezpośrednio reużywalny wzorzec, nie nowy system UI.
+- `core/three/graphics/atmosphere.ts::createLightShaft` — istniejący,
+  ogólny prymityw „fałszywej wolumetrycznej wiązki światła" (dziś używany
+  do światła z okna/naświetla) — bezpośredni kandydat na „pulsowanie
+  promieni świetlnych od strony Słońca" z raportu, zamiast pisania nowego
+  efektu od zera. Prawdziwa atmosfera planety z niebieską poświatą na
+  krawędzi (Fresnel/rim shader) NIE istnieje jeszcze nigdzie w
+  `core/three` — to realny nowy shader do napisania, nie coś do podpięcia.
+- Status epistemiczny (tekstury/dzień-noc/chmury = ★★★★★ obserwacja
+  bezpośrednia; oświetlenie miast jako uproszczony placeholder danych
+  nocnych = jawnie oznaczone jako model poglądowy, nie zdjęcie satelitarne)
+  — istniejący `ConfirmationLevel`, żadna nowa skala.
+- Provenance/replay — jeśli ta scena stanie się elementem eksperymentu
+  (a nie czystą dekoracją), przechodzi przez te same mechanizmy co
+  wszystkie inne (`run.provenance`, `statusFor()` w `experimentGraph.ts`)
+  zamiast deklarowanego statusu — ta sama zasada BEAUTIFUL≠FAKE co
+  World Visual.
+
+**Nie implementować teraz.** Ten wpis istnieje wyłącznie po to, żeby
+specyfikacja wizualna z raportu nie zginęła i miała już wskazane miejsce w
+architekturze, zanim ktoś zacznie budować — nie po to, by cokolwiek z
+niego zaczynać dzisiaj (obecny 24–48h freeze/grant ma priorytet).
+
 ## Earth Deep Systems (nowa, duża przyszła domena planetarna)
 
 **NIE BUDOWAĆ TERAZ — poniżej wyłącznie mapa badawcza i architektura, nie

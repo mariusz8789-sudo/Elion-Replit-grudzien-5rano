@@ -71,6 +71,7 @@ import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
 import { listToolchain, getTool } from './campaign/toolchain.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
+import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
@@ -93,6 +94,7 @@ import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeInges
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
+import { runSpeculative } from './speculativeApi.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -171,6 +173,31 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'qm' && seg[2] === 'singlepoint' && seg.length === 3 && method === 'POST') {
       const r = runQuantumSinglePoint(body ?? {});
       return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- Myth & Theory Lab: isolated speculative sandbox only ----
+  if (seg[0] === 'speculative') {
+    if (seg[1] === 'run' && seg.length === 2 && method === 'POST') {
+      const result = runSpeculative(body);
+      return result.ok ? ok(result) : err(result.error === 'sandbox_disabled' ? 403 : 400, result.error);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- Physics: CERN Open Data (record 5208, CC0) — read-only ----
+  // Wraps the existing, unmodified cmsOpenDataAdapter.mjs; adds zero
+  // scientific logic. Real, checksum-verified event counts and full
+  // 5 GeV histogram, or an honest 503 — never a substitute/mock/seed.
+  // This is analysis of 2011 historical open data, not a live collider
+  // and not a simulation — see resultOrigin/offline/live/simulation flags.
+  if (seg[0] === 'physics') {
+    if (seg[1] === 'cms-z' && seg.length === 2 && method === 'GET') {
+      const r = zMuMuInvariantMassStats();
+      return r.ok
+        ? ok({ data: r.data, version: r.version, engine: r.engine, resultOrigin: 'real-engine', dataProvenance: 'REAL_EXTERNAL_DATASET', offline: true, live: false, simulation: false })
+        : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
     return err(404, 'not_found');
   }

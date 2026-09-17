@@ -4,23 +4,27 @@ import { getLab, getLabs } from './core/registry';
 import { LabShell } from './components/LabShell';
 import { ScaleJourney } from './components/ScaleJourney';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AppShell } from './components/AppShell';
+import { AppShell, GenesisWordmark } from './components/AppShell';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ScientificMemoryScreen } from './components/ScientificMemoryScreen';
 import { DiscoveryLogScreen } from './components/DiscoveryLogScreen';
 import { GlossaryScreen } from './components/GlossaryScreen';
+import { DomeWorldScreen } from './components/DomeWorldScreen';
 import { WhatIfScreen } from './components/WhatIfScreen';
 import { SearchOverlay } from './components/SearchOverlay';
 import { HelpOverlay } from './components/HelpOverlay';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
+import { requestOpenScienceChat } from './core/scienceChatBridge';
 import { hasActiveSim, resetActiveSim, toggleActiveSimRunning } from './core/activeSimControls';
 import { track } from './core/analytics';
 import { getSettings } from './core/settings';
 import { t } from './core/i18n';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
+import { getVoiceEngine } from './core/guide/guideRuntime';
 import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
+import { HyperStateVisualizer } from './components/HyperStateVisualizer';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -36,6 +40,15 @@ const QuantumDecisionExplorer = lazy(() => import('./components/QuantumDecisionE
 const RealityNavigator = lazy(() => import('./components/RealityNavigator').then((m) => ({ default: m.RealityNavigator })));
 const EngineeringNavigator = lazy(() => import('./components/EngineeringNavigator').then((m) => ({ default: m.EngineeringNavigator })));
 const ModelConflictPanel = lazy(() => import('./components/ModelConflictPanel').then((m) => ({ default: m.ModelConflictPanel })));
+const ModelTournamentPanel = lazy(() => import('./components/ModelTournamentPanel').then((m) => ({ default: m.ModelTournamentPanel })));
+const ProtectionPriorityScreen = lazy(() => import('./components/ProtectionPriorityScreen').then((m) => ({ default: m.ProtectionPriorityScreen })));
+const GovDrugCampaignScreen = lazy(() => import('./components/GovDrugCampaignScreen').then((m) => ({ default: m.GovDrugCampaignScreen })));
+const MonetizeScreen = lazy(() => import('./components/MonetizeScreen').then((m) => ({ default: m.MonetizeScreen })));
+const GeodesicWorldScreen = lazy(() => import('./components/GeodesicWorldScreen').then((m) => ({ default: m.GeodesicWorldScreen })));
+const WorldProposalScreen = lazy(() => import('./components/WorldProposalScreen').then((m) => ({ default: m.WorldProposalScreen })));
+const CalibrationInquiryScreen = lazy(() => import('./components/CalibrationInquiryScreen').then((m) => ({ default: m.CalibrationInquiryScreen })));
+const AutonomousInquiryScreen = lazy(() => import('./components/AutonomousInquiryScreen').then((m) => ({ default: m.AutonomousInquiryScreen })));
+const EntanglementMeasuresScreen = lazy(() => import('./components/EntanglementMeasuresScreen').then((m) => ({ default: m.EntanglementMeasuresScreen })));
 const CloudProjectsScreen = lazy(() => import('./components/CloudProjectsScreen').then((m) => ({ default: m.CloudProjectsScreen })));
 const CandidateDiscoveryScreen = lazy(() => import('./components/CandidateDiscoveryScreen').then((m) => ({ default: m.CandidateDiscoveryScreen })));
 const DrugDiscoveryScreen = lazy(() => import('./components/DrugDiscoveryScreen').then((m) => ({ default: m.DrugDiscoveryScreen })));
@@ -56,6 +69,9 @@ const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulatio
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
 const InvestorDemoScreen = lazy(() => import('./components/visual-simulation/InvestorDemoScreen').then((m) => ({ default: m.InvestorDemoScreen })));
+const StartHero = lazy(() => import('./components/StartHero').then((m) => ({ default: m.StartHero })));
+const WorldsHubScreen = lazy(() => import('./components/WorldsHubScreen').then((m) => ({ default: m.WorldsHubScreen })));
+const DiscoveryHallScreen = lazy(() => import('./components/visual-simulation/DiscoveryHallScreen').then((m) => ({ default: m.DiscoveryHallScreen })));
 const ExperimentPilotScreen = lazy(() => import('./components/ExperimentPilotScreen').then((m) => ({ default: m.ExperimentPilotScreen })));
 const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/PrecisionReferenceAnalysisScreen').then((m) => ({ default: m.PrecisionReferenceAnalysisScreen })));
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
@@ -64,6 +80,11 @@ const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
+const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
+const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard').then((m) => ({ default: m.VirtualLabDashboard })));
+const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
+const SimWorldDashboard = lazy(() => import('./components/SimWorldDashboard').then((m) => ({ default: m.SimWorldDashboard })));
+const MythTheoryLab = lazy(() => import('./features/myths-theories/MythTheoryLab').then((m) => ({ default: m.MythTheoryLab })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -91,6 +112,13 @@ type Route =
   | { kind: 'dossier' }
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
+  | { kind: 'dome-world' }
+  | { kind: 'protection-priority' }
+  | { kind: 'geodesics' }
+  | { kind: 'world-proposal' }
+  | { kind: 'calibration' }
+  | { kind: 'inquiry' }
+  | { kind: 'entanglement' }
   | { kind: 'what-if' }
   | { kind: 'timeline'; mode?: 'cosmic' | 'place' }
   | { kind: 'decision-explorer' }
@@ -100,6 +128,12 @@ type Route =
   | { kind: 'projects' }
   | { kind: 'cde' }
   | { kind: 'drug' }
+  | { kind: 'gov-campaign' }
+  | { kind: 'monetize' }
+  | { kind: 'physics-cms-z' }
+  | { kind: 'virtual-bio' }
+  | { kind: 'research-console' }
+  | { kind: 'sim-world' }
   | { kind: 'campaign' }
   | { kind: 'generate' }
   | { kind: 'compare' }
@@ -116,11 +150,15 @@ type Route =
   | { kind: 'first-person-lab' }
   | { kind: 'looking-glass' }
   | { kind: 'investor-demo' }
+  | { kind: 'discovery-hall' }
+  | { kind: 'worlds' }
+  | { kind: 'tour' }
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
   | { kind: 'cyber' }
-  | { kind: 'decipherment' };
+  | { kind: 'decipherment' }
+  | { kind: 'myths-theories' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -131,6 +169,13 @@ function parseHash(): Route {
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
+  if (h === '#/dome-world') return { kind: 'dome-world' };
+  if (h === '#/protection-priority') return { kind: 'protection-priority' };
+  if (h === '#/geodesics') return { kind: 'geodesics' };
+  if (h === '#/world-proposal') return { kind: 'world-proposal' };
+  if (h === '#/calibration') return { kind: 'calibration' };
+  if (h === '#/inquiry') return { kind: 'inquiry' };
+  if (h === '#/entanglement') return { kind: 'entanglement' };
   if (h === '#/what-if') return { kind: 'what-if' };
   if (h === '#/timeline' || h === '#/timeline?mode=cosmic') return { kind: 'timeline', mode: 'cosmic' };
   if (h === '#/timeline?mode=place') return { kind: 'timeline', mode: 'place' };
@@ -141,6 +186,13 @@ function parseHash(): Route {
   if (h === '#/projects') return { kind: 'projects' };
   if (h === '#/cde') return { kind: 'cde' };
   if (h === '#/drug' || h.startsWith('#/drug?')) return { kind: 'drug' };
+  if (h === '#/gov-campaign') return { kind: 'gov-campaign' };
+  if (h === '#/monetize') return { kind: 'monetize' };
+  if (h === '#/physics/cms-z') return { kind: 'physics-cms-z' };
+  if (h === '#/virtual-bio') return { kind: 'virtual-bio' };
+  if (h === '#/research-console' || h.startsWith('#/research-console?')) return { kind: 'research-console' };
+  if (h === '#/tour') return { kind: 'tour' };
+  if (h === '#/sim-world') return { kind: 'sim-world' };
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
@@ -160,11 +212,14 @@ function parseHash(): Route {
   if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
+  if (h === '#/discovery-hall' || h.startsWith('#/discovery-hall?')) return { kind: 'discovery-hall' };
+  if (h === '#/worlds') return { kind: 'worlds' };
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
+  if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
 }
 
@@ -176,6 +231,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [homeMoreOpen, setHomeMoreOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
   const lastLabId = useRef<string | null>(null);
@@ -248,6 +304,11 @@ export default function App() {
     return (
       <OnboardingOverlay
         onFinish={(destination) => {
+          getVoiceEngine().speak({
+            key: 'intro',
+            lang: 'pl',
+            text: 'Witaj w Genesis Physics. Zaczynamy od pytania, a kończymy na wyniku, który można sprawdzić.',
+          });
           markOnboardingComplete();
           setOnboardingOpen(false);
           if (destination === 'timeline') window.location.hash = '#/timeline';
@@ -350,6 +411,160 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'dome-world') {
+      return (
+        <div className="app">
+          <TopBar title="🌍 Kopuła vs kula — falsyfikacja" onSearch={() => setSearchOpen(true)} />
+          <DomeWorldScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'gov-campaign') {
+      return (
+        <div className="app">
+          <TopBar title="🏛 Government Drug Discovery" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GovDrugCampaignScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'monetize') {
+      return (
+        <div className="app">
+          <TopBar title="💼 Monetize" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <MonetizeScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'physics-cms-z') {
+      return (
+        <div className="app">
+          <TopBar title="⚛ Physics / CMS Z→μμ" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <PhysicsCmsZScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'virtual-bio') {
+      return (
+        <div className="app">
+          <TopBar title="🧫 Virtual Bio Lab" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <VirtualLabDashboard />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'research-console') {
+      return (
+        <div className="app">
+          <TopBar title="Odkrycia — Genesis Research Console" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GenesisConsole key="console" />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'sim-world') {
+      return (
+        <div className="app">
+          <TopBar title="🪐 Sim World" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <SimWorldDashboard />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'protection-priority') {
+      return (
+        <div className="app">
+          <TopBar title="🛡 Kogo chronić najpierw?" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ProtectionPriorityScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'geodesics') {
+      return (
+        <div className="app">
+          <TopBar title="🕳 Fotony wokół czarnej dziury" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <GeodesicWorldScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'world-proposal') {
+      return (
+        <div className="app">
+          <TopBar title="🧩 Zaproponuj świat" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <WorldProposalScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'calibration') {
+      return (
+        <div className="app">
+          <TopBar title="🔎 Ile trwa okres zakaźności?" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <CalibrationInquiryScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'inquiry') {
+      return (
+        <div className="app">
+          <TopBar title="🔬 Autonomiczne dochodzenie" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <AutonomousInquiryScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'entanglement') {
+      return (
+        <div className="app">
+          <TopBar title="🔗 Miary splątania" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <EntanglementMeasuresScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'what-if') {
       return (
         <div className="app">
@@ -415,6 +630,12 @@ export default function App() {
           <main id="main-content" tabIndex={-1} className="home">
             <HeavyRoute>
               <ModelConflictPanel />
+              {/* Two different questions on two different substrates, so two
+                  panels. ModelConflictPanel reads recorded MCRE friction
+                  correlations; the tournament EXECUTES two registered models
+                  and compares what they computed — the protocol
+                  counterfactualCompare.ts explicitly declines to perform. */}
+              <ModelTournamentPanel />
             </HeavyRoute>
           </main>
           {overlays}
@@ -545,7 +766,7 @@ export default function App() {
     if (route.kind === 'city3d') {
       return (
         <div className="app">
-          <TopBar title="🏙 Epidemia w małym mieście — żywa scena WebGL" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Miasto epidemiologiczne" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <City3DWebGLScreen />
           </HeavyRoute>
@@ -590,10 +811,22 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'myths-theories') {
+      return (
+        <div className="app">
+          <TopBar title="Mity i Teorie" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <MythTheoryLab />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
     if (route.kind === 'first-person-lab') {
       return (
         <div className="app">
-          <TopBar title="🔬 Laboratorium pierwszoosobowe" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Wirtualne laboratorium" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <FirstPersonLabScreen />
           </HeavyRoute>
@@ -608,6 +841,44 @@ export default function App() {
           <TopBar title="🔬 GENESIS — Investor Demo" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <InvestorDemoScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'tour') {
+      return (
+        <div className="app">
+          <TopBar title="Genesis Tour" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            {/* Distinct key: switching between the console and the tour must remount the console,
+                so a guided session never leaks into the tour (and vice versa). */}
+            <GenesisConsole key="tour" autoplay="TOUR" />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'worlds') {
+      return (
+        <div className="app">
+          <TopBar title="Światy 3D" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <WorldsHubScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'discovery-hall') {
+      return (
+        <div className="app">
+          <TopBar title="Discovery Hall" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <DiscoveryHallScreen />
           </HeavyRoute>
           {overlays}
         </div>
@@ -676,7 +947,7 @@ export default function App() {
     if (route.kind === 'molecule') {
       return (
         <div className="app">
-          <TopBar title="🧪 Genesis Molecule Lab — real RDKit atoms + bonds" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Molecule World" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <MoleculeLabScreen />
           </HeavyRoute>
@@ -711,14 +982,28 @@ export default function App() {
 
     return (
       <div className="app">
+        <TopBar title="Start" onSearch={() => setSearchOpen(true)} />
         <main className="home home-dashboard" id="main-content" tabIndex={-1}>
           {/* The workspace stage: mission context by default, or one of the
               EXISTING renderers (City3D / Scientific City / World Engine)
               mounted right here beside the chat. Opening a world no longer
               unmounts the conversation. */}
           <HeavyRoute>
+            <StartHero />
+          </HeavyRoute>
+          <HeavyRoute>
             <WorkspaceStage />
           </HeavyRoute>
+          {/* D-118: everything Home used to shout (launcher lists, research zone, the 3D command
+              centre, the capability showcase, the scale journey, the labs grid) stays reachable
+              behind ONE disclosure. Nothing was deleted; it stopped competing with the question box. */}
+          <div className="home-more">
+            <button type="button" className="chip-btn home-more-toggle" aria-expanded={homeMoreOpen} onClick={() => setHomeMoreOpen((v) => !v)}>
+              {homeMoreOpen ? 'Zwiń przegląd systemu' : 'Poznaj Genesis od środka — moduły, laboratoria, przegląd systemu'}
+            </button>
+          </div>
+          {homeMoreOpen && (
+          <div className="home-more-body">
           <div className="section-label">Zacznij tutaj</div>
           <div className="home-launcher">
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>
@@ -828,6 +1113,14 @@ export default function App() {
                 </span>
                 <span className="timeline-cta-arrow" aria-hidden="true">→</span>
               </button>
+              <button className="timeline-cta" onClick={() => { window.location.hash = '#/gov-campaign'; }}>
+                <span className="timeline-cta-icon" aria-hidden="true">🏛</span>
+                <span className="timeline-cta-text">
+                  <span className="timeline-cta-title">Government Drug Discovery</span>
+                  <span className="timeline-cta-sub">Pełna kampania na realnej, wygenerowanej z mechanizmu puli kandydatów: screening, TOP 10, TOP 2, głęboka falsyfikacja, bramka bezpieczeństwa i werdykt — łącznie z uczciwym brakiem zwycięzcy.</span>
+                </span>
+                <span className="timeline-cta-arrow" aria-hidden="true">→</span>
+              </button>
               <button className="timeline-cta" onClick={() => { window.location.hash = '#/drug'; }}>
                 <span className="timeline-cta-icon" aria-hidden="true">💊</span>
                 <span className="timeline-cta-text">
@@ -908,6 +1201,8 @@ export default function App() {
             Genesis OS · Każda symulacja nosi etykietę uczciwości naukowej: hipotezy nigdy nie udają faktów.
             Naciśnij <kbd>/</kbd>, aby szukać, albo <kbd>?</kbd> po listę skrótów.
           </p>
+          </div>
+          )}
         </main>
         {overlays}
       </div>
@@ -918,6 +1213,7 @@ export default function App() {
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
+      <ErrorBoundary><HyperStateVisualizer /></ErrorBoundary>
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —
@@ -935,17 +1231,41 @@ export default function App() {
   );
 }
 
+/** Route titles were written with a leading emoji; the chrome shows the Genesis mark instead (D-118). */
+export function cleanRouteTitle(title: string): string {
+  return title.replace(/^[^\p{L}\p{N}]+\s*/u, '').trim();
+}
+
 function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {
+  const [ask, setAsk] = useState('');
+  const submit = (): void => {
+    const text = ask.trim();
+    if (!text) return;
+    setAsk('');
+    requestOpenScienceChat(text);
+  };
   return (
     <header className="topbar">
-      <button className="back" aria-label="Wróć do laboratoriów" onClick={() => { window.location.hash = ''; }}>
-        ←
+      {/* The logo is the way home on every page (D-120). */}
+      <button className="topbar-logo" aria-label="Genesis Physics — Start" onClick={() => { window.location.hash = ''; }}>
+        <GenesisWordmark size={26} tagline={false} />
       </button>
       <div className="titles">
-        <h1>{title}</h1>
+        <h1>{cleanRouteTitle(title)}</h1>
       </div>
-      <button className="back" aria-label={t('nav.search')} onClick={onSearch} style={{ marginLeft: 'auto' }}>
-        🔍
+      <form className="topbar-ask" onSubmit={(e) => { e.preventDefault(); submit(); }} role="search" aria-label="Zapytaj Genesis">
+        <span className="topbar-ask-icon" aria-hidden="true">✦</span>
+        <input
+          className="topbar-ask-input"
+          value={ask}
+          onChange={(e) => setAsk(e.target.value)}
+          placeholder="Zapytaj Genesis…"
+          aria-label="Zapytaj Genesis"
+        />
+        <button type="submit" className="topbar-ask-send" disabled={!ask.trim()} aria-label="Wyślij pytanie">→</button>
+      </form>
+      <button className="back" aria-label={t('nav.search')} onClick={onSearch}>
+        ⌕
       </button>
     </header>
   );

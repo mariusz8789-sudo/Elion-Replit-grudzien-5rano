@@ -73,7 +73,7 @@ const TICKS = 12;
 describe('Every adapter delegates, and none of them decides anything itself', () => {
   it('the hypothesis-loop adapter returns exactly what the real selector returns', () => {
     const problem = HYPOTHESIS_PROBLEMS[0];
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
     const direct = selectNextHypothesisExperiment(result);
     const wrapped = hypothesisLoopNextAction(result);
 
@@ -203,8 +203,9 @@ describe('The campaign adapter matches the REAL backend selector, not just a sta
   // asserted across a package boundary.
   // Resolved from the working directory rather than written as a bundler-visible
   // relative specifier: the point is that this path is never part of the build graph.
+  const REPO_ROOT = process.env.INIT_CWD ?? path.resolve(process.cwd(), '../..');
   const BACKEND_SELECTOR = pathToFileURL(
-    path.resolve(process.cwd(), '../backend/src/campaign/nextExperiment.mjs'),
+    path.resolve(REPO_ROOT, 'packages/backend/src/campaign/nextExperiment.mjs'),
   ).href;
 
   it('returns exactly what analyzeAndDecide returns, and honours its own isStop', async () => {
@@ -237,7 +238,7 @@ describe('The campaign adapter matches the REAL backend selector, not just a sta
 
 describe('The shared shape is honest about what each selector does not report', () => {
   const problem = HYPOTHESIS_PROBLEMS[0];
-  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
 
   it('stamps every action with the contract version and its own selector id', () => {
     const actions: NextAction[] = [

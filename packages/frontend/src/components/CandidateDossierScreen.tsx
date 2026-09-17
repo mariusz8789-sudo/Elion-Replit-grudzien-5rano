@@ -9,6 +9,7 @@ import {
   type SavedExperiment,
 } from '../core/scienceMemory';
 import type { CandidateDiscoveryReport } from '../core/biotechDiscoveryContract';
+import { biotechToCanonicalReliability, canonicalReliabilityLabel } from '../core/epistemicReliability';
 
 function candidateCid(candidateId: string): number | undefined {
   const match = candidateId.match(/pubchem:(\d+)/);
@@ -34,6 +35,25 @@ function downloadDossier(record: SavedExperiment, artifact: SavedBiotechDiscover
   link.download = `candidate-dossier-${(candidateCid(report.candidateId) ?? report.candidateId).toString()}.json`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * G6 CANONICAL RELIABILITY BADGE — the dossier's own `BiotechEpistemicStatus`
+ * value stays exactly as recorded (it is displayed unchanged right next to
+ * this), but it carries no information a reader can compare across domains:
+ * "OBSERVED" here and "MODEL" on a knowledge citation are not obviously
+ * orderable against each other. This maps the SAME stored value onto the
+ * shared 7-tier `EpistemicStatus` scale (`core/epistemicReliability.ts`) and
+ * shows its Polish label — read-only classification, nothing is written back
+ * or renamed. `BLOCKED` has no honest place on a reliability ladder (it is a
+ * process state, not a claim about evidentiary strength — see that module's
+ * doc), so it renders as the process note rather than a guessed tier.
+ */
+function reliabilityBadge(status: CandidateDiscoveryReport['epistemicStatus']): string {
+  const canonical = biotechToCanonicalReliability(status);
+  return canonical === undefined
+    ? 'proces nieukończony (brak twierdzenia do sklasyfikowania)'
+    : `wiarygodność: ${canonicalReliabilityLabel(canonical)}`;
 }
 
 function Stat({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
@@ -83,7 +103,7 @@ export function CandidateDossierScreen() {
           <p className="dossier-title">{source?.name ?? report.candidateId}</p>
           <p className="settings-hint">Jedna spójna ścieżka: identity → evidence → compute → ranking → WHY → validation → Memory → Replay.</p>
         </div>
-        <div className="dossier-status"><strong>{report.epistemicStatus}</strong><span>{report.clinicalEfficacy} clinical efficacy</span><span>{successfulRuns.length}/{runs.length} compute OK</span></div>
+        <div className="dossier-status"><strong>{report.epistemicStatus}</strong><span>{reliabilityBadge(report.epistemicStatus)}</span><span>{report.clinicalEfficacy} clinical efficacy</span><span>{successfulRuns.length}/{runs.length} compute OK</span></div>
       </section>
 
       <section className="dossier-flow" aria-label="Investor flow">
@@ -132,6 +152,7 @@ export function CandidateDossierScreen() {
         <div className="stat-list">
           <Stat label="Research priority" value={report.ranking ? report.ranking.score.toFixed(4) : 'UNKNOWN'} />
           <Stat label="Ranking status" value={report.ranking?.epistemicStatus ?? 'UNKNOWN'} />
+          <Stat label="Ranking status (G6 canonical tier)" value={report.ranking ? reliabilityBadge(report.ranking.epistemicStatus) : 'n/d'} />
           <Stat label="Rationale" value={report.ranking?.rationale ?? 'UNKNOWN'} />
           <Stat label="Uncertainty penalty" value={report.ranking ? String(report.ranking.components.uncertaintyPenalty) : 'UNKNOWN'} />
         </div>

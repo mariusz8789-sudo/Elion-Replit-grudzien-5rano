@@ -1,0 +1,850 @@
+{
+  "nctId": "NCT02863419",
+  "briefTitle": "Efficacy and Safety of Oral Semaglutide Versus Liraglutide and Versus Placebo in Subjects With Type 2 Diabetes Mellitus",
+  "arms": [
+    {
+      "label": "Oral Semaglutide",
+      "type": "EXPERIMENTAL",
+      "description": null
+    },
+    {
+      "label": "Liraglutide",
+      "type": "ACTIVE_COMPARATOR",
+      "description": null
+    },
+    {
+      "label": "Placebo",
+      "type": "PLACEBO_COMPARATOR",
+      "description": null
+    }
+  ],
+  "hba1cOutcomes": [
+    {
+      "title": "Change in HbA1c (Week 26)",
+      "type": "PRIMARY",
+      "paramType": "MEAN",
+      "dispersionType": "Standard Deviation",
+      "unitOfMeasure": "Percentage of HbA1c",
+      "timeFrame": "Week 0, week 26",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Oral Semaglutide 14 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.8 mg"
+        },
+        {
+          "id": "OG002",
+          "title": "Placebo"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "285"
+            },
+            {
+              "groupId": "OG001",
+              "value": "284"
+            },
+            {
+              "groupId": "OG002",
+              "value": "142"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "title": "In-trial",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "278"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "272"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "134"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "-1.2",
+                  "spread": "0.9"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "-1.1",
+                  "spread": "0.9"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "-0.1",
+                  "spread": "0.7"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "On-treatment without rescue medication",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "238"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "245"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "112"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "-1.4",
+                  "spread": "0.9"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "-1.2",
+                  "spread": "0.9"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "-0.1",
+                  "spread": "0.7"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Change in HbA1c (Week 52)",
+      "type": "SECONDARY",
+      "paramType": "MEAN",
+      "dispersionType": "Standard Deviation",
+      "unitOfMeasure": "Percentage of HbA1c",
+      "timeFrame": "Week 0, week 52",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Oral Semaglutide 14 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.8 mg"
+        },
+        {
+          "id": "OG002",
+          "title": "Placebo"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "275"
+            },
+            {
+              "groupId": "OG001",
+              "value": "269"
+            },
+            {
+              "groupId": "OG002",
+              "value": "133"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "-1.2",
+                  "spread": "1.0"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "-0.9",
+                  "spread": "1.0"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "-0.1",
+                  "spread": "0.9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Participants Who Achieve HbA1c <7.0% (53 mmol/Mol) ADA Target (Yes/no)",
+      "type": "SECONDARY",
+      "paramType": "COUNT_OF_PARTICIPANTS",
+      "unitOfMeasure": "Participants",
+      "timeFrame": "Week 26, week 52",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Oral Semaglutide 14 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.8 mg"
+        },
+        {
+          "id": "OG002",
+          "title": "Placebo"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "285"
+            },
+            {
+              "groupId": "OG001",
+              "value": "284"
+            },
+            {
+              "groupId": "OG002",
+              "value": "142"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "title": "Week 26",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "278"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "272"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "134"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "188"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "168"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "19"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "90"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "104"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "115"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Week 52",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "275"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "269"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "133"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "167"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "148"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "20"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "108"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "121"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "113"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Participants Who Achieve HbA1c <6.5% (48 mmol/Mol) AACE Target (Yes/no)",
+      "type": "SECONDARY",
+      "paramType": "COUNT_OF_PARTICIPANTS",
+      "unitOfMeasure": "Participants",
+      "timeFrame": "Week 26, week 52",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Oral Semaglutide 14 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.8 mg"
+        },
+        {
+          "id": "OG002",
+          "title": "Placebo"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "285"
+            },
+            {
+              "groupId": "OG001",
+              "value": "284"
+            },
+            {
+              "groupId": "OG002",
+              "value": "142"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "title": "Week 26",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "278"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "272"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "134"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "133"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "116"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "7"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "145"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "156"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "127"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Week 52",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "275"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "269"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "133"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "119"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "88"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "5"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "156"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "181"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "128"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Participants Who Achieve HbA1c <7.0 % (53 mmol/Mol) Without Hypoglycaemia (Severe or BG Confirmed Symptomatic Hypoglycaemia) and no Weight Gain (Yes/no)",
+      "type": "SECONDARY",
+      "paramType": "COUNT_OF_PARTICIPANTS",
+      "unitOfMeasure": "Participants",
+      "timeFrame": "Week 26, week 52",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Oral Semaglutide 14 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.8 mg"
+        },
+        {
+          "id": "OG002",
+          "title": "Placebo"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "285"
+            },
+            {
+              "groupId": "OG001",
+              "value": "284"
+            },
+            {
+              "groupId": "OG002",
+              "value": "142"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "title": "Week 26",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "278"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "271"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "134"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "169"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "145"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "15"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "109"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "126"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "119"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Week 52",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "275"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "269"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "133"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "155"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "130"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "15"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "120"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "139"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "118"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Participants Who Achieve HbA1c Reduction ≥1% (10.9 mmol/Mol) and Weight Loss ≥3% (Yes/no)",
+      "type": "SECONDARY",
+      "paramType": "COUNT_OF_PARTICIPANTS",
+      "unitOfMeasure": "Participants",
+      "timeFrame": "Week 26, week 52",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Oral Semaglutide 14 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.8 mg"
+        },
+        {
+          "id": "OG002",
+          "title": "Placebo"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "285"
+            },
+            {
+              "groupId": "OG001",
+              "value": "284"
+            },
+            {
+              "groupId": "OG002",
+              "value": "142"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "title": "Week 26",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "278"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "271"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "134"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "130"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "93"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "5"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "148"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "178"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "129"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Week 52",
+          "denoms": [
+            {
+              "units": "Participants",
+              "counts": [
+                {
+                  "groupId": "OG000",
+                  "value": "275"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "269"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "133"
+                }
+              ]
+            }
+          ],
+          "categories": [
+            {
+              "title": "Yes",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "120"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "77"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "9"
+                }
+              ]
+            },
+            {
+              "title": "No",
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "155"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "192"
+                },
+                {
+                  "groupId": "OG002",
+                  "value": "124"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

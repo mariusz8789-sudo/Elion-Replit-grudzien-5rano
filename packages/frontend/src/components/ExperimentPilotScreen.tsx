@@ -26,6 +26,7 @@ import {
   serializeScientificEvidencePack,
   serializeEvidencePackRoCrate,
   analyseExperimentSeries,
+  parseEvidenceUri,
   type ScientificExperimentDesign,
   type ScientificEvidenceChain,
   type ScientificEvidencePack,
@@ -40,6 +41,7 @@ import type { ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
 import { GOVERNED_PREPAREDNESS_QUESTIONS, governedCounterfactualParameters, resolvePreparednessQuestion, type PreparednessResolution } from '../core/simulation/preparednessQuestions';
 import {
+  deriveNarrowedHypothesisProblem,
   executePreregisteredHypotheses,
   generateCompetingHypotheses,
   HYPOTHESIS_PROBLEMS,
@@ -49,6 +51,7 @@ import {
   type NextHypothesisExperiment,
   type Preregistration,
 } from '../core/experimentFabric/hypothesisLoop';
+import { explainWhyBeliefChanged } from '../core/experimentFabric/beliefChangeRun';
 import { setPendingScenario } from '../core/scenarioBridge';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
@@ -149,8 +152,14 @@ export function ExperimentPilotScreen() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
-    const evidencePackId = params.get('replay');
-    if (!evidencePackId) return;
+    const replayParam = params.get('replay');
+    if (!replayParam) return;
+    // The producer side (ScientificMemoryScreen.tsx) writes this as a real
+    // `evidence://` URI (evidenceUri.ts). Bare, unprefixed ids are still
+    // accepted so a link copied before this wiring, or typed by hand, keeps
+    // working — `parseEvidenceUri` returns null on anything that isn't a
+    // well-formed v1 URI rather than guessing, so the fallback is explicit.
+    const evidencePackId = parseEvidenceUri(replayParam)?.evidencePackId ?? replayParam;
     const stored = getScientificEvidencePack(evidencePackId);
     if (!stored) {
       setError(`Nie znaleziono lokalnego Evidence Pack: ${evidencePackId}`);
@@ -429,7 +438,7 @@ export function ExperimentPilotScreen() {
               className="chip-btn"
               disabled={loopBusy}
               onClick={() => {
-                const registered = preregisterHypotheses(generateCompetingHypotheses(problem));
+                const registered = preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] });
                 setPrereg(registered);
                 setLoopResult(null);
                 setNextStep(null);
@@ -512,6 +521,62 @@ export function ExperimentPilotScreen() {
             </dl>
             <p className="pilot-summary">ROZSTRZYGNIĘCIE: {loopResult.discrimination.reason}</p>
             <p className="settings-hint">{loopResult.preregistrationIntact.reason}</p>
+            {/* DLACZEGO ZMIENIŁO SIĘ PRZEKONANIE — BEFORE -> OBSERVATION -> AFTER,
+                every field read straight off the loop result that was just
+                executed above. `explainWhyBeliefChanged` is the pure, synchronous
+                half of `beliefChangeRun.ts`; it re-runs nothing and infers
+                nothing, which is why it can sit directly under the verdict.
+                Without it the screen showed WHAT was decided and never WHAT
+                CHANGED — and "the model changed its mind, here are the numbers
+                that changed it" is the claim this pilot exists to make. */}
+            {(() => {
+              const why = explainWhyBeliefChanged(loopResult);
+              const changed = why.after.filter((after) => {
+                const before = why.before.find((entry) => entry.hypothesisId === after.hypothesisId);
+                return before !== undefined && before.status !== after.status;
+              });
+              return (
+                <div className="pilot-step" data-testid="belief-change-why">
+                  <h3>Dlaczego zmieniło się przekonanie</h3>
+                  <p className="settings-hint">PYTANIE: {why.question}</p>
+                  <p className="settings-hint">PORÓWNANIE: {why.comparison}</p>
+                  <p className="settings-hint">POWÓD: {why.reason}</p>
+                  {/* Reuses the existing `compare-table` styling (and its
+                      overflow wrapper, so it stays readable on a phone) rather
+                      than minting a pilot-only table class. */}
+                  <div className="compare-table-wrap">
+                    <table className="compare-table belief-change-table">
+                      <thead>
+                        <tr><th>hipoteza</th><th>przed</th><th>obserwacja</th><th>po</th></tr>
+                      </thead>
+                      <tbody>
+                        {why.after.map((after) => {
+                          const before = why.before.find((entry) => entry.hypothesisId === after.hypothesisId);
+                          const observed = why.observation.find((entry) => entry.hypothesisId === after.hypothesisId);
+                          return (
+                            <tr key={after.hypothesisId} data-testid={`belief-change-row-${after.hypothesisId}`}>
+                              <td>{after.statement}</td>
+                              <td className="mono">{before?.status ?? '—'}</td>
+                              <td className="mono">
+                                {observed === undefined || observed.value === null
+                                  ? '—'
+                                  : `${observed.metric} = ${observed.value}${observed.unit === null ? '' : ` ${observed.unit}`}`}
+                              </td>
+                              <td className="mono">{after.status}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="settings-hint" data-testid="belief-change-count">
+                    {changed.length === 0
+                      ? 'Żadna hipoteza nie zmieniła statusu — obserwacja nie rozstrzygnęła między nimi.'
+                      : `Status zmieniło ${changed.length} z ${why.after.length} hipotez.`}
+                  </p>
+                </div>
+              );
+            })()}
             {nextStep && (
               <>
                 <h3>Następny eksperyment</h3>
@@ -548,6 +613,35 @@ export function ExperimentPilotScreen() {
                 </div>
               </>
             )}
+            {/* G4 — generowanie hipotez świadome obserwacji: kandydat, którego
+                nikt nie zadeklarował, wyprowadzony z REALNIE zmierzonego
+                zwycięzcy i jego bezpośredniego konkurenta. Widoczne tylko, gdy
+                deriveNarrowedHypothesisProblem uzna zbiór za rozstrzygnięty i
+                liczbowy — dla remisu albo zmiennej kategorycznej (np.
+                scenarioId) przycisk się nie pojawia, zamiast zgadywać. */}
+            {(() => {
+              const narrowed = deriveNarrowedHypothesisProblem(loopResult);
+              if (!narrowed.ok) return null;
+              return (
+                <div className="pilot-actions" data-testid="pilot-narrow-hypothesis">
+                  <p className="settings-hint">ZAWĘŻENIE (G4): {narrowed.derivation.rationale}</p>
+                  <button
+                    className="chip-btn"
+                    disabled={loopBusy}
+                    onClick={() => {
+                      const priorFingerprints = [...new Set(loopResult.allRuns.map((entry) => entry.provenance.runFingerprint))];
+                      const registered = preregisterHypotheses(generateCompetingHypotheses(narrowed.derivation.problem), { priorRunFingerprints: priorFingerprints });
+                      setPrereg(registered);
+                      setLoopResult(null);
+                      setNextStep(null);
+                      setLoopNotice(`Zawężono wokół zwycięzcy: nowy kandydat ${String(narrowed.derivation.problem.candidateValues[0])} nie był wcześniej zadeklarowany. Prerejestrowano ${registered.hypotheses.length} hipotez(ę) — nic jeszcze nie zostało uruchomione.`);
+                    }}
+                  >
+                    Zawęź wokół zwycięzcy
+                  </button>
+                </div>
+              );
+            })()}
           </>
         )}
         {loopNotice && <p className="settings-hint" role="status">{loopNotice}</p>}

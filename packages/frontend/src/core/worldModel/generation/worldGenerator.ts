@@ -42,7 +42,19 @@ export function generateWorld(blueprint: WorldBlueprint): GeneratedWorld {
     graph.addRelationship(entityId(relationship.from), entityId(relationship.to), relationship.kind);
   }
 
-  const paramsHash = fnv1a(canonicalJson({ worldId: blueprint.worldId, seed: blueprint.seed, entityCount: entityIds.length }));
+  // Structured provenance beyond seed/entityCount: WHICH templates were
+  // requested and at WHAT level of detail — only present when this blueprint
+  // came from `compileSpecification` (a hand-authored blueprint has neither
+  // field, and the event's parameters correspondingly omit them, exactly as
+  // before these fields existed on WorldBlueprint). Included in the same
+  // reproducibility hash as worldId/seed/entityCount: two specifications
+  // that differ only in requested templates or level of detail are a
+  // genuinely different generation request and must not share a paramsHash.
+  const templateProvenance = {
+    ...(blueprint.templateIds !== undefined ? { templateIds: blueprint.templateIds } : {}),
+    ...(blueprint.levelOfDetail !== undefined ? { levelOfDetail: blueprint.levelOfDetail } : {}),
+  };
+  const paramsHash = fnv1a(canonicalJson({ worldId: blueprint.worldId, seed: blueprint.seed, entityCount: entityIds.length, ...templateProvenance }));
   const generationEvent: GenesisEvent = {
     contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
     id: `world-gen:${blueprint.worldId}:${blueprint.seed}`,
@@ -51,7 +63,7 @@ export function generateWorld(blueprint: WorldBlueprint): GeneratedWorld {
     source: blueprint.root.ref,
     affectedEntities: [blueprint.root.ref],
     cause: 'declarative-world-generation',
-    parameters: { worldId: blueprint.worldId, seed: blueprint.seed, entityCount: entityIds.length },
+    parameters: { worldId: blueprint.worldId, seed: blueprint.seed, entityCount: entityIds.length, ...templateProvenance },
     provenance: {
       origin: 'experiment-action',
       seed: blueprint.seed,

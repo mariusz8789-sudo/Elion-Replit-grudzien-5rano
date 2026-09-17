@@ -9,9 +9,14 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GENESIS_AI_MODEL=${GENESIS_AI_MODEL:-claude-opus-4-8}
-      - GENESIS_DB_PATH=/app/packages/backend/data/genesis.db
+      - GENESIS_DB_PATH=/data/genesis.db
     volumes:
-      - genesis-data:/app/packages/backend/data
+      - genesis-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
 volumes:

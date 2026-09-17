@@ -11,7 +11,9 @@ import { evaluateTwoArmRelation } from '../experimentFabric/falsificationRelatio
 import { AT_HORIZON } from '../experimentFabric/objectiveReducer';
 import type { FalsificationCriterion, HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import type { ScenarioKind } from '../lookingGlass/scenarioRequest';
+import type { GroundingLevel } from '../worldModel/ecs/types';
 import type { WorldGraph } from '../worldModel/ecs/worldGraph';
+import { groundingContributionWeight, weightMagnitudeByGrounding } from '../worldModel/discovery/groundingWeight';
 import { reduceObjectiveTrajectory } from '../worldModel/discovery/objectiveTrajectory';
 import { TemporalBranchRegistry, TemporalEngine, type TemporalUpdater } from '../worldModel/temporal/temporalEngine';
 
@@ -144,7 +146,18 @@ export interface WorldCalibrationOutcome {
   readonly predicted: number | null;
   readonly assessment: HypothesisAssessment;
   readonly relativeError: number | null;
+  /** The magnitude actually handed to `updateConfidence` — already weighted by `groundingWeight`. */
   readonly evidenceMagnitude: number;
+  /**
+   * The magnitude BEFORE grounding weighting, kept so the weighting is
+   * auditable rather than silent: `evidenceMagnitude === rawEvidenceMagnitude
+   * * groundingWeight` always holds.
+   */
+  readonly rawEvidenceMagnitude: number;
+  /** `GroundingLevel` of the measured entity, read from the real world this calibration measures — never assumed. */
+  readonly measuredGrounding: GroundingLevel;
+  /** 0..1 multiplier this grounding level carries — see `worldModel/discovery/groundingWeight.ts`. */
+  readonly groundingWeight: number;
   readonly confidenceBefore: number;
   readonly confidenceAfter: number;
   readonly reason: string;
@@ -369,6 +382,13 @@ export function runAutonomousWorldCalibration(input: WorldParameterCalibrationIn
   const maxTick = Math.max(input.openingProbeTick, ...system.candidateProbeTicks);
 
   const hiddenEngine = buildAdvancedEngine(system, system.hiddenValue, `hidden:${system.systemId}`, maxTick);
+  // How grounded the measured entity's own model is, read ONCE off the real
+  // world this calibration measures — the same entity every `readAt` below
+  // reads. Declared by the domain (`spawnEntity`), never assumed here; it
+  // scales how far a reading on this entity may move belief. See
+  // `worldModel/discovery/groundingWeight.ts`.
+  const measuredGrounding: GroundingLevel = hiddenEngine.graph.getEntity(system.entityId).grounding;
+  const groundingWeight = groundingContributionWeight(measuredGrounding);
   const enginesById = new Map<string, TemporalEngine>(
     input.hypotheses.map((h) => [h.hypothesisId, buildAdvancedEngine(system, h.claimedValue, h.hypothesisId, maxTick)]),
   );
@@ -427,6 +447,9 @@ export function runAutonomousWorldCalibration(input: WorldParameterCalibrationIn
           assessment: 'INCONCLUSIVE',
           relativeError: null,
           evidenceMagnitude: 0,
+          rawEvidenceMagnitude: 0,
+          measuredGrounding,
+          groundingWeight,
           confidenceBefore: hypothesis.confidence,
           confidenceAfter: hypothesis.confidence,
           reason: `${system.worldId} produced no ${system.observedMetric} for this hypothesis's value at tick=${probeTick}, so its prediction could not be compared.`,
@@ -440,7 +463,12 @@ export function runAutonomousWorldCalibration(input: WorldParameterCalibrationIn
         : relation.met
           ? 'SUPPORTED_WITHIN_PROTOCOL'
           : 'FALSIFIED_WITHIN_PROTOCOL';
-      const magnitude = evidenceMagnitudeWithinTolerance(observed, predicted, criterion.tolerance ?? 0);
+      const rawMagnitude = evidenceMagnitudeWithinTolerance(observed, predicted, criterion.tolerance ?? 0);
+      // Grounding-weighted: a reading taken on an entity no solver advances is
+      // weaker evidence about the world than the same reading on a modelled
+      // one. `MODEL_ESTIMATE`/`GROUNDED_EXACT` weigh 1, so every world whose
+      // measured entity declares a real solver behaves exactly as before.
+      const magnitude = weightMagnitudeByGrounding(rawMagnitude, measuredGrounding);
       const reason = assessment === 'SUPPORTED_WITHIN_PROTOCOL'
         ? `Predicted ${predicted}, measured ${observed} at tick=${probeTick} — inside the declared ±${system.agreementTolerance * 100}% band.`
         : assessment === 'FALSIFIED_WITHIN_PROTOCOL'
@@ -454,6 +482,9 @@ export function runAutonomousWorldCalibration(input: WorldParameterCalibrationIn
         assessment,
         relativeError: predicted === 0 ? null : Math.abs(observed - predicted) / Math.abs(predicted),
         evidenceMagnitude: magnitude,
+        rawEvidenceMagnitude: rawMagnitude,
+        measuredGrounding,
+        groundingWeight,
         confidenceBefore: hypothesis.confidence,
         confidenceAfter: updated.confidence,
         reason,

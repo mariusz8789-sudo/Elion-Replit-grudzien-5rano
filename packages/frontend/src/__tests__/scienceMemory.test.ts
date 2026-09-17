@@ -37,7 +37,7 @@ describe('scienceMemory: save / list / get / delete', () => {
     labId: 'universe', experimentId: 'threebody', experimentName: 'Problem trzech ciał',
     params: { mass: 1.0 }, stats: { energy: -0.5 },
     honesty: 'exact' as const, honestyNote: 'Velocity-Verlet.',
-    equations: ['a_i = Σ ...'], assumptions: ['Newton'], epistemicStatus: 'Nauka ustalona',
+    equations: ['a_i = Σ ...'], assumptions: ['Newton'], epistemicStatus: 'ESTABLISHED_SCIENCE' as const,
   };
 
   it('saves an experiment carrying model, params, equations, stats and a hash', async () => {

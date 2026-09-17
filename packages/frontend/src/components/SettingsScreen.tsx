@@ -13,6 +13,7 @@ const EVENT_LABELS: Record<AnalyticsEvent, string> = {
   shortcut_used: 'Użycia skrótów klawiszowych',
   discovery_log_viewed: 'Wizyty w dzienniku odkryć',
   glossary_viewed: 'Wizyty w słowniczku',
+  dome_world_viewed: 'Wizyty w falsyfikacji kopuła vs kula',
   custom_experiment_run: 'Uruchomione własne eksperymenty',
   custom_experiment_saved: 'Zapisane własne eksperymenty',
   experiment_fabric_run: 'Uruchomienia Experiment Fabric',

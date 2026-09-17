@@ -1,0 +1,92 @@
+{
+  "id": "D-105-NOISE-FLOOR-VERIFIED",
+  "kind": "SEALED_MEASUREMENT",
+  "supersedes": "D-103-NOISE-FLOOR-FINAL (coverage only; methodology unchanged)",
+  "identityKey": "canonicalSmiles (real, via replicateGrouping.mjs — no substitute)",
+  "prereg": {
+    "id": "D-102-READOUT-FAMILY-PREREG",
+    "fingerprint": "f475467a12dff413"
+  },
+  "a2Status": "8/8 chunks delivered; 3/8 byte-verified (chunks 3, 5, 6); chunks 1, 2, 4, 7, 8 failed custody and are excluded in full",
+  "coverage": {
+    "a1Molecules": 300,
+    "chunksVerified": [
+      3,
+      5,
+      6
+    ],
+    "chunksFailed": [
+      1,
+      2,
+      4,
+      7,
+      8
+    ],
+    "rowsDelivered": 300,
+    "declaredTotalRows": 300,
+    "structuresFromVerifiedChunks": 94,
+    "structuresFromFrozenPin": 7,
+    "countedInBothSources": 2,
+    "custodyVerifiedStructures": 99,
+    "moleculesStillWithoutVerifiedStructure": 201,
+    "complete": false
+  },
+  "rowsExcludedNoVerifiedSmiles": 362,
+  "rowsExcludedUnverifiedLabel": 190,
+  "rowsInMeasurement": 205,
+  "perFamily": {
+    "OTHER": {
+      "rows": 19,
+      "molecules": 16,
+      "groups": 2,
+      "status": "NOT_MEASURED",
+      "medianSpread": null,
+      "medianSd": null
+    },
+    "CAMP": {
+      "rows": 82,
+      "molecules": 41,
+      "groups": 28,
+      "status": "MEASURED",
+      "medianSpread": 1.4949,
+      "medianSd": 1.0005
+    },
+    "ARRESTIN": {
+      "rows": 35,
+      "molecules": 24,
+      "groups": 7,
+      "status": "NOT_MEASURED",
+      "medianSpread": null,
+      "medianSd": null
+    },
+    "CALCIUM": {
+      "rows": 67,
+      "molecules": 65,
+      "groups": 1,
+      "status": "NOT_MEASURED",
+      "medianSpread": null,
+      "medianSd": null
+    },
+    "INTERNALIZATION": {
+      "rows": 1,
+      "molecules": 1,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null,
+      "medianSd": null
+    },
+    "BINDING": {
+      "rows": 1,
+      "molecules": 1,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null,
+      "medianSd": null
+    }
+  },
+  "minGroupsForNoiseFloor": 20,
+  "c1Status": "CLOSED",
+  "c1Reason": "readout families reaching 20+ replicate groups under real structure identity: CAMP",
+  "computedAt": "2026-09-15T21:45:27.812Z",
+  "artifactHash": "655b3171cb189dc54eddb2306afb004774c30309b9e1fa47b5c3db5f2d1cc991"
+}

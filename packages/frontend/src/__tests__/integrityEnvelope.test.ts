@@ -238,4 +238,98 @@ describe('Signed Integrity Envelope — real ECDSA signatures, zero dependencies
     expect((await verifySignedEnvelope(first)).valid).toBe(true);
     expect((await verifySignedEnvelope(second)).valid).toBe(true);
   });
+
+  it('signIntegrityEnvelope stamps signedAt with an ISO timestamp by default, distinct from the underlying exportedAt', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, '2020-01-01T00:00:00.000Z');
+    const keyPair = await generateSigningKeyPair();
+    const before = new Date();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+    const after = new Date();
+
+    expect(signed.signedAt).not.toBe(envelope.exportedAt);
+    const signedAtMs = new Date(signed.signedAt).getTime();
+    expect(signedAtMs).toBeGreaterThanOrEqual(before.getTime());
+    expect(signedAtMs).toBeLessThanOrEqual(after.getTime());
+  });
+
+  it('signIntegrityEnvelope accepts an explicit signedAt override', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const fixedSignedAt = '2026-01-01T00:00:00.000Z';
+    const signed = await signIntegrityEnvelope(envelope, keyPair, fixedSignedAt);
+    expect(signed.signedAt).toBe(fixedSignedAt);
+    expect((await verifySignedEnvelope(signed)).valid).toBe(true);
+  });
+
+  it('rejects a signed envelope missing signedAt', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+    const { signedAt: _dropped, ...withoutSignedAt } = signed;
+    const result = await verifySignedEnvelope(withoutSignedAt as unknown as SignedIntegrityEnvelope);
+    expect(result.valid).toBe(false);
+    expect(result.status).toBe('STRUCTURALLY_INVALID');
+  });
+});
+
+describe('Integrity Envelope — IntegrityCertificateStatus (five-value verdict)', () => {
+  it('verifyIntegrityEnvelope reports INTEGRITY_VALID_UNSIGNED for a valid unsigned envelope', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const result = await verifyIntegrityEnvelope(envelope);
+    expect(result.status).toBe('INTEGRITY_VALID_UNSIGNED');
+  });
+
+  it('verifyIntegrityEnvelope reports INTEGRITY_INVALID for a tampered record', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const result = await verifyIntegrityEnvelope({ ...envelope, record: { a: 2 } });
+    expect(result.status).toBe('INTEGRITY_INVALID');
+  });
+
+  it('verifyIntegrityEnvelope reports STRUCTURALLY_INVALID for a malformed envelope', async () => {
+    const result = await verifyIntegrityEnvelope({ record: null } as unknown as IntegrityEnvelope);
+    expect(result.status).toBe('STRUCTURALLY_INVALID');
+  });
+
+  it('verifySignedEnvelope reports INTEGRITY_SIGNED_VERIFIED for a validly signed, trusted envelope', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+    const result = await verifySignedEnvelope(signed);
+    expect(result.status).toBe('INTEGRITY_SIGNED_VERIFIED');
+  });
+
+  it('verifySignedEnvelope reports INTEGRITY_SIGNED_UNTRUSTED when the signer is not the expected one', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const realSigner = await generateSigningKeyPair();
+    const impostor = await generateSigningKeyPair();
+    const signedByImpostor = await signIntegrityEnvelope(envelope, impostor);
+    const realSignerFingerprint = await exportPublicKeySpki(realSigner.publicKey);
+
+    const result = await verifySignedEnvelope(signedByImpostor, realSignerFingerprint);
+    expect(result.status).toBe('INTEGRITY_SIGNED_UNTRUSTED');
+  });
+
+  it('verifySignedEnvelope reports INTEGRITY_INVALID when the signature bytes do not verify', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const realKeyPair = await generateSigningKeyPair();
+    const attackerKeyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, realKeyPair);
+    const forged: SignedIntegrityEnvelope = { ...signed, signature: (await signIntegrityEnvelope(envelope, attackerKeyPair)).signature };
+
+    const result = await verifySignedEnvelope(forged);
+    expect(result.status).toBe('INTEGRITY_INVALID');
+  });
+
+  it('verifySignedEnvelope reports STRUCTURALLY_INVALID for a signed envelope missing its signature field', async () => {
+    const envelope = await buildIntegrityEnvelope({ a: 1 }, new Date().toISOString());
+    const keyPair = await generateSigningKeyPair();
+    const signed = await signIntegrityEnvelope(envelope, keyPair);
+    const result = await verifySignedEnvelope({ ...signed, signature: '' });
+    expect(result.status).toBe('STRUCTURALLY_INVALID');
+  });
+
+  it('verifySignedEnvelope propagates STRUCTURALLY_INVALID from the underlying hash check on a malformed envelope', async () => {
+    const result = await verifySignedEnvelope({ record: null } as unknown as SignedIntegrityEnvelope);
+    expect(result.status).toBe('STRUCTURALLY_INVALID');
+  });
 });

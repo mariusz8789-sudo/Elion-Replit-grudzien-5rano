@@ -37,9 +37,33 @@ export interface IntegrityEnvelope {
   readonly verificationInstructions: string;
 }
 
+/**
+ * The certificate-auditor's terminal state, distinguishing outcomes
+ * `valid: boolean` alone cannot: a well-formed, unsigned, hash-valid
+ * envelope; a validly signed one; one signed by SOMEONE but not the
+ * expected/trusted signer (the file is genuine, just not from who you
+ * trust); a hash or signature that plainly fails; and a malformed envelope
+ * that never reached a real check at all. Added alongside `valid`/`reason`
+ * (never replacing them — every existing caller keeps working) because a
+ * real cert:// auditor UI needs to react differently to "untrusted signer"
+ * than to "corrupted file", and a boolean cannot carry that distinction.
+ */
+export type IntegrityCertificateStatus =
+  /** Hash matches; the envelope carries no signature at all — `verifyIntegrityEnvelope`'s own ceiling. */
+  | 'INTEGRITY_VALID_UNSIGNED'
+  /** Hash matches, signature cryptographically verifies, and (when checked) the signer is the expected/trusted one. */
+  | 'INTEGRITY_SIGNED_VERIFIED'
+  /** Hash matches, signature cryptographically verifies — but the embedded key is NOT the expected/trusted signer's key. */
+  | 'INTEGRITY_SIGNED_UNTRUSTED'
+  /** The envelope is well-formed but its content fails a real check: the hash does not match the record, or the signature does not verify. */
+  | 'INTEGRITY_INVALID'
+  /** The envelope itself is malformed — missing or wrong-typed fields — before any hash or signature check could even run. */
+  | 'STRUCTURALLY_INVALID';
+
 export interface VerificationResult {
   readonly valid: boolean;
   readonly reason: string;
+  readonly status: IntegrityCertificateStatus;
 }
 
 function canonicalize(value: unknown): string {
@@ -145,18 +169,18 @@ const HASH_FORMAT = /^[a-f0-9]{64}$/;
 
 /** Recomputes the hash from `envelope.record` and compares — never trusts `envelope.integrityHash` alone. */
 export async function verifyIntegrityEnvelope(envelope: IntegrityEnvelope): Promise<VerificationResult> {
-  if (!envelope || typeof envelope !== 'object') return { valid: false, reason: 'Invalid envelope: not an object.' };
-  if (!envelope.record || typeof envelope.record !== 'object') return { valid: false, reason: 'Invalid envelope: missing or invalid "record" field.' };
+  if (!envelope || typeof envelope !== 'object') return { valid: false, reason: 'Invalid envelope: not an object.', status: 'STRUCTURALLY_INVALID' };
+  if (!envelope.record || typeof envelope.record !== 'object') return { valid: false, reason: 'Invalid envelope: missing or invalid "record" field.', status: 'STRUCTURALLY_INVALID' };
   if (typeof envelope.integrityHash !== 'string' || !HASH_FORMAT.test(envelope.integrityHash)) {
-    return { valid: false, reason: `Invalid envelope: "integrityHash" is not 64 lowercase hex characters (got "${String(envelope.integrityHash).slice(0, 32)}").` };
+    return { valid: false, reason: `Invalid envelope: "integrityHash" is not 64 lowercase hex characters (got "${String(envelope.integrityHash).slice(0, 32)}").`, status: 'STRUCTURALLY_INVALID' };
   }
   try {
     const recomputed = await computeIntegrityHash(envelope.record);
     return recomputed === envelope.integrityHash
-      ? { valid: true, reason: 'Integrity verified: the record matches its hash.' }
-      : { valid: false, reason: `Hash mismatch — record has been modified since export (expected "${envelope.integrityHash}", computed "${recomputed}").` };
+      ? { valid: true, reason: 'Integrity verified: the record matches its hash.', status: 'INTEGRITY_VALID_UNSIGNED' }
+      : { valid: false, reason: `Hash mismatch — record has been modified since export (expected "${envelope.integrityHash}", computed "${recomputed}").`, status: 'INTEGRITY_INVALID' };
   } catch (error) {
-    return { valid: false, reason: `Verification error: ${error instanceof Error ? error.message : String(error)}` };
+    return { valid: false, reason: `Verification error: ${error instanceof Error ? error.message : String(error)}`, status: 'STRUCTURALLY_INVALID' };
   }
 }
 
@@ -195,6 +219,8 @@ export interface SignedIntegrityEnvelope extends IntegrityEnvelope {
   /** Base64-encoded SPKI-format public key the signature verifies against. Travels with the file — see module doc on why that alone is not non-repudiation. */
   readonly publicKeySpki: string;
   readonly signatureAlgorithm: SignatureAlgorithm;
+  /** ISO 8601 timestamp of when the signature itself was produced — distinct from (and normally later than) `exportedAt`, which timestamps the underlying hash's envelope. */
+  readonly signedAt: string;
 }
 
 const ECDSA_PARAMS = { name: 'ECDSA', namedCurve: 'P-256' } as const;
@@ -232,9 +258,10 @@ export async function importPublicKeySpki(base64Spki: string): Promise<CryptoKey
  * Signs an already-built `IntegrityEnvelope` with an ECDSA key pair,
  * producing a `SignedIntegrityEnvelope` a recipient can check with
  * `verifySignedEnvelope` — no private key ever leaves this function's
- * caller.
+ * caller. `signedAt` defaults to now; pass it explicitly only when
+ * reproducing a signature made at a specific past time (e.g. in tests).
  */
-export async function signIntegrityEnvelope(envelope: IntegrityEnvelope, keyPair: CryptoKeyPair): Promise<SignedIntegrityEnvelope> {
+export async function signIntegrityEnvelope(envelope: IntegrityEnvelope, keyPair: CryptoKeyPair, signedAt: string = new Date().toISOString()): Promise<SignedIntegrityEnvelope> {
   const hashBytes = new TextEncoder().encode(envelope.integrityHash);
   const signatureBuffer = await crypto.subtle.sign(ECDSA_SIGN_PARAMS, keyPair.privateKey, hashBytes);
   return {
@@ -242,6 +269,7 @@ export async function signIntegrityEnvelope(envelope: IntegrityEnvelope, keyPair
     signature: bufferToBase64(signatureBuffer),
     publicKeySpki: await exportPublicKeySpki(keyPair.publicKey),
     signatureAlgorithm: 'ECDSA-P256-SHA256',
+    signedAt,
   };
 }
 
@@ -266,18 +294,21 @@ export async function verifySignedEnvelope(signed: SignedIntegrityEnvelope, expe
   const hashResult = await verifyIntegrityEnvelope(signed);
   if (!hashResult.valid) return hashResult;
 
-  if (!signed || typeof signed !== 'object') return { valid: false, reason: 'Invalid signed envelope: not an object.' };
+  if (!signed || typeof signed !== 'object') return { valid: false, reason: 'Invalid signed envelope: not an object.', status: 'STRUCTURALLY_INVALID' };
   if (typeof signed.signature !== 'string' || signed.signature.length === 0) {
-    return { valid: false, reason: 'Invalid signed envelope: missing "signature".' };
+    return { valid: false, reason: 'Invalid signed envelope: missing "signature".', status: 'STRUCTURALLY_INVALID' };
   }
   if (typeof signed.publicKeySpki !== 'string' || signed.publicKeySpki.length === 0) {
-    return { valid: false, reason: 'Invalid signed envelope: missing "publicKeySpki".' };
+    return { valid: false, reason: 'Invalid signed envelope: missing "publicKeySpki".', status: 'STRUCTURALLY_INVALID' };
   }
   if (signed.signatureAlgorithm !== 'ECDSA-P256-SHA256') {
-    return { valid: false, reason: `Unsupported signature algorithm "${String(signed.signatureAlgorithm)}" — only ECDSA-P256-SHA256 is verified here.` };
+    return { valid: false, reason: `Unsupported signature algorithm "${String(signed.signatureAlgorithm)}" — only ECDSA-P256-SHA256 is verified here.`, status: 'STRUCTURALLY_INVALID' };
+  }
+  if (typeof signed.signedAt !== 'string' || signed.signedAt.length === 0) {
+    return { valid: false, reason: 'Invalid signed envelope: missing "signedAt".', status: 'STRUCTURALLY_INVALID' };
   }
   if (expectedPublicKeySpki !== undefined && expectedPublicKeySpki !== signed.publicKeySpki) {
-    return { valid: false, reason: 'The embedded public key does not match the expected signer\'s key — this file was not signed by the key you were told to trust.' };
+    return { valid: false, reason: 'The embedded public key does not match the expected signer\'s key — this file was not signed by the key you were told to trust.', status: 'INTEGRITY_SIGNED_UNTRUSTED' };
   }
 
   try {
@@ -286,9 +317,9 @@ export async function verifySignedEnvelope(signed: SignedIntegrityEnvelope, expe
     const signatureBuffer = base64ToBuffer(signed.signature);
     const signatureValid = await crypto.subtle.verify(ECDSA_SIGN_PARAMS, publicKey, signatureBuffer, hashBytes);
     return signatureValid
-      ? { valid: true, reason: 'Integrity and signature both verified: the record is unmodified and the signature matches the declared key.' }
-      : { valid: false, reason: 'Signature does not verify: the file was altered after signing, or the signature does not belong to the declared key.' };
+      ? { valid: true, reason: 'Integrity and signature both verified: the record is unmodified and the signature matches the declared key.', status: 'INTEGRITY_SIGNED_VERIFIED' }
+      : { valid: false, reason: 'Signature does not verify: the file was altered after signing, or the signature does not belong to the declared key.', status: 'INTEGRITY_INVALID' };
   } catch (error) {
-    return { valid: false, reason: `Signature verification error: ${error instanceof Error ? error.message : String(error)}` };
+    return { valid: false, reason: `Signature verification error: ${error instanceof Error ? error.message : String(error)}`, status: 'STRUCTURALLY_INVALID' };
   }
 }

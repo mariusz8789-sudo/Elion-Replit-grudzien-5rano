@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { WorldChrome } from '../genesis-ui/WorldChrome';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { MoleculeScene3D, type SelectedAtomInfo } from '../../core/three/moleculeScene3D';
 import { MOLECULE_STATE_CODE } from '../../core/worldModel/domains/molecularStructure';
@@ -72,6 +73,14 @@ export function MoleculeLabScreen() {
 
   return (
     <div className="app">
+      <WorldChrome
+        glyph="⬡"
+        domain="Molecular World"
+        title="Molecule World"
+        purpose="Cząsteczka jako obiekt badawczy: geometria i wiązania z RDKit, kolory CPK jako konwencja — model obliczeniowy, nie pomiar."
+        badges={[{ label: stateCode === MOLECULE_STATE_CODE.MATERIALISED ? 'GEOMETRIA · RDKit (MODEL_ESTIMATE)' : 'RDKit · ' + stateLabel, tone: stateCode === MOLECULE_STATE_CODE.MATERIALISED ? 'approximation' : 'blocked' }, { label: 'SCENA 3D · WIZUALIZACJA', tone: 'visual' }]}
+        kpis={stateCode === MOLECULE_STATE_CODE.MATERIALISED ? [{ label: 'atomów', value: Math.round(stats.atomsMaterialised ?? 0) }, { label: 'wiązań', value: Math.round(stats.bondsMaterialised ?? 0) }] : []}
+      />
       <div className="gsc-stage">
         <canvas ref={canvasRef} className="gsc-canvas" aria-label="Genesis Molecule Lab — real RDKit atoms and Phase 8.1 bonds (Three.js)" />
         {loading && <div className="route-loading" role="status">Ładowanie silnika 3D…</div>}
@@ -113,6 +122,7 @@ export function MoleculeLabScreen() {
 
             {/* GRAPHICS V3's own real WebGLRenderer.info counters — same observability contract
                 every other Sim3D scene already exposes (PERFORMANCE_BUDGET.md). */}
+            <div className="gsc-panels">
             <div className="gsc-panel observability-panel">
               <div><span>draw calls</span><b>{Math.round(stats.webgl_draw_calls ?? 0)}</b></div>
               <div><span>triangles</span><b>{Math.round(stats.webgl_triangles ?? 0)}</b></div>
@@ -133,6 +143,7 @@ export function MoleculeLabScreen() {
                   Backend RDKit jest niedostępny w tym środowisku — scena pokazuje ten realny stan zamiast wymyślonej geometrii.
                 </p>
               )}
+            </div>
             </div>
           </>
         )}

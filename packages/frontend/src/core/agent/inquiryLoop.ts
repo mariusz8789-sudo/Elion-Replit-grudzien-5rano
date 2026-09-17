@@ -13,8 +13,9 @@ import type { DataProvenance } from '../dataProvenance';
 import { getRouterModel } from '../experimentFabric/router';
 import type { FalsificationCriterion, HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import { buildStructuredRequestFromModel } from '../experimentFabric/structuredRequestBuilder';
-import type { ExperimentRun } from '../experimentFabric/types';
+import type { ExperimentRun, ExperimentValue } from '../experimentFabric/types';
 import type { StrategyRunProvenance } from './discoveryStrategy';
+import { assessSingleTautology, evidenceCeiling, type TautologyAssessment, type TautologyComponent } from './tautologyGate';
 
 /**
  * AUTONOMOUS PARAMETER INQUIRY — the experiment Genesis runs next is chosen
@@ -139,8 +140,19 @@ export interface SystemUnderStudy {
   readonly probeParameterId: string;
   /** Probe settings that are physically meaningful for this system, in the order to consider them. */
   readonly candidateProbeValues: readonly number[];
-  /** Everything else held fixed, so probe and unknown are the only things that move. */
-  readonly fixedParameters: Readonly<Record<string, number>>;
+  /**
+   * Everything else held fixed, so probe and unknown are the only things that
+   * move.
+   *
+   * `ExperimentValue`, not `number`, because a fixed setting is not always a
+   * quantity: the Fabric's entanglement model selects WHICH declared state
+   * family is on the bench with a string preset (`stateId`), exactly as
+   * `quantum-bloch-circuit` passes a whole gate sequence as one string. The
+   * hidden parameters and the probe stay strictly numeric — they are what
+   * predictions are computed from and what discriminability is judged on — so
+   * nothing about the inquiry's arithmetic changes.
+   */
+  readonly fixedParameters: Readonly<Record<string, ExperimentValue>>;
   /** The solver output the agent reads. */
   readonly observedMetric: string;
   /**
@@ -149,6 +161,21 @@ export interface SystemUnderStudy {
    * a property of the measurement, not of this module.
    */
   readonly agreementTolerance: number;
+  /**
+   * Tautology/circularity classification (`tautologyGate.ts`) of this
+   * system's prediction/observation pairing — OPTIONAL and strictly
+   * additive: every existing caller that never declares it keeps running
+   * exactly as before (no cap on evidence magnitude). When declared,
+   * `runAutonomousInquiryWithRuns` computes `InquiryLoopResult.tautologyAssessment`
+   * ONCE from it and, if it classifies as `CONSISTENCY_CHECK` or
+   * `UNTESTABLE`, caps every round's evidence magnitude at zero — a
+   * consistency check or an unclassifiable pairing can never move
+   * confidence, using the SAME `evidenceMagnitude` knob
+   * `beliefRevision.ts::updateConfidence` already has. See
+   * `docs/TAUTOLOGY_GATE_AUDIT.md` for why this is a separate axis from
+   * `NO_DISCRIMINATING_PROBE`.
+   */
+  readonly observableDerivation?: TautologyComponent;
 }
 
 /**
@@ -297,6 +324,21 @@ export interface InquiryLoopResult {
   /** The experiment the inquiry proposes next, from the last observation. */
   readonly nextExperiment: ProbeSelection;
   readonly limitations: readonly string[];
+  /**
+   * `null` when `system.observableDerivation` was never declared — every
+   * caller from before this field existed keeps getting exactly that.
+   * Otherwise the `tautologyGate.ts` classification of this whole inquiry's
+   * prediction/observation pairing, computed once from the declared
+   * derivation (never from these results' own numbers — see that module's
+   * own "zero heuristics" rule). A `CONSISTENCY_CHECK` or `UNTESTABLE`
+   * classification means every round's evidence magnitude above was capped
+   * at zero: nothing in `rounds[].outcomes[].confidenceAfter` could have
+   * moved because of it. This is a SEPARATE axis from `stopReason`
+   * (`NO_DISCRIMINATING_PROBE` is a fact about one round's probe choice,
+   * this is a fact about whether the whole line of inquiry could ever
+   * disagree with itself) — see `docs/TAUTOLOGY_GATE_AUDIT.md`.
+   */
+  readonly tautologyAssessment: TautologyAssessment | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -558,6 +600,13 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
   const { hiddenParameters, ...observable } = system;
   const model = getRouterModel(system.modelId);
   const claimedValuesById = new Map(input.hypotheses.map((h) => [h.hypothesisId, h.claimedValues]));
+
+  // Computed ONCE, from declared metadata only — never re-derived per round
+  // and never touching a measured number (see tautologyGate.ts's own "zero
+  // heuristics" rule). `null` (no declaration) behaves exactly as this
+  // function always did: no cap.
+  const tautologyAssessment = system.observableDerivation ? assessSingleTautology(system.observableDerivation) : null;
+  const evidenceCap = tautologyAssessment ? evidenceCeiling(tautologyAssessment.classification) : null;
   const beliefs = new Map<string, Hypothesis>(
     input.hypotheses.map((h) => [
       h.hypothesisId,
@@ -647,12 +696,18 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
         : relation.met
           ? 'SUPPORTED_WITHIN_PROTOCOL'
           : 'FALSIFIED_WITHIN_PROTOCOL';
-      const magnitude = evidenceMagnitudeWithinTolerance(observed, predicted, criterion.tolerance ?? 0);
-      const reason = assessment === 'SUPPORTED_WITHIN_PROTOCOL'
+      const rawMagnitude = evidenceMagnitudeWithinTolerance(observed, predicted, criterion.tolerance ?? 0);
+      // Tautology Gate boundary: a CONSISTENCY_CHECK or UNTESTABLE system can
+      // never move confidence, however the numbers happen to compare — reuses
+      // `updateConfidence`'s own `evidenceMagnitude` knob rather than adding a
+      // second confidence pathway. See `system.observableDerivation`'s doc.
+      const magnitude = evidenceCap !== null ? Math.min(rawMagnitude, evidenceCap) : rawMagnitude;
+      const reason = (assessment === 'SUPPORTED_WITHIN_PROTOCOL'
         ? `Predicted ${predicted}, measured ${observed} — inside the declared ±${system.agreementTolerance * 100}% band.`
         : assessment === 'FALSIFIED_WITHIN_PROTOCOL'
           ? `Predicted ${predicted}, measured ${observed} — outside the declared ±${system.agreementTolerance * 100}% band, so this hypothesis's claimed values are not what this system has.`
-          : relation.explanation;
+          : relation.explanation)
+        + (evidenceCap === 0 ? ` Tautology Gate: ${tautologyAssessment!.classification} — this comparison cannot move confidence.` : '');
       const updated = updateConfidence(hypothesis, assessment, magnitude, reason, round);
       beliefs.set(hypothesis.id, updated);
       outcomes.push({
@@ -734,6 +789,7 @@ export function runAutonomousInquiryWithRuns(input: InquiryLoopInput): InquiryEx
       `Only the parameter assignments the caller declared were ever in contention; the inquiry cannot find a value nobody proposed.`,
       `Agreement is decided by a declared ±${system.agreementTolerance * 100}% band, not by a measurement's own error model.`,
     ],
+    tautologyAssessment,
   };
   return { result, measurements };
 }
@@ -761,6 +817,7 @@ export function inquiryResultFingerprint(result: InquiryLoopResult): string {
     falsified: result.falsifiedHypothesisIds,
     untested: result.untestedHypothesisIds,
     nextExperiment: result.nextExperiment,
+    tautologyAssessment: result.tautologyAssessment,
     finalBeliefs: result.finalBeliefs,
     rounds: result.rounds.map((round) => ({
       round: round.round,

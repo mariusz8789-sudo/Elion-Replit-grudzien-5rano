@@ -6,6 +6,7 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "paths": { "@genesis/core/*": ["../core/src/*"] },
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",

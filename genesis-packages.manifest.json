@@ -1,0 +1,14 @@
+{
+  "targetBranch": "claude/genesis-winner-gate-audit-qgf90v",
+  "packages": {
+    "advanced": { "dir": "packages/core/src/advanced", "files": ["VirtualHyperMicroscope.ts", "MarketGapHarvester.ts", "GenesisCyberBastion.ts", "advanced.test.ts", "README_ADVANCED.md", "index.ts"] },
+    "supreme": { "dir": "packages/core/src/supreme", "files": ["GenesisAgisCognitiveCore.ts", "ClassifiedInquiryEngine.ts", "SpacetimeCurvatureEngine.ts", "RelativisticRendererPipeline.ts", "GenesisEnterpriseMonetizer.ts", "GenesisSentinelOpsAgent.ts", "GenesisCosmicTimeMachineEngine.ts", "supreme-agi.test.ts", "supreme-enterprise.test.ts", "v15-contract.test.ts", "README_SUPREME.md", "index.ts"] },
+    "cityEnterprise": { "dir": "packages/core/src/city-enterprise", "files": ["GenesisCityGenerator.ts", "GenesisCrisisEngine.ts", "GenesisCityMonetizer.ts", "city-enterprise.test.ts", "README_CITY_ENTERPRISE.md", "index.ts"] },
+    "molecular": { "dir": "packages/core/src/molecular-engine", "files": ["GenesisPhysicoChemicalSandbox.ts", "GenesisMolecularSearchCore.ts", "molecular-engine.test.ts", "README_MOLECULAR_ENGINE.md", "index.ts"] },
+    "quantum": { "dir": "packages/core/src/quantum-lab", "files": ["GenesisSpacetimePortalEngine.ts", "GenesisQuantumSandbox.ts", "quantum-lab.test.ts", "README_QUANTUM_LAB.md", "index.ts"] },
+    "supremeUi": { "dir": "packages/ui/src/supreme", "files": ["GenesisLaboratoryView.tsx"] },
+    "quantumUi": { "dir": "packages/ui/src/quantum-lab", "files": ["GenesisCinematicLabView.tsx"] },
+    "matrixUi": { "dir": "packages/ui/src/render", "files": ["GenesisCinematicMatrixRenderer.ts"] },
+    "city": { "dir": "packages/frontend/src/core/city", "files": ["GenesisCityDigitalTwin.ts", "GenesisDisasterEngine.ts", "CityDisasterController.ts", "city-disaster.test.ts", "README_CITY_DISASTER.md", "index.ts"] }
+  }
+}

@@ -86,6 +86,7 @@ const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').th
 const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard').then((m) => ({ default: m.VirtualLabDashboard })));
 const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
 const SimWorldDashboard = lazy(() => import('./components/SimWorldDashboard').then((m) => ({ default: m.SimWorldDashboard })));
+const MythTheoryLab = lazy(() => import('./features/myths-theories/MythTheoryLab').then((m) => ({ default: m.MythTheoryLab })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -158,7 +159,8 @@ type Route =
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
   | { kind: 'cyber' }
-  | { kind: 'decipherment' };
+  | { kind: 'decipherment' }
+  | { kind: 'myths-theories' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -219,6 +221,7 @@ function parseHash(): Route {
   if (h === '#/matrix') return { kind: 'matrix' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
+  if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
 }
 
@@ -799,6 +802,18 @@ export default function App() {
           <TopBar title="🔭 Looking Glass" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <LookingGlassChat />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'myths-theories') {
+      return (
+        <div className="app">
+          <TopBar title="Mity i Teorie" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <MythTheoryLab />
           </HeavyRoute>
           {overlays}
         </div>

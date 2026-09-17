@@ -104,6 +104,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'molecule', label: 'Molecule Lab', icon: '🧪', hash: '#/molecule' },
   { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass' },
+  { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline' },
   { id: 'decipherment', label: 'Deszyfracja', icon: '📜', hash: '#/decipherment' },
   { id: 'glossary', label: 'Słowniczek', icon: '📚', hash: '#/glossary' },

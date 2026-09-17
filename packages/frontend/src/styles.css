@@ -5475,6 +5475,20 @@ textarea.guide-typing, input.guide-typing { caret-color: var(--cyan); background
 .myth-footer { max-width: 1180px; margin: 24px auto 0; color: var(--text-faint); font: .67rem ui-monospace, monospace; letter-spacing: .12em; }
 @media (max-width: 700px) { .myth-hero { display: block; } .myth-honest { margin-top: 18px; max-width: none; } .myth-card-footer { align-items: stretch; flex-direction: column; } .myth-run { width: 100%; } }
 
+.genesis-engine-app { position: fixed; inset: 0; z-index: 2; background: #000; overflow: hidden; }
+.genesis-canvas-host, .genesis-canvas { position: absolute; inset: 0; width: 100vw; height: 100vh; display: block; }
+.genesis-canvas { touch-action: none; }
+.genesis-hud { position: fixed; left: 50%; bottom: max(1rem, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 10; width: min(58rem, calc(100vw - 2rem)); display: grid; gap: .55rem; padding: .8rem 1rem; border: 1px solid rgba(0,255,65,.24); border-radius: 18px; background: rgba(5,10,15,.76); backdrop-filter: blur(18px) saturate(125%); -webkit-backdrop-filter: blur(18px) saturate(125%); box-shadow: 0 0 36px rgba(0,229,255,.12); color: #e8fff0; font-family: var(--font-mono); }
+.genesis-hud-title, .genesis-hud-controls, .genesis-hud-timeline { display: flex; align-items: center; gap: .6rem; }
+.genesis-hud-title { font-size: .72rem; letter-spacing: .13em; color: #00ff41; }
+.genesis-hud-status { margin-left: auto; color: #00e5ff; font-size: .62rem; }
+.genesis-hud-dot { width: .45rem; height: .45rem; border-radius: 50%; background: #00ff41; box-shadow: 0 0 10px #00ff41; }
+.genesis-hud-button { border: 1px solid rgba(0,229,255,.45); border-radius: 999px; padding: .45rem .75rem; color: #00e5ff; background: rgba(0,229,255,.06); font: inherit; font-size: .68rem; }
+.genesis-hud-button:hover { border-color: #00ff41; color: #00ff41; }
+.genesis-hud-timeline { flex: 1; color: #a9b3cf; font-size: .68rem; }
+.genesis-hud-timeline input { flex: 1; accent-color: #00ff41; }
+@media (max-width: 600px) { .genesis-hud { width: calc(100vw - 1rem); bottom: max(.5rem, env(safe-area-inset-bottom)); padding: .65rem .7rem; } .genesis-hud-status { display: none; } .genesis-hud-controls { gap: .4rem; } .genesis-hud-timeline { min-width: 0; } }
+
 /* Critical frontend overhaul: obsidian ground plane + floating glass HUD. */
 :root { --bg: #000000; --bg-panel: rgba(5, 10, 15, 0.75); --bg-raised: rgba(5, 10, 15, 0.82); --green: #00ff41; --cyan: #00e5ff; --border: rgba(0, 255, 65, 0.2); --border-strong: rgba(0, 229, 255, 0.52); }
 html, body, #root { min-height: 100%; background: #000 !important; }

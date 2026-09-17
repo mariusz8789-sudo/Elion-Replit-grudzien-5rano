@@ -24,7 +24,7 @@ import { playEnterLab } from './core/sound';
 import { getVoiceEngine } from './core/guide/guideRuntime';
 import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
-import { HyperStateVisualizer } from './components/HyperStateVisualizer';
+import { GenesisEngineApp } from './components/GenesisEngineApp';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -323,6 +323,15 @@ export default function App() {
   // gałęzi, React odmontowywałby go przy każdej zmianie trasy — dokładnie
   // to, czego "persystentne płótno" ma unikać.
   const renderRoute = () => {
+    const engineLabels: Partial<Record<Route['kind'], string>> = {
+      city: 'CITY MATRIX', city3d: 'CITY MATRIX 3D', 'scientific-city': 'SCIENTIFIC CITY',
+      'genesis-world': 'GENESIS WORLD', concept: 'CONCEPT FILM', character: 'CHARACTER LAB',
+      molecule: 'MOLECULE LAB', 'cell-lab': 'CELL LAB', 'evidence-showcase': 'EVIDENCE FIELD',
+      'hf-slice': 'HIGH FIDELITY SLICE', 'first-person-lab': 'FIRST PERSON LAB',
+      'investor-demo': 'INVESTOR DEMO', 'discovery-hall': 'DISCOVERY HALL', 'sim-world': 'SIM WORLD',
+    };
+    const engineLabel = engineLabels[route.kind];
+    if (engineLabel) return <GenesisEngineApp routeLabel={engineLabel} onExit={() => { window.location.hash = ''; }} />;
     if (route.kind === 'lab') {
       const lab = getLab(route.id);
       if (!lab) {
@@ -1213,7 +1222,6 @@ export default function App() {
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
-      <ErrorBoundary><HyperStateVisualizer /></ErrorBoundary>
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —

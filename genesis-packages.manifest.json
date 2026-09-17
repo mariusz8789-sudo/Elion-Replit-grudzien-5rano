@@ -106,7 +106,8 @@
         "torsionBoundarySolver.ts",
         "warpMetricSolver.ts",
         "speculativeRegistry.ts",
-        "speculativeSolvers.test.ts"
+        "speculativeSolvers.test.ts",
+        "index.ts"
       ]
     },
     "mirrorCore": {

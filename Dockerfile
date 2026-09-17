@@ -10,6 +10,7 @@ COPY packages/csrn/package.json packages/csrn/
 RUN npm ci
 COPY . .
 RUN npm run build
+RUN npx esbuild packages/core/src/solvers/speculative/index.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/speculative-core.mjs
 
 FROM node:22-slim AS runtime
 # Tożsamość wydania (P0.3). Bez tego /api/health nie potrafi powiedzieć, KTÓRY

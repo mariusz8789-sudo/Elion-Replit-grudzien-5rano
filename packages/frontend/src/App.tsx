@@ -21,12 +21,10 @@ import { getSettings } from './core/settings';
 import { t } from './core/i18n';
 import { hasCompletedOnboarding, markOnboardingComplete } from './core/onboarding';
 import { playEnterLab } from './core/sound';
+import { getVoiceEngine } from './core/guide/guideRuntime';
 import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
-import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
-import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
-import { isSuppressed as isHeavy3DRoute } from './components/MatrixDataStream';
-import { listExperiments } from './core/scienceMemory';
+import { HyperStateVisualizer } from './components/HyperStateVisualizer';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -306,6 +304,11 @@ export default function App() {
     return (
       <OnboardingOverlay
         onFinish={(destination) => {
+          getVoiceEngine().speak({
+            key: 'intro',
+            lang: 'pl',
+            text: 'Witaj w Genesis Physics. Zaczynamy od pytania, a kończymy na wyniku, który można sprawdzić.',
+          });
           markOnboardingComplete();
           setOnboardingOpen(false);
           if (destination === 'timeline') window.location.hash = '#/timeline';
@@ -1206,41 +1209,11 @@ export default function App() {
     );
   };
 
-  // Real, honest signals only (see genesisVisualState.ts's own doc): the
-  // record count is a genuine read of Science Memory; the other three
-  // signals are not yet wired to a cheap, honest global source at this
-  // App-level scope (a real-time "is a Campaign running right now" /  "is a
-  // capability blocked" check), so they stay `false` rather than guessed —
-  // `deriveGenesisVisualState` degrades gracefully to IDLE/ACTIVE off the
-  // record count alone when they are. A real follow-up, not a fabrication.
-  const genesisVisualState = deriveGenesisVisualState({
-    runInProgress: false,
-    needsAttention: false,
-    hasOpenInvestigation: false,
-    savedExperimentCount: (() => { try { return listExperiments().length; } catch { return 0; } })(),
-  });
-  // The same route list `MatrixDataStream.tsx` uses, read here for a DIFFERENT
-  // decision. Suppressing the background entirely on these routes was measured
-  // to be wrong: on #/genesis-world the 3D canvas is 1200x750 inside a
-  // 1440x900 viewport — 69% — so the sidebar, title strip, description block
-  // and margins (the other 31%) were left empty for no reason. What actually
-  // needs protecting on these screens is the frame budget, since a second rAF
-  // loop runs beside the 3D scene's own. So the background stays mounted and
-  // visible, and drops to LOW quality instead: fewer streams and particles,
-  // no glow blur, lower device-pixel-ratio cap (matrixEngine.ts::QUALITY).
-  const heavy3DRoute = isHeavy3DRoute(window.location.hash);
-
   return (
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
-      <ErrorBoundary>
-        <LiveMatrixBackground
-          className="matrix-datastream"
-          {...toMatrixConfig(genesisVisualState)}
-          quality={heavy3DRoute ? 'LOW' : 'HIGH'}
-        />
-      </ErrorBoundary>
+      <ErrorBoundary><HyperStateVisualizer /></ErrorBoundary>
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —

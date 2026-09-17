@@ -5474,3 +5474,13 @@ textarea.guide-typing, input.guide-typing { caret-color: var(--cyan); background
 .myth-hashes dd { margin: 0; color: var(--green); font: .68rem ui-monospace, monospace; overflow-wrap: anywhere; }
 .myth-footer { max-width: 1180px; margin: 24px auto 0; color: var(--text-faint); font: .67rem ui-monospace, monospace; letter-spacing: .12em; }
 @media (max-width: 700px) { .myth-hero { display: block; } .myth-honest { margin-top: 18px; max-width: none; } .myth-card-footer { align-items: stretch; flex-direction: column; } .myth-run { width: 100%; } }
+
+/* Critical frontend overhaul: obsidian ground plane + floating glass HUD. */
+:root { --bg: #000000; --bg-panel: rgba(5, 10, 15, 0.75); --bg-raised: rgba(5, 10, 15, 0.82); --green: #00ff41; --cyan: #00e5ff; --border: rgba(0, 255, 65, 0.2); --border-strong: rgba(0, 229, 255, 0.52); }
+html, body, #root { min-height: 100%; background: #000 !important; }
+.hyper-state-visualizer { position: fixed; inset: 0; z-index: 0; width: 100vw; height: 100vh; overflow: hidden; pointer-events: none; background: #000; }
+.hyper-state-canvas { display: block; width: 100%; height: 100%; }
+.app, .app-shell, .app-content, main, .home, .settings-view, .timeline-view, .matrix-hub, .reality-main, .worlds, .cy-workspace, .qde-view, .discovery-view { position: relative; z-index: 1; }
+.app-shell, .topbar, .narrator, .card, .panel, .settings-section, .matrix-card, .matrix-detail-panel, .matrix-chat-dock, .sim-panel, .lab-shell, .glass-panel { background: rgba(5, 10, 15, 0.75) !important; border-color: rgba(0, 255, 65, 0.2) !important; backdrop-filter: blur(14px) saturate(120%); -webkit-backdrop-filter: blur(14px) saturate(120%); }
+.topbar { position: relative; z-index: 10; }
+@media (max-width: 700px) { .app-shell, .app-content { padding-bottom: 7.5rem; } .topbar { background: rgba(0, 0, 0, 0.84) !important; } .narrator, .science-chat, .guide { z-index: 10; } }

@@ -48,7 +48,7 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('aEnergy', new THREE.Float32BufferAttribute(energies, 1));
     geometry.setAttribute('aW', new THREE.Float32BufferAttribute(hidden, 1));
-    const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.NormalBlending });
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
@@ -58,7 +58,7 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     const renderPass = new RenderPass(scene, camera);
     renderPass.clear = false;
     composer.addPass(renderPass);
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 1.4, 0.85, 0.15));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.4, 0.85));
     const clock = new THREE.Clock(); let raf = 0;
     const resize = () => { const w = window.innerWidth; const h = window.innerHeight; camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w, h); };
     const frame = () => { raf = requestAnimationFrame(frame); if (!pausedRef.current) { const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); } };

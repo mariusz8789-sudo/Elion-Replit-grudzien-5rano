@@ -14,7 +14,7 @@ void main(){
 
 export const particleVertexShader = `
 uniform float uTime; attribute float aEnergy; attribute float aW; varying float vEnergy;
-void main(){ vec3 p=position; float t=uTime*(0.16+aEnergy*0.08); float x=p.x*cos(t)-aW*sin(t); float z=p.z*cos(t*.71)-aW*sin(t*.71); p.x=x+sin(t+p.z)*.16; p.y+=cos(t*.83+p.x)*.18; p.z=z; vec4 mv=modelViewMatrix*vec4(p,1.0); gl_PointSize=(1.2+aEnergy*2.6)*(90.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; vEnergy=aEnergy; }`;
-export const particleFragmentShader = `varying float vEnergy; void main(){ vec2 uv=gl_PointCoord-.5; float d=length(uv); if(d>.5) discard; float glow=pow(1.0-d*2.0,2.3); vec3 e=vec3(0.,1.,.255), c=vec3(0.,.898,1.); gl_FragColor=vec4(mix(e,c,clamp(vEnergy,0.,1.)),glow*(.25+vEnergy*.7)); }`;
+void main(){ vec3 p=position; float t=uTime*(0.16+aEnergy*0.08); float x=p.x*cos(t)-aW*sin(t); float z=p.z*cos(t*.71)-aW*sin(t*.71); p.x=x+sin(t+p.z)*.16; p.y+=cos(t*.83+p.x)*.18; p.z=z; vec4 mv=modelViewMatrix*vec4(p,1.0); gl_PointSize=(0.7+aEnergy*1.5)*(70.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; vEnergy=aEnergy; }`;
+export const particleFragmentShader = `varying float vEnergy; void main(){ vec2 uv=gl_PointCoord-.5; float d=length(uv); if(d>.5) discard; float glow=pow(1.0-d*2.0,2.3); vec3 e=vec3(0.,1.,.255), c=vec3(0.,.898,1.); gl_FragColor=vec4(mix(e,c,clamp(vEnergy,0.,1.)),glow*(.08+vEnergy*.22)); }`;
 export const hyperGlowVertexShader = `varying vec3 vNormal; void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
 export const hyperGlowFragmentShader = `varying vec3 vNormal; void main(){float rim=pow(1.-max(0.,dot(vNormal,vec3(0.,0.,1.))),2.4);gl_FragColor=vec4(0.,.9,1.,rim*.22);}`;

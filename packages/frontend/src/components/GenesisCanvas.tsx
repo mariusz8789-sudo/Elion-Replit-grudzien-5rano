@@ -6,6 +6,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { mulberry32, hyperNode, project5D } from '../engine/HyperMath';
 import { matrixRainVertexShader, matrixRainFragmentShader, particleVertexShader, particleFragmentShader } from '../engine/GenesisShaders';
+import { applyCinematicQuality } from '../render/GenesisQualityUpgrade.js';
 
 const COUNT = 24000;
 export type GenesisMode = 'matrix' | 'city' | 'epidemic' | 'quantum';
@@ -26,11 +27,10 @@ export function GenesisCanvas({ promptSeed = 0, mode = 'matrix' }: { promptSeed?
     renderer.setClearColor(0x000000, 1);
     renderer.domElement.className = 'genesis-canvas';
     host.appendChild(renderer.domElement);
-    const rainScene = new THREE.Scene();
-    const rainCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 }, uMode: { value: modeValue[mode] } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false });
-    const rain = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), rainMaterial);
-    rainScene.add(rain);
+    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 }, uMode: { value: modeValue[mode] } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    const rain = new THREE.Mesh(new THREE.PlaneGeometry(30, 22), rainMaterial);
+    rain.position.set(0, 0, -12);
+    scene.add(rain);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 4; controls.maxDistance = 14;
 
@@ -39,8 +39,15 @@ export function GenesisCanvas({ promptSeed = 0, mode = 'matrix' }: { promptSeed?
     const energies = new Float32Array(COUNT);
     const hidden = new Float32Array(COUNT);
     for (let i = 0; i < COUNT; i += 1) {
+      const stream = i % 96;
+      const phase = Math.floor(i / 96) / (COUNT / 96);
+      const angle = stream * 0.21 + phase * 8.0;
+      const radius = 0.35 + (stream % 24) * 0.16;
       const node = hyperNode(i, rng);
       const p = project5D(node, 0);
+      p[0] = Math.cos(angle + phase * 2.0) * radius + Math.sin(phase * 19.0 + stream) * 0.18;
+      p[1] = (phase - 0.5) * 9.0 + Math.sin(angle * 2.0) * 0.35;
+      p[2] = Math.sin(angle + phase * 2.0) * radius - 1.5 + Math.cos(phase * 13.0 + stream) * 0.2;
       positions[i * 3] = p[0]; positions[i * 3 + 1] = p[1]; positions[i * 3 + 2] = p[2];
       energies[i] = rng(); hidden[i] = node[3];
     }
@@ -50,6 +57,7 @@ export function GenesisCanvas({ promptSeed = 0, mode = 'matrix' }: { promptSeed?
     geometry.setAttribute('aW', new THREE.Float32BufferAttribute(hidden, 1));
     const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 }, uMode: { value: modeValue[mode] } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.NormalBlending });
     const particles = new THREE.Points(geometry, material);
+    particles.visible = mode !== 'matrix';
     scene.add(particles);
 
 
@@ -58,10 +66,12 @@ export function GenesisCanvas({ promptSeed = 0, mode = 'matrix' }: { promptSeed?
     const renderPass = new RenderPass(scene, camera);
     renderPass.clear = false;
     composer.addPass(renderPass);
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.4, 0.85));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.4, 0.85);
+    composer.addPass(bloom);
+    applyCinematicQuality(renderer, composer, bloom);
     const clock = new THREE.Clock(); let raf = 0;
     const resize = () => { const w = window.innerWidth; const h = window.innerHeight; camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w, h); };
-    const frame = () => { raf = requestAnimationFrame(frame); const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; rainMaterial.uniforms.uPrompt.value = promptSeed / 4294967296; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; material.uniforms.uPrompt.value = promptSeed / 4294967296; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); };
+    const frame = () => { raf = requestAnimationFrame(frame); const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; rainMaterial.uniforms.uPrompt.value = promptSeed / 4294967296; material.uniforms.uTime.value = t; material.uniforms.uPrompt.value = promptSeed / 4294967296; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); };
     resize(); window.addEventListener('resize', resize); frame();
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); material.dispose(); rainMaterial.dispose(); rain.geometry.dispose(); renderer.dispose(); renderer.domElement.remove(); };
   }, [promptSeed, mode]);

@@ -4,11 +4,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { mulberry32, hyperNode, rotate4D, project5D, type Vec4 } from '../engine/HyperMath';
+import { mulberry32, hyperNode, project5D } from '../engine/HyperMath';
 import { matrixRainVertexShader, matrixRainFragmentShader, particleVertexShader, particleFragmentShader } from '../engine/GenesisShaders';
 
-const COUNT = 12000;
-const emerald = 0x00ff41;
+const COUNT = 24000;
 
 export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -19,6 +18,7 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     if (!host) return;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.045);
     const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 100);
     camera.position.set(0, 0.4, 8);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -52,27 +52,18 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
-    const lineMaterial = new THREE.LineBasicMaterial({ color: emerald, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending });
-    const vertices: THREE.Vector3[] = [];
-    const corners: Vec4[] = [];
-    for (let mask = 0; mask < 16; mask += 1) corners.push([mask & 1 ? 1.5 : -1.5, mask & 2 ? 1.5 : -1.5, mask & 4 ? 1.5 : -1.5, mask & 8 ? 1.5 : -1.5]);
-    for (let i = 0; i < corners.length; i += 1) for (let bit = 0; bit < 4; bit += 1) {
-      const j = i ^ (1 << bit); if (i < j) { const a = rotate4D(corners[i], 'xw', 0.2); const b = rotate4D(corners[j], 'xw', 0.2); vertices.push(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(b[0], b[1], b[2])); }
-    }
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(vertices);
-    const tesseract = new THREE.LineSegments(lineGeo, lineMaterial); scene.add(tesseract);
 
     const composer = new EffectComposer(renderer);
     renderer.autoClear = false;
     const renderPass = new RenderPass(scene, camera);
     renderPass.clear = false;
     composer.addPass(renderPass);
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 1.25, 0.72, 0.06));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 1.4, 0.85, 0.15));
     const clock = new THREE.Clock(); let raf = 0;
     const resize = () => { const w = window.innerWidth; const h = window.innerHeight; camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w, h); };
-    const frame = () => { raf = requestAnimationFrame(frame); if (!pausedRef.current) { const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; particles.rotation.y += 0.0007; tesseract.rotation.y = t * 0.08; tesseract.rotation.x = t * 0.05; controls.update(); composer.render(); } };
+    const frame = () => { raf = requestAnimationFrame(frame); if (!pausedRef.current) { const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); } };
     resize(); window.addEventListener('resize', resize); frame();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); lineGeo.dispose(); material.dispose(); lineMaterial.dispose(); rainMaterial.dispose(); rain.geometry.dispose(); renderer.dispose(); renderer.domElement.remove(); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); material.dispose(); rainMaterial.dispose(); rain.geometry.dispose(); renderer.dispose(); renderer.domElement.remove(); };
   }, []);
   return <div ref={hostRef} className="genesis-canvas-host" aria-label="Genesis 9D visualizer" />;
 }

@@ -56,7 +56,8 @@
     "investor-demo:capture": "node scripts/genesis-investor-demo-capture.mjs",
     "guide-film:capture": "node scripts/genesis-guide-film-capture.mjs",
     "voice:lines": "node scripts/genesis-voice-lines-export.mjs",
-    "mol-01:demo": "node scripts/genesis-molecular-mission-demo.mjs"
+    "mol-01:demo": "node scripts/genesis-molecular-mission-demo.mjs",
+    "start": "npm run start --workspace=packages/backend"
   },
   "keywords": [
     "genesis-os",

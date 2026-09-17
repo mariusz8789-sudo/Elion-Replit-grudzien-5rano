@@ -5,7 +5,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { mulberry32, hyperNode, rotate4D, project5D, type Vec4 } from '../engine/HyperMath';
-import { particleVertexShader, particleFragmentShader } from '../engine/GenesisShaders';
+import { matrixRainVertexShader, matrixRainFragmentShader, particleVertexShader, particleFragmentShader } from '../engine/GenesisShaders';
 
 const COUNT = 12000;
 const emerald = 0x00ff41;
@@ -26,6 +26,11 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     renderer.setClearColor(0x000000, 1);
     renderer.domElement.className = 'genesis-canvas';
     host.appendChild(renderer.domElement);
+    const rainScene = new THREE.Scene();
+    const rainCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false });
+    const rain = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), rainMaterial);
+    rainScene.add(rain);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 4; controls.maxDistance = 14;
 
@@ -58,13 +63,16 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     const tesseract = new THREE.LineSegments(lineGeo, lineMaterial); scene.add(tesseract);
 
     const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.55, 0.12));
+    renderer.autoClear = false;
+    const renderPass = new RenderPass(scene, camera);
+    renderPass.clear = false;
+    composer.addPass(renderPass);
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 1.25, 0.72, 0.06));
     const clock = new THREE.Clock(); let raf = 0;
     const resize = () => { const w = window.innerWidth; const h = window.innerHeight; camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w, h); };
-    const frame = () => { raf = requestAnimationFrame(frame); if (!pausedRef.current) { const t = clock.getElapsedTime(); material.uniforms.uTime.value = t; particles.rotation.y += 0.0007; tesseract.rotation.y = t * 0.08; tesseract.rotation.x = t * 0.05; controls.update(); composer.render(); } };
+    const frame = () => { raf = requestAnimationFrame(frame); if (!pausedRef.current) { const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; particles.rotation.y += 0.0007; tesseract.rotation.y = t * 0.08; tesseract.rotation.x = t * 0.05; controls.update(); composer.render(); } };
     resize(); window.addEventListener('resize', resize); frame();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); lineGeo.dispose(); material.dispose(); lineMaterial.dispose(); renderer.dispose(); renderer.domElement.remove(); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); lineGeo.dispose(); material.dispose(); lineMaterial.dispose(); rainMaterial.dispose(); rain.geometry.dispose(); renderer.dispose(); renderer.domElement.remove(); };
   }, []);
   return <div ref={hostRef} className="genesis-canvas-host" aria-label="Genesis 9D visualizer" />;
 }

@@ -122,7 +122,10 @@
       "files": [
         "GenesisCinematicMatrixRenderer.ts",
         "GenesisMatrixGradeRenderer.ts",
+        "GenesisProductionRenderer.ts",
         "GenesisCyberEcosystem.ts",
+        "GenesisAssetPipeline.ts",
+        "AssetErrorBoundary.tsx",
         "matrix-renderer.test.ts",
         "matrix-cyber-ecosystem.test.ts",
         "shaders/MatrixRainShader.ts",
@@ -144,6 +147,20 @@
         "city-disaster.test.ts",
         "README_CITY_DISASTER.md",
         "index.ts"
+      ]
+    },
+    "routesUi": {
+      "dir": "packages/ui/src/routes",
+      "files": [
+        "City3DRoute.tsx",
+        "LaboratoryRoute.tsx",
+        "index.ts"
+      ]
+    },
+    "stateUi": {
+      "dir": "packages/ui/src/state",
+      "files": [
+        "GenesisEngineProvider.tsx"
       ]
     }
   }

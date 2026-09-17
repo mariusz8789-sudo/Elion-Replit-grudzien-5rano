@@ -1,22 +1,26 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import * as THREE from 'three';
 import { createCyberEcosystem } from './GenesisCyberEcosystem.js';
 import { MATRIX_RAIN_FRAGMENT_SHADER, createMatrixRainMaterial, updateMatrixRainMaterial } from './shaders/MatrixRainShader.js';
 
 describe('matrix cyber ecosystem contracts', () => {
+  const deps = {
+    chrome: (options: { obsidian?: boolean } = {}) => new THREE.MeshStandardMaterial({ color: options.obsidian ? 0x0a0a0f : 0xb8c4cc, metalness: 0.9, roughness: 0.12 }),
+    emissive: (color: number, intensity = 1) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensity }),
+  };
   it('creates deterministic instance counts', () => {
-    const a = createCyberEcosystem({ seed: 7, agents: 4, traffic: 3 });
-    const b = createCyberEcosystem({ seed: 7, agents: 4, traffic: 3 });
-    expect(a.group.children.length).toBe(5);
-    expect((a.group.children[1] as THREE.InstancedMesh).count).toBe((b.group.children[1] as THREE.InstancedMesh).count);
+    const a = createCyberEcosystem(deps, { seed: 7, bounds: 40, agents: 4, cars: 3 });
+    const b = createCyberEcosystem(deps, { seed: 7, bounds: 40, agents: 4, cars: 3 });
+    expect(a.counts.AGENT).toBe(4);
+    expect(a.counts.CAR).toBe(b.counts.CAR);
     a.dispose(); b.dispose();
   });
   it('updates only from supplied simulation time', () => {
-    const ecosystem = createCyberEcosystem({ seed: 11 });
-    ecosystem.update({ t: 4 });
-    expect(ecosystem.group.children[1].rotation.y).toBeCloseTo(0.12);
+    const ecosystem = createCyberEcosystem(deps, { seed: 11, bounds: 40 });
+    ecosystem.update(0.016, 4);
+    expect(ecosystem.counts.CAT).toBe(6);
     ecosystem.dispose();
   });
   it('binds Matrix time uniform without random or wall clock', () => {

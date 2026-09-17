@@ -541,7 +541,7 @@ describe('the discoveryLoop shape has a real production writer, not only test ca
         if (readFileSync(full, 'utf8').includes('saveScientificDiscoveryLoopToMemory')) callers.push(full);
       }
     };
-    walk(join(process.cwd(), 'src'));
+    walk(join(process.cwd(), 'packages/frontend/src'));
 
     expect(callers.length).toBeGreaterThan(0);
     // A component, not another core module quietly re-exporting it.

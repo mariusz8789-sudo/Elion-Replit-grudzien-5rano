@@ -19,7 +19,7 @@ import LiveMatrixBackground from '../components/liveMatrix/LiveMatrixBackground'
  * whole reason it was extracted out of the component.
  */
 
-const COMPONENT_DIR = join(process.cwd(), 'src', 'components', 'liveMatrix');
+const COMPONENT_DIR = join(process.cwd(), 'packages/frontend/src', 'components', 'liveMatrix');
 
 function readOrNull(file: string): string | null {
   try { return readFileSync(file, 'utf8'); } catch { return null; }
@@ -117,7 +117,7 @@ describe('the component is standalone — the dependency arrow points one way', 
    * translation `genesisVisualState.ts` exists to own exclusively.
    */
   it('the app wires the component only through the genesisVisualState adapter, never around it', () => {
-    const appFiles = [join(process.cwd(), 'src', 'App.tsx'), join(process.cwd(), 'src', 'main.tsx')];
+    const appFiles = [join(process.cwd(), 'packages/frontend/src', 'App.tsx'), join(process.cwd(), 'packages/frontend/src', 'main.tsx')];
     let mountedSomewhere = false;
     for (const file of appFiles) {
       const raw = readOrNull(file);
@@ -143,7 +143,7 @@ describe('the component is standalone — the dependency arrow points one way', 
    * mount would silently throw that third of the screen away again.
    */
   it('heavy-3D routes tier the background down to LOW quality rather than unmounting it', () => {
-    const app = readOrNull(join(process.cwd(), 'src', 'App.tsx'));
+    const app = readOrNull(join(process.cwd(), 'packages/frontend/src', 'App.tsx'));
     expect(app).not.toBeNull();
     expect(app!).toMatch(/quality=\{[^}]*\?\s*'LOW'\s*:\s*'HIGH'\}/);
     // No conditional-render guard wrapping the background any more.

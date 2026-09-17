@@ -28,7 +28,7 @@ import { dirname, join, relative, resolve } from 'node:path';
  * written down; silence is not.
  */
 
-const SRC = resolve(process.cwd(), 'src');
+const SRC = resolve(process.cwd(), 'packages/frontend/src');
 
 function allSourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

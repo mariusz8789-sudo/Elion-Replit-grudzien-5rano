@@ -7,6 +7,7 @@ import {
   keywordOverlapSimilarity,
   type LiteratureSearchClient,
 } from '../core/agent/literatureNoveltyAdapter';
+import { OPENALEX_EMPTY_FIXTURE, OPENALEX_WORKS_FIXTURE } from './fixtures/openalexWorksFixture';
 
 /** A fake OpenAlex HTTP response, shaped exactly like the real API. */
 function fakeOpenAlexFetch(matchQuery: boolean): typeof fetch {
@@ -15,9 +16,7 @@ function fakeOpenAlexFetch(matchQuery: boolean): typeof fetch {
       ok: true,
       status: 200,
       json: async () => ({
-        results: matchQuery
-          ? [{ id: 'https://openalex.org/W123', title: 'Orbital period and semi-major axis relation', publication_year: 1619, doi: 'https://doi.org/10.1/kepler' }]
-          : [],
+        ...(matchQuery ? OPENALEX_WORKS_FIXTURE : OPENALEX_EMPTY_FIXTURE),
       }),
     }) as unknown as Response) as unknown as typeof fetch;
 }
@@ -120,13 +119,10 @@ describe('overallFromLiteratureLayer', () => {
   });
 });
 
-describe('environment reality — the REAL client, against the REAL global fetch, in THIS sandbox', () => {
-  it('makeOpenAlexClient() with no injected fetch genuinely fails against the live network here, and runLiteratureLayer reports NO_ACCESS end-to-end', async () => {
-    const realClient = makeOpenAlexClient();
-    const result = await runLiteratureLayer([realClient], { text: 'orbital period semi-major axis' }, 'L5');
-    // This is not a mock assertion — it is the Krok 0 network finding,
-    // re-verified programmatically: this sandbox's network policy blocks
-    // OpenAlex, so the real client genuinely cannot reach it.
-    expect(result.status).toBe('NO_ACCESS');
-  }, 15000);
+describe('deterministic offline OpenAlex fixture', () => {
+  it('runs the client without a live network dependency', async () => {
+    const fixtureClient = makeOpenAlexClient(fakeOpenAlexFetch(true));
+    const result = await runLiteratureLayer([fixtureClient], { text: 'orbital period semi-major axis' }, 'L5');
+    expect(result.status).toBe('OK');
+  });
 });

@@ -8,8 +8,10 @@ import { mulberry32, hyperNode, project5D } from '../engine/HyperMath';
 import { matrixRainVertexShader, matrixRainFragmentShader, particleVertexShader, particleFragmentShader } from '../engine/GenesisShaders';
 
 const COUNT = 24000;
+export type GenesisMode = 'matrix' | 'city' | 'epidemic' | 'quantum';
+const modeValue: Record<GenesisMode, number> = { matrix: 0, city: 1, epidemic: 2, quantum: 3 };
 
-export function GenesisCanvas({ promptSeed = 0 }: { promptSeed?: number }): JSX.Element {
+export function GenesisCanvas({ promptSeed = 0, mode = 'matrix' }: { promptSeed?: number; mode?: GenesisMode }): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const host = hostRef.current;
@@ -26,7 +28,7 @@ export function GenesisCanvas({ promptSeed = 0 }: { promptSeed?: number }): JSX.
     host.appendChild(renderer.domElement);
     const rainScene = new THREE.Scene();
     const rainCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false });
+    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 }, uMode: { value: modeValue[mode] } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false });
     const rain = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), rainMaterial);
     rainScene.add(rain);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -46,7 +48,7 @@ export function GenesisCanvas({ promptSeed = 0 }: { promptSeed?: number }): JSX.
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('aEnergy', new THREE.Float32BufferAttribute(energies, 1));
     geometry.setAttribute('aW', new THREE.Float32BufferAttribute(hidden, 1));
-    const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.NormalBlending });
+    const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 }, uMode: { value: modeValue[mode] } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.NormalBlending });
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
@@ -62,6 +64,6 @@ export function GenesisCanvas({ promptSeed = 0 }: { promptSeed?: number }): JSX.
     const frame = () => { raf = requestAnimationFrame(frame); const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; rainMaterial.uniforms.uPrompt.value = promptSeed / 4294967296; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; material.uniforms.uPrompt.value = promptSeed / 4294967296; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); };
     resize(); window.addEventListener('resize', resize); frame();
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); material.dispose(); rainMaterial.dispose(); rain.geometry.dispose(); renderer.dispose(); renderer.domElement.remove(); };
-  }, [promptSeed]);
+  }, [promptSeed, mode]);
   return <div ref={hostRef} className="genesis-canvas-host" aria-label="Genesis 9D visualizer" />;
 }

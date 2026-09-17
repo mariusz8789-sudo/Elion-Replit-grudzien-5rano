@@ -98,6 +98,17 @@
         "index.ts"
       ]
     },
+    "speculativeSolvers": {
+      "dir": "packages/core/src/solvers/speculative",
+      "files": [
+        "speculativeTypes.ts",
+        "retrocausalTreeSolver.ts",
+        "torsionBoundarySolver.ts",
+        "warpMetricSolver.ts",
+        "speculativeRegistry.ts",
+        "speculativeSolvers.test.ts"
+      ]
+    },
     "mirrorCore": {
       "dir": "packages/core/src/mirror",
       "files": [

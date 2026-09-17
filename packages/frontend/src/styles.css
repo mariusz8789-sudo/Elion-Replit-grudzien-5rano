@@ -22,4 +22,10 @@ button, input { font: inherit; }
 .genesis-hud-timeline input { flex: 1; accent-color: #00ff41; }
 .genesis-result-card { position: fixed; right: 1rem; bottom: 9.5rem; z-index: 110; max-width: min(30rem, calc(100vw - 2rem)); display: flex; gap: 1rem; align-items: center; border: 1px solid rgba(0,255,65,.25); border-radius: 14px; padding: .75rem .9rem; background: rgba(2,8,4,.85); backdrop-filter: blur(24px); color: #00ff41; cursor: pointer; font-size: .7rem; }
 .genesis-result-card span { color: #00e5ff; font-size: 1rem; }
+.genesis-command-bar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 100; width: min(58rem, calc(100vw - 2rem)); display: flex; align-items: center; gap: .65rem; padding: .9rem 1.1rem; border: 1px solid rgba(0,255,65,.25); border-radius: 999px; background: rgba(2,8,4,.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: 0 0 42px rgba(0,229,255,.12); }
+.genesis-command-bar input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #e8fff0; font: 1rem 'JetBrains Mono', monospace; }
+.genesis-command-bar input::placeholder { color: #71858c; }
+.genesis-command-mark { color: #00ff41; font-size: 1.3rem; }
+.genesis-route-label { color: #00e5ff; font-size: .62rem; white-space: nowrap; }
+.genesis-command-hint { color: #58736a; font-size: .58rem; white-space: nowrap; }
 @media (max-width: 600px) { .genesis-hud { width: calc(100vw - 1rem); bottom: max(20px, env(safe-area-inset-bottom)); padding: .65rem .7rem; } .genesis-hud-status { display: none; } .genesis-hud-title { font-size: .62rem; } .genesis-narrator-toggle { font-size: .52rem; } }

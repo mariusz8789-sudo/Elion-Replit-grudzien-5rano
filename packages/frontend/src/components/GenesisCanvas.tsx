@@ -9,10 +9,8 @@ import { matrixRainVertexShader, matrixRainFragmentShader, particleVertexShader,
 
 const COUNT = 24000;
 
-export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Element {
+export function GenesisCanvas({ promptSeed = 0 }: { promptSeed?: number }): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const pausedRef = useRef(paused);
-  pausedRef.current = paused;
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -28,7 +26,7 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     host.appendChild(renderer.domElement);
     const rainScene = new THREE.Scene();
     const rainCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false });
+    const rainMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 } }, vertexShader: matrixRainVertexShader, fragmentShader: matrixRainFragmentShader, transparent: true, depthWrite: false });
     const rain = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), rainMaterial);
     rainScene.add(rain);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -48,7 +46,7 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('aEnergy', new THREE.Float32BufferAttribute(energies, 1));
     geometry.setAttribute('aW', new THREE.Float32BufferAttribute(hidden, 1));
-    const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.NormalBlending });
+    const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uPrompt: { value: 0 } }, vertexShader: particleVertexShader, fragmentShader: particleFragmentShader, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.NormalBlending });
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
@@ -61,9 +59,9 @@ export function GenesisCanvas({ paused = false }: { paused?: boolean }): JSX.Ele
     composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.4, 0.85));
     const clock = new THREE.Clock(); let raf = 0;
     const resize = () => { const w = window.innerWidth; const h = window.innerHeight; camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w, h); };
-    const frame = () => { raf = requestAnimationFrame(frame); if (!pausedRef.current) { const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); } };
+    const frame = () => { raf = requestAnimationFrame(frame); const t = clock.getElapsedTime(); rainMaterial.uniforms.uTime.value = t; rainMaterial.uniforms.uPrompt.value = promptSeed / 4294967296; renderer.render(rainScene, rainCamera); material.uniforms.uTime.value = t; material.uniforms.uPrompt.value = promptSeed / 4294967296; particles.rotation.y += 0.0007; particles.rotation.x = Math.sin(t * 0.08) * 0.08; controls.update(); composer.render(); };
     resize(); window.addEventListener('resize', resize); frame();
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); controls.dispose(); composer.dispose(); geometry.dispose(); material.dispose(); rainMaterial.dispose(); rain.geometry.dispose(); renderer.dispose(); renderer.domElement.remove(); };
-  }, []);
+  }, [promptSeed]);
   return <div ref={hostRef} className="genesis-canvas-host" aria-label="Genesis 9D visualizer" />;
 }

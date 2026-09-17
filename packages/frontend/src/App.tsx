@@ -14,5 +14,5 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
   const label = route === '#/' ? 'GENESIS COMMAND CENTER' : `GENESIS · ${route.slice(2).replaceAll('-', ' ').toUpperCase()}`;
-  return <GenesisEngineApp routeLabel={label} onExit={() => { window.location.hash = '#/'; }} />;
+  return <GenesisEngineApp routeLabel={label} />;
 }

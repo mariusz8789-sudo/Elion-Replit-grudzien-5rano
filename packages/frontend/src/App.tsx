@@ -84,6 +84,8 @@ const MatrixStageView = lazy(() => import('./components/MatrixStageView').then((
 const MatrixRoute = lazy(() => import('../../ui/src/matrix/MatrixRoute').then((m) => ({ default: m.MatrixRoute })));
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
 const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').then((m) => ({ default: m.ClockworkDashboard })));
+const ColliderChamber = lazy(() => import('./components/ColliderChamber').then((m) => ({ default: m.ColliderChamber })));
+const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ default: m.LabFpvView })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -166,6 +168,8 @@ type Route =
   | { kind: 'matrix-map' }
   | { kind: 'cyber' }
   | { kind: 'clockwork' }
+  | { kind: 'collider' }
+  | { kind: 'lab-fpv' }
   | { kind: 'decipherment' }
   | { kind: 'myths-theories' };
 
@@ -230,6 +234,8 @@ function parseHash(): Route {
   if (h === '#/matrix-map') return { kind: 'matrix-map' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/clockwork') return { kind: 'clockwork' };
+  if (h === '#/collider') return { kind: 'collider' };
+  if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
@@ -704,6 +710,30 @@ export default function App() {
           <TopBar title="◈ Genesis Matrix — mapa systemu" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GenesisMatrixHub />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'collider') {
+      return (
+        <div className="app">
+          <TopBar title="⚛ Genesis Collider — komora detektora" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ColliderChamber />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'lab-fpv') {
+      return (
+        <div className="app">
+          <TopBar title="🧪 Quantum Lab — FPV" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <LabFpvView />
           </HeavyRoute>
           {overlays}
         </div>

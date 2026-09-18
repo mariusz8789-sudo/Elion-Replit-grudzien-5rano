@@ -310,3 +310,24 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .cw-draft h3 { margin: 0 0 0.3rem; font-size: 0.98rem; }
 .cw-body { white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.5; color: #e6f2ec; background: transparent; border-left: 2px solid rgba(142, 232, 245, 0.4); padding: 0.4rem 0.8rem; margin: 0.6rem 0; }
 @media (max-width: 720px) { .cw-form { grid-template-columns: 1fr; } .cw-table { font-size: 0.78rem; } .cw-readout { grid-template-columns: 1fr; } }
+
+/* ---- 15. COLLIDER chamber + QUANTUM LAB FPV ---- */
+.col, .lab { max-width: 1280px; margin: 0 auto; padding: 1.2rem 1.2rem 4rem; color: #dbe7e0; }
+.col-head { display: flex; justify-content: space-between; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; margin-bottom: 1rem; }
+.col-head h1 { margin: 0.2rem 0 0.4rem; font-size: 1.6rem; letter-spacing: 0.04em; }
+.col-lede { max-width: 70ch; color: #9fb3aa; margin: 0; }
+.col-controls { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: flex-end; }
+.col-controls label { display: flex; flex-direction: column; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #7d93ad; }
+.col input, .col select, .lab input { background: transparent !important; border: 1px solid rgba(98, 240, 163, 0.28); color: #e6f2ec; padding: 0.4rem 0.55rem; border-radius: 4px; font: inherit; width: 9rem; }
+.col-stage { position: relative; width: 100%; height: min(60vh, 620px); border: 1px solid rgba(98, 240, 163, 0.16); border-radius: 8px; overflow: hidden; background: #000; }
+.col-stage canvas { display: block; width: 100% !important; height: 100% !important; }
+.col-readout { margin-top: 1rem; }
+.lab-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1rem; }
+.lab-stage { height: min(70vh, 720px); cursor: crosshair; }
+.lab-bench h2 { font-size: 0.95rem; letter-spacing: 0.06em; margin: 0 0 0.5rem; }
+.lab-reagents { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem 0.8rem; margin-bottom: 0.8rem; }
+.lab-reagent { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
+.lab-reagent input { width: 5.5rem; }
+.lab-inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #cfeedd; }
+.lab-inline input[type="number"] { width: 6rem; }
+@media (max-width: 900px) { .lab-grid { grid-template-columns: 1fr; } .lab-reagents { grid-template-columns: 1fr; } }

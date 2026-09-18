@@ -20,7 +20,7 @@ import {
   type CyberTestSelection,
 } from './cyberTestPlanner';
 
-import { kernelRegistry, ztseProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
 import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
@@ -44,7 +44,12 @@ if (kernelRegistry.resolve('semantic-verify') === null) kernelRegistry.register(
 /** CLOCKWORK (B2G module 1): statutory deadline monitoring, drafts for human approval, anchored in its own EvidenceLedger
  *  whose clock is the browser's real time (the ledger entry timestamp, not any deadline arithmetic — `today` is always passed in). */
 export const clockworkLedger = new EvidenceLedger({ now: () => Date.now() });
+/** The same ledger anchors every provider's output (one evidence trail for the one kernel). */
+export const kernelLedger = clockworkLedger;
 if (kernelRegistry.resolve('deadline-monitoring') === null) kernelRegistry.register(clockworkProvider(new ClockworkEngine(clockworkLedger)));
+/** Collider and thermo-lab: toy-normalised models (labelled as such), each event/mix committed to the ledger by the engine. */
+if (kernelRegistry.resolve('particle-collision-sim') === null) kernelRegistry.register(colliderProvider(kernelLedger));
+if (kernelRegistry.resolve('thermodynamic-reaction-sim') === null) kernelRegistry.register(thermoLabProvider(kernelLedger));
 
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic

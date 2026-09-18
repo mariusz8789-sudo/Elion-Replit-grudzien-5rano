@@ -47,6 +47,8 @@ export const SUPPRESSED_ROUTES: readonly string[] = [
   // CLOCKWORK is a clerk's work screen: no animated backdrop behind a case register (office PCs, and the
   // numbers are the point), so the shell's WebGL layer stays off there too.
   '#/clockwork',
+  // Collider chamber and the FPV lab own their full WebGL scenes.
+  '#/collider', '#/lab-fpv',
 ];
 
 export function isSuppressed(hash: string): boolean {

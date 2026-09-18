@@ -5474,3 +5474,34 @@ textarea.guide-typing, input.guide-typing { caret-color: var(--cyan); background
 .myth-hashes dd { margin: 0; color: var(--green); font: .68rem ui-monospace, monospace; overflow-wrap: anywhere; }
 .myth-footer { max-width: 1180px; margin: 24px auto 0; color: var(--text-faint); font: .67rem ui-monospace, monospace; letter-spacing: .12em; }
 @media (max-width: 700px) { .myth-hero { display: block; } .myth-honest { margin-top: 18px; max-width: none; } .myth-card-footer { align-items: stretch; flex-direction: column; } .myth-run { width: 100%; } }
+
+.genesis-engine-app { position: fixed; inset: 0; z-index: 2; background: #000; overflow: hidden; }
+.genesis-canvas-host, .genesis-canvas { position: absolute; inset: 0; width: 100vw; height: 100vh; display: block; }
+.genesis-canvas { touch-action: none; }
+.genesis-hud { position: fixed; left: 50%; bottom: max(1rem, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 10; width: min(58rem, calc(100vw - 2rem)); display: grid; gap: .55rem; padding: .8rem 1rem; border: 1px solid rgba(0,255,65,.24); border-radius: 18px; background: rgba(5,10,15,.76); backdrop-filter: blur(18px) saturate(125%); -webkit-backdrop-filter: blur(18px) saturate(125%); box-shadow: 0 0 36px rgba(0,229,255,.12); color: #e8fff0; font-family: var(--font-mono); }
+.genesis-hud-title, .genesis-hud-controls, .genesis-hud-timeline { display: flex; align-items: center; gap: .6rem; }
+.genesis-hud-title { font-size: .72rem; letter-spacing: .13em; color: #00ff41; }
+.genesis-hud-status { margin-left: auto; color: #00e5ff; font-size: .62rem; }
+.genesis-hud-dot { width: .45rem; height: .45rem; border-radius: 50%; background: #00ff41; box-shadow: 0 0 10px #00ff41; }
+.genesis-hud-button { border: 1px solid rgba(0,229,255,.45); border-radius: 999px; padding: .45rem .75rem; color: #00e5ff; background: rgba(0,229,255,.06); font: inherit; font-size: .68rem; }
+.genesis-hud-button:hover { border-color: #00ff41; color: #00ff41; }
+.genesis-hud-timeline { flex: 1; color: #a9b3cf; font-size: .68rem; }
+.genesis-hud-timeline input { flex: 1; accent-color: #00ff41; }
+.genesis-command-bar { display: flex; align-items: center; gap: .55rem; border: 1px solid rgba(0,255,65,.3); border-radius: 999px; padding: .35rem .45rem .35rem .8rem; background: rgba(0,0,0,.42); }
+.genesis-command-bar input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #e8fff0; font: inherit; font-size: .78rem; }
+.genesis-command-bar input::placeholder { color: #71858c; }
+.genesis-command-mark { color: #00ff41; font-size: 1.1rem; }
+.genesis-narrator-toggle { margin-left: auto; border: 1px solid rgba(0,229,255,.28); border-radius: 999px; padding: .25rem .5rem; color: #00e5ff; background: transparent; font: inherit; font-size: .58rem; white-space: nowrap; }
+.genesis-result-card { position: fixed; right: 1rem; bottom: 9.5rem; z-index: 100; max-width: min(30rem, calc(100vw - 2rem)); display: flex; gap: 1rem; align-items: center; border: 1px solid rgba(0,255,65,.3); border-radius: 14px; padding: .75rem .9rem; background: rgba(5,10,15,.78); backdrop-filter: blur(20px); color: #00ff41; font: .7rem var(--font-mono); }
+.genesis-result-card span { color: #00e5ff; font-size: 1rem; }
+@media (max-width: 600px) { .genesis-hud { width: calc(100vw - 1rem); bottom: max(.5rem, env(safe-area-inset-bottom)); padding: .65rem .7rem; } .genesis-hud-status { display: none; } .genesis-hud-controls { gap: .4rem; } .genesis-hud-timeline { min-width: 0; } }
+
+/* Critical frontend overhaul: obsidian ground plane + floating glass HUD. */
+:root { --bg: #000000; --bg-panel: rgba(5, 10, 15, 0.75); --bg-raised: rgba(5, 10, 15, 0.82); --green: #00ff41; --cyan: #00e5ff; --border: rgba(0, 255, 65, 0.2); --border-strong: rgba(0, 229, 255, 0.52); }
+html, body, #root { min-height: 100%; background: #000 !important; }
+.hyper-state-visualizer { position: fixed; inset: 0; z-index: 0; width: 100vw; height: 100vh; overflow: hidden; pointer-events: none; background: #000; }
+.hyper-state-canvas { display: block; width: 100%; height: 100%; }
+.app, .app-shell, .app-content, main, .home, .settings-view, .timeline-view, .matrix-hub, .reality-main, .worlds, .cy-workspace, .qde-view, .discovery-view { position: relative; z-index: 1; }
+.app-shell, .topbar, .narrator, .card, .panel, .settings-section, .matrix-card, .matrix-detail-panel, .matrix-chat-dock, .sim-panel, .lab-shell, .glass-panel { background: rgba(5, 10, 15, 0.75) !important; border-color: rgba(0, 255, 65, 0.2) !important; backdrop-filter: blur(14px) saturate(120%); -webkit-backdrop-filter: blur(14px) saturate(120%); }
+.topbar { position: relative; z-index: 10; }
+@media (max-width: 700px) { .app-shell, .app-content { padding-bottom: 7.5rem; } .topbar { background: rgba(0, 0, 0, 0.84) !important; } .narrator, .science-chat, .guide { z-index: 10; } }

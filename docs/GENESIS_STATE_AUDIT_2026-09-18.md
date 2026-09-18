@@ -188,3 +188,19 @@ Wszystkie liczby pochodzą z realnych uruchomień w tej sesji; nic nie jest szac
 3. **Serwer kwantowy**: `QPU_API_URL` + `QPU_API_KEY` (IBM Quantum / AWS Braket lub inny REST) — bez nich `/quantum` liczy wyłącznie na lokalnym symulatorze z etykietą `MODEL_ESTIMATE`. Który dostawca i jaki budżet — decyzja właściciela.
 4. **Deploy**: Railway śledzi `main`; po każdym scaleniu wymagany redeploy (panel Railway). Wolumen `/data` musi pozostać w `Dockerfile`.
 5. **TTS**: bez płatnych kluczy; głos przewodnika pozostaje na Web Speech API przeglądarki.
+
+## 9. Pakiet nocny (18/19.09) — co weszło, co odrzucono, co jest modelem
+
+Cztery równoległe strumienie (native, quantum, powłoka 2040, ekrany 2040), potem tryb HUD. Wszystko na tej gałęzi i po scaleniu na `main`. Decyzja: `docs/DECISIONS.md` D-123.
+
+| Element | Ścieżka | Status | Uwagi epistemiczne |
+|---|---|---|---|
+| Native System Orchestrator | `packages/core/src/engine/native/` | wdrożony po audycie (17 defektów naprawionych, 31 testów, tryb wątkowy realnie testowany) | `streamSubprocess` = prymityw wewnętrzny, nigdy na HTTP |
+| Hybrid Quantum Bridge | `packages/core/src/engine/quantum/`, `packages/backend/src/quantumApi.mjs`, czat `/quantum` | wdrożony (22 + 8 + 10 testów; curl OK) — **kod „Qwena" nigdy nie dotarł, implementacja własna wg specyfikacji** | wynik lokalny = `LOCAL_SIMULATOR` / `MODEL_ESTIMATE` („NIE pomiar"); `HARDWARE_MEASUREMENT` tylko z `QPU_API_URL` + `QPU_API_KEY`; symulacja liczona w puli wątków orkiestratora natywnego |
+| Powłoka 2040 (warstwa shell) | `styles-2040.css`, `AppShell.tsx`, `GenesisHoloBackdrop.tsx` | wdrożona | brak nowych liczb na ekranie; pill „SYS · ROUTE" czyta realny hash |
+| Ekrany 2040 | `styles-2040-screens.css`, `components/holo/*`, `StartHero`, `WorldsHubScreen` | wdrożone | podglądy proceduralne oznaczone „PODGLĄD PROCEDURALNY", `aria-hidden` |
+| Tryb HUD (pełnoekranowy świat) | `GenesisHoloBackdrop.tsx` (portal FBO, ACES, UnrealBloom, aberracja chromatyczna, niebo SDF), sekcja 9 w `styles-2040.css` | wdrożony | dostarczone komponenty portalu używały Tailwinda (brak w repo) i `Math.random` → przepisane na CSS repo i seed mulberry32; brak czarnych klatek (światy zamieniają się przy przejściu) |
+| `Genesis5DEnhancedManifoldEngine`, `GenesisEliteEnterpriseCore`, `GenesisEnterpriseMasterHub` | — | **nie wdrożone** | `generateNodeTelemetry` zwraca stałe „64 wątki / 16384 MB / SECURE_OPTIMAL", a HUD miał je wyświetlać jako telemetrię — to są liczby zmyślone; „tensor krzywizny 5D" to suma dowolnych iloczynów. Realna telemetria maszyny istnieje w `SystemResourceBridge` (os.cpus, pamięć, load) |
+| Pakiet „Gemini" (9 silników + 2 specy Playwright) | — | odrzucony / zmapowany (sekcja 5.1) | pliki już istnieją w bogatszych wersjach; specy zmapowane na `scripts/city-hud-e2e.mjs` |
+
+Uczciwe ograniczenia trybu HUD: pełnoekranowy render z post-processingiem kosztuje GPU — na telefonach kompozytor jest wyłączony, FBO ma połowę rozdzielczości, a pętla staje przy ukrytej karcie, `prefers-reduced-motion` i na ciężkich trasach 3D (miasto, laboratorium, molekuła). Zrzuty w tej sesji pochodzą z programowego renderera (SwiftShader), więc na realnym GPU obraz jest ostrzejszy, nie gorszy.

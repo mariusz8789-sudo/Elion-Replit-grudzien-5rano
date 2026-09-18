@@ -4,6 +4,8 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { t } from './core/i18n';
 import './styles.css';
+import './styles-2040.css';
+import './styles-2040-screens.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

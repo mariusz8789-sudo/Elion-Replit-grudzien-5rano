@@ -73,6 +73,10 @@ export type ChatAction =
    * side effect (running `runAdaptiveInvestigation`, formatting the summary) lives in
    * `ScienceChat.tsx`, exactly like every other action here — this resolver stays a pure function. */
   | { type: 'runCyber' }
+  /** KNOWLEDGE INGESTION — `/ingest <url …>`: the URLs the message itself contained, in order. The
+   * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
+   * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
+  | { type: 'ingestUrls'; urls: readonly string[] }
   /** Same ETAP 1.5 pattern for Decipherment. `sequenceText` is whatever the message itself supplied
    * as a candidate glyph sequence (see the extraction right before this action is returned) — null
    * when none was found, in which case `ScienceChat.tsx` falls back to the honest toy demo sequence
@@ -326,6 +330,14 @@ function buildComparison(raw: string): { a: ModelConfig; b: ModelConfig } {
 export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): ChatResponse {
   const norm = normalize(message);
   if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM', intent: 'HELP' };
+
+  // --- Knowledge ingestion: `/ingest <url>` (also "zaingestuj", "pobierz źródło"). URLs come from the RAW
+  //     message (normalize() strips punctuation); with no URL the command explains itself instead of guessing.
+  if (/^\s*\/ingest\b/i.test(message) || has(norm, 'zaingestuj', 'pobierz zrodlo', 'pobierz zrodla', 'dodaj zrodlo')) {
+    const urls = Array.from(message.matchAll(/https?:\/\/[^\s<>"']+/g), (m) => m[0].replace(/[),.;]+$/, ''));
+    if (urls.length === 0) return { text: 'Podaj adres: `/ingest https://…`. Pobieram wyłącznie przez oficjalne API (YouTube, X, Facebook — z kluczem w środowisku) albo z domen dopuszczonych w rejestrze polityk; wynik trafia do bazy jako PROPOZYCJA do zatwierdzenia, nigdy jako fakt.', tag: 'SYSTEM', intent: 'CREATE_TASK' };
+    return { text: `Wysyłam ${urls.length} adres(y) do modułu pozyskiwania wiedzy. Zasady: oficjalne API lub domeny z rejestru, robots.txt respektowany, wynik = propozycja z jawnym statusem.`, tag: 'SYSTEM', intent: 'CREATE_TASK', action: { type: 'ingestUrls', urls } };
+  }
 
   // --- Sterowanie odtwarzaniem (istniejący activeSimControls) ---
   if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'pause' } };

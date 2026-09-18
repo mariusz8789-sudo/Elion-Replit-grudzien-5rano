@@ -95,6 +95,7 @@ import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
 import { runSpeculative } from './speculativeApi.mjs';
+import { runIngest, listProposals, publishProposal, rejectProposal } from './knowledgeApi.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -173,6 +174,22 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'qm' && seg[2] === 'singlepoint' && seg.length === 3 && method === 'POST') {
       const r = runQuantumSinglePoint(body ?? {});
       return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- Knowledge ingestion (Science Chat `/ingest <url>`): propose-only, human publishes ----
+  if (seg[0] === 'knowledge') {
+    if (seg[1] === 'ingest' && seg.length === 2 && method === 'POST') {
+      // The only asynchronous route in this router: server.mjs awaits handleApi's result.
+      return runIngest(body).then((result) => (result.ok ? ok(result) : err(400, result.error)));
+    }
+    if (seg[1] === 'proposals' && seg.length === 2 && method === 'GET') return ok(listProposals());
+    if (seg[1] === 'proposals' && seg.length === 4 && method === 'POST' && (seg[3] === 'publish' || seg[3] === 'reject')) {
+      const approver = getUserByToken(db, ctx.token);
+      if (!approver) return err(401, 'unauthorized', 'Publishing or rejecting a proposal requires a signed-in approver.');
+      const result = seg[3] === 'publish' ? publishProposal(seg[2], approver.id) : rejectProposal(seg[2], approver.id);
+      return result.ok ? ok(result) : err(409, result.error);
     }
     return err(404, 'not_found');
   }

@@ -327,14 +327,14 @@ function handlePersistApi(req, res, url) {
     if (size > maxBodyBytes) { overflow = true; req.destroy(); return; }
     raw += chunk;
   });
-  req.on('end', () => {
+  req.on('end', async () => {
     if (overflow) return;
     let body = {};
     if (raw) {
       try { body = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad_json' }); }
     }
     try {
-      const result = handleApi(db, { method: req.method, pathname: url.pathname, token, body, query });
+      const result = await handleApi(db, { method: req.method, pathname: url.pathname, token, body, query });
       return json(res, result.status, result.body);
     } catch (err) {
       log('error', 'persist_api_failed', { path: url.pathname, message: String(err?.message) });
@@ -404,7 +404,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
   const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
   if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/worlds') || req.url?.startsWith('/api/security') || req.url?.startsWith('/api/speculative')) {
+  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/worlds') || req.url?.startsWith('/api/security') || req.url?.startsWith('/api/speculative') || req.url?.startsWith('/api/knowledge')) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });

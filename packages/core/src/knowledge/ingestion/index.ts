@@ -5,3 +5,4 @@ export * from './YouTubeOfficialApiAdapter.js';
 export * from './PublicWebAdapter.js';
 export * from './SocialOfficialApiAdapter.js';
 export * from './OmniIngestionController.js';
+export * from './EnvKeyProvider.js';

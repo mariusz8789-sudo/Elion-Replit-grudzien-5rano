@@ -21,6 +21,7 @@
     "smoke:mobile": "node scripts/smoke-e2e.mjs mobile",
     "compute:bundle": "esbuild packages/frontend/src/core/compute/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --legal-comments=none --outfile=packages/backend/src/compute/core.bundle.mjs",
     "compute:bundle:speculative": "esbuild packages/core/src/solvers/speculative/index.ts --bundle --format=esm --platform=node --target=node22 --banner:js=\"/* eslint-disable @typescript-eslint/no-unused-vars -- esbuild bundle of packages/core/src/solvers/speculative; regenerate with npm run compute:bundle:speculative, do not edit */\" --outfile=packages/backend/src/compute/speculative-core.mjs",
+    "compute:bundle:knowledge": "esbuild packages/core/src/knowledge/ingestion/serverEntry.ts --bundle --format=esm --platform=node --target=node22 --banner:js=\"/* esbuild bundle of packages/core/src/knowledge/ingestion/serverEntry.ts; regenerate with npm run compute:bundle:knowledge, do not edit */\" --outfile=packages/backend/src/compute/knowledge-core.mjs",
     "compute:bundle:check": "node scripts/check-compute-bundle.mjs",
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",

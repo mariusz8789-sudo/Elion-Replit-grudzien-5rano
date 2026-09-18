@@ -34,6 +34,16 @@ import { fnv1a, canonicalJson } from '../core/events/hash';
 /** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
  * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
  * workspace's own rendering of the same result. */
+const INGEST_SKIP_LABEL: Record<string, string> = {
+  REQUIRES_OFFICIAL_API: 'wymaga oficjalnego API i klucza w środowisku (bez scrapingu)',
+  LEGAL_GATE_PENDING: 'domena poza rejestrem zweryfikowanych źródeł',
+  ROBOTS_DISALLOWED: 'robots.txt zabrania',
+  RATE_LIMITED: 'limit zapytań',
+  REFUSED_UNSAFE_URL: 'adres odrzucony (niepubliczny host lub protokół)',
+  NETWORK: 'błąd sieci',
+  PARSE: 'nie udało się odczytać treści',
+  NO_ADAPTER: 'brak adaptera dla tej platformy',
+};
 const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
   CANDIDATE: 'kandydat',
   SUPPORTED_WITHIN_PROTOCOL: 'potwierdzona w protokole',
@@ -638,6 +648,24 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         const result = control.applyObservation(a.sentence);
         appendGenesis(result.narration, result.found ? 'MODEL' : 'SYSTEM');
       }
+    } else if (a?.type === 'ingestUrls') {
+      // KNOWLEDGE INGESTION — the backend does the fetching (official APIs / allowlisted web) and the
+      // propose-only ledger; the chat reports the outcome and never rewords a skip reason into success.
+      void fetch('/api/knowledge/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ urls: a.urls }) })
+        .then(async (res) => {
+          const data = await res.json() as { ok?: boolean; error?: string; fetched?: number; skipped?: { url: string; reason: string }[]; proposals?: { claim: string; status: string; sourceKind: string }[]; pendingProposals?: number; activeRecords?: number };
+          if (!res.ok || data.ok !== true) { appendGenesis(`Pozyskiwanie nie powiodło się: ${data.error ?? res.status}.`, 'SYSTEM'); return; }
+          const skipped = (data.skipped ?? []).map((sk) => `${sk.url} → ${INGEST_SKIP_LABEL[sk.reason] ?? sk.reason}`).join('\n');
+          const proposals = (data.proposals ?? []).map((p) => `• „${p.claim}" — status: ${p.status}, źródło: ${p.sourceKind}`).join('\n');
+          appendGenesis(
+            `Pobrano ${data.fetched ?? 0} element(ów); propozycje w bazie: ${data.pendingProposals ?? 0} oczekujących, ${data.activeRecords ?? 0} opublikowanych.\n`
+            + (proposals ? proposals + '\n' : '')
+            + (skipped ? 'Pominięte:\n' + skipped + '\n' : '')
+            + 'Nic nie zostało opublikowane — propozycję zatwierdza zalogowany człowiek (POST /api/knowledge/proposals/:id/publish). To nie jest dowód kliniczny i nie zasila Winner Gate.',
+            'HIPOTEZA',
+          );
+        })
+        .catch((e: unknown) => appendGenesis(`Pozyskiwanie nie powiodło się: ${e instanceof Error ? e.message : String(e)}.`, 'SYSTEM'));
     } else if (a?.type === 'runCyber') {
       // ETAP 1.5 — the real kernel, run synchronously right here, exactly like CyberWorkspace.tsx's
       // own `run()` does. The result lives in chat state so a follow-up "zapisz" can persist it

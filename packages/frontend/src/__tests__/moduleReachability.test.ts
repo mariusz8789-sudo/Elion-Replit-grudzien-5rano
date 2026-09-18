@@ -173,6 +173,16 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/worldModel/domains/genesisCityWorld2.ts': 'An earlier city composition; the live path is genesisScientificCity3/4.ts through createScientificWorld.',
   'core/events/epidemicTransmissionAnalysis.ts': 'Superseded by contacts/clusterAnalysis.ts + simulation/worldEngineContract.ts::computeHotspots, both already on City3DWebGLScreen; its infection.transmission events are never produced in production.',
   'core/knowledge/context.ts': 'A convenience wrapper that never gained a caller — experimentFabric/router.ts reads findSupplementalKnowledge directly.',
+  // origin/main (commits e3cc9f3a…3e106f8d) replaced App.tsx with a full-screen particle "command center"
+  // (GenesisEngineApp). The merge keeps the product shell; these files stay in the tree as an unreferenced
+  // visual proposal until they get a route of their own with the same REAL / VISUALISATION labels as every world.
+  'components/GenesisCanvas.tsx': 'Particle-field canvas from the main-branch command-center override; not routed — the product shell (AppShell + StartHero) is the root route.',
+  'components/GenesisEngineApp.tsx': 'Root override from origin/main (canvas + HUD, no menu, no worlds); superseded by App.tsx; kept as a visual proposal.',
+  'components/GenesisHUD.tsx': 'HUD bar of the main-branch override; not routed.',
+  'components/HyperStateVisualizer.tsx': 'Obsidian hyper-state visualizer from origin/main; not routed.',
+  'engine/GenesisShaders.ts': 'GLSL sources used only by the unrouted GenesisCanvas.',
+  'engine/HyperMath.ts': 'Helper used only by the unrouted HyperStateVisualizer.',
+  'render/GenesisQualityUpgrade.ts': 'Render-quality helper used only by the unrouted GenesisCanvas.',
   'core/city/CityDisasterController.ts': 'City disaster adapter package is built and unit-tested, but no production screen has been approved to expose this synthetic crisis-control surface yet.',
   'core/city/GenesisCityDigitalTwin.ts': 'City digital-twin adapter is staged for a deliberate product wiring decision; the live city routes use the existing scientific-city runtime instead.',
   'core/city/GenesisDisasterEngine.ts': 'City disaster engine is a tested integration seam, intentionally not connected to live routes until its synthetic-data labeling and product UX are reviewed.',

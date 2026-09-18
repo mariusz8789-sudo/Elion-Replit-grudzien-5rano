@@ -43,3 +43,5 @@ packages/frontend/public/audio/lines.json
 artifacts/matrix-*.png
 test-results/
 playwright-report/
+
+artifacts/clockwork-*.png

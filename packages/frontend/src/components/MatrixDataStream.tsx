@@ -44,6 +44,9 @@ export const SUPPRESSED_ROUTES: readonly string[] = [
   '#/city3d', '#/city', '#/scientific-city', '#/genesis-world', '#/first-person-lab', '#/lab-3d',
   '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo', '#/discovery-hall',
   '#/hf-slice', '#/reality', '#/prebuild', '#/timeline', '#/matrix',
+  // CLOCKWORK is a clerk's work screen: no animated backdrop behind a case register (office PCs, and the
+  // numbers are the point), so the shell's WebGL layer stays off there too.
+  '#/clockwork',
 ];
 
 export function isSuppressed(hash: string): boolean {

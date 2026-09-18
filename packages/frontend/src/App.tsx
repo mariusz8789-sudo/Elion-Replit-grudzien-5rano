@@ -83,6 +83,7 @@ const MatrixStageView = lazy(() => import('./components/MatrixStageView').then((
 // Mythos B2G Matrix HUD (packages/ui): hex/bin GPU rain + live EvidenceLedger / CICADA CEP feeds. Source-only package, same alias rules as @genesis/core.
 const MatrixRoute = lazy(() => import('../../ui/src/matrix/MatrixRoute').then((m) => ({ default: m.MatrixRoute })));
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
+const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').then((m) => ({ default: m.ClockworkDashboard })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -164,6 +165,7 @@ type Route =
   | { kind: 'matrix-stage' }
   | { kind: 'matrix-map' }
   | { kind: 'cyber' }
+  | { kind: 'clockwork' }
   | { kind: 'decipherment' }
   | { kind: 'myths-theories' };
 
@@ -227,6 +229,7 @@ function parseHash(): Route {
   if (h === '#/matrix-stage') return { kind: 'matrix-stage' };
   if (h === '#/matrix-map') return { kind: 'matrix-map' };
   if (h === '#/cyber') return { kind: 'cyber' };
+  if (h === '#/clockwork') return { kind: 'clockwork' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
@@ -701,6 +704,19 @@ export default function App() {
           <TopBar title="◈ Genesis Matrix — mapa systemu" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GenesisMatrixHub />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'clockwork') {
+      // CLOCKWORK: the clerk's deadline dashboard — a client of the single kernel's `deadline-monitoring` provider.
+      return (
+        <div className="app">
+          <TopBar title="⏱ CLOCKWORK — terminy KPA i UDIP" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ClockworkDashboard />
           </HeavyRoute>
           {overlays}
         </div>

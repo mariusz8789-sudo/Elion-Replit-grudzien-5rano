@@ -20,6 +20,32 @@ import {
   type CyberTestSelection,
 } from './cyberTestPlanner';
 
+import { kernelRegistry, ztseProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
+import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
+import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+
+/**
+ * SINGLE-KERNEL POLICY. This module is Genesis's one cyber orchestrator and
+ * the only execution point. It binds itself to the shared provider registry
+ * at load: any other module that tries to bind as a kernel throws
+ * KERNEL_ALREADY_BOUND. The Mythos / Post-Mythos engines (CICADA, ZTSE,
+ * Action-Gate, PQC) are analysis PROVIDERS resolved through the registry,
+ * never a second kernel; `#/matrix` is visualisation only and binds nothing.
+ *
+ * Registered here by default: ZTSE (needs no configuration). CICADA needs
+ * baselines and Action-Gate needs a real signature verifier, so their
+ * providers are registered by whoever owns that configuration — never with
+ * invented baselines or a stub verifier.
+ */
+export const GENESIS_CYBER_KERNEL_ID = 'genesis-cyber-kernel';
+kernelRegistry.bindKernel(GENESIS_CYBER_KERNEL_ID);
+if (kernelRegistry.resolve('semantic-verify') === null) kernelRegistry.register(ztseProvider(new ZeroTrustSemanticEngine()));
+/** CLOCKWORK (B2G module 1): statutory deadline monitoring, drafts for human approval, anchored in its own EvidenceLedger
+ *  whose clock is the browser's real time (the ledger entry timestamp, not any deadline arithmetic — `today` is always passed in). */
+export const clockworkLedger = new EvidenceLedger({ now: () => Date.now() });
+if (kernelRegistry.resolve('deadline-monitoring') === null) kernelRegistry.register(clockworkProvider(new ClockworkEngine(clockworkLedger)));
+
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic
  * target. Adapted from an external draft (Qwen), integrated after fixing

@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { EvidenceLedger, type NewEvidenceInput } from '../knowledge/EvidenceLedger.js';
 import { MythosSubstrate } from './MythosSubstrate.js';
 import { CicadaEngine, InsufficientEvidenceError, type ProcurementEvent, type CicadaConfig } from './CicadaEngine.js';
+import { KernelProviderRegistry, cicadaProvider, ztseProvider, actionGateProvider } from './KernelProviderRegistry.js';
+import { ZeroTrustSemanticEngine } from '../postmythos/ZeroTrustSemanticEngine.js';
+import { ActionGateSynthesizer } from '../postmythos/ActionGateSynthesizer.js';
 const clock = { t: 1000, now() { return this.t; } };
 const srcInput = (claim: string): NewEvidenceInput => ({ sourceUrl: 'https://example.org/osint/1', sourceTimestamp: null, claim, claimType: 'observation', confidence: 0.9, provenance: { sourceKind: 'dataset', retrievedBy: 'test', independentSourceIds: ['IND-1'] } });
 const CONFIG: CicadaConfig = { windowMs: 7 * 86400000, surgeK: 2.5, minSuppliers: 3, newEntityDays: 30, criticalComponents: ['COMP-X'], scoreThreshold: 0.6, historicalWindows: [{ year: 2019, hadPattern: true, escalated: false }] };
@@ -74,4 +77,41 @@ describe('iron rules', () => {
       expect(s).not.toContain('Date.now(');
     });
   }
+});
+describe('KernelProviderRegistry (single-kernel policy)', () => {
+  const ctx = { kernelId: 'genesis-cyber-kernel', route: '#/cyber', operatorId: 'OP-1' };
+  it('exactly one kernel may bind; a second, different kernel throws KERNEL_ALREADY_BOUND', () => {
+    const r = new KernelProviderRegistry();
+    expect(r.boundKernel).toBeNull();
+    r.bindKernel('genesis-cyber-kernel');
+    r.bindKernel('genesis-cyber-kernel'); // idempotent for the same kernel
+    expect(() => r.bindKernel('other')).toThrow('KERNEL_ALREADY_BOUND:genesis-cyber-kernel');
+    expect(r.boundKernel).toBe('genesis-cyber-kernel');
+  });
+  it('a capability resolves only after its provider is registered, and duplicates are refused', () => {
+    const r = new KernelProviderRegistry();
+    expect(r.resolve('supply-chain-anomaly')).toBeNull();
+    const cicada = cicadaProvider(new CicadaEngine(CONFIG, BASELINES));
+    r.register(cicada);
+    expect(r.resolve('supply-chain-anomaly')?.providerId).toBe('cicada-ledger');
+    expect(() => r.register(cicada)).toThrow('DUPLICATE_PROVIDER:cicada-ledger');
+    r.unregister('cicada-ledger');
+    expect(r.resolve('supply-chain-anomaly')).toBeNull();
+  });
+  it('providers delegate to the real engines (same result as calling the engine directly)', () => {
+    const r = new KernelProviderRegistry();
+    const engine = new CicadaEngine(CONFIG, BASELINES);
+    r.register(cicadaProvider(engine));
+    const events = [ev('E1', 'S1', 140, 1), ev('E2', 'S2', 145, 2), ev('E3', 'S3', 150, 3)];
+    const viaProvider = r.resolve('supply-chain-anomaly')!.analyze(ctx, events) as { provenanceHash: string };
+    expect(viaProvider.provenanceHash).toBe(engine.evaluate(events).provenanceHash);
+    r.register(ztseProvider(new ZeroTrustSemanticEngine()));
+    const check = r.resolve('semantic-verify')!.analyze(ctx, { kind: 'INTERVAL', subject: 'S', metric: 'm', lo: 1, hi: 2, provenanceHash: 'f'.repeat(64) }) as { verdict: string };
+    expect(check.verdict).toBe('ACCEPT');
+    r.register(actionGateProvider(new ActionGateSynthesizer(() => false)));
+    const specs = r.resolve('action-synthesis')!.analyze(ctx, { criticalNodeCompromised: false, supplySurge: true, treatyCandidateViolation: false }) as readonly { status: string }[];
+    expect(specs.length).toBe(1);
+    expect(specs[0].status).toBe('PROPOSED');
+    expect(r.list()).toEqual(['cicada-ledger', 'ztse-verify', 'action-gate']);
+  });
 });

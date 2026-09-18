@@ -55,7 +55,8 @@ export function StartHero(): React.ReactElement {
     <section className="start" aria-label="Start" data-testid="start-hero">
       <div className="start-glow" aria-hidden="true" />
       <header className="start-head">
-        <span className="gx-eyebrow">Genesis Physics · Scientific OS · genesis-physics.com</span>
+        <img className="start-brand" src="/brand/genesis-lockup.png" alt="Genesis Physics — Scientific OS" width={1200} height={400} decoding="async" />
+        <span className="gx-eyebrow">genesis-physics.com</span>
         <h1 className="start-title">Zadaj pytanie. Genesis przeprowadzi badanie.</h1>
         <p className="start-lede">
           Kandydaci, dowody, próba obalenia własnej hipotezy, bramka zwycięzcy — w jednym przebiegu, z odciskiem każdego etapu.

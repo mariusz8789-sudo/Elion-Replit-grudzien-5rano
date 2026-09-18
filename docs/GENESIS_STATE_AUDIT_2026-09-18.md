@@ -166,20 +166,20 @@ Dostarczono 9 plików silników + 2 specyfikacje Playwright. Wszystkie 9 nazw pl
 
 ## 7. Weryfikacja liczbowa (stan po scaleniu i po pakiecie nocnym)
 
-Wszystkie liczby pochodzą z realnych uruchomień w tej sesji; nic nie jest szacowane. Ostatnia kolumna zostanie uzupełniona po zakończeniu pakietu nocnego (sekcja 9).
+Wszystkie liczby pochodzą z realnych uruchomień w tej sesji; nic nie jest szacowane. Ostatnia kolumna: stan po pakiecie nocnym (sekcja 9), commit `b8524220`+docs, scalony na `main`.
 
 | Kontrola | Po scaleniu z `main` (commit `299fa0a8`) | Po pakiecie nocnym |
 |---|---|---|
-| `npm run lint` | 0 błędów | _do uzupełnienia_ |
-| `tsc --noEmit` (frontend) | 0 błędów | _do uzupełnienia_ |
-| `vite build` | OK | _do uzupełnienia_ |
-| Frontend vitest | 569 plików, 6621 pass, 1 skip | _do uzupełnienia_ |
-| Backend `node --test` | 844 testy, 811 pass, 33 skip, 0 fail | _do uzupełnienia_ |
-| `npm run test:core` (packages/core + packages/ui) | 26 plików, 261 testów (w tym 13 ingestion + 1 EnvKeyProvider) | _do uzupełnienia_ |
-| Smoke desktop (`scripts/smoke-e2e.mjs`) | 34 trasy + 13 labów, 0 błędów konsoli | _do uzupełnienia_ |
-| E2E (`npm run e2e`) | 18/18 | _do uzupełnienia_ |
-| Lejek (`funnel`) / przepis (`recipe`) | 5/5 / 8/8 | _do uzupełnienia_ |
-| `npm run audit:verify` (D-121) | VERIFIED, pieczęć `8072bb69…` | _do uzupełnienia_ |
+| `npm run lint` | 0 błędów | 0 błędów |
+| `tsc --noEmit` (frontend) | 0 błędów | 0 błędów |
+| `vite build` | OK | OK (backdrop = osobny chunk 8,7 kB) |
+| Frontend vitest | 569 plików, 6621 pass, 1 skip | 575 plików, 6651 pass, 1 skip (3 pliki przekroczyły 5 s przy obciążeniu równoległym; w izolacji 132/132) |
+| Backend `node --test` | 844 testy, 811 pass, 33 skip, 0 fail | 854 testy, 821 pass, 33 skip, 0 fail |
+| `npm run test:core` (packages/core + packages/ui) | 26 plików, 261 testów (w tym 13 ingestion + 1 EnvKeyProvider) | 328 testów (native 31, quantum 22) |
+| Smoke desktop / mobile (`scripts/smoke-e2e.mjs`) | 34 trasy + 13 labów, 0 błędów konsoli | desktop 34+13, 227 interakcji, 0 błędów; mobile 34+13, 256 interakcji, 0 błędów |
+| E2E przeglądarkowe | 18/18 | `e2e:myths` OK (errors=0); `e2e:city-hud` 6/6 |
+| Quantum end-to-end | — | `POST /api/quantum/run` bell-state 2048/seed 7 → 00: 1060, 11: 988, `MODEL_ESTIMATE`, histogram w czacie (zrzut) |
+| `npm run audit:verify` (D-121) | VERIFIED, pieczęć `8072bb69…` | VERIFIED (werdykt WINNER LIRAGLUTIDE, gate REQUIRES_HUMAN_APPROVAL — bez zmian) |
 
 ## 8. Decyzje właściciela (otwarte)
 

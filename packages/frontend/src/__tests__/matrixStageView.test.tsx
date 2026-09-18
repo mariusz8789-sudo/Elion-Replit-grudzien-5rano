@@ -16,10 +16,9 @@ describe('MatrixStageView — a HUD column over the stage, nothing else', () => 
     expect(html).not.toContain('matrix-hub-grid');
     expect((html.match(/<aside/g) ?? []).length).toBe(1);
   });
-  it('shows the stage legend in the owner’s order and the four controls', () => {
-    for (const w of ['GENESIS', 'EVIDENCE', 'TRUTH', 'ABSENCE', 'A BETTER TOMORROW']) expect(html).toContain(w);
-    expect(html.indexOf('EVIDENCE')).toBeGreaterThan(html.indexOf('>GENESIS<'));
+  it('shows the four controls and no stage props (no figures, no legend of props)', () => {
     for (const c of ['Zapytaj Genesis', 'Światy 3D', 'Konsola badawcza', 'Mapa systemu']) expect(html).toContain(c);
+    expect(html).not.toContain('matrix-stage-legend');
   });
   it('without a backend the readout says so instead of showing a number', () => {
     expect(html).toContain('brak backendu');

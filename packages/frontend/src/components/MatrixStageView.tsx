@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
-import { MATRIX_WORDS } from './holo/MatrixStage';
 
 /**
  * MATRIX — the clean stage view of `#/matrix`.
  *
- * The world (glyph rain, chrome figures on luminous platforms, mirror floor,
- * word columns) is the full-bleed WebGL backdrop the shell already runs; this
- * component paints NOTHING opaque over it. All it adds is one borderless HUD
- * column on the right: measured telemetry, the manifold geometry of the stage
- * camera's real path, the stage legend and four controls. The system map that
- * used to fill this route lives at `#/matrix-map`.
+ * The world (volumetric glyph rain over an obsidian mirror — nothing else) is
+ * the full-bleed WebGL backdrop the shell already runs; this component paints
+ * NOTHING opaque over it. All it adds is one borderless HUD column on the
+ * right: measured telemetry, the manifold geometry of the camera's real path
+ * and four controls. The system map that used to fill this route lives at
+ * `#/matrix-map`.
  *
  * Every number shown here came from the backend in this session or is not
  * shown at all.
@@ -69,14 +68,11 @@ export function MatrixStageView(): JSX.Element {
         <div className="matrix-stage-eyebrow">GENESIS · MATRIX</div>
         <h1 className="matrix-stage-title">Matrix</h1>
         <dl className="matrix-stage-readout">
-          <dt>RENDER</dt><dd>WebGL · glyph rain · mirror floor · ACES · bloom</dd>
+          <dt>RENDER</dt><dd>WebGL · volumetric glyph rain · obsidian mirror · ACES · double bloom</dd>
           <dt>NODE</dt><dd>{health?.commitShort ? `commit ${health.commitShort}` : '—'}</dd>
           <dt>TELEMETRY</dt><dd>{telemetry !== '' ? telemetry : '— (brak backendu)'}</dd>
           <dt>LABEL</dt><dd>MEASURED (telemetria) · GEOMETRIC_MODEL (M5D) · nic nie zasila Winner Gate</dd>
         </dl>
-        <ol className="matrix-stage-legend" aria-label="Kolumny słów na scenie">
-          {MATRIX_WORDS.map((w) => <li key={w}>{w}</li>)}
-        </ol>
         <div className="matrix-stage-controls">
           <button type="button" className="matrix-stage-btn" onClick={() => requestOpenScienceChat()}>Zapytaj Genesis →</button>
           <button type="button" className="matrix-stage-btn" onClick={() => { window.location.hash = '#/worlds'; }}>Światy 3D →</button>

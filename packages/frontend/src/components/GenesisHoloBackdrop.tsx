@@ -15,10 +15,10 @@ import { buildMatrixStage, isMatrixRoute, type MatrixStage } from './holo/Matrix
  * One fixed 100vw × 100vh WebGL canvas that every piece of UI floats over as
  * a borderless HUD. It runs the Matrix engine (`holo/MatrixStage`): a
  * procedural volumetric rain of glyphs over a black mirror floor with a
- * hairline grid, pure black distance fog, ACES tone mapping and a restrained
- * bloom that lifts only the rain heads. On `#/matrix` the stage group —
- * cyber-armoured figures on dark pedestals and the word columns — is shown;
- * everywhere else it is hidden and the camera looks down the code space.
+ * hairline grid, pure black distance fog, ACES tone mapping and a double
+ * bloom (tight + wide) that only the glyphs are bright enough to trigger. No
+ * figures, no props: the rain is the only subject. On `#/matrix` the camera
+ * drops low across the mirror; everywhere else it looks down the code space.
  *
  * Budget discipline (this is atmosphere, the solvers own the CPU):
  *   - device-pixel-ratio capped (1.5 desktop, 1 phone); the rain is computed
@@ -118,12 +118,16 @@ export function mountHoloBackdrop(
 
   let composer: EffectComposer | null = null;
   let bloom: UnrealBloomPass | null = null;
+  let bloomWide: UnrealBloomPass | null = null;
   if (!lowPower) {
     composer = new EffectComposer(renderer);
     composer.setPixelRatio(dpr);
     composer.addPass(new RenderPass(stage.scene, stage.camera));
-    bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.3, 0.85);
+    // Double bloom on the glyphs only: a tight pass for crisp heads, a wide soft pass for the haze.
+    bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.25, 0.82);
+    bloomWide = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.85, 0.9);
     composer.addPass(bloom);
+    composer.addPass(bloomWide);
     composer.addPass(new ShaderPass(ABERRATION_SHADER));
     composer.addPass(new OutputPass());
   }
@@ -154,6 +158,7 @@ export function mountHoloBackdrop(
     renderer.setSize(width, height, false);
     composer?.setSize(width, height);
     bloom?.setSize(width, height);
+    bloomWide?.setSize(width, height);
   };
 
   const frame = (now: number): void => {
@@ -164,10 +169,9 @@ export function mountHoloBackdrop(
     last = now;
     const t = now * 0.001;
     const onStage = isMatrixRoute(win.location.hash);
-    stage.setStage(onStage);
     parallaxX += (pointerX * 0.6 - parallaxX) * 0.04;
     parallaxY += (pointerY * 0.35 - parallaxY) * 0.04;
-    stage.update(t, dt, parallaxX, parallaxY);
+    stage.update(t, dt, parallaxX, parallaxY, onStage);
     if (now - lastSample >= SAMPLE_MS) {
       lastSample = now;
       const c = stage.camera.position;
@@ -211,6 +215,7 @@ export function mountHoloBackdrop(
     stage.dispose();
     composer?.dispose();
     bloom?.dispose();
+    bloomWide?.dispose();
     renderer.setRenderTarget(null);
     renderer.dispose();
     renderer.forceContextLoss();

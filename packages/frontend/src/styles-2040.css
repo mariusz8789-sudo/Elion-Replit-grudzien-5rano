@@ -1,1 +1,743 @@
-/* GENESIS 2040 — shell design layer (tokens, glass, glow, controls). Owned by the shell-visual pass. */
+/* =============================================================================
+   GENESIS 2040 — SHELL DESIGN LAYER
+   ---------------------------------------------------------------------------
+   Loaded AFTER styles.css (see main.tsx), so on equal specificity these rules
+   win. This file owns everything GLOBAL: tokens, the layered background, glass
+   panels, controls (buttons / fields / sliders / toggles / tabs), scrollbars,
+   focus rings, and the shell chrome (top bar, sidebar, mobile bar). Screen
+   specific overrides live in styles-2040-screens.css, which loads after this
+   one and may refine any of it.
+
+   Design brief: a 2040 holographic instrument panel — deep layered background
+   with volumetric glow, glass surfaces with luminous 1px gradient borders, HUD
+   corner brackets, neon cyan / violet / matrix-green accents, fine typography,
+   controls that read as instruments. The Matrix data stream stays; every
+   layer here is arranged AROUND it (z-index: backdrop -1 < stream 0 < shell 1).
+
+   Contrast rule: body text on glass stays >= 4.5:1 (text #eef2fb on a
+   surface no lighter than #1a2440 is ~11:1; dim text #b3bcd6 is ~7:1).
+
+   Sections:
+     1. Tokens              5. Controls (buttons, fields, sliders, toggles)
+     2. Body & background   6. Shell chrome (top bar, sidebar, mobile, HUD)
+     3. Typography          7. Motion
+     4. Panels & cards      8. Mobile / print / reduced motion
+   ============================================================================= */
+
+/* ---------------------------------------------------------------------------
+   1. TOKENS — refined values on the existing variable names (never renamed),
+      plus the 2040 additions every section below reads.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Depth: the base goes deeper, the layers still climb in lightness. */
+  --bg: #05070f;
+  --bg-raised: #0a0f1e;
+  --bg-panel: #0f172b;
+  --bg-elevated: #172038;
+
+  /* Accents: the brief's holographic triad. */
+  --cyan: #8ee8f5;
+  --violet: #a78bfa;
+  --green: #62f0a3;
+  --matrix: #39d97a;
+  --accent: var(--cyan);
+
+  /* Text: dim text lifted for legibility on glass (>= 7:1 on panels). */
+  --text: #eef2fb;
+  --text-dim: #b3bcd6;
+  --text-faint: #7d89ad;
+
+  /* Lines: cool, luminous, never green-tinted on the shell. */
+  --border: rgba(160, 196, 255, 0.12);
+  --border-strong: rgba(160, 196, 255, 0.26);
+
+  /* Glass surfaces (rgba + backdrop-filter; see the fallback block below). */
+  --glass: rgba(12, 18, 36, 0.58);
+  --glass-strong: rgba(8, 12, 26, 0.78);
+  --glass-soft: rgba(16, 24, 46, 0.42);
+  --glass-border: rgba(160, 196, 255, 0.16);
+  --glass-blur: blur(20px) saturate(1.4);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+
+  /* Glow shadows. */
+  --glow-cyan: 0 0 0 1px rgba(142, 232, 245, 0.18), 0 0 24px -4px rgba(142, 232, 245, 0.55);
+  --glow-cyan-strong: 0 0 0 1px rgba(142, 232, 245, 0.32), 0 0 36px -4px rgba(142, 232, 245, 0.8), 0 0 90px -20px rgba(142, 232, 245, 0.6);
+  --glow-violet: 0 0 0 1px rgba(167, 139, 250, 0.18), 0 0 24px -4px rgba(167, 139, 250, 0.55);
+  --glow-green: 0 0 0 1px rgba(98, 240, 163, 0.2), 0 0 20px -4px rgba(98, 240, 163, 0.55);
+
+  /* Gradients. */
+  --grad-primary: linear-gradient(120deg, #9df0fb 0%, #8ee8f5 38%, #a78bfa 100%);
+  --grad-primary-hover: linear-gradient(120deg, #b6f4fd 0%, #9deefa 38%, #b9a3ff 100%);
+  --grad-border: linear-gradient(135deg, rgba(142, 232, 245, 0.55), rgba(167, 139, 250, 0.35) 45%, rgba(142, 232, 245, 0.06) 75%, rgba(167, 139, 250, 0.3));
+  --grad-border-quiet: linear-gradient(135deg, rgba(142, 232, 245, 0.28), rgba(167, 139, 250, 0.18) 50%, rgba(160, 196, 255, 0.06));
+  --grad-text: linear-gradient(100deg, #f4f7ff 0%, #cfeef8 55%, #c7b8ff 100%);
+
+  /* Radius scale. */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-pill: 999px;
+
+  /* Motion. */
+  --dur-fast: 0.14s;
+  --dur-base: 0.24s;
+  --dur-slow: 0.48s;
+  --dur-ambient: 24s;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 14px 34px -14px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 34px 80px -22px rgba(0, 0, 0, 0.8);
+}
+
+/* Browsers without backdrop-filter get a denser glass so text stays legible. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass: rgba(12, 18, 36, 0.9);
+    --glass-strong: rgba(8, 12, 26, 0.95);
+    --glass-soft: rgba(16, 24, 46, 0.86);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   2. BODY & BACKGROUND — the canvas colour lives on <html>; body and #root are
+      transparent so the fixed layers below content (aurora, grid floor, the
+      three.js backdrop at z -1, the data stream at z 0) are all visible.
+      styles.css ends with `html, body, #root { background: #000 !important }`;
+      the !important here is what lets the 2040 layer take that decision back.
+   --------------------------------------------------------------------------- */
+html { background: var(--bg) !important; }
+body, #root { background: transparent !important; }
+body {
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Aurora: two slow-drifting volumetric blobs (cyan / violet) + a faint
+   matrix-green pool low left. Fixed, behind everything. */
+body::before {
+  content: '';
+  position: fixed; inset: -20vh -20vw; z-index: -3;
+  pointer-events: none;
+  background:
+    radial-gradient(38vw 30vh at 18% 12%, rgba(142, 232, 245, 0.13), transparent 70%),
+    radial-gradient(44vw 36vh at 84% 18%, rgba(167, 139, 250, 0.13), transparent 70%),
+    radial-gradient(34vw 30vh at 70% 88%, rgba(142, 232, 245, 0.07), transparent 70%),
+    radial-gradient(28vw 24vh at 10% 90%, rgba(57, 217, 122, 0.05), transparent 70%);
+  filter: blur(18px);
+  animation: holo-aurora var(--dur-ambient) ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* Grid floor: a perspective plane rising from the bottom edge, masked out
+   towards the horizon so it reads as a HUD floor, not wallpaper. */
+body::after {
+  content: '';
+  position: fixed; left: -40vw; right: -40vw; bottom: -6vh; height: 52vh; z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(142, 232, 245, 0.16) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(0deg, rgba(142, 232, 245, 0.16) 1px, transparent 1px) 0 0 / 64px 64px;
+  transform: perspective(520px) rotateX(62deg);
+  transform-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.28) 45%, transparent 100%);
+  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.28) 45%, transparent 100%);
+  animation: holo-grid 9s linear infinite;
+}
+
+/* Scanline + noise film at ~3%: the CRT-glass feel of an instrument panel.
+   Sits over the shell (z 2) but under every floating panel / dialog (z >= 20). */
+html::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 2;
+  pointer-events: none;
+  opacity: 0.032;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.9) 0 1px, transparent 1px 3px),
+    radial-gradient(circle at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.9) 100%);
+  mix-blend-mode: screen;
+}
+
+/* The three.js ambient layer (GenesisHoloBackdrop). Below the data stream. */
+.holo-backdrop {
+  position: fixed; inset: 0; z-index: -1;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  opacity: 0.62;
+  transition: opacity var(--dur-slow) var(--ease-out);
+  -webkit-mask-image: radial-gradient(ellipse 110% 100% at 70% 70%, #000 35%, rgba(0, 0, 0, 0.45) 70%, transparent 100%);
+  mask-image: radial-gradient(ellipse 110% 100% at 70% 70%, #000 35%, rgba(0, 0, 0, 0.45) 70%, transparent 100%);
+}
+.holo-backdrop[hidden] { display: none; }
+
+/* The data stream keeps its identity; it just gets the cooler tint of the
+   new palette via a slightly lower opacity and the same screen blend. */
+.matrix-datastream { opacity: 0.8; }
+
+@keyframes holo-aurora {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to   { transform: translate3d(2.5%, 2%, 0) scale(1.08); }
+}
+@keyframes holo-grid {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 0 0, 0 64px; }
+}
+@keyframes holo-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.25); }
+}
+@keyframes holo-bars {
+  0%, 100% { transform: scaleY(0.35); }
+  50%      { transform: scaleY(1); }
+}
+@keyframes holo-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes holo-sweep {
+  from { transform: translateX(-130%) skewX(-18deg); }
+  to   { transform: translateX(130%) skewX(-18deg); }
+}
+
+/* ---------------------------------------------------------------------------
+   3. TYPOGRAPHY — gradient headings, mono eyebrows, selection, links.
+   --------------------------------------------------------------------------- */
+::selection { background: rgba(142, 232, 245, 0.35); color: #ffffff; }
+
+.topbar h1,
+.settings-section > h2,
+.gx-display,
+.dash-title,
+.myth-hero h1 {
+  background: var(--grad-text);
+  -webkit-background-clip: text; background-clip: text;
+  color: var(--text);
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+/* Eyebrows: mono, tracked, with a short luminous tick before the label. */
+.section-label, .gx-eyebrow, .dash-eyebrow, .brand, .shell-nav-section-title, .myth-eyebrow, .myth-kicker {
+  font-family: var(--font-mono);
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.section-label::before, .gx-eyebrow::before, .dash-eyebrow::before {
+  content: ''; display: inline-block; vertical-align: middle;
+  width: 1.1em; height: 1px; margin-right: 0.6em;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+  box-shadow: 0 0 6px rgba(142, 232, 245, 0.8);
+}
+.brand { color: var(--cyan); }
+
+a { color: var(--cyan); transition: color var(--dur-fast) var(--ease-out), text-shadow var(--dur-fast) var(--ease-out); }
+a:hover { text-shadow: 0 0 14px rgba(142, 232, 245, 0.7); }
+.link-btn:hover { text-shadow: 0 0 14px rgba(142, 232, 245, 0.7); }
+
+code, kbd, pre { font-family: var(--font-mono); }
+kbd {
+  padding: 0.08em 0.45em; border-radius: 6px;
+  border: 1px solid var(--glass-border); background: var(--glass);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4), 0 0 8px -2px rgba(142, 232, 245, 0.35);
+}
+
+/* ---------------------------------------------------------------------------
+   4. PANELS & CARDS — glass, 1px luminous gradient border (mask-composite),
+      inner top highlight, hover lift + glow, HUD corner brackets on primary
+      panels. Selectors are the real surfaces found in styles.css / the
+      components (settings-section, dash-*, gx-panel, matrix-*, gu-*, hall-card,
+      narrator, empty-state). `.lab-card` and `.narrator` already own a
+      `::before` in styles.css, so they get the plain-border treatment.
+   --------------------------------------------------------------------------- */
+.settings-section, .dash-card, .dash-tile, .gx-panel, .gx-glass, .pilot-step,
+.matrix-card, .matrix-detail-panel, .gu-recipe, .gu-replay-col, .gu-cspace-row,
+.gu-gate-conjunct, .gu-gate-decision, .hall-card, .lab-card, .narrator,
+.card, .panel, .sim-panel, .glass-panel {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.045), transparent 38%),
+    var(--glass) !important;
+  border-color: var(--glass-border) !important;
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-md);
+}
+
+/* Gradient border via mask-composite: a 1px ring painted by a gradient, cut
+   out of a full-size pseudo-element. Needs a positioned host. */
+.settings-section, .dash-card, .dash-tile, .gx-panel, .gx-glass, .pilot-step,
+.matrix-card, .gu-recipe, .gu-replay-col, .gu-cspace-row, .gu-gate-conjunct, .gu-gate-decision, .hall-card,
+.card, .panel, .sim-panel, .glass-panel { position: relative; }
+
+.settings-section::before, .dash-card::before, .dash-tile::before, .gx-panel::before, .gx-glass::before, .pilot-step::before,
+.matrix-card::before, .gu-recipe::before, .gu-replay-col::before, .gu-cspace-row::before, .gu-gate-conjunct::before, .gu-gate-decision::before, .hall-card::before,
+.card::before, .panel::before, .sim-panel::before, .glass-panel::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: var(--grad-border-quiet);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+/* HUD corner brackets on the primary panels (drawn by ONE ::after using four
+   corner gradients, so no extra markup is needed). */
+.settings-section::after, .gx-panel::after, .dash-card::after, .gu-recipe::after, .matrix-detail-panel::after {
+  content: ''; position: absolute; inset: 6px; pointer-events: none;
+  --bracket: 14px;
+  --bracket-color: rgba(142, 232, 245, 0.75);
+  background:
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 0 0 / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 0 0 / 1px var(--bracket) no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 100% 0 / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 100% 0 / 1px var(--bracket) no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 0 100% / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 0 100% / 1px var(--bracket) no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 100% 100% / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--bracket-color), var(--bracket-color)) 100% 100% / 1px var(--bracket) no-repeat;
+  opacity: 0.55;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.settings-section:hover::after, .gx-panel:hover::after, .dash-card:hover::after, .gu-recipe:hover::after { opacity: 1; }
+/* Both pseudo-elements are transparent except the 1px ring / the bracket
+   lines, so painting above the panel's in-flow content is harmless and no
+   child positioning has to change (an absolutely positioned badge keeps its
+   own `position`). */
+
+/* Hover: lift + glow on the interactive cards (buttons / links as cards). */
+.dash-tile:hover, .hall-card:hover, .matrix-card:hover, .lab-card:hover, .lab-card:focus-visible,
+button.dash-card:hover, a.dash-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(142, 232, 245, 0.4) !important;
+  box-shadow: var(--glass-highlight), var(--shadow-md), var(--glow-cyan);
+}
+.dash-tile:hover::before, .hall-card:hover::before, .matrix-card:hover::before { background: var(--grad-border); }
+
+/* Quiet, dashed empty states become a faint holographic slot. */
+.empty-state {
+  border: 1px dashed rgba(142, 232, 245, 0.3);
+  background: linear-gradient(160deg, rgba(142, 232, 245, 0.05), transparent 60%);
+  color: var(--text-dim);
+  box-shadow: inset 0 0 40px -30px rgba(142, 232, 245, 0.5);
+}
+
+/* Narrator keeps its own top light-line from styles.css; only the glass changes. */
+.narrator::before { opacity: 0.9; box-shadow: 0 0 12px rgba(142, 232, 245, 0.6); }
+
+/* ---------------------------------------------------------------------------
+   5. CONTROLS — global. Buttons, fields, sliders, toggles, tabs, chips,
+      badges, checkboxes, scrollbars, focus rings.
+   --------------------------------------------------------------------------- */
+
+/* 5a. Buttons: secondary = glass; primary = cyan→violet with outer glow and a
+       sweeping highlight on hover. */
+.chip-btn, .dash-btn, .gx-btn, .ghost-btn, .exp-tabs button, .seg button, .myth-tabs button, .topbar .back {
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), transparent 45%), var(--glass);
+  color: var(--text);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-base) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.chip-btn:hover:not(:disabled), .dash-btn:hover, .gx-btn:hover, .ghost-btn:hover, .exp-tabs button:hover, .seg button:hover, .myth-tabs button:hover, .topbar .back:hover {
+  border-color: rgba(142, 232, 245, 0.55);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), transparent 45%), rgba(142, 232, 245, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--glow-cyan);
+  color: var(--text);
+}
+.chip-btn:active:not(:disabled), .dash-btn:active, .gx-btn:active { transform: translateY(1px) scale(0.98); }
+
+.chip-btn.primary, .dash-btn-primary, .gx-btn.primary, .primary-btn, .dash-ask-send, .topbar-ask-send {
+  position: relative; overflow: hidden; isolation: isolate;
+  color: #05101a; border-color: transparent;
+  background: var(--grad-primary);
+  box-shadow: 0 10px 30px -10px rgba(142, 232, 245, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.14) inset, 0 0 40px -14px rgba(167, 139, 250, 0.8);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.chip-btn.primary:hover:not(:disabled), .dash-btn-primary:hover, .gx-btn.primary:hover, .primary-btn:hover:not(:disabled), .dash-ask-send:hover:not(:disabled) {
+  color: #05101a;
+  background: var(--grad-primary-hover);
+  box-shadow: 0 14px 36px -10px rgba(142, 232, 245, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.2) inset, 0 0 56px -12px rgba(167, 139, 250, 0.9);
+  transform: translateY(-1px);
+}
+.chip-btn.primary::after, .dash-btn-primary::after, .gx-btn.primary::after, .primary-btn::after {
+  content: ''; position: absolute; top: -20%; bottom: -20%; left: 0; width: 45%; z-index: -1;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-130%) skewX(-18deg);
+  pointer-events: none;
+}
+.chip-btn.primary:hover::after, .dash-btn-primary:hover::after, .gx-btn.primary:hover::after, .primary-btn:hover::after {
+  animation: holo-sweep 0.7s var(--ease-out) forwards;
+}
+.chip-btn.primary:disabled { background: linear-gradient(120deg, #4b6a70, #5a5478); box-shadow: none; }
+
+.chip-btn[aria-pressed="true"], .chip-btn.active, .exp-tabs button[aria-selected='true'], .seg button[aria-pressed='true'], .myth-tabs button.active {
+  border-color: rgba(142, 232, 245, 0.7);
+  color: var(--cyan);
+  background: linear-gradient(160deg, rgba(142, 232, 245, 0.2), rgba(167, 139, 250, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(142, 232, 245, 0.15), var(--glow-cyan);
+  text-shadow: 0 0 10px rgba(142, 232, 245, 0.55);
+}
+.chip-btn.danger { color: #ff9c9c; border-color: rgba(244, 124, 124, 0.5); background: rgba(244, 124, 124, 0.09); }
+.chip-btn.danger:hover:not(:disabled) { border-color: rgba(244, 124, 124, 0.8); background: rgba(244, 124, 124, 0.16); box-shadow: 0 0 22px -6px rgba(244, 124, 124, 0.7); }
+
+/* Badges & status pills: mono, tracked, luminous outline. */
+.shell-nav-badge, .gx-status, .badge, .honesty, .stage-3d-badge, .myth-index, .myth-source {
+  font-family: var(--font-mono); letter-spacing: 0.1em;
+  border-radius: var(--r-pill);
+  background: rgba(142, 232, 245, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 0 12px -6px currentColor;
+}
+.gx-status.real { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), var(--glow-green); }
+
+/* 5b. Fields: glass, glowing focus ring. Inline inputs living inside their
+       own styled pill (top-bar ask, engine command bar) stay transparent. */
+textarea,
+select,
+.settings-view input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.settings-section input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.gu-sandbox input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.control input[type="text"], .control input[type="number"],
+input[type="text"].field, input[type="search"].field, input[type="number"].field, input[type="email"].field, input[type="password"].field {
+  font: inherit; color: var(--text);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%), var(--glass-strong);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  caret-color: var(--cyan);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+textarea:focus, select:focus,
+.settings-view input:focus, .settings-section input:focus, .gu-sandbox input:focus, .control input:focus, input.field:focus {
+  outline: none;
+  border-color: rgba(142, 232, 245, 0.75);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%), rgba(10, 16, 32, 0.92);
+  box-shadow: 0 0 0 3px rgba(142, 232, 245, 0.16), 0 0 26px -6px rgba(142, 232, 245, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+input::placeholder, textarea::placeholder { color: var(--text-faint); opacity: 1; }
+select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 2.2rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--cyan) 50%), linear-gradient(135deg, var(--cyan) 50%, transparent 50%);
+  background-position: calc(100% - 1.1rem) 50%, calc(100% - 0.75rem) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+select option { background: var(--bg-panel); color: var(--text); }
+.topbar-ask { background: var(--glass) !important; border-color: var(--glass-border); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: var(--glass-highlight); }
+.topbar-ask:focus-within { border-color: rgba(142, 232, 245, 0.75); box-shadow: 0 0 0 3px rgba(142, 232, 245, 0.16), 0 0 26px -6px rgba(142, 232, 245, 0.7); }
+.topbar-ask-input, .genesis-command-bar input { background: transparent; border: none; box-shadow: none; }
+
+/* Checkboxes & radios: accent, glow when checked. */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--cyan);
+  width: 1.05rem; height: 1.05rem;
+  cursor: pointer;
+  filter: drop-shadow(0 0 0 transparent);
+  transition: filter var(--dur-fast) var(--ease-out);
+}
+input[type="checkbox"]:checked, input[type="radio"]:checked { filter: drop-shadow(0 0 6px rgba(142, 232, 245, 0.7)); }
+
+/* Toggles (.switch): glass rail, luminous knob. */
+.switch {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+.switch::after {
+  background: radial-gradient(circle at 35% 35%, #ffffff, #c5ccdd 55%, #8d97b4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.switch[aria-checked='true'] {
+  background: linear-gradient(90deg, rgba(142, 232, 245, 0.35), rgba(167, 139, 250, 0.35));
+  border-color: rgba(142, 232, 245, 0.6);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35), var(--glow-cyan);
+}
+.switch[aria-checked='true']::after {
+  background: radial-gradient(circle at 35% 35%, #ffffff, var(--cyan) 50%, #4fbfd2);
+  box-shadow: 0 0 12px rgba(142, 232, 245, 0.9), 0 0 0 2px rgba(142, 232, 245, 0.25);
+}
+
+/* 5c. Sliders — EVERY input[type=range]. Track = thin glass rail with a filled
+       glowing segment (--fill-pct, set inline by Controls.tsx and painted for
+       all other sliders by AppShell's range painter; unfilled by default so a
+       missing value never draws a fake fill). Thumb = luminous orb with halo,
+       scales when active. `.control` sliders add fine tick marks. */
+.shell input[type="range"], input[type="range"].holo-range {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 1.7rem;
+  margin: 0; padding: 0;
+  background: transparent;
+  accent-color: var(--cyan);
+  cursor: pointer;
+  --range-fill: linear-gradient(90deg, rgba(142, 232, 245, 0.95), var(--accent, var(--cyan)));
+  --range-rail: rgba(160, 196, 255, 0.14);
+}
+.shell input[type="range"]:focus-visible { outline: none; }
+.shell input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(142, 232, 245, 0.3), 0 0 18px rgba(142, 232, 245, 0.9); }
+.shell input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(142, 232, 245, 0.3), 0 0 18px rgba(142, 232, 245, 0.9); }
+
+/* WebKit / Blink */
+.shell input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: var(--r-pill);
+  background:
+    linear-gradient(90deg, var(--accent, var(--cyan)) var(--fill-pct, 0%), transparent var(--fill-pct, 0%)),
+    var(--range-rail);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 12px -4px color-mix(in srgb, var(--accent, var(--cyan)) 70%, transparent);
+}
+.shell input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; margin-top: -7px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, var(--accent, var(--cyan)) 45%, color-mix(in srgb, var(--accent, var(--cyan)) 55%, #0a1a30) 100%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, var(--cyan)) 22%, transparent), 0 0 14px color-mix(in srgb, var(--accent, var(--cyan)) 80%, transparent), 0 2px 4px rgba(0, 0, 0, 0.5);
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) var(--ease-out);
+}
+.shell input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.shell input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.28);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent, var(--cyan)) 22%, transparent), 0 0 22px color-mix(in srgb, var(--accent, var(--cyan)) 95%, transparent);
+}
+/* Firefox */
+.shell input[type="range"]::-moz-range-track {
+  height: 4px; border-radius: var(--r-pill);
+  background: var(--range-rail);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.shell input[type="range"]::-moz-range-progress {
+  height: 4px; border-radius: var(--r-pill);
+  background: var(--accent, var(--cyan));
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--accent, var(--cyan)) 80%, transparent);
+}
+.shell input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, var(--accent, var(--cyan)) 45%, color-mix(in srgb, var(--accent, var(--cyan)) 55%, #0a1a30) 100%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, var(--cyan)) 22%, transparent), 0 0 14px color-mix(in srgb, var(--accent, var(--cyan)) 80%, transparent);
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+.shell input[type="range"]:active::-moz-range-thumb { transform: scale(1.28); }
+.shell input[type="range"]:disabled { opacity: 0.45; cursor: default; }
+
+/* Instrument ticks on .control sliders: fine marks every 10% under the fill. */
+.shell .control input[type="range"]::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(90deg, var(--accent, var(--cyan)) var(--fill-pct, 0%), transparent var(--fill-pct, 0%)),
+    repeating-linear-gradient(90deg, rgba(160, 196, 255, 0.45) 0 1px, transparent 1px 10%),
+    var(--range-rail);
+}
+.shell .control input[type="range"]::-moz-range-track {
+  background:
+    repeating-linear-gradient(90deg, rgba(160, 196, 255, 0.45) 0 1px, transparent 1px 10%),
+    var(--range-rail);
+}
+.control label .val {
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(142, 232, 245, 0.45);
+}
+/* Gold (decision) sliders keep their role colour; only the finish changes. */
+.myth-slider input { --accent: var(--gold); }
+.genesis-hud-timeline input { --accent: var(--matrix); }
+
+/* 5d. Scrollbars: thin, neon. Elements that hide theirs keep doing so. */
+* { scrollbar-width: thin; scrollbar-color: rgba(142, 232, 245, 0.35) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border-radius: var(--r-pill);
+  background: linear-gradient(180deg, rgba(142, 232, 245, 0.45), rgba(167, 139, 250, 0.45));
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(142, 232, 245, 0.8), rgba(167, 139, 250, 0.8)); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* 5e. Focus: visible everywhere, never hidden. */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(142, 232, 245, 0.18);
+}
+button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   6. SHELL CHROME — top bar as floating glass HUD, sidebar glass with active
+      beam, HUD status pill, mobile bottom bar, menu sheet.
+   --------------------------------------------------------------------------- */
+
+/* Top bar: a floating HUD strip, detached from the edges. */
+.topbar {
+  position: sticky; top: 0.55rem; z-index: 20;
+  margin: 0.55rem 0.85rem 0.35rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), transparent 40%), var(--glass) !important;
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), 0 18px 40px -22px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(142, 232, 245, 0.04);
+}
+.topbar::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(90deg, rgba(142, 232, 245, 0.5), rgba(167, 139, 250, 0.35) 40%, rgba(160, 196, 255, 0.08) 70%, rgba(142, 232, 245, 0.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.topbar::after {
+  content: ''; position: absolute; left: 12%; right: 12%; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(142, 232, 245, 0.7), transparent);
+  filter: blur(0.3px);
+  pointer-events: none;
+}
+.topbar .back { border-radius: 50%; }
+.topbar .tagline { color: var(--text-dim); }
+.topbar-logo:hover { background: rgba(142, 232, 245, 0.1); box-shadow: var(--glow-cyan); }
+
+/* Sidebar: glass column with a luminous right edge. */
+.shell-sidebar {
+  background: linear-gradient(180deg, rgba(10, 15, 30, 0.72), rgba(5, 7, 15, 0.86)) !important;
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: inset -1px 0 0 rgba(142, 232, 245, 0.06), 8px 0 40px -30px rgba(142, 232, 245, 0.35);
+  position: relative;
+}
+.shell-brand { border-bottom-color: var(--glass-border); }
+.shell-brand:hover .genesis-wordmark-mark { filter: drop-shadow(0 0 14px rgba(142, 232, 245, 0.9)); }
+
+/* HUD status pill under the brand. */
+.shell-hud {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0.7rem 0.9rem 0;
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(142, 232, 245, 0.28);
+  background: linear-gradient(90deg, rgba(142, 232, 245, 0.1), rgba(167, 139, 250, 0.06));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 18px -8px rgba(142, 232, 245, 0.7);
+  font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.16em;
+  color: var(--cyan);
+  white-space: nowrap; overflow: hidden;
+}
+.shell-hud-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--matrix);
+  box-shadow: 0 0 8px var(--matrix), 0 0 2px #fff inset;
+  animation: holo-pulse 2.4s ease-in-out infinite;
+}
+.shell-hud-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.shell-hud-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; flex: none; }
+.shell-hud-bars i {
+  display: block; width: 2px; height: 100%; border-radius: 1px;
+  background: linear-gradient(180deg, var(--violet), var(--cyan));
+  transform-origin: 50% 100%;
+  animation: holo-bars 1.6s ease-in-out infinite;
+}
+.shell-hud-bars i:nth-child(2) { animation-delay: 0.2s; }
+.shell-hud-bars i:nth-child(3) { animation-delay: 0.4s; }
+.shell-hud-bars i:nth-child(4) { animation-delay: 0.6s; }
+
+/* Navigation items: hover glass, active item with a glow beam on the left. */
+.shell-nav-item { position: relative; transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+.shell-nav-item:hover { background: rgba(142, 232, 245, 0.06); box-shadow: inset 0 0 0 1px rgba(142, 232, 245, 0.12); }
+.shell-nav-item.active {
+  background: linear-gradient(90deg, rgba(142, 232, 245, 0.16), rgba(167, 139, 250, 0.06) 60%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(142, 232, 245, 0.16), 0 0 28px -10px rgba(142, 232, 245, 0.7);
+}
+.shell-nav-item.active::before {
+  content: ''; position: absolute; left: -0.55rem; top: 18%; bottom: 18%; width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--violet), var(--cyan), var(--violet));
+  box-shadow: 0 0 10px var(--cyan), 0 0 22px rgba(142, 232, 245, 0.6);
+}
+.shell-nav-item.active .shell-nav-icon { text-shadow: 0 0 12px rgba(142, 232, 245, 0.9); }
+.shell-nav-item.active .shell-nav-label { color: #ffffff; }
+.shell-nav-icon { color: var(--cyan); }
+.shell-nav-section + .shell-nav-section { border-top-color: var(--glass-border); }
+.shell-nav-section-title { color: var(--text-faint); font-size: 0.62rem; }
+.shell-nav-more:hover { color: var(--cyan); }
+.shell-domain { border-top-color: var(--glass-border); }
+.shell-domain:hover { text-shadow: 0 0 12px rgba(142, 232, 245, 0.7); }
+
+/* Home split: the chat column reads as a second glass pane. */
+.shell-chat {
+  background: linear-gradient(180deg, rgba(10, 15, 30, 0.6), rgba(5, 7, 15, 0.78));
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: inset 1px 0 0 rgba(142, 232, 245, 0.06);
+}
+
+/* Mobile bar & sheet. */
+@media (max-width: 900px) {
+  .shell-mobilebar {
+    background: linear-gradient(180deg, rgba(10, 15, 30, 0.82), rgba(5, 7, 15, 0.92)) !important;
+    -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--glass-border);
+    box-shadow: 0 -12px 40px -20px rgba(142, 232, 245, 0.35);
+  }
+  .shell-mobilebar::before {
+    content: ''; position: absolute; left: 10%; right: 10%; top: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(142, 232, 245, 0.7), rgba(167, 139, 250, 0.7), transparent);
+    pointer-events: none;
+  }
+  .shell-mobilebar-item { position: relative; color: var(--text-dim); }
+  .shell-mobilebar-item.active { color: var(--cyan); text-shadow: 0 0 12px rgba(142, 232, 245, 0.8); }
+  .shell-mobilebar-item.active::after {
+    content: ''; position: absolute; top: 0; left: 30%; right: 30%; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--violet), var(--cyan));
+    box-shadow: 0 0 10px var(--cyan);
+  }
+  .shell-sheet { background: rgba(5, 7, 15, 0.92); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+  .shell-sheet-head { border-bottom-color: var(--glass-border); color: var(--cyan); }
+}
+
+/* ---------------------------------------------------------------------------
+   7. MOTION — entrance for main content (240 ms), fill-mode `backwards` so no
+      transform lingers after the animation (a lingering transform would turn
+      the route into a containing block for its fixed children).
+   --------------------------------------------------------------------------- */
+.shell-route > * { animation: holo-enter var(--dur-base) var(--ease-out) backwards; }
+.home, .lab-main, .settings-view, .discovery-view, .glossary-view { animation: holo-enter var(--dur-base) var(--ease-out) backwards; }
+
+/* ---------------------------------------------------------------------------
+   8. MOBILE / PRINT / REDUCED MOTION
+   --------------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  :root { --glass-blur: blur(10px) saturate(1.25); }
+  body::before { filter: blur(10px); animation: none; }
+  body::after { height: 38vh; animation: none; }
+  html::after { display: none; }              /* the blend-mode film costs a composite per scroll on phones */
+  .holo-backdrop { opacity: 0.42; }
+  .topbar { margin: 0.45rem 0.55rem 0.3rem; padding: 0.45rem 0.6rem; top: 0.45rem; }
+  .settings-section::after, .gx-panel::after, .dash-card::after, .gu-recipe::after, .matrix-detail-panel::after { --bracket: 10px; inset: 4px; }
+  .shell input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9px; }
+  .shell input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+}
+
+@media print {
+  body::before, body::after, html::after, .holo-backdrop, .matrix-datastream, .shell-sidebar, .shell-mobilebar, .shell-hud { display: none !important; }
+  html { background: #ffffff !important; }
+  body { color: #000000; }
+  .settings-section, .dash-card, .dash-tile, .gx-panel, .hall-card { background: #ffffff !important; border-color: #999999 !important; box-shadow: none; color: #000000; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after, .shell-hud-dot, .shell-hud-bars i, .shell-route > *,
+  .home, .lab-main, .settings-view, .discovery-view, .glossary-view { animation: none !important; }
+  .chip-btn.primary::after, .dash-btn-primary::after, .gx-btn.primary::after, .primary-btn::after { display: none; }
+  .holo-backdrop { display: none; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
+}
+:root.force-reduced-motion body::before, :root.force-reduced-motion body::after,
+:root.force-reduced-motion .shell-hud-dot, :root.force-reduced-motion .shell-hud-bars i { animation: none !important; }
+:root.force-reduced-motion .holo-backdrop { display: none; }
+
+/* High-contrast mode (already a :root class in styles.css): denser glass. */
+:root.high-contrast {
+  --glass: rgba(8, 12, 26, 0.94);
+  --glass-strong: rgba(5, 7, 15, 0.97);
+  --glass-border: rgba(230, 234, 245, 0.45);
+  --text-dim: #d5dbec;
+}

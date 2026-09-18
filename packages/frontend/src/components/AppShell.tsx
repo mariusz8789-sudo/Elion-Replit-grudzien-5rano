@@ -1,6 +1,60 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
+import { ErrorBoundary } from './ErrorBoundary';
+
+/**
+ * The 2040 ambient 3D layer (three.js) is lazy: the initial bundle must not
+ * grow for a decoration. It renders BEHIND everything (see styles-2040.css,
+ * `.holo-backdrop`), inside its own error boundary so a GPU failure can never
+ * take the navigation down with it.
+ */
+const GenesisHoloBackdrop = lazy(() => import('./GenesisHoloBackdrop').then((m) => ({ default: m.GenesisHoloBackdrop })));
+
+/**
+ * Range sliders everywhere get a filled, glowing segment (styles-2040.css,
+ * `--fill-pct`). `Controls.tsx` already sets that variable for its own
+ * sliders; this paints it for every OTHER `input[type=range]` in the app so
+ * the fill matches the thumb without each screen having to know about it.
+ * Progressive: if this never runs, the rail is simply unfilled.
+ */
+function paintRangeFill(input: HTMLInputElement): void {
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const value = Number(input.value);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || max <= min) return;
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  input.style.setProperty('--fill-pct', `${pct.toFixed(2)}%`);
+}
+
+function useRangeFillPainter(): void {
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const paintAll = (): void => {
+      document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
+    };
+    const onInput = (event: Event): void => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && target.type === 'range') paintRangeFill(target);
+    };
+    let scheduled = 0;
+    const schedule = (): void => {
+      if (scheduled !== 0) return;
+      scheduled = window.requestAnimationFrame(() => { scheduled = 0; paintAll(); });
+    };
+    paintAll();
+    document.addEventListener('input', onInput, true);
+    document.addEventListener('change', onInput, true);
+    const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(schedule);
+    observer?.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+    return () => {
+      document.removeEventListener('input', onInput, true);
+      document.removeEventListener('change', onInput, true);
+      observer?.disconnect();
+      if (scheduled !== 0) window.cancelAnimationFrame(scheduled);
+    };
+  }, []);
+}
 
 /**
  * APP SHELL — the frame that makes Genesis one product instead of ~35 screens
@@ -101,6 +155,9 @@ export function AppShell({ children, chat, chatInline = false }: {
   }, []);
 
   const active = activeNavId(hash);
+  useRangeFillPainter();
+  /** HUD readout under the brand: the real current route, nothing invented. */
+  const routeLabel = (hash.replace(/^#\/?/, '').split('?')[0] || 'home').toUpperCase();
 
   const go = (item: NavItem): void => {
     if (item.kind === 'chat') { requestOpenScienceChat(); setMenuOpen(false); return; }
@@ -133,11 +190,28 @@ export function AppShell({ children, chat, chatInline = false }: {
   );
 
   return (
+    <>
+      {/* Ambient 3D layer: fixed, pointer-events:none, z-index below the Matrix
+          data stream. A sibling of `.shell` on purpose — `.shell` is its own
+          stacking context (z-index 1), so anything inside it would paint OVER
+          the data stream instead of under it. */}
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <GenesisHoloBackdrop />
+        </Suspense>
+      </ErrorBoundary>
     <div className="shell">
       <aside className="shell-sidebar" aria-label="Nawigacja Genesis">
         <button className="shell-brand" onClick={() => { window.location.hash = ''; }} aria-label="Genesis Physics — Start">
           <GenesisWordmark size={30} />
         </button>
+        {/* HUD status pill — decorative readout of the live route (the nav
+            already carries aria-current, so this stays out of the a11y tree). */}
+        <div className="shell-hud" aria-hidden="true" data-testid="shell-hud">
+          <span className="shell-hud-dot" />
+          <span className="shell-hud-text">SYS · {routeLabel}</span>
+          <span className="shell-hud-bars"><i /><i /><i /><i /></span>
+        </div>
         <nav className="shell-nav">{sections}</nav>
         <a className="shell-domain" href="https://genesis-physics.com" target="_blank" rel="noreferrer">genesis-physics.com</a>
       </aside>
@@ -176,6 +250,7 @@ export function AppShell({ children, chat, chatInline = false }: {
         </div>
       )}
     </div>
+    </>
   );
 }
 

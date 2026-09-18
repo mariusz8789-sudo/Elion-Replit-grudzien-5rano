@@ -1,7 +1,8 @@
 {
   "name": "Genesis Physics — Scientific OS",
   "short_name": "Genesis Physics",
-  "description": "Interaktywna platforma do eksploracji fizyki, kosmologii i nauki. Od kwarku do Wszechświata.",
+  "description": "Genesis Physics — Scientific OS (genesis-physics.com). Silniki odkryć naukowych z bramką dowodową: od kwarku do Wszechświata.",
+  "id": "https://genesis-physics.com/",
   "lang": "pl",
   "start_url": "/",
   "display": "standalone",

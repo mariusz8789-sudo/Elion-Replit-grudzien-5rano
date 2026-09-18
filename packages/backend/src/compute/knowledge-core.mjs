@@ -116,8 +116,26 @@ function sha256Bytes(message) {
   for (let i = 0; i < 8; i++) ov.setUint32(i * 4, h[i], false);
   return out;
 }
+function utf8Bytes(text) {
+  const out = [];
+  for (let i = 0; i < text.length; i++) {
+    let c = text.charCodeAt(i);
+    if (c >= 55296 && c <= 56319 && i + 1 < text.length) {
+      const d = text.charCodeAt(i + 1);
+      if (d >= 56320 && d <= 57343) {
+        c = 65536 + (c - 55296 << 10) + (d - 56320);
+        i++;
+      } else c = 65533;
+    } else if (c >= 55296 && c <= 57343) c = 65533;
+    if (c < 128) out.push(c);
+    else if (c < 2048) out.push(192 | c >> 6, 128 | c & 63);
+    else if (c < 65536) out.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63);
+    else out.push(240 | c >> 18, 128 | c >> 12 & 63, 128 | c >> 6 & 63, 128 | c & 63);
+  }
+  return Uint8Array.from(out);
+}
 function sha256HexSync(text) {
-  const bytes = sha256Bytes(new TextEncoder().encode(text));
+  const bytes = sha256Bytes(utf8Bytes(text));
   let hex = "";
   for (let i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, "0");
   return hex;

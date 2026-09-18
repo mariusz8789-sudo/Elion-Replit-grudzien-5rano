@@ -113,30 +113,36 @@ function useRangeFillPainter(): void {
  */
 
 /**
- * The Genesis Physics mark: an orbital ring opened like a "G" with its crossbar,
- * a glowing nucleus, a cyan node on the orbit and one small matrix-green node —
- * the brand's DNA in a single glyph. Used on every page (top bar, sidebar,
- * title card) via `GenesisWordmark`.
+ * GENESIS PHYSICS brand mark — "the lattice and the spark". Used on every
+ * page (top bar, sidebar, title card) via `GenesisWordmark`.
+ * A hexagonal evidence lattice (six nodes, three spokes) around a bright
+ * core; one vertex lit green: the single verified node the Winner Gate lets
+ * through. Same geometry as public/icon-*.png and og-image.jpg.
  */
 export function GenesisMark({ size = 28 }: { size?: number }): JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="genesis-mark">
       <defs>
-        <linearGradient id="gm-ring" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id="gm-ring" x1="1" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#8ee8f5" />
           <stop offset="1" stopColor="#a78bfa" />
         </linearGradient>
-        <radialGradient id="gm-core" cx="0.4" cy="0.35" r="0.8">
+        <radialGradient id="gm-core" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.45" stopColor="#8ee8f5" />
-          <stop offset="1" stopColor="#3db4ca" />
+          <stop offset="0.5" stopColor="#c9f4fa" />
+          <stop offset="1" stopColor="#8ee8f5" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <path d="M 26.4 10.2 A 12 12 0 1 0 26.4 21.8" fill="none" stroke="url(#gm-ring)" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M 17.5 16 H 28" fill="none" stroke="url(#gm-ring)" strokeWidth="2.4" strokeLinecap="round" />
-      <circle cx="16" cy="16" r="3.9" fill="url(#gm-core)" />
-      <circle cx="24.6" cy="7.4" r="2.1" fill="#eef2fb" />
-      <circle cx="7.2" cy="24.2" r="1.6" fill="#39d97a" />
+      <polygon points="16,4 26.39,10 26.39,22 16,28 5.61,22 5.61,10" fill="none" stroke="url(#gm-ring)" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M16 4 L16 16 M26.39 22 L16 16 M5.61 22 L16 16" fill="none" stroke="url(#gm-ring)" strokeWidth="1.1" strokeOpacity="0.7" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="5.2" fill="url(#gm-core)" />
+      <circle cx="16" cy="16" r="2.2" fill="#eef2fb" />
+      <circle cx="16" cy="4" r="1.25" fill="#eef2fb" />
+      <circle cx="26.39" cy="10" r="1.35" fill="#39d97a" />
+      <circle cx="26.39" cy="22" r="1.25" fill="#eef2fb" />
+      <circle cx="16" cy="28" r="1.25" fill="#eef2fb" />
+      <circle cx="5.61" cy="22" r="1.25" fill="#eef2fb" />
+      <circle cx="5.61" cy="10" r="1.25" fill="#eef2fb" />
     </svg>
   );
 }

@@ -1,7 +1,7 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { sha256Bytes, sha256HexSync } from './sha256.js';
+import { sha256Bytes, sha256HexSync, utf8Bytes } from './sha256.js';
 import { sha256hex } from './EvidenceLedger.js';
 
 const nodeHex = (t: string): string => createHash('sha256').update(t, 'utf8').digest('hex');
@@ -31,6 +31,12 @@ describe('sha256 — bit-identical to node:crypto', () => {
     for (const s of ['zażółć gęślą jaźń', '漢字とカタカナ', '🧬🔬', '{"a":1,"b":[1,2,3],"c":"ś"}']) {
       expect(sha256HexSync(s)).toBe(nodeHex(s));
       expect(sha256hex(s)).toBe(nodeHex(s));
+    }
+  });
+
+  it('utf8Bytes matches TextEncoder, lone surrogates included', () => {
+    for (const s of ['abc', 'zażółć', '漢字', '🧬', 'a\ud800b', '\udc00']) {
+      expect(Array.from(utf8Bytes(s))).toEqual(Array.from(new TextEncoder().encode(s)));
     }
   });
 

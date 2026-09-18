@@ -11,7 +11,7 @@ export default defineConfig({
     alias: { '@genesis/core': resolve(__dirname, 'packages/core/src') },
   },
   test: {
-    include: ['packages/core/src/**/*.test.ts', 'packages/ui/src/**/*.test.ts', 'packages/ui/src/**/*.test.tsx'],
+    include: ['packages/core/src/**/*.test.ts', 'packages/ui/src/**/*.test.ts', 'packages/ui/src/**/*.test.tsx', 'packages/e2e/src/**/*.test.ts'],
     environment: 'node',
   },
 });

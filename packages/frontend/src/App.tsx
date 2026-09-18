@@ -86,6 +86,7 @@ const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m)
 const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').then((m) => ({ default: m.ClockworkDashboard })));
 const ColliderChamber = lazy(() => import('./components/ColliderChamber').then((m) => ({ default: m.ColliderChamber })));
 const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ default: m.LabFpvView })));
+const CernComplexView = lazy(() => import('./components/CernComplexView').then((m) => ({ default: m.CernComplexView })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -170,6 +171,7 @@ type Route =
   | { kind: 'clockwork' }
   | { kind: 'collider' }
   | { kind: 'lab-fpv' }
+  | { kind: 'cern-complex' }
   | { kind: 'decipherment' }
   | { kind: 'myths-theories' };
 
@@ -236,6 +238,7 @@ function parseHash(): Route {
   if (h === '#/clockwork') return { kind: 'clockwork' };
   if (h === '#/collider') return { kind: 'collider' };
   if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
+  if (h === '#/cern-complex') return { kind: 'cern-complex' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
@@ -734,6 +737,18 @@ export default function App() {
           <TopBar title="🧪 Quantum Lab — FPV" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <LabFpvView />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'cern-complex') {
+      // CERN complex: full-viewport WebGL (lab hub, glass, tunnel) with a transparent HUD; the shell backdrop is suppressed here.
+      return (
+        <div className="app app-matrix-stage app-cern">
+          <HeavyRoute>
+            <CernComplexView />
           </HeavyRoute>
           {overlays}
         </div>

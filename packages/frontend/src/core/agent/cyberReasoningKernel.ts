@@ -20,7 +20,7 @@ import {
   type CyberTestSelection,
 } from './cyberTestPlanner';
 
-import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
 import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
@@ -50,6 +50,10 @@ if (kernelRegistry.resolve('deadline-monitoring') === null) kernelRegistry.regis
 /** Collider and thermo-lab: toy-normalised models (labelled as such), each event/mix committed to the ledger by the engine. */
 if (kernelRegistry.resolve('particle-collision-sim') === null) kernelRegistry.register(colliderProvider(kernelLedger));
 if (kernelRegistry.resolve('thermodynamic-reaction-sim') === null) kernelRegistry.register(thermoLabProvider(kernelLedger));
+/** CERN complex: micro black hole formation (4D hypothesis / ADD speculative, labelled by the engine) and crystal synthesis (documented estimates). */
+if (kernelRegistry.resolve('micro-blackhole-sim') === null) kernelRegistry.register(blackHoleProvider(kernelLedger));
+if (kernelRegistry.resolve('crystal-synthesis-sim') === null) kernelRegistry.register(materialsProvider(kernelLedger));
+if (kernelRegistry.resolve('collision-batch') === null) kernelRegistry.register(computeColliderProvider(kernelLedger));
 
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic

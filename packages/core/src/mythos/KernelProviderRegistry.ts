@@ -5,6 +5,9 @@ import type { ActionGateSynthesizer, GraphStateFlags, ActionSpec } from '../post
 import type { EvidenceLedger } from '../knowledge/EvidenceLedger.js';
 import { QuantumColliderEngine, type ColliderEvent } from '../collider/QuantumColliderEngine.js';
 import { ThermodynamicLabEngine, type LabResult } from '../lab/ThermodynamicLabEngine.js';
+import { BlackHoleEventHorizonEngine, type FormationResult } from '../cern/BlackHoleEventHorizonEngine.js';
+import { MaterialsDiscoveryEngine, type CrystalStructure, type IonSpec } from '../cern/MaterialsDiscoveryEngine.js';
+import { ComputeColliderEngine, type TrackAttributes } from '../cern/ComputeColliderEngine.js';
 
 export interface KernelContext { readonly kernelId: string; readonly route: string; readonly operatorId: string; }
 export interface AnalysisProvider {
@@ -74,6 +77,58 @@ export function thermoLabProvider(ledger: EvidenceLedger): AnalysisProvider {
       const result = engine.mix(r.reagents, r.ignition, r.T0 ?? 298.15);
       const ledgerContentHash = engine.commitToLedger(ledger, result);
       const out: ThermoLabAnalysis = { result, ledgerContentHash, label: 'THERMODYNAMIC_MODEL' };
+      return out;
+    },
+  };
+}
+/** Micro black hole request: collision energy √s in GeV; `addThresholdTeV` opts into the SPECULATIVE ADD (extra-dimension) scenario. */
+export interface BlackHoleRequest { readonly seed: number; readonly sqrtSGeV: number; readonly addThresholdTeV?: number; }
+/** `label` is the engine's own epistemic label of the formed object ('hypothesis' | 'speculative') or NOT_FORMED. */
+export interface BlackHoleAnalysis { readonly result: FormationResult; readonly ledgerContentHash: string; readonly label: 'hypothesis' | 'speculative' | 'NOT_FORMED'; }
+/** Every formation attempt (formed or not) is anchored in the ledger through the engine's own commitToLedger(). */
+export function blackHoleProvider(ledger: EvidenceLedger): AnalysisProvider {
+  return {
+    providerId: 'blackhole-event-horizon', capabilities: ['micro-blackhole-sim'],
+    analyze: (_ctx, req) => {
+      const r = req as BlackHoleRequest;
+      const engine = new BlackHoleEventHorizonEngine(r.seed >>> 0);
+      const result = engine.attemptFormation(r.sqrtSGeV, r.addThresholdTeV === undefined ? {} : { addThresholdTeV: r.addThresholdTeV });
+      const ledgerContentHash = engine.commitToLedger(ledger, result);
+      const out: BlackHoleAnalysis = { result, ledgerContentHash, label: result.bh?.label ?? 'NOT_FORMED' };
+      return out;
+    },
+  };
+}
+/** Crystal synthesis request: the ionic composition (species, charge, ionic radius in pm, count per formula unit, mass in u). */
+export interface MaterialsRequest { readonly seed: number; readonly ions: readonly IonSpec[]; }
+export interface MaterialsAnalysis { readonly crystal: CrystalStructure; readonly ledgerContentHash: string; readonly label: 'EMPIRICAL_ESTIMATE_MODEL'; }
+/** Every synthesised structure is anchored in the ledger through the engine's own commitToLedger(). Properties are documented estimates, not DFT. */
+export function materialsProvider(ledger: EvidenceLedger): AnalysisProvider {
+  return {
+    providerId: 'materials-discovery', capabilities: ['crystal-synthesis-sim'],
+    analyze: (_ctx, req) => {
+      const r = req as MaterialsRequest;
+      const engine = new MaterialsDiscoveryEngine(r.seed >>> 0);
+      const crystal = engine.synthesize(r.ions);
+      const ledgerContentHash = engine.commitToLedger(ledger, crystal);
+      const out: MaterialsAnalysis = { crystal, ledgerContentHash, label: 'EMPIRICAL_ESTIMATE_MODEL' };
+      return out;
+    },
+  };
+}
+/** Collision batch request: `label` derives the engine seed (sha256 of the label); `n` events from `startIndex` at √s (GeV, default 13000). */
+export interface CollisionBatchRequest { readonly label: string; readonly n: number; readonly startIndex?: number; readonly sqrtS?: number; }
+export interface CollisionBatchAnalysis { readonly events: readonly ColliderEvent[]; readonly tracks: TrackAttributes; readonly seedBase: number; readonly ledgerContentHash: string; readonly label: 'TOY_MC_MODEL'; }
+/** The batch (all event hashes under the seed) is anchored in the ledger through the engine's own commitBatch(). */
+export function computeColliderProvider(ledger: EvidenceLedger): AnalysisProvider {
+  return {
+    providerId: 'compute-collider', capabilities: ['collision-batch'],
+    analyze: (_ctx, req) => {
+      const r = req as CollisionBatchRequest;
+      const engine = new ComputeColliderEngine(ledger, r.label, r.sqrtS ?? 13000);
+      const events = engine.generateBatch(Math.max(1, Math.min(64, r.n | 0)), r.startIndex ?? 0);
+      const ledgerContentHash = engine.commitBatch(events);
+      const out: CollisionBatchAnalysis = { events, tracks: engine.buildTrackAttributes(events), seedBase: engine.getSeedBase(), ledgerContentHash, label: 'TOY_MC_MODEL' };
       return out;
     },
   };

@@ -47,3 +47,9 @@ playwright-report/
 artifacts/clockwork-*.png
 artifacts/collider-*.png
 artifacts/lab-fpv-*.png
+artifacts/cern-complex-*.png
+# CERN complex e2e (packages/e2e/src/cern-complex.e2e.spec.ts): the four fidelity-gated screenshots
+artifacts/walk-5d.png
+artifacts/glass-refraction.png
+artifacts/console-pbr.png
+artifacts/tunnel-volumetric.png

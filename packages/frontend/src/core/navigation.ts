@@ -88,6 +88,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'clockwork', label: 'CLOCKWORK — terminy urzędu', icon: '⏱', hash: '#/clockwork' },
   { id: 'collider', label: 'Collider — komora detektora', icon: '⚛', hash: '#/collider' },
   { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
+  { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
   {
     id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',

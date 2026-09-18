@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 /**
  * Playwright runner config for the `*.e2e.spec.ts` files that live next to
- * their UI package sources (`packages/ui/src/**`). The other e2e flows in
+ * their UI package sources (`packages/ui/src/**`) and in `packages/e2e/src/**`. The other e2e flows in
  * `scripts/*-e2e.mjs` drive the `playwright` library directly and do not use
  * this runner.
  *
@@ -15,7 +15,7 @@ import { defineConfig } from '@playwright/test';
 const chromiumPath = process.env.CHROME ?? process.env.GENESIS_CHROMIUM_PATH;
 
 export default defineConfig({
-  testDir: 'packages/ui/src',
+  testDir: 'packages',
   testMatch: /.*\.e2e\.spec\.ts$/,
   outputDir: 'test-results',
   timeout: 60_000,

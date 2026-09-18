@@ -147,4 +147,29 @@ Reguła audytu pozostaje: **nic z tych pakietów nie dotyka preregistracji, prog
 
 ## 6. Gałąź `main` — „straszna grafika"
 
-`origin/main` (= `railway-production-ready`, commity „cinematic prompt-driven Matrix command center", „restore full Genesis worlds…", „smooth radial Matrix rain droplets") renderuje na trasie głównej `GenesisEngineApp` = `GenesisCanvas` (pole cząsteczek) + `GenesisHUD` (pasek „GENESIS COMMAND CENTER · READY · RECOMPOSE"). `App.tsx` na `main` nie zawiera `AppShell` ani `StartHero`; względem tej gałęzi w `packages/frontend/src` ubyło 1 296 linii. To jest ekran ze zrzutu o 03:24. Produkt (menu, Start, konsola, światy, przewodnik, Mity i Teorie) jest w całości na **tej** gałęzi. Decyzja właściciela: która gałąź jest źródłem deployu (sekcja 8). Ta sesja nie pisze do `main`.
+`origin/main` (= `railway-production-ready`, commity „cinematic prompt-driven Matrix command center", „restore full Genesis worlds…", „smooth radial Matrix rain droplets") renderuje na trasie głównej `GenesisEngineApp` = `GenesisCanvas` (pole cząsteczek) + `GenesisHUD` (pasek „GENESIS COMMAND CENTER · READY · RECOMPOSE"). `App.tsx` na `main` nie zawiera `AppShell` ani `StartHero`; względem tej gałęzi w `packages/frontend/src` ubyło 1 296 linii. To jest ekran ze zrzutu o 03:24. Produkt (menu, Start, konsola, światy, przewodnik, Mity i Teorie) jest w całości na **tej** gałęzi. Decyzja właściciela (podjęta tego samego dnia, na piśmie: „scalaj z genesis i działaj"): `main` jest źródłem deployu, więc ta gałąź została scalona do `main` z zachowaniem powłoki produktu — `App.tsx` z `AppShell`/`StartHero`/wszystkimi trasami, a pliki z `main` (`GenesisEngineApp`, `GenesisCanvas`, `GenesisHUD`, `HyperStateVisualizer`, `engine/GenesisShaders`, `engine/HyperMath`, `render/GenesisQualityUpgrade`) zostały jako nietrasowane, wpisane na listę wyjątków w `moduleReachability.test.ts`. Scalenie zdjęło też z `Dockerfile` `VOLUME ["/data"]` (P0.2 trwałość bazy) — przywrócone. `RAILWAY_DEPLOY.md` wskazuje `main`. Weryfikacja po scaleniu: sekcja 7.
+
+## 7. Weryfikacja liczbowa (stan po scaleniu i po pakiecie nocnym)
+
+Wszystkie liczby pochodzą z realnych uruchomień w tej sesji; nic nie jest szacowane. Ostatnia kolumna zostanie uzupełniona po zakończeniu pakietu nocnego (sekcja 9).
+
+| Kontrola | Po scaleniu z `main` (commit `299fa0a8`) | Po pakiecie nocnym |
+|---|---|---|
+| `npm run lint` | 0 błędów | _do uzupełnienia_ |
+| `tsc --noEmit` (frontend) | 0 błędów | _do uzupełnienia_ |
+| `vite build` | OK | _do uzupełnienia_ |
+| Frontend vitest | 569 plików, 6621 pass, 1 skip | _do uzupełnienia_ |
+| Backend `node --test` | 844 testy, 811 pass, 33 skip, 0 fail | _do uzupełnienia_ |
+| `npm run test:core` (packages/core + packages/ui) | 26 plików, 261 testów (w tym 13 ingestion + 1 EnvKeyProvider) | _do uzupełnienia_ |
+| Smoke desktop (`scripts/smoke-e2e.mjs`) | 34 trasy + 13 labów, 0 błędów konsoli | _do uzupełnienia_ |
+| E2E (`npm run e2e`) | 18/18 | _do uzupełnienia_ |
+| Lejek (`funnel`) / przepis (`recipe`) | 5/5 / 8/8 | _do uzupełnienia_ |
+| `npm run audit:verify` (D-121) | VERIFIED, pieczęć `8072bb69…` | _do uzupełnienia_ |
+
+## 8. Decyzje właściciela (otwarte)
+
+1. **Pakiety staged** (`supreme/`, `advanced/`, `genesis9d/`, `quantum-lab/`, `molecular-engine/`, `packages/ui`): dla każdego — świat z trasą i etykietą epistemiczną, dalej propozycja, albo usunięcie. Bez decyzji pozostają tylko testowane (D-122).
+2. **Ingestion**: flip `legalStatus` na `VERIFIED` dla konkretnych domen wymaga pisemnej weryfikacji prawnej; klucze `YOUTUBE_API_KEY` / `X_API_KEY` / `FACEBOOK_API_KEY` dostarcza właściciel (nigdy w repo). Publikacja propozycji zawsze przez zalogowanego zatwierdzającego.
+3. **Serwer kwantowy**: `QPU_API_URL` + `QPU_API_KEY` (IBM Quantum / AWS Braket lub inny REST) — bez nich `/quantum` liczy wyłącznie na lokalnym symulatorze z etykietą `MODEL_ESTIMATE`. Który dostawca i jaki budżet — decyzja właściciela.
+4. **Deploy**: Railway śledzi `main`; po każdym scaleniu wymagany redeploy (panel Railway). Wolumen `/data` musi pozostać w `Dockerfile`.
+5. **TTS**: bez płatnych kluczy; głos przewodnika pozostaje na Web Speech API przeglądarki.

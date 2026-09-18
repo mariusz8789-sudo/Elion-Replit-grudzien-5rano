@@ -145,6 +145,21 @@ Inna sesja wypchnęła commity `009f219c…8d03d9cf` (149 plików, 5 380 linii).
 
 Reguła audytu pozostaje: **nic z tych pakietów nie dotyka preregistracji, progów, Winner Gate ani odcisków** (audyt 6615057e / recipe 7ddcabe9 / rekord b6207e9c / pieczęć 8072bb69… bez zmian, `npm run audit:verify` VERIFIED).
 
+### 5.1 Pakiet „Gemini" (re-emisja z 18.09, noc) — werdykt: NIE nadpisywać
+
+Dostarczono 9 plików silników + 2 specyfikacje Playwright. Wszystkie 9 nazw plików **już istnieje** na tej gałęzi (`supreme/`, `solvers/speculative/`, `genesis9d/`) w bogatszych, przetestowanych wersjach (z disclaimerami, surogatami fizycznymi, testami iron-rules). Wersje re-emitowane są uproszczonymi duplikatami; nadpisanie byłoby regresją.
+
+| Plik (re-emisja) | Istniejący odpowiednik | Werdykt |
+|---|---|---|
+| `supreme/GenesisCrisisResilienceEngine.ts` | 69 linii, `CRISIS_DISCLAIMER`, overpressure/fallout surrogates, test | zachować istniejący; re-emisja = heurystyka `severity·(1+r/1000)` bez podstaw |
+| `supreme/GenesisSatelliteGeoEngine.ts` | 72 linie + test | zachować istniejący; re-emisja: „footprint" = π(range·cos el)² bez modelu orbity |
+| `supreme/GenesisQuantumFrontierEngine.ts` | 42 linie + test | **odrzucić re-emisję**: `applyHadamard` mnoży cały wektor przez 1/√2 (to nie jest bramka Hadamarda; łamie normalizację). Prawdziwy symulator: `engine/quantum` (sekcja 9) |
+| `supreme/GenesisSwissPrecisionEngine.ts` | 55 linii + test | zachować istniejący (re-emisja poprawna, ale trywialna) |
+| `supreme/GenesisBioVirologyEngine.ts` | 44 linie + test | zachować istniejący; re-emisja: `mutationRiskScore` liczony z bitów hasha = liczba bez znaczenia biologicznego |
+| `solvers/speculative/{retrocausal,torsion,warp}` | sandbox z bramką `allowUnphysicalSandbox` + Mity i Teorie | zachować istniejące; re-emisje pod inną ścieżką (`src/speculative/`) rozdwoiłyby moduł |
+| `genesis9d/GenesisIceWallBeyondEngine.ts` | 39 linii + test | zachować istniejący |
+| `e2e/city.e2e.spec.ts`, `e2e/government-manifest.e2e.spec.ts` | brak `@playwright/test` w repo; komendy `/city`, `/propose`, `/publish` i selektor `.hud-response` nie istnieją; nasłuch błędów konsoli rejestrowany PO nawigacji (asercja pusta) | **zmapowane** na realny produkt: `scripts/city-hud-e2e.mjs` (`npm run e2e:city-hud`): canvas na `#/city3d`, drag, komenda w Science Chat, bramka publikacji 401 bez zatwierdzającego, zero błędów strony i konsoli — 6/6 PASS |
+
 ## 6. Gałąź `main` — „straszna grafika"
 
 `origin/main` (= `railway-production-ready`, commity „cinematic prompt-driven Matrix command center", „restore full Genesis worlds…", „smooth radial Matrix rain droplets") renderuje na trasie głównej `GenesisEngineApp` = `GenesisCanvas` (pole cząsteczek) + `GenesisHUD` (pasek „GENESIS COMMAND CENTER · READY · RECOMPOSE"). `App.tsx` na `main` nie zawiera `AppShell` ani `StartHero`; względem tej gałęzi w `packages/frontend/src` ubyło 1 296 linii. To jest ekran ze zrzutu o 03:24. Produkt (menu, Start, konsola, światy, przewodnik, Mity i Teorie) jest w całości na **tej** gałęzi. Decyzja właściciela (podjęta tego samego dnia, na piśmie: „scalaj z genesis i działaj"): `main` jest źródłem deployu, więc ta gałąź została scalona do `main` z zachowaniem powłoki produktu — `App.tsx` z `AppShell`/`StartHero`/wszystkimi trasami, a pliki z `main` (`GenesisEngineApp`, `GenesisCanvas`, `GenesisHUD`, `HyperStateVisualizer`, `engine/GenesisShaders`, `engine/HyperMath`, `render/GenesisQualityUpgrade`) zostały jako nietrasowane, wpisane na listę wyjątków w `moduleReachability.test.ts`. Scalenie zdjęło też z `Dockerfile` `VOLUME ["/data"]` (P0.2 trwałość bazy) — przywrócone. `RAILWAY_DEPLOY.md` wskazuje `main`. Weryfikacja po scaleniu: sekcja 7.

@@ -306,7 +306,7 @@ export function mountHoloBackdrop(
       matrixComposer.setPixelRatio(dpr);
       matrixPass = new RenderPass(matrix.scene, matrix.camera);
       matrixComposer.addPass(matrixPass);
-      matrixBloom = new UnrealBloomPass(new THREE.Vector2(Math.max(1, win.innerWidth), Math.max(1, win.innerHeight)), 0.8, 0.5, 0.62);
+      matrixBloom = new UnrealBloomPass(new THREE.Vector2(Math.max(1, win.innerWidth), Math.max(1, win.innerHeight)), 0.42, 0.35, 0.78);
       matrixComposer.addPass(matrixBloom);
       matrixComposer.addPass(new ShaderPass(ABERRATION_SHADER));
       matrixComposer.addPass(new OutputPass());

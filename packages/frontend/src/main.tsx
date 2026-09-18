@@ -6,6 +6,7 @@ import { t } from './core/i18n';
 import './styles.css';
 import './styles-2040.css';
 import './styles-2040-screens.css';
+import './styles-2040-hud.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

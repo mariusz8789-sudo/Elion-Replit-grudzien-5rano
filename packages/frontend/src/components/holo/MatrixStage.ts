@@ -170,9 +170,15 @@ export function buildMatrixStage(
   const key = new THREE.DirectionalLight(0x9dffc4, 3.0);
   key.position.set(2, 9, 8);
   scene.add(key);
-  const fill = new THREE.PointLight(0x7dffb0, 7, 34, 1.4);
+  const fill = new THREE.PointLight(0x7dffb0, 3.5, 34, 1.4);
   fill.position.set(0, 4.5, 8.5);
   scene.add(fill);
+  // Rim lights from behind and above: contour highlights along shoulders, heads and limbs.
+  const rimA = new THREE.DirectionalLight(0xc8ffe0, 2.6);
+  rimA.position.set(-6, 7, -9);
+  const rimB = new THREE.DirectionalLight(0x9dffc4, 2.2);
+  rimB.position.set(7, 6, -8);
+  scene.add(rimA, rimB);
 
   // Mirror floor + hairline grid.
   const floorGeo = track(new THREE.PlaneGeometry(80, 80));
@@ -188,9 +194,21 @@ export function buildMatrixStage(
   scene.add(grid);
 
   // Platforms, rings, figures.
-  const chrome = track(new THREE.MeshStandardMaterial({ color: 0xd6f5e4, metalness: 0.95, roughness: 0.2, envMapIntensity: 2.2, emissive: 0x123d26, emissiveIntensity: 0.35 }));
+  const chrome = track(new THREE.MeshStandardMaterial({ color: 0xdfeee6, metalness: 0.9, roughness: 0.1, envMapIntensity: 1.8, emissive: 0x0b2416, emissiveIntensity: 0.06 }));
+  // Fresnel rim: a crisp green contour on every silhouette edge, independent of the lights, so the
+  // figures read as sharp chrome shapes instead of bloomed blobs.
+  chrome.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      {
+        float rim = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.2);
+        totalEmissiveRadiance += vec3(0.28, 0.95, 0.55) * rim * 0.55;
+      }`,
+    );
+  };
   const platMat = track(new THREE.MeshStandardMaterial({ color: 0x08150d, metalness: 0.8, roughness: 0.3 }));
-  const ringMat = track(new THREE.MeshStandardMaterial({ color: 0x39d97a, emissive: 0x39d97a, emissiveIntensity: 3.2, roughness: 0.4 }));
+  const ringMat = track(new THREE.MeshStandardMaterial({ color: 0x39d97a, emissive: 0x39d97a, emissiveIntensity: 2.0, roughness: 0.4 }));
   const rings: THREE.Mesh[] = [];
   const xs = [-7.2, -3.6, 0, 3.6, 7.2];
   const poses: Array<'reach' | 'wave' | 'stand' | 'hands' | 'open'> = ['stand', 'wave', 'reach', 'hands', 'open'];
@@ -202,7 +220,7 @@ export function buildMatrixStage(
     const ring = new THREE.Mesh(track(new THREE.TorusGeometry(r, 0.05, 10, 96)), ringMat);
     ring.rotation.x = Math.PI / 2;
     ring.position.set(x, 0.23, big ? 1.2 : 0);
-    const glow = new THREE.PointLight(0x39d97a, big ? 6 : 3.5, 9, 1.8);
+    const glow = new THREE.PointLight(0x39d97a, big ? 3.2 : 2.0, 9, 1.8);
     glow.position.set(x, 0.6, big ? 1.2 : 0);
     const figure = mannequin(chrome, poses[i], track);
     figure.position.set(x, 0.22, big ? 1.2 : 0);
@@ -284,7 +302,7 @@ export function buildMatrixStage(
         g[idx] = (g[idx] + 37) % (ATLAS_COLS * ATLAS_COLS);
       }
       glyphAttr.needsUpdate = true;
-      rings.forEach((ring, i) => { (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = 2.6 + Math.sin(t * 1.6 + i) * 0.7; });
+      rings.forEach((ring, i) => { (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.7 + Math.sin(t * 1.6 + i) * 0.45; });
       wordMeshes.forEach((m, i) => { m.position.y += Math.sin(t * 0.6 + i * 1.3) * 0.0012; });
       camera.position.x = 3.2 + Math.sin(t * 0.07) * 1.2 + parallaxX * 0.8;
       camera.position.y = 2.7 + parallaxY * 0.4;

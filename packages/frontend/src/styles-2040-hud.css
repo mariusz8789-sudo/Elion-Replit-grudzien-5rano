@@ -1,0 +1,209 @@
+/* GENESIS 2040 — HUD MODE layer. Imported LAST so it wins over the shell and screens layers at equal specificity:
+   the WebGL world is the viewport and every panel is transparent HUD over it. */
+
+/* =====================================================================
+   9 · HUD MODE — the world is the viewport, the UI floats over it
+   ---------------------------------------------------------------------
+   The owner's rule for the 2040 shell: no flat dark boxes, no fake CSS
+   neon, no padding or borders around the 3D layer. The WebGL backdrop
+   (GenesisHoloBackdrop: FBO portal, ACES, bloom, chromatic aberration)
+   runs edge to edge at 100vw × 100vh; everything above it is a borderless
+   vector HUD: hairlines, corner ticks, mono telemetry, clean type. Light
+   comes from the renderer's bloom, not from box-shadows.
+   ===================================================================== */
+:root {
+  --glow-cyan: 0 0 0 0 transparent;
+  --glow-violet: 0 0 0 0 transparent;
+  --glow-green: 0 0 0 0 transparent;
+  --glass: rgba(5, 8, 16, 0.22);
+  --glass-strong: rgba(5, 8, 16, 0.34);
+  --glass-border: rgba(160, 196, 255, 0.14);
+  --hud-line: rgba(142, 232, 245, 0.28);
+  --hud-line-soft: rgba(142, 232, 245, 0.12);
+}
+/* The CSS atmosphere (aurora blobs, grid floor, scanline film) is replaced by
+   the real renderer. */
+body::before, body::after, html::after { display: none !important; }
+html { background: #05070f; }
+
+/* Full-bleed canvas: no mask, no dimming, no margins. */
+.holo-backdrop {
+  z-index: -2;
+  opacity: 1;
+  -webkit-mask-image: none; mask-image: none;
+}
+/* The scrim keeps text ≥ 4.5:1 without boxing it: darker where the sidebar
+   and the copy live, open where the world should breathe. */
+.hud-scrim {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(5, 7, 15, 0.66) 0, rgba(5, 7, 15, 0.5) 22%, rgba(5, 7, 15, 0.28) 48%, rgba(5, 7, 15, 0.12) 72%, rgba(5, 7, 15, 0.36) 100%),
+    linear-gradient(180deg, rgba(5, 7, 15, 0.45) 0, rgba(5, 7, 15, 0.06) 26%, rgba(5, 7, 15, 0.06) 68%, rgba(5, 7, 15, 0.5) 100%);
+}
+.matrix-datastream { opacity: 0.5; }
+
+/* Shell chrome: transparent, hairlines only. */
+.shell-sidebar, .topbar, .shell-mobilebar, .shell-sheet {
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+.shell-sidebar { border-right: 1px solid var(--hud-line-soft) !important; }
+.topbar { margin: 0 !important; border-radius: 0 !important; border-bottom: 1px solid var(--hud-line-soft) !important; }
+.topbar::before, .topbar::after { display: none !important; }
+.shell-mobilebar { border-top: 1px solid var(--hud-line-soft) !important; background: rgba(5, 7, 15, 0.7) !important; }
+.shell-hud { background: transparent; border: 1px solid var(--hud-line-soft); box-shadow: none; }
+.shell-nav-item.active { background: transparent !important; box-shadow: none !important; border-left: 1px solid var(--cyan); }
+.shell-nav-item:hover { background: rgba(142, 232, 245, 0.05) !important; }
+
+/* Panels: no dark slab, no blur, no glow — a hairline top rule + corner ticks. */
+.settings-section, .dash-card, .dash-tile, .gx-panel, .gx-glass, .pilot-step,
+.matrix-card, .matrix-detail-panel, .gu-recipe, .gu-replay-col, .gu-cspace-row,
+.hall-card, .lab-card, .narrator, .research-panel, .science-chat-panel, .world-card, .start-card,
+.hero-card, .evidence-capsule, .console-panel, .control-panel, .panel,
+.start-door, .start-ask, .science-chat, .next-move-panel, .science-chat-suggest > *, .start-status {
+  background: var(--glass) !important;
+  -webkit-backdrop-filter: blur(6px) !important; backdrop-filter: blur(6px) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--hud-line-soft) !important;
+  border-radius: 4px !important;
+}
+.settings-section::before, .dash-card::before, .dash-tile::before, .gx-panel::before, .gx-glass::before, .pilot-step::before,
+.matrix-card::before, .matrix-detail-panel::before, .gu-recipe::before, .gu-replay-col::before, .gu-cspace-row::before { display: none !important; }
+.settings-section:hover, .dash-card:hover, .dash-tile:hover, .gx-panel:hover, .world-card:hover, .start-card:hover, .start-door:hover {
+  transform: none !important; box-shadow: none !important; border-color: var(--hud-line) !important;
+}
+/* Corner ticks — thin, vector, no blur. */
+.settings-section::after, .gx-panel::after, .dash-card::after, .gu-recipe::after, .matrix-detail-panel::after {
+  opacity: 1 !important;
+  background:
+    linear-gradient(var(--hud-line), var(--hud-line)) top left / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) top left / 1px 12px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) top right / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) top right / 1px 12px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom left / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom left / 1px 12px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom right / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom right / 1px 12px no-repeat !important;
+}
+
+/* Controls: flat vector — hairline, no gradient slab, no glow. */
+.chip-btn.primary, .dash-btn-primary, .gx-btn.primary, .primary-btn, .dash-ask-send, .topbar-ask-send {
+  background: rgba(142, 232, 245, 0.12) !important;
+  border: 1px solid var(--cyan) !important;
+  color: var(--cyan) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.chip-btn.primary::after, .dash-btn-primary::after, .gx-btn.primary::after, .primary-btn::after { display: none !important; }
+.chip-btn.primary:hover, .dash-btn-primary:hover, .gx-btn.primary:hover, .primary-btn:hover, .dash-ask-send:hover, .topbar-ask-send:hover {
+  background: rgba(142, 232, 245, 0.22) !important; box-shadow: none !important; transform: none !important;
+}
+button:not(.primary-btn):not(.chip-btn.primary):not(.dash-btn-primary), .chip-btn, .gx-btn, .tab, .dash-btn {
+  box-shadow: none !important;
+}
+input, select, textarea, .topbar-ask { box-shadow: none !important; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .topbar-ask:focus-within {
+  box-shadow: none !important; outline: 1px solid var(--cyan) !important; outline-offset: 2px;
+}
+.shell input[type='range']::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--cyan) !important; background: #05070f !important; }
+.shell input[type='range']::-moz-range-thumb { box-shadow: 0 0 0 1px var(--cyan) !important; background: #05070f !important; }
+
+/* Headings: clean, no glow — the renderer's bloom is the only light source. */
+h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-shadow: none !important; }
+.hero-title, .start-hero h1 { text-shadow: none !important; }
+
+/* Print keeps hiding the world; reduced motion keeps a still frame (the loop
+   stops, the canvas stays). */
+@media (prefers-reduced-motion: reduce) { .holo-backdrop { display: block; } }
+:root.force-reduced-motion .holo-backdrop { display: block; }
+@media (max-width: 720px) {
+  .hud-scrim {
+    background:
+      linear-gradient(180deg, rgba(5, 7, 15, 0.78) 0, rgba(5, 7, 15, 0.6) 30%, rgba(5, 7, 15, 0.6) 70%, rgba(5, 7, 15, 0.85) 100%);
+  }
+}
+.start-door::before, .start-door::after, .start-ask::before, .start-glow { display: none !important; }
+.start-door { box-shadow: none !important; }
+
+/* HUD telemetry readout: measured machine state + computed 5D geometry of the
+   backdrop flight path. Mono, hairline-separated, wraps under the route. */
+.shell-hud { flex-wrap: wrap; row-gap: 0.15rem; }
+.shell-hud-telemetry { flex-basis: 100%; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.06em; color: var(--text-dim); white-space: normal; line-height: 1.4; }
+
+/* Matrix hub (#/matrix) in HUD mode: the world stays visible through every
+   panel — the hub's panel tokens become thin glass, cards lose their slabs. */
+.matrix-hub {
+  --mx-panel: rgba(5, 8, 16, 0.22);
+  --mx-panel-raised: rgba(5, 8, 16, 0.3);
+  --mx-panel-sunken: rgba(5, 8, 16, 0.14);
+  --mx-border: var(--hud-line-soft);
+  background: transparent !important;
+}
+.matrix-focus-card, .matrix-ask-bar, .matrix-hub-grid-section, .matrix-graph-wrap, .matrix-loop-column, .matrix-chat-dock, .matrix-activity-feed {
+  background: var(--glass) !important;
+  border: 1px solid var(--hud-line-soft) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: blur(6px) !important; backdrop-filter: blur(6px) !important;
+}
+.matrix-graph-svg { background: transparent !important; }
+.matrix-card, .matrix-detail-panel { border-radius: 4px !important; }
+/* On #/matrix the world IS the page: the hub becomes a right-hand HUD column
+   so the stage (figures, platforms, word columns) stays in the open. */
+@media (min-width: 1100px) {
+  .matrix-hub { margin-left: auto !important; max-width: 44rem !important; }
+}
+.matrix-hub .matrix-hub-grid-section, .matrix-hub .matrix-focus-card, .matrix-hub .matrix-ask-bar { background: rgba(3, 10, 6, 0.42) !important; }
+@media (min-width: 1100px) {
+  /* Inside the narrow HUD column every hub grid stacks; nothing overlaps. */
+  .matrix-hub [class*="grid"], .matrix-hub [class*="columns"], .matrix-hub [class*="layout"], .matrix-hub [class*="loop"] { grid-template-columns: 1fr !important; }
+  .matrix-hub [class*="loop"] { flex-direction: column !important; }
+}
+
+/* =====================================================================
+   10 · MATRIX STAGE (#/matrix) — the world is the page
+   ===================================================================== */
+.app-matrix-stage { background: transparent !important; }
+.matrix-stage { position: relative; min-height: 100%; height: 100%; pointer-events: none; }
+.matrix-stage-hud {
+  position: absolute; top: 1.4rem; right: 1.4rem; bottom: 1.4rem; width: min(24rem, 42vw);
+  display: flex; flex-direction: column; gap: 1rem; padding: 1.2rem 1.3rem;
+  pointer-events: auto;
+  background: transparent; border: none; border-left: 1px solid rgba(98, 240, 163, 0.28);
+  color: #d8ffe8; font-family: var(--font-mono);
+  mix-blend-mode: screen;
+}
+.matrix-stage-eyebrow { font-size: 0.62rem; letter-spacing: 0.3em; color: #62f0a3; }
+.matrix-stage-title { margin: 0; font-family: var(--font-body); font-size: 2.4rem; font-weight: 700; letter-spacing: 0.02em; color: #eafff2; text-shadow: none; }
+.matrix-stage-readout { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.35rem 0.6rem; margin: 0; font-size: 0.66rem; line-height: 1.5; }
+.matrix-stage-readout dt { color: #62f0a3; letter-spacing: 0.14em; }
+.matrix-stage-readout dd { margin: 0; color: #cdeedd; }
+.matrix-stage-legend { list-style: none; margin: 0; padding: 0.6rem 0 0; border-top: 1px solid rgba(98, 240, 163, 0.2); display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; font-size: 0.62rem; letter-spacing: 0.22em; color: #9fffc8; }
+.matrix-stage-controls { margin-top: auto; display: grid; gap: 0.45rem; }
+.matrix-stage-btn {
+  background: transparent !important; border: 1px solid rgba(98, 240, 163, 0.45) !important; color: #d8ffe8 !important;
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-align: left; padding: 0.55rem 0.8rem; border-radius: 2px !important;
+  box-shadow: none !important; cursor: pointer;
+}
+.matrix-stage-btn:hover { background: rgba(98, 240, 163, 0.12) !important; border-color: #62f0a3 !important; }
+/* On the stage the scrim opens up: the left 60% is the unobstructed world. */
+.route-matrix .hud-scrim { background: linear-gradient(90deg, rgba(0, 8, 4, 0.3) 0, transparent 22%, transparent 58%, rgba(0, 8, 4, 0.55) 100%); }
+.route-matrix .shell-sidebar { background: rgba(0, 6, 3, 0.42) !important; }
+.route-matrix .matrix-datastream { opacity: 0.25; }
+@media (max-width: 720px) {
+  .matrix-stage-hud { position: static; width: auto; margin: 0.8rem; border-left: none; border-top: 1px solid rgba(98, 240, 163, 0.28); mix-blend-mode: normal; background: rgba(0, 8, 4, 0.55); }
+}
+
+/* Dashboard (`/`) and every route: no opaque slab may hide the world. */
+.science-chat, .shell-chat, .shell-chat > *, .research-panel, .next-move-panel, .science-chat-log, .science-chat-suggest, .science-chat-form, .science-chat-head, .science-chat-capsule-wrap,
+.start-door, .start-ask, .start-status, .dash-card, .dash-tile, .settings-section, .gx-panel, .world-card, .hall-card, .lab-card {
+  background: rgba(5, 8, 16, 0.18) !important;
+  -webkit-backdrop-filter: blur(5px) !important; backdrop-filter: blur(5px) !important;
+  box-shadow: none !important;
+}
+.science-chat { border: 1px solid var(--hud-line-soft) !important; border-radius: 4px !important; }
+.science-chat-log, .science-chat-suggest, .science-chat-form, .science-chat-head, .science-chat-capsule-wrap, .shell-chat > * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: transparent !important; }
+.chat-turn, .science-chat-msg, .science-chat-turn { background: rgba(5, 8, 16, 0.32) !important; box-shadow: none !important; }
+.shell-hud, .matrix-stage-hud, .gx-eyebrow, .start-status { mix-blend-mode: screen; }

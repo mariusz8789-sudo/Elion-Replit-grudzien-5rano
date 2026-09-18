@@ -2,21 +2,28 @@ import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 
 /**
- * MATRIX STAGE — the cinematic world behind `#/matrix`.
+ * MATRIX STAGE — the black cyber-space behind the whole shell, and the stage
+ * with figures behind `#/matrix`.
  *
- * What the owner's reference shows, built with real WebGL rather than an image:
- *   - a volumetric rain of glyphs (thousands of GPU points sampling a generated
- *     glyph atlas; column heads burn brighter so bloom lifts them);
- *   - a black mirror floor (planar Reflector) with a hairline grid;
- *   - five luminous platforms with emissive rings;
- *   - five chrome figures (articulated mannequins, metallic PBR lit by a green
- *     environment probe) in distinct poses, the central one reaching up;
- *   - vertical word columns — GENESIS · EVIDENCE · TRUTH · ABSENCE · A BETTER
- *     TOMORROW — floating behind the figures;
- *   - the frame is bloomed by the backdrop's composer.
+ *   - CODE RAIN: a procedural, volumetric rain of glyphs computed entirely on
+ *     the GPU — thousands of columns at real depth, each a head glyph with a
+ *     fading trail; position, speed, flicker and depth fade all come from
+ *     `uTime` in the vertex/fragment shaders, so the CPU touches nothing per
+ *     frame. Far columns are smaller and darker (depth), near ones sharp.
+ *   - FLOOR: a black planar mirror (Reflector, no tint) under a hairline neon
+ *     grid — reflections are of the real scene, not a texture.
+ *   - FIGURES (stage only): five cybernetic silhouettes assembled from armour
+ *     plates — helmet with visor slit, chest and back plates, pauldrons,
+ *     segmented arms and legs, plated boots — in dark chrome
+ *     (metalness 0.95, roughness 0.05) over matte titanium joints. Lit by a
+ *     dark studio probe (two light strips) so the chrome shows hard highlights;
+ *     the only colour on them is a faint Fresnel rim on the contour. No
+ *     emissive, no glowing platforms: dark pedestals with a hairline edge.
+ *   - ATMOSPHERE: pure black, black exponential fog (distance goes dark, not
+ *     green), no ambient tint.
  *
- * Deterministic (seeded PRNG passed in), disposable, and built only inside a
- * live WebGL context — never at import time, so tests without a DOM stay safe.
+ * Deterministic (seeded PRNG), disposable, built only inside a live WebGL
+ * context — never at import time, so tests without a DOM stay safe.
  */
 
 export const MATRIX_WORDS = ['GENESIS', 'EVIDENCE', 'TRUTH', 'ABSENCE', 'A BETTER TOMORROW'] as const;
@@ -28,6 +35,8 @@ export function isMatrixRoute(hash: string): boolean {
 export interface MatrixStage {
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
+  /** Show or hide the figures, pedestals and word columns (stage vs plain code space). */
+  setStage(on: boolean): void;
   update(t: number, dt: number, parallaxX: number, parallaxY: number): void;
   layout(width: number, height: number): void;
   dispose(): void;
@@ -45,15 +54,13 @@ function glyphAtlas(doc: Document): THREE.CanvasTexture | null {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, size, size);
   const cell = size / ATLAS_COLS;
-  ctx.font = `bold ${Math.floor(cell * 0.78)}px "Noto Sans JP", "Yu Gothic", "MS Gothic", monospace`;
+  ctx.font = `bold ${Math.floor(cell * 0.8)}px "Noto Sans JP", "Yu Gothic", "MS Gothic", monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let i = 0; i < ATLAS_COLS * ATLAS_COLS; i++) {
     const ch = GLYPHS[i % GLYPHS.length];
-    const cx = (i % ATLAS_COLS) * cell + cell / 2;
-    const cy = Math.floor(i / ATLAS_COLS) * cell + cell / 2;
-    ctx.fillStyle = '#b7ffd0';
-    ctx.fillText(ch, cx, cy);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(ch, (i % ATLAS_COLS) * cell + cell / 2, Math.floor(i / ATLAS_COLS) * cell + cell / 2);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -70,13 +77,11 @@ function wordTexture(doc: Document, word: string): THREE.CanvasTexture | null {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = `700 ${Math.floor(cell * 0.62)}px "DejaVu Sans Mono", "Fira Code", monospace`;
+  ctx.font = `700 ${Math.floor(cell * 0.6)}px "DejaVu Sans Mono", "Fira Code", monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   letters.forEach((ch, i) => {
-    ctx.shadowColor = '#4dff9b';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = '#d8ffe8';
+    ctx.fillStyle = '#9fe8c0';
     ctx.fillText(ch, cell / 2, i * cell + cell / 2);
   });
   const tex = new THREE.CanvasTexture(canvas);
@@ -84,59 +89,145 @@ function wordTexture(doc: Document, word: string): THREE.CanvasTexture | null {
   return tex;
 }
 
+/**
+ * Procedural code rain. Per point: column origin (x, z), index k along the
+ * trail, column speed, phase and glyph seed. Everything else is a function of
+ * uTime: the head falls, the trail hangs above it, glyphs flicker on a
+ * per-point clock, brightness fades along the trail and with depth.
+ */
 const RAIN_VERTEX = /* glsl */ `
-attribute float aGlyph;
-attribute float aBright;
-attribute float aSize;
+attribute vec3 aColumn;   // x, z of the column, y = column height span
+attribute float aIndex;   // 0 = head, 1..n = trail
+attribute float aSpeed;
+attribute float aPhase;
+attribute float aSeed;
+uniform float uTime;
+uniform float uSpacing;
 varying float vGlyph;
 varying float vBright;
+varying float vDepth;
+float hash(float n) { return fract(sin(n) * 43758.5453123); }
 void main() {
-  vGlyph = aGlyph;
-  vBright = aBright;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = aSize * (300.0 / -mv.z);
+  float span = aColumn.y;
+  float head = span - mod(uTime * aSpeed + aPhase * span, span + 6.0);
+  float y = head + aIndex * uSpacing;
+  float trailFade = exp(-aIndex * 0.16);
+  vBright = aIndex < 0.5 ? 2.2 : 0.95 * trailFade;
+  float flick = floor(uTime * (1.5 + hash(aSeed) * 4.0) + aSeed * 7.0);
+  vGlyph = floor(hash(aSeed * 13.7 + flick + aIndex * 3.1) * 256.0);
+  vec4 mv = modelViewMatrix * vec4(aColumn.x, y, aColumn.z, 1.0);
+  vDepth = -mv.z;
+  gl_PointSize = clamp(0.42 * (420.0 / max(1.0, -mv.z)), 3.0, 22.0);
   gl_Position = projectionMatrix * mv;
+  if (y < -0.4 || y > span + 0.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
 `;
 const RAIN_FRAGMENT = /* glsl */ `
 uniform sampler2D uAtlas;
 uniform float uCols;
+uniform float uFar;
 varying float vGlyph;
 varying float vBright;
+varying float vDepth;
 void main() {
   float col = mod(vGlyph, uCols);
   float row = floor(vGlyph / uCols);
   vec2 uv = (vec2(col, row) + gl_PointCoord) / uCols;
   uv.y = 1.0 - uv.y;
-  vec4 tex = texture2D(uAtlas, uv);
-  float a = tex.g;
-  if (a < 0.08) discard;
-  vec3 color = mix(vec3(0.05, 0.55, 0.22), vec3(0.75, 1.0, 0.85), clamp(vBright - 0.5, 0.0, 1.0));
-  gl_FragColor = vec4(color * vBright, a);
+  float a = texture2D(uAtlas, uv).r;
+  if (a < 0.1) discard;
+  float depthFade = clamp(1.0 - vDepth / uFar, 0.08, 1.0);
+  vec3 tail = vec3(0.0, 0.42, 0.14);
+  vec3 head = vec3(0.82, 1.0, 0.88);
+  vec3 color = mix(tail, head, clamp(vBright - 0.9, 0.0, 1.0)) * min(vBright, 1.6) * depthFade;
+  gl_FragColor = vec4(color, a * depthFade);
 }
 `;
 
-function mannequin(material: THREE.Material, pose: 'reach' | 'wave' | 'stand' | 'hands' | 'open', track: <T extends { dispose(): void }>(d: T) => T): THREE.Group {
+type Track = <T extends { dispose(): void }>(d: T) => T;
+
+/** A dark studio probe: black room with two thin light strips — chrome gets hard highlights, nothing else. */
+function studioProbe(renderer: THREE.WebGLRenderer, track: Track): THREE.Texture {
+  const room = new THREE.Scene();
+  room.background = new THREE.Color(0x000000);
+  const strip = track(new THREE.MeshBasicMaterial({ color: 0xdfffe9 }));
+  const a = new THREE.Mesh(track(new THREE.PlaneGeometry(14, 0.6)), strip);
+  a.position.set(0, 6, -4); a.rotation.x = Math.PI / 2.4;
+  const b = new THREE.Mesh(track(new THREE.PlaneGeometry(0.5, 12)), strip);
+  b.position.set(-7, 3, 2); b.rotation.y = Math.PI / 2;
+  const c = new THREE.Mesh(track(new THREE.PlaneGeometry(0.4, 10)), track(new THREE.MeshBasicMaterial({ color: 0x5fffa8 })));
+  c.position.set(7, 2.5, -3); c.rotation.y = -Math.PI / 2;
+  const floorGlow = new THREE.Mesh(track(new THREE.PlaneGeometry(30, 30)), track(new THREE.MeshBasicMaterial({ color: 0x041a0d })));
+  floorGlow.rotation.x = -Math.PI / 2; floorGlow.position.y = -1;
+  room.add(a, b, c, floorGlow);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = track(pmrem.fromScene(room, 0, 0.1, 100));
+  pmrem.dispose();
+  return env.texture;
+}
+
+type Pose = 'reach' | 'guard' | 'stand' | 'hands' | 'open';
+
+/** Cybernetic silhouette assembled from armour plates over a titanium under-layer. */
+function cyberFigure(chrome: THREE.Material, titanium: THREE.Material, visor: THREE.Material, pose: Pose, track: Track): THREE.Group {
   const g = new THREE.Group();
-  const torso = new THREE.Mesh(track(new THREE.CapsuleGeometry(0.34, 0.86, 6, 16)), material);
-  torso.position.y = 1.32;
-  const head = new THREE.Mesh(track(new THREE.SphereGeometry(0.22, 24, 16)), material);
-  head.position.y = 2.05;
-  const limb = (len: number, r: number): THREE.Mesh => new THREE.Mesh(track(new THREE.CapsuleGeometry(r, len, 4, 12)), material);
-  const legL = limb(0.86, 0.12); legL.position.set(-0.17, 0.5, 0);
-  const legR = limb(0.86, 0.12); legR.position.set(0.17, 0.5, 0);
-  const armL = new THREE.Group(); const armR = new THREE.Group();
-  const upperL = limb(0.72, 0.1); upperL.position.y = -0.4; armL.add(upperL);
-  const upperR = limb(0.72, 0.1); upperR.position.y = -0.4; armR.add(upperR);
-  armL.position.set(-0.46, 1.72, 0); armR.position.set(0.46, 1.72, 0);
+  const plate = (w: number, h: number, d: number, m: THREE.Material): THREE.Mesh => new THREE.Mesh(track(new THREE.BoxGeometry(w, h, d, 1, 1, 1)), m);
+  const joint = (r: number): THREE.Mesh => new THREE.Mesh(track(new THREE.SphereGeometry(r, 18, 12)), titanium);
+  const tube = (r: number, len: number): THREE.Mesh => new THREE.Mesh(track(new THREE.CylinderGeometry(r, r * 0.86, len, 14)), titanium);
+
+  // Torso: titanium core, chrome chest + back plates, abdominal segments.
+  const core = tube(0.22, 0.9); core.position.y = 1.32;
+  const chest = plate(0.62, 0.5, 0.34, chrome); chest.position.set(0, 1.5, 0.05);
+  const back = plate(0.58, 0.56, 0.2, chrome); back.position.set(0, 1.46, -0.16);
+  const abs1 = plate(0.44, 0.12, 0.28, chrome); abs1.position.set(0, 1.16, 0.04);
+  const abs2 = plate(0.4, 0.12, 0.26, chrome); abs2.position.set(0, 1.02, 0.03);
+  const pelvis = plate(0.5, 0.22, 0.3, chrome); pelvis.position.set(0, 0.86, 0);
+  // Helmet with visor slit.
+  const neck = tube(0.09, 0.14); neck.position.y = 1.85;
+  const helmet = new THREE.Mesh(track(new THREE.SphereGeometry(0.2, 22, 16)), chrome); helmet.position.y = 2.07; helmet.scale.set(1, 1.12, 1.05);
+  const jaw = plate(0.26, 0.12, 0.22, chrome); jaw.position.set(0, 1.93, 0.04);
+  const visorSlit = plate(0.3, 0.035, 0.05, visor); visorSlit.position.set(0, 2.09, 0.19);
+  g.add(core, chest, back, abs1, abs2, pelvis, neck, helmet, jaw, visorSlit);
+
+  const arm = (side: -1 | 1): THREE.Group => {
+    const a = new THREE.Group();
+    const pauldron = new THREE.Mesh(track(new THREE.SphereGeometry(0.17, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2)), chrome);
+    const shoulder = joint(0.1);
+    const upper = tube(0.075, 0.44); upper.position.y = -0.28;
+    const upperPlate = plate(0.12, 0.36, 0.16, chrome); upperPlate.position.set(side * 0.03, -0.28, 0);
+    const elbow = joint(0.08); elbow.position.y = -0.52;
+    const fore = new THREE.Group(); fore.position.y = -0.52;
+    const foreTube = tube(0.065, 0.42); foreTube.position.y = -0.24;
+    const forePlate = plate(0.11, 0.34, 0.15, chrome); forePlate.position.set(side * 0.02, -0.24, 0.02);
+    const hand = plate(0.1, 0.14, 0.06, chrome); hand.position.y = -0.5;
+    fore.add(foreTube, forePlate, hand);
+    a.add(pauldron, shoulder, upper, upperPlate, elbow, fore);
+    a.position.set(side * 0.4, 1.7, 0);
+    return a;
+  };
+  const leg = (side: -1 | 1): THREE.Group => {
+    const l = new THREE.Group();
+    const hip = joint(0.09);
+    const thigh = tube(0.09, 0.44); thigh.position.y = -0.26;
+    const thighPlate = plate(0.16, 0.36, 0.2, chrome); thighPlate.position.set(0, -0.26, 0.04);
+    const knee = joint(0.085); knee.position.y = -0.5;
+    const shin = tube(0.075, 0.42); shin.position.y = -0.72;
+    const shinPlate = plate(0.13, 0.34, 0.16, chrome); shinPlate.position.set(0, -0.72, 0.05);
+    const boot = plate(0.17, 0.12, 0.3, chrome); boot.position.set(0, -0.96, 0.05);
+    l.add(hip, thigh, thighPlate, knee, shin, shinPlate, boot);
+    l.position.set(side * 0.17, 0.98, 0);
+    return l;
+  };
+  const armL = arm(-1); const armR = arm(1);
+  const legL = leg(-1); const legR = leg(1);
   switch (pose) {
-    case 'reach': armR.rotation.z = Math.PI * 0.92; armR.rotation.x = -0.15; armL.rotation.z = 0.35; break;
-    case 'wave': armL.rotation.z = -Math.PI * 0.55; armL.rotation.x = 0.4; armR.rotation.z = 0.2; break;
-    case 'hands': armL.rotation.z = -0.9; armL.rotation.x = 1.1; armR.rotation.z = 0.9; armR.rotation.x = 1.1; break;
-    case 'open': armL.rotation.z = -0.75; armR.rotation.z = 0.75; break;
-    default: armL.rotation.z = -0.18; armR.rotation.z = 0.18;
+    case 'reach': armR.rotation.z = Math.PI * 0.94; armR.rotation.x = -0.1; armL.rotation.z = 0.3; break;
+    case 'guard': armL.rotation.z = -0.5; armL.rotation.x = 1.3; armR.rotation.z = 0.5; armR.rotation.x = 1.3; break;
+    case 'hands': armL.rotation.z = -0.35; armL.rotation.x = 1.0; armR.rotation.z = 0.35; armR.rotation.x = 1.0; break;
+    case 'open': armL.rotation.z = -0.7; armR.rotation.z = 0.7; legL.rotation.z = 0.08; legR.rotation.z = -0.08; break;
+    default: armL.rotation.z = -0.14; armR.rotation.z = 0.14;
   }
-  g.add(torso, head, legL, legR, armL, armR);
+  g.add(armL, armR, legL, legR);
   return g;
 }
 
@@ -147,166 +238,151 @@ export function buildMatrixStage(
   lowPower: boolean,
 ): MatrixStage {
   const disposables: { dispose(): void }[] = [];
-  const track = <T extends { dispose(): void }>(d: T): T => { disposables.push(d); return d; };
+  const track: Track = (d) => { disposables.push(d); return d; };
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000704);
-  scene.fog = new THREE.FogExp2(0x000905, lowPower ? 0.06 : 0.042);
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
-  camera.position.set(3.2, 2.7, 13.5);
+  scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.FogExp2(0x000000, lowPower ? 0.05 : 0.034);
+  const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 220);
+  camera.position.set(2.6, 2.4, 11.6);
 
-  // Green environment probe so the chrome has something to reflect.
-  const probeScene = new THREE.Scene();
-  probeScene.background = new THREE.Color(0x0e4d2a);
-  probeScene.add(new THREE.HemisphereLight(0x2dff7f, 0x001a0c, 3.5));
-  const probeMesh = new THREE.Mesh(track(new THREE.SphereGeometry(6, 16, 8)), track(new THREE.MeshBasicMaterial({ color: 0x0a3a1c, side: THREE.BackSide })));
-  probeScene.add(probeMesh);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const env = track(pmrem.fromScene(probeScene, 0, 0.1, 100));
-  pmrem.dispose();
-  scene.environment = env.texture;
+  scene.environment = studioProbe(renderer, track);
 
-  // Lights.
-  scene.add(new THREE.HemisphereLight(0x39d97a, 0x000000, 0.55));
-  const key = new THREE.DirectionalLight(0x9dffc4, 3.0);
-  key.position.set(2, 9, 8);
-  scene.add(key);
-  const fill = new THREE.PointLight(0x7dffb0, 3.5, 34, 1.4);
-  fill.position.set(0, 4.5, 8.5);
-  scene.add(fill);
-  // Rim lights from behind and above: contour highlights along shoulders, heads and limbs.
-  const rimA = new THREE.DirectionalLight(0xc8ffe0, 2.6);
-  rimA.position.set(-6, 7, -9);
-  const rimB = new THREE.DirectionalLight(0x9dffc4, 2.2);
-  rimB.position.set(7, 6, -8);
-  scene.add(rimA, rimB);
+  // Lights: hard key from the front-top, two cool rims from behind; no ambient tint.
+  const key = new THREE.DirectionalLight(0xe8fff1, 2.2);
+  key.position.set(3, 8, 7);
+  const rimA = new THREE.DirectionalLight(0x9dffc4, 1.6);
+  rimA.position.set(-7, 6, -8);
+  const rimB = new THREE.DirectionalLight(0xffffff, 1.2);
+  rimB.position.set(8, 5, -7);
+  scene.add(key, rimA, rimB);
 
-  // Mirror floor + hairline grid.
-  const floorGeo = track(new THREE.PlaneGeometry(80, 80));
-  const mirror = new Reflector(floorGeo, { clipBias: 0.003, textureWidth: lowPower ? 256 : 768, textureHeight: lowPower ? 256 : 768, color: 0x0b1f13 });
+  // Black mirror floor + hairline neon grid.
+  const floorGeo = track(new THREE.PlaneGeometry(120, 120));
+  const mirror = new Reflector(floorGeo, { clipBias: 0.003, textureWidth: lowPower ? 384 : 1024, textureHeight: lowPower ? 384 : 1024, color: 0x8a8a8a });
   mirror.rotation.x = -Math.PI / 2;
   scene.add(mirror);
   track({ dispose: () => mirror.dispose() });
-  const grid = new THREE.GridHelper(80, 80, 0x1f8a4c, 0x0d3d22);
+  const grid = new THREE.GridHelper(120, 120, 0x1fa85e, 0x0b3d22);
   (grid.material as THREE.Material).transparent = true;
-  (grid.material as THREE.Material).opacity = 0.35;
-  grid.position.y = 0.01;
+  (grid.material as THREE.Material).opacity = 0.28;
+  grid.position.y = 0.006;
   track(grid.geometry); track(grid.material as THREE.Material);
   scene.add(grid);
 
-  // Platforms, rings, figures.
-  const chrome = track(new THREE.MeshStandardMaterial({ color: 0xdfeee6, metalness: 0.9, roughness: 0.1, envMapIntensity: 1.8, emissive: 0x0b2416, emissiveIntensity: 0.06 }));
-  // Fresnel rim: a crisp green contour on every silhouette edge, independent of the lights, so the
-  // figures read as sharp chrome shapes instead of bloomed blobs.
+  // Stage group: pedestals, figures, word columns (visible only on #/matrix).
+  const stage = new THREE.Group();
+  const chrome = track(new THREE.MeshStandardMaterial({ color: 0x1b1f24, metalness: 0.95, roughness: 0.05, envMapIntensity: 1.5 }));
   chrome.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
       {
-        float rim = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.2);
-        totalEmissiveRadiance += vec3(0.28, 0.95, 0.55) * rim * 0.55;
+        float rim = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 4.0);
+        totalEmissiveRadiance += vec3(0.24, 0.9, 0.5) * rim * 0.22;
       }`,
     );
   };
-  const platMat = track(new THREE.MeshStandardMaterial({ color: 0x08150d, metalness: 0.8, roughness: 0.3 }));
-  const ringMat = track(new THREE.MeshStandardMaterial({ color: 0x39d97a, emissive: 0x39d97a, emissiveIntensity: 2.0, roughness: 0.4 }));
-  const rings: THREE.Mesh[] = [];
-  const xs = [-7.2, -3.6, 0, 3.6, 7.2];
-  const poses: Array<'reach' | 'wave' | 'stand' | 'hands' | 'open'> = ['stand', 'wave', 'reach', 'hands', 'open'];
+  const titanium = track(new THREE.MeshStandardMaterial({ color: 0x3a3f46, metalness: 0.9, roughness: 0.45, envMapIntensity: 0.8 }));
+  const visor = track(new THREE.MeshStandardMaterial({ color: 0x0c1a12, metalness: 0.6, roughness: 0.2, emissive: 0x2dff8a, emissiveIntensity: 0.9 }));
+  const pedestalMat = track(new THREE.MeshStandardMaterial({ color: 0x07090b, metalness: 0.85, roughness: 0.25 }));
+  const edgeMat = track(new THREE.MeshBasicMaterial({ color: 0x1fa85e, transparent: true, opacity: 0.7 }));
+  const xs = [-7.0, -3.5, 0, 3.5, 7.0];
+  const poses: Pose[] = ['stand', 'guard', 'reach', 'hands', 'open'];
   xs.forEach((x, i) => {
     const big = i === 2;
-    const r = big ? 2.0 : 1.55;
-    const platform = new THREE.Mesh(track(new THREE.CylinderGeometry(r, r * 1.04, 0.22, 48)), platMat);
-    platform.position.set(x, 0.11, big ? 1.2 : 0);
-    const ring = new THREE.Mesh(track(new THREE.TorusGeometry(r, 0.05, 10, 96)), ringMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.set(x, 0.23, big ? 1.2 : 0);
-    const glow = new THREE.PointLight(0x39d97a, big ? 3.2 : 2.0, 9, 1.8);
-    glow.position.set(x, 0.6, big ? 1.2 : 0);
-    const figure = mannequin(chrome, poses[i], track);
-    figure.position.set(x, 0.22, big ? 1.2 : 0);
-    figure.scale.setScalar(big ? 1.08 : 0.96);
-    figure.rotation.y = (random() - 0.5) * 0.5;
-    scene.add(platform, ring, glow, figure);
-    rings.push(ring);
+    const r = big ? 1.7 : 1.35;
+    const z = big ? 1.1 : 0;
+    const pedestal = new THREE.Mesh(track(new THREE.CylinderGeometry(r, r * 1.03, 0.18, 64)), pedestalMat);
+    pedestal.position.set(x, 0.09, z);
+    const edge = new THREE.Mesh(track(new THREE.TorusGeometry(r, 0.012, 6, 128)), edgeMat);
+    edge.rotation.x = Math.PI / 2;
+    edge.position.set(x, 0.185, z);
+    const figure = cyberFigure(chrome, titanium, visor, poses[i], track);
+    figure.position.set(x, 0.18, z);
+    figure.scale.setScalar(big ? 1.06 : 0.97);
+    figure.rotation.y = (random() - 0.5) * 0.45;
+    stage.add(pedestal, edge, figure);
   });
-
-  // Word columns.
   const wordMeshes: THREE.Mesh[] = [];
   MATRIX_WORDS.forEach((w, i) => {
     const tex = wordTexture(doc, w);
     if (!tex) return;
     track(tex);
-    const h = 0.7 * w.length;
-    const mesh = new THREE.Mesh(track(new THREE.PlaneGeometry(0.7, h)), track(new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, color: 0x8dffbd })));
-    mesh.position.set(xs[i] + (i === 2 ? 0 : (random() - 0.5) * 1.2), 4.2 + h / 2 + (random() - 0.5), -6.5 - random() * 2);
-    scene.add(mesh);
+    const h = 0.62 * w.length;
+    const mesh = new THREE.Mesh(track(new THREE.PlaneGeometry(0.62, h)), track(new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85, depthWrite: false })));
+    mesh.position.set(xs[i] + (i === 2 ? 0 : (random() - 0.5) * 1.4), 4.0 + h / 2 + (random() - 0.5), -7.5 - random() * 2.5);
+    stage.add(mesh);
     wordMeshes.push(mesh);
   });
+  scene.add(stage);
 
-  // Glyph rain.
+  // Procedural volumetric code rain.
   const atlas = glyphAtlas(doc);
-  const count = lowPower ? 2600 : 7000;
-  const positions = new Float32Array(count * 3);
-  const glyph = new Float32Array(count);
-  const bright = new Float32Array(count);
-  const size = new Float32Array(count);
+  const columns = lowPower ? 1100 : 3800;
+  const trail = lowPower ? 10 : 16;
+  const count = columns * trail;
+  const col = new Float32Array(count * 3);
+  const idx = new Float32Array(count);
   const speed = new Float32Array(count);
-  for (let i = 0; i < count; i++) {
-    positions[i * 3] = (random() - 0.5) * 70;
-    positions[i * 3 + 1] = random() * 30;
-    positions[i * 3 + 2] = -34 + random() * 44;
-    glyph[i] = Math.floor(random() * ATLAS_COLS * ATLAS_COLS);
-    const head = random() < 0.09;
-    bright[i] = head ? 1.9 + random() * 0.6 : 0.35 + random() * 0.55;
-    size[i] = 0.55 + random() * 0.5;
-    speed[i] = 2.2 + random() * 4.5;
+  const phase = new Float32Array(count);
+  const seed = new Float32Array(count);
+  const pos = new Float32Array(count * 3); // unused by the shader but required by three for bounding
+  for (let c = 0; c < columns; c++) {
+    const x = (random() - 0.5) * 110;
+    const z = -70 + random() * 84;
+    const span = 16 + random() * 22;
+    const sp = 2.5 + random() * 6.5;
+    const ph = random();
+    for (let k = 0; k < trail; k++) {
+      const i = c * trail + k;
+      col[i * 3] = x; col[i * 3 + 1] = span; col[i * 3 + 2] = z;
+      idx[i] = k; speed[i] = sp; phase[i] = ph; seed[i] = c * 0.731 + k * 0.17;
+      pos[i * 3] = x; pos[i * 3 + 1] = span / 2; pos[i * 3 + 2] = z;
+    }
   }
   const rainGeo = track(new THREE.BufferGeometry());
-  rainGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  rainGeo.setAttribute('aGlyph', new THREE.BufferAttribute(glyph, 1));
-  rainGeo.setAttribute('aBright', new THREE.BufferAttribute(bright, 1));
-  rainGeo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  rainGeo.setAttribute('aColumn', new THREE.BufferAttribute(col, 3));
+  rainGeo.setAttribute('aIndex', new THREE.BufferAttribute(idx, 1));
+  rainGeo.setAttribute('aSpeed', new THREE.BufferAttribute(speed, 1));
+  rainGeo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+  rainGeo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  rainGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 15, -28), 120);
   const rainMat = track(new THREE.ShaderMaterial({
     vertexShader: RAIN_VERTEX, fragmentShader: RAIN_FRAGMENT,
-    uniforms: { uAtlas: { value: atlas }, uCols: { value: ATLAS_COLS } },
+    uniforms: { uAtlas: { value: atlas }, uCols: { value: ATLAS_COLS }, uTime: { value: 0 }, uSpacing: { value: 0.72 }, uFar: { value: 95 } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
   }));
   if (atlas) track(atlas);
   const rain = new THREE.Points(rainGeo, rainMat);
+  rain.frustumCulled = false;
   rain.visible = atlas !== null;
   scene.add(rain);
-  const posAttr = rainGeo.getAttribute('position') as THREE.BufferAttribute;
-  const glyphAttr = rainGeo.getAttribute('aGlyph') as THREE.BufferAttribute;
-  let glyphTick = 0;
 
+  let stageOn = true;
   return {
     scene,
     camera,
+    setStage(on) {
+      stageOn = on;
+      stage.visible = on;
+    },
     layout(width, height) {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     },
-    update(t, dt, parallaxX, parallaxY) {
-      const arr = posAttr.array as Float32Array;
-      for (let i = 0; i < count; i++) {
-        let y = arr[i * 3 + 1] - speed[i] * dt;
-        if (y < -0.5) y += 30.5;
-        arr[i * 3 + 1] = y;
+    update(t, _dt, parallaxX, parallaxY) {
+      rainMat.uniforms.uTime.value = t;
+      if (stageOn) {
+        wordMeshes.forEach((m, i) => { m.position.y += Math.sin(t * 0.6 + i * 1.3) * 0.0012; });
+        camera.position.x = 2.6 + Math.sin(t * 0.06) * 1.0 + parallaxX * 0.7;
+        camera.position.y = 2.4 + parallaxY * 0.35;
+        camera.lookAt(-1.2, 1.9, 0);
+      } else {
+        camera.position.x = Math.sin(t * 0.05) * 2.0 + parallaxX * 0.6;
+        camera.position.y = 3.2 + parallaxY * 0.3;
+        camera.lookAt(0, 4.5, -20);
       }
-      posAttr.needsUpdate = true;
-      // Flicker a slice of glyphs each frame (deterministic walk through the buffer).
-      glyphTick = (glyphTick + 97) % count;
-      const g = glyphAttr.array as Float32Array;
-      for (let k = 0; k < 40; k++) {
-        const idx = (glyphTick + k * 131) % count;
-        g[idx] = (g[idx] + 37) % (ATLAS_COLS * ATLAS_COLS);
-      }
-      glyphAttr.needsUpdate = true;
-      rings.forEach((ring, i) => { (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.7 + Math.sin(t * 1.6 + i) * 0.45; });
-      wordMeshes.forEach((m, i) => { m.position.y += Math.sin(t * 0.6 + i * 1.3) * 0.0012; });
-      camera.position.x = 3.2 + Math.sin(t * 0.07) * 1.2 + parallaxX * 0.8;
-      camera.position.y = 2.7 + parallaxY * 0.4;
-      camera.lookAt(-1.6, 2.4, 0);
     },
     dispose() {
       for (const d of disposables) d.dispose();

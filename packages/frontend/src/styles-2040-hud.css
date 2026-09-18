@@ -207,3 +207,28 @@ h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-
 .science-chat-log, .science-chat-suggest, .science-chat-form, .science-chat-head, .science-chat-capsule-wrap, .shell-chat > * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: transparent !important; }
 .chat-turn, .science-chat-msg, .science-chat-turn { background: rgba(5, 8, 16, 0.32) !important; box-shadow: none !important; }
 .shell-hud, .matrix-stage-hud, .gx-eyebrow, .start-status { mix-blend-mode: screen; }
+
+/* =====================================================================
+   11 · BLACK CODE SPACE — 100 % transparent HUD
+   The engine is black with digits; nothing may sit on a slab. Hairlines only.
+   ===================================================================== */
+html { background: #000 !important; }
+.hud-scrim { display: none !important; }
+.matrix-datastream { display: none !important; }   /* the 2D stream is superseded by the 3D rain */
+.science-chat, .shell-chat, .shell-chat > *, .research-panel, .next-move-panel, .science-chat-log, .science-chat-suggest, .science-chat-form, .science-chat-head, .science-chat-capsule-wrap,
+.start-door, .start-ask, .start-status, .dash-card, .dash-tile, .settings-section, .gx-panel, .gx-glass, .world-card, .hall-card, .lab-card, .pilot-step, .matrix-card, .matrix-detail-panel,
+.gu-recipe, .gu-replay-col, .gu-cspace-row, .narrator, .evidence-capsule, .console-panel, .control-panel, .panel, .topbar, .shell-sidebar, .shell-mobilebar, .shell-sheet, .shell-hud, .topbar-ask {
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+.chat-turn, .science-chat-msg, .science-chat-turn, .science-chat-log > * { background: transparent !important; border: 1px solid rgba(98, 240, 163, 0.18) !important; box-shadow: none !important; }
+.shell-sidebar { border-right: 1px solid rgba(98, 240, 163, 0.16) !important; }
+.topbar { border-bottom: 1px solid rgba(98, 240, 163, 0.16) !important; }
+.start-door, .start-ask, .dash-card, .settings-section, .gx-panel, .world-card, .research-panel, .next-move-panel { border: 1px solid rgba(98, 240, 163, 0.16) !important; border-radius: 2px !important; }
+.start-door::after, .settings-section::after, .gx-panel::after, .dash-card::after { display: none !important; }
+:root { --text-dim: #b9d8c7; --text-faint: #86a595; --hud-line: rgba(98, 240, 163, 0.34); --hud-line-soft: rgba(98, 240, 163, 0.16); }
+.chip-btn.primary, .dash-btn-primary, .gx-btn.primary, .primary-btn, .dash-ask-send, .topbar-ask-send { background: transparent !important; border-color: rgba(98, 240, 163, 0.6) !important; color: #c8ffe0 !important; }
+.chip-btn, .gx-btn, .tab, .dash-btn { background: transparent !important; border: 1px solid rgba(98, 240, 163, 0.22) !important; }
+input, select, textarea { background: transparent !important; border: 1px solid rgba(98, 240, 163, 0.22) !important; color: #e6fff0 !important; }
+.holo-backdrop { opacity: 1 !important; }

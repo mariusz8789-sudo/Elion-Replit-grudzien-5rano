@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
+import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
+import { QuantumHistogram } from './QuantumHistogram';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { subscribeScienceChatOpenRequests } from '../core/scienceChatBridge';
 import { setPendingScenario } from '../core/scenarioBridge';
@@ -60,7 +62,7 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
  * atrap; funkcje niegotowe są jawnie oznaczone jako TODO w odpowiedzi.
  */
 
-interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean }
+interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData }
 
 type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
 
@@ -666,6 +668,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           );
         })
         .catch((e: unknown) => appendGenesis(`Pozyskiwanie nie powiodło się: ${e instanceof Error ? e.message : String(e)}.`, 'SYSTEM'));
+    } else if (a?.type === 'quantum') {
+      // HYBRID QUANTUM BRIDGE — the backend runs the circuit (cloud QPU only with env credentials, else the local
+      // statevector simulator) and labels the result; the chat shows that label and a histogram, never a "measurement"
+      // the device did not make. A backend error is shown as-is.
+      void runQuantumAction(a).then((turn) => setTurns((prev) => [...prev, { role: 'genesis', text: turn.text, tag: turn.tag, ...(turn.quantum ? { quantum: turn.quantum } : {}) }]));
     } else if (a?.type === 'runCyber') {
       // ETAP 1.5 — the real kernel, run synchronously right here, exactly like CyberWorkspace.tsx's
       // own `run()` does. The result lives in chat state so a follow-up "zapisz" can persist it
@@ -923,6 +930,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
               </span>
             )}
             <div className="sc-text">{t.text}</div>
+            {t.quantum && <QuantumHistogram data={t.quantum} />}
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
             )}

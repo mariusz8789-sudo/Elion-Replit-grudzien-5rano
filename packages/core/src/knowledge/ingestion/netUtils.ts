@@ -1,7 +1,9 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import type { Clock } from '../evidenceTypes.js';
 export interface HttpResponse { readonly status: number; readonly headers: Readonly<Record<string, string>>; readonly body: string; }
-export interface HttpTransport { fetch(url: string, opts?: { headers?: Readonly<Record<string, string>> }): Promise<HttpResponse>; }
+/** `method`/`body` are optional and additive: existing GET-only transports keep working unchanged; a transport that ignores them is still a valid implementation for GET callers. */
+export interface HttpRequestOptions { readonly headers?: Readonly<Record<string, string>>; readonly method?: 'GET' | 'POST'; readonly body?: string; }
+export interface HttpTransport { fetch(url: string, opts?: HttpRequestOptions): Promise<HttpResponse>; }
 export interface Sleeper { sleep(ms: number): Promise<void>; }
 export const realSleeper: Sleeper = { sleep: (ms) => new Promise(res => setTimeout(res, ms)) };
 export class HttpError extends Error { constructor(readonly status: number) { super('HTTP_' + status); } }

@@ -77,6 +77,10 @@ export type ChatAction =
    * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
    * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
   | { type: 'ingestUrls'; urls: readonly string[] }
+  /** HYBRID QUANTUM BRIDGE — `/quantum bell-state | ghz <n> | superposition <n> | run <qasm>` (+ `shots=` `seed=`).
+   * The backend (`/api/quantum/run`) decides where it runs: a cloud QPU only with env credentials, else the
+   * local statevector simulator whose answer is a MODEL_ESTIMATE; `ScienceChat.tsx` shows exactly that label. */
+  | { type: 'quantum'; preset?: 'bell-state' | 'ghz' | 'superposition'; qubits?: number; qasm?: string; shots: number; seed: number }
   /** Same ETAP 1.5 pattern for Decipherment. `sequenceText` is whatever the message itself supplied
    * as a candidate glyph sequence (see the extraction right before this action is returned) — null
    * when none was found, in which case `ScienceChat.tsx` falls back to the honest toy demo sequence
@@ -338,6 +342,10 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     if (urls.length === 0) return { text: 'Podaj adres: `/ingest https://…`. Pobieram wyłącznie przez oficjalne API (YouTube, X, Facebook — z kluczem w środowisku) albo z domen dopuszczonych w rejestrze polityk; wynik trafia do bazy jako PROPOZYCJA do zatwierdzenia, nigdy jako fakt.', tag: 'SYSTEM', intent: 'CREATE_TASK' };
     return { text: `Wysyłam ${urls.length} adres(y) do modułu pozyskiwania wiedzy. Zasady: oficjalne API lub domeny z rejestru, robots.txt respektowany, wynik = propozycja z jawnym statusem.`, tag: 'SYSTEM', intent: 'CREATE_TASK', action: { type: 'ingestUrls', urls } };
   }
+
+  // --- Hybrid Quantum Bridge: `/quantum …` (also "stan Bella", "obwód kwantowy", "symulacja kwantowa" -> Bell preset).
+  //     Parsed from the RAW message (QASM text is case- and punctuation-sensitive); the backend labels the result.
+  if (/^\s*\/quantum\b/i.test(message) || has(norm, 'stan bella', 'obwod kwantowy', 'symulacja kwantowa')) return resolveQuantumCommand(message);
 
   // --- Sterowanie odtwarzaniem (istniejący activeSimControls) ---
   if (has(norm, 'pauza', 'zatrzymaj', 'wstrzymaj', 'stop ')) return { text: 'Wstrzymuję symulację.', tag: 'SYSTEM', intent: 'CONTROL', action: { type: 'control', op: 'pause' } };
@@ -962,6 +970,41 @@ function taskResponse(ctx: ChatSimSnapshot): ChatResponse {
   };
 }
 
+const QUANTUM_HELP = 'Formy: `/quantum bell-state`, `/quantum ghz 3`, `/quantum superposition 4`, `/quantum run <OpenQASM 3.0>` (obwód w treści wiadomości, może być wieloliniowy; bramki h x y z s t rx ry rz cx cz swap barrier measure, maks. 16 kubitów), opcjonalnie `shots=2048 seed=5` (1–8192 strzałów). Bez klucza QPU w środowisku wynik pochodzi z lokalnego symulatora i jest etykietowany MODEL_ESTIMATE — nigdy jako pomiar.';
+const QUANTUM_MAX_SHOTS = 8192;
+const QUANTUM_MAX_QUBITS = 16;
+
+/** Deterministic parser for `/quantum …`; every unknown form answers with the help text instead of guessing. */
+function resolveQuantumCommand(message: string): ChatResponse {
+  const help = (why?: string): ChatResponse => ({ text: (why ? why + ' ' : '') + QUANTUM_HELP, tag: 'SYSTEM', intent: 'HELP' });
+  const shotsMatch = /\bshots\s*=\s*(\d+)/i.exec(message);
+  const seedMatch = /\bseed\s*=\s*(-?\d+)/i.exec(message);
+  const shots = shotsMatch ? Number(shotsMatch[1]) : 1024;
+  const seed = seedMatch ? Number(seedMatch[1]) : 1;
+  if (!Number.isInteger(shots) || shots < 1 || shots > QUANTUM_MAX_SHOTS) return help(`shots musi być liczbą całkowitą 1–${QUANTUM_MAX_SHOTS}.`);
+  if (!Number.isSafeInteger(seed)) return help('seed musi być liczbą całkowitą.');
+  const stripped = message.replace(/\bshots\s*=\s*\d+/gi, ' ').replace(/\bseed\s*=\s*-?\d+/gi, ' ');
+  const cmd = /^\s*\/quantum\b([\s\S]*)$/i.exec(stripped);
+  const accept = (action: Extract<ChatAction, { type: 'quantum' }>, what: string): ChatResponse => ({
+    text: `Wysyłam ${what} do mostka kwantowego (${action.shots} strzałów, ziarno ${action.seed}). Chmurowy QPU tylko z kluczem w środowisku; inaczej lokalny symulator — wynik oznaczony jako MODEL_ESTIMATE, nie pomiar.`,
+    tag: 'SYSTEM', intent: 'CREATE_TASK', action,
+  });
+  if (!cmd) return accept({ type: 'quantum', preset: 'bell-state', shots, seed }, 'stan Bella (2 kubity)'); // Polish alias
+  const rest = cmd[1].trim();
+  const sub = (rest.split(/\s+/)[0] ?? '').toLowerCase();
+  const arg = rest.split(/\s+/)[1];
+  const qubitsOf = (fallback: number): number | null => { if (arg === undefined) return fallback; const n = Number(arg); return Number.isInteger(n) && n >= 1 && n <= QUANTUM_MAX_QUBITS ? n : null; };
+  if (sub === 'bell-state' || sub === 'bell' || sub === 'bella') return accept({ type: 'quantum', preset: 'bell-state', shots, seed }, 'stan Bella (2 kubity)');
+  if (sub === 'ghz') { const n = qubitsOf(3); return n === null ? help(`ghz: liczba kubitów musi być całkowita 1–${QUANTUM_MAX_QUBITS}.`) : accept({ type: 'quantum', preset: 'ghz', qubits: n, shots, seed }, `stan GHZ (${n} kubitów)`); }
+  if (sub === 'superposition' || sub === 'superpozycja') { const n = qubitsOf(2); return n === null ? help(`superposition: liczba kubitów musi być całkowita 1–${QUANTUM_MAX_QUBITS}.`) : accept({ type: 'quantum', preset: 'superposition', qubits: n, shots, seed }, `superpozycję (${n} kubitów)`); }
+  if (sub === 'run') {
+    const qasm = rest.slice(3).replace(/^\s*```[a-z0-9]*\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    if (!qasm) return help('`/quantum run` wymaga tekstu obwodu.');
+    return accept({ type: 'quantum', qasm, shots, seed }, 'własny obwód OpenQASM');
+  }
+  return help(sub ? `Nieznana podkomenda „${sub}".` : undefined);
+}
+
 function helpResponse(): ChatResponse {
   return {
     text:
@@ -969,6 +1012,7 @@ function helpResponse(): ChatResponse {
       'zmienić parametr otwartej symulacji („zwiększ masę 2×", „co jeśli zmniejszymy prędkość?"), porównać dwa modele ' +
       '(„porównaj SIR R0=1.5 z SIR R0=3"), wyjaśnić stan („co się zmieniło?"), pokazać równania i założenia, ' +
       'zbudować zadanie oraz zaproponować kolejny eksperyment („zaproponuj eksperyment"). ' +
+      'Komendy: `/ingest <url>` (pozyskanie źródła jako propozycji) i `/quantum bell-state` (mostek kwantowy; lokalny symulator = MODEL_ESTIMATE). ' +
       'Weryfikacja inwariantami jest dostępna dla wspieranych snapshotów, a SHOW_SOURCE pokazuje internal model provenance; brak niezależnej referencji pozostaje VERIFY_REQUIRED.',
     tag: 'SYSTEM',
     intent: 'HELP',

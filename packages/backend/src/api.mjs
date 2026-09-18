@@ -96,6 +96,7 @@ import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAcces
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
 import { runSpeculative } from './speculativeApi.mjs';
 import { runIngest, listProposals, publishProposal, rejectProposal } from './knowledgeApi.mjs';
+import { runQuantum, describeQuantum } from './quantumApi.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -191,6 +192,16 @@ export function handleApi(db, ctx) {
       const result = seg[3] === 'publish' ? publishProposal(seg[2], approver.id) : rejectProposal(seg[2], approver.id);
       return result.ok ? ok(result) : err(409, result.error);
     }
+    return err(404, 'not_found');
+  }
+
+  // ---- Hybrid Quantum Computing Bridge (Science Chat `/quantum …`): cloud QPU only with env credentials, else local MODEL_ESTIMATE ----
+  if (seg[0] === 'quantum') {
+    if (seg[1] === 'run' && seg.length === 2 && method === 'POST') {
+      // Asynchronous like /api/knowledge/ingest: server.mjs awaits handleApi's result.
+      return runQuantum(body).then((result) => (result.ok ? ok(result) : err(result.status ?? 400, result.error, result.message)));
+    }
+    if (seg[1] === 'status' && seg.length === 2 && method === 'GET') return ok(describeQuantum());
     return err(404, 'not_found');
   }
 

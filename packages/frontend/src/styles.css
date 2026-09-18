@@ -5505,3 +5505,17 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .app-shell, .topbar, .narrator, .card, .panel, .settings-section, .matrix-card, .matrix-detail-panel, .matrix-chat-dock, .sim-panel, .lab-shell, .glass-panel { background: rgba(5, 10, 15, 0.75) !important; border-color: rgba(0, 255, 65, 0.2) !important; backdrop-filter: blur(14px) saturate(120%); -webkit-backdrop-filter: blur(14px) saturate(120%); }
 .topbar { position: relative; z-index: 10; }
 @media (max-width: 700px) { .app-shell, .app-content { padding-bottom: 7.5rem; } .topbar { background: rgba(0, 0, 0, 0.84) !important; } .narrator, .science-chat, .guide { z-index: 10; } }
+
+/* Hybrid Quantum Bridge — `/quantum` histogram inside a Science Chat turn (QuantumHistogram.tsx). */
+.quantum-hist { margin-top: .5rem; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--bg); font-family: var(--font-mono); font-size: .72rem; display: grid; gap: .3rem; }
+.quantum-hist-head { display: flex; flex-wrap: wrap; gap: .5rem; align-items: baseline; margin-bottom: .2rem; }
+.quantum-hist-label { border: 1px solid var(--cyan); border-radius: 999px; padding: .1rem .5rem; color: var(--cyan); font-size: .62rem; letter-spacing: .08em; }
+.quantum-hist-hardware_measurement { border-color: var(--green, #00ff41); color: var(--green, #00ff41); }
+.quantum-hist-meta { color: var(--muted, #a9b3cf); font-size: .64rem; }
+.quantum-row { display: grid; grid-template-columns: minmax(3ch, auto) 1fr auto; align-items: center; gap: .5rem; }
+.quantum-bit { color: var(--cyan); }
+.quantum-track { height: .8rem; background: rgba(92, 214, 232, .08); border-radius: .2rem; overflow: hidden; }
+.quantum-bar { height: 100%; min-width: 2px; background: var(--cyan); border-radius: .2rem; }
+.quantum-val { white-space: nowrap; }
+.quantum-model { color: var(--muted, #a9b3cf); }
+@media (max-width: 600px) { .quantum-row { grid-template-columns: minmax(3ch, auto) 1fr; } .quantum-val { grid-column: 2; font-size: .64rem; } }

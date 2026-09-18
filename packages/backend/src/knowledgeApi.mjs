@@ -34,7 +34,7 @@ export function isFetchableUrl(url) {
 class FetchTransport {
   constructor(fetchImpl) { this.fetchImpl = fetchImpl; }
   async fetch(url, opts) {
-    const res = await this.fetchImpl(url, { headers: opts?.headers ?? {}, redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const res = await this.fetchImpl(url, { method: opts?.method ?? 'GET', headers: opts?.headers ?? {}, ...(opts?.body !== undefined ? { body: opts.body } : {}), redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     const body = await res.text();
     if (res.status === 429 || res.status >= 500) { const e = new Error('HTTP_' + res.status); e.status = res.status; throw e; }
     return { status: res.status, headers: {}, body: body.slice(0, 200_000) };

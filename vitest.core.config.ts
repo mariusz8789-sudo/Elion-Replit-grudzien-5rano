@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { resolve } from 'node:path';
 
 /**
  * packages/core and packages/ui are source-only packages (no package.json of their own): the
@@ -6,6 +7,9 @@ import { defineConfig } from 'vitest/config';
  * bundle. This config runs their vitest suites from the repo root: `npm run test:core`.
  */
 export default defineConfig({
+  resolve: {
+    alias: { '@genesis/core': resolve(__dirname, 'packages/core/src') },
+  },
   test: {
     include: ['packages/core/src/**/*.test.ts', 'packages/ui/src/**/*.test.ts', 'packages/ui/src/**/*.test.tsx'],
     environment: 'node',

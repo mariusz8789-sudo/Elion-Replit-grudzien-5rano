@@ -3,9 +3,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { LedgerFeed, LedgerFeedEntry, CepFeed, CepAlert } from '@genesis/core/mythos/ledgerFeed.js';
 import { LedgerFeedBus, CepFeedBus } from '@genesis/core/mythos/ledgerFeed.js';
+import { RecursiveSimulationMatrix, type RsmResult } from '@genesis/core/postmythos/RecursiveSimulationMatrix.js';
+import { createHypergraphLayer } from './HypergraphGpu.js';
+import { hypergraphFromRsm } from './hypergraphFromRsm.js';
 
 const GLYPHS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', '0', '1'];
 const GCOLS = 6; const GROWS = 3;
+/** The RSM run drawn as the hypergraph layer: a fixed synthetic objective and seed, so the lattice on screen is the
+ *  engine's real, reproducible output (GEOMETRIC_MODEL) — never live data and never a hand-placed picture. */
+const RSM_CONFIG = { dims: 6, horizon: 4, branching: 3, beamK: 8, maxScenarios: 2000, eps: 0.05, seed: 0x47454e45 };
+const RSM_OBJECTIVE = new Float64Array([0.4, -0.2, 0.6, 0.1, 0.3, -0.5]);
+const RSM_INTERACT = new Float64Array(36).fill(0.02);
 function buildAtlas(): HTMLCanvasElement {
   const cell = 64;
   const canvas = document.createElement('canvas');
@@ -55,6 +63,7 @@ export const MatrixRoute: React.FC<MatrixRouteProps> = ({ ledgerFeed, cepFeed, p
   const [entries, setEntries] = useState<LedgerFeedEntry[]>([]);
   const [alerts, setAlerts] = useState<CepAlert[]>([]);
   const [feedStatus, setFeedStatus] = useState<'live' | 'closed' | 'local'>('local');
+  const [rsm, setRsm] = useState<RsmResult | null>(null);
   const busRef = useRef<LedgerFeedBus | null>(null);
   const cepBusRef = useRef<CepFeedBus | null>(null);
   const playRef = useRef(playing); playRef.current = playing;
@@ -79,6 +88,9 @@ export const MatrixRoute: React.FC<MatrixRouteProps> = ({ ledgerFeed, cepFeed, p
 
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
+    // The engine runs whether or not WebGL does: the readout is engine output, the layer is only its picture.
+    const rsmResult = new RecursiveSimulationMatrix(RSM_CONFIG, RSM_OBJECTIVE, RSM_INTERACT).run();
+    setRsm(rsmResult);
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' }); } catch { return; }
     const BASE_DPR = Math.min(window.devicePixelRatio || 1, 2);
@@ -92,8 +104,14 @@ export const MatrixRoute: React.FC<MatrixRouteProps> = ({ ledgerFeed, cepFeed, p
     const uniforms = { uAtlas: { value: atlas }, uTime: { value: 0 }, uCols: { value: 110 }, uRows: { value: 42 }, uGCols: { value: GCOLS }, uGRows: { value: GROWS }, uGCount: { value: GLYPHS.length } };
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: RAIN_VERT, fragmentShader: RAIN_FRAG, uniforms, depthTest: false, depthWrite: false }));
     scene.add(quad);
+    // Post-Mythos hypergraph: the RSM lattice in 3D over the rain, its own scene and perspective camera.
+    const view = hypergraphFromRsm(rsmResult);
+    const graphScene = new THREE.Scene();
+    const graphCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    const graph = createHypergraphLayer(graphScene, view.nodes, rsmResult.edges, view.margins, RSM_CONFIG.seed, BASE_DPR);
+    renderer.autoClear = false;
     host.appendChild(renderer.domElement);
-    const resize = (): void => { const w = host.clientWidth || window.innerWidth; const h = Math.max(1, host.clientHeight || window.innerHeight); renderer.setSize(w, h, false); };
+    const resize = (): void => { const w = host.clientWidth || window.innerWidth; const h = Math.max(1, host.clientHeight || window.innerHeight); renderer.setSize(w, h, false); graphCamera.aspect = w / h; graphCamera.updateProjectionMatrix(); };
     resize();
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', resize);
@@ -103,12 +121,19 @@ export const MatrixRoute: React.FC<MatrixRouteProps> = ({ ledgerFeed, cepFeed, p
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       if (playRef.current) simT += dt;
       uniforms.uTime.value = simT;
+      renderer.clear();
       renderer.render(scene, camera);
+      renderer.clearDepth();
+      const orbit = simT * 0.06;
+      graphCamera.position.set(Math.sin(orbit) * 26, 9 + Math.sin(simT * 0.11) * 1.5, Math.cos(orbit) * 26);
+      graphCamera.lookAt(0, 0, 0);
+      graph.update(simT);
+      renderer.render(graphScene, graphCamera);
       frames += 1; acc += dt;
       if (acc >= 0.5) { statsRef.current?.(Math.round(frames / acc), BASE_DPR); frames = 0; acc = 0; }
     };
     raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); window.removeEventListener('orientationchange', resize); quad.geometry.dispose(); (quad.material as THREE.Material).dispose(); atlas.dispose(); if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement); renderer.dispose(); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); window.removeEventListener('orientationchange', resize); quad.geometry.dispose(); (quad.material as THREE.Material).dispose(); atlas.dispose(); graph.dispose(); if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement); renderer.dispose(); };
   }, []);
 
   return (
@@ -132,6 +157,17 @@ export const MatrixRoute: React.FC<MatrixRouteProps> = ({ ledgerFeed, cepFeed, p
             </div>
           ))}
         </div>
+        <div style={{ color: '#38bdf8', fontSize: 10, letterSpacing: 3, textShadow: '0 0 10px #38bdf888', marginTop: 8 }}>RSM // HYPERGRAPH · GEOMETRIC_MODEL</div>
+        {rsm ? (
+          <div style={{ color: '#9fd7f9', fontSize: 10, lineHeight: 1.45, textShadow: '0 0 6px #38bdf844' }}>
+            NODES {rsm.enumerated} · BEAM {RSM_CONFIG.beamK} · HORIZON {RSM_CONFIG.horizon} · EDGES {rsm.edges.length}<br />
+            BEST {rsm.bestScore.toFixed(4)} · 2ND {rsm.secondScore.toFixed(4)} · PATH {rsm.bestPath.length}<br />
+            MARGIN {rsm.certificate.margin.toFixed(4)} · {rsm.certificate.verified ? 'CERT VERIFIED' : 'CERT NOT VERIFIED'}<br />
+            {rsm.resultHash.slice(0, 40)}…
+          </div>
+        ) : (
+          <div style={{ color: '#7d93ad', fontSize: 10 }}>RSM: —</div>
+        )}
         <div style={{ marginTop: 'auto', color: '#7d93ad', fontSize: 9, letterSpacing: 2 }}>DATA: SYNTHETIC / SCENARIO · PROPOSE-ONLY · DUAL-CONTROL</div>
       </div>
     </div>

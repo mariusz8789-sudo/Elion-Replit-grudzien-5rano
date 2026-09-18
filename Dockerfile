@@ -37,7 +37,9 @@ COPY --from=build /app/packages/frontend/dist packages/frontend/dist
 # Katalog musi należeć do użytkownika `node`, bo proces nie jest rootem.
 ENV GENESIS_DB_PATH=/data/genesis.db
 RUN mkdir -p /data && chown -R node:node /data
-
+# Railway mounts its volume at the path set in the service config; this VOLUME keeps the durability
+# contract (P0.2) explicit for every other container runtime and for the dbDurability test.
+VOLUME ["/data"]
 
 # Proces bez roota
 USER node

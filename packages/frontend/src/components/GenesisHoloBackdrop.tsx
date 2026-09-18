@@ -7,6 +7,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { isSuppressed } from './MatrixDataStream';
 import { pushHoloPoint } from '../core/holoTelemetry';
+import { buildMatrixStage, isMatrixRoute, type MatrixStage } from './holo/MatrixStage';
 
 /**
  * GENESIS HOLO BACKDROP — the full-bleed world behind the whole shell.
@@ -291,6 +292,29 @@ export function mountHoloBackdrop(
     composer.addPass(track(new OutputPass()));
   }
 
+  // --- the Matrix stage (#/matrix): built on first visit, its own bloom ---
+  let matrix: MatrixStage | null = null;
+  let matrixComposer: EffectComposer | null = null;
+  let matrixBloom: UnrealBloomPass | null = null;
+  let matrixPass: RenderPass | null = null;
+  const ensureMatrix = (): MatrixStage => {
+    if (matrix) return matrix;
+    matrix = buildMatrixStage(renderer, doc, mulberry32((options.seed ?? 0x47454e45) ^ 0x4d415458), lowPower);
+    matrix.layout(Math.max(1, win.innerWidth), Math.max(1, win.innerHeight));
+    if (!lowPower) {
+      matrixComposer = new EffectComposer(renderer);
+      matrixComposer.setPixelRatio(dpr);
+      matrixPass = new RenderPass(matrix.scene, matrix.camera);
+      matrixComposer.addPass(matrixPass);
+      matrixBloom = new UnrealBloomPass(new THREE.Vector2(Math.max(1, win.innerWidth), Math.max(1, win.innerHeight)), 0.8, 0.5, 0.62);
+      matrixComposer.addPass(matrixBloom);
+      matrixComposer.addPass(new ShaderPass(ABERRATION_SHADER));
+      matrixComposer.addPass(new OutputPass());
+      matrixComposer.setSize(Math.max(1, win.innerWidth), Math.max(1, win.innerHeight));
+    }
+    return matrix;
+  };
+
   // --- loop, guarded by shouldAnimate ---------------------------------------
   const motionQuery = win.matchMedia?.('(prefers-reduced-motion: reduce)');
   let raf = 0;
@@ -321,6 +345,9 @@ export function mountHoloBackdrop(
     composer?.setSize(width, height);
     bloom?.setSize(width, height);
     portalTarget.setSize(Math.max(2, Math.floor(width * dpr * fboScale)), Math.max(2, Math.floor(height * dpr * fboScale)));
+    matrix?.layout(width, height);
+    matrixComposer?.setSize(width, height);
+    matrixBloom?.setSize(width, height);
   };
 
   const frame = (now: number): void => {
@@ -330,6 +357,19 @@ export function mountHoloBackdrop(
     const dt = last === 0 ? 1 / 60 : Math.min(0.05, (now - last) / 1000);
     last = now;
     const t = now * 0.001;
+    if (isMatrixRoute(win.location.hash)) {
+      const stage = ensureMatrix();
+      parallaxX += (pointerX * 0.6 - parallaxX) * 0.04;
+      parallaxY += (pointerY * 0.35 - parallaxY) * 0.04;
+      stage.update(t, dt, parallaxX, parallaxY);
+      if (now - lastSample >= SAMPLE_MS) {
+        lastSample = now;
+        pushHoloPoint({ x: stage.camera.position.x, y: stage.camera.position.y, z: stage.camera.position.z, temporalT: t, hyperspaceW: 1 });
+      }
+      renderer.setRenderTarget(null);
+      if (matrixComposer) matrixComposer.render(); else renderer.render(stage.scene, stage.camera);
+      return;
+    }
     portalMaterial.uniforms.uTime.value = t;
     skyMaterial.uniforms.uTime.value = t;
 
@@ -402,6 +442,9 @@ export function mountHoloBackdrop(
     doc.removeEventListener('visibilitychange', onVisibility);
     motionQuery?.removeEventListener?.('change', onMotionChange);
     for (const d of disposables) d.dispose();
+    matrix?.dispose();
+    matrixComposer?.dispose();
+    matrixBloom?.dispose();
     worldA.clear(); worldB.clear(); skyScene.clear();
     renderer.setRenderTarget(null);
     renderer.dispose();

@@ -204,3 +204,14 @@ Cztery równoległe strumienie (native, quantum, powłoka 2040, ekrany 2040), po
 | Pakiet „Gemini" (9 silników + 2 specy Playwright) | — | odrzucony / zmapowany (sekcja 5.1) | pliki już istnieją w bogatszych wersjach; specy zmapowane na `scripts/city-hud-e2e.mjs` |
 
 Uczciwe ograniczenia trybu HUD: pełnoekranowy render z post-processingiem kosztuje GPU — na telefonach kompozytor jest wyłączony, FBO ma połowę rozdzielczości, a pętla staje przy ukrytej karcie, `prefers-reduced-motion` i na ciężkich trasach 3D (miasto, laboratorium, molekuła). Zrzuty w tej sesji pochodzą z programowego renderera (SwiftShader), więc na realnym GPU obraz jest ostrzejszy, nie gorszy.
+
+## 10. Audyt przeddeployowy (18.09, przedpołudnie) — checklista właściciela
+
+| Punkt | Stan faktyczny | Dowód |
+|---|---|---|
+| 1. Silniki 5D + telemetria bez stałych | Wdrożone we własnej implementacji (sekcja 9): geometria dyskretna w R⁵, SDF na CPU = shader, provenance SHA-256, telemetria z `os`. Dostarczone szkice z „64 wątki / 16384 MB / SECURE_OPTIMAL" odrzucone. | `POST /api/manifold/evaluate` → `GEOMETRIC_MODEL`, `GET /api/system/telemetry` → `MEASURED`; testy core 11, backend 5 |
+| 2. `/` i `/matrix` = pełnoekranowy WebGL + bezramkowy HUD | `/`: portal FBO między dwoma światami, ACES, bloom, aberracja; `/matrix`: scena kinowa (deszcz glifów z atlasu, lustrzana podłoga Reflector, 5 platform z emisyjnymi pierścieniami, 5 chromowanych postaci, kolumny słów GENESIS·EVIDENCE·TRUTH·ABSENCE·A BETTER TOMORROW), jedna kolumna HUD po prawej, zero kart w centrum. Dawna mapa systemu → `#/matrix-map`. | zrzuty `genesis-matrix-stage.png`, `genesis-root-hud.png`; test `matrixStageView` (brak `.matrix-card`) |
+| 3. Tor A / Tor B | Żaden plik `core/orchestrator`, `biotechData`, `agent`, `audit` nie importuje `solvers/speculative`, `engine/quantum`, `engine/manifold`, `supreme`, `genesis9d`; backend: speculative wymaga `allowUnphysicalSandbox: true`, quantum = `MODEL_ESTIMATE`, manifold = `GEOMETRIC_MODEL`; Winner Gate/prereg nietknięte przez Manusa (0 commitów). | grep grafu importów (sekcja 10, ten audyt); `audit:verify` VERIFIED |
+| 4. Testy + zrzuty | patrz sekcja 7 (kolumna po pakiecie nocnym) + wyniki po scenie Matrix poniżej | — |
+
+CI GitHub: job `verify` był czerwony lub anulowany na KAŻDYM uruchomieniu od 16.09 (brak RDKit na runnerze → 19 testów backendu; limit 10 min → anulowanie). Naprawa: `requirements-rdkit.txt` + instalacja w jobie, limit 30 min. Run 2227 na `main` (`2f43c556`): **success**.

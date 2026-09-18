@@ -891,3 +891,48 @@ h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-
 }
 .matrix-graph-svg { background: transparent !important; }
 .matrix-card, .matrix-detail-panel { border-radius: 4px !important; }
+/* On #/matrix the world IS the page: the hub becomes a right-hand HUD column
+   so the stage (figures, platforms, word columns) stays in the open. */
+@media (min-width: 1100px) {
+  .matrix-hub { margin-left: auto !important; max-width: 44rem !important; }
+}
+.matrix-hub .matrix-hub-grid-section, .matrix-hub .matrix-focus-card, .matrix-hub .matrix-ask-bar { background: rgba(3, 10, 6, 0.42) !important; }
+@media (min-width: 1100px) {
+  /* Inside the narrow HUD column every hub grid stacks; nothing overlaps. */
+  .matrix-hub [class*="grid"], .matrix-hub [class*="columns"], .matrix-hub [class*="layout"], .matrix-hub [class*="loop"] { grid-template-columns: 1fr !important; }
+  .matrix-hub [class*="loop"] { flex-direction: column !important; }
+}
+
+/* =====================================================================
+   10 · MATRIX STAGE (#/matrix) — the world is the page
+   ===================================================================== */
+.app-matrix-stage { background: transparent !important; }
+.matrix-stage { position: relative; min-height: 100%; height: 100%; pointer-events: none; }
+.matrix-stage-hud {
+  position: absolute; top: 1.4rem; right: 1.4rem; bottom: 1.4rem; width: min(24rem, 42vw);
+  display: flex; flex-direction: column; gap: 1rem; padding: 1.2rem 1.3rem;
+  pointer-events: auto;
+  background: transparent; border: none; border-left: 1px solid rgba(98, 240, 163, 0.28);
+  color: #d8ffe8; font-family: var(--font-mono);
+  mix-blend-mode: screen;
+}
+.matrix-stage-eyebrow { font-size: 0.62rem; letter-spacing: 0.3em; color: #62f0a3; }
+.matrix-stage-title { margin: 0; font-family: var(--font-body); font-size: 2.4rem; font-weight: 700; letter-spacing: 0.02em; color: #eafff2; text-shadow: none; }
+.matrix-stage-readout { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.35rem 0.6rem; margin: 0; font-size: 0.66rem; line-height: 1.5; }
+.matrix-stage-readout dt { color: #62f0a3; letter-spacing: 0.14em; }
+.matrix-stage-readout dd { margin: 0; color: #cdeedd; }
+.matrix-stage-legend { list-style: none; margin: 0; padding: 0.6rem 0 0; border-top: 1px solid rgba(98, 240, 163, 0.2); display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; font-size: 0.62rem; letter-spacing: 0.22em; color: #9fffc8; }
+.matrix-stage-controls { margin-top: auto; display: grid; gap: 0.45rem; }
+.matrix-stage-btn {
+  background: transparent !important; border: 1px solid rgba(98, 240, 163, 0.45) !important; color: #d8ffe8 !important;
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-align: left; padding: 0.55rem 0.8rem; border-radius: 2px !important;
+  box-shadow: none !important; cursor: pointer;
+}
+.matrix-stage-btn:hover { background: rgba(98, 240, 163, 0.12) !important; border-color: #62f0a3 !important; }
+/* On the stage the scrim opens up: the left 60% is the unobstructed world. */
+.route-matrix .hud-scrim { background: linear-gradient(90deg, rgba(0, 8, 4, 0.3) 0, transparent 22%, transparent 58%, rgba(0, 8, 4, 0.55) 100%); }
+.route-matrix .shell-sidebar { background: rgba(0, 6, 3, 0.42) !important; }
+.route-matrix .matrix-datastream { opacity: 0.25; }
+@media (max-width: 720px) {
+  .matrix-stage-hud { position: static; width: auto; margin: 0.8rem; border-left: none; border-top: 1px solid rgba(98, 240, 163, 0.28); mix-blend-mode: normal; background: rgba(0, 8, 4, 0.55); }
+}

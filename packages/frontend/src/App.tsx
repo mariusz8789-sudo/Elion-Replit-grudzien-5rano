@@ -79,6 +79,7 @@ const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/Precisi
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
+const MatrixStageView = lazy(() => import('./components/MatrixStageView').then((m) => ({ default: m.MatrixStageView })));
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
@@ -158,6 +159,7 @@ type Route =
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
+  | { kind: 'matrix-map' }
   | { kind: 'cyber' }
   | { kind: 'decipherment' }
   | { kind: 'myths-theories' };
@@ -219,6 +221,7 @@ function parseHash(): Route {
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
+  if (h === '#/matrix-map') return { kind: 'matrix-map' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
@@ -665,9 +668,21 @@ export default function App() {
     }
 
     if (route.kind === 'matrix') {
+      // The clean stage: the full-bleed WebGL world is the page; one HUD column, no cards.
+      return (
+        <div className="app app-matrix-stage">
+          <HeavyRoute>
+            <MatrixStageView />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'matrix-map') {
       return (
         <div className="app">
-          <TopBar title="◈ Genesis Matrix" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="◈ Genesis Matrix — mapa systemu" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <GenesisMatrixHub />
           </HeavyRoute>

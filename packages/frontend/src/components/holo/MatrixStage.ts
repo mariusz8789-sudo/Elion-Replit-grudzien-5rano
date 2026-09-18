@@ -25,7 +25,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
  */
 
 export function isMatrixRoute(hash: string): boolean {
-  return /^#\/matrix(?:\?|$)/.test(hash || '#/');
+  return /^#\/matrix-stage(?:\?|$)/.test(hash || '#/');
 }
 
 export interface MatrixStage {

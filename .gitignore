@@ -38,3 +38,8 @@ __pycache__/
 packages/frontend/public/audio/*.mp3
 packages/frontend/public/audio/manifest.json
 packages/frontend/public/audio/lines.json
+
+# Playwright: Mythos Matrix HUD screenshots (scripts/capture-matrix-screenshots.mjs, matrix.e2e.spec.ts) and runner output
+artifacts/matrix-*.png
+test-results/
+playwright-report/

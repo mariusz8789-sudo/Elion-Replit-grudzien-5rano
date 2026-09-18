@@ -43,7 +43,7 @@ import { kindsOf } from './GenesisMatrixHub';
 export const SUPPRESSED_ROUTES: readonly string[] = [
   '#/city3d', '#/city', '#/scientific-city', '#/genesis-world', '#/first-person-lab', '#/lab-3d',
   '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo', '#/discovery-hall',
-  '#/hf-slice', '#/reality', '#/prebuild', '#/timeline',
+  '#/hf-slice', '#/reality', '#/prebuild', '#/timeline', '#/matrix',
 ];
 
 export function isSuppressed(hash: string): boolean {

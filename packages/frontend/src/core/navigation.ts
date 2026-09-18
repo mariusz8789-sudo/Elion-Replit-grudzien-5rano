@@ -78,7 +78,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  */
 export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'tour', label: 'Genesis Tour — przewodnik głosowy', icon: '▶', hash: '#/tour' },
-  { id: 'matrix', label: 'Matrix — scena', icon: '◈', hash: '#/matrix' },
+  { id: 'matrix', label: 'Matrix — HUD', icon: '◈', hash: '#/matrix' },
+  { id: 'matrix-stage', label: 'Matrix — scena 3D', icon: '◈', hash: '#/matrix-stage' },
   { id: 'matrix-map', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix-map' },
   { id: 'world', label: 'World Engine', icon: '🌍', hash: '#/genesis-world' },
   { id: 'simulation', label: 'Generator symulacji', icon: '🔭', hash: '#/generate' },

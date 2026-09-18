@@ -8,6 +8,7 @@ import {
 import { EPISTEMIC_LABELS, type EpistemicStatus } from '../core/generator/recipe';
 import type { KnowledgeEpistemicStatus } from '../core/knowledge/supplementalRegistry';
 import type { BiotechEpistemicStatus } from '../core/biotechDiscoveryContract';
+import { FRONTEND_SRC } from './fixtures/repoPaths';
 
 const ALL_KNOWLEDGE_STATUSES: readonly KnowledgeEpistemicStatus[] = [
   'FACT', 'MODEL', 'THEORY', 'HYPOTHESIS', 'SCENARIO_ASSUMPTION', 'FICTIONAL_REFERENCE',
@@ -96,7 +97,7 @@ describe('G6 canonical epistemic reliability dictionary (P1)', () => {
 
 describe('G6: the four orthogonal axes stay untouched — zero breaking of saved data', () => {
   it('this module never imports the four orthogonal-axis types (HypothesisAssessment / terminalStatus / DataProvenance / scienceMemory) — doc-comment mentions are fine, a real import is not', () => {
-    const source = readFileSync(join(process.cwd(), 'packages/frontend/src', 'core', 'epistemicReliability.ts'), 'utf8');
+    const source = readFileSync(join(FRONTEND_SRC, 'core', 'epistemicReliability.ts'), 'utf8');
     const importLines = source.split('\n').filter((line) => /^\s*import\b/.test(line)).join('\n');
     expect(importLines).not.toMatch(/HypothesisAssessment/);
     expect(importLines).not.toMatch(/DataProvenance/);
@@ -105,7 +106,7 @@ describe('G6: the four orthogonal axes stay untouched — zero breaking of saved
   });
 
   it('scienceMemory.ts is untouched by this consolidation: SavedExperimentEpistemicStatus still unions all six original vocabularies verbatim', () => {
-    const source = readFileSync(join(process.cwd(), 'packages/frontend/src', 'core', 'scienceMemory.ts'), 'utf8');
+    const source = readFileSync(join(FRONTEND_SRC, 'core', 'scienceMemory.ts'), 'utf8');
     expect(source).toContain('export type SavedExperimentEpistemicStatus =');
     expect(source).toContain('| KnowledgeEpistemicStatus');
     expect(source).toContain('| HypothesisAssessment');

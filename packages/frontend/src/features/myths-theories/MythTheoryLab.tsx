@@ -70,7 +70,7 @@ export function MythTheoryLab() {
     let source: RunRecord['source'] = 'offline-preview';
     let result = localPreview(selected, params[selected]);
     try {
-      const response = await fetch('/api/speculative/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(900) });
+      const response = await fetch('/api/speculative/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(4000) });
       if (response.ok) { const remote = await response.json() as Partial<RunRecord>; result = { warnings: remote.warnings ?? result.warnings, summary: remote.summary ?? result.summary }; source = 'backend'; }
     } catch { /* The UI remains honest and usable when the optional backend route is unavailable. */ }
     const canonical = JSON.stringify({ payload, result, source });

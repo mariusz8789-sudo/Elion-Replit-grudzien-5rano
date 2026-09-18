@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { runScientificDiscovery } from '../core/orchestrator/orchestrator';
 import { parseProblem } from '../core/orchestrator/nl';
@@ -175,6 +175,14 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
       setReplayBusy(false);
     }
   };
+
+  // D-119/D-121: the guide compares result IDENTITY to detect a new run. Rebuilding this object on
+  // every render (replay starting, ledger updating) looked like a new run and threw the tour back to
+  // CANDIDATES — so it is built only when one of its real inputs changes.
+  const guideResult = useMemo<RunResult | ExecutionBlockedResult | null>(
+    () => (blocked ?? run === null ? blocked : ({ kind: 'RUN', ...run, detail, winnerRecord, evidenceCustody: custody } as unknown as RunResult)),
+    [blocked, run, detail, winnerRecord, custody],
+  );
 
   // D-117: the custody node of the provenance graph — the real custody gate result when the
   // console has one, else the record's own custody block; null (drawn as "not recorded") otherwise.
@@ -404,7 +412,7 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
         <GuidedDiscovery
           key={guideMode}
           autoplay={guideMode}
-          result={blocked ?? run === null ? blocked : ({ kind: 'RUN', ...run, detail, winnerRecord, evidenceCustody: custody } as unknown as RunResult)}
+          result={guideResult}
           running={busy}
           replay={replay}
           replayBusy={replayBusy}

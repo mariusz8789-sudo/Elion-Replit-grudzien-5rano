@@ -58,6 +58,7 @@ import {
 } from '../core/discovery/molecular/precisionReferenceAnalysis';
 import { createNodeRdkitTransport } from '../core/discovery/molecular/rdkitTransport.node';
 import { TemporalBranchRegistry, TemporalEngine } from '../core/worldModel/temporal/temporalEngine';
+import { REPO_ROOT } from './fixtures/repoPaths';
 
 /**
  * ONE INTERFACE OVER FIVE REAL SELECTORS.
@@ -203,7 +204,6 @@ describe('The campaign adapter matches the REAL backend selector, not just a sta
   // asserted across a package boundary.
   // Resolved from the working directory rather than written as a bundler-visible
   // relative specifier: the point is that this path is never part of the build graph.
-  const REPO_ROOT = process.env.INIT_CWD ?? path.resolve(process.cwd(), '../..');
   const BACKEND_SELECTOR = pathToFileURL(
     path.resolve(REPO_ROOT, 'packages/backend/src/campaign/nextExperiment.mjs'),
   ).href;

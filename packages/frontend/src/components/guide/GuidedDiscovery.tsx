@@ -71,7 +71,10 @@ export function GuidedDiscovery(p: GuidedDiscoveryProps): React.ReactElement | n
     if (session.state === 'IDLE') { lastResult.current = p.result; return; }
     if (p.running && !wasRunning.current) { wasRunning.current = true; dispatch({ type: 'RUN_STARTED' }); return; }
     if (p.running) return;
-    const arrived = p.result !== null && p.result !== lastResult.current;
+    // A new result only means "the run finished" while the guide is waiting for one (ASK / RUNNING);
+    // later in the path the console re-rendering with a rebuilt result is not a new run.
+    const waiting = session.state === 'ASK' || session.state === 'RUNNING';
+    const arrived = waiting && p.result !== null && p.result !== lastResult.current;
     if (wasRunning.current || arrived) {
       wasRunning.current = false;
       lastResult.current = p.result;

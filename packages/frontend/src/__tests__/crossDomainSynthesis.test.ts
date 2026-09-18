@@ -7,6 +7,7 @@ import {
 import type { SavedExperiment } from '../core/scienceMemory';
 import type { CyberInvestigationResult } from '../core/agent/cyberInvestigation';
 import type { DeciphermentCaseResult } from '../core/agent/decipherment/deciphermentTypes';
+import { FRONTEND_SRC } from './fixtures/repoPaths';
 
 /**
  * CROSS-DOMAIN NEXT QUESTION — the master gap plan's P1.3, proven two ways:
@@ -541,7 +542,7 @@ describe('the discoveryLoop shape has a real production writer, not only test ca
         if (readFileSync(full, 'utf8').includes('saveScientificDiscoveryLoopToMemory')) callers.push(full);
       }
     };
-    walk(join(process.cwd(), 'packages/frontend/src'));
+    walk(FRONTEND_SRC);
 
     expect(callers.length).toBeGreaterThan(0);
     // A component, not another core module quietly re-exporting it.

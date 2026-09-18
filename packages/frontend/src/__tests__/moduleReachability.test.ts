@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { FRONTEND_SRC } from './fixtures/repoPaths';
 
 /**
  * MODULE REACHABILITY — is every module this repo contains actually reachable
@@ -28,7 +29,7 @@ import { dirname, join, relative, resolve } from 'node:path';
  * written down; silence is not.
  */
 
-const SRC = resolve(process.cwd(), 'packages/frontend/src');
+const SRC = FRONTEND_SRC;
 
 function allSourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

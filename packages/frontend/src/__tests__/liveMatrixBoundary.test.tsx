@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import LiveMatrixBackground from '../components/liveMatrix/LiveMatrixBackground';
+import { FRONTEND_SRC } from './fixtures/repoPaths';
 
 /**
  * LIVE MATRIX — the two claims that are about the component's PLACE in the
@@ -19,7 +20,7 @@ import LiveMatrixBackground from '../components/liveMatrix/LiveMatrixBackground'
  * whole reason it was extracted out of the component.
  */
 
-const COMPONENT_DIR = join(process.cwd(), 'packages/frontend/src', 'components', 'liveMatrix');
+const COMPONENT_DIR = join(FRONTEND_SRC, 'components', 'liveMatrix');
 
 function readOrNull(file: string): string | null {
   try { return readFileSync(file, 'utf8'); } catch { return null; }
@@ -95,7 +96,7 @@ describe('the component is standalone — the dependency arrow points one way', 
         const specifier = match[1]!;
         const isReact = specifier === 'react' || specifier.startsWith('react/') || specifier.startsWith('react-dom');
         const isSibling = specifier.startsWith('./');
-        if (!isReact && !isSibling) offenders.push(`${file.replace(process.cwd(), '')} -> ${specifier}`);
+        if (!isReact && !isSibling) offenders.push(`${file.replace(FRONTEND_SRC, '')} -> ${specifier}`);
       }
     }
     expect(offenders).toEqual([]);
@@ -117,7 +118,7 @@ describe('the component is standalone — the dependency arrow points one way', 
    * translation `genesisVisualState.ts` exists to own exclusively.
    */
   it('the app wires the component only through the genesisVisualState adapter, never around it', () => {
-    const appFiles = [join(process.cwd(), 'packages/frontend/src', 'App.tsx'), join(process.cwd(), 'packages/frontend/src', 'main.tsx')];
+    const appFiles = [join(FRONTEND_SRC, 'App.tsx'), join(FRONTEND_SRC, 'main.tsx')];
     let mountedSomewhere = false;
     for (const file of appFiles) {
       const raw = readOrNull(file);
@@ -143,7 +144,7 @@ describe('the component is standalone — the dependency arrow points one way', 
    * mount would silently throw that third of the screen away again.
    */
   it('heavy-3D routes tier the background down to LOW quality rather than unmounting it', () => {
-    const app = readOrNull(join(process.cwd(), 'packages/frontend/src', 'App.tsx'));
+    const app = readOrNull(join(FRONTEND_SRC, 'App.tsx'));
     expect(app).not.toBeNull();
     expect(app!).toMatch(/quality=\{[^}]*\?\s*'LOW'\s*:\s*'HIGH'\}/);
     // No conditional-render guard wrapping the background any more.

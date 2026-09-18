@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { REPO_ROOT } from './fixtures/repoPaths';
 import { describe, expect, it } from 'vitest';
 import {
   runAutonomousDiscovery,
@@ -264,7 +265,6 @@ describe('Every step is traceable and the run is replayable', () => {
 });
 
 describe('The trace persists through the real AgentRun tables', () => {
-  const REPO_ROOT = process.env.INIT_CWD ?? path.resolve(process.cwd(), '../..');
   it('stores and reads back every step, unchanged', async () => {
     const storeUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/store.mjs')).href;
     const agentRunUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/agentRun.mjs')).href;

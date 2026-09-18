@@ -9716,3 +9716,9 @@ proves.
 **Why.** The internal fingerprints prove reproducibility to Genesis itself; an auditor, investor or scientist outside the app needs a digest they can recompute with any SHA-256 tool and a chain that makes retroactive edits to a verdict visible.
 
 **What did not change.** Preregistration, thresholds, weights, evidence rules, the Winner Gate, the fingerprint system, the four previously committed artifacts (byte-identical after re-emit). The module never decides anything scientific; a NO_WINNER is sealed as NO_WINNER.
+
+## D-122 — Staged Qwen packages on this branch: tested and linted, kept out of the product until each earns a route (no scientific change)
+
+**Decision.** Commits `009f219c…8d03d9cf` (another session) added `packages/core` and `packages/ui` as source-only trees (no workspace, no tsconfig), the Myth & Theory lab, the speculative solver sandbox (`/api/speculative/run`, refuses without `allowUnphysicalSandbox: true`), staged city-disaster adapters and a knowledge vertical slice. This audit (`docs/GENESIS_STATE_AUDIT_2026-09-18.md`) keeps them as **staged proposals**: their 26 test files now run in CI (`npm run test:core`, `vitest.core.config.ts`), lint is clean, the frontend suite is cwd-independent again (`__tests__/fixtures/repoPaths.ts`), the speculative bundle is reproducible (`npm run compute:bundle:speculative`). Nothing in `supreme/`, `advanced/`, `genesis9d/`, `quantum-lab/`, `molecular-engine/` or `packages/ui` is imported by the product, and none of it may be until it has a route, a real data source or model, and the same epistemic labels as every other world. Preregistration, thresholds, Winner Gate, fingerprints and the D-121 seal chain are untouched (`npm run audit:verify` VERIFIED).
+
+**Why.** Code that tests only itself is not a capability; a route that shows a labelled sandbox (Mity i Teorie) is. The owner decides per package whether it becomes a world, stays a proposal, or is removed.

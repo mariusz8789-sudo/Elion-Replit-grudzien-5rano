@@ -8,7 +8,7 @@ import type { SandboxContext, EcsWorld } from './speculativeTypes.js';
 const clock = { t: 1000, now() { return this.t; } };
 const ctxOn = (seed = 7): SandboxContext => ({ allowUnphysicalSandbox: true, dt: 0.1, seed, clock });
 const ctxOff = (seed = 7): SandboxContext => ({ allowUnphysicalSandbox: false, dt: 0.1, seed, clock });
-const miniEcs = (): EcsWorld & { count: number } => { let n = 0; const comps = new Map<string, unknown>(); return { count: 0, createEntity: () => ++n, setComponent: (e: number, name: string, d: unknown) => { comps.set(e + ':' + name, d); }, getComponent: <T>(e: number, name: string) => comps.get(e + ':' + name) as T | undefined }; };
+const _miniEcs = (): EcsWorld & { count: number } => { let n = 0; const comps = new Map<string, unknown>(); return { count: 0, createEntity: () => ++n, setComponent: (e: number, name: string, d: unknown) => { comps.set(e + ':' + name, d); }, getComponent: <T>(e: number, name: string) => comps.get(e + ':' + name) as T | undefined }; };
 describe('registry gating & tag integrity', () => {
   it('refuses execution when allowUnphysicalSandbox=false and writes no ledger', () => {
     const r = new SpeculativeSolverRegistry(); r.register(new WarpMetricSolver());
@@ -53,7 +53,7 @@ describe('warp metric solver', () => {
   const p = { R: 1, sigma: 2, vS: 0.6, pathLength: 10 };
   it('always flags NEGATIVE_ENERGY_REQUIRED; properTime <= coordinateTime', () => {
     const r = new SpeculativeSolverRegistry(); r.register(new WarpMetricSolver());
-    let res = r.run('warp-metric', p, ctxOn());
+    const res = r.run('warp-metric', p, ctxOn());
     expect(res.warnings).toContain('NEGATIVE_ENERGY_REQUIRED');
     const st = res.state as unknown as { properTime: number; coordinateTime: number };
     expect(st.properTime).toBeLessThanOrEqual(st.coordinateTime + 1e-12);

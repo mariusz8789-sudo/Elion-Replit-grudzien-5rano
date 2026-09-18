@@ -6,5 +6,5 @@ const path = process.argv[2];
 if (!path) { console.error('usage: verifyContainer.cli.ts <bundle.zip>'); process.exit(2); }
 const bytes = new Uint8Array(readFileSync(path));
 const res = verifyContainerOffline(bytes);
-console.log(JSON.stringify(res, null, 2));
+process.stdout.write(JSON.stringify(res, null, 2) + "\n");
 process.exit(res.ok ? 0 : 1);

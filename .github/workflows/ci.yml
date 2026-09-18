@@ -57,6 +57,9 @@ jobs:
           GENESIS_CERN_OPEN_DATA_DIR: ${{ github.workspace }}/packages/backend/src/compute/cms-zmumu
         run: npm run test --workspace=packages/backend
 
+      - name: Testy packages/core + packages/ui (source-only pakiety, vitest.core.config.ts)
+        run: npm run test:core
+
       - name: Typecheck frontend
         run: npm exec --workspace=packages/frontend -- tsc --noEmit
 

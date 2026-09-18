@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- esbuild bundle of packages/core/src/solvers/speculative; regenerate, do not edit */
 // packages/core/src/expansionHash.ts
 import { createHash } from "node:crypto";
 var stableStringify = (v) => {

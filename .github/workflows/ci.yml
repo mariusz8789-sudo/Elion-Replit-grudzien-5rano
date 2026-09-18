@@ -11,7 +11,10 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Frontend tests alone take ~8 min on a single worker; with the RDKit install,
+    # backend, core, typecheck and build the job needs more than the old 10 min
+    # (every run since 2026-09-16 that did not fail was cancelled at that limit).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:

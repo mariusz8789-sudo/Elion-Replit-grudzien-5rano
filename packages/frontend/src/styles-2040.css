@@ -741,3 +741,129 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   --glass-border: rgba(230, 234, 245, 0.45);
   --text-dim: #d5dbec;
 }
+
+/* =====================================================================
+   9 · HUD MODE — the world is the viewport, the UI floats over it
+   ---------------------------------------------------------------------
+   The owner's rule for the 2040 shell: no flat dark boxes, no fake CSS
+   neon, no padding or borders around the 3D layer. The WebGL backdrop
+   (GenesisHoloBackdrop: FBO portal, ACES, bloom, chromatic aberration)
+   runs edge to edge at 100vw × 100vh; everything above it is a borderless
+   vector HUD: hairlines, corner ticks, mono telemetry, clean type. Light
+   comes from the renderer's bloom, not from box-shadows.
+   ===================================================================== */
+:root {
+  --glow-cyan: 0 0 0 0 transparent;
+  --glow-violet: 0 0 0 0 transparent;
+  --glow-green: 0 0 0 0 transparent;
+  --glass: rgba(5, 8, 16, 0.22);
+  --glass-strong: rgba(5, 8, 16, 0.34);
+  --glass-border: rgba(160, 196, 255, 0.14);
+  --hud-line: rgba(142, 232, 245, 0.28);
+  --hud-line-soft: rgba(142, 232, 245, 0.12);
+}
+/* The CSS atmosphere (aurora blobs, grid floor, scanline film) is replaced by
+   the real renderer. */
+body::before, body::after, html::after { display: none !important; }
+html { background: #05070f; }
+
+/* Full-bleed canvas: no mask, no dimming, no margins. */
+.holo-backdrop {
+  z-index: -2;
+  opacity: 1;
+  -webkit-mask-image: none; mask-image: none;
+}
+/* The scrim keeps text ≥ 4.5:1 without boxing it: darker where the sidebar
+   and the copy live, open where the world should breathe. */
+.hud-scrim {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(5, 7, 15, 0.88) 0, rgba(5, 7, 15, 0.74) 22%, rgba(5, 7, 15, 0.46) 48%, rgba(5, 7, 15, 0.2) 72%, rgba(5, 7, 15, 0.5) 100%),
+    linear-gradient(180deg, rgba(5, 7, 15, 0.6) 0, rgba(5, 7, 15, 0.1) 26%, rgba(5, 7, 15, 0.1) 68%, rgba(5, 7, 15, 0.7) 100%);
+}
+.matrix-datastream { opacity: 0.5; }
+
+/* Shell chrome: transparent, hairlines only. */
+.shell-sidebar, .topbar, .shell-mobilebar, .shell-sheet {
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+.shell-sidebar { border-right: 1px solid var(--hud-line-soft) !important; }
+.topbar { margin: 0 !important; border-radius: 0 !important; border-bottom: 1px solid var(--hud-line-soft) !important; }
+.topbar::before, .topbar::after { display: none !important; }
+.shell-mobilebar { border-top: 1px solid var(--hud-line-soft) !important; background: rgba(5, 7, 15, 0.7) !important; }
+.shell-hud { background: transparent; border: 1px solid var(--hud-line-soft); box-shadow: none; }
+.shell-nav-item.active { background: transparent !important; box-shadow: none !important; border-left: 1px solid var(--cyan); }
+.shell-nav-item:hover { background: rgba(142, 232, 245, 0.05) !important; }
+
+/* Panels: no dark slab, no blur, no glow — a hairline top rule + corner ticks. */
+.settings-section, .dash-card, .dash-tile, .gx-panel, .gx-glass, .pilot-step,
+.matrix-card, .matrix-detail-panel, .gu-recipe, .gu-replay-col, .gu-cspace-row,
+.hall-card, .lab-card, .narrator, .research-panel, .science-chat-panel, .world-card, .start-card,
+.hero-card, .evidence-capsule, .console-panel, .control-panel, .panel,
+.start-door, .start-ask, .science-chat, .next-move-panel, .science-chat-suggest > *, .start-status {
+  background: var(--glass) !important;
+  -webkit-backdrop-filter: blur(6px) !important; backdrop-filter: blur(6px) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--hud-line-soft) !important;
+  border-radius: 4px !important;
+}
+.settings-section::before, .dash-card::before, .dash-tile::before, .gx-panel::before, .gx-glass::before, .pilot-step::before,
+.matrix-card::before, .matrix-detail-panel::before, .gu-recipe::before, .gu-replay-col::before, .gu-cspace-row::before { display: none !important; }
+.settings-section:hover, .dash-card:hover, .dash-tile:hover, .gx-panel:hover, .world-card:hover, .start-card:hover, .start-door:hover {
+  transform: none !important; box-shadow: none !important; border-color: var(--hud-line) !important;
+}
+/* Corner ticks — thin, vector, no blur. */
+.settings-section::after, .gx-panel::after, .dash-card::after, .gu-recipe::after, .matrix-detail-panel::after {
+  opacity: 1 !important;
+  background:
+    linear-gradient(var(--hud-line), var(--hud-line)) top left / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) top left / 1px 12px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) top right / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) top right / 1px 12px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom left / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom left / 1px 12px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom right / 12px 1px no-repeat,
+    linear-gradient(var(--hud-line), var(--hud-line)) bottom right / 1px 12px no-repeat !important;
+}
+
+/* Controls: flat vector — hairline, no gradient slab, no glow. */
+.chip-btn.primary, .dash-btn-primary, .gx-btn.primary, .primary-btn, .dash-ask-send, .topbar-ask-send {
+  background: rgba(142, 232, 245, 0.12) !important;
+  border: 1px solid var(--cyan) !important;
+  color: var(--cyan) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.chip-btn.primary::after, .dash-btn-primary::after, .gx-btn.primary::after, .primary-btn::after { display: none !important; }
+.chip-btn.primary:hover, .dash-btn-primary:hover, .gx-btn.primary:hover, .primary-btn:hover, .dash-ask-send:hover, .topbar-ask-send:hover {
+  background: rgba(142, 232, 245, 0.22) !important; box-shadow: none !important; transform: none !important;
+}
+button:not(.primary-btn):not(.chip-btn.primary):not(.dash-btn-primary), .chip-btn, .gx-btn, .tab, .dash-btn {
+  box-shadow: none !important;
+}
+input, select, textarea, .topbar-ask { box-shadow: none !important; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .topbar-ask:focus-within {
+  box-shadow: none !important; outline: 1px solid var(--cyan) !important; outline-offset: 2px;
+}
+.shell input[type='range']::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--cyan) !important; background: #05070f !important; }
+.shell input[type='range']::-moz-range-thumb { box-shadow: 0 0 0 1px var(--cyan) !important; background: #05070f !important; }
+
+/* Headings: clean, no glow — the renderer's bloom is the only light source. */
+h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-shadow: none !important; }
+.hero-title, .start-hero h1 { text-shadow: none !important; }
+
+/* Print keeps hiding the world; reduced motion keeps a still frame (the loop
+   stops, the canvas stays). */
+@media (prefers-reduced-motion: reduce) { .holo-backdrop { display: block; } }
+:root.force-reduced-motion .holo-backdrop { display: block; }
+@media (max-width: 720px) {
+  .hud-scrim {
+    background:
+      linear-gradient(180deg, rgba(5, 7, 15, 0.78) 0, rgba(5, 7, 15, 0.6) 30%, rgba(5, 7, 15, 0.6) 70%, rgba(5, 7, 15, 0.85) 100%);
+  }
+}
+.start-door::before, .start-door::after, .start-ask::before, .start-glow { display: none !important; }
+.start-door { box-shadow: none !important; }

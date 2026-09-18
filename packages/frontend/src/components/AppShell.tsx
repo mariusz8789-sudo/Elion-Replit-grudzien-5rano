@@ -200,6 +200,9 @@ export function AppShell({ children, chat, chatInline = false }: {
           <GenesisHoloBackdrop />
         </Suspense>
       </ErrorBoundary>
+      {/* Legibility scrim over the full-bleed world: a gradient, not a box, so
+          the HUD stays borderless while text keeps its contrast. */}
+      <div className="hud-scrim" aria-hidden="true" />
     <div className="shell">
       <aside className="shell-sidebar" aria-label="Nawigacja Genesis">
         <button className="shell-brand" onClick={() => { window.location.hash = ''; }} aria-label="Genesis Physics — Start">

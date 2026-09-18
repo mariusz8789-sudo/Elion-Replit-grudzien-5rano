@@ -867,3 +867,27 @@ h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-
 }
 .start-door::before, .start-door::after, .start-ask::before, .start-glow { display: none !important; }
 .start-door { box-shadow: none !important; }
+
+/* HUD telemetry readout: measured machine state + computed 5D geometry of the
+   backdrop flight path. Mono, hairline-separated, wraps under the route. */
+.shell-hud { flex-wrap: wrap; row-gap: 0.15rem; }
+.shell-hud-telemetry { flex-basis: 100%; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.06em; color: var(--text-dim); white-space: normal; line-height: 1.4; }
+
+/* Matrix hub (#/matrix) in HUD mode: the world stays visible through every
+   panel — the hub's panel tokens become thin glass, cards lose their slabs. */
+.matrix-hub {
+  --mx-panel: rgba(5, 8, 16, 0.22);
+  --mx-panel-raised: rgba(5, 8, 16, 0.3);
+  --mx-panel-sunken: rgba(5, 8, 16, 0.14);
+  --mx-border: var(--hud-line-soft);
+  background: transparent !important;
+}
+.matrix-focus-card, .matrix-ask-bar, .matrix-hub-grid-section, .matrix-graph-wrap, .matrix-loop-column, .matrix-chat-dock, .matrix-activity-feed {
+  background: var(--glass) !important;
+  border: 1px solid var(--hud-line-soft) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: blur(6px) !important; backdrop-filter: blur(6px) !important;
+}
+.matrix-graph-svg { background: transparent !important; }
+.matrix-card, .matrix-detail-panel { border-radius: 4px !important; }

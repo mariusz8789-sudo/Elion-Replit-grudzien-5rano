@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { isSuppressed } from './MatrixDataStream';
+import { pushHoloPoint } from '../core/holoTelemetry';
 
 /**
  * GENESIS HOLO BACKDROP — the full-bleed world behind the whole shell.
@@ -302,6 +303,8 @@ export function mountHoloBackdrop(
   let pointerY = 0;
   const FRAME_MS = lowPower ? 1000 / 30 : 0;
   const START_Z = 8;
+  let lastSample = 0;
+  const SAMPLE_MS = 250;
 
   const state = (): { hidden: boolean; reducedMotion: boolean; hash: string } => ({
     hidden: doc.hidden,
@@ -347,6 +350,12 @@ export function mountHoloBackdrop(
       portalMaterial.uniforms.uRing.value = active === worldA ? RING_A : RING_B;
     }
     portal.rotation.y = Math.sin(t * 0.3) * 0.08;
+    // The camera's real flight path, as 5D samples for the manifold engine:
+    // (x, y, z, t seconds, w = signed distance to the portal plane).
+    if (now - lastSample >= SAMPLE_MS) {
+      lastSample = now;
+      pushHoloPoint({ x: camera.position.x, y: camera.position.y, z: camera.position.z, temporalT: t, hyperspaceW: camera.position.z - portal.position.z });
+    }
 
     // 1. world B's sky (SDF architecture) — small texture, every frame.
     renderer.setRenderTarget(skyTarget);

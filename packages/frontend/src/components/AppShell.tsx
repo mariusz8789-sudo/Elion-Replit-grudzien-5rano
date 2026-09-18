@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { ErrorBoundary } from './ErrorBoundary';
+import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 
 /**
  * The 2040 ambient 3D layer (three.js) is lazy: the initial bundle must not
@@ -25,6 +26,45 @@ function paintRangeFill(input: HTMLInputElement): void {
   if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || max <= min) return;
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   input.style.setProperty('--fill-pct', `${pct.toFixed(2)}%`);
+}
+
+/**
+ * HUD telemetry: the machine's measured state (`/api/system/telemetry`) and the
+ * 5D manifold engine's geometry of the backdrop camera's real flight path
+ * (`/api/manifold/evaluate`). Both come from the backend or not at all — the
+ * readout is empty when there is nothing measured, never a placeholder number.
+ */
+function useHudTelemetry(): string {
+  const [sys, setSys] = useState<SystemTelemetryView | null>(null);
+  const [manifold, setManifold] = useState<ManifoldView | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+    let alive = true;
+    const pullSystem = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/system/telemetry', { signal: AbortSignal.timeout(4000) });
+        if (!r.ok) return;
+        const j = (await r.json()) as SystemTelemetryView & { ok?: boolean };
+        if (alive && j && typeof j.cpuCount === 'number') setSys(j);
+      } catch { /* backend absent: the readout stays empty */ }
+    };
+    const pullManifold = async (): Promise<void> => {
+      const points = snapshotHoloPath();
+      if (points.length < 3) return;
+      try {
+        const r = await fetch('/api/manifold/evaluate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nodeId: 'HUD', points }), signal: AbortSignal.timeout(4000) });
+        if (!r.ok) return;
+        const j = (await r.json()) as { manifold?: ManifoldView };
+        if (alive && j.manifold) setManifold(j.manifold);
+      } catch { /* backend absent */ }
+    };
+    void pullSystem();
+    const a = window.setInterval(() => { void pullSystem(); }, 15000);
+    const b = window.setInterval(() => { void pullManifold(); }, 20000);
+    const first = window.setTimeout(() => { void pullManifold(); }, 6000);
+    return () => { alive = false; window.clearInterval(a); window.clearInterval(b); window.clearTimeout(first); };
+  }, []);
+  return formatHudTelemetry(sys, manifold);
 }
 
 function useRangeFillPainter(): void {
@@ -156,6 +196,7 @@ export function AppShell({ children, chat, chatInline = false }: {
 
   const active = activeNavId(hash);
   useRangeFillPainter();
+  const hudTelemetry = useHudTelemetry();
   /** HUD readout under the brand: the real current route, nothing invented. */
   const routeLabel = (hash.replace(/^#\/?/, '').split('?')[0] || 'home').toUpperCase();
 
@@ -213,6 +254,7 @@ export function AppShell({ children, chat, chatInline = false }: {
         <div className="shell-hud" aria-hidden="true" data-testid="shell-hud">
           <span className="shell-hud-dot" />
           <span className="shell-hud-text">SYS · {routeLabel}</span>
+          {hudTelemetry !== '' && <span className="shell-hud-telemetry">{hudTelemetry}</span>}
           <span className="shell-hud-bars"><i /><i /><i /><i /></span>
         </div>
         <nav className="shell-nav">{sections}</nav>

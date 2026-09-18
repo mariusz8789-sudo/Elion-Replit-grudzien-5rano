@@ -97,6 +97,7 @@ import { runDependencyAudit, summarizeFindings } from './security/dependencyAudi
 import { runSpeculative } from './speculativeApi.mjs';
 import { runIngest, listProposals, publishProposal, rejectProposal } from './knowledgeApi.mjs';
 import { runQuantum, describeQuantum } from './quantumApi.mjs';
+import { evaluateManifold, systemTelemetry } from './manifoldApi.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -192,6 +193,19 @@ export function handleApi(db, ctx) {
       const result = seg[3] === 'publish' ? publishProposal(seg[2], approver.id) : rejectProposal(seg[2], approver.id);
       return result.ok ? ok(result) : err(409, result.error);
     }
+    return err(404, 'not_found');
+  }
+
+  // ---- 5D manifold engine + real machine telemetry (2040 HUD): GEOMETRIC_MODEL, feeds nothing scientific ----
+  if (seg[0] === 'manifold') {
+    if (seg[1] === 'evaluate' && seg.length === 2 && method === 'POST') {
+      const result = evaluateManifold(body);
+      return result.ok ? ok(result) : err(result.status ?? 400, result.error, result.message);
+    }
+    return err(404, 'not_found');
+  }
+  if (seg[0] === 'system') {
+    if (seg[1] === 'telemetry' && seg.length === 2 && method === 'GET') return ok(systemTelemetry());
     return err(404, 'not_found');
   }
 

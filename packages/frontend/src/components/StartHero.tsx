@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { listExperiments } from '../core/scienceMemory';
 import { getLabs } from '../core/registry';
 import { WORLDS } from './WorldsHubScreen';
 import { AskGenesisMic } from './guide/AskGenesisMic';
+
+/** Holographic engine core — three.js, lazy: the Start route loads it only after first paint. */
+const EngineCoreHolo = lazy(() => import('./holo/EngineCoreHolo').then((m) => ({ default: m.EngineCoreHolo })));
 
 /**
  * START HERO — the first thing a visitor sees (D-118). One question box,
@@ -24,6 +27,9 @@ const SUGGESTIONS: readonly string[] = [
 export function StartHero(): React.ReactElement {
   const [ask, setAsk] = useState('');
   const [health, setHealth] = useState<Health>('checking');
+  // Static render (tests, SSR) never mounts the WebGL hero; the browser turns it on after mount.
+  const [holo, setHolo] = useState(false);
+  useEffect(() => { setHolo(true); }, []);
   const records = useMemo(() => { try { return listExperiments().length; } catch { return 0; } }, []);
   const labs = useMemo(() => getLabs().length, []);
 
@@ -56,6 +62,13 @@ export function StartHero(): React.ReactElement {
           Wynik możesz odtworzyć jutro, na innej maszynie.
         </p>
       </header>
+
+      <div className="start-holo" aria-hidden="true">
+        <span className="start-holo-base" />
+        <span className="start-holo-ring start-holo-ring-a" />
+        <span className="start-holo-ring start-holo-ring-b" />
+        {holo && <Suspense fallback={null}><EngineCoreHolo /></Suspense>}
+      </div>
 
       <form className="start-ask" onSubmit={(e) => { e.preventDefault(); submit(ask); }} role="search" aria-label="Zapytaj Genesis">
         <span className="start-ask-icon" aria-hidden="true">✦</span>

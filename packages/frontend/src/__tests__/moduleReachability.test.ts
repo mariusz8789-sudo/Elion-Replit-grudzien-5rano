@@ -104,7 +104,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // D-127: the delivered cognitive core (packages/core/src/cognitive) bound to the canonical systems with a real
   // approval gate. Which host (the Scientific Worlds screen, the chat, a campaign) issues goals to it is a product
   // decision, not a side effect of landing the bridge; scientificWorldsCognitive.test.ts drives the full loop.
-  'core/scientificWorlds/cognitiveBridge.ts': 'D-127 cognitive-core bridge; unwired pending a decision on which host issues goals (tests drive the loop end to end).',
   // D-127: the V3 Human Biology Lab pack is saved as written; its barrel and inventory module are part of the delivered
   // contract but the host imports the modules it uses directly (biologyRunners/biologyLabWorld/biologyCommands).
   'core/scientificWorlds/humanLab/index.ts': 'D-127 delivered pack barrel, kept verbatim; the host imports modules directly.',

@@ -51,7 +51,7 @@ describe('environmental detective — on the CAP-2 causal library, honest about 
     expect(a.ledgerContentHash).toMatch(/^[0-9a-f]{64}$/); expect(a.label).toBe('ENVIRONMENTAL_DETECTIVE_CAUSAL_MODEL');
     expect(kernelLedger.getActive().length).toBe(before + 1);
     expect(kernelLedger.getActive().at(-1)?.claimType).toBe('model');
-    expect(environmentalDetectiveProvider(kernelLedger).capabilities).toEqual(['environmental-detective']);
+    expect(environmentalDetectiveProvider(kernelLedger).capabilities).toEqual(['environmental-detective', 'environmental-case-graph']);
     expect(kernelRegistry.resolve('central-dogma-model')?.providerId).toBe('molecular-biology');
   });
 });

@@ -18,10 +18,12 @@ import { fnv1a } from '../events/hash';
  * every locale.
  */
 
-export type ScaleLevel = 'body' | 'organ' | 'tissue' | 'cell' | 'organelle' | 'molecule';
-export const SCALE_LADDER: readonly ScaleLevel[] = ['body', 'organ', 'tissue', 'cell', 'organelle', 'molecule'];
+export type ScaleLevel = 'body' | 'organ' | 'tissue' | 'cell' | 'organelle' | 'molecule' | 'dna' | 'atom';
+export const SCALE_LADDER: readonly ScaleLevel[] = ['body', 'organ', 'tissue', 'cell', 'organelle', 'molecule', 'dna', 'atom'];
 /** Order of magnitude per level (metres), for the HUD scale bar. */
-export const SCALE_METRES: Readonly<Record<ScaleLevel, number>> = { body: 1, organ: 0.1, tissue: 1e-3, cell: 1e-5, organelle: 1e-6, molecule: 1e-9 };
+export const SCALE_METRES: Readonly<Record<ScaleLevel, number>> = { body: 1, organ: 0.1, tissue: 1e-3, cell: 1e-5, organelle: 1e-6, molecule: 1e-9, dna: 1e-10, atom: 1e-11 };
+/** Human-readable scale bar text per level. */
+export const SCALE_TEXT: Readonly<Record<ScaleLevel, string>> = { body: '1 m', organ: '10 cm', tissue: '1 mm', cell: '10 µm', organelle: '1 µm', molecule: '1 nm', dna: '0.1 nm', atom: '0.01 nm' };
 
 export type ExplorerEvidenceMode = 'REAL_IMAGE' | 'REAL_DATASET' | 'RECONSTRUCTED' | 'SIMULATED' | 'ILLUSTRATIVE';
 const NON_EVIDENCE: ReadonlySet<ExplorerEvidenceMode> = new Set(['RECONSTRUCTED', 'SIMULATED', 'ILLUSTRATIVE']);
@@ -33,22 +35,30 @@ export function explorerTruthLabel(mode: ExplorerEvidenceMode): string { return 
 export interface ExplorerOrgan { readonly organId: string; readonly tissue: 'CARDIAC' | 'NEURAL' | 'LUNG' | 'LIVER' | 'EPITHELIUM'; readonly labelKey: string; readonly keywords: readonly string[]; }
 
 /** Organs the ladder can start from — each one is an ORGAN node of the V3 atlas. */
-export const EXPLORER_ORGANS: readonly ExplorerOrgan[] = [
+const EXPLORER_ORGANS_RAW: readonly ExplorerOrgan[] = [
   { organId: 'heart', tissue: 'CARDIAC', labelKey: 'explorer.heart', keywords: ['serc', 'heart', 'corazon', 'القلب'] },
   { organId: 'brain', tissue: 'NEURAL', labelKey: 'explorer.brain', keywords: ['mozg', 'brain', 'cerebro', 'الدماغ'] },
   { organId: 'left-lung', tissue: 'LUNG', labelKey: 'explorer.lungs', keywords: ['pluc', 'lung', 'pulmon', 'الرئ'] },
   { organId: 'liver', tissue: 'LIVER', labelKey: 'explorer.liver', keywords: ['watrob', 'liver', 'higado', 'الكبد'] },
   { organId: 'left-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['nerk', 'kidney', 'rinon', 'الكل'] },
+  { organId: 'right-lung', tissue: 'LUNG', labelKey: 'explorer.lungs', keywords: ['prawe pluc', 'right lung'] },
+  { organId: 'right-kidney', tissue: 'EPITHELIUM', labelKey: 'explorer.kidneys', keywords: ['prawa nerk', 'right kidney'] },
+  { organId: 'stomach', tissue: 'EPITHELIUM', labelKey: 'explorer.stomach', keywords: ['zoladek', 'zoladk', 'stomach', 'estomago', 'المعدة'] },
+  { organId: 'liver', tissue: 'LIVER', labelKey: 'explorer.liver', keywords: [] },
+  { organId: 'pancreas', tissue: 'EPITHELIUM', labelKey: 'explorer.pancreas', keywords: ['trzustk', 'pancreas', 'البنكرياس'] },
+  { organId: 'small-intestine', tissue: 'EPITHELIUM', labelKey: 'explorer.smallIntestine', keywords: ['jelit', 'intestine', 'intestino', 'الأمعاء'] },
 ];
+export const EXPLORER_ORGANS: readonly ExplorerOrgan[] = EXPLORER_ORGANS_RAW.filter((o, i, arr) => arr.findIndex((x) => x.organId === o.organId) === i);
 
 const LEVEL_KEYWORDS: Readonly<Record<ScaleLevel, readonly string[]>> = {
   body: ['cialo', 'body', 'cuerpo', 'جسم'], organ: ['narzad', 'organ', 'organo', 'عضو'], tissue: ['tkank', 'tissue', 'tejido', 'نسيج'],
-  cell: ['komork', 'cell', 'celul', 'خلية'], organelle: ['organell', 'mitochond', 'organelle', 'organulo', 'عضية'], molecule: ['czasteczk', 'molecule', 'molecul', 'dna', 'atp', 'جزيء'],
+  cell: ['komork', 'cell', 'celul', 'خلية'], organelle: ['organell', 'mitochond', 'organelle', 'organulo', 'عضية'], molecule: ['czasteczk', 'molecule', 'molecul', 'atp', 'جزيء'],
+  dna: ['dna', 'adn', 'helis', 'helix', 'gen '], atom: ['atom', 'átomo', 'ذرة'],
 };
 
 export function levelLabel(level: ScaleLevel, locale: Locale): string {
-  const key: Record<ScaleLevel, string> = { body: 'explorer.body', organ: 'explorer.organ', tissue: 'explorer.tissue', cell: 'explorer.cell', organelle: 'explorer.organelle', molecule: 'explorer.molecule' };
-  // 'organ' has no pack translation: the key falls back visibly (never a guessed word).
+  const key: Record<ScaleLevel, string> = { body: 'explorer.body', organ: 'explorer.organ', tissue: 'explorer.tissue', cell: 'explorer.cell', organelle: 'explorer.organelle', molecule: 'explorer.molecule', dna: 'explorer.dna', atom: 'explorer.atoms' };
+  // 'organ' / 'atoms' have no pack translation for es/ar: they fall back to the Polish source label (never a guessed word).
   return t(key[level], locale);
 }
 
@@ -70,6 +80,9 @@ export function explorerPath(organ: ExplorerOrgan, target: ScaleLevel): readonly
       case 'cell': return { level, nodeId: `${organ.organId}:cell`, evidenceMode: 'SIMULATED', experimentId: 'hyperscope-capture', magnification: 100 };
       case 'organelle': return { level, nodeId: `${organ.organId}:organelle`, evidenceMode: 'SIMULATED', experimentId: 'hyperscope-capture', magnification: 500 };
       case 'molecule': return { level, nodeId: `${organ.organId}:molecule`, evidenceMode: 'SIMULATED', experimentId: 'central-dogma', magnification: null };
+      case 'dna': return { level, nodeId: `${organ.organId}:dna`, evidenceMode: 'SIMULATED', experimentId: 'central-dogma', magnification: null };
+      // Atoms: no instrument in the lab models this scale — the rung is shown, labelled, and runs nothing.
+      case 'atom': return { level, nodeId: `${organ.organId}:atom`, evidenceMode: 'ILLUSTRATIVE', experimentId: null, magnification: null };
     }
   });
 }
@@ -91,7 +104,9 @@ export function explorerCommands(organ: ExplorerOrgan, level: ScaleLevel, text: 
     { commandId: id(0), text, intent: 'NAVIGATE', targetEntityId: 'station:human-study', requestedAtLogicalTime: logicalTime },
     { commandId: id(1), text, intent: 'INTERACT', targetEntityId: 'station:human-study', parameters: { action: 'FOCUS_ANATOMY', focus: organ.organId, mode: organ.organId === 'brain' ? 'BRAIN' : 'ORGANS' }, requestedAtLogicalTime: logicalTime },
   ];
-  const steps = explorerPath(organ, level).filter((s) => s.experimentId);
+  // One canonical experiment per instrument on the way down (a deeper rung never repeats the shallower one's session).
+  const seen = new Set<string>();
+  const steps = explorerPath(organ, level).filter((s) => s.experimentId && !seen.has(`${s.experimentId}:${s.magnification ?? ''}`) && seen.add(`${s.experimentId}:${s.magnification ?? ''}`));
   steps.forEach((s, i) => {
     const station = s.experimentId === 'histology-slide' ? 'station:histology' : s.experimentId === 'central-dogma' ? 'station:compute' : 'station:microscopy';
     const parameters: Record<string, CommandParameterValue> = s.experimentId === 'histology-slide' ? { tissue: organ.tissue, stage: 'slide' } : s.experimentId === 'hyperscope-capture' ? { magnification: s.magnification ?? 100, tissue: organ.tissue } : {};
@@ -99,4 +114,34 @@ export function explorerCommands(organ: ExplorerOrgan, level: ScaleLevel, text: 
   });
   out.push({ commandId: id(99), text, intent: 'INSPECT', parameters: { provenance: true, result: true }, requestedAtLogicalTime: logicalTime });
   return out;
+}
+
+/** The Hyperscope at one magnification on the selected organ's tissue (the magnification ladder of the explorer UI). */
+export function magnificationCommands(organ: ExplorerOrgan, magnification: number, text: string, logicalTime: number): readonly WorldCommand[] {
+  const id = (i: number): string => `cmd-${fnv1a(`${text}|${logicalTime}|magnification|${i}`)}`;
+  return [
+    { commandId: id(0), text, intent: 'NAVIGATE', targetEntityId: 'station:microscopy', requestedAtLogicalTime: logicalTime },
+    { commandId: id(1), text, intent: 'RUN_EXPERIMENT', targetEntityId: 'station:microscopy', parameters: { magnification, tissue: organ.tissue }, requestedAtLogicalTime: logicalTime },
+    { commandId: id(2), text, intent: 'INSPECT', parameters: { provenance: true, result: true }, requestedAtLogicalTime: logicalTime },
+  ];
+}
+
+/** The twin's display mode for a body system (the systems rail) — the V3 visual modes, through the anatomy table's interaction. */
+export function systemDisplayMode(system: string): 'XRAY' | 'VASCULAR' | 'NERVOUS' | 'ORGANS' {
+  return system === 'SKELETAL' ? 'XRAY' : system === 'CARDIOVASCULAR' || system === 'LYMPHATIC' ? 'VASCULAR' : system === 'NERVOUS' ? 'NERVOUS' : 'ORGANS';
+}
+export function systemCommands(system: string, text: string, logicalTime: number): readonly WorldCommand[] {
+  const id = (i: number): string => `cmd-${fnv1a(`${text}|${logicalTime}|system|${i}`)}`;
+  return [
+    { commandId: id(0), text, intent: 'NAVIGATE', targetEntityId: 'station:human-study', requestedAtLogicalTime: logicalTime },
+    { commandId: id(1), text, intent: 'INTERACT', targetEntityId: 'station:human-study', parameters: { action: 'SET_ANATOMY_MODE', mode: systemDisplayMode(system) }, requestedAtLogicalTime: logicalTime },
+  ];
+}
+
+/** Which rung the last sealed session reached (for the HUD): the instrument and magnification decide, never a guess. */
+export function levelOfSession(experimentId: string | null, magnification: number | null, organSelected: boolean): ScaleLevel {
+  if (experimentId === 'central-dogma') return 'dna';
+  if (experimentId === 'hyperscope-capture') return (magnification ?? 0) >= 500 ? 'organelle' : 'cell';
+  if (experimentId === 'histology-slide') return 'tissue';
+  return organSelected ? 'organ' : 'body';
 }

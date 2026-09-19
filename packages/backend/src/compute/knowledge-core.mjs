@@ -167,7 +167,7 @@ var stableStringify = (v) => {
   return JSON.stringify(v);
 };
 var sha256hex = (t) => sha256HexSync(t);
-var EvidenceLedger = class {
+var EvidenceLedger = class _EvidenceLedger {
   constructor(clock) {
     this.clock = clock;
   }
@@ -177,6 +177,39 @@ var EvidenceLedger = class {
   proposals = /* @__PURE__ */ new Map();
   activeIds = [];
   version = 1;
+  listeners = /* @__PURE__ */ new Set();
+  /** Called after every appended entry (the persistence hook). Returns the unsubscribe function. */
+  onAppend(listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  toSnapshot() {
+    return { schema: "evidence-ledger-snapshot/1", version: this.version, entries: [...this.entries], records: [...this.records.values()], proposals: [...this.proposals.values()], activeIds: [...this.activeIds] };
+  }
+  /** Rebuild from a snapshot. The chain is verified first: a broken or tampered snapshot is refused (thrown `LEDGER_SNAPSHOT_REJECTED: …`), never silently repaired. */
+  static fromSnapshot(clock, snapshot) {
+    if (!snapshot || snapshot.schema !== "evidence-ledger-snapshot/1" || !Array.isArray(snapshot.entries)) throw new Error("LEDGER_SNAPSHOT_REJECTED: SCHEMA");
+    const l = new _EvidenceLedger(clock);
+    l.entries = snapshot.entries.map((e) => Object.freeze({ ...e }));
+    const v = l.verifyLedger();
+    if (!v.ok) throw new Error("LEDGER_SNAPSHOT_REJECTED: " + v.errors.join(","));
+    for (const r of snapshot.records) {
+      l.records.set(r.id, r);
+      l.byHash.set(r.contentHash, r);
+    }
+    for (const p of snapshot.proposals) l.proposals.set(p.proposalId, p);
+    for (const id of snapshot.activeIds) {
+      if (!l.records.has(id)) throw new Error("LEDGER_SNAPSHOT_REJECTED: ACTIVE_ID_UNKNOWN:" + id);
+    }
+    for (const e of l.entries) {
+      if (e.kind === "ADD" && !l.records.has(e.recordId)) throw new Error("LEDGER_SNAPSHOT_REJECTED: RECORD_MISSING:" + e.recordId);
+    }
+    l.activeIds = [...snapshot.activeIds];
+    l.version = Number.isFinite(snapshot.version) ? snapshot.version : 1;
+    return l;
+  }
   contentHashOf(i) {
     return sha256hex(stableStringify({ sourceUrl: i.sourceUrl, claim: i.claim, claimType: i.claimType, sourceTimestamp: i.sourceTimestamp, provenance: i.provenance }));
   }
@@ -188,7 +221,9 @@ var EvidenceLedger = class {
     const prev = this.entries.length ? this.entries[this.entries.length - 1].hash : "GENESIS";
     const at = this.clock.now();
     const index = this.entries.length;
-    this.entries.push(Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256hex(stableStringify({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at }));
+    const entry = Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256hex(stableStringify({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at });
+    this.entries.push(entry);
+    for (const fn of this.listeners) fn(entry, this);
   }
   addRecord(i) {
     const contentHash = this.contentHashOf(i);
@@ -219,8 +254,8 @@ var EvidenceLedger = class {
       this.byHash.set(p.record.contentHash, p.record);
       this.activeIds.push(p.record.id);
     }
-    this.append("PUBLISH", p.record);
     this.version += 1;
+    this.append("PUBLISH", p.record);
     return p.record;
   }
   rejectProposal(proposalId, approverId) {
@@ -251,6 +286,55 @@ var EvidenceLedger = class {
       prev = e.hash;
     }
     return { ok: errors.length === 0, errors };
+  }
+};
+
+// packages/core/src/knowledge/ledgerPersistence.ts
+function restoreLedger(clock, store) {
+  let snapshot;
+  try {
+    snapshot = store.load();
+  } catch (e) {
+    return { ledger: new EvidenceLedger(clock), status: "REJECTED", entries: 0, reason: `LOAD_FAILED: ${e.message}` };
+  }
+  if (!snapshot) return { ledger: new EvidenceLedger(clock), status: "EMPTY", entries: 0, reason: null };
+  try {
+    const ledger = EvidenceLedger.fromSnapshot(clock, snapshot);
+    return { ledger, status: "RESTORED", entries: ledger.getEntries().length, reason: null };
+  } catch (e) {
+    return { ledger: new EvidenceLedger(clock), status: "REJECTED", entries: 0, reason: e.message };
+  }
+}
+function attachLedgerPersistence(ledger, store, onError) {
+  const save = () => {
+    try {
+      if (!store.save(ledger.toSnapshot())) onError?.("SAVE_REFUSED");
+    } catch (e) {
+      onError?.(`SAVE_FAILED: ${e.message}`);
+    }
+  };
+  if (ledger.getEntries().length > 0) save();
+  return ledger.onAppend(save);
+}
+function openPersistentLedger(clock, store, onError) {
+  const r = restoreLedger(clock, store);
+  if (r.status === "REJECTED") {
+    onError?.(r.reason ?? "REJECTED");
+    return { ...r, persisting: false };
+  }
+  attachLedgerPersistence(r.ledger, store, onError);
+  return { ...r, persisting: true };
+}
+var MemoryLedgerSnapshotStore = class {
+  snapshot = null;
+  saves = 0;
+  load() {
+    return this.snapshot ? JSON.parse(JSON.stringify(this.snapshot)) : null;
+  }
+  save(s) {
+    this.snapshot = JSON.parse(JSON.stringify(s));
+    this.saves += 1;
+    return true;
   }
 };
 
@@ -553,15 +637,19 @@ export {
   EvidenceLedger,
   KEY_ENV_NAMES,
   KNOWLEDGE_DISCLAIMER,
+  MemoryLedgerSnapshotStore,
   OmniIngestionController,
   ProposeOnlyLearner,
   PublicWebAdapter,
   SocialOfficialApiAdapter,
   SourcePolicyRegistry,
   YouTubeOfficialApiAdapter,
+  attachLedgerPersistence,
   classifyClaim,
   envKeyProvider,
+  openPersistentLedger,
   originOf,
   realSleeper,
+  restoreLedger,
   statusLabelPl
 };

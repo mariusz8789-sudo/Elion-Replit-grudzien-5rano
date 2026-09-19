@@ -10,6 +10,7 @@ import { createExperimentSession, type ExperimentRunner, type ExperimentSession,
 import type { HumanDigitalTwinManifest } from './humanLab/types';
 import type { LabStation } from './labWorld';
 import type { CommandCatalog, ParsedCommands } from './worldCommand';
+import type { ScienceMemoryPort } from './scienceMemoryPort';
 
 /**
  * SCIENTIFIC WORLDS — THE COGNITIVE CORE ON THE CANONICAL SYSTEMS.
@@ -65,11 +66,15 @@ export interface CognitiveWorldBinding {
   /** The host's hook for an accepted WORLD_COMMAND plan (e.g. the agent controller). Not called for refused commands. */
   readonly onPlan?: (plan: ActionPlan) => void;
   readonly defaultSeed?: number;
+  /** D-130: Science Memory bound to the core (write accepts only typed curiosity-cycle records; read returns stored cycles). */
+  readonly memory?: ScienceMemoryPort;
 }
 
 export interface ScientificWorldsCognitiveCore {
   readonly core: GenesisCognitiveCore;
   readonly approvals: ApprovalRegistry;
+  /** The bound Science Memory port (null when the host bound none). */
+  readonly memory: ScienceMemoryPort | null;
   readonly sessions: readonly ExperimentSession[];
   readonly plans: readonly ActionPlan[];
   listEntities(): WorldEntity[];
@@ -154,10 +159,11 @@ export function createScientificWorldsCognitiveCore(binding: CognitiveWorldBindi
     },
     listEntities: async () => worldEntitiesOf(binding).entities,
     listRelations: async () => worldEntitiesOf(binding).relations,
+    ...(binding.memory ? { memoryWrite: binding.memory.write.bind(binding.memory), memoryRead: binding.memory.read.bind(binding.memory) } : {}),
   });
   const core = new GenesisCognitiveCore({ commandBus: adapters.commandBus, experimentFabric: adapters.experimentFabric });
   return {
-    core, approvals, sessions, plans,
+    core, approvals, sessions, plans, memory: adapters.scienceMemory ?? null,
     listEntities: () => worldEntitiesOf(binding).entities,
     listRelations: () => worldEntitiesOf(binding).relations,
     attach: () => adapters.attach(core),

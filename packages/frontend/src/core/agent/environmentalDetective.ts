@@ -3,6 +3,7 @@ import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import { sha256HexSync } from '@genesis/core/knowledge/sha256.js';
 import { canonicalJson } from '../events/hash';
 import { fitCausalEffect, testParallelPreTrends, type CausalEstimator, type CausalFitResult, type PanelObservation, type ParallelTrendsTestResult } from './causalInference';
+import { buildEnvironmentalCaseGraph, type EnvironmentalCaseGraph, type EnvironmentalCaseGraphInput } from './environmentalCaseGraph';
 
 /**
  * ENVIRONMENTAL DIGITAL DETECTIVE — "what changed, when, and does the
@@ -118,12 +119,19 @@ function finish(r: Omit<DetectiveReport, 'fingerprint'>): DetectiveReport {
 }
 
 export interface DetectiveAnalysis { readonly report: DetectiveReport; readonly ledgerContentHash: string; readonly label: 'ENVIRONMENTAL_DETECTIVE_CAUSAL_MODEL'; }
+/** D-130: the explainable case graph over a report (request shape `{ caseGraph: EnvironmentalCaseGraphInput }`). */
+export interface CaseGraphAnalysis { readonly graph: EnvironmentalCaseGraph; readonly ledgerContentHash: string; readonly label: 'ENVIRONMENTAL_CASE_GRAPH'; }
 
 /** Kernel provider (D-124): every investigation is anchored on the kernel ledger as a model claim. */
 export function environmentalDetectiveProvider(ledger: EvidenceLedger): AnalysisProvider {
   return {
-    providerId: 'environmental-detective', capabilities: ['environmental-detective'],
+    providerId: 'environmental-detective', capabilities: ['environmental-detective', 'environmental-case-graph'],
     analyze: (_ctx: KernelContext, req: unknown) => {
+      if (req && typeof req === 'object' && 'caseGraph' in req) {
+        const graph = buildEnvironmentalCaseGraph((req as { caseGraph: EnvironmentalCaseGraphInput }).caseGraph);
+        const res = ledger.addRecord({ sourceUrl: `genesis://environmental-detective/${graph.caseId}/case-graph`, sourceTimestamp: null, claim: `Environmental case graph case=${graph.caseId} status=${graph.status} nodes=${graph.nodes.length} signals=${graph.signals.length} counterExplanations=${graph.counterExplanations.length} fingerprint=${graph.fingerprint}`, claimType: 'model', confidence: graph.status === 'CANDIDATE_SITE_FOR_REVIEW' ? 0.5 : 0.2, provenance: { sourceKind: 'dataset', retrievedBy: 'environmental-detective', independentSourceIds: [] } });
+        return { graph, ledgerContentHash: res.record.contentHash, label: 'ENVIRONMENTAL_CASE_GRAPH' } satisfies CaseGraphAnalysis;
+      }
       const report = investigateEnvironmentalCase(req as EnvironmentalCaseInput);
       const res = ledger.addRecord({ sourceUrl: `genesis://environmental-detective/${report.caseId}`, sourceTimestamp: null, claim: `Environmental detective case=${report.caseId} quantity=${report.quantity} verdict=${report.verdict} estimator=${report.estimator ?? 'none'} effect=${report.causal?.effect.estimate ?? 'none'} anomalies=${report.anomalies.length} provenance=${report.provenance.kind} fingerprint=${report.fingerprint}`, claimType: 'model', confidence: report.epistemicStatus === 'MODEL' ? 0.6 : 0.2, provenance: { sourceKind: 'dataset', retrievedBy: 'environmental-detective', independentSourceIds: [] } });
       return { report, ledgerContentHash: res.record.contentHash, label: 'ENVIRONMENTAL_DETECTIVE_CAUSAL_MODEL' } satisfies DetectiveAnalysis;

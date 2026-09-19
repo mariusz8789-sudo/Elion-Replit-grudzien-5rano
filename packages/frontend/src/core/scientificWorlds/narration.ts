@@ -26,10 +26,12 @@ const STATUS_EN: Readonly<Record<ExperimentSession['epistemicStatus'], string>> 
 const EXPERIMENT_PL: Readonly<Record<string, string>> = {
   'crystal-synthesis': 'synteza kryształu', 'collision-batch': 'paczka zderzeń', 'micro-blackhole': 'próba horyzontu zdarzeń', 'seir-epidemic': 'symulacja epidemii SEIRD',
   'physiology-state': 'model fizjologii bliźniaka', 'neuro-signals': 'symulacja sygnałów nerwowych', 'hyperscope-capture': 'ujęcie Hyperscope', 'histology-slide': 'wirtualny preparat histologiczny', 'imaging-frame': 'klatka obrazowania', 'orpheus-scan': 'skan ORPHEUS', 'central-dogma': 'centralny dogmat (DNA → RNA → białko)',
+  'spacetime-photon': 'propagacja fotonu w zakrzywionej czasoprzestrzeni (model)',
 };
 const EXPERIMENT_EN: Readonly<Record<string, string>> = {
   'crystal-synthesis': 'crystal synthesis', 'collision-batch': 'collision batch', 'micro-blackhole': 'event-horizon attempt', 'seir-epidemic': 'SEIRD epidemic simulation',
   'physiology-state': 'twin physiology model', 'neuro-signals': 'neural signal simulation', 'hyperscope-capture': 'Hyperscope capture', 'histology-slide': 'virtual histology slide', 'imaging-frame': 'imaging frame', 'orpheus-scan': 'ORPHEUS scan', 'central-dogma': 'central dogma (DNA → RNA → protein)',
+  'spacetime-photon': 'photon propagation in curved spacetime (model)',
 };
 
 function fmt(v: number | string | boolean): string {
@@ -54,6 +56,9 @@ function headline(s: ExperimentSession, lang: GuideLang): string {
     case 'seir-epidemic':
       return lang === 'pl' ? `Szczyt zakażeń ${fmt(o.peakInfected)} osób w dniu ${fmt(o.peakDay)} przy R0 ${fmt(o.r0)}; łącznie ${fmt(o.totalInfected)} zakażonych, ${fmt(o.finalDead)} zgonów w modelu.`
         : `Infections peak at ${fmt(o.peakInfected)} on day ${fmt(o.peakDay)} with R0 ${fmt(o.r0)}; ${fmt(o.totalInfected)} infected in total, ${fmt(o.finalDead)} deaths in the model.`;
+    case 'spacetime-photon':
+      return lang === 'pl' ? `W modelu słabego pola foton mijający masę ${fmt(o.massKg)} kg w odległości ${fmt(o.impactParameterM)} m przybywa o ${fmt(o.shapiroDelayS)} s później niż w płaskiej linii bazowej i ugina się o ${fmt(o.deflectionArcsec)}″. Prędkość światła to stała SI — nic tu jej nie mierzy.`
+        : `In the weak-field model a photon passing a ${fmt(o.massKg)} kg mass at ${fmt(o.impactParameterM)} m arrives ${fmt(o.shapiroDelayS)} s later than in the flat baseline and bends by ${fmt(o.deflectionArcsec)}″. The speed of light is the SI constant — nothing here measures it.`;
     case 'physiology-state':
       return lang === 'pl' ? `Model fizjologii bliźniaka: tętno ${fmt(o.heartRateBpm)}/min, oddech ${fmt(o.respiratoryRatePerMin)}/min, SpO₂ ${fmt(o.oxygenSaturationPercent)}%, ciśnienie ${fmt(o.systolicMmHg)}/${fmt(o.diastolicMmHg)} mmHg — to model edukacyjny, nie urządzenie medyczne.`
         : `Twin physiology model: heart rate ${fmt(o.heartRateBpm)}/min, breathing ${fmt(o.respiratoryRatePerMin)}/min, SpO₂ ${fmt(o.oxygenSaturationPercent)}%, blood pressure ${fmt(o.systolicMmHg)}/${fmt(o.diastolicMmHg)} mmHg — an educational model, not a medical device.`;

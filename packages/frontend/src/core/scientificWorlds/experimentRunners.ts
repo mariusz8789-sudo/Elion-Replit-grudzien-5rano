@@ -1,5 +1,6 @@
 import { kernelRegistry } from '@genesis/core/mythos/KernelProviderRegistry.js';
-import type { BlackHoleAnalysis, CollisionBatchAnalysis, MaterialsAnalysis } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import type { BlackHoleAnalysis, CollisionBatchAnalysis, MaterialsAnalysis, SpacetimePhotonAnalysis } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import type { SpacetimePhotonReport } from '@genesis/core/flagship/spacetimePhoton.js';
 import type { LatticeSite } from '@genesis/core/cern/MaterialsDiscoveryEngine.js';
 import type { FinalParticle } from '@genesis/core/collider/QuantumColliderEngine.js';
 import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
@@ -22,13 +23,14 @@ import { ION_PRESETS } from './ionPresets';
  * a model to a fact.
  */
 
-export type LabExperimentId = 'crystal-synthesis' | 'collision-batch' | 'micro-blackhole' | 'seir-epidemic';
+export type LabExperimentId = 'crystal-synthesis' | 'collision-batch' | 'micro-blackhole' | 'seir-epidemic' | 'spacetime-photon';
 
 export interface CrystalArtifact { readonly kind: 'crystal'; readonly sites: readonly LatticeSite[]; readonly lattice: string; readonly name: string; readonly aPm: number; }
 export interface CollisionArtifact { readonly kind: 'collision'; readonly finals: readonly FinalParticle[]; readonly process: string; readonly eventId: string; readonly batchSize: number; }
 export interface BlackHoleArtifact { readonly kind: 'blackhole'; readonly formed: boolean; readonly rsM: number | null; readonly temperatureK: number | null; }
 export interface EpidemicArtifact { readonly kind: 'epidemic'; readonly series: readonly EpidemicPoint[]; readonly params: EpidemicParams; }
-export type LabArtifact = CrystalArtifact | CollisionArtifact | BlackHoleArtifact | EpidemicArtifact;
+export interface SpacetimeArtifact { readonly kind: 'spacetime'; readonly report: SpacetimePhotonReport; }
+export type LabArtifact = CrystalArtifact | CollisionArtifact | BlackHoleArtifact | EpidemicArtifact | SpacetimeArtifact;
 
 const CTX = (worldId: string) => ({ kernelId: 'genesis-cyber-kernel', route: '#/scientific-worlds', operatorId: `AGENT:${worldId}` });
 
@@ -130,6 +132,22 @@ export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedge
           engineLabel: 'SEIRD_RK4_MODEL',
           steps: ['parameters from tabulated defaults × command multipliers', `RK4 integration ${days} d @ 0.25 d`, 'peak/total/deaths', 'hospital pressure estimate', 'ledger commit'],
           artifact: { kind: 'epidemic', series: result.series, params },
+        };
+      }
+      case 'spacetime-photon': {
+        // D-130 flagship scenario at the observation window: photon propagation in a weak field vs. the flat baseline (MODEL; c is SI-defined).
+        const p = kernelRegistry.resolve('spacetime-photon-model');
+        if (!p) throw new Error('SPACETIME_PHOTON_PROVIDER_NOT_REGISTERED');
+        const req = { worldId, massKg: num(inputs.massKg, 1.989e30), impactParameterM: num(inputs.impactParameterM, 6.957e8), emitterDistanceM: num(inputs.emitterDistanceM, 1.496e11), receiverDistanceM: num(inputs.receiverDistanceM, 1.496e11) };
+        const a = p.analyze(CTX(worldId), req) as SpacetimePhotonAnalysis;
+        const r = a.report;
+        return {
+          outputs: { massKg: r.inputs.massKg, impactParameterM: r.inputs.impactParameterM, schwarzschildRadiusM: r.schwarzschildRadiusM, flatTravelTimeS: r.flatTravelTimeS, shapiroDelayS: r.shapiroDelayS, curvedTravelTimeS: r.curvedTravelTimeS, deflectionArcsec: r.deflectionArcsec, curvatureProxy: r.curvatureProxy, regime: r.regime, speedOfLightMps: 299792458, reportHash: r.contentHash },
+          evidenceHashes: [a.ledgerContentHash],
+          epistemicStatus: 'MODEL',
+          engineLabel: a.label,
+          steps: ['inputs: mass, impact parameter, emitter/receiver distances (defaults: Sun, solar limb, 1 AU)', 'flat baseline: same geometry with M = 0', 'first-order Shapiro delay and Einstein deflection', 'regime check (b > 20 r_s)', 'ledger commit'],
+          artifact: { kind: 'spacetime', report: r },
         };
       }
       default:

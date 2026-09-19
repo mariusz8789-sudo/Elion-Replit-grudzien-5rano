@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setLocale, t, localeDirection, isLocale, SUPPORTED_LOCALES } from '../core/i18n';
-import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_METRES, canClaimDirectObservation, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, organById, parseExplorerZoom } from '../core/scientificWorlds/humanExplorer';
+import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_METRES, canClaimDirectObservation, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, organById, parseExplorerZoom, systemCommands } from '../core/scientificWorlds/humanExplorer';
 import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
 import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
 import { MUSEUM_CALM, chunkForSpeech, epistemicStatusLine, museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
@@ -14,7 +14,8 @@ describe('i18n — pack locales es/ar on the canonical dictionary (no auto-trans
     expect(t('explorer.cell', 'ar')).toBe('خلية');
     expect(t('explorer.cell', 'en')).toBe('Cell');
     expect(t('nav.search', 'es')).toBe('Szukaj'); // no pack string → Polish, never a guessed translation
-    expect(t('explorer.organ', 'es')).toBe('explorer.organ'); // absent everywhere → visible key
+    expect(t('explorer.organ', 'es')).toBe('Narząd'); // no pack string → the Polish source label, never a guessed Spanish word
+    expect(t('explorer.nonexistent', 'es')).toBe('explorer.nonexistent'); // absent everywhere → visible key
     expect(isLocale('ar')).toBe(true); expect(isLocale('de')).toBe(false);
   });
   it('Arabic is RTL and setLocale flips the document direction; ids stay untouched', () => {
@@ -40,7 +41,7 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
   });
   it('the path down to a molecule runs histology → hyperscope 100× → 500× → central-dogma, all labelled non-observation', () => {
     const path = explorerPath(EXPLORER_ORGANS[0], 'molecule');
-    expect(path.map((s) => s.level)).toEqual([...SCALE_LADDER]);
+    expect(path.map((s) => s.level)).toEqual(SCALE_LADDER.slice(0, 6));
     expect(path.map((s) => s.experimentId)).toEqual([null, null, 'histology-slide', 'hyperscope-capture', 'hyperscope-capture', 'central-dogma']);
     expect(path.map((s) => s.magnification)).toEqual([null, null, 40, 100, 500, null]);
     for (const s of path) { expect(canClaimDirectObservation(s.evidenceMode)).toBe(false); expect(explorerTruthLabel(s.evidenceMode)).toMatch(/NOT_DIRECT_OBSERVATION$/); }
@@ -75,9 +76,22 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
     expect(cmds.map((c) => c.intent)).toEqual(['NAVIGATE', 'INTERACT', 'RUN_EXPERIMENT', 'RUN_EXPERIMENT', 'INSPECT']);
     expect(new Set(cmds.map((c) => c.commandId)).size).toBe(cmds.length);
   });
+  it('DNA and atom rungs: DNA runs the central dogma at the compute wall; atoms run nothing and say so; a zoom to DNA does not repeat the molecule session', () => {
+    const organ = EXPLORER_ORGANS[0];
+    expect(explorerPath(organ, 'dna').at(-1)).toMatchObject({ level: 'dna', experimentId: 'central-dogma' });
+    expect(explorerPath(organ, 'atom').at(-1)).toMatchObject({ level: 'atom', experimentId: null, evidenceMode: 'ILLUSTRATIVE' });
+    const dna = explorerCommands(organ, 'dna', 'z', 2);
+    expect(dna.filter((c) => c.targetEntityId === 'station:compute').length).toBe(1);
+    expect(magnificationCommands(organ, 500, 'm', 3).map((c) => c.intent)).toEqual(['NAVIGATE', 'RUN_EXPERIMENT', 'INSPECT']);
+    expect(magnificationCommands(organ, 500, 'm', 3)[1].parameters).toEqual({ magnification: 500, tissue: 'CARDIAC' });
+    expect(systemCommands('SKELETAL', 's', 4)[1].parameters).toEqual({ action: 'SET_ANATOMY_MODE', mode: 'XRAY' });
+    expect(levelOfSession('hyperscope-capture', 500, true)).toBe('organelle'); expect(levelOfSession('hyperscope-capture', 100, true)).toBe('cell');
+    expect(levelOfSession('central-dogma', null, true)).toBe('dna'); expect(levelOfSession(null, null, false)).toBe('body');
+    expect(new Set(EXPLORER_ORGANS.map((o) => o.organId)).size).toBe(EXPLORER_ORGANS.length);
+  });
   it('level labels come from i18n with the visible-key fallback for the untranslated level', () => {
     expect(levelLabel('cell', 'es')).toBe('Célula');
-    expect(levelLabel('organ', 'ar')).toBe('explorer.organ');
+    expect(levelLabel('organ', 'ar')).toBe('Narząd'); expect(levelLabel('atom', 'en')).toBe('Atoms');
   });
 });
 

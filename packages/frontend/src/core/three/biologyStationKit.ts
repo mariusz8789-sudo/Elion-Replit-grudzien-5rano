@@ -23,6 +23,8 @@ import { NEURO_REGIONS } from '../scientificWorlds/humanLab/neuroLab';
  */
 
 export interface Readout { readonly ctx: CanvasRenderingContext2D; readonly texture: THREE_NS.CanvasTexture; readonly canvas: HTMLCanvasElement; }
+/** What the 2D drawers need: a context, its canvas and something to flag dirty — a scene readout (CanvasTexture) or a DOM canvas in the HUD (D-130 Human Explorer). */
+export interface ReadoutTarget { readonly ctx: CanvasRenderingContext2D; readonly canvas: HTMLCanvasElement; readonly texture: { needsUpdate: boolean }; }
 
 export interface StationBuild {
   readonly group: THREE_NS.Group;
@@ -204,7 +206,7 @@ export function buildBiologyStation(THREE: typeof THREE_NS, ctx: StationKitConte
 // ---------------------------------------------------------------------------------------------------------------------
 // Screens: idle text, and the artifact of a sealed session.
 
-function frame(r: Readout, title: string, accent = 'rgba(98,240,163,0.45)'): void {
+function frame(r: ReadoutTarget, title: string, accent = 'rgba(98,240,163,0.45)'): void {
   const { ctx, canvas } = r;
   ctx.fillStyle = '#07111a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
@@ -212,7 +214,7 @@ function frame(r: Readout, title: string, accent = 'rgba(98,240,163,0.45)'): voi
   ctx.fillText(title, 14, Math.round(canvas.height * 0.13));
 }
 
-export function drawBiologyIdle(r: Readout, st: LabStation): void {
+export function drawBiologyIdle(r: ReadoutTarget, st: LabStation): void {
   frame(r, st.label.toUpperCase(), 'rgba(56,189,248,0.35)');
   const { ctx, canvas, texture } = r;
   ctx.fillStyle = '#62f0a3'; ctx.font = `${Math.round(canvas.height * 0.07)}px monospace`;
@@ -223,7 +225,7 @@ export function drawBiologyIdle(r: Readout, st: LabStation): void {
 }
 
 /** The evidence wall lists the sessions sealed so far — ids, experiment, status, hash prefix — never anything invented. */
-export function drawEvidenceWall(r: Readout, sessions: readonly { sessionId: string; experimentId: string; epistemicStatus: string; contentHash: string; evidenceHashes: readonly string[] }[]): void {
+export function drawEvidenceWall(r: ReadoutTarget, sessions: readonly { sessionId: string; experimentId: string; epistemicStatus: string; contentHash: string; evidenceHashes: readonly string[] }[]): void {
   frame(r, 'EVIDENCE LEDGER · ZAPIECZĘTOWANE SESJE');
   const { ctx, canvas, texture } = r;
   ctx.font = `${Math.round(canvas.height * 0.05)}px monospace`;
@@ -241,7 +243,7 @@ function seeded(hash: string): () => number {
   return () => { state = (state + 0x6D2B79F5) >>> 0; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-export function drawBiologyArtifact(r: Readout, artifact: BiologyArtifact, manifest: HumanDigitalTwinManifest): void {
+export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact, manifest: HumanDigitalTwinManifest): void {
   const { ctx, canvas, texture } = r; const W = canvas.width; const H = canvas.height;
   const small = `${Math.round(H * 0.065)}px monospace`; const mid = `${Math.round(H * 0.075)}px monospace`;
   switch (artifact.kind) {

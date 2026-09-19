@@ -428,3 +428,43 @@ input, select, textarea { background: transparent !important; border: 1px solid 
   .sw-btn, .sw-chip, .sw-input { min-height: 40px; }
   .sw-visor-frame { border-radius: 40% / 34%; }
 }
+
+/* =====================================================================
+   18. HUMAN EXPLORER (D-130) — the reference UI's four blocks as a HUD dock over the biology scene:
+   systems rail · organ card · Hyperscope ladder + field · macro→micro strip. Glass, restrained, no clutter.
+   ===================================================================== */
+.sw-hud-explorer { right: 0; bottom: 0; width: min(760px, 62vw); max-height: 58vh; overflow: auto; padding-bottom: calc(0.9rem + var(--safe-bottom)); gap: 0.45rem; }
+.sw-explorer-open .sw-hud-evidence { max-height: 34vh; }
+.sw-ex-head { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.sw-ex-mode-real_image, .sw-ex-mode-real_dataset { border-color: #62f0a3; color: #eafff4; }
+.sw-ex-mode-simulated, .sw-ex-mode-reconstructed, .sw-ex-mode-illustrative { border-color: rgba(251, 191, 36, 0.55); color: #fde68a; text-shadow: 0 0 8px rgba(251, 191, 36, 0.35); }
+.sw-ex-body { display: grid; grid-template-columns: 9.5rem 1fr 1.25fr; gap: 0.5rem; background: rgba(2, 6, 14, 0.58); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 8px; padding: 0.55rem; backdrop-filter: blur(8px); box-shadow: 0 0 24px rgba(56, 189, 248, 0.08) inset; }
+.sw-ex-title { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.14em; color: #7dd3fc; text-transform: uppercase; margin-bottom: 0.3rem; }
+.sw-ex-systems { display: flex; flex-direction: column; gap: 0.22rem; border-right: 1px solid rgba(56, 189, 248, 0.16); padding-right: 0.45rem; }
+.sw-ex-systems .sw-chip { text-align: left; font-size: 0.66rem; padding: 0.26rem 0.5rem; }
+.sw-chip.is-on { border-color: #62f0a3; color: #eafff4; box-shadow: 0 0 12px rgba(98, 240, 163, 0.28) inset; }
+.sw-ex-organ-list { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.4rem; }
+.sw-ex-organ-chip { font-size: 0.64rem; }
+.sw-ex-card { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.5rem; margin: 0; font-size: 0.7rem; }
+.sw-ex-card dt { color: #cfeedd; font-weight: 700; }
+.sw-ex-card dd { margin: 0; color: #a9c6bb; overflow-wrap: anywhere; }
+.sw-ex-scope { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.sw-ex-mags { display: flex; flex-wrap: wrap; gap: 0.22rem; }
+.sw-ex-mags .sw-chip { font-size: 0.64rem; padding: 0.22rem 0.45rem; }
+.sw-ex-canvas { width: 100%; aspect-ratio: 16 / 9; height: auto; border-radius: 50% / 50%; border: 2px solid rgba(125, 211, 252, 0.35); background: radial-gradient(circle at 50% 50%, #08131c 0%, #030609 78%); box-shadow: 0 0 22px rgba(56, 189, 248, 0.18), 0 0 0 6px rgba(2, 6, 14, 0.7); }
+.sw-ex-strip { background: rgba(2, 6, 14, 0.58); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 8px; padding: 0.45rem 0.55rem; backdrop-filter: blur(8px); }
+.sw-ex-rungs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.3rem; }
+.sw-ex-rung { position: relative; }
+.sw-ex-rung + .sw-ex-rung::before { content: '›'; position: absolute; left: -0.28rem; top: 38%; color: rgba(125, 211, 252, 0.45); font-size: 0.8rem; }
+.sw-ex-rung-btn { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; background: rgba(2, 6, 14, 0.62); border: 1px solid rgba(56, 189, 248, 0.28); color: #cfeedd; font: inherit; padding: 0.4rem 0.2rem; border-radius: 6px; cursor: pointer; }
+.sw-ex-rung-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.sw-ex-rung.is-on .sw-ex-rung-btn { border-color: #62f0a3; color: #eafff4; box-shadow: 0 0 14px rgba(98, 240, 163, 0.3) inset; }
+.sw-ex-rung-name { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; }
+.sw-ex-rung-scale { font-size: 0.58rem; color: #7dd3fc; }
+.sw-btn-mini { font-size: 0.62rem; padding: 0.22rem 0.45rem; }
+@media (max-width: 900px) {
+  .sw-hud-explorer { width: 100vw; max-height: 46vh; padding: 0.5rem 0.6rem calc(4.2rem + var(--safe-bottom)); }
+  .sw-ex-body { grid-template-columns: 1fr; }
+  .sw-ex-systems { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid rgba(56, 189, 248, 0.16); padding: 0 0 0.35rem; }
+  .sw-ex-rungs { grid-template-columns: repeat(4, 1fr); }
+}

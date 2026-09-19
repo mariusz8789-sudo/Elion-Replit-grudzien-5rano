@@ -55,8 +55,8 @@ export const LAB_STATIONS: readonly LabStation[] = [
     position: { x: 4.2, z: -3.2 }, facing: 0, standoff: 1.3, consoleHeight: 0.95, footprint: fp(4.2, -3.2, 2.4, 1.2),
   },
   {
-    id: 'st-window', kind: 'window', label: 'Okno obserwacyjne',
-    keywords: ['okno', 'okna', 'szyba', 'window', 'glass', 'obserwacyjne', 'observation'],
+    id: 'st-window', kind: 'window', label: 'Okno obserwacyjne', experimentId: 'spacetime-photon',
+    keywords: ['okno', 'okna', 'szyba', 'window', 'glass', 'obserwacyjne', 'observation', 'foton', 'photon', 'czasoprzestrze', 'spacetime', 'shapiro', 'ugięcie', 'ugiecie', 'światł', 'swiatl', 'light'],
     position: { x: 6.6, z: 1.5 }, facing: -Math.PI / 2, standoff: 1.2, consoleHeight: 1.1, footprint: fp(6.6, 1.5, 0.4, 3.2),
   },
 ];

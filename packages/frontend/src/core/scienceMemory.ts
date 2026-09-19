@@ -286,6 +286,36 @@ export type SavedExperimentEpistemicStatus =
   | 'EXECUTED_WITH_LIMITATIONS'
   | `MAX_SUPPORTABLE_CLAIM=${'STRUCTURAL_SIMILARITY' | 'NONE'}`;
 
+/**
+ * CURIOSITY CYCLE (D-130) — one persisted iteration of the autonomous
+ * curiosity loop: the ledger gap it started from, the hypothesis pair, the
+ * differentiating experiment (a canonical ExperimentSession, by id and
+ * hash), the assessments and the revised confidences. Science Memory keeps
+ * it so the next run does not ask the same question again and so the
+ * cognitive core can read what was already tried. Inputs and hashes only;
+ * nothing here is a result that could be read back as a fact.
+ */
+export interface SavedCuriosityCycle {
+  contractVersion: '1.0.0';
+  worldId: string;
+  questionId: string;
+  questionKind: string;
+  questionText: string;
+  subjectKeys: string[];
+  evidenceIds: string[];
+  hypotheses: { id: string; metric: string; expectedValue: number; tolerance: number; priorConfidence: number; posteriorConfidence: number; assessment: string }[];
+  experiment: { stationId: string; experimentId: string; sessionId: string; contentHash: string; replayFingerprint: string; epistemicStatus: string } | null;
+  terminal: string;
+  fingerprint: string;
+}
+export function isSavedCuriosityCycle(value: unknown): value is SavedCuriosityCycle {
+  if (!value || typeof value !== 'object') return false;
+  const o = value as Record<string, unknown>;
+  return o.contractVersion === '1.0.0' && nonEmptyString(o.worldId) && nonEmptyString(o.questionId) && nonEmptyString(o.questionKind) && nonEmptyString(o.questionText)
+    && Array.isArray(o.subjectKeys) && Array.isArray(o.evidenceIds) && Array.isArray(o.hypotheses) && nonEmptyString(o.terminal) && nonEmptyString(o.fingerprint)
+    && (o.experiment === null || (!!o.experiment && typeof o.experiment === 'object' && nonEmptyString((o.experiment as Record<string, unknown>).sessionId) && nonEmptyString((o.experiment as Record<string, unknown>).contentHash)));
+}
+
 export interface SavedExperiment {
   id: string;
   createdAt: string;
@@ -318,6 +348,8 @@ export interface SavedExperiment {
    * WEJŚCIA i statusy; odtworzenie wykonuje zbiór od nowa i je porównuje.
    */
   hypothesisLoop?: SavedHypothesisLoop;
+  /** One iteration of the autonomous curiosity cycle (D-130): inputs, ids and hashes only. */
+  curiosityCycle?: SavedCuriosityCycle;
   /**
    * Warstwa Obserwacja/Analiza/Znalezisko/Dowód i Następny Eksperyment NAD
    * powyższym `hypothesisLoop` (ten sam przebieg, `hypothesisLoopFingerprint`
@@ -571,6 +603,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
     (o.counterfactual === undefined || isSavedScenarioCounterfactual(o.counterfactual)) &&
     (o.hypothesisLoop === undefined || isSavedHypothesisLoop(o.hypothesisLoop)) &&
+    (o.curiosityCycle === undefined || isSavedCuriosityCycle(o.curiosityCycle)) &&
     (o.discoveryLoop === undefined || isSavedScientificDiscoveryLoop(o.discoveryLoop)) &&
     (o.investigation === undefined || isSavedInvestigation(o.investigation)) &&
     validReplayIdentity(o.replayIdentity)
@@ -714,6 +747,7 @@ export interface SaveExperimentInput {
   scenario?: SavedScenarioRunContext;
   counterfactual?: SavedScenarioCounterfactual;
   hypothesisLoop?: SavedHypothesisLoop;
+  curiosityCycle?: SavedCuriosityCycle;
   discoveryLoop?: SavedScientificDiscoveryLoop;
   investigation?: SavedInvestigation;
   worldDiscovery?: SavedWorldDiscoveryRun;
@@ -765,6 +799,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
   if (input.counterfactual !== undefined && !isSavedScenarioCounterfactual(input.counterfactual)) throw new Error('Kontrfaktyk musi zawierać komplet obu ramion i policzoną, porównywalną różnicę.');
   if (input.hypothesisLoop !== undefined && !isSavedHypothesisLoop(input.hypothesisLoop)) throw new Error('Zapis pętli hipotez musi zawierać prerejestrację, hipotezy i komplet wyników.');
+  if (input.curiosityCycle !== undefined && !isSavedCuriosityCycle(input.curiosityCycle)) throw new Error('Zapis cyklu ciekawości musi zawierać pytanie, hipotezy, sesję (lub null) i odcisk.');
   if (input.discoveryLoop !== undefined) {
     if (!isSavedScientificDiscoveryLoop(input.discoveryLoop)) throw new Error('Zapis pętli odkrycia naukowego musi zawierać pytanie, łańcuch dowodowy i następny eksperyment.');
     if (input.hypothesisLoop === undefined || input.discoveryLoop.hypothesisLoopFingerprint !== input.hypothesisLoop.loopFingerprint) {
@@ -799,6 +834,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
     ...(input.counterfactual === undefined ? {} : { counterfactual: input.counterfactual }),
     ...(input.hypothesisLoop === undefined ? {} : { hypothesisLoop: input.hypothesisLoop }),
+    ...(input.curiosityCycle === undefined ? {} : { curiosityCycle: input.curiosityCycle }),
     ...(input.discoveryLoop === undefined ? {} : { discoveryLoop: input.discoveryLoop }),
     ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
     ...(input.worldDiscovery === undefined ? {} : { worldDiscovery: input.worldDiscovery }),
@@ -3239,6 +3275,30 @@ export function replaySavedDeciphermentCase(saved: SavedExperiment): SavedDeciph
 
 export function listExperiments(): SavedExperiment[] {
   return readAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Persist one curiosity-cycle iteration (D-130). The record is the typed target the cognitive core's ScienceMemoryAdapter writes to. */
+export function saveCuriosityCycleToMemory(cycle: SavedCuriosityCycle): SavedExperiment {
+  if (!isSavedCuriosityCycle(cycle)) throw new Error('Zapis cyklu ciekawości musi zawierać pytanie, hipotezy, sesję (lub null) i odcisk.');
+  return saveExperiment({
+    labId: cycle.worldId,
+    experimentId: `curiosity-cycle:${cycle.questionId}`,
+    experimentName: `Cykl ciekawości — ${cycle.questionText}`,
+    params: { questionId: cycle.questionId, questionKind: cycle.questionKind, hypotheses: cycle.hypotheses.length, terminal: cycle.terminal, experimentId: cycle.experiment?.experimentId ?? 'none', sessionId: cycle.experiment?.sessionId ?? 'none' },
+    stats: Object.fromEntries(cycle.hypotheses.map((h) => [`posterior:${h.id}`, h.posteriorConfidence])),
+    honesty: 'simplified',
+    honestyNote: 'Autonomous curiosity iteration: the question came from ledger gaps, the experiment is a canonical session (replayable by id and hash); confidences are log-odds updates within the protocol, not measurements of the world.',
+    epistemicStatus: cycle.experiment ? (cycle.experiment.epistemicStatus as SavedExperimentEpistemicStatus) : 'INCONCLUSIVE',
+    curiosityCycle: cycle,
+  });
+}
+
+/** Curiosity cycles already in memory, newest first; `topic` narrows by question text / subject keys / world. */
+export function listCuriosityCycles(topic?: string, limit = 50): readonly SavedCuriosityCycle[] {
+  const t = topic?.trim().toLowerCase() ?? '';
+  return listExperiments().map((e) => e.curiosityCycle).filter((c): c is SavedCuriosityCycle => !!c)
+    .filter((c) => !t || c.worldId.toLowerCase().includes(t) || c.questionText.toLowerCase().includes(t) || c.subjectKeys.some((k) => k.toLowerCase().includes(t)) || c.questionId === topic)
+    .slice(0, limit);
 }
 
 export function getExperiment(id: string): SavedExperiment | undefined {

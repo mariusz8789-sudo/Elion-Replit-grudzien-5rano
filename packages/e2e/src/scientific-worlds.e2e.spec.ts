@@ -21,6 +21,7 @@ const SHOTS = {
   bioHyperscope: 'artifacts/human-biology-lab-hyperscope.png',
   bioOrpheus: 'artifacts/human-biology-lab-orpheus.png',
   bioSpectator: 'artifacts/human-biology-lab-spectator.png',
+  bioExplorer: 'artifacts/human-biology-lab-explorer.png',
 } as const;
 
 const settled = async (page: Page, frames = 2): Promise<void> => {
@@ -173,9 +174,27 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await expect(root).toHaveAttribute('data-camera', 'SPECTATOR');
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioSpectator });
+    // Human Explorer (D-130): the dock is open, empty of stock images until a session exists; a click on the CELL rung walks the
+    // agent to histology and the Hyperscope (100×) and the microscope field is drawn from that sealed session only.
+    const explorer = page.getByTestId('sw-explorer');
+    await expect(explorer).toBeVisible();
+    await expect(page.getByTestId('sw-explorer-evidence')).toContainText('NOT_DIRECT_OBSERVATION');
+    await page.getByTestId('sw-explorer-organ-heart').click();
+    await expect(page.getByTestId('sw-transcript')).toContainText('Narząd: Heart');
+    await waitState(page, ['IDLE'], 400_000);
+    await expect(page.getByTestId('sw-twin')).toContainText('heart');
+    await page.getByTestId('sw-explorer-rung-cell').click();
+    await expect(page.getByTestId('sw-transcript')).toContainText('Komórka');
+    await expect.poll(async () => page.getByTestId('sw-session').getAttribute('data-session-id'), { timeout: 400_000 }).not.toBe(first);
+    await expect.poll(async () => explorer.getAttribute('data-level'), { timeout: 400_000 }).toBe('cell');
+    await expect(page.getByTestId('sw-explorer-capture')).toContainText('hyperscope-capture');
+    await expect(page.getByTestId('sw-explorer-scale')).toContainText('10 µm');
+    await waitState(page, ['IDLE'], 400_000);
+    await settled(page, 2);
+    await page.screenshot({ path: SHOTS.bioExplorer });
 
     const harness = new VisualFidelityHarness();
-    for (const path of [SHOTS.bioIdle, SHOTS.bioWalking, SHOTS.bioBrain, SHOTS.bioHyperscope, SHOTS.bioOrpheus, SHOTS.bioSpectator]) {
+    for (const path of [SHOTS.bioIdle, SHOTS.bioWalking, SHOTS.bioBrain, SHOTS.bioHyperscope, SHOTS.bioOrpheus, SHOTS.bioSpectator, SHOTS.bioExplorer]) {
       const report = harness.inspectFile(path);
       expect(report.ok, `Eyes reject ${path}: ${report.reason ?? 'OK'}`).toBe(true);
     }

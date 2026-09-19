@@ -20,6 +20,14 @@ import { getVoiceEngine } from '../core/guide/guideRuntime';
 import { museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
 import type { GuideLevel } from '../core/guide/narrationModel';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
+import HumanExplorerPanel from './HumanExplorerPanel';
+import { createScientificWorldsCognitiveCore } from '../core/scientificWorlds/cognitiveBridge';
+import { scienceMemoryPort } from '../core/scientificWorlds/scienceMemoryPort';
+import { runCuriosityCycle, type CycleResult } from '../core/scientificWorlds/curiosityCycle';
+import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientificWorlds/agenticScienceRuntime';
+import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
+import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -105,6 +113,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [blocked, setBlocked] = useState<string | null>(null);
   const [session, setSession] = useState<ExperimentSession | null>(null);
   const [artifactKind, setArtifactKind] = useState<string | null>(null);
+  const [bioArtifact, setBioArtifact] = useState<BiologyArtifact | null>(null);
+  const [sessions, setSessions] = useState<ExperimentSession[]>([]);
+  const [explorerOpen, setExplorerOpen] = useState(true);
+  const [curiosity, setCuriosity] = useState<CycleResult | null>(null);
+  const [curiosityBusy, setCuriosityBusy] = useState(false);
+  const [flagship, setFlagship] = useState<FlagshipJourneyResult | null>(null);
   const [replay, setReplay] = useState<ReplayVerdict | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [text, setText] = useState('');
@@ -149,6 +163,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       if (u.sessionSealed) {
         const { session: sealed, artifact } = u.sessionSealed;
         setSession(sealed); sessionRef.current = sealed; setReplay(null); setArtifactKind((artifact as SceneArtifact).kind);
+        setSessions((list) => [...list.slice(-40), sealed]);
+        if (world === 'biology') setBioArtifact(artifact as BiologyArtifact);
         if (sealed.stationId) sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
         sim.noteSealedSession(sealed);
       }
@@ -164,21 +180,65 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       }
     });
     return () => sim.setUpdateListener(null);
-  }, [sim, speak, say]);
+  }, [sim, speak, say, world]);
 
-  const submit = useCallback((raw: string) => {
-    const t = raw.trim(); if (!t) return;
-    say('user', t);
-    logicalTime.current += 1;
-    const parsed = def.parse(t, logicalTime.current);
+  /** Typed commands from the Human Explorer's clicks: the same planner and controller as the command bar, no parser in between. */
+  const runCommands = useCallback((parsed: ParsedCommands) => {
     const plan = planActions(parsed.commands, def.catalog, controller.station);
     say('system', describePlan(parsed.commands.length, parsed.unresolved, plan.steps.map((s) => s.kind), plan.rejected));
     if (plan.steps.length === 0) return;
     const started = controller.startPlan(plan);
     if (!started.ok) say('system', `Agent nie może przyjąć planu: ${started.reason}.`);
     else { setBlocked(null); const first = plan.steps.find((s) => 'stationId' in s); sim.setHighlight(first && 'stationId' in first ? first.stationId : null); }
-    setText('');
   }, [controller, def, say, sim]);
+  const submit = useCallback((raw: string) => {
+    const t = raw.trim(); if (!t) return;
+    say('user', t);
+    logicalTime.current += 1;
+    runCommands(def.parse(t, logicalTime.current));
+    setText('');
+  }, [def, runCommands, say]);
+  const submitCommands = useCallback((commands: readonly WorldCommand[], label: string) => { say('user', label); runCommands({ commands, unresolved: [] }); }, [runCommands, say]);
+  const nextLogicalTime = useCallback(() => { logicalTime.current += 1; return logicalTime.current; }, []);
+  /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
+   *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
+  const bridgeRef = useRef<ReturnType<typeof createScientificWorldsCognitiveCore> | null>(null);
+  const runCuriosity = useCallback(async (approve: boolean) => {
+    if (curiosityBusy) return;
+    setCuriosityBusy(true);
+    try {
+      bridgeRef.current ??= createScientificWorldsCognitiveCore({ worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, memory: scienceMemoryPort(), defaultSeed: 7 });
+      const probeRunner = def.runner(new EvidenceLedger({ now: () => Date.now() }));
+      const result = await runCuriosityCycle({ bridge: bridgeRef.current, binding: { worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, memory: bridgeRef.current.memory ?? undefined }, probeRunner, approvedBy: approve ? 'operator (HUD)' : null, maxIterations: 1 });
+      setCuriosity(result);
+      const it = result.iterations[0];
+      if (!it) { say('system', 'Ciekawość: brak luk w bazie dowodów — nie ma pytania do zbadania.'); return; }
+      say('agent', `Ciekawość: ${it.question.text}`);
+      if (it.hypotheses.length) say('agent', `Hipotezy: ${it.hypotheses.map((h) => `${h.revised.criterion.metric}≈${h.revised.criterion.expectedValue} (${h.assessment}, pewność ${h.revised.confidence.toFixed(2)})`).join(' | ')}`);
+      if (it.terminal === 'AWAITING_HUMAN_APPROVAL' && it.experiment) say('system', `Proponowany eksperyment różnicujący: ${it.experiment.experimentId} przy ${it.experiment.station.label}. Wymaga zatwierdzenia przez człowieka — kliknij „Zatwierdź i uruchom".`);
+      else if (it.session) { setSession(it.session); sessionRef.current = it.session; setReplay(null); setSessions((list) => [...list.slice(-40), it.session!]); sim.noteSealedSession(it.session); say('agent', `Sesja ${it.session.sessionId} (${it.session.epistemicStatus}) zapieczętowana; ${it.key}=${it.observed}. Wynik dotyczy modelu, nie świata. Zapisano w Pamięci Naukowej.`); }
+      else say('system', `Cykl zakończony: ${it.terminal}${it.sourceSearch.ingestionRequest ? ` — ${it.sourceSearch.ingestionRequest}` : ''}.`);
+    } finally { setCuriosityBusy(false); }
+  }, [curiosityBusy, def, runner, say, sim]);
+  /** D-130: the flagship journey (mirror twin → circular gate → time machine → the agentic loop at the observation window → capture spec → replay), headless on this world's services.
+   *  The click is the human approval for the one experiment the loop runs; every state is narrated with its label. Physics world only (the window runs the photon model). */
+  const runAgentic = useCallback(async () => {
+    if (curiosityBusy || world !== 'physics') return;
+    setCuriosityBusy(true);
+    try {
+      bridgeRef.current ??= createScientificWorldsCognitiveCore({ worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, memory: scienceMemoryPort(), defaultSeed: 7 });
+      const r = await runFlagshipJourney({ sessionId: `flagship-${Date.now().toString(36)}`, binding: { worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, defaultSeed: 7 }, bridge: bridgeRef.current, room: def.room, obstacles: def.obstacles, spawn: def.spawn, userGoal: 'Czy zakrzywiona czasoprzestrzeń zmienia propagację światła w modelu? Wyjaśnij wynik i jego dowody.', mode: 'SCIENTIFIC', approvedBy: 'operator (HUD)' });
+      setFlagship(r);
+      say('agent', `Lustro: ${r.mirror.state} (${r.mirror.identityScope}); bliźniak: ${r.mirror.divergenceAction ?? '—'}.`);
+      say('agent', `Brama: ${r.portal.style} ${r.portal.phase}, przejście ${r.portal.traversed ? 'wykonane' : 'nie'}; świat docelowy ${r.portal.destinationStatus}.`);
+      say('agent', `Wehikuł czasu: ${r.timeMachine.mode} → ${r.timeMachine.epistemicStatus}${r.timeMachine.computation ? `, różnica zegarów ${r.timeMachine.computation.differenceSeconds.toExponential(3)} s/dobę (${r.timeMachine.computation.regime})` : ''}.`);
+      setSession(r.trace.session); sessionRef.current = r.trace.session; setReplay(null); setSessions((list) => [...list.slice(-40), r.trace.session]); sim.noteSealedSession(r.trace.session); if (r.trace.session.stationId) sim.setArtifact(r.trace.session.stationId, ((): SceneArtifact => { const v = replayExperimentSession(r.trace.session, runner); return v.artifact as SceneArtifact; })());
+      say('agent', `Falsyfikacja: ${r.trace.falsification.status} — ${r.trace.falsification.rationale}`);
+      say('agent', r.trace.finalAnswer.text);
+      say('system', `Zapis sesji: ${r.events.length} zdarzeń w łańcuchu, replay ${r.replayMatches ? 'ZGODNY' : 'ROZBIEŻNY'}, sesja ${r.sessionReplay}; capture ${r.capture.aspect} z etykietą ${r.capture.badge.status}.`);
+    } catch (e) { say('system', `Pętla agentowa odmówiła: ${e instanceof Error ? e.message : String(e)}.`); }
+    finally { setCuriosityBusy(false); }
+  }, [curiosityBusy, def, runner, say, sim, world]);
 
   const onSubmit = (e: FormEvent): void => { e.preventDefault(); submit(text); };
   const doReplay = (): void => {
@@ -193,7 +253,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
 
   return (
-    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined}>
+    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined}>
       <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
       {camera === 'VISOR' && (
         <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">
@@ -213,6 +273,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           {station && <span className="sw-badge">STANOWISKO: {station.label}</span>}
           <span className="sw-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : 'OBSERWATOR'}</span>
           {world === 'biology' && <span className="sw-badge" data-testid="sw-twin">BLIŹNIAK: {anatomy.displayMode} · {anatomy.selectedNodeId} · {TWIN_ASSET_TIER} · MODEL</span>}
+          {world === 'biology' && <button type="button" className="sw-btn sw-btn-mini" onClick={() => setExplorerOpen((o) => !o)} aria-expanded={explorerOpen} data-testid="sw-explorer-toggle">Human Explorer {explorerOpen ? '▾' : '▸'}</button>}
         </div>
         {agentState !== 'IDLE' && agentState !== 'BLOCKED' && <div className="sw-progress" aria-hidden="true"><span style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
         {blocked && <p className="cw-error" role="alert" data-testid="sw-blocked">Zablokowany: {blocked}</p>}
@@ -247,8 +308,20 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         ) : (
           <p className="sw-faint" data-testid="sw-no-session">Brak sesji. Każdy eksperyment tworzy jedną sesję z hashem treści, odciskiem replay i wpisem w EvidenceLedger.</p>
         ))}
+        {evidenceOpen && (
+          <div className="sw-actions" data-testid="sw-curiosity">
+            <button type="button" className="sw-btn" onClick={() => void runCuriosity(false)} disabled={curiosityBusy} data-testid="sw-curiosity-propose">Ciekawość: zaproponuj</button>
+            {curiosity?.terminal === 'AWAITING_HUMAN_APPROVAL' && <button type="button" className="sw-btn sw-btn-primary" onClick={() => void runCuriosity(true)} disabled={curiosityBusy} data-testid="sw-curiosity-approve">Zatwierdź i uruchom</button>}
+            {curiosity && <span className="sw-badge" data-testid="sw-curiosity-terminal">{curiosity.terminal}</span>}
+            {world === 'physics' && <button type="button" className="sw-btn" onClick={() => void runAgentic()} disabled={curiosityBusy} data-testid="sw-agentic-run">Pętla agentowa: foton (zatwierdzam)</button>}
+            {flagship && <span className="sw-badge" data-testid="sw-agentic-status">{flagship.trace.falsification.status} · replay {flagship.replayMatches ? 'MATCH' : 'DRIFT'}</span>}
+          </div>
+        )}
       </section>
 
+      {world === 'biology' && explorerOpen && (
+        <HumanExplorerPanel manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions} busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime} />
+      )}
       <section className="sw-hud sw-hud-command" aria-label="Polecenia" data-testid="sw-command">
         <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">
           {transcript.map((e) => <li key={e.id} className={`sw-line sw-line-${e.who}`}>{e.text}</li>)}

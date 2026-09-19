@@ -476,10 +476,15 @@ export class AgentLabScene3D implements Sim3D {
       ctx.fillText('ZDERZENIE · TOY MC', 14, 30);
       ctx.fillStyle = '#e6f2ec'; ctx.font = `${Math.round(canvas.height * 0.08)}px monospace`;
       ctx.fillText(artifact.eventId, 14, 66); ctx.fillText(`${artifact.process} · ${artifact.finals.length} cząstek`, 14, 94); ctx.fillText(`paczka ${artifact.batchSize}`, 14, 122);
-    } else {
+    } else if (artifact.kind === 'blackhole') {
       ctx.fillText('HORYZONT · SPEKULATYWNE', 14, 30);
       ctx.fillStyle = '#e6f2ec'; ctx.font = `${Math.round(canvas.height * 0.08)}px monospace`;
       ctx.fillText(artifact.formed ? `r_s ${artifact.rsM?.toExponential(2)} m` : 'BRAK FORMACJI', 14, 66);
+    } else {
+      // D-130: the observation window's spacetime model — the delay and deflection from the sealed session, labelled MODEL.
+      ctx.fillText('FOTON · CZASOPRZESTRZEŃ · MODEL', 14, 30);
+      ctx.fillStyle = '#e6f2ec'; ctx.font = `${Math.round(canvas.height * 0.08)}px monospace`;
+      ctx.fillText(`Δt Shapiro ${artifact.report.shapiroDelayS.toExponential(3)} s`, 14, 66); ctx.fillText(`ugięcie ${artifact.report.deflectionArcsec.toFixed(3)}″`, 14, 94); ctx.fillText(`c = 299 792 458 m/s (SI)`, 14, 122);
     }
     texture.needsUpdate = true;
   }

@@ -360,4 +360,3 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .cern-badge.is-hot { color: #f87171; border-color: rgba(248, 113, 113, 0.5); text-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
 .cern-hashes { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.66rem; color: #9ff9d0; text-shadow: 0 0 6px rgba(0, 255, 156, 0.3); }
 @media (max-width: 900px) { .cern-hud-left { width: 100%; position: relative; } .cern-hud-right { position: relative; width: 100%; } .cern { overflow-y: auto; } }
-

@@ -26,6 +26,12 @@ export interface WorldEntry {
 
 export const WORLDS: readonly WorldEntry[] = [
   {
+    id: 'scientific-worlds', preview: 'vessel', hash: '#/scientific-worlds', glyph: '⛑', title: 'Agent w laboratorium', domain: 'Scientific Worlds', featured: true,
+    purpose: 'Napisz polecenie — agent w kombinezonie idzie do stanowiska, obsługuje konsolę i wykonuje prawdziwy eksperyment; patrzysz przez wizjer.',
+    real: 'Jedna sesja na eksperyment: wejścia, silnik, wyniki, hash treści, odcisk replay i wpis w EvidenceLedger; replay MATCH/DRIFT.',
+    visual: 'Laboratorium z zestawów Genesis Graphics, rig humanoida w kombinezonie, kamera w hełmie; HUD w strefach bezpiecznych.',
+  },
+  {
     id: 'city3d', preview: 'city', hash: '#/city3d', glyph: '◫', title: 'Miasto epidemiologiczne', domain: 'Epidemiology World', featured: true,
     purpose: 'Jak interwencja (izolacja, zamknięcie szkół) zmienia dynamikę zakażeń w mieście.',
     real: 'Agentowy model epidemii dzień po dniu, hotspoty, obłożenie szpitala, fingerprint przebiegu.',

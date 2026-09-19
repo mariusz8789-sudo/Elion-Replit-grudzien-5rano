@@ -87,6 +87,7 @@ const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').
 const ColliderChamber = lazy(() => import('./components/ColliderChamber').then((m) => ({ default: m.ColliderChamber })));
 const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ default: m.LabFpvView })));
 const CernComplexView = lazy(() => import('./components/CernComplexView').then((m) => ({ default: m.CernComplexView })));
+const ScientificWorldsScreen = lazy(() => import('./components/ScientificWorldsScreen').then((m) => ({ default: m.ScientificWorldsScreen })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -172,6 +173,7 @@ type Route =
   | { kind: 'collider' }
   | { kind: 'lab-fpv' }
   | { kind: 'cern-complex' }
+  | { kind: 'scientific-worlds' }
   | { kind: 'decipherment' }
   | { kind: 'myths-theories' };
 
@@ -239,6 +241,7 @@ function parseHash(): Route {
   if (h === '#/collider') return { kind: 'collider' };
   if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
   if (h === '#/cern-complex') return { kind: 'cern-complex' };
+  if (h === '#/scientific-worlds' || h.startsWith('#/scientific-worlds?')) return { kind: 'scientific-worlds' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
@@ -737,6 +740,18 @@ export default function App() {
           <TopBar title="🧪 Quantum Lab — FPV" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <LabFpvView />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'scientific-worlds') {
+      // Scientific Worlds: full-viewport WebGL through the agent's visor, HUD in safe zones; the shell backdrop is suppressed here.
+      return (
+        <div className="app app-matrix-stage app-sw">
+          <HeavyRoute>
+            <ScientificWorldsScreen />
           </HeavyRoute>
           {overlays}
         </div>

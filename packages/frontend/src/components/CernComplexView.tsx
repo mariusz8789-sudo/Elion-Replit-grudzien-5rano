@@ -5,6 +5,7 @@ import { SSRPass } from 'three/examples/jsm/postprocessing/SSRPass.js';
 import type { BlackHoleAnalysis, CollisionBatchAnalysis, MaterialsAnalysis } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import { kernelRegistry } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import type { IonSpec, LatticeSite } from '@genesis/core/cern/MaterialsDiscoveryEngine.js';
+import { ION_PRESETS } from '../core/scientificWorlds/ionPresets';
 import { createEventHorizonMaterial, createEventHorizonQuad } from '../../../ui/src/cern/EventHorizonShader';
 import { createTunnelWalkthrough } from '../../../ui/src/cern/TunnelWalkthroughGpu';
 import { createLabComplex, type CameraMode, type LabComplexHandle } from '../../../ui/src/cern/LabComplexGpu';
@@ -40,13 +41,7 @@ import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
 
 export const MODE_LABEL: Record<CameraMode, string> = { WALK: '1 · WALK — spacer FPV', GLASS: '2 · GLASS — pancerna szyba', CONSOLE: '3 · CONSOLE — sterownia', TUNNEL: '4 · TUNNEL — pierścień LHC' };
 
-export const ION_PRESETS: Readonly<Record<string, readonly IonSpec[]>> = {
-  NaCl: [{ species: 'Na', charge: 1, radiusPm: 102, count: 1, atomicMassU: 22.99 }, { species: 'Cl', charge: -1, radiusPm: 181, count: 1, atomicMassU: 35.45 }],
-  SrTiO3: [{ species: 'Sr', charge: 2, radiusPm: 144, count: 1, atomicMassU: 87.62 }, { species: 'Ti', charge: 4, radiusPm: 60.5, count: 1, atomicMassU: 47.87 }, { species: 'O', charge: -2, radiusPm: 140, count: 3, atomicMassU: 16.0 }],
-  Cu: [{ species: 'Cu', charge: 0, radiusPm: 128, count: 1, atomicMassU: 63.55 }],
-  MgO: [{ species: 'Mg', charge: 2, radiusPm: 72, count: 1, atomicMassU: 24.31 }, { species: 'O', charge: -2, radiusPm: 140, count: 1, atomicMassU: 16.0 }],
-  Fe: [{ species: 'Fe', charge: 2, radiusPm: 126, count: 1, atomicMassU: 55.85 }],
-};
+export { ION_PRESETS } from '../core/scientificWorlds/ionPresets';
 
 const SEED = 0x4345524e; // 'CERN'
 

@@ -51,6 +51,8 @@ export const SUPPRESSED_ROUTES: readonly string[] = [
   '#/collider', '#/lab-fpv',
   // The CERN complex is a full-viewport WebGL route with its own composer.
   '#/cern-complex',
+  // Scientific Worlds: the agent laboratory owns its full-viewport WebGL.
+  '#/scientific-worlds',
 ];
 
 export function isSuppressed(hash: string): boolean {

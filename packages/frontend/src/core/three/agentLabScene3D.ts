@@ -7,7 +7,8 @@ import { createGlassChamber, createPipe, createPlatform } from './graphics/primi
 import { createConduitRun, createElectricalCabinet } from './graphics/electricalKit';
 import { createWallSign } from './graphics/signageKit';
 import { createGenesisMaterialPalette, createEmissiveInstrumentMaterial, createScientificGlass, createScreenMaterial, makeReadoutSurface, type GenesisMaterialPalette } from './graphics/materials';
-import { createBackgroundFill, createHeroLight, createKeyLight, createPracticalLight } from './graphics/lighting';
+import { createHeroLight, createKeyLight, createPracticalLight } from './graphics/lighting';
+import { WORLD_GRADES, applyGradeFloor, applyWorldGrade, gradePipelineOptions, type WorldGrade } from './graphics/worldGrade';
 import { createDustMotes, createLightShaft, type DustMotesHandle } from './graphics/atmosphere';
 import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postProcessing';
 import { applyShadowPolicy } from './graphics/shadowPolicy';
@@ -117,6 +118,10 @@ export class AgentLabScene3D implements Sim3D {
   private chamberGlass: THREE_NS.Object3D | null = null;
   /** D-131: how the BODY shell is presented. X-ray here is a stylised view of a model, never a radiograph. */
   private twinSurface: TwinSurfaceMode = 'NORMAL';
+  /** D-132: this world's look — black point, fog, ambient balance, exposure, bloom, floor. */
+  private grade: WorldGrade = WORLD_GRADES.physics;
+  /** D-132: the room probe must fire once the first full frame exists, never during init. */
+  private probeTaken = false;
   private onTwinTier: ((tier: HumanTwinTier) => void) | null = null;
   private lastWall: number | null = null;
   private gate: VisualRealityResult | null = null;
@@ -274,14 +279,16 @@ export class AgentLabScene3D implements Sim3D {
     const palette = createGenesisMaterialPalette(THREE);
     const tier = detectRenderTier();
     if (this.world === 'biology') { this.initBiology(THREE, scene, camera, palette, tier); return; }
-    scene.background = new THREE.Color(0x05070d);
-    scene.fog = new THREE.FogExp2(0x070a12, 0.028);
+    // D-132: the physics lab's own grade — concrete and metal, warmer and dirtier than biology.
+    this.grade = WORLD_GRADES.physics;
+    applyWorldGrade(THREE, scene, this.grade);
     configureCinematicCamera(camera, 'SCIENTIST_POV');
 
     const W = this.room.maxX - this.room.minX; const D = this.room.maxZ - this.room.minZ;
     const cx = (this.room.maxX + this.room.minX) / 2; const cz = (this.room.maxZ + this.room.minZ) / 2;
     // Shell: floor, ceiling, walls.
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), palette.LAB_FLOOR); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
+    const floorMat = (palette.LAB_FLOOR as THREE_NS.MeshStandardMaterial).clone(); applyGradeFloor(floorMat, this.grade);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
     const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), palette.CONCRETE); ceiling.rotation.x = Math.PI / 2; ceiling.position.set(cx, CEILING_Y, cz); scene.add(ceiling);
     const wallGeoX = new THREE.PlaneGeometry(W, CEILING_Y); const wallGeoZ = new THREE.PlaneGeometry(D, CEILING_Y);
     const back = new THREE.Mesh(wallGeoX, palette.LAB_WALL); back.position.set(cx, CEILING_Y / 2, this.room.minZ); scene.add(back);
@@ -304,7 +311,8 @@ export class AgentLabScene3D implements Sim3D {
       const p = new THREE.Mesh(panelGeo, panelMat); p.position.set(x, CEILING_Y - 0.03, z); scene.add(p);
       createPracticalLight(THREE, scene, { position: [x, CEILING_Y - 0.25, z], color: 0xdff3ff, intensity: 3.2, distance: 6.5, decay: 1.8 });
     }
-    createBackgroundFill(THREE, scene, { skyColor: 0x9fb8d8, groundColor: 0x3a4250, intensity: 0.42 });
+    // D-132: the ambient bounce now comes from the grade (applyWorldGrade). A second, brighter fill here
+    // is what flattened the shadows — and a scene without shadows has no form.
     createKeyLight(THREE, scene, { target: [0, 0.9, -1.5], position: [0.8, CEILING_Y - 0.2, 0.4], intensity: 30, angle: Math.PI / 3.2, penumbra: 0.6, shadowMapSize: recommendedShadowMapSize(tier), shadowNear: 0.3, shadowFar: 14 });
     scene.add(createLightShaft(THREE, { origin: [0, CEILING_Y - 0.1, -2.5], direction: [0.1, -1, 0.35], length: 3.4, width: 1.2, color: 0xcfe9ff, opacity: 0.18 }));
     this.dust = createDustMotes(THREE, { count: 220, bounds: [W / 2 - 0.5, 1.6, D / 2 - 0.5], center: [cx, 1.7, cz], color: 0xdde8ff, size: 0.012, opacity: 0.35, seed: 7 });
@@ -355,15 +363,17 @@ export class AgentLabScene3D implements Sim3D {
   private initBiology(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, palette: GenesisMaterialPalette, tier: ReturnType<typeof detectRenderTier>): void {
     this.ceilingY = BIOLOGY_SCENE.dimensionsMeters.y;
     const H = this.ceilingY;
-    scene.background = new THREE.Color(0x070a10);
-    scene.fog = new THREE.FogExp2(0x0a0f18, 0.014);
+    // D-132: the biology lab's own grade — deep black point, dark mirrored floor, light on the twin.
+    this.grade = WORLD_GRADES.biology;
+    applyWorldGrade(THREE, scene, this.grade);
     configureCinematicCamera(camera, 'SCIENTIST_POV');
     this.spectatorPos?.set(0, 2.6, 9.5); this.spectatorLook?.set(0, 1.4, 0);
     const W = this.room.maxX - this.room.minX; const D = this.room.maxZ - this.room.minZ;
     const cx = (this.room.maxX + this.room.minX) / 2; const cz = (this.room.maxZ + this.room.minZ) / 2;
     const glass = labGlass(THREE, 0xd6ecff);
     // Shell: floor, two solid walls (east/west), two glass curtain walls (north/south, as the pack's arch.glass-wall nodes) with corridors behind, the layered ceiling.
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), createEpoxyFloor(THREE)); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
+    const epoxy = createEpoxyFloor(THREE); applyGradeFloor(epoxy, this.grade);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), epoxy); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
     const wallGeoZ = new THREE.PlaneGeometry(D, H);
     const left = new THREE.Mesh(wallGeoZ, palette.LAB_WALL); left.position.set(this.room.minX, H / 2, cz); left.rotation.y = Math.PI / 2; scene.add(left);
     const right = new THREE.Mesh(wallGeoZ, palette.LAB_WALL); right.position.set(this.room.maxX, H / 2, cz); right.rotation.y = -Math.PI / 2; scene.add(right);
@@ -376,7 +386,7 @@ export class AgentLabScene3D implements Sim3D {
     for (const x of [-5, 5]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.004, D - 2), laneMat); l.position.set(x, 0.003, cz); scene.add(l); }
     for (const z of [-2.2, 2.2]) { const l = new THREE.Mesh(new THREE.BoxGeometry(W - 2, 0.004, 0.08), laneMat); l.position.set(cx, 0.003, z); scene.add(l); }
     // Lights from the pack's nodes: key (shadow caster, aimed at the twin), fill and rim; colour temperature and lumens honoured.
-    createBackgroundFill(THREE, scene, { skyColor: 0xb9cce4, groundColor: 0x3d4652, intensity: 0.26 });
+    // D-132: ambient comes from the grade; the extra fill here was half of why the room read white.
     for (const n of BIOLOGY_SCENE.nodes) {
       if (n.kind !== 'LIGHT') continue;
       const color = kelvinToColor(THREE, Number(n.metadata?.temperatureK ?? 5000)); const lumens = Number(n.metadata?.lumens ?? 5000);
@@ -564,6 +574,10 @@ export class AgentLabScene3D implements Sim3D {
     const THREE = this.THREE; const ch = this.character;
     if (!THREE || !ch || !this.scratchA || !this.scratchB || !this.spectatorPos || !this.spectatorLook) return;
     this.frames++;
+    // D-132: the reflection probe is taken from the SECOND frame, never during init — only by then are
+    // lights, shadows and emissive surfaces actually resolved, so the environment map carries this room
+    // rather than an empty scene. One capture, then never again.
+    if (!this.probeTaken && this.frames > 1) { this.probeTaken = true; this.pipeline?.captureRoomProbe(); }
     const pose = this.controller.pose;
     const u = this.lastUpdate;
     ch.root.position.set(pose.position.x, 0, pose.position.z);
@@ -675,12 +689,19 @@ export class AgentLabScene3D implements Sim3D {
     // D-131: local clipping is what makes the section plane real. Off until a cutaway is requested, so the
     // opaque path is unchanged for every other scene and frame.
     renderer.localClippingEnabled = this.cutawayState.enabled;
+    // D-132: exposure, bloom and the ambient source all come from this world's grade. The previous
+    // `ambient: 'studio+hdri'` put a generic white-ceilinged studio box at environmentIntensity 1.15
+    // ON TOP of a scene that had already set its own dark background, fog and lights — which is
+    // precisely the case the pipeline's own docs say to opt out of, and what every other scene in
+    // the repository already does. The room probe reflects THIS room instead of a generic one.
+    const graded = gradePipelineOptions(this.grade, [TWIN_CHAMBER.position.x, 1.5, TWIN_CHAMBER.position.z + 2.2]);
     this.pipeline = setupGraphicsPipeline(THREE, modules, renderer, {
-      scene, camera, width: w, height: h, toneMappingExposure: 1.0,
-      bloom: tierAllowsBloom(tier) ? { strength: 0.38, radius: 0.55, threshold: 0.82 } : { strength: 0, radius: 0, threshold: 1 },
+      scene, camera, width: w, height: h,
+      toneMappingExposure: graded.toneMappingExposure,
+      bloom: tierAllowsBloom(tier) ? graded.bloom : { strength: 0, radius: 0, threshold: 1 },
       ambientOcclusion: { enabled: true, minTier: 'medium', radius: 0.5 },
       depthOfField: { enabled: false, focusDistance: 1.6 },
-      ambient: { mode: 'studio+hdri' },
+      ambient: graded.ambient,
     });
     return this.pipeline;
   }
@@ -696,6 +717,7 @@ export class AgentLabScene3D implements Sim3D {
     this.stations.clear();
     this.beacons = [];
     this.character = null; this.scene = null; this.THREE = null; this.pipeline = null; this.renderer = null; this.gate = null;
+    this.probeTaken = false;
   }
 }
 

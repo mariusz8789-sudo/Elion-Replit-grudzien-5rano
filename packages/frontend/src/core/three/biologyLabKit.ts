@@ -415,7 +415,9 @@ export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptio
   const bottom = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.08, 0.03, 10, 64), ring); bottom.rotation.x = Math.PI / 2; bottom.position.y = 0.21; g.add(bottom);
   // Reference look: vertical ribs around the glass, four pilasters, a segmented LED ring in the base, an emitter inside, concentric light rings overhead.
   for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, opts.height, 0.05), opts.palette.POLISHED_METAL); rib.position.set(Math.cos(a) * (opts.radius + 0.01), opts.height / 2 + 0.2, Math.sin(a) * (opts.radius + 0.01)); rib.rotation.y = -a; enclosure.add(rib); }
-  for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; g.add(createColumn(THREE, opts.palette.PAINTED_METAL, { position: [Math.cos(a) * (opts.radius + 0.18), 0.14, Math.sin(a) * (opts.radius + 0.18)], height: opts.height + 0.1, radius: 0.045 })); }
+  // The four pilasters belong to the vitrine too: from the twin camera's distance they cut straight
+  // across the figure's arms, so they open with the glass and the ribs.
+  for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; enclosure.add(createColumn(THREE, opts.palette.PAINTED_METAL, { position: [Math.cos(a) * (opts.radius + 0.18), 0.14, Math.sin(a) * (opts.radius + 0.18)], height: opts.height + 0.1, radius: 0.045 })); }
   const ledGeo = new THREE.BoxGeometry(0.06, 0.05, 0.02);
   for (let i = 0; i < 48; i++) { const a = (i / 48) * Math.PI * 2; const led = new THREE.Mesh(ledGeo, ring); led.position.set(Math.cos(a) * (opts.radius + 0.22), 0.1, Math.sin(a) * (opts.radius + 0.22)); led.rotation.y = -a; g.add(led); }
   const emitter = createPracticalLight(THREE, g as unknown as THREE_NS.Scene, { position: [0, opts.height * 0.62, 0], color: 0x9fe9ff, intensity: 5, distance: 4.5, decay: 2 });

@@ -90,6 +90,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
   { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex' },
   { id: 'scientific-worlds', label: 'Światy naukowe — agent w laboratorium', icon: '⛑', hash: '#/scientific-worlds' },
+  { id: 'human-biology-lab', label: 'Human Biology Lab — cyfrowy bliźniak', icon: '🫀', hash: '#/human-biology-lab' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
   {
     id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',

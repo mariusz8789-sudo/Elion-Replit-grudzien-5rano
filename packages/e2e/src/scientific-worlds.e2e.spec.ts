@@ -15,6 +15,12 @@ const SHOTS = {
   spectator: 'artifacts/scientific-worlds-spectator.png',
   epidemic: 'artifacts/scientific-worlds-epidemic.png',
   mobile: 'artifacts/scientific-worlds-mobile.png',
+  bioIdle: 'artifacts/human-biology-lab-visor-idle.png',
+  bioWalking: 'artifacts/human-biology-lab-walking.png',
+  bioBrain: 'artifacts/human-biology-lab-brain-mode.png',
+  bioHyperscope: 'artifacts/human-biology-lab-hyperscope.png',
+  bioOrpheus: 'artifacts/human-biology-lab-orpheus.png',
+  bioSpectator: 'artifacts/human-biology-lab-spectator.png',
 } as const;
 
 const settled = async (page: Page, frames = 2): Promise<void> => {
@@ -115,6 +121,64 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await page.screenshot({ path: SHOTS.mobile });
     const report = new VisualFidelityHarness().inspectFile(SHOTS.mobile);
     expect(report.ok, `Eyes reject mobile: ${report.reason ?? 'OK'}`).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('human biology lab: the V3 acceptance sentence — twin, brain, Hyperscope 5×, ORPHEUS, Evidence', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
+    await page.goto('/#/human-biology-lab');
+    const root = page.getByTestId('scientific-worlds');
+    await expect(root).toHaveAttribute('data-world', 'biology');
+    await expect(page.getByTestId('sw-twin')).toContainText('NORMAL');
+    await expect(page.getByTestId('sw-twin')).toContainText('PROXY');
+    await settled(page, 3);
+    await page.screenshot({ path: SHOTS.bioIdle });
+
+    await page.getByTestId('sw-input').fill('Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope, powiększ 5×, a potem zbadaj próbkę przez Orpheus i pokaż mi Evidence.');
+    await page.getByTestId('sw-send').click();
+    await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem 7 polecenia');
+    await waitState(page, ['MOVING_TO_TARGET']);
+    await settled(page, 2);
+    await page.screenshot({ path: SHOTS.bioWalking });
+    // The anatomy table: OPEN_TWIN then FOCUS_ANATOMY → the twin's display mode becomes BRAIN (V3 anatomyView reducers).
+    await expect.poll(async () => root.getAttribute('data-twin-mode'), { timeout: 400_000 }).toBe('BRAIN');
+    await expect(page.getByTestId('sw-twin')).toContainText('BRAIN · brain');
+    await settled(page, 2);
+    await page.screenshot({ path: SHOTS.bioBrain });
+    // Hyperscope 5×: a MODEL session (digital zoom of the model — never an observation).
+    await expect(page.getByTestId('sw-session')).toBeVisible({ timeout: 400_000 });
+    await expect(page.getByTestId('sw-epistemic')).toHaveText('MODEL');
+    await expect(page.getByTestId('sw-outputs')).toContainText('magnification: 5');
+    await expect(page.getByTestId('sw-outputs')).toContainText('mode: DIGITAL_ZOOM');
+    await expect(page.getByTestId('sw-ledger-hash').first()).toContainText(/contentHash [0-9a-f]{64}/);
+    const first = await page.getByTestId('sw-session').getAttribute('data-session-id');
+    await settled(page, 2);
+    await page.screenshot({ path: SHOTS.bioHyperscope });
+    // ORPHEUS: a SIMULATION session on the same contract, biosafety ACCESS_RESTRICTED (conceptual-only protocol).
+    await expect.poll(async () => page.getByTestId('sw-session').getAttribute('data-session-id'), { timeout: 400_000 }).not.toBe(first);
+    await expect(page.getByTestId('sw-epistemic')).toHaveText('SIMULATION');
+    await expect(page.getByTestId('sw-outputs')).toContainText('biosafety: ACCESS_RESTRICTED');
+    await waitState(page, ['IDLE'], 400_000);
+    await expect(page.getByTestId('sw-transcript')).toContainText('ORPHEUS');
+    await expect(page.getByTestId('sw-transcript')).toContainText('Skąd to pochodzi');
+    await settled(page, 2);
+    await page.screenshot({ path: SHOTS.bioOrpheus });
+    await page.getByTestId('sw-replay').click();
+    await expect(page.getByTestId('sw-replay-verdict')).toHaveText(/MATCH/);
+    await page.getByTestId('sw-camera').click();
+    await expect(root).toHaveAttribute('data-camera', 'SPECTATOR');
+    await settled(page, 2);
+    await page.screenshot({ path: SHOTS.bioSpectator });
+
+    const harness = new VisualFidelityHarness();
+    for (const path of [SHOTS.bioIdle, SHOTS.bioWalking, SHOTS.bioBrain, SHOTS.bioHyperscope, SHOTS.bioOrpheus, SHOTS.bioSpectator]) {
+      const report = harness.inspectFile(path);
+      expect(report.ok, `Eyes reject ${path}: ${report.reason ?? 'OK'}`).toBe(true);
+    }
     expect(errors).toEqual([]);
   });
 });

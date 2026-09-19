@@ -173,7 +173,7 @@ type Route =
   | { kind: 'collider' }
   | { kind: 'lab-fpv' }
   | { kind: 'cern-complex' }
-  | { kind: 'scientific-worlds' }
+  | { kind: 'scientific-worlds'; world?: 'physics' | 'biology' }
   | { kind: 'decipherment' }
   | { kind: 'myths-theories' };
 
@@ -242,6 +242,7 @@ function parseHash(): Route {
   if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
   if (h === '#/cern-complex') return { kind: 'cern-complex' };
   if (h === '#/scientific-worlds' || h.startsWith('#/scientific-worlds?')) return { kind: 'scientific-worlds' };
+  if (h === '#/human-biology-lab' || h.startsWith('#/human-biology-lab?')) return { kind: 'scientific-worlds', world: 'biology' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
   return { kind: 'home' };
@@ -751,7 +752,7 @@ export default function App() {
       return (
         <div className="app app-matrix-stage app-sw">
           <HeavyRoute>
-            <ScientificWorldsScreen />
+            <ScientificWorldsScreen world={route.world ?? 'physics'} />
           </HeavyRoute>
           {overlays}
         </div>

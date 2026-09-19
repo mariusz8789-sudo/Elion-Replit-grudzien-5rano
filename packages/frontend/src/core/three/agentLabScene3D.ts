@@ -18,6 +18,15 @@ import type { AgentController, AgentUpdate } from '../scientificWorlds/agentCont
 import type { LabStation } from '../scientificWorlds/labWorld';
 import type { LabArtifact } from '../scientificWorlds/experimentRunners';
 import type { RoomBounds } from './firstPersonController';
+import type { BiologyArtifact } from '../scientificWorlds/biologyRunners';
+import type { ExperimentSession } from '../scientificWorlds/experimentSession';
+import { BIOLOGY_SCENE, TWIN_CHAMBER } from '../scientificWorlds/biologyLabWorld';
+import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/anatomyAtlas';
+import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
+import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
+import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
+import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
+import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -37,6 +46,12 @@ import type { RoomBounds } from './firstPersonController';
  */
 
 export type AgentCameraMode = 'VISOR' | 'SPECTATOR';
+/** Which typed world the scene builds: the physics lab (default) or the V3 human-biology lab — one scene class, one pipeline. */
+export type SceneWorld = 'physics' | 'biology';
+export type SceneArtifact = LabArtifact | BiologyArtifact;
+const BIOLOGY_KINDS: ReadonlySet<string> = new Set(['physiology', 'neuro', 'hyperscope', 'histology', 'imaging', 'orpheus']);
+/** The twin id is fixed so the manifest (and every hash derived from it) is the same on every load. */
+export const TWIN_ID = 'HDT-genesis-human-biology-lab';
 
 export const AGENT_STATE_CODE: Readonly<Record<string, number>> = { IDLE: 0, MOVING_TO_TARGET: 1, ARRIVED: 2, ALIGNING: 3, REACHING: 4, INTERACTING: 5, EXECUTING: 6, OBSERVING: 7, REPORTING: 8, RETURNING: 9, BLOCKED: 10 };
 
@@ -45,8 +60,13 @@ interface StationVisual {
   readonly group: THREE_NS.Group;
   readonly statusMaterial: THREE_NS.MeshStandardMaterial;
   readonly light: THREE_NS.PointLight;
-  readonly screen?: { readonly ctx: CanvasRenderingContext2D; readonly texture: THREE_NS.CanvasTexture; readonly canvas: HTMLCanvasElement };
+  readonly screen?: Readout;
   artifactGroup: THREE_NS.Group | null;
+  /** Biology stations: robotic arms, where a 3D artifact is parented, LED strips, the table twin. */
+  readonly arms?: readonly ManipulatorHandle[];
+  readonly artifactAnchor?: THREE_NS.Group;
+  readonly leds?: readonly THREE_NS.MeshStandardMaterial[];
+  readonly twin?: TwinHandle;
 }
 
 const FLOOR_Y = 0;
@@ -71,8 +91,34 @@ export class AgentLabScene3D implements Sim3D {
   private spectatorPos: THREE_NS.Vector3 | null = null;
   private spectatorLook: THREE_NS.Vector3 | null = null;
   private onUpdate: ((u: AgentUpdate) => void) | null = null;
+  private ceilingY = CEILING_Y;
+  private twins: TwinHandle[] = [];
+  private arms: ManipulatorHandle[] = [];
+  private spinners: THREE_NS.Object3D[] = [];
+  private chamberRing: THREE_NS.MeshStandardMaterial | null = null;
+  private sealedSessions: ExperimentSession[] = [];
+  private twinInstruction: VisualLayerInstruction | null = null;
+  private renderer: THREE_NS.WebGLRenderer | null = null;
+  private lastWall: number | null = null;
+  private gate: VisualRealityResult | null = null;
+  readonly manifest: HumanDigitalTwinManifest = createHumanDigitalTwinManifest(TWIN_ID);
 
-  constructor(private readonly controller: AgentController, private readonly stationDefs: readonly LabStation[], private readonly room: RoomBounds) {}
+  constructor(private readonly controller: AgentController, private readonly stationDefs: readonly LabStation[], private readonly room: RoomBounds, private readonly world: SceneWorld = 'physics') {}
+
+  getWorld(): SceneWorld { return this.world; }
+
+  /** Biology: apply a V3 anatomy display mode to every twin in the scene (the chamber twin and the table twin). */
+  setTwinView(mode: Parameters<typeof buildVisualLayerInstruction>[1], selectedNodeId: string | null): void {
+    this.twinInstruction = buildVisualLayerInstruction(this.manifest, mode);
+    for (const t of this.twins) t.setView(this.twinInstruction, selectedNodeId);
+  }
+
+  /** Biology: the evidence wall lists the sessions sealed in this world — nothing else ever appears on it. */
+  noteSealedSession(session: ExperimentSession): void {
+    if (!this.sealedSessions.some((s) => s.sessionId === session.sessionId)) this.sealedSessions.push(session);
+    const wall = this.stations.get('station:evidence');
+    if (wall?.screen) drawEvidenceWall(wall.screen, this.sealedSessions);
+  }
 
   setUpdateListener(listener: ((u: AgentUpdate) => void) | null): void { this.onUpdate = listener; }
   setCameraMode(mode: AgentCameraMode): void { this.cameraMode = mode; }
@@ -80,7 +126,21 @@ export class AgentLabScene3D implements Sim3D {
   setHighlight(stationId: string | null): void { this.highlightId = stationId; }
 
   /** Renders THIS session's payload at its station; `null` clears it. */
-  setArtifact(stationId: string, artifact: LabArtifact | null): void {
+  setArtifact(stationId: string, artifact: SceneArtifact | null): void {
+    if (artifact && BIOLOGY_KINDS.has(artifact.kind)) { this.setBiologyArtifact(stationId, artifact as BiologyArtifact); return; }
+    this.setPhysicsArtifact(stationId, artifact as LabArtifact | null);
+  }
+
+  private setBiologyArtifact(stationId: string, artifact: BiologyArtifact): void {
+    const THREE = this.THREE; const v = this.stations.get(stationId);
+    if (!THREE || !v) return;
+    if (v.artifactGroup) { v.artifactGroup.parent?.remove(v.artifactGroup); disposeSceneResources(v.artifactGroup as unknown as THREE_NS.Scene); v.artifactGroup = null; }
+    if (v.screen) drawBiologyArtifact(v.screen, artifact, this.manifest);
+    const g = buildBiologyArtifact3D(THREE, artifact);
+    if (g && v.artifactAnchor) { v.artifactAnchor.add(g); v.artifactGroup = g; }
+  }
+
+  private setPhysicsArtifact(stationId: string, artifact: LabArtifact | null): void {
     const THREE = this.THREE; const v = this.stations.get(stationId);
     if (!THREE || !v) return;
     if (v.artifactGroup) { disposeSceneResources(v.artifactGroup); v.group.remove(v.artifactGroup); v.artifactGroup = null; }
@@ -139,6 +199,15 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   getStats(): Record<string, number> {
+    const base = this.statsBase();
+    // The flagship pack's density gate, re-measured every 60 frames (a scene traversal is not a per-frame cost).
+    if (this.scene && (this.gate === null || this.frames % 60 === 0)) this.gate = evaluateVisualReality(this.scene, this.renderer);
+    const g = this.gate;
+    return { ...base, world: this.world === 'biology' ? 1 : 0, twinMode: this.twinInstruction ? ['NORMAL', 'XRAY', 'VASCULAR', 'NERVOUS', 'ORGANS', 'BRAIN', 'TISSUE', 'CELLULAR'].indexOf(this.twinInstruction.mode) : -1, twins: this.twins.length,
+      polygons: g?.polygonCount ?? 0, drawCalls: g?.drawCalls ?? 0, opaqueMeshes: g?.opaqueMeshes ?? 0, transparentMeshes: g?.transparentMeshes ?? 0, visualGate: g ? (g.pass ? 1 : 0) : -1 };
+  }
+
+  private statsBase(): Record<string, number> {
     const u = this.lastUpdate; const pose = this.controller.pose;
     return {
       agentState: AGENT_STATE_CODE[u?.state ?? 'IDLE'] ?? 0, reach: pose.reach, progress: u?.progress ?? 0,
@@ -152,6 +221,7 @@ export class AgentLabScene3D implements Sim3D {
     this.spectatorPos = new THREE.Vector3(0, 2.2, 8); this.spectatorLook = new THREE.Vector3(0, 1.4, 0);
     const palette = createGenesisMaterialPalette(THREE);
     const tier = detectRenderTier();
+    if (this.world === 'biology') { this.initBiology(THREE, scene, camera, palette, tier); return; }
     scene.background = new THREE.Color(0x05070d);
     scene.fog = new THREE.FogExp2(0x070a12, 0.028);
     configureCinematicCamera(camera, 'SCIENTIST_POV');
@@ -222,6 +292,101 @@ export class AgentLabScene3D implements Sim3D {
     scene.add(character.root); this.character = character;
 
     applyShadowPolicy(THREE, scene);
+  }
+
+  /**
+   * The human-biology lab, built from the V3 pack's scene description (`BIOLOGY_SCENE`): its dimensions, its nine stations at
+   * their own ids and positions, its light nodes (colour temperature and lumens honoured), its signs and its clean-room air —
+   * with the Genesis kits (materials palette, lab/electrical kits, primitives, lighting roles, atmosphere) and the biology kits
+   * (layered ceiling, glass curtain walls, twin chamber, manipulators, stations). Same class, same pipeline, same cameras.
+   */
+  private initBiology(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, palette: GenesisMaterialPalette, tier: ReturnType<typeof detectRenderTier>): void {
+    this.ceilingY = BIOLOGY_SCENE.dimensionsMeters.y;
+    const H = this.ceilingY;
+    scene.background = new THREE.Color(0x070a10);
+    scene.fog = new THREE.FogExp2(0x0a0f18, 0.014);
+    configureCinematicCamera(camera, 'SCIENTIST_POV');
+    this.spectatorPos?.set(0, 2.6, 9.5); this.spectatorLook?.set(0, 1.4, 0);
+    const W = this.room.maxX - this.room.minX; const D = this.room.maxZ - this.room.minZ;
+    const cx = (this.room.maxX + this.room.minX) / 2; const cz = (this.room.maxZ + this.room.minZ) / 2;
+    const glass = labGlass(THREE, 0xd6ecff);
+    // Shell: floor, two solid walls (east/west), two glass curtain walls (north/south, as the pack's arch.glass-wall nodes) with corridors behind, the layered ceiling.
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), createEpoxyFloor(THREE)); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
+    const wallGeoZ = new THREE.PlaneGeometry(D, H);
+    const left = new THREE.Mesh(wallGeoZ, palette.LAB_WALL); left.position.set(this.room.minX, H / 2, cz); left.rotation.y = Math.PI / 2; scene.add(left);
+    const right = new THREE.Mesh(wallGeoZ, palette.LAB_WALL); right.position.set(this.room.maxX, H / 2, cz); right.rotation.y = -Math.PI / 2; scene.add(right);
+    const wallOpts = { width: W, height: H, glass, mullionMaterial: palette.PAINTED_METAL, plinthMaterial: palette.BRUSHED_METAL, corridorFloor: palette.CONCRETE, corridorWall: palette.LAB_WALL } as const;
+    scene.add(createGlassCurtainWall(THREE, { ...wallOpts, position: [cx, 0, this.room.minZ], headingRadians: 0 }));
+    scene.add(createGlassCurtainWall(THREE, { ...wallOpts, position: [cx, 0, this.room.maxZ], headingRadians: Math.PI }));
+    createLayeredCeiling(THREE, scene, { center: [cx, H, cz], width: W, depth: D, height: H, slabMaterial: palette.CONCRETE, beamMaterial: palette.PAINTED_METAL, ductMaterial: palette.BRUSHED_METAL, pitch: 4, practicalSpots: [[-5, 0], [5, 0]], practicalColor: kelvinToColor(THREE, 4800) });
+    // Floor lanes between zones, painted and faintly emissive.
+    const laneMat = createEmissiveInstrumentMaterial(THREE, { color: 0x7dd3fc, intensity: 0.22, baseColor: 0x1e3040 });
+    for (const x of [-5, 5]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.004, D - 2), laneMat); l.position.set(x, 0.003, cz); scene.add(l); }
+    for (const z of [-2.2, 2.2]) { const l = new THREE.Mesh(new THREE.BoxGeometry(W - 2, 0.004, 0.08), laneMat); l.position.set(cx, 0.003, z); scene.add(l); }
+    // Lights from the pack's nodes: key (shadow caster, aimed at the twin), fill and rim; colour temperature and lumens honoured.
+    createBackgroundFill(THREE, scene, { skyColor: 0xb9cce4, groundColor: 0x3d4652, intensity: 0.26 });
+    for (const n of BIOLOGY_SCENE.nodes) {
+      if (n.kind !== 'LIGHT') continue;
+      const color = kelvinToColor(THREE, Number(n.metadata?.temperatureK ?? 5000)); const lumens = Number(n.metadata?.lumens ?? 5000);
+      const pos: [number, number, number] = [n.positionMeters.x, n.positionMeters.y, n.positionMeters.z];
+      if (n.id.startsWith('light.key')) createKeyLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.2, TWIN_CHAMBER.position.z], position: pos, color, intensity: lumensToIntensity(lumens) * 0.6, angle: Math.PI / 3.4, penumbra: 0.65, shadowMapSize: recommendedShadowMapSize(tier), shadowNear: 0.4, shadowFar: 22 });
+      else createPracticalLight(THREE, scene, { position: pos, color, intensity: lumensToIntensity(lumens) * 0.35, distance: 14, decay: 1.8 });
+    }
+    scene.add(createLightShaft(THREE, { origin: [-5, H - 0.5, -4], direction: [0.35, -1, 0.3], length: 4.2, width: 1.6, color: kelvinToColor(THREE, 5200).getHex(), opacity: 0.14 }));
+    const air = BIOLOGY_SCENE.nodes.find((n) => n.id === 'vfx.cleanroom-air');
+    this.dust = createDustMotes(THREE, { count: Math.round(4000 * Number(air?.metadata?.density ?? 0.08)), bounds: [W / 2 - 0.5, 1.8, D / 2 - 0.5], center: [cx, 1.9, cz], color: 0xe8f1ff, size: 0.01, opacity: 0.28, seed: 11 });
+    scene.add(this.dust.points);
+    // The central Human Digital Twin chamber, hero-lit; the twin inside is the labelled proxy (no approved human GLB in the repository).
+    const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
+    scene.add(chamber.group); this.chamberRing = chamber.ring;
+    const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
+    chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
+    // Two manipulators flank the chamber (reference 2), sharing the ORPHEUS arm builder.
+    for (const [x, z, heading, phase] of [[-2.1, 0.9, Math.PI * 0.35, 0.8], [2.1, 0.9, -Math.PI * 0.35, 2.4]] as const) {
+      const arm = createManipulatorArm(THREE, { position: [x, 0, z], headingRadians: heading, scale: 1.25, phase, linkMaterial: palette.BRUSHED_METAL, jointMaterial: palette.POLISHED_METAL, baseMaterial: palette.PAINTED_METAL });
+      scene.add(arm.group); this.arms.push(arm);
+    }
+    createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 16, rim: 4 }, color: { key: 0xf2f7ff, rim: 0x8fd3ff }, castShadow: false });
+    // Stations (pack ids), their practical lights, and the pack's hanging signs.
+    for (const st of this.stationDefs) this.buildBiologyStationVisual(THREE, scene, palette, glass, st);
+    const signText: Readonly<Record<string, [string, string]>> = { 'sign.neuro': ['Neuro Lab', 'sygnały · MODEL'], 'sign.micro': ['Hyperscope', 'mikroskopia wirtualna'], 'sign.orpheus': ['ORPHEUS', 'analizator koncepcyjny'] };
+    for (const n of BIOLOGY_SCENE.nodes) {
+      if (n.kind !== 'SIGNAGE') continue; const t = signText[n.id]; if (!t) continue;
+      scene.add(createTextSign(THREE, { position: [n.positionMeters.x, n.positionMeters.y, n.positionMeters.z], text: t[0], subtext: t[1], frameMaterial: palette.PAINTED_METAL }));
+    }
+    scene.add(createTextSign(THREE, { position: [cx, 3.1, this.room.maxZ - 0.6], headingRadians: Math.PI, text: 'Genesis Human Biology Lab', subtext: 'bliźniak = PROXY · dane = MODEL · brak wyrobu medycznego', width: 2.6, height: 0.4, frameMaterial: palette.PAINTED_METAL }));
+    // Upper observation gallery along the north glass wall (reference: the command hub), and holographic dashboards at the hero bays (static labels only).
+    scene.add(createMezzanine(THREE, { position: [cx, 0, this.room.minZ + 1.9], headingRadians: 0, length: W - 1.2, depth: 1.8, height: 2.75, slabMaterial: palette.PAINTED_METAL, railMaterial: palette.BRUSHED_METAL, glass }));
+    scene.add(createHoloPanel(THREE, { position: [-3, 1.75, -3.6], headingRadians: 0, title: 'Neuro Lab', lines: ['regiony: NEURO_REGIONS (11)', 'sygnały: model seeded', 'etykieta: SIMULATION', 'brak danych klinicznych'] }));
+    scene.add(createHoloPanel(THREE, { position: [-6, 1.8, 3.5], headingRadians: Math.PI / 2, title: 'Imaging Center', lines: ['XRAY · CT · MRI-like · USG-like', 'przekroje z atlasu (MODEL)', 'diagnostyka: ZABRONIONA'] }));
+    scene.add(createHoloPanel(THREE, { position: [1.9, 2.0, 0.4], headingRadians: Math.PI * 0.25, width: 1.0, height: 0.6, title: 'Human Digital Twin', lines: ['skala 1:1 · 1.78 m', 'ciało: PROXY (brak GLB)', 'narządy: atlas MODEL', 'NOT_A_MEDICAL_DEVICE'] }));
+    // Wall dressing on the solid walls: cabinets and a shelf, conduit at height.
+    for (let i = 0; i < 2; i++) createAndAdd(scene, createElectricalCabinet(THREE, { position: [this.room.minX + 0.4, 0, -7.5 + i * 1.1], headingRadians: Math.PI / 2, width: 0.8, depth: 0.5, height: 2.0, bodyMaterial: palette.PAINTED_METAL, doorMaterial: palette.BRUSHED_METAL, hazardStripeMaterial: laneMat }));
+    createAndAdd(scene, createShelfUnit(THREE, { position: [this.room.minX + 0.35, 0, 8.2], width: 1.4, depth: 0.5, height: 2.1, shelfCount: 5, material: palette.BRUSHED_METAL, frameMaterial: palette.PAINTED_METAL }));
+    createAndAdd(scene, createCabinet(THREE, { position: [this.room.maxX - 0.5, 0, 8.4], width: 1.6, depth: 0.7, height: 1.1, bodyMaterial: palette.PAINTED_METAL, doorMaterial: palette.BRUSHED_METAL, handleMaterial: palette.POLISHED_METAL }));
+    createAndAdd(scene, createConduitRun(THREE, { waypoints: [[this.room.minX + 0.1, 3.3, this.room.maxZ - 0.5], [this.room.minX + 0.1, 3.3, this.room.minZ + 0.5]], radius: 0.035, material: palette.BRUSHED_METAL, bracketMaterial: palette.PAINTED_METAL }));
+    for (const [y, r] of [[3.5, 0.08], [3.35, 0.05]] as const) scene.add(createPipe(THREE, palette.POLISHED_METAL, { from: [this.room.maxX - 0.25, y, this.room.minZ + 0.6], to: [this.room.maxX - 0.25, y, this.room.maxZ - 0.6], radius: r }));
+    // The suited scientist (same rig as the physics lab).
+    const character = buildCharacter(THREE, { height: 1.78, suit: { fabric: 0xe9edf2, trim: 0x7dd3fc, gloves: 0x263340, boots: 0x1a1f26, visor: 0x8fd3ff, lamp: 0x62f0a3 } });
+    character.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = false; } });
+    scene.add(character.root); this.character = character;
+    this.setTwinView('NORMAL', null);
+    applyShadowPolicy(THREE, scene);
+  }
+
+  private buildBiologyStationVisual(THREE: typeof THREE_NS, scene: THREE_NS.Scene, palette: GenesisMaterialPalette, glass: THREE_NS.Material, st: LabStation): void {
+    const build = buildBiologyStation(THREE, { palette, glass, manifest: this.manifest, skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex }, st);
+    build.group.position.set(st.position.x, 0, st.position.z); build.group.rotation.y = st.facing; scene.add(build.group);
+    // Light budget (forward renderer: every point light costs every fragment): only the hero bays get a practical; the rest read by their emissive screens and the ceiling.
+    const hero = st.kind === 'human-study' || st.kind === 'neuro' || st.kind === 'microscopy' || st.kind === 'orpheus' || st.kind === 'imaging';
+    // The imaging gantry is white ceramic a metre under its practical: half intensity there, or it glares (seen on the first e2e frames).
+    const light = hero ? createPracticalLight(THREE, scene, { position: [st.position.x + Math.sin(st.facing) * 0.7, 2.1, st.position.z + Math.cos(st.facing) * 0.7], color: 0xbfe3ff, intensity: st.kind === 'imaging' ? 1.0 : 2.2, distance: 5, decay: 2 }) : new THREE.PointLight(0xbfe3ff, 0, 0.1);
+    if (build.twin) this.twins.push(build.twin);
+    this.arms.push(...build.arms);
+    const carousel = build.group.getObjectByName('carousel'); if (carousel) this.spinners.push(carousel);
+    const holo = build.group.getObjectByName('brain-holo'); if (holo) this.spinners.push(holo);
+    this.stations.set(st.id, { station: st, group: build.group, statusMaterial: build.status, light, screen: build.screen, artifactGroup: null, arms: build.arms, artifactAnchor: build.artifactAnchor, leds: build.leds, ...(build.twin ? { twin: build.twin } : {}) });
+    if (build.screen) { if (st.kind === 'evidence') drawEvidenceWall(build.screen, this.sealedSessions); else drawBiologyIdle(build.screen, st); }
   }
 
   private buildStation(THREE: typeof THREE_NS, scene: THREE_NS.Scene, palette: GenesisMaterialPalette, st: LabStation): void {
@@ -321,7 +486,12 @@ export class AgentLabScene3D implements Sim3D {
 
   update(dt: number, _params: SimParams): void {
     this.time += dt;
-    const u = this.controller.update(dt);
+    // The render loop clamps dt to 0.05 s; on a slow (software) renderer that would make the agent walk at a fraction of
+    // real time. The body follows the wall clock instead, capped at 0.2 s per frame so a stall never teleports it.
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const wall = this.lastWall === null ? dt : Math.min(0.2, (now - this.lastWall) / 1000);
+    this.lastWall = now;
+    const u = this.controller.update(Math.max(dt, wall));
     this.lastUpdate = u;
     this.onUpdate?.(u);
     this.dust?.update(dt);
@@ -348,6 +518,16 @@ export class AgentLabScene3D implements Sim3D {
       if (v.artifactGroup) v.artifactGroup.rotation.y = this.time * 0.35;
     }
     for (const b of this.beacons) b.emissiveIntensity = 0.9 + 0.7 * (0.5 + 0.5 * Math.sin(this.time * 2.6));
+    // Biology: twins idle, manipulators sweep (faster at the active bay), LEDs tick, the chamber ring and the carousel/hologram turn slowly.
+    for (const t of this.twins) t.update(this.time);
+    for (const v of this.stations.values()) {
+      const active = u?.stationId === v.station.id && (u.state === 'INTERACTING' || u.state === 'EXECUTING' || u.state === 'OBSERVING');
+      if (v.arms) for (const a of v.arms) { a.setActive(active); a.update(this.time); }
+      if (v.leds) v.leds.forEach((led, i) => { led.emissiveIntensity = 0.4 + 0.8 * (Math.sin(this.time * (1.3 + (i % 5) * 0.37) + i) > 0.2 ? 1 : 0.15); });
+    }
+    for (const a of this.arms) if (![...this.stations.values()].some((v) => v.arms?.includes(a))) a.update(this.time);
+    for (const sp of this.spinners) sp.rotation.y = this.time * (sp.name === 'carousel' ? 0.5 : 0.18);
+    if (this.chamberRing) this.chamberRing.emissiveIntensity = 1.2 + 0.4 * Math.sin(this.time * 1.4);
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
@@ -365,7 +545,7 @@ export class AgentLabScene3D implements Sim3D {
     } else {
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
-      const target = this.scratchA.set(pose.position.x - fx * 3.4, 2.15, pose.position.z - fz * 3.4);
+      const target = this.scratchA.set(pose.position.x - fx * 3.4, Math.min(2.15, this.ceilingY - 0.6), pose.position.z - fz * 3.4);
       // keep the spectator inside the room
       target.x = Math.max(this.room.minX + 0.5, Math.min(this.room.maxX - 0.5, target.x));
       target.z = Math.max(this.room.minZ + 0.5, Math.min(this.room.maxZ - 0.5, target.z));
@@ -379,6 +559,7 @@ export class AgentLabScene3D implements Sim3D {
   setupPostProcessing(modules: PostProcessingModules, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number): PostProcessor {
     const THREE = this.THREE!;
     const tier = detectRenderTier();
+    this.renderer = renderer;
     this.pipeline = setupGraphicsPipeline(THREE, modules, renderer, {
       scene, camera, width: w, height: h, toneMappingExposure: 1.0,
       bloom: tierAllowsBloom(tier) ? { strength: 0.38, radius: 0.55, threshold: 0.82 } : { strength: 0, radius: 0, threshold: 1 },
@@ -394,10 +575,12 @@ export class AgentLabScene3D implements Sim3D {
   dispose(): void {
     if (this.scene) disposeSceneResources(this.scene);
     this.character?.dispose();
+    for (const t of this.twins) t.dispose();
+    this.twins = []; this.arms = []; this.spinners = []; this.chamberRing = null;
     this.dust?.dispose();
     this.stations.clear();
     this.beacons = [];
-    this.character = null; this.scene = null; this.THREE = null; this.pipeline = null;
+    this.character = null; this.scene = null; this.THREE = null; this.pipeline = null; this.renderer = null; this.gate = null;
   }
 }
 

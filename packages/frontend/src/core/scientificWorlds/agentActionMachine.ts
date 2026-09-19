@@ -29,6 +29,8 @@ export type AgentActionEvent =
   | { readonly type: 'ALIGNED' }
   | { readonly type: 'REACHED' }
   | { readonly type: 'INTERACTION_DONE' }
+  /** An interaction that runs no experiment (a view change, a switch): hands back, still at the console. */
+  | { readonly type: 'INTERACTION_SETTLED' }
   | { readonly type: 'EXECUTION_DONE'; readonly sessionId: string }
   | { readonly type: 'OBSERVATION_DONE' }
   | { readonly type: 'REPORT_DONE' }
@@ -87,6 +89,9 @@ export function transitionAgent(context: AgentActionContext, event: AgentActionE
     case 'INTERACTION_DONE':
       if (s !== 'INTERACTING') return refuse(context, `interaction reported while ${s}`);
       return accept(context, { state: 'EXECUTING' });
+    case 'INTERACTION_SETTLED':
+      if (s !== 'INTERACTING') return refuse(context, `interaction settled while ${s}`);
+      return accept(context, { state: 'ARRIVED' });
     case 'EXECUTION_DONE':
       if (s !== 'EXECUTING') return refuse(context, `execution reported while ${s}`);
       return accept(context, { state: 'OBSERVING', sessionId: event.sessionId });

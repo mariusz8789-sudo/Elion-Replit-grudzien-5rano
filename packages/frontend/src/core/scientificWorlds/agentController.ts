@@ -68,6 +68,8 @@ export interface AgentUpdate {
   readonly sessionSealed: SessionWithArtifact | null;
   readonly blockedReason: string | null;
   readonly progress: number;
+  /** Emitted once, on the frame an INTERACT step completes: what the hands did at which console (e.g. an anatomy view change). */
+  readonly interaction: { readonly stationId: string; readonly parameters: Readonly<Record<string, string | number | boolean>> } | null;
 }
 
 const TWO_PI = Math.PI * 2;
@@ -119,7 +121,7 @@ export class AgentController {
 
   /** Accepts a plan only when idle (or between plans); returns the refusal otherwise. */
   startPlan(plan: ActionPlan): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
-    if (this.context.state !== 'IDLE' && this.context.state !== 'BLOCKED') return { ok: false, reason: `agent is ${this.context.state}` };
+    if (this.context.state !== 'IDLE' && this.context.state !== 'BLOCKED' && this.context.state !== 'ARRIVED') return { ok: false, reason: `agent is ${this.context.state}` };
     if (plan.steps.length === 0) return { ok: false, reason: plan.rejected[0]?.reason ?? 'plan has no steps' };
     this.context = INITIAL_AGENT_CONTEXT;
     this.plan = plan;
@@ -154,7 +156,11 @@ export class AgentController {
     this.stepIndex++;
     this.timer = 0;
     const step = this.currentStep();
-    if (!step) { if (this.context.state === 'REPORTING') this.apply({ type: 'REPORT_DONE' }); this.plan = null; return; }
+    // A view-only interaction ends with the hands back at the console (ARRIVED), so the next step can align, walk or report.
+    if (this.context.state === 'INTERACTING' && (!step || step.kind !== 'EXECUTE')) this.apply({ type: 'INTERACTION_SETTLED' });
+    // An observation followed by more work (another station, another run) closes as observed-and-noted; the body may leave the console.
+    if (this.context.state === 'OBSERVING' && step && step.kind !== 'REPORT' && step.kind !== 'OBSERVE') this.apply({ type: 'OBSERVATION_DONE' });
+    if (!step) { if (this.context.state === 'REPORTING') this.apply({ type: 'REPORT_DONE' }); else if (this.context.state === 'ARRIVED') this.apply({ type: 'RESET' }); this.plan = null; return; }
     switch (step.kind) {
       case 'NAVIGATE': {
         const station = this.stationFor(step);
@@ -208,6 +214,7 @@ export class AgentController {
     const step = this.currentStep();
     let report: AgentReport | null = null;
     let sessionSealed: SessionWithArtifact | null = null;
+    let interaction: AgentUpdate['interaction'] = null;
     const s = this.context.state;
     // Pose easing that is independent of the step: arm and head follow the state.
     const wantReach = s === 'REACHING' || s === 'INTERACTING' || s === 'EXECUTING' ? 1 : s === 'OBSERVING' ? 0.35 : 0;
@@ -248,7 +255,11 @@ export class AgentController {
           break;
         }
         case 'REACH': this.timer += dt; progress = Math.min(1, this.timer / this.reachSeconds); if (this.timer >= this.reachSeconds) this.advanceStep(); break;
-        case 'INTERACT': this.timer += dt; progress = Math.min(1, this.timer / this.interactSeconds); if (this.timer >= this.interactSeconds) this.advanceStep(); break;
+        case 'INTERACT': {
+          this.timer += dt; progress = Math.min(1, this.timer / this.interactSeconds);
+          if (this.timer >= this.interactSeconds) { interaction = { stationId: step.stationId, parameters: step.parameters ?? {} }; this.advanceStep(); }
+          break;
+        }
         case 'EXECUTE': {
           // Sealed on entry (advanceStep); one frame later the artifact is announced and we move on.
           sessionSealed = this.sealed; this.sealed = null; progress = 1;
@@ -261,6 +272,7 @@ export class AgentController {
           if (this.timer >= this.reportSeconds) {
             report = { planId: this.plan.planId, session: this.lastSession, includeProvenance: step.includeProvenance, includeResult: step.includeResult, deferred: this.plan.steps.filter((x): x is Extract<ActionStep, { kind: 'DEFER' }> => x.kind === 'DEFER'), rejected: this.plan.rejected };
             if (this.context.state === 'REPORTING') this.apply({ type: 'REPORT_DONE' });
+            else if (this.context.state === 'ARRIVED') this.apply({ type: 'RESET' });
             this.plan = null; this.stepIndex = -1;
           }
           break;
@@ -276,6 +288,6 @@ export class AgentController {
         }
       }
     } else { this.speed = 0; }
-    return { state: this.context.state, stepIndex: this.stepIndex, stepKind: this.currentStep()?.kind ?? null, stationId: this.currentStationId, report, sessionSealed, blockedReason: this.context.blockedReason, progress };
+    return { state: this.context.state, stepIndex: this.stepIndex, stepKind: this.currentStep()?.kind ?? null, stationId: this.currentStationId, report, sessionSealed, blockedReason: this.context.blockedReason, progress, interaction };
   }
 }

@@ -11,7 +11,9 @@ import type { CommandCatalog, StationDescriptor } from './worldCommand';
  * defines a station of its own.
  */
 
-export type StationKind = 'synthesizer' | 'collider' | 'epidemiology' | 'window' | 'airlock';
+/** Stations of the human-biology lab (V3 pack): the ids are the pack's own `station:*` ids, unchanged. */
+export type BiologyStationKind = 'human-study' | 'neuro' | 'microscopy' | 'histology' | 'imaging' | 'orpheus' | 'compute' | 'evidence' | 'safety';
+export type StationKind = 'synthesizer' | 'collider' | 'epidemiology' | 'window' | 'airlock' | BiologyStationKind;
 
 export interface LabStation extends StationDescriptor {
   readonly kind: StationKind;

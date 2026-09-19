@@ -53,6 +53,7 @@ export const SUPPRESSED_ROUTES: readonly string[] = [
   '#/cern-complex',
   // Scientific Worlds: the agent laboratory owns its full-viewport WebGL.
   '#/scientific-worlds',
+  '#/human-biology-lab',
 ];
 
 export function isSuppressed(hash: string): boolean {

@@ -18,7 +18,7 @@ export type ActionStep =
   | { readonly kind: 'NAVIGATE'; readonly stationId: string }
   | { readonly kind: 'ALIGN'; readonly stationId: string }
   | { readonly kind: 'REACH'; readonly stationId: string }
-  | { readonly kind: 'INTERACT'; readonly stationId: string }
+  | { readonly kind: 'INTERACT'; readonly stationId: string; readonly parameters?: Readonly<Record<string, string | number | boolean>> }
   | { readonly kind: 'EXECUTE'; readonly stationId: string; readonly experimentId: string; readonly inputs: Readonly<Record<string, string | number | boolean>> }
   | { readonly kind: 'OBSERVE'; readonly stationId: string }
   | { readonly kind: 'REPORT'; readonly includeProvenance: boolean; readonly includeResult: boolean }
@@ -49,7 +49,7 @@ export function planActions(commands: readonly WorldCommand[], catalog: CommandC
       case 'INTERACT':
         if (!station) break;
         if (at !== station.id) { steps.push({ kind: 'NAVIGATE', stationId: station.id }); at = station.id; }
-        steps.push({ kind: 'ALIGN', stationId: station.id }, { kind: 'REACH', stationId: station.id }, { kind: 'INTERACT', stationId: station.id });
+        steps.push({ kind: 'ALIGN', stationId: station.id }, { kind: 'REACH', stationId: station.id }, { kind: 'INTERACT', stationId: station.id, ...(command.parameters ? { parameters: command.parameters } : {}) });
         break;
       case 'RUN_EXPERIMENT':
         if (!station || !station.experimentId) break;

@@ -23,8 +23,14 @@ const STATUS_EN: Readonly<Record<ExperimentSession['epistemicStatus'], string>> 
   HYPOTHESIS: 'a hypothesis', SPECULATIVE: 'speculative, with no evidence', FICTION_INSPIRED_SCENARIO: 'a fiction-inspired scenario', NOT_MODELED: 'not modelled', INSUFFICIENT_EVIDENCE: 'insufficient evidence',
 };
 
-const EXPERIMENT_PL: Readonly<Record<string, string>> = { 'crystal-synthesis': 'synteza kryształu', 'collision-batch': 'paczka zderzeń', 'micro-blackhole': 'próba horyzontu zdarzeń', 'seir-epidemic': 'symulacja epidemii SEIRD' };
-const EXPERIMENT_EN: Readonly<Record<string, string>> = { 'crystal-synthesis': 'crystal synthesis', 'collision-batch': 'collision batch', 'micro-blackhole': 'event-horizon attempt', 'seir-epidemic': 'SEIRD epidemic simulation' };
+const EXPERIMENT_PL: Readonly<Record<string, string>> = {
+  'crystal-synthesis': 'synteza kryształu', 'collision-batch': 'paczka zderzeń', 'micro-blackhole': 'próba horyzontu zdarzeń', 'seir-epidemic': 'symulacja epidemii SEIRD',
+  'physiology-state': 'model fizjologii bliźniaka', 'neuro-signals': 'symulacja sygnałów nerwowych', 'hyperscope-capture': 'ujęcie Hyperscope', 'histology-slide': 'wirtualny preparat histologiczny', 'imaging-frame': 'klatka obrazowania', 'orpheus-scan': 'skan ORPHEUS',
+};
+const EXPERIMENT_EN: Readonly<Record<string, string>> = {
+  'crystal-synthesis': 'crystal synthesis', 'collision-batch': 'collision batch', 'micro-blackhole': 'event-horizon attempt', 'seir-epidemic': 'SEIRD epidemic simulation',
+  'physiology-state': 'twin physiology model', 'neuro-signals': 'neural signal simulation', 'hyperscope-capture': 'Hyperscope capture', 'histology-slide': 'virtual histology slide', 'imaging-frame': 'imaging frame', 'orpheus-scan': 'ORPHEUS scan',
+};
 
 function fmt(v: number | string | boolean): string {
   if (typeof v === 'number') return Math.abs(v) >= 1e5 || (Math.abs(v) < 1e-3 && v !== 0) ? v.toExponential(2) : String(+v.toFixed(3));
@@ -48,6 +54,24 @@ function headline(s: ExperimentSession, lang: GuideLang): string {
     case 'seir-epidemic':
       return lang === 'pl' ? `Szczyt zakażeń ${fmt(o.peakInfected)} osób w dniu ${fmt(o.peakDay)} przy R0 ${fmt(o.r0)}; łącznie ${fmt(o.totalInfected)} zakażonych, ${fmt(o.finalDead)} zgonów w modelu.`
         : `Infections peak at ${fmt(o.peakInfected)} on day ${fmt(o.peakDay)} with R0 ${fmt(o.r0)}; ${fmt(o.totalInfected)} infected in total, ${fmt(o.finalDead)} deaths in the model.`;
+    case 'physiology-state':
+      return lang === 'pl' ? `Model fizjologii bliźniaka: tętno ${fmt(o.heartRateBpm)}/min, oddech ${fmt(o.respiratoryRatePerMin)}/min, SpO₂ ${fmt(o.oxygenSaturationPercent)}%, ciśnienie ${fmt(o.systolicMmHg)}/${fmt(o.diastolicMmHg)} mmHg — to model edukacyjny, nie urządzenie medyczne.`
+        : `Twin physiology model: heart rate ${fmt(o.heartRateBpm)}/min, breathing ${fmt(o.respiratoryRatePerMin)}/min, SpO₂ ${fmt(o.oxygenSaturationPercent)}%, blood pressure ${fmt(o.systolicMmHg)}/${fmt(o.diastolicMmHg)} mmHg — an educational model, not a medical device.`;
+    case 'neuro-signals':
+      return lang === 'pl' ? `Z regionu ${o.sourceRegionId} zasymulowałem ${fmt(o.signals)} sygnałów; najsilniejszy do ${o.strongestTarget} (amplituda ${fmt(o.strongestAmplitude)}), średnia latencja ${fmt(o.meanLatencyMs)} ms.`
+        : `From ${o.sourceRegionId} I simulated ${fmt(o.signals)} signals; the strongest goes to ${o.strongestTarget} (amplitude ${fmt(o.strongestAmplitude)}), mean latency ${fmt(o.meanLatencyMs)} ms.`;
+    case 'hyperscope-capture':
+      return lang === 'pl' ? `Hyperscope ${fmt(o.magnification)}× w trybie ${o.mode}: pole widzenia ${fmt(o.fieldOfViewUm)} µm, ujęcie ${o.captureId}. Powiększenie nie tworzy nowych dowodów — to ${o.instrumentLabel === 'RECONSTRUCTION' ? 'cyfrowy zoom modelu' : 'model komórkowy'}.`
+        : `Hyperscope ${fmt(o.magnification)}× in ${o.mode}: field of view ${fmt(o.fieldOfViewUm)} µm, capture ${o.captureId}. Magnification creates no new evidence — this is ${o.instrumentLabel === 'RECONSTRUCTION' ? 'a digital zoom of the model' : 'a cell model'}.`;
+    case 'histology-slide':
+      return lang === 'pl' ? `Wirtualny preparat ${o.slideId} (${o.tissue}, ${o.stain}); model komórki ${o.cellId} z ${fmt(o.organelles)} organellami, w tym ${fmt(o.mitochondria)} mitochondriami.`
+        : `Virtual slide ${o.slideId} (${o.tissue}, ${o.stain}); cell model ${o.cellId} with ${fmt(o.organelles)} organelles, ${fmt(o.mitochondria)} of them mitochondria.`;
+    case 'imaging-frame':
+      return lang === 'pl' ? `Klatka ${o.frameId}: ${o.mode}, przekrój ${o.sliceAxis} nr ${fmt(o.sliceIndex)} bliźniaka. Użycie diagnostyczne: ${o.diagnosticUse}.`
+        : `Frame ${o.frameId}: ${o.mode}, ${o.sliceAxis} slice ${fmt(o.sliceIndex)} of the twin. Diagnostic use: ${o.diagnosticUse}.`;
+    case 'orpheus-scan':
+      return lang === 'pl' ? `ORPHEUS ${o.runId}: indeks sygnału ${fmt(o.signal_index)}, złożoność tekstury ${fmt(o.texture_complexity)}, gęstość cech ${fmt(o.feature_density)}/mm², pewność modelu ${fmt(o.model_confidence)}. Biosafety: ${o.biosafety} — protokół jest wyłącznie koncepcyjny.`
+        : `ORPHEUS ${o.runId}: signal index ${fmt(o.signal_index)}, texture complexity ${fmt(o.texture_complexity)}, feature density ${fmt(o.feature_density)}/mm², model confidence ${fmt(o.model_confidence)}. Biosafety: ${o.biosafety} — the protocol is conceptual only.`;
     default:
       return lang === 'pl' ? `Eksperyment ${s.experimentId} zakończony.` : `Experiment ${s.experimentId} finished.`;
   }

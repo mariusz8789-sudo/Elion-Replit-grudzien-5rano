@@ -32,6 +32,12 @@ export const WORLDS: readonly WorldEntry[] = [
     visual: 'Laboratorium z zestawów Genesis Graphics, rig humanoida w kombinezonie, kamera w hełmie; HUD w strefach bezpiecznych.',
   },
   {
+    id: 'human-biology-lab', preview: 'vessel', hash: '#/human-biology-lab', glyph: '🫀', title: 'Human Biology Lab', domain: 'Scientific Worlds', featured: true,
+    purpose: 'Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope, powiększ, zbadaj próbkę przez ORPHEUS — agent wykonuje to przy dziewięciu stanowiskach V3.',
+    real: 'Instrumenty V3 (Hyperscope, ORPHEUS, obrazowanie, histologia, neuro, fizjologia) to deterministyczne modele; każdy bieg to jedna sesja z hashami w EvidenceLedger; bliźniak = MODEL, nie wyrób medyczny.',
+    visual: 'Centralna komora bliźniaka, wielowarstwowy sufit, szklane ściany, manipulatory, Neuro Lab, Hyperscope, histologia, obrazowanie; bliźniak jako oznaczony PROXY (brak zatwierdzonego GLB).',
+  },
+  {
     id: 'city3d', preview: 'city', hash: '#/city3d', glyph: '◫', title: 'Miasto epidemiologiczne', domain: 'Epidemiology World', featured: true,
     purpose: 'Jak interwencja (izolacja, zamknięcie szkół) zmienia dynamikę zakażeń w mieście.',
     real: 'Agentowy model epidemii dzień po dniu, hotspoty, obłożenie szpitala, fingerprint przebiegu.',

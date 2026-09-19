@@ -21,7 +21,10 @@ import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
-import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, kernelLedger, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { LaypersonAssistant } from '@genesis/core/knowledge/LaypersonAssistant.js';
+import { generateCuriosityQuestions } from '@genesis/core/knowledge/curiosity.js';
+import { statusLabelPl } from '@genesis/core/knowledge/classifyClaim.js';
 import type { HypothesisAssessment } from '../core/experimentFabric/scientificDiscovery';
 import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
@@ -668,6 +671,17 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           );
         })
         .catch((e: unknown) => appendGenesis(`Pozyskiwanie nie powiodło się: ${e instanceof Error ? e.message : String(e)}.`, 'SYSTEM'));
+    } else if (a?.type === 'evidenceAnswer') {
+      // D-128 EPISTEMIC TRUTH RESPONSE — the ledger answers, with the status of every source, or "Nie wiem".
+      const answer = new LaypersonAssistant(kernelLedger).answer(a.query);
+      const sources = answer.sources.map((src) => `• ${src.url} — ${statusLabelPl(src.status)} (${src.sourceKind})`).join('\n');
+      const tag: EpistemicTag = answer.saidIdontKnow || answer.roleRefusal ? 'SYSTEM' : answer.sources.some((src) => src.status === 'verified') ? 'FAKT' : 'HIPOTEZA';
+      appendGenesis(`${answer.answer}\nPoziom pewności: ${answer.confidenceLevel}.${sources ? `\nŹródła:\n${sources}` : ''}\n${answer.disclaimer}`, tag);
+    } else if (a?.type === 'curiosity') {
+      // D-128 CURIOSITY — questions only from ledger gaps; an empty or consistent ledger yields none, and says so.
+      const report = generateCuriosityQuestions(kernelLedger.getActive(), { limit: a.limit });
+      if (!report.questions.length) appendGenesis(`Brak pytań: baza dowodów (${kernelLedger.getActive().length} zapisów) nie zawiera sprzeczności, twierdzeń z jednego źródła ani wartości istniejących tylko w modelu.`, 'SYSTEM');
+      else appendGenesis(report.questions.map((q, i) => `${i + 1}. [${q.kind}] ${q.text}\n   dowody: ${q.evidenceIds.join(', ')} · status: ${q.epistemicStatus}`).join('\n') + `\n(${report.contradictions.contradictions.length} sprzeczności w ${report.contradictions.scanned} zapisach; odcisk ${report.fingerprint.slice(0, 12)})`, 'HIPOTEZA');
     } else if (a?.type === 'quantum') {
       // HYBRID QUANTUM BRIDGE — the backend runs the circuit (cloud QPU only with env credentials, else the local
       // statevector simulator) and labels the result; the chat shows that label and a histogram, never a "measurement"

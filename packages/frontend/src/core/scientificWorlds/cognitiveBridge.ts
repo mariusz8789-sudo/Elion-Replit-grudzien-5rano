@@ -1,6 +1,8 @@
 import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import { GenesisCognitiveCore, createCognitiveCoreAdapters } from '@genesis/core/cognitive/index.js';
 import type { CommandEnvelope, ExperimentProposal, WorldEntity, WorldRelation } from '@genesis/core/cognitive/index.js';
+import { huntContradictions, unresolvedContradictionLabels, type ContradictionReport } from '@genesis/core/knowledge/contradictionHunter.js';
+import { curiosityGoalProposals, generateCuriosityQuestions, type CuriosityReport } from '@genesis/core/knowledge/curiosity.js';
 import { canonicalJson, fnv1a } from '../events/hash';
 import type { ActionPlan } from './actionPlanner';
 import { planActions } from './actionPlanner';
@@ -74,6 +76,14 @@ export interface ScientificWorldsCognitiveCore {
   listRelations(): WorldRelation[];
   /** Pull the world's entities and relations into the core's world model. */
   attach(): Promise<void>;
+  /** Contradiction hunt over the kernel ledger's active records (reported, never resolved). */
+  contradictions(): ContradictionReport;
+  /** The labels practicalCandidateGate expects as `unresolvedContradictions`. */
+  unresolvedContradictions(): readonly string[];
+  /** Curiosity: questions derived from ledger gaps, each citing its evidence. */
+  curiosity(limit?: number): CuriosityReport;
+  /** Turn the curiosity questions into GOAL proposals and admit them through the core's ProposalGate; returns how many goals were added. */
+  adoptCuriosityGoals(limit?: number): number;
 }
 
 const HIGH_IMPACT: ReadonlySet<CommandEnvelope['safetyClass']> = new Set(['IRREVERSIBLE', 'BIOLOGICAL']);
@@ -151,6 +161,18 @@ export function createScientificWorldsCognitiveCore(binding: CognitiveWorldBindi
     listEntities: () => worldEntitiesOf(binding).entities,
     listRelations: () => worldEntitiesOf(binding).relations,
     attach: () => adapters.attach(core),
+    contradictions: () => huntContradictions(binding.ledger.getActive()),
+    unresolvedContradictions: () => unresolvedContradictionLabels(huntContradictions(binding.ledger.getActive())),
+    curiosity: (limit) => generateCuriosityQuestions(binding.ledger.getActive(), { limit }),
+    adoptCuriosityGoals: (limit) => {
+      let added = 0;
+      for (const proposal of curiosityGoalProposals(generateCuriosityQuestions(binding.ledger.getActive(), { limit }))) {
+        const goal = core.proposalGate.goal({ ...proposal, payload: { ...proposal.payload, targetEntityIds: [...proposal.payload.targetEntityIds] } });
+        if (!goal || core.goals.get(goal.id)) continue;
+        core.addGoal(goal); added += 1;
+      }
+      return added;
+    },
     /** Exposed for the host: evidence goes through the same gate as everything else. */
     ...({ evidence: adapters.evidence } as object),
   };

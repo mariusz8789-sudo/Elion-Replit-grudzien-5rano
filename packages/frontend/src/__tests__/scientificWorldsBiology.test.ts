@@ -67,7 +67,7 @@ describe('biology command bridge — the pack router feeds the canonical WorldCo
 
 describe('biology runners — pack instruments sealed as canonical sessions on the kernel ledger', () => {
   const runner = createBiologyExperimentRunner(BIOLOGY_WORLD_ID, kernelLedger);
-  const ids: readonly BiologyExperimentId[] = ['physiology-state', 'neuro-signals', 'hyperscope-capture', 'histology-slide', 'imaging-frame', 'orpheus-scan'];
+  const ids: readonly BiologyExperimentId[] = ['physiology-state', 'neuro-signals', 'hyperscope-capture', 'histology-slide', 'imaging-frame', 'orpheus-scan', 'central-dogma'];
   it('every experiment seals, carries ledger hashes, a non-observation status, and replays MATCH', () => {
     for (const id of ids) {
       const { session, artifact } = createExperimentSession({ worldId: BIOLOGY_WORLD_ID, stationId: 'st', experimentId: id, seed: 11, inputs: { magnification: 100 }, logicalTime: 1 }, runner);
@@ -108,5 +108,18 @@ describe('biology runners — pack instruments sealed as canonical sessions on t
     expect(sealed).toEqual(['hyperscope-capture', 'orpheus-scan']);
     expect(report).toMatchObject({ includeProvenance: true, includeResult: true });
     expect(c.state).toBe('IDLE');
+  });
+  it('central dogma at the compute wall: a DNA sequence in the command is transcribed and translated through the kernel provider; the default ORF is named as such', () => {
+    const parsed = parseBiologyWorldCommands('Idź do ściany obliczeniowej i uruchom centralny dogmat dla sekwencji ATGGCCTTATGA.', 1);
+    expect(parsed.commands.map((c) => [c.intent, c.targetEntityId])).toEqual([['NAVIGATE', 'station:compute'], ['RUN_EXPERIMENT', 'station:compute']]);
+    expect(parsed.commands[1].parameters?.dna).toBe('ATGGCCTTATGA');
+    const r = runner('central-dogma', 3, { dna: 'ATGGCCTTATGA' });
+    expect(r.outputs).toMatchObject({ peptide: 'MAL', terminated: true, stopCodon: 'UGA', atpNetMin: 30, atpNetMax: 32, sequenceSource: 'command' });
+    expect(r.engineLabel).toBe('MOLECULAR_BIOLOGY_TEXTBOOK_MODEL'); expect(r.epistemicStatus).toBe('MODEL');
+    expect(runner('central-dogma', 3, {}).outputs.sequenceSource).toBe('default reference ORF');
+    expect(() => runner('central-dogma', 3, { dna: 'ATGXYZ' })).toThrow('DNA_SEQUENCE_INVALID');
+    const { session } = createExperimentSession({ worldId: BIOLOGY_WORLD_ID, stationId: 'station:compute', experimentId: 'central-dogma', seed: 1, inputs: { dna: 'ATGGCCTTATGA' }, logicalTime: 2 }, runner);
+    expect(replayExperimentSession(session, runner).status).toBe('MATCH');
+    expect(narrateSession(session, { level: 'EXPLORER', lang: 'pl', includeProvenance: false })[0].text).toContain('peptyd MAL');
   });
 });

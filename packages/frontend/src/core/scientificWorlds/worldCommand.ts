@@ -113,6 +113,8 @@ function extractParameters(original: string, clause: string, intent: WorldComman
   if (add) p.addThresholdTeV = Number(add[1].replace(',', '.'));
   const seed = clause.match(/(?:seed|ziarno)\s*(\d+)/);
   if (seed) p.seed = Number(seed[1]);
+  const dna = original.match(/\b([ACGT]{9,})\b/);
+  if (dna) p.dna = dna[1];
   if (intent === 'SCENARIO') {
     if (/dwukrotnie|podwojn|twice|double|2x|x2/.test(clause)) p.transmissionMultiplier = 2;
     else if (/trzykrotnie|triple|3x/.test(clause)) p.transmissionMultiplier = 3;

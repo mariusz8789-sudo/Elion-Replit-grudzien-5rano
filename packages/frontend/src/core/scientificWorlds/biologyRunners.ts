@@ -1,4 +1,5 @@
 import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+import { kernelRegistry, type CentralDogmaAnalysis } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import { canonicalJson } from '../events/hash';
 import type { EvidenceRecordInput, EvidenceSink } from './humanLab/contracts';
 import { GenesisHyperscope } from './humanLab/hyperscope';
@@ -31,7 +32,7 @@ import type { EpistemicStatus, ExperimentRunResult, ExperimentRunner, SessionInp
  * the same inputs reproduces the same ledger content hash.
  */
 
-export type BiologyExperimentId = 'physiology-state' | 'neuro-signals' | 'hyperscope-capture' | 'histology-slide' | 'imaging-frame' | 'orpheus-scan';
+export type BiologyExperimentId = 'physiology-state' | 'neuro-signals' | 'hyperscope-capture' | 'histology-slide' | 'imaging-frame' | 'orpheus-scan' | 'central-dogma';
 
 export interface PhysiologyArtifact { readonly kind: 'physiology'; readonly state: PhysiologicalState; }
 export interface NeuroArtifact { readonly kind: 'neuro'; readonly signals: readonly NeuronSignal[]; readonly sourceRegionId: string; }
@@ -39,7 +40,11 @@ export interface HyperscopeArtifact { readonly kind: 'hyperscope'; readonly capt
 export interface HistologyArtifact { readonly kind: 'histology'; readonly slide: HistologySlide; readonly cell: CellModel; }
 export interface ImagingArtifact { readonly kind: 'imaging'; readonly frame: ImagingFrame; }
 export interface OrpheusArtifact { readonly kind: 'orpheus'; readonly run: OrpheusRunResult; readonly specimen: Specimen; }
-export type BiologyArtifact = PhysiologyArtifact | NeuroArtifact | HyperscopeArtifact | HistologyArtifact | ImagingArtifact | OrpheusArtifact;
+export interface CentralDogmaArtifact { readonly kind: 'central-dogma'; readonly report: CentralDogmaAnalysis['report']; }
+export type BiologyArtifact = PhysiologyArtifact | NeuroArtifact | HyperscopeArtifact | HistologyArtifact | ImagingArtifact | OrpheusArtifact | CentralDogmaArtifact;
+
+/** A short reference coding sequence (ATG … stop) used when a command names none: 12 codons of a made-up ORF, labelled as such. */
+export const DEFAULT_CODING_SEQUENCE = 'ATGGCCTTAGTGAAGCACGGTACCTTCGAATGGTGA';
 
 const TISSUES: readonly TissueType[] = ['BLOOD', 'EPITHELIUM', 'MUSCLE', 'NEURAL', 'CONNECTIVE', 'BONE', 'LIVER', 'LUNG', 'CARDIAC', 'GENERIC'];
 const IMAGING_MODES: readonly ImagingRequest['mode'][] = ['XRAY', 'CT_RECONSTRUCTION', 'MRI_LIKE', 'ULTRASOUND_LIKE', 'FLUORESCENCE'];
@@ -178,6 +183,20 @@ export function createBiologyExperimentRunner(worldId: string, ledger: EvidenceL
           evidenceHashes: sink.hashes, epistemicStatus: sessionStatusFor(run.epistemic), engineLabel: 'ORPHEUS_CONCEPTUAL_SIMULATION',
           steps: ['virtual specimen registered', 'biosafety evaluation (conceptual-only protocol)', 'seeded multimodal metrics', 'ledger commit'],
           artifact: { kind: 'orpheus', run, specimen },
+        };
+      }
+      case 'central-dogma': {
+        const p = kernelRegistry.resolve('central-dogma-model');
+        if (!p) throw new Error('MOLECULAR_BIOLOGY_PROVIDER_NOT_REGISTERED');
+        const dna = str(inputs.dna, DEFAULT_CODING_SEQUENCE);
+        const pathway = inputs.pathway === 'GLYCOLYSIS_ONLY' ? 'GLYCOLYSIS_ONLY' : 'AEROBIC_COMPLETE';
+        const a = p.analyze({ kernelId: 'genesis-cyber-kernel', route: '#/human-biology-lab', operatorId: `AGENT:${worldId}` }, { worldId, dna, pathway }) as CentralDogmaAnalysis;
+        const r0 = a.report;
+        return {
+          outputs: { dnaLength: r0.length, gc: r0.gc, mrna: r0.mrna, peptide: r0.translation.peptide, peptideLength: r0.translation.peptide.length, terminated: r0.translation.terminated, stopCodon: r0.translation.stopCodon ?? 'none', codons: r0.translation.codons.length, atpPathway: r0.atp.pathway, atpNetMin: r0.atp.atpNetMin, atpNetMax: r0.atp.atpNetMax, atpLabel: r0.atp.label, sequenceSource: typeof inputs.dna === 'string' && inputs.dna.length ? 'command' : 'default reference ORF', reportHash: r0.contentHash },
+          evidenceHashes: [a.ledgerContentHash], epistemicStatus: 'MODEL', engineLabel: a.label,
+          steps: ['coding strand validated', 'transcription (T→U)', 'translation from the first AUG (standard code)', `ATP budget ${pathway} (textbook range)`, 'ledger commit'],
+          artifact: { kind: 'central-dogma', report: r0 },
         };
       }
       default:

@@ -25,11 +25,11 @@ const STATUS_EN: Readonly<Record<ExperimentSession['epistemicStatus'], string>> 
 
 const EXPERIMENT_PL: Readonly<Record<string, string>> = {
   'crystal-synthesis': 'synteza kryształu', 'collision-batch': 'paczka zderzeń', 'micro-blackhole': 'próba horyzontu zdarzeń', 'seir-epidemic': 'symulacja epidemii SEIRD',
-  'physiology-state': 'model fizjologii bliźniaka', 'neuro-signals': 'symulacja sygnałów nerwowych', 'hyperscope-capture': 'ujęcie Hyperscope', 'histology-slide': 'wirtualny preparat histologiczny', 'imaging-frame': 'klatka obrazowania', 'orpheus-scan': 'skan ORPHEUS',
+  'physiology-state': 'model fizjologii bliźniaka', 'neuro-signals': 'symulacja sygnałów nerwowych', 'hyperscope-capture': 'ujęcie Hyperscope', 'histology-slide': 'wirtualny preparat histologiczny', 'imaging-frame': 'klatka obrazowania', 'orpheus-scan': 'skan ORPHEUS', 'central-dogma': 'centralny dogmat (DNA → RNA → białko)',
 };
 const EXPERIMENT_EN: Readonly<Record<string, string>> = {
   'crystal-synthesis': 'crystal synthesis', 'collision-batch': 'collision batch', 'micro-blackhole': 'event-horizon attempt', 'seir-epidemic': 'SEIRD epidemic simulation',
-  'physiology-state': 'twin physiology model', 'neuro-signals': 'neural signal simulation', 'hyperscope-capture': 'Hyperscope capture', 'histology-slide': 'virtual histology slide', 'imaging-frame': 'imaging frame', 'orpheus-scan': 'ORPHEUS scan',
+  'physiology-state': 'twin physiology model', 'neuro-signals': 'neural signal simulation', 'hyperscope-capture': 'Hyperscope capture', 'histology-slide': 'virtual histology slide', 'imaging-frame': 'imaging frame', 'orpheus-scan': 'ORPHEUS scan', 'central-dogma': 'central dogma (DNA → RNA → protein)',
 };
 
 function fmt(v: number | string | boolean): string {
@@ -72,6 +72,9 @@ function headline(s: ExperimentSession, lang: GuideLang): string {
     case 'orpheus-scan':
       return lang === 'pl' ? `ORPHEUS ${o.runId}: indeks sygnału ${fmt(o.signal_index)}, złożoność tekstury ${fmt(o.texture_complexity)}, gęstość cech ${fmt(o.feature_density)}/mm², pewność modelu ${fmt(o.model_confidence)}. Biosafety: ${o.biosafety} — protokół jest wyłącznie koncepcyjny.`
         : `ORPHEUS ${o.runId}: signal index ${fmt(o.signal_index)}, texture complexity ${fmt(o.texture_complexity)}, feature density ${fmt(o.feature_density)}/mm², model confidence ${fmt(o.model_confidence)}. Biosafety: ${o.biosafety} — the protocol is conceptual only.`;
+    case 'central-dogma':
+      return lang === 'pl' ? `Sekwencja ${fmt(o.dnaLength)} nt (GC ${fmt(o.gc)}) → mRNA → peptyd ${o.peptide} (${fmt(o.peptideLength)} aa, ${o.terminated ? `stop ${o.stopCodon}` : 'bez kodonu stop'}); bilans ATP na glukozę ${fmt(o.atpNetMin)}–${fmt(o.atpNetMax)} (${o.atpPathway}, podręcznikowe oszacowanie). Sekwencja: ${o.sequenceSource}.`
+        : `Sequence ${fmt(o.dnaLength)} nt (GC ${fmt(o.gc)}) → mRNA → peptide ${o.peptide} (${fmt(o.peptideLength)} aa, ${o.terminated ? `stop ${o.stopCodon}` : 'no stop codon'}); ATP per glucose ${fmt(o.atpNetMin)}–${fmt(o.atpNetMax)} (${o.atpPathway}, textbook estimate). Sequence: ${o.sequenceSource}.`;
     default:
       return lang === 'pl' ? `Eksperyment ${s.experimentId} zakończony.` : `Experiment ${s.experimentId} finished.`;
   }

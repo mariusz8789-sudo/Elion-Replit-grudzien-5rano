@@ -8,6 +8,7 @@ import { ThermodynamicLabEngine, type LabResult } from '../lab/ThermodynamicLabE
 import { BlackHoleEventHorizonEngine, type FormationResult } from '../cern/BlackHoleEventHorizonEngine.js';
 import { MaterialsDiscoveryEngine, type CrystalStructure, type IonSpec } from '../cern/MaterialsDiscoveryEngine.js';
 import { ComputeColliderEngine, type TrackAttributes } from '../cern/ComputeColliderEngine.js';
+import { centralDogmaReport, commitCentralDogmaReport, type AtpPathway, type CentralDogmaReport } from '../knowledge/molecularBiology.js';
 
 export interface KernelContext { readonly kernelId: string; readonly route: string; readonly operatorId: string; }
 export interface AnalysisProvider {
@@ -130,6 +131,21 @@ export function computeColliderProvider(ledger: EvidenceLedger): AnalysisProvide
       const ledgerContentHash = engine.commitBatch(events);
       const out: CollisionBatchAnalysis = { events, tracks: engine.buildTrackAttributes(events), seedBase: engine.getSeedBase(), ledgerContentHash, label: 'TOY_MC_MODEL' };
       return out;
+    },
+  };
+}
+
+// --- Molecular biology (D-128): the textbook central dogma + ATP ledger as a provider of the single kernel. ---
+export interface CentralDogmaRequest { readonly worldId: string; readonly dna: string; readonly pathway?: AtpPathway; }
+export interface CentralDogmaAnalysis { readonly report: CentralDogmaReport; readonly ledgerContentHash: string; readonly label: 'MOLECULAR_BIOLOGY_TEXTBOOK_MODEL'; }
+export function molecularBiologyProvider(ledger: EvidenceLedger): AnalysisProvider {
+  return {
+    providerId: 'molecular-biology', capabilities: ['central-dogma-model'],
+    analyze: (_ctx, req) => {
+      const r = req as CentralDogmaRequest;
+      const report = centralDogmaReport(r.dna, r.pathway ?? 'AEROBIC_COMPLETE');
+      const ledgerContentHash = commitCentralDogmaReport(ledger, report, r.worldId);
+      return { report, ledgerContentHash, label: 'MOLECULAR_BIOLOGY_TEXTBOOK_MODEL' } satisfies CentralDogmaAnalysis;
     },
   };
 }

@@ -51,6 +51,7 @@ export const BIOLOGY_QUICK_COMMANDS: readonly { readonly label: string; readonly
   { label: 'Neuro', text: 'Idź do konsoli neuro i uruchom symulację sygnałów nerwowych.' },
   { label: 'Obrazowanie', text: 'Uruchom obrazowanie.' },
   { label: 'Histologia', text: 'Przygotuj preparat histologiczny.' },
+  { label: 'DNA', text: 'Idź do ściany obliczeniowej i uruchom centralny dogmat dla sekwencji ATGGCCTTAGTGAAGCACGGTACCTTCGAATGGTGA.' },
 ];
 
 interface WorldDefinition {

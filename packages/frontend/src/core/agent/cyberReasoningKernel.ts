@@ -20,7 +20,8 @@ import {
   type CyberTestSelection,
 } from './cyberTestPlanner';
 
-import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider, molecularBiologyProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { environmentalDetectiveProvider } from './environmentalDetective';
 import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
 import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
@@ -54,6 +55,9 @@ if (kernelRegistry.resolve('thermodynamic-reaction-sim') === null) kernelRegistr
 if (kernelRegistry.resolve('micro-blackhole-sim') === null) kernelRegistry.register(blackHoleProvider(kernelLedger));
 if (kernelRegistry.resolve('crystal-synthesis-sim') === null) kernelRegistry.register(materialsProvider(kernelLedger));
 if (kernelRegistry.resolve('collision-batch') === null) kernelRegistry.register(computeColliderProvider(kernelLedger));
+// D-128: the textbook molecular-biology layer and the environmental detective (on CAP-2 causal inference) as providers.
+if (kernelRegistry.resolve('central-dogma-model') === null) kernelRegistry.register(molecularBiologyProvider(kernelLedger));
+if (kernelRegistry.resolve('environmental-detective') === null) kernelRegistry.register(environmentalDetectiveProvider(kernelLedger));
 
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic

@@ -85,4 +85,23 @@ describe('cognitive core on the canonical systems — the handoff acceptance loo
     const reg = createApprovalRegistry();
     reg.grant('a', 'x'); expect(reg.list().length).toBe(1); expect(reg.has('b')).toBe(false);
   });
+  it('hunts contradictions on the kernel ledger and turns ledger gaps into curiosity goals admitted through the proposal gate', async () => {
+    const b = bridge();
+    kernelLedger.addRecord({ sourceUrl: 'https://a.example.org/r0', sourceTimestamp: null, claim: 'SEIRD summary r0=2.5', claimType: 'reported_claim', confidence: 0.7, provenance: { sourceKind: 'document', retrievedBy: 't', independentSourceIds: [] } });
+    kernelLedger.addRecord({ sourceUrl: 'https://b.example.org/r0', sourceTimestamp: null, claim: 'SEIRD summary r0=3.4', claimType: 'reported_claim', confidence: 0.7, provenance: { sourceKind: 'document', retrievedBy: 't', independentSourceIds: [] } });
+    const report = b.contradictions();
+    expect(report.contradictions.some((c) => c.kind === 'NUMERIC_DISAGREEMENT' && c.key === 'r0')).toBe(true);
+    expect(b.unresolvedContradictions().some((l) => l.startsWith('NUMERIC_DISAGREEMENT:r0:'))).toBe(true);
+    const curiosity = b.curiosity(5);
+    expect(curiosity.questions[0].kind).toBe('RESOLVE_CONTRADICTION');
+    expect(curiosity.questions[0].evidenceIds.length).toBe(2);
+    const added = b.adoptCuriosityGoals(5);
+    expect(added).toBeGreaterThan(0);
+    expect(b.adoptCuriosityGoals(5)).toBe(0); // idempotent: the same goal ids are not re-added
+    const top = b.core.goals.active(1)[0];
+    expect(top.priority).toBe('HIGH');
+    expect(top.description).toContain('r0');
+    await b.attach();
+    expect((await b.core.cycle(9)).outcome).toBe('BLOCKED'); // the goal targets evidence records, which are not world entities: honest BLOCKED, not a fake plan
+  });
 });

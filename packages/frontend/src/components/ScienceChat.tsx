@@ -22,9 +22,8 @@ import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LA
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
 import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, kernelLedger, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
-import { LaypersonAssistant } from '@genesis/core/knowledge/LaypersonAssistant.js';
 import { generateCuriosityQuestions } from '@genesis/core/knowledge/curiosity.js';
-import { statusLabelPl } from '@genesis/core/knowledge/classifyClaim.js';
+import { buildTruthResponse, renderTruthResponsePl } from '@genesis/core/knowledge/truthResponse.js';
 import type { HypothesisAssessment } from '../core/experimentFabric/scientificDiscovery';
 import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
@@ -672,11 +671,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         })
         .catch((e: unknown) => appendGenesis(`Pozyskiwanie nie powiodło się: ${e instanceof Error ? e.message : String(e)}.`, 'SYSTEM'));
     } else if (a?.type === 'evidenceAnswer') {
-      // D-128 EPISTEMIC TRUTH RESPONSE — the ledger answers, with the status of every source, or "Nie wiem".
-      const answer = new LaypersonAssistant(kernelLedger).answer(a.query);
-      const sources = answer.sources.map((src) => `• ${src.url} — ${statusLabelPl(src.status)} (${src.sourceKind})`).join('\n');
-      const tag: EpistemicTag = answer.saidIdontKnow || answer.roleRefusal ? 'SYSTEM' : answer.sources.some((src) => src.status === 'verified') ? 'FAKT' : 'HIPOTEZA';
-      appendGenesis(`${answer.answer}\nPoziom pewności: ${answer.confidenceLevel}.${sources ? `\nŹródła:\n${sources}` : ''}\n${answer.disclaimer}`, tag);
+      // D-128/D-129 EPISTEMIC TRUTH RESPONSE — the ledger answers (LaypersonAssistant), with contradictions, missing evidence,
+      // next tests (curiosity) and provenance; "Nie wiem" and INSUFFICIENT_EVIDENCE when nothing matches.
+      const truth = buildTruthResponse(kernelLedger, a.query);
+      const tag: EpistemicTag = truth.status === 'VERIFIED_SOURCE' ? 'FAKT' : truth.status === 'INSUFFICIENT_EVIDENCE' || truth.status === 'ROLE_REFUSED' ? 'SYSTEM' : 'HIPOTEZA';
+      appendGenesis(renderTruthResponsePl(truth), tag);
     } else if (a?.type === 'curiosity') {
       // D-128 CURIOSITY — questions only from ledger gaps; an empty or consistent ledger yields none, and says so.
       const report = generateCuriosityQuestions(kernelLedger.getActive(), { limit: a.limit });

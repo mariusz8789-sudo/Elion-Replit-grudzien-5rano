@@ -3,6 +3,7 @@ import { parseBiologyLabCommand } from './humanLab/commandRouter';
 import type { BiologyLabCommand } from './humanLab/types';
 import { BIOLOGY_CATALOG } from './biologyLabWorld';
 import { parseWorldCommands, type CommandParameterValue, type ParsedCommands, type WorldCommand, type WorldCommandIntent } from './worldCommand';
+import { explorerCommands, parseExplorerZoom } from './humanExplorer';
 
 /**
  * SCIENTIFIC WORLDS — BIOLOGY COMMAND BRIDGE.
@@ -53,6 +54,9 @@ export function parseBiologyWorldCommands(text: string, logicalTime: number): Pa
   const commands: WorldCommand[] = [];
   const unresolved: string[] = [];
   clauses.forEach((clause, index) => {
+    // Human Explorer: "przybliż do komórki serca" walks the macro → micro ladder through the canonical experiments.
+    const zoom = parseExplorerZoom(clause);
+    if (zoom) { commands.push(...explorerCommands(zoom.organ, zoom.level, clause, logicalTime).map((c, sub) => ({ ...c, commandId: `cmd-${fnv1a(`${raw}|${logicalTime}|${index}|${sub}|explorer`)}` }))); return; }
     const routed = parseBiologyLabCommand(routerText(clause), logicalTime);
     const mapped = routed ? mapKind(routed) : [];
     if (mapped.length) {

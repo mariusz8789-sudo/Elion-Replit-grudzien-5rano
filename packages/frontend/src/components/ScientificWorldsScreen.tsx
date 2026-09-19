@@ -17,6 +17,7 @@ import { AGENT_STATE_LABEL_PL, type AgentActionState } from '../core/scientificW
 import { narrateReport, narrateSession, type NarrationLine } from '../core/scientificWorlds/narration';
 import { kernelLedger } from '../core/agent/cyberReasoningKernel';
 import { getVoiceEngine } from '../core/guide/guideRuntime';
+import { museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
 import type { GuideLevel } from '../core/guide/narrationModel';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 
@@ -115,6 +116,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const logicalTime = useRef(0);
   const nextId = useRef(1);
   const levelRef = useRef(level); levelRef.current = level;
+  const sessionRef = useRef<ExperimentSession | null>(null);
   const voiceRef = useRef(voice); voiceRef.current = voice;
 
   const say = useCallback((who: TranscriptEntry['who'], line: string) => {
@@ -123,8 +125,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const speak = useCallback((lines: readonly NarrationLine[]) => {
     for (const l of lines) say('agent', l.text);
     if (voiceRef.current) {
+      // Museum-calm delivery (D-129): the engine's own providers, calmer pacing, captions on, the status first, one idea per utterance.
       const engine = getVoiceEngine();
-      const joined = lines.map((l) => l.text).join(' ');
+      engine.update(museumCalmSettings(engine.settings));
+      const status = lines.find((l) => l.key === 'status') ? sessionRef.current?.epistemicStatus ?? null : null;
+      const utterances = museumUtterances(lines.filter((l) => l.key !== 'status'), status, 'pl');
+      const joined = utterances.map((u) => u.text).join(' ');
       engine.speak({ key: `worlds:${lines[0]?.key ?? 'line'}`, text: joined, lang: 'pl' });
     }
   }, [say]);
@@ -142,7 +148,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       setBlocked(u.blockedReason);
       if (u.sessionSealed) {
         const { session: sealed, artifact } = u.sessionSealed;
-        setSession(sealed); setReplay(null); setArtifactKind((artifact as SceneArtifact).kind);
+        setSession(sealed); sessionRef.current = sealed; setReplay(null); setArtifactKind((artifact as SceneArtifact).kind);
         if (sealed.stationId) sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
         sim.noteSealedSession(sealed);
       }

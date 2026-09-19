@@ -55,3 +55,6 @@ artifacts/console-pbr.png
 artifacts/tunnel-volumetric.png
 artifacts/scientific-worlds-*.png
 artifacts/human-biology-lab-*.png
+# Molecule World Smart UI e2e (packages/e2e/src/molecule-world.e2e.spec.ts)
+artifacts/molecule-world.png
+artifacts/molecule-world-mobile.png

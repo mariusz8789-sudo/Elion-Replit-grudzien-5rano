@@ -73,6 +73,14 @@ export interface Sim3D {
    */
   cameraAutoRotateSpeed?: number;
   /**
+   * Wywoływane co klatkę, gdy `cameraAutoRotateSpeed` jest ustawione — zwrócenie `true`
+   * chwilowo wyłącza auto-obrót (bez utraty jego docelowej prędkości/stanu), np. gdy Smart UI
+   * pokazuje Contextual Popup zakotwiczony na wybranym obiekcie: bez tego auto-obrót
+   * przesuwałby ekranowy punkt zakotwiczenia co klatkę, czyniąc popup nieklikalnym (D-133).
+   * Domyślny brak metody = brak zmiany zachowania dla każdej dotychczasowej sceny.
+   */
+  suspendAutoRotate?(): boolean;
+  /**
    * Punkt, wokół którego OrbitControls ma aktualnie orbitować — wywoływane
    * co klatkę PRZED controls.update(); zwrócenie `null` zostawia bieżący
    * cel OrbitControls bez zmian (domyślne zachowanie większości scen: stały

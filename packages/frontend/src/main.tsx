@@ -7,6 +7,7 @@ import './styles.css';
 import './styles-2040.css';
 import './styles-2040-screens.css';
 import './styles-2040-hud.css';
+import './components/genesis-ui/worldViewShell.css';
 
 // Deep links by path (`/matrix`, as the Playwright specs and external links use) are served
 // by the backend's SPA fallback; the router is hash-based, so map the path onto the hash

@@ -25,6 +25,9 @@ import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/ana
 import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
+import { evaluateHumanTwinAsset, loadHumanTwinBody, type HumanTwinTier, type LoadedHumanTwinBody } from './humanTwinAsset';
+import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
+import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
 
@@ -37,15 +40,18 @@ import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidence
  * every station the command parser knows is a real piece of furniture
  * here, at the same coordinates the navigation planner walks to. The suited
  * character is driven by the pure AgentController; this class only READS
- * its pose. Two cameras: VISOR (through the helmet glass, body and hands in
- * frame) and SPECTATOR (a follow camera behind the agent). Session
+ * its pose. Three cameras: VISOR (through the helmet glass, body and hands in
+ * frame), SPECTATOR (a follow camera behind the agent) and, in the biology
+ * world, TWIN (D-131 — a slow orbit framing the Human Digital Twin itself, so
+ * the body, the section plane and the isolated organ are actually legible;
+ * the other two follow the agent and leave the twin a distant figure). Session
  * artifacts are rendered at the station that produced them — a lattice in
  * the synthesizer chamber, tracks in the collider hologram, the SEIR curve
  * on the epidemiology desk — from the sealed session's payload, never from
  * a second run.
  */
 
-export type AgentCameraMode = 'VISOR' | 'SPECTATOR';
+export type AgentCameraMode = 'VISOR' | 'SPECTATOR' | 'TWIN';
 /** Which typed world the scene builds: the physics lab (default) or the V3 human-biology lab — one scene class, one pipeline. */
 export type SceneWorld = 'physics' | 'biology';
 export type SceneArtifact = LabArtifact | BiologyArtifact;
@@ -99,6 +105,19 @@ export class AgentLabScene3D implements Sim3D {
   private sealedSessions: ExperimentSession[] = [];
   private twinInstruction: VisualLayerInstruction | null = null;
   private renderer: THREE_NS.WebGLRenderer | null = null;
+  /** D-131: what the twin body is made of, and the section state shared by every twin in the scene. */
+  private twinTier: HumanTwinTier = 'PROXY';
+  private cutawayState: CutawayState = DEFAULT_CUTAWAY;
+  /** D-131: how many anatomy nodes are isolated — the TWIN camera moves in when the view narrows to one organ. */
+  private isolatedCount = 0;
+  /** D-131: the smoothed TWIN-camera pose, so switching cameras eases instead of cutting. */
+  private twinCamPos: THREE_NS.Vector3 | null = null;
+  private twinCamLook: THREE_NS.Vector3 | null = null;
+  /** D-131: the chamber's glass shell and ribs, hidden only while the twin camera frames the body. */
+  private chamberGlass: THREE_NS.Object3D | null = null;
+  /** D-131: how the BODY shell is presented. X-ray here is a stylised view of a model, never a radiograph. */
+  private twinSurface: TwinSurfaceMode = 'NORMAL';
+  private onTwinTier: ((tier: HumanTwinTier) => void) | null = null;
   private lastWall: number | null = null;
   private gate: VisualRealityResult | null = null;
   readonly manifest: HumanDigitalTwinManifest = createHumanDigitalTwinManifest(TWIN_ID);
@@ -112,6 +131,36 @@ export class AgentLabScene3D implements Sim3D {
     this.twinInstruction = buildVisualLayerInstruction(this.manifest, mode);
     for (const t of this.twins) t.setView(this.twinInstruction, selectedNodeId);
   }
+
+  /** D-131: what the twin body is made of right now (a licensed CC0 asset, or the procedural proxy). */
+  getTwinTier(): HumanTwinTier { return this.twinTier; }
+  /** D-131: the HUD subscribes so it can stop saying PROXY the moment the approved asset is in the scene. */
+  setTwinTierListener(listener: ((tier: HumanTwinTier) => void) | null): void { this.onTwinTier = listener; }
+
+  /** D-131: isolate anatomy nodes across every twin (empty list = back to the current display mode). */
+  setTwinIsolated(nodeIds: readonly string[]): void {
+    this.isolatedCount = nodeIds.length;
+    for (const t of this.twins) t.setIsolated(nodeIds);
+  }
+
+  /** D-131: the section plane. A cut reveals the MODEL proxies inside the body; it is not a medical cross-section. */
+  setTwinCutaway(state: CutawayState): void {
+    this.cutawayState = state;
+    if (this.renderer) this.renderer.localClippingEnabled = state.enabled;
+    for (const t of this.twins) t.setCutaway(state);
+  }
+  getTwinCutaway(): CutawayState { return this.cutawayState; }
+
+  /**
+   * D-131: the BODY shell's presentation — solid, translucent, X-ray or ghost. It changes how the licensed
+   * asset is drawn and nothing else: no epistemic status, no session, no evidence record moves with it. An
+   * "X-ray" built from a fresnel term is a stylised view of a model; it is not and can never be a radiograph.
+   */
+  setTwinSurface(mode: TwinSurfaceMode): void {
+    this.twinSurface = mode;
+    for (const t of this.twins) t.setSurface(mode);
+  }
+  getTwinSurface(): TwinSurfaceMode { return this.twinSurface; }
 
   /** Biology: the evidence wall lists the sessions sealed in this world — nothing else ever appears on it. */
   noteSealedSession(session: ExperimentSession): void {
@@ -211,7 +260,7 @@ export class AgentLabScene3D implements Sim3D {
     const u = this.lastUpdate; const pose = this.controller.pose;
     return {
       agentState: AGENT_STATE_CODE[u?.state ?? 'IDLE'] ?? 0, reach: pose.reach, progress: u?.progress ?? 0,
-      cameraMode: this.cameraMode === 'VISOR' ? 0 : 1, frames: this.frames, agentX: pose.position.x, agentZ: pose.position.z, facing: pose.facing,
+      cameraMode: this.cameraMode === 'VISOR' ? 0 : this.cameraMode === 'SPECTATOR' ? 1 : 2, frames: this.frames, agentX: pose.position.x, agentZ: pose.position.z, facing: pose.facing,
     };
   }
 
@@ -219,6 +268,9 @@ export class AgentLabScene3D implements Sim3D {
     this.THREE = THREE; this.scene = scene;
     this.scratchA = new THREE.Vector3(); this.scratchB = new THREE.Vector3();
     this.spectatorPos = new THREE.Vector3(0, 2.2, 8); this.spectatorLook = new THREE.Vector3(0, 1.4, 0);
+    // D-131: the TWIN camera starts already framing the chamber, so the first frame after a switch is correct.
+    this.twinCamPos = new THREE.Vector3(TWIN_CHAMBER.position.x, 1.0, TWIN_CHAMBER.position.z + 3.3);
+    this.twinCamLook = new THREE.Vector3(TWIN_CHAMBER.position.x, 0.38, TWIN_CHAMBER.position.z);
     const palette = createGenesisMaterialPalette(THREE);
     const tier = detectRenderTier();
     if (this.world === 'biology') { this.initBiology(THREE, scene, camera, palette, tier); return; }
@@ -336,11 +388,17 @@ export class AgentLabScene3D implements Sim3D {
     const air = BIOLOGY_SCENE.nodes.find((n) => n.id === 'vfx.cleanroom-air');
     this.dust = createDustMotes(THREE, { count: Math.round(4000 * Number(air?.metadata?.density ?? 0.08)), bounds: [W / 2 - 0.5, 1.8, D / 2 - 0.5], center: [cx, 1.9, cz], color: 0xe8f1ff, size: 0.01, opacity: 0.28, seed: 11 });
     scene.add(this.dust.points);
-    // The central Human Digital Twin chamber, hero-lit; the twin inside is the labelled proxy (no approved human GLB in the repository).
+    // The central Human Digital Twin chamber, hero-lit. D-131: the twin inside is the licence-verified CC0
+    // asset when the gate approves it, otherwise the labelled proxy. Either way its ANATOMY stays a MODEL:
+    // the organ shapes are atlas ellipsoids, and the asset itself carries no medical anatomy.
     const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
-    scene.add(chamber.group); this.chamberRing = chamber.ring;
+    scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
     const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
+    this.twinTier = twin.tier;
+    // The asset is fetched only after its record passes the gate, and only then does it replace the proxy.
+    // A refusal, a missing file or a decode error simply leaves the proxy standing — nothing is faked.
+    if (evaluateHumanTwinAsset().enabled) void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor, palette);
     // Two manipulators flank the chamber (reference 2), sharing the ORPHEUS arm builder.
     for (const [x, z, heading, phase] of [[-2.1, 0.9, Math.PI * 0.35, 0.8], [2.1, 0.9, -Math.PI * 0.35, 2.4]] as const) {
       const arm = createManipulatorArm(THREE, { position: [x, 0, z], headingRadians: heading, scale: 1.25, phase, linkMaterial: palette.BRUSHED_METAL, jointMaterial: palette.POLISHED_METAL, baseMaterial: palette.PAINTED_METAL });
@@ -536,6 +594,7 @@ export class AgentLabScene3D implements Sim3D {
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
+      if (this.chamberGlass) this.chamberGlass.visible = true;
       ch.head.getWorldPosition(this.scratchA);
       // Just inside the visor glass, so the suit's arms and gloves stay in frame below.
       this.scratchA.x += fx * 0.17; this.scratchA.z += fz * 0.17; this.scratchA.y += 0.04;
@@ -547,7 +606,28 @@ export class AgentLabScene3D implements Sim3D {
       if (moving) camera.position.y += Math.sin(pose.gait * Math.PI) * 0.012;
       if (ch.helmet) ch.helmet.visible = false;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = false; });
+    } else if (this.cameraMode === 'TWIN' && this.twinCamPos && this.twinCamLook) {
+      // D-131: frame the Human Digital Twin, not the agent. The twin turns on its own (it is one of the
+      // scene's slow spinners), so the camera stays put and the body presents itself; it only moves IN when
+      // the view narrows — one isolated organ, or an active section — and eases back out when it widens.
+      if (ch.helmet) ch.helmet.visible = true;
+      ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
+      if (this.chamberGlass) this.chamberGlass.visible = false;
+      const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
+      // 3.3 m fits the whole 1.7 m body; the look target sits BELOW the body's centre so the figure rides
+      // in the upper two thirds of the frame, clear of the research dock at the bottom. 2.3 m moves in on
+      // a cut or an isolate, where the interesting thing is the torso rather than the whole person.
+      const dist = tight ? 2.3 : 3.3;
+      const height = tight ? 1.05 : 1.0;
+      // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
+      const drift = Math.sin(this.time * 0.22) * 0.14;
+      this.scratchA.set(TWIN_CHAMBER.position.x + drift, height, TWIN_CHAMBER.position.z + dist);
+      this.twinCamPos.lerp(this.scratchA, 0.08);
+      this.scratchB.set(TWIN_CHAMBER.position.x, tight ? 0.86 : 0.38, TWIN_CHAMBER.position.z);
+      this.twinCamLook.lerp(this.scratchB, 0.12);
+      camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
+      if (this.chamberGlass) this.chamberGlass.visible = true;
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
       const target = this.scratchA.set(pose.position.x - fx * 3.4, Math.min(2.15, this.ceilingY - 0.6), pose.position.z - fz * 3.4);
@@ -558,13 +638,43 @@ export class AgentLabScene3D implements Sim3D {
       this.spectatorLook.lerp(this.scratchB.set(pose.position.x + fx * 0.8, 1.35, pose.position.z + fz * 0.8), 0.1);
       camera.position.copy(this.spectatorPos); camera.lookAt(this.spectatorLook);
     }
-    this.pipeline?.setFocusDistance(this.cameraMode === 'VISOR' ? 1.6 : 3.4);
+    this.pipeline?.setFocusDistance(this.cameraMode === 'VISOR' ? 1.6 : this.cameraMode === 'TWIN' ? 2.4 : 3.4);
+  }
+
+  /**
+   * D-131: swap the procedural proxy for the approved, licence-verified human asset once it has loaded.
+   * Runs after `initBiology` because the load is asynchronous; the scene is fully usable throughout, and
+   * if the load fails the proxy stays exactly as it was. Only the BODY changes — organs, stations,
+   * sessions, evidence and every epistemic label are untouched.
+   */
+  private async upgradeTwinsToLicensedAsset(THREE: typeof THREE_NS, anchor: THREE_NS.Group, palette: GenesisMaterialPalette): Promise<void> {
+    let asset: LoadedHumanTwinBody | null;
+    try { asset = await loadHumanTwinBody(THREE, this.manifest.parameters.heightMeters); } catch { asset = null; }
+    if (!asset || this.scene === null) return; // disposed while loading, or the asset could not be read
+    const old = this.twins[0];
+    if (!old) return;
+    const upgraded = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, bodyAsset: asset });
+    anchor.remove(old.group);
+    this.spinners = this.spinners.filter((g) => g !== old.group);
+    old.dispose();
+    anchor.add(upgraded.group);
+    this.twins[0] = upgraded;
+    this.spinners.push(upgraded.group);
+    upgraded.setSurface(this.twinSurface);
+    this.twinTier = upgraded.tier;
+    if (this.twinInstruction) upgraded.setView(this.twinInstruction, null);
+    upgraded.setCutaway(this.cutawayState);
+    this.onTwinTier?.(upgraded.tier);
+    void palette;
   }
 
   setupPostProcessing(modules: PostProcessingModules, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number): PostProcessor {
     const THREE = this.THREE!;
     const tier = detectRenderTier();
     this.renderer = renderer;
+    // D-131: local clipping is what makes the section plane real. Off until a cutaway is requested, so the
+    // opaque path is unchanged for every other scene and frame.
+    renderer.localClippingEnabled = this.cutawayState.enabled;
     this.pipeline = setupGraphicsPipeline(THREE, modules, renderer, {
       scene, camera, width: w, height: h, toneMappingExposure: 1.0,
       bloom: tierAllowsBloom(tier) ? { strength: 0.38, radius: 0.55, threshold: 0.82 } : { strength: 0, radius: 0, threshold: 1 },

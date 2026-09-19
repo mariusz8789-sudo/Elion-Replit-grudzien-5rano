@@ -9,9 +9,12 @@ import { createLabExperimentRunner } from '../core/scientificWorlds/experimentRu
 import { createBiologyExperimentRunner } from '../core/scientificWorlds/biologyRunners';
 import { BIOLOGY_CATALOG, BIOLOGY_OBSTACLES, BIOLOGY_ROOM, BIOLOGY_SPAWN, BIOLOGY_STATIONS, BIOLOGY_WORLD_ID } from '../core/scientificWorlds/biologyLabWorld';
 import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
-import { createDefaultAnatomyView, isolateAnatomyNode, setAnatomyMode } from '../core/scientificWorlds/humanLab/anatomyView';
+import { createDefaultAnatomyView, isolateAnatomyNode, setAnatomyMode, setCutaway } from '../core/scientificWorlds/humanLab/anatomyView';
 import type { AnatomyDisplayMode, AnatomyViewState } from '../core/scientificWorlds/humanLab/types';
 import { TWIN_ASSET_TIER } from '../core/three/biologyLabKit';
+import { humanTwinProvenanceLabel, type HumanTwinTier } from '../core/three/humanTwinAsset';
+import { DEFAULT_CUTAWAY, type CutawayState } from '../core/three/humanTwinCutaway';
+import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { replayExperimentSession, type ExperimentRunner, type ExperimentSession, type ReplayVerdict } from '../core/scientificWorlds/experimentSession';
 import { AGENT_STATE_LABEL_PL, type AgentActionState } from '../core/scientificWorlds/agentActionMachine';
 import { narrateReport, narrateSession, type NarrationLine } from '../core/scientificWorlds/narration';
@@ -83,6 +86,10 @@ export function applyAnatomyInteraction(state: AnatomyViewState, parameters: Rea
     if (action === 'OPEN_TWIN') return { state: setAnatomyMode(createDefaultAnatomyView(state.twinId), mode), error: null };
     if (action === 'FOCUS_ANATOMY') return { state: setAnatomyMode(isolateAnatomyNode(state, String(parameters.focus ?? 'brain'), manifest), mode), error: null };
     if (action === 'SET_ANATOMY_MODE') return { state: setAnatomyMode(state, mode), error: null };
+    // D-131: the two V3 reducers that existed but had no renderer behind them until the section plane was implemented.
+    if (action === 'SET_CUTAWAY') return { state: setCutaway(state, parameters.enabled !== false), error: null };
+    if (action === 'ISOLATE_NODE') return { state: isolateAnatomyNode(state, String(parameters.focus ?? state.selectedNodeId), manifest), error: null };
+    if (action === 'CLEAR_ISOLATION') return { state: { ...state, isolatedNodeIds: [] }, error: null };
     return { state, error: null };
   } catch (e) { return { state, error: e instanceof Error ? e.message : String(e) }; }
 }
@@ -116,6 +123,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [bioArtifact, setBioArtifact] = useState<BiologyArtifact | null>(null);
   const [sessions, setSessions] = useState<ExperimentSession[]>([]);
   const [explorerOpen, setExplorerOpen] = useState(true);
+  const [twinTier, setTwinTier] = useState<HumanTwinTier>('PROXY');
+  const [cutaway, setCutawayState] = useState<CutawayState>(DEFAULT_CUTAWAY);
   const [curiosity, setCuriosity] = useState<CycleResult | null>(null);
   const [curiosityBusy, setCuriosityBusy] = useState(false);
   const [flagship, setFlagship] = useState<FlagshipJourneyResult | null>(null);
@@ -123,6 +132,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [text, setText] = useState('');
   const [camera, setCamera] = useState<AgentCameraMode>('VISOR');
+  /** D-131: how the twin's BODY shell is drawn (skin / translucent / stylised x-ray / ghost). */
+  const [surface, setSurface] = useState<TwinSurfaceMode>('NORMAL');
   const [voice, setVoice] = useState(false);
   const [level, setLevel] = useState<GuideLevel>('EXPLORER');
   const [evidenceOpen, setEvidenceOpen] = useState(true);
@@ -131,6 +142,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const nextId = useRef(1);
   const levelRef = useRef(level); levelRef.current = level;
   const sessionRef = useRef<ExperimentSession | null>(null);
+  const cutawayRef = useRef<CutawayState>(DEFAULT_CUTAWAY);
   const voiceRef = useRef(voice); voiceRef.current = voice;
 
   const say = useCallback((who: TranscriptEntry['who'], line: string) => {
@@ -157,6 +169,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
 
   useEffect(() => {
+    sim.setTwinTierListener((tier) => setTwinTier(tier));
+    setTwinTier(sim.getTwinTier());
     sim.setUpdateListener((u) => {
       if (u.stationId) setStationId(u.stationId);
       setBlocked(u.blockedReason);
@@ -171,7 +185,14 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       if (u.interaction && u.interaction.stationId === 'station:human-study') {
         const r = applyAnatomyInteraction(anatomyRef.current, u.interaction.parameters, sim.manifest);
         if (r.error) say('system', `Bliźniak: odmowa — ${r.error}.`);
-        else { setAnatomy(r.state); sim.setTwinView(r.state.displayMode, r.state.selectedNodeId); say('agent', `Bliźniak: tryb ${r.state.displayMode}, wybrany węzeł ${r.state.selectedNodeId} (MODEL, ${TWIN_ASSET_TIER}).`); }
+        else {
+          setAnatomy(r.state);
+          sim.setTwinView(r.state.displayMode, r.state.selectedNodeId);
+          sim.setTwinIsolated(r.state.isolatedNodeIds);
+          const next = { ...cutawayRef.current, enabled: r.state.cutawayEnabled };
+          cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next);
+          say('agent', `Bliźniak: tryb ${r.state.displayMode}, wybrany węzeł ${r.state.selectedNodeId} (anatomia: MODEL; postać: ${sim.getTwinTier() === 'LICENSED_CC0_ASSET' ? 'CC0' : TWIN_ASSET_TIER}).`);
+        }
       }
       if (u.report) {
         const report: AgentReport = u.report;
@@ -179,7 +200,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         if (report.deferred.some((d) => d.intent === 'ASK')) { /* the question is handed to Science Chat by the button below */ }
       }
     });
-    return () => sim.setUpdateListener(null);
+    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); };
   }, [sim, speak, say, world]);
 
   /** Typed commands from the Human Explorer's clicks: the same planner and controller as the command bar, no parser in between. */
@@ -249,6 +270,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     speak(narrateSession(session, { level: levelRef.current, lang: 'pl', includeProvenance: false, replay: verdict }).filter((l) => l.key === 'replay'));
   };
   const toggleCamera = (): void => { const next: AgentCameraMode = camera === 'VISOR' ? 'SPECTATOR' : 'VISOR'; setCamera(next); sim.setCameraMode(next); };
+  // D-131: the twin camera frames the body instead of the agent; turning it off returns to the observer shot.
+  const setTwinCamera = (on: boolean): void => { const next: AgentCameraMode = on ? 'TWIN' : 'SPECTATOR'; setCamera(next); sim.setCameraMode(next); };
+  // D-131: the body shell's presentation. Stylised views of a model — no label, session or evidence changes.
+  const applySurface = (mode: TwinSurfaceMode): void => { setSurface(mode); sim.setTwinSurface(mode); };
   const station = stationId ? def.stations.find((s) => s.id === stationId) ?? null : null;
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
 
@@ -271,8 +296,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           <span className="sw-badge">ŚWIAT: {def.label}</span>
           <span className="sw-badge" data-testid="sw-agent-state">AGENT: {AGENT_STATE_LABEL_PL[agentState]}</span>
           {station && <span className="sw-badge">STANOWISKO: {station.label}</span>}
-          <span className="sw-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : 'OBSERWATOR'}</span>
-          {world === 'biology' && <span className="sw-badge" data-testid="sw-twin">BLIŹNIAK: {anatomy.displayMode} · {anatomy.selectedNodeId} · {TWIN_ASSET_TIER} · MODEL</span>}
+          <span className="sw-badge" data-testid="sw-camera-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : camera === 'TWIN' ? 'BLIŹNIAK' : 'OBSERWATOR'}</span>
+          {world === 'biology' && <span className="sw-badge" data-testid="sw-twin" data-tier={twinTier}>BLIŹNIAK: {anatomy.displayMode} · {anatomy.selectedNodeId} · {humanTwinProvenanceLabel(twinTier)}</span>}
           {world === 'biology' && <button type="button" className="sw-btn sw-btn-mini" onClick={() => setExplorerOpen((o) => !o)} aria-expanded={explorerOpen} data-testid="sw-explorer-toggle">Human Explorer {explorerOpen ? '▾' : '▸'}</button>}
         </div>
         {agentState !== 'IDLE' && agentState !== 'BLOCKED' && <div className="sw-progress" aria-hidden="true"><span style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
@@ -320,7 +345,15 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       </section>
 
       {world === 'biology' && explorerOpen && (
-        <HumanExplorerPanel manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions} busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime} />
+        <HumanExplorerPanel
+          manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions}
+          busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
+          twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds}
+          twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
+          surface={surface} onSurface={applySurface}
+          onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
+          onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
+        />
       )}
       <section className="sw-hud sw-hud-command" aria-label="Polecenia" data-testid="sw-command">
         <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">

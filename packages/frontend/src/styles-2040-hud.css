@@ -435,6 +435,20 @@ input, select, textarea { background: transparent !important; border: 1px solid 
    ===================================================================== */
 .sw-hud-explorer { right: 0; bottom: 0; width: min(760px, 62vw); max-height: 58vh; overflow: auto; padding-bottom: calc(0.9rem + var(--safe-bottom)); gap: 0.45rem; }
 .sw-explorer-open .sw-hud-evidence { max-height: 34vh; }
+/* The explorer dock and the command bar are both bottom-anchored, and the command bar also starts after
+   the 12.5rem nav rail — so a plain vw split is not enough. With the dock open the transcript takes exactly
+   what is left over (never below 190px, never above its own 440px), so the two can never overlap at any
+   desktop width. Before this, the transcript covered the dock's left column and intercepted its clicks —
+   caught by the browser E2E, which no unit test could have seen. */
+.sw-explorer-open .sw-hud-explorer { width: min(760px, 56vw); }
+.sw-explorer-open .sw-hud-command { width: clamp(190px, calc(100vw - 12.5rem - min(760px, 56vw) - 1rem), 440px); }
+/* D-131 — the twin camera exists to SHOW the body, so while it is active the HUD gets out of its way:
+   the transcript steps aside and the research dock keeps only the height its controls need. This is the
+   "world view" posture of the reference material, applied to the one camera whose whole purpose is the
+   subject; every other camera keeps the HUD exactly as it was. */
+.sw-cam-twin .sw-hud-command { opacity: 0; pointer-events: none; }
+.sw-cam-twin .sw-hud-explorer { max-height: 32vh; }
+.sw-cam-twin .sw-hud-evidence { opacity: 0.25; }
 .sw-ex-head { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .sw-ex-mode-real_image, .sw-ex-mode-real_dataset { border-color: #62f0a3; color: #eafff4; }
 .sw-ex-mode-simulated, .sw-ex-mode-reconstructed, .sw-ex-mode-illustrative { border-color: rgba(251, 191, 36, 0.55); color: #fde68a; text-shadow: 0 0 8px rgba(251, 191, 36, 0.35); }
@@ -463,8 +477,16 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-ex-rung-scale { font-size: 0.58rem; color: #7dd3fc; }
 .sw-btn-mini { font-size: 0.62rem; padding: 0.22rem 0.45rem; }
 @media (max-width: 900px) {
-  .sw-hud-explorer { width: 100vw; max-height: 46vh; padding: 0.5rem 0.6rem calc(4.2rem + var(--safe-bottom)); }
+  .sw-hud-explorer, .sw-explorer-open .sw-hud-explorer { width: 100vw; max-height: 46vh; padding: 0.5rem 0.6rem calc(4.2rem + var(--safe-bottom)); }
+  .sw-explorer-open .sw-hud-command { width: 100vw; }
   .sw-ex-body { grid-template-columns: 1fr; }
   .sw-ex-systems { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid rgba(56, 189, 248, 0.16); padding: 0 0 0.35rem; }
   .sw-ex-rungs { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* D-131: Human Explorer — section plane + isolation controls (the twin's body is a licensed CC0 asset;
+   the anatomy it reveals is still the atlas MODEL, and the panel says so on its own badge). */
+.sw-ex-section { margin-top: 0.45rem; border-top: 1px solid rgba(56, 189, 248, 0.16); padding-top: 0.4rem; }
+.sw-ex-slider { width: 100%; margin: 0.3rem 0 0.2rem; accent-color: #62f0a3; background: transparent; }
+.sw-ex-slider:disabled { opacity: 0.4; }
+.sw-ex-section .sw-faint { font-size: 0.6rem; line-height: 1.35; margin: 0.2rem 0 0; }

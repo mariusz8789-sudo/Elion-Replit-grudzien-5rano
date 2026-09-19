@@ -6,6 +6,9 @@ import { createPracticalLight } from './graphics/lighting';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import type { VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import { NEURO_REGIONS } from '../scientificWorlds/humanLab/neuroLab';
+import { applyRimLight, isRimPatched, selectionPulse, setSurfaceMode, type TwinSurfaceMode } from './humanTwinMaterials';
+import { createCutaway, measureCutawayBounds, setClippingOnObject, type CutawayHandle, type CutawayState } from './humanTwinCutaway';
+import type { LoadedHumanTwinBody, HumanTwinTier } from './humanTwinAsset';
 
 /**
  * GENESIS GRAPHICS ENGINE — HUMAN BIOLOGY LAB KIT (architecture + the twin).
@@ -187,8 +190,16 @@ export interface TwinHandle {
   readonly group: THREE_NS.Group;
   readonly body: Character;
   readonly organs: ReadonlyMap<string, THREE_NS.Mesh>;
+  /** What the body is made of: a licensed CC0 asset, or the procedural proxy. Anatomy stays MODEL either way. */
+  readonly tier: HumanTwinTier;
   /** Apply a V3 visual-layer instruction (mode → visible asset slots, translucency, tint) and the selected node. */
   setView(instruction: VisualLayerInstruction, selectedNodeId: string | null): void;
+  /** D-131: isolate the listed anatomy nodes (empty = show everything the current mode allows). */
+  setIsolated(nodeIds: readonly string[]): void;
+  /** D-131: real section plane through the twin (schematic — clipping reveals model proxies, not tissue). */
+  setCutaway(state: CutawayState): void;
+  /** D-131: the surface presentation of the BODY shell (x-ray is a stylised view of a model, never a radiograph). */
+  setSurface(mode: TwinSurfaceMode): void;
   update(t: number): void;
   dispose(): void;
 }
@@ -198,6 +209,12 @@ export interface TwinProxyOptions {
   /** Reference look: the twin as a luminous holographic body (emissive shell + a point cloud sampled from the rig's own vertices). Default false = skin proxy. */
   hologram?: boolean;
   hologramHex?: number;
+  /**
+   * D-131: the APPROVED, licence-verified human GLB. When present it replaces the procedural rig as the
+   * body — the twin looks like a person instead of a glowing mannequin. Its ANATOMY is unchanged: the
+   * organ proxies below are still atlas ellipsoids (MODEL), and the asset carries no medical anatomy.
+   */
+  bodyAsset?: LoadedHumanTwinBody | null;
 }
 
 /**
@@ -208,11 +225,33 @@ export interface TwinProxyOptions {
 export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTwinManifest, opts: TwinProxyOptions): TwinHandle {
   const g = new THREE.Group(); g.name = 'twin:proxy';
   const body = buildCharacter(THREE, { height: manifest.parameters.heightMeters });
-  const holo = opts.hologram === true; const holoColor = opts.hologramHex ?? 0x9fe9ff;
+  const asset = opts.bodyAsset ?? null;
+  const tier: HumanTwinTier = asset ? asset.tier : 'PROXY';
+  const holo = opts.hologram === true && !asset; const holoColor = opts.hologramHex ?? 0x9fe9ff;
   const skin = holo
     ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(holoColor), emissive: new THREE.Color(holoColor), emissiveIntensity: 0.55, roughness: 0.35, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false })
     : new THREE.MeshPhysicalMaterial({ color: new THREE.Color(opts.skinHex), roughness: 0.42, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.5, transparent: true, opacity: 1, depthWrite: true });
-  body.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.material = skin; m.castShadow = !holo; } });
+  // D-131: with an approved licensed asset the GLB IS the body; the procedural rig stays built (the
+  // Character handle is part of the contract) but is hidden, so no second body is ever on screen.
+  const shellMaterials: THREE_NS.Material[] = [];
+  if (asset) {
+    body.root.visible = false;
+    g.add(asset.root);
+    const rim = new THREE.Color(opts.hologramHex ?? 0x7dd3fc);
+    for (const mesh of asset.meshes) {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        if (!m || shellMaterials.includes(m)) continue;
+        shellMaterials.push(m);
+        // The asset's own PBR material is kept; only a fresnel rim is injected on top of it.
+        if (!isRimPatched(m)) applyRimLight(THREE, m, { color: rim, power: 3.0, intensity: 0.28 });
+      }
+    }
+  } else {
+    body.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.material = skin; m.castShadow = !holo; } });
+    shellMaterials.push(skin);
+    if (!isRimPatched(skin)) applyRimLight(THREE, skin, { color: new THREE.Color(opts.hologramHex ?? 0x7dd3fc), power: 3.0, intensity: holo ? 0.1 : 0.22 });
+  }
   if (body.helmet) body.helmet.visible = false;
   g.add(body.root);
   // The point-mesh look of the reference: one point per rig vertex, in the rig's own bind pose (a presentation layer over the same proxy).
@@ -255,8 +294,54 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   regions.visible = false; g.add(regions);
   let selected: THREE_NS.Mesh | null = null;
   const tint = new THREE.Color();
+  // D-131 state that survives between setView calls: isolation, the section plane and the surface mode.
+  let isolated: readonly string[] = [];
+  let lastInstr: VisualLayerInstruction | null = null;
+  let lastSelected: string | null = null;
+  let surface: TwinSurfaceMode = 'NORMAL';
+  const cutaway: CutawayHandle = createCutaway(THREE, opts.hologramHex ?? 0x7dd3fc);
+  g.add(cutaway.indicator);
+  let cutawayOn = false;
+  const blink = asset?.morphs.get('eyeBlinkLeft') ?? null;
+  const blinkR = asset?.morphs.get('eyeBlinkRight') ?? null;
+
+  /** Visibility of one organ under the current mode AND the isolation set (isolation narrows, never widens). */
+  const organVisible = (id: string, slot: string, instr: VisualLayerInstruction | null): boolean => {
+    const byMode = instr ? instr.visibleAssetSlots.includes(slot) : false;
+    if (!isolated.length) return byMode;
+    return isolated.includes(id);
+  };
+  const applyOrgans = (): void => {
+    for (const [id, m] of organs) {
+      const slot = String(m.userData.assetSlot);
+      m.visible = organVisible(id, slot, lastInstr);
+      const mat = m.material as THREE_NS.MeshStandardMaterial;
+      mat.emissiveIntensity = lastSelected === id ? 0.9 : 0.22;
+      // Isolation dims whatever is still shown but is not the isolated node, so context stays readable.
+      mat.opacity = !isolated.length || isolated.includes(id) ? 0.92 : 0.12;
+    }
+    // The body shell steps back when a node is isolated, so the isolated organ is actually visible.
+    const shellMode: TwinSurfaceMode = isolated.length ? 'GHOST' : surface;
+    for (const m of shellMaterials) setSurfaceMode(m, shellMode);
+    if (cloudMat) cloudMat.opacity = isolated.length ? 0.1 : cloudMat.opacity;
+  };
+
   return {
-    group: g, body, organs,
+    group: g, body, organs, tier,
+    setIsolated(nodeIds) { isolated = [...nodeIds]; applyOrgans(); },
+    setSurface(mode) { surface = mode; applyOrgans(); },
+    setCutaway(state) {
+      cutawayOn = state.enabled;
+      const bounds = measureCutawayBounds(THREE, asset ? asset.root : body.root);
+      cutaway.apply(state, bounds);
+      // The plane is attached to the body shell AND the organ proxies, so a cut opens the whole twin.
+      setClippingOnObject(asset ? asset.root : body.root, state.enabled ? cutaway.plane : null);
+      for (const [, m] of organs) {
+        const mat = m.material as THREE_NS.MeshStandardMaterial;
+        mat.clippingPlanes = state.enabled ? [cutaway.plane] : null;
+        mat.needsUpdate = true;
+      }
+    },
     setView(instr, selectedNodeId) {
       const bodySlot = manifest.nodes.find((n) => n.id === 'body')?.assetSlot ?? '';
       const bodyVisible = instr.visibleAssetSlots.includes(bodySlot);
@@ -273,13 +358,33 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
       }
       regions.visible = instr.mode === 'BRAIN' || instr.mode === 'NERVOUS';
       selected = selectedNodeId ? organs.get(selectedNodeId) ?? null : null;
+      lastInstr = instr; lastSelected = selectedNodeId;
+      // X-ray IS the translucent modes' surface: one fresnel shell, labelled as a stylised model view.
+      surface = instr.mode === 'XRAY' ? 'XRAY' : instr.translucent ? 'TRANSLUCENT' : 'NORMAL';
+      applyOrgans();
     },
     update(t) {
-      if (!holo) body.update('idle', t, 0);
+      if (!holo && !asset) body.update('idle', t, 0);
       if (cloudMat) cloudMat.opacity = Math.max(0.1, cloudMat.opacity) * (0.92 + 0.08 * Math.sin(t * 2.2));
-      if (selected) (selected.material as THREE_NS.MeshStandardMaterial).emissiveIntensity = 0.7 + 0.35 * Math.sin(t * 3);
+      if (selected) (selected.material as THREE_NS.MeshStandardMaterial).emissiveIntensity = 0.55 + 0.45 * selectionPulse(t);
+      // D-131: the asset's own ARKit blendshapes give the twin a blink — presentation only, deterministic
+      // in scene time, never part of a session, an experiment input or an evidence record.
+      if (blink || blinkR) {
+        const cycle = t % 5.2;
+        const amount = cycle < 0.16 ? Math.sin((cycle / 0.16) * Math.PI) : 0;
+        for (const target of [blink, blinkR]) {
+          if (!target) continue;
+          const influences = target.mesh.morphTargetInfluences;
+          if (influences) influences[target.index] = amount;
+        }
+      }
+      if (cutawayOn) cutaway.indicator.material.opacity = 0.05 + 0.03 * selectionPulse(t * 0.4);
     },
-    dispose() { body.dispose(); skin.dispose(); sphere.dispose(); regionMat.dispose(); for (const m of organMats) m.dispose(); cloud?.geometry.dispose(); cloudMat?.dispose(); },
+    dispose() {
+      body.dispose(); skin.dispose(); sphere.dispose(); regionMat.dispose();
+      for (const m of organMats) m.dispose();
+      cloud?.geometry.dispose(); cloudMat?.dispose(); cutaway.dispose();
+    },
   };
 }
 
@@ -291,17 +396,25 @@ export interface TwinChamberOptions {
 }
 
 /** The central sealed twin chamber: disc plinth, glass cylinder, capped crown with a ring of light, and a base ring. Returns the anchor the twin stands on. */
-export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptions): { group: THREE_NS.Group; anchor: THREE_NS.Group; ring: THREE_NS.MeshStandardMaterial } {
+/**
+ * The chamber returns its enclosure as well (D-131): the glass shell plus the twelve ribs that stand
+ * between a close camera and the body. The twin camera opens that vitrine while it is framing the twin —
+ * from close range the glass's specular highlight and the ribs cut straight across the figure the shot
+ * exists to show. Hiding the case around a model changes nothing about the model.
+ */
+export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptions): { group: THREE_NS.Group; anchor: THREE_NS.Group; ring: THREE_NS.MeshStandardMaterial; glass: THREE_NS.Object3D } {
   const g = new THREE.Group(); g.position.set(...opts.position); g.name = 'twin:chamber';
   g.add(createPlatform(THREE, opts.palette.POLISHED_METAL, { position: [0, 0.07, 0], thickness: 0.14, shape: 'disc', radius: opts.radius + 0.25, radialSegments: 48 }));
   g.add(createPlatform(THREE, opts.palette.TECH_COMPOSITE, { position: [0, 0.17, 0], thickness: 0.06, shape: 'disc', radius: opts.radius + 0.05, radialSegments: 48 }));
-  g.add(createGlassChamber(THREE, opts.glass, { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: false, radialSegments: 48 }));
+  // Everything the twin camera opens: the glass shell and the ribs that stand in front of the body.
+  const enclosure = new THREE.Group(); enclosure.name = 'twin:chamber-enclosure'; g.add(enclosure);
+  enclosure.add(createGlassChamber(THREE, opts.glass, { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: false, radialSegments: 48 }));
   const crown = new THREE.Mesh(new THREE.CylinderGeometry(opts.radius + 0.2, opts.radius + 0.1, 0.18, 48), opts.palette.BRUSHED_METAL); crown.position.y = opts.height + 0.29; g.add(crown);
   const ring = createEmissiveInstrumentMaterial(THREE, { color: 0x8fd3ff, intensity: 1.4, baseColor: 0x123047 });
   const top = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.02, 0.03, 10, 64), ring); top.rotation.x = Math.PI / 2; top.position.y = opts.height + 0.19; g.add(top);
   const bottom = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.08, 0.03, 10, 64), ring); bottom.rotation.x = Math.PI / 2; bottom.position.y = 0.21; g.add(bottom);
   // Reference look: vertical ribs around the glass, four pilasters, a segmented LED ring in the base, an emitter inside, concentric light rings overhead.
-  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, opts.height, 0.05), opts.palette.POLISHED_METAL); rib.position.set(Math.cos(a) * (opts.radius + 0.01), opts.height / 2 + 0.2, Math.sin(a) * (opts.radius + 0.01)); rib.rotation.y = -a; g.add(rib); }
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, opts.height, 0.05), opts.palette.POLISHED_METAL); rib.position.set(Math.cos(a) * (opts.radius + 0.01), opts.height / 2 + 0.2, Math.sin(a) * (opts.radius + 0.01)); rib.rotation.y = -a; enclosure.add(rib); }
   for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; g.add(createColumn(THREE, opts.palette.PAINTED_METAL, { position: [Math.cos(a) * (opts.radius + 0.18), 0.14, Math.sin(a) * (opts.radius + 0.18)], height: opts.height + 0.1, radius: 0.045 })); }
   const ledGeo = new THREE.BoxGeometry(0.06, 0.05, 0.02);
   for (let i = 0; i < 48; i++) { const a = (i / 48) * Math.PI * 2; const led = new THREE.Mesh(ledGeo, ring); led.position.set(Math.cos(a) * (opts.radius + 0.22), 0.1, Math.sin(a) * (opts.radius + 0.22)); led.rotation.y = -a; g.add(led); }
@@ -311,7 +424,7 @@ export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptio
   for (const [r, w] of [[opts.radius + 0.6, 0.05], [opts.radius + 1.1, 0.04], [opts.radius + 1.6, 0.03]] as const) { const t = new THREE.Mesh(new THREE.TorusGeometry(r, w, 8, 72), ring); t.rotation.x = Math.PI / 2; t.position.y = ringsY - 0.5 - (r - opts.radius) * 0.18; g.add(t); }
   const floorRing = new THREE.Mesh(new THREE.RingGeometry(opts.radius + 0.55, opts.radius + 0.62, 72), ring); floorRing.rotation.x = -Math.PI / 2; floorRing.position.y = 0.004; g.add(floorRing);
   const anchor = new THREE.Group(); anchor.position.y = 0.2; g.add(anchor);
-  return { group: g, anchor, ring };
+  return { group: g, anchor, ring, glass: enclosure };
 }
 
 export interface MezzanineOptions {

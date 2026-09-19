@@ -22,6 +22,9 @@ const SHOTS = {
   bioOrpheus: 'artifacts/human-biology-lab-orpheus.png',
   bioSpectator: 'artifacts/human-biology-lab-spectator.png',
   bioExplorer: 'artifacts/human-biology-lab-explorer.png',
+  bioTwinCc0: 'artifacts/human-biology-lab-twin-cc0.png',
+  bioCutaway: 'artifacts/human-biology-lab-cutaway.png',
+  bioXray: 'artifacts/human-biology-lab-xray.png',
 } as const;
 
 const settled = async (page: Page, frames = 2): Promise<void> => {
@@ -193,8 +196,49 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioExplorer });
 
+    // D-131: the licensed CC0 body replaces the proxy in the running app, and the section plane cuts it
+    // for real. The HUD must say what the body is made of WITHOUT upgrading the anatomy label.
+    await expect.poll(async () => page.getByTestId('sw-twin').getAttribute('data-tier'), { timeout: 400_000 }).toBe('LICENSED_CC0_ASSET');
+    await expect(page.getByTestId('sw-twin')).toContainText('CC0');
+    await expect(page.getByTestId('sw-twin')).toContainText('ANATOMIA: MODEL');
+    await expect(page.getByTestId('sw-explorer-tier')).toContainText('CC0');
+    // Both agent cameras leave the twin a distant figure in its chamber; the twin camera frames the body,
+    // which is the only way a screenshot can show whether the licensed asset actually rendered.
+    await page.getByTestId('sw-explorer-twin-camera').click();
+    await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
+    await expect(page.getByTestId('sw-camera-badge')).toContainText('BLIŹNIAK');
+    // Focusing the heart isolated it (the V3 reducer's own semantics), and an isolated node ghosts the body
+    // shell so the organ can be seen. Clear it, so this shot is of the licensed body itself.
+    await expect(page.getByTestId('sw-explorer-isolate')).toContainText('Pokaż wszystko');
+    await page.getByTestId('sw-explorer-isolate').click();
+    await expect(page.getByTestId('sw-explorer-isolate')).toContainText('Izoluj narząd');
+    await expect(page.getByTestId('sw-explorer-surface')).toHaveAttribute('data-surface', 'NORMAL');
+    await settled(page, 4);
+    await page.screenshot({ path: SHOTS.bioTwinCc0 });
+
+    // The stylised x-ray shell. It is a fresnel term over a licensed 3D model — the chip says "RTG (model)"
+    // and the anatomy label must STILL read MODEL, because a prettier view is not an observation.
+    await page.getByTestId('sw-explorer-surface-xray').click();
+    await expect(page.getByTestId('sw-explorer-surface')).toHaveAttribute('data-surface', 'XRAY');
+    await expect(page.getByTestId('sw-twin')).toContainText('ANATOMIA: MODEL');
+    await settled(page, 4);
+    await page.screenshot({ path: SHOTS.bioXray });
+    await page.getByTestId('sw-explorer-surface-normal').click();
+
+    await page.getByTestId('sw-explorer-cut-toggle').click();
+    await expect(page.getByTestId('sw-explorer-section')).toHaveAttribute('data-cutaway', 'on');
+    await page.getByTestId('sw-explorer-axis-coronal').click();
+    await page.getByTestId('sw-explorer-isolate').click();
+    await expect(page.getByTestId('sw-explorer-isolate')).toContainText('Pokaż wszystko');
+    await expect(page.getByTestId('sw-explorer-section-note')).toContainText('schemat');
+    await settled(page, 4);
+    await page.screenshot({ path: SHOTS.bioCutaway });
+    // Cutting and isolating are presentation: they must not seal a session or add evidence.
+    await expect(page.getByTestId('sw-session')).toHaveAttribute('data-session-id', /.+/);
+
+
     const harness = new VisualFidelityHarness();
-    for (const path of [SHOTS.bioIdle, SHOTS.bioWalking, SHOTS.bioBrain, SHOTS.bioHyperscope, SHOTS.bioOrpheus, SHOTS.bioSpectator, SHOTS.bioExplorer]) {
+    for (const path of [SHOTS.bioIdle, SHOTS.bioWalking, SHOTS.bioBrain, SHOTS.bioHyperscope, SHOTS.bioOrpheus, SHOTS.bioSpectator, SHOTS.bioExplorer, SHOTS.bioTwinCc0, SHOTS.bioXray, SHOTS.bioCutaway]) {
       const report = harness.inspectFile(path);
       expect(report.ok, `Eyes reject ${path}: ${report.reason ?? 'OK'}`).toBe(true);
     }

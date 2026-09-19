@@ -7,6 +7,8 @@ import type { AnatomyViewState, HumanDigitalTwinManifest, OrganSystemId } from '
 import { VIRTUAL_MICROSCOPE_MAGNIFICATIONS } from '../core/scientificWorlds/humanLab/virtualMicroscope';
 import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_TEXT, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, systemCommands, type ExplorerOrgan, type ScaleLevel } from '../core/scientificWorlds/humanExplorer';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
+import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../core/three/humanTwinCutaway';
+import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 
 /**
  * HUMAN EXPLORER PANEL (D-130) — the reference UI's four blocks over the
@@ -20,6 +22,20 @@ import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
  */
 export interface HumanExplorerPanelProps {
   readonly manifest: HumanDigitalTwinManifest;
+  /** D-131: the live section state, owned by the screen (the V3 anatomy state remains the single source of truth). */
+  readonly cutaway: CutawayState;
+  readonly onCutaway: (next: CutawayState) => void;
+  /** D-131: isolate the selected organ (empty list clears it). */
+  readonly isolated: readonly string[];
+  readonly onIsolate: (nodeIds: readonly string[]) => void;
+  /** What the body is made of — a licensed asset or the proxy. Anatomy stays MODEL either way. */
+  readonly twinTier: 'LICENSED_CC0_ASSET' | 'PROXY';
+  /** D-131: is the camera framing the twin? Both agent cameras leave the body a distant figure in its chamber. */
+  readonly twinCamera: boolean;
+  readonly onTwinCamera: (on: boolean) => void;
+  /** D-131: how the BODY shell is drawn. X-ray here is a stylised view of a model, never a radiograph. */
+  readonly surface: TwinSurfaceMode;
+  readonly onSurface: (mode: TwinSurfaceMode) => void;
   readonly anatomy: AnatomyViewState;
   readonly artifact: BiologyArtifact | null;
   readonly session: ExperimentSession | null;
@@ -30,9 +46,11 @@ export interface HumanExplorerPanelProps {
 }
 
 const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY: 'Skórny', SKELETAL: 'Szkieletowy', MUSCULAR: 'Mięśniowy', NERVOUS: 'Nerwowy', ENDOCRINE: 'Dokrewny', CARDIOVASCULAR: 'Krążenia', LYMPHATIC: 'Limfatyczny', RESPIRATORY: 'Oddechowy', DIGESTIVE: 'Pokarmowy', URINARY: 'Moczowy', REPRODUCTIVE: 'Rozrodczy', IMMUNE: 'Immunologiczny' };
+/** D-131: the four body-shell presentations. `RTG (model)` names itself a model so the chip can never read as a radiograph. */
+const SURFACE_MODES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['TRANSLUCENT', 'Prześwit'], ['XRAY', 'RTG (model)'], ['GHOST', 'Duch']];
 const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope', 'histology', 'imaging', 'central-dogma', 'neuro']);
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
   const organs = useMemo(() => manifest.nodes.filter((n) => n.kind === 'ORGAN'), [manifest]);
   const [system, setSystem] = useState<OrganSystemId | null>(null);
@@ -68,7 +86,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   return (
     <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-evidence-mode={evidenceMode}>
       <header className="sw-ex-head">
-        <span className="sw-badge">{t('explorer.humanExplorer', locale).toUpperCase()} · MODEL</span>
+        <span className="sw-badge" data-testid="sw-explorer-tier">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
         <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
         <span className={`sw-badge sw-ex-mode sw-ex-mode-${evidenceMode.toLowerCase()}`} data-testid="sw-explorer-evidence">{explorerTruthLabel(evidenceMode)}</span>
       </header>
@@ -92,6 +110,36 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
               <dt>{t('explorer.evidence', locale)}</dt><dd className="cw-mono">{organ.epistemic} · {manifest.clinicalUse}</dd>
             </dl>
           )}
+          {/* D-131: a real section plane and isolation. Clipping reveals the MODEL proxies inside the body —
+              it is a schematic section, never a medical cross-section, and the label says so. */}
+          <div className="sw-ex-section" data-testid="sw-explorer-section" data-cutaway={cutaway.enabled ? 'on' : 'off'}>
+            <div className="sw-ex-title">{t('explorer.section', locale)}</div>
+            <div className="sw-ex-mags">
+              <button type="button" className={`sw-chip${cutaway.enabled ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, enabled: !cutaway.enabled })} disabled={busy} data-testid="sw-explorer-cut-toggle">{t('explorer.cutaway', locale)}</button>
+              {(['SAGITTAL', 'CORONAL', 'AXIAL'] as const).map((axis: SectionAxis) => (
+                <button key={axis} type="button" className={`sw-chip${cutaway.axis === axis ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, axis, enabled: true })} disabled={busy} title={SECTION_AXIS_LABEL_PL[axis]} data-testid={`sw-explorer-axis-${axis.toLowerCase()}`}>{SECTION_AXIS_LABEL_PL[axis].split(' ')[0]}</button>
+              ))}
+              <button type="button" className={`sw-chip${cutaway.flipped ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, flipped: !cutaway.flipped, enabled: true })} disabled={busy} data-testid="sw-explorer-cut-flip">↔</button>
+            </div>
+            <input className="sw-ex-slider" type="range" min={0} max={1} step={0.01} value={cutaway.position} disabled={busy || !cutaway.enabled}
+              onChange={(e) => onCutaway({ ...cutaway, position: Number(e.target.value) })} aria-label={t('explorer.section', locale)} data-testid="sw-explorer-cut-position" />
+            <div className="sw-ex-mags">
+              <button type="button" className={`sw-chip${isolated.length ? ' is-on' : ''}`} onClick={() => onIsolate(isolated.length ? [] : organ ? [organ.id] : [])} disabled={busy || !organ} data-testid="sw-explorer-isolate">{isolated.length ? t('explorer.showAll', locale) : t('explorer.isolate', locale)}</button>
+              {/* Both agent cameras follow the suited agent, which leaves the twin a distant figure inside its
+                  chamber. This one frames the body itself — the only way to actually READ a section or an
+                  isolated organ. It is a camera, not a claim: no label, session or evidence changes with it. */}
+              <button type="button" className={`sw-chip${twinCamera ? ' is-on' : ''}`} onClick={() => onTwinCamera(!twinCamera)} data-testid="sw-explorer-twin-camera">{t('explorer.twinCamera', locale)}</button>
+            </div>
+            {/* The body shell's presentation. The "X-ray" is a fresnel shell over a licensed 3D model —
+                a stylised view that lets the atlas volumes read through the skin. It is NOT a radiograph,
+                and it upgrades no epistemic status: the anatomy under it stays MODEL. */}
+            <div className="sw-ex-mags" data-testid="sw-explorer-surface" data-surface={surface}>
+              {SURFACE_MODES.map(([mode, label]) => (
+                <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} onClick={() => onSurface(mode)} disabled={busy} data-testid={`sw-explorer-surface-${mode.toLowerCase()}`}>{label}</button>
+              ))}
+            </div>
+            <p className="sw-faint" data-testid="sw-explorer-section-note">{t('explorer.sectionNote', locale)}</p>
+          </div>
         </div>
         <div className="sw-ex-scope" data-testid="sw-explorer-scope" data-capture={imageSession?.sessionId ?? ''}>
           <div className="sw-ex-title">{t('explorer.hyperscope', locale)} · {t('explorer.magnification', locale)}</div>

@@ -41,6 +41,7 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
+import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
 
@@ -83,6 +84,10 @@ try {
   // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
   console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
 }
+// Evidence ledger of the knowledge channel (proposals, published records): a JSON snapshot beside the DB,
+// restored at boot and rewritten after every appended entry (D-130). ':memory:' keeps it ephemeral, and says so.
+const LEDGER_PATH = process.env.GENESIS_LEDGER_PATH ?? (DB_PATH === ':memory:' ? ':memory:' : path.join(path.dirname(DB_PATH), 'evidence-ledger.json'));
+const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH);
 // Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
 if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
@@ -391,6 +396,7 @@ const server = http.createServer((req, res) => {
       // Operator i tak dostaje ścieżkę w logu startowym.
       db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
       persistence: dbState.state,
+      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, entries: LEDGER_PERSISTENCE.entries },
       // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
       // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
       // meant EVERY entry fell through to the literal 'unknown', so the health
@@ -422,7 +428,9 @@ server.listen(PORT, () => {
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',
     durability: DB_DURABILITY.durability,
+    knowledgeLedger: LEDGER_PERSISTENCE.status, knowledgeLedgerPath: LEDGER_PERSISTENCE.path ?? 'memory',
   });
+  if (LEDGER_PERSISTENCE.status === 'REJECTED_IN_MEMORY') log('error', 'knowledge_ledger_snapshot_rejected', { path: LEDGER_PERSISTENCE.path, reason: LEDGER_PERSISTENCE.reason });
   if (db && !DB_DURABILITY.persistent) log('warn', 'db_not_durable', { durability: DB_DURABILITY.durability, why: DB_DURABILITY.why });
 });
 

@@ -18,14 +18,39 @@ type Obj = THREE_NS.Object3D;
 export interface CharacterOptions {
   height?: number;          // wysokość postaci [j. świata]
   skin?: number; shirt?: number; pants?: number; shoes?: number; hair?: number;
+  /**
+   * SCIENTIFIC WORLDS — a sealed scientific/hazmat suit over the same rig: suit fabric on every
+   * limb and the torso, gloves, boots, a helmet with a transparent visor, a backpack unit. The
+   * skeleton, walk cycle and tint behaviour are untouched; only the clothing layer changes.
+   */
+  suit?: SuitOptions;
+}
+
+export interface SuitOptions {
+  fabric?: number; trim?: number; gloves?: number; boots?: number;
+  /** Visor glass tint. */
+  visor?: number;
+  /** Emissive helmet lamp / status light colour. */
+  lamp?: number;
 }
 
 export type PoseMode = 'idle' | 'walk' | 'gesture';
 
 export interface Character {
   root: Obj;                // korzeń przy stopach (y=0)
+  /** The head joint (neck group): a first-person camera parents here to look through the visor. */
+  head: Obj;
+  /** The helmet/visor meshes, so a through-visor camera can hide what would occlude it. */
+  helmet: Obj | null;
   /** Aktualizacja pozy: tryb, czas [s], tempo (0..1 = intensywność chodu). */
   update(mode: PoseMode, t: number, speed: number): void;
+  /**
+   * SCIENTIFIC WORLDS — reach overlay applied AFTER `update()`: 0 = arms as posed, 1 = the right
+   * arm extended forward and slightly down to a console, left arm steadying. Blended, so a walk
+   * cycle fades into a reach instead of snapping. `headPitch` (radians, down positive) tilts the
+   * head toward the work.
+   */
+  reach(amount: number, headPitch?: number): void;
   setFacing(angleRad: number): void;
   /** Płynny tint ubrań; skóra, włosy i anatomia pozostają naturalne. */
   setEpidemicTint(color: number, intensity: number): void;
@@ -44,11 +69,20 @@ export function paletteFromSeed(seed: number): Required<Pick<CharacterOptions, '
 
 export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Character {
   const H = opts.height ?? 1.75;
+  const suit = opts.suit;
   const mat = (color: number, rough = 0.85) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.02 });
-  const M = {
-    skin: mat(opts.skin ?? 0xf2c9a0), shirt: mat(opts.shirt ?? 0x4a76c4),
-    pants: mat(opts.pants ?? 0x2f3a4c), shoes: mat(opts.shoes ?? 0x22262e), hair: mat(opts.hair ?? 0x2a1e14), face: mat(0x202b38, 0.72),
-  };
+  // A suited character wears the same rig: fabric on the torso and every limb, gloves where the hands are,
+  // boots where the shoes are, and no exposed skin or hair.
+  const M = suit
+    ? {
+      skin: mat(suit.gloves ?? 0x1f2933, 0.55), shirt: mat(suit.fabric ?? 0xe8ecf0, 0.72),
+      pants: mat(suit.fabric ?? 0xe8ecf0, 0.72), shoes: mat(suit.boots ?? 0x1a1f26, 0.6), hair: mat(suit.trim ?? 0xf0b35c, 0.6), face: mat(0x202b38, 0.72),
+    }
+    : {
+      skin: mat(opts.skin ?? 0xf2c9a0), shirt: mat(opts.shirt ?? 0x4a76c4),
+      pants: mat(opts.pants ?? 0x2f3a4c), shoes: mat(opts.shoes ?? 0x22262e), hair: mat(opts.hair ?? 0x2a1e14), face: mat(0x202b38, 0.72),
+    };
+  const extraMaterials: THREE_NS.Material[] = [];
   const disposables: THREE_NS.BufferGeometry[] = [];
   const baseShirt = M.shirt.color.clone();
   const basePants = M.pants.color.clone();
@@ -59,6 +93,7 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   const scratchPantsTarget = new THREE.Color();
 
   const root = new THREE.Group(); root.name = 'character';
+  let helmet: Obj | null = null;
 
   // Pomocnik: staw (Group) w pozycji; segment (mesh) rozciąga się od stawu w dół o `len`.
   const joint = (parent: Obj, x: number, y: number, z: number): Obj => {
@@ -84,11 +119,35 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   const chest = joint(pelvis, 0, chestY - hipY, 0);
 
   // Szyja + głowa + włosy.
-  const neck = joint(chest, 0, H * 0.05, 0);
+  const neck = joint(chest, 0, H * 0.05, 0); neck.name = 'joint:neck';
   const headGeo = new THREE.SphereGeometry(H * 0.075, 18, 16); disposables.push(headGeo);
   const head = new THREE.Mesh(headGeo, M.skin); head.position.y = headY - chestY; head.scale.set(0.9, 1.05, 0.95); neck.add(head);
   const hairGeo = new THREE.SphereGeometry(H * 0.079, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.62); disposables.push(hairGeo);
   const hair = new THREE.Mesh(hairGeo, M.hair); hair.position.copy(head.position); hair.position.y += H * 0.012; hair.scale.copy(head.scale); neck.add(hair);
+  if (suit) {
+    // Helmet: a shell around the head with a transparent visor in front, a trim ring at the collar
+    // and a small lamp — the first-person camera sits just inside the visor glass.
+    hair.visible = false;
+    const helmetGroup = new THREE.Group(); helmetGroup.name = 'helmet'; helmetGroup.position.copy(head.position); neck.add(helmetGroup);
+    const shellGeo = new THREE.SphereGeometry(H * 0.105, 24, 18, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI); disposables.push(shellGeo);
+    const shellMat = mat(suit.fabric ?? 0xe8ecf0, 0.5); extraMaterials.push(shellMat);
+    const shell = new THREE.Mesh(shellGeo, shellMat); shell.scale.set(1, 1.08, 1); shell.rotation.y = Math.PI; helmetGroup.add(shell);
+    const visorGeo = new THREE.SphereGeometry(H * 0.104, 24, 18, -Math.PI * 0.44, Math.PI * 0.88, Math.PI * 0.22, Math.PI * 0.5); disposables.push(visorGeo);
+    const visorMat = new THREE.MeshPhysicalMaterial({ color: suit.visor ?? 0x8fd3ff, transparent: true, opacity: 0.28, roughness: 0.08, metalness: 0.1, transmission: 0, side: THREE.DoubleSide, depthWrite: false });
+    extraMaterials.push(visorMat);
+    const visor = new THREE.Mesh(visorGeo, visorMat); visor.name = 'visor'; visor.scale.set(1, 1.08, 1); helmetGroup.add(visor);
+    const collarGeo = new THREE.TorusGeometry(H * 0.075, H * 0.014, 8, 20); disposables.push(collarGeo);
+    const collarMat = mat(suit.trim ?? 0xf0b35c, 0.45); extraMaterials.push(collarMat);
+    const collar = new THREE.Mesh(collarGeo, collarMat); collar.rotation.x = Math.PI / 2; collar.position.y = -H * 0.085; helmetGroup.add(collar);
+    const lampGeo = new THREE.SphereGeometry(H * 0.012, 8, 6); disposables.push(lampGeo);
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: suit.lamp ?? 0x62f0a3, emissiveIntensity: 2.2 }); extraMaterials.push(lampMat);
+    const lamp = new THREE.Mesh(lampGeo, lampMat); lamp.position.set(H * 0.07, H * 0.06, H * 0.05); helmetGroup.add(lamp);
+    // Backpack life-support unit on the torso.
+    const packGeo = new THREE.BoxGeometry(H * 0.16, H * 0.2, H * 0.07); disposables.push(packGeo);
+    const packMat = mat(suit.boots ?? 0x1a1f26, 0.55); extraMaterials.push(packMat);
+    const pack = new THREE.Mesh(packGeo, packMat); pack.position.set(0, (chestY - hipY) / 2 - H * 0.02, -H * 0.12); pelvis.add(pack);
+    helmet = helmetGroup;
+  }
   // Minimalne cechy twarzy są tylko detalem rigu obserwowanego z bliska; nie reprezentują danych demograficznych ani stanu modelu.
   const eyeGeo = new THREE.SphereGeometry(H * 0.010, 8, 6); disposables.push(eyeGeo);
   for (const side of [-1, 1]) {
@@ -101,9 +160,9 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
 
   // Ramiona: bark → łokieć → dłoń.
   const arm = (side: number) => {
-    const shoulder = joint(chest, side * shoulderX, H * 0.02, 0);
+    const shoulder = joint(chest, side * shoulderX, H * 0.02, 0); shoulder.name = side > 0 ? 'joint:shoulder.L' : 'joint:shoulder.R';
     limb(shoulder, upperArm, H * 0.035, M.shirt);
-    const elbow = joint(shoulder, 0, -upperArm, 0);
+    const elbow = joint(shoulder, 0, -upperArm, 0); elbow.name = side > 0 ? 'joint:elbow.L' : 'joint:elbow.R';
     limb(elbow, foreArm, H * 0.028, M.skin);
     const wrist = joint(elbow, 0, -foreArm, 0);
     const handGeo = new THREE.SphereGeometry(H * 0.032, 10, 8); disposables.push(handGeo);
@@ -169,9 +228,24 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     }
   };
 
+  const reach = (amount: number, headPitch = 0): void => {
+    const a = Math.max(0, Math.min(1, amount));
+    if (a <= 0 && headPitch === 0) return;
+    // Right arm forward/down to the console, elbow slightly bent; left arm rests forward as a brace.
+    armR.shoulder.rotation.x = armR.shoulder.rotation.x * (1 - a) + (-1.05) * a;
+    armR.shoulder.rotation.z = armR.shoulder.rotation.z * (1 - a) + (-0.12) * a;
+    armR.elbow.rotation.x = armR.elbow.rotation.x * (1 - a) + 0.35 * a;
+    armL.shoulder.rotation.x = armL.shoulder.rotation.x * (1 - a) + (-0.55) * a;
+    armL.elbow.rotation.x = armL.elbow.rotation.x * (1 - a) + 0.6 * a;
+    neck.rotation.x = headPitch;
+  };
+
   return {
     root,
+    head: neck,
+    helmet,
     update,
+    reach,
     setFacing: (a: number) => { root.rotation.y = a; },
     setEpidemicTint: (color: number, intensity: number) => {
       targetTint.setHex(color);
@@ -181,7 +255,7 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
       M.shirt.color.lerp(shirtTarget, 0.14);
       M.pants.color.lerp(pantsTarget, 0.12);
     },
-    dispose: () => { for (const g of disposables) g.dispose(); Object.values(M).forEach((m) => m.dispose()); },
+    dispose: () => { for (const g of disposables) g.dispose(); Object.values(M).forEach((m) => m.dispose()); extraMaterials.forEach((m) => m.dispose()); },
   };
 }
 

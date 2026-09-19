@@ -77,6 +77,11 @@ export type ChatAction =
    * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
    * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
   | { type: 'ingestUrls'; urls: readonly string[] }
+  /** D-128 — EPISTEMIC TRUTH RESPONSE: the LaypersonAssistant over the kernel ledger answers `query`
+   * with status + sources, or literally "Nie wiem"; ScienceChat.tsx executes it, the resolver only routes. */
+  | { type: 'evidenceAnswer'; query: string }
+  /** D-128 — CURIOSITY: questions derived from the kernel ledger's gaps (contradictions, single-source claims, model-only keys). */
+  | { type: 'curiosity'; limit: number }
   /** HYBRID QUANTUM BRIDGE — `/quantum bell-state | ghz <n> | superposition <n> | run <qasm>` (+ `shots=` `seed=`).
    * The backend (`/api/quantum/run`) decides where it runs: a cloud QPU only with env credentials, else the
    * local statevector simulator whose answer is a MODEL_ESTIMATE; `ScienceChat.tsx` shows exactly that label. */
@@ -341,6 +346,20 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     const urls = Array.from(message.matchAll(/https?:\/\/[^\s<>"']+/g), (m) => m[0].replace(/[),.;]+$/, ''));
     if (urls.length === 0) return { text: 'Podaj adres: `/ingest https://…`. Pobieram wyłącznie przez oficjalne API (YouTube, X, Facebook — z kluczem w środowisku) albo z domen dopuszczonych w rejestrze polityk; wynik trafia do bazy jako PROPOZYCJA do zatwierdzenia, nigdy jako fakt.', tag: 'SYSTEM', intent: 'CREATE_TASK' };
     return { text: `Wysyłam ${urls.length} adres(y) do modułu pozyskiwania wiedzy. Zasady: oficjalne API lub domeny z rejestru, robots.txt respektowany, wynik = propozycja z jawnym statusem.`, tag: 'SYSTEM', intent: 'CREATE_TASK', action: { type: 'ingestUrls', urls } };
+  }
+
+  // --- D-128 Epistemic truth response: `/dowody <pytanie>` (also "co wiemy o …", "jakie są dowody na …").
+  //     The answer comes from the ledger through LaypersonAssistant — never from this resolver's own words.
+  const evidenceMatch = message.match(/^\s*\/dowody\s+(.+)$/i) ?? message.match(/^\s*(?:co wiemy o|co wiemy na temat|jakie s[aą] dowody na|jakie mamy dowody na)\s+(.+)$/i);
+  if (evidenceMatch) {
+    const query = evidenceMatch[1].trim().replace(/[?.!]+$/, '');
+    return { text: `Sprawdzam bazę dowodów dla: „${query}”. Odpowiedź niesie status źródeł; bez dowodów odpowiem „Nie wiem”.`, tag: 'SYSTEM', intent: 'VERIFY', action: { type: 'evidenceAnswer', query } };
+  }
+  if (/^\s*\/dowody\s*$/i.test(message)) return { text: 'Podaj pytanie: `/dowody <o co pytasz>`. Odpowiadam wyłącznie z bazy dowodów (status źródła, poziom pewności) albo mówię „Nie wiem”.', tag: 'SYSTEM', intent: 'HELP' };
+  // --- D-128 Curiosity: `/ciekawość` (also "jakie pytania warto zadać", "co warto zbadać", "luki w dowodach").
+  if (/^\s*\/ciekawo(s|ś)(c|ć)(?=\s|$)/i.test(message) || has(norm, 'jakie pytania warto', 'co warto zbadac', 'luki w dowodach', 'czego nie wiemy')) {
+    const n = message.match(/\b(\d{1,2})\b/);
+    return { text: 'Wyprowadzam pytania z luk w bazie dowodów: sprzeczności między źródłami, twierdzenia z jednego źródła, wartości istniejące tylko jako wynik modelu. Każde pytanie cytuje swoje zapisy.', tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'curiosity', limit: n ? Math.max(1, Math.min(20, Number(n[1]))) : 6 } };
   }
 
   // --- Hybrid Quantum Bridge: `/quantum …` (also "stan Bella", "obwód kwantowy", "symulacja kwantowa" -> Bell preset).

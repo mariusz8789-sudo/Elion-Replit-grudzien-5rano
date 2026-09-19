@@ -1,0 +1,239 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-19T18:56:34Z"
+ },
+ "title": "Genesis World First — mockupy",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Genesis Home",
+   "is_interactive": true
+  },
+  "Matrix_Now.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Stan obecny — 12 paneli",
+   "is_interactive": true
+  },
+  "Matrix_Next.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Docelowo — world first",
+   "is_interactive": true
+  },
+  "HB_World.dc.html": {
+   "x": 0,
+   "y": 1200,
+   "w": 1440,
+   "h": 900,
+   "title": "1. World View",
+   "is_interactive": true
+  },
+  "HB_Hover.dc.html": {
+   "x": 1520,
+   "y": 1200,
+   "w": 1440,
+   "h": 900,
+   "title": "2. Najazd na serce",
+   "is_interactive": true
+  },
+  "HB_Selected.dc.html": {
+   "x": 3040,
+   "y": 1200,
+   "w": 1440,
+   "h": 900,
+   "title": "3. Panel kontekstowy",
+   "is_interactive": true
+  },
+  "HB_Research.dc.html": {
+   "x": 0,
+   "y": 2400,
+   "w": 1440,
+   "h": 900,
+   "title": "4. Research Drawer",
+   "is_interactive": true
+  },
+  "HB_Tissue.dc.html": {
+   "x": 1520,
+   "y": 2400,
+   "w": 1440,
+   "h": 900,
+   "title": "5. Tkanka",
+   "is_interactive": true
+  },
+  "HB_Cell.dc.html": {
+   "x": 3040,
+   "y": 2400,
+   "w": 1440,
+   "h": 900,
+   "title": "6. Komórka",
+   "is_interactive": true
+  },
+  "HB_Molecule.dc.html": {
+   "x": 0,
+   "y": 3600,
+   "w": 1440,
+   "h": 900,
+   "title": "7. Cząsteczka / DNA",
+   "is_interactive": true
+  },
+  "HB_Clean.dc.html": {
+   "x": 1520,
+   "y": 3600,
+   "w": 1440,
+   "h": 900,
+   "title": "8. Czyste laboratorium",
+   "is_interactive": true
+  },
+  "Chat_Closed.dc.html": {
+   "x": 3040,
+   "y": 3600,
+   "w": 1440,
+   "h": 900,
+   "title": "9. Science Chat zamknięty",
+   "is_interactive": true
+  },
+  "Chat_Open.dc.html": {
+   "x": 0,
+   "y": 4800,
+   "w": 1440,
+   "h": 900,
+   "title": "10. Science Chat otwarty",
+   "is_interactive": true
+  },
+  "CERN_World.dc.html": {
+   "x": 1520,
+   "y": 4800,
+   "w": 1440,
+   "h": 900,
+   "title": "11. CERN World View",
+   "is_interactive": true
+  },
+  "CERN_Research.dc.html": {
+   "x": 3040,
+   "y": 4800,
+   "w": 1440,
+   "h": 900,
+   "title": "12. CERN Research",
+   "is_interactive": true
+  },
+  "Cosmos_World.dc.html": {
+   "x": 0,
+   "y": 6000,
+   "w": 1440,
+   "h": 900,
+   "title": "13. Cosmos World View",
+   "is_interactive": true
+  },
+  "Cosmos_Research.dc.html": {
+   "x": 1520,
+   "y": 6000,
+   "w": 1440,
+   "h": 900,
+   "title": "14. Cosmos Research",
+   "is_interactive": true
+  },
+  "Mobile_Human.dc.html": {
+   "x": 3040,
+   "y": 6000,
+   "w": 390,
+   "h": 844,
+   "title": "15. Mobile — człowiek",
+   "is_interactive": true
+  },
+  "Mobile_Organ.dc.html": {
+   "x": 3510,
+   "y": 6000,
+   "w": 390,
+   "h": 844,
+   "title": "16. Mobile — narząd",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Matrix_Now.dc.html",
+  "Matrix_Next.dc.html",
+  "HB_World.dc.html",
+  "HB_Hover.dc.html",
+  "HB_Selected.dc.html",
+  "HB_Research.dc.html",
+  "HB_Tissue.dc.html",
+  "HB_Cell.dc.html",
+  "HB_Molecule.dc.html",
+  "HB_Clean.dc.html",
+  "Chat_Closed.dc.html",
+  "Chat_Open.dc.html",
+  "CERN_World.dc.html",
+  "CERN_Research.dc.html",
+  "Cosmos_World.dc.html",
+  "Cosmos_Research.dc.html",
+  "Mobile_Human.dc.html",
+  "Mobile_Organ.dc.html"
+ ],
+ "notes": {
+  "t0": {
+   "x": 0,
+   "y": -150,
+   "text": "Genesis Home — Matrix zostaje TUTAJ",
+   "kind": "title1",
+   "maxW": 4480
+  },
+  "t1": {
+   "x": 0,
+   "y": 1050,
+   "text": "Human Biology — WORLD → OBJECT → RESEARCH",
+   "kind": "title1",
+   "maxW": 4480
+  },
+  "t2": {
+   "x": 0,
+   "y": 2250,
+   "text": "Human Biology — badanie i makro→mikro",
+   "kind": "title1",
+   "maxW": 4480
+  },
+  "t3": {
+   "x": 0,
+   "y": 3450,
+   "text": "Powrót do świata i Science Chat",
+   "kind": "title1",
+   "maxW": 4480
+  },
+  "t4": {
+   "x": 0,
+   "y": 4650,
+   "text": "Pozostałe światy — ten sam mechanizm, własna tożsamość",
+   "kind": "title1",
+   "maxW": 4480
+  },
+  "t5": {
+   "x": 0,
+   "y": 5850,
+   "text": "Cosmos i mobile",
+   "kind": "title1",
+   "maxW": 4480
+  },
+  "gate": {
+   "x": 0,
+   "y": 6990,
+   "text": "Nic z tego nie jest w produkcie. Implementacja startuje dopiero po AKCEPTUJĘ DESIGN.",
+   "maxW": 900,
+   "color": "orange"
+  }
+ },
+ "designSystems": []
+}

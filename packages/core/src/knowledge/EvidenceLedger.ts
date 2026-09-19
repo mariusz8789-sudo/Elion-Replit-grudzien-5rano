@@ -10,6 +10,9 @@ export const sha256hex = (t: string): string => sha256HexSync(t);
 export const mulberry32 = (seed: number): (() => number) => { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 export interface NewEvidenceInput { readonly sourceUrl: string; readonly sourceTimestamp: string | null; readonly claim: string; readonly claimType: ClaimType; readonly confidence: number; readonly provenance: ProvenanceInfo; }
 export interface AddResult { readonly record: EvidenceRecord; readonly deduped: boolean; }
+/** The whole ledger as plain JSON: entries verbatim (their hashes fold the original `at`, so a restore reproduces the chain bit for bit), records, proposals, the active order and the version. */
+export interface LedgerSnapshot { readonly schema: 'evidence-ledger-snapshot/1'; readonly version: number; readonly entries: readonly LedgerEntry[]; readonly records: readonly EvidenceRecord[]; readonly proposals: readonly Proposal[]; readonly activeIds: readonly string[]; }
+export type LedgerAppendListener = (entry: LedgerEntry, ledger: EvidenceLedger) => void;
 /** Append-only, hash-chained, versioned evidence ledger with propose-only publication gate. */
 export class EvidenceLedger {
   private entries: LedgerEntry[] = [];
@@ -18,7 +21,24 @@ export class EvidenceLedger {
   private proposals = new Map<string, Proposal>();
   private activeIds: string[] = [];
   private version = 1;
+  private listeners = new Set<LedgerAppendListener>();
   constructor(private clock: Clock) {}
+  /** Called after every appended entry (the persistence hook). Returns the unsubscribe function. */
+  onAppend(listener: LedgerAppendListener): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  toSnapshot(): LedgerSnapshot { return { schema: 'evidence-ledger-snapshot/1', version: this.version, entries: [...this.entries], records: [...this.records.values()], proposals: [...this.proposals.values()], activeIds: [...this.activeIds] }; }
+  /** Rebuild from a snapshot. The chain is verified first: a broken or tampered snapshot is refused (thrown `LEDGER_SNAPSHOT_REJECTED: …`), never silently repaired. */
+  static fromSnapshot(clock: Clock, snapshot: LedgerSnapshot): EvidenceLedger {
+    if (!snapshot || snapshot.schema !== 'evidence-ledger-snapshot/1' || !Array.isArray(snapshot.entries)) throw new Error('LEDGER_SNAPSHOT_REJECTED: SCHEMA');
+    const l = new EvidenceLedger(clock);
+    l.entries = snapshot.entries.map((e) => Object.freeze({ ...e }));
+    const v = l.verifyLedger(); if (!v.ok) throw new Error('LEDGER_SNAPSHOT_REJECTED: ' + v.errors.join(','));
+    for (const r of snapshot.records) { l.records.set(r.id, r); l.byHash.set(r.contentHash, r); }
+    for (const p of snapshot.proposals) l.proposals.set(p.proposalId, p);
+    for (const id of snapshot.activeIds) { if (!l.records.has(id)) throw new Error('LEDGER_SNAPSHOT_REJECTED: ACTIVE_ID_UNKNOWN:' + id); }
+    for (const e of l.entries) { if (e.kind === 'ADD' && !l.records.has(e.recordId)) throw new Error('LEDGER_SNAPSHOT_REJECTED: RECORD_MISSING:' + e.recordId); }
+    l.activeIds = [...snapshot.activeIds]; l.version = Number.isFinite(snapshot.version) ? snapshot.version : 1;
+    return l;
+  }
   contentHashOf(i: NewEvidenceInput): string { return sha256hex(stableStringify({ sourceUrl: i.sourceUrl, claim: i.claim, claimType: i.claimType, sourceTimestamp: i.sourceTimestamp, provenance: i.provenance })); }
   private buildRecord(i: NewEvidenceInput, contentHash: string): EvidenceRecord {
     const status = classifyClaim({ claimType: i.claimType, sourceKind: i.provenance.sourceKind, independentSourceIds: i.provenance.independentSourceIds, confidence: i.confidence });
@@ -27,7 +47,9 @@ export class EvidenceLedger {
   private append(kind: LedgerEntry['kind'], rec: EvidenceRecord): void {
     const prev = this.entries.length ? this.entries[this.entries.length - 1].hash : 'GENESIS';
     const at = this.clock.now(); const index = this.entries.length;
-    this.entries.push(Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256hex(stableStringify({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at }));
+    const entry = Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256hex(stableStringify({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at });
+    this.entries.push(entry);
+    for (const fn of this.listeners) fn(entry, this);
   }
   addRecord(i: NewEvidenceInput): AddResult {
     const contentHash = this.contentHashOf(i);
@@ -49,7 +71,7 @@ export class EvidenceLedger {
     const p = this.proposals.get(proposalId); if (!p || p.status !== 'pending') return null;
     this.proposals.set(proposalId, { ...p, status: 'approved', approverId });
     if (!this.byHash.has(p.record.contentHash)) { this.records.set(p.record.id, p.record); this.byHash.set(p.record.contentHash, p.record); this.activeIds.push(p.record.id); }
-    this.append('PUBLISH', p.record); this.version += 1; return p.record;
+    this.version += 1; this.append('PUBLISH', p.record); return p.record; // version bumps before the append so a persistence listener snapshots the published state
   }
   rejectProposal(proposalId: string, approverId: string): boolean {
     const p = this.proposals.get(proposalId); if (!p || p.status !== 'pending') return false;

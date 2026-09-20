@@ -6,6 +6,8 @@ import { createPracticalLight } from './graphics/lighting';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import type { VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import { NEURO_REGIONS } from '../scientificWorlds/humanLab/neuroLab';
+import { ANATOMY_NETWORK_BUILDERS, type AnatomyNetworkKind } from '../scientificWorlds/humanLab/anatomyNetworks';
+import { buildAnatomyNetworkGroup } from './anatomyNetworkGeometry';
 import { applyRimLight, isRimPatched, selectionPulse, setSurfaceMode, type TwinSurfaceMode } from './humanTwinMaterials';
 import { createCutaway, measureCutawayBounds, setClippingOnObject, type CutawayHandle, type CutawayState } from './humanTwinCutaway';
 import type { LoadedHumanTwinBody, HumanTwinTier } from './humanTwinAsset';
@@ -234,16 +236,37 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   // D-131: with an approved licensed asset the GLB IS the body; the procedural rig stays built (the
   // Character handle is part of the contract) but is hidden, so no second body is ever on screen.
   const shellMaterials: THREE_NS.Material[] = [];
+  // Visual presentation audit: the approved asset's own clothing mesh (`female_casualsuit01`, verified
+  // by inspecting the GLB's mesh/material names) is a plain civilian outfit — reads as a generic game
+  // avatar, not a lab participant, and its glossy default material was one of the reasons the figure
+  // sank into the chamber glass. Replaced with a deterministic, professional scrub appearance and
+  // tracked separately from the skin so it can be hidden outright (not just faded) once a real
+  // anatomy mode is selected — see `setView` below.
+  // The GLB's own mesh definition is named 'female_casualsuit01', but GLTFLoader names the produced
+  // Mesh after the glTF NODE that references it, not the mesh definition — and this asset's node is
+  // 'Human.female_casualsuit01' (verified by parsing the GLB's own JSON chunk directly: every mesh
+  // node here follows the same 'Human.<meshname>' convention). An exact match against the mesh-
+  // definition name never fires at runtime; matched by suffix instead.
+  const CLOTHING_MESH_NAME = 'female_casualsuit01';
+  let clothingMesh: THREE_NS.Mesh | null = null;
   if (asset) {
     body.root.visible = false;
     g.add(asset.root);
     const rim = new THREE.Color(opts.hologramHex ?? 0x7dd3fc);
     for (const mesh of asset.meshes) {
+      if (mesh.name.endsWith(CLOTHING_MESH_NAME)) {
+        clothingMesh = mesh;
+        mesh.material = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x4a6b70), roughness: 0.78, metalness: 0.02, name: 'genesis-lab-scrubs' });
+      }
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const m of mats) {
         if (!m || shellMaterials.includes(m)) continue;
         shellMaterials.push(m);
-        // The asset's own PBR material is kept; only a fresnel rim is injected on top of it.
+        // The asset's own PBR material is kept; only a fresnel rim is injected on top of it — back at
+        // the original 0.28/3.0 baseline. A stronger 0.42/2.6 was tried for silhouette separation but
+        // caused a real visual regression (the fresnel term's falloff broadens as power drops, so a
+        // lower power spreads the additive rim across more of the surface, not just the edge; combined
+        // with the higher intensity this blew out the skin/head in real screenshots).
         if (!isRimPatched(m)) applyRimLight(THREE, m, { color: rim, power: 3.0, intensity: 0.28 });
       }
     }
@@ -292,6 +315,15 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     const brainMesh = organs.get('brain'); if (brainMesh) { (brainMesh.material as THREE_NS.MeshStandardMaterial).opacity = 0.35; }
   }
   regions.visible = false; g.add(regions);
+  // D-135: the real vascular/neural/lymphatic network graphs (anchored to this manifest's own organ
+  // positions — see `anatomyNetworks.ts`), one group per kind, built once and toggled by `setView`.
+  // This REPLACES the old "tint the whole organ mesh" stand-in for these three display modes.
+  const networkGroups = new Map<AnatomyNetworkKind, ReturnType<typeof buildAnatomyNetworkGroup>>();
+  for (const [kind, build] of Object.entries(ANATOMY_NETWORK_BUILDERS) as [AnatomyNetworkKind, typeof ANATOMY_NETWORK_BUILDERS[AnatomyNetworkKind]][]) {
+    const built = buildAnatomyNetworkGroup(THREE, build(manifest));
+    g.add(built.group);
+    networkGroups.set(kind, built);
+  }
   let selected: THREE_NS.Mesh | null = null;
   const tint = new THREE.Color();
   // D-131 state that survives between setView calls: isolation, the section plane and the surface mode.
@@ -345,6 +377,13 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     setView(instr, selectedNodeId) {
       const bodySlot = manifest.nodes.find((n) => n.id === 'body')?.assetSlot ?? '';
       const bodyVisible = instr.visibleAssetSlots.includes(bodySlot);
+      // Visual presentation audit: NORMAL/TWIN view (bodySlot in the instruction) keeps the clothed
+      // asset; every real anatomy view (ORGANS/VASCULAR/NERVOUS/LYMPHATIC/BRAIN/TISSUE/CELLULAR — none
+      // of which list the body slot) hides the clothing outright rather than just fading it along with
+      // the skin, so the organs it was requested for are not read through a translucent outfit. XRAY
+      // keeps the body slot (it is a stylised view OF the body), so clothing stays with it, fading via
+      // the same shell translucency as the skin below.
+      if (clothingMesh) clothingMesh.visible = bodyVisible;
       // The body slot absent from the instruction: a faint reference silhouette so organs keep their scale (presentation, not data).
       skin.opacity = holo ? (bodyVisible ? (instr.translucent ? 0.2 : 0.42) : 0.06) : bodyVisible ? (instr.translucent ? 0.24 : 1) : 0.07;
       skin.depthWrite = !holo && skin.opacity > 0.9;
@@ -357,6 +396,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
         mat.emissiveIntensity = selectedNodeId === id ? 0.9 : 0.22;
       }
       regions.visible = instr.mode === 'BRAIN' || instr.mode === 'NERVOUS';
+      for (const [kind, built] of networkGroups) built.group.visible = instr.network === kind;
       selected = selectedNodeId ? organs.get(selectedNodeId) ?? null : null;
       lastInstr = instr; lastSelected = selectedNodeId;
       // X-ray IS the translucent modes' surface: one fresnel shell, labelled as a stylised model view.
@@ -384,6 +424,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
       body.dispose(); skin.dispose(); sphere.dispose(); regionMat.dispose();
       for (const m of organMats) m.dispose();
       cloud?.geometry.dispose(); cloudMat?.dispose(); cutaway.dispose();
+      for (const built of networkGroups.values()) built.dispose();
     },
   };
 }

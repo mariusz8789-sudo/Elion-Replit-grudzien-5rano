@@ -197,6 +197,33 @@ export function buildBiologyStation(THREE: typeof THREE_NS, ctx: StationKitConte
       const strip = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.02, 0.08), createEmissiveInstrumentMaterial(THREE, { color: 0xf0b35c, intensity: 0.9, baseColor: 0x3a2a10 })); strip.position.set(0, 0.012, 0.6); group.add(strip);
       break;
     }
+    // Wet Lab: physical stations only (no chemistry dataset to run an experiment against yet — see
+    // `biologyLabWorld.ts`'s HOST entries, none of which carry an `experimentId`). Real bench, real
+    // storage, real glassware, so the room reads as an equipped lab rather than an empty shell.
+    case 'sample-preparation': {
+      group.add(createBench(THREE, { position: [0, 0, 0], width: 2.0, depth: 0.9, height: 0.86, topMaterial: P.CERAMIC, legMaterial: P.PAINTED_METAL }));
+      group.add(createCabinet(THREE, { position: [-0.8, 0, -0.25], width: 0.6, depth: 0.5, height: 0.86, bodyMaterial: P.PAINTED_METAL, doorMaterial: P.BRUSHED_METAL, handleMaterial: P.POLISHED_METAL }));
+      const tubeGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.12, 12);
+      for (let i = 0; i < 6; i++) { const v = new THREE.Mesh(tubeGeo, ctx.glass); v.position.set(0.15 + i * 0.09, 0.94, -0.15); group.add(v); }
+      group.add(consoleDeck(THREE, ctx, status, 0.5, 0.9, 0.3, 0.8));
+      break;
+    }
+    case 'wet-lab-bench': {
+      group.add(createBench(THREE, { position: [0, 0, 0], width: 2.4, depth: 1.2, height: 0.88, topMaterial: P.CERAMIC, legMaterial: P.PAINTED_METAL }));
+      const basin = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.4), P.BRUSHED_METAL); basin.position.set(0.6, 0.88, 0.2); group.add(basin);
+      screen = readout(THREE, 384, 224);
+      group.add(createMonitor(THREE, { position: [-0.8, 0.9, -0.35], width: 0.55, height: 0.34, standHeight: 0.12, frameMaterial: P.PAINTED_METAL, screenMaterial: screenMat(THREE, screen) }));
+      group.add(consoleDeck(THREE, ctx, status, -0.2, 0.94, 0.45, 1.0));
+      break;
+    }
+    case 'analytical-bench': {
+      group.add(createBench(THREE, { position: [0, 0, 0], width: 2.0, depth: 1.0, height: 0.86, topMaterial: P.TECH_COMPOSITE, legMaterial: P.PAINTED_METAL }));
+      group.add(createGlassChamber(THREE, ctx.glass, { position: [-0.3, 0.9, -0.1], height: 0.3, radiusBottom: 0.18, radiusTop: 0.15, openEnded: false, radialSegments: 24 }));
+      screen = readout(THREE, 384, 224);
+      group.add(createMonitor(THREE, { position: [0.6, 0.88, -0.25], width: 0.55, height: 0.34, standHeight: 0.12, frameMaterial: P.PAINTED_METAL, screenMaterial: screenMat(THREE, screen) }));
+      group.add(consoleDeck(THREE, ctx, status, 0, 0.92, 0.35, 0.9));
+      break;
+    }
     default:
       break;
   }

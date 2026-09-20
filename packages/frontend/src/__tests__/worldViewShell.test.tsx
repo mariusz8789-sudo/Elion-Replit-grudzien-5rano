@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { WorldViewShell, EpistemicBadge } from '../components/genesis-ui';
 import type { WorldDefinition, WorldObject } from '../components/genesis-ui';
-import { explorerEvidenceModeToEpistemicTone, gxStatusToEpistemicTone } from '../components/genesis-ui/epistemicToneAdapter';
+import { anatomyEpistemicLabelToEpistemicTone, explorerEvidenceModeToEpistemicTone, gxStatusToEpistemicTone } from '../components/genesis-ui/epistemicToneAdapter';
 
 /**
  * D-133 SMART UI — `WorldViewShell` static-shape tests, in this repo's own convention
@@ -91,6 +91,17 @@ describe('epistemic tone adapters — the ONE translation point, never a fifth v
     expect(explorerEvidenceModeToEpistemicTone('REAL_DATASET')).toBe('dataset');
     for (const mode of ['RECONSTRUCTED', 'SIMULATED', 'ILLUSTRATIVE'] as const) {
       const tone = explorerEvidenceModeToEpistemicTone(mode);
+      expect(tone).not.toBe('real');
+      expect(tone).not.toBe('dataset');
+    }
+  });
+
+  it('the Human Digital Twin anatomy label (D-134) maps every value without inventing or upgrading one', () => {
+    expect(anatomyEpistemicLabelToEpistemicTone('REAL_OBSERVATION')).toBe('real');
+    expect(anatomyEpistemicLabelToEpistemicTone('VERIFIED_SOURCE')).toBe('dataset');
+    expect(anatomyEpistemicLabelToEpistemicTone('MODEL')).toBe('model');
+    for (const label of ['SIMULATION', 'RECONSTRUCTION', 'HYPOTHESIS', 'SPECULATIVE', 'FICTION_INSPIRED', 'NOT_MODELED', 'INSUFFICIENT_EVIDENCE'] as const) {
+      const tone = anatomyEpistemicLabelToEpistemicTone(label);
       expect(tone).not.toBe('real');
       expect(tone).not.toBe('dataset');
     }

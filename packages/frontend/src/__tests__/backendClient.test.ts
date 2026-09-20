@@ -13,6 +13,9 @@ import {
   createMergeRequest,
   decideMergeRequest,
   getContributions,
+  listKnowledgeProposals,
+  publishKnowledgeProposal,
+  rejectKnowledgeProposal,
 } from '../core/backend/client';
 
 /**
@@ -165,5 +168,54 @@ describe('Scientific Git client', () => {
     const r = await getContributions('tok', 'p');
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.totalTrials).toBe(0);
+  });
+});
+
+describe('knowledge proposals client (SW-5 knowledge/public-source surface)', () => {
+  it('listKnowledgeProposals GETs the public endpoint with no auth header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, {
+      ok: true,
+      proposals: [{ proposalId: 'prop1', status: 'pending', approverId: null, claim: 'X causes Y', recordStatus: 'PROPOSED', sourceKind: 'WEB', sourceUrl: 'https://example.org/a', contentHash: 'abc123' }],
+      activeRecords: 2, ledgerVersion: 5, ledgerOk: true,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await listKnowledgeProposals();
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.proposals).toHaveLength(1);
+      expect(r.data.proposals[0].claim).toBe('X causes Y');
+      expect(r.data.ledgerOk).toBe(true);
+    }
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/knowledge/proposals');
+    expect(fetchMock.mock.calls[0][1].method).toBe('GET');
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBeUndefined();
+  });
+
+  it('publishKnowledgeProposal posts to the proposal publish endpoint with the bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, {
+      ok: true, published: { id: 'rec1', claim: 'X causes Y', status: 'ACTIVE', contentHash: 'abc123' }, activeRecords: 3, ledgerOk: true,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await publishKnowledgeProposal('tok', 'prop1');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.published.status).toBe('ACTIVE');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/knowledge/proposals/prop1/publish');
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe('Bearer tok');
+  });
+
+  it('rejectKnowledgeProposal posts to the proposal reject endpoint with the bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await rejectKnowledgeProposal('tok', 'prop1');
+    expect(r.ok).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/knowledge/proposals/prop1/reject');
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe('Bearer tok');
+  });
+
+  it('a proposal decision without a signed-in approver maps the backend 401 to a typed failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeResponse(401, { error: 'unauthorized', message: 'Publishing or rejecting a proposal requires a signed-in approver.' })));
+    const r = await publishKnowledgeProposal('bad-or-missing-tok', 'prop1');
+    expect(r).toEqual({ ok: false, status: 401, error: 'unauthorized', message: 'Publishing or rejecting a proposal requires a signed-in approver.' });
   });
 });

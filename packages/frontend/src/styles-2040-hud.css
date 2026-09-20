@@ -407,6 +407,15 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-status-hypothesis { color: #f0b35c; }
 .sw-status-speculative, .sw-status-fiction_inspired_scenario { color: #ff8fb0; }
 .sw-status-not_modeled, .sw-status-insufficient_evidence { color: #cbd5e1; }
+.sw-chem-visual { margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed rgba(98, 240, 163, 0.2); display: flex; flex-direction: column; gap: 0.3rem; }
+.sw-chem-visual-title { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #7d93ad; }
+.sw-chem-visual-note { font-size: 0.66rem; color: var(--text-dim); }
+.sw-chem-fitbar { display: grid; grid-template-columns: 8.5rem 1fr 2.4rem; align-items: center; gap: 0.4rem; font-size: 0.66rem; }
+.sw-chem-fitbar-label { color: #cfeedd; }
+.sw-chem-fitbar-track { display: block; height: 0.4rem; border-radius: 999px; background: rgba(2, 6, 14, 0.55); border: 1px solid rgba(56, 189, 248, 0.25); overflow: hidden; }
+.sw-chem-fitbar-fill { display: block; height: 100%; background: linear-gradient(90deg, #38bdf8, #62f0a3); }
+.sw-chem-fitbar-value { font-family: var(--font-mono); text-align: right; color: #9fd7f9; }
+.sw-chem-pk-chart { display: block; background: rgba(2, 6, 14, 0.55); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 4px; }
 .sw-replay-match { color: #62f0a3; } .sw-replay-drift { color: #ff5a5a; }
 .sw-faint { margin: 0; font-size: 0.7rem; color: #7d93ad; background: rgba(2, 6, 14, 0.5); border-radius: 6px; padding: 0.5rem 0.7rem; }
 .sw-transcript { list-style: none; margin: 0; padding: 0.4rem 0.6rem; max-height: 30vh; overflow: auto; display: flex; flex-direction: column; gap: 0.25rem; background: rgba(2, 6, 14, 0.5); border: 1px solid rgba(56, 189, 248, 0.16); border-radius: 6px; backdrop-filter: blur(8px); font-size: 0.76rem; }
@@ -449,6 +458,15 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-cam-twin .sw-hud-command { opacity: 0; pointer-events: none; }
 .sw-cam-twin .sw-hud-explorer { max-height: 32vh; }
 .sw-cam-twin .sw-hud-evidence { opacity: 0.25; }
+/* Visual presentation audit: the status badges (top-left) and the Human Explorer panel's own opacity
+   were left at full strength in twin mode — real screenshots showed them competing hard with the body
+   for attention, exactly the "HUD dominates the figure" complaint this whole block exists to avoid.
+   Dimmed to a glance-only baseline; :hover/:focus-within restores full strength the moment the panel
+   is actually being used, so nothing becomes harder to read or operate. */
+.sw-cam-twin .sw-hud-status { opacity: 0.45; transition: opacity 0.2s ease; }
+.sw-cam-twin .sw-hud-status:hover, .sw-cam-twin .sw-hud-status:focus-within { opacity: 1; }
+.sw-cam-twin .sw-hud-explorer { opacity: 0.55; transition: opacity 0.2s ease; }
+.sw-cam-twin .sw-hud-explorer:hover, .sw-cam-twin .sw-hud-explorer:focus-within { opacity: 1; }
 .sw-ex-head { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .sw-ex-mode-real_image, .sw-ex-mode-real_dataset { border-color: #62f0a3; color: #eafff4; }
 .sw-ex-mode-simulated, .sw-ex-mode-reconstructed, .sw-ex-mode-illustrative { border-color: rgba(251, 191, 36, 0.55); color: #fde68a; text-shadow: 0 0 8px rgba(251, 191, 36, 0.35); }

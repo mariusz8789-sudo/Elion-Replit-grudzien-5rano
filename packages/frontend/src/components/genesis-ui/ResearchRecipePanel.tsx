@@ -17,7 +17,7 @@ export function ResearchRecipePanel({ record }: { readonly record: LowerHarmWinn
           <div className="gu-recipe-eyebrow">WINNER RECORD · {record.scenarioId} · {record.mode}</div>
           <h3 className="gu-recipe-title">{record.candidateName} <code>{record.winnerId}</code></h3>
         </div>
-        <div className="gu-recipe-gate">{record.gate.outcome}</div>
+        <div className={`gu-recipe-gate gu-recipe-gate-${record.gate.outcome.toLowerCase()}`}>{record.gate.outcome.replace(/_/g, ' ')}</div>
       </div>
 
       <div className="gu-recipe-fps">
@@ -31,20 +31,22 @@ export function ResearchRecipePanel({ record }: { readonly record: LowerHarmWinn
       </div>
 
       <h4 className="section-label">Evidence behind the winner ({record.observationCount} real observations)</h4>
-      <table className="gu-recipe-table">
-        <thead><tr><th>Trial</th><th>Comparison</th><th>Δ vs reference</th><th>n</th><th>Within margin</th></tr></thead>
-        <tbody>
-          {record.evidence.map((e) => (
-            <tr key={e.nctId}>
-              <td><code>{e.nctId}</code></td>
-              <td>{e.comparisonType} · {e.evidenceBasis}</td>
-              <td>{e.deltaVsReferencePp === null ? 'n/a' : `${e.deltaVsReferencePp > 0 ? '+' : ''}${e.deltaVsReferencePp.toFixed(2)} pp`}</td>
-              <td>{e.candidateArmN}</td>
-              <td>{e.withinMargin === null ? 'n/a' : e.withinMargin ? 'yes' : 'NO'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="gu-recipe-table-wrap">
+        <table className="gu-recipe-table">
+          <thead><tr><th>Trial</th><th>Comparison</th><th>Δ vs reference</th><th>n</th><th>Within margin</th></tr></thead>
+          <tbody>
+            {record.evidence.map((e) => (
+              <tr key={e.nctId}>
+                <td><code>{e.nctId}</code></td>
+                <td>{e.comparisonType} · {e.evidenceBasis}</td>
+                <td>{e.deltaVsReferencePp === null ? 'n/a' : `${e.deltaVsReferencePp > 0 ? '+' : ''}${e.deltaVsReferencePp.toFixed(2)} pp`}</td>
+                <td>{e.candidateArmN}</td>
+                <td className={e.withinMargin === false ? 'gu-recipe-table-bad' : undefined}>{e.withinMargin === null ? 'n/a' : e.withinMargin ? 'yes' : 'NO'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {record.evidence.some((e) => e.fairnessFlags.length > 0) && (
         <p className="gu-hint">{record.evidence[0]?.fairnessFlags[0]}</p>
       )}
@@ -61,7 +63,7 @@ export function ResearchRecipePanel({ record }: { readonly record: LowerHarmWinn
         <dt>Formulation concept</dt><dd>{r.formulationConcept}</dd>
         <dt>Synthesis route</dt><dd>{r.conceptualSynthesisRoute}</dd>
         <dt>Required properties</dt><dd><ul>{r.requiredProperties.map((p) => <li key={p}>{p}</li>)}</ul></dd>
-        <dt>Identifiers</dt><dd>{r.identifiers.map((id) => <code key={id} className="gu-recipe-id">{id}</code>)}</dd>
+        <dt>Identifiers</dt><dd><span className="gu-recipe-ids">{r.identifiers.map((id) => <code key={id} className="gu-recipe-id">{id}</code>)}</span></dd>
         <dt>Provenance</dt><dd>{r.provenance}</dd>
         <dt>Falsification results</dt>
         <dd><ul>{(r.falsificationResults ?? []).map((x) => <li key={x.probe}><code>{x.probe}</code> — {x.outcome}</li>)}</ul></dd>

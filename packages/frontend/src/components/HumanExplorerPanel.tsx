@@ -3,7 +3,8 @@ import { t, getLocale } from '../core/i18n';
 import { drawBiologyArtifact } from '../core/three/biologyStationKit';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { ExperimentSession } from '../core/scientificWorlds/experimentSession';
-import type { AnatomyViewState, HumanDigitalTwinManifest, OrganSystemId } from '../core/scientificWorlds/humanLab/types';
+import type { AnatomyDisplayMode, AnatomyViewState, HumanDigitalTwinManifest, OrganSystemId } from '../core/scientificWorlds/humanLab/types';
+import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
 import { VIRTUAL_MICROSCOPE_MAGNIFICATIONS } from '../core/scientificWorlds/humanLab/virtualMicroscope';
 import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_TEXT, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, systemCommands, type ExplorerOrgan, type ScaleLevel } from '../core/scientificWorlds/humanExplorer';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
@@ -49,6 +50,12 @@ const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY
 /** D-131: the four body-shell presentations. `RTG (model)` names itself a model so the chip can never read as a radiograph. */
 const SURFACE_MODES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['TRANSLUCENT', 'Prześwit'], ['XRAY', 'RTG (model)'], ['GHOST', 'Duch']];
 const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope', 'histology', 'imaging', 'central-dogma', 'neuro']);
+/** D-135: the three real network layers (see `anatomyNetworks.ts`) — the phrase is the SAME text the
+ * chat bar accepts, routed through the SAME `parseBiologyWorldCommands` → canonical resolver path, so
+ * a chip click and typing the phrase are provably the same command, never a second mechanism. */
+const NETWORK_MODES: readonly (readonly [AnatomyDisplayMode, string, string])[] = [
+  ['VASCULAR', 'Naczynia', 'pokaż naczynia'], ['NERVOUS', 'Nerwy', 'pokaż nerwy'], ['LYMPHATIC', 'Układ chłonny', 'pokaż układ chłonny'],
+];
 
 export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
@@ -82,6 +89,10 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   };
   const magnify = (m: number): void => { if (!explorer) return; const lt = nextLogicalTime(); const label = `${t('explorer.hyperscope', locale)} ${m}× · ${t(explorer.labelKey, locale)}`; run(magnificationCommands(explorer, m, label, lt), label); };
   const pickSystem = (s: OrganSystemId): void => { setSystem((cur) => (cur === s ? null : s)); const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
+  const setNetworkMode = (phrase: string): void => {
+    const parsed = parseBiologyWorldCommands(phrase, nextLogicalTime());
+    if (parsed.commands.length) run(parsed.commands, phrase);
+  };
 
   return (
     <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-evidence-mode={evidenceMode}>
@@ -136,6 +147,14 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
             <div className="sw-ex-mags" data-testid="sw-explorer-surface" data-surface={surface}>
               {SURFACE_MODES.map(([mode, label]) => (
                 <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} onClick={() => onSurface(mode)} disabled={busy} data-testid={`sw-explorer-surface-${mode.toLowerCase()}`}>{label}</button>
+              ))}
+            </div>
+            {/* D-135: real vascular/neural/lymphatic network layers — a tube-and-hub graph anchored to
+                this twin's own organ positions (`anatomyNetworks.ts`), never a mesh colour swap. Each
+                chip issues the SAME canonical WorldCommand the chat bar would for the same phrase. */}
+            <div className="sw-ex-mags" data-testid="sw-explorer-networks" data-anatomy-mode={anatomy.displayMode}>
+              {NETWORK_MODES.map(([mode, label, phrase]) => (
+                <button key={mode} type="button" className={`sw-chip${anatomy.displayMode === mode ? ' is-on' : ''}`} onClick={() => setNetworkMode(phrase)} disabled={busy} data-testid={`sw-explorer-network-${mode.toLowerCase()}`}>{label}</button>
               ))}
             </div>
             <p className="sw-faint" data-testid="sw-explorer-section-note">{t('explorer.sectionNote', locale)}</p>

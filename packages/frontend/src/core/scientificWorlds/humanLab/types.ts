@@ -44,7 +44,7 @@ export interface HumanDigitalTwinManifest {
   readonly notes: readonly string[];
 }
 
-export type AnatomyDisplayMode = 'NORMAL' | 'XRAY' | 'VASCULAR' | 'NERVOUS' | 'ORGANS' | 'BRAIN' | 'TISSUE' | 'CELLULAR';
+export type AnatomyDisplayMode = 'NORMAL' | 'XRAY' | 'VASCULAR' | 'NERVOUS' | 'LYMPHATIC' | 'ORGANS' | 'BRAIN' | 'TISSUE' | 'CELLULAR';
 
 export interface AnatomyViewState {
   readonly twinId: string;

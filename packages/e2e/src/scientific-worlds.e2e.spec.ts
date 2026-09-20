@@ -36,6 +36,41 @@ const waitState = async (page: Page, states: readonly string[], timeout = 240_00
   await expect.poll(async () => page.getByTestId('scientific-worlds').getAttribute('data-agent-state'), { timeout }).toMatch(new RegExp(`^(${states.join('|')})$`));
 };
 
+/**
+ * D-134 SMART UI (Human Biology): scans for a screen point that lands on a real, currently-visible
+ * organ mesh — no hardcoded organ position. Searches in RINGS out from the canvas centre rather
+ * than a raster grid: the twin (whichever twin the agent is standing at) is roughly centred in
+ * frame, so the organ-dense middle of the body is checked first. This sandboxed environment's
+ * software-rendered WebGL makes each `mouse.move` + hover check cost real seconds (a heavy biology
+ * scene, not Molecule World's light one), so the point budget stays small and front-loaded on the
+ * likeliest hits rather than exhaustive.
+ */
+async function findHoveredOrganPoint(page: Page): Promise<{ x: number; y: number; label: string }> {
+  const canvas = page.locator('.sw-canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas has no layout box');
+  const hint = page.getByTestId('sw-organ-hover-hint');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const points: { x: number; y: number }[] = [{ x: cx, y: cy }];
+  const ringSteps = [0.06, 0.12, 0.18, 0.24, 0.3, 0.36] as const;
+  for (const r of ringSteps) {
+    const dx = box.width * r;
+    const dy = box.height * r;
+    for (const [ox, oy] of [[0, -dy], [dx, 0], [0, dy], [-dx, 0], [dx * 0.7, -dy * 0.7], [-dx * 0.7, -dy * 0.7], [dx * 0.7, dy * 0.7], [-dx * 0.7, dy * 0.7]] as const) {
+      points.push({ x: cx + ox, y: cy + oy });
+    }
+  }
+  for (const { x, y } of points) {
+    await page.mouse.move(x, y);
+    if (await hint.isVisible().catch(() => false)) {
+      const text = (await hint.textContent()) ?? '';
+      return { x, y, label: text };
+    }
+  }
+  throw new Error('no organ mesh found under the pointer across the scan grid');
+}
+
 test.describe('Scientific Worlds — command → agent → session → evidence → replay', () => {
   test.setTimeout(1_500_000);
   test('desktop: the acceptance sentence end to end, through the visor', async ({ page }) => {
@@ -242,6 +277,83 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
       const report = harness.inspectFile(path);
       expect(report.ok, `Eyes reject ${path}: ${report.reason ?? 'OK'}`).toBe(true);
     }
+    expect(errors).toEqual([]);
+  });
+
+  test('human biology lab: Smart UI (D-134) — hover/click a real organ mesh, BADAJ, close, preview-only (never the full pipeline by itself)', async ({ page }) => {
+    // Reaching a mode where organs are visible needs a real agent walk to the study table (the
+    // OPEN_TWIN/SET_ANATOMY_MODE commands only apply once the agent physically interacts with
+    // `station:human-study` — the same real pipeline the V3 acceptance test above proves), which
+    // this sandboxed software-rendered environment runs well under real time; the describe-level
+    // 25-minute budget isn't enough headroom on top of that walk plus the grid scan.
+    test.setTimeout(2_700_000);
+    const t0 = Date.now();
+    const mark = (label: string): void => console.warn(`[D-134 timing] ${label}: ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
+    await page.goto('/#/human-biology-lab');
+    await page.waitForSelector('.sw-canvas');
+    await settled(page, 3);
+    mark('canvas settled');
+
+    // Organs are hidden by default (NORMAL mode shows only the skin) — the existing "RTG" quick
+    // command switches the twin to XRAY (every organ slot visible), the same command path the V3
+    // acceptance test already proves end to end. Real agent walk + session, not a shortcut.
+    await page.getByTestId('sw-quick-rtg').click();
+    mark('RTG clicked');
+    await waitState(page, ['IDLE'], 400_000);
+    mark('IDLE reached');
+    await settled(page, 3);
+    mark('settled after IDLE');
+
+    // D-131: both agent cameras (VISOR/SPECTATOR) leave the twin a distant figure in its chamber —
+    // only the TWIN camera actually frames the body closely enough for organs to be a real,
+    // clickable screen target (the same reason the V3 acceptance test above switches to it before
+    // any of its own twin-detail screenshots).
+    await page.getByTestId('sw-explorer-twin-camera').click();
+    mark('twin camera clicked');
+    await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
+    mark('data-camera=TWIN confirmed');
+    await settled(page, 3);
+    mark('settled after twin camera');
+
+    // WORLD VIEW: no popup by default.
+    await expect(page.getByTestId('gx-contextual-popup')).toHaveCount(0);
+
+    const organ = await findHoveredOrganPoint(page);
+    mark(`organ found: ${organ.label}`);
+    expect(organ.label.length).toBeGreaterThan(0);
+
+    // CLICK — selects the organ, opens the popup, honestly labelled MODEL (the atlas proxy, never
+    // dressed up as an observation). Clicking never, by itself, seals a session.
+    const sessionBefore = await page.getByTestId('sw-session').getAttribute('data-session-id').catch(() => null);
+    await page.mouse.click(organ.x, organ.y);
+    mark('clicked organ');
+    const popup = page.getByTestId('gx-contextual-popup');
+    await expect(popup).toBeVisible();
+    await expect(popup).toContainText('MODEL');
+    const viewport = page.viewportSize()!;
+    const popupBox = await popup.boundingBox();
+    expect(popupBox).not.toBeNull();
+    expect(popupBox!.x).toBeGreaterThanOrEqual(0);
+    expect(popupBox!.y).toBeGreaterThanOrEqual(0);
+    expect(popupBox!.x + popupBox!.width).toBeLessThanOrEqual(viewport.width);
+    expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(viewport.height);
+    expect(await page.getByTestId('sw-session').getAttribute('data-session-id').catch(() => null)).toBe(sessionBefore);
+
+    // BADAJ — opens the Human Explorer (the SAME panel the organ chip already opens, not a second
+    // one); this may or may not run the agent pipeline (only 5 of the manifest's organs have a
+    // matching explorer entry), but the panel must be visible either way.
+    await page.getByRole('button', { name: 'BADAJ' }).click();
+    await expect(page.getByTestId('sw-explorer')).toBeVisible();
+
+    // CLOSE — restores a clean world view: no popup left open.
+    await page.getByLabel('Zamknij').click();
+    await expect(page.getByTestId('gx-contextual-popup')).toHaveCount(0);
+
     expect(errors).toEqual([]);
   });
 });

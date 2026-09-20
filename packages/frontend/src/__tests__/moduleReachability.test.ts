@@ -108,6 +108,25 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // contract but the host imports the modules it uses directly (biologyRunners/biologyLabWorld/biologyCommands).
   'core/scientificWorlds/humanLab/index.ts': 'D-127 delivered pack barrel, kept verbatim; the host imports modules directly.',
   'core/scientificWorlds/humanLab/inventory.ts': 'D-127 delivered pack module (LabInventory), kept verbatim; no host consumer yet.',
+  // D-135: the delivered "Genesis Canonical Laboratory" package — a fixed 7-room/6-door building,
+  // remapping the existing biology stations into rooms with real, deterministic navigation (a
+  // door-gap fix was required and is tested: see canonicalLaboratory.test.ts). Both `canonicalLaboratory.ts`
+  // (wired into `biologyLabWorld.ts` — BIOLOGY_ROOM/BIOLOGY_OBSTACLES/BIOLOGY_SPAWN/station positions
+  // all come from it, see biologyLabWorldCanonicalIntegration.test.ts) and `canonicalLaboratoryGeometry.ts`
+  // (wired into `agentLabScene3D.ts`'s initBiology — real interior walls with door gaps, additive to the
+  // existing single-shell floor/ceiling) are reachable now and no longer belong on this allowlist. The
+  // Human Digital Twin chamber itself deliberately stays at its fixed (0,0) centre — the centrepiece of
+  // the protected D-134 organ-picking/camera work, whose screen-anchor and E2E coverage is built around
+  // that exact position — with the three main-hall consoles routed around it instead (see
+  // MAIN_HALL_CONSOLE_OVERRIDE in biologyLabWorld.ts).
+  // Biomedical Intervention Bay: the supplied package's UI view-model adapter
+  // (`toRegenerativeBaySessionView`, converting a sealed `ExperimentSession` into a display-friendly
+  // shape for a results panel). The station itself is real and wired (registered in BIOLOGY_STATIONS,
+  // reachable via the real AgentController, mounted in agentLabScene3D — see
+  // biologyLabWorldCanonicalIntegration.test.ts), but no results-display panel exists for it yet in
+  // this product; that is a UI decision, not a side effect of landing the physical station.
+  'core/scientificWorlds/humanLab/regenerativeMedicineBaySessionView.ts': 'Biomedical Bay session view-model adapter; unwired pending a results-panel UI decision.',
+
   // --- Built and tested, awaiting a deliberate wiring decision ---------------
   // D-085: the agent composer. It is NOT wired into a production caller yet on
   // purpose. The package that proposed it wanted callbacks installed into
@@ -282,6 +301,20 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
 
   // --- D-080 Chaos-Aware Ensemble --------------------------------------------
   'core/chaos/ensemble.ts': 'D-080: audited chaos-ensemble utility (Lorenz63/threebody predictability horizon, ensemble spread, empirical Lyapunov estimate) -- calls the existing stepLorenzRK4 (core/physics.ts) and stepVerlet/totalEnergy/figure8Bodies/pythagoreanBodies (labs/experiments/universe-threebody.ts) unmodified, adds no second physics engine. VALIDATED (docs/DECISIONS.md D-080), reached today only by its own test suites (chaosEnsemble.test.ts, chaosEnsembleBenchmark.test.ts) -- no browser screen renders a chaos-ensemble run yet. Remove this entry once one does.',
+
+  // --- D-136 real external medical dataset boundary (NIfTI-1/DICOM Part-10) --
+  // A strict provenance/format/checksum gate for real medical volumes, deliberately built as a
+  // standalone boundary layer before any UI consumes it (no fake DICOM/NIfTI, no dataset admitted
+  // without a real SHA-256 match and license). Reached today only by medicalDatasetAdapters.test.ts.
+  // No screen imports a medical dataset yet because Genesis has not been handed one to import; wiring
+  // this into a world/screen is a deliberate follow-up, not a side effect of landing the gate.
+  'core/medicalData/index.ts': 'D-136 medical dataset boundary barrel; no host consumer yet (no dataset has been imported into any world).',
+  'core/medicalData/medicalDatasetTypes.ts': 'D-136: types for the real-dataset gate; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/medicalDatasetRegistry.ts': 'D-136: validates provenance/SHA-256/format before a dataset is admitted; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/niftiDatasetAdapter.ts': 'D-136: real NIfTI-1 header/voxel reader; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/dicomDatasetAdapter.ts': 'D-136: real DICOM Part-10 explicit-VR-LE reader; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/volumeReconstruction.ts': 'D-136: builds a RECONSTRUCTED voxel volume from a validated dataset\'s own bytes; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/segmentationOverlay.ts': 'D-136: dimension-checked segmentation overlay contract over a reconstructed volume; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

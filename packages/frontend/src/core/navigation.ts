@@ -97,6 +97,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
     plannedNote: 'Profil instytucjonalny (skala miasta/energii/wody/transportu) — nie istnieje jeszcze ani jako route, ani jako model uprawnień. Wymieniony, żeby nie udawać, że go pomijamy.',
   },
   { id: 'evidence', label: 'Evidence i Replay', icon: '📋', hash: '#/evidence' },
+  { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
   { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },
   { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde' },

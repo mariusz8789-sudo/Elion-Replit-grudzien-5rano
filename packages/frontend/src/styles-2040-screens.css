@@ -436,6 +436,12 @@
 .gu-twin-row { background: rgba(7, 11, 23, 0.5); }
 .gu-recipe { background: var(--s2040-glass-soft); border-color: var(--s2040-line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .gu-recipe-eyebrow { color: #9fe6f2; text-shadow: 0 0 8px rgba(92, 214, 232, 0.35); }
+.gu-recipe-gate { text-shadow: 0 0 10px currentColor; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.gu-recipe-table-wrap { border-color: var(--s2040-line); background: rgba(7, 11, 23, 0.4); }
+.gu-recipe-table th { background: rgba(92, 214, 232, 0.06); }
+.gu-recipe-table tbody tr:hover { background: rgba(92, 214, 232, 0.07); }
+.gu-recipe-table-bad { text-shadow: 0 0 8px rgba(244, 124, 124, 0.5); }
+.gu-recipe-id { background: rgba(7, 11, 23, 0.55); border-color: rgba(92, 214, 232, 0.28); text-shadow: 0 0 6px rgba(92, 214, 232, 0.4); }
 
 /* world chrome (header of every 3D world) */
 .world-chrome { border-color: var(--s2040-line); }

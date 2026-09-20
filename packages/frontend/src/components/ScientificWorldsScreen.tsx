@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useThreeLoop } from '../core/three/useThreeLoop';
-import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
+import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type SceneArtifact, type SceneWorld, type SelectedOrganInfo } from '../core/three/agentLabScene3D';
+import { ContextualPopup, type ScreenPoint, type WorldObject } from './genesis-ui';
+import { anatomyEpistemicLabelToEpistemicTone } from './genesis-ui/epistemicToneAdapter';
+import { EXPLORER_ORGANS, explorerCommands } from '../core/scientificWorlds/humanExplorer';
 import { AgentController, type AgentReport } from '../core/scientificWorlds/agentController';
 import { planActions } from '../core/scientificWorlds/actionPlanner';
 import { parseWorldCommands, type ParsedCommands } from '../core/scientificWorlds/worldCommand';
 import { LAB_CATALOG, LAB_OBSTACLES, LAB_ROOM, LAB_SPAWN, LAB_STATIONS, LAB_WORLD_ID, type LabStation } from '../core/scientificWorlds/labWorld';
 import { createLabExperimentRunner } from '../core/scientificWorlds/experimentRunners';
-import { createBiologyExperimentRunner } from '../core/scientificWorlds/biologyRunners';
+import { createCanonicalHumanBiologyExperimentRunner } from '../core/scientificWorlds/humanLab/regenerativeMedicineBayRunnerIntegration';
 import { BIOLOGY_CATALOG, BIOLOGY_OBSTACLES, BIOLOGY_ROOM, BIOLOGY_SPAWN, BIOLOGY_STATIONS, BIOLOGY_WORLD_ID } from '../core/scientificWorlds/biologyLabWorld';
+import { CITY_CATALOG, CITY_OBSTACLES, CITY_ROOM, CITY_SPAWN, CITY_STATIONS, CITY_WORLD_ID } from '../core/scientificWorlds/cityLabWorld';
+import { createCityExperimentRunner } from '../core/scientificWorlds/cityRunners';
 import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
 import { createDefaultAnatomyView, isolateAnatomyNode, setAnatomyMode, setCutaway } from '../core/scientificWorlds/humanLab/anatomyView';
 import type { AnatomyDisplayMode, AnatomyViewState } from '../core/scientificWorlds/humanLab/types';
@@ -31,6 +36,8 @@ import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientif
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
+import type { ChemistryArtifact } from '../core/scientificWorlds/chemistryRunners';
+import ChemistrySessionVisual from './ChemistrySessionVisual';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -49,6 +56,11 @@ import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 
 const STATE_NAMES: readonly AgentActionState[] = ['IDLE', 'MOVING_TO_TARGET', 'ARRIVED', 'ALIGNING', 'REACHING', 'INTERACTING', 'EXECUTING', 'OBSERVING', 'REPORTING', 'RETURNING', 'BLOCKED'];
 
+/** `SceneArtifact` (physics|biology) doesn't list the chemistry kinds — the runner boundary already casts loosely (see the `as SceneArtifact` calls below); this narrows the ACTUAL runtime value rather than widening `SceneArtifact` itself. */
+function isChemistryArtifact(value: unknown): value is ChemistryArtifact {
+  return !!value && typeof value === 'object' && typeof (value as { kind?: unknown }).kind === 'string' && (value as { kind: string }).kind.startsWith('chemistry-');
+}
+
 export const QUICK_COMMANDS: readonly { readonly label: string; readonly text: string }[] = [
   { label: 'Synteza NaCl', text: 'Idź do syntezatora kryształów i uruchom próbę NaCl. Potem pokaż mi, co otrzymałeś i skąd to pochodzi.' },
   { label: 'Zderzacz 13 TeV', text: 'Podejdź do konsoli zderzacza i uruchom paczkę zderzeń przy 13 TeV.' },
@@ -66,6 +78,11 @@ export const BIOLOGY_QUICK_COMMANDS: readonly { readonly label: string; readonly
   { label: 'DNA', text: 'Idź do ściany obliczeniowej i uruchom centralny dogmat dla sekwencji ATGGCCTTAGTGAAGCACGGTACCTTCGAATGGTGA.' },
 ];
 
+/** SW-4: the epidemiology city's one command-driven experiment. */
+export const CITY_QUICK_COMMANDS: readonly { readonly label: string; readonly text: string }[] = [
+  { label: 'SEIR miasta', text: 'Idź do centrum dowodzenia epidemiologicznego i uruchom symulację SEIR.' },
+];
+
 interface WorldDefinition {
   readonly id: string; readonly label: string; readonly room: typeof LAB_ROOM; readonly obstacles: typeof LAB_OBSTACLES; readonly stations: readonly LabStation[];
   readonly spawn: typeof LAB_SPAWN; readonly catalog: typeof LAB_CATALOG; readonly quick: typeof QUICK_COMMANDS;
@@ -75,7 +92,8 @@ interface WorldDefinition {
 
 const WORLDS: Readonly<Record<SceneWorld, WorldDefinition>> = {
   physics: { id: LAB_WORLD_ID, label: 'LABORATORIUM', room: LAB_ROOM, obstacles: LAB_OBSTACLES, stations: LAB_STATIONS, spawn: LAB_SPAWN, catalog: LAB_CATALOG, quick: QUICK_COMMANDS, parse: (t, lt) => parseWorldCommands(t, LAB_CATALOG, lt), runner: (l) => createLabExperimentRunner(LAB_WORLD_ID, l) as ExperimentRunner<SceneArtifact> },
-  biology: { id: BIOLOGY_WORLD_ID, label: 'HUMAN BIOLOGY LAB', room: BIOLOGY_ROOM, obstacles: BIOLOGY_OBSTACLES, stations: BIOLOGY_STATIONS, spawn: BIOLOGY_SPAWN, catalog: BIOLOGY_CATALOG, quick: BIOLOGY_QUICK_COMMANDS, parse: parseBiologyWorldCommands, runner: (l) => createBiologyExperimentRunner(BIOLOGY_WORLD_ID, l) as ExperimentRunner<SceneArtifact> },
+  biology: { id: BIOLOGY_WORLD_ID, label: 'HUMAN BIOLOGY LAB', room: BIOLOGY_ROOM, obstacles: BIOLOGY_OBSTACLES, stations: BIOLOGY_STATIONS, spawn: BIOLOGY_SPAWN, catalog: BIOLOGY_CATALOG, quick: BIOLOGY_QUICK_COMMANDS, parse: parseBiologyWorldCommands, runner: (l) => createCanonicalHumanBiologyExperimentRunner(BIOLOGY_WORLD_ID, l) as ExperimentRunner<SceneArtifact> },
+  city: { id: CITY_WORLD_ID, label: 'MIASTO EPIDEMIOLOGICZNE', room: CITY_ROOM, obstacles: CITY_OBSTACLES, stations: CITY_STATIONS, spawn: CITY_SPAWN, catalog: CITY_CATALOG, quick: CITY_QUICK_COMMANDS, parse: (t, lt) => parseWorldCommands(t, CITY_CATALOG, lt), runner: (l) => createCityExperimentRunner(CITY_WORLD_ID, l) as ExperimentRunner<SceneArtifact> },
 };
 
 /** Pure: the twin's view after an interaction at the anatomy table (V3 anatomyView reducers; unknown nodes are refused, not invented). */
@@ -121,6 +139,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [session, setSession] = useState<ExperimentSession | null>(null);
   const [artifactKind, setArtifactKind] = useState<string | null>(null);
   const [bioArtifact, setBioArtifact] = useState<BiologyArtifact | null>(null);
+  const [chemistryArtifact, setChemistryArtifact] = useState<ChemistryArtifact | null>(null);
   const [sessions, setSessions] = useState<ExperimentSession[]>([]);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [twinTier, setTwinTier] = useState<HumanTwinTier>('PROXY');
@@ -138,6 +157,11 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [level, setLevel] = useState<GuideLevel>('EXPLORER');
   const [evidenceOpen, setEvidenceOpen] = useState(true);
   const [frames, setFrames] = useState(0);
+  /** D-134 SMART UI: a real hover/click on an organ mesh — preview only (see `SelectedOrganInfo`'s
+   * own doc). BADAJ (below) is the one thing that commits to the agent-walk-and-session pipeline. */
+  const [hoveredOrgan, setHoveredOrgan] = useState<SelectedOrganInfo | null>(null);
+  const [selectedOrgan, setSelectedOrgan] = useState<SelectedOrganInfo | null>(null);
+  const [organAnchor, setOrganAnchor] = useState<ScreenPoint | null>(null);
   const logicalTime = useRef(0);
   const nextId = useRef(1);
   const levelRef = useRef(level); levelRef.current = level;
@@ -165,12 +189,19 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     setAgentState((prev) => { const next = STATE_NAMES[s.agentState ?? 0] ?? 'IDLE'; return prev === next ? prev : next; });
     setProgress((p) => (Math.abs(p - (s.progress ?? 0)) > 0.02 ? s.progress ?? 0 : p));
     setFrames((f) => (s.frames && s.frames - f >= 10 ? s.frames : f));
+    // D-134: the selected organ's live screen anchor, on the SAME throttled onStats channel every
+    // other number this screen already reads — no second per-frame update path.
+    setOrganAnchor(Number.isFinite(s.selectedOrganAnchorX) && Number.isFinite(s.selectedOrganAnchorY)
+      ? { x: s.selectedOrganAnchorX, y: s.selectedOrganAnchorY }
+      : null);
   }, []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
 
   useEffect(() => {
     sim.setTwinTierListener((tier) => setTwinTier(tier));
     setTwinTier(sim.getTwinTier());
+    sim.onOrganHovered = (info) => setHoveredOrgan(info);
+    sim.onOrganSelected = (info) => setSelectedOrgan(info);
     sim.setUpdateListener((u) => {
       if (u.stationId) setStationId(u.stationId);
       setBlocked(u.blockedReason);
@@ -179,6 +210,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         setSession(sealed); sessionRef.current = sealed; setReplay(null); setArtifactKind((artifact as SceneArtifact).kind);
         setSessions((list) => [...list.slice(-40), sealed]);
         if (world === 'biology') setBioArtifact(artifact as BiologyArtifact);
+        setChemistryArtifact(isChemistryArtifact(artifact) ? artifact : null);
         if (sealed.stationId) sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
         sim.noteSealedSession(sealed);
       }
@@ -200,7 +232,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         if (report.deferred.some((d) => d.intent === 'ASK')) { /* the question is handed to Science Chat by the button below */ }
       }
     });
-    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); };
+    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); sim.onOrganHovered = undefined; sim.onOrganSelected = undefined; };
   }, [sim, speak, say, world]);
 
   /** Typed commands from the Human Explorer's clicks: the same planner and controller as the command bar, no parser in between. */
@@ -221,6 +253,19 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   }, [def, runCommands, say]);
   const submitCommands = useCallback((commands: readonly WorldCommand[], label: string) => { say('user', label); runCommands({ commands, unresolved: [] }); }, [runCommands, say]);
   const nextLogicalTime = useCallback(() => { logicalTime.current += 1; return logicalTime.current; }, []);
+  /** D-134 SMART UI: BADAJ on the organ popup — the ONLY thing a hover/click ever commits to the real
+   * agent-walk-and-session pipeline. Reuses the SAME `EXPLORER_ORGANS`/`explorerCommands` the Human
+   * Explorer's own organ chip already runs (`HumanExplorerPanel.tsx`); not every manifest organ has
+   * an explorer entry (5 of them do), so a node without one still opens the panel — honestly, without
+   * claiming a command ran that didn't. */
+  const badajOrgan = useCallback((info: SelectedOrganInfo) => {
+    setExplorerOpen(true);
+    const explorer = EXPLORER_ORGANS.find((e) => e.organId === info.entityId);
+    if (!explorer) return;
+    const lt = nextLogicalTime();
+    const label = `Eksploracja: ${info.label}`;
+    submitCommands(explorerCommands(explorer, 'organ', label, lt), label);
+  }, [nextLogicalTime, submitCommands]);
   /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
    *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
   const bridgeRef = useRef<ReturnType<typeof createScientificWorldsCognitiveCore> | null>(null);
@@ -291,6 +336,31 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       {loading && <div className="sw-loading" role="status">Ładowanie laboratorium…</div>}
       {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
 
+      {/* D-134 SMART UI: a real hover/click on an organ mesh — layered additively over the existing
+          HUD (`.sw` is `position:fixed;inset:0`, so this needs no WorldViewShell wrapper of its own;
+          see D-134's own docs/DECISIONS.md entry for why the rest of the HUD was NOT replaced in this
+          pass). Never commits to the agent pipeline by itself — BADAJ is the one explicit action that
+          does. */}
+      {world === 'biology' && hoveredOrgan && !selectedOrgan && (
+        <div className="honesty-row" data-testid="sw-organ-hover-hint">
+          <span className="honesty educational">Najedziesz: {hoveredOrgan.label}</span>
+        </div>
+      )}
+      {world === 'biology' && (
+        <ContextualPopup
+          object={selectedOrgan ? {
+            id: selectedOrgan.entityId,
+            label: selectedOrgan.label,
+            subtitle: selectedOrgan.system ?? undefined,
+            badges: [{ label: selectedOrgan.epistemic, tone: anatomyEpistemicLabelToEpistemicTone(selectedOrgan.epistemic as Parameters<typeof anatomyEpistemicLabelToEpistemicTone>[0]) }],
+            actions: [{ id: 'badaj', label: 'BADAJ', kind: 'research' }],
+          } satisfies WorldObject : null}
+          anchor={organAnchor}
+          onClose={() => sim.clearOrganSelection()}
+          onAction={(actionId) => { if (actionId === 'badaj' && selectedOrgan) badajOrgan(selectedOrgan); }}
+        />
+      )}
+
       <section className="sw-hud sw-hud-status" aria-label="Stan agenta" data-testid="sw-status">
         <div className="sw-badges">
           <span className="sw-badge">ŚWIAT: {def.label}</span>
@@ -324,6 +394,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
             <dt>Hash sesji</dt><dd className="cw-mono cw-wrap" data-testid="sw-content-hash">{session.contentHash}</dd>
             <dt>Odcisk replay</dt><dd className="cw-mono cw-wrap">{session.replayFingerprint}</dd>
             <dt>Artefakt</dt><dd className="cw-mono">{artifactKind ?? '—'} · renderowany z tej sesji</dd>
+            {chemistryArtifact && <><dt /><dd><ChemistrySessionVisual artifact={chemistryArtifact} /></dd></>}
             <dt>Replay</dt>
             <dd>
               <button type="button" className="sw-btn" onClick={doReplay} data-testid="sw-replay">Powtórz eksperyment</button>

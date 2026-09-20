@@ -12,7 +12,15 @@ import type { CommandCatalog, StationDescriptor } from './worldCommand';
  */
 
 /** Stations of the human-biology lab (V3 pack): the ids are the pack's own `station:*` ids, unchanged. */
-export type BiologyStationKind = 'human-study' | 'neuro' | 'microscopy' | 'histology' | 'imaging' | 'orpheus' | 'compute' | 'evidence' | 'safety';
+export type BiologyStationKind = 'human-study' | 'neuro' | 'microscopy' | 'histology' | 'imaging' | 'orpheus' | 'compute' | 'evidence' | 'safety'
+  /** Canonical Laboratory integration: the pack never defined a wet-lab program, so these three are
+   * host-added (not part of the delivered V3 pack) — physical stations, real experiment ids backed
+   * by Genesis Chemistry v0.2.1's knowledge adapter (`chemistryRunners.ts`), real Evidence Ledger
+   * records. */
+  | 'sample-preparation' | 'wet-lab-bench' | 'analytical-bench'
+  /** Biomedical Intervention Bay integration (`humanLab/regenerativeMedicineBay.ts`): a single host
+   * physical station in the experimental room, real experiment ids, real Evidence Ledger records. */
+  | 'biomedical';
 export type StationKind = 'synthesizer' | 'collider' | 'epidemiology' | 'window' | 'airlock' | BiologyStationKind;
 
 export interface LabStation extends StationDescriptor {

@@ -26,11 +26,32 @@ import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/ana
 import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
+import { createCanonicalLaboratoryGeometry } from './canonicalLaboratoryGeometry';
 import { evaluateHumanTwinAsset, loadHumanTwinBody, type HumanTwinTier, type LoadedHumanTwinBody } from './humanTwinAsset';
 import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
 import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
+import { InteractionController, applyHighlight, clearHighlight, type EntityResolver } from './graphics/interaction';
+import { REGENERATIVE_BAY_STATION_ID, REGENERATIVE_BAY_VISUAL_SCALE } from '../scientificWorlds/humanLab/regenerativeMedicineBay';
+import { createRegenerativeMedicineBayGeometry } from '../scientificWorlds/humanLab/regenerativeMedicineBayGeometry';
+import { updateRegenerativeBayVisualRuntime, disposeRegenerativeBayGeometry } from '../scientificWorlds/humanLab/regenerativeMedicineBayVisualRuntime';
+import { createInitialRegenerativeBayRuntime, setRegenerativeBayPhase, stepRegenerativeBayRuntime, type RegenerativeBayRuntimeState } from '../scientificWorlds/humanLab/regenerativeMedicineBayRuntime';
+import { bindExistingHumanTwinToRegenerativeBay } from '../scientificWorlds/humanLab/regenerativeMedicineBayTwinBridge';
+import type { WorldFrameEntityId } from './graphics/worldFrame';
+
+/**
+ * D-134 SMART UI (Human Biology): a real organ, hovered or clicked in the 3D chamber/study-table
+ * twin — no fixed agent-pipeline commitment, matching `moleculeScene3D.ts`'s own `SelectedAtomInfo`
+ * contract exactly. Firing the full agent-walk-and-session pipeline stays an explicit, separate
+ * "BADAJ" action (`ScientificWorldsScreen.tsx`), never something a casual hover or click triggers.
+ */
+export interface SelectedOrganInfo {
+  entityId: WorldFrameEntityId;
+  label: string;
+  system: string | null;
+  epistemic: string;
+}
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -54,7 +75,8 @@ import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidence
 
 export type AgentCameraMode = 'VISOR' | 'SPECTATOR' | 'TWIN';
 /** Which typed world the scene builds: the physics lab (default) or the V3 human-biology lab — one scene class, one pipeline. */
-export type SceneWorld = 'physics' | 'biology';
+/** 'city' (SW-4, the epidemiology city) uses the SAME generic (non-biology) render path 'physics' already uses — no second renderer, no dedicated `initCity`. */
+export type SceneWorld = 'physics' | 'biology' | 'city';
 export type SceneArtifact = LabArtifact | BiologyArtifact;
 const BIOLOGY_KINDS: ReadonlySet<string> = new Set(['physiology', 'neuro', 'hyperscope', 'histology', 'imaging', 'orpheus']);
 /** The twin id is fixed so the manifest (and every hash derived from it) is the same on every load. */
@@ -86,6 +108,12 @@ export class AgentLabScene3D implements Sim3D {
   private character: Character | null = null;
   private stations = new Map<string, StationVisual>();
   private dust: DustMotesHandle | null = null;
+  /** Biomedical Intervention Bay: the real, dedicated apparatus geometry (bed, sensor arch, imaging
+   * ring, two robotic arms, console) — a distinct physical station, never the Human Twin chamber.
+   * The Human Twin stays exactly where it already is; this bay only ever references the SAME twin's
+   * manifest/parameters as experiment input data (`bindExistingHumanTwinToRegenerativeBay` below). */
+  private regenerativeBayGroup: THREE_NS.Group | null = null;
+  private regenerativeBayRuntime: RegenerativeBayRuntimeState | null = null;
   private beacons: THREE_NS.MeshStandardMaterial[] = [];
   private pipeline: GraphicsPipeline | null = null;
   private cameraMode: AgentCameraMode = 'VISOR';
@@ -123,9 +151,36 @@ export class AgentLabScene3D implements Sim3D {
   /** D-132: the room probe must fire once the first full frame exists, never during init. */
   private probeTaken = false;
   private onTwinTier: ((tier: HumanTwinTier) => void) | null = null;
+  /** D-131 readiness gate: true only while the licensed asset's materials are being compiled/uploaded
+   * to the GPU (`upgradeTwinsToLicensedAsset`), before it is ever added to the live scene graph.
+   * Exposed on `getStats()` as `humanTwinCompiling` so a test or a diagnostic script can observe the
+   * exact swap ordering instead of guessing from wall-clock time. */
+  private twinCompiling = false;
   private lastWall: number | null = null;
   private gate: VisualRealityResult | null = null;
   readonly manifest: HumanDigitalTwinManifest = createHumanDigitalTwinManifest(TWIN_ID);
+  /** D-134: the SAME `camera` `init`/`syncScene` already receive each frame, stored so `getStats()`
+   * can project the selected organ's screen position for the Smart UI contextual popup — no second
+   * camera reference (mirrors `moleculeScene3D.ts`'s own `camera` field exactly). */
+  private camera: THREE_NS.PerspectiveCamera | null = null;
+  private viewportWidth = 300;
+  private viewportHeight = 300;
+  private interaction: InteractionController | null = null;
+  private hoveredOrganId: WorldFrameEntityId | null = null;
+  private selectedOrganId: WorldFrameEntityId | null = null;
+  /** D-134: biology-only — a real raycast against the organ meshes `biologyLabKit.ts` already tags
+   * with `userData.nodeId`; no second picking implementation, the SAME `InteractionController`
+   * `moleculeScene3D.ts` uses. */
+  private readonly organResolver: EntityResolver = {
+    resolveEntityId: (intersection) => {
+      const nodeId = (intersection.object.userData as { nodeId?: unknown }).nodeId;
+      return typeof nodeId === 'string' && nodeId ? nodeId : null;
+    },
+  };
+  /** D-134: fired on hover/deselect too (not just a hit) — the same "honest null, never sticky"
+   * contract `moleculeScene3D.ts`'s `onAtomHovered` already establishes. */
+  onOrganHovered?: (info: SelectedOrganInfo | null) => void;
+  onOrganSelected?: (info: SelectedOrganInfo | null) => void;
 
   constructor(private readonly controller: AgentController, private readonly stationDefs: readonly LabStation[], private readonly room: RoomBounds, private readonly world: SceneWorld = 'physics') {}
 
@@ -257,8 +312,13 @@ export class AgentLabScene3D implements Sim3D {
     // The flagship pack's density gate, re-measured every 60 frames (a scene traversal is not a per-frame cost).
     if (this.scene && (this.gate === null || this.frames % 60 === 0)) this.gate = evaluateVisualReality(this.scene, this.renderer);
     const g = this.gate;
+    // D-134: the selected organ's live screen anchor, on the SAME throttled getStats() channel
+    // every other Sim3D scene already reads its numbers through — no second per-frame update path.
+    const anchor = this.screenAnchorFor(this.selectedOrganId);
     return { ...base, world: this.world === 'biology' ? 1 : 0, twinMode: this.twinInstruction ? ['NORMAL', 'XRAY', 'VASCULAR', 'NERVOUS', 'ORGANS', 'BRAIN', 'TISSUE', 'CELLULAR'].indexOf(this.twinInstruction.mode) : -1, twins: this.twins.length,
-      polygons: g?.polygonCount ?? 0, drawCalls: g?.drawCalls ?? 0, opaqueMeshes: g?.opaqueMeshes ?? 0, transparentMeshes: g?.transparentMeshes ?? 0, visualGate: g ? (g.pass ? 1 : 0) : -1 };
+      polygons: g?.polygonCount ?? 0, drawCalls: g?.drawCalls ?? 0, opaqueMeshes: g?.opaqueMeshes ?? 0, transparentMeshes: g?.transparentMeshes ?? 0, visualGate: g ? (g.pass ? 1 : 0) : -1,
+      selectedOrganAnchorX: anchor?.x ?? Number.NaN, selectedOrganAnchorY: anchor?.y ?? Number.NaN,
+      humanTwinCompiling: this.twinCompiling ? 1 : 0 };
   }
 
   private statsBase(): Record<string, number> {
@@ -270,7 +330,7 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
-    this.THREE = THREE; this.scene = scene;
+    this.THREE = THREE; this.scene = scene; this.camera = camera;
     this.scratchA = new THREE.Vector3(); this.scratchB = new THREE.Vector3();
     this.spectatorPos = new THREE.Vector3(0, 2.2, 8); this.spectatorLook = new THREE.Vector3(0, 1.4, 0);
     // D-131: the TWIN camera starts already framing the chamber, so the first frame after a switch is correct.
@@ -398,10 +458,27 @@ export class AgentLabScene3D implements Sim3D {
     const air = BIOLOGY_SCENE.nodes.find((n) => n.id === 'vfx.cleanroom-air');
     this.dust = createDustMotes(THREE, { count: Math.round(4000 * Number(air?.metadata?.density ?? 0.08)), bounds: [W / 2 - 0.5, 1.8, D / 2 - 0.5], center: [cx, 1.9, cz], color: 0xe8f1ff, size: 0.01, opacity: 0.28, seed: 11 });
     scene.add(this.dust.points);
+    // Canonical Laboratory (D-135 integration): real interior walls with door gaps, dividing this single
+    // shell into the seven rooms `canonicalLaboratory.ts` defines (BIOLOGY_ROOM/BIOLOGY_OBSTACLES already
+    // span the same footprint, so the existing grid-A* routes the agent through these exact openings).
+    // Only wall and door-frame/glazing meshes are kept — the kit's own floor/ceiling/label/light meshes
+    // are discarded because the shell above already owns one floor and one layered ceiling for the whole
+    // building; keeping both would double them up for no visual gain.
+    const canonicalGeom = createCanonicalLaboratoryGeometry(THREE, { floorMaterial: palette.LAB_WALL, wallMaterial: palette.LAB_WALL, ceilingMaterial: palette.CONCRETE, frameMaterial: palette.PAINTED_METAL, glassMaterial: glass });
+    for (const child of [...canonicalGeom.group.children]) {
+      if (/:floor$|:ceiling$|:label$|:light$/.test(child.name)) canonicalGeom.group.remove(child);
+    }
+    scene.add(canonicalGeom.group);
     // The central Human Digital Twin chamber, hero-lit. D-131: the twin inside is the licence-verified CC0
     // asset when the gate approves it, otherwise the labelled proxy. Either way its ANATOMY stays a MODEL:
     // the organ shapes are atlas ellipsoids, and the asset itself carries no medical anatomy.
-    const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
+    // Visual presentation audit: the shared `glass` (roughness 0.06, envMapIntensity 0.35 — tuned for
+    // curtain walls and station domes, where nothing stands directly behind it) put hard, hot
+    // reflections right over the body at close range, one of the reasons the figure read as merged
+    // into the chamber. A dedicated, slightly softer clone for JUST this enclosure — the shared
+    // instance other glass in the scene uses is untouched.
+    const chamberGlassMat = glass.clone(); chamberGlassMat.roughness = 0.16; chamberGlassMat.envMapIntensity = 0.16;
+    const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass: chamberGlassMat, palette, ceilingHeight: H });
     scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
     const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
@@ -415,18 +492,44 @@ export class AgentLabScene3D implements Sim3D {
       scene.add(arm.group); this.arms.push(arm);
     }
     createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 16, rim: 4 }, color: { key: 0xf2f7ff, rim: 0x8fd3ff }, castShadow: false });
-    // Stations (pack ids), their practical lights, and the pack's hanging signs.
-    for (const st of this.stationDefs) this.buildBiologyStationVisual(THREE, scene, palette, glass, st);
+    // Stations (pack ids), their practical lights, and the pack's hanging signs. The Biomedical
+    // Intervention Bay has its OWN dedicated geometry (not the generic per-kind switch below, which
+    // has no case for 'biomedical' and would silently build an empty group) — built separately right
+    // after this loop.
+    for (const st of this.stationDefs) { if (st.kind !== 'biomedical') this.buildBiologyStationVisual(THREE, scene, palette, glass, st); }
+    const regenerativeBayStation = this.stationDefs.find((s) => s.kind === 'biomedical');
+    if (regenerativeBayStation) this.buildRegenerativeBayVisual(THREE, scene, regenerativeBayStation);
     const signText: Readonly<Record<string, [string, string]>> = { 'sign.neuro': ['Neuro Lab', 'sygnały · MODEL'], 'sign.micro': ['Hyperscope', 'mikroskopia wirtualna'], 'sign.orpheus': ['ORPHEUS', 'analizator koncepcyjny'] };
+    // Canonical Laboratory integration: each sign's own position in `BIOLOGY_SCENE.nodes` is the V3 pack's
+    // ORIGINAL single-room coordinate (e.g. sign.neuro at the old neuro console, near (-4.5,-5.2)) — it was
+    // never tied to the station it labels, so the canonical remap left it floating disconnected from its
+    // station, in a different room in two of three cases. Derive the hung position from the mapped
+    // station's own (now-canonical) position/facing instead, falling back to the pack's node position only
+    // if a station id is ever missing (kept the sign visible rather than silently dropping it).
+    const signStation: Readonly<Record<string, string>> = { 'sign.neuro': 'station:neuro', 'sign.micro': 'station:microscopy', 'sign.orpheus': 'station:orpheus' };
     for (const n of BIOLOGY_SCENE.nodes) {
       if (n.kind !== 'SIGNAGE') continue; const t = signText[n.id]; if (!t) continue;
-      scene.add(createTextSign(THREE, { position: [n.positionMeters.x, n.positionMeters.y, n.positionMeters.z], text: t[0], subtext: t[1], frameMaterial: palette.PAINTED_METAL }));
+      const st = this.stationDefs.find((s) => s.id === signStation[n.id]);
+      const pos: [number, number, number] = st
+        ? [st.position.x + Math.sin(st.facing) * 1.1, n.positionMeters.y, st.position.z + Math.cos(st.facing) * 1.1]
+        : [n.positionMeters.x, n.positionMeters.y, n.positionMeters.z];
+      scene.add(createTextSign(THREE, { position: pos, text: t[0], subtext: t[1], frameMaterial: palette.PAINTED_METAL }));
     }
     scene.add(createTextSign(THREE, { position: [cx, 3.1, this.room.maxZ - 0.6], headingRadians: Math.PI, text: 'Genesis Human Biology Lab', subtext: 'bliźniak = PROXY · dane = MODEL · brak wyrobu medycznego', width: 2.6, height: 0.4, frameMaterial: palette.PAINTED_METAL }));
     // Upper observation gallery along the north glass wall (reference: the command hub), and holographic dashboards at the hero bays (static labels only).
-    scene.add(createMezzanine(THREE, { position: [cx, 0, this.room.minZ + 1.9], headingRadians: 0, length: W - 1.2, depth: 1.8, height: 2.75, slabMaterial: palette.PAINTED_METAL, railMaterial: palette.BRUSHED_METAL, glass }));
-    scene.add(createHoloPanel(THREE, { position: [-3, 1.75, -3.6], headingRadians: 0, title: 'Neuro Lab', lines: ['regiony: NEURO_REGIONS (11)', 'sygnały: model seeded', 'etykieta: SIMULATION', 'brak danych klinicznych'] }));
-    scene.add(createHoloPanel(THREE, { position: [-6, 1.8, 3.5], headingRadians: Math.PI / 2, title: 'Imaging Center', lines: ['XRAY · CT · MRI-like · USG-like', 'przekroje z atlasu (MODEL)', 'diagnostyka: ZABRONIONA'] }));
+    // Canonical Laboratory: this observation gallery used to run the full width of the single 20 m room.
+    // At that span it would now float over the new interior walls of microscopy/histology (whose own
+    // west/east walls it would clip straight through) and past the human-study/imaging rooms it never
+    // reaches. Scaled down to main-hall's own footprint instead — an upper gallery over the control bank
+    // reads at least as naturally there, and it no longer crosses any wall this integration added.
+    scene.add(createMezzanine(THREE, { position: [0, 0, -2.8], headingRadians: 0, length: 6.8, depth: 1.2, height: 2.75, slabMaterial: palette.PAINTED_METAL, railMaterial: palette.BRUSHED_METAL, glass }));
+    // Canonical Laboratory: these two panels dress a specific station, so they moved with it — Neuro Lab
+    // now sits against the human-study room's back wall (station:neuro is now at -7.8,2.0, not the old
+    // single-room -3,-5), and Imaging Center against the imaging room's back wall (station:imaging is now
+    // at 7.8,0.0, not the old -6,5). The Human Digital Twin panel below stays put: the twin chamber itself
+    // never moved (protects D-134).
+    scene.add(createHoloPanel(THREE, { position: [-7.8, 1.75, -3.35], headingRadians: 0, title: 'Neuro Lab', lines: ['regiony: NEURO_REGIONS (11)', 'sygnały: model seeded', 'etykieta: SIMULATION', 'brak danych klinicznych'] }));
+    scene.add(createHoloPanel(THREE, { position: [7.8, 1.8, -3.35], headingRadians: 0, title: 'Imaging Center', lines: ['XRAY · CT · MRI-like · USG-like', 'przekroje z atlasu (MODEL)', 'diagnostyka: ZABRONIONA'] }));
     scene.add(createHoloPanel(THREE, { position: [1.9, 2.0, 0.4], headingRadians: Math.PI * 0.25, width: 1.0, height: 0.6, title: 'Human Digital Twin', lines: ['skala 1:1 · 1.78 m', 'ciało: PROXY (brak GLB)', 'narządy: atlas MODEL', 'NOT_A_MEDICAL_DEVICE'] }));
     // Wall dressing on the solid walls: cabinets and a shelf, conduit at height.
     for (let i = 0; i < 2; i++) createAndAdd(scene, createElectricalCabinet(THREE, { position: [this.room.minX + 0.4, 0, -7.5 + i * 1.1], headingRadians: Math.PI / 2, width: 0.8, depth: 0.5, height: 2.0, bodyMaterial: palette.PAINTED_METAL, doorMaterial: palette.BRUSHED_METAL, hazardStripeMaterial: laneMat }));
@@ -440,21 +543,76 @@ export class AgentLabScene3D implements Sim3D {
     scene.add(character.root); this.character = character;
     this.setTwinView('NORMAL', null);
     applyShadowPolicy(THREE, scene);
+    // D-134 SMART UI: real hover/click picking on the organ meshes `createTwinProxy` already tags
+    // (`biologyLabKit.ts`, `userData.nodeId`) — both twins (chamber + study table) are already in
+    // `this.twins` at this point. Preview only: never commits to the agent-walk-and-session
+    // pipeline by itself (see `SelectedOrganInfo`'s own doc).
+    this.interaction = new InteractionController(THREE, {
+      camera,
+      resolver: this.organResolver,
+      getTargets: () => this.twins.flatMap((t) => Array.from(t.organs.values())),
+      onHoverChange: (id) => this.handleOrganHover(id),
+      onSelect: (id) => this.handleOrganSelect(id),
+    });
   }
 
   private buildBiologyStationVisual(THREE: typeof THREE_NS, scene: THREE_NS.Scene, palette: GenesisMaterialPalette, glass: THREE_NS.Material, st: LabStation): void {
     const build = buildBiologyStation(THREE, { palette, glass, manifest: this.manifest, skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex }, st);
     build.group.position.set(st.position.x, 0, st.position.z); build.group.rotation.y = st.facing; scene.add(build.group);
     // Light budget (forward renderer: every point light costs every fragment): only the hero bays get a practical; the rest read by their emissive screens and the ceiling.
-    const hero = st.kind === 'human-study' || st.kind === 'neuro' || st.kind === 'microscopy' || st.kind === 'orpheus' || st.kind === 'imaging';
+    // Canonical Laboratory room audit: histology, safety and the three Wet Lab stations had no
+    // practical at all — under the biology grade's deep black point (D-132) they rendered essentially
+    // invisible, failing "every room shows a visible operational station" even though the geometry,
+    // position and AgentController reachability were all already correct. Every room now has at least
+    // one lit station.
+    const hero = st.kind === 'human-study' || st.kind === 'neuro' || st.kind === 'microscopy' || st.kind === 'orpheus' || st.kind === 'imaging'
+      || st.kind === 'histology' || st.kind === 'safety' || st.kind === 'sample-preparation' || st.kind === 'wet-lab-bench' || st.kind === 'analytical-bench';
     // The imaging gantry is white ceramic a metre under its practical: half intensity there, or it glares (seen on the first e2e frames).
-    const light = hero ? createPracticalLight(THREE, scene, { position: [st.position.x + Math.sin(st.facing) * 0.7, 2.1, st.position.z + Math.cos(st.facing) * 0.7], color: 0xbfe3ff, intensity: st.kind === 'imaging' ? 1.0 : 2.2, distance: 5, decay: 2 }) : new THREE.PointLight(0xbfe3ff, 0, 0.1);
+    // Canonical Laboratory lighting polish: Main Hall Safety and Human Study Neuro still read dim next
+    // to Microscopy/Imaging/Experimental even after getting the same generic hero practical — their
+    // interesting geometry (safety's console+hazard strip; neuro's brain-holo pedestal) sits lower and
+    // closer to the console than the generic 2.1 m/0.7 m offset reaches under the biology grade's deep
+    // black point. Local-only fix: a closer, lower, brighter practical for exactly these two kinds;
+    // every other station's light is byte-for-byte unchanged.
+    const localLight: Readonly<Record<string, { height: number; forward: number; intensity: number; distance: number }>> = {
+      safety: { height: 1.55, forward: 0.45, intensity: 4.2, distance: 4 },
+      neuro: { height: 1.5, forward: 0.4, intensity: 4.0, distance: 4 },
+    };
+    const tuned = localLight[st.kind];
+    const height = tuned?.height ?? 2.1;
+    const forward = tuned?.forward ?? 0.7;
+    const intensity = tuned ? tuned.intensity : st.kind === 'imaging' ? 1.0 : 2.2;
+    const distance = tuned?.distance ?? 5;
+    const light = hero ? createPracticalLight(THREE, scene, { position: [st.position.x + Math.sin(st.facing) * forward, height, st.position.z + Math.cos(st.facing) * forward], color: 0xbfe3ff, intensity, distance, decay: 2 }) : new THREE.PointLight(0xbfe3ff, 0, 0.1);
     if (build.twin) this.twins.push(build.twin);
     this.arms.push(...build.arms);
     const carousel = build.group.getObjectByName('carousel'); if (carousel) this.spinners.push(carousel);
     const holo = build.group.getObjectByName('brain-holo'); if (holo) this.spinners.push(holo);
     this.stations.set(st.id, { station: st, group: build.group, statusMaterial: build.status, light, screen: build.screen, artifactGroup: null, arms: build.arms, artifactAnchor: build.artifactAnchor, leds: build.leds, ...(build.twin ? { twin: build.twin } : {}) });
     if (build.screen) { if (st.kind === 'evidence') drawEvidenceWall(build.screen, this.sealedSessions); else drawBiologyIdle(build.screen, st); }
+  }
+
+  /**
+   * Biomedical Intervention Bay: the supplied package's own real geometry (bed, multimodal imaging
+   * ring, two robotic research arms, biosensor cabinet, console) — mounted at `REGENERATIVE_BAY_VISUAL_SCALE`
+   * (see `regenerativeMedicineBay.ts`'s own comment on why: the room-fit conflict this scale corrects
+   * for). A dedicated station, not a second Human Twin chamber and not the existing twin platform —
+   * the existing Human Twin is referenced here only as DATA (`bindExistingHumanTwinToRegenerativeBay`),
+   * never duplicated or rendered a second time.
+   */
+  private buildRegenerativeBayVisual(THREE: typeof THREE_NS, scene: THREE_NS.Scene, st: LabStation): void {
+    const group = createRegenerativeMedicineBayGeometry({ scale: REGENERATIVE_BAY_VISUAL_SCALE, includeLabels: true, highQuality: true });
+    group.position.set(st.position.x, 0, st.position.z);
+    group.rotation.y = st.facing;
+    scene.add(group);
+    this.regenerativeBayGroup = group;
+    createPracticalLight(THREE, scene, { position: [st.position.x + Math.sin(st.facing) * 0.9, 2.6, st.position.z + Math.cos(st.facing) * 0.9], color: 0x8feaff, intensity: 2.6, distance: 6, decay: 2 });
+    // Handoff: the SAME existing Human Digital Twin manifest this scene already uses for the chamber
+    // and every anatomy view — an input binding for the bay's experiments, not a rendered figure on
+    // the bed and not a second twin instance.
+    bindExistingHumanTwinToRegenerativeBay(this.manifest);
+    this.regenerativeBayRuntime = createInitialRegenerativeBayRuntime(this.manifest.twinId, this.manifest.twinId);
+    updateRegenerativeBayVisualRuntime(group, this.regenerativeBayRuntime);
   }
 
   private buildStation(THREE: typeof THREE_NS, scene: THREE_NS.Scene, palette: GenesisMaterialPalette, st: LabStation): void {
@@ -571,6 +729,7 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
+    this.camera = camera;
     const THREE = this.THREE; const ch = this.character;
     if (!THREE || !ch || !this.scratchA || !this.scratchB || !this.spectatorPos || !this.spectatorLook) return;
     this.frames++;
@@ -595,6 +754,24 @@ export class AgentLabScene3D implements Sim3D {
       if (v.artifactGroup) v.artifactGroup.rotation.y = this.time * 0.35;
     }
     for (const b of this.beacons) b.emissiveIntensity = 0.9 + 0.7 * (0.5 + 0.5 * Math.sin(this.time * 2.6));
+    // Biomedical Intervention Bay: driven off the SAME real AgentController tick every other
+    // station already reads (`u`/`this.lastUpdate`) — no setInterval, no second clock. The bay's own
+    // phase tracks the real NAVIGATE→ALIGN→REACH→INTERACT→EXECUTE→OBSERVE state machine while the
+    // agent is actually at this station; it idles the instant the agent is anywhere else.
+    if (this.regenerativeBayGroup && this.regenerativeBayRuntime) {
+      const atBay = u?.stationId === REGENERATIVE_BAY_STATION_ID;
+      const phase = !atBay ? 'IDLE'
+        : u.state === 'ALIGNING' || u.state === 'REACHING' ? 'PRECHECK'
+        : u.state === 'INTERACTING' ? 'ACQUIRE'
+        : u.state === 'EXECUTING' ? 'INTERVENE_MODEL'
+        : u.state === 'OBSERVING' ? 'OBSERVE'
+        : u.state === 'REPORTING' ? 'COMPLETE'
+        : 'IDLE';
+      let next = setRegenerativeBayPhase(this.regenerativeBayRuntime, phase);
+      if (atBay && phase !== 'IDLE' && phase !== 'COMPLETE') next = stepRegenerativeBayRuntime(next, 1);
+      this.regenerativeBayRuntime = next;
+      updateRegenerativeBayVisualRuntime(this.regenerativeBayGroup, this.regenerativeBayRuntime);
+    }
     // Biology: twins idle, manipulators sweep (faster at the active bay), LEDs tick, the chamber ring and the carousel/hologram turn slowly.
     for (const t of this.twins) t.update(this.time);
     for (const v of this.stations.values()) {
@@ -609,6 +786,8 @@ export class AgentLabScene3D implements Sim3D {
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
       if (this.chamberGlass) this.chamberGlass.visible = true;
+      if (this.dust) this.dust.points.visible = true;
+      ch.root.visible = true;
       ch.head.getWorldPosition(this.scratchA);
       // Just inside the visor glass, so the suit's arms and gloves stay in frame below.
       this.scratchA.x += fx * 0.17; this.scratchA.z += fz * 0.17; this.scratchA.y += 0.04;
@@ -627,6 +806,20 @@ export class AgentLabScene3D implements Sim3D {
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
       if (this.chamberGlass) this.chamberGlass.visible = false;
+      // Ambient dust has no place in a focused twin/anatomy inspection anyway; hidden for this
+      // camera only (a real, minor improvement, but NOT the cause of the defect below).
+      if (this.dust) this.dust.points.visible = false;
+      // Root cause of a real, reproducible defect (verified via a real-browser raycast probe, which
+      // ruled out camera position/matrix/FOV and the dust cloud in turn before finding this): the
+      // TWIN camera sits at a FIXED world point near the twin chamber — unlike VISOR/SPECTATOR, which
+      // both track the moving AGENT — and the suited agent character (`ch`, a completely different
+      // entity from the Human Twin being inspected) is very often standing right there too, since the
+      // chamber is a central hub most commands navigate through. The raycast's two closest hits at
+      // the broken frame were unnamed meshes at 2–10 cm colored exactly `ch`'s own suit fabric/boot
+      // hex values — the camera was rendering from literally INSIDE the agent's own body mesh. The
+      // agent is not the subject of this camera; hidden here exactly like VISOR already hides the
+      // agent's own helmet/face for the same "don't let your own character occlude the shot" reason.
+      ch.root.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
       // 3.3 m fits the whole 1.7 m body; the look target sits BELOW the body's centre so the figure rides
       // in the upper two thirds of the frame, clear of the research dock at the bottom. 2.3 m moves in on
@@ -642,6 +835,8 @@ export class AgentLabScene3D implements Sim3D {
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
       if (this.chamberGlass) this.chamberGlass.visible = true;
+      if (this.dust) this.dust.points.visible = true;
+      ch.root.visible = true;
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
       const target = this.scratchA.set(pose.position.x - fx * 3.4, Math.min(2.15, this.ceilingY - 0.6), pose.position.z - fz * 3.4);
@@ -667,7 +862,25 @@ export class AgentLabScene3D implements Sim3D {
     if (!asset || this.scene === null) return; // disposed while loading, or the asset could not be read
     const old = this.twins[0];
     if (!old) return;
+    // Bounds/scale are already deterministic here: `loadHumanTwinBody` measures the loaded root and
+    // sets `root.scale` synchronously before its promise resolves (see `humanTwinAsset.ts`), so the
+    // asset is never mid-measurement by this point.
     const upgraded = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, bodyAsset: asset });
+    // Readiness gate (fixes a real, reproducible defect: the first frame rendered right after this
+    // swap could show a huge, pale, blown-out surface — WebGL caught mid-shader-compile/mid-texture-
+    // upload for the newly added materials, which three.js otherwise does lazily on first use). Force
+    // every material the new group needs onto the GPU in a scene it does NOT share with the live one,
+    // so the swap only ever happens once the asset can render correctly on its very first live frame.
+    // The old proxy keeps presenting, unchanged, for the whole compile — never an invalid-geometry gap.
+    if (this.renderer && this.camera && this.scene !== null) {
+      this.twinCompiling = true;
+      const compileScene = new THREE.Scene();
+      compileScene.add(upgraded.group);
+      try { await this.renderer.compileAsync(compileScene, this.camera); } catch { /* best effort: swap anyway below */ }
+      compileScene.remove(upgraded.group);
+      this.twinCompiling = false;
+    }
+    if (this.scene === null) { upgraded.dispose(); return; } // disposed while compiling
     anchor.remove(old.group);
     this.spinners = this.spinners.filter((g) => g !== old.group);
     old.dispose();
@@ -678,6 +891,8 @@ export class AgentLabScene3D implements Sim3D {
     this.twinTier = upgraded.tier;
     if (this.twinInstruction) upgraded.setView(this.twinInstruction, null);
     upgraded.setCutaway(this.cutawayState);
+    // Proxy-hidden + materialized + tier reported, all atomically, only now that the new group is
+    // both in the live scene graph AND GPU-ready — the badge and the pixels agree from frame one.
     this.onTwinTier?.(upgraded.tier);
     void palette;
   }
@@ -706,7 +921,85 @@ export class AgentLabScene3D implements Sim3D {
     return this.pipeline;
   }
 
-  onResize(): void { /* the camera is fully owned here; useThreeLoop keeps the aspect */ }
+  /** The camera stays fully owned here (`useThreeLoop` keeps the aspect on its own) — this only
+   * records the viewport's CSS-pixel size, the same `w`/`h` `moleculeScene3D.ts` keeps, for the D-134
+   * organ-picking raycast to convert a pointer event's screen pixel into the right NDC coordinate. */
+  onResize(w: number, h: number): void { this.viewportWidth = w; this.viewportHeight = h; }
+
+  /** D-134: a programmatic close (the Smart UI popup's × / Escape) — clears the SAME selection state
+   * and highlight a raycast-driven deselect would, rather than leaving the scene's own state (and
+   * the gold highlight on the mesh) out of sync with whatever the caller's own React state now says. */
+  clearOrganSelection(): void { this.handleOrganSelect(null); }
+
+  /** D-134: biology-only real hover/click picking, mechanically identical to
+   * `moleculeScene3D.ts`'s own `pointer()` — entirely delegated to `InteractionController`. A no-op
+   * for the physics world (`this.interaction` stays `null` there) and before `initBiology` has run. */
+  pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
+    if (!this.interaction) return;
+    if (type === 'down') this.interaction.pointerDown(x, y);
+    else if (type === 'move') this.interaction.pointerMove(x, y, this.viewportWidth, this.viewportHeight);
+    else this.interaction.pointerUp(x, y, this.viewportWidth, this.viewportHeight);
+  }
+
+  /** The first VISIBLE organ mesh carrying `nodeId` across every twin in the scene (the chamber twin
+   * and the study-table twin both carry the full organ set, tagged the same way) — an invisible mesh
+   * (hidden by the current visual mode/isolation) is never highlighted or anchored to. */
+  private findVisibleOrganMesh(nodeId: string): THREE_NS.Mesh | null {
+    for (const t of this.twins) { const mesh = t.organs.get(nodeId); if (mesh && mesh.visible) return mesh; }
+    return null;
+  }
+
+  private organInfo(nodeId: WorldFrameEntityId): SelectedOrganInfo | null {
+    const node = this.manifest.nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    return { entityId: nodeId, label: node.label, system: node.system ?? null, epistemic: node.epistemic };
+  }
+
+  /** Mirrors `moleculeScene3D.ts`'s own `handleHover` exactly: clear the previous highlight, apply
+   * the new one via the SAME `applyHighlight`/`clearHighlight` emissive-boost mechanism, fire the
+   * callback with an honest `null` for anything that doesn't resolve to a real manifest node. */
+  private handleOrganHover(id: WorldFrameEntityId | null): void {
+    const THREE = this.THREE;
+    if (this.hoveredOrganId && this.hoveredOrganId !== id && THREE) {
+      const previous = this.findVisibleOrganMesh(this.hoveredOrganId);
+      if (previous) clearHighlight(previous);
+    }
+    this.hoveredOrganId = id;
+    if (!id) { this.onOrganHovered?.(null); return; }
+    const info = this.organInfo(id);
+    if (!info) { this.hoveredOrganId = null; this.onOrganHovered?.(null); return; }
+    if (THREE) { const mesh = this.findVisibleOrganMesh(id); if (mesh) applyHighlight(THREE, mesh, 'hover'); }
+    this.onOrganHovered?.(info);
+  }
+
+  private handleOrganSelect(id: WorldFrameEntityId | null): void {
+    const THREE = this.THREE;
+    if (this.selectedOrganId && this.selectedOrganId !== id && THREE) {
+      const previous = this.findVisibleOrganMesh(this.selectedOrganId);
+      if (previous) clearHighlight(previous);
+    }
+    this.selectedOrganId = id;
+    if (!id) { this.onOrganSelected?.(null); return; }
+    const info = this.organInfo(id);
+    if (!info) { this.selectedOrganId = null; this.onOrganSelected?.(null); return; }
+    if (THREE) { const mesh = this.findVisibleOrganMesh(id); if (mesh) applyHighlight(THREE, mesh, 'select'); }
+    this.onOrganSelected?.(info);
+  }
+
+  /** D-134: project the SELECTED organ's live world position to viewport pixel coordinates (y down),
+   * for the Smart UI `ContextualPopup` anchor — the SAME projection `moleculeScene3D.ts`'s own
+   * `screenAnchorFor` uses. `null` whenever nothing is selected, or the point is behind the camera. */
+  private screenAnchorFor(id: WorldFrameEntityId | null): { x: number; y: number } | null {
+    const THREE = this.THREE;
+    if (!id || !THREE || !this.camera) return null;
+    const mesh = this.findVisibleOrganMesh(id);
+    if (!mesh) return null;
+    const world = new THREE.Vector3();
+    mesh.getWorldPosition(world);
+    const ndc = world.clone().project(this.camera);
+    if (ndc.z > 1) return null;
+    return { x: (ndc.x * 0.5 + 0.5) * this.viewportWidth, y: (1 - (ndc.y * 0.5 + 0.5)) * this.viewportHeight };
+  }
 
   dispose(): void {
     if (this.scene) disposeSceneResources(this.scene);
@@ -714,10 +1007,13 @@ export class AgentLabScene3D implements Sim3D {
     for (const t of this.twins) t.dispose();
     this.twins = []; this.arms = []; this.spinners = []; this.chamberRing = null;
     this.dust?.dispose();
+    if (this.regenerativeBayGroup) disposeRegenerativeBayGeometry(this.regenerativeBayGroup);
+    this.regenerativeBayGroup = null; this.regenerativeBayRuntime = null;
     this.stations.clear();
     this.beacons = [];
     this.character = null; this.scene = null; this.THREE = null; this.pipeline = null; this.renderer = null; this.gate = null;
     this.probeTaken = false;
+    this.interaction = null; this.camera = null; this.hoveredOrganId = null; this.selectedOrganId = null;
   }
 }
 

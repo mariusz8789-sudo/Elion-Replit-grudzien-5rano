@@ -51,17 +51,26 @@ export function planActions(commands: readonly WorldCommand[], catalog: CommandC
         if (at !== station.id) { steps.push({ kind: 'NAVIGATE', stationId: station.id }); at = station.id; }
         steps.push({ kind: 'ALIGN', stationId: station.id }, { kind: 'REACH', stationId: station.id }, { kind: 'INTERACT', stationId: station.id, ...(command.parameters ? { parameters: command.parameters } : {}) });
         break;
-      case 'RUN_EXPERIMENT':
-        if (!station || !station.experimentId) break;
+      case 'RUN_EXPERIMENT': {
+        if (!station) break;
+        // Biomedical Intervention Bay integration: an explicit `parameters.experimentId` selects
+        // among a multi-experiment station's own `experimentIds`; every other, single-experiment
+        // station falls back to its own default, byte-identical to before this case existed.
+        const requestedExperimentId = typeof command.parameters?.experimentId === 'string'
+          ? command.parameters.experimentId
+          : station.experimentId;
+        if (!requestedExperimentId) break;
+        if (station.experimentIds && !station.experimentIds.includes(requestedExperimentId)) break;
         if (at !== station.id) { steps.push({ kind: 'NAVIGATE', stationId: station.id }); at = station.id; }
         steps.push(
           { kind: 'ALIGN', stationId: station.id },
           { kind: 'REACH', stationId: station.id },
           { kind: 'INTERACT', stationId: station.id },
-          { kind: 'EXECUTE', stationId: station.id, experimentId: station.experimentId, inputs: command.parameters ?? {} },
+          { kind: 'EXECUTE', stationId: station.id, experimentId: requestedExperimentId, inputs: command.parameters ?? {} },
           { kind: 'OBSERVE', stationId: station.id },
         );
         break;
+      }
       case 'INSPECT':
         steps.push({ kind: 'REPORT', includeProvenance: command.parameters?.provenance === true, includeResult: command.parameters?.result !== false });
         break;

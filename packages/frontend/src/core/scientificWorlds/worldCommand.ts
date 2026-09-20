@@ -34,12 +34,44 @@ export interface StationDescriptor {
   readonly label: string;
   readonly keywords: readonly string[];
   readonly experimentId?: string;
+  /** Biomedical Intervention Bay integration: optional additional experiments executable at the
+   * SAME physical station (one station, several canonical experiment ids) — never a second station. */
+  readonly experimentIds?: readonly string[];
+  /** Deterministic natural-language aliases for those experiment ids. */
+  readonly experimentAliases?: readonly {
+    readonly experimentId: string;
+    readonly keywords: readonly string[];
+  }[];
+}
+
+/**
+ * D-136 — resolver hooks on the ONE canonical parser. A world-specific vocabulary (biology's own
+ * organ/mode phrasing, Mirror Twin commands) is registered here rather than forking a second parser
+ * entry point: `parseWorldCommands` itself calls a catalog's resolvers, per clause, before its own
+ * generic intent matching — so a resolver only ever narrows or extends what one function already
+ * owns (ids, logical time, clause ordering), never competes with it.
+ */
+export interface CommandResolverContext {
+  readonly rawText: string;
+  readonly clauseText: string;
+  readonly normalizedClause: string;
+  readonly catalog: CommandCatalog;
+  readonly logicalTime: number;
+  readonly clauseIndex: number;
+}
+
+export type ResolvedWorldCommand = Omit<WorldCommand, 'commandId' | 'requestedAtLogicalTime'>;
+
+export interface CommandResolver {
+  readonly id: string;
+  resolve(context: CommandResolverContext): readonly ResolvedWorldCommand[] | null;
 }
 
 export interface CommandCatalog {
   readonly worldId: string;
   readonly stations: readonly StationDescriptor[];
   readonly allowedIntents: readonly WorldCommandIntent[];
+  readonly resolvers?: readonly CommandResolver[];
 }
 
 export interface ParsedCommands {
@@ -104,7 +136,12 @@ function findStation(clause: string, catalog: CommandCatalog): StationDescriptor
   return best;
 }
 
-function extractParameters(original: string, clause: string, intent: WorldCommandIntent): Record<string, CommandParameterValue> {
+function extractParameters(
+  original: string,
+  clause: string,
+  intent: WorldCommandIntent,
+  station?: StationDescriptor | null,
+): Record<string, CommandParameterValue> {
   const p: Record<string, CommandParameterValue> = {};
   for (const c of COMPOSITIONS) { if (new RegExp(`\\b${c}\\b`, 'i').test(original)) { p.composition = c; break; } }
   const tev = clause.match(/(\d+(?:[.,]\d+)?)\s*tev/);
@@ -129,6 +166,16 @@ function extractParameters(original: string, clause: string, intent: WorldComman
     if (/skad|pochodz|zrodl|source|where does|provenance|dowod|evidence/.test(clause)) p.provenance = true;
     if (/wynik|otrzymal|result|what did/.test(clause)) p.result = true;
   }
+  // Biomedical Intervention Bay integration: one physical station can expose several canonical
+  // experiments (`station.experimentAliases`) — pick the longest matching keyword so a more specific
+  // phrase (e.g. "model naprawy tkanki") wins over a shorter one that happens to be a substring of it.
+  if (intent === 'RUN_EXPERIMENT' && station?.experimentAliases?.length) {
+    const matches = station.experimentAliases
+      .flatMap((alias) => alias.keywords.map((keyword) => ({ alias, keyword: normalizeText(keyword) })))
+      .filter((entry) => entry.keyword.length > 0 && clause.includes(entry.keyword))
+      .sort((a, b) => b.keyword.length - a.keyword.length);
+    if (matches[0]) p.experimentId = matches[0].alias.experimentId;
+  }
   return p;
 }
 
@@ -146,6 +193,30 @@ export function parseWorldCommands(text: string, catalog: CommandCatalog, logica
   let lastStation: StationDescriptor | null = null;
   originalClauses.forEach((original, index) => {
     const clause = normalizeText(original);
+
+    // D-136: resolver hooks are still inside THIS parser, not a second bus or a second entry
+    // point — this function still owns ids, logical time and clause ordering for whatever a
+    // resolver returns. A resolver returning null (or nothing matching) falls straight through to
+    // the generic intent matching below, exactly as if no resolver had run.
+    const context: CommandResolverContext = { rawText: raw, clauseText: original, normalizedClause: clause, catalog, logicalTime, clauseIndex: index };
+    const hit = catalog.resolvers?.reduce<{ resolver: CommandResolver; resolved: readonly ResolvedWorldCommand[] } | null>((found, candidate) => {
+      if (found) return found;
+      const resolved = candidate.resolve(context);
+      return resolved?.length ? { resolver: candidate, resolved } : null;
+    }, null);
+    if (hit) {
+      hit.resolved.forEach((r, sub) => {
+        const command: WorldCommand = {
+          ...r,
+          commandId: `cmd-${fnv1a(`${raw}|${logicalTime}|${index}|${sub}|resolver:${hit.resolver.id}`)}`,
+          requestedAtLogicalTime: logicalTime,
+        };
+        commands.push(command);
+        if (command.targetEntityId) lastStation = catalog.stations.find((s) => s.id === command.targetEntityId) ?? lastStation;
+      });
+      return;
+    }
+
     const intents = findIntents(clause);
     if (intents.length === 0) { unresolved.push(original); return; }
     const station = findStation(clause, catalog);
@@ -153,7 +224,7 @@ export function parseWorldCommands(text: string, catalog: CommandCatalog, logica
     intents.forEach((intent, sub) => {
       // A run or interaction without its own station name applies to the station named just before ("idź do X i uruchom").
       const target = station ?? ((intent === 'RUN_EXPERIMENT' || intent === 'INTERACT') ? lastStation : null);
-      const parameters = extractParameters(original, clause, intent);
+      const parameters = extractParameters(original, clause, intent, target);
       const command: WorldCommand = {
         commandId: `cmd-${fnv1a(`${raw}|${logicalTime}|${index}|${sub}`)}`,
         text: original,
@@ -182,7 +253,19 @@ export function validateWorldCommand(command: WorldCommand, catalog: CommandCata
     if (!command.targetEntityId) return { ok: false, reason: `${command.intent} needs a station; none of [${catalog.stations.map((s) => s.label).join(', ')}] was named` };
     const station = catalog.stations.find((s) => s.id === command.targetEntityId);
     if (!station) return { ok: false, reason: `unknown station ${command.targetEntityId}` };
-    if (command.intent === 'RUN_EXPERIMENT' && !station.experimentId) return { ok: false, reason: `station ${station.label} runs no experiment` };
+    if (command.intent === 'RUN_EXPERIMENT') {
+      // Biomedical Intervention Bay integration: an explicit `parameters.experimentId` (set by the
+      // alias match in `extractParameters`) selects among a multi-experiment station's own
+      // `experimentIds`; falling back to the station's single default keeps every other station's
+      // existing single-experiment behavior byte-identical.
+      const requestedExperimentId = typeof command.parameters?.experimentId === 'string'
+        ? command.parameters.experimentId
+        : station.experimentId;
+      if (!requestedExperimentId) return { ok: false, reason: `station ${station.label} runs no experiment` };
+      if (station.experimentIds && !station.experimentIds.includes(requestedExperimentId)) {
+        return { ok: false, reason: `experiment ${requestedExperimentId} is not allowed at station ${station.label}` };
+      }
+    }
   }
   if (command.parameters) {
     for (const [k, v] of Object.entries(command.parameters)) {

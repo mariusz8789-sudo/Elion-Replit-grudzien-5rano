@@ -85,6 +85,7 @@ function spawnNode(graph: WorldGraph, node: WorldBlueprintNode, parentEntityId: 
     physics: node.physics,
     chemical: node.chemical,
     domainBinding: node.domainBinding,
+    geometry: node.geometry,
     domainState: node.domainState,
     statusLabel: node.statusLabel,
     grounding: node.grounding,

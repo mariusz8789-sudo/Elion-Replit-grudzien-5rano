@@ -3,6 +3,7 @@ import type { EpidemicParams } from '../../epidemic/sir';
 import type { ChemistryExperimentOptions } from '../domains/chemistryKinetics';
 import type { PumpPipeDefaults } from '../../engineeringGraph/pumpPipe';
 import type { ScaleDomain } from '../ecs/types';
+import type { StructuralDetailSpec } from '../generation/geometry/structuralDetailSpec';
 import type { WorldBlueprintNode, WorldBlueprintRelationship } from '../generation/worldBlueprint';
 
 /**
@@ -85,6 +86,17 @@ export interface WorldSpecification {
   /** Root structural scale of the generated world (see ecs/types.ts's `ScaleDomain`) — defaults to `'MACRO_CITY'` in the compiler if omitted. */
   scale?: ScaleDomain;
   geography?: GeographySpec;
+  /**
+   * OPT-IN geometry-foundation request (generation/geometry/): real
+   * district bounds/roads/intersections/parcels/buildings, and — when its
+   * own flags ask for them — real interiors and a navigation graph. Omit
+   * entirely to keep today's exact `CITY_TEMPLATE` behavior (flat, jittered,
+   * bounds-free districts/buildings) unchanged — this is a SEPARATE,
+   * additive contribution to the compiled blueprint, not a replacement of
+   * that template. See `StructuralDetailSpec`'s own doc for why it lives in
+   * `generation/`, not here.
+   */
+  structuralDetail?: StructuralDetailSpec;
   population?: PopulationSpec;
   scientificDomains?: readonly ScientificDomainRequest[];
   initialConditions?: readonly InitialConditionSpec[];

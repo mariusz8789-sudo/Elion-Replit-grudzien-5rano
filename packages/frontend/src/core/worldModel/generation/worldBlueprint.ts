@@ -1,4 +1,5 @@
 import type { EntityRef } from '../../events/genesisEvent';
+import type { GeometryComponent } from '../ecs/geometry';
 import type {
   ChemicalComponent,
   DomainBindingComponent,
@@ -74,6 +75,7 @@ export interface WorldBlueprintNode {
   chemical?: ChemicalComponent;
   /** `solverId: null` is a declared, honest "no real solver exists yet for this node" — never omit this to silently mean the same thing. */
   domainBinding?: DomainBindingComponent;
+  geometry?: GeometryComponent;
   domainState?: Record<string, number>;
   statusLabel?: string;
   /** Defaults to `'UNGROUNDED_APPROXIMATION'`, same honest default as `createEntity` — see ecs/entityFactory.ts. */

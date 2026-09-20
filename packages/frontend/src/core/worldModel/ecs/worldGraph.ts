@@ -308,6 +308,7 @@ function structuredCloneEntity(entity: WorldModelEntity): WorldModelEntity {
     physics: entity.physics ? { ...entity.physics, velocityMS: entity.physics.velocityMS ? { ...entity.physics.velocityMS } : undefined } : undefined,
     chemical: entity.chemical ? { ...entity.chemical } : undefined,
     domainBinding: entity.domainBinding ? { ...entity.domainBinding } : undefined,
+    geometry: entity.geometry ? { ...entity.geometry } : undefined,
     domainState: entity.domainState ? { ...entity.domainState } : undefined,
   };
 }

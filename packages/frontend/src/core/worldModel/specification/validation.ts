@@ -20,7 +20,19 @@ export const KNOWN_SCIENTIFIC_DOMAINS = ['chemistry', 'epidemiology', 'hydraulic
 export type KnownScientificDomain = (typeof KNOWN_SCIENTIFIC_DOMAINS)[number];
 
 const KNOWN_TEMPLATE_IDS = ['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE'] as const;
-const KNOWN_SCALE_LEVELS = ['PLANET', 'REGION', 'MACRO_CITY', 'BUILDING', 'ROOM', 'MESO_LAB', 'MICRO_MOLECULAR', 'NANO_ATOMIC'] as const;
+const KNOWN_SCALE_LEVELS = [
+  'PLANET',
+  'REGION',
+  'MACRO_CITY',
+  'DISTRICT',
+  'PARCEL',
+  'BUILDING',
+  'FLOOR',
+  'ROOM',
+  'MESO_LAB',
+  'MICRO_MOLECULAR',
+  'NANO_ATOMIC',
+] as const;
 
 export interface ValidationIssue {
   path: string;
@@ -110,6 +122,13 @@ export function validateSpecification(spec: WorldSpecification): SpecificationVa
     for (const key of ['regionCount', 'districtCount', 'buildingsPerDistrict'] as const) {
       const value = spec.geography[key];
       if (value !== undefined && (!isFiniteNumber(value) || value < 0)) err(`geography.${key}`, `${key} must be a non-negative finite number`);
+    }
+  }
+
+  if (spec.structuralDetail) {
+    for (const key of ['citySizeM', 'districtCount', 'parcelsPerDistrict', 'maxFloors', 'roomsPerFloorSide'] as const) {
+      const value = spec.structuralDetail[key];
+      if (value !== undefined && (!isFiniteNumber(value) || value <= 0)) err(`structuralDetail.${key}`, `${key} must be a positive finite number`);
     }
   }
 

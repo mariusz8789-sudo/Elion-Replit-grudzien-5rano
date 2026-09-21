@@ -101,6 +101,13 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  // D-127: the delivered cognitive core (packages/core/src/cognitive) bound to the canonical systems with a real
+  // approval gate. Which host (the Scientific Worlds screen, the chat, a campaign) issues goals to it is a product
+  // decision, not a side effect of landing the bridge; scientificWorldsCognitive.test.ts drives the full loop.
+  // D-127: the V3 Human Biology Lab pack is saved as written; its barrel and inventory module are part of the delivered
+  // contract but the host imports the modules it uses directly (biologyRunners/biologyLabWorld/biologyCommands).
+  'core/scientificWorlds/humanLab/index.ts': 'D-127 delivered pack barrel, kept verbatim; the host imports modules directly.',
+  'core/scientificWorlds/humanLab/inventory.ts': 'D-127 delivered pack module (LabInventory), kept verbatim; no host consumer yet.',
   // --- Built and tested, awaiting a deliberate wiring decision ---------------
   // D-085: the agent composer. It is NOT wired into a production caller yet on
   // purpose. The package that proposed it wanted callbacks installed into
@@ -142,7 +149,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // DESIGN — reaching them from the browser bundle would be the bug.
   'core/compute/serverEntry.ts': 'Node-side entry point; never imported by the browser bundle.',
   'core/repro/reproEntry.node.ts': 'Node-side facade for scripts/repro-demo.mjs (P3.2 one-command reproducibility pack); bundled by esbuild --platform=node and never imported by the browser bundle. It computes nothing of its own -- it calls runExternalAnchor and runAutonomousInquiry and returns what they returned.',
-  'core/agent/causalInference.ts': 'CAP-2 (docs/B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md) -- a new, general-purpose DiD/ITS/synthetic-control estimator library, built and TDD-verified against simulated panels before any real B1 data was pulled. Deliberately NOT yet wired into any UI: the B1 experiment itself (real DEFRA/AURN data, preregistration, execution, evidence classification) is still in progress. Reached today only by its own test suite (causalInference.test.ts); remove this entry once B1 wires it into the existing backend/service or Evidence path, mirroring qe4BrydgesAnalysis.ts\'s own orphan-then-wired history.',
   'core/agent/qe4RegimeInquiryLoop.ts': 'Discovery Engine P0-2/P0-3/P0-5, canonical after D-026: the QE4 regime inquiry loop. Reached at runtime by core/repro/reproEntry.node.ts -> scripts/repro-demo.mjs (4 real checks incl. all 7 rounds\' replay fingerprints), which is the Node side of the boundary and therefore not reachable from main.tsx by design -- the same category as the other .node.ts entries here. Remove this entry once a browser screen renders a discovery campaign.',
   'core/agent/structuralDiscovery.ts': 'M3 structural discovery: the runnable demonstration that the engine builds a model form it was never given, plus its three negative controls. Orchestrates existing components only (discoveryCampaign, residualStructure, modelSpace, falsifiedModelRegistry, beliefRevision, tautologyGate). Reached at runtime through core/repro/reproEntry.node.ts -> scripts/m3-demonstrator.mjs and scripts/repro-demo.mjs.',
   'core/agent/sovereignTruthAnswer.ts': 'Sovereign Truth-Answer Protocol v1 — Government Research plane: Question Router, AnswerRecord, Template Enforcer, machine-enforced Assertions. Standalone (no discoveryCampaign.ts dependency; reuses tautologyGate.ts/knowledge/supplementalRegistry.ts/dataProvenance.ts/matrixFoundation/replayVerdict.ts/events/hash.ts). Reached today only by its own test suite (sovereignTruthAnswer.test.ts); no browser screen or NL command routes to it yet — out of this task\'s explicit scope (Government Research plane only, no Phase B/Streams/Lucy).',

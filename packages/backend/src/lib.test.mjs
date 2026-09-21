@@ -168,6 +168,21 @@ describe('SECURITY_HEADERS', () => {
     assert.ok(SECURITY_HEADERS['referrer-policy']);
     assert.ok(SECURITY_HEADERS['permissions-policy']);
   });
+
+  test('allows blob: only for own-origin GLB textures, and nothing remote (D-131)', () => {
+    const csp = SECURITY_HEADERS['content-security-policy'];
+    // GLTFLoader unpacks the textures of an already same-origin .glb into Blobs and reads
+    // them back through URL.createObjectURL; without these two the twin's body loads untextured.
+    assert.ok(csp.includes("img-src 'self' data: blob:"));
+    assert.ok(csp.includes("connect-src 'self' blob:"));
+    // The relaxation stops there: no scheme that could reach a third-party server or inline code.
+    assert.ok(!csp.includes('http:'));
+    assert.ok(!csp.includes('https:'));
+    assert.ok(!csp.includes('*'));
+    assert.ok(!csp.includes('unsafe-inline'));
+    assert.ok(!csp.includes('unsafe-eval'));
+    assert.ok(csp.includes("script-src 'self'"));
+  });
 });
 
 describe('AI_UNAVAILABLE_MESSAGE (production hardening: no secrets/config leaked to clients)', () => {

@@ -213,19 +213,28 @@ export const WORLD_ENGINE_ASSET_MANIFEST: readonly WorldAssetRecord[] = Object.f
     sha256: {},
   },
   {
-    id: 'unverified-lod0-human',
+    // D-131: promowany z UNVERIFIED po weryfikacji. Poprzedni rekord twierdził „brak lokalnego rekordu źródła
+    // i licencji"; rekord jednak istniał — w `public/assets/genesis-hf/ASSETS.md` obok samego pliku. Weryfikacja
+    // przeprowadzona 2026-09-19: (1) obie sumy SHA-256 policzone z plików w repo zgadzają się co do znaku z ASSETS.md;
+    // (2) README źródła pobrane i zacytowane: „Example avatar »mpfb.glb« was created using Blender and MPFB Blender
+    // extension. The avatar is licensed under CC0." MPFB opisany tam jako korzystający z ekosystemu MakeHuman (CC0/CC-BY).
+    // To jest licencjonowany asset 3D — NIE jest to medyczny model anatomiczny i nie wolno go tak przedstawiać.
+    id: 'cc0-mpfb-human-lod0',
     runtimePath: '/assets/genesis-hf/characters/mpfb-lod0.glb',
     format: 'GLB',
-    status: 'UNVERIFIED',
-    sourceName: 'Unknown',
-    sourceUrl: null,
-    license: null,
-    licenseUrl: null,
-    author: null,
+    status: 'APPROVED',
+    sourceName: 'met4citizen/TalkingHead — avatars/mpfb.glb (wariant runtime LOD0)',
+    sourceUrl: 'https://github.com/met4citizen/TalkingHead/blob/main/avatars/mpfb.glb',
+    license: 'CC0-1.0',
+    licenseUrl: 'https://creativecommons.org/public-domain/cc0/',
+    author: 'met4citizen (utworzony w Blender + MPFB, zasoby ekosystemu MakeHuman)',
     polygonCount: null,
-    textureResolution: null,
-    rationale: 'Brak lokalnego rekordu źródła i licencji dla hero GLB; asset nie może być domyślnie ładowany produkcyjnie.',
-    sha256: {},
+    textureResolution: '1024 px WebP (lokalny wariant runtime: zmniejszenie tekstur, transkodowanie WebP, prune)',
+    rationale: 'Źródło i licencja CC0 wg README źródła (cytat w komentarzu powyżej) — to DEKLARACJA autora upstream, zweryfikowana co do istnienia i treści, nie niezależny audyt prawny; obie sumy SHA-256 przeliczone lokalnie i zgodne z ASSETS.md (tożsamość pliku jest dowodem, licencja pozostaje oświadczeniem). Asset wyłącznie graficzny: zewnętrzna postać ludzka (skóra, ubranie, włosy, szkielet animacji, blendshapes twarzy). Nie zawiera anatomii medycznej.',
+    sha256: {
+      'mpfb-lod0.glb': 'ec47cffd0a56d201869afb9c10ea957e237c55d4e12c197fc9d9c30d5772a8d2',
+      'mpfb.glb': '63c645a2a863b9972e9a9c2ed576a1de4c390b8475508e1473e69c87a3ee299c',
+    },
   },
   {
     id: 'unverified-pbr-textures',

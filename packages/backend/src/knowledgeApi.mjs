@@ -14,8 +14,10 @@
  * Platform adapters (YouTube / X / Facebook) use official APIs with keys from the environment only
  * (YOUTUBE_API_KEY, X_API_KEY, FACEBOOK_API_KEY); without a key they report REQUIRES_OFFICIAL_API.
  */
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import {
-  EvidenceLedger, ProposeOnlyLearner, OmniIngestionController, SourcePolicyRegistry,
+  EvidenceLedger, ProposeOnlyLearner, OmniIngestionController, SourcePolicyRegistry, openPersistentLedger,
   YouTubeOfficialApiAdapter, PublicWebAdapter, SocialOfficialApiAdapter, envKeyProvider, KEY_ENV_NAMES, realSleeper, originOf,
 } from './compute/knowledge-core.mjs';
 
@@ -41,11 +43,35 @@ class FetchTransport {
   }
 }
 
-/** One process-wide ledger: proposals live here until a human publishes or rejects them. Not persisted (yet). */
+/** One process-wide ledger: proposals live here until a human publishes or rejects them. In-memory until the server
+ *  opens persistence (`openKnowledgeLedgerPersistence`, called once at boot with GENESIS_LEDGER_PATH — a JSON snapshot
+ *  beside genesis.db, rewritten atomically after every appended entry; a snapshot whose hash chain does not verify is
+ *  REJECTED and left in place, the process runs in memory and says so). */
 const clock = { now: () => Date.now() };
-const ledger = new EvidenceLedger(clock);
-const learner = new ProposeOnlyLearner(clock, ledger);
+let ledger = new EvidenceLedger(clock);
+let learner = new ProposeOnlyLearner(clock, ledger);
 const registry = new SourcePolicyRegistry();
+let persistence = { status: 'IN_MEMORY', path: null, entries: 0, reason: null };
+
+/** File-backed snapshot store on the data directory (the same place as genesis.db); atomic rename on save. */
+export function fileLedgerSnapshotStore(filePath) {
+  return {
+    load() { if (!existsSync(filePath)) return null; return JSON.parse(readFileSync(filePath, 'utf8')); },
+    save(snapshot) { const dir = path.dirname(filePath); if (!existsSync(dir)) mkdirSync(dir, { recursive: true }); const tmp = `${filePath}.tmp`; writeFileSync(tmp, JSON.stringify(snapshot)); renameSync(tmp, filePath); return true; },
+  };
+}
+
+/** Restore the process ledger from `filePath` and keep persisting to it. `':memory:'` keeps the in-memory ledger (tests, ephemeral deployments). */
+export function openKnowledgeLedgerPersistence(filePath) {
+  if (!filePath || filePath === ':memory:') { persistence = { status: 'IN_MEMORY', path: null, entries: ledger.getEntries().length, reason: null }; return persistence; }
+  const errors = [];
+  const r = openPersistentLedger(clock, fileLedgerSnapshotStore(filePath), (reason) => errors.push(reason));
+  ledger = r.ledger; learner = new ProposeOnlyLearner(clock, ledger);
+  persistence = { status: r.status === 'REJECTED' ? 'REJECTED_IN_MEMORY' : r.status === 'RESTORED' ? 'RESTORED' : 'PERSISTING_NEW', path: filePath, entries: r.entries, reason: errors[0] ?? null };
+  return persistence;
+}
+
+export function knowledgeLedgerPersistenceStatus() { return { ...persistence, ledgerOk: ledger.verifyLedger().ok, activeRecords: ledger.getActive().length, entries: ledger.getEntries().length }; }
 
 function buildController(deps) {
   const transport = deps.transport ?? new FetchTransport(deps.fetchImpl ?? globalThis.fetch);

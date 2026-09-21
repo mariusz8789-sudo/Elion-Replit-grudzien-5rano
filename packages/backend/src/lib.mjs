@@ -166,9 +166,15 @@ export const SECURITY_HEADERS = {
   'x-frame-options': 'DENY',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  // `blob:` w img-src/connect-src (D-131): GLTFLoader rozpakowuje tekstury WŁASNEGO,
+  // już pobranego z 'self' pliku .glb do obiektów Blob i czyta je przez
+  // URL.createObjectURL (ImageBitmapLoader używa do tego fetch, stąd connect-src).
+  // Blob URL jest tworzony przez samą stronę z bajtów tego samego origin i nie da się
+  // go wskazać na cudzy serwer — to nie jest kanał wyjścia danych. Bez tego przeglądarka
+  // blokuje tekstury ciała bliźniaka (wyłapane przez E2E, nie przez testy jednostkowe).
   'content-security-policy':
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
-    "font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; " +
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; " +
+    "font-src 'self'; connect-src 'self' blob:; manifest-src 'self'; base-uri 'none'; " +
     "form-action 'none'; frame-ancestors 'none'; object-src 'none'",
   // Nieszkodliwy na czystym HTTP (przeglądarki ignorują HSTS bez TLS) —
   // aktywny, gdy wdrożenie stoi za reverse proxy terminującym TLS.

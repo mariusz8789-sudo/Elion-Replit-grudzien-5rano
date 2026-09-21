@@ -292,7 +292,7 @@ describe('Belief-Change Run — PySCF H2 A/B vertical slice', () => {
   describe('explainWhyBeliefChanged — Phase F standalone (works on any real HypothesisLoopResult, no BeliefChangeRun needed)', () => {
     it('explains a real, purely local (sync, no backend) epidemiology hypothesis loop', () => {
       const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:lowest-modeled-deaths')!;
-      const loopResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+      const loopResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
       const why = explainWhyBeliefChanged(loopResult);
       expect(why.question).toBe(problem.statement);
       expect(why.before.every((b) => b.status === 'PRE_REGISTERED')).toBe(true);
@@ -305,7 +305,7 @@ describe('Belief-Change Run — PySCF H2 A/B vertical slice', () => {
 
     it('a custom question overrides the default (derived from the problem statement)', () => {
       const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:lowest-modeled-deaths')!;
-      const loopResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+      const loopResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
       const why = explainWhyBeliefChanged(loopResult, 'custom question text');
       expect(why.question).toBe('custom question text');
     });

@@ -10,6 +10,7 @@ Commands:
   descriptors {smiles}   -> { ok, data: {...real descriptors...} }
   validate {smiles}      -> { ok, valid, canonicalSmiles? }
   similarity {smiles, reference} -> { ok, tanimoto, scaffold* }
+  fingerprint {smiles}   -> { ok, bits, scaffold, canonicalSmiles }  (D-076/077)
 """
 import sys
 import json
@@ -174,6 +175,155 @@ def main():
         }))
         return
 
+    # D-076/077 GLP1R QSAR — dense Morgan bit vector for one molecule (not a
+    # pairwise comparison, unlike `similarity` above). 512 bits, not the 2048
+    # `similarity` uses: with typical human-activity pin sizes in the low
+    # hundreds of rows, a 2048+1-coefficient ridge would be heavily
+    # underdetermined even regularised: 512 keeps folded-collision noise low
+    # while staying well inside a plausible training-set size. Same Morgan
+    # r=2 radius as `similarity`, so a candidate's OOD check (Tanimoto against
+    # training fingerprints) stays comparable in kind, not just in name.
+    if cmd == "fingerprint":
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+        mol = Chem.MolFromSmiles(req.get("smiles", "")) if isinstance(req.get("smiles"), str) else None
+        if mol is None:
+            print(json.dumps({"ok": False, "error": "invalid_smiles"}))
+            return
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=512)
+        print(json.dumps({
+            "ok": True,
+            "bits": list(fp),
+            "nBits": 512,
+            "fingerprint": "morgan_r2_512",
+            "scaffold": Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(mol)),
+            "canonicalSmiles": Chem.MolToSmiles(mol),
+        }))
+        return
+
+    # D-078 — THE REAL BATCH: many molecules, ONE python process, ONE RDKit import.
+    #
+    # Measured on the 287-row human GLP-1R pin in this runtime: a full worker
+    # invocation costs ~338 ms of which the RDKit import is ~154 ms and the
+    # actual per-molecule work is ~15.5 ms. Spawning per molecule therefore
+    # spends ~95% of its time on process startup: 287 calls = ~97 s, while the
+    # same 287 molecules in one process = ~4.6 s. That is a 21x saving and it
+    # comes from deleting overhead, NOT from changing any chemistry: each
+    # molecule below runs through exactly the same MolFromSmiles ->
+    # GetMorganFingerprintAsBitVect(r=2, 512) -> Murcko path as the
+    # single-molecule `fingerprint` command above, in input order.
+    #
+    # A molecule RDKit cannot parse yields {"ok": false} IN ITS SLOT — the
+    # batch never drops a row silently and never shifts the alignment between
+    # inputs and outputs.
+    if cmd == "batch_fingerprint":
+        from rdkit.Chem.Scaffolds import MurckoScaffold
+        smiles_list = req.get("smilesList")
+        if not isinstance(smiles_list, list):
+            print(json.dumps({"ok": False, "error": "smilesList_required"}))
+            return
+        results = []
+        for s in smiles_list:
+            mol = Chem.MolFromSmiles(s) if isinstance(s, str) else None
+            if mol is None:
+                results.append({"ok": False, "error": "invalid_smiles"})
+                continue
+            fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=512)
+            results.append({
+                "ok": True,
+                "bits": list(fp),
+                "nBits": 512,
+                "fingerprint": "morgan_r2_512",
+                "scaffold": Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(mol)),
+                "canonicalSmiles": Chem.MolToSmiles(mol),
+            })
+        print(json.dumps({"ok": True, "results": results, "n": len(results), "engine": "RDKit " + rdkit.__version__}))
+        return
+
+    # D-082 — batched PEPTIDE PARSE. Exists because the string-based
+    # `countAmideBonds` in glp1rQsarV2.mjs double counts a urea: the SMILES
+    # `NC(=O)N` matches BOTH `NC(=O)` and `C(=O)N`, so one urea scores 2 and a
+    # biuret scores 4. Measured on the real pins: 0 of 287 GLP-1R rows affected
+    # (so the D-079 numbers stand) but 11 of 233 GIPR rows, every one of which
+    # flipped across the peptideLike>=3 boundary.
+    #
+    # THE SMARTS MATTERS AND THE OBVIOUS ONE IS WRONG. `[CX3](=O)[NX3]` — the
+    # naive amide pattern — reproduces the same defect in RDKit form: it
+    # returns 2 matches for a urea, because the carbonyl carbon carries two
+    # nitrogens and each is a separate match. The pattern used here requires
+    # the carbonyl carbon to ALSO carry a carbon substituent, which is what a
+    # peptide bond has and a urea, biuret and carbamate do not. Verified live
+    # against RDKit on all four cases before this command was written.
+    if cmd == "batch_peptide_parse":
+        smiles_list = req.get("smilesList")
+        if not isinstance(smiles_list, list):
+            print(json.dumps({"ok": False, "error": "smilesList_required"}))
+            return
+        # Compiled once per process, not per molecule — the whole point of batching.
+        pep_amide = Chem.MolFromSmarts("[CX3](=[OX1])([#6])[NX3]")
+        any_amide = Chem.MolFromSmarts("[CX3](=[OX1])[NX3]")
+        nterm = Chem.MolFromSmarts("[NX3;H2]")
+        cterm = Chem.MolFromSmarts("[CX3](=[OX1])[OX2H1]")
+        out_rows = []
+        for s in smiles_list:
+            m = Chem.MolFromSmiles(s) if isinstance(s, str) else None
+            if m is None:
+                out_rows.append({"ok": False, "error": "invalid_smiles"})
+                continue
+            pep = m.GetSubstructMatches(pep_amide)
+            backbone = set()
+            for idx in pep:
+                backbone.update(idx)
+            heavy = m.GetNumHeavyAtoms()
+            out_rows.append({"ok": True, "data": {
+                # The authoritative count: peptide-type amides only.
+                "peptideAmideBonds": len(pep),
+                # Reported alongside so the difference is visible rather than hidden.
+                # naiveAmideBonds - peptideAmideBonds is exactly the urea/carbamate excess.
+                "naiveAmideBonds": len(m.GetSubstructMatches(any_amide)),
+                "residueEstimate": len(pep) + 1 if len(pep) > 0 else 0,
+                "backboneFraction": round(len(backbone) / heavy, 6) if heavy else 0.0,
+                "terminalGroups": len(m.GetSubstructMatches(nterm)) + len(m.GetSubstructMatches(cterm)),
+                "cyclicCount": m.GetRingInfo().NumRings(),
+            }})
+        print(json.dumps({"ok": True, "results": out_rows, "n": len(out_rows), "engine": "RDKit " + rdkit.__version__}))
+        return
+
+    # D-079 — batched descriptors, same one-process-per-list rule as
+    # `batch_fingerprint`. Each molecule runs the identical descriptor block as
+    # the single-molecule `descriptors` command; a molecule RDKit cannot parse
+    # yields {"ok": false} IN ITS OWN SLOT so indices never shift.
+    if cmd == "batch_descriptors":
+        smiles_list = req.get("smilesList")
+        if not isinstance(smiles_list, list):
+            print(json.dumps({"ok": False, "error": "smilesList_required"}))
+            return
+        out_rows = []
+        for s in smiles_list:
+            m = Chem.MolFromSmiles(s) if isinstance(s, str) else None
+            if m is None:
+                out_rows.append({"ok": False, "error": "invalid_smiles"})
+                continue
+            mw = Descriptors.MolWt(m)
+            logp = Crippen.MolLogP(m)
+            hbd = Lipinski.NumHDonors(m)
+            hba = Lipinski.NumHAcceptors(m)
+            out_rows.append({"ok": True, "data": {
+                "molWt": round(mw, 4),
+                "heavyAtomCount": m.GetNumHeavyAtoms(),
+                "hbd": hbd,
+                "hba": hba,
+                "rotatableBonds": Descriptors.NumRotatableBonds(m),
+                "ringCount": rdMolDescriptors.CalcNumRings(m),
+                "aromaticRings": rdMolDescriptors.CalcNumAromaticRings(m),
+                "fractionCsp3": round(Descriptors.FractionCSP3(m), 4),
+                "tpsa": round(Descriptors.TPSA(m), 3),
+                "crippenLogP": round(logp, 4),
+                "formalCharge": Chem.GetFormalCharge(m),
+                "heteroatomCount": rdMolDescriptors.CalcNumHeteroatoms(m),
+            }})
+        print(json.dumps({"ok": True, "results": out_rows, "n": len(out_rows), "engine": "RDKit " + rdkit.__version__}))
+        return
+
     smiles = req.get("smiles", "")
     mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else None
     if mol is None:
@@ -243,6 +393,75 @@ def main():
         print(json.dumps({
             "ok": True, "atoms": atoms, "bonds": bonds, "forceField": ff, "seed": seed,
             "charge": Chem.GetFormalCharge(mol), "nAtoms": len(atoms), "nBonds": len(bonds),
+            "canonicalSmiles": Chem.MolToSmiles(mol),
+        }))
+        return
+
+    # STRUCTURAL LIABILITY / DRUG-LIKENESS PANEL (D-074).
+    #
+    # Every number below is computed by RDKit itself from published, citable
+    # rule sets -- no fitted model of ours, no new dependency, no invented
+    # biology:
+    #   qed                  -> Bickerton et al., Nat Chem 2012 (rdkit.Chem.QED)
+    #   PAINS                -> Baell & Holloway, J Med Chem 2010 (RDKit FilterCatalog)
+    #   BRENK                -> Brenk et al., ChemMedChem 2008 (RDKit FilterCatalog)
+    #   NIH                  -> NIH/MLSMR screening-deck filters (RDKit FilterCatalog)
+    #   veber                -> Veber et al., J Med Chem 2002 (rotB <= 10, TPSA <= 140)
+    #
+    # WHAT THESE ARE NOT: they are STRUCTURAL LIABILITY and ORAL-BIOAVAILABILITY
+    # proxies -- assay-interference motifs, known reactive/toxicophoric
+    # substructures, and general drug-likeness. They are NOT an adverse-event
+    # prediction, NOT a toxicity model, and NOT target-specific. A caller that
+    # needs a real ADMET/toxicity estimate must use `compute/admetAdapter.mjs`
+    # (ADMET-AI), which reports BLOCKED_BY_RUNTIME when that model is absent
+    # rather than being silently replaced by this panel.
+    if cmd == "liabilities":
+        try:
+            from rdkit.Chem import QED
+            from rdkit.Chem import FilterCatalog
+            from rdkit.Chem.FilterCatalog import FilterCatalogParams
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "liability_catalogs_unavailable: %s" % e}))
+            return
+        params = FilterCatalogParams()
+        catalog_names = ["PAINS", "BRENK", "NIH"]
+        for name in catalog_names:
+            params.AddCatalog(getattr(FilterCatalogParams.FilterCatalogs, name))
+        catalog = FilterCatalog.FilterCatalog(params)
+        alerts = sorted({entry.GetDescription() for entry in catalog.GetMatches(mol)})
+        rot_b = Descriptors.NumRotatableBonds(mol)
+        tpsa = Descriptors.TPSA(mol)
+        mw = Descriptors.MolWt(mol)
+        logp = Crippen.MolLogP(mol)
+        hbd = Lipinski.NumHDonors(mol)
+        hba = Lipinski.NumHAcceptors(mol)
+        lipinski_violations = sum([mw > 500, logp > 5, hbd > 5, hba > 10])
+        veber_pass = bool(rot_b <= 10 and tpsa <= 140)
+        data = {
+            "qed": round(QED.qed(mol), 4),
+            "structuralAlertCount": len(alerts),
+            "structuralAlerts": alerts,
+            "lipinskiViolations": lipinski_violations,
+            "veberPass": 1 if veber_pass else 0,
+            "veberViolations": int(rot_b > 10) + int(tpsa > 140),
+            "rotatableBonds": rot_b,
+            "tpsa": round(tpsa, 3),
+        }
+        # Molecular identity travels with the liability panel because the
+        # registry's `chem-rdkit-descriptors` projection drops InChI, and a
+        # candidate without a structure-derived identifier cannot be checked
+        # for accidental duplication against anything outside this campaign.
+        # Same molecule, same worker invocation -- no second RDKit call.
+        inchi_key = None
+        try:
+            from rdkit.Chem import inchi as rd_inchi
+            inchi_key = rd_inchi.MolToInchiKey(mol) or None
+        except Exception:  # noqa: BLE001 — no InChI module => no identifier, never a fabricated one
+            inchi_key = None
+        data["inchiKey"] = inchi_key
+        print(json.dumps({
+            "ok": True, "data": data, "engine": "RDKit " + rdkit.__version__,
+            "catalogs": catalog_names,
             "canonicalSmiles": Chem.MolToSmiles(mol),
         }))
         return

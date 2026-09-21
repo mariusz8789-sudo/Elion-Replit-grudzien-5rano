@@ -9,11 +9,16 @@
  */
 import { createHash } from 'node:crypto';
 import { runModel } from '../compute/engine.mjs';
-import { saveRun } from '../store.mjs';
+import { saveRun, saveScienceRun } from '../store.mjs';
+import { sha256Hex16 as sha16 } from '../provenance.mjs';
 import * as store from './persistence.mjs';
 import * as adapter from './drugAdapter.mjs';
 import { paretoFrontIndices, hypervolume2D, bestScalar } from './pareto.mjs';
+import { assertCampaignObjectivesD069 } from './objectiveGuardD069.mjs';
+import { endpointCategories } from './multiFidelity.mjs';
 import { analyzeAndDecide, isStop } from './nextExperiment.mjs';
+import { applyPredictionHardFilters, loadFrozenPredictionThresholds } from './predictionHardFilters.mjs';
+import { createLiabilityPredictionSource, LIABILITY_TERMS } from './molecularLiabilities.mjs';
 
 const scalar = (vec) => Object.values(vec).reduce((a, b) => a + b, 0);
 const hashState = (gen, smiles, strategy) =>
@@ -26,7 +31,58 @@ function describeAsRun(db, projectId, smiles) {
   return run;
 }
 
-function makeCandidateRecord(db, campaignId, projectId, generation, proposal, objectives, constraints) {
+/**
+ * REPLAY GAP CLOSED (docs/DECISIONS.md D-069 follow-up). `describeAsRun`'s
+ * own `saveRun` write above goes to the general-purpose `runs` table --
+ * real, unmodified, kept exactly as it was. But `campaign/verify.mjs`'s
+ * `replayScienceRun`/`getScienceRun` read a DIFFERENT table, `science_runs`
+ * (capability/campaignId/candidateId-shaped), written only by
+ * `multiFidelity.mjs`'s four heavy-engine stages -- so the campaign's own
+ * flagship computation (its RDKit descriptor run, made once per generated
+ * candidate) was never independently replayable. This persists the SAME
+ * real computation `describeAsRun` already made -- same `run` object, no
+ * second RDKit invocation, no second engine -- as a REAL `science_runs` row,
+ * called AFTER `store.addCandidate` so it carries the REAL `candidateId`
+ * (never `null`: a fabricated or omitted link would be exactly the kind of
+ * broken provenance this whole persistence layer exists to refuse).
+ *
+ * `inputHash`/`outputHash` use `provenance.mjs::sha256Hex16` -- the SAME
+ * hash provider `verify.mjs`'s own replayers already use, so a later
+ * `replayScienceRun` compares like with like.
+ *
+ * `engine` is taken from `run.provenance.engine`, NOT `run.engine`
+ * (`genesis-compute@1.0.0`, the generic model-runner wrapper string) and
+ * NOT `run.modelVersion` (`'1.0.0'`, the static registry entry version).
+ * `run.provenance.engine` is the RDKit worker's OWN reported engine string
+ * (`registry.mjs`'s `chem-rdkit-descriptors` compute function sets
+ * `provenance: { engine: r.engine, ... }` from the real `rdkitAdapter.mjs`
+ * call) -- the EXACT SAME field the new `REPLAYERS['molecular-descriptors']`
+ * entry in `verify.mjs` reads at replay time via `descriptors(...).engine`.
+ * Storing anything else here would compare two different kinds of version
+ * strings and report `ENGINE_VERSION_CHANGED` on every single replay.
+ *
+ * `evidenceClass: 'COMPUTATIONAL'`, not `saveScienceRun`'s documented
+ * default of `'MODEL_ESTIMATE'`: RDKit descriptors are exact deterministic
+ * chemistry, not a fitted model's estimate -- the same COMPUTATIONAL/
+ * MODEL_ESTIMATE distinction this repo's own evidence-class taxonomy
+ * already draws between real computed values and multiFidelity.mjs's
+ * ADMET/docking predictions.
+ */
+function persistDescriptorScienceRun(db, { campaignId, candidateId, projectId, run }) {
+  if (!run || run.status !== 'ok') return; // no real computation to persist -- a rejected run leaves no science_runs row
+  try {
+    saveScienceRun(db, {
+      projectId, campaignId, candidateId,
+      engine: run.provenance?.engine ?? null, capability: 'molecular-descriptors', method: 'RDKit',
+      status: run.status, evidenceClass: 'COMPUTATIONAL',
+      inputs: run.inputs, outputs: run.outputs, units: run.units, warnings: run.warnings, provenance: run.provenance,
+      inputHash: sha16(run.inputs), outputHash: sha16(run.outputs), artifacts: [],
+      durationMs: run.durationMs,
+    });
+  } catch { /* audyt best-effort, same discipline as describeAsRun's own saveRun call */ }
+}
+
+function makeCandidateRecord(db, campaignId, projectId, generation, proposal, objectives, constraints, predictionGate = null) {
   const run = describeAsRun(db, projectId, proposal.canonicalSmiles);
   if (run.status !== 'ok') {
     return { valid: false, status: 'rejected', rejectedReason: `descriptors_failed:${run.error ?? run.message}`, runIds: [run.runId], descriptors: {}, objectiveVector: {}, constraintViolations: [] };
@@ -35,15 +91,50 @@ function makeCandidateRecord(db, campaignId, projectId, generation, proposal, ob
   const violations = adapter.constraintViolations(desc, constraints);
   const objVecArr = adapter.objectiveVector(desc, objectives);
   const objectiveVector = Object.fromEntries(objectives.map((o, i) => [o.id, objVecArr[i]]));
-  const rejected = violations.length > 0;
+  let rejected = violations.length > 0;
+  let rejectedReason = rejected ? `constraint:${violations.map((v) => v.constraint).join(',')}` : null;
+
+  // ---- D-069 OPTION A, NOW ACTUALLY APPLIED (D-074) ----
+  // `predictionHardFilters.mjs` was built, tested and frozen for D-069 and had
+  // ZERO production callers until this line: its designed input
+  // (multiFidelity.mjs's ADMET/docking MODEL_ESTIMATEs) is BLOCKED_BY_RUNTIME
+  // wherever those heavy models are absent, so the gate could never run and
+  // the loop silently had no prediction filter at all.
+  //
+  // The filter is applied HERE — to the candidate, before it can ever reach
+  // `retained`, `recomputePareto` or `metricsSnapshot` — which is exactly
+  // D-069's own requirement that a model estimate may rule a candidate OUT
+  // and may never rank candidates IN. Nothing below touches `descriptors` or
+  // `objectiveVector`; a rejected candidate is still persisted in full, with
+  // its reason, never silently dropped.
+  let predictionRejection = null;
+  if (predictionGate && !rejected) {
+    const { survivors, rejections } = applyPredictionHardFilters(
+      [{ canonicalSmiles: proposal.canonicalSmiles }],
+      predictionGate.predictionsFor,
+      predictionGate.thresholds,
+    );
+    if (survivors.length === 0) {
+      predictionRejection = rejections[0] ?? { canonicalSmiles: proposal.canonicalSmiles, codes: ['PREDICTION_MISSING'] };
+      rejected = true;
+      rejectedReason = `prediction:${predictionRejection.codes.join(',')}`;
+    }
+  }
+
   return {
     valid: true,
     status: rejected ? 'rejected' : 'retained',
-    rejectedReason: rejected ? `constraint:${violations.map((v) => v.constraint).join(',')}` : null,
+    rejectedReason,
     runIds: [run.runId],
     descriptors: desc,
     objectiveVector,
     constraintViolations: violations,
+    predictionRejection,
+    // Carried through, never persisted directly by addCandidate (extra keys
+    // on the spread object are ignored there) -- the caller uses this to
+    // bind persistDescriptorScienceRun to the REAL candidateId once
+    // store.addCandidate has returned one.
+    scienceRun: run,
   };
 }
 
@@ -61,11 +152,52 @@ function selectParents(retained, strategy, k) {
  * Wykonuje kampanię. Zwraca podsumowanie. Wszystkie kandydaci, decyzje i
  * zdarzenia są utrwalane (append-only). `log` opcjonalny: (state, info)=>void.
  */
-export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () => false, onProgress = () => {} } = {}) {
+export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () => false, onProgress = () => {}, predictionGate: gateOverride = null } = {}) {
   let campaign = store.getCampaign(db, campaignId);
   if (!campaign) throw new Error('campaign_not_found');
   const { projectId } = campaign;
   const objectives = campaign.objectiveVector.length ? campaign.objectiveVector : adapter.DEFAULT_OBJECTIVES;
+  // D-069 OPTION A, enforced in code (not left to convention): predictions
+  // are frozen hard filters, never objectives, and hypervolume2D silently
+  // truncates past two dimensions — a mis-set campaign.objectiveVector row
+  // in the database could otherwise defeat both without any error.
+  const predictionTerms = [...Object.keys(endpointCategories()), 'bestAffinityKcalMol', ...LIABILITY_TERMS];
+  const objectivesGuard = assertCampaignObjectivesD069(objectives, predictionTerms);
+  if (!objectivesGuard.ok) throw new Error(`FAIL_CLOSED[${objectivesGuard.code}]: ${objectivesGuard.reason}`);
+
+  // ---- D-069 prediction gate: EXPLICIT OPT-IN, then FAIL CLOSED (D-074) ----
+  // Opt-in, because today's benchmark campaigns (scripts/campaign-demo.mjs and
+  // the existing test suites) legitimately run without a liability gate and
+  // must keep behaving byte-identically. Opted in, there is no soft path: a
+  // missing or fingerprint-mismatched threshold file aborts the campaign
+  // rather than quietly degrading to "no filter", which is precisely what
+  // `loadFrozenPredictionThresholds` was written to refuse.
+  //
+  // The config rides in `strategy` — the same persisted, free-form JSON blob
+  // `startingSmiles` already uses, so it round-trips through the DB and
+  // survives `nextExperiment`'s `{...strategy}` spread across generations
+  // without a schema migration. The frozen rule itself is recorded in the
+  // append-only event log below, which is stronger provenance than a column.
+  let predictionGate = null;
+  const gateConfig = gateOverride ?? campaign.strategy?.predictionGate ?? null;
+  if (gateConfig?.enabled) {
+    const loaded = loadFrozenPredictionThresholds(
+      gateConfig.thresholdsPath,
+      gateConfig.expectedRuleFingerprint,
+    );
+    if (!loaded.ok) throw new Error(`FAIL_CLOSED[${loaded.code}]: ${loaded.reason}`);
+    const source = createLiabilityPredictionSource();
+    predictionGate = { thresholds: loaded.thresholds, predictionsFor: source.predictionsFor, source };
+    store.addEvent(db, {
+      campaignId, generation: 0, type: 'PREDICTION_GATE_FROZEN',
+      payload: {
+        ruleFingerprint: loaded.thresholds.ruleFingerprint,
+        terms: loaded.thresholds.terms,
+        evidenceClass: loaded.thresholds.evidenceClass ?? null,
+        source: loaded.thresholds.source ?? null,
+      },
+    });
+  }
   const constraints = campaign.constraints.length ? campaign.constraints : adapter.DEFAULT_CONSTRAINTS;
   const budget = { maxGenerations: 6, maxGeneratedCandidates: 400, ...campaign.budget };
   const stopping = { patience: 2, minImprovement: 1e-3, diversityFloor: 0.15, ...campaign.stopping };
@@ -95,9 +227,10 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
     }
     if (seenCanonical.has(canon.canonicalSmiles)) continue;
     seenCanonical.add(canon.canonicalSmiles);
-    const rec = makeCandidateRecord(db, campaignId, projectId, 0, { canonicalSmiles: canon.canonicalSmiles }, objectives, constraints);
+    const rec = makeCandidateRecord(db, campaignId, projectId, 0, { canonicalSmiles: canon.canonicalSmiles }, objectives, constraints, predictionGate);
     totalGenerated++;
     const id = store.addCandidate(db, { campaignId, generation: 0, canonicalSmiles: canon.canonicalSmiles, ...rec });
+    persistDescriptorScienceRun(db, { campaignId, candidateId: id, projectId, run: rec.scienceRun });
     if (rec.status === 'retained') retained.push({ id, canonicalSmiles: canon.canonicalSmiles, objectiveVector: rec.objectiveVector, transformation: null });
   }
   recomputePareto(db, campaignId, retained);
@@ -144,13 +277,14 @@ export function runCampaign(db, campaignId, { log = () => {}, shouldCancel = () 
       }
       seenCanonical.add(prop.canonicalSmiles);
       const parent = parents.find((p) => p.canonicalSmiles === prop.parentSmiles) ?? null;
-      const rec = makeCandidateRecord(db, campaignId, projectId, generation, prop, objectives, constraints);
+      const rec = makeCandidateRecord(db, campaignId, projectId, generation, prop, objectives, constraints, predictionGate);
       totalGenerated++;
       const id = store.addCandidate(db, {
         campaignId, generation, parentId: parent?.id ?? null, parentSmiles: prop.parentSmiles,
         coParentSmiles: prop.coParentSmiles ?? null,
         transformation: prop.transformation, canonicalSmiles: prop.canonicalSmiles, ...rec,
       });
+      persistDescriptorScienceRun(db, { campaignId, candidateId: id, projectId, run: rec.scienceRun });
       if (rec.status === 'retained') {
         genRetained.push({ id, canonicalSmiles: prop.canonicalSmiles, objectiveVector: rec.objectiveVector, transformation: prop.transformation });
         retained.push({ id, canonicalSmiles: prop.canonicalSmiles, objectiveVector: rec.objectiveVector, transformation: prop.transformation });

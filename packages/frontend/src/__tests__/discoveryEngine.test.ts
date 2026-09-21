@@ -290,25 +290,39 @@ describe('Discovery Engine — conclusion is derived, not written', () => {
     const c = runDiscoveryCase(spec({
       hypothesis: { ...spec().hypothesis, falsification: { metric: 'peakInfectious', relation: 'monotonic-decrease', rationale: 'wymaga sweepu' } },
     }));
-    expect(c.conclusion!.primary!.met).toBe(false);
-    expect(c.conclusion!.primary!.explanation).toContain('sweep');
+    // CORRECTED. This test's NAME said "refuses", and its assertion pinned
+    // `met: false`, which the conclusion turned into NOT_SUPPORTED — a
+    // falsification-flavoured verdict for a criterion that was never tested.
+    // `falsificationRelation.ts` reports a series-only relation as
+    // `applicable: false` precisely so it cannot be read that way. The refusal
+    // the name asks for is INSUFFICIENT_EVIDENCE, and the explanation survives
+    // in the message rather than in a `primary` that no verdict backs.
+    expect(c.conclusion!.verdict).toBe('INSUFFICIENT_EVIDENCE');
+    expect(c.conclusion!.primary).toBeNull();
+    expect(c.conclusion!.message).toContain('sweep');
   });
 
   it('refuses a criterion whose metric the model does not report', () => {
     const c = runDiscoveryCase(spec({
       hypothesis: { ...spec().hypothesis, falsification: { metric: 'hospitalStaffBurnout', relation: 'less-than', rationale: 'metryka nie istnieje' } },
     }));
-    expect(c.conclusion!.primary!.met).toBe(false);
-    expect(c.conclusion!.primary!.baseline).toBeNull();
-    expect(c.conclusion!.verdict).toBe('NOT_SUPPORTED');
+    // CORRECTED, same reason: a metric the model never reported is missing
+    // data, not a failed test. NOT_SUPPORTED claimed a result from an
+    // unmeasured quantity.
+    expect(c.conclusion!.verdict).toBe('INSUFFICIENT_EVIDENCE');
+    expect(c.conclusion!.message).toContain('nie występuje');
   });
 
   it('an equality criterion without a tolerance is refused rather than guessed', () => {
     const c = runDiscoveryCase(spec({
       hypothesis: { ...spec().hypothesis, falsification: { metric: 'totalDeaths', relation: 'equal-within-tolerance', expectedValue: 5, rationale: 'brak tolerancji' } },
     }));
-    expect(c.conclusion!.primary!.explanation).toContain('tolerancji');
-    expect(c.conclusion!.verdict).toBe('NOT_SUPPORTED');
+    // CORRECTED, same reason: an equality criterion with no preregistered
+    // tolerance is undecidable, which is why the relation module returns
+    // `applicable: false` for it. "Refused rather than guessed" is exactly
+    // INSUFFICIENT_EVIDENCE.
+    expect(c.conclusion!.message).toContain('tolerancji');
+    expect(c.conclusion!.verdict).toBe('INSUFFICIENT_EVIDENCE');
   });
 
   it('the basis cites the model, the seed, the controlled difference and the replay verdict', () => {

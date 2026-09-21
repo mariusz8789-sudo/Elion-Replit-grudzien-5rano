@@ -42,7 +42,7 @@ import { getScienceRun, saveScienceRunVerification, listScienceRunVerifications 
 import * as docking from '../compute/dockingAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
-import { embed3d } from '../compute/rdkitAdapter.mjs';
+import { embed3d, descriptors } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
 import { endpointCategories, splitAdmetPrediction } from './multiFidelity.mjs';
 import { sha256Hex16 as sha16, maxRelativeDiff } from '../provenance.mjs';
@@ -71,6 +71,10 @@ const TOLERANCE = {
   'quantum-chemistry': 0,
   'admet-estimation': 1e-4,
   'toxicity-risk-estimation': 1e-4,
+  // RDKit 2D descriptors are exact deterministic arithmetic over a fixed
+  // SMILES -- no batched-inference floating-point non-associativity like
+  // ADMET-AI's, so MATCH requires a bit-exact replay, same as docking/QM.
+  'molecular-descriptors': 0,
 };
 
 /** Re-executes the underlying engine for one capability. Returns { ok, error?, engineVersion?, outputHash?, output? }. */
@@ -94,6 +98,15 @@ const REPLAYERS = {
   },
   'admet-estimation': (inputs) => replayAdmet(inputs, 'admet'),
   'toxicity-risk-estimation': (inputs) => replayAdmet(inputs, 'toxicity'),
+  // Re-runs the SAME real RDKit call `orchestrator.mjs::persistDescriptorScienceRun`
+  // already made when the run was first persisted (docs/DECISIONS.md D-069
+  // follow-up) -- no second engine, no new computation shape.
+  'molecular-descriptors': (inputs) => {
+    if (!capabilityAvailable('molecular-descriptors')) return { ok: false, error: 'BLOCKED_BY_RUNTIME' };
+    const r = descriptors(inputs.smiles);
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, engineVersion: r.engine, outputHash: sha16(r.data), output: r.data };
+  },
 };
 
 function replayAdmet(inputs, kind) {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -76,7 +76,7 @@ const SMALL: HypothesisProblem = {
   ...HYPOTHESIS_PROBLEMS[0]!,
   sharedLevers: { days: 18, stepsPerDay: 2, nAgents: 120, initialInfected: 4, seed: 20260831, interventionStartDay: 0 },
 };
-const runHypothesisLoop = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+const runHypothesisLoop = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
 
 // =============================================================================
 // 1. EPISTEMIC STATUS CONSISTENCY — three distinct, non-reducible enumerations.
@@ -134,7 +134,7 @@ describe('1. Epistemic status consistency', () => {
 // =============================================================================
 describe('2 & 3. Preregistration + falsification-criterion integrity', () => {
   it('a preregistration intact at build time, tampered before save, is caught before it can ever reach Science Memory', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     expect(verifyPreregistrationIntact(prereg).intact).toBe(true);
 
     const tamperedFalsifier = prereg.hypotheses.map((h, i) => i !== 0 ? h : {
@@ -300,7 +300,7 @@ describe('7. Deterministic fingerprints', () => {
 
     const different = buildSavedHypothesisLoop(executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
       ...SMALL, sharedLevers: { ...SMALL.sharedLevers, seed: Number(SMALL.sharedLevers.seed) + 1 },
-    }))));
+    }), { priorRunFingerprints: [] })));
     expect(different.preregistrationFingerprint).not.toBe(a.preregistrationFingerprint);
   });
 
@@ -424,7 +424,7 @@ describe('Specifically named guards', () => {
   it('BLOCKED and FALSIFIED are never conflated: BLOCKED means "never executed" (no proposedExperiment), FALSIFIED means "executed and the falsifier matched" — real, different fixtures produce each', () => {
     const blockedResult = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
       ...SMALL, candidateVariable: 'nieistniejacaDzwignia',
-    })));
+    }), { priorRunFingerprints: [] }));
     expect(blockedResult.outcomes.every((o) => o.status === 'BLOCKED')).toBe(true);
     expect(blockedResult.outcomes.every((o) => o.observedMetric === null)).toBe(true);
 
@@ -607,5 +607,53 @@ describe('14. No unsupported truth claims', () => {
     const interfaceMatch = source.match(/export interface CrossDomainNextQuestion \{([\s\S]*?)\n\}/);
     expect(interfaceMatch).not.toBeNull();
     expect(interfaceMatch![1]).not.toMatch(/probability|confidence|truthScore|likelihood/i);
+  });
+});
+
+// =============================================================================
+// 15. NO SIMULATION LABELLED AS AN OBSERVATION — the one mislabel that would
+// undo every other guard in this file. A run of Genesis's own simulator is
+// SIMULATION; only data that actually came from outside may carry an
+// observation-flavoured status.
+// =============================================================================
+describe('15. No simulation labelled as an observation', () => {
+  /**
+   * REGRESSION, found by reading what the code actually persists: the
+   * "Stwórz eksperyment" tab records samples from THIS LAB'S OWN simulation
+   * (useSimLoop / useThreeLoop -> appendSample) and saved them to Science
+   * Memory as OBSERVATION_RECORDED_NOT_VALIDATED — a status that sits beside
+   * OBSERVED / REAL_EXPERIMENTAL / REFERENCE and reads as "something real was
+   * observed". It was the sole outlier: every other site persisting a
+   * simulation run already says SIMULATION.
+   */
+  it('the custom-experiment recorder persists its own simulation samples as SIMULATION, never as an observation', () => {
+    const source = readFileSync(join(SRC_DIR, 'components', 'CustomExperimentTab.tsx'), 'utf8');
+    const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(stripped).toMatch(/epistemicStatus:\s*'SIMULATION'/);
+    expect(stripped).not.toMatch(/OBSERVATION_RECORDED_NOT_VALIDATED/);
+  });
+
+  /**
+   * The broader invariant: an observation-flavoured status may only be written
+   * where the data genuinely came from outside Genesis. `scienceMemory.ts` may
+   * DECLARE the literal (it owns the union) and the real-experiment path may
+   * use it; a lab-simulation component may not.
+   */
+  it('no lab-simulation component writes an observation-flavoured epistemic status', () => {
+    const componentsDir = join(SRC_DIR, 'components');
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) { walk(full); continue; }
+        if (!full.endsWith('.tsx') && !full.endsWith('.ts')) continue;
+        const code = readFileSync(full, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+        if (/epistemicStatus:\s*'OBSERVATION_RECORDED_NOT_VALIDATED'/.test(code)) {
+          offenders.push(full.replace(SRC_DIR, ''));
+        }
+      }
+    };
+    walk(componentsDir);
+    expect(offenders).toEqual([]);
   });
 });

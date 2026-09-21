@@ -52,6 +52,9 @@ export function useThreeLoop(
     // orbit-follow blocks already guard on this via `orbitControls?.target`.
     let orbitControls: OrbitControls | undefined;
     let post: PostProcessor | undefined;
+    // Whether the drag/idle state machine below WANTS auto-rotate on — the render loop combines
+    // this with `sim.suspendAutoRotate?.()` every frame (see that block's own doc).
+    let autoRotateDesired = false;
 
     setLoading(true);
     setFailed(false);
@@ -75,7 +78,13 @@ export function useThreeLoop(
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 2000);
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: sim.preserveDrawingBufferForCapture ?? false,
+        });
         // EffectComposer wykonuje kilka passów; reset raz na pełną klatkę zachowuje uczciwe calls/triangles całego renderu.
         renderer.info.autoReset = false;
         renderer.setClearColor(0x02030a, 1);
@@ -106,17 +115,21 @@ export function useThreeLoop(
           // Kinowy auto-obrót wokół celu, dopóki użytkownik nie zacznie
           // przeciągać — wbudowana funkcja OrbitControls, więc nie "walczy"
           // z jej własną obsługą gestów (patrz Sim3D.cameraAutoRotateSpeed).
+          // `autoRotateDesired` śledzi TĘ decyzję (drag/idle) niezależnie od
+          // `Sim3D.suspendAutoRotate()` poniżej (D-133 Smart UI: popup
+          // zakotwiczony na wybranym obiekcie) — pętla renderu łączy oba co
+          // klatkę, żeby żadne z nich nie nadpisywało trwale drugiego.
           let idleResume: ReturnType<typeof setTimeout> | undefined;
           if (sim.cameraAutoRotateSpeed && !getSettings().reducedMotion) {
-            oc.autoRotate = true;
+            autoRotateDesired = true;
             oc.autoRotateSpeed = sim.cameraAutoRotateSpeed;
             oc.addEventListener('start', () => {
-              oc.autoRotate = false;
+              autoRotateDesired = false;
               if (idleResume) clearTimeout(idleResume);
             });
             oc.addEventListener('end', () => {
               idleResume = setTimeout(() => {
-                oc.autoRotate = true;
+                autoRotateDesired = true;
               }, 2500);
             });
           }
@@ -192,6 +205,7 @@ export function useThreeLoop(
               } else orbitControls.target.copy(target);
             }
           }
+          if (orbitControls) orbitControls.autoRotate = autoRotateDesired && !(sim.suspendAutoRotate?.() ?? false);
           if (!sim.disableOrbitControls) controls?.update();
           // OrbitControls aktualizuje pozycję w swojej pętli; finalny focus jest nakładany
           // po update, aby wybrany obiekt rzeczywiście otrzymał drugi poziom kamery.

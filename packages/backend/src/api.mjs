@@ -71,6 +71,7 @@ import { buildDiscoveryGraph } from './campaign/discoveryGraph.mjs';
 import { listToolchain, getTool } from './campaign/toolchain.mjs';
 import { listEndpoints, predict as predictAdmet } from './compute/admetAdapter.mjs';
 import { singlePoint as runQuantumSinglePoint } from './compute/qmAdapter.mjs';
+import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
@@ -93,6 +94,10 @@ import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeInges
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
+import { runSpeculative } from './speculativeApi.mjs';
+import { runIngest, listProposals, publishProposal, rejectProposal } from './knowledgeApi.mjs';
+import { runQuantum, describeQuantum } from './quantumApi.mjs';
+import { evaluateManifold, systemTelemetry } from './manifoldApi.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -171,6 +176,70 @@ export function handleApi(db, ctx) {
     if (seg[1] === 'qm' && seg[2] === 'singlepoint' && seg.length === 3 && method === 'POST') {
       const r = runQuantumSinglePoint(body ?? {});
       return r.ok ? ok({ data: r.data, meta: r.meta, runId: `pyscf:${createHash('sha256').update(JSON.stringify({ atoms: body.atoms, charge: body.charge ?? 0, spin: body.spin ?? 0, basis: body.basis ?? 'sto-3g', method: body.method ?? 'RHF' })).digest('hex').slice(0, 24)}`, resultOrigin: 'real-engine' }) : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- Knowledge ingestion (Science Chat `/ingest <url>`): propose-only, human publishes ----
+  if (seg[0] === 'knowledge') {
+    if (seg[1] === 'ingest' && seg.length === 2 && method === 'POST') {
+      // The only asynchronous route in this router: server.mjs awaits handleApi's result.
+      return runIngest(body).then((result) => (result.ok ? ok(result) : err(400, result.error)));
+    }
+    if (seg[1] === 'proposals' && seg.length === 2 && method === 'GET') return ok(listProposals());
+    if (seg[1] === 'proposals' && seg.length === 4 && method === 'POST' && (seg[3] === 'publish' || seg[3] === 'reject')) {
+      const approver = getUserByToken(db, ctx.token);
+      if (!approver) return err(401, 'unauthorized', 'Publishing or rejecting a proposal requires a signed-in approver.');
+      const result = seg[3] === 'publish' ? publishProposal(seg[2], approver.id) : rejectProposal(seg[2], approver.id);
+      return result.ok ? ok(result) : err(409, result.error);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- 5D manifold engine + real machine telemetry (2040 HUD): GEOMETRIC_MODEL, feeds nothing scientific ----
+  if (seg[0] === 'manifold') {
+    if (seg[1] === 'evaluate' && seg.length === 2 && method === 'POST') {
+      const result = evaluateManifold(body);
+      return result.ok ? ok(result) : err(result.status ?? 400, result.error, result.message);
+    }
+    return err(404, 'not_found');
+  }
+  if (seg[0] === 'system') {
+    if (seg[1] === 'telemetry' && seg.length === 2 && method === 'GET') return ok(systemTelemetry());
+    return err(404, 'not_found');
+  }
+
+  // ---- Hybrid Quantum Computing Bridge (Science Chat `/quantum …`): cloud QPU only with env credentials, else local MODEL_ESTIMATE ----
+  if (seg[0] === 'quantum') {
+    if (seg[1] === 'run' && seg.length === 2 && method === 'POST') {
+      // Asynchronous like /api/knowledge/ingest: server.mjs awaits handleApi's result.
+      return runQuantum(body).then((result) => (result.ok ? ok(result) : err(result.status ?? 400, result.error, result.message)));
+    }
+    if (seg[1] === 'status' && seg.length === 2 && method === 'GET') return ok(describeQuantum());
+    return err(404, 'not_found');
+  }
+
+  // ---- Myth & Theory Lab: isolated speculative sandbox only ----
+  if (seg[0] === 'speculative') {
+    if (seg[1] === 'run' && seg.length === 2 && method === 'POST') {
+      const result = runSpeculative(body);
+      return result.ok ? ok(result) : err(result.error === 'sandbox_disabled' ? 403 : 400, result.error);
+    }
+    return err(404, 'not_found');
+  }
+
+  // ---- Physics: CERN Open Data (record 5208, CC0) — read-only ----
+  // Wraps the existing, unmodified cmsOpenDataAdapter.mjs; adds zero
+  // scientific logic. Real, checksum-verified event counts and full
+  // 5 GeV histogram, or an honest 503 — never a substitute/mock/seed.
+  // This is analysis of 2011 historical open data, not a live collider
+  // and not a simulation — see resultOrigin/offline/live/simulation flags.
+  if (seg[0] === 'physics') {
+    if (seg[1] === 'cms-z' && seg.length === 2 && method === 'GET') {
+      const r = zMuMuInvariantMassStats();
+      return r.ok
+        ? ok({ data: r.data, version: r.version, engine: r.engine, resultOrigin: 'real-engine', dataProvenance: 'REAL_EXTERNAL_DATASET', offline: true, live: false, simulation: false })
+        : err(503, r.error ?? 'BLOCKED_BY_RUNTIME', r.reason);
     }
     return err(404, 'not_found');
   }

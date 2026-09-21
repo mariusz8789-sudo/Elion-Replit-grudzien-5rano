@@ -58,12 +58,12 @@ function rdkitFetchMock() {
 
 function runLocalLoop(problemId: string): HypothesisLoopResult {
   const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === problemId)!;
-  return executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  return executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
 }
 
 async function runChemLoop(): Promise<HypothesisLoopResult> {
   const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === 'problem:chem-rdkit-molecular-weight-comparison')!;
-  return executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  return executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
 }
 
 async function threeDomainInputs() {

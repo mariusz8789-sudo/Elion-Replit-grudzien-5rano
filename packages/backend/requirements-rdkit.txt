@@ -1,0 +1,3 @@
+# Approved real-engine runtime for the backend RDKit worker (packages/backend/src/compute/rdkit_worker.py).
+# The CI verify job installs this so the 19 RDKit-backed backend tests run instead of failing on a bare runner.
+rdkit==2026.3.6

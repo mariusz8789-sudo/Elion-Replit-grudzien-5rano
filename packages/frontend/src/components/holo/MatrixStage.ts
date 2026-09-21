@@ -1,0 +1,219 @@
+import * as THREE from 'three';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+
+/**
+ * MATRIX STAGE — the black cyber-universe behind the whole shell.
+ *
+ * There is exactly one subject in this scene: the code rain. No figures, no
+ * mannequins, no pedestals, no props — by the owner's standing directive.
+ *
+ *   - CODE RAIN: a procedural, volumetric rain of glyphs computed entirely on
+ *     the GPU — thousands of columns at real depth, each a bright head glyph
+ *     with a fading trail; position, speed, flicker and depth fade all come
+ *     from `uTime` in the shaders, so the CPU does nothing per frame. Near
+ *     columns are large and sharp, far ones small and dim (volumetric depth).
+ *   - FLOOR: an obsidian planar mirror (Reflector) under an ultra-thin hairline
+ *     grid; the falling glyphs reflect in it because the reflector renders the
+ *     real scene from the mirrored camera.
+ *   - ATMOSPHERE: pure black background, black exponential fog (distance goes
+ *     dark, never green), ACES tone mapping and a double bloom (tight + wide)
+ *     applied by the backdrop's composer — the only thing bright enough to
+ *     bloom is the glyphs.
+ *
+ * Deterministic (seeded PRNG), disposable, built only inside a live WebGL
+ * context — never at import time, so tests without a DOM stay safe.
+ */
+
+export function isMatrixRoute(hash: string): boolean {
+  return /^#\/matrix-stage(?:\?|$)/.test(hash || '#/');
+}
+
+export interface MatrixStage {
+  readonly scene: THREE.Scene;
+  readonly camera: THREE.PerspectiveCamera;
+  update(t: number, dt: number, parallaxX: number, parallaxY: number, onMatrixRoute: boolean): void;
+  layout(width: number, height: number): void;
+  dispose(): void;
+}
+
+const GLYPHS = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789Z:・"=*+-<>¦|çﾘｸ';
+const ATLAS_COLS = 16;
+
+function glyphAtlas(doc: Document): THREE.CanvasTexture | null {
+  const canvas = doc.createElement('canvas');
+  const size = 1024;
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  const cell = size / ATLAS_COLS;
+  ctx.font = `bold ${Math.floor(cell * 0.8)}px "Noto Sans JP", "Yu Gothic", "MS Gothic", monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < ATLAS_COLS * ATLAS_COLS; i++) {
+    ctx.fillText(GLYPHS[i % GLYPHS.length], (i % ATLAS_COLS) * cell + cell / 2, Math.floor(i / ATLAS_COLS) * cell + cell / 2);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  return tex;
+}
+
+/**
+ * Procedural code rain. Per point: column origin (x, z), index k along the
+ * trail, column speed, phase and glyph seed. Everything else is a function of
+ * uTime: the head falls, the trail hangs above it, glyphs flicker on a
+ * per-point clock, brightness fades along the trail and with depth.
+ */
+const RAIN_VERTEX = /* glsl */ `
+attribute vec3 aColumn;   // x, z of the column, y = column height span
+attribute float aIndex;   // 0 = head, 1..n = trail
+attribute float aSpeed;
+attribute float aPhase;
+attribute float aSeed;
+uniform float uTime;
+uniform float uSpacing;
+varying float vGlyph;
+varying float vBright;
+varying float vDepth;
+float hash(float n) { return fract(sin(n) * 43758.5453123); }
+void main() {
+  float span = aColumn.y;
+  float head = span - mod(uTime * aSpeed + aPhase * span, span + 6.0);
+  float y = head + aIndex * uSpacing;
+  float trailFade = exp(-aIndex * 0.15);
+  vBright = aIndex < 0.5 ? 2.4 : 1.0 * trailFade;
+  float flick = floor(uTime * (1.5 + hash(aSeed) * 4.0) + aSeed * 7.0);
+  vGlyph = floor(hash(aSeed * 13.7 + flick + aIndex * 3.1) * 256.0);
+  vec4 mv = modelViewMatrix * vec4(aColumn.x, y, aColumn.z, 1.0);
+  vDepth = -mv.z;
+  gl_PointSize = clamp(0.44 * (440.0 / max(1.0, -mv.z)), 3.0, 24.0);
+  gl_Position = projectionMatrix * mv;
+  if (y < -0.4 || y > span + 0.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+}
+`;
+const RAIN_FRAGMENT = /* glsl */ `
+uniform sampler2D uAtlas;
+uniform float uCols;
+uniform float uFar;
+varying float vGlyph;
+varying float vBright;
+varying float vDepth;
+void main() {
+  float col = mod(vGlyph, uCols);
+  float row = floor(vGlyph / uCols);
+  vec2 uv = (vec2(col, row) + gl_PointCoord) / uCols;
+  uv.y = 1.0 - uv.y;
+  float a = texture2D(uAtlas, uv).r;
+  if (a < 0.1) discard;
+  float depthFade = clamp(1.0 - vDepth / uFar, 0.06, 1.0);
+  vec3 tail = vec3(0.0, 0.46, 0.15);
+  vec3 head = vec3(0.85, 1.0, 0.9);
+  vec3 color = mix(tail, head, clamp(vBright - 0.9, 0.0, 1.0)) * min(vBright, 1.7) * depthFade;
+  gl_FragColor = vec4(color, a * depthFade);
+}
+`;
+
+export function buildMatrixStage(
+  renderer: THREE.WebGLRenderer,
+  doc: Document,
+  random: () => number,
+  lowPower: boolean,
+): MatrixStage {
+  void renderer; // the scene needs no renderer-side resources (no env probe); kept for API symmetry
+  const disposables: { dispose(): void }[] = [];
+  const track = <T extends { dispose(): void }>(d: T): T => { disposables.push(d); return d; };
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.FogExp2(0x000000, lowPower ? 0.05 : 0.032);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 240);
+  camera.position.set(0, 3.0, 12);
+
+  // Obsidian mirror + hairline grid. The reflector tint is neutral-dark so the
+  // reflection is a true, slightly darkened image of the rain.
+  const floorGeo = track(new THREE.PlaneGeometry(160, 160));
+  const mirror = new Reflector(floorGeo, { clipBias: 0.003, textureWidth: lowPower ? 384 : 1024, textureHeight: lowPower ? 384 : 1024, color: 0x707070 });
+  mirror.rotation.x = -Math.PI / 2;
+  scene.add(mirror);
+  track({ dispose: () => mirror.dispose() });
+  const grid = new THREE.GridHelper(160, 160, 0x19945a, 0x0a3a20);
+  (grid.material as THREE.Material).transparent = true;
+  (grid.material as THREE.Material).opacity = 0.22;
+  grid.position.y = 0.005;
+  track(grid.geometry); track(grid.material as THREE.Material);
+  scene.add(grid);
+
+  // Procedural volumetric code rain.
+  const atlas = glyphAtlas(doc);
+  const columns = lowPower ? 1400 : 5200;
+  const trail = lowPower ? 10 : 18;
+  const count = columns * trail;
+  const col = new Float32Array(count * 3);
+  const idx = new Float32Array(count);
+  const speed = new Float32Array(count);
+  const phase = new Float32Array(count);
+  const seed = new Float32Array(count);
+  const pos = new Float32Array(count * 3); // required by three for the attribute count; the shader ignores it
+  for (let c = 0; c < columns; c++) {
+    const x = (random() - 0.5) * 130;
+    const z = -80 + random() * 96;
+    const span = 16 + random() * 24;
+    const sp = 2.5 + random() * 7;
+    const ph = random();
+    for (let k = 0; k < trail; k++) {
+      const i = c * trail + k;
+      col[i * 3] = x; col[i * 3 + 1] = span; col[i * 3 + 2] = z;
+      idx[i] = k; speed[i] = sp; phase[i] = ph; seed[i] = c * 0.731 + k * 0.17;
+      pos[i * 3] = x; pos[i * 3 + 1] = span / 2; pos[i * 3 + 2] = z;
+    }
+  }
+  const rainGeo = track(new THREE.BufferGeometry());
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  rainGeo.setAttribute('aColumn', new THREE.BufferAttribute(col, 3));
+  rainGeo.setAttribute('aIndex', new THREE.BufferAttribute(idx, 1));
+  rainGeo.setAttribute('aSpeed', new THREE.BufferAttribute(speed, 1));
+  rainGeo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+  rainGeo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  rainGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 16, -32), 140);
+  const rainMat = track(new THREE.ShaderMaterial({
+    vertexShader: RAIN_VERTEX, fragmentShader: RAIN_FRAGMENT,
+    uniforms: { uAtlas: { value: atlas }, uCols: { value: ATLAS_COLS }, uTime: { value: 0 }, uSpacing: { value: 0.72 }, uFar: { value: 100 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+  }));
+  if (atlas) track(atlas);
+  const rain = new THREE.Points(rainGeo, rainMat);
+  rain.frustumCulled = false;
+  rain.visible = atlas !== null;
+  scene.add(rain);
+
+  return {
+    scene,
+    camera,
+    layout(width, height) {
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    },
+    update(t, _dt, parallaxX, parallaxY, onMatrixRoute) {
+      rainMat.uniforms.uTime.value = t;
+      if (onMatrixRoute) {
+        // Low, slow dolly across the mirror so the reflections carry the frame.
+        camera.position.x = Math.sin(t * 0.05) * 2.4 + parallaxX * 0.8;
+        camera.position.y = 2.2 + parallaxY * 0.3;
+        camera.position.z = 12 + Math.sin(t * 0.03) * 1.5;
+        camera.lookAt(0, 3.6, -14);
+      } else {
+        camera.position.x = Math.sin(t * 0.04) * 2.0 + parallaxX * 0.6;
+        camera.position.y = 3.4 + parallaxY * 0.3;
+        camera.position.z = 12;
+        camera.lookAt(0, 5.0, -20);
+      }
+    },
+    dispose() {
+      for (const d of disposables) d.dispose();
+      scene.clear();
+    },
+  };
+}

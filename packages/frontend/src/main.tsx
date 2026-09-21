@@ -4,6 +4,17 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { t } from './core/i18n';
 import './styles.css';
+import './styles-2040.css';
+import './styles-2040-screens.css';
+import './styles-2040-hud.css';
+import './components/genesis-ui/worldViewShell.css';
+
+// Deep links by path (`/matrix`, as the Playwright specs and external links use) are served
+// by the backend's SPA fallback; the router is hash-based, so map the path onto the hash
+// once, before the first render. `/` and any URL that already has a hash are untouched.
+if (window.location.pathname !== '/' && !window.location.hash) {
+  window.history.replaceState(null, '', `/#${window.location.pathname}${window.location.search}`);
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

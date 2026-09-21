@@ -27,14 +27,36 @@ import { kindsOf } from './GenesisMatrixHub';
  * decoration does not get to compete with the solvers for frame budget.
  */
 
-/** Routes that own their own full-viewport visual; the stream stays off. */
-const SUPPRESSED_ROUTES: readonly string[] = [
-  '#/city3d', '#/city', '#/scientific-city', '#/first-person-lab', '#/lab-3d',
-  '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo',
-  '#/hf-slice', '#/reality', '#/prebuild', '#/timeline',
+/**
+ * Routes that own their own full-viewport visual; ANY decorative background
+ * layer stays off on these — a data stream behind a 3D scene is invisible at
+ * best and a framerate tax at worst.
+ *
+ * Exported (not private to this file) so a second background layer never has
+ * to re-derive or hand-copy this list: `liveMatrix/LiveMatrixBackground.tsx`
+ * has no router awareness by design (see its own boundary doc — a decorative
+ * canvas component takes props, it does not read `window.location`), so
+ * whatever mounts it conditionally (an App-level wrapper) is the correct,
+ * ONE place to call `isSuppressed(window.location.hash)` — reusing this exact
+ * list rather than a second one that could silently drift from it.
+ */
+export const SUPPRESSED_ROUTES: readonly string[] = [
+  '#/city3d', '#/city', '#/scientific-city', '#/genesis-world', '#/first-person-lab', '#/lab-3d',
+  '#/molecule', '#/cell-lab', '#/character', '#/concept', '#/investor-demo', '#/discovery-hall',
+  '#/hf-slice', '#/reality', '#/prebuild', '#/timeline', '#/matrix',
+  // CLOCKWORK is a clerk's work screen: no animated backdrop behind a case register (office PCs, and the
+  // numbers are the point), so the shell's WebGL layer stays off there too.
+  '#/clockwork',
+  // Collider chamber and the FPV lab own their full WebGL scenes.
+  '#/collider', '#/lab-fpv',
+  // The CERN complex is a full-viewport WebGL route with its own composer.
+  '#/cern-complex',
+  // Scientific Worlds: the agent laboratory owns its full-viewport WebGL.
+  '#/scientific-worlds',
+  '#/human-biology-lab',
 ];
 
-function isSuppressed(hash: string): boolean {
+export function isSuppressed(hash: string): boolean {
   const normalized = hash || '#/';
   return SUPPRESSED_ROUTES.some((r) => normalized === r || normalized.startsWith(`${r}?`))
     || normalized.startsWith('#/lab/');

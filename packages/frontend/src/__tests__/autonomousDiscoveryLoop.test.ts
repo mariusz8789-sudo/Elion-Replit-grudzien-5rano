@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { REPO_ROOT } from './fixtures/repoPaths';
 import { describe, expect, it } from 'vitest';
 import {
   runAutonomousDiscovery,
@@ -265,9 +266,9 @@ describe('Every step is traceable and the run is replayable', () => {
 
 describe('The trace persists through the real AgentRun tables', () => {
   it('stores and reads back every step, unchanged', async () => {
-    const storeUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/store.mjs')).href;
-    const agentRunUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/agentRun.mjs')).href;
-    const authUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/auth.mjs')).href;
+    const storeUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/store.mjs')).href;
+    const agentRunUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/agentRun.mjs')).href;
+    const authUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/auth.mjs')).href;
     const store = (await import(/* @vite-ignore */ storeUrl)) as Record<string, (...args: never[]) => never>;
     const agentRun = (await import(/* @vite-ignore */ agentRunUrl)) as Record<string, (...args: never[]) => never>;
     const auth = (await import(/* @vite-ignore */ authUrl)) as Record<string, (...args: never[]) => never>;
@@ -318,9 +319,9 @@ describe('The trace persists through the real AgentRun tables', () => {
    * false confidence a real DB file rules out.
    */
   async function loadAgentRunModules() {
-    const storeUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/store.mjs')).href;
-    const agentRunUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/agentRun.mjs')).href;
-    const authUrl = pathToFileURL(path.resolve(process.cwd(), '../backend/src/auth.mjs')).href;
+    const storeUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/store.mjs')).href;
+    const agentRunUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/agentRun.mjs')).href;
+    const authUrl = pathToFileURL(path.resolve(REPO_ROOT, 'packages/backend/src/auth.mjs')).href;
     return {
       store: (await import(/* @vite-ignore */ storeUrl)) as Record<string, (...args: never[]) => never>,
       agentRun: (await import(/* @vite-ignore */ agentRunUrl)) as Record<string, (...args: never[]) => never>,

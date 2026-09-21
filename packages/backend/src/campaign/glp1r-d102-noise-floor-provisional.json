@@ -1,0 +1,67 @@
+{
+  "id": "D-102-NOISE-FLOOR-PROVISIONAL",
+  "kind": "PROVISIONAL_MEASUREMENT",
+  "identityKey": "molecule_chembl_id — NOT canonicalSmiles; A2 (SMILES) is 0/8 chunks",
+  "warning": "molecule_chembl_id identity risks a falsely LOW spread relative to true structure identity (salts, unspecified stereochemistry, duplicate deposits). This is PROVISIONAL, not the sealed noise-floor number. The final measurement still requires A2.",
+  "prereg": {
+    "id": "D-102-READOUT-FAMILY-PREREG",
+    "fingerprint": "f475467a12dff413"
+  },
+  "a1RowCount": 757,
+  "a3AssayCount": 90,
+  "unverifiedLabelRowsExcluded": 190,
+  "suspectFlatValueRows": 66,
+  "perFamily": {
+    "OTHER": {
+      "rows": 24,
+      "rowsExFlat": 24,
+      "molecules": 20,
+      "groups": 3,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "CAMP": {
+      "rows": 203,
+      "rowsExFlat": 203,
+      "molecules": 121,
+      "groups": 55,
+      "status": "MEASURED",
+      "medianSpread": 1.426
+    },
+    "CALCIUM": {
+      "rows": 201,
+      "rowsExFlat": 201,
+      "molecules": 181,
+      "groups": 3,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "ARRESTIN": {
+      "rows": 134,
+      "rowsExFlat": 68,
+      "molecules": 46,
+      "groups": 13,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "BINDING": {
+      "rows": 2,
+      "rowsExFlat": 2,
+      "molecules": 2,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "INTERNALIZATION": {
+      "rows": 3,
+      "rowsExFlat": 3,
+      "molecules": 3,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    }
+  },
+  "minGroupsForNoiseFloor": 20,
+  "computedAt": "2026-09-15T19:28:00.053Z",
+  "artifactHash": "22c1c9019b7a2fac5bc44e9377a1f24a142a31fedab9ae61ba8d21d1c0c02e4b"
+}

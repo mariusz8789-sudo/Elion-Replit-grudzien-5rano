@@ -21,6 +21,7 @@ export type AnalyticsEvent =
   | 'shortcut_used'
   | 'discovery_log_viewed'
   | 'glossary_viewed'
+  | 'dome_world_viewed'
   | 'custom_experiment_run'
   | 'custom_experiment_saved'
   | 'experiment_fabric_run'

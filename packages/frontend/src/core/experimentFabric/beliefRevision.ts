@@ -38,8 +38,26 @@ export const BELIEF_REVISION_CONTRACT_VERSION = '1.0.0';
  * `STRUCTURAL_ALTERNATIVE`: the parent's criterion and intervention are kept
  * unchanged; what changes is which registered domain solver the entity is
  * bound to before the intervention runs — a real runtime MODEL update, not a
- * re-interpretation of the evidence (see `structuralAlternative.ts`). */
-export type HypothesisGenerationMechanism = 'INITIAL' | 'RELATION_FLIP' | 'TOLERANCE_WIDENED' | 'STRUCTURAL_ALTERNATIVE';
+ * re-interpretation of the evidence (see `structuralAlternative.ts`).
+ *
+ * `REGIME_FIT_FROM_GRID`: the hypothesis's very existence as a candidate was
+ * computed from a pinned real dataset's own grid (which time/partition values
+ * actually have data), not declared as a literal by a human — see
+ * `core/agent/qe4RegimeInquiryLoop.ts`. Deliberately distinct from `INITIAL`:
+ * `INITIAL` means "declared before any mechanical derivation ran", this means
+ * "mechanically derived from the shape of the data itself, before any of it
+ * has been looked at as evidence".
+ *
+ * `RESIDUAL_FROM_FIT`: the hypothesis was derived from the WINNING regime's own
+ * residuals against real admitted points (a localized fit failure), not from a
+ * new measurement — see `deriveResidualHypothesis` in the same file. */
+export type HypothesisGenerationMechanism =
+  | 'INITIAL'
+  | 'RELATION_FLIP'
+  | 'TOLERANCE_WIDENED'
+  | 'STRUCTURAL_ALTERNATIVE'
+  | 'REGIME_FIT_FROM_GRID'
+  | 'RESIDUAL_FROM_FIT';
 
 export interface ConfidenceUpdateRecord {
   readonly stepIndex: number;

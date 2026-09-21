@@ -1,4 +1,5 @@
 import type { EntityRef, GenesisLocation } from '../../events/genesisEvent';
+import type { GeometryComponent } from './geometry';
 
 /**
  * C3 — GENESIS WORLD MODEL ENGINE: ECS component contracts.
@@ -23,15 +24,36 @@ import type { EntityRef, GenesisLocation } from '../../events/genesisEvent';
  * pre-existing `MESO_LAB`/`MACRO_CITY` containers never claimed one. Adding
  * a scale level here never implies a new solver exists for it — see
  * `GroundingLevel` and `WorldGraph.zoomInto`'s honest-boundary reporting.
+ *
+ * `DISTRICT`/`PARCEL`/`FLOOR` were added for the geometry-foundation phase
+ * of World Generation (see generation/geometry/) to give procedurally
+ * generated cities a real structural hierarchy between `MACRO_CITY` and
+ * `BUILDING` (districts, subdivided into buildable parcels) and between
+ * `BUILDING` and `ROOM` (a building's individual floors) — same rule as
+ * above: no solver is implied for any of them.
  */
-export type ScaleDomain = 'PLANET' | 'REGION' | 'MACRO_CITY' | 'BUILDING' | 'ROOM' | 'MESO_LAB' | 'MICRO_MOLECULAR' | 'NANO_ATOMIC';
+export type ScaleDomain =
+  | 'PLANET'
+  | 'REGION'
+  | 'MACRO_CITY'
+  | 'DISTRICT'
+  | 'PARCEL'
+  | 'BUILDING'
+  | 'FLOOR'
+  | 'ROOM'
+  | 'MESO_LAB'
+  | 'MICRO_MOLECULAR'
+  | 'NANO_ATOMIC';
 
 /** Coarsest-to-finest ordering — informational (e.g. for a scale picker UI); nothing in C3 currently enforces monotonic parent/child scale ordering. */
 export const SCALE_DOMAIN_ORDER: readonly ScaleDomain[] = [
   'PLANET',
   'REGION',
   'MACRO_CITY',
+  'DISTRICT',
+  'PARCEL',
   'BUILDING',
+  'FLOOR',
   'ROOM',
   'MESO_LAB',
   'MICRO_MOLECULAR',
@@ -122,6 +144,12 @@ export interface WorldModelEntity {
   chemical?: ChemicalComponent;
   domainBinding?: DomainBindingComponent;
   /**
+   * World Generation — structural geometry (district/road/building/room/
+   * door/stair/nav-node/...). See ecs/geometry.ts's own doc: this is ONE
+   * new optional component on the SAME entity shape, not a second ontology.
+   */
+  geometry?: GeometryComponent;
+  /**
    * Generic numeric ledger for real solver output that does not fit the
    * fixed physical components above (e.g. epidemiological compartments
    * S/E/I/R/D). Same role as `ScientificProperty` bags elsewhere in Genesis
@@ -136,7 +164,7 @@ export interface WorldModelEntity {
 }
 
 export type WorldModelEntityPatch = Partial<
-  Pick<WorldModelEntity, 'label' | 'spatial' | 'physics' | 'chemical' | 'domainBinding' | 'domainState' | 'statusLabel' | 'grounding'>
+  Pick<WorldModelEntity, 'label' | 'spatial' | 'physics' | 'chemical' | 'domainBinding' | 'domainState' | 'statusLabel' | 'grounding' | 'geometry'>
 > & { scale?: Partial<ScaleComponent> };
 
 export function locationOf(entity: WorldModelEntity): GenesisLocation | undefined {

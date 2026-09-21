@@ -6,6 +6,9 @@ import {
   buildCaseStudy, buildSignedEvidenceDownload, listCaseStudyCandidates, replayCaseStudy, verifyEvidenceFile,
   type CaseStudy, type CaseStudyReplay,
 } from './evidenceShowcase';
+import { EXTERNAL_ANCHORS, runExternalAnchor, type ExternalAnchor } from '../../core/biotechData/externalAnchor';
+import type { ExternalDatasetCase } from '../../core/agent/externalDatasetCase';
+import { buildQe4EvidenceCase } from '../../core/biotechData/qe4EvidenceCase';
 
 /**
  * EVIDENCE & REPLAY SHOWCASE (C2, "Evidence & Replay as a product" directive).
@@ -46,6 +49,170 @@ function ReplayVerdictBlock({ replay }: { replay: CaseStudyReplay }) {
       <b>{replay.status}</b>
       {' — '}{replay.reason}
     </p>
+  );
+}
+
+/**
+ * KOTWICA ZEWNĘTRZNA (P2.3) — jedyna rzecz na tym ekranie, która NIE zależy od
+ * tego, czy ktokolwiek cokolwiek wcześniej zapisał.
+ *
+ * Reszta ekranu pokazuje Evidence Bundle z Pamięci Naukowej, więc na świeżej
+ * przeglądarce jest pusta. Kotwica jest przypięta w repo, więc recenzent
+ * otwierający `#/evidence` widzi ją ZAWSZE — i widzi cały łańcuch: predykcję
+ * policzoną przez Genesis, obserwację odczytaną z opublikowanego, sumowanego
+ * zbioru zewnętrznego, prerejestrowane kryterium, werdykt falsyfikacyjny,
+ * odcisk i werdykt replayu.
+ *
+ * Blok pokazuje też — z tą samą wagą wizualną — co ta kotwica POZOSTAWIA
+ * nieprzetestowane. Bez tego zdania kotwica sugerowałaby pomiar przyrody,
+ * którym nie jest.
+ *
+ * Renderuje JEDNĄ kotwicę, przekazaną jako prop — `ExternalAnchorsSection`
+ * poniżej mapuje to na WSZYSTKIE wpisy `EXTERNAL_ANCHORS`, więc dodanie
+ * drugiej kotwicy do rejestru wystarcza, żeby wyrenderowała się tutaj bez
+ * dalszych zmian w tym ekranie.
+ */
+function ExternalAnchorCard({ anchor }: { anchor: ExternalAnchor }) {
+  const result = useMemo(() => runExternalAnchor(anchor.id), [anchor.id]);
+
+  return (
+    <section className="ecs-section" data-testid={`ecs-external-anchor-${anchor.id}`}>
+      <span className="dl-label">External anchor — an observation Genesis did not produce</span>
+      {!result.ok ? (
+        <p className="ecs-replay-line wd-replay-BLOCKED" data-testid={`ecs-anchor-blocked-${anchor.id}`}>
+          <b>BLOCKED</b>{' — '}{result.reason}
+        </p>
+      ) : (
+        <>
+          <p data-testid={`ecs-anchor-verdict-${anchor.id}`}>
+            <b>{result.verification.assessment}</b>{' — '}
+            Genesis predicted {result.verification.predictedValue} {anchor.unit} for {anchor.metric};
+            the externally published value is {result.verification.observedValue} {anchor.unit}.
+            Preregistered band ±{anchor.tolerance.toFixed(3)} {anchor.unit}.
+          </p>
+          <dl className="pilot-provenance" data-testid={`ecs-anchor-provenance-${anchor.id}`}>
+            <div><dt>observation origin</dt><dd><ProvenanceBadge provenance={result.observationOrigin} /></dd></div>
+            <div><dt>source</dt><dd className="mono">{anchor.sourceUrl}</dd></div>
+            <div><dt>version / retrieved</dt><dd className="mono">{anchor.sourceVersion} · {anchor.retrievedAt}</dd></div>
+            <div><dt>licence</dt><dd className="mono">{anchor.license}</dd></div>
+            <div><dt>pinned payload digest</dt><dd className="mono">{anchor.payloadDigest}</dd></div>
+            <div><dt>verdict fingerprint</dt><dd className="mono">{result.verificationFingerprint}</dd></div>
+          </dl>
+          <p className="gsc-caption" data-testid={`ecs-anchor-tautology-${anchor.id}`}>
+            <b>Tautology Gate: {result.tautologyAssessment.classification}</b>{' — '}
+            {result.tautologyAssessment.classification === 'EMPIRICAL_TEST'
+              ? 'the observation is registered as an independent channel, separate from whatever produced the prediction — agreement or disagreement here carries real information.'
+              : result.tautologyAssessment.reasons[0]}
+          </p>
+          <p data-testid={`ecs-anchor-belief-${anchor.id}`}>
+            <b>Belief revision</b>{' — '}
+            confidence that this model correctly predicts this real observation moved from{' '}
+            {result.belief.before.toFixed(3)} to {result.belief.after.toFixed(3)} ({result.belief.status}).
+          </p>
+          <p className={`ecs-replay-line wd-replay-${result.replay}`} data-testid={`ecs-anchor-replay-${anchor.id}`}>
+            <b>{result.replay}</b>{' — '}
+            the comparison was re-executed just now, in this browser, from the pinned payload; the two
+            verdict fingerprints were then compared. A changed payload refuses outright rather than
+            reporting a different number.
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-anchor-untested-${anchor.id}`}>
+            <b>What this does NOT establish:</b> {result.whatRemainsUntested}
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-anchor-next-question-${anchor.id}`}>
+            <b>Next question:</b> {result.nextQuestion}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Itera po CAŁYM rejestrze `EXTERNAL_ANCHORS` — żadna kotwica nie jest hardkodowana po ID. */
+function ExternalAnchorsSection() {
+  return (
+    <>
+      {EXTERNAL_ANCHORS.map((anchor) => (
+        <ExternalAnchorCard key={anchor.id} anchor={anchor} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * MULTI-HYPOTHESIS EXTERNAL DATASET CASE (QE4 architecture-integration
+ * round) — one external dataset that yields SEVERAL independent, co-equal
+ * hypothesis verdicts, none demoted to "supporting" the others.
+ *
+ * Renders `core/agent/externalDatasetCase.ts`'s `ExternalDatasetCase` the
+ * same way `ExternalAnchorCard` above renders a single-metric
+ * `ExternalAnchor`: live, computed in this browser from the pinned dataset,
+ * never read back from a stored verdict. The one structural difference is
+ * `.hypotheses.map(...)` — one card per verdict — instead of one verdict per
+ * anchor, so N independent verdicts stay visibly N, and `verdictCounts`/
+ * `tautologyCounts` are shown as tallies, never averaged into a single
+ * pass/fail.
+ */
+function MultiHypothesisCaseCard({ evidenceCase }: { evidenceCase: ExternalDatasetCase }) {
+  const verdictSummary = Object.entries(evidenceCase.verdictCounts)
+    .map(([verdict, count]) => `${count}× ${verdict}`)
+    .join(', ');
+  return (
+    <section className="ecs-section" data-testid={`ecs-case-${evidenceCase.caseId}`}>
+      <span className="dl-label">External dataset case — {evidenceCase.hypotheses.length} independent hypothesis verdicts over one shared dataset</span>
+      <dl className="pilot-provenance" data-testid={`ecs-case-provenance-${evidenceCase.caseId}`}>
+        <div><dt>dataset</dt><dd className="mono">{evidenceCase.provenance.datasetId}</dd></div>
+        <div><dt>source</dt><dd className="mono">{evidenceCase.provenance.sourceUrl}</dd></div>
+        <div><dt>version / retrieved</dt><dd className="mono">{evidenceCase.provenance.sourceVersion} · {evidenceCase.provenance.retrievedAt}</dd></div>
+        <div><dt>licence</dt><dd className="mono">{evidenceCase.provenance.license}</dd></div>
+        {evidenceCase.provenance.archiveSha256 && (
+          <div><dt>archive SHA-256</dt><dd className="mono">{evidenceCase.provenance.archiveSha256}</dd></div>
+        )}
+        <div><dt>domain result fingerprint</dt><dd className="mono">{evidenceCase.domainResultFingerprint}</dd></div>
+        <div><dt>case fingerprint</dt><dd className="mono">{evidenceCase.caseFingerprint}</dd></div>
+      </dl>
+      <p className="gsc-caption" data-testid={`ecs-case-tally-${evidenceCase.caseId}`}>
+        <b>Verdict tally (never collapsed into one case-level verdict):</b> {verdictSummary}
+      </p>
+      {evidenceCase.hypotheses.map((h) => (
+        <div key={h.id} className="ecs-step" data-testid={`ecs-case-hypothesis-${evidenceCase.caseId}-${h.id}`}>
+          <span className="dl-label">{h.id}</span>
+          <p data-testid={`ecs-case-verdict-${evidenceCase.caseId}-${h.id}`}>
+            <b>{h.verdict}</b>{' — '}{h.statement}
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-case-tautology-${evidenceCase.caseId}-${h.id}`}>
+            <b>Tautology Gate: {h.tautology.classification}</b>{' — '}{h.tautology.reasons[0]}
+          </p>
+          <p data-testid={`ecs-case-belief-${evidenceCase.caseId}-${h.id}`}>
+            <b>Belief revision</b>{' — '}confidence moved from {h.belief.before.toFixed(3)} to {h.belief.after.toFixed(3)} ({h.belief.status}).
+          </p>
+          <p className="gsc-caption" data-testid={`ecs-case-next-question-${evidenceCase.caseId}-${h.id}`}>
+            <b>Next question:</b> {h.nextQuestion}
+          </p>
+        </div>
+      ))}
+      <p className="gsc-caption" data-testid={`ecs-case-honesty-${evidenceCase.caseId}`}>
+        Reproduction/replication against one already-published dataset, not new physics: a SUPPORTED_WITHIN_MODEL
+        verdict here means these hypotheses survived a preregistered, independently recomputed check against this
+        one dataset — see docs/QE4_EVIDENCE.md for the full preregistration, estimator, and limitations.
+      </p>
+    </section>
+  );
+}
+
+/** Rejestr wielohipotezowych spraw zewnętrznych — dziś tylko QE4; kolejne (np. odblokowane QE5-7) dopisują się tutaj bez zmian gdzie indziej na tym ekranie. */
+const EXTERNAL_DATASET_CASE_BUILDERS: readonly (() => ExternalDatasetCase)[] = [buildQe4EvidenceCase];
+
+function MultiHypothesisCasesSection() {
+  // Computed once per mount, not per render — QE4's own analysis runs a real
+  // 2000-iteration bootstrap, the same reason `ExternalAnchorCard` above
+  // memoizes `runExternalAnchor`.
+  const evidenceCases = useMemo(() => EXTERNAL_DATASET_CASE_BUILDERS.map((build) => build()), []);
+  return (
+    <>
+      {evidenceCases.map((evidenceCase) => (
+        <MultiHypothesisCaseCard key={evidenceCase.caseId} evidenceCase={evidenceCase} />
+      ))}
+    </>
   );
 }
 
@@ -225,6 +392,10 @@ export function EvidenceShowcaseScreen() {
           <footer className="ecs-footer gsc-caption">{caseStudy.honestyNote}</footer>
         </article>
       )}
+
+      {/* Zawsze widoczna, nawet bez żadnego zapisanego rekordu — patrz doc komponentu. */}
+      <ExternalAnchorsSection />
+      <MultiHypothesisCasesSection />
     </div>
   );
 }

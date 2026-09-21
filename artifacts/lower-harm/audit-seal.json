@@ -1,0 +1,145 @@
+{
+  "algorithm": "sha256",
+  "contractVersion": "1.0.0",
+  "snapshot": {
+    "contractVersion": "1.0.0",
+    "scenarioId": "GOV-DRUG-DISCOVERY-E2E-02-LOWER-HARM",
+    "mode": "PRODUCTION",
+    "verdict": "WINNER",
+    "auditFingerprint": "6615057e",
+    "recipeFingerprint": "7ddcabe9",
+    "record": {
+      "kind": "WINNER_RECORD",
+      "winnerId": "CHEMBL4084119",
+      "candidateName": "LIRAGLUTIDE",
+      "recordFingerprint": "b6207e9c",
+      "gateOutcome": "REQUIRES_HUMAN_APPROVAL",
+      "gateFingerprint": "cf987dda"
+    },
+    "conjuncts": [
+      {
+        "criterion": "G2_SEPARATES_TOP2",
+        "held": true
+      },
+      {
+        "criterion": "AGREES_WITH_PRE_EXPERIMENT_RANK",
+        "held": true
+      },
+      {
+        "criterion": "FAVOURED_CANDIDATE_PASSES_SAFETY_GATE",
+        "held": true
+      }
+    ],
+    "custody": {
+      "sourceId": "LOWER_HARM_A2_PINNED_DATASET",
+      "hash": "4d63f8f0d24ab28b528e4c386fa01adf64d640aa7e05d410d5dc0fa9a6e36b10",
+      "hashPolicy": "sha256"
+    },
+    "stages": [
+      {
+        "stage": "01_FORMALIZE",
+        "status": "OK",
+        "fingerprint": "3fdc04b7"
+      },
+      {
+        "stage": "02_NL_TO_REQUEST",
+        "status": "OK",
+        "fingerprint": "186b812c"
+      },
+      {
+        "stage": "03_GENERATE",
+        "status": "OK",
+        "fingerprint": "720a44ca"
+      },
+      {
+        "stage": "04_NORMALIZE_DEDUP",
+        "status": "OK",
+        "fingerprint": "93d315c0"
+      },
+      {
+        "stage": "05_HARD_FILTER",
+        "status": "OK",
+        "fingerprint": "ad09aa47"
+      },
+      {
+        "stage": "06_DIVERSITY",
+        "status": "OK",
+        "fingerprint": "253ecb15"
+      },
+      {
+        "stage": "07_RANK",
+        "status": "OK",
+        "fingerprint": "5f55b0d2"
+      },
+      {
+        "stage": "08_TOP10",
+        "status": "OK",
+        "fingerprint": "487204dd"
+      },
+      {
+        "stage": "09_TOP2",
+        "status": "OK",
+        "fingerprint": "937d71d1"
+      },
+      {
+        "stage": "10_FREEZE_PREREG",
+        "status": "OK",
+        "fingerprint": "e4d1c845"
+      },
+      {
+        "stage": "11_EXPERIMENT_PLAN",
+        "status": "OK",
+        "fingerprint": "e5293a7a"
+      },
+      {
+        "stage": "12_EXECUTE",
+        "status": "OK",
+        "fingerprint": "e4942ecb"
+      },
+      {
+        "stage": "13_EVIDENCE",
+        "status": "OK",
+        "fingerprint": "1e6f6c79"
+      },
+      {
+        "stage": "14_FALSIFY",
+        "status": "OK",
+        "fingerprint": "6e621658"
+      },
+      {
+        "stage": "15_ADJUDICATE_D047",
+        "status": "OK",
+        "fingerprint": "3d13ed7b"
+      },
+      {
+        "stage": "16_COMPARE",
+        "status": "OK",
+        "fingerprint": "bdb1c660"
+      },
+      {
+        "stage": "17_VERDICT",
+        "status": "OK",
+        "fingerprint": "03619d16"
+      },
+      {
+        "stage": "18_RECIPE_OR_LOCK",
+        "status": "OK",
+        "fingerprint": "74899caa"
+      },
+      {
+        "stage": "19_AUDIT_REPLAY",
+        "status": "OK",
+        "fingerprint": "902d5c82"
+      },
+      {
+        "stage": "20_NEXT_EXPERIMENT",
+        "status": "OK",
+        "fingerprint": "9b74bd09"
+      }
+    ]
+  },
+  "sha256": "8072bb69456741adeb480b85a55ed261f6280e44d06190d1382b317843d41ad7",
+  "previousSha256": null,
+  "chainIndex": 0,
+  "sealedAt": "2026-09-16T21:34:16.149Z"
+}

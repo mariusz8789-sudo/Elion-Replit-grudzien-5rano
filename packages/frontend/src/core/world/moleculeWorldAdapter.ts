@@ -90,6 +90,8 @@ function replayStateFor(loopResult: HypothesisLoopResult): Promise<ReplayState> 
       contractVersion: loopResult.contractVersion,
       preregistrationId: loopResult.preregistration.preregistrationId,
       preregistrationFingerprint: loopResult.preregistration.preregistrationFingerprint,
+      createdAt: loopResult.preregistration.createdAt,
+      anchor: loopResult.preregistration.anchor,
       problem: loopResult.preregistration.set.problem,
       hypotheses: loopResult.preregistration.hypotheses,
       outcomes: loopResult.outcomes.map((o) => ({ hypothesisId: o.hypothesisId, status: o.status, observedMetric: o.observedMetric, baselineMetric: o.baselineMetric, evidencePackId: o.evidencePackId, evidenceChainId: o.evidenceChainId })),

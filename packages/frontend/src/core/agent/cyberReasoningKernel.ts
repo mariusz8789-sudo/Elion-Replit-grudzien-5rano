@@ -20,6 +20,50 @@ import {
   type CyberTestSelection,
 } from './cyberTestPlanner';
 
+import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider, molecularBiologyProvider, spacetimePhotonProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { environmentalDetectiveProvider } from './environmentalDetective';
+import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
+import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
+import { openKernelLedger } from '../knowledge/ledgerStore';
+
+/**
+ * SINGLE-KERNEL POLICY. This module is Genesis's one cyber orchestrator and
+ * the only execution point. It binds itself to the shared provider registry
+ * at load: any other module that tries to bind as a kernel throws
+ * KERNEL_ALREADY_BOUND. The Mythos / Post-Mythos engines (CICADA, ZTSE,
+ * Action-Gate, PQC) are analysis PROVIDERS resolved through the registry,
+ * never a second kernel; `#/matrix` is visualisation only and binds nothing.
+ *
+ * Registered here by default: ZTSE (needs no configuration). CICADA needs
+ * baselines and Action-Gate needs a real signature verifier, so their
+ * providers are registered by whoever owns that configuration — never with
+ * invented baselines or a stub verifier.
+ */
+export const GENESIS_CYBER_KERNEL_ID = 'genesis-cyber-kernel';
+kernelRegistry.bindKernel(GENESIS_CYBER_KERNEL_ID);
+if (kernelRegistry.resolve('semantic-verify') === null) kernelRegistry.register(ztseProvider(new ZeroTrustSemanticEngine()));
+/** CLOCKWORK (B2G module 1): statutory deadline monitoring, drafts for human approval, anchored in its own EvidenceLedger
+ *  whose clock is the browser's real time (the ledger entry timestamp, not any deadline arithmetic — `today` is always passed in). */
+/** D-130: the ledger is restored from the browser's local storage when a verified snapshot exists and persists after every entry;
+ *  a broken snapshot is rejected (console error) and the kernel runs in memory — `kernelLedgerBoot` says which. */
+export const kernelLedgerBoot = openKernelLedger({ now: () => Date.now() });
+export const clockworkLedger = kernelLedgerBoot.ledger;
+/** The same ledger anchors every provider's output (one evidence trail for the one kernel). */
+export const kernelLedger = clockworkLedger;
+if (kernelRegistry.resolve('deadline-monitoring') === null) kernelRegistry.register(clockworkProvider(new ClockworkEngine(clockworkLedger)));
+/** Collider and thermo-lab: toy-normalised models (labelled as such), each event/mix committed to the ledger by the engine. */
+if (kernelRegistry.resolve('particle-collision-sim') === null) kernelRegistry.register(colliderProvider(kernelLedger));
+if (kernelRegistry.resolve('thermodynamic-reaction-sim') === null) kernelRegistry.register(thermoLabProvider(kernelLedger));
+/** CERN complex: micro black hole formation (4D hypothesis / ADD speculative, labelled by the engine) and crystal synthesis (documented estimates). */
+if (kernelRegistry.resolve('micro-blackhole-sim') === null) kernelRegistry.register(blackHoleProvider(kernelLedger));
+if (kernelRegistry.resolve('crystal-synthesis-sim') === null) kernelRegistry.register(materialsProvider(kernelLedger));
+if (kernelRegistry.resolve('collision-batch') === null) kernelRegistry.register(computeColliderProvider(kernelLedger));
+// D-128: the textbook molecular-biology layer and the environmental detective (on CAP-2 causal inference) as providers.
+if (kernelRegistry.resolve('central-dogma-model') === null) kernelRegistry.register(molecularBiologyProvider(kernelLedger));
+if (kernelRegistry.resolve('environmental-detective') === null) kernelRegistry.register(environmentalDetectiveProvider(kernelLedger));
+// D-130: the flagship physics scenario (weak-field photon propagation vs. a flat baseline) as a provider; c is SI-defined, nothing measures it.
+if (kernelRegistry.resolve('spacetime-photon-model') === null) kernelRegistry.register(spacetimePhotonProvider(kernelLedger));
+
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic
  * target. Adapted from an external draft (Qwen), integrated after fixing

@@ -1,0 +1,421 @@
+{
+  "nctId": "NCT03191396",
+  "briefTitle": "Research Study Comparing a New Medicine Semaglutide to Liraglutide in People With Type 2 Diabetes",
+  "arms": [
+    {
+      "label": "Semaglutide",
+      "type": "EXPERIMENTAL",
+      "description": "Half the study participants are randomised to receive semaglutide"
+    },
+    {
+      "label": "Liraglutide",
+      "type": "ACTIVE_COMPARATOR",
+      "description": "Half the study participants are randomised to receive liraglutide"
+    }
+  ],
+  "hba1cOutcomes": [
+    {
+      "title": "Change in HbA1c",
+      "type": "PRIMARY",
+      "paramType": "MEAN",
+      "dispersionType": "Standard Deviation",
+      "unitOfMeasure": "Percentage of glycosylated haemoglobin",
+      "timeFrame": "Week 0, week 30",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "-1.7",
+                  "spread": "0.9"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "-1.1",
+                  "spread": "1.0"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Below 7.0% (53 mmol/Mol), American Diabetes Association (ADA) Target",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "80.4"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "45.9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Below or Equal to 6.5% (48 mmol/Mol), American Association of Clinical Endocrinologists (AACE) Target",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "58.5"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "24.8"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Below 7.0% (53 mmol/Mol) Without Severe or Blood Glucose Confirmed Symptomatic Hypoglycaemia Episodes and no Weight Gain",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "Percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "75.6"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "36.8"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Reduction Above or Equal to 1%",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "Percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "82.8"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "48.3"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Reduction Above or Equal to 1% and Weight Loss Above or Equal to 3%",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "Percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "62.4"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "20.9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Reduction Above or Equal to 1% and Weight Loss Above or Equal to 5%",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "Percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "49.6"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "11.9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Subjects Who Achieve HbA1c Reduction Above or Equal to 1% and Weight Loss Above or Equal to 10%",
+      "type": "SECONDARY",
+      "paramType": "NUMBER",
+      "unitOfMeasure": "Percentage of participants",
+      "timeFrame": "After 30 weeks of treatment",
+      "groups": [
+        {
+          "id": "OG000",
+          "title": "Semaglutide 1.0 mg"
+        },
+        {
+          "id": "OG001",
+          "title": "Liraglutide 1.2 mg"
+        }
+      ],
+      "denoms": [
+        {
+          "units": "Participants",
+          "counts": [
+            {
+              "groupId": "OG000",
+              "value": "290"
+            },
+            {
+              "groupId": "OG001",
+              "value": "287"
+            }
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "categories": [
+            {
+              "measurements": [
+                {
+                  "groupId": "OG000",
+                  "value": "17.1"
+                },
+                {
+                  "groupId": "OG001",
+                  "value": "3.6"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

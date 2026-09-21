@@ -7,7 +7,7 @@
  */
 
 const CACHE = 'genesis-v3';
-const PRECACHE = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+const PRECACHE = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/brand/genesis-mark.png', '/brand/genesis-lockup.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

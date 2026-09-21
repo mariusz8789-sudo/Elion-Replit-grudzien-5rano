@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "genesis.qe4-brydges.pinned.v1",
+  "source": "Brydges, Elben, Jurcevic, Vermersch, Maier, Lanyon, Zoller, Blatt, Roos — \"Probing Rényi entanglement entropy via randomized measurements\", Science 364, 260 (2019)",
+  "arxiv": "arXiv:1806.05747",
+  "zenodo": {
+    "recordUrl": "https://zenodo.org/records/2527010",
+    "doi": "10.5281/zenodo.2527010",
+    "conceptrecid": "1445994",
+    "recordId": "2527010",
+    "revision": 5,
+    "license": "cc-by-4.0",
+    "accessRight": "open",
+    "publicationDate": "2018-10-05",
+    "note": "The record page's own UI shows a 'v2' label; the record API response captured here (zenodo-record.json) has no metadata.version field -- 'v2' likely reflects Zenodo's versioned-deposit display convention (conceptrecid groups versions; revision=5 is this snapshot's own edit count), not something this API payload exposes directly. Not blocking: the file checksum, license, and content are independently verified below regardless of version label."
+  },
+  "archive": {
+    "filename": "Data_aau4963_Updated.zip",
+    "bytes": 2286535,
+    "md5": "5f027c6ee5d1283ca9338015e066dff6",
+    "sha256": "87424c2ddfbc9e68361d70a41878b63919ceb7257bdb70b4fad65d4179cd8389",
+    "md5MatchesZenodoApi": true,
+    "md5MatchesTaskStatedValue": true
+  },
+  "retrieval": {
+    "method": "GitHub Actions CI runner fetch (local sandbox egress to zenodo.org is blocked at the proxy/policy level, confirmed directly via curl 403 on CONNECT and via the agent-side WebFetch tool returning EGRESS_BLOCKED for the same host)",
+    "workflow": ".github/workflows/ci.yml",
+    "jobs": [
+      "qe4-brydges-recon (run 34718066781, job 103618756589) -- Phase 0 format/structure reconnaissance",
+      "qe4-brydges-pin-measured-states (matrix, run 34718557559) -- one job per raw MeasuredStates file",
+      "qe4-brydges-pin-small-files (run 34718557559, job 103620057995) -- RenyiEntropy/AllPartitions/Fig1a/record.json"
+    ],
+    "readBackMethod": "Each job printed its file's full byte content plus a SHA-256 header into its own CI job log; content was read back via the GitHub Actions job-logs API and every byte verified against the printed hash before being committed here.",
+    "retrievedAt": "2026-09-13"
+  },
+  "files": [
+    { "path": "10Ions_CleanSystem/MeasuredStates_T_0ms.csv", "sha256": "722866dd25128483015e1a7fb5b89bfdb621f9538bfa470fd2ff614c8565ebbd", "rows": 500, "columns": 150, "description": "Raw randomized-measurement outcomes (decimal-encoded 10-bit projective measurement, 0-1023), 10-ion clean chain, t=0ms after quench." },
+    { "path": "10Ions_CleanSystem/MeasuredStates_T_1ms.csv", "sha256": "14abbdc66b1ffbcd00f495fb5ab3f04b0ede7befa3bb508f66ed6001107ce71b", "rows": 500, "columns": 150 },
+    { "path": "10Ions_CleanSystem/MeasuredStates_T_2ms.csv", "sha256": "a67ff760a0b9a5bfa288919f2f81a044d3e4fc3709c600aa8bdb780d927e1b42", "rows": 500, "columns": 150 },
+    { "path": "10Ions_CleanSystem/MeasuredStates_T_3ms.csv", "sha256": "2468ff07e4304806ae9945582750d2cbed10f402b93ff1d5462d8fb98b165c28", "rows": 500, "columns": 150 },
+    { "path": "10Ions_CleanSystem/MeasuredStates_T_4ms.csv", "sha256": "b7a199bd63d423e753d2df44f2c75dc6b1265ec11e4cfed15945729064139625", "rows": 500, "columns": 150 },
+    { "path": "10Ions_CleanSystem/MeasuredStates_T_5ms.csv", "sha256": "594b219ec058f4cb6e01cd46eba9fb403b9cc93cabdbd266c5824467dda65240", "rows": 500, "columns": 150 },
+    { "path": "10Ions_CleanSystem/RenyiEntropy_T_0ms.csv", "sha256": "24bf31e01c82a3e2d47f6e3056a944739e5c309b391926762cc1a3cef4cd8776", "description": "Published (authors' own pipeline) S2 per contiguous subsystem size 1-10 at t=0ms -- P4 reference only, never used as an input to Genesis's own recomputation." },
+    { "path": "10Ions_CleanSystem/RenyiEntropy_T_1ms.csv", "sha256": "7b406cc359a2471e4a321957b8d483a8eea80167b89ffcc7c1e1b1a6dd4cbee6" },
+    { "path": "10Ions_CleanSystem/RenyiEntropy_T_2ms.csv", "sha256": "563ee8019434685cc3bfa4f81c611b3b5081f97e3961d99183ff16408723c370" },
+    { "path": "10Ions_CleanSystem/RenyiEntropy_T_3ms.csv", "sha256": "2814716a1cb10b527e00658dbb9d0eed5e7984499520160c8a92a593241e77ce" },
+    { "path": "10Ions_CleanSystem/RenyiEntropy_T_4ms.csv", "sha256": "1a47ca32a352e829d3c71a0a096d63ec0e900183539d866f6e102799e8f9acf3" },
+    { "path": "10Ions_CleanSystem/RenyiEntropy_T_5ms.csv", "sha256": "a4bcb98b23eeb7b7c56d21ef1dc8bd756c392d826c03c1f9321829c490fc60a0" },
+    { "path": "10Ions_CleanSystem/RenyiEntropyAllPartitions_T_5ms.csv", "sha256": "f8cf8a1cad13be5ad9b982e6e9cb933aa91c39a60210e9699a9bcfd8a4f26707", "description": "Published S2 for all measured partitions at t=5ms saturation -- reference only." },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_01ms.csv", "sha256": "b6c2ccbb441b6a771b57cca88b5cf7aef9ec9130f0ce5fd89fef0f9b3f8d7048", "rows": 345, "columns": 150, "description": "Raw randomized-measurement outcomes, 10-ion chain WITH disorder, t=1ms. Rows grouped in blocks of 10 (one disorder realization per block) per Data_Description_10Ions_withDisorder.docx." },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_02ms.csv", "sha256": "a8e4ddfc9c5466f8d6bc46bc2d58f4a62f8b91068f3e7f00bf1ed952c304d3e2", "rows": 345, "columns": 150 },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_04ms.csv", "sha256": "b10d206e01779e965508a8591be61062e5196584ff205b16557616629a25f565", "rows": 345, "columns": 150 },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_06ms.csv", "sha256": "1a6204e807804ad1e06ee2c8153145b9cb16c4352004293f3fc19ae9a3db46da", "rows": 345, "columns": 150 },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_10ms.csv", "sha256": "b6453f578075d2e1e1bd85f4c16871c5f88fd2b7cf668220599c1c23c07a0a6e", "rows": 345, "columns": 150 },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_16ms.csv", "sha256": "8ddbf39f2592d826c9eb6bc2f09d5655f0d76e7cb08ac66bea534dab5dadd9a3", "rows": 345, "columns": 150 },
+    { "path": "10Ions_withDisorder/MeasuredStates_T_20ms.csv", "sha256": "4af0adab5d276c4b44d7f943ef90267713d68ed6c0c8c22eab34a4f8e6dd518a", "rows": 345, "columns": 150 },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_1ms.csv", "sha256": "ef1bd4eae2562e43328d81aece554f9b3f9c319e2b8c0f940bb2369e8a32b248", "description": "Published S2 for half (5-ion) and full (10-ion) subsystems -- P4 reference only." },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_2ms.csv", "sha256": "416456f9c3b8afda34d623cff80a7407df93f402b2c993fb9e9e4749f30ee414" },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_4ms.csv", "sha256": "0913d5659ec693e4b853d45c3fb24cbd536baadd894540ceecbe1b0d57de16e4" },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_6ms.csv", "sha256": "b16d39d3071be08d6a992c66964a1ae2cd36f515204cabbbd1135114af6681cd" },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_10ms.csv", "sha256": "b3305144bc40a7a1242c9ef48465ea5c931b965c80cd2fefb530a4abab31fa7f" },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_16ms.csv", "sha256": "d76252761227ecce4954e60a08acee66fd999fa2d43c4573f472d3e7ec4ecc17" },
+    { "path": "10Ions_withDisorder/RenyiEntropy_T_20ms.csv", "sha256": "69477597ee7d7a3cd9e175e6db0497000effae530b95e3afb615afd14768b71a" },
+    { "path": "Fig1a/PureState.csv", "sha256": "80dfbfa59e5c24f0425a0551e1c2f5648ae843535b47efa8febf20a857bef29e", "rows": 100, "description": "Single-qubit Bloch-vector components (Sx,Sy,Sz), already averaged per random unitary, for a state DELIBERATELY prepared pure." },
+    { "path": "Fig1a/MixedState.csv", "sha256": "3797855d76951efb9242612a24c73b186ec0306b53d4491ccb0f7c1295161fd3", "rows": 100, "description": "Same as PureState.csv but for a state DELIBERATELY prepared mixed." },
+    { "path": "zenodo-record.json", "sha256": "7b88970f667168df43610a3f7e9ba42d5df0489a378cf1f904ad35ee4f2abd3c", "description": "Raw response of https://zenodo.org/api/records/2527010 at retrieval time -- source of the license/DOI/checksum facts above." }
+  ],
+  "excludedFromScope": {
+    "20Ions_CleanSystem/*": "Fig.3 data for a 20-ion chain. Not used by any of P1-P4 as preregistered (P1/P4 use the 10-ion clean set; P2 uses the 10-ion disorder set). Excluded by scope decided before any file in this folder was opened, not after seeing any result.",
+    "10Ions_withDisorder/RenyiMutInfo_*.csv, RenyiTimeEvo_HalfPartition_Numerics.csv": "Rényi mutual-information and author-simulated (Numerics) reference curves -- outside P1-P4's scope, and RenyiMutInfo/Numerics files are explicitly excluded from ever being used as a prediction input, per the preregistration."
+  }
+}

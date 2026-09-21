@@ -117,7 +117,18 @@ function useCustomExperimentState(lab: LabDefinition) {
         honestyNote: lab.honestyNote,
         equations: [],
         assumptions: [],
-        epistemicStatus: 'OBSERVATION_RECORDED_NOT_VALIDATED',
+        // These samples come from THIS LAB'S OWN SIMULATION (useSimLoop /
+        // useThreeLoop above), recorded via appendSample — not from measuring
+        // anything real. `OBSERVATION_RECORDED_NOT_VALIDATED` sits beside
+        // OBSERVED / REAL_EXPERIMENTAL / REFERENCE in this vocabulary and reads
+        // as "something real was observed, just not validated yet", which is a
+        // claim these numbers cannot support. Every other site that persists a
+        // simulation run already says SIMULATION (scenarioSession.ts,
+        // experimentFabric/executor.ts, worldHandoff.ts, GenesisWorldScreen.tsx);
+        // this was the sole outlier. The honest label for a recorded simulation
+        // is SIMULATION, and `honesty`/`honestyNote` above still carry the lab's
+        // own fidelity disclosure.
+        epistemicStatus: 'SIMULATION',
       });
     }
     setSaved(listCustomExperiments(lab.id));

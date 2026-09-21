@@ -55,9 +55,26 @@ describe('World Engine asset governance — provenance completeness', () => {
     expect(assetFileChecksum('/assets/genesis-hf/pbr/asphalt/diffuse.jpg', 'diffuse.jpg')).toBeNull();
   });
 
-  it('the undocumented LOD0 human stays blocked on every path that loads it', () => {
-    // Dwa różne miejsca w rendererze ładują ten sam plik; obydwa pytają bramkę.
-    expect(isWorldAssetApproved('/assets/genesis-hf/characters/mpfb-lod0.glb')).toBe(false);
-    expect(getWorldAssetRecord('/assets/genesis-hf/characters/mpfb-lod0.glb')?.status).toBe('UNVERIFIED');
+  it('the LOD0 human is approved ONLY with complete, verified provenance (D-131)', () => {
+    // Do D-130 ten asset był UNVERIFIED z uzasadnieniem „brak lokalnego rekordu źródła i licencji".
+    // Rekord jednak istniał — w ASSETS.md obok pliku. D-131 zweryfikowało obie rzeczy (sumy SHA-256 policzone
+    // z plików w repo + cytat licencji CC0 z README źródła) i dopiero wtedy promowało wpis.
+    const record = getWorldAssetRecord('/assets/genesis-hf/characters/mpfb-lod0.glb');
+    expect(record?.status).toBe('APPROVED');
+    expect(isWorldAssetApproved('/assets/genesis-hf/characters/mpfb-lod0.glb')).toBe(true);
+    // Bramka jest tyle warta, ile kompletność rekordu: bez licencji, źródła i sumy nie wolno go dopuścić.
+    expect(record?.license).toBe('CC0-1.0');
+    expect(record?.sourceUrl).toMatch(/^https:\/\//);
+    expect(record?.author).toBeTruthy();
+    expect(record?.sha256['mpfb-lod0.glb']).toBe('ec47cffd0a56d201869afb9c10ea957e237c55d4e12c197fc9d9c30d5772a8d2');
+    expect(approvedAssetsMissingProvenance()).toEqual([]);
+    // Licencja dotyczy GRAFIKI. Rekord nie może sugerować, że to medyczny model anatomiczny.
+    expect(record?.rationale).toMatch(/[Nn]ie zawiera anatomii medycznej/);
+  });
+
+  it('an asset with no recorded source or licence is still blocked', () => {
+    expect(isWorldAssetApproved('/assets/genesis-hf/pbr/asphalt/diffuse.jpg')).toBe(false);
+    expect(getWorldAssetRecord('/assets/genesis-hf/pbr/')?.status).toBe('UNVERIFIED');
+    expect(isWorldAssetApproved('/assets/nieistniejacy/asset.glb')).toBe(false);
   });
 });

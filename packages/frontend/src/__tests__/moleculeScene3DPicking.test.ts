@@ -164,3 +164,73 @@ describe('MoleculeScene3D — clickable atoms (GENESIS WORLD INTERACTION)', () =
     expect(() => sim.dispose()).not.toThrow();
   });
 });
+
+describe('MoleculeScene3D — hover (D-133 Smart UI: WORLD VIEW -> hover -> popup)', () => {
+  function move(sim: MoleculeScene3D, point: { x: number; y: number }): void {
+    sim.pointer(point.x, point.y, 'move');
+  }
+
+  it('moving over a real atom mesh fires onAtomHovered with its real element, without selecting it', async () => {
+    const { sim, scene, camera } = await buildScene();
+    const atom = firstAtomMesh(scene, 'genesis-molecule-atom-c');
+    let hovered: SelectedAtomInfo | null | undefined;
+    let selected: SelectedAtomInfo | null | undefined;
+    sim.onAtomHovered = (info) => { hovered = info; };
+    sim.onAtomSelected = (info) => { selected = info; };
+    move(sim, screenPointOf(atom, camera));
+    expect(hovered).toBeTruthy();
+    expect(hovered!.element).toBe('c');
+    expect(selected).toBeUndefined(); // hover never fires a selection callback
+  });
+
+  it('moving off the atom fires onAtomHovered(null) — the hover clears honestly, never sticks', async () => {
+    const { sim, scene, camera } = await buildScene();
+    const atom = firstAtomMesh(scene, 'genesis-molecule-atom-c');
+    const calls: (SelectedAtomInfo | null)[] = [];
+    sim.onAtomHovered = (info) => calls.push(info);
+    move(sim, screenPointOf(atom, camera));
+    move(sim, { x: -500, y: -500 });
+    expect(calls.at(-1)).toBeNull();
+  });
+
+  it('hover and selection are independent: hovering a different atom never changes the selection', async () => {
+    const { sim, scene, camera } = await buildScene();
+    const carbon = firstAtomMesh(scene, 'genesis-molecule-atom-c');
+    const hydrogen = firstAtomMesh(scene, 'genesis-molecule-atom-h');
+    click(sim, screenPointOf(carbon, camera));
+    move(sim, screenPointOf(hydrogen, camera));
+    expect(sim.getStats().moleculeStateCode).toBeDefined(); // scene still consistent
+    // Re-select is still the carbon until a new click happens — hover alone never reassigns it.
+    let selectedAgain: SelectedAtomInfo | null | undefined;
+    sim.onAtomSelected = (info) => { selectedAgain = info; };
+    click(sim, { x: -500, y: -500 }); // clears — proves the prior click (carbon) was still live, not silently replaced
+    expect(selectedAgain).toBeNull();
+  });
+});
+
+describe('MoleculeScene3D — selected-atom screen anchor (D-133: ContextualPopup positioning)', () => {
+  it('getStats() reports NaN for the anchor with nothing selected — never a stale/guessed corner', async () => {
+    const { sim } = await buildScene();
+    const stats = sim.getStats();
+    expect(Number.isNaN(stats.selectedAnchorX)).toBe(true);
+    expect(Number.isNaN(stats.selectedAnchorY)).toBe(true);
+  });
+
+  it('getStats() reports a finite on-screen anchor for a selected, on-screen atom', async () => {
+    const { sim, scene, camera } = await buildScene();
+    const atom = firstAtomMesh(scene);
+    const expected = screenPointOf(atom, camera);
+    click(sim, expected);
+    const stats = sim.getStats();
+    expect(stats.selectedAnchorX).toBeCloseTo(expected.x, 0);
+    expect(stats.selectedAnchorY).toBeCloseTo(expected.y, 0);
+  });
+
+  it('clearing the selection clears the anchor back to NaN', async () => {
+    const { sim, scene, camera } = await buildScene();
+    click(sim, screenPointOf(firstAtomMesh(scene), camera));
+    expect(Number.isNaN(sim.getStats().selectedAnchorX)).toBe(false);
+    click(sim, { x: -500, y: -500 });
+    expect(Number.isNaN(sim.getStats().selectedAnchorX)).toBe(true);
+  });
+});

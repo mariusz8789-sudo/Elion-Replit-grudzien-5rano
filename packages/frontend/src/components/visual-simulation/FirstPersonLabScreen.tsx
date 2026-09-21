@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { WorldChrome } from '../genesis-ui/WorldChrome';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { consumePendingLookingGlassExperience, peekPendingLookingGlassExperience } from '../../core/lookingGlass/sessionHandoff';
 import { ExperiencePlayer } from '../../core/lookingGlass/experienceOrchestrator';
@@ -455,6 +456,13 @@ export function FirstPersonLabScreen() {
 
   return (
     <main id="main-content" tabIndex={-1} className="gid-shell fp-lab">
+      <WorldChrome
+        glyph="⌬"
+        domain="Virtual Lab"
+        title="Wirtualne laboratorium"
+        purpose="Hipoteza → eksperyment → obserwacja → dowód → wynik. Kamera naukowa reaguje na realne zdarzenia przebiegu."
+        badges={[{ label: 'SCENARIO ENGINE · REAL RUN', tone: 'real' }, { label: 'SCENA 3D · WIZUALIZACJA', tone: 'visual' }]}
+      />
       <section className="gid-flow" aria-label="Przepływ naukowy: Pytanie -> Eksperyment -> Wykonanie -> Obserwacja -> Porównanie -> Następny krok">
         {flowStrip}
       </section>

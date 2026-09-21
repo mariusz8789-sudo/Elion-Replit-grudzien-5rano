@@ -1,0 +1,83 @@
+{
+  "artifact": {
+    "id": "D-091-DIAGNOSTIC-1",
+    "kind": "SEALED_RESEARCH_ARTIFACT",
+    "question": "Is the assay noise floor measurable on an endpoint-HOMOGENEOUS axis of the frozen GLP-1R pin?",
+    "datasetPinSha256": "5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244",
+    "datasetRows": 287,
+    "gateRuleFingerprint": "d2f77a7e6042f0fc",
+    "gateConstants": {
+      "MIN_TRAIN": 150,
+      "MIN_TEST": 40,
+      "MAX_MAE": 1,
+      "MIN_R2": 0.25
+    },
+    "gateConstantsChanged": false,
+    "pinsChanged": false,
+    "winnerGateChanged": false,
+    "testSplitRead": false,
+    "representationAttemptsConsumed": 0,
+    "modelFitted": false,
+    "replicateRule": {
+      "definition": "same canonicalSmiles + same standardType + >= 2 DISTINCT assayId",
+      "minDistinctAssays": 2,
+      "minGroupsForNoiseFloor": 20,
+      "implementedIn": "packages/backend/src/campaign/replicateGrouping.mjs",
+      "whyDistinctAssaysIsRequired": "two rows from ONE assay are a duplicated record, not an independent repeat. Counting them yields a spread near zero and therefore a falsely LOW noise floor — the dangerous direction, because it makes the data look more reliable than it is.",
+      "whySameEndpointIsRequired": "EC50 (functional potency) and IC50/Ki (binding) are different physical quantities. D-089 measured their median disagreement at 1.7618 pActivity across 65 molecules; treating that as noise produced a spurious floor of 1.1212, recorded WITHDRAWN in the D-089 seal."
+    },
+    "assayIdProvenanceVerification": {
+      "method": "measured directly on the frozen pin, not assumed",
+      "distinctAssayIds": 25,
+      "nullOrEmptyAssayIds": 0,
+      "assayIdType": "string (ChEMBL assay identifiers, e.g. CHEMBL677178)",
+      "assaysCarryingMoreThanOneEndpointType": 0,
+      "moleculeAssayPairsAppearingMoreThanOnce": 0,
+      "consequence": "on THIS pin the distinct-assay condition is currently REDUNDANT: no molecule repeats within one assay, so >=2 records already implies >=2 assays. The condition is retained because that redundancy is a property of today's data, not of the rule — bulk sources routinely carry several rows per assay, and the first extension would make it load-bearing. A guard that is currently inert is not a guard that is unnecessary."
+    },
+    "measurements": {
+      "EC50": {
+        "molecules": 189,
+        "replicateGroups": 4,
+        "rejectedSingleRecord": 185,
+        "rejectedSameAssayOnly": 0,
+        "status": "NOT_MEASURED"
+      },
+      "IC50": {
+        "molecules": 86,
+        "replicateGroups": 2,
+        "rejectedSingleRecord": 84,
+        "rejectedSameAssayOnly": 0,
+        "status": "NOT_MEASURED"
+      },
+      "KI": {
+        "molecules": 4,
+        "replicateGroups": 0,
+        "rejectedSingleRecord": 4,
+        "rejectedSameAssayOnly": 0,
+        "status": "NOT_MEASURED"
+      },
+      "totalReplicateGroups": 6,
+      "reconcilesWith": "the aggregate of 6 sealed in D-089 Diagnostic-0 (artifactHash dd782ef2a4bab906a0b5869242861a84)"
+    },
+    "result": {
+      "status": "NOT_MEASURED",
+      "onEveryAxis": true,
+      "statement": "The assay noise floor cannot be measured from this pin on ANY endpoint axis. The EC50 axis — the one that would matter, being both the largest and the homogeneous one — carries 4 replicate groups against a floor of 20.",
+      "implementationIndependent": "This outcome does not depend on the quality of any grouping implementation. The data physically contains 6 repeat measurements in total; no rule recovers a floor from that."
+    },
+    "consequenceForTheResearchQuestion": {
+      "question": "Can the D-088 V2 ceiling (MAE 1.0425) be scientifically improved under frozen rules?",
+      "answer": "UNDECIDABLE FROM THIS PIN. Deciding it requires knowing how much of the error is irreducible label noise, and that quantity is NOT_MEASURED. D-089's CONSTRAINT_CONFLICT therefore stands unchanged and is NOT upgraded to an impossibility claim.",
+      "whatWouldDecideIt": "endpoint-homogeneous EC50-only human GLP-1R rows on new Murcko scaffolds — the same acquisition that lifts the size floor also creates the replicate groups that make the noise floor measurable. One acquisition answers both open questions."
+    },
+    "scientificStateUnchanged": {
+      "NO_WINNER": true,
+      "recipe": "LOCKED",
+      "d088AttemptBudget": "1 of 2 remaining",
+      "gatesPinsWinnerGate": "UNTOUCHED"
+    }
+  },
+  "artifactHash": "e965ac46535375996fe7b34a8b6cbf047466da98eb7f781b2126a08dbcd242f5",
+  "sealedAt": "2026-09-15T13:17:31.472Z"
+}

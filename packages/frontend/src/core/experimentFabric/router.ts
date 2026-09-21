@@ -477,6 +477,17 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Rzeczywisty backendowy Fabric wykonuje te same dokładne macierze unitarne jednokubitowych bramek H, X, Y, Z, S i T co wizualizacja sfery Blocha, startując z |0⟩. Przeglądarka nie wyprowadza zastępczego wyniku. Model nie symuluje splątania, CNOT, szumu sprzętowego ani pojedynczego wyniku pomiaru.',
     capability: 'BACKEND_REAL_ENGINE',
   },
+  {
+    id: 'quantum-entanglement-measures', domainId: 'quantum', modelVersion: '1.1.0', engine: 'genesis-entanglement-measures@1.1.0',
+    parameters: [
+      text('stateId', 'Zadeklarowany stan (preset)', 'phi-plus'),
+      number('familyParameter', 'Parametr rodziny (Werner p, α, Horodecki a, kąt θ rodziny GHZ/W)', '', 0, 90, 0.5),
+      number('mixingAngleDeg', 'Domieszka |W⟩ — kąt α (tylko rodzina GHZ/W)', 'deg', 0, 90, 0),
+      number('whiteNoise', 'Szum biały (kanał depolaryzujący w)', '', 0, 1, 0),
+    ],
+    route: { kind: 'none' }, knowledgeSources: ['quantum.md'],
+    rationale: 'Liczy dokładne miary splątania (concurrence Woottersa, negatywność, entropie, kryterium Horodeckich na max CHSH, realignment/CCNR, PPT) na zadeklarowanych stanach o znanej postaci zamkniętej. Stan przekazywany jako nazwany preset, bo kontrakt Fabric dopuszcza wyłącznie płaskie prymitywy — macierz gęstości nie jest parametrem. Kanał depolaryzujący (szum biały) jest jedynym modelowanym niedoskonałym przygotowaniem; miary czystostanowe (ranga Schmidta, resztkowy trójsplot CKW) zwracają wtedy NaN, bo przestają być zdefiniowane. Model NIE symuluje detektorów, dekoherencji zależnej od czasu, hardware ani testu Bella bez luk; to dokładna algebra, nie pomiar.',
+  },
 ] as const;
 
 const BY_MODEL = new Map(ROUTER_MODELS.map((model) => [model.id, model]));

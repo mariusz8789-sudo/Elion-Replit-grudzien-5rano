@@ -1,0 +1,23 @@
+{
+  "ruleId": "GLP1R-QSAR-VALIDATION-GATE",
+  "frozenFor": "docs/DECISIONS.md D-077 (GLP-1R QSAR efficacy axis) — sealed BEFORE any human GLP-1R activity data was pulled or trained on",
+  "ruleFingerprint": "d2f77a7e6042f0fc",
+  "fingerprintMethod": "provenance.mjs::canonicalHash(gate).slice(0,16) — derived from the `gate` object below ONLY, so editing any field changes this value",
+  "gate": {
+    "algorithm": "ridge-ecfp4-morgan-r2-512bit",
+    "lambda": 1.0,
+    "conformalAlpha": 0.1,
+    "splitMethod": "scaffold-hash-mod10",
+    "MIN_TRAIN": 150,
+    "MIN_TEST": 40,
+    "MAX_MAE": 1.0,
+    "MIN_R2": 0.25
+  },
+  "rationale": {
+    "MIN_TRAIN": "150 is a conservative floor for a 512-bit ridge model on a single congeneric-ish target class; below it, coefficients are dominated by the lambda=1.0 prior rather than the data.",
+    "MIN_TEST": "40 held-out compounds is the smallest set this project accepts a scaffold-split MAE/R2 estimate from without it being dominated by 1-2 outlier scaffolds.",
+    "MAX_MAE": "1.0 pActivity unit (~10x in raw potency) is the outer bound of a QSAR estimate this project will call 'validated' rather than 'noise'.",
+    "MIN_R2": "0.25 is a low but non-trivial bar: it rules out a model no better than predicting the training mean, without pretending a small, single-target dataset should clear a high-R2 bar tuned for larger public benchmarks."
+  },
+  "changeRequiresNewDEntry": "any edit to `gate` (including relaxing a threshold after seeing a training run's numbers) invalidates ruleFingerprint and requires a new DECISIONS.md D-entry, per the same rule D-069/D-074 already established for frozen-prediction-thresholds.json"
+}

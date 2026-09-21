@@ -1,0 +1,66 @@
+{
+  "prereg": {
+    "id": "GLP1R-REPRESENTATION-ATTEMPT-1",
+    "sealedBefore": "any V3 model was fitted or any V3 metric was computed",
+    "attemptBudget": {
+      "thisAttempt": 1,
+      "maxAttempts": 2,
+      "rule": "at most two preregistered representation attempts; a third would be searching for a representation that passes, which is threshold-moving by another name"
+    },
+    "motivation": "descriptorVector feeds the ridge three PEPTIDE features derived from countAmideBonds(), a substring matcher. Measured against RDKit 2026.03.6 on the real 287-row pin, that counter disagrees with the true peptide-amide substructure count on 226 of 287 rows. residueEstimate is literally amideBonds + 1, a proxy standing in for a residue count the runtime could not previously compute. D-082 added batch_peptide_parse, so it can now be computed for real.",
+    "change": {
+      "what": "the three peptide features become real RDKit substructure measurements",
+      "from": [
+        "countAmideBonds(smiles) [substring match]",
+        "countAmideBonds(smiles) + 1 [proxy for residues]",
+        "smiles.length"
+      ],
+      "to": [
+        "peptideAmideBonds [RDKit SMARTS [CX3](=[OX1])([#6])[NX3]]",
+        "residueEstimate [RDKit]",
+        "backboneFraction [RDKit]"
+      ],
+      "unchanged": [
+        "the 12 RDKit descriptor features",
+        "the Morgan ECFP4 bits",
+        "the ridge lambda",
+        "the scaffold split policy",
+        "the standardization-on-train-only rule",
+        "the calibration-only selection rule"
+      ]
+    },
+    "frozenGateUntouched": {
+      "ruleFingerprint": "d2f77a7e6042f0fc",
+      "MIN_TRAIN": 150,
+      "MIN_TEST": 40,
+      "MAX_MAE": 1,
+      "MIN_R2": 0.25,
+      "statement": "NOT ONE OF THESE MOVES. This attempt changes what the model SEES, never what it must BEAT."
+    },
+    "priorState": {
+      "v2TestMAE": 1.0425,
+      "gateVerdict": "BLOCKED",
+      "shortfall": 0.0425
+    },
+    "predictionsBeforeRunning": {
+      "direction": "UNKNOWN \u2014 a corrected feature is not automatically a better feature. Replacing a proxy with a real measurement can raise MAE if the proxy happened to correlate with the target through an artifact.",
+      "explicitlyNotPredicted": "that this will clear the gate"
+    },
+    "decisionRule": {
+      "selection": "representation chosen on calibMAE only, via the existing selectRepresentation, which structurally refuses any candidate carrying a test metric",
+      "outcome": "whatever applyFrozenGate returns stands. If MAE remains above 1.0, the GLP-1R axis stays BLOCKED and NO_WINNER stands. A failed attempt is reported, never retried into a pass.",
+      "afterTwoAttempts": "if neither clears the gate, the honest conclusion is that this dataset and this model class do not meet the frozen bar, and the axis needs more peptide rows rather than more representations"
+    }
+  },
+  "preregFingerprint": "3b0af23cc216566e",
+  "amendment": {
+    "status": "NOT_EXECUTED \u2014 premise falsified before any model was fitted",
+    "sealedFingerprintOfVoidedAttempt": "3b0af23cc216566e",
+    "whatWasWrong": "The motivation assumed the live GLP-1R axis consumes descriptorVector's peptide features. It does not. glp1rQsar.mjs::trainAndValidate \u2014 the function reached by glp1rEfficacyAdapter.trainGlp1rModel(), which is what probeCapabilities() actually calls \u2014 fits the ridge on r.bits ONLY, i.e. Morgan ECFP4 fingerprints. No RDKit descriptor and no peptide feature enters the GLP-1R production model at all.",
+    "consequence": "Correcting the peptide features would have changed the GLP-1R number by exactly zero. The corrected features would have affected only the GIPR path, which is the sole caller of descriptorVector \u2014 and GIPR is already blocked upstream at INSUFFICIENT_DATA, so the change would have been unobservable there too.",
+    "whyThisIsRecordedRatherThanQuietlyReplaced": "An attempt budget only means something if a spent attempt is spent. This one is voided because its PREMISE was false, not because its RESULT was disappointing \u2014 the distinction is the whole difference between preregistration and shopping. No model was fitted under it, so no result was seen, so nothing could have been selected on.",
+    "theRealFindingInstead": "The repository has TWO fitting paths. V1 (glp1rQsar.trainAndValidate) is fingerprint-only ridge and is what the GLP-1R axis runs. V2 (glp1rQsarV2) carries the descriptor + peptide features, the A/B/C representation family and the calibration-only selection rule \u2014 and despite its name it is wired ONLY for GIPR. The GLP-1R axis never reaches its own V2 engine.",
+    "whatTheNextAttemptShouldBe": "Unify the two paths so GLP-1R runs through the same generic engine GIPR uses, the way activityDataset.mjs already unified the two dataset loaders. That is a refactor with a real risk of duplicating an engine if done carelessly, and choosing to switch engines AFTER seeing the current one fail is exactly the move that must be preregistered deliberately rather than taken at the end of an unsupervised run.",
+    "attemptBudgetConsumed": 0
+  }
+}

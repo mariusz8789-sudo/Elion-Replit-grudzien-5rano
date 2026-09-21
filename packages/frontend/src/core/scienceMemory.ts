@@ -7,6 +7,10 @@ import type { ScientificEvidencePack } from './experimentFabric/evidencePack';
 import { compareAme2020Observations } from './observation/nuclearAme2020';
 import { compareCandidateDiscoveryReports, type CandidateComparison } from './biotechDiscoveryContract';
 import { canonicalJson, fnv1a } from './events/hash';
+import type { A1AnalysisReport } from './biotechData/a1Glp1Analysis';
+import type { A2AnalysisReport } from './biotechData/a2OzempicSubstitute';
+import type { A3Report } from './biotechData/a3GovernmentDrugRecommendation';
+import type { E2E01ScenarioResult } from './biotechData/govDrugDiscoveryE2E';
 import type { CompositionComputeReport } from './naturalCompositionCompute';
 import { buildSavedScenarioRunContext, isSavedScenarioRunContext, type SavedScenarioRunContext } from './simulation/scenarioMemory';
 import type { ScenarioRun } from './simulation/scenarioEngine';
@@ -282,6 +286,36 @@ export type SavedExperimentEpistemicStatus =
   | 'EXECUTED_WITH_LIMITATIONS'
   | `MAX_SUPPORTABLE_CLAIM=${'STRUCTURAL_SIMILARITY' | 'NONE'}`;
 
+/**
+ * CURIOSITY CYCLE (D-130) — one persisted iteration of the autonomous
+ * curiosity loop: the ledger gap it started from, the hypothesis pair, the
+ * differentiating experiment (a canonical ExperimentSession, by id and
+ * hash), the assessments and the revised confidences. Science Memory keeps
+ * it so the next run does not ask the same question again and so the
+ * cognitive core can read what was already tried. Inputs and hashes only;
+ * nothing here is a result that could be read back as a fact.
+ */
+export interface SavedCuriosityCycle {
+  contractVersion: '1.0.0';
+  worldId: string;
+  questionId: string;
+  questionKind: string;
+  questionText: string;
+  subjectKeys: string[];
+  evidenceIds: string[];
+  hypotheses: { id: string; metric: string; expectedValue: number; tolerance: number; priorConfidence: number; posteriorConfidence: number; assessment: string }[];
+  experiment: { stationId: string; experimentId: string; sessionId: string; contentHash: string; replayFingerprint: string; epistemicStatus: string } | null;
+  terminal: string;
+  fingerprint: string;
+}
+export function isSavedCuriosityCycle(value: unknown): value is SavedCuriosityCycle {
+  if (!value || typeof value !== 'object') return false;
+  const o = value as Record<string, unknown>;
+  return o.contractVersion === '1.0.0' && nonEmptyString(o.worldId) && nonEmptyString(o.questionId) && nonEmptyString(o.questionKind) && nonEmptyString(o.questionText)
+    && Array.isArray(o.subjectKeys) && Array.isArray(o.evidenceIds) && Array.isArray(o.hypotheses) && nonEmptyString(o.terminal) && nonEmptyString(o.fingerprint)
+    && (o.experiment === null || (!!o.experiment && typeof o.experiment === 'object' && nonEmptyString((o.experiment as Record<string, unknown>).sessionId) && nonEmptyString((o.experiment as Record<string, unknown>).contentHash)));
+}
+
 export interface SavedExperiment {
   id: string;
   createdAt: string;
@@ -314,6 +348,8 @@ export interface SavedExperiment {
    * WEJŚCIA i statusy; odtworzenie wykonuje zbiór od nowa i je porównuje.
    */
   hypothesisLoop?: SavedHypothesisLoop;
+  /** One iteration of the autonomous curiosity cycle (D-130): inputs, ids and hashes only. */
+  curiosityCycle?: SavedCuriosityCycle;
   /**
    * Warstwa Obserwacja/Analiza/Znalezisko/Dowód i Następny Eksperyment NAD
    * powyższym `hypothesisLoop` (ten sam przebieg, `hypothesisLoopFingerprint`
@@ -567,6 +603,7 @@ function isSavedExperiment(v: unknown): v is SavedExperiment {
     (o.scenario === undefined || isSavedScenarioRunContext(o.scenario)) &&
     (o.counterfactual === undefined || isSavedScenarioCounterfactual(o.counterfactual)) &&
     (o.hypothesisLoop === undefined || isSavedHypothesisLoop(o.hypothesisLoop)) &&
+    (o.curiosityCycle === undefined || isSavedCuriosityCycle(o.curiosityCycle)) &&
     (o.discoveryLoop === undefined || isSavedScientificDiscoveryLoop(o.discoveryLoop)) &&
     (o.investigation === undefined || isSavedInvestigation(o.investigation)) &&
     validReplayIdentity(o.replayIdentity)
@@ -710,6 +747,7 @@ export interface SaveExperimentInput {
   scenario?: SavedScenarioRunContext;
   counterfactual?: SavedScenarioCounterfactual;
   hypothesisLoop?: SavedHypothesisLoop;
+  curiosityCycle?: SavedCuriosityCycle;
   discoveryLoop?: SavedScientificDiscoveryLoop;
   investigation?: SavedInvestigation;
   worldDiscovery?: SavedWorldDiscoveryRun;
@@ -761,6 +799,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
   if (input.scenario !== undefined && !isSavedScenarioRunContext(input.scenario)) throw new Error('Kontekst scenariusza musi zawierać komplet wejść i odcisków wystarczających do odtworzenia.');
   if (input.counterfactual !== undefined && !isSavedScenarioCounterfactual(input.counterfactual)) throw new Error('Kontrfaktyk musi zawierać komplet obu ramion i policzoną, porównywalną różnicę.');
   if (input.hypothesisLoop !== undefined && !isSavedHypothesisLoop(input.hypothesisLoop)) throw new Error('Zapis pętli hipotez musi zawierać prerejestrację, hipotezy i komplet wyników.');
+  if (input.curiosityCycle !== undefined && !isSavedCuriosityCycle(input.curiosityCycle)) throw new Error('Zapis cyklu ciekawości musi zawierać pytanie, hipotezy, sesję (lub null) i odcisk.');
   if (input.discoveryLoop !== undefined) {
     if (!isSavedScientificDiscoveryLoop(input.discoveryLoop)) throw new Error('Zapis pętli odkrycia naukowego musi zawierać pytanie, łańcuch dowodowy i następny eksperyment.');
     if (input.hypothesisLoop === undefined || input.discoveryLoop.hypothesisLoopFingerprint !== input.hypothesisLoop.loopFingerprint) {
@@ -795,6 +834,7 @@ export function saveExperiment(input: SaveExperimentInput): SavedExperiment {
     ...(input.scenario === undefined ? {} : { scenario: input.scenario }),
     ...(input.counterfactual === undefined ? {} : { counterfactual: input.counterfactual }),
     ...(input.hypothesisLoop === undefined ? {} : { hypothesisLoop: input.hypothesisLoop }),
+    ...(input.curiosityCycle === undefined ? {} : { curiosityCycle: input.curiosityCycle }),
     ...(input.discoveryLoop === undefined ? {} : { discoveryLoop: input.discoveryLoop }),
     ...(input.investigation === undefined ? {} : { investigation: input.investigation }),
     ...(input.worldDiscovery === undefined ? {} : { worldDiscovery: input.worldDiscovery }),
@@ -3237,6 +3277,30 @@ export function listExperiments(): SavedExperiment[] {
   return readAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Persist one curiosity-cycle iteration (D-130). The record is the typed target the cognitive core's ScienceMemoryAdapter writes to. */
+export function saveCuriosityCycleToMemory(cycle: SavedCuriosityCycle): SavedExperiment {
+  if (!isSavedCuriosityCycle(cycle)) throw new Error('Zapis cyklu ciekawości musi zawierać pytanie, hipotezy, sesję (lub null) i odcisk.');
+  return saveExperiment({
+    labId: cycle.worldId,
+    experimentId: `curiosity-cycle:${cycle.questionId}`,
+    experimentName: `Cykl ciekawości — ${cycle.questionText}`,
+    params: { questionId: cycle.questionId, questionKind: cycle.questionKind, hypotheses: cycle.hypotheses.length, terminal: cycle.terminal, experimentId: cycle.experiment?.experimentId ?? 'none', sessionId: cycle.experiment?.sessionId ?? 'none' },
+    stats: Object.fromEntries(cycle.hypotheses.map((h) => [`posterior:${h.id}`, h.posteriorConfidence])),
+    honesty: 'simplified',
+    honestyNote: 'Autonomous curiosity iteration: the question came from ledger gaps, the experiment is a canonical session (replayable by id and hash); confidences are log-odds updates within the protocol, not measurements of the world.',
+    epistemicStatus: cycle.experiment ? (cycle.experiment.epistemicStatus as SavedExperimentEpistemicStatus) : 'INCONCLUSIVE',
+    curiosityCycle: cycle,
+  });
+}
+
+/** Curiosity cycles already in memory, newest first; `topic` narrows by question text / subject keys / world. */
+export function listCuriosityCycles(topic?: string, limit = 50): readonly SavedCuriosityCycle[] {
+  const t = topic?.trim().toLowerCase() ?? '';
+  return listExperiments().map((e) => e.curiosityCycle).filter((c): c is SavedCuriosityCycle => !!c)
+    .filter((c) => !t || c.worldId.toLowerCase().includes(t) || c.questionText.toLowerCase().includes(t) || c.subjectKeys.some((k) => k.toLowerCase().includes(t)) || c.questionId === topic)
+    .slice(0, limit);
+}
+
 export function getExperiment(id: string): SavedExperiment | undefined {
   return readAll().find((e) => e.id === id);
 }
@@ -3248,4 +3312,403 @@ export function deleteExperiment(id: string): void {
 
 export function countExperiments(): number {
   return readAll().length;
+}
+
+// --- §9: an autonomous discovery campaign, written to Science Memory ---------
+
+/**
+ * The persisted form of one `runDiscoveryCampaign` result. Deliberately NOT the
+ * whole campaign: the rounds carry every fitted model at every round, which is
+ * large, redundant and already replayable from `campaignFingerprint`. What is
+ * stored is what a later reader actually needs — the question, the winner, the
+ * lineage of anything derived mid-campaign, what stopped it, what it still
+ * wants measured, and the fingerprints that let the whole thing be reproduced.
+ */
+export interface SavedDiscoveryCampaign {
+  readonly labId: string;
+  readonly problem: string;
+  readonly rounds: number;
+  readonly stopReason: string;
+  readonly winningFormula: string | null;
+  readonly winnerEnteredAtRound: number;
+  readonly winnerDerivedFrom: string | null;
+  readonly derivedModelFormulas: readonly string[];
+  readonly observationsAdmitted: number;
+  readonly observationGapTriggers: readonly string[];
+  readonly campaignFingerprint: string;
+  readonly gapLedgerFingerprint: string;
+  readonly graphFingerprint: string | null;
+}
+
+/**
+ * Writes a finished campaign to Science Memory through the SAME `saveExperiment`
+ * path every other record uses — no second store, no new persistence layer.
+ *
+ * `epistemicStatus` is `'PREDICTION'`, not `'SIMULATION'` and not anything
+ * stronger: a campaign fits models to real pinned observations and reports
+ * which fits best, which is a model-level claim about those observations. It is
+ * not a simulation (nothing was simulated) and it is emphatically not an
+ * established fact.
+ */
+export function saveDiscoveryCampaignToMemory(saved: SavedDiscoveryCampaign): SavedExperiment {
+  return saveExperiment({
+    labId: saved.labId,
+    experimentId: `discovery-campaign:${saved.campaignFingerprint}`,
+    experimentName: `Kampania odkrycia — ${saved.problem}`,
+    params: {
+      rounds: saved.rounds,
+      observationsAdmitted: saved.observationsAdmitted,
+      derivedModels: saved.derivedModelFormulas.length,
+    },
+    stats: {
+      rounds: saved.rounds,
+      observationsAdmitted: saved.observationsAdmitted,
+      derivedModels: saved.derivedModelFormulas.length,
+      observationGaps: saved.observationGapTriggers.length,
+    },
+    analysis: [
+      {
+        title: 'Wynik',
+        body: saved.winningFormula === null
+          ? `Zatrzymano z powodem ${saved.stopReason}; zaden model nie zostal ustalony.`
+          : `Zwyciezca: ${saved.winningFormula}. ${saved.winnerEnteredAtRound > 0 ? `Wszedl do kampanii w rundzie ${saved.winnerEnteredAtRound}, wyprowadzony z ${saved.winnerDerivedFrom} — a wiec NIE istnial, gdy kampania sie zaczynala.` : 'Pochodzi z zadeklarowanej gramatyki, wyliczony przed pierwsza obserwacja.'} Zatrzymano z powodem ${saved.stopReason}.`,
+        kind: 'discovery-campaign-result',
+      },
+      {
+        title: 'Czego kampania NIE ustalila',
+        body: `${saved.observationGapTriggers.length === 0 ? 'Nie zglosila zapotrzebowania na nowy pomiar.' : `Zglosila ${saved.observationGapTriggers.length} zapotrzebowanie(a) na pomiar, ktorego to laboratorium nie oferuje (${saved.observationGapTriggers.join(', ')}) — pytanie pozostaje w tej czesci otwarte.`} Wynik obowiazuje wylacznie w zakresie dopuszczonych obserwacji i w granicach zadeklarowanej gramatyki modeli.`,
+        kind: 'discovery-campaign-boundary',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Odcisk kampanii ${saved.campaignFingerprint}, rejestr luk ${saved.gapLedgerFingerprint}${saved.graphFingerprint === null ? '' : `, graf odkrycia ${saved.graphFingerprint}`}. Ten sam zbior i te same opcje odtwarzaja te same odciski.`,
+        kind: 'discovery-campaign-replay',
+      },
+    ],
+    honesty: 'simplified',
+    honestyNote: `Kampania dopasowala modele do realnych, przypietych obserwacji i wskazala najlepszy wedlug chi-kwadrat z kara za zlozonosc. To twierdzenie o modelu wobec tych obserwacji, nie ustalony fakt o swiecie.`,
+    assumptions: [
+      'Obserwacje sa niezalezne, a ich zadeklarowane sigmy poprawne.',
+      'Prawdziwa zaleznosc lezy w zadeklarowanej gramatyce modeli.',
+    ],
+    epistemicStatus: 'PREDICTION',
+  });
+}
+
+/**
+ * Writes a finished A1 GLP-1 substitution analysis (`biotechData/a1Glp1Analysis.ts`)
+ * to Science Memory through the SAME `saveExperiment` path every other record
+ * uses — no second store. `epistemicStatus` reuses `HypothesisAssessment`
+ * verbatim (already a member of `SavedExperimentEpistemicStatus`): the
+ * deterministic §8 verdict IS a falsification verdict on H1 (substitution
+ * supported), so it is stored in that real, existing vocabulary rather than
+ * inventing a parallel one. `honesty: 'exact'` because every number here
+ * traces to a real, pinned ChEMBL/ClinicalTrials.gov fixture and a
+ * preregistered, disclosed decision rule — nothing simplified for display.
+ */
+export function saveA1Glp1AnalysisToMemory(report: A1AnalysisReport): SavedExperiment {
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    report.verdict.hypothesisId === 'H1_SUBSTITUTION_SUPPORTED' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : report.verdict.hypothesisId === 'H2_NOT_SUPPORTED' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : report.verdict.hypothesisId === 'H0_NULL' ? 'INCONCLUSIVE'
+    : 'CANDIDATE';
+  return saveExperiment({
+    labId: 'government-research-a1-glp1',
+    experimentId: `a1-glp1-substitution:${report.analysisFingerprint}`,
+    experimentName: 'A1 — semaglutyd/liraglutyd, substytucja GLP-1R w niedoborze',
+    params: {
+      potencyRatioLiraOverSema: report.potency.ratioLiraOverSema ?? Number.NaN,
+      qualifyingTrials: report.trials.length,
+      qualifyingAssaysSemaglutide: report.potency.semaglutide.qualifyingCount,
+      qualifyingAssaysLiraglutide: report.potency.liraglutide.qualifyingCount,
+    },
+    stats: {
+      potencyRatioLiraOverSema: report.potency.ratioLiraOverSema ?? Number.NaN,
+      trialsWithinMargin: report.trials.filter((t) => t.withinMargin).length,
+      trialsWithCiOutsideMargin: report.trials.filter((t) => t.diffCiEntirelyOutsideMargin).length,
+      negativeControlsPassed: report.negativeControls.filter((c) => c.passed).length,
+    },
+    analysis: [
+      {
+        title: 'Werdykt (regula preregestracyjna §8, dosłowna)',
+        body: `${report.verdict.hypothesisId}: ${report.verdict.reason}`,
+        kind: 'a1-glp1-verdict',
+      },
+      {
+        title: 'Rewizja przekonan i ranking — NIE zawsze zgodne z werdyktem',
+        body: report.verdictDisagreesWithRanking
+          ? `Werdykt (${report.verdict.hypothesisId}) NIE zgadza sie z rankingiem sekwencyjnej rewizji przekonan (najwyzej: ${report.beliefRevision.ranked[0].id}). Ta niezgodnosc jest realna i celowo nie jest cicho rozstrzygana — patrz gatedCandidate.evidence.unresolvedContradictions.`
+          : `Werdykt i ranking rewizji przekonan sa zgodne: oba wskazuja ${report.verdict.hypothesisId}.`,
+        kind: 'a1-glp1-belief-revision',
+      },
+      {
+        title: 'Bramka bezpieczenstwa §8/§14 (Government Research/Action)',
+        body: `Wynik bramki: ${report.gateDecision.outcome} (${report.gateDecision.reason}). Powierzchnia: ${report.surface}. Ustalenie negatywne/kontrowersyjne NIE zostalo ukryte — pelny werdykt i dowody pozostaja widoczne w tym rekordzie niezaleznie od wyniku bramki.`,
+        kind: 'a1-glp1-safety-gate',
+      },
+      {
+        title: 'Kontrole negatywne (§13)',
+        body: report.negativeControls.map((c) => `${c.name}: ${c.passed ? 'PASSED' : 'FAILED'} — ${c.detail}`).join(' | '),
+        kind: 'a1-glp1-negative-controls',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${report.preregistrationFingerprint} (przypieta PRZED pobraniem danych), odcisk analizy ${report.analysisFingerprint}. Realne dane: ChEMBL target ${report.target.targetChemblId}, ${report.trials.length} badan ClinicalTrials.gov — pelna proweniencja w a1-glp1/meta.json.`,
+        kind: 'a1-glp1-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Populacyjne porownanie farmakologiczne na realnych, przypietych danych ChEMBL i ClinicalTrials.gov wedlug regul preregestrowanych przed pobraniem danych. To NIE jest dyrektywa kliniczna dla zadnego pacjenta.',
+    assumptions: [
+      'Mediana potencji z kwalifikujacych sie testow ChEMBL reprezentuje wiazanie z GLP-1R.',
+      'Pierwszorzedowy wynik HbA1c przy najwyzszej testowanej/zarejestrowanej dawce reprezentuje skutecznosc kliniczna.',
+      'Progi decyzyjne (okno potencji, margines skutecznosci, minimalna liczba dowodow) zostaly ustalone PRZED pobraniem jakichkolwiek danych.',
+    ],
+    epistemicStatus,
+  });
+}
+
+/**
+ * Writes a finished A2 autonomous Ozempic-substitute analysis
+ * (`biotechData/a2OzempicSubstitute.ts`) to Science Memory through the
+ * SAME `saveExperiment` path every other record uses. `epistemicStatus`
+ * reuses `HypothesisAssessment` verbatim, same convention as A1: the
+ * verdict IS a real epistemic state about the candidate space, not a new
+ * vocabulary. CONFLICTING_EVIDENCE/INSUFFICIENT_EVIDENCE map to
+ * 'INCONCLUSIVE' (a genuinely undecided result, not a failure); a real
+ * winner (BEST_SUPPORTED_CANDIDATE) maps to 'SUPPORTED_WITHIN_PROTOCOL';
+ * NO_SUPERIOR_CANDIDATE/NO_SAFE_SUPERIOR_CANDIDATE map to
+ * 'FALSIFIED_WITHIN_PROTOCOL' (the hypothesis "a better/safer candidate
+ * exists in this space" was tested and failed); PROMISING_BUT_UNCERTAIN
+ * maps to 'CANDIDATE' (real signal, not yet a supported claim).
+ */
+export function saveA2OzempicSubstituteToMemory(report: A2AnalysisReport): SavedExperiment {
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    report.verdict.label === 'BEST_SUPPORTED_CANDIDATE' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : report.verdict.label === 'PROMISING_BUT_UNCERTAIN' ? 'CANDIDATE'
+    : report.verdict.label === 'NO_SUPERIOR_CANDIDATE' || report.verdict.label === 'NO_SAFE_SUPERIOR_CANDIDATE' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : 'INCONCLUSIVE';
+
+  const rankedWithEvidence = report.rankedByScore.filter((r) => r.efficacy.length > 0);
+  const vetoedCount = report.candidateReports.filter((r) => r.score.vetoed).length;
+
+  return saveExperiment({
+    labId: 'government-research-a2-ozempic-substitute',
+    experimentId: `a2-ozempic-substitute:${report.analysisFingerprint}`,
+    experimentName: 'A2 — autonomiczny dobor kandydata na zamiennik semaglutydu',
+    params: {
+      totalCandidatesInSpace: report.totalCandidatesInSpace,
+      candidatesWithTrialEvidence: report.candidateReports.length,
+      candidatesWithEfficacyEvidence: rankedWithEvidence.length,
+      candidatesVetoedOnSafety: vetoedCount,
+    },
+    stats: {
+      totalCandidatesInSpace: report.totalCandidatesInSpace,
+      candidatesWithEfficacyEvidence: rankedWithEvidence.length,
+      candidatesVetoedOnSafety: vetoedCount,
+      selfFalsificationFindingCount: report.selfFalsification?.findings.length ?? 0,
+    },
+    analysis: [
+      {
+        title: 'Werdykt koncowy',
+        body: `${report.verdict.label}: ${report.verdict.reason}`,
+        kind: 'a2-ozempic-substitute-verdict',
+      },
+      {
+        title: 'Przestrzen kandydatow — z mechanizmu, nie z listy nazw',
+        body: `${report.totalCandidatesInSpace} czasteczek z realnym wiazaniem przy GLP-1R/GIPR/GCGR i max_phase>=2; ${report.candidateReports.length} ma realne, opublikowane badania T2DM/otylosc. Ranking pelny: ${report.rankedByScore.map((r) => `${r.summary.prefName}=${r.score.weightedScore.toFixed(3)}`).join(', ')}.`,
+        kind: 'a2-ozempic-substitute-candidate-space',
+      },
+      {
+        title: 'Self-falsyfikacja rundy 2',
+        body: report.selfFalsification === null
+          ? 'Brak kandydata z realnym dowodem skutecznosci do self-falsyfikacji.'
+          : `Kandydat ${report.selfFalsification.candidateId}: ${report.selfFalsification.findings.length} realne zastrzezenie(a) znalezione aktywnie, nie zalozone: ${report.selfFalsification.findings.join(' | ') || '(brak)'}.`,
+        kind: 'a2-ozempic-substitute-self-falsification',
+      },
+      {
+        title: 'Bramka bezpieczenstwa (Government Research/Action)',
+        body: report.gateDecision === null
+          ? 'Zaden kandydat nie zostal zaproponowany jako PracticalCandidate — werdykt nie wskazuje zwyciezcy do bramkowania.'
+          : `Wynik bramki: ${report.gateDecision.outcome}. Powierzchnia: ${report.surface}.`,
+        kind: 'a2-ozempic-substitute-safety-gate',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${report.preregistrationFingerprint} (przypieta PRZED pobraniem danych kandydatow), odcisk analizy ${report.analysisFingerprint}. Cele mechanizmu: GLP-1R ${report.targets.glp1r.chemblId}, GIPR ${report.targets.gipr.chemblId}, GCGR ${report.targets.gcgr.chemblId}.`,
+        kind: 'a2-ozempic-substitute-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Populacyjne, autonomiczne porownanie farmakologiczne na realnych, przypietych danych ChEMBL i ClinicalTrials.gov. Werdykt nie zostal wymuszony do bycia pozytywnym — CONFLICTING_EVIDENCE/NO_SUPERIOR_CANDIDATE/INSUFFICIENT_EVIDENCE sa realnymi, dozwolonymi wynikami. To NIE jest dyrektywa kliniczna dla zadnego pacjenta.',
+    assumptions: [
+      'Przestrzen kandydatow jest wyprowadzona z mechanizmu (ChEMBL, wiazanie GLP-1R/GIPR/GCGR) i realnego rozwoju klinicznego (max_phase>=2), nie z listy nazw.',
+      'Bez bezposredniego badania semaglutyd-vs-kandydat w tym samym RCT, porownanie jest NAIWNYM posrednim porownaniem (miedzy roznymi badaniami) — slabsza klasa dowodu, jawnie oznaczona.',
+      'Kategorie bezpieczenstwa i weto egzystencjalne zostaly ustalone PRZED pobraniem jakichkolwiek danych kandydatow.',
+    ],
+    epistemicStatus,
+  });
+}
+
+/**
+ * Writes an A3 Government Research recommendation
+ * (`biotechData/a3GovernmentDrugRecommendation.ts`) to Science Memory.
+ * Handles BOTH branches: the hard REQUIRED_POLICY_INPUT gate (no candidate
+ * analysis ran) and a full ANSWERED recommendation — never silently
+ * upgrades the former to look like the latter.
+ */
+export function saveA3GovernmentRecommendationToMemory(report: A3Report): SavedExperiment {
+  if (report.status === 'REQUIRED_POLICY_INPUT') {
+    return saveExperiment({
+      labId: 'government-research-a3-drug-recommendation',
+      experimentId: `a3-government-drug-recommendation:required-policy-input:${report.preregistrationFingerprint}`,
+      experimentName: 'A3 — Genesis Government Research: rekomendacja zamiennika semaglutydu',
+      params: {},
+      stats: {},
+      analysis: [
+        {
+          title: 'Brakujacy wymagany parametr polityki',
+          body: `REQUIRED_POLICY_INPUT: ${report.reason} Wymagany format: ${report.requiredInput}`,
+          kind: 'a3-government-required-policy-input',
+        },
+      ],
+      honesty: 'exact',
+      honestyNote: 'Populacja nie zostala podana przez rzad — system NIE zgaduje; zwraca REQUIRED_POLICY_INPUT i nie uruchamia zadnej analizy kandydatow.',
+      assumptions: ['Zaden kandydat nie zostal oceniony: analiza A2 nie zostala uruchomiona.'],
+      epistemicStatus: 'INCONCLUSIVE',
+    });
+  }
+
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    report.answerRecord.recommendation.label === 'BEST_SUPPORTED_CANDIDATE' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : report.answerRecord.recommendation.label === 'PROMISING_BUT_UNCERTAIN' ? 'CANDIDATE'
+    : report.answerRecord.recommendation.label === 'NO_SUPERIOR_CANDIDATE' || report.answerRecord.recommendation.label === 'NO_SAFE_SUPERIOR_CANDIDATE' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : 'INCONCLUSIVE';
+
+  return saveExperiment({
+    labId: 'government-research-a3-drug-recommendation',
+    experimentId: `a3-government-drug-recommendation:${report.decisionFingerprint}`,
+    experimentName: `A3 — rekomendacja rzadowa zamiennika semaglutydu (populacja: ${report.populationDescription})`,
+    params: {
+      totalCandidatesInSpace: report.answerRecord.totalCandidatesInSpace,
+      candidatesWithEfficacyEvidence: report.answerRecord.scientificRanking.length,
+    },
+    stats: {
+      totalCandidatesInSpace: report.answerRecord.totalCandidatesInSpace,
+      candidatesWithEfficacyEvidence: report.answerRecord.scientificRanking.length,
+      rankingsDiverge: report.answerRecord.rankingsDiverge ? 1 : 0,
+    },
+    analysis: [
+      {
+        title: 'Rekomendacja rzadowa',
+        body: `${report.answerRecord.recommendation.label}: ${report.answerRecord.recommendation.reason}`,
+        kind: 'a3-government-recommendation',
+      },
+      {
+        title: 'Najlepsza skutecznosc vs najbezpieczniejsza wspierana opcja vs najlepsza ogolna',
+        body: `Skutecznosc: ${report.answerRecord.bestEfficacyCandidate?.report.summary.prefName ?? 'brak'}${report.answerRecord.bestEfficacyCandidate?.report.score.vetoed ? ' (WETOWANY na bezpieczenstwie)' : ''}. Bezpieczenstwo: ${report.answerRecord.safestSupportedCandidate?.report.summary.prefName ?? 'INSUFFICIENT_EVIDENCE'}. Ogolna: ${report.answerRecord.bestOverallCandidate?.report.summary.prefName ?? 'brak'}.`,
+        kind: 'a3-government-best-options',
+      },
+      {
+        title: 'Luki danych politycznych (koszt/dostepnosc/produkcja)',
+        body: `Brak zintegrowanego realnego zrodla dla: ${report.policyDimensionsWithoutSource.join(', ')}. Wynik rzadowy obecnie rowny wynikowi naukowemu — ujawniony fakt, nie zalozenie.`,
+        kind: 'a3-government-policy-gaps',
+      },
+      {
+        title: 'AnswerRecord (PRAWDA) vs ActionRecord (POLITYKA)',
+        body: `Powierzchnia: ${report.actionRecord.surface}. ${report.actionRecord.gateDecision === null ? 'Zaden kandydat nie zostal zaproponowany do dzialania.' : `Wynik bramki: ${report.actionRecord.gateDecision.outcome}.`} Wszystkie ${report.answerRecord.candidateViews.length} widokow kandydatow pozostaja widoczne niezaleznie od dzialania.`,
+        kind: 'a3-government-answer-vs-action',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${report.preregistrationFingerprint} (przypieta PRZED fetchem warunkow per-badanie), odcisk decyzji ${report.decisionFingerprint}.`,
+        kind: 'a3-government-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Rekomendacja dla rzadu na realnych, przypietych danych. Nie jest dyrektywa kliniczna dla zadnego pacjenta — tylko populacyjna rekomendacja badawcza z jawnym oddzieleniem prawdy od polityki.',
+    assumptions: [
+      'Ranking naukowy i rzadowy uzywaja identycznych wag naukowych; wymiary czysto polityczne (koszt/dostepnosc/skalowalnosc/bezpieczenstwo dostaw/mozliwosci produkcyjne/pokrycie populacji) sa INSUFFICIENT_EVIDENCE, nie zalozone.',
+      'Dopasowanie populacji per-badanie pochodzi z realnego, strukturalnego pola ClinicalTrials.gov conditions, nie z domyslu na podstawie tytulu.',
+      'Kandydat bez zadnego dowodu skutecznosci nie moze zostac zwyciezca naukowym/ogolnym, nawet przy wysokim wyniku samego bezpieczenstwa.',
+    ],
+    epistemicStatus,
+  });
+}
+
+/**
+ * Writes a GOV-DRUG-DISCOVERY-E2E-01 scenario run
+ * (`biotechData/govDrugDiscoveryE2E.ts`) to Science Memory. The record
+ * keeps the funnel's real shape — how many were generated, how many each
+ * stage removed, and the honest outcome — because the reduction IS the
+ * finding, not a step on the way to one.
+ */
+export function saveGovDrugDiscoveryE2EToMemory(run: E2E01ScenarioResult): SavedExperiment {
+  const epistemicStatus: SavedExperimentEpistemicStatus =
+    run.decision.outcome === 'WINNER' ? 'SUPPORTED_WITHIN_PROTOCOL'
+    : run.decision.outcome === 'NO_SAFE_WINNER' || run.decision.outcome === 'NO_WINNER' ? 'FALSIFIED_WITHIN_PROTOCOL'
+    : 'INCONCLUSIVE';
+
+  const [tier1, tier2] = run.stages;
+
+  return saveExperiment({
+    labId: 'government-research-gov-drug-discovery-e2e',
+    experimentId: `gov-drug-discovery-e2e:${run.runFingerprint}`,
+    experimentName: 'GOV-DRUG-DISCOVERY-E2E-01 — generacja kandydatow, lejek, falsyfikacja, werdykt',
+    params: {
+      generatedCandidates: run.generationCheck.generatedCount,
+      outsidePresuppliedList: run.generationCheck.outsidePresuppliedCount,
+      tier1Survivors: tier1.outputCount,
+      tier2Survivors: tier2.outputCount,
+    },
+    stats: {
+      generatedCandidates: run.generationCheck.generatedCount,
+      outsidePresuppliedList: run.generationCheck.outsidePresuppliedCount,
+      tier1Survivors: tier1.outputCount,
+      tier2Survivors: tier2.outputCount,
+      top3: run.top3.length,
+      unresolvedCounterevidence: run.falsifications.reduce((n, f) => n + f.unresolvedCounterevidence.length, 0),
+      bannedStringHits: run.bannedStringHits.length,
+    },
+    analysis: [
+      {
+        title: 'Generacja, nie selekcja z listy',
+        body: `${run.generationCheck.generatedCount} czasteczek wygenerowanych z mechanizmu; ${run.generationCheck.outsidePresuppliedCount} poza jakakolwiek lista podana z gory; zbior rowny liscie kontrolnej? ${run.generationCheck.equalsPresuppliedSet}. Kazdy wiersz ma pelna proweniencje: ${run.generationCheck.everyCandidateHasFullProvenance}.`,
+        kind: 'gov-drug-discovery-e2e-generation',
+      },
+      {
+        title: 'Lejek — kazda eliminacja z powodem i dowodem',
+        body: run.stages.map((s) => `${s.stage}: ${s.inputCount} -> ${s.outputCount} (usunieto ${s.eliminated.length})`).join('; ') + `. TOP3: ${run.top3.map((c) => c.prefName).join(', ')}.`,
+        kind: 'gov-drug-discovery-e2e-funnel',
+      },
+      {
+        title: 'Gleboka falsyfikacja',
+        body: run.falsifications.map((f) => `${f.prefName}: przetrwal wszystkie ataki=${f.survivedAll}, nierozwiazane kontrdowody=${f.unresolvedCounterevidence.length}`).join(' | '),
+        kind: 'gov-drug-discovery-e2e-falsification',
+      },
+      {
+        title: 'Werdykt',
+        body: `${run.decision.outcome}: ${run.decision.reason} Przepis badawczy: ${run.researchRecipe === null ? 'NIE wygenerowany (poprawnie — tylko dla WINNER)' : 'wygenerowany'}.`,
+        kind: 'gov-drug-discovery-e2e-outcome',
+      },
+      {
+        title: 'Luki dostepu zadeklarowane, nie zmyslone',
+        body: run.noAccessDeclarations.map((d) => `${d.status}: ${d.sourceId}`).join('; '),
+        kind: 'gov-drug-discovery-e2e-no-access',
+      },
+      {
+        title: 'Odtwarzalnosc',
+        body: `Preregestracja ${run.preregistrationFingerprint} (przypieta PRZED pobraniem przestrzeni kandydatow), odcisk przebiegu ${run.runFingerprint}.`,
+        kind: 'gov-drug-discovery-e2e-replay',
+      },
+    ],
+    honesty: 'exact',
+    honestyNote: 'Realny przebieg na realnej, przypietej, WYGENEROWANEJ przestrzeni kandydatow. Wynik bez zwyciezcy jest dozwolonym i oczekiwanym zakonczeniem — kryterium sukcesu to "werdykt wynika z dowodow", nie "znaleziono lek". To NIE jest dyrektywa kliniczna dla zadnego pacjenta.',
+    assumptions: [
+      'Przestrzen kandydatow powstaje z zapytania mechanizmowego do ChEMBL; zadna nazwa leku nie jest zapytaniem przy generacji.',
+      'Kryteria lejka, ataki falsyfikacyjne i regula wyboru zwyciezcy zostaly zapieczetowane PRZED pobraniem przestrzeni kandydatow.',
+      'Przepis badawczy moze powstac wylacznie dla wyniku WINNER i pozostaje koncepcyjny — nigdy dawka ani procedura operacyjna.',
+    ],
+    epistemicStatus,
+  });
 }

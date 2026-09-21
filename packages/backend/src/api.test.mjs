@@ -388,3 +388,23 @@ describe('knowledge ingestion', () => {
     assert.equal(fakePdf.body.error, 'invalid_pdf_signature');
   });
 });
+
+describe('quantum bridge routes', () => {
+  test('GET /api/quantum/status describes the bridge without leaking credentials', () => {
+    const r = call('GET', '/api/quantum/status');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.ok, true);
+    assert.equal(typeof r.body.cloudConfigured, 'boolean');
+    assert.equal(r.body.maxQubits, 16);
+    assert.equal(r.body.maxShots, 8192);
+    assert.deepEqual(r.body.presets, ['bell-state', 'ghz', 'superposition']);
+    assert.equal(JSON.stringify(r.body).includes('QPU_API_KEY'), false);
+  });
+
+  test('POST /api/quantum/run with bad input is a 400 (async route, resolved like /api/knowledge/ingest)', async () => {
+    const r = await call('POST', '/api/quantum/run', { body: { preset: 'bell-state', shots: 8193 } });
+    assert.equal(r.status, 400);
+    assert.equal(r.body.error, 'invalid_shots');
+    assert.equal(call('GET', '/api/quantum/nope').status, 404);
+  });
+});

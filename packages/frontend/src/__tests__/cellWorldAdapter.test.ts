@@ -20,7 +20,7 @@ const PROBLEM_ID = 'problem:cell-population-growth-rate-fastest-to-capacity';
 
 async function runCellLoop() {
   const problem = HYPOTHESIS_PROBLEMS.find((p) => p.problemId === PROBLEM_ID)!;
-  return executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem)));
+  return executePreregisteredHypothesesAsync(preregisterHypotheses(generateCompetingHypotheses(problem), { priorRunFingerprints: [] }));
 }
 
 describe('Cell/Population Biology World Adapter — fourth domain for ScientificWorldState', () => {

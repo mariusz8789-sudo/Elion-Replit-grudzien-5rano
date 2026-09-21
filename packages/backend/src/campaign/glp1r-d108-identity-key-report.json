@@ -1,0 +1,22 @@
+{
+  "id": "D-108-IDENTITY-KEY-MONITOR",
+  "kind": "MONITOR_REPORT",
+  "currentIdentityKey": "canonicalSmiles",
+  "fullUsableSet": {
+    "structureCount": 338,
+    "distinctCanonicalSmiles": 338,
+    "distinctInchiKeys": 338,
+    "potentialGroupSplits": 0,
+    "collisions": []
+  },
+  "a1ScopedSet": {
+    "structureCount": 131,
+    "distinctCanonicalSmiles": 131,
+    "distinctInchiKeys": 131,
+    "potentialGroupSplits": 0,
+    "collisions": []
+  },
+  "a1MoleculeCount": 300,
+  "computedAt": "2026-09-15T22:20:32.020Z",
+  "artifactHash": "155af59e589e4f81a62793fc812079ea867a73884288eb30427664c0115da2a9"
+}

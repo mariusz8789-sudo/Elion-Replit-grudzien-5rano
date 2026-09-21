@@ -1,0 +1,483 @@
+{
+  "artifact": {
+    "id": "D-092-INGEST-READINESS",
+    "kind": "SEALED_RESEARCH_ARTIFACT",
+    "question": "Does the offered EC50 dataset actually enter Genesis, and does it unblock attempt 2/2?",
+    "startedAt": "2026-09-15T17:01:56.166Z",
+    "gateConstantsChanged": false,
+    "pinsChanged": false,
+    "winnerGateChanged": false,
+    "splitRuleChanged": false,
+    "ingestPolicyChanged": false,
+    "testSplitRead": false,
+    "modelFitted": false,
+    "representationAttemptsConsumed": 0,
+    "attemptBudgetAfterThisRun": "1/2 consumed — unchanged",
+    "egressMeasurement": {
+      "probedAt": "2026-09-15T17:01:56.166Z",
+      "allReachable": false,
+      "probes": [
+        {
+          "url": "https://www.ebi.ac.uk/chembl/api/data/target/CHEMBL1784.json",
+          "httpCode": "000",
+          "curlExit": 56,
+          "reachable": false
+        },
+        {
+          "url": "https://rest.uniprot.org/uniprotkb/P43220.json",
+          "httpCode": "000",
+          "curlExit": 56,
+          "reachable": false
+        },
+        {
+          "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=CHEMBL1784&standard_type=EC50&limit=1000&offset=0",
+          "httpCode": "000",
+          "curlExit": 56,
+          "reachable": false
+        },
+        {
+          "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=CHEMBL1784&standard_type=EC50&limit=1000&offset=1000",
+          "httpCode": "000",
+          "curlExit": 56,
+          "reachable": false
+        },
+        {
+          "url": "https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=CHEMBL1784&standard_type=EC50&limit=1000&offset=2000",
+          "httpCode": "000",
+          "curlExit": 56,
+          "reachable": false
+        }
+      ]
+    },
+    "frozenPinBaseline": {
+      "pinSha256": null,
+      "rows": 287,
+      "uniqueMolecules": 214,
+      "byEndpoint": {
+        "EC50": {
+          "rows": 194,
+          "molecules": 189,
+          "replicateGroups": 4,
+          "rejectedSingleRecord": 185,
+          "rejectedSameAssayOnly": 0,
+          "noiseFloor": "NOT_MEASURED"
+        },
+        "IC50": {
+          "rows": 89,
+          "molecules": 86,
+          "replicateGroups": 2,
+          "rejectedSingleRecord": 84,
+          "rejectedSameAssayOnly": 0,
+          "noiseFloor": "NOT_MEASURED"
+        },
+        "KI": {
+          "rows": 4,
+          "molecules": 4,
+          "replicateGroups": 0,
+          "rejectedSingleRecord": 4,
+          "rejectedSameAssayOnly": 0,
+          "noiseFloor": "NOT_MEASURED"
+        }
+      },
+      "replicateRule": "same canonicalSmiles + same standardType + >= 2 distinct assayId"
+    },
+    "declaredUnverified": {
+      "provenance": "supplied with the dataset offer; bytes were NOT transferred; no hash in this block was checked against bytes",
+      "pages": [
+        {
+          "label": "offset=0",
+          "declaredRows": 1000,
+          "sha256": "489e0e42e2542e88392c2abc48dd280f789c785dd045b67cf126ad080f5934bf"
+        },
+        {
+          "label": "offset=1000",
+          "declaredRows": 1000,
+          "sha256": "4eaf816af16c7e9d3fccceb96c7456369f6a4e58134176ffa7f30eb4743df062"
+        },
+        {
+          "label": "offset=2000",
+          "declaredRows": 365,
+          "sha256": "3d339aec1f10d18c2469a50b01c653825d80fbbaf00d2d8685f546a1c9311ddc",
+          "declaredAs": "strona częściowa = koniec"
+        },
+        {
+          "label": "manifest",
+          "declaredRows": null,
+          "sha256": null
+        }
+      ],
+      "counts": {
+        "rowsTotal": 3365,
+        "rowsRelationEqual": 3100,
+        "rowsEqGoodUnits": 3084,
+        "rowsWithCanonicalSmiles": 3062,
+        "uniqueMolecules": 1720,
+        "replicateGroupsEC50": 325,
+        "singleRecordMolecules": 1261,
+        "assayTypeFunctional": 2014,
+        "assayTypeBinding": 1070,
+        "actionTypeAgonist": 1220,
+        "actionTypeNone": 1774,
+        "actionTypePAM": 46,
+        "actionTypePartialAgonist": 14,
+        "actionTypeActivator": 30,
+        "rejectedCensored": 251,
+        "rejectedNoRelation": 14,
+        "rejectedOrAnomalousUnits": 16,
+        "flaggedOutsideTypicalRange": 222,
+        "flaggedPotentialDuplicate": 35
+      },
+      "targetVerification": {
+        "chemblResponseSha256": "fb2f71b9183a9e4acd69c32e52513d6f1b6476fd4f2e8dda32f0639050b0b9b5",
+        "uniprotResponseSha256": "1cea8706939c89053da84866ea03dc07c80fea8b117daf1483eb93baa140e1f2"
+      }
+    },
+    "declarationReconciliation": [
+      {
+        "name": "pages reproduce rowsTotal",
+        "expected": 3365,
+        "actual": 2365,
+        "note": "sum of declaredRows over the listed source files must equal rowsTotal",
+        "ok": false,
+        "delta": -1000
+      },
+      {
+        "name": "rowsTotal - censored - noRelation = rowsRelationEqual",
+        "expected": 3100,
+        "actual": 3100,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "rowsRelationEqual - badUnits = rowsEqGoodUnits",
+        "expected": 3084,
+        "actual": 3084,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "action_type partition = rowsEqGoodUnits",
+        "expected": 3084,
+        "actual": 3084,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "assay_type partition = rowsEqGoodUnits",
+        "expected": 3084,
+        "actual": 3084,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "replicateGroups + singleRecord = uniqueMolecules",
+        "expected": 1720,
+        "actual": 1586,
+        "note": "a shortfall here is the sameAssayOnly bucket, which the declaration does not report",
+        "ok": false,
+        "delta": -134
+      }
+    ],
+    "declaredV2Unverified": {
+      "provenance": "resupplied after the D-092 audit; bytes still NOT transferred; no hash here was checked against bytes",
+      "supersedes": "declaredUnverified (v1) — v1 is retained, not deleted, so the correction stays auditable",
+      "pages": [
+        {
+          "label": "offset=0",
+          "declaredRows": 1000,
+          "sha256": "489e0e42e2542e88392c2abc48dd280f789c785dd045b67cf126ad080f5934bf"
+        },
+        {
+          "label": "offset=1000",
+          "declaredRows": 1000,
+          "sha256": "4eaf816af16c7e9d3fccceb96c7456369f6a4e58134176ffa7f30eb4743df062"
+        },
+        {
+          "label": "offset=2000",
+          "declaredRows": 365,
+          "sha256": "3d339aec1f10d18c2469a50b01c653825d80fbbaf00d2d8685f546a1c9311ddc",
+          "declaredAs": "partial final page"
+        },
+        {
+          "label": "manifest",
+          "declaredRows": null,
+          "sha256": "698d556f3b8049388e4b8585cb94a1ef08bf19551ccb2ae6feb08c17240d8c94"
+        }
+      ],
+      "dedupedBytesSha256": "8dec7f27c50fd88120f472d3bb09f503a7026ec33ae661c99b08268dfd338dda",
+      "dedupedBytesLength": 6283424,
+      "dedupKey": "activity_id",
+      "counts": {
+        "rowsTotal": 2365,
+        "rowsRelationEqual": 2181,
+        "rowsEqGoodUnits": 2173,
+        "uniqueMolecules": 1586,
+        "replicateGroupsEC50": 325,
+        "singleRowMolecules": 1222,
+        "sameAssayOnlyMultiRow": 39,
+        "rejectedCensored": 174,
+        "rejectedNoRelation": 10,
+        "rejectedOrAnomalousUnits": 8,
+        "flaggedOutsideTypicalRange": 201,
+        "flaggedPotentialDuplicate": 20,
+        "assayTypeFunctional": 1549,
+        "assayTypeBinding": 624,
+        "actionTypeNone": 1339,
+        "actionTypeAgonistFamily": 834
+      }
+    },
+    "declarationReconciliationV2": [
+      {
+        "name": "pages reproduce rowsTotal",
+        "expected": 2365,
+        "actual": 2365,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "rowsTotal - censored - noRelation = rowsRelationEqual",
+        "expected": 2181,
+        "actual": 2181,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "rowsRelationEqual - badUnits = rowsEqGoodUnits",
+        "expected": 2173,
+        "actual": 2173,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "groups + singleRow + sameAssayMulti = uniqueMolecules",
+        "expected": 1586,
+        "actual": 1586,
+        "note": "the three-bucket partition replicateGrouping.mjs actually produces",
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "assay_type partition = rowsEqGoodUnits",
+        "expected": 2173,
+        "actual": 2173,
+        "ok": true,
+        "delta": 0
+      },
+      {
+        "name": "action_type partition = rowsEqGoodUnits",
+        "expected": 2173,
+        "actual": 2173,
+        "ok": true,
+        "delta": 0
+      }
+    ],
+    "v1ToV2Transition": [
+      {
+        "name": "dedup on activity_id cannot reduce the distinct-molecule count",
+        "holds": false,
+        "v1": 1720,
+        "v2": 1586,
+        "verdict": "IMPOSSIBLE_UNDER_STATED_OPERATION — one of the two molecule counts was not computed the way it is described"
+      },
+      {
+        "name": "v1's singleRecord bucket was the union of v2's singleRow and sameAssayMulti",
+        "holds": true,
+        "v1": 1261,
+        "v2": 1261,
+        "verdict": "explains why v1 under-partitioned; corroborates 1586 from BOTH declarations independently"
+      },
+      {
+        "name": "row drop equals exactly one page",
+        "holds": true,
+        "v1": 3365,
+        "v2": 2365,
+        "verdict": "consistent with one page having been counted twice"
+      }
+    ],
+    "existingPolicyProjection": {
+      "startFrom": 2173,
+      "rejectedByExistingPolicy": {
+        "data_validity_comment": 201,
+        "potential_duplicate": 20,
+        "note": "overlap between the two sets is unknown from the declaration, so the survivor count is an interval, not a point"
+      },
+      "survivingRowsBeforeCanonicalisation": {
+        "min": 1952,
+        "max": 1972
+      },
+      "stillToApply": [
+        "RDKit canonicalisation (unparseable SMILES drop)",
+        "pActivity within [3, 12]",
+        "dedup on canonicalSmiles|assayId|standardType",
+        "overlap with the 194 EC50 rows already in the frozen pin"
+      ],
+      "branches": {
+        "AGONIST_FAMILY_ONLY": {
+          "rows": 834,
+          "shareOfEqGood": 0.3838,
+          "replicateGroups": "NOT_MEASURED — the group count for this subset was never computed",
+          "sizeFloorLikelySurvives": true
+        },
+        "RETAIN_NONE_WITH_FLAG": {
+          "rows": 2173,
+          "shareOfEqGood": 1,
+          "replicateGroups": 325,
+          "caveat": "pharmacological direction unconfirmed for 1339 of 2173 rows"
+        }
+      },
+      "theTrapToAvoid": "the two branches must NOT be compared on how many replicate groups each yields. Choosing the branch that makes the noise floor measurable would be selecting the analysis to obtain the result. The branch is sealed on pharmacological grounds BEFORE its group count is measured."
+    },
+    "ingestPolicyResolved": {
+      "resolvedFrom": "scripts/fetch-gov-drug-discovery-generated-space.mjs:198 (assayInclusion) + packages/backend/src/campaign/activityDataset.mjs::normalizeActivityRows",
+      "statedPolicy": "organism=Homo sapiens, standard_units=nM, standard_relation=\"=\", no data_validity_comment, no potential_duplicate",
+      "rules": [
+        {
+          "field": "target_organism",
+          "policy": "Homo sapiens only",
+          "enforcedIn": "normalizeActivityRows (humanOnly)",
+          "existing": true
+        },
+        {
+          "field": "target_chembl_id",
+          "policy": "must equal the expected target id",
+          "enforcedIn": "normalizeActivityRows (expectedTargetId)",
+          "existing": true
+        },
+        {
+          "field": "standard_type",
+          "policy": "EC50|IC50|KI|PEC50|PIC50|PKI",
+          "enforcedIn": "normalizeActivityRows (ACCEPTED_TYPES)",
+          "existing": true
+        },
+        {
+          "field": "pActivity",
+          "policy": "within [3, 12]",
+          "enforcedIn": "normalizeActivityRows (PACTIVITY_MIN/MAX)",
+          "existing": true
+        },
+        {
+          "field": "dedup",
+          "policy": "canonicalSmiles|assay_chembl_id|standardType",
+          "enforcedIn": "normalizeActivityRows (dedupKey)",
+          "existing": true
+        },
+        {
+          "field": "data_validity_comment",
+          "policy": "ROW IS REJECTED when present — so the 222 \"Outside typical range\" rows DROP, they are not flags",
+          "enforcedIn": "fetch-script layer only",
+          "existing": true,
+          "gap": "not enforced by normalizeActivityRows"
+        },
+        {
+          "field": "potential_duplicate",
+          "policy": "ROW IS REJECTED when set — the 35 declared rows DROP",
+          "enforcedIn": "fetch-script layer only",
+          "existing": true,
+          "gap": "not enforced by normalizeActivityRows"
+        },
+        {
+          "field": "standard_relation",
+          "policy": "must be \"=\" ",
+          "enforcedIn": "fetch-script layer only",
+          "existing": true,
+          "gap": "NOT enforced by normalizeActivityRows, and the frozen pin carries no standardRelation column — so relation is NOT_MEASURED for the pin already in the repo"
+        },
+        {
+          "field": "action_type",
+          "policy": "NO POLICY EXISTS IN GENESIS",
+          "enforcedIn": null,
+          "existing": false,
+          "consequence": "under existing policy the 1774 action_type=None rows are ADMITTED, because no rule excludes them. Writing a rule now would be a NEW policy, which this mandate forbids. Direction of pharmacology therefore stays an OPEN PREREGISTRATION QUESTION for a human, not a silent default."
+        }
+      ]
+    },
+    "acquisitionRounds": [
+      {
+        "round": 1,
+        "outcome": "EGRESS_BLOCKED_HERE",
+        "detail": "this container: 403 CONNECT to every scientific host; supplier reported a successful fetch in its own sandbox"
+      },
+      {
+        "round": 2,
+        "outcome": "DECLARATION_ONLY",
+        "detail": "manifest v2 supplied and self-consistent; still no bytes in this container"
+      },
+      {
+        "round": 3,
+        "outcome": "NOT_RETRIEVED",
+        "detail": "supplier reported 4 fetch attempts, all read-timeout on www.ebi.ac.uk; no bytes produced in that round either"
+      }
+    ],
+    "channelConstraint": {
+      "requiredTogether": [
+        "egress to www.ebi.ac.uk / rest.uniprot.org",
+        "git push to the working branch"
+      ],
+      "thisContainer": {
+        "egress": false,
+        "gitPush": true
+      },
+      "supplier": {
+        "egress": "intermittent — succeeded in earlier rounds, read-timeout in round 3",
+        "gitPush": false
+      },
+      "consequence": "retrying on either side alone cannot resolve it; the two capabilities must meet on one machine, or a human moves the bytes"
+    },
+    "blockers": [
+      {
+        "code": "EGRESS_BLOCKED",
+        "detail": "the mandate's steps 1-2 (refetch, verify sha256) cannot execute: the network policy answers 403 to CONNECT for every declared scientific host. No byte of the offered dataset can enter this runtime through this container.",
+        "evidence": [
+          "http=000 curlExit=56 https://www.ebi.ac.uk/chembl/api/data/target/CHEMBL1784.json",
+          "http=000 curlExit=56 https://rest.uniprot.org/uniprotkb/P43220.json",
+          "http=000 curlExit=56 https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=CHEMBL1784&standard",
+          "http=000 curlExit=56 https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=CHEMBL1784&standard",
+          "http=000 curlExit=56 https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id=CHEMBL1784&standard"
+        ],
+        "proxyDetail": [
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "rest.uniprot.org:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)",
+          "www.ebi.ac.uk:443: connect_rejected — gateway answered 403 to CONNECT (policy denial or upstream failure)"
+        ]
+      },
+      {
+        "code": "TRANSITION_DISCREPANCY_RECORDED",
+        "severity": "NON_BLOCKING",
+        "detail": "the v1 -> v2 correction contains a step the stated operation cannot produce. v2 stays usable; the discrepancy is recorded rather than smoothed over.",
+        "evidence": [
+          "dedup on activity_id cannot reduce the distinct-molecule count: v1 1720 -> v2 1586 — IMPOSSIBLE_UNDER_STATED_OPERATION — one of the two molecule counts was not computed the way it is described"
+        ]
+      }
+    ],
+    "decision": "BLOCKED",
+    "whatWouldUnblock": [
+      "THE ONLY REMAINING ITEM: the raw response bytes, committed to this branch. Every arithmetic objection has been answered; nothing further can be established from a declaration.",
+      "a human preregistration decision on action_type, sealed on pharmacological grounds BEFORE the replicate-group count of the chosen branch is measured"
+    ],
+    "resolvedSinceV1": [
+      "the missing page — v2 states rowsTotal 2365, matching the three files it lists",
+      "the null manifest hash — v2 supplies 698d556f…",
+      "the unreported bucket — v2 reports sameAssayOnlyMultiRow = 39 and all six identities close"
+    ],
+    "scientificStateUnchanged": "NO_WINNER · Recipe LOCKED · CONSTRAINT_CONFLICT · attempts 1/2 · gates, pins, split rule and Winner Gate untouched"
+  },
+  "artifactHash": "ea3df532eafa503d5ba7ef7f5ef626edfe5fcf9719949f0e89656a80b91d7e6d",
+  "sealedAt": "2026-09-15T17:01:57.587Z"
+}

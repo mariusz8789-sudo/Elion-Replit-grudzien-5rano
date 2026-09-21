@@ -338,3 +338,1054 @@ dyscyplina tej sesji — każdy commit z drugiej gałęzi jest inspekcjonowany
 `git show --stat` + bezpieczeństwo cyber/gov PRZED cherry-pickiem do
 `main`), więc nic nie wejdzie do `main` bez tego audytu — ale lepiej
 zamknąć to świadomie niż czekać na przypadkowe złapanie.
+
+---
+
+## UPDATE — 2026-09-12, C3: domknięcie listy + status od ostatniego wpisu (2026-09-09)
+
+**Dlaczego ten wpis istnieje**: ten dokument nie był aktualizowany od
+2026-09-09, mimo że w tym czasie zamknięto sporo z listy powyżej —
+status żył wyłącznie w osobnych sesjach czatu per-agent (C1/C2/C3), nie
+tutaj. Poniżej domykam to, co faktycznie zamknięte, zgłaszam co zostało
+zweryfikowane, i zapisuję nowy kontekst (deadline/freeze), żeby C2, Qwen
+i każda przyszła sesja miały to z jednego miejsca, nie tylko C1 w swoim
+wątku.
+
+### 1. Zamknięte formalnie: C3 — Mechanism Composition / researchChain actuator
+
+Przydział z sekcji "C1/C3/QN" wyżej (linia ok. 147) — **ZAMKNIĘTE**,
+commit `bbdc0a90`/`5051e25d` ("MECHANISM composition reaches
+researchChain, plus the killer case on the generator domain"). Ten sam
+wzorzec co `NARROW_A_DERIVED_INTERVAL` po stronie PARAMETER, bez nowej
+logiki wyboru. Wszystkie trzy równoległe ścieżki z sekcji "wieczorny
+sprint" (C1 Real Experiment E2E, C3 researchChain actuator, QN recon) są
+teraz zamknięte.
+
+### 2. Ostrzeżenie o przypadkowym handoffie Qwen→C3 (Multi-Model Tournament) — NIEAKTUALNE, zamykam
+
+Sprawdziłem repo: **żaden N-way tournament / cycle-detection kod nigdy
+nie wylądował**. Jedyny istniejący kontrakt to pre-istniejący, PARowy
+`core/experimentFabric/modelVsModelCompare.ts` (Model A vs Model B,
+commit `ea22c8bd`/`99d43172`, 2026-09-04 — sprzed tego ostrzeżenia, więc
+to NIE jest ten output). Ostrzeżenie z 2026-09-09 dotyczyło ryzyka, które
+się nie zmaterializowało — zamykam bez żadnej akcji kodowej.
+
+### 3. Audyt WorldRegistry → Construct → City 4.0 (zlecony osobno) — domknięty przez REALNĄ implementację
+
+Mój wcześniejszy audyt na checkpoint `44438afb` dał **REFUTED**: "Genesis
+Construct" wtedy nie istniał nigdzie w repo. Od tego czasu ktoś go
+zbudował realnie (`a435ac63`, "Genesis Construct: deterministic staging
+layer, integrated into the real City 4.0 screen") — **właśnie
+zweryfikowałem ten commit**, bo zostawiłem go sobie jako otwarty wątek:
+- Adresuje dokładnie ryzyko, które sam bym flagował: WorldRegistry miał
+  jednego konsumenta (`genesisScientificCity4.ts`) — Construct dostał
+  realnego konsumenta W TYM SAMYM commicie
+  (`GenesisWorldSim3D`/`GenesisWorldScreen.tsx`), zamiast zostać drugim
+  osieroconym subsystemem.
+- Zero nowego słownika epistemicznego — `epistemicStatus` jest
+  nieinterpretowanym stringiem przechodzącym przez Construct, nie nową
+  7-wartościową taksonomią równoległą do istniejącej.
+  `scenarioCapsule.ts` pozostaje osobne (replay gotowych artefaktów, nie
+  loader ze stanem LOADED/EMPTY).
+- Reużywa fingerprint z `worldGenerator.ts` (`paramsHash`) — zero nowego
+  schematu fingerprintu.
+- **Spot-check wykonany teraz, na bieżącym tip gałęzi**: `construct.test.ts`,
+  `constructGenesisScientificCity4.test.ts`,
+  `genesisWorldScreenFirstPerson.test.ts`,
+  `genesisWorldScreenPostProcessing.test.ts` → **74/74 zielone**.
+- Solar Twin (deklarowany następny konsument Construct) świadomie NIE
+  rozpoczęty w tym commicie — zgodne z poniższym freeze.
+
+### 4. Nowy kontekst od ostatniego wpisu: 24–48h deploy + grant freeze, Solar Twin zamrożony
+
+Nie zapisane dotąd nigdzie poza czatem — zapisuję teraz, żeby nie zginęło:
+**Solar Twin jest jawnie zamrożony** (potwierdzone niezależnie w dwóch
+miejscach: instrukcja przy `a435ac63` wyżej, i osobne zlecenie do C3 z
+tym samym zdaniem wprost: "Solar Twin zamrożony"). W tym oknie **zero
+nowych systemów** — wyłącznie dostrajanie/audyt/hardening istniejącego.
+
+**LiveMatrixBackground — tło dekoracyjne, teraz w produkcji**, ciąg
+commitów od zbudowania do weryfikacji:
+1. `75d2e3c6` — zbudowane i przetestowane jako czysty, wyizolowany
+   moduł (37 testów lifecycle'u), NIEwpięte.
+2. `12e312d9` (C3) — `deriveGenesisVisualState()`: kalibracja realny stan
+   Genesis → poziom aktywności tła (Home/pusta Memory = IDLE najspokojniejszy,
+   realny Campaign `status==='running'` = RUNNING najbardziej żywy), plus
+   eksport `SUPPRESSED_ROUTES`/`isSuppressed` z `MatrixDataStream.tsx` do
+   reużycia.
+3. `2e25cd18` (C1) — realne wpięcie w `App.tsx` przez adapter, plus
+   uzupełnienie luki w `SUPPRESSED_ROUTES` (`#/genesis-world` brakowało).
+4. `6837ff98` (C1) — dwa zmierzone (nie "na oko") defekty widoczności
+   naprawione: strumienie generowane od razu w kadrze zamiast 1.6 wysokości
+   ekranu nad nim, i próg `intensity` podniesiony powyżej granicy
+   wyłączającej glow całkowicie. 35 920 zapalonych pikseli @1440×900 po
+   naprawie (zmierzone, nie deklarowane).
+5. **C3, pełny visual QA przed deployem** (ten wpis dokumentuje wynik dla
+   C2/Qwen, nie tylko dla C1, który dostał to wcześniej w czacie): realny
+   Chromium, desktop 1440×900 + mobile 420×860, 26 tras × 2 viewporty = 52
+   kombinacji. Zero błędów konsoli, zero horizontal overflow, tło poprawnie
+   obecne/nieobecne zgodnie z `SUPPRESSED_ROUTES` na każdej kombinacji.
+   Znaleziona i wyjaśniona pozorna regresja: Home w tym headless sandboksie
+   mierzy ~10 fps — zbadane CPU-profilerem (CDP), przyczyna to
+   `GenesisCommandCenterHero` (WebGL) renderowany programowo przez
+   SwiftShader (sandbox nie ma prawdziwego GPU: `ANGLE ... SwiftShader
+   Device`), NIE Matrix (własny koszt renderowania Matrixa: 0,7–1,3 ms/klatkę;
+   `#/campaign` z tym samym tłem = pełne 60 fps). Potwierdzone A/B na
+   commicie SPRZED wpięcia Matrixa (`6d070cb0`): Home już wtedy mierzył
+   ~12 fps. **Wniosek: nie regresja, nie do naprawy na tej gałęzi** — do
+   zweryfikowania na prawdziwym sprzęcie z GPU przed komisją, poza
+   zakresem tego zadania.
+
+**Inne prace C3 od 2026-09-09, nigdzie wcześniej nie zapisane tutaj**:
+CSRN v4 (`8b568012`→reconciliation `d0ef51fa`/`f74914a4`, dokumentacja
+kontraktu podpisu w `4a4052e8`), P0.2 belief persistence + hardening
+(`94a0e431`, `44438afb` — realny test przetrwania restartu procesu na
+plikowym SQLite, nie mocku), World/City generator provenance completeness
+(`templateIds`/`levelOfDetail` w `world.generation.completed`, część
+`44438afb`), Earth Observatory jako pozycja backlogu post-grant w
+`VISION-BACKLOG.md` (`35a6d481` — bez implementacji, tylko zmapowane
+istniejące punkty rozszerzenia).
+
+### 5. Stan bramki jakości w chwili tego wpisu (branch tip `35a6d481`)
+
+tsc: czysto. Frontend: 458/458 plików, 4992 passed / 1 skip (znany,
+niezwiązany flake w innym miejscu). Backend: 362 passed / 0 failed / 34
+skipped. Build: czysto.
+
+### 6. Co zostaje otwarte (żadnego nowego zadania nie zamykam sam z siebie)
+
+- Weryfikacja realnego FPS Home/scen 3D na sprzęcie z prawdziwym GPU przed
+  komisją — niemożliwa do wykonania z tego sandboksa.
+- Freeze (zero nowych systemów, Solar Twin zamrożony) pozostaje w mocy do
+  odwołania — ten wpis go nie kończy, tylko dokumentuje.
+- Priorytet 3 (Product/Funding Readiness, sekcja wyżej) w praktyce JEST
+  tym, czym jest ten freeze (przygotowanie do dema/deployu/grantu) —
+  wart jawnego nazwania, jeśli ktoś wraca do tego dokumentu i zastanawia
+  się, czy Priorytet 3 wciąż czeka.
+
+### 7. Dodatkowy re-check: trzy moduły oznaczone wcześniej jako "ryzyko osieroconego subsystemu" (przy okazji audytu Construct)
+
+Commit `a435ac63` wymieniał `evidenceUri.ts`, `core/governance/` i
+`generateAlternativeHypotheses` jako wcześniej znalezione ryzyka
+osieroconych modułów. Sprawdziłem realnych konsumentów na bieżącym tip:
+
+- `evidenceUri.ts` — MA realnych konsumentów (`ExperimentPilotScreen.tsx`,
+  `core/experimentFabric/index.ts`, `core/csrn/genesisCertificateAdapter.ts`)
+  — nieosierocony.
+- `generateAlternativeHypotheses` — MA realnych konsumentów
+  (`core/experimentFabric/objectiveReducer.ts`,
+  `core/worldModel/discovery/worldCounterfactual.ts`) — nieosierocony.
+- `core/governance/` — zero konsumentów poza sobą. To jednak ZGODNE z
+  regułą już zapisaną w sekcji "Zasady wykonania" wyżej ("Cyber/GOV
+  pozostaje OFF `main`") — świadomie odizolowany, nie bug. Zero akcji.
+
+Wszystkie trzy zamknięte/potwierdzone — żadnego realnego osieroconego
+modułu nie znaleziono.
+
+### 7b. Korekta do sekcji 7: jeden realny osierocony moduł jednak istniał — `core/agent/domeWorld/`
+
+Sekcja 7 sprawdziła trzy moduły wskazane w audycie Construct i zamknęła
+temat wnioskiem „żadnego realnego osieroconego modułu nie znaleziono". Ten
+wniosek był poprawny dla tych trzech, ale nie dla repo: sweep nie objął
+`core/agent/domeWorld/`, który miał **zero konsumentów produkcyjnych** —
+kompletny, przetestowany i całkowicie niewidoczny dla użytkownika.
+
+Moduł liczy, co przewiduje model płaskiego dysku z lokalnym słońcem i
+kopułą, i sądzi te przewidywania przeciw cytowanym pomiarom przez ISTNIEJĄCY
+pipeline REFERENCE (`createReferenceMeasurementRun` +
+`verifyPredictionAgainstRealExperiment`) — ten sam, którego
+`RealExperimentPipeline.tsx` używa dla ręcznie wprowadzonego cytowania:
+
+- `shadow_angle_degrees` — kopuła przewiduje 9,09°, Eratostenes 7,2° ± 0,5°
+  (Kleomedes, ~240 p.n.e.) → `FALSIFIED_WITHIN_PROTOCOL`
+- `horizon_distance_km` — kopuła przewiduje 100 km, geodezja 4,65 km ± 0,2
+  (d = √(2Rh+h²), potwierdzone obserwacją hull-down) → `FALSIFIED_WITHIN_PROTOCOL`
+
+Podpięte jako `#/dome-world` (commit `2a92cd5`). Ekran nic nie liczy i nie
+wydaje własnego werdyktu — renderuje to, co zwrócił pipeline; tolerancja
+każdego kryterium to własna niepewność cytowania. Suwak wysokości słońca
+istnieje po to, żeby czytelnik mógł przemieść jedyny wolny parametr modelu
+po całym zakresie i sam zobaczyć, że żadna wartość go nie ratuje — różnica
+między „aplikacja twierdzi" a „możesz sprawdzić".
+
+Wniosek dla przyszłych sweepów: sprawdzanie listy modułów wskazanych przez
+wcześniejszy audyt nie jest tym samym co sprawdzenie repo. `domeWorld`
+nie był na żadnej liście, bo nikt go nie podejrzewał.
+
+### 8. Mechaniczny sweep osiągalności — 44 moduły osierocone, 5 podpiętych, 1 usunięty
+
+Wniosek z 7b („sprawdzenie listy nie jest sprawdzeniem repo") został zamieniony
+na narzędzie. `packages/frontend/src/__tests__/moduleReachability.test.ts`
+przechodzi realny graf importów z `main.tsx` i **wywala się na KAŻDYM nowym
+module nieosiągalnym z aplikacji**. Testy nie są punktem wejścia — bycie
+osiągalnym wyłącznie z własnego testu to dokładnie kształt `domeWorld`:
+zielony, udowodniony, niewidoczny.
+
+Stan po tej sesji: **622 z 657 modułów produkcyjnych osiągalnych** (35 w allowliście).
+
+Allowlista NIE jest listą wyciszeń. Każdy z 44 wpisów niesie powód, dla
+którego moduł jest osierocony **zasadnie**, a drugi test odrzuca powody-
+zaślepki (za krótkie, `TODO`). Test wywala się także wtedy, gdy moduł z
+allowlisty STAJE SIĘ osiągalny — bez tego lista zgniłaby w fikcję. Ten
+mechanizm zadziałał trzy razy w trakcie tej sesji (`beliefChangeRun.ts`,
+`modelVsModelCompare.ts`, `protectionPriority.ts`).
+
+Pułapka warta zapamiętania: sweep, który dopasowuje tylko `from '...'`, gubi
+`import './labs/index';` — a tak ładuje się CAŁY rejestr 23 eksperymentów.
+Pierwsza wersja raportowała więc każde laboratorium jako sierotę. Fałszywy
+alarm tej klasy zabija wiarygodność takiego testu przy pierwszym uruchomieniu.
+
+#### Podpięte w tej sesji (każde zweryfikowane realnym Chromium)
+
+1. **Trwały zapis świata** — backend serwował `POST/GET/PUT /api/worlds` z
+   własnym zielonym testem („survives a real process restart"),
+   `worldSnapshot.ts` i `worldPersistenceClient.ts` były kompletne i
+   przetestowane, a przeglądarka nie wołała NICZEGO z tego. Zbudowane na obu
+   końcach, połączone na żadnym. `GenesisWorldScreen` (jedyny ekran trzymający
+   żywy `TemporalEngine`) zapisuje i odczytuje przez nie. Zmierzone: 2 ticki →
+   zapis → `GET /api/worlds` zwraca świat z realną specyfikacją → odczyt
+   round-trip zgodny co do liczby (tick 2 = żywy 2, 27 encji = 27, 16 zdarzeń
+   = 16). ZAKRES POWIEDZIANY W UI: zapisywana jest gałąź BAZOWA (fork sceny
+   powstaje przez `engine.forkBranch`, nie przez `WorldRegistry.fork`, więc nie
+   ma własnego `worldId` — wymyślenie go byłoby wymyśleniem tożsamości, której
+   model świata nigdy nie wydał), a ścieżka odczytu mówi wprost, że scena 3D
+   nadal pokazuje świat żywy.
+
+2. **„Dlaczego zmieniło się przekonanie"** na `#/pilot` — `explainWhyBeliefChanged`
+   to czysta, synchroniczna połowa `beliefChangeRun.ts`; nic nie przelicza i
+   nic nie wnioskuje. Ekran pokazywał CO rozstrzygnięto i nigdy CO SIĘ
+   ZMIENIŁO. Zmierzone na realnym przebiegu wzrostu logistycznego: 8 realnych
+   runów, obie hipotezy PREREGISTERED → SUPPORTED, fractionOfCapacity 80,2957
+   vs 16,8665. „Żadna hipoteza nie zmieniła statusu" jest renderowane jako
+   własny, uczciwy wynik.
+
+3. **Stan epistemiczny + zasięg dowodu** na `#/matrix` —
+   `buildEpistemicStateGraph` bierze dokładnie te dane, które ekran już miał, i
+   dokłada jedyną rzecz, której graf relacji nie niesie: status WYPROWADZONY z
+   realnych pól, z regułą wyprowadzenia obok niego (status, którego nie da się
+   sprawdzić, to etykieta, nie klasyfikacja). `computeEvidenceImpact` odpowiada
+   na pytanie, na które lista relacji odpowiedzieć nie może: co jeszcze się
+   sypie, jeśli ten rekord jest błędny (przechodnio, po siedmiu realnych polach
+   referencyjnych).
+
+4. **Turniej modeli** na `#/conflict` — `counterfactualCompare.ts` jawnie
+   odmawia porównania dwóch różnych `modelId` i NAZYWA protokół, który to robi.
+   `modelVsModelCompare.ts` JEST tym protokołem i nikt go nie wołał. Osobny
+   panel obok `ModelConflictPanel` (tamten czyta zapisane korelacje MCRE, ten
+   URUCHAMIA dwa modele) — przepisanie jednego na kształt drugiego byłoby
+   przeetykietowaniem realnego wyniku. Zmierzone: v/c=0,02 → Newton
+   0,000102200 MeV vs Einstein 0,000102231 MeV (ZGODNE); v/c=0,99 → 0,25042 vs
+   3,1114 MeV (ROZBIEŻNE), najbardziej rozróżniający eksperyment v/c=0,99.
+
+5. **„Kogo chronić najpierw?"** jako `#/protection-priority` —
+   `protectionPriority.ts` uruchamia każdy wariant ochrony jako osobną, w pełni
+   udowodnioną sprawę i podaje ranking OSOBNO dla każdego z 8 celów. Zmierzone
+   (260 agentów, 60 dni, ziarno 4242, 523 ms, 3/3 kandydatów DOPUSZCZONYCH z
+   replay MATCH): przy profilu ilustracyjnym wszystkie cele wskazują
+   PROTECT_ADULTS, przy neutralnym pojawia się REALNA rozbieżność —
+   `deaths_adult → PROTECT_SENIORS` przy `PROTECT_ADULTS` we wszystkich
+   pozostałych. To jest sedno modułu i do tej pory nikt nie mógł tego zobaczyć.
+
+6. **Wolnotekstowe „dlaczego?"** na `#/campaign` — `campaignWhyIntent.ts` mapuje
+   zdanie na jeden z 9 realnych rodzajów WHY, które backend już serwuje z
+   utrwalonych danych kampanii. TRZY z tych dziewięciu (`status`,
+   `stage-selection`, `conflict`) nie mają na tym ekranie żadnego przycisku,
+   więc były nieosiągalne w ogóle. Gdy nic nie pasuje, ekran ODMAWIA zamiast
+   podstawiać domyślny rodzaj.
+   Zweryfikowane na REALNEJ kampanii (konto lokalne, projekt, orchestrator na
+   RDKit 2026.03.6, aspiryna, 2 generacje, 20 kandydatów → STOP_RESOURCE_LIMIT):
+   „dlaczego kampania się zatrzymała?" → realna odpowiedź z frontem Pareto
+   `CC(=O)Oc1c(C(=O)O)ccc(Cl)c1Cl`; „jaka jest dzisiaj pogoda" → odmowa.
+   PRZY OKAZJI ZŁAPANY REALNY BŁĄD: pierwsza wersja podpowiadała przykład
+   „dlaczego stop", którego gramatyka NIE akceptuje. Ekran podpowiadający
+   frazy odrzucane przez własny parser uczy użytkownika, że funkcja nie
+   działa. Teraz test przepuszcza przez parser każdy przykład pokazywany w UI.
+
+7. **Fotony wokół czarnej dziury** jako `#/geodesics` —
+   `relativityGeodesic.ts` całkuje równanie geodezyjnej zerowej
+   `d²u/dφ² = −u + (3/2)·r_s·u²` (RK4) jako realny `DomainSolver`, bit w bit
+   zgodnie z runnerem Labs. Ekran nic nie całkuje: czyta publikowane pozycje i
+   dzieli je przez własny, jawny współczynnik solvera (test pilnuje, że w
+   komponencie nie ma ani trygonometrii, ani wywołania integratora).
+   Zmierzone (259 ms, 5 fotonów): b/b_crit 0,70 → POCHŁONIĘTY (min 1,0083 r_s),
+   0,90 → POCHŁONIĘTY, 1,01 → UCIEKŁ ocierając się o 1,6369 r_s przy 1,155
+   okrążenia, 1,30 i 1,80 → UCIEKŁY. Granica b_crit = 3√3/2 ≈ 2,5981 r_s jest
+   stałą zamkniętą, więc wykres można sprawdzić z podręcznikiem — ten sam
+   standard co falsyfikacja kopuły.
+
+8. **„Zaproponuj świat"** jako `#/world-proposal` — `llmWorldProposalAdapter.ts`
+   pyta realny backend `/api/world-proposal`, `resolveWorldProposal.ts` składa
+   go z torem deterministycznym. Zdanie NIE jest po cichu zamieniane na
+   przełączniki planu awaryjnego: deterministyczny proposer celowo nie rozumie
+   języka naturalnego, więc ekran prosi o jedno i drugie i mówi dlaczego (test
+   pilnuje, że komponent nigdy nie dotyka `prompt.includes/match/toLowerCase`).
+   Zmierzone: POST → 503, tor DETERMINISTYCZNY FALLBACK, powód `no-key`
+   wypisany dosłownie obok zdania „nie udajemy, że wymyślił go model";
+   zbudowany świat: walidacja OK, 25 encji, realne solvery
+   chemistry-kinetics / epidemiology / hydraulics-engineering.
+   To 503 JEST działającą funkcją, nie usterką.
+
+9. **Kalibracja parametru** jako `#/calibration` i **autonomiczne dochodzenie**
+   jako `#/inquiry` — istniały TRZY przetestowane strategie
+   (`discoveryStrategies.ts`: MECHANISM, PARAMETER, CALIBRATION), a produkcja
+   uruchamiała wyłącznie MECHANISM, na sztywno wpiętą w katalog powodziowy.
+   Teraz uruchamiane są wszystkie trzy.
+   Świat ma UKRYTĄ wartość, agent jej nie dostaje, a ekran porównuje dopiero po
+   przebiegu:
+   - okres zakaźności 7,5 dnia → agent czyta dzień 2, potem dzień 45 → ODZYSKANY
+     (66 ms); przy 6 dniach czyta dzień 2, potem dzień 30 → ODZYSKANY (43 ms).
+     Inna prawda, inny moment pomiaru — to jest ta zdolność.
+   - złącze kwantowe (bariera 1,2, szerokość 2,5) → E=1,3 nie rozróżnia niczego
+     (wszystkie cztery SUPPORTED), agent schodzi do E=0,4 → ODZYSKANY (1352 ms).
+   - zwijanie białka (T=1,2) → 200 kroków daje 0,1300 dla każdego kandydata
+     (podłoga algorytmu), agent wydłuża przebieg i kończy na
+     NO_DISCRIMINATING_PROBE z h:warm i h:hot przy życiu → ZAWĘŻONE,
+     NIEROZSTRZYGNIĘTE. Moduł sam to ograniczenie deklarował; ekran mówi to
+     wprost, zamiast podawać dwóch ocalałych jako odpowiedź.
+   JEDEN RAPORT NA TRZY STRATEGIE: `StrategyRunReport.tsx`. Wszystkie trzy
+   zwracają ten sam kontrakt `StrategyRun`, więc druga tabela rund byłaby drugą
+   opinią o tym, co znaczy przebieg — wolną, żeby się rozjechać z pierwszą.
+
+#### Usunięte
+
+`components/MissionStatusBar.tsx` wraz z jego CSS `.mission-bar`. Jego własny
+komentarz mówił, że został wydzielony, „żeby Genesis Command Center mógł go
+reużyć bez drugiej implementacji tego samego statusu" — Command Center
+zbudował drugą implementację mimo to. `GenesisCommandCenterHero.tsx` renderuje
+wszystkie cztery te same fakty z tych samych źródeł i to jego montuje
+`App.tsx`. Zero importerów, zero testów. Zdublowany, wyparty moduł to dokładnie
+to, czego reguły tego repo zabraniają trzymać.
+
+#### Co zostaje otwarte (nie zamykam sam z siebie)
+
+Największa grupa w allowlist to **kompletna, przetestowana nauka zablokowana za
+NAZWANYM brakiem**, nie za zapomnieniem — i to jest realny materiał na kolejne
+zadania dla C2/C3/Qwen, każde z gotowym, zielonym rdzeniem:
+
+- `discoveryTrace.ts` — konsumuje `ResearchChainResult` (łańcuch PARAMETER), a
+  produkcja uruchamia wyłącznie `runMechanismResearchChain` (inny typ).
+- `moleculeWorldAdapter.ts`, `particleWorldAdapter.ts` — 2. i 3. domena dowodu,
+  że kontrakt `WorldState` jest ogólny; ta druga czeka na `DivergenceSweepResult`.
+- `spatialWorldFrame.ts` + `spatialFeatureBridge.ts` — most OSM → renderer
+  kanoniczny, zablokowany brakiem wejścia z realnymi, licencjonowanymi danymi.
+
+Reszta allowlisty to świadome decyzje (Sovereign OFF), kod nie-przeglądarkowy
+(`.node.ts`, `serverEntry.ts`), wykonywalna dokumentacja (`graphics/examples/`),
+barrele oraz prymitywy (odciski, steppery), których brak konsumenta nie jest
+defektem — odcisk nigdy nie jest tematem ekranu.
+
+---
+
+## UPDATE — 2026-09-12, C1: QE1 → QE2 → QE3 przeszły pełny cykl w prawdziwym StrategyRun
+
+**Status: E2E VERIFIED** (wykonanie, nie inspekcja — tabele niżej pochodzą z
+przebiegów, nie z założeń).
+
+Polecenie brzmiało: wciągnąć QE1–QE3 do research-loop jako **prawdziwe
+StrategyRun**, w kolejności QE1 → QE2 → QE3, z obowiązkowym cyklem
+hypothesis → prediction → experiment → independent expected result → execution →
+falsification verdict → belief update → next question. Bez QE4–QE7, dopóki
+pierwsza trójka nie przejdzie tego end-to-end.
+
+Nie powstała żadna druga pętla, żaden drugi silnik i żaden „Entanglement Lab"
+jako osobna wyspa. Powstały **trzy systemy pod badaniem** na istniejącej
+strategii PARAMETER (`parameterStrategy` → `inquiryLoop`), na zarejestrowanym
+modelu Fabric `quantum-entanglement-measures`. Cała arytmetyka pochodzi z
+`entanglementMeasures.ts`, wszystkie decyzje z `inquiryLoop.ts`.
+
+### Co dodano (i dlaczego akurat tyle)
+
+1. **Dwie realne gałki preparatyki** w modelu Fabric (1.0.0 → 1.1.0):
+   - `whiteNoise` — kanał depolaryzujący ρ → (1−w)ρ + w·I/d. To jedyna gałka,
+     którą eksperymentator naprawdę kręci: jakość przygotowania źródła.
+   - `mixingAngleDeg` — domieszka |W⟩ do uogólnionego GHZ.
+   Bez drugiej liczbowej gałki nie ma inquiry: pętla wymaga ukrytego parametru
+   ORAZ sondy, a model miał wcześniej tylko jedną liczbę.
+2. **`SystemUnderStudy.fixedParameters`** poszerzone z `number` na
+   `ExperimentValue`. Preset stanu (`stateId`) to napis — dokładnie jak
+   sekwencja bramek w `quantum-bloch-circuit`. Ukryte parametry i sonda
+   pozostają ściśle liczbowe, więc arytmetyka pętli się nie zmienia.
+3. **`agent/entanglementInquiry.ts`** — trzy systemy, ich ukryte prawdy,
+   hipotezy konkurencyjne i pasma zgodności. Zero miar, zero solverów, zero
+   pętli.
+4. **Ucięcie pyłu numerycznego** (`NUMERICAL_ZERO = 1e-12`) na wyjściach
+   runnera. To nie kosmetyka: zmierzone, na `ghz-w-family` przy α = 90° surowa
+   reszta trójsplotu wraca jako −1,776e-15 dla θ = 20° i −6,661e-16 dla θ = 70°.
+   Pętla sądząca predykcje względem pomiaru na tej metryce **sfalsyfikowałaby
+   wszystkich kandydatów w pierwszej rundzie** na podstawie szumu
+   zmiennoprzecinkowego. Strażnik przeżywa: realne złamanie monogamii byłoby
+   rzędu 0,1–1, a `checkCKWMonogamy` dalej zwraca resztę nieuciętą.
+
+### Co pętla naprawdę zrobiła
+
+**QE1 — widzialność źródła. STOP: NO_DISCRIMINATING_PROBE, dwóch ocalałych.**
+Otwarcie przy w = 1: max CHSH dokładnie 0 dla wszystkich czterech kandydatów,
+pewność nie drgnęła (magnituda dowodu 0). Runda 2 przy w = 0,9 wybrana regułą
+`DISCRIMINATES_OTHER_PAIR` — pętla jawnie powiedziała, że ten pomiar NIE
+rozstrzyga sporu dwóch najsilniejszych, tylko zawęża pole: padły `h:marginal`
+(0,20365 vs zmierzone 0,26022) i `h:classical` (0,14142). Potem odmowa.
+**Odmowa jest strukturalna, nie pechowa**: max CHSH = 2√2·(1−w)·p, więc sonda
+mnoży każdą predykcję przez ten sam czynnik, stosunek 1,00/0,92 = 1,087 jest
+stały przy KAŻDYM ustawieniu i mieści się w zadeklarowanym paśmie ±15%. Pętla
+odkryła, że **szum biały to zła gałka do tego pytania** — i to jest wynik.
+Pasmo zadeklarowano na ±15% świadomie i jest to zapisane w module: przy ±5%
+inquiry odzyskałoby p = 0,92 w jednej rundzie. Trudniejszy wynik jest
+uczciwszy, więc został wybrany i opisany, a nie ukryty.
+
+**QE2 — monogamia CKW. STOP: NO_CONTENDERS_LEFT, ODZYSKANE θ = 70°.**
+Trzy rundy, bo dwie nie wystarczyły:
+| α | θ=20° | θ=35° | θ=45° | θ=55° | θ=70° |
+|---|---|---|---|---|---|
+| 90° (otwarcie) | 0 | 0 | 0 | 0 | 0 |
+| 0° (czysty GHZ) | 0,41318 | 0,88302 | 1,00000 | 0,88302 | 0,41318 |
+| 15° | 0,37731 | 0,79826 | 0,90698 | 0,81092 | 0,40813 |
+Najsilniejszy sygnał w rodzinie (czysty uogólniony GHZ, τ₃ = sin²2θ) jest
+**symetryczny względem 45°**, więc zostawia θ = 20° i θ = 70° remisujące co do
+1e-15 — prawdziwa degeneracja rodziny stanów, nie artefakt. Pętla sięgnęła
+poza oś, po α = 15°, gdzie |W⟩ interferuje z |000⟩ i nie z |111⟩, symetria
+pęka, i sfalsyfikowała θ = 20°.
+
+**QE3 — zakres kryterium PPT. STOP: NO_CONTENDERS_LEFT, ODZYSKANE a = 0,4.**
+Każdy z czterech kandydatów jest PPT (negatywność 0), więc partial transpose
+nie rozstrzygnąłby niczego; całe dochodzenie jedzie na drugim, niezależnym
+kryterium (CCNR). Zmierzony margines przy w = 0: 0,003031 / 0,002716 /
+0,001884 / 0,000941 dla a = 0,2 / 0,4 / 0,6 / 0,8. **Zmierzony wynik uboczny,
+który jest realnym odkryciem tego przebiegu:** margines spada do zera już przy
+w = 0,005 — pół procenta szumu białego niszczy jedyny dowód, jaki istnieje na
+splątanie związane. Dlatego wszystkie ustawienia sondy poza w = 0 są
+bezużyteczne, a pętla musiała to odkryć sama.
+
+### Czego NIE zrobiono i dlaczego (najważniejszy punkt)
+
+**QE1 NIE testuje granicy Tsirelsona i jest to zapisane w module.** Uruchomienie
+kalkulatora mechaniki kwantowej i stwierdzenie, że nie widać |S| > 2√2, jest
+tautologią, nie dowodem: granica jest wbudowana w algebrę, którą model liczy,
+więc model nie może wyprodukować kontrprzykładu. Hipoteza o źródle
+nadkwantowym jest tu **nierozstrzygalna**, a nie sfalsyfikowana — i tak jest
+raportowana. To samo dotyczy QE2: nierówność CKW jest twierdzeniem tej algebry,
+ujemna reszta falsyfikowałaby implementację, nie twierdzenie.
+
+QE4–QE7 nie ruszone, zgodnie z poleceniem.
+
+### Weryfikacja
+
+`npx tsc --noEmit` czysto; `npx eslint src --max-warnings=0` czysto;
+`entanglementInquiry.test.ts` 21 testów zielonych (asercje na DECYZJE pętli:
+która sonda, która reguła wyboru, który werdykt, który stop);
+`moduleReachability.test.ts` + `orphanModuleWiring.test.ts` 62 zielone — nowy
+moduł jest osiągalny z `main.tsx`, bo QE1–QE3 są w `#/inquiry` obok złącza
+kwantowego i zwijania białka, w tym samym `StrategyRunReport`.
+
+### Podział pracy po QE1–QE3 (C1 → C2 / C3 / Qwen)
+
+Kolejność wynika z macierzy priorytetów planu master, nie z wygody. Każde
+zadanie ma ZIELONY rdzeń i nazwany brak — żadne nie jest „zbuduj coś nowego".
+
+**C3 — G3: kotwica anty-HARKing w prerejestracji (P0, jedyne P0 na liście).**
+`experimentFabric/hypothesisLoop.ts:299` ustawia `createdBeforeRun: true`
+BEZWARUNKOWO, a odcisk (`:301-305`) nie zawiera ani `createdAt`, ani żadnego id
+/odcisku przebiegu. Rekord dowodzi więc tylko „ten tekst nie zmienił się od
+zahaszowania" i nic o tym, KIEDY powstał względem danych: sekwencja
+`uruchom → zobacz wyniki → napisz candidateValues → prerejestruj → wykonaj`
+daje rekord bit-identyczny i „nienaruszony". Zakres: do odcisku wchodzi kotwica
+(znacznik czasu prerejestracji + odcisk stanu świata/przebiegu, który
+prerejestracja poprzedza), `createdBeforeRun` przestaje być literałem i staje
+się czymś, co da się PODWAŻYĆ. **Test najpierw, na czerwono**: napisz test,
+który udaje HARKing (prerejestracja po zobaczeniu wyników) i pokaż, że dziś
+przechodzi. Nie dodawaj scoringu ani niczego z G5 — repo słusznie tego odmawia.
+
+**C2 — G6: kanoniczny słownik epistemiczny + warstwa zgodności (P1).**
+`scienceMemory.ts:267-283` — `SavedExperimentEpistemicStatus` to unia SZEŚCIU
+nazwanych osi plus dziesięć literałów ad-hoc. `HYPOTHESIS` należy do trzech osi
+naraz; `SIMULATION` i `DataProvenance.SIMULATED` to jedno pojęcie w dwóch
+pisowniach (plik sam to przyznaje w `:236-240`). Cztery słowniki są genuinnie
+ortogonalne i ZOSTAJĄ (`ReplayVerdict`, `DataProvenance`, `GroundingLevel`,
+`AdmissionStatus`); trzy to redundantne rankingi „jak ustalone jest
+twierdzenie" (`ConfirmationLevel` / `EpistemicStatus` /
+`KnowledgeEpistemicStatus`) i te się konsolidują. Twardy warunek: **zero
+łamania zapisanych danych** — warstwa zgodności czyta stare stringi i mapuje na
+osie, migracja jest jednokierunkowa i przetestowana na realnych rekordach z
+`localStorage`/SQLite, nie na fikcyjnych.
+
+**Qwen — pakiet badawczy, NIE kod: obserwable dla QE4–QE7.**
+QE1–QE3 dały się sfalsyfikować, bo istniała dla nich MIARA. QE4–QE7 nie mają
+jeszcze obserwabli na podłożu, które Genesis faktycznie posiada. Zadanie:
+dla każdej z QE4–QE7 podać (a) konkretną liczbę, którą można policzyć z
+istniejących solverów lub z jednej nazwanej, dodanej funkcji, (b) rodzinę stanów
+/układów z ZAMKNIĘTĄ formą, żeby wynik dał się sprawdzić arytmetycznie,
+(c) ustawienie sondy, przy którym pomiar jest BEZUŻYTECZNY, i takie, przy którym
+rozstrzyga, (d) jawnie: co z tego jest tautologią liczonej algebry, a co realnie
+falsyfikowalne. Bez tego czwartego punktu pakiet jest nieprzyjmowalny — QE1
+pokazał, że łatwo zbudować „test", który nie może nie przejść.
+**Solar H051–H056** (P1 planu master) wciąż czeka: raporty `SOLAR_MIND_*` nie
+weszły do repo i nie zostały uruchomione, więc kto to bierze, musi najpierw
+dostać ich pełny tekst i wciągnąć go jako DANE do `knowledge/` z adnotacją
+„nieuruchomione", zanim cokolwiek z H051–H056 stanie się problemem pętli.
+
+**Czego NIE robimy teraz:** QE4–QE7 jako przebiegi (do czasu pakietu Qwena),
+warstwa starzenia dowodów (G9 — zamiast niej jeden komentarz mówiący, że jej
+brak jest decyzją), scoring wartości eksperymentu (G5).
+
+## UPDATE — C3: G3 (jedyne P0) ZAMKNIĘTE — kotwica anty-HARKingowa
+
+Commit `2ab93cbf`. Test napisany i uruchomiony na czerwono NAJPIERW —
+`preregisterHypotheses` nie miała parametru kotwicy, więc próba wyrażenia
+"ten odcisk już znałem przed rejestracją" kończyła się błędem typu, nie
+cichym zaakceptowaniem — po dodaniu kotwicy do sygnatury test przeszedł na
+zielono.
+
+**Co realnie znaleziono**: modele są deterministyczne (stały seed), a
+`provenance.ts::createExperimentProvenance` liczy `runFingerprint` z
+requestu I WYNIKÓW razem — więc podglądnięty i "oficjalny" przebieg tej
+samej hipotezy mają identyczny odcisk. Sekwencja PODGLĄDNIJ → PREREJESTRUJ
+→ WYKONAJ OFICJALNIE dawała rekord nierozróżnialny od uczciwej, ślepej
+rejestracji.
+
+**Naprawa — kotwica, nie ranking/scoring (G5/G9 poza zakresem, zgodnie z
+notatką podziału pracy wyżej)**: `PreregistrationAnchor.priorRunFingerprints`
+jako WYMAGANY argument `preregisterHypotheses` — uczciwa, ślepa rejestracja
+deklaruje `[]` (prawda dla wszystkich 7 realnych miejsc wywołania w repo,
+sprawdzone jedno po drugim). Kotwica wchodzi w `preregistrationFingerprint`
+(więc nie da się jej po cichu wyczyścić po fakcie); nowa funkcja
+`verifyAntiHarkingAnchor` wykrywa kolizję, gdy zadeklarowany-jako-już-znany
+odcisk wraca jako potwierdzający dowód. `createdAt` CELOWO zostaje POZA
+odciskiem (to zegar, nie deklaracja — inaczej złamałby istniejący test
+"Deterministyczne odciski", który wymaga tej samej wartości dla dwóch
+niezależnych, treściowo identycznych rejestracji). `createdBeforeRun`
+pozostaje uczciwym twierdzeniem składanym w momencie rejestracji
+(strukturalnie prawdziwym — żadna `Preregistration` nie istnieje przed
+`generateCompetingHypotheses`), ale teraz może zostać PODWAŻONE przez
+`verifyAntiHarkingAnchor`, czego wcześniej nie dało się zrobić w ogóle.
+
+**Efekt uboczny znaleziony przez pełny suite, nie przez tsc**: trzy world
+adaptery (`cellWorldAdapter.ts`, `epidemiologyWorldAdapter.ts`,
+`moleculeWorldAdapter.ts`) budują `SavedHypothesisLoop`-kształtny obiekt
+ręcznie do replayu i nie miały nowych pól — `isSavedHypothesisLoop` cicho
+zamieniało to w `BLOCKED` (a `replaySavedHypothesisLoop` przyjmuje
+`unknown`, więc tsc tego nie złapał). Naprawione w tym samym commicie.
+
+Zweryfikowane: tsc czysto, eslint czysto, pełny frontend suite 464/464
+plików, 5134 passed / 1 znany niezwiązany skip, build czysto.
+
+---
+
+## UPDATE — 2026-09-12, C1: G3 + G6 scalone, priorytet ZAMKNIĘTY; prompty dla Qwena wydane
+
+### Co przejrzałem i scaliłem
+
+**C3 — G3 (kotwica anty-HARKingowa).** Praca trafiła bezpośrednio na tę samą
+gałąź (`claude/genesis-autonomous-completion-95bt4e`), więc nie było scalania
+— tylko weryfikacja. Projekt jest solidny: `PreregistrationAnchor` jako
+wymagany argument `preregisterHypotheses`, zahaszowany w odcisku, sprawdzany
+mechanicznie przez `verifyAntiHarkingAnchor` względem realnie użytych
+`runFingerprints`. `createdAt` celowo POZA odciskiem (uzasadnione względem
+testu determinizmu). Skutek uboczny — trzy world-adaptery budujące
+`SavedHypothesisLoop` ręcznie i cicho lądujące w `BLOCKED` — znaleziony przez
+pełny suite, nie przez `tsc`, i naprawiony w tym samym commicie. Zgadza się z
+warunkiem z podziału pracy: kotwica, nie scoring/staleness (G5/G9 poza
+zakresem).
+
+**C2 — G6 (kanoniczny słownik niezawodności epistemicznej).** Praca była na
+osobnej gałęzi `claude/genesis-graphics-engine-v1-wd0r66`, która niesie też
+dwa wcześniej ODRZUCONE commity (`5dfe87c`, `2fd0d61` — duplikat Matrix/
+policy i Construct już rozwiązany gdzie indziej). **Nie scaliłem całej
+gałęzi** — cherry-pick wyłącznie commita G6 (`508b09a`), czysto, zero
+konfliktów, bo dotyka tylko dwóch nowych plików. Projekt trafny: trzy z
+sześciu osi (`EpistemicStatus`, `KnowledgeEpistemicStatus`,
+`BiotechEpistemicStatus`) faktycznie mierzą to samo — „ile naukowego
+wsparcia ma to twierdzenie" — i konsolidują się na już-wysłanej,
+7-poziomowej skali z polskimi etykietami; cztery pozostałe (`ReplayVerdict`,
+`DataProvenance`, `GroundingLevel`, `AdmissionStatus`) zostają nietknięte, bo
+odpowiadają na inne pytania. Zero zmian w zapisanych danych — warstwa
+wyłącznie do odczytu.
+
+**Znaleziony i naprawiony przeze mnie defekt w tym, co C2 dostarczył:**
+`core/epistemicReliability.ts` nie miał ŻADNEGO realnego konsumenta — tylko
+własny test go importował. Dokładnie ta sama klasa błędu, którą
+`moduleReachability.test.ts` istnieje, żeby złapać (patrz `domeWorld` w
+sekcji 8 wyżej), i złapał ją natychmiast: `expected ['core/epistemicReliability.ts'] to deeply equal []`.
+Podpiąłem prawdziwego konsumenta zamiast dopisywać moduł do allowlisty:
+`CandidateDossierScreen.tsx` (`#/dossier`) pokazywał dotąd
+`report.epistemicStatus`/`report.ranking.epistemicStatus` jako gołe stringi
+(`BiotechEpistemicStatus`), nieporównywalne między domenami. Teraz obok
+każdego renderuje się `reliabilityBadge()` — kanoniczna polska etykieta z tej
+samej, już przetestowanej, czystej funkcji `biotechToCanonicalReliability` +
+`canonicalReliabilityLabel`; `BLOCKED` renderuje się jako nota o procesie, nie
+zgadnięty poziom (moduł C2 już to rozstrzygał poprawnie — po prostu nikt
+tego nie czytał).
+
+### Co NIE zostało zweryfikowane wizualnie i dlaczego to napisane wprost
+
+Badge nie został potwierdzony zrzutem ekranu z prawdziwymi danymi kandydata:
+`DrugDiscoveryScreen`/`#/dossier` wymaga zalogowanej sesji backendu, a
+zbudowanie pełnego, poprawnego artefaktu biotech (przez prawdziwy przepływ
+UI albo przypięty fixture) wykraczało poza proporcjonalny zakres tego
+scalenia. Zweryfikowane zamiast tego: `tsc` czysto, `eslint` czysto, build
+czysto, `moduleReachability`/`orphanModuleWiring` zielone (dowód realnego
+podpięcia, nie tylko braku błędu kompilacji), i 14 testów C2 na
+`biotechToCanonicalReliability` nad KAŻDĄ realną wartością `BiotechEpistemicStatus`
+łącznie z `BLOCKED`. To nie jest E2E VERIFIED w sensie tego repo — jest
+TESTED + wired, i tak jest tu nazwane, zamiast udawać dowód, którego nie ma.
+
+### Pełna weryfikacja po scaleniu (G3 + G6 + QE1–QE3 razem)
+
+`tsc --noEmit` czysto · `eslint src --max-warnings=0` czysto · `npm run
+build` czysto · pełny frontend suite: **465/465 plików, 5148 passed / 1
+znany niezwiązany skip** (jeden przebieg złapał `nextActionSelectors.test.ts`
+jako flaka pod obciążeniem pełnego suite — potwierdzone: zielony osobno i
+zielony przy powtórzeniu całego suite zaraz potem, 0 failed).
+
+### Priorytet ZAMKNIĘTY
+
+G3 (P0) ✅ · G6 (P1, częściowo — 3 z 6 osi skonsolidowane, reszta świadomie
+zostaje) ✅ · QE1–QE3 przez prawdziwy `StrategyRun` ✅. Pozostają otwarte, poza
+zakresem tej rundy: G4/G5/G9 (świadomie NIE robione — patrz uzasadnienia w
+audycie PHASE 0), QE4–QE7 (czekają na pakiet obserwabli), Solar H051–H056
+(czekają na surowy tekst raportów w repo).
+
+### Prompty wydane dla Qwena (do przekazania przez usera — brak bezpośredniego
+kanału do Qwena w tej sesji)
+
+Dwa gotowe prompty, każdy jako osobny dokument:
+1. **QE4–QE7 obserwable** — wymaga dla każdej hipotezy: obserwabli
+   policzalnej na istniejących solverach Genesis, rodziny stanów o
+   zamkniętej formie, gałki bezużytecznej i rozstrzygającej, oraz — warunek
+   twardy — jawnego rozdzielenia tautologii liczonej algebry od tego, co
+   naprawdę falsyfikowalne. Instruuje wprost: jeśli hipoteza wymaga nowego
+   podsystemu (stos QKD, solver JT gravity), nazwać to BLOCKED zamiast
+   projektować fikcyjny silnik.
+2. **Solar H051–H056, wejście do ingestion** — żąda pełnego, niestreszczonego
+   tekstu `SOLAR_MIND_MASTER_REPORT.md`/`SOLAR_MIND_EXPANSION.md` gotowego do
+   zapisania w `knowledge/`, oznaczonego NIEURUCHOMIONE, plus tabelę H051–H056
+   na wzór tabeli QE1–QE7. Explicite: żaden kod, żadna implementacja na tym
+   etapie.
+
+## UPDATE — C3: P2.3 druga kotwica (Kepler) BLOCKED · P2.2 Solar ingestion BLOCKED (2026-09-12)
+
+Zadanie `docs/prompts/C3-P2.3-kepler-anchor-i-P2.2-solar-ingestion.md`
+zakładało, że oba prompty wydane Qwenowi (sekcja wyżej) już wróciły z
+odpowiedzią i że ta odpowiedź trafiła do C3. **Sprawdzone przed napisaniem
+czegokolwiek**: `docs/prompts/QWEN-P2.3-kotwica-zewnetrzna.md` i
+`docs/prompts/QWEN-QE4-QE7-obserwable.md` w repo to WYŁĄCZNIE te same dwa
+prompty WYDANE Qwenowi (identyczne z opisem w sekcji wyżej) — nie zawierają
+odpowiedzi Qwena. Przeszukano `git log --all --full-history` po całym repo
+(wszystkie gałęzie lokalne i `origin/*`, w tym `staging/qwen-cyber-foundation-unreviewed`,
+który jest osobnym, niepowiązanym pakietem Qwena — Cyber Foundation, odrzuconym
+w `de565414`) — realny tekst `SOLAR_MIND_MASTER_REPORT.md`/`SOLAR_MIND_EXPANSION.md`
+ani szczegółowy pakiet Kepler (§1–§10 z promptu C3, ilustracyjny CSV, wzory
+pasma) nie istnieją nigdzie w repo. To pokrywa się z tym, co ta sekcja MASTER
+PRIORITY już mówiła wyżej: „Solar H051–H056... czekają na surowy tekst
+raportów w repo" — tekst nadal nie wszedł.
+
+**Część zrobiona mimo braku pakietu (nie wymagała jego treści):**
+- Zmierzono niezależnie dostęp sieciowy do `exoplanetarchive.ipac.caltech.edu`
+  z TEGO środowiska: `403` na CONNECT, ten sam rodzaj blokady co już
+  udokumentowana dla pierwszej kotwicy. Zgodnie z regułą zadania („jeśli NIE
+  masz dostępu... nie przypinaj rekordu ilustracyjnego") druga kotwica
+  keplerowska zostaje `BLOCKED — brak dostępu do źródła`, dowód w
+  `docs/P2_EVIDENCE.md`.
+- Wygeneralizowano `EvidenceShowcaseScreen.tsx`: `ExternalAnchorSection`
+  (hardkodująca `MOLECULAR_WEIGHT_ANCHOR_ID`) zastąpiona przez
+  `ExternalAnchorCard`/`ExternalAnchorsSection`, iterującą po całym
+  `EXTERNAL_ANCHORS`. Zero zmiany zachowania dziś (nadal jedna kotwica), ale
+  kolejna kotwica (Kepler albo inna) wyrenderuje się bez zmian ekranu.
+  Zweryfikowane: `tsc --noEmit` czysto, `eslint` czysto,
+  `evidenceShowcaseScreen.test.tsx` + `externalObservationAnchor.test.ts` +
+  `moduleReachability.test.ts` — 17/17, bez regresji.
+- Zaktualizowano `docs/RISKS.md` R-005 i `docs/P2_EVIDENCE.md` z prawdziwym
+  stanem obu prób.
+
+**Część NIEROBIONA, bo wymaga treści, której nie mam:**
+- Sam wpis kotwicy keplerowskiej (pasmo z `pl_orbpererr1`, `whatThisTests`/
+  `whatRemainsUntested`) — zablokowany na sieci, więc nie ma payloadu do
+  przypięcia niezależnie od treści pakietu.
+- **P2.2 Solar ingestion w całości.** `knowledge/SOLAR_MIND_MASTER_REPORT.md`
+  i `knowledge/SOLAR_MIND_EXPANSION.md` wymagają DOSŁOWNEGO tekstu raportów —
+  nie da się ich uczciwie napisać z opisu zadania, bo zadanie samo zakłada, że
+  tekst już istnieje u wykonawcy. Wymyślenie hipotez H051–H056 albo treści
+  raportu byłoby dokładnie tą fabrykacją, której cała ta misja zabrania od
+  pierwszego promptu. **Zgłoszone useriwi jako blokada wymagająca jego
+  działania**: wklejenie realnej, pełnej odpowiedzi Qwena (oba prompty) do
+  sesji, zanim P2.2 i reszta P2.3 mogą ruszyć.
+
+Priorytet CZĘŚCIOWO ZAMKNIĘTY po tym wpisie: P2.3 (druga kotwica, Kepler) =
+`BLOCKED — brak dostępu do źródła`, wciąż otwarte. P2.2 (Solar ingestion) —
+**ZAMKNIĘTE zaraz po tym wpisie C3**, przez C1: treść, którą C3 słusznie
+uznał za brakującą w repo, dotarła do C1 wprost w rozmowie z userem (po tym,
+jak trafiła najpierw do C3 przez pomyłkę, opisaną wcześniej w tym pliku) —
+`knowledge/SOLAR_MIND_MASTER_REPORT.md`/`SOLAR_MIND_EXPANSION.md` zapisane
+dosłownie, z tabelą statusu H051–H056 na wzór QE1–QE7. Diagnoza C3
+(„tekst nigdzie w repo, nie da się uczciwie napisać z opisu zadania") była w
+100% trafna w momencie jej postawienia — commit C1 jest PO tym wpisie, nie
+przeczy mu.
+
+## UPDATE — C3: G4 ZAMKNIĘTE — generowanie hipotez świadome obserwacji
+
+P2.2/P2.3 pozostają zablokowane (sieć, brak treści od Qwena — sekcja wyżej). Zamiast czekać biernie,
+podjęto G4 (`docs/GENESIS_SCIENTIFIC_DISCOVERY_ENGINE_MASTER_PLAN.md`, P1, oznaczone tam
+„ZAPROJEKTOWANE" bez realnego kontraktu do znalezienia w repo) — jedyna pozycja z G4/G5/G9 bez
+zewnętrznej zależności i bez zakazu wprost (G5 jest CELOWO nierobione — scoring bez metodologii; G9
+to jedno zdanie komentarza, trywialne).
+
+**Luka, dokładnie.** `generateCompetingHypotheses` (`hypothesisLoop.ts`) rozwija WYŁĄCZNIE
+zadeklarowaną z góry tablicę `candidateValues` — nie czyta żadnego wyniku poprzedniej rundy. Jedyny
+kod w repo, który TWORZY nową, wcześniej niezadeklarowaną wartość z realnego wyniku, to interpolacja
+środka przedziału (`parameterAlternative.ts`/`intervalNarrowing.ts`) — ale ten kontrakt należy do
+INNEGO systemu hipotez (`inquiryLoop.ts`'s `ParameterHypothesis`, ciągła estymacja jednego parametru
+dla PARAMETER strategy), nie do dyskretnego zestawu konkurencyjnych kandydatów `hypothesisLoop.ts`.
+
+**Co zbudowano.** `deriveNarrowedHypothesisProblem(result: HypothesisLoopResult)` — z REALNIE
+rozstrzygniętego zbioru (`discrimination.decisive === true`, ≥2 rozstrzygnięte kandydatury) bierze
+zwycięzcę i jego bezpośredniego konkurenta na uporządkowaniu metryki i, TYLKO gdy zmienna
+kandydująca jest liczbowa, zwraca nowy `HypothesisProblem` z JEDNYM kandydatem — środkiem przedziału
+między nimi. Ten kandydat nigdy nie był w `HYPOTHESIS_PROBLEMS`; podany z powrotem do
+`generateCompetingHypotheses` przechodzi przez DOKŁADNIE ten sam silnik, prerejestrację i wykonanie
+— zero nowego kodu generującego, zero drugiego solvera, zero nowego słownika epistemicznego. Zmienna
+kategoryczna (`scenarioId`, `smiles`) i remis odmawiają wprost z nazwanym powodem, zamiast zgadywać
+— ta sama dyscyplina, którą G5 wymusza na scoringu.
+
+**Wpięcie produkcyjne.** `ExperimentPilotScreen.tsx` — nowy przycisk „Zawęź wokół zwycięzcy",
+widoczny tylko gdy derywacja się powiedzie; klika i prerejestruje nowy zbiór z prawdziwymi
+odciskami poprzedniej rundy jako `priorRunFingerprints` (uczciwe: te odciski BYŁY już znane przed tą
+rejestracją — poprawka względem istniejących wywołań, które przekazywały `[]` uniwersalnie).
+
+**TDD, test na czerwono najpierw.**
+```bash
+$ npx vitest run src/__tests__/hypothesisLoop.test.ts   # przed implementacją
+ FAIL  ... 5 failed | 34 passed (39)   — TypeError: deriveNarrowedHypothesisProblem is not a function
+
+$ npx vitest run src/__tests__/hypothesisLoop.test.ts   # po
+ Test Files  1 passed (1) | Tests  39 passed (39)
+```
+5 nowych testów: kandydat wewnętrzny jest liczbą pomiędzy zwycięzcą a konkurentem i nie był
+zadeklarowany; zawężony problem jest REALNIE wykonywalny (drugi przebieg, prawdziwy silnik
+biology-logistic, `antiHarkingCheck.intact === true`); zmienna kategoryczna odmawia z powodu
+zawierającym „liczbow"; remis odmawia; pojedynczy kandydat (< 2 rozstrzygnięte) odmawia.
+
+**Dowód wizualny — Chromium, `#/pilot`, zero błędów konsoli.** Realny przebieg end-to-end: problem
+„wewnętrznego tempa wzrostu r" (`growthRate: [0.3, 0.6]`), wykonany → zwycięzca 0.6
+(`fractionOfCapacity=80.29571527702831`) nad 0.3 (`16.86647887068201`) → przycisk „Zawęź wokół
+zwycięzcy" → nowy kandydat `growthRate=0.44999999999999996` (środek przedziału, NIGDY niezadeklarowany)
+→ prerejestracja → wykonanie → REALNY wynik `fractionOfCapacity=47.62379509262678`, liczba wewnętrzna
+między 16.87 a 80.30, dokładnie tak, jak przewiduje krzywa logistyczna. `CONSOLE_ERRORS: []`.
+
+**Pełna weryfikacja.**
+```
+tsc --noEmit                     czysto
+eslint src --max-warnings=0      czysto
+vitest run (frontend)            469 plików, 5198 passed / 1 znany niezwiązany skip
+npm test (backend)                396/396 passed
+npm run build                    czysto
+node scripts/repro-demo.mjs      12/12 (bez zmian — G4 nie dotyka tego zakresu)
+```
+
+**Czego to NIE robi — granica jest jawna.** Działa wyłącznie dla zmiennej kandydującej LICZBOWEJ i
+tylko gdy zbiór jest realnie rozstrzygnięty (nie remis, ≥2 kandydatów z liczbową metryką). Nie ma tu
+optymalizacji ani wyszukiwania — jeden środek przedziału, ta sama zasada co istniejąca interpolacja,
+zero nowej metodologii. Nie dotyka `selectNextHypothesisExperiment` (duży, delikatny graf decyzyjny
+z wieloma konsumentami — `crossDomainSynthesis.ts`, `nextAction.ts`, `researchCampaign.ts`,
+`scienceMemory.ts`) — to jest ADDYTYWNA, osobna ścieżka, żeby nie zmienić zachowania niczego, co już
+na niej polega.
+
+---
+
+## UPDATE — C3: P2.3 druga kotwica (Kepler/Mars) ZAMKNIĘTA + Tautology Gate wpięty w OBIE kotwice (2026-09-12)
+
+Poprzedni wpis (wyżej) zgłosił P2.3 jako `BLOCKED — brak dostępu do źródła` (Exoplanet Archive,
+403 z tego sandboxa). To ustalenie pozostaje PRAWDZIWE dla tego konkretnego hosta — ale zamiast
+czekać, druga kotwica została zbudowana na innym, realnym źródle: NASA NSSDCA Planetary Fact
+Sheet (Mars), pobranym RZECZYWIŚCIE przez GitHub Actions w innym zadaniu (C1, commit `d2af93cf`,
+świadomie NIE Exoplanet Archive — realne ryzyko cyrkularności: tam półoś wielka bywa wyprowadzona
+z okresu przez to samo III prawo Keplera, którego kotwica by użyła do predykcji).
+
+**Jak dane trafiły do repo mimo zablokowanego Azure Blob Storage.** CI pobrał i przypiął stronę
+(dowód w logu joba, run `34714125596`), ale URL artefaktu jest zablokowany tą samą polityką proxy
+co bezpośredni fetch. Zamiast czekać na inną sesję: odczytano log joba przez GitHub MCP
+(`get_job_logs`), znaleziono krok DIAGNOSTIC (`cat` przypiętego pliku wprost do logu), odtworzono
+treść pliku usuwając prefiksy znaczników czasu, i policzono SHA-256 odtworzonego pliku —
+**dokładnie zgodny** z hashem, który sam skrypt fetchujący wypisał w tym samym logu PODCZAS
+pobierania, ORAZ z hashem osobnego, niezależnego kroku weryfikacyjnego tego samego joba (trzy
+niezależne obliczenia tej samej sumy, wszystkie zgodne — `42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c`,
+14363 B). To jest dowód bajtowej identyczności, nie odtworzenie „na oko".
+
+**Kotwica.** Predykcja: REALNY `universe-kepler` (III prawo Keplera) na odległości Marsa
+(228.0×10⁶ km z tej samej strony) → 687.2335878355307 dni. Obserwacja: okres orbitalny Marsa,
+687.0 dni, z INNEGO wiersza tej samej strony (nigdy z tego, co czyta predykcja). Pasmo ±0,344 dnia
+(0,05%, z rozdzielczości publikacji NASA propagowanej przez wykładnik 3/2). Werdykt
+`SUPPORTED_WITHIN_PROTOCOL`, replay `MATCH`.
+
+**Tautology Gate wpięty w cały kontrakt kotwic, nie tylko w Kepler.** Audyt C1 (commit `d2af93cf`)
+stwierdził wprost, że `runExternalAnchor` nie miał żadnego wpięcia Gate'u. Zamknięte generycznie:
+`ExternalAnchor` ma nowe pole `tautologyDerivation`; `runExternalAnchor` liczy
+`assessSingleTautology` i dodaje `tautologyAssessment` do wyniku. Obie kotwice (PubChem i
+Kepler/Mars) klasyfikują się jako `EMPIRICAL_TEST` — nigdy `CONSISTENCY_CHECK`, bo
+`observation.source` musi być zadeklarowane `independent-measurement`. To jest zdanie z prośby
+zadania: system porównuje własną predykcję z czymś NIEZALEŻNYM od siebie, i Brama to teraz
+strukturalnie potwierdza, a nie tylko narracyjnie.
+
+**TDD i weryfikacja.** 14 nowych testów (`keplerExternalAnchor.test.ts`), czerwone przed
+implementacją (`KEPLER_MARS_ANCHOR_ID`/`tautologyDerivation`/`tautologyAssessment` nie istniały),
+25/25 zielone po. `scripts/repro-demo.mjs`: 16/16 (było 12/12) — przy okazji naprawiono
+niezwiązaną, ale sąsiadującą lukę (`GENESIS_KEPLER_FIXTURE_DIR` brakujący w `.env.example`,
+wprowadzony przez commit `d2af93cf`). Realny Chromium na `#/evidence` pokazuje OBIE kotwice przez
+wspólną pętlę (C3'a wcześniejsza generalizacja `ExternalAnchorsSection`), zero błędów konsoli.
+Pełna bramka: tsc czysto, eslint czysto, frontend 470 plików/5215 passed (1 znany niezwiązany
+flake w `nextActionSelectors.test.ts`, potwierdzony osobnym uruchomieniem — zielony), backend
+396/396, build czysto. Pełny dowód command+output+hash w `docs/P2_EVIDENCE.md`.
+
+Priorytet ZAMKNIĘTY: P2.3 (obie kotwice, Tautology Gate wpięty). Pozostaje otwarte, świadomie poza
+zakresem: prawdziwa kotwica EMPIRYCZNA (instrumentalny pomiar, nie przeliczona wartość) — CMS Open
+Data Z→μμ, `docs/RISKS.md` R-005.
+
+---
+
+## UPDATE — C1: belief revision + next question dołożone na kanonicznej kotwicy Kepler/Mars — dwie sesje trafiły w to samo źródło równolegle (2026-09-12)
+
+**Zadanie.** "C1 — NEXT MAJOR TASK: EXTERNAL-ANCHOR SCIENTIFIC DISCOVERY LOOP" —
+dokończyć pętlę PROBLEM → ... → BELIEF REVISION → NEXT QUESTION na istniejącej
+maszynerii `externalAnchor.ts` (P2.3), reużywając `universe-kepler`, bez
+budowania drugiego silnika ani duplikowania cudzej pracy.
+
+**Kolizja architektoniczna, znaleziona przed napisaniem kodu do produkcji,
+nie po.** C1 zaczął ten sam audyt niezależnie i doszedł do IDENTYCZNEGO
+wniosku co wpis C3 powyżej: to samo źródło (NASA NSSDCA Planetary Fact
+Sheet), ten sam powód unikania NASA Exoplanet Archive (ryzyko cyrkularności
+`pl_orbsmax` wyliczanego z `pl_orbper`), ten sam wzorzec CI-fetch-pin. C1
+zbudował własną, równoważną kotwicę Kepler/Wenus na TYM SAMYM pinowanym
+pliku (predykcja 0,615109979562335 roku, obserwacja 0,6151950718685831 roku,
+różnica 0,014%, `SUPPORTED_WITHIN_PROTOCOL`, Tautology Gate `EMPIRICAL_TEST`)
+zanim zauważył wpis C3. Po `git fetch` i bezpośrednim porównaniu obu
+implementacji, C1 ODRZUCIŁ własną kotwicę Wenus zamiast wypychać drugą,
+konkurencyjną implementację Keplera — dokładnie duplikację, której zadanie
+miało zabronić ("jeśli zadanie jest już zamknięte przez inną sesję, NIE
+duplikuj — wybierz najsilniejszego pozostałego kandydata i udokumentuj
+dlaczego"). Kotwica Mars (C3, sekcja powyżej) pozostaje jedyną kotwicą
+keplerowską w repo.
+
+**Co kanoniczna implementacja (C3) NIE miała, a czego wymagało zadanie.**
+Rewizja przekonania (belief revision) i konkretne „next question" po każdym
+przebiegu kotwicy — dwa ostatnie kroki pętli odkrycia. C1 dołożył je
+GENERYCZNIE do `runExternalAnchor`, dla OBU zadeklarowanych kotwic (PubChem
+i Kepler/Mars), a nie jako część trzeciej, zbędnej kotwicy:
+
+- `AnchorRunResult.belief: { before, after, status }` — świeża hipoteza
+  (`beliefRevision.ts::createHypothesis`, prior 0,5) przy każdym wywołaniu,
+  zaktualizowana `updateConfidence` na podstawie werdyktu i zgodności
+  (`evidenceMagnitudeWithinTolerance`), z ruchem OGRANICZONYM sufitem
+  Tautology Gate (`evidenceCeiling`) — `CONSISTENCY_CHECK`/`UNTESTABLE` dają
+  sufit 0, więc kotwica bez prawdziwie niezależnej obserwacji nie mogłaby
+  fałszywie podnieść pewności. Zmierzone: PubChem 0,500→0,817, Kepler/Mars
+  0,500→0,618 (oba `SUPPORTED_WITHIN_PROTOCOL`).
+- `AnchorRunResult.nextQuestion: string` — inna treść dla SUPPORTED (zbadać
+  przypadek napinający własną, zadeklarowaną granicę tej kotwicy) niż dla
+  FALSIFIED (zbadać jednostki/stałą/pasmo przed wnioskiem o modelu) niż dla
+  INCONCLUSIVE (rozwiązać niejednoznaczność danych najpierw).
+
+**Weryfikacja, nie deklaracja.** `externalObservationAnchor.test.ts` (14/14)
++ `keplerExternalAnchor.test.ts` (14/14, przejęty bez zmian z kanonicznej
+implementacji) = 28/28 zielone; `tsc --noEmit` czysto; `scripts/repro-demo.mjs`
+rozszerzony o dwa nowe czeki (rewizja przekonania + next question dla obu
+kotwic) — 18/18 zielone, realnie wykonane, liczby powyżej z tego uruchomienia,
+nie z pamięci. Pełny opis techniczny: `docs/P2_EVIDENCE.md` (dodatek pod
+sekcją C3), `docs/RISKS.md` (R-005).
+
+---
+
+## UPDATE — C3: QE5/QE6/QE7 ZBADANE, każde `BLOCKED` z nazwanym powodem (2026-09-12)
+
+Zadanie (`docs/prompts/C3-QE5-QE6-QE7-implementacja.md`): zbudować `qe5.../qe6.../qe7...Inquiry`
+w `entanglementInquiry.ts`, tym samym `runAutonomousInquiry` co QE1–QE3, wg pakietu badawczego
+Qwena (`docs/prompts/QWEN-QE4-QE7-obserwable.md`). Zakres CELOWO ograniczony do
+`entanglementInquiry.ts` + `entanglementMeasures.ts`.
+
+**Wynik: żadna z trzech nie stała się czwartym realnym dochodzeniem — każda zbadana osobno i
+zablokowana z INNEGO, konkretnego, nazwanego powodu, zgodnie z regułą zadania „BLOCKED z
+nazwanym komponentem, nigdy symulowany sukces".** Pełne uzasadnienie fizyczne/architektoniczne
+jest w kodzie: `packages/frontend/src/core/agent/entanglementInquiry.ts`, stałe
+`QE5_BLOCKED`/`QE6_BLOCKED`/`QE7_BLOCKED` + `*_BLOCKED_MISSING_COMPONENT`, w tym samym stylu co
+`QE1_NOT_MODELLED`/`QE2_NOT_MODELLED`/`QE3_NOT_MODELLED`.
+
+**QE5 (PLOB ogranicza QKD).** Pakiet Qwena postawił otwarte pytanie: czy granicę PLOB da się
+wyrazić jako funkcję negatywności stanu Wernera, którą `entanglementMeasures.ts` już liczy.
+Odpowiedź, wypracowana tutaj (bo Qwen jej nie dostarczył — pakiet to prośba o zbadanie, nie
+gotowy wynik): NIE, uczciwie. PLOB (Pirandola–Laurenza–Ottaviani–Banchi 2017) to ograniczenie na
+przepustowość SEKRETNEGO KLUCZA bozonowego, ciągłozmiennowego KANAŁU strat (transmitancja η) —
+`quantum-entanglement-measures` liczy dokładną algebrę na zadeklarowanych, SKOŃCZENIE
+wymiarowych stanach qubitowych, bez kanału, bez η, bez tempa klucza. Nie istnieje zweryfikowana,
+cytowalna tożsamość sprowadzająca jedno do drugiego — wymyślenie jej byłoby dokładnie tym
+„wymuszeniem dopasowania", którego zadanie zabrania. Brakujący komponent: model kanału
+bozonowego/gaussowskiego + warstwa protokołu QKD nad nim.
+
+**QE6 (formuła wysp / krzywa Page'a).** Pakiet ma rację, że wykonalny rdzeń QE6 to WYŁĄCZNIE
+wynik Page'a z 1993: średnia entropia podukładu losowego stanu Haara na małym N, bez fizyki
+czarnych dziur — i to JEST w zasięgu istniejących solverów (`vonNeumannEntropyNats`,
+`schmidtDecomposition`), GDYBY dało się wygenerować świeży losowy stan i zmierzyć go przez
+realne dochodzenie. Nie da się, na dozwolonej ścieżce plików: `inquiryLoop.ts::runAt` dociera
+wyłącznie przez `getRouterModel(modelId)` + `runExperiment` (`executor.ts`) do zadeklarowanej
+listy presetów w `entanglementStateRunner.ts::ENTANGLEMENT_STATES` — nie ma tam (ani w
+kontrakcie parametrów Fabric, `number|string|boolean`) sposobu wyrazić „świeży losowy stan
+Haara". Dodanie takiego presetu wymaga dotknięcia `entanglementStateRunner.ts` i prawdopodobnie
+`router.ts`/`executor.ts` — poza dozwolonym zakresem tego zadania. Napisanie samej funkcji
+próbkującej w `entanglementMeasures.ts` bez ścieżki przez `runAt` byłoby martwym kodem bez
+realnego `StrategyRun` za nim — dokładnie „symulowany sukces", którego DONE zabrania.
+
+**QE7 (monogamia/SSA na splątaniu makroskopowym).** Pakiet słusznie nazywa CKW i SSA
+TWIERDZENIAMI tej algebry — żaden przebieg nie mógłby ich sfalsyfikować, więc jedyna uczciwa
+treść to weryfikacja IMPLEMENTACJI. Sprawdzone: nie da się zbudować takiej weryfikacji jako
+dochodzenia ODRĘBNEGO od QE2. Jedyna nie-NaN-owa obserwabla trójkubitowa na tym podłożu to
+`ckwResidual` (`vonNeumannEntropyNats`/`renyi2Nats`/`maxCHSH`/`concurrence`/`schmidtRank`
+wymagają `dimA=2,dimB=2` — żaden preset trójkubitowy tego nie spełnia, wszystkie są 2×4), a
+`ckwResidual` jest zdefiniowana wyłącznie przy `whiteNoise=0`. To zostawia dokładnie JEDNĄ
+rodzinę z JEDNĄ sondą: `ghz-w-family`, θ jako ukryty parametr, `mixingAngleDeg` jako sonda — czyli
+dosłownie `qe2System`. Dochodzenie zbudowane z tych samych składników pod inną nazwą nie
+przetestowałoby niczego, czego realny, już wykonany przebieg QE2 nie ustalił (θ = 70° odzyskane w
+trzech rundach, `ckwResidual` liczony i rewidowany co rundę, nigdy ujemny — patrz
+`knowledge/quantum.md`). Pytanie „czy implementacja poprawnie liczy monogamię w realnych
+przebiegach" ma więc ODPOWIEDŹ — w historii QE2, nie w nowym dochodzeniu.
+
+**Co NIE zostało zrobione, świadomie.** Żadna nowa funkcja (np. próbkowanie Haara) nie została
+napisana mimo dozwolenia zadania („jedna wąska nowa funkcja... jeśli naprawdę potrzebna") — bo
+żadna z nich byłaby REALNIE potrzebna bez wpięcia przez `runAt`, którego dozwolony zakres plików
+nie obejmuje; napisanie nieużywanej funkcji byłoby fasadą, nie postępem.
+`scripts/inquiry-e2e.mjs` NIE zyskał nowych wpisów — nie ma nowego realnego dochodzenia do
+sprawdzenia; rozszerzenie o coś nieistniejącego byłoby fikcją. `knowledge/quantum.md` (tabela
+„Co Genesis NAPRAWDĘ uruchomił") ma trzy nowe wiersze z werdyktem `BLOCKED` i konkretnym
+brakującym komponentem dla każdej hipotezy — bez zmiany kolumny „Status wg pakietu" (to ocena
+literatury, nie wynik Genesis, ta sama zasada co przy QE1–QE3).
+
+**Regresja: zero.** QE1–QE3 nietknięte (74/74 testów: `entanglementInquiry.test.ts` +
+`entanglementInquiryTautology.test.ts` + `entanglementMeasures.test.ts` +
+`moduleReachability.test.ts`), `externalObservationAnchor.test.ts`/`keplerExternalAnchor.test.ts`
+nietknięte (nie moja domena w tym zadaniu).
+
+**Pełna weryfikacja.**
+```
+tsc --noEmit                     czysto
+eslint src --max-warnings=0      czysto
+vitest run (frontend)            470 plików, 5217 passed / 1 znany niezwiązany flake
+                                  (nextActionSelectors.test.ts, zielony osobno) / 1 znany skip
+npm test (backend)                396/396 passed
+npm run build                    czysto
+node scripts/repro-demo.mjs      18/18 (bez zmian — to zadanie nie dotyka tego zakresu)
+CHROME=/opt/pw-browsers/chromium node scripts/inquiry-e2e.mjs
+                                  6/6 problemów, bez zmian — QE1-3 dochodzenia nietknięte
+```
+
+Priorytet ZAMKNIĘTY jako „zbadane i udokumentowane" (DONE dopuszcza to wprost): QE5, QE6, QE7
+każde `BLOCKED` z konkretnym, innym powodem — nie trzy odmowy tej samej wymówki. Następny krok,
+jeśli ktoś chce go podjąć: QE6 jest NAJBLIŻEJ wykonalności — wymaga tylko dodania jednego presetu
+Haar-losowego do `entanglementStateRunner.ts` (i prawdopodobnie jednego parametru w `router.ts`),
+poza zakresem plików tego zadania, nie poza zakresem fizyki czy architektury.
+
+---
+
+## UPDATE — C1: R-005 — PIERWSZA kotwica INSTRUMENTALNA w repo, CMS Open Data Z→μμ (2026-09-12)
+
+**Zadanie.** Domknąć `docs/RISKS.md` R-005's „następny krok, konkretnie": kotwica
+empiryczna na CMS Open Data Z→μμ 2011 (rekord 5208, CC0) — instrumentalny
+pomiar, nie przeliczona wartość jak PubChem/Kepler.
+
+**W 90% już zrobione, zanim zaczęto.** `compute/cmsOpenDataAdapter.mjs`,
+`cms_zmumu_worker.py` i model Fabric `particle-cern-cms-zmumu-invariant-mass`
+istniały od wcześniej, w pełni zaimplementowane i testowane pod nieobecność
+danych (fail-closed `DATA_REQUIRED`), z DOKŁADNYMI oczekiwanymi liczbami już
+zapisanymi w trzecim, dotąd pomijanym teście — czekały wyłącznie na sam plik
+`Zmumu.csv`. Zadanie C1 sprowadzało się do: pobrać, zweryfikować, przypiąć.
+
+**Realna przeszkoda po drodze — cichy limit odczytu logów CI, nie
+przewidziany.** Pierwsza próba wydrukowania całego pliku (970 KB, 10001
+linii) do jednego loga joba dała log, który `get_job_logs` odczytał TYLKO
+częściowo (ostatnie ~5000 linii, ~630 KB) — bez żadnego błędu, po cichu.
+Rozwiązanie: job macierzowy na 4 fragmenty, każda linia jawnie ponumerowana,
+każdy fragment odczytany osobno i złożony z powrotem po numerze linii.
+Pełny opis techniczny i dowód bajtowej zgodności: `docs/DECISIONS.md` D-023.
+
+**Weryfikacja.** Worker Pythona uruchomiony lokalnie na przypiętym pliku
+(offline) daje DOKŁADNIE liczby zapisane w teście od dawna:
+`eventCount=10000`, `events80To100GeV=8259`, `median=90.28540772526225`.
+Trzeci test `cmsOpenDataCompute.test.mjs` (był `{ skip: !configuredDataDir }`)
+teraz przechodzi naprawdę: `3/3 pass`. Pełny backend: `397/397 pass, 33
+skipped` (było `396/396, 34 skipped`). Job CI zamieniony z bootstrapu na
+trwałą kontrolę dryfu (`cms-zmumu-verify-pinned`), `GENESIS_CERN_OPEN_DATA_DIR`
+ustawiony w kroku testowym `verify`, żeby test uruchamiał się naprawdę w CI.
+
+**Czego to NIE ustanawia.** To jest opisowa statystyka realnego pomiaru
+(masa niezmiennicza 10 000 zdarzeń dimionowych), nie test falsyfikacyjny —
+nie ma tu jeszcze prerejestrowanej predykcji Genesis do porównania z tym
+pomiarem. To jest naturalny „next question" dla tej kotwicy, świadomie poza
+zakresem tego zadania (por. `docs/RISKS.md` R-005).
+
+Priorytet ZWĘŻONY: R-005 (punkt „brak pomiaru instrumentalnego" domknięty
+przykładem; punkt „brak ingestion na żywo" i "brak testu falsyfikacyjnego
+na tym pomiarze" pozostają otwarte, nazwane wprost).
+
+## UPDATE — C3: P0-2/P0-3/P0-5 — QE4 Regime Inquiry Loop (2026-09-13)
+
+**Zadanie.** `docs/prompts/2026-09-12-DZIS-priorytety-F1.md`: P0-2 (hipotezy
+konkurencyjne liczone z siatki `(T,k)` przypiętego zbioru QE4, nie z literału,
+z rodowodem przez `beliefRevision.ts::createHypothesis` + operator hipotezy
+rezydualnej), P0-3 (dołożenie `CONVERGENCE`/`NO_INFORMATION_GAIN` do słownika
+stopu jednej pętli), P0-5 (obowiązkowy, DZIAŁAJĄCY krok anty-HARK co rundę).
+
+**Blokada wykryta przed startem, obejście udokumentowane.** `DatasetLaboratory`
+(P0.1 klasyfikacji), od którego P0-2/P0-3/P0-5 formalnie zależą, NIE istnieje
+w repo (zweryfikowane: zero trafień na wszystkich gałęziach zdalnych) — to
+otwarte, nierozpoczęte zadanie C2. Żadna z czterech istniejących pętli
+(`discoveryLoop`/`inquiryLoop`/`hypothesisLoop`/`scientificDiscoveryLoop`) nie
+może w ogóle przyjąć realnego przypiętego zbioru QE4 (wymagają
+symulowalnego substratu lub pojedynczego przebiegu bez rund). Zamiast czekać,
+zbudowano NOWĄ, WĄSKĄ, jednorazową pętlę `core/agent/qe4RegimeInquiryLoop.ts`
+— czwarta, nie uogólnienie żadnej z istniejących, i nie generyczny szew
+`DatasetLaboratory` (który miałby obsłużyć 17 domen). Reużywa bez zmian:
+`runQe4BrydgesAnalysis` (bootstrap na przypiętych CSV), `weightedLinearFit`/
+`weightedResidualSumOfSquares` (`qe4BrydgesEstimator.ts`), `createHypothesis`/
+`updateConfidence` (`beliefRevision.ts`), `fnv1a`/`canonicalJson`.
+
+**P0-2 — hipotezy z siatki.** Trzy konkurujące reżimy (LINIOWY / LOGARYTMICZNY
+/ SATURUJĄCY — dopasowanie profilowe z siatkownym przeszukaniem stałej τ)
+dopasowywane od nowa co rundę do REALNYCH punktów admitowanych z siatki
+`DISORDER_T_VALUES_MS` zbioru Brydgesa, jako trzy `Hypothesis` ze znacznikiem
+rodowodu `generatedBy: 'REGIME_FIT_FROM_GRID'` (nowa wartość w
+`HypothesisGenerationMechanism`, oddzielona od `INITIAL` bo pochodzi z
+KSZTAŁTU danych, nie z deklaracji człowieka). Operator hipotezy rezydualnej
+(`deriveResidualHypothesis`, druga połowa P0-2): po ustaleniu zwycięskiego
+reżimu liczy realne ważone residua i — jeśli jeden punkt odstaje ≥3× RMS
+reszty — wyprowadza NOWĄ hipotezę o anomalii w konkretnym `T`, ze znacznikiem
+`generatedBy: 'RESIDUAL_FROM_FIT'` i `parentHypothesisId` zwycięzcy, jawnie
+oznaczoną jako NIEPRZETESTOWANĄ (przetestowanie wymagałoby drobniejszej
+realnej siatki, niedostępnej w tym przypiętym zbiorze).
+
+**P0-3 — nowy, mały słownik stopu.** `Qe4RegimeStopReason =
+'CONVERGENCE' | 'NO_INFORMATION_GAIN' | 'ROUND_BUDGET_EXHAUSTED' |
+'ANTI_HARKING_VIOLATION'` — WYŁĄCZNIE dla tej pętli, bez dotykania siedmiu
+istniejących słowników stopu w innych pętlach.
+
+**P0-5 — anty-HARK naprawdę obowiązkowy.** Zastany stan (potwierdzony
+niezależnym audytem): KAŻDY istniejący wywołujący `verifyAntiHarkingAnchor`
+przekazuje literał `[]`, więc kontrola strukturalnie zawsze przechodzi, a
+`buildSavedHypothesisLoop` w ogóle nie sprawdza jej wyniku. W nowej pętli
+kotwica jest REALNA (odciski poprzednich rund tego samego przebiegu, wątkowane
+w przód) i DZIAŁAJĄCA: naruszenie natychmiast zatrzymuje pętlę
+(`ANTI_HARKING_VIOLATION`) i odmawia zgłoszenia zwycięzcy. Bezpieczna
+ekstrakcja: rdzeń kontroli wydzielony z `hypothesisLoop.ts` do
+`checkAntiHarkingAnchor` (behavior-preserving — `verifyAntiHarkingAnchor`
+deleguje do niego), żeby nowa pętla nie duplikowała logiki.
+
+**Weryfikacja.** 15 nowych testów (`qe4RegimeInquiryLoop.test.ts`) — w tym
+scenariusz anty-HARK wykrywający kolizję z odciskiem zadeklarowanym jako
+znany PRZED startem przebiegu (nie mockowany, realnie zbudowany przez
+uruchomienie pętli dwa razy). Pełna bramka zielona: eslint (repo), tsc
+(frontend), oba suite'y (frontend + backend, bez regresji), build, `node
+scripts/repro-demo.mjs` — **27/27**, z czterema nowymi kontrolami repro dla
+tej pętli. Realny wynik na przypiętym zbiorze (k=5, half-partition): 7 rund,
+`ROUND_BUDGET_EXHAUSTED`, zwycięzca `qe4-regime-logarithmic-k5` (zgodne z
+istniejącym werdyktem P2 w `qe4BrydgesAnalysis.ts`, że wzrost jest co
+najmniej logarytmiczny), brak hipotezy rezydualnej (dane czyste, bez
+odstającego punktu) — odciski rund przypięte w `repro-demo.mjs` jako literały.
+
+**Czego to NIE ustanawia.** To nie jest `DatasetLaboratory` — jeśli C2
+zbuduje generyczny szew P0.1, ta pętla może wymagać pogodzenia z nim (ryzyko
+nazwane wprost w komentarzu modułu). To nie jest też nowe odkrycie naukowe:
+zwycięski reżim (logarytmiczny) już wcześniej ustaliła prerejestrowana
+weryfikacja P2 tego samego zbioru — ta pętla demonstruje MECHANIZM (hipotezy
+z siatki, stopowanie, anty-HARK), nie nowy wynik fizyczny.

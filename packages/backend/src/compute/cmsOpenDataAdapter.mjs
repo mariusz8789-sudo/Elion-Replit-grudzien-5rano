@@ -18,6 +18,17 @@ const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cms_zmum
 const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
 const TIMEOUT_MS = 60_000;
 
+// Config default only — never touches the science worker or its logic.
+// The real, checksum-pinned CSV is already committed at this exact path
+// (see docs/DECISIONS.md D-051). If the operator has set
+// GENESIS_CERN_OPEN_DATA_DIR explicitly, that value always wins; this only
+// fills the gap so a fresh deployment does not have to be told where its
+// own committed data lives. `detect()` still verifies the SHA-256 before
+// ever calling this "available" — a wrong or tampered path fails honestly.
+if (!process.env.GENESIS_CERN_OPEN_DATA_DIR || process.env.GENESIS_CERN_OPEN_DATA_DIR.trim() === '') {
+  process.env.GENESIS_CERN_OPEN_DATA_DIR = path.dirname(fileURLToPath(import.meta.url)) + '/cms-zmumu';
+}
+
 let detectCache = null;
 
 function invoke(request, timeout = TIMEOUT_MS) {

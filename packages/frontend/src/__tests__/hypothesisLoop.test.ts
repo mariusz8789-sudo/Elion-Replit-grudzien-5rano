@@ -6,6 +6,7 @@ import {
   HYPOTHESIS_PROBLEMS,
   NEXT_EXPERIMENT_PRIORITY,
   buildSavedHypothesisLoop,
+  deriveNarrowedHypothesisProblem,
   isSavedHypothesisLoop,
   preregisterHypotheses,
   replaySavedHypothesisLoop,
@@ -104,7 +105,7 @@ describe('Generowanie konkurencyjnych hipotez', () => {
 
 describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   it('zamraża zbiór i oznacza go jako utworzony przed przebiegiem', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
 
     expect(prereg.preregistrationId).toMatch(/^prereg_[0-9a-f]{8}$/);
     expect(prereg.createdAt).toBeTruthy();
@@ -116,7 +117,7 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   });
 
   it('zmiana twierdzenia po zamrożeniu jest WYKRYWANA', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const tampered = prereg.hypotheses.map((entry, index) => index !== 0 ? entry : { ...entry, statement: 'przepisane po zobaczeniu wyniku' });
     const verdict = verifyPreregistrationIntact(prereg, tampered);
 
@@ -125,7 +126,7 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   });
 
   it('podmiana kryterium falsyfikacji jest WYKRYWANA', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const tampered = prereg.hypotheses.map((entry, index) => index !== 0 ? entry : {
       ...entry,
       falsificationCriteria: { ...entry.falsificationCriteria, relation: 'greater-than' as const },
@@ -135,14 +136,14 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
   });
 
   it('dopisanie hipotezy po zamrożeniu jest WYKRYWANE', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const added = [...prereg.hypotheses, { ...prereg.hypotheses[0]!, hypothesisId: 'hyp_dopisana' }];
 
     expect(verifyPreregistrationIntact(prereg, added).intact).toBe(false);
   });
 
   it('zmiana parametrów zaproponowanego eksperymentu jest WYKRYWANA', () => {
-    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL));
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] });
     const tampered = prereg.hypotheses.map((entry, index) => index !== 0 || entry.proposedExperiment === null ? entry : {
       ...entry,
       proposedExperiment: { ...entry.proposedExperiment, parameters: { ...entry.proposedExperiment.parameters, seed: 1 } },
@@ -150,10 +151,71 @@ describe('Prerejestracja i ochrona przed HARK-owaniem', () => {
 
     expect(verifyPreregistrationIntact(prereg, tampered).intact).toBe(false);
   });
+
+  /**
+   * KOTWICA ANTY-HARKINGOWA (P0). Do tej pory `createdBeforeRun: true` było
+   * ustawiane bezwarunkowo (`hypothesisLoop.ts:299`), a odcisk prerejestracji
+   * nie zawierał ani `createdAt`, ani żadnej kotwicy do przebiegu, który
+   * prerejestracja poprzedza. Skutek: sekwencja
+   * URUCHOM (zobacz wynik) → PREREJESTRUJ → WYKONAJ OFICJALNIE
+   * dawała rekord bit-identyczny ze ślepą, uczciwą prerejestracją — bo model
+   * jest deterministyczny (stały seed), więc "podglądnięty" i "oficjalny"
+   * przebieg mają identyczny `runFingerprint`, a nic tego nie porównywało.
+   */
+  it('kotwica anty-HARKingowa WYKRYWA prerejestrację napisaną po zobaczeniu wyniku', () => {
+    // Krok 1 — PODGLĄD: wykonujemy ten sam eksperyment "nieformalnie", zanim
+    // cokolwiek zostanie prerejestrowane, i widzimy jego odcisk.
+    const peek = executePreregisteredHypotheses(
+      preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }),
+    );
+    const peekedFingerprint = peek.outcomes.flatMap((o) => o.runFingerprints)[0];
+    expect(peekedFingerprint).toBeTruthy();
+
+    // Krok 2 — PREREJESTRACJA PO FAKCIE: uczciwie deklarujemy, że ten
+    // konkretny odcisk już znaliśmy PRZED tą rejestracją (bo go podejrzeliśmy).
+    const dishonestPrereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), {
+      priorRunFingerprints: [peekedFingerprint!],
+    });
+
+    // Krok 3 — "OFICJALNE" wykonanie: model deterministyczny, więc odcisk
+    // wraca identyczny co w podglądzie.
+    const official = executePreregisteredHypotheses(dishonestPrereg);
+
+    expect(official.antiHarkingCheck.intact).toBe(false);
+    expect(official.antiHarkingCheck.contradictingFingerprints).toContain(peekedFingerprint);
+    expect(official.antiHarkingCheck.reason).toMatch(/HARK/i);
+  });
+
+  it('ślepa prerejestracja (pusta kotwica, żaden przebieg wcześniej nieznany) NIE jest fałszywie oskarżana', () => {
+    const result = executePreregisteredHypotheses(
+      preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }),
+    );
+
+    expect(result.antiHarkingCheck.intact).toBe(true);
+    expect(result.antiHarkingCheck.contradictingFingerprints).toHaveLength(0);
+  });
+
+  it('kotwica jest częścią odcisku prerejestracji — ciche przepisanie jej po fakcie jest WYKRYWANE', () => {
+    const prereg = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: ['run_already_known'] });
+
+    // Ktoś podglądnął wynik, uczciwie zadeklarował to w kotwicy, a potem
+    // próbuje po cichu wyczyścić ślad — odcisk to wykrywa, bo kotwica wchodzi
+    // w jego obliczenie.
+    const erasedAnchor: typeof prereg = { ...prereg, anchor: { priorRunFingerprints: [] } };
+    expect(verifyPreregistrationIntact(erasedAnchor).intact).toBe(false);
+  });
+
+  it('createdAt NIE wchodzi w odcisk treści — to prawdziwy zegar, nie deklaracja: dwie identyczne, niezależne rejestracje muszą dać ten sam preregistrationFingerprint mimo różnego czasu', () => {
+    const a = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }, () => new Date('2020-01-01T00:00:00Z'));
+    const b = preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }, () => new Date('2030-06-15T12:00:00Z'));
+
+    expect(a.createdAt).not.toBe(b.createdAt);
+    expect(a.preregistrationFingerprint).toBe(b.preregistrationFingerprint);
+  });
 });
 
 describe('Wykonanie, status i rozstrzygnięcie', () => {
-  const run = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+  const run = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
 
   it('wykonuje REALNE przebiegi przez istniejący silnik', () => {
     const result = run();
@@ -210,7 +272,7 @@ describe('Wykonanie, status i rozstrzygnięcie', () => {
     // Wszyscy kandydaci to ten sam scenariusz — wyniki są identyczne z definicji.
     const tie = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
       ...SMALL, candidateValues: ['ISOLATION', 'ISOLATION'],
-    })));
+    }), { priorRunFingerprints: [] }));
 
     expect(tie.discrimination.decisive).toBe(false);
     expect(tie.discrimination.winnerHypothesisId).toBeNull();
@@ -228,7 +290,7 @@ describe('Wykonanie, status i rozstrzygnięcie', () => {
 
 describe('Następny eksperyment', () => {
   it('po rozstrzygnięciu kieruje na kontrolę pojedynczego ziarna, ze zmianą jednego pola', () => {
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
     const next = selectNextHypothesisExperiment(result);
 
     expect(NEXT_EXPERIMENT_PRIORITY[0]).toBe('PREREGISTRATION_VIOLATED');
@@ -245,7 +307,7 @@ describe('Następny eksperyment', () => {
   });
 
   it('naruszona prerejestracja blokuje kolejny krok zamiast go proponować', () => {
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
     const violated = { ...result, preregistrationIntact: { intact: false, reason: 'test: odcisk się nie zgadza' } };
     const next = selectNextHypothesisExperiment(violated);
 
@@ -255,12 +317,96 @@ describe('Następny eksperyment', () => {
   });
 
   it('niewykonana hipoteza daje VALIDATION_REQUIRED, a nie kolejny przebieg', () => {
-    const blockedSet = preregisterHypotheses(generateCompetingHypotheses({ ...SMALL, candidateVariable: 'nieistniejacaDzwignia' }));
+    const blockedSet = preregisterHypotheses(generateCompetingHypotheses({ ...SMALL, candidateVariable: 'nieistniejacaDzwignia' }), { priorRunFingerprints: [] });
     const next = selectNextHypothesisExperiment(executePreregisteredHypotheses(blockedSet));
 
     expect(next.status).toBe('VALIDATION_REQUIRED');
     expect(next.request).toBeNull();
     expect(next.why).toMatch(/nie zostało wykonanych|nie została wykonana/);
+  });
+});
+
+describe('Zawężanie hipotez na podstawie REALNEGO wyniku (G4)', () => {
+  const GROWTH = HYPOTHESIS_PROBLEMS.find((entry) => entry.problemId === 'problem:cell-population-growth-rate-fastest-to-capacity')!;
+
+  it('kandydat wewnętrzny NIE jest zadeklarowany w oryginalnym problemie, ale JEST liczbą pomiędzy zwycięzcą a konkurentem', () => {
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(GROWTH), { priorRunFingerprints: [] }));
+    expect(result.discrimination.decisive).toBe(true);
+
+    const derived = deriveNarrowedHypothesisProblem(result);
+    expect(derived.ok).toBe(true);
+    if (!derived.ok) return;
+
+    const [candidate] = derived.derivation.problem.candidateValues;
+    expect(typeof candidate).toBe('number');
+    expect(GROWTH.candidateValues).not.toContain(candidate);
+    const [a, b] = result.discrimination.ranking.map((entry) => Number(entry.candidate));
+    expect(candidate).toBeGreaterThan(Math.min(a!, b!));
+    expect(candidate).toBeLessThan(Math.max(a!, b!));
+    expect(derived.derivation.problem.problemId).not.toBe(GROWTH.problemId);
+  });
+
+  it('zawężony problem jest REALNIE wykonywalny przez istniejący silnik — bez drugiego solvera', () => {
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(GROWTH), { priorRunFingerprints: [] }));
+    const derived = deriveNarrowedHypothesisProblem(result);
+    expect(derived.ok).toBe(true);
+    if (!derived.ok) return;
+
+    const nextRound = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(derived.derivation.problem), {
+      priorRunFingerprints: [...new Set(result.allRuns.map((entry) => entry.provenance.runFingerprint))],
+    }));
+    expect(nextRound.allRuns.length).toBeGreaterThan(0);
+    expect(nextRound.outcomes[0]!.observedMetric).not.toBeNull();
+    // Kandydat jest GENUINE nowy (nie był w poprzedniej rundzie), więc jego odciski
+    // nie mogą kolidować z zadeklarowaną kotwicą — to nie jest HARK-owanie.
+    expect(nextRound.antiHarkingCheck.intact).toBe(true);
+    expect(nextRound.antiHarkingCheck.contradictingFingerprints).toEqual([]);
+  });
+
+  it('zmienna kategoryczna (nie liczbowa) NIE jest zawężana — interpolacja nie ma tam znaczenia', () => {
+    const categorical = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
+    // `scenarioId` bywa realnie remisowe na tym małym wariancie (patrz test wyżej
+    // w „Wykonanie, status i rozstrzygnięcie" — decisive zależy od realnego wyniku
+    // modelu). Ta jedna oś (kategoryczność zmiennej) jest testowana niezależnie od
+    // tego, czy TEN konkretny przebieg akurat się rozstrzygnął — wymuszamy decisive,
+    // żeby sprawdzić DOKŁADNIE gałąź "nie liczbowa", tak jak istniejący test wyżej
+    // wymusza `preregistrationIntact: false` przez `{ ...result, ... }`.
+    const forcedDecisive = {
+      ...categorical,
+      discrimination: {
+        ...categorical.discrimination,
+        decisive: true,
+        ranking: [
+          { hypothesisId: 'h1', candidate: 'ISOLATION', metric: 1 },
+          { hypothesisId: 'h2', candidate: 'CONTACT_REDUCTION', metric: 2 },
+        ],
+      },
+    };
+    const derived = deriveNarrowedHypothesisProblem(forcedDecisive);
+
+    expect(derived.ok).toBe(false);
+    if (derived.ok) return;
+    expect(derived.reason).toMatch(/liczbow/i);
+  });
+
+  it('remis NIE daje zawężenia — zawężanie wymaga realnego zwycięzcy', () => {
+    const tie = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
+      ...SMALL, candidateValues: ['ISOLATION', 'ISOLATION'],
+    }), { priorRunFingerprints: [] }));
+    const derived = deriveNarrowedHypothesisProblem(tie);
+
+    expect(derived.ok).toBe(false);
+    if (derived.ok) return;
+    expect(derived.reason).toMatch(/rozstrzygni/i);
+  });
+
+  it('mniej niż dwóch rozstrzygniętych kandydatów NIE daje zawężenia', () => {
+    const single = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses({
+      ...GROWTH, candidateValues: [0.3],
+    }), { priorRunFingerprints: [] }));
+    const derived = deriveNarrowedHypothesisProblem(single);
+
+    expect(derived.ok).toBe(false);
   });
 });
 
@@ -293,7 +439,7 @@ describe('Pamięć i odtworzenie pętli', () => {
       get length() { return map.size; },
     };
   };
-  const executed = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+  const executed = () => executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
 
   it('zapis niesie prerejestrację, hipotezy i statusy', () => {
     const saved = buildSavedHypothesisLoop(executed());
@@ -391,7 +537,7 @@ describe('Pamięć i odtworzenie pętli', () => {
 describe('Graf eksperymentu z pętli', () => {
   it('prerejestrowane łańcuchy dają węzły HYPOTHESIS z zachowaną kolejnością', async () => {
     const { buildExperimentGraph } = await import('../core/experimentFabric/experimentGraph');
-    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL)));
+    const result = executePreregisteredHypotheses(preregisterHypotheses(generateCompetingHypotheses(SMALL), { priorRunFingerprints: [] }));
     const graph = buildExperimentGraph({
       question: SMALL.statement,
       runs: result.allRuns,

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
+import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
+import { QuantumHistogram } from './QuantumHistogram';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
 import { subscribeScienceChatOpenRequests } from '../core/scienceChatBridge';
 import { setPendingScenario } from '../core/scenarioBridge';
@@ -19,7 +21,9 @@ import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
-import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, kernelLedger, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { generateCuriosityQuestions } from '@genesis/core/knowledge/curiosity.js';
+import { buildTruthResponse, renderTruthResponsePl } from '@genesis/core/knowledge/truthResponse.js';
 import type { HypothesisAssessment } from '../core/experimentFabric/scientificDiscovery';
 import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
@@ -34,6 +38,16 @@ import { fnv1a, canonicalJson } from '../core/events/hash';
 /** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
  * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
  * workspace's own rendering of the same result. */
+const INGEST_SKIP_LABEL: Record<string, string> = {
+  REQUIRES_OFFICIAL_API: 'wymaga oficjalnego API i klucza w środowisku (bez scrapingu)',
+  LEGAL_GATE_PENDING: 'domena poza rejestrem zweryfikowanych źródeł',
+  ROBOTS_DISALLOWED: 'robots.txt zabrania',
+  RATE_LIMITED: 'limit zapytań',
+  REFUSED_UNSAFE_URL: 'adres odrzucony (niepubliczny host lub protokół)',
+  NETWORK: 'błąd sieci',
+  PARSE: 'nie udało się odczytać treści',
+  NO_ADAPTER: 'brak adaptera dla tej platformy',
+};
 const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
   CANDIDATE: 'kandydat',
   SUPPORTED_WITHIN_PROTOCOL: 'potwierdzona w protokole',
@@ -50,7 +64,7 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
  * atrap; funkcje niegotowe są jawnie oznaczone jako TODO w odpowiedzi.
  */
 
-interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean }
+interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData }
 
 type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
 
@@ -638,6 +652,40 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         const result = control.applyObservation(a.sentence);
         appendGenesis(result.narration, result.found ? 'MODEL' : 'SYSTEM');
       }
+    } else if (a?.type === 'ingestUrls') {
+      // KNOWLEDGE INGESTION — the backend does the fetching (official APIs / allowlisted web) and the
+      // propose-only ledger; the chat reports the outcome and never rewords a skip reason into success.
+      void fetch('/api/knowledge/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ urls: a.urls }) })
+        .then(async (res) => {
+          const data = await res.json() as { ok?: boolean; error?: string; fetched?: number; skipped?: { url: string; reason: string }[]; proposals?: { claim: string; status: string; sourceKind: string }[]; pendingProposals?: number; activeRecords?: number };
+          if (!res.ok || data.ok !== true) { appendGenesis(`Pozyskiwanie nie powiodło się: ${data.error ?? res.status}.`, 'SYSTEM'); return; }
+          const skipped = (data.skipped ?? []).map((sk) => `${sk.url} → ${INGEST_SKIP_LABEL[sk.reason] ?? sk.reason}`).join('\n');
+          const proposals = (data.proposals ?? []).map((p) => `• „${p.claim}" — status: ${p.status}, źródło: ${p.sourceKind}`).join('\n');
+          appendGenesis(
+            `Pobrano ${data.fetched ?? 0} element(ów); propozycje w bazie: ${data.pendingProposals ?? 0} oczekujących, ${data.activeRecords ?? 0} opublikowanych.\n`
+            + (proposals ? proposals + '\n' : '')
+            + (skipped ? 'Pominięte:\n' + skipped + '\n' : '')
+            + 'Nic nie zostało opublikowane — propozycję zatwierdza zalogowany człowiek (POST /api/knowledge/proposals/:id/publish). To nie jest dowód kliniczny i nie zasila Winner Gate.',
+            'HIPOTEZA',
+          );
+        })
+        .catch((e: unknown) => appendGenesis(`Pozyskiwanie nie powiodło się: ${e instanceof Error ? e.message : String(e)}.`, 'SYSTEM'));
+    } else if (a?.type === 'evidenceAnswer') {
+      // D-128/D-129 EPISTEMIC TRUTH RESPONSE — the ledger answers (LaypersonAssistant), with contradictions, missing evidence,
+      // next tests (curiosity) and provenance; "Nie wiem" and INSUFFICIENT_EVIDENCE when nothing matches.
+      const truth = buildTruthResponse(kernelLedger, a.query);
+      const tag: EpistemicTag = truth.status === 'VERIFIED_SOURCE' ? 'FAKT' : truth.status === 'INSUFFICIENT_EVIDENCE' || truth.status === 'ROLE_REFUSED' ? 'SYSTEM' : 'HIPOTEZA';
+      appendGenesis(renderTruthResponsePl(truth), tag);
+    } else if (a?.type === 'curiosity') {
+      // D-128 CURIOSITY — questions only from ledger gaps; an empty or consistent ledger yields none, and says so.
+      const report = generateCuriosityQuestions(kernelLedger.getActive(), { limit: a.limit });
+      if (!report.questions.length) appendGenesis(`Brak pytań: baza dowodów (${kernelLedger.getActive().length} zapisów) nie zawiera sprzeczności, twierdzeń z jednego źródła ani wartości istniejących tylko w modelu.`, 'SYSTEM');
+      else appendGenesis(report.questions.map((q, i) => `${i + 1}. [${q.kind}] ${q.text}\n   dowody: ${q.evidenceIds.join(', ')} · status: ${q.epistemicStatus}`).join('\n') + `\n(${report.contradictions.contradictions.length} sprzeczności w ${report.contradictions.scanned} zapisach; odcisk ${report.fingerprint.slice(0, 12)})`, 'HIPOTEZA');
+    } else if (a?.type === 'quantum') {
+      // HYBRID QUANTUM BRIDGE — the backend runs the circuit (cloud QPU only with env credentials, else the local
+      // statevector simulator) and labels the result; the chat shows that label and a histogram, never a "measurement"
+      // the device did not make. A backend error is shown as-is.
+      void runQuantumAction(a).then((turn) => setTurns((prev) => [...prev, { role: 'genesis', text: turn.text, tag: turn.tag, ...(turn.quantum ? { quantum: turn.quantum } : {}) }]));
     } else if (a?.type === 'runCyber') {
       // ETAP 1.5 — the real kernel, run synchronously right here, exactly like CyberWorkspace.tsx's
       // own `run()` does. The result lives in chat state so a follow-up "zapisz" can persist it
@@ -895,6 +943,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
               </span>
             )}
             <div className="sc-text">{t.text}</div>
+            {t.quantum && <QuantumHistogram data={t.quantum} />}
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
             )}

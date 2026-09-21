@@ -54,8 +54,12 @@ export const QUALITY_DPR_CAP = {
  * which is what "subtle ATTENTION signal" means. It is never a multiplier.
  */
 const ACTIVITY: readonly { speed: number; density: number; particles: number; amber: number }[] = [
-  { speed: 0.55, density: 0.6, particles: 0.15, amber: 0 },
-  { speed: 1.0, density: 1.0, particles: 0.4, amber: 0 },
+  // IDLE stays the calmest tier of the five, but not an invisible one: at the
+  // previous 0.55/0.6/0.15 it rendered ~47 streams over a 1280px viewport,
+  // measured at well under 1% lit pixels — a background that is technically
+  // running and practically absent. Still the slowest and sparsest row here.
+  { speed: 0.8, density: 1.0, particles: 0.35, amber: 0 },
+  { speed: 1.0, density: 1.15, particles: 0.4, amber: 0 },
   { speed: 1.15, density: 1.2, particles: 0.7, amber: 0 },
   { speed: 1.45, density: 1.45, particles: 1.1, amber: 0 },
   { speed: 1.2, density: 1.25, particles: 0.9, amber: 0.12 },
@@ -66,23 +70,36 @@ const SPEED_MULT: Record<SpeedLevel, number> = { LOW: 0.6, MEDIUM: 1, HIGH: 1.5 
 
 /** `flicker`, like `amber`, is a probability in [0,1] — not a multiplier. */
 const QUALITY: Record<QualityLevel, { density: number; fade: number; glowBlur: number; dprCap: number; flicker: number }> = {
-  HIGH: { density: 1, fade: 0.14, glowBlur: 9, dprCap: QUALITY_DPR_CAP.HIGH, flicker: 0.05 },
+  // `fade` is how hard each frame paints over the last one: LOWER = longer
+  // trails. 0.14 wiped a column in ~7 frames (~120ms), which is why the field
+  // read as isolated dots rather than falling streaks.
+  HIGH: { density: 1, fade: 0.09, glowBlur: 9, dprCap: QUALITY_DPR_CAP.HIGH, flicker: 0.05 },
   MEDIUM: { density: 0.8, fade: 0.18, glowBlur: 6, dprCap: QUALITY_DPR_CAP.MEDIUM, flicker: 0.03 },
   LOW: { density: 0.55, fade: 0.26, glowBlur: 0, dprCap: QUALITY_DPR_CAP.LOW, flicker: 0 },
   REDUCED_MOTION: { density: 0.7, fade: 1, glowBlur: 5, dprCap: QUALITY_DPR_CAP.REDUCED_MOTION, flicker: 0 },
 };
 
 /** Depth: BACKGROUND (slow, dim, deep) → MIDGROUND (the main field) → FOREGROUND (sparse, sharp). */
+// Alphas raised from 0.26/0.5/0.85: at the original values the field measured
+// visible to a pixel counter but not to a person — the background layer in
+// particular sat at 0.26 over a near-black fill. Depth ORDER is unchanged
+// (background dimmest, foreground sharpest); only the floor moved up.
+// MATRIX PREMIUM (D-118): the rain keeps its identity (falling glyph columns,
+// three depth layers, respawn from above) but speaks the product's language:
+// slower and sparser than the film cliché, scientific glyphs instead of
+// katakana, the navy/cyan/cool-white palette with the classic matrix green
+// kept as a sparse signature on a few column heads, gold only at ATTENTION.
 const LAYERS = [
-  { fs: 10, alpha: 0.26, speed: 26 },
-  { fs: 14, alpha: 0.5, speed: 58 },
-  { fs: 18, alpha: 0.85, speed: 104 },
+  { fs: 10, alpha: 0.36, speed: 18 },
+  { fs: 14, alpha: 0.6, speed: 40 },
+  { fs: 18, alpha: 0.82, speed: 72 },
 ] as const;
 
+// Scientific vocabulary: hex fingerprint digits, Greek, calculus/statistics, units.
 const GLYPH_SETS = [
-  'ｱｲｳｴｵｶｷｸｹｺｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉ0123456789',
-  '0123456789ABCDEF⟨⟩∆∇≈≠∑πλμσ∫',
-  'XYZMRGBHVNTKSFWD0123456789',
+  '0123456789abcdef0123456789abcdef',
+  'αβγδεζηθλμνξπρστφχψωΔΣΩ0123456789',
+  '∑∫∂√∞≈≠≤≥±ÅμmMkJ0123456789',
 ] as const;
 
 const MONO_FONT = 'ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -168,8 +185,19 @@ export function buildStreams(width: number, height: number, cfg: MatrixConfig): 
       out.push({
         layer: L,
         x: col * step,
-        // Staggered starts: the field is never born on one horizontal line.
-        y: -rng() * height * 1.6 - cells * base.fs * 0.5,
+        // Staggered starts across the FULL visible height, not only above it —
+        // this is the initial BUILD, standing in for "the field has already
+        // been running." Placing every stream above the viewport (as respawn
+        // correctly does — see `updateStreams`, which re-enters a finished
+        // stream above y=0 so it never pops in mid-screen) would mean the
+        // slowest layer (26px/s base, further slowed by low-activity tiers)
+        // takes tens of seconds of real wall-clock time to scroll down into
+        // view from a `-height*1.6` start — measured empirically as a fully
+        // black canvas for the first ~10-14s and still <0.2% populated at 30s
+        // on a fresh IDLE-tier mount. `updateStreams`'s respawn logic is
+        // untouched and still re-enters above the viewport, which is correct
+        // there because other streams are already on screen by that point.
+        y: rng() * (height + cells * base.fs * 1.6) - cells * base.fs * 1.6,
         speed: base.speed * (0.6 + rng() * 0.9),
         fontSize: base.fs,
         cells,
@@ -233,8 +261,9 @@ export function updateParticles(field: ParticleField, dt: number, cfg: MatrixCon
   }
 }
 
+// Far layer: deep teal-navy; mid: cyan; near: cool white. (Matrix green is a sparse head accent, below.)
 const layerColor = (layer: number, alpha: number): string =>
-  layer === 0 ? `rgba(14,122,65,${alpha})` : layer === 1 ? `rgba(31,175,94,${alpha})` : `rgba(90,230,150,${alpha})`;
+  layer === 0 ? `rgba(58,122,150,${alpha})` : layer === 1 ? `rgba(92,214,232,${alpha})` : `rgba(214,236,255,${alpha})`;
 
 /**
  * The narrow surface the engine needs. `CanvasRenderingContext2D` satisfies it
@@ -262,7 +291,7 @@ export function renderFrame(
   const act = ACTIVITY[cfg.activity]!;
 
   ctx.shadowBlur = 0;
-  ctx.fillStyle = `rgba(2,6,4,${q.fade})`; // trail fade ⇒ smooth column falloff
+  ctx.fillStyle = `rgba(7,11,23,${q.fade})`; // trail fade ⇒ smooth column falloff (navy, not green-black)
   ctx.fillRect(0, 0, width, height);
 
   // Font changes are state changes on the 2D context; streams are grouped by
@@ -281,17 +310,22 @@ export function renderFrame(
     const font = `${s.fontSize}px ${MONO_FONT}`;
     if (font !== currentFont) { ctx.font = font; currentFont = font; }
 
+    // The matrix signature: roughly one column head in eight glows the classic green — a
+    // deliberate, sparse nod to the brand's DNA, never the whole field.
+    const signature = !amber && hashUnit(s.seed, s.epoch, 11) < 0.125;
     if (glowOn) {
       ctx.shadowBlur = q.glowBlur * glowScale;
-      ctx.shadowColor = amber ? 'rgba(255,183,110,0.5)' : 'rgba(57,217,122,0.55)';
+      ctx.shadowColor = amber ? 'rgba(255,183,110,0.5)' : signature ? 'rgba(57,217,122,0.5)' : 'rgba(92,214,232,0.5)';
     }
 
     const headAlpha = Math.min(1, s.alpha * s.headBright + (s.layer === 2 ? 0.2 : 0.05));
     ctx.fillStyle = amber
       ? `rgba(255,214,170,${headAlpha})`
-      : s.layer === 2 && s.headBright > 0.92
-        ? `rgba(224,255,240,${headAlpha})` // sporadic near-white scientific highlight
-        : layerColor(s.layer, headAlpha);
+      : signature
+        ? `rgba(120,232,164,${headAlpha})` // matrix green signature head
+        : s.layer === 2 && s.headBright > 0.92
+          ? `rgba(240,248,255,${headAlpha})` // sporadic near-white highlight
+          : layerColor(s.layer, headAlpha);
     ctx.fillText(set[hashGlyph(s.seed, s.epoch, headCell) % set.length]!, s.x, s.y);
 
     ctx.shadowBlur = 0;
@@ -308,9 +342,9 @@ export function renderFrame(
   if (particles.length > 0) {
     const particleFont = `12px ${MONO_FONT}`;
     if (particleFont !== currentFont) ctx.font = particleFont; // last font change of the frame
-    if (glowAllowed) { ctx.shadowBlur = q.glowBlur; ctx.shadowColor = 'rgba(160,255,200,0.5)'; }
+    if (glowAllowed) { ctx.shadowBlur = q.glowBlur; ctx.shadowColor = 'rgba(140,220,255,0.5)'; }
     for (const p of particles) {
-      ctx.fillStyle = `rgba(220,255,236,${p.alpha})`;
+      ctx.fillStyle = `rgba(214,236,255,${p.alpha})`;
       ctx.fillText(p.glyph, p.x, p.y);
     }
     ctx.shadowBlur = 0;
@@ -327,7 +361,7 @@ export function renderStatic(ctx: RenderContext, streams: readonly Stream[], cfg
   const q = QUALITY.REDUCED_MOTION;
   ctx.clearRect(0, 0, width, height);
   ctx.shadowBlur = 0;
-  ctx.fillStyle = '#020604';
+  ctx.fillStyle = '#070b17';
   ctx.fillRect(0, 0, width, height);
 
   const glowAllowed = q.glowBlur > 0 && cfg.glow !== 'LOW';
@@ -349,9 +383,9 @@ export function renderStatic(ctx: RenderContext, streams: readonly Stream[], cfg
 
     if (glowAllowed && s.layer >= 1) {
       ctx.shadowBlur = q.glowBlur;
-      ctx.shadowColor = 'rgba(57,217,122,0.5)';
+      ctx.shadowColor = 'rgba(92,214,232,0.5)';
     }
-    ctx.fillStyle = `rgba(216,255,230,${Math.min(1, s.alpha * s.headBright + 0.2)})`;
+    ctx.fillStyle = `rgba(240,248,255,${Math.min(1, s.alpha * s.headBright + 0.2)})`;
     ctx.fillText(set[hashGlyph(s.seed, s.epoch, headCell) % set.length]!, s.x, s.y);
     ctx.shadowBlur = 0;
   }

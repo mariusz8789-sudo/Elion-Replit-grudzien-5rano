@@ -1,6 +1,100 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
+import { ErrorBoundary } from './ErrorBoundary';
+import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
+
+/**
+ * The 2040 ambient 3D layer (three.js) is lazy: the initial bundle must not
+ * grow for a decoration. It renders BEHIND everything (see styles-2040.css,
+ * `.holo-backdrop`), inside its own error boundary so a GPU failure can never
+ * take the navigation down with it.
+ */
+const GenesisHoloBackdrop = lazy(() => import('./GenesisHoloBackdrop').then((m) => ({ default: m.GenesisHoloBackdrop })));
+
+/**
+ * Range sliders everywhere get a filled, glowing segment (styles-2040.css,
+ * `--fill-pct`). `Controls.tsx` already sets that variable for its own
+ * sliders; this paints it for every OTHER `input[type=range]` in the app so
+ * the fill matches the thumb without each screen having to know about it.
+ * Progressive: if this never runs, the rail is simply unfilled.
+ */
+function paintRangeFill(input: HTMLInputElement): void {
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const value = Number(input.value);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || max <= min) return;
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  input.style.setProperty('--fill-pct', `${pct.toFixed(2)}%`);
+}
+
+/**
+ * HUD telemetry: the machine's measured state (`/api/system/telemetry`) and the
+ * 5D manifold engine's geometry of the backdrop camera's real flight path
+ * (`/api/manifold/evaluate`). Both come from the backend or not at all — the
+ * readout is empty when there is nothing measured, never a placeholder number.
+ */
+function useHudTelemetry(): string {
+  const [sys, setSys] = useState<SystemTelemetryView | null>(null);
+  const [manifold, setManifold] = useState<ManifoldView | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+    let alive = true;
+    const pullSystem = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/system/telemetry', { signal: AbortSignal.timeout(4000) });
+        if (!r.ok) return;
+        const j = (await r.json()) as SystemTelemetryView & { ok?: boolean };
+        if (alive && j && typeof j.cpuCount === 'number') setSys(j);
+      } catch { /* backend absent: the readout stays empty */ }
+    };
+    const pullManifold = async (): Promise<void> => {
+      const points = snapshotHoloPath();
+      if (points.length < 3) return;
+      try {
+        const r = await fetch('/api/manifold/evaluate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nodeId: 'HUD', points }), signal: AbortSignal.timeout(4000) });
+        if (!r.ok) return;
+        const j = (await r.json()) as { manifold?: ManifoldView };
+        if (alive && j.manifold) setManifold(j.manifold);
+      } catch { /* backend absent */ }
+    };
+    void pullSystem();
+    const a = window.setInterval(() => { void pullSystem(); }, 15000);
+    const b = window.setInterval(() => { void pullManifold(); }, 20000);
+    const first = window.setTimeout(() => { void pullManifold(); }, 6000);
+    return () => { alive = false; window.clearInterval(a); window.clearInterval(b); window.clearTimeout(first); };
+  }, []);
+  return formatHudTelemetry(sys, manifold);
+}
+
+function useRangeFillPainter(): void {
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const paintAll = (): void => {
+      document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
+    };
+    const onInput = (event: Event): void => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && target.type === 'range') paintRangeFill(target);
+    };
+    let scheduled = 0;
+    const schedule = (): void => {
+      if (scheduled !== 0) return;
+      scheduled = window.requestAnimationFrame(() => { scheduled = 0; paintAll(); });
+    };
+    paintAll();
+    document.addEventListener('input', onInput, true);
+    document.addEventListener('change', onInput, true);
+    const observer = typeof MutationObserver === 'undefined' ? null : new MutationObserver(schedule);
+    observer?.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+    return () => {
+      document.removeEventListener('input', onInput, true);
+      document.removeEventListener('change', onInput, true);
+      observer?.disconnect();
+      if (scheduled !== 0) window.cancelAnimationFrame(scheduled);
+    };
+  }, []);
+}
 
 /**
  * APP SHELL — the frame that makes Genesis one product instead of ~35 screens
@@ -18,6 +112,29 @@ import { requestOpenScienceChat } from '../core/scienceChatBridge';
  * than a second router.
  */
 
+/**
+ * GENESIS PHYSICS brand mark — the chrome-and-glass hexagonal lattice with a
+ * lit core (public/brand/genesis-mark.png, the same artwork as the PWA icons
+ * and og-image.jpg). Used on every page (top bar, sidebar, title card) via
+ * `GenesisWordmark`. Decorative: the wordmark text carries the name.
+ */
+export function GenesisMark({ size = 28 }: { size?: number }): JSX.Element {
+  return <img src="/brand/genesis-mark.png" width={size} height={size} alt="" aria-hidden="true" className="genesis-mark" decoding="async" />;
+}
+
+/** Mark + name, one component for every page's chrome. */
+export function GenesisWordmark({ size = 26, tagline = true }: { size?: number; tagline?: boolean }): JSX.Element {
+  return (
+    <span className="genesis-wordmark">
+      <span className="genesis-wordmark-mark"><GenesisMark size={size} /></span>
+      <span className="genesis-wordmark-text">
+        <strong>GENESIS<em>PHYSICS</em></strong>
+        {tagline && <small>Scientific OS</small>}
+      </span>
+    </span>
+  );
+}
+
 function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate: () => void }): JSX.Element {
   const planned = item.status === 'planned';
   return (
@@ -29,7 +146,10 @@ function NavButton({ item, active, onNavigate }: { item: NavItem; active: boolea
       title={planned ? item.plannedNote : undefined}
     >
       <span className="shell-nav-icon" aria-hidden="true">{item.icon}</span>
-      <span className="shell-nav-label">{item.label}</span>
+      <span className="shell-nav-text">
+        <span className="shell-nav-label">{item.label}</span>
+        {item.description !== undefined && <span className="shell-nav-desc">{item.description}</span>}
+      </span>
       {planned && <span className="shell-nav-badge">wkrótce</span>}
     </button>
   );
@@ -56,6 +176,10 @@ export function AppShell({ children, chat, chatInline = false }: {
   }, []);
 
   const active = activeNavId(hash);
+  useRangeFillPainter();
+  const hudTelemetry = useHudTelemetry();
+  /** HUD readout under the brand: the real current route, nothing invented. */
+  const routeLabel = (hash.replace(/^#\/?/, '').split('?')[0] || 'home').toUpperCase();
 
   const go = (item: NavItem): void => {
     if (item.kind === 'chat') { requestOpenScienceChat(); setMenuOpen(false); return; }
@@ -88,16 +212,34 @@ export function AppShell({ children, chat, chatInline = false }: {
   );
 
   return (
+    <>
+      {/* Ambient 3D layer: fixed, pointer-events:none, z-index below the Matrix
+          data stream. A sibling of `.shell` on purpose — `.shell` is its own
+          stacking context (z-index 1), so anything inside it would paint OVER
+          the data stream instead of under it. */}
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <GenesisHoloBackdrop />
+        </Suspense>
+      </ErrorBoundary>
+      {/* Legibility scrim over the full-bleed world: a gradient, not a box, so
+          the HUD stays borderless while text keeps its contrast. */}
+      <div className="hud-scrim" aria-hidden="true" />
     <div className="shell">
       <aside className="shell-sidebar" aria-label="Nawigacja Genesis">
-        <button className="shell-brand" onClick={() => { window.location.hash = ''; }}>
-          <span className="shell-brand-mark" aria-hidden="true">◈</span>
-          <span className="shell-brand-text">
-            <strong>GENESIS</strong>
-            <em>Scientific OS</em>
-          </span>
+        <button className="shell-brand" onClick={() => { window.location.hash = ''; }} aria-label="Genesis Physics — Start">
+          <GenesisWordmark size={30} />
         </button>
+        {/* HUD status pill — decorative readout of the live route (the nav
+            already carries aria-current, so this stays out of the a11y tree). */}
+        <div className="shell-hud" aria-hidden="true" data-testid="shell-hud">
+          <span className="shell-hud-dot" />
+          <span className="shell-hud-text">SYS · {routeLabel}</span>
+          {hudTelemetry !== '' && <span className="shell-hud-telemetry">{hudTelemetry}</span>}
+          <span className="shell-hud-bars"><i /><i /><i /><i /></span>
+        </div>
         <nav className="shell-nav">{sections}</nav>
+        <a className="shell-domain" href="https://genesis-physics.com" target="_blank" rel="noreferrer">genesis-physics.com</a>
       </aside>
 
       <div className={chatInline ? 'shell-main shell-main-split' : 'shell-main'}>
@@ -134,6 +276,7 @@ export function AppShell({ children, chat, chatInline = false }: {
         </div>
       )}
     </div>
+    </>
   );
 }
 

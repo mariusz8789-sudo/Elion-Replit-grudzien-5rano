@@ -8,6 +8,7 @@ import {
 import { EPISTEMIC_LABELS, type EpistemicStatus } from '../core/generator/recipe';
 import type { KnowledgeEpistemicStatus } from '../core/knowledge/supplementalRegistry';
 import type { BiotechEpistemicStatus } from '../core/biotechDiscoveryContract';
+import { FRONTEND_SRC } from './fixtures/repoPaths';
 
 const ALL_KNOWLEDGE_STATUSES: readonly KnowledgeEpistemicStatus[] = [
   'FACT', 'MODEL', 'THEORY', 'HYPOTHESIS', 'SCENARIO_ASSUMPTION', 'FICTIONAL_REFERENCE',
@@ -96,7 +97,7 @@ describe('G6 canonical epistemic reliability dictionary (P1)', () => {
 
 describe('G6: the four orthogonal axes stay untouched — zero breaking of saved data', () => {
   it('this module never imports the four orthogonal-axis types (HypothesisAssessment / terminalStatus / DataProvenance / scienceMemory) — doc-comment mentions are fine, a real import is not', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'core', 'epistemicReliability.ts'), 'utf8');
+    const source = readFileSync(join(FRONTEND_SRC, 'core', 'epistemicReliability.ts'), 'utf8');
     const importLines = source.split('\n').filter((line) => /^\s*import\b/.test(line)).join('\n');
     expect(importLines).not.toMatch(/HypothesisAssessment/);
     expect(importLines).not.toMatch(/DataProvenance/);
@@ -105,7 +106,7 @@ describe('G6: the four orthogonal axes stay untouched — zero breaking of saved
   });
 
   it('scienceMemory.ts is untouched by this consolidation: SavedExperimentEpistemicStatus still unions all six original vocabularies verbatim', () => {
-    const source = readFileSync(join(process.cwd(), 'src', 'core', 'scienceMemory.ts'), 'utf8');
+    const source = readFileSync(join(FRONTEND_SRC, 'core', 'scienceMemory.ts'), 'utf8');
     expect(source).toContain('export type SavedExperimentEpistemicStatus =');
     expect(source).toContain('| KnowledgeEpistemicStatus');
     expect(source).toContain('| HypothesisAssessment');
@@ -113,5 +114,20 @@ describe('G6: the four orthogonal axes stay untouched — zero breaking of saved
     expect(source).toContain('| DataProvenance');
     expect(source).toContain('| EpistemicStatus');
     expect(source).toContain('| BiotechEpistemicStatus');
+  });
+});
+
+describe('D-128 — session statuses and the ★ scale onto the canonical rank (never upgraded)', () => {
+  it('maps every session status monotonically and every star count', async () => {
+    const m = await import('../core/epistemicReliability');
+    expect(m.sessionStatusToCanonicalReliability('VERIFIED_SOURCE')).toBe('ESTABLISHED_SCIENCE');
+    expect(m.sessionStatusToCanonicalReliability('REAL_OBSERVATION')).toBe('WELL_SUPPORTED_MODEL');
+    expect(m.sessionStatusToCanonicalReliability('SIMULATION')).toBe('THEORETICAL_MODEL');
+    expect(m.sessionStatusToCanonicalReliability('SPECULATIVE')).toBe('SPECULATIVE_MODEL');
+    expect(m.sessionStatusToCanonicalReliability('INSUFFICIENT_EVIDENCE')).toBe('UNSUPPORTED_CLAIM');
+    expect(m.reliabilityRankIndex(m.sessionStatusToCanonicalReliability('MODEL'))).toBeLessThan(m.reliabilityRankIndex(m.sessionStatusToCanonicalReliability('REAL_OBSERVATION')));
+    expect([0, 1, 2, 3, 4, 5, 9, Number.NaN].map((n) => m.starScaleToCanonicalReliability(n))).toEqual(['UNSUPPORTED_CLAIM', 'SPECULATIVE_MODEL', 'HYPOTHESIS', 'THEORETICAL_MODEL', 'WELL_SUPPORTED_MODEL', 'ESTABLISHED_SCIENCE', 'ESTABLISHED_SCIENCE', 'UNSUPPORTED_CLAIM']);
+    expect(m.starScaleToCanonicalReliability(m.countFilledStars('★★★☆☆'))).toBe('THEORETICAL_MODEL');
+    expect(m.starScaleToCanonicalReliability(4.9)).toBe('WELL_SUPPORTED_MODEL');
   });
 });

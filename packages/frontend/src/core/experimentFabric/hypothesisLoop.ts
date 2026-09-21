@@ -267,11 +267,120 @@ export function generateCompetingHypotheses(problem: HypothesisProblem): Hypothe
   };
 }
 
+/** Jeden nowo wyprowadzony problem-następca, gotowy do podania z powrotem do `generateCompetingHypotheses`. */
+export interface NarrowedHypothesisDerivation {
+  readonly problem: HypothesisProblem;
+  /** Skąd dokładnie wziął się kandydat — liczby, nie narracja. */
+  readonly rationale: string;
+}
+
+export type NarrowedHypothesisResult =
+  | { readonly ok: true; readonly derivation: NarrowedHypothesisDerivation }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * GENEROWANIE HIPOTEZ ŚWIADOME OBSERWACJI (G4).
+ *
+ * `generateCompetingHypotheses` powyżej rozwija WYŁĄCZNIE zadeklarowaną z góry
+ * tablicę `candidateValues` — nie czyta żadnego wyniku. To jest udokumentowana,
+ * świadoma decyzja projektowa (patrz nagłówek pliku): hipotezy mają być
+ * wyprowadzalne z zadeklarowanej powierzchni modelu, nigdy z tekstu generowanego
+ * przez model językowy. Jedyny w repo kod, który TWORZY nową, wcześniej
+ * niezadeklarowaną wartość z realnego wyniku, to interpolacja środka przedziału
+ * (`parameterAlternative.ts`, `intervalNarrowing.ts`) — ale ta należy do innego
+ * kontraktu hipotez (`inquiryLoop.ts`'s `ParameterHypothesis`), zbudowanego dla
+ * ciągłej estymacji jednego parametru, nie dla tego, dyskretnego zestawu
+ * konkurencyjnych kandydatów.
+ *
+ * Ta funkcja daje `hypothesisLoop.ts` DOKŁADNIE TĘ SAMĄ zasadę, bez kopiowania
+ * kodu: z REALNIE wykonanego, rozstrzygniętego zbioru bierze zwycięzcę i jego
+ * bezpośredniego konkurenta na uporządkowaniu metryki, i — TYLKO gdy zmienna
+ * kandydująca jest liczbowa — zwraca nowy `HypothesisProblem`, którego jedyny
+ * kandydat to ŚRODEK PRZEDZIAŁU między nimi. Ten problem nigdy nie był
+ * zadeklarowany w `HYPOTHESIS_PROBLEMS`; powstaje wyłącznie z tego, co Genesis
+ * już zmierzył. Podany z powrotem do `generateCompetingHypotheses` przechodzi
+ * przez DOKŁADNIE ten sam silnik, prerejestrację i wykonanie — zero nowego
+ * kodu generującego, zero drugiego silnika.
+ *
+ * Granica jest jawna, nie domyślna: zmienna kategoryczna (np. `scenarioId`,
+ * `smiles`) nie ma między wartościami żadnego "środka" — funkcja odmawia
+ * zamiast zgadywać, tak samo jak reszta tego pliku odmawia scoringu bez
+ * uzasadnionej metodologii (G5).
+ */
+export function deriveNarrowedHypothesisProblem(result: HypothesisLoopResult): NarrowedHypothesisResult {
+  const problem = result.preregistration.set.problem;
+
+  if (!result.discrimination.decisive) {
+    return { ok: false, reason: 'Zbiór nie jest rozstrzygnięty (remis albo brak wyniku) — zawężanie wymaga realnego zwycięzcy, nie remisu.' };
+  }
+  const ranking = result.discrimination.ranking;
+  if (ranking.length < 2) {
+    return { ok: false, reason: 'Za mało rozstrzygniętych kandydatów, żeby wyznaczyć przedział do zawężenia — potrzeba co najmniej dwóch.' };
+  }
+
+  const winner = ranking[0]!;
+  const runnerUp = ranking[1]!;
+  const winnerValue = Number(winner.candidate);
+  const runnerUpValue = Number(runnerUp.candidate);
+  if (!Number.isFinite(winnerValue) || !Number.isFinite(runnerUpValue)) {
+    return {
+      ok: false,
+      reason: `Zmienna kandydująca "${problem.candidateVariable}" nie jest liczbowa (wartości: "${winner.candidate}", "${runnerUp.candidate}") — interpolacja środka przedziału nie ma znaczenia dla wartości kategorycznych.`,
+    };
+  }
+
+  const midpoint = (winnerValue + runnerUpValue) / 2;
+  if (midpoint === winnerValue || midpoint === runnerUpValue) {
+    return {
+      ok: false,
+      reason: `Zwycięzca (${winnerValue}) i bezpośredni konkurent (${runnerUpValue}) są już zbyt blisko siebie — nie ma punktu wewnętrznego, który dałoby się odróżnić od obu.`,
+    };
+  }
+
+  const narrowedProblem: HypothesisProblem = {
+    ...problem,
+    problemId: `${problem.problemId}:narrowed:${fnv1a(canonicalJson({ parent: problem.problemId, winnerValue, runnerUpValue, midpoint }))}`,
+    statement: `Zawężenie „${problem.statement}" — czy ${problem.candidateVariable}=${midpoint} (środek przedziału między zmierzonym zwycięzcą ${winnerValue} a bezpośrednim konkurentem ${runnerUpValue}) nadal daje ${problem.objective === 'minimize' ? 'najniższą' : 'najwyższą'} wartość ${problem.primaryMetric} spośród tego węższego zbioru?`,
+    candidateValues: [midpoint],
+  };
+
+  return {
+    ok: true,
+    derivation: {
+      problem: narrowedProblem,
+      rationale: `Kandydat ${midpoint} NIE był zadeklarowany w problemie źródłowym (${problem.problemId}) — powstał z interpolacji środka przedziału między realnie zmierzonym zwycięzcą (${problem.candidateVariable}=${winnerValue}, ${problem.primaryMetric}=${winner.metric}) a jego bezpośrednim konkurentem (${problem.candidateVariable}=${runnerUpValue}, ${problem.primaryMetric}=${runnerUp.metric}) na REALNYM, wykonanym uporządkowaniu — tą samą zasadą co istniejąca interpolacja środka przedziału w parameterAlternative.ts/intervalNarrowing.ts, zastosowaną do kontraktu tego pliku.`,
+    },
+  };
+}
+
+/**
+ * KOTWICA ANTY-HARKINGOWA. Bez niej prerejestracja dowodzi wyłącznie tego,
+ * że treść nie zmieniła się od zahaszowania — nic o TYM, KIEDY powstała
+ * względem danych. Model jest deterministyczny (stały seed), więc
+ * "podglądnięty" i "oficjalny" przebieg tej samej hipotezy mają identyczny
+ * `runFingerprint` (patrz `provenance.ts::createExperimentProvenance` —
+ * odcisk liczony jest z requestu I wyników razem). Kotwica wymaga
+ * jawnej deklaracji: jakie odciski przebiegów już były znane PRZED tą
+ * rejestracją. Uczciwa, ślepa rejestracja deklaruje pustą listę — to
+ * PRAWDA dla każdego dzisiejszego wywołania (`generateCompetingHypotheses`
+ * → `preregisterHypotheses` → `executePreregisteredHypotheses`, bez
+ * podglądu pomiędzy). Jeżeli ktoś podejrzał wynik i uczciwie go zadeklaruje
+ * tutaj, `verifyAntiHarkingAnchor` wykryje kolizję, gdy ten sam odcisk
+ * wróci jako "potwierdzający dowód". To NIE jest dowód niepodważalny —
+ * nie da się skonstruować jednego bez zewnętrznego, zaufanego zegara —
+ * ale `createdBeforeRun` przestaje być literałem, którego nic nie broni, i
+ * staje się twierdzeniem, które można PODWAŻYĆ.
+ */
+export interface PreregistrationAnchor {
+  readonly priorRunFingerprints: readonly string[];
+}
+
 export interface Preregistration {
   contractVersion: string;
   preregistrationId: string;
   problemId: string;
   createdAt: string;
+  anchor: PreregistrationAnchor;
   hypotheses: readonly PreregisteredHypothesis[];
   /** Odcisk zamrożonego zbioru. Każda późniejsza zmiana treści jest wykrywalna. */
   preregistrationFingerprint: string;
@@ -292,22 +401,33 @@ function frozenView(hypotheses: readonly PreregisteredHypothesis[]) {
   }));
 }
 
-export function preregisterHypotheses(set: HypothesisSet, now: () => Date = () => new Date()): Preregistration {
+export function preregisterHypotheses(set: HypothesisSet, anchor: PreregistrationAnchor, now: () => Date = () => new Date()): Preregistration {
   const hypotheses = set.hypotheses.map((entry) => ({
     ...entry,
     status: entry.status === 'BLOCKED' ? entry.status : ('PRE_REGISTERED' as HypothesisStatus),
     createdBeforeRun: true,
   }));
+  const createdAt = now().toISOString();
+  // `createdAt` is deliberately NOT part of the hash: it is real wall-clock
+  // time, and `preregistrationFingerprint` must stay reproducible for two
+  // genuinely identical, independent registrations of the same content (see
+  // "Deterministyczne odciski" — the same real run, called twice, must
+  // produce the same fingerprint). `anchor` IS hashed: for any given caller
+  // it is a fixed, deliberate declaration, not a clock — hashing it protects
+  // it from being silently rewritten after the fact, the same way `frozen`
+  // protects statements and criteria.
   const fingerprint = fnv1a(canonicalJson({
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     problemId: set.problem.problemId,
+    anchor,
     frozen: frozenView(hypotheses),
   }));
   return {
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistrationId: `prereg_${fingerprint}`,
     problemId: set.problem.problemId,
-    createdAt: now().toISOString(),
+    createdAt,
+    anchor,
     hypotheses,
     preregistrationFingerprint: fingerprint,
     set,
@@ -315,18 +435,65 @@ export function preregisterHypotheses(set: HypothesisSet, now: () => Date = () =
 }
 
 /**
- * Przelicza odcisk zamrożonego zbioru i porównuje z zapisanym. Wykrywa
- * dopisanie hipotezy po wyniku, zmianę przewidywania i podmianę kryterium.
+ * Przelicza odcisk zamrożonego zbioru (treść + kotwica) i porównuje z
+ * zapisanym. Wykrywa dopisanie hipotezy po wyniku, zmianę przewidywania,
+ * podmianę kryterium ORAZ przepisanie kotwicy po fakcie — `createdAt`
+ * celowo NIE wchodzi w ten odcisk (patrz komentarz w `preregisterHypotheses`).
  */
 export function verifyPreregistrationIntact(prereg: Preregistration, hypotheses: readonly PreregisteredHypothesis[] = prereg.hypotheses): { intact: boolean; reason: string } {
   const recomputed = fnv1a(canonicalJson({
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     problemId: prereg.problemId,
+    anchor: prereg.anchor,
     frozen: frozenView(hypotheses),
   }));
   return recomputed === prereg.preregistrationFingerprint
     ? { intact: true, reason: 'Prerejestracja jest nienaruszona: twierdzenia, przewidywania i kryteria są te same, co przed wykonaniem.' }
     : { intact: false, reason: `Prerejestracja została naruszona po zamrożeniu (odcisk ${prereg.preregistrationFingerprint} → ${recomputed}). Wynik nie może definiować hipotezy, która go tłumaczy.` };
+}
+
+export interface AntiHarkingCheck {
+  intact: boolean;
+  reason: string;
+  /** Odciski zadeklarowane w kotwicy jako już znane PRZED rejestracją, które mimo to wróciły jako potwierdzający dowód — bezpośredni dowód HARK-owania. */
+  contradictingFingerprints: readonly string[];
+}
+
+/**
+ * The domain-agnostic CORE of the anti-HARK check, extracted from
+ * `verifyAntiHarkingAnchor` below so any loop with its own notion of
+ * "fingerprints known before this round" and "fingerprints used as evidence
+ * this round" can reuse the identical check without constructing a full
+ * `Preregistration` — see `core/agent/qe4RegimeInquiryLoop.ts`'s per-round
+ * anchor for the other real caller. Pure behavior-preserving extraction: the
+ * two arguments here are exactly `prereg.anchor.priorRunFingerprints` and
+ * `outcomes.flatMap((o) => o.runFingerprints)` below.
+ */
+export function checkAntiHarkingAnchor(anchoredFingerprints: readonly string[], usedFingerprints: readonly string[]): AntiHarkingCheck {
+  const anchored = new Set(anchoredFingerprints);
+  const used = [...new Set(usedFingerprints)];
+  const contradicting = used.filter((fp) => anchored.has(fp));
+  return contradicting.length === 0
+    ? {
+      intact: true,
+      contradictingFingerprints: [],
+      reason: 'Żaden przebieg użyty jako dowód nie był zadeklarowany w kotwicy jako już znany przed rejestracją.',
+    }
+    : {
+      intact: false,
+      contradictingFingerprints: contradicting,
+      reason: `HARK-owanie wykryte: kotwica deklarowała odcisk(i) ${contradicting.join(', ')} jako znane PRZED tą prerejestracją, a mimo to ten sam odcisk wraca teraz jako potwierdzający dowód. Hipoteza nie mogła zostać uczciwie zarejestrowana w niewiedzy o tym wyniku.`,
+    };
+}
+
+/**
+ * Sprawdza kotwicę anty-HARKingową: żaden odcisk przebiegu użyty jako dowód
+ * dla tej prerejestracji nie może być jednym z odcisków, które sama
+ * prerejestracja zadeklarowała jako już znane PRZED rejestracją. Naruszenie
+ * dowodzi, że autor znał wynik, zanim (rzekomo) zamroził hipotezy.
+ */
+export function verifyAntiHarkingAnchor(prereg: Preregistration, outcomes: readonly HypothesisOutcome[]): AntiHarkingCheck {
+  return checkAntiHarkingAnchor(prereg.anchor.priorRunFingerprints, outcomes.flatMap((outcome) => outcome.runFingerprints));
 }
 
 export interface HypothesisOutcome {
@@ -358,6 +525,8 @@ export interface HypothesisLoopResult {
   contractVersion: string;
   preregistration: Preregistration;
   preregistrationIntact: { intact: boolean; reason: string };
+  /** Kotwica anty-HARKingowa — patrz `verifyAntiHarkingAnchor`. Osobna oś od `preregistrationIntact`: tamta pilnuje TREŚCI, ta pilnuje KOLEJNOŚCI W CZASIE. */
+  antiHarkingCheck: AntiHarkingCheck;
   outcomes: readonly HypothesisOutcome[];
   discrimination: HypothesisDiscrimination;
   chains: readonly ScientificEvidenceChain[];
@@ -489,6 +658,7 @@ export function executePreregisteredHypotheses(prereg: Preregistration): Hypothe
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistration: prereg,
     preregistrationIntact: verifyPreregistrationIntact(prereg),
+    antiHarkingCheck: verifyAntiHarkingAnchor(prereg, outcomes),
     outcomes,
     discrimination,
     chains,
@@ -623,6 +793,7 @@ export async function executePreregisteredHypothesesAsync(prereg: Preregistratio
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistration: prereg,
     preregistrationIntact: verifyPreregistrationIntact(prereg),
+    antiHarkingCheck: verifyAntiHarkingAnchor(prereg, outcomes),
     outcomes,
     discrimination,
     chains,
@@ -768,6 +939,9 @@ export interface SavedHypothesisLoop {
   contractVersion: string;
   preregistrationId: string;
   preregistrationFingerprint: string;
+  /** Wymagane, żeby replay mógł wiernie odtworzyć `Preregistration` i jej odcisk — patrz `createdAt`/`anchor` w `Preregistration`. */
+  createdAt: string;
+  anchor: PreregistrationAnchor;
   problem: HypothesisProblem;
   hypotheses: readonly PreregisteredHypothesis[];
   outcomes: readonly {
@@ -790,6 +964,7 @@ export function buildSavedHypothesisLoop(result: HypothesisLoopResult): SavedHyp
     contractVersion: HYPOTHESIS_LOOP_CONTRACT_VERSION,
     preregistrationId: result.preregistration.preregistrationId,
     preregistrationFingerprint: result.preregistration.preregistrationFingerprint,
+    anchor: result.preregistration.anchor,
     problem: result.preregistration.set.problem,
     hypotheses: result.preregistration.hypotheses,
     outcomes: result.outcomes.map((outcome) => ({
@@ -806,7 +981,11 @@ export function buildSavedHypothesisLoop(result: HypothesisLoopResult): SavedHyp
       decisive: result.discrimination.decisive,
     },
   };
-  return { ...base, loopFingerprint: fnv1a(canonicalJson(base)) };
+  // `createdAt` is real wall-clock time (see `preregisterHypotheses`'s own
+  // comment) — stored for replay reconstruction, deliberately excluded from
+  // `loopFingerprint` so two independent, content-identical runs still
+  // produce the same fingerprint (see "Deterministyczne odciski").
+  return { ...base, createdAt: result.preregistration.createdAt, loopFingerprint: fnv1a(canonicalJson(base)) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -818,6 +997,8 @@ export function isSavedHypothesisLoop(value: unknown): value is SavedHypothesisL
   if (!isRecord(value)) return false;
   if (typeof value.contractVersion !== 'string' || typeof value.preregistrationId !== 'string') return false;
   if (typeof value.preregistrationFingerprint !== 'string' || typeof value.loopFingerprint !== 'string') return false;
+  if (typeof value.createdAt !== 'string') return false;
+  if (!isRecord(value.anchor) || !Array.isArray(value.anchor.priorRunFingerprints) || !value.anchor.priorRunFingerprints.every((entry) => typeof entry === 'string')) return false;
   if (!isRecord(value.problem) || typeof value.problem.problemId !== 'string' || typeof value.problem.modelId !== 'string') return false;
   if (!Array.isArray(value.hypotheses) || value.hypotheses.length === 0) return false;
   if (!value.hypotheses.every((entry) => isRecord(entry) && typeof entry.hypothesisId === 'string' && entry.createdBeforeRun === true)) return false;
@@ -852,7 +1033,8 @@ export function replaySavedHypothesisLoop(saved: unknown): HypothesisLoopReplay 
     contractVersion: saved.contractVersion,
     preregistrationId: saved.preregistrationId,
     problemId: saved.problem.problemId,
-    createdAt: '',
+    createdAt: saved.createdAt,
+    anchor: saved.anchor,
     hypotheses: saved.hypotheses,
     preregistrationFingerprint: saved.preregistrationFingerprint,
     set: generateCompetingHypotheses(saved.problem),
@@ -914,7 +1096,8 @@ export async function replaySavedHypothesisLoopAsync(saved: unknown): Promise<Hy
     contractVersion: saved.contractVersion,
     preregistrationId: saved.preregistrationId,
     problemId: saved.problem.problemId,
-    createdAt: '',
+    createdAt: saved.createdAt,
+    anchor: saved.anchor,
     hypotheses: saved.hypotheses,
     preregistrationFingerprint: saved.preregistrationFingerprint,
     set: generateCompetingHypotheses(saved.problem),

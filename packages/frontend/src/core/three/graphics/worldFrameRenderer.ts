@@ -85,16 +85,21 @@ export interface WorldFrameRendererOptions {
   resolveBoundaryPlaceholder?: (THREE: typeof THREE_NS, entity: WorldFrameEntity) => THREE_NS.Object3D;
 }
 
-function defaultResolveVisual(THREE: typeof THREE_NS, entity: WorldFrameEntity): EntityVisualSpec {
-  const radius = 0.5 * (entity.scale ?? 1);
-  const object = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 10), new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.7 }));
+// Radius 0.5, UN-scaled by `entity.scale` here: `applyTransform` below already applies
+// `object.scale.setScalar(entity.scale)` to whatever this returns, for EVERY 'object'-kind entity
+// regardless of which resolver produced it. Baking `entity.scale` into the geometry too (as this
+// used to) double-applied it (effective radius `0.5 * scale^2`) — invisible for the small `scale`
+// values (~1) every existing caller happened to use, but a real bug: confirmed by a caller passing
+// a real, non-trivial scale (a building's actual footprint/height, ~100), where `scale^2` put the
+// camera INSIDE the sphere (back-face culled, so the sphere may vanish from render entirely).
+function defaultResolveVisual(THREE: typeof THREE_NS, _entity: WorldFrameEntity): EntityVisualSpec {
+  const object = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.7 }));
   return { kind: 'object', object };
 }
 
-function defaultBoundaryPlaceholder(THREE: typeof THREE_NS, entity: WorldFrameEntity): THREE_NS.Object3D {
-  const radius = 0.5 * (entity.scale ?? 1);
+function defaultBoundaryPlaceholder(THREE: typeof THREE_NS, _entity: WorldFrameEntity): THREE_NS.Object3D {
   return new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 8, 6),
+    new THREE.SphereGeometry(0.5, 8, 6),
     new THREE.MeshBasicMaterial({ color: 0x5a6b7a, wireframe: true, transparent: true, opacity: 0.35 }),
   );
 }

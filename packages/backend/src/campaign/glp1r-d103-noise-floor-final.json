@@ -1,0 +1,67 @@
+{
+  "id": "D-103-NOISE-FLOOR-FINAL",
+  "kind": "SEALED_MEASUREMENT",
+  "identityKey": "canonicalSmiles (real, via replicateGrouping.mjs — no substitute)",
+  "prereg": {
+    "id": "D-102-READOUT-FAMILY-PREREG",
+    "fingerprint": "f475467a12dff413"
+  },
+  "a2Status": "NOT_DELIVERED — 0/8 chunks; no cache, no egress; 7/300 molecules covered incidentally by the pre-existing frozen D-076/077 pin",
+  "a1MoleculeCount": 300,
+  "moleculesWithRealSmiles": 7,
+  "moleculesWithoutSmiles": 293,
+  "coveredMoleculeIds": [
+    "CHEMBL398714",
+    "CHEMBL410972",
+    "CHEMBL414357",
+    "CHEMBL428139",
+    "CHEMBL4524066",
+    "CHEMBL499930",
+    "CHEMBL577346"
+  ],
+  "rowsExcludedNoSmiles": 526,
+  "rowsExcludedUnverifiedLabel": 190,
+  "rowsInMeasurement": 41,
+  "perFamily": {
+    "OTHER": {
+      "rows": 7,
+      "molecules": 4,
+      "groups": 2,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "CAMP": {
+      "rows": 21,
+      "molecules": 7,
+      "groups": 5,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "ARRESTIN": {
+      "rows": 9,
+      "molecules": 3,
+      "groups": 2,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "CALCIUM": {
+      "rows": 3,
+      "molecules": 2,
+      "groups": 1,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    },
+    "INTERNALIZATION": {
+      "rows": 1,
+      "molecules": 1,
+      "groups": 0,
+      "status": "NOT_MEASURED",
+      "medianSpread": null
+    }
+  },
+  "minGroupsForNoiseFloor": 20,
+  "c1Status": "NOT_CLOSED",
+  "c1Reason": "no readout family reached 20 groups under real structure identity — data volume, not methodology, is the blocker (only 7/300 molecules have a real SMILES)",
+  "computedAt": "2026-09-15T19:44:49.702Z",
+  "artifactHash": "4cb0dd1c6048da0295fa5974353ff1570e4aa59dd729b48e000b3a3f3331fefe"
+}

@@ -1,0 +1,204 @@
+{
+  "targetBranch": "claude/genesis-winner-gate-audit-qgf90v",
+  "packages": {
+    "genesis9d": {
+      "dir": "packages/core/src/genesis9d",
+      "files": [
+        "GenesisIceWallBeyondEngine.ts",
+        "GenesisPyramidInteriorEngine.ts",
+        "GenesisChronosScaleEngine.ts",
+        "GenesisMathematicalTimeMachineCore.ts",
+        "GenesisPlatformUXEnvironment.ts",
+        "GenesisInteractiveEntityEngine.ts",
+        "GenesisGenealogicalTreeEngine.ts",
+        "ice-wall-beyond.test.ts",
+        "pyramid-interior.test.ts",
+        "chronos-scale.test.ts",
+        "time-machine-core.test.ts",
+        "platform-ux.test.ts",
+        "interactive-entity.test.ts",
+        "genealogical-tree.test.ts",
+        "GENESIS_9D_V16_MANIFEST.md",
+        "index.ts"
+      ]
+    },
+    "advanced": {
+      "dir": "packages/core/src/advanced",
+      "files": [
+        "VirtualHyperMicroscope.ts",
+        "MarketGapHarvester.ts",
+        "GenesisCyberBastion.ts",
+        "advanced.test.ts",
+        "README_ADVANCED.md",
+        "index.ts"
+      ]
+    },
+    "supreme": {
+      "dir": "packages/core/src/supreme",
+      "files": [
+        "GenesisAgisCognitiveCore.ts",
+        "ClassifiedInquiryEngine.ts",
+        "SpacetimeCurvatureEngine.ts",
+        "RelativisticRendererPipeline.ts",
+        "GenesisEnterpriseMonetizer.ts",
+        "GenesisSentinelOpsAgent.ts",
+        "GenesisCosmicTimeMachineEngine.ts",
+        "GenesisHPCComputeEngine.ts",
+        "GenesisWetwareGnosticExploit.ts",
+        "GenesisSatelliteGeoEngine.ts",
+        "GenesisQuantumFrontierEngine.ts",
+        "GenesisSwissPrecisionEngine.ts",
+        "GenesisBioVirologyEngine.ts",
+        "GenesisTitanExpandedCore.ts",
+        "GenesisDrugDiscoveryEngine.ts",
+        "GenesisCrisisResilienceEngine.ts",
+        "GenesisSocialMatrixCore.ts",
+        "GenesisUrbanCyberEngine.ts",
+        "supreme-agi.test.ts",
+        "supreme-enterprise.test.ts",
+        "v15-contract.test.ts",
+        "hpc-engine.test.ts",
+        "satellite-geo.test.ts",
+        "frontier-quantum.test.ts",
+        "swiss-bio-titan.test.ts",
+        "genesis-omnicore-master.test.ts",
+        "urban-cyber.test.ts",
+        "README_SUPREME.md",
+        "index.ts"
+      ]
+    },
+    "cityEnterprise": {
+      "dir": "packages/core/src/city-enterprise",
+      "files": [
+        "GenesisCityGenerator.ts",
+        "GenesisCrisisEngine.ts",
+        "GenesisCityMonetizer.ts",
+        "city-enterprise.test.ts",
+        "README_CITY_ENTERPRISE.md",
+        "index.ts"
+      ]
+    },
+    "molecular": {
+      "dir": "packages/core/src/molecular-engine",
+      "files": [
+        "GenesisPhysicoChemicalSandbox.ts",
+        "GenesisMolecularSearchCore.ts",
+        "molecular-engine.test.ts",
+        "README_MOLECULAR_ENGINE.md",
+        "index.ts"
+      ]
+    },
+    "quantum": {
+      "dir": "packages/core/src/quantum-lab",
+      "files": [
+        "GenesisSpacetimePortalEngine.ts",
+        "GenesisQuantumSandbox.ts",
+        "quantum-lab.test.ts",
+        "README_QUANTUM_LAB.md",
+        "index.ts"
+      ]
+    },
+    "speculativeSolvers": {
+      "dir": "packages/core/src/solvers/speculative",
+      "files": [
+        "speculativeTypes.ts",
+        "retrocausalTreeSolver.ts",
+        "torsionBoundarySolver.ts",
+        "warpMetricSolver.ts",
+        "speculativeRegistry.ts",
+        "speculativeSolvers.test.ts",
+        "index.ts"
+      ]
+    },
+    "mirrorCore": {
+      "dir": "packages/core/src/mirror",
+      "files": [
+        "GenesisMirrorBridge.ts",
+        "mirror.test.ts"
+      ]
+    },
+    "supremeUi": {
+      "dir": "packages/ui/src/supreme",
+      "files": [
+        "GenesisLaboratoryView.tsx"
+      ]
+    },
+    "quantumUi": {
+      "dir": "packages/ui/src/quantum-lab",
+      "files": [
+        "GenesisCinematicLabView.tsx"
+      ]
+    },
+    "matrixUi": {
+      "dir": "packages/ui/src/render",
+      "files": [
+        "GenesisCinematicMatrixRenderer.ts",
+        "GenesisMatrixGradeRenderer.ts",
+        "GenesisProductionRenderer.ts",
+        "GenesisCyberEcosystem.ts",
+        "GenesisAssetPipeline.ts",
+        "AssetErrorBoundary.tsx",
+        "matrix-renderer.test.ts",
+        "matrix-cyber-ecosystem.test.ts",
+        "shaders/MatrixRainShader.ts",
+        "index.ts"
+      ]
+    },
+    "mirrorUi": {
+      "dir": "packages/ui/src/mirror",
+      "files": [
+        "GenesisMirrorClient.ts"
+      ]
+    },
+    "city": {
+      "dir": "packages/frontend/src/core/city",
+      "files": [
+        "GenesisCityDigitalTwin.ts",
+        "GenesisDisasterEngine.ts",
+        "CityDisasterController.ts",
+        "city-disaster.test.ts",
+        "README_CITY_DISASTER.md",
+        "index.ts"
+      ]
+    },
+    "routesUi": {
+      "dir": "packages/ui/src/routes",
+      "files": [
+        "City3DRoute.tsx",
+        "LaboratoryRoute.tsx",
+        "index.ts"
+      ]
+    },
+    "stateUi": {
+      "dir": "packages/ui/src/state",
+      "files": [
+        "GenesisEngineProvider.tsx"
+      ]
+    },
+    "qwenExpansion": {
+      "dir": "packages/core/src",
+      "files": [
+        "expansionHash.ts",
+        "engine/hypothesisTournament.ts",
+        "evidence/evidenceContainer.ts",
+        "evidence/verifyContainer.cli.ts",
+        "reports/auditReportGenerator.ts",
+        "connectors/gisOpenUSDAdapter.ts",
+        "connectors/sensorWebhookStream.ts",
+        "glue/genesisBindings.ts",
+        "__tests__/genesisCoreExpansion.test.ts"
+      ]
+    },
+    "knowledge": {
+      "dir": "packages/core/src/knowledge",
+      "files": [
+        "evidenceTypes.ts",
+        "classifyClaim.ts",
+        "EvidenceLedger.ts",
+        "LaypersonAssistant.ts",
+        "index.ts",
+        "knowledge.test.ts"
+      ]
+    }
+  }
+}

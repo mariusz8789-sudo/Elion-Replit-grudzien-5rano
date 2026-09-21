@@ -81,6 +81,12 @@ export interface WorldFrameRendererOptions {
    * recreating geometry. Omit for transform-only updates (no-op).
    */
   updateVisual?: (entity: WorldFrameEntity, object: THREE_NS.Object3D) => void;
+  /**
+   * Materials owned by the caller/resolver and shared across multiple entity visuals. The generic
+   * renderer must not dispose them when one entity disappears or an instanced batch rebuilds; the
+   * caller disposes this registry once, after WorldFrameRenderer.dispose().
+   */
+  sharedMaterials?: readonly THREE_NS.Material[];
   /** Overrides the built-in honest-boundary placeholder for `grounding: 'NOT_MODELED'` entities. */
   resolveBoundaryPlaceholder?: (THREE: typeof THREE_NS, entity: WorldFrameEntity) => THREE_NS.Object3D;
 }
@@ -196,7 +202,7 @@ export class WorldFrameRenderer {
       const entity = byId.get(id);
       if (entity && entity.visible !== false) continue;
       tracked.object.parent?.remove(tracked.object);
-      disposeSceneResources(tracked.object);
+      disposeSceneResources(tracked.object, { excludeMaterials: this.options.sharedMaterials ?? [] });
       this.tracked.delete(id);
     }
   }
@@ -224,7 +230,7 @@ export class WorldFrameRenderer {
     for (const [batchKey, tracked] of [...this.instancedBatches]) {
       if (!groups.has(batchKey)) {
         tracked.mesh.parent?.remove(tracked.mesh);
-        disposeSceneResources(tracked.mesh);
+        disposeSceneResources(tracked.mesh, { excludeMaterials: this.options.sharedMaterials ?? [] });
         this.instancedBatches.delete(batchKey);
       }
     }
@@ -262,7 +268,7 @@ export class WorldFrameRenderer {
       // STRUCTURAL CHANGE (or first appearance of this batch key) — full rebuild.
       if (existing) {
         existing.mesh.parent?.remove(existing.mesh);
-        disposeSceneResources(existing.mesh);
+        disposeSceneResources(existing.mesh, { excludeMaterials: this.options.sharedMaterials ?? [] });
         this.instancedBatches.delete(batchKey);
       }
       const batch = new InstanceBatch(this.THREE, firstSpec.geometry, firstSpec.material);
@@ -325,12 +331,12 @@ export class WorldFrameRenderer {
   dispose(): void {
     for (const tracked of this.tracked.values()) {
       tracked.object.parent?.remove(tracked.object);
-      disposeSceneResources(tracked.object);
+      disposeSceneResources(tracked.object, { excludeMaterials: this.options.sharedMaterials ?? [] });
     }
     this.tracked.clear();
     for (const tracked of this.instancedBatches.values()) {
       tracked.mesh.parent?.remove(tracked.mesh);
-      disposeSceneResources(tracked.mesh);
+      disposeSceneResources(tracked.mesh, { excludeMaterials: this.options.sharedMaterials ?? [] });
     }
     this.instancedBatches.clear();
   }

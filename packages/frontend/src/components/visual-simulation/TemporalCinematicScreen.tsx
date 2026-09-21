@@ -8,31 +8,9 @@ import type { SimParams } from '../../core/types';
 /**
  * TEMPORAL CINEMATIC ENGINE — REAL BROWSER ENTRY POINT.
  *
- * The concrete gap this closes (see `renderRuntimeStatus.ts`'s own honest
- * accounting, written BEFORE this file existed): "a historical scene from
- * this module cannot reach the real WorldFrameRenderer canvas without [UI]
- * wiring." This is that wiring — a minimal, additive screen, not a rewrite
- * of `GenesisWorldScreen.tsx` (whose ~2000 lines are deeply specific to
- * `buildGenesisScientificCity4`'s hospital/floodplain/pump fixtures; bolting
- * an arbitrary `WorldSpecification` onto it safely is a separate, much
- * larger task than proving the temporal-cinematic path end to end). This
- * screen reuses the exact same canonical stack that one does
- * (`useThreeLoop`, the `Sim3D` contract, `WorldFrameRenderer` via
- * `TemporalCinematicSim3D`) — no second renderer, no second WebGL harness.
- *
- * URL CONTRACT (hash query string, e.g.
- * `#/temporal-cinematic?place=Warsaw&year=1900&duration=5&road=0`):
- *   place    - required, any string (see historicalWorldParameters.ts)
- *   year     - required, integer
- *   duration - optional seconds, defaults to 20 (temporalCinematicEngine.ts's own default)
- *   road     - optional 0-indexed generated road to point the camera at, defaults to 0
- *
- * CAPTURE HOOK — `window.__GENESIS_TEMPORAL_CAPTURE__`, set only once the
- * scene has genuinely built and the canvas exists. A Playwright script
- * calls `seekTo(seconds)` then screenshots the canvas element itself
- * (`document.querySelector('canvas')`) — this hook never returns pixel
- * bytes itself, so it cannot fake a capture; it only moves the same real
- * camera the visible canvas renders from.
+ * Canonical route: `#/temporal-cinematic?place=Warsaw&year=1900&duration=5&road=1&weather=RAIN`.
+ * The world always comes from the canonical WorldSpecification -> WorldGraph -> TemporalEngine path.
+ * `weather` is presentation-only and never mutates the scientific/historical world state.
  */
 export interface GenesisTemporalCaptureHook {
   readonly ready: true;
@@ -61,9 +39,11 @@ export interface TemporalCinematicRouteParams {
   readonly year: number;
   readonly durationSeconds?: number;
   readonly roadIndex?: number;
+  /** Visual-only atmosphere selector: CLEAR/RAIN/STORM/FOG/SNOW/DUST/NIGHT. */
+  readonly weather?: string;
 }
 
-/** Pure parse — exported for tests. Returns `null` for a request missing required fields, never a fabricated default place/year. */
+/** Pure parse — exported for tests. Returns null for a request missing required fields, never a fabricated default place/year. */
 export function parseTemporalCinematicRoute(hash: string): TemporalCinematicRouteParams | null {
   const params = parseQuery(hash);
   const place = params.get('place');
@@ -73,11 +53,13 @@ export function parseTemporalCinematicRoute(hash: string): TemporalCinematicRout
   if (!Number.isFinite(year)) return null;
   const durationRaw = params.get('duration');
   const roadRaw = params.get('road');
+  const weatherRaw = params.get('weather');
   return {
     place,
     year,
     durationSeconds: durationRaw ? parseInt(durationRaw, 10) : undefined,
     roadIndex: roadRaw ? parseInt(roadRaw, 10) : undefined,
+    weather: weatherRaw?.trim() || undefined,
   };
 }
 
@@ -104,16 +86,14 @@ export function TemporalCinematicScreen() {
   const outcome: BuildOutcome | BuildFailure | null = useMemo(() => {
     if (!route) return null;
     const scene = buildHistoricalScene({ place: route.place, year: route.year, durationSeconds: route.durationSeconds, roadIndex: route.roadIndex });
-    if (!('keyframes' in scene.camera)) {
-      return { kind: 'blocked', reason: scene.camera.reason };
-    }
+    if (!('keyframes' in scene.camera)) return { kind: 'blocked', reason: scene.camera.reason };
     return { kind: 'ok', scene, cameraPath: scene.camera };
   }, [route]);
 
   const sim = useMemo(() => {
     if (!outcome || outcome.kind !== 'ok') return null;
-    return new TemporalCinematicSim3D(outcome.scene.world.engine, outcome.cameraPath);
-  }, [outcome]);
+    return new TemporalCinematicSim3D(outcome.scene.world.engine, outcome.cameraPath, route?.weather);
+  }, [outcome, route?.weather]);
 
   const params: SimParams = useMemo(() => ({}), []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true);
@@ -161,7 +141,7 @@ export function TemporalCinematicScreen() {
       {failed ? <div style={{ position: 'absolute', top: 16, left: 16, color: '#f08a8a' }}>WebGL failed to initialize.</div> : null}
       {outcome?.kind === 'ok' ? (
         <div style={{ position: 'absolute', bottom: 16, left: 16, color: '#96a7bb', font: '13px monospace' }}>
-          {outcome.scene.place} · {outcome.scene.year} · road#{route.roadIndex ?? 0}
+          {outcome.scene.place} · {outcome.scene.year} · road#{route.roadIndex ?? 0}{route.weather ? ` · ${route.weather.toUpperCase()}` : ''}
         </div>
       ) : null}
     </div>

@@ -1,68 +1,124 @@
 import type * as THREE_NS from 'three';
-import type { Sim3D } from '../three/types';
+import type { PostProcessingModules, PostProcessor, Sim3D } from '../three/types';
 import type { SimParams } from '../types';
 import { WorldFrameRenderer } from '../three/graphics/worldFrameRenderer';
+import { createSceneEnvironment, type SceneEnvironmentHandle } from '../three/graphics/sceneEnvironment';
+import { setupGraphicsPipeline } from '../three/graphics/postProcessing';
+import { createHighFidelityWeatherRig, weatherProfile, type WeatherRig } from '../three/graphics/highFidelityWeather';
 import { getFrameState } from '../worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../worldModel/bridge/graphicsWorldFrameAdapter';
 import type { WorldFrame as GraphicsWorldFrame } from '../three/graphics/worldFrame';
 import type { TemporalEngine } from '../worldModel/temporal/temporalEngine';
 import type { CameraKeyframe, CameraPath } from './cameraPath';
+import {
+  createTemporalCinematicVisualResolver,
+  estimateTemporalWorldGroundSize,
+  normalizeTemporalCinematicFrameHierarchy,
+  type TemporalCinematicVisualResolverHandle,
+} from './temporalCinematicVisualResolver';
 
 /**
- * TEMPORAL CINEMATIC ENGINE — REAL BROWSER Sim3D.
+ * TEMPORAL CINEMATIC ENGINE — CANONICAL HIGH-FIDELITY Sim3D (V5.1).
  *
- * Reuses the SAME canonical rendering stack every other 3D lab already uses
- * (`useThreeLoop.ts`'s `Sim3D` contract, `WorldFrameRenderer`,
- * `getFrameState`/`toGraphicsWorldFrame`) — no second renderer, no second
- * WebGL harness. This is the smallest real Sim3D that can play a
- * `HistoricalScene`'s `CameraPath` on a real canvas: it owns the camera
- * fully (`disableOrbitControls: true`, exactly the mechanism labScene3D.ts's
- * first-person/cinematic modes already use) and syncs one static
- * `WorldFrame` (this world does not tick — it is a structural snapshot, see
- * `temporalCinematicEngine.ts`) through the unmodified `WorldFrameRenderer`.
+ * Still the SAME canonical path:
+ * WorldSpecification -> createScientificWorld -> WorldGraph -> TemporalEngine
+ * -> WorldFrame -> WorldFrameRenderer.
  *
- * DETERMINISTIC SEEK: `seekTo(seconds)` is the one method the browser
- * capture hook (`TemporalCinematicScreen.tsx`'s
- * `window.__GENESIS_TEMPORAL_CAPTURE__`) calls between frames — it moves the
- * camera to an exact point on the path and nothing else, so a Playwright
- * script can capture a bit-for-bit reproducible sequence of frames rather
- * than sampling a live, wall-clock-driven animation.
+ * V5.1 only supplies the caller-owned visual resolver/environment/post-processing seams the generic
+ * renderer was explicitly designed to receive. It does NOT add a second renderer, scene mount,
+ * historical world-state model or temporal engine.
  */
 export class TemporalCinematicSim3D implements Sim3D {
   readonly disableOrbitControls = true;
-  /** See `Sim3D`'s own doc — required for `TemporalCinematicScreen.tsx`'s capture hook to read real pixels via `canvas.toDataURL()` from a Playwright script, outside this render loop. */
   readonly preserveDrawingBufferForCapture = true;
 
   private renderer: WorldFrameRenderer | null = null;
+  private visualResolver: TemporalCinematicVisualResolverHandle | null = null;
+  private environment: SceneEnvironmentHandle | null = null;
+  private weatherRig: WeatherRig | null = null;
+  private THREE: typeof THREE_NS | null = null;
+  private camera: THREE_NS.PerspectiveCamera | null = null;
   private currentTimeSeconds = 0;
   private readonly graphicsFrame: GraphicsWorldFrame;
 
   constructor(
-    engine: TemporalEngine,
+    private readonly engine: TemporalEngine,
     private readonly cameraPath: CameraPath,
+    private readonly weather?: string,
   ) {
-    // The historical world is a generated snapshot, never ticked by this scene (no solver advances
-    // it) -- computed once, reused for every sync(), exactly like a single-frame WorldFrame would
-    // be for any other static structural view.
-    this.graphicsFrame = toGraphicsWorldFrame(getFrameState(engine));
+    this.graphicsFrame = normalizeTemporalCinematicFrameHierarchy(
+      toGraphicsWorldFrame(getFrameState(engine)),
+      engine.graph,
+    );
   }
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, _w: number, _h: number): void {
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const sun = new THREE.DirectionalLight(0xfff2e0, 1.1);
-    sun.position.set(80, 140, 60);
-    scene.add(sun);
-    scene.fog = new THREE.Fog(0x0c1018, 60, 900);
+    this.THREE = THREE;
+    this.camera = camera;
+    const profile = weatherProfile(this.weather);
+    const groundSize = estimateTemporalWorldGroundSize(this.engine.graph);
 
-    this.renderer = new WorldFrameRenderer(THREE, scene);
+    // One shared environment baseline: canonical lighting, shadows, fog, real ground and tier-aware
+    // atmosphere. No hand-rolled second lighting system.
+    this.environment = createSceneEnvironment(THREE, scene, {
+      mode: 'OUTDOOR',
+      hourOfDay: /NIGHT/i.test(this.weather ?? '') ? 21 : 14,
+      fogDensity: profile.fogDensity,
+      groundSize,
+      tier: 'cinematic',
+      ambientHaze: true,
+    });
+
+    this.weatherRig = createHighFidelityWeatherRig(THREE, scene, this.weather);
+    this.visualResolver = createTemporalCinematicVisualResolver(THREE, this.engine.graph, {
+      weather: this.weather,
+      detailedHumanCount: 24,
+      governedHeroHuman: true,
+    });
+
+    this.renderer = new WorldFrameRenderer(THREE, scene, {
+      resolveVisual: this.visualResolver.resolveVisual,
+      updateVisual: this.visualResolver.updateVisual,
+      sharedMaterials: this.visualResolver.sharedMaterials,
+    });
     this.renderer.sync(this.graphicsFrame);
 
     const first = this.cameraPath.keyframes[0];
     if (first) this.applyKeyframe(camera, first);
   }
 
-  /** Moves the owned camera to `seconds` along `cameraPath` — nearest-keyframe lookup (this path is
-   * sampled at a fixed frame rate already; interpolation is not needed for a proof-correct capture). */
+  setupPostProcessing(
+    modules: PostProcessingModules,
+    renderer: THREE_NS.WebGLRenderer,
+    scene: THREE_NS.Scene,
+    camera: THREE_NS.PerspectiveCamera,
+    w: number,
+    h: number,
+  ): PostProcessor {
+    // `setupGraphicsPipeline` is the canonical shared pipeline: ACES, IBL/HDRI upgrade, GTAO,
+    // bloom and SMAA. `cinematic` is deliberate for this route/capture pathway.
+    if (!this.THREE) throw new Error('TemporalCinematicSim3D.setupPostProcessing called before init');
+    return setupGraphicsPipeline(
+      this.THREE,
+      modules,
+      renderer,
+      {
+        scene,
+        camera,
+        width: w,
+        height: h,
+        qualityTier: 'cinematic',
+        toneMappingExposure: 1.08,
+        bloom: { strength: 0.26, radius: 0.5, threshold: 0.91 },
+        ambientOcclusion: { enabled: true, minTier: 'high', radius: 0.5, blendIntensity: 0.86 },
+        reflections: /RAIN|STORM/i.test(this.weather ?? '')
+          ? { enabled: true, minTier: 'cinematic', strength: 0.42, maxDistance: 10 }
+          : { enabled: false },
+        antiAliasing: { enabled: true, minTier: 'medium' },
+      },
+    );
+  }
+
   seekTo(seconds: number): void {
     this.currentTimeSeconds = Math.max(0, Math.min(this.cameraPath.durationSeconds, seconds));
   }
@@ -71,7 +127,6 @@ export class TemporalCinematicSim3D implements Sim3D {
     return this.currentTimeSeconds;
   }
 
-  /** Diagnostic snapshot of the exact graphics-frame data this scene is rendering — surfaced via the browser capture hook so a Playwright script can confirm what the renderer actually received, not just what the Node-side generator produced. */
   debugEntitySummary(): readonly { id: string; position: readonly [number, number, number]; scale: number }[] {
     return this.graphicsFrame.entities.map((e) => ({ id: e.id, position: e.position, scale: e.scale ?? 1 }));
   }
@@ -95,9 +150,9 @@ export class TemporalCinematicSim3D implements Sim3D {
     return best;
   }
 
-  update(_dt: number, _params: SimParams): void {
-    // Camera state is driven entirely by `seekTo` (either the capture hook, for a deterministic
-    // proof, or a live playback driver) -- no autonomous per-frame advance here.
+  update(dt: number, _params: SimParams): void {
+    this.environment?.update(dt);
+    this.weatherRig?.update(dt, this.camera ?? undefined);
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
@@ -106,7 +161,17 @@ export class TemporalCinematicSim3D implements Sim3D {
   }
 
   dispose(): void {
+    // Renderer first: it tears down entity-owned materials/geometries while explicitly excluding
+    // the resolver's shared palette. Resolver disposes that palette exactly once afterward.
     this.renderer?.dispose();
     this.renderer = null;
+    this.weatherRig?.dispose();
+    this.weatherRig = null;
+    this.environment?.dispose();
+    this.environment = null;
+    this.visualResolver?.dispose();
+    this.visualResolver = null;
+    this.camera = null;
+    this.THREE = null;
   }
 }

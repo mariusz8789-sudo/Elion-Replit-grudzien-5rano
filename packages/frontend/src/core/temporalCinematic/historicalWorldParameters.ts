@@ -1,37 +1,11 @@
 import { fnv1a } from '../events/hash';
+import { entityId, type WorldModelEntity } from '../worldModel/ecs/types';
+import type { WorldGraph } from '../worldModel/ecs/worldGraph';
 import type { StructuralDetailSpec } from '../worldModel/generation/geometry/structuralDetailSpec';
 import type { WorldSpecification } from '../worldModel/specification/worldSpecification';
 import { resolveEraProfile } from './historicalEra';
 
-/**
- * TEMPORAL CINEMATIC ENGINE — PLACE → WORLD SPECIFICATION.
- *
- * Builds a `WorldSpecification` (the SAME contract every other Genesis
- * world already compiles from — `specification/compiler.ts`, unchanged) for
- * one `(place, year)` pair, reusing the existing `CITY` template plus the
- * existing `structuralDetail` opt-in geometry hook. No new compiler, no new
- * generator: this module's entire job is choosing the RIGHT INPUT NUMBERS
- * for the existing pipeline.
- *
- * DETERMINISM ACROSS YEARS FOR THE SAME PLACE — the mechanism that makes
- * "show the same street in 1900 and 2026" answerable at all:
- * `generation/geometry/roadGenerator.ts::generateRoadNetwork` places
- * roads/intersections as a PURE function of `citySizeM`/district grid shape
- * — never the rng, never the year. This module fixes `citySizeM`,
- * `districtCount`, and `parcelsPerDistrict` from `place` ALONE (never
- * `year`), so the two worlds' road networks are laid out identically
- * (same count, same positions, same index order) — only `maxFloors`
- * (`historicalEra.ts`) varies with `year`, which affects building HEIGHT
- * (and, via the existing floor-count rng roll, nothing else — building
- * TYPE draws are unaffected by the cap; see
- * `generation/geometry/buildingGenerator.ts`'s own doc on why the rng draw
- * always happens regardless of the cap). This is what lets
- * `cameraPath.ts`/`temporalCinematicEngine.ts::compareSameStreetAcrossYears`
- * point at "the Nth generated road" in both compiled worlds and get the
- * exact same (start, end) — the same physical street location — while the
- * skyline around it honestly differs by era.
- */
-
+/** Canonical place/year -> WorldSpecification parameterization. V6 adds an opt-in interior flag. */
 const PLACE_CITY_SIZE_MIN_M = 400;
 const PLACE_CITY_SIZE_MAX_M = 900;
 const PLACE_DISTRICT_COUNT_MIN = 3;
@@ -43,7 +17,6 @@ function hashToUnitInterval(input: string): number {
   return parseInt(fnv1a(input), 16) / 0xffffffff;
 }
 
-/** Deterministic pure function of `place` alone — the same place name always yields the same structural counts, regardless of year, caller, or run. Never a claim about the REAL geography of `place`: an honest placeholder shape, not a geodata lookup. */
 export interface PlaceGeographyProfile {
   readonly citySizeM: number;
   readonly districtCount: number;
@@ -67,21 +40,15 @@ export function resolvePlaceGeography(place: string): PlaceGeographyProfile {
 export interface HistoricalWorldRequest {
   readonly place: string;
   readonly year: number;
-  /** Opts into Phase 5 navigation-graph generation (needed only if a caller wants NAV_NODE-based pathing rather than the straight-road sampling `cameraPath.ts` uses by default). Defaults to false — kept off by default to keep generation fast for a cinematic preview. */
   readonly generateNavigation?: boolean;
+  /** V6: compile real FLOOR/ROOM/ASSET_SLOT geometry into the same WorldGraph. */
+  readonly generateInteriors?: boolean;
 }
 
-/** Deterministic, collision-safe world id for one (place, year) request — never reused across a different place or year. */
 export function historicalWorldId(place: string, year: number): string {
   return `historical:${place.trim().toLowerCase().replace(/\s+/g, '-')}:${year}`;
 }
 
-/**
- * Builds the `WorldSpecification` for `request`. Throws nothing itself —
- * `compileSpecification`/`generateSpecifiedWorld` (called by
- * `temporalCinematicEngine.ts`) perform the real validation this
- * specification must pass, exactly like every other Genesis world.
- */
 export function buildHistoricalWorldSpecification(request: HistoricalWorldRequest): WorldSpecification {
   const geography = resolvePlaceGeography(request.place);
   const era = resolveEraProfile(request.year);
@@ -90,7 +57,7 @@ export function buildHistoricalWorldSpecification(request: HistoricalWorldReques
     districtCount: geography.districtCount,
     parcelsPerDistrict: geography.parcelsPerDistrict,
     maxFloors: era.maxFloors,
-    generateInteriors: false,
+    generateInteriors: request.generateInteriors ?? false,
     generateNavigation: request.generateNavigation ?? false,
   };
 
@@ -102,4 +69,68 @@ export function buildHistoricalWorldSpecification(request: HistoricalWorldReques
     structuralDetail,
     provenanceNote: `Procedural era heuristic (${era.label}, cap ${era.maxFloors} floors) for "${request.place}" in ${request.year} — NOT a real historical reconstruction; no historical dataset backs this world. See historicalEra.ts.`,
   };
+}
+
+const PEDESTRIANS_PER_ROAD_MIN = 4;
+const PEDESTRIANS_PER_ROAD_MAX = 8;
+/** Perpendicular sidewalk offset from a road's centerline, in metres. */
+const PEDESTRIAN_SIDEWALK_OFFSET_M = 2.2;
+
+/**
+ * Deterministic pedestrian presence for a generated historical CITY world. This is the SAME
+ * canonical WorldModelEntity/WorldGraph contract every generated entity already uses (see
+ * generation/geometry/index.ts) — no second world, no population solver, no new geometry kind.
+ * `ref.kind: 'human'` is the ALREADY-canonical marker `personLike()` checks in
+ * temporalCinematicVisualResolver.ts, so the resolver's existing hero/detailed(LOD1)/proxy(LOD2)
+ * tiers apply completely unchanged; this only supplies the entities that were previously never
+ * generated for a CITY template (unlike EPIDEMIOLOGY's single aggregate `population` entity, real
+ * spatially-placed individuals are what the renderer's LOD system needs).
+ *
+ * This is deliberate scenic placement along each generated road's sidewalk offset — NOT
+ * demographic or epidemiological modeling. Same honesty regime as this file's own
+ * `provenanceNote`: grounding is `PROCEDURAL_APPROXIMATION` (a generic placement heuristic, no
+ * domain solver), and the label says "Pedestrian", never a claim of a real historical person.
+ */
+export function populateHistoricalPedestrians(graph: WorldGraph, worldId: string): number {
+  const roads = graph.listEntities().filter((e) => e.geometry?.kind === 'ROAD');
+  let added = 0;
+  for (const road of roads) {
+    if (road.geometry?.kind !== 'ROAD') continue;
+    const { start, end } = road.geometry;
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const length = Math.hypot(dx, dz);
+    if (length < 1) continue;
+    const nx = -dz / length;
+    const nz = dx / length;
+    const countU = hashToUnitInterval(`${worldId}:${road.id}:pedestrianCount`);
+    const count = PEDESTRIANS_PER_ROAD_MIN + Math.floor(countU * (PEDESTRIANS_PER_ROAD_MAX - PEDESTRIANS_PER_ROAD_MIN + 1));
+    for (let i = 0; i < count; i += 1) {
+      const alongU = hashToUnitInterval(`${worldId}:${road.id}:pedestrian${i}:along`);
+      const sideU = hashToUnitInterval(`${worldId}:${road.id}:pedestrian${i}:side`);
+      const t = 0.08 + alongU * 0.84;
+      const side = sideU < 0.5 ? -1 : 1;
+      const ref = { kind: 'human', id: `${road.id}-pedestrian-${i}` };
+      const id = entityId(ref);
+      if (graph.has(id)) continue;
+      const entity: WorldModelEntity = {
+        id,
+        ref,
+        label: 'Pedestrian',
+        scale: { level: 'DISTRICT' },
+        spatial: {
+          position: {
+            x: start.x + dx * t + nx * PEDESTRIAN_SIDEWALK_OFFSET_M * side,
+            y: 0,
+            z: start.z + dz * t + nz * PEDESTRIAN_SIDEWALK_OFFSET_M * side,
+          },
+        },
+        grounding: 'PROCEDURAL_APPROXIMATION',
+        updatedAtTick: 0,
+      };
+      graph.addEntity(entity);
+      added += 1;
+    }
+  }
+  return added;
 }

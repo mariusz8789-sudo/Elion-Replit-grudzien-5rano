@@ -4,14 +4,9 @@ import { TemporalCinematicSim3D } from '../../core/temporalCinematic/temporalCin
 import { buildHistoricalScene, type HistoricalScene } from '../../core/temporalCinematic/temporalCinematicEngine';
 import type { CameraPath } from '../../core/temporalCinematic/cameraPath';
 import type { SimParams } from '../../core/types';
+import type { CinematicViewMode } from '../../core/temporalCinematic/cinematicShotDirector';
 
-/**
- * TEMPORAL CINEMATIC ENGINE — REAL BROWSER ENTRY POINT.
- *
- * Canonical route: `#/temporal-cinematic?place=Warsaw&year=1900&duration=5&road=1&weather=RAIN`.
- * The world always comes from the canonical WorldSpecification -> WorldGraph -> TemporalEngine path.
- * `weather` is presentation-only and never mutates the scientific/historical world state.
- */
+/** One canonical capture hook; V6.1 adds deterministic seek-and-wait, not a second hook. */
 export interface GenesisTemporalCaptureHook {
   readonly ready: true;
   readonly place: string;
@@ -19,14 +14,14 @@ export interface GenesisTemporalCaptureHook {
   readonly durationSeconds: number;
   readonly sameStreetLocation: boolean | null;
   seekTo(seconds: number): void;
+  seekAndWait(seconds: number): Promise<void>;
   getCurrentTimeSeconds(): number;
+  getPresentationSummary(): { readonly viewMode: CinematicViewMode; readonly interiorRoomId: string | null; readonly interiorAssetSlotCount: number; readonly livingWorld: boolean };
   debugEntitySummary(): readonly { id: string; position: readonly [number, number, number]; scale: number }[];
 }
 
 declare global {
-  interface Window {
-    __GENESIS_TEMPORAL_CAPTURE__?: GenesisTemporalCaptureHook;
-  }
+  interface Window { __GENESIS_TEMPORAL_CAPTURE__?: GenesisTemporalCaptureHook; }
 }
 
 function parseQuery(hash: string): URLSearchParams {
@@ -39,11 +34,11 @@ export interface TemporalCinematicRouteParams {
   readonly year: number;
   readonly durationSeconds?: number;
   readonly roadIndex?: number;
-  /** Visual-only atmosphere selector: CLEAR/RAIN/STORM/FOG/SNOW/DUST/NIGHT. */
   readonly weather?: string;
+  readonly viewMode: CinematicViewMode;
+  readonly generateInteriors: boolean;
 }
 
-/** Pure parse — exported for tests. Returns null for a request missing required fields, never a fabricated default place/year. */
 export function parseTemporalCinematicRoute(hash: string): TemporalCinematicRouteParams | null {
   const params = parseQuery(hash);
   const place = params.get('place');
@@ -54,23 +49,25 @@ export function parseTemporalCinematicRoute(hash: string): TemporalCinematicRout
   const durationRaw = params.get('duration');
   const roadRaw = params.get('road');
   const weatherRaw = params.get('weather');
+  const viewRaw = params.get('view');
+  const viewMode: CinematicViewMode = viewRaw === 'interior' ? 'interior' : 'street';
+  const generateInteriors = viewMode === 'interior' || params.get('interiors') === '1' || params.get('interiors') === 'true';
   return {
     place,
     year,
     durationSeconds: durationRaw ? parseInt(durationRaw, 10) : undefined,
     roadIndex: roadRaw ? parseInt(roadRaw, 10) : undefined,
     weather: weatherRaw?.trim() || undefined,
+    viewMode,
+    generateInteriors,
   };
 }
 
-interface BuildOutcome {
-  readonly kind: 'ok';
-  readonly scene: HistoricalScene;
-  readonly cameraPath: CameraPath;
-}
-interface BuildFailure {
-  readonly kind: 'blocked';
-  readonly reason: string;
+interface BuildOutcome { readonly kind: 'ok'; readonly scene: HistoricalScene; readonly cameraPath: CameraPath; }
+interface BuildFailure { readonly kind: 'blocked'; readonly reason: string; }
+
+function twoAnimationFrames(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
 export function TemporalCinematicScreen() {
@@ -82,18 +79,27 @@ export function TemporalCinematicScreen() {
   }, []);
 
   const route = useMemo(() => parseTemporalCinematicRoute(hash), [hash]);
-
   const outcome: BuildOutcome | BuildFailure | null = useMemo(() => {
     if (!route) return null;
-    const scene = buildHistoricalScene({ place: route.place, year: route.year, durationSeconds: route.durationSeconds, roadIndex: route.roadIndex });
+    const scene = buildHistoricalScene({
+      place: route.place,
+      year: route.year,
+      durationSeconds: route.durationSeconds,
+      roadIndex: route.roadIndex,
+      generateInteriors: route.generateInteriors,
+    });
     if (!('keyframes' in scene.camera)) return { kind: 'blocked', reason: scene.camera.reason };
     return { kind: 'ok', scene, cameraPath: scene.camera };
   }, [route]);
 
   const sim = useMemo(() => {
-    if (!outcome || outcome.kind !== 'ok') return null;
-    return new TemporalCinematicSim3D(outcome.scene.world.engine, outcome.cameraPath, route?.weather);
-  }, [outcome, route?.weather]);
+    if (!outcome || outcome.kind !== 'ok' || !route) return null;
+    return new TemporalCinematicSim3D(outcome.scene.world.engine, outcome.cameraPath, {
+      weather: route.weather,
+      year: route.year,
+      viewMode: route.viewMode,
+    });
+  }, [outcome, route]);
 
   const params: SimParams = useMemo(() => ({}), []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true);
@@ -107,41 +113,30 @@ export function TemporalCinematicScreen() {
       durationSeconds: outcome.cameraPath.durationSeconds,
       sameStreetLocation: null,
       seekTo: (seconds: number) => sim.seekTo(seconds),
+      seekAndWait: async (seconds: number) => { sim.seekTo(seconds); await twoAnimationFrames(); },
       getCurrentTimeSeconds: () => sim.getCurrentTimeSeconds(),
+      getPresentationSummary: () => sim.getPresentationSummary(),
       debugEntitySummary: () => sim.debugEntitySummary(),
     };
     window.__GENESIS_TEMPORAL_CAPTURE__ = hook;
-    return () => {
-      if (window.__GENESIS_TEMPORAL_CAPTURE__ === hook) delete window.__GENESIS_TEMPORAL_CAPTURE__;
-    };
+    return () => { if (window.__GENESIS_TEMPORAL_CAPTURE__ === hook) delete window.__GENESIS_TEMPORAL_CAPTURE__; };
   }, [sim, outcome, loading, failed]);
 
   if (!route) {
-    return (
-      <div className="app" style={{ padding: 32, color: '#d7e2ee' }}>
-        <h2>Temporal Cinematic Engine</h2>
-        <p>Missing required <code>place</code>/<code>year</code> query params. Example: <code>#/temporal-cinematic?place=Warsaw&amp;year=1900&amp;duration=5</code></p>
-      </div>
-    );
+    return <div className="app" style={{ padding: 32, color: '#d7e2ee' }}><h2>Temporal Cinematic Engine</h2><p>Missing required <code>place</code>/<code>year</code> query params.</p></div>;
   }
-
   if (outcome?.kind === 'blocked') {
-    return (
-      <div className="app" style={{ padding: 32, color: '#d7e2ee' }}>
-        <h2>Temporal Cinematic Engine — BLOCKED_BY_RUNTIME</h2>
-        <p>{outcome.reason}</p>
-      </div>
-    );
+    return <div className="app" style={{ padding: 32, color: '#d7e2ee' }}><h2>Temporal Cinematic Engine — BLOCKED_BY_RUNTIME</h2><p>{outcome.reason}</p></div>;
   }
 
   return (
-    <div className="app" style={{ position: 'relative', width: '100%', height: '100vh' }}>
+    <div className="app" style={{ position: 'relative', width: '100%', height: '100vh' }} data-view={route.viewMode}>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} data-testid="temporal-cinematic-canvas" />
       {loading ? <div style={{ position: 'absolute', top: 16, left: 16, color: '#d7e2ee' }}>Loading Three.js…</div> : null}
       {failed ? <div style={{ position: 'absolute', top: 16, left: 16, color: '#f08a8a' }}>WebGL failed to initialize.</div> : null}
       {outcome?.kind === 'ok' ? (
         <div style={{ position: 'absolute', bottom: 16, left: 16, color: '#96a7bb', font: '13px monospace' }}>
-          {outcome.scene.place} · {outcome.scene.year} · road#{route.roadIndex ?? 0}{route.weather ? ` · ${route.weather.toUpperCase()}` : ''}
+          {outcome.scene.place} · {outcome.scene.year} · {route.viewMode.toUpperCase()} · road#{route.roadIndex ?? 0}{route.weather ? ` · ${route.weather.toUpperCase()}` : ''}
         </div>
       ) : null}
     </div>

@@ -63,7 +63,15 @@ export function applyStudioEnvironment(THREE: typeof THREE_NS, renderer: THREE_N
     envScene.add(strip);
   }
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, 0.06).texture;
+  // sigma (radians): PMREMGenerator's own internal sample budget clips anything above ~0.04 here
+  // (confirmed via its own runtime warning — "sigmaRadians, 0.06, is too large and will clip,
+  // requested 30 samples when the maximum is set to 20"), which does not merely reduce quality —
+  // the clipped convolution produces visible directional banding across every glossy/specular
+  // surface reading scene.environment (every building facade in a wide outdoor scene, since this
+  // studio box is the only environment source there; captureRoomEnvironment's interior probe uses
+  // PMREMGenerator's own default sigma and was never affected). 0.04 is the largest sigma this
+  // PMREMGenerator accepts without clipping, at the same class of soft blur this was tuned for.
+  scene.environment = pmrem.fromScene(envScene, 0.04).texture;
   scene.environmentIntensity = 1.15;
   pmrem.dispose();
 }

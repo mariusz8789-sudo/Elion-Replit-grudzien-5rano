@@ -294,6 +294,20 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
 
   // --- D-080 Chaos-Aware Ensemble --------------------------------------------
   'core/chaos/ensemble.ts': 'D-080: audited chaos-ensemble utility (Lorenz63/threebody predictability horizon, ensemble spread, empirical Lyapunov estimate) -- calls the existing stepLorenzRK4 (core/physics.ts) and stepVerlet/totalEnergy/figure8Bodies/pythagoreanBodies (labs/experiments/universe-threebody.ts) unmodified, adds no second physics engine. VALIDATED (docs/DECISIONS.md D-080), reached today only by its own test suites (chaosEnsemble.test.ts, chaosEnsembleBenchmark.test.ts) -- no browser screen renders a chaos-ensemble run yet. Remove this entry once one does.',
+
+  // --- V6.1/V7 visual-E2E capture pack: delivered but not wired -------------
+  // UNLIKE every other .node.ts entry above, these four are NOT reached by any companion script either.
+  // scripts/visual-e2e-v52-v7.mjs (the actual delivered E2E driver) reimplements its own inline Playwright
+  // capture instead of calling into this module chain, so it is genuinely dead code as delivered, not a
+  // browser/Node boundary case. Documented here rather than silently wired in, per this branch's audit/report
+  // mandate; C1 fixed the same canvas-screenshot reliability bug in both this module and the real driver script,
+  // but did not redirect the driver to use this chain since that would be a larger, unrequested rewiring
+  // decision. Remove this block once either a script imports canonicalTemporalCapture.node.ts, or the module
+  // chain is deliberately dropped.
+  'core/lookingGlass/capture/canonicalBrowserFrameRenderer.node.ts': 'V6.1 pack: real Node/Playwright capture of the canonical temporal-cinematic canvas via window.__GENESIS_TEMPORAL_CAPTURE__.seekTo/seekAndWait. Not imported by scripts/visual-e2e-v52-v7.mjs, which reimplements the same capture inline; not imported by anything else.',
+  'core/lookingGlass/capture/canonicalTemporalCapture.node.ts': 'V6.1 pack: orchestrates CanonicalBrowserFrameRenderer + encodeCanonicalFramesToWebm into a multi-frame capture session. Not imported by scripts/visual-e2e-v52-v7.mjs or anything else.',
+  'core/lookingGlass/capture/canonicalVideoEncoder.node.ts': 'V6.1 pack: encodes captured JPEG frames to VP8/WebM via the Playwright-bundled ffmpeg (locatePlaywrightBundledFfmpeg), honestly reporting failure rather than silently skipping encode. Not imported by scripts/visual-e2e-v52-v7.mjs or anything else.',
+  'core/lookingGlass/capture/playwrightFfmpegLocator.node.ts': 'V6.1 pack: locates the ffmpeg binary bundled with the installed Playwright browsers. Only consumer is canonicalVideoEncoder.node.ts above, itself unreached.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

@@ -24,6 +24,7 @@ import { museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
 import type { GuideLevel } from '../core/guide/narrationModel';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import HumanExplorerPanel from './HumanExplorerPanel';
+import { macroMicroLevelForArtifact } from '../core/three/humanMacroMicroLayer';
 import { createScientificWorldsCognitiveCore } from '../core/scientificWorlds/cognitiveBridge';
 import { scienceMemoryPort } from '../core/scientificWorlds/scienceMemoryPort';
 import { runCuriosityCycle, type CycleResult } from '../core/scientificWorlds/curiosityCycle';
@@ -278,7 +279,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
 
   return (
-    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined}>
+    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? macroMicroLevelForArtifact(bioArtifact) : undefined}>
       <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
       {camera === 'VISOR' && (
         <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">

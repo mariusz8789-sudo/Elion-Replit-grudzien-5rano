@@ -1,6 +1,6 @@
 import type * as THREE_NS from 'three';
 import { boundsDepth, boundsWidth } from '../worldModel/ecs/geometry';
-import type { WorldModelEntity } from '../worldModel/ecs/types';
+import { entityId, type WorldModelEntity } from '../worldModel/ecs/types';
 import type { WorldGraph } from '../worldModel/ecs/worldGraph';
 import { createFacadeBuilding } from '../three/graphics/buildingKit';
 import { disposeMaterials, disposeSceneResources } from '../three/graphics/lifecycle';
@@ -10,6 +10,7 @@ import {
   createHighFidelityMaterialPalette,
   type HighFidelityMaterialPalette,
 } from '../three/graphics/highFidelityMaterialRegistry';
+import { createScientificAssetSlotVisual, createScientificRoomShell } from './scientificInteriorVisuals';
 import type { WorldFrame, WorldFrameEntity } from '../three/graphics/worldFrame';
 import type { EntityVisualSpec } from '../three/graphics/worldFrameRenderer';
 import { buildCharacter, paletteFromSeed } from '../three/characterRig';
@@ -24,11 +25,15 @@ export interface TemporalCinematicVisualResolverOptions {
   detailedHumanCount?: number;
   /** Opt-in governed LOD0 upgrade for exactly one hero human. Defaults true. */
   governedHeroHuman?: boolean;
+  /** V6: when set, render exactly this canonical ROOM and its ASSET_SLOT children as an interior. */
+  interiorTargetRoomId?: string | null;
 }
+
 
 export interface TemporalCinematicVisualResolverHandle {
   resolveVisual(entity: WorldFrameEntity): EntityVisualSpec;
   updateVisual(entity: WorldFrameEntity, object: THREE_NS.Object3D): void;
+  readonly palette: HighFidelityMaterialPalette;
   sharedMaterials: readonly THREE_NS.Material[];
   dispose(): void;
 }
@@ -83,7 +88,27 @@ function createBuildingVisual(
   const height = Math.max(0.01, heightMeters / transformScale);
   const seed = seedFromId(frame.id);
   const tint = FACADE_TINTS[seed % FACADE_TINTS.length]!;
-  const wall = createPBRMaterial(THREE, 'BUILDING_FACADE', { color: tint });
+  const wall = createPBRMaterial(THREE, 'BUILDING_FACADE', { color: tint }) as THREE_NS.MeshStandardMaterial;
+  // BUILDING_FACADE's map/normalMap are baked at a fixed pixel size and, like every THREE.BoxGeometry
+  // face, default to a single 0..1 UV tile regardless of the box's actual world-unit size — so at
+  // real city scale (buildings up to ~30m wide) the same texture stretches roughly 10-30x too large,
+  // reading as a soft directional smear across the whole facade (confirmed by direct frame inspection:
+  // present at every camera position/weather, absent on human-scale geometry, gone once tiled here).
+  // `wall` is a FRESH material per building (not one of `sharedMaterials`), so retuning its own repeat
+  // to this building's real width/height affects only this building, matching the density convention
+  // BRICK/CONCRETE/ASPHALT/GROUND already use for their own worn-surface textures elsewhere in this file.
+  // MUST use the pre-normalization real-world bounds here, not the local `width`/`height` above — those
+  // are already divided by `transformScale` (often >>1, since the container object applies that scale
+  // back afterward), so they stay near 1 regardless of the building's true size and would round to a
+  // no-op repeat(1,1) every time.
+  const facadeTileM = 9;
+  const realWidthM = boundsWidth(geometry.bounds);
+  const realHeightM = heightMeters;
+  const facadeRepeatU = Math.max(1, Math.round(realWidthM / facadeTileM));
+  const facadeRepeatV = Math.max(1, Math.round(realHeightM / facadeTileM));
+  wall.map?.repeat.set(facadeRepeatU, facadeRepeatV);
+  wall.normalMap?.repeat.set(facadeRepeatU, facadeRepeatV);
+  wall.emissiveMap?.repeat.set(facadeRepeatU, facadeRepeatV);
   const roof = geometry.buildingType === 'INDUSTRIAL' || geometry.buildingType === 'WATER_RESEARCH_FACILITY'
     ? palette.stainless
     : palette.brick;
@@ -137,7 +162,21 @@ function createRoadVisual(
   const dx = g.end.x - g.start.x;
   const dz = g.end.z - g.start.z;
   const length = Math.max(0.01, Math.hypot(dx, dz));
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(length, 0.12, Math.max(0.5, g.widthM)), wet ? palette.wetAsphalt : palette.asphalt);
+  const roadGeometry = new THREE.BoxGeometry(length, 0.12, Math.max(0.5, g.widthM));
+  // Same class of fix as createBuildingVisual's facade repeat, applied differently: BoxGeometry's
+  // default UVs are a fixed 0..1 tile per face regardless of `length`, but palette.asphalt is a
+  // genuinely SHARED material (in sharedMaterials, excluded from per-entity disposal), so its own
+  // texture.repeat must never be mutated per road segment. Scaling THIS geometry's own UV attribute
+  // instead is per-mesh and safe — it multiplies with the material's fixed repeat(5,5), keeping
+  // texel density roughly constant instead of stretching one fixed tile across the whole road length.
+  const roadTileM = 8;
+  const roadUv = roadGeometry.attributes.uv;
+  if (roadUv) {
+    const uScale = Math.max(1, length / roadTileM);
+    for (let i = 0; i < roadUv.count; i += 1) roadUv.setX(i, roadUv.getX(i) * uScale);
+    roadUv.needsUpdate = true;
+  }
+  const mesh = new THREE.Mesh(roadGeometry, wet ? palette.wetAsphalt : palette.asphalt);
   mesh.name = `genesis-road-${g.roadClass.toLowerCase()}`;
   mesh.position.y = 0.04;
   mesh.rotation.y = -Math.atan2(dz, dx);
@@ -300,13 +339,27 @@ export function createTemporalCinematicVisualResolver(
       return { kind: 'object', object: mesh };
     }
 
+    const interiorTargetRoomId = options.interiorTargetRoomId ?? null;
+    if (interiorTargetRoomId) {
+      if (g.kind === 'ROOM') {
+        return model.id === interiorTargetRoomId
+          ? { kind: 'object', object: createScientificRoomShell(THREE, model, palette) }
+          : structuralNoop(THREE, 'ROOM');
+      }
+      if (g.kind === 'ASSET_SLOT') {
+        return entityId(g.roomRef) === interiorTargetRoomId
+          ? { kind: 'object', object: createScientificAssetSlotVisual(THREE, model, palette) }
+          : structuralNoop(THREE, 'ASSET_SLOT');
+      }
+      // Interior presentation intentionally hides the city shell/roads and unrelated generated
+      // structure, but the canonical WorldGraph remains fully intact behind this visual filter.
+      return structuralNoop(THREE, g.kind);
+    }
+
     switch (g.kind) {
       case 'BUILDING': return createBuildingVisual(THREE, model, frame, palette);
       case 'ROAD': return createRoadVisual(THREE, model, palette, wet);
       case 'INTERSECTION': return createIntersectionVisual(THREE, palette, wet);
-      // Interior geometry currently carries absolute city-space positions while WorldFrame parenting
-      // is relative. The canonical historical route does not generate interiors today; keep these
-      // structural until a real local-space interior adapter lands rather than rendering them wrong.
       case 'FLOOR': case 'ROOM':
       case 'DISTRICT': case 'PARCEL': case 'NAV_ZONE': case 'NAV_EDGE':
       case 'DOOR': case 'STAIR': case 'ELEVATOR': case 'ASSET_SLOT': case 'NAV_NODE':
@@ -333,6 +386,7 @@ export function createTemporalCinematicVisualResolver(
   return {
     resolveVisual,
     updateVisual,
+    palette,
     sharedMaterials,
     dispose() {
       disposed = true;

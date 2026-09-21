@@ -31,6 +31,7 @@ import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
 import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
+import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -56,7 +57,7 @@ export type AgentCameraMode = 'VISOR' | 'SPECTATOR' | 'TWIN';
 /** Which typed world the scene builds: the physics lab (default) or the V3 human-biology lab — one scene class, one pipeline. */
 export type SceneWorld = 'physics' | 'biology';
 export type SceneArtifact = LabArtifact | BiologyArtifact;
-const BIOLOGY_KINDS: ReadonlySet<string> = new Set(['physiology', 'neuro', 'hyperscope', 'histology', 'imaging', 'orpheus']);
+const BIOLOGY_KINDS: ReadonlySet<string> = new Set(['physiology', 'neuro', 'hyperscope', 'histology', 'imaging', 'orpheus', 'central-dogma']);
 /** The twin id is fixed so the manifest (and every hash derived from it) is the same on every load. */
 export const TWIN_ID = 'HDT-genesis-human-biology-lab';
 
@@ -125,6 +126,8 @@ export class AgentLabScene3D implements Sim3D {
   private onTwinTier: ((tier: HumanTwinTier) => void) | null = null;
   private lastWall: number | null = null;
   private gate: VisualRealityResult | null = null;
+  /** V7 presentation-only macro→micro lens embedded in this existing scene/renderer. */
+  private macroMicro: HumanMacroMicroLayer | null = null;
   readonly manifest: HumanDigitalTwinManifest = createHumanDigitalTwinManifest(TWIN_ID);
 
   constructor(private readonly controller: AgentController, private readonly stationDefs: readonly LabStation[], private readonly room: RoomBounds, private readonly world: SceneWorld = 'physics') {}
@@ -135,6 +138,7 @@ export class AgentLabScene3D implements Sim3D {
   setTwinView(mode: Parameters<typeof buildVisualLayerInstruction>[1], selectedNodeId: string | null): void {
     this.twinInstruction = buildVisualLayerInstruction(this.manifest, mode);
     for (const t of this.twins) t.setView(this.twinInstruction, selectedNodeId);
+    this.macroMicro?.setOrgan(selectedNodeId);
   }
 
   /** D-131: what the twin body is made of right now (a licensed CC0 asset, or the procedural proxy). */
@@ -188,6 +192,7 @@ export class AgentLabScene3D implements Sim3D {
   private setBiologyArtifact(stationId: string, artifact: BiologyArtifact): void {
     const THREE = this.THREE; const v = this.stations.get(stationId);
     if (!THREE || !v) return;
+    this.macroMicro?.setArtifact(artifact);
     if (v.artifactGroup) { v.artifactGroup.parent?.remove(v.artifactGroup); disposeSceneResources(v.artifactGroup as unknown as THREE_NS.Scene); v.artifactGroup = null; }
     if (v.screen) drawBiologyArtifact(v.screen, artifact, this.manifest);
     const g = buildBiologyArtifact3D(THREE, artifact);
@@ -403,6 +408,9 @@ export class AgentLabScene3D implements Sim3D {
     // the organ shapes are atlas ellipsoids, and the asset itself carries no medical anatomy.
     const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
     scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
+    this.macroMicro = new HumanMacroMicroLayer(THREE, this.manifest);
+    this.macroMicro.group.position.set(TWIN_CHAMBER.position.x + 1.55, 1.35, TWIN_CHAMBER.position.z + 0.15);
+    scene.add(this.macroMicro.group);
     const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
     this.twinTier = twin.tier;
@@ -568,6 +576,7 @@ export class AgentLabScene3D implements Sim3D {
     this.lastUpdate = u;
     this.onUpdate?.(u);
     this.dust?.update(dt);
+    this.macroMicro?.update(dt);
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
@@ -709,6 +718,7 @@ export class AgentLabScene3D implements Sim3D {
   onResize(): void { /* the camera is fully owned here; useThreeLoop keeps the aspect */ }
 
   dispose(): void {
+    this.macroMicro?.dispose(); this.macroMicro = null;
     if (this.scene) disposeSceneResources(this.scene);
     this.character?.dispose();
     for (const t of this.twins) t.dispose();

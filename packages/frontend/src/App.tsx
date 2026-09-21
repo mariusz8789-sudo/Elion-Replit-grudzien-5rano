@@ -68,6 +68,7 @@ const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/Mole
 const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
 const EvidenceShowcaseScreen = lazy(() => import('./components/visual-simulation/EvidenceShowcaseScreen').then((m) => ({ default: m.EvidenceShowcaseScreen })));
 const KnowledgeSourcesScreen = lazy(() => import('./components/KnowledgeSourcesScreen').then((m) => ({ default: m.KnowledgeSourcesScreen })));
+const TemporalCinematicStudio = lazy(() => import('./components/TemporalCinematicStudio').then((m) => ({ default: m.TemporalCinematicStudio })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
@@ -158,6 +159,7 @@ type Route =
   | { kind: 'cell-lab' }
   | { kind: 'evidence-showcase' }
   | { kind: 'knowledge-sources' }
+  | { kind: 'temporal-cinematic' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
   | { kind: 'looking-glass' }
@@ -228,6 +230,7 @@ function parseHash(): Route {
   if (h === '#/cell-lab') return { kind: 'cell-lab' };
   if (h === '#/evidence' || h === '#/evidence-showcase' || h === '#/evidence-case-study' || h === '#/case-study') return { kind: 'evidence-showcase' };
   if (h === '#/knowledge-sources' || h === '#/knowledge') return { kind: 'knowledge-sources' };
+  if (h === '#/temporal-cinematic' || h === '#/temporal-cinematic-studio') return { kind: 'temporal-cinematic' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
@@ -1095,6 +1098,18 @@ export default function App() {
           <TopBar title="📚 Wiedza i źródła publiczne" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <KnowledgeSourcesScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'temporal-cinematic') {
+      return (
+        <div className="app">
+          <TopBar title="🎬 Temporal Cinematic Studio" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <TemporalCinematicStudio />
           </HeavyRoute>
           {overlays}
         </div>

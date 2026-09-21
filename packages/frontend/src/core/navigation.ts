@@ -98,6 +98,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   },
   { id: 'evidence', label: 'Evidence i Replay', icon: '📋', hash: '#/evidence' },
   { id: 'knowledge-sources', label: 'Wiedza i źródła publiczne', icon: '📚', hash: '#/knowledge-sources', description: 'Propozycje z /ingest — publikuj lub odrzuć jako zalogowany człowiek' },
+  { id: 'temporal-cinematic', label: 'Temporal Cinematic Studio', icon: '🎬', hash: '#/temporal-cinematic', description: 'To samo miejsce w różnych latach (1900-2026) — świat, kamera, scrubber' },
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
   { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },
   { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde' },

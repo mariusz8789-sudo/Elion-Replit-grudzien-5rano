@@ -315,6 +315,46 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/medicalData/dicomDatasetAdapter.ts': 'D-136: real DICOM Part-10 explicit-VR-LE reader; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
   'core/medicalData/volumeReconstruction.ts': 'D-136: builds a RECONSTRUCTED voxel volume from a validated dataset\'s own bytes; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
   'core/medicalData/segmentationOverlay.ts': 'D-136: dimension-checked segmentation overlay contract over a reconstructed volume; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+
+  // --- Temporal Cinematic World Engine: the real URBAN_TRANSFORMATION domain binding
+  // `scenarioResolution.ts` has named since before this module existed, with an explicit note
+  // that nothing routed to it yet. Reuses the existing WorldGraph-generation family and the
+  // Looking Glass camera/perspective vocabulary (perspectiveRequest/placeCamera) rather than a
+  // second camera system. Wired into a real screen (TemporalCinematicStudio.tsx, route
+  // #/temporal-cinematic) that calls `generateTemporalCinematicScene` directly in the browser --
+  // every module in the pipeline (parser/sequence builder/world state/consistency engine/camera
+  // director/render controller/video pipeline/contracts) is reachable through that one call chain
+  // and no longer needs an entry here. NOT wired into `scenarioResolution.ts`'s capability table
+  // -- that would require conforming to the full `ScenarioWorld` contract (an already-executed
+  // run's observation/evidence series), which calendar-year historical jumps do not naturally
+  // fit, disclosed as deliberate follow-up work. Two files remain genuinely unreached:
+  'core/lookingGlass/urbanTransformation/historicalResolvers.ts': 'Temporal Cinematic World Engine Phase C: named per-domain resolvers (buildings/vehicles/population/clothing/infrastructure/environment) over the one era archetype table -- an alternate, more literally-named API over the same data the screen already reads via buildHistoricalWorldState/entitiesForYear. Reached by its own test suite.',
+  'core/lookingGlass/urbanTransformation/ffmpegVideoEncoder.node.ts': 'Temporal Cinematic World Engine: the real Node-side ffmpeg adapter (execFileSync-based presence check, verified to correctly detect ffmpeg\'s absence in this sandbox); unreachable from the browser bundle BY DESIGN, same convention as core/repro/reproEntry.node.ts.',
+
+  // --- Final Execution Bridge: real renderer -> real frames -> real video ----
+  // The Node-side half of the real capture bridge. The browser-side half
+  // (temporalCinematicSceneMount.ts, browserCaptureContract.ts) IS reached from
+  // main.tsx via TemporalCinematicStudio.tsx, which installs
+  // window.__GENESIS_TEMPORAL_CAPTURE__ against the real, existing scene mount.
+  // These four modules are the Node-only counterpart that drives that hook with
+  // real Playwright — unreachable from the browser bundle BY DESIGN (same
+  // convention as ffmpegVideoEncoder.node.ts above), reached at runtime by a
+  // real (non-mocked) Node script/test that launches Chromium against the
+  // live-running Genesis server.
+  'core/lookingGlass/urbanTransformation/browserFrameRenderer.node.ts': 'Final Execution Bridge: real Playwright capture adapter (launches headless Chromium, drives window.__GENESIS_TEMPORAL_CAPTURE__, screenshots the real canvas to a real JPEG). Node-only, unreachable from the browser bundle BY DESIGN.',
+  'core/lookingGlass/urbanTransformation/realTemporalCapture.node.ts': 'Final Execution Bridge: async orchestration over BrowserFrameRenderer mirroring temporalRenderController.ts\'s year-selection logic for real capture. Node-only, unreachable from the browser bundle BY DESIGN.',
+  'core/lookingGlass/urbanTransformation/playwrightFfmpegLocator.node.ts': 'Final Execution Bridge: locates the real ffmpeg binary Playwright\'s own browser download already ships (not a new dependency), since `ffmpeg` is confirmed absent from PATH in this sandbox. Node-only, unreachable from the browser bundle BY DESIGN.',
+  'core/lookingGlass/urbanTransformation/bundledFfmpegVideoEncoder.node.ts': 'Final Execution Bridge: real video encoding via the Playwright-bundled ffmpeg binary (WEBM/VP8 output — this exact stripped build has no MP4/h264 muxer, verified by inspecting its own -version flags). Node-only, unreachable from the browser bundle BY DESIGN.',
+  // Audited v4 "Universal World Engine" package (surgical reuse, not the whole package — see the
+  // decision in temporalCinematicSceneMount.ts's header comment). Its `createHighFidelityHuman`
+  // export was relocated out of this file into temporalCinematicSceneMount.ts (the only real
+  // caller) because it constructed `HumanoidAgentVisual`, which itself imports `../simulation/types`
+  // — exactly what graphicsArchitectureBoundary.test.ts exists to forbid inside core/three/graphics/.
+  // The remaining factories here (MRI/hospital/laboratory/factory/wastewater/forest/cell/DNA/
+  // virus/molecule/planet/Mars/space-field) are real, audited, reusable graphics-kit primitives for
+  // other Genesis world domains — wiring them in would be scope creep beyond this task's explicit
+  // "materially improve fidelity" mandate for the historical urban temporal-cinematic scene.
+  'core/three/graphics/highFidelityFactories.ts': 'Audited v4 package graphics-kit factories for non-urban Genesis domains (MRI/hospital/lab/factory/space/molecular). Its one urban-relevant export was relocated to temporalCinematicSceneMount.ts to satisfy the graphics/ architecture boundary; kept here, currently unreachable, as real reusable primitives for a future world that needs them.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

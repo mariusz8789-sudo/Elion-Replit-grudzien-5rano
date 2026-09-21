@@ -1,0 +1,419 @@
+diff --git a/packages/frontend/src/components/holo/MatrixStage.ts b/packages/frontend/src/components/holo/MatrixStage.ts
+index e6be86d2..4b8878f9 100644
+--- a/packages/frontend/src/components/holo/MatrixStage.ts
++++ b/packages/frontend/src/components/holo/MatrixStage.ts
+@@ -2,33 +2,36 @@ import * as THREE from 'three';
+ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+ 
+ /**
+- * MATRIX STAGE — the cinematic world behind `#/matrix`.
++ * MATRIX STAGE — the black cyber-universe behind the whole shell.
+  *
+- * What the owner's reference shows, built with real WebGL rather than an image:
+- *   - a volumetric rain of glyphs (thousands of GPU points sampling a generated
+- *     glyph atlas; column heads burn brighter so bloom lifts them);
+- *   - a black mirror floor (planar Reflector) with a hairline grid;
+- *   - five luminous platforms with emissive rings;
+- *   - five chrome figures (articulated mannequins, metallic PBR lit by a green
+- *     environment probe) in distinct poses, the central one reaching up;
+- *   - vertical word columns — GENESIS · EVIDENCE · TRUTH · ABSENCE · A BETTER
+- *     TOMORROW — floating behind the figures;
+- *   - the frame is bloomed by the backdrop's composer.
++ * There is exactly one subject in this scene: the code rain. No figures, no
++ * mannequins, no pedestals, no props — by the owner's standing directive.
+  *
+- * Deterministic (seeded PRNG passed in), disposable, and built only inside a
+- * live WebGL context — never at import time, so tests without a DOM stay safe.
++ *   - CODE RAIN: a procedural, volumetric rain of glyphs computed entirely on
++ *     the GPU — thousands of columns at real depth, each a bright head glyph
++ *     with a fading trail; position, speed, flicker and depth fade all come
++ *     from `uTime` in the shaders, so the CPU does nothing per frame. Near
++ *     columns are large and sharp, far ones small and dim (volumetric depth).
++ *   - FLOOR: an obsidian planar mirror (Reflector) under an ultra-thin hairline
++ *     grid; the falling glyphs reflect in it because the reflector renders the
++ *     real scene from the mirrored camera.
++ *   - ATMOSPHERE: pure black background, black exponential fog (distance goes
++ *     dark, never green), ACES tone mapping and a double bloom (tight + wide)
++ *     applied by the backdrop's composer — the only thing bright enough to
++ *     bloom is the glyphs.
++ *
++ * Deterministic (seeded PRNG), disposable, built only inside a live WebGL
++ * context — never at import time, so tests without a DOM stay safe.
+  */
+ 
+-export const MATRIX_WORDS = ['GENESIS', 'EVIDENCE', 'TRUTH', 'ABSENCE', 'A BETTER TOMORROW'] as const;
+-
+ export function isMatrixRoute(hash: string): boolean {
+-  return /^#\/matrix(?:\?|$)/.test(hash || '#/');
++  return /^#\/matrix-stage(?:\?|$)/.test(hash || '#/');
+ }
+ 
+ export interface MatrixStage {
+   readonly scene: THREE.Scene;
+   readonly camera: THREE.PerspectiveCamera;
+-  update(t: number, dt: number, parallaxX: number, parallaxY: number): void;
++  update(t: number, dt: number, parallaxX: number, parallaxY: number, onMatrixRoute: boolean): void;
+   layout(width: number, height: number): void;
+   dispose(): void;
+ }
+@@ -45,15 +48,12 @@ function glyphAtlas(doc: Document): THREE.CanvasTexture | null {
+   ctx.fillStyle = '#000';
+   ctx.fillRect(0, 0, size, size);
+   const cell = size / ATLAS_COLS;
+-  ctx.font = `bold ${Math.floor(cell * 0.78)}px "Noto Sans JP", "Yu Gothic", "MS Gothic", monospace`;
++  ctx.font = `bold ${Math.floor(cell * 0.8)}px "Noto Sans JP", "Yu Gothic", "MS Gothic", monospace`;
+   ctx.textAlign = 'center';
+   ctx.textBaseline = 'middle';
++  ctx.fillStyle = '#ffffff';
+   for (let i = 0; i < ATLAS_COLS * ATLAS_COLS; i++) {
+-    const ch = GLYPHS[i % GLYPHS.length];
+-    const cx = (i % ATLAS_COLS) * cell + cell / 2;
+-    const cy = Math.floor(i / ATLAS_COLS) * cell + cell / 2;
+-    ctx.fillStyle = '#b7ffd0';
+-    ctx.fillText(ch, cx, cy);
++    ctx.fillText(GLYPHS[i % GLYPHS.length], (i % ATLAS_COLS) * cell + cell / 2, Math.floor(i / ATLAS_COLS) * cell + cell / 2);
+   }
+   const tex = new THREE.CanvasTexture(canvas);
+   tex.colorSpace = THREE.SRGBColorSpace;
+@@ -62,222 +62,132 @@ function glyphAtlas(doc: Document): THREE.CanvasTexture | null {
+   return tex;
+ }
+ 
+-function wordTexture(doc: Document, word: string): THREE.CanvasTexture | null {
+-  const canvas = doc.createElement('canvas');
+-  const letters = word.split('');
+-  const cell = 96;
+-  canvas.width = cell; canvas.height = cell * letters.length;
+-  const ctx = canvas.getContext('2d');
+-  if (!ctx) return null;
+-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+-  ctx.font = `700 ${Math.floor(cell * 0.62)}px "DejaVu Sans Mono", "Fira Code", monospace`;
+-  ctx.textAlign = 'center';
+-  ctx.textBaseline = 'middle';
+-  letters.forEach((ch, i) => {
+-    ctx.shadowColor = '#4dff9b';
+-    ctx.shadowBlur = 18;
+-    ctx.fillStyle = '#d8ffe8';
+-    ctx.fillText(ch, cell / 2, i * cell + cell / 2);
+-  });
+-  const tex = new THREE.CanvasTexture(canvas);
+-  tex.colorSpace = THREE.SRGBColorSpace;
+-  return tex;
+-}
+-
++/**
++ * Procedural code rain. Per point: column origin (x, z), index k along the
++ * trail, column speed, phase and glyph seed. Everything else is a function of
++ * uTime: the head falls, the trail hangs above it, glyphs flicker on a
++ * per-point clock, brightness fades along the trail and with depth.
++ */
+ const RAIN_VERTEX = /* glsl */ `
+-attribute float aGlyph;
+-attribute float aBright;
+-attribute float aSize;
++attribute vec3 aColumn;   // x, z of the column, y = column height span
++attribute float aIndex;   // 0 = head, 1..n = trail
++attribute float aSpeed;
++attribute float aPhase;
++attribute float aSeed;
++uniform float uTime;
++uniform float uSpacing;
+ varying float vGlyph;
+ varying float vBright;
++varying float vDepth;
++float hash(float n) { return fract(sin(n) * 43758.5453123); }
+ void main() {
+-  vGlyph = aGlyph;
+-  vBright = aBright;
+-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+-  gl_PointSize = aSize * (300.0 / -mv.z);
++  float span = aColumn.y;
++  float head = span - mod(uTime * aSpeed + aPhase * span, span + 6.0);
++  float y = head + aIndex * uSpacing;
++  float trailFade = exp(-aIndex * 0.15);
++  vBright = aIndex < 0.5 ? 2.4 : 1.0 * trailFade;
++  float flick = floor(uTime * (1.5 + hash(aSeed) * 4.0) + aSeed * 7.0);
++  vGlyph = floor(hash(aSeed * 13.7 + flick + aIndex * 3.1) * 256.0);
++  vec4 mv = modelViewMatrix * vec4(aColumn.x, y, aColumn.z, 1.0);
++  vDepth = -mv.z;
++  gl_PointSize = clamp(0.44 * (440.0 / max(1.0, -mv.z)), 3.0, 24.0);
+   gl_Position = projectionMatrix * mv;
++  if (y < -0.4 || y > span + 0.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+ }
+ `;
+ const RAIN_FRAGMENT = /* glsl */ `
+ uniform sampler2D uAtlas;
+ uniform float uCols;
++uniform float uFar;
+ varying float vGlyph;
+ varying float vBright;
++varying float vDepth;
+ void main() {
+   float col = mod(vGlyph, uCols);
+   float row = floor(vGlyph / uCols);
+   vec2 uv = (vec2(col, row) + gl_PointCoord) / uCols;
+   uv.y = 1.0 - uv.y;
+-  vec4 tex = texture2D(uAtlas, uv);
+-  float a = tex.g;
+-  if (a < 0.08) discard;
+-  vec3 color = mix(vec3(0.05, 0.55, 0.22), vec3(0.75, 1.0, 0.85), clamp(vBright - 0.5, 0.0, 1.0));
+-  gl_FragColor = vec4(color * vBright, a);
++  float a = texture2D(uAtlas, uv).r;
++  if (a < 0.1) discard;
++  float depthFade = clamp(1.0 - vDepth / uFar, 0.06, 1.0);
++  vec3 tail = vec3(0.0, 0.46, 0.15);
++  vec3 head = vec3(0.85, 1.0, 0.9);
++  vec3 color = mix(tail, head, clamp(vBright - 0.9, 0.0, 1.0)) * min(vBright, 1.7) * depthFade;
++  gl_FragColor = vec4(color, a * depthFade);
+ }
+ `;
+ 
+-function mannequin(material: THREE.Material, pose: 'reach' | 'wave' | 'stand' | 'hands' | 'open', track: <T extends { dispose(): void }>(d: T) => T): THREE.Group {
+-  const g = new THREE.Group();
+-  const torso = new THREE.Mesh(track(new THREE.CapsuleGeometry(0.34, 0.86, 6, 16)), material);
+-  torso.position.y = 1.32;
+-  const head = new THREE.Mesh(track(new THREE.SphereGeometry(0.22, 24, 16)), material);
+-  head.position.y = 2.05;
+-  const limb = (len: number, r: number): THREE.Mesh => new THREE.Mesh(track(new THREE.CapsuleGeometry(r, len, 4, 12)), material);
+-  const legL = limb(0.86, 0.12); legL.position.set(-0.17, 0.5, 0);
+-  const legR = limb(0.86, 0.12); legR.position.set(0.17, 0.5, 0);
+-  const armL = new THREE.Group(); const armR = new THREE.Group();
+-  const upperL = limb(0.72, 0.1); upperL.position.y = -0.4; armL.add(upperL);
+-  const upperR = limb(0.72, 0.1); upperR.position.y = -0.4; armR.add(upperR);
+-  armL.position.set(-0.46, 1.72, 0); armR.position.set(0.46, 1.72, 0);
+-  switch (pose) {
+-    case 'reach': armR.rotation.z = Math.PI * 0.92; armR.rotation.x = -0.15; armL.rotation.z = 0.35; break;
+-    case 'wave': armL.rotation.z = -Math.PI * 0.55; armL.rotation.x = 0.4; armR.rotation.z = 0.2; break;
+-    case 'hands': armL.rotation.z = -0.9; armL.rotation.x = 1.1; armR.rotation.z = 0.9; armR.rotation.x = 1.1; break;
+-    case 'open': armL.rotation.z = -0.75; armR.rotation.z = 0.75; break;
+-    default: armL.rotation.z = -0.18; armR.rotation.z = 0.18;
+-  }
+-  g.add(torso, head, legL, legR, armL, armR);
+-  return g;
+-}
+-
+ export function buildMatrixStage(
+   renderer: THREE.WebGLRenderer,
+   doc: Document,
+   random: () => number,
+   lowPower: boolean,
+ ): MatrixStage {
++  void renderer; // the scene needs no renderer-side resources (no env probe); kept for API symmetry
+   const disposables: { dispose(): void }[] = [];
+   const track = <T extends { dispose(): void }>(d: T): T => { disposables.push(d); return d; };
+   const scene = new THREE.Scene();
+-  scene.background = new THREE.Color(0x000704);
+-  scene.fog = new THREE.FogExp2(0x000905, lowPower ? 0.06 : 0.042);
+-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+-  camera.position.set(3.2, 2.7, 13.5);
+-
+-  // Green environment probe so the chrome has something to reflect.
+-  const probeScene = new THREE.Scene();
+-  probeScene.background = new THREE.Color(0x0e4d2a);
+-  probeScene.add(new THREE.HemisphereLight(0x2dff7f, 0x001a0c, 3.5));
+-  const probeMesh = new THREE.Mesh(track(new THREE.SphereGeometry(6, 16, 8)), track(new THREE.MeshBasicMaterial({ color: 0x0a3a1c, side: THREE.BackSide })));
+-  probeScene.add(probeMesh);
+-  const pmrem = new THREE.PMREMGenerator(renderer);
+-  const env = track(pmrem.fromScene(probeScene, 0, 0.1, 100));
+-  pmrem.dispose();
+-  scene.environment = env.texture;
+-
+-  // Lights.
+-  scene.add(new THREE.HemisphereLight(0x39d97a, 0x000000, 0.55));
+-  const key = new THREE.DirectionalLight(0x9dffc4, 3.0);
+-  key.position.set(2, 9, 8);
+-  scene.add(key);
+-  const fill = new THREE.PointLight(0x7dffb0, 3.5, 34, 1.4);
+-  fill.position.set(0, 4.5, 8.5);
+-  scene.add(fill);
+-  // Rim lights from behind and above: contour highlights along shoulders, heads and limbs.
+-  const rimA = new THREE.DirectionalLight(0xc8ffe0, 2.6);
+-  rimA.position.set(-6, 7, -9);
+-  const rimB = new THREE.DirectionalLight(0x9dffc4, 2.2);
+-  rimB.position.set(7, 6, -8);
+-  scene.add(rimA, rimB);
+-
+-  // Mirror floor + hairline grid.
+-  const floorGeo = track(new THREE.PlaneGeometry(80, 80));
+-  const mirror = new Reflector(floorGeo, { clipBias: 0.003, textureWidth: lowPower ? 256 : 768, textureHeight: lowPower ? 256 : 768, color: 0x0b1f13 });
++  scene.background = new THREE.Color(0x000000);
++  scene.fog = new THREE.FogExp2(0x000000, lowPower ? 0.05 : 0.032);
++  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 240);
++  camera.position.set(0, 3.0, 12);
++
++  // Obsidian mirror + hairline grid. The reflector tint is neutral-dark so the
++  // reflection is a true, slightly darkened image of the rain.
++  const floorGeo = track(new THREE.PlaneGeometry(160, 160));
++  const mirror = new Reflector(floorGeo, { clipBias: 0.003, textureWidth: lowPower ? 384 : 1024, textureHeight: lowPower ? 384 : 1024, color: 0x707070 });
+   mirror.rotation.x = -Math.PI / 2;
+   scene.add(mirror);
+   track({ dispose: () => mirror.dispose() });
+-  const grid = new THREE.GridHelper(80, 80, 0x1f8a4c, 0x0d3d22);
++  const grid = new THREE.GridHelper(160, 160, 0x19945a, 0x0a3a20);
+   (grid.material as THREE.Material).transparent = true;
+-  (grid.material as THREE.Material).opacity = 0.35;
+-  grid.position.y = 0.01;
++  (grid.material as THREE.Material).opacity = 0.22;
++  grid.position.y = 0.005;
+   track(grid.geometry); track(grid.material as THREE.Material);
+   scene.add(grid);
+ 
+-  // Platforms, rings, figures.
+-  const chrome = track(new THREE.MeshStandardMaterial({ color: 0xdfeee6, metalness: 0.9, roughness: 0.1, envMapIntensity: 1.8, emissive: 0x0b2416, emissiveIntensity: 0.06 }));
+-  // Fresnel rim: a crisp green contour on every silhouette edge, independent of the lights, so the
+-  // figures read as sharp chrome shapes instead of bloomed blobs.
+-  chrome.onBeforeCompile = (shader) => {
+-    shader.fragmentShader = shader.fragmentShader.replace(
+-      '#include <emissivemap_fragment>',
+-      `#include <emissivemap_fragment>
+-      {
+-        float rim = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.2);
+-        totalEmissiveRadiance += vec3(0.28, 0.95, 0.55) * rim * 0.55;
+-      }`,
+-    );
+-  };
+-  const platMat = track(new THREE.MeshStandardMaterial({ color: 0x08150d, metalness: 0.8, roughness: 0.3 }));
+-  const ringMat = track(new THREE.MeshStandardMaterial({ color: 0x39d97a, emissive: 0x39d97a, emissiveIntensity: 2.0, roughness: 0.4 }));
+-  const rings: THREE.Mesh[] = [];
+-  const xs = [-7.2, -3.6, 0, 3.6, 7.2];
+-  const poses: Array<'reach' | 'wave' | 'stand' | 'hands' | 'open'> = ['stand', 'wave', 'reach', 'hands', 'open'];
+-  xs.forEach((x, i) => {
+-    const big = i === 2;
+-    const r = big ? 2.0 : 1.55;
+-    const platform = new THREE.Mesh(track(new THREE.CylinderGeometry(r, r * 1.04, 0.22, 48)), platMat);
+-    platform.position.set(x, 0.11, big ? 1.2 : 0);
+-    const ring = new THREE.Mesh(track(new THREE.TorusGeometry(r, 0.05, 10, 96)), ringMat);
+-    ring.rotation.x = Math.PI / 2;
+-    ring.position.set(x, 0.23, big ? 1.2 : 0);
+-    const glow = new THREE.PointLight(0x39d97a, big ? 3.2 : 2.0, 9, 1.8);
+-    glow.position.set(x, 0.6, big ? 1.2 : 0);
+-    const figure = mannequin(chrome, poses[i], track);
+-    figure.position.set(x, 0.22, big ? 1.2 : 0);
+-    figure.scale.setScalar(big ? 1.08 : 0.96);
+-    figure.rotation.y = (random() - 0.5) * 0.5;
+-    scene.add(platform, ring, glow, figure);
+-    rings.push(ring);
+-  });
+-
+-  // Word columns.
+-  const wordMeshes: THREE.Mesh[] = [];
+-  MATRIX_WORDS.forEach((w, i) => {
+-    const tex = wordTexture(doc, w);
+-    if (!tex) return;
+-    track(tex);
+-    const h = 0.7 * w.length;
+-    const mesh = new THREE.Mesh(track(new THREE.PlaneGeometry(0.7, h)), track(new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, color: 0x8dffbd })));
+-    mesh.position.set(xs[i] + (i === 2 ? 0 : (random() - 0.5) * 1.2), 4.2 + h / 2 + (random() - 0.5), -6.5 - random() * 2);
+-    scene.add(mesh);
+-    wordMeshes.push(mesh);
+-  });
+-
+-  // Glyph rain.
++  // Procedural volumetric code rain.
+   const atlas = glyphAtlas(doc);
+-  const count = lowPower ? 2600 : 7000;
+-  const positions = new Float32Array(count * 3);
+-  const glyph = new Float32Array(count);
+-  const bright = new Float32Array(count);
+-  const size = new Float32Array(count);
++  const columns = lowPower ? 1400 : 5200;
++  const trail = lowPower ? 10 : 18;
++  const count = columns * trail;
++  const col = new Float32Array(count * 3);
++  const idx = new Float32Array(count);
+   const speed = new Float32Array(count);
+-  for (let i = 0; i < count; i++) {
+-    positions[i * 3] = (random() - 0.5) * 70;
+-    positions[i * 3 + 1] = random() * 30;
+-    positions[i * 3 + 2] = -34 + random() * 44;
+-    glyph[i] = Math.floor(random() * ATLAS_COLS * ATLAS_COLS);
+-    const head = random() < 0.09;
+-    bright[i] = head ? 1.9 + random() * 0.6 : 0.35 + random() * 0.55;
+-    size[i] = 0.55 + random() * 0.5;
+-    speed[i] = 2.2 + random() * 4.5;
++  const phase = new Float32Array(count);
++  const seed = new Float32Array(count);
++  const pos = new Float32Array(count * 3); // required by three for the attribute count; the shader ignores it
++  for (let c = 0; c < columns; c++) {
++    const x = (random() - 0.5) * 130;
++    const z = -80 + random() * 96;
++    const span = 16 + random() * 24;
++    const sp = 2.5 + random() * 7;
++    const ph = random();
++    for (let k = 0; k < trail; k++) {
++      const i = c * trail + k;
++      col[i * 3] = x; col[i * 3 + 1] = span; col[i * 3 + 2] = z;
++      idx[i] = k; speed[i] = sp; phase[i] = ph; seed[i] = c * 0.731 + k * 0.17;
++      pos[i * 3] = x; pos[i * 3 + 1] = span / 2; pos[i * 3 + 2] = z;
++    }
+   }
+   const rainGeo = track(new THREE.BufferGeometry());
+-  rainGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+-  rainGeo.setAttribute('aGlyph', new THREE.BufferAttribute(glyph, 1));
+-  rainGeo.setAttribute('aBright', new THREE.BufferAttribute(bright, 1));
+-  rainGeo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
++  rainGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
++  rainGeo.setAttribute('aColumn', new THREE.BufferAttribute(col, 3));
++  rainGeo.setAttribute('aIndex', new THREE.BufferAttribute(idx, 1));
++  rainGeo.setAttribute('aSpeed', new THREE.BufferAttribute(speed, 1));
++  rainGeo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
++  rainGeo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
++  rainGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 16, -32), 140);
+   const rainMat = track(new THREE.ShaderMaterial({
+     vertexShader: RAIN_VERTEX, fragmentShader: RAIN_FRAGMENT,
+-    uniforms: { uAtlas: { value: atlas }, uCols: { value: ATLAS_COLS } },
++    uniforms: { uAtlas: { value: atlas }, uCols: { value: ATLAS_COLS }, uTime: { value: 0 }, uSpacing: { value: 0.72 }, uFar: { value: 100 } },
+     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+   }));
+   if (atlas) track(atlas);
+   const rain = new THREE.Points(rainGeo, rainMat);
++  rain.frustumCulled = false;
+   rain.visible = atlas !== null;
+   scene.add(rain);
+-  const posAttr = rainGeo.getAttribute('position') as THREE.BufferAttribute;
+-  const glyphAttr = rainGeo.getAttribute('aGlyph') as THREE.BufferAttribute;
+-  let glyphTick = 0;
+ 
+   return {
+     scene,
+@@ -286,27 +196,20 @@ export function buildMatrixStage(
+       camera.aspect = width / height;
+       camera.updateProjectionMatrix();
+     },
+-    update(t, dt, parallaxX, parallaxY) {
+-      const arr = posAttr.array as Float32Array;
+-      for (let i = 0; i < count; i++) {
+-        let y = arr[i * 3 + 1] - speed[i] * dt;
+-        if (y < -0.5) y += 30.5;
+-        arr[i * 3 + 1] = y;
+-      }
+-      posAttr.needsUpdate = true;
+-      // Flicker a slice of glyphs each frame (deterministic walk through the buffer).
+-      glyphTick = (glyphTick + 97) % count;
+-      const g = glyphAttr.array as Float32Array;
+-      for (let k = 0; k < 40; k++) {
+-        const idx = (glyphTick + k * 131) % count;
+-        g[idx] = (g[idx] + 37) % (ATLAS_COLS * ATLAS_COLS);
++    update(t, _dt, parallaxX, parallaxY, onMatrixRoute) {
++      rainMat.uniforms.uTime.value = t;
++      if (onMatrixRoute) {
++        // Low, slow dolly across the mirror so the reflections carry the frame.
++        camera.position.x = Math.sin(t * 0.05) * 2.4 + parallaxX * 0.8;
++        camera.position.y = 2.2 + parallaxY * 0.3;
++        camera.position.z = 12 + Math.sin(t * 0.03) * 1.5;
++        camera.lookAt(0, 3.6, -14);
++      } else {
++        camera.position.x = Math.sin(t * 0.04) * 2.0 + parallaxX * 0.6;
++        camera.position.y = 3.4 + parallaxY * 0.3;
++        camera.position.z = 12;
++        camera.lookAt(0, 5.0, -20);
+       }
+-      glyphAttr.needsUpdate = true;
+-      rings.forEach((ring, i) => { (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.7 + Math.sin(t * 1.6 + i) * 0.45; });
+-      wordMeshes.forEach((m, i) => { m.position.y += Math.sin(t * 0.6 + i * 1.3) * 0.0012; });
+-      camera.position.x = 3.2 + Math.sin(t * 0.07) * 1.2 + parallaxX * 0.8;
+-      camera.position.y = 2.7 + parallaxY * 0.4;
+-      camera.lookAt(-1.6, 2.4, 0);
+     },
+     dispose() {
+       for (const d of disposables) d.dispose();

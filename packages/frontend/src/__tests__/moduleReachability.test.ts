@@ -114,6 +114,17 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // direction stays one-way.
   'core/agent/agentBridge.ts': 'D-085 composer; unwired pending a deliberate campaignOrchestrator decision (wiring it INTO hypothesisLoop would close an import cycle).',
 
+  // --- Temporal Cinematic Engine (place+year -> historical WorldGraph -> camera
+  // path -> real browser WebGL render, see TemporalCinematicScreen.tsx and the
+  // #/temporal-cinematic route in App.tsx) -- now wired and reachable. Only
+  // renderRuntimeStatus.ts remains genuinely unreached: it is a pure status/
+  // documentation module (TEMPORAL_CINEMATIC_RUNTIME_BLOCKERS,
+  // isRenderToVideoReady()) naming exactly which real-render/video-encode gaps
+  // still exist, read by developers and by temporal-cinematic-e2e-capture.mjs's
+  // own console output convention, not imported by any production module.
+  'core/temporalCinematic/renderRuntimeStatus.ts': 'Temporal Cinematic Engine — pure status/documentation module (capability gaps), not imported by production code; read by developers and the E2E capture script.',
+  'core/worldModel/capability/capabilityStatus.ts': 'CTO consolidation pass (2026-09-21): a foundational CapabilityStatus/CapabilityProvenance vocabulary + evaluateQualityGate() gate, written ahead of the Universal Intent Resolver work it is meant to back -- deliberately paused per the consolidation mandate ("uporzadkuj fundament, dopiero potem buduj giganta") rather than half-wiring a large new feature during a stabilization pass. Reached today only by nothing (no test yet either); remove this entry once the Universal Intent Resolver work resumes and actually consumes it.',
+
   // --- Deliberately OFF in the product, not broken ---------------------------
   // The Sovereign/governance module is staged behind a visibly disabled menu
   // entry ("wkrótce") by an explicit product decision recorded in

@@ -64,6 +64,7 @@ const GenesisScientificCityScreen = lazy(() => import('./components/visual-simul
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const GenesisWorldScreen = lazy(() => import('./components/visual-simulation/GenesisWorldScreen').then((m) => ({ default: m.GenesisWorldScreen })));
+const TemporalCinematicScreen = lazy(() => import('./components/visual-simulation/TemporalCinematicScreen').then((m) => ({ default: m.TemporalCinematicScreen })));
 const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/MoleculeLabScreen').then((m) => ({ default: m.MoleculeLabScreen })));
 const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
 const EvidenceShowcaseScreen = lazy(() => import('./components/visual-simulation/EvidenceShowcaseScreen').then((m) => ({ default: m.EvidenceShowcaseScreen })));
@@ -152,6 +153,7 @@ type Route =
   | { kind: 'concept' }
   | { kind: 'character' }
   | { kind: 'genesis-world' }
+  | { kind: 'temporal-cinematic' }
   | { kind: 'molecule' }
   | { kind: 'cell-lab' }
   | { kind: 'evidence-showcase' }
@@ -217,6 +219,7 @@ function parseHash(): Route {
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/genesis-world') return { kind: 'genesis-world' };
+  if (h === '#/temporal-cinematic' || h.startsWith('#/temporal-cinematic?')) return { kind: 'temporal-cinematic' };
   // Deliberately just `#/molecule`, never `#/lab/molecule` — that shape is claimed by the OLD
   // Canvas-2D `registerLab()` registry's own route match above (`^#\/lab\/`), which would resolve
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
@@ -1030,6 +1033,14 @@ export default function App() {
           </HeavyRoute>
           {overlays}
         </div>
+      );
+    }
+
+    if (route.kind === 'temporal-cinematic') {
+      return (
+        <HeavyRoute>
+          <TemporalCinematicScreen />
+        </HeavyRoute>
       );
     }
 

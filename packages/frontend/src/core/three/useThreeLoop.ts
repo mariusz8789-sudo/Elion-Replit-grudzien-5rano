@@ -75,7 +75,13 @@ export function useThreeLoop(
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 2000);
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: sim.preserveDrawingBufferForCapture ?? false,
+        });
         // EffectComposer wykonuje kilka passów; reset raz na pełną klatkę zachowuje uczciwe calls/triangles całego renderu.
         renderer.info.autoReset = false;
         renderer.setClearColor(0x02030a, 1);

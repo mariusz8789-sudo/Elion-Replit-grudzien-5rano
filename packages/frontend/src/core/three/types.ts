@@ -94,6 +94,21 @@ export interface Sim3D {
    * scena z OrbitControls (przeciąganie/zoom) działa bez zmian.
    */
   disableOrbitControls?: boolean;
+  /**
+   * Opt-in for a scene whose canvas must be readable from OUTSIDE the render
+   * loop (`canvas.toDataURL()`/`gl.readPixels()` called from a Playwright
+   * E2E script, e.g. `temporalCinematicSim3D.ts`) — WITHOUT this, a WebGL
+   * canvas's drawing buffer is cleared by the browser as soon as it composites
+   * a frame, so a read issued from a separate JS turn (a `page.evaluate()`
+   * call racing the compositor, not this render loop) can catch a blank
+   * buffer even though the scene visibly renders every frame (confirmed via
+   * a real Playwright page screenshot showing content while a same-moment
+   * `canvas.toDataURL()` returned transparent black). Defaults to false —
+   * every existing scene keeps its exact current renderer config; only a
+   * Sim3D that sets this incurs the (typically small) extra GPU buffer-copy
+   * cost `preserveDrawingBuffer: true` implies.
+   */
+  preserveDrawingBufferForCapture?: boolean;
   /** Budowa sceny — wywoływane raz przy montażu (i przy zmianie eksperymentu). */
   init(three: typeof THREE, scene: THREE.Scene, camera: THREE.PerspectiveCamera, w: number, h: number): void;
   /** Krok fizyki/animacji — CZYSTE dane, bez efektów ubocznych na WebGL (testowalne bez GPU). */

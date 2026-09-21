@@ -297,14 +297,35 @@ describe('WorldFrameRenderer — instanced-kind incremental updates (same member
 });
 
 describe('WorldFrameRenderer — default visual (no resolver supplied)', () => {
-  it('produces a working mesh sized by the entity\'s own scale', () => {
+  it('produces a working mesh with a fixed unit geometry, sized by the OBJECT transform, not the geometry', () => {
     const root = new THREE.Group();
     const renderer = new WorldFrameRenderer(THREE, root);
     renderer.sync(frame([entity({ id: 'a', scale: 4 })]));
     const mesh = root.children[0] as THREE.Mesh;
     expect(mesh.isMesh).toBe(true);
     const geometry = mesh.geometry as THREE.SphereGeometry;
-    expect(geometry.parameters.radius).toBeCloseTo(2); // 0.5 * scale
+    // Regression for a real double-scaling bug: this geometry USED to be built at `0.5 * scale`
+    // radius (here, 2) and THEN `applyTransform` applied `object.scale.setScalar(scale)` on top —
+    // compounding to an effective radius of `0.5 * scale^2` (here, 8). Unnoticeable for the small
+    // scales (~1) every production caller happens to use, but a real bug: a caller passing a
+    // genuinely large scale (e.g. a building's real footprint/height, ~100) put the camera INSIDE
+    // the sphere, which (back-face culled) can vanish from render entirely. The geometry itself
+    // must always be the fixed unit radius; `object.scale` is the ONLY place `entity.scale` acts.
+    expect(geometry.parameters.radius).toBeCloseTo(0.5);
+    expect(mesh.scale.x).toBeCloseTo(4);
+    // The effective world-space radius a viewer actually sees is geometry.radius * object.scale —
+    // this must equal 0.5 * entity.scale exactly once, never entity.scale^2.
+    expect(geometry.parameters.radius * mesh.scale.x).toBeCloseTo(2); // 0.5 * scale, not 0.5 * scale^2 (= 8)
+  });
+
+  it('scales the honest-boundary NOT_MODELED placeholder the same single way', () => {
+    const root = new THREE.Group();
+    const renderer = new WorldFrameRenderer(THREE, root);
+    renderer.sync(frame([entity({ id: 'a', scale: 4, grounding: 'NOT_MODELED' })]));
+    const mesh = root.children[0] as THREE.Mesh;
+    const geometry = mesh.geometry as THREE.SphereGeometry;
+    expect(geometry.parameters.radius).toBeCloseTo(0.5);
+    expect(mesh.scale.x).toBeCloseTo(4);
   });
 });
 

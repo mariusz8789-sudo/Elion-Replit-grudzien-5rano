@@ -22,6 +22,7 @@ import {
 
 import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider, molecularBiologyProvider, spacetimePhotonProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import { environmentalDetectiveProvider } from './environmentalDetective';
+import { genesisLabProvider } from '../lab/genesisLabProvider';
 import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
 import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
 import { openKernelLedger } from '../knowledge/ledgerStore';
@@ -63,6 +64,9 @@ if (kernelRegistry.resolve('central-dogma-model') === null) kernelRegistry.regis
 if (kernelRegistry.resolve('environmental-detective') === null) kernelRegistry.register(environmentalDetectiveProvider(kernelLedger));
 // D-130: the flagship physics scenario (weak-field photon propagation vs. a flat baseline) as a provider; c is SI-defined, nothing measures it.
 if (kernelRegistry.resolve('spacetime-photon-model') === null) kernelRegistry.register(spacetimePhotonProvider(kernelLedger));
+// D-140: the laboratory/instrument integration package (device/sensor/calibration/uncertainty/protocol/
+// safety/digital-twin/solver/LIMS seams) bound to the real canonical SolverRouter/WorldGraph/storage — see core/lab/genesisLabProvider.ts.
+if (kernelRegistry.resolve('d140-laboratory') === null) kernelRegistry.register(genesisLabProvider(kernelLedger));
 
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic

@@ -308,6 +308,51 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/lookingGlass/capture/canonicalTemporalCapture.node.ts': 'V6.1 pack: orchestrates CanonicalBrowserFrameRenderer + encodeCanonicalFramesToWebm into a multi-frame capture session. Not imported by scripts/visual-e2e-v52-v7.mjs or anything else.',
   'core/lookingGlass/capture/canonicalVideoEncoder.node.ts': 'V6.1 pack: encodes captured JPEG frames to VP8/WebM via the Playwright-bundled ffmpeg (locatePlaywrightBundledFfmpeg), honestly reporting failure rather than silently skipping encode. Not imported by scripts/visual-e2e-v52-v7.mjs or anything else.',
   'core/lookingGlass/capture/playwrightFfmpegLocator.node.ts': 'V6.1 pack: locates the ffmpeg binary bundled with the installed Playwright browsers. Only consumer is canonicalVideoEncoder.node.ts above, itself unreached.',
+
+  // --- D-140 Laboratory/Instrument Integration package -----------------------
+  // Backend-only canonical integration pass (device/sensor/calibration/uncertainty/protocol/safety/
+  // HIL/digital-twin/model-calibration-validation/data-assimilation/closed-loop/LIMS-ELN/reality-loop
+  // seams). The four `genesis*.ts` adapters bind D-140's transfer-seam interfaces to this repo's own
+  // canonical infrastructure (kernelLedger, WorldGraph/TemporalEngine/WorldFrameRenderer, SolverRouter,
+  // core/storage.ts) rather than introducing a second implementation of any of them. No browser screen
+  // exposes a laboratory UI yet -- this is scoped to proving the real-repo E2E chain, not building a
+  // route. Reached today by their own test suites (labCore.test.ts, completion15.test.ts,
+  // safetyAndProtocol.test.ts, twinCalibrationValidation.test.ts, lineageAssimilation.test.ts,
+  // core/e2e/realLabStandaloneE2E.test.ts [fixtures only], core/e2e/realLabGenesisE2E.test.ts [real
+  // canonical bindings]).
+  //
+  // The four `genesis*.ts` real-repo bindings, `labRuntime.ts`, and the seam contracts
+  // `genesisLabProvider.ts` actually imports (`limsElnPersistenceIntegration.ts`, `limsElnPorts.ts`,
+  // `scientificSolverIntegration.ts`, `worldVisualizationIntegration.ts`) are now ALSO wired into
+  // production via `core/lab/genesisLabProvider.ts` — a real `AnalysisProvider` registered on the
+  // one canonical `KernelProviderRegistry` from `core/agent/cyberReasoningKernel.ts` (the same
+  // single-kernel registration pattern `colliderProvider`/`molecularBiologyProvider`/
+  // `environmentalDetectiveProvider` already use), so their ALLOWED_ORPHANS entries are gone —
+  // real static imports now reach them from `main.tsx`. The remaining `core/lab/*` files below are
+  // NOT imported by `genesisLabProvider.ts` and stay orphaned until something wires them in too.
+  // Remove the rest of these entries once a screen/route (or a further provider capability) uses them.
+  'core/lab/bigScienceInterface.ts': 'D-140: big-science dataset ingestion. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/biotechRealityLoop.ts': 'D-140: non-clinical model/measurement residual gate. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/calibrationEngine.ts': 'D-140: measurement calibration. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/capabilityReport.ts': 'D-140: builds the 20-entry GenesisLabCapabilityReport (e2eOrStrongerPercent, LAB_SCOPE_90/97_READY). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/closedLoopExperimentEngine.ts': 'D-140: proposes the next experiment from a completed iteration, without authorizing live actuation. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/devicePorts.ts': 'D-140: device/sensor/actuator/measurement contracts. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/digitalTwinSynchronizer.ts': 'D-140: prediction/measurement residual and sync status. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/experimentProtocol.ts': 'D-140: experiment protocol contract. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/hardwareInLoopBridge.ts': 'D-140: hardware-in-loop device adapter bridge. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/labInstrumentRegistry.ts': 'D-140: device registry. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/labSafetyInterlock.ts': 'D-140: safety veto interlock (target range, sensor quality, calibration, human approval, emergency stop). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/materialDiscoveryRealityLoop.ts': 'D-140: materials-discovery predicted/measured residual gate (pure residual math, no solver-injection point). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/mirrorTwinLabAdapter.ts': 'D-140 package module delivered verbatim but NOT exercised by any test or the real-repo E2E chain (no "Mirror Twin" concept existed in this repo before D-140). Genuinely uncalled and untested today -- disclosed rather than silently wired in. Remove this entry once a caller/test exists.',
+  'core/lab/modelCalibrationEngine.ts': 'D-140: weighted linear model calibration. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/modelValidationEngine.ts': 'D-140: prediction-vs-measurement falsification classification. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/physicalQuantity.ts': 'D-140: physical-quantity-with-uncertainty/unit-conversion primitive (no such canonical type existed in this repo before D-140). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/protocolExecutionEngine.ts': 'D-140: experiment protocol state machine (CREATED->...->COMPLETED). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/sampleLineage.ts': 'D-140: sample/material lineage store. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/scientificDataAssimilation.ts': 'D-140: hybrid simulated/measured data assimilation. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/sensorIngestEngine.ts': 'D-140: sensor measurement ingestion with quality classification. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/standaloneDeterminism.ts': 'D-140: explicit standalone-only LabRuntime fixture (RecordingEvidencePort, createStandaloneLabRuntime) kept in test scope only, per CLAUDE_DIRECTIVE.md -- the real-repo E2E uses genesisLabRuntime.ts instead. Reached only by core/e2e/realLabStandaloneE2E.test.ts and labCore.test.ts.',
+  'core/lab/uncertaintyEngine.ts': 'D-140: measurement uncertainty combination. Reached only by its own test suite and the E2E tests; no screen yet.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

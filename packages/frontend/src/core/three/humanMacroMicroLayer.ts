@@ -1,7 +1,9 @@
 import type * as THREE_NS from 'three';
 import type { BiologyArtifact } from '../scientificWorlds/biologyRunners';
 import type { AnatomyNode, CellModel, HumanDigitalTwinManifest, Organelle } from '../scientificWorlds/humanLab/types';
+import { CANONICAL_ANATOMY_LAYER_SHELL, type CanonicalAnatomyLayerId } from '../scientificWorlds/humanLab/anatomyAtlas';
 import { disposeSceneResources } from './graphics/lifecycle';
+import { attachAnatomyLayerShellMetadata, resolveAnatomyLayerShell, type AnatomyLayerPresentation } from './anatomyIntegrationShell';
 
 /**
  * V7 — HUMAN MACRO → MICRO VISUAL LAYER.
@@ -23,6 +25,13 @@ export interface HumanMacroMicroState {
   readonly selectedNodeId: string | null;
   readonly artifactKind: BiologyArtifact['kind'] | null;
   readonly evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION';
+  readonly anatomyLayers: Readonly<{
+    visibleLayerIds: readonly CanonicalAnatomyLayerId[];
+    selectedLayerId: CanonicalAnatomyLayerId | null;
+    lod: 'LOW';
+    crossSection: boolean;
+    hyperscopeMagnification: number | null;
+  }>;
 }
 
 /**
@@ -160,6 +169,19 @@ function addCellContents(THREE: typeof THREE_NS, root: THREE_NS.Group, cell: Cel
     new THREE.MeshPhysicalMaterial({ color: 0x86def0, emissive: 0x1d6070, emissiveIntensity: 0.16, roughness: 0.22, transparent: true, opacity: 0.17, clearcoat: 0.48, clearcoatRoughness: 0.18, depthWrite: false, side: THREE.DoubleSide }),
   );
   shell.name = 'cell:membrane'; root.add(shell);
+  // Cytoskeleton: deterministic microtubule/actin-like paths, explicitly illustrative.
+  const cytoskeletonMaterial = new THREE.MeshPhysicalMaterial({ color: 0x85d5c5, emissive: 0x184b43, emissiveIntensity: 0.12, roughness: 0.38, clearcoat: 0.2 });
+  for (let index = 0; index < 7; index += 1) {
+    const phase = index * 0.83;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.36 * scale, Math.sin(phase) * 0.17 * scale, Math.cos(phase) * 0.14 * scale),
+      new THREE.Vector3(-0.10 * scale, Math.cos(phase * 1.3) * 0.22 * scale, Math.sin(phase) * 0.20 * scale),
+      new THREE.Vector3(0.14 * scale, Math.sin(phase * 1.7) * 0.18 * scale, -Math.cos(phase) * 0.18 * scale),
+      new THREE.Vector3(0.37 * scale, -Math.sin(phase) * 0.15 * scale, Math.cos(phase * 1.2) * 0.12 * scale),
+    ]);
+    const filament = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.0045 * scale, 5, false), cytoskeletonMaterial);
+    filament.name = `cell:cytoskeleton-filament:${index}`; root.add(filament);
+  }
   for (const o of cell.organelles) {
     if (o.kind === 'MEMBRANE') continue;
     const mat = organelleMaterial(THREE, o.kind);
@@ -178,6 +200,15 @@ function addCellContents(THREE: typeof THREE_NS, root: THREE_NS.Group, cell: Cel
       nucleolus.name = 'cell:nucleolus:illustrative'; nucleolus.position.copy(mesh.position).add(new THREE.Vector3(radius * 0.25, radius * 0.12, radius * 0.15)); root.add(nucleolus);
     }
   }
+  // Membrane proteins make the CELL view visually distinct from a transparent sphere.
+  const channelMaterial = new THREE.MeshPhysicalMaterial({ color: 0x9de6ff, emissive: 0x245a70, emissiveIntensity: 0.16, roughness: 0.34, clearcoat: 0.3 });
+  for (let index = 0; index < 12; index += 1) {
+    const phi = Math.acos(1 - 2 * (index + 0.5) / 12); const theta = index * 2.399963229728653;
+    const normal = new THREE.Vector3(Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta));
+    const channel = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * scale, 0.012 * scale, 0.055 * scale, 8), channelMaterial);
+    channel.name = `cell:membrane-channel:${index}`; channel.position.copy(normal).multiplyScalar(0.515 * scale);
+    channel.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal); root.add(channel);
+  }
 }
 
 function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
@@ -185,6 +216,8 @@ function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Gro
   const rotor = createPresentationStage(THREE, root, 0.82);
   const slab = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.13, 0.92, 8, 2, 6), biologicalMaterial(THREE, 0x7f3d52, { emissive: 0x260d17, roughness: 0.66 }));
   slab.name = 'tissue:extracellular-matrix'; rotor.add(slab);
+  const sectionFace = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.018, 0.86), biologicalMaterial(THREE, 0xb96a84, { translucent: true, emissive: 0x461426, roughness: 0.42 }));
+  sectionFace.name = 'tissue:cross-section-surface'; sectionFace.position.y = 0.078; rotor.add(sectionFace);
   // The repeated cells reuse the ACTUAL canonical CellModel organelle layout; only their placement in
   // this pedagogical tissue tile is illustrative and is explicitly tagged as such on the root.
   const positions: Array<[number, number, number]> = [[-0.42, 0.12, -0.22], [0, 0.13, -0.2], [0.42, 0.12, -0.18], [-0.22, 0.12, 0.23], [0.28, 0.12, 0.24]];
@@ -197,6 +230,16 @@ function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Gro
     const z = -0.34 + i * 0.135;
     const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(-0.64, 0.11, z), new THREE.Vector3(-0.22, 0.17 + (i % 2) * 0.025, z + 0.035), new THREE.Vector3(0.2, 0.12, z - 0.025), new THREE.Vector3(0.64, 0.16, z)]);
     const fiber = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.009, 5, false), fiberMat); fiber.name = `tissue:matrix-fiber:${i}`; rotor.add(fiber);
+  }
+  // Paired capillary-like channels establish a tissue-scale transport network;
+  // this remains illustrative geometry and carries no perfusion measurement.
+  for (const [index, color, z] of [[0, 0xbe3048, -0.31], [1, 0x316fba, 0.31]] as const) {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.68, 0.035, z), new THREE.Vector3(-0.22, 0.055, z + 0.04),
+      new THREE.Vector3(0.24, 0.03, z - 0.025), new THREE.Vector3(0.68, 0.05, z),
+    ]);
+    const vessel = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 0.026, 10, false), new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0.09, roughness: 0.34, clearcoat: 0.28 }));
+    vessel.name = `tissue:capillary-model:${index}`; rotor.add(vessel);
   }
   markModel(root, 'tissue'); addShadows(root); return root;
 }
@@ -223,6 +266,12 @@ function buildOrganelleModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.
       ]);
       const crista = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.012, 6, false), new THREE.MeshStandardMaterial({ color: 0xffd3a8, emissive: 0xf09a54, emissiveIntensity: 0.15, roughness: 0.5 })); crista.name = `organelle:crista:${i + 3}`; rotor.add(crista);
     }
+    const matrixParticles = new THREE.Group(); matrixParticles.name = 'organelle:matrix-granules';
+    for (let index = 0; index < 18; index += 1) {
+      const granule = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), biologicalMaterial(THREE, 0xffddb8, { emissive: 0x6b351f, roughness: 0.58 }));
+      granule.position.set(-0.32 + (index % 6) * 0.125, -0.14 + Math.floor(index / 6) * 0.14, Math.sin(index * 1.7) * 0.09); matrixParticles.add(granule);
+    }
+    rotor.add(matrixParticles);
   } else {
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.46, 40, 30), mat); body.name = `organelle:${focus.kind.toLowerCase()}`; rotor.add(body);
   }
@@ -253,6 +302,8 @@ function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArt
         const bead = new THREE.Mesh(new THREE.SphereGeometry(0.038, 12, 9), biologicalMaterial(THREE, color, { emissive: color, roughness: 0.34 })); bead.name = `dna:backbone-node:${strand}:${i}`; bead.position.copy(p); rotor.add(bead);
       }
     }
+    const pairedBase = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), biologicalMaterial(THREE, BASE_COLORS[base] ?? 0xd9e5f2, { emissive: BASE_COLORS[base] ?? 0xd9e5f2, roughness: 0.36 }));
+    pairedBase.name = `dna:nucleotide:${i}:${base}`; pairedBase.position.copy(a).lerp(b, 0.34); rotor.add(pairedBase);
   }
   const backboneA = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(left), 160, 0.028, 8, false), new THREE.MeshStandardMaterial({ color: 0x66baff, emissive: 0x274e78, emissiveIntensity: 0.18, roughness: 0.4 }));
   const backboneB = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(right), 160, 0.028, 8, false), new THREE.MeshStandardMaterial({ color: 0xff7097, emissive: 0x78344a, emissiveIntensity: 0.18, roughness: 0.4 }));
@@ -279,16 +330,35 @@ export class HumanMacroMicroLayer {
   private selectedNodeId: string | null = 'body';
   private artifact: BiologyArtifact | null = null;
   private time = 0;
+  private anatomyLayers: readonly AnatomyLayerPresentation[];
 
   constructor(private readonly THREE: typeof THREE_NS, private readonly manifest: HumanDigitalTwinManifest) {
     this.group = new THREE.Group(); this.group.name = 'genesis-human-macro-micro-layer'; this.group.visible = false;
     this.group.userData.presentationOnly = true; this.group.userData.epistemic = 'MODEL'; this.group.userData.directObservation = false;
+    this.anatomyLayers = resolveAnatomyLayerShell(manifest);
+    attachAnatomyLayerShellMetadata(this.group, this.anatomyLayers);
   }
+
+  getAnatomyLayerShell(): readonly AnatomyLayerPresentation[] { return this.anatomyLayers; }
 
   getState(): HumanMacroMicroState {
     const node = this.manifest.nodes.find((entry) => entry.id === this.selectedNodeId);
     const level = this.artifact ? macroMicroLevelForArtifact(this.artifact) : node?.kind === 'SYSTEM' ? 'organ_system' : this.selectedOrganId ? 'organ' : 'body';
-    return { level, selectedNodeId: this.selectedNodeId, selectedOrganId: this.selectedOrganId, artifactKind: this.artifact?.kind ?? null, evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION' };
+    const active = this.anatomyLayers.filter((layer) => layer.visible);
+    return {
+      level,
+      selectedNodeId: this.selectedNodeId,
+      selectedOrganId: this.selectedOrganId,
+      artifactKind: this.artifact?.kind ?? null,
+      evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION',
+      anatomyLayers: {
+        visibleLayerIds: active.map((layer) => layer.id),
+        selectedLayerId: this.anatomyLayers.find((layer) => layer.selected)?.id ?? null,
+        lod: 'LOW',
+        crossSection: this.anatomyLayers.some((layer) => layer.crossSection.enabled),
+        hyperscopeMagnification: this.artifact?.kind === 'hyperscope' ? this.artifact.capture.request.magnification : null,
+      },
+    };
   }
 
   setOrgan(organId: string | null): void {
@@ -305,11 +375,12 @@ export class HumanMacroMicroLayer {
   private replace(next: THREE_NS.Group | null): void {
     if (this.content) { this.group.remove(this.content); disposeSceneResources(this.content); }
     this.content = next;
-    if (next) this.group.add(next);
+    if (next) { attachAnatomyLayerShellMetadata(next, this.anatomyLayers); this.group.add(next); }
     this.group.visible = next !== null;
   }
 
   private rebuild(): void {
+    this.refreshAnatomyLayers();
     const artifact = this.artifact;
     if (artifact?.kind === 'histology') { this.replace(buildTissueModel(this.THREE, artifact.cell)); return; }
     if (artifact?.kind === 'hyperscope' && artifact.cell) {
@@ -318,6 +389,24 @@ export class HumanMacroMicroLayer {
     if (artifact?.kind === 'central-dogma') { this.replace(buildMoleculeModel(this.THREE, artifact)); return; }
     const organ = organNode(this.manifest, this.selectedOrganId);
     this.replace(organ ? buildOrganModel(this.THREE, organ) : null);
+  }
+
+  private refreshAnatomyLayers(): void {
+    const node = this.manifest.nodes.find((entry) => entry.id === this.selectedNodeId);
+    const systemLayer = node?.kind === 'SYSTEM'
+      ? CANONICAL_ANATOMY_LAYER_SHELL.find((layer) => layer.system === node.system)?.id ?? null
+      : null;
+    const selectedLayerId: CanonicalAnatomyLayerId = this.selectedOrganId ? 'layer:organs' : systemLayer ?? 'layer:skin';
+    const magnification = this.artifact?.kind === 'hyperscope' ? this.artifact.capture.request.magnification : null;
+    this.anatomyLayers = resolveAnatomyLayerShell(this.manifest, {
+      visibleLayerIds: [selectedLayerId],
+      isolatedLayerId: selectedLayerId,
+      selectedLayerId,
+      lod: 'LOW',
+      crossSection: { enabled: this.artifact?.kind === 'histology', axis: 'AXIAL', positionNormalized: 0.5 },
+      hyperscopeMagnification: magnification,
+    });
+    attachAnatomyLayerShellMetadata(this.group, this.anatomyLayers);
   }
 
   update(dt: number): void {

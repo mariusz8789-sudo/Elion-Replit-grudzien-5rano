@@ -6,6 +6,7 @@ import type { HighFidelityMaterialPalette } from '../three/graphics/highFidelity
 import { createBench, createCabinet, createMonitor } from '../three/graphics/labKit';
 import { createScientificGlass } from '../three/graphics/materials';
 import { createColumn, createPipe, createPlatform } from '../three/graphics/primitives';
+import { InstanceBatch } from '../three/graphics/instancing';
 
 /** V6 — canonical generated-room visuals. No second lab world and no second renderer. */
 
@@ -191,6 +192,23 @@ function createSpectrometer(THREE: typeof THREE_NS, p: HighFidelityMaterialPalet
   g.add(createPlatform(THREE, p.stainless, { position: [0.47, 0.9, 0.02], thickness: 0.04, shape: 'box', width: 0.34, depth: 0.3 }));
   const display = createInstrumentScreen(THREE, p, 0.48, 0.31);
   display.position.set(-0.36, 1.37, 0.18); display.rotation.x = -0.14; g.add(display);
+  const opticalRail = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.045, 0.12), p.dark);
+  opticalRail.position.set(0.08, 0.91, 0.02); g.add(opticalRail);
+  addRepeatedParts(
+    THREE, g, 'genesis-spectrometer-sample-carousel',
+    new THREE.CylinderGeometry(0.023, 0.023, 0.085, 12), p.stainless,
+    Array.from({ length: 8 }, (_, index) => {
+      const angle = (index / 8) * Math.PI * 2;
+      return { position: [0.47 + Math.cos(angle) * 0.095, 0.99, 0.02 + Math.sin(angle) * 0.095] as THREE_NS.Vector3Tuple };
+    }),
+  );
+  addRepeatedParts(
+    THREE, g, 'genesis-spectrometer-vent-bank',
+    new THREE.BoxGeometry(0.18, 0.016, 0.012), p.dark,
+    Array.from({ length: 6 }, (_, index) => ({ position: [-0.12, 1.0 + index * 0.045, 0.268] as THREE_NS.Vector3Tuple })),
+    false,
+  );
+  addServiceConduits(THREE, g, p, -0.66, 0.66, 0.84, -0.31);
   addStatusLamps(THREE, g, p, [-0.34, 0.94, 0.25], 4);
   g.userData.instrumentState = 'UNBOUND';
   g.userData.visualProfile = 'MATERIALS_SPECTROMETER_CINEMATIC';
@@ -209,6 +227,54 @@ function addStatusLamps(
     lamp.position.set(origin[0] + i * 0.052, origin[1], origin[2]);
     root.add(lamp);
   }
+}
+
+interface RepeatedPart {
+  readonly position: THREE_NS.Vector3Tuple;
+  readonly rotation?: THREE_NS.Vector3Tuple;
+  readonly scale?: THREE_NS.Vector3Tuple | number;
+}
+
+/** One draw call for repeated equipment detail. Geometry is slot-owned; material stays palette-owned. */
+function addRepeatedParts(
+  THREE: typeof THREE_NS,
+  root: THREE_NS.Object3D,
+  name: string,
+  geometry: THREE_NS.BufferGeometry,
+  material: THREE_NS.Material,
+  parts: readonly RepeatedPart[],
+  castShadow = true,
+): THREE_NS.InstancedMesh | null {
+  const batch = new InstanceBatch(THREE, geometry, material);
+  for (const part of parts) batch.add(part.position, part.rotation, part.scale);
+  const mesh = batch.build(root as THREE_NS.Scene, castShadow);
+  if (mesh) {
+    mesh.name = name;
+    mesh.receiveShadow = true;
+  }
+  return mesh;
+}
+
+function addServiceConduits(
+  THREE: typeof THREE_NS,
+  root: THREE_NS.Object3D,
+  p: HighFidelityMaterialPalette,
+  fromX: number,
+  toX: number,
+  y: number,
+  z: number,
+): THREE_NS.Group {
+  const bundle = new THREE.Group();
+  bundle.name = 'genesis-instrument-service-conduits';
+  for (const offset of [-0.045, 0, 0.045]) {
+    bundle.add(createPipe(THREE, offset === 0 ? p.chrome : p.dark, {
+      from: [fromX, y + offset * 0.35, z + offset],
+      to: [toX, y + offset * 0.35, z + offset],
+      radius: offset === 0 ? 0.014 : 0.011,
+    }));
+  }
+  root.add(bundle);
+  return bundle;
 }
 
 function createInstrumentScreen(
@@ -246,6 +312,17 @@ function createThermalStage(THREE: typeof THREE_NS, p: HighFidelityMaterialPalet
   const shieldMaterial = createScientificGlass(THREE, { color: 0x9ed8ef, transmissive: false, thicknessMeters: 0.01 });
   const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.34, 32, 1, true), shieldMaterial);
   shield.position.set(0, 1.09, 0); g.add(shield);
+  addRepeatedParts(
+    THREE, g, 'genesis-thermal-sample-holders',
+    new THREE.CylinderGeometry(0.027, 0.027, 0.065, 12), p.stainless,
+    Array.from({ length: 8 }, (_, index) => {
+      const angle = (index / 8) * Math.PI * 2;
+      return { position: [Math.cos(angle) * 0.145, 1.085, Math.sin(angle) * 0.145] as THREE_NS.Vector3Tuple };
+    }),
+  );
+  const rearRail = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.055, 0.08), p.dark);
+  rearRail.position.set(0, 0.91, -0.31); g.add(rearRail);
+  addServiceConduits(THREE, g, p, -0.48, 0.48, 0.88, -0.35);
   addStatusLamps(THREE, g, p, [-0.5, 1.06, 0.12], 3);
   g.userData.instrumentState = 'UNBOUND';
   g.userData.visualProfile = 'THERMAL_STAGE_CINEMATIC';
@@ -263,12 +340,38 @@ function createComputeStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPal
   for (const x of [0.68, 0.91]) {
     const rack = createCabinet(THREE, { position: [x, 0, -0.08], width: 0.2, depth: 0.58, height: 0.72, bodyMaterial: p.dark, handleMaterial: p.stainless });
     g.add(rack);
-    for (let unit = 0; unit < 6; unit += 1) addStatusLamps(THREE, g, p, [x - 0.055, 0.18 + unit * 0.085, 0.22], 2);
   }
+  const rackUnits: RepeatedPart[] = [];
+  const rackLeds: RepeatedPart[] = [];
+  for (const x of [0.68, 0.91]) {
+    for (let unit = 0; unit < 6; unit += 1) {
+      const y = 0.18 + unit * 0.085;
+      rackUnits.push({ position: [x, y, 0.218] });
+      rackLeds.push({ position: [x - 0.047, y, 0.232] }, { position: [x + 0.047, y, 0.232] });
+    }
+  }
+  addRepeatedParts(THREE, g, 'genesis-compute-rack-units', new THREE.BoxGeometry(0.16, 0.055, 0.025), p.stainless, rackUnits);
+  addRepeatedParts(THREE, g, 'genesis-compute-rack-led-bank', new THREE.SphereGeometry(0.012, 8, 6), p.blueGlow, rackLeds, false);
   const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.025, 0.16), p.medical);
   keyboard.position.set(-0.18, 0.8, 0.18); g.add(keyboard);
+  const keys: RepeatedPart[] = [];
+  for (let row = 0; row < 4; row += 1) for (let column = 0; column < 10; column += 1) {
+    keys.push({ position: [-0.374 + column * 0.043, 0.817, 0.132 + row * 0.031] });
+  }
+  addRepeatedParts(THREE, g, 'genesis-compute-key-array', new THREE.BoxGeometry(0.032, 0.008, 0.021), p.dark, keys, false);
   const consoleGlow = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.018, 0.035), p.blueGlow);
   consoleGlow.position.set(-0.16, 0.78, -0.37); g.add(consoleGlow);
+  const gantryPosts = addRepeatedParts(
+    THREE, g, 'genesis-compute-monitor-gantry-posts',
+    new THREE.BoxGeometry(0.045, 0.72, 0.055), p.stainless,
+    [{ position: [-0.84, 1.14, -0.34] }, { position: [0.53, 1.14, -0.34] }],
+  );
+  gantryPosts?.layers.enable(0);
+  const gantryBeam = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.055, 0.06), p.stainless);
+  gantryBeam.position.set(-0.155, 1.5, -0.34); g.add(gantryBeam);
+  const cableTray = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.055, 0.11), p.dark);
+  cableTray.position.set(-0.12, 0.52, -0.34); g.add(cableTray);
+  addServiceConduits(THREE, g, p, -0.82, 0.94, 0.48, -0.3);
   g.userData.computeBinding = 'UNBOUND';
   g.userData.visualProfile = 'SCIENTIFIC_COMPUTE_CONSOLE_CINEMATIC';
   shadow(g); return g;

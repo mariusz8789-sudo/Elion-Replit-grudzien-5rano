@@ -46,6 +46,12 @@ interface SpacetimePresentationProfile {
   readonly sunIntensity: number;
   readonly exposure: number;
   readonly bloom: { readonly strength: number; readonly radius: number; readonly threshold: number };
+  /** Scene-specific contact depth. These are presentation settings, never scientific outputs. */
+  readonly ambientOcclusion: { readonly radius: number; readonly intensity: number };
+  /** Lens treatment matched to the scale of the generated world. */
+  readonly depthOfField: { readonly focusDistance: number; readonly aperture: number; readonly maxBlur: number };
+  /** Screen-space reflection strength; zero avoids an unnecessary pass. */
+  readonly reflectionStrength: number;
   readonly livingWorld: boolean;
 }
 
@@ -57,15 +63,15 @@ interface SpacetimePresentationProfile {
 export function spacetimePresentationProfile(kind: SpacetimeWorldDescriptor['kind']): SpacetimePresentationProfile {
   switch (kind) {
     case 'HISTORICAL_CITY':
-      return { environmentMode: 'OUTDOOR', hourOfDay: 18.1, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.34, sunIntensity: 1.7, exposure: 0.82, bloom: { strength: 0.2, radius: 0.46, threshold: 0.98 }, livingWorld: true };
+      return { environmentMode: 'OUTDOOR', hourOfDay: 18.1, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.34, sunIntensity: 1.7, exposure: 0.82, bloom: { strength: 0.2, radius: 0.46, threshold: 0.98 }, ambientOcclusion: { radius: 0.72, intensity: 0.9 }, depthOfField: { focusDistance: 12, aperture: 0.00012, maxBlur: 0.0025 }, reflectionStrength: 0, livingWorld: true };
     case 'ALIEN_DESERT':
-      return { environmentMode: 'OUTDOOR', hourOfDay: 15.8, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.48, sunIntensity: 1.8, exposure: 0.86, bloom: { strength: 0.28, radius: 0.58, threshold: 0.88 }, livingWorld: false };
+      return { environmentMode: 'OUTDOOR', hourOfDay: 15.8, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.48, sunIntensity: 1.8, exposure: 0.86, bloom: { strength: 0.28, radius: 0.58, threshold: 0.88 }, ambientOcclusion: { radius: 0.86, intensity: 0.96 }, depthOfField: { focusDistance: 15, aperture: 0.0001, maxBlur: 0.002 }, reflectionStrength: 0, livingWorld: false };
     case 'MARS_STATION':
-      return { environmentMode: 'OUTDOOR', hourOfDay: 15.4, fogDensity: 0.0016, ambientHaze: true, fillIntensity: 0.46, sunIntensity: 1.85, exposure: 0.86, bloom: { strength: 0.2, radius: 0.5, threshold: 0.96 }, livingWorld: false };
+      return { environmentMode: 'OUTDOOR', hourOfDay: 15.4, fogDensity: 0.0016, ambientHaze: true, fillIntensity: 0.46, sunIntensity: 1.85, exposure: 0.86, bloom: { strength: 0.2, radius: 0.5, threshold: 0.96 }, ambientOcclusion: { radius: 0.74, intensity: 0.94 }, depthOfField: { focusDistance: 13, aperture: 0.0001, maxBlur: 0.002 }, reflectionStrength: 0, livingWorld: false };
     case 'UNDERWATER_CITY':
-      return { environmentMode: 'OUTDOOR', hourOfDay: 11, fogDensity: 0.012, ambientHaze: true, fillIntensity: 0.24, sunIntensity: 0.58, exposure: 0.76, bloom: { strength: 0.34, radius: 0.62, threshold: 0.82 }, livingWorld: false };
+      return { environmentMode: 'OUTDOOR', hourOfDay: 11, fogDensity: 0.012, ambientHaze: true, fillIntensity: 0.24, sunIntensity: 0.58, exposure: 0.76, bloom: { strength: 0.34, radius: 0.62, threshold: 0.82 }, ambientOcclusion: { radius: 0.64, intensity: 0.92 }, depthOfField: { focusDistance: 9, aperture: 0.00022, maxBlur: 0.0045 }, reflectionStrength: 0.28, livingWorld: false };
     default:
-      return { environmentMode: 'INDOOR', hourOfDay: 21, fogDensity: 0, ambientHaze: false, fillIntensity: 0.08, sunIntensity: 0.72, exposure: 0.72, bloom: { strength: 0.46, radius: 0.72, threshold: 0.76 }, livingWorld: false };
+      return { environmentMode: 'INDOOR', hourOfDay: 21, fogDensity: 0, ambientHaze: false, fillIntensity: 0.08, sunIntensity: 0.72, exposure: 0.72, bloom: { strength: 0.46, radius: 0.72, threshold: 0.76 }, ambientOcclusion: { radius: 0.42, intensity: 0.72 }, depthOfField: { focusDistance: 7.5, aperture: 0.00018, maxBlur: 0.0035 }, reflectionStrength: 0, livingWorld: false };
   }
 }
 
@@ -299,10 +305,23 @@ export class TemporalCinematicSim3D implements Sim3D {
         : this.presentation.viewMode === 'interior'
           ? { mode: 'room-probe', probe: { position: [0, 1.4, 0], intensity: 0.58 } }
           : undefined,
-      ambientOcclusion: { enabled: true, minTier: 'high', radius: 0.5, blendIntensity: 0.86 },
-      reflections: wet ? { enabled: true, minTier: 'cinematic', strength: 0.42, maxDistance: 10 } : { enabled: false },
+      ambientOcclusion: {
+        enabled: true,
+        minTier: 'high',
+        radius: spacetimeProfile?.ambientOcclusion.radius ?? 0.5,
+        blendIntensity: spacetimeProfile?.ambientOcclusion.intensity ?? 0.86,
+      },
+      reflections: wet || (spacetimeProfile?.reflectionStrength ?? 0) > 0
+        ? { enabled: true, minTier: 'cinematic', strength: wet ? 0.42 : spacetimeProfile!.reflectionStrength, maxDistance: wet ? 10 : 18 }
+        : { enabled: false },
       antiAliasing: { enabled: true, minTier: 'medium' },
-      depthOfField: { enabled: true, minTier: 'high', focusDistance: 7.5, aperture: 0.00016, maxBlur: 0.004 },
+      depthOfField: {
+        enabled: true,
+        minTier: 'high',
+        focusDistance: spacetimeProfile?.depthOfField.focusDistance ?? 7.5,
+        aperture: spacetimeProfile?.depthOfField.aperture ?? 0.00016,
+        maxBlur: spacetimeProfile?.depthOfField.maxBlur ?? 0.004,
+      },
     });
     // `room-probe` starts with the shared studio fallback; keep it deliberately dim until/if a
     // caller captures the actual room. This prevents pale walls and monitor bloom from clipping.

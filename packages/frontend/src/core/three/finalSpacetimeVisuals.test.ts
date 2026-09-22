@@ -14,6 +14,7 @@ const CASES = [
   ['Create a historical Boston battle reconstruction.', 'HISTORICAL_CITY'],
   ['Create a desert alien planet with ruins and two suns.', 'ALIEN_DESERT'],
   ['Create a Mars research world.', 'MARS_STATION'],
+  ['Create an underwater research city.', 'UNDERWATER_CITY'],
 ] as const;
 
 beforeAll(() => {
@@ -63,11 +64,11 @@ describe('canonical spacetime Three.js visual layer', () => {
     const directed = directGenesisPromptWorld('Generate an Einstein-Rosen bridge.');
     const descriptorSnapshot = JSON.stringify(directed.descriptor);
     const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
-    const firstRing = handle.root.children.find((child) => child.userData.sourcePrimitiveId);
+    const firstRing = handle.root.getObjectByName('wormhole-instanced-embedding-rings');
     expect(firstRing).toBeDefined();
-    const before = firstRing!.rotation.z;
+    const before = firstRing!.scale.x;
     handle.update(2.5);
-    expect(firstRing!.rotation.z).not.toBe(before);
+    expect(firstRing!.scale.x).not.toBe(before);
     expect(JSON.stringify(directed.descriptor)).toBe(descriptorSnapshot);
     handle.dispose();
   });
@@ -122,19 +123,18 @@ describe('canonical spacetime Three.js visual layer', () => {
   it('builds a dense but honestly labelled historical reconstruction context', () => {
     const directed = directGenesisPromptWorld('Create a historical Boston battle reconstruction.');
     const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
-    const townhouses: THREE.Object3D[] = [];
-    const figures: THREE.Object3D[] = [];
-    const smoke: THREE.Object3D[] = [];
-    handle.root.traverse((object) => {
-      if (object.name.startsWith('reconstruction-townhouse-')) townhouses.push(object);
-      if (object.name.startsWith('reconstruction-crowd-figure-')) figures.push(object);
-      if (object.name.startsWith('reconstruction-smoke-')) smoke.push(object);
-    });
-    expect(townhouses.length).toBeGreaterThanOrEqual(12);
-    expect(figures).toHaveLength(34);
-    expect(smoke).toHaveLength(35);
-    expect([...townhouses, ...figures, ...smoke].every((object) => object.userData.epistemic === 'RECONSTRUCTION')).toBe(true);
-    expect([...townhouses, ...figures, ...smoke].every((object) => object.userData.visualOnlyContext === true)).toBe(true);
+    const townhouses = handle.root.getObjectByName('reconstruction-instanced-townhouses') as THREE.InstancedMesh;
+    const roofs = handle.root.getObjectByName('reconstruction-instanced-roofs') as THREE.InstancedMesh;
+    const figures = handle.root.getObjectByName('reconstruction-instanced-crowd-bodies') as THREE.InstancedMesh;
+    const pavers = handle.root.getObjectByName('reconstruction-instanced-street-pavers') as THREE.InstancedMesh;
+    const smoke = handle.root.getObjectByName('reconstruction-atmospheric-smoke') as THREE.Points;
+    expect(townhouses.count).toBeGreaterThanOrEqual(12);
+    expect(roofs.count).toBe(townhouses.count);
+    expect(figures.count).toBe(34);
+    expect(pavers.count).toBeGreaterThan(20);
+    expect(smoke.geometry.attributes.position?.count).toBe(350);
+    expect([townhouses, roofs, figures, pavers, smoke].every((object) => object.userData.epistemic === 'RECONSTRUCTION')).toBe(true);
+    expect([townhouses, roofs, figures, pavers, smoke].every((object) => object.userData.visualOnlyContext === true)).toBe(true);
     handle.dispose();
   });
 
@@ -148,7 +148,7 @@ describe('canonical spacetime Three.js visual layer', () => {
     expect(handle.root.getObjectByName('alien-secondary-sun')).toBeTruthy();
     expect(handle.root.getObjectByName('alien-desert-atmospheric-dust')).toBeTruthy();
     expect(handle.root.getObjectByName('alien-desert-atmosphere')).toBeTruthy();
-    expect(handle.root.children.filter((object) => object.name.startsWith('alien-desert-boulder-'))).toHaveLength(24);
+    expect((handle.root.getObjectByName('alien-desert-instanced-boulders') as THREE.InstancedMesh).count).toBe(24);
     expect(ruins.every((object) => object.userData.fictionInspired === true && object.userData.visualOnlyContext === true)).toBe(true);
     handle.dispose();
   });
@@ -157,14 +157,49 @@ describe('canonical spacetime Three.js visual layer', () => {
     const directed = directGenesisPromptWorld('Create a Mars research world.');
     const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
     const moduleCount = directed.runtime.engine.graph.getEntity('building:mars-research-station').domainState?.habitatModules;
-    expect(handle.root.children.filter((object) => object.name.startsWith('mars-habitat-module-'))).toHaveLength(Number(moduleCount));
-    expect(handle.root.children.filter((object) => object.name.startsWith('mars-pressurized-connector-'))).toHaveLength(Number(moduleCount) - 1);
+    expect((handle.root.getObjectByName('mars-instanced-habitat-modules') as THREE.InstancedMesh).count).toBe(Number(moduleCount));
+    expect((handle.root.getObjectByName('mars-instanced-pressurized-connectors') as THREE.InstancedMesh).count).toBe(Number(moduleCount) - 1);
     expect(handle.root.getObjectByName('mars-communications-dish')).toBeTruthy();
     expect(handle.root.getObjectByName('mars-field-rover')).toBeTruthy();
-    expect(handle.root.getObjectByName('mars-solar-array-west')).toBeTruthy();
-    expect(handle.root.getObjectByName('mars-solar-array-east')).toBeTruthy();
+    expect((handle.root.getObjectByName('mars-instanced-solar-arrays') as THREE.InstancedMesh).count).toBe(2);
     expect(handle.root.getObjectByName('mars-regolith-dust')).toBeTruthy();
-    expect(handle.root.children.filter((object) => object.name.startsWith('mars-regolith-rock-'))).toHaveLength(30);
+    expect((handle.root.getObjectByName('mars-instanced-regolith-rocks') as THREE.InstancedMesh).count).toBe(30);
     handle.dispose();
+  });
+
+  it('renders an underwater city with graph-counted domes, pressure tunnels, instruments and layered water context', () => {
+    const directed = directGenesisPromptWorld('Create an underwater research city.');
+    const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
+    const moduleCount = directed.runtime.engine.graph.getEntity('building:underwater-research-habitat').domainState?.habitatModules;
+    const sensorCount = directed.runtime.engine.graph.getEntity('instrument:underwater-observatory').domainState?.sensorNodes;
+    expect((handle.root.getObjectByName('underwater-instanced-habitat-domes') as THREE.InstancedMesh).count).toBe(Number(moduleCount));
+    expect((handle.root.getObjectByName('underwater-instanced-pressure-tunnels') as THREE.InstancedMesh).count).toBe(Number(moduleCount));
+    expect((handle.root.getObjectByName('underwater-instanced-observation-array') as THREE.InstancedMesh).count).toBe(Number(sensorCount));
+    expect((handle.root.getObjectByName('underwater-instanced-fauna-silhouettes') as THREE.InstancedMesh).count).toBe(120);
+    expect((handle.root.getObjectByName('underwater-marine-snow') as THREE.Points).geometry.attributes.position?.count).toBe(2200);
+    expect((handle.root.getObjectByName('underwater-bubble-columns') as THREE.Points).geometry.attributes.position?.count).toBe(520);
+    expect(handle.root.getObjectByName('underwater-layered-seabed')).toBeTruthy();
+    expect(handle.root.getObjectByName('underwater-volume-atmosphere')).toBeTruthy();
+    expect(handle.root.userData.epistemic).toBe('SIMULATION');
+    handle.dispose();
+  });
+
+  it('keeps wormhole and cosmology presentation dense while bounding draw-call-producing objects', () => {
+    const wormhole = directGenesisPromptWorld('Generate an Einstein-Rosen bridge.');
+    const wormholeVisual = createSpacetimeWorldVisualLayer(THREE, wormhole.descriptor, wormhole.runtime.engine.graph);
+    expect((wormholeVisual.root.getObjectByName('wormhole-instanced-embedding-rings') as THREE.InstancedMesh).count).toBe(wormhole.descriptor.primitives.length);
+    expect(wormholeVisual.root.getObjectByName('wormhole-deep-starfield')).toBeTruthy();
+    expect(wormholeVisual.root.getObjectByName('wormhole-accretion-style-presentation')?.userData.visualAnalogy).toContain('NOT_GENERAL_RELATIVITY_OUTPUT');
+    expect(wormholeVisual.root.children.length).toBeLessThanOrEqual(8);
+    wormholeVisual.dispose();
+
+    const cosmology = directGenesisPromptWorld('Create a cosmology world with gravity wells and dark matter.');
+    const cosmologyVisual = createSpacetimeWorldVisualLayer(THREE, cosmology.descriptor, cosmology.runtime.engine.graph);
+    expect(cosmologyVisual.root.getObjectByName('cosmology-model-curvature-grid')).toBeInstanceOf(THREE.LineSegments);
+    expect(cosmologyVisual.root.getObjectByName('cosmology-deep-starfield')).toBeTruthy();
+    expect(cosmologyVisual.root.getObjectByName('cosmology-accretion-style-particles')?.userData.visualAnalogy).toContain('NOT_SOLVER_OUTPUT');
+    expect(cosmologyVisual.root.getObjectByName('cosmology-inferred-dark-matter-halo')?.userData.epistemic).toBe('MODEL_INFERRED_DISTRIBUTION');
+    expect(cosmologyVisual.root.children.length).toBeLessThanOrEqual(8);
+    cosmologyVisual.dispose();
   });
 });

@@ -3,6 +3,40 @@ import { stableHash } from './hash';
 
 const P = (x: number, y: number, z: number) => ({ x, y, z });
 const D = (x: number, y: number, z: number) => ({ x, y, z });
+export const ANATOMY_ATLAS_VERSION = 'GENESIS-ANATOMY-0.2' as const;
+
+export type CanonicalAnatomyLayerId =
+  | 'layer:skin' | 'layer:muscles' | 'layer:skeleton'
+  | 'layer:vessels' | 'layer:nerves' | 'layer:organs';
+
+export interface CanonicalAnatomyLayerDefinition {
+  readonly id: CanonicalAnatomyLayerId;
+  readonly label: string;
+  readonly system?: OrganSystemId;
+  readonly assetSlot: string;
+  readonly visibleByDefault: boolean;
+  readonly pickable: true;
+  readonly isolatable: true;
+  readonly crossSectionCompatible: true;
+  readonly hyperscopeTarget: 'TISSUE' | 'CELL' | 'SUBCELLULAR' | 'NONE';
+  readonly lodAssetSlots: Readonly<{ full: string; medium: string; low: string }>;
+  /** External geometry stays blocked until the one asset-governance registry approves its runtime path. */
+  readonly assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK';
+}
+
+/**
+ * Stable semantic shell for future licensed anatomical meshes. These IDs are
+ * canonical even while the renderer uses honest procedural fallbacks, so an
+ * approved asset can replace geometry without changing picking/isolation IDs.
+ */
+export const CANONICAL_ANATOMY_LAYER_SHELL: readonly CanonicalAnatomyLayerDefinition[] = Object.freeze([
+  { id: 'layer:skin', label: 'Skin', system: 'INTEGUMENTARY', assetSlot: 'human.layer.skin.high_fidelity.glb', visibleByDefault: true, pickable: true, isolatable: true, crossSectionCompatible: true, hyperscopeTarget: 'TISSUE', lodAssetSlots: { full: 'human.layer.skin.high_fidelity.glb', medium: 'human.layer.skin.medium.glb', low: 'human.layer.skin.proxy' }, assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK' },
+  { id: 'layer:muscles', label: 'Muscles', system: 'MUSCULAR', assetSlot: 'human.layer.muscles.high_fidelity.glb', visibleByDefault: false, pickable: true, isolatable: true, crossSectionCompatible: true, hyperscopeTarget: 'TISSUE', lodAssetSlots: { full: 'human.layer.muscles.high_fidelity.glb', medium: 'human.layer.muscles.medium.glb', low: 'human.layer.muscles.proxy' }, assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK' },
+  { id: 'layer:skeleton', label: 'Skeleton', system: 'SKELETAL', assetSlot: 'human.layer.skeleton.high_fidelity.glb', visibleByDefault: false, pickable: true, isolatable: true, crossSectionCompatible: true, hyperscopeTarget: 'TISSUE', lodAssetSlots: { full: 'human.layer.skeleton.high_fidelity.glb', medium: 'human.layer.skeleton.medium.glb', low: 'human.layer.skeleton.proxy' }, assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK' },
+  { id: 'layer:vessels', label: 'Vessels', system: 'CARDIOVASCULAR', assetSlot: 'human.layer.vessels.high_fidelity.glb', visibleByDefault: false, pickable: true, isolatable: true, crossSectionCompatible: true, hyperscopeTarget: 'TISSUE', lodAssetSlots: { full: 'human.layer.vessels.high_fidelity.glb', medium: 'human.layer.vessels.medium.glb', low: 'human.layer.vessels.proxy' }, assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK' },
+  { id: 'layer:nerves', label: 'Nerves', system: 'NERVOUS', assetSlot: 'human.layer.nerves.high_fidelity.glb', visibleByDefault: false, pickable: true, isolatable: true, crossSectionCompatible: true, hyperscopeTarget: 'SUBCELLULAR', lodAssetSlots: { full: 'human.layer.nerves.high_fidelity.glb', medium: 'human.layer.nerves.medium.glb', low: 'human.layer.nerves.proxy' }, assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK' },
+  { id: 'layer:organs', label: 'Internal organs', assetSlot: 'human.layer.organs.high_fidelity.bundle', visibleByDefault: false, pickable: true, isolatable: true, crossSectionCompatible: true, hyperscopeTarget: 'CELL', lodAssetSlots: { full: 'human.layer.organs.high_fidelity.bundle', medium: 'human.layer.organs.medium.bundle', low: 'human.layer.organs.proxy' }, assetGovernance: 'REQUIRES_APPROVED_ASSET_OR_PROCEDURAL_FALLBACK' },
+]);
 
 const SYSTEMS: readonly { id: OrganSystemId; label: string }[] = [
   { id: 'INTEGUMENTARY', label: 'Integumentary System' },
@@ -21,7 +55,7 @@ const SYSTEMS: readonly { id: OrganSystemId; label: string }[] = [
 
 function node(args: Omit<AnatomyNode, 'children' | 'representation'>): AnatomyNode {
   return { ...args, children: [], representation: {
-    provenance: { source: 'GENESIS-ANATOMY-0.1', description: 'Procedural canonical atlas in humanLab/anatomyAtlas.ts; illustrative dimensions, not a measured subject or imported scan.' },
+    provenance: { source: ANATOMY_ATLAS_VERSION, description: 'Procedural canonical atlas in humanLab/anatomyAtlas.ts; illustrative dimensions, not a measured subject or imported scan.' },
     confidence: { status: 'UNKNOWN', reason: 'No calibrated confidence in this procedural representation has been supplied.' },
     resolution: { status: 'UNSPECIFIED', reason: 'No source acquisition resolution; geometry and display scale are not scientific resolution.' },
   } };
@@ -59,7 +93,20 @@ export function createHumanDigitalTwinManifest(twinId = `HDT-${stableHash(Date.n
     node({ id: 'small-intestine', parentId: 'abdomen', kind: 'ORGAN', label: 'Small Intestine', system: 'DIGESTIVE', scaleMeters: 0.20, positionMeters: P(0, 0.79, 0), dimensionsMeters: D(0.25, 0.22, 0.16), assetSlot: 'human.organ.intestine.small.high_fidelity.glb', visibleByDefault: false, epistemic: 'MODEL' }),
   ];
   const systemNodes = SYSTEMS.map((s) => node({ id: `system:${s.id.toLowerCase()}`, parentId: 'body', kind: 'SYSTEM', label: s.label, system: s.id, scaleMeters: parameters.heightMeters, positionMeters: P(0, parameters.heightMeters / 2, 0), dimensionsMeters: D(0.50, parameters.heightMeters, 0.30), assetSlot: `human.system.${s.id.toLowerCase()}.bundle`, visibleByDefault: false, epistemic: 'MODEL' }));
-  const nodes = [root, ...regions, ...systemNodes, ...organs];
+  const layerNodes = CANONICAL_ANATOMY_LAYER_SHELL.map((layer) => node({
+    id: layer.id,
+    parentId: 'body',
+    kind: 'STRUCTURE',
+    label: layer.label,
+    ...(layer.system ? { system: layer.system } : {}),
+    scaleMeters: parameters.heightMeters,
+    positionMeters: P(0, parameters.heightMeters / 2, 0),
+    dimensionsMeters: D(parameters.shoulderWidthMeters, parameters.heightMeters, 0.30),
+    assetSlot: layer.assetSlot,
+    visibleByDefault: layer.visibleByDefault,
+    epistemic: 'MODEL',
+  }));
+  const nodes = [root, ...regions, ...systemNodes, ...layerNodes, ...organs];
   const childMap = new Map<string, string[]>();
   for (const n of nodes) childMap.set(n.id, []);
   for (const n of nodes) if (n.parentId) childMap.get(n.parentId)?.push(n.id);
@@ -69,17 +116,18 @@ export function createHumanDigitalTwinManifest(twinId = `HDT-${stableHash(Date.n
     scale: 'REAL_WORLD_1_TO_1',
     parameters,
     rootNodeId: 'body',
-    anatomyVersion: 'GENESIS-ANATOMY-0.1',
+    anatomyVersion: ANATOMY_ATLAS_VERSION,
     nodes: finalized,
     relationships: organs.filter((organ) => organ.system).map((organ) => ({
       kind: 'SYSTEM_HAS_ORGAN', fromNodeId: `system:${organ.system!.toLowerCase()}`, toNodeId: organ.id,
-      provenance: { source: 'GENESIS-ANATOMY-0.1', description: `Declared primary system membership of ${organ.id} in the canonical atlas; not a claim of exhaustive biological membership.` },
+      provenance: { source: ANATOMY_ATLAS_VERSION, description: `Declared primary system membership of ${organ.id} in the canonical atlas; not a claim of exhaustive biological membership.` },
     })),
     supportedSystems: SYSTEMS.map((s) => s.id),
     clinicalUse: 'NOT_A_MEDICAL_DEVICE',
     notes: [
       '1:1 means world-scale and parameterized anatomy dimensions; it is not a medical replica of a specific person.',
       'High-fidelity production assets are referenced by assetSlot and must be supplied/validated separately.',
+      'Layer IDs are stable integration targets; external layer meshes remain blocked until assetGovernance approves their provenance, license and runtime file.',
       'Anatomical geometry is MODEL unless linked to a validated external dataset.',
     ],
   };

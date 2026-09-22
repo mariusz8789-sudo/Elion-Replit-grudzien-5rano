@@ -160,6 +160,16 @@ export {
 } from '../metaCognition/decisionTrace';
 
 export {
+  SPACETIME_WORLD_PROPOSAL_VERSION,
+  inferSpacetimeWorldTemplate,
+  proposeSpacetimeWorld,
+  resolveSpacetimeWorldProposal,
+  spacetimeEpistemicLabel,
+  type SpacetimePromptRequest,
+  type SpacetimeWorldResolution,
+} from '../worldModel/generation/spacetimeWorldProposal';
+
+export {
   SPACETIME_VISUALIZATION_VERSION,
   gravityWellPotentialField,
   wormholeEmbeddingGeometry,

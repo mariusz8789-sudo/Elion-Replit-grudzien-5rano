@@ -19,7 +19,11 @@ import type { WorldSpecification } from './worldSpecification';
 export const KNOWN_SCIENTIFIC_DOMAINS = ['chemistry', 'epidemiology', 'hydraulics', 'kinematics'] as const;
 export type KnownScientificDomain = (typeof KNOWN_SCIENTIFIC_DOMAINS)[number];
 
-const KNOWN_TEMPLATE_IDS = ['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE'] as const;
+const KNOWN_TEMPLATE_IDS = [
+  'CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE',
+  'EINSTEIN_ROSEN_BRIDGE', 'MULTIVERSE_BRANCH', 'TIME_DILATION_LAB', 'QUANTUM',
+  'COSMOLOGY_SPACETIME', 'HISTORICAL_RECONSTRUCTION', 'DESERT_ALIEN', 'MARS_RESEARCH',
+] as const;
 const KNOWN_SCALE_LEVELS = [
   'PLANET',
   'REGION',

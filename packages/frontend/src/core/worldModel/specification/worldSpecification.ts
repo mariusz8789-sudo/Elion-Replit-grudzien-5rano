@@ -26,8 +26,26 @@ import type { WorldBlueprintNode, WorldBlueprintRelationship } from '../generati
  * is safe to log, diff, hash, or store, exactly like a `WorldBlueprint` is.
  */
 
-/** The composable base world templates — see specification/templates.ts. A specification MAY request several at once ("CITY + LABORATORY + WATER_SYSTEM"), which the compiler composes into one coherent world, never separate disconnected demos. */
-export type WorldTemplateId = 'CITY' | 'LABORATORY' | 'WATER_SYSTEM' | 'EPIDEMIOLOGY' | 'INDUSTRIAL_SITE';
+/**
+ * The composable base world templates — see specification/templates.ts. A specification MAY
+ * request several at once ("CITY + LABORATORY + WATER_SYSTEM"), which the compiler composes
+ * into one coherent world, never separate disconnected demos.
+ *
+ * The eight SPACETIME_TEMPLATE_IDS (specification/spacetimeTemplates.ts) were added for the
+ * Genesis Spacetime product-binding integration — each is real, honestly-grounded structural
+ * content (a building/observatory/lab), with real solver bindings where one already exists
+ * (QUANTUM reuses the existing `quantumTunneling.ts` split-step-Fourier solver) and explicit
+ * MODEL_ESTIMATE/UNGROUNDED_APPROXIMATION grounding elsewhere — never a fabricated physics claim.
+ */
+export type WorldTemplateId =
+  | 'CITY' | 'LABORATORY' | 'WATER_SYSTEM' | 'EPIDEMIOLOGY' | 'INDUSTRIAL_SITE'
+  | 'EINSTEIN_ROSEN_BRIDGE' | 'MULTIVERSE_BRANCH' | 'TIME_DILATION_LAB' | 'QUANTUM'
+  | 'COSMOLOGY_SPACETIME' | 'HISTORICAL_RECONSTRUCTION' | 'DESERT_ALIEN' | 'MARS_RESEARCH';
+
+export const SPACETIME_TEMPLATE_IDS = [
+  'EINSTEIN_ROSEN_BRIDGE', 'MULTIVERSE_BRANCH', 'TIME_DILATION_LAB', 'QUANTUM',
+  'COSMOLOGY_SPACETIME', 'HISTORICAL_RECONSTRUCTION', 'DESERT_ALIEN', 'MARS_RESEARCH',
+] as const satisfies readonly WorldTemplateId[];
 
 export interface GeographySpec {
   /** Purely structural/topological flags consumed by the CITY template's procedural expansion (specification/templates.ts) — they do not imply a hydrology or terrain solver exists. */

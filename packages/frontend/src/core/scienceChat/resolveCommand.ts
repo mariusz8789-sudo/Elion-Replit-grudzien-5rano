@@ -65,6 +65,8 @@ export type ChatAction =
   | { type: 'searchResearchChains'; query: ResearchChainSearchQuery }
   | { type: 'compare'; a: ModelConfig; b: ModelConfig }
   | { type: 'openRoute'; hash: string }
+  /** Opens the existing canonical World Director with the user's unchanged prompt. */
+  | { type: 'openWorldPrompt'; prompt: string }
   /** GENESIS WORLD INTERACTION — forwards one sentence to whichever real 3D scene is currently
    * open, via `activeObservationControl.ts`. Never decided HERE whether the named object exists or
    * the scene even supports observation commands — that is `ScienceChat.tsx`'s side effect to
@@ -668,6 +670,39 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
       action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
+  // --- CANONICAL WORLDS FROM CHAT -------------------------------------------------
+  // Dedicated permanent worlds win before the free-form generation command. The
+  // free-form branch only transports the original text to World Director; that
+  // existing bounded resolver remains the single authority that accepts/refuses
+  // a WorldSpecification.
+  if (has(norm, 'otworz cern', 'pokaz cern', 'wejdz do cern', 'open cern', 'cern complex')) {
+    return {
+      text: 'Otwieram stały kompleks CERN. To modelowane środowisko badawcze Genesis, nie połączenie z infrastrukturą CERN w czasie rzeczywistym.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/cern-complex' },
+    };
+  }
+  if (has(norm, 'otworz genesis lab', 'otworz glowne laboratorium', 'pokaz genesis lab', 'open genesis lab', 'open main lab')) {
+    return {
+      text: 'Otwieram stały świat Genesis Lab — kanoniczne laboratorium naukowe z istniejącymi stacjami i eksperymentami.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/scientific-worlds' },
+    };
+  }
+  if (
+    /\b(create|generate|build|stworz|wygeneruj|zbuduj)\b/.test(norm)
+    && /\b(world|city|colony|planet|civilization|swiat|miasto|koloni|planete|cywilizacj)\b/.test(norm)
+  ) {
+    return {
+      text: 'Przekazuję Twój prompt do kanonicznego World Directora. Jeśli żądany typ świata nie jest obsługiwany, generator odmówi jawnie zamiast podstawiać inną scenę.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openWorldPrompt', prompt: message.trim() },
     };
   }
 

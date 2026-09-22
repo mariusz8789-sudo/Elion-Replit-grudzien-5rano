@@ -21,6 +21,7 @@ export const SPACETIME_PRODUCT_TEMPLATES = [
   'HISTORICAL_RECONSTRUCTION',
   'DESERT_ALIEN',
   'MARS_RESEARCH',
+  'UNDERWATER_RESEARCH_CITY',
 ] as const satisfies readonly WorldTemplateId[];
 
 export type SpacetimeProductTemplate = (typeof SPACETIME_PRODUCT_TEMPLATES)[number];
@@ -36,6 +37,7 @@ export function inferSpacetimeWorldTemplate(prompt: string): SpacetimeProductTem
   if (/historical|reconstruction|battle|historycz|rekonstrukcj|bitw/.test(text)) return 'HISTORICAL_RECONSTRUCTION';
   if (/alien|two suns|desert planet|obc.*planet|dwa słońca|pustynn/.test(text)) return 'DESERT_ALIEN';
   if (/mars|martian/.test(text)) return 'MARS_RESEARCH';
+  if (/underwater|undersea|subsea|ocean city|podwodn|glebinow/.test(text)) return 'UNDERWATER_RESEARCH_CITY';
   throw new Error('WORLD_PROMPT_UNSUPPORTED: request a supported spacetime, quantum, historical, alien, or Mars world');
 }
 
@@ -87,6 +89,8 @@ export function createSpacetimeWorldSpecification(prompt: string): { readonly pr
       return { primaryTemplate, specification: { ...base, scale: 'PLANET' } };
     case 'MARS_RESEARCH':
       return { primaryTemplate, specification: { ...base, scale: 'PLANET', worldType: [primaryTemplate, 'LABORATORY'], scientificDomains: [{ domain: 'chemistry', required: false }] } };
+    case 'UNDERWATER_RESEARCH_CITY':
+      return { primaryTemplate, specification: { ...base, scale: 'REGION', worldType: [primaryTemplate, 'LABORATORY'], scientificDomains: [{ domain: 'chemistry', required: false }] } };
   }
 }
 

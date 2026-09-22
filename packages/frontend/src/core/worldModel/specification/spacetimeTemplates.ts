@@ -161,3 +161,19 @@ export const MARS_RESEARCH_TEMPLATE: WorldTemplate = () => {
     ids: { stationId, terrainId },
   };
 };
+
+/** Structural deep-ocean habitat; parameters are declared scenario inputs, not observations. */
+export const UNDERWATER_RESEARCH_CITY_TEMPLATE: WorldTemplate = () => {
+  const habitatId: EntityId = 'building:underwater-research-habitat';
+  const oceanId: EntityId = 'environment:underwater-ocean-context';
+  const observatoryId: EntityId = 'instrument:underwater-observatory';
+  return {
+    children: [
+      node('environment', 'underwater-ocean-context', 'Deep-Ocean Simulation Context', { x: 0, y: -28, z: 0 }, { depthM: 850, pressureBar: 86.8, visibilityM: 38 }, 'SIMULATION · DECLARED OCEAN PARAMETERS', 'REGION'),
+      node('building', 'underwater-research-habitat', 'Underwater Research City', { x: 0, y: -24, z: 0 }, { habitatModules: 8, crewCapacity: 36, pressureRatedDepthM: 1000 }, 'SIMULATION · RESEARCH HABITAT', 'BUILDING'),
+      node('instrument', 'underwater-observatory', 'Deep-Ocean Observation Array', { x: 18, y: -29, z: -12 }, { sensorNodes: 12, sampleIntervalSeconds: 30 }, 'SIMULATION · INSTRUMENT ARRAY', 'ROOM'),
+    ],
+    ...EMPTY,
+    ids: { habitatId, oceanId, observatoryId },
+  };
+};

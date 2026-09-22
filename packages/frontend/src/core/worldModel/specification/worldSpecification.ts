@@ -40,7 +40,8 @@ export type WorldTemplateId =
   | 'MULTIVERSE_BRANCH'
   | 'HISTORICAL_RECONSTRUCTION'
   | 'DESERT_ALIEN'
-  | 'MARS_RESEARCH';
+  | 'MARS_RESEARCH'
+  | 'UNDERWATER_RESEARCH_CITY';
 
 /** Parameters consumed only by the composable spacetime/world templates. */
 export interface SpacetimeWorldParameters {

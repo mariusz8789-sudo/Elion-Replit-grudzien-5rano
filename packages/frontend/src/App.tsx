@@ -253,7 +253,7 @@ function parseHash(): Route {
   if (h === '#/human-biology-lab' || h.startsWith('#/human-biology-lab?')) return { kind: 'scientific-worlds', world: 'biology' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
-  if (h === '#/world-director') return { kind: 'world-director' };
+  if (h === '#/world-director' || h.startsWith('#/world-director?')) return { kind: 'world-director' };
   if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
   if (h === '#/mirror') return { kind: 'mirror' };
   return { kind: 'home' };

@@ -55,7 +55,12 @@ export function WorldDirectorScreen(): JSX.Element {
   const [navigation, setNavigation] = useState<GenesisWorldNavigation>('CINEMATIC');
   const [assetSelection, setAssetSelection] = useState<{ readonly entityId: string; readonly slotType: string } | null>(null);
   const [assetEvidenceHash, setAssetEvidenceHash] = useState<string | null>(null);
-  const [worldPrompt, setWorldPrompt] = useState('Generate an Einstein-Rosen bridge and show a cinematic flythrough.');
+  const initialPrompt = (() => {
+    if (typeof window === 'undefined') return 'Generate an Einstein-Rosen bridge and show a cinematic flythrough.';
+    const query = window.location.hash.split('?')[1] ?? '';
+    return new URLSearchParams(query).get('prompt')?.trim() || 'Generate an Einstein-Rosen bridge and show a cinematic flythrough.';
+  })();
+  const [worldPrompt, setWorldPrompt] = useState(initialPrompt);
   const [submittedPrompt, setSubmittedPrompt] = useState(worldPrompt);
   const productResolution = useMemo(() => {
     try {

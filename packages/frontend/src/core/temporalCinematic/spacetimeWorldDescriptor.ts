@@ -12,7 +12,8 @@ export type SpacetimeRenderKind =
   | 'TIMELINE_BRANCHES'
   | 'HISTORICAL_CITY'
   | 'ALIEN_DESERT'
-  | 'MARS_STATION';
+  | 'MARS_STATION'
+  | 'UNDERWATER_CITY';
 
 export interface SpacetimeRenderPrimitive {
   readonly id: string;
@@ -97,6 +98,7 @@ function genericDescriptor(template: WorldTemplateId, entities: readonly WorldMo
     HISTORICAL_RECONSTRUCTION: { kind: 'HISTORICAL_CITY', title: 'Historical Reconstruction', epistemic: 'RECONSTRUCTION', palette: ['#120d09', '#d8a96d', '#566777'], limitations: ['Unsourced details remain inferred reconstruction.'] },
     DESERT_ALIEN: { kind: 'ALIEN_DESERT', title: 'Fiction-Inspired Desert World', epistemic: 'FICTION_INSPIRED', palette: ['#150a07', '#e08a43', '#83d9ff'], limitations: ['No claim that this planet or its ruins exist.'] },
     MARS_RESEARCH: { kind: 'MARS_STATION', title: 'Mars Research World', epistemic: 'SIMULATION', palette: ['#100908', '#ce5f3d', '#7fcfff'], limitations: ['Station layout is simulated; planetary parameters are model inputs.'] },
+    UNDERWATER_RESEARCH_CITY: { kind: 'UNDERWATER_CITY', title: 'Underwater Research City', epistemic: 'SIMULATION', palette: ['#010b16', '#1bb9d4', '#78f0dc'], limitations: ['Depth, pressure and habitat layout are declared simulation inputs, not observations of a real site.'] },
   };
   const config = configs[template];
   if (!config) throw new Error(`SPACETIME_DESCRIPTOR_UNSUPPORTED:${template}`);

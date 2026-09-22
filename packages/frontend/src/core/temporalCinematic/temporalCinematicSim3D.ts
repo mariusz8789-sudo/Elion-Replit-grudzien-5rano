@@ -62,6 +62,8 @@ export function spacetimePresentationProfile(kind: SpacetimeWorldDescriptor['kin
       return { environmentMode: 'OUTDOOR', hourOfDay: 15.8, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.48, sunIntensity: 1.8, exposure: 0.86, bloom: { strength: 0.28, radius: 0.58, threshold: 0.88 }, livingWorld: false };
     case 'MARS_STATION':
       return { environmentMode: 'OUTDOOR', hourOfDay: 15.4, fogDensity: 0.0016, ambientHaze: true, fillIntensity: 0.46, sunIntensity: 1.85, exposure: 0.86, bloom: { strength: 0.2, radius: 0.5, threshold: 0.96 }, livingWorld: false };
+    case 'UNDERWATER_CITY':
+      return { environmentMode: 'OUTDOOR', hourOfDay: 11, fogDensity: 0.012, ambientHaze: true, fillIntensity: 0.24, sunIntensity: 0.58, exposure: 0.76, bloom: { strength: 0.34, radius: 0.62, threshold: 0.82 }, livingWorld: false };
     default:
       return { environmentMode: 'INDOOR', hourOfDay: 21, fogDensity: 0, ambientHaze: false, fillIntensity: 0.08, sunIntensity: 0.72, exposure: 0.72, bloom: { strength: 0.46, radius: 0.72, threshold: 0.76 }, livingWorld: false };
   }
@@ -181,6 +183,8 @@ export class TemporalCinematicSim3D implements Sim3D {
             ? { color: 0xd87538, opacity: 0.035, count: 120 }
             : this.presentation.spacetimeDescriptor?.kind === 'MARS_STATION'
               ? { color: 0xb95e43, opacity: 0.025, count: 90 }
+              : this.presentation.spacetimeDescriptor?.kind === 'UNDERWATER_CITY'
+                ? { color: 0x1aa8bd, opacity: 0.045, count: 150 }
               : undefined,
         }
       : {

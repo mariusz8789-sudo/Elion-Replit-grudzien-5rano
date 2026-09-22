@@ -646,6 +646,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     } else if (a?.type === 'openRoute') {
       window.location.hash = a.hash;
       setOpen(false);
+    } else if (a?.type === 'openWorldPrompt') {
+      window.location.hash = `#/world-director?prompt=${encodeURIComponent(a.prompt)}`;
+      setOpen(false);
     } else if (a?.type === 'setParam') {
       getSimContext()?.setParam(a.key, a.value);
     } else if (a?.type === 'control') {

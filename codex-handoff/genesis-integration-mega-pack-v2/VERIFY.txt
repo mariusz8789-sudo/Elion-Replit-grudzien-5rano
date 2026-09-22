@@ -1,0 +1,14 @@
+Package: genesis-integration-mega-pack-v2
+Verification performed: clean-state rebuild (node_modules, dist, package-lock.json deleted, npm install from package.json, tsc --noEmit, tsc build, node dist/tests/run.js)
+
+TypeScript strict build: PASS (rc=0)
+(no build output)
+
+Tests: PASS (rc=0)
+  core (mirror/deviceSafety/d141/precisionBay/bioRealLab/coreHardening/historicalEpistemic): 20/20 PASS
+  new (providerRouter/astraWorldAuthor/cyberScientist/drugDiscovery): 13/13 PASS
+GENESIS-INTEGRATION-MEGA-PACK-V2 tests: 33/33 PASS
+
+This verifies the standalone transfer package only, not integration into the real
+Genesis repository. See CODEX_INTEGRATION_PROMPT.md and LOCAL_VALIDATION_CHECKLIST.md
+for required production bindings and local-only verification.

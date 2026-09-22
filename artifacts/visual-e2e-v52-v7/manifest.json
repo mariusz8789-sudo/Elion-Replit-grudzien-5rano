@@ -1,0 +1,57 @@
+{
+  "capturedAt": "2026-09-21T18:54:50.573Z",
+  "base": "http://127.0.0.1:5000",
+  "chromium": "/opt/pw-browsers/chromium",
+  "checks": {
+    "street": {
+      "url": "http://127.0.0.1:5000/#/temporal-cinematic?place=Warsaw&year=2026&duration=3&road=1&weather=RAIN&view=street",
+      "summary": {
+        "viewMode": "street",
+        "interiorRoomId": null,
+        "interiorAssetSlotCount": 0,
+        "livingWorld": true
+      },
+      "webgl": true,
+      "errors": [],
+      "moved": true,
+      "files": [
+        "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/street-rain-0.jpg",
+        "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/street-rain-1.jpg",
+        "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/street-rain-2.jpg"
+      ]
+    },
+    "interior": {
+      "url": "http://127.0.0.1:5000/#/temporal-cinematic?place=Cambridge&year=2026&duration=3&road=1&view=interior&interiors=1",
+      "summary": {
+        "viewMode": "interior",
+        "interiorRoomId": "room:historical:cambridge:2026-district-3-parcel-0-building-floor-1-room-left-0",
+        "interiorAssetSlotCount": 1,
+        "livingWorld": false
+      },
+      "webgl": true,
+      "errors": [],
+      "moved": true,
+      "files": [
+        "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-cambridge-0.jpg",
+        "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-cambridge-1.jpg",
+        "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-cambridge-2.jpg"
+      ]
+    }
+  },
+  "artifacts": [
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/street-rain-0.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/street-rain-1.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/street-rain-2.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-geneva-0.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-geneva-1.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-geneva-2.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-cambridge-0.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-cambridge-1.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/scientific-interior-cambridge-2.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/biology-organ.jpg",
+    "/home/user/Elion-Replit-grudzien-5rano/artifacts/visual-e2e-v52-v7/biology-tissue.jpg"
+  ],
+  "failures": [
+    "page.waitForFunction: Timeout 240000ms exceeded.\n    at captureBiology (/home/user/Elion-Replit-grudzien-5rano/scripts/visual-e2e-v52-v7.mjs:121:16)\n    at async file:///home/user/Elion-Replit-grudzien-5rano/scripts/visual-e2e-v52-v7.mjs:146:19"
+  ]
+}

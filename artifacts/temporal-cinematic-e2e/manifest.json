@@ -1,0 +1,96 @@
+{
+  "capturedAt": "2026-09-21T05:52:11.689Z",
+  "base": "http://127.0.0.1:8181",
+  "weather": "RAIN",
+  "frameCount": 6,
+  "durationSeconds": 3,
+  "scenes": [
+    {
+      "place": "Warsaw",
+      "year": 1900,
+      "hook": {
+        "ready": true,
+        "place": "Warsaw",
+        "year": 1900,
+        "durationSeconds": 3,
+        "sameStreetLocation": null
+      },
+      "hasWebGL": true,
+      "frames": [
+        {
+          "t": 0,
+          "bytes": 91283
+        },
+        {
+          "t": 0.6000000000000001,
+          "bytes": 101492
+        },
+        {
+          "t": 1.2000000000000002,
+          "bytes": 73030
+        },
+        {
+          "t": 1.7999999999999998,
+          "bytes": 86730
+        },
+        {
+          "t": 2.4000000000000004,
+          "bytes": 89667
+        },
+        {
+          "t": 3,
+          "bytes": 86117
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "place": "Warsaw",
+      "year": 2026,
+      "hook": {
+        "ready": true,
+        "place": "Warsaw",
+        "year": 2026,
+        "durationSeconds": 3,
+        "sameStreetLocation": null
+      },
+      "hasWebGL": true,
+      "frames": [
+        {
+          "t": 0,
+          "bytes": 88024
+        },
+        {
+          "t": 0.6000000000000001,
+          "bytes": 85404
+        },
+        {
+          "t": 1.2000000000000002,
+          "bytes": 66463
+        },
+        {
+          "t": 1.7999999999999998,
+          "bytes": 86899
+        },
+        {
+          "t": 2.4000000000000004,
+          "bytes": 92104
+        },
+        {
+          "t": 3,
+          "bytes": 86815
+        }
+      ],
+      "pageErrors": []
+    }
+  ],
+  "realPixelProof": {
+    "sameSceneMotion": true,
+    "skylineDiffers": true
+  },
+  "video": {
+    "code": "READY",
+    "format": "WEBM",
+    "reason": "Playwright-bundled ffmpeg produced 94313 bytes; Playwright-bundled ffmpeg produced 93673 bytes"
+  }
+}

@@ -4,13 +4,14 @@ Branch: `claude/genesis-winner-gate-audit-qgf90v-transfer-handoff`
 Based on: `claude/genesis-c1-visual-integration` @ `d48edeb0` (current release branch tip
 at the time this was created — nothing on that branch was touched or overwritten).
 
-This branch was pushed directly via the GitHub API as a new ref, without ever checking
-out or modifying the working copy that the current release branch (Codex) is developing
-on. Two commits:
+This branch was pushed directly via the GitHub API / by SHA as a new ref, without ever
+checking out or modifying the working copy that the current release branch (Codex) is
+developing on. Commits:
 
 1. Real repo integration work (the "~30%" done directly, in-repo, this round).
 2. This `codex-handoff/` directory (the "~70-75%" — audited, independently re-verified,
    standalone transfer-package source for Codex/a human to review and decide on).
+3. E2E capture evidence artifacts (screenshots/video) backing the V6/V6.1/V7 work.
 
 ## 1. What was done for real, in the repo, this round
 
@@ -36,6 +37,9 @@ on. Two commits:
   canonical `scientificInteriorVisuals.ts`/`geometry.ts`, proven via the real-repo
   `core/e2e/visualStagesGenesisE2E.test.ts`. All re-verified clean this round (`tsc
   --noEmit`, `vitest run` on all touched/added test files).
+- **`artifacts/temporal-cinematic-e2e/`, `artifacts/visual-e2e-v52-v7/`**: the real-browser
+  E2E capture evidence (screenshots + webm) backing the above, included so Codex/a human
+  doesn't have to re-run the capture to see what was actually produced.
 
 Neither of these touches any file on the active release branch's current working set;
 both are additive, standalone, and documented as orphans pending a deliberate wiring

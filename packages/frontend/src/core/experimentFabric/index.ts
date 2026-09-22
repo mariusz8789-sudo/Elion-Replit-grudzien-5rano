@@ -160,6 +160,30 @@ export {
 } from '../metaCognition/decisionTrace';
 
 export {
+  SPACETIME_VISUALIZATION_VERSION,
+  gravityWellPotentialField,
+  wormholeEmbeddingGeometry,
+  wormholeScientificClaim,
+  validateCausalityGraph,
+  explainParadoxType,
+  chronologyProtectionLabel,
+  type GravityWellFieldInput,
+  type GravityWellPoint,
+  type GravityWellField,
+  type WormholeEmbeddingInput,
+  type WormholeEmbeddingPoint,
+  type WormholeScientificClaim,
+  type CausalityNode,
+  type CausalityRelation,
+  type CausalityEdge,
+  type CausalityGraph,
+  type CausalityValidation,
+  type ParadoxKind,
+  type ParadoxExplanation,
+  type ChronologyProtectionAssessment,
+} from '../spacetime/spacetimeVisualization';
+
+export {
   PAIN_RESEARCH_USE_CASE_VERSION,
   PAIN_RESEARCH_GOVERNANCE_ENVELOPE,
   assertNoClinicalOrActuationParameters,

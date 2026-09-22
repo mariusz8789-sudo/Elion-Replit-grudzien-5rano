@@ -171,6 +171,29 @@ export {
 } from './scientificIntegration';
 
 export {
+  PAIN_RESEARCH_VERSION,
+  PAIN_RESEARCH_GOVERNANCE_ENVELOPE,
+  assertNoClinicalOrActuationParameters,
+  runPainResearchQuestion,
+  type PainResearchGovernance,
+  type PainResearchTarget,
+  type PainResearchQuestion,
+  type PainResearchCapabilityStatus,
+  type PainResearchReport,
+} from './painResearch';
+
+export {
+  SPACETIME_INTEGRITY_VERSION,
+  requiredEpistemicLabelForPhysicsClaim,
+  assertNoBackwardTimeTravelClaim,
+  validatePhysicsClaim,
+  validatePhysicsClaims,
+  type PhysicsClaimCategory,
+  type PhysicsClaim,
+  type PhysicsClaimValidation,
+} from './spacetimeIntegrity';
+
+export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,
   confirmCrossDomainOrchestration,

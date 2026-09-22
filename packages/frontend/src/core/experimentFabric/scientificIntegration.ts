@@ -40,6 +40,13 @@ import {
 import { getRouterModel } from './router';
 import type { HypothesisOutcome } from './hypothesisLoop';
 import type { ScientificEvidenceChain } from './scientificDiscovery';
+import { runPainResearchQuestion, type PainResearchQuestion, type PainResearchReport } from './painResearch';
+import {
+  validatePhysicsClaim,
+  requiredEpistemicLabelForPhysicsClaim,
+  type PhysicsClaim,
+  type PhysicsClaimValidation,
+} from './spacetimeIntegrity';
 
 /**
  * SCIENTIFIC INTEGRATION (Work Item 2) — a thin canonical coordinator over
@@ -209,6 +216,71 @@ function emitMetaEvidence(sink: EvidenceSink, cycleId: string, event: { readonly
   sink.addRecord(input);
 }
 
+/**
+ * Runs a caller-supplied pain research question through the real, unmodified `painResearch.ts`
+ * use case, anchored to the SAME evidence sink as the campaign it rides alongside — one Evidence
+ * stream, not a second one. Bounded, non-recursive: `runPainResearchQuestion` may itself call
+ * `runScientificIntegrationCampaign` (for its own `backingProblemId`), but that nested call is
+ * built WITHOUT `painQuestion`/`physicsClaims`, so this never re-enters itself.
+ */
+async function runPainResearchForCampaign(
+  painQuestion: PainResearchQuestion,
+  evidenceSink: EvidenceSink,
+  options: RunScientificCampaignOptions,
+): Promise<PainResearchReport> {
+  return runPainResearchQuestion(painQuestion, evidenceSink, {
+    maxCycles: options.maxCycles,
+    ...(options.providers !== undefined ? { providers: options.providers } : {}),
+    ...(options.invokePort !== undefined ? { invokePort: options.invokePort } : {}),
+  });
+}
+
+function emitPhysicsClaimEvidence(evidenceSink: EvidenceSink, problemId: string, validation: PhysicsClaimValidation): void {
+  const input: EvidenceRecordInput = {
+    sourceUrl: `genesis://scientific-integration/${problemId}/spacetime/${validation.claim.claimId}`,
+    claim: `SPACETIME_CLAIM_VALIDATED category=${validation.claim.category} assignedLabel=${validation.claim.assignedLabel} requiredLabel=${validation.requiredLabel} ok=${validation.ok}${validation.reason ? ` reason=${validation.reason}` : ''}`,
+    claimType: 'SPACETIME_CLAIM_VALIDATION',
+    confidence: 1,
+    provenance: {
+      category: validation.claim.category,
+      assignedLabel: validation.claim.assignedLabel,
+      requiredLabel: validation.requiredLabel,
+      sourceIds: validation.claim.sourceIds,
+    },
+  };
+  evidenceSink.addRecord(input);
+}
+
+/**
+ * Validates every caller-supplied physics claim against the real `spacetimeIntegrity.ts`
+ * validator and anchors each verdict into the canonical Evidence ledger — EVIDENCE_BACKED only
+ * with real provenance, never silently accepted. A claim that throws (a forbidden truth-upgrade,
+ * or a backward-time-travel assertion) is reported as an explicit, reasoned rejection rather than
+ * aborting the whole batch — "never silently promoted to verified science" means the rejection is
+ * loud and recorded, not that one bad claim crashes every other claim's honest verdict.
+ */
+function validatePhysicsClaimsForCampaign(
+  problemId: string,
+  evidenceSink: EvidenceSink,
+  physicsClaims: readonly PhysicsClaim[],
+): readonly PhysicsClaimValidation[] {
+  return physicsClaims.map((claim) => {
+    let validation: PhysicsClaimValidation;
+    try {
+      validation = validatePhysicsClaim(claim);
+    } catch (err) {
+      validation = {
+        claim,
+        requiredLabel: requiredEpistemicLabelForPhysicsClaim(claim.category, claim.sourceIds),
+        ok: false,
+        reason: err instanceof Error ? err.message : String(err),
+      };
+    }
+    emitPhysicsClaimEvidence(evidenceSink, problemId, validation);
+    return validation;
+  });
+}
+
 function alternativesFor(cycle: ResearchCycle): readonly DecisionAlternative[] {
   const winnerId = cycle.result.loop.discrimination.winnerHypothesisId;
   return cycle.result.loop.outcomes.map((outcome): DecisionAlternative => {
@@ -257,12 +329,20 @@ export interface ScientificCampaignResult {
   readonly stoppedBecause: NoJustifiedNextQuestion | { readonly status: 'MAX_CYCLES_REACHED'; readonly maxCycles: number };
   /** Real per-cycle solver/model availability, aggregated — never a fabricated capability. */
   readonly capabilityReport: CapabilityIntrospectionReport;
+  /** Present only when the caller supplied `painQuestion` — the real, honest Pain Discovery verdict (BLOCKED/PARTIAL) for that question, anchored to this same Evidence stream. */
+  readonly painResearchResult?: PainResearchReport;
+  /** Present only when the caller supplied `physicsClaims` — one real, Evidence-anchored verdict per claim, never a fabricated label. */
+  readonly spacetimeIntegrityResults?: readonly PhysicsClaimValidation[];
 }
 
 export interface RunScientificCampaignOptions {
   readonly maxCycles?: number;
   readonly providers?: readonly ModelProviderDescriptor[];
   readonly invokePort?: ModelInvokePort;
+  /** Optional: a pain research question to run alongside this campaign, through the real, unmodified `painResearch.ts` use case. Never a second campaign engine — see `runPainResearchForCampaign`. */
+  readonly painQuestion?: PainResearchQuestion;
+  /** Optional: physics claims (wormhole/multiverse/time-dilation/gravity-well/historical-reconstruction/etc.) to validate alongside this campaign, through the real, unmodified `spacetimeIntegrity.ts` validator. */
+  readonly physicsClaims?: readonly PhysicsClaim[];
 }
 
 function statusForCycle(cycle: ResearchCycle): ScientificCampaignStatus {
@@ -341,6 +421,15 @@ export async function runScientificIntegrationCampaign(
   };
   const capabilityReport = (): CapabilityIntrospectionReport => introspectCapabilities(cycles.map((r) => capabilityDescriptorForCycle(r.cycle)));
 
+  const painResearchResult =
+    options.painQuestion !== undefined ? await runPainResearchForCampaign(options.painQuestion, evidenceSink, options) : undefined;
+  const spacetimeIntegrityResults =
+    options.physicsClaims !== undefined ? validatePhysicsClaimsForCampaign(problemId, evidenceSink, options.physicsClaims) : undefined;
+  const sideResults = {
+    ...(painResearchResult !== undefined ? { painResearchResult } : {}),
+    ...(spacetimeIntegrityResults !== undefined ? { spacetimeIntegrityResults } : {}),
+  };
+
   let current: ResearchCycle = await startResearchCampaign(problemId);
   await pushCycle(current);
 
@@ -353,6 +442,7 @@ export async function runScientificIntegrationCampaign(
         cycles,
         stoppedBecause: { status: 'MAX_CYCLES_REACHED', maxCycles },
         capabilityReport: capabilityReport(),
+        ...sideResults,
       };
     }
     const step = await continueResearchCampaign(current);
@@ -368,6 +458,7 @@ export async function runScientificIntegrationCampaign(
         cycles,
         stoppedBecause: step,
         capabilityReport: capabilityReport(),
+        ...sideResults,
       };
     }
     current = step;

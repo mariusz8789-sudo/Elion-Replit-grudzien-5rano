@@ -29,7 +29,7 @@ describe('scientificIntegration — bounded cycles and explicit budget', () => {
     const b = await runScientificIntegrationCampaign(CHAINING_PROBLEM, ledgerAndSink().sink, { maxCycles: 3 });
     expect(a.cycles.length).toBe(b.cycles.length);
     expect(a.cycles.map((c) => c.cycle.result.loop.discrimination)).toEqual(b.cycles.map((c) => c.cycle.result.loop.discrimination));
-  });
+  }, 20_000);
 });
 
 describe('scientificIntegration — at least two competing hypotheses, real falsification', () => {

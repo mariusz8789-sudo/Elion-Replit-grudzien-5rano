@@ -116,6 +116,26 @@ export { QUANTUM_EVIDENCE_CARD_VERSION, createMajorana1QuantumEvidenceCard, quan
 export { SCENARIO_CAPSULE_VERSION, createScenarioCapsule, replayScenarioCapsule, serializeScenarioCapsule, type ScenarioCapsuleReplayStatus, type ScenarioCapsuleInput, type SpatialScenarioAttachment, type ReproducibleScenarioCapsule, type ScenarioCapsuleReplay } from './scenarioCapsule';
 export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normalizeOsmMapXml, type SpatialLayer, type LonLat, type GenesisSpatialFeature, type GenesisSpatialDataset, type OsmMapImportRequest } from './spatialImport';
 export {
+  MODEL_ROUTER_CONTRACT_VERSION,
+  isModelRouterTaskClass,
+  routeModelRequest,
+  attachSolverVerification,
+  type ModelRouterTaskClass,
+  type ModelProviderIdentity,
+  type ModelProviderDescriptor,
+  type EvidenceRef as ModelRouterEvidenceRef,
+  type SolverVerification,
+  type ModelResultKind,
+  type ModelReasoningRequest,
+  type ModelInvokeResult,
+  type ModelInvokePort,
+  type ModelRoutingBlocked,
+  type ModelRoutingResult,
+  type ModelRouterOutcome,
+  type SolverVerifiedResult,
+} from './modelRouter';
+
+export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,
   confirmCrossDomainOrchestration,

@@ -5,6 +5,24 @@ import type { EntityId, GroundingLevel, WorldModelEntity, WorldModelEntityPatch 
 import type { WorldGraph } from '../ecs/worldGraph';
 
 /**
+ * Specialist solver adapters (Work Item 6, this integration): re-exported here so a caller
+ * constructing a `SolverRouter` can `.register(...)` them the same way it already does for
+ * `newtonianKinematicsSolver`/`makeHydraulicFrictionSolver` below — this router never
+ * auto-registers any solver itself, and these are no exception. See `specialistSolvers.ts`
+ * for what was (and deliberately was not) added and why.
+ */
+export {
+  SPECIALIST_SOLVERS_VERSION,
+  LOGISTIC_GROWTH_SOLVER_ID,
+  LOGISTIC_GROWTH_DOMAIN_ID,
+  DEFAULT_LOGISTIC_GROWTH_PARAMS,
+  logisticGrowthStep,
+  makeLogisticGrowthSolver,
+  logisticGrowthSolver,
+  type LogisticGrowthParams,
+} from './specialistSolvers';
+
+/**
  * SOLVER ROUTER & GROUNDING LAYER.
  *
  * Routes each entity's per-tick update to the real Genesis domain solver its

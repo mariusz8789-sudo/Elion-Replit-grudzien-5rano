@@ -8,6 +8,8 @@ import {
   unverifiedWorldAssetCount,
   approvedAssetsMissingProvenance,
   assetFileChecksum,
+  evaluatePremiumAssetAcceptance,
+  type PremiumAssetCandidate,
 } from '../core/three/assetGovernance';
 
 describe('World Engine asset governance', () => {
@@ -76,5 +78,198 @@ describe('World Engine asset governance — provenance completeness', () => {
     expect(isWorldAssetApproved('/assets/genesis-hf/pbr/asphalt/diffuse.jpg')).toBe(false);
     expect(getWorldAssetRecord('/assets/genesis-hf/pbr/')?.status).toBe('UNVERIFIED');
     expect(isWorldAssetApproved('/assets/nieistniejacy/asset.glb')).toBe(false);
+  });
+});
+
+describe('Premium asset acceptance gate', () => {
+  const goodLicense = {
+    name: 'CC0-1.0',
+    url: 'https://creativecommons.org/publicdomain/zero/1.0/',
+    requiresAttribution: false,
+    permitsCommercialRedistribution: true as const,
+    aiRestriction: 'NONE' as const,
+  };
+  const goodProvenance = {
+    sourceName: 'Poly Haven — Reference Asset',
+    sourceUrl: 'https://polyhaven.com/a/reference_asset',
+    sha256: { 'reference_asset.glb': 'a'.repeat(64) },
+    immutableSource: true,
+  };
+  const goodAnatomy = {
+    separateMeshes: true,
+    stableMeshIds: ['organ.heart', 'organ.liver'],
+    supportsOrganPicking: true,
+    supportsIsolation: true,
+    supportsCrossSection: true,
+  };
+  const goodPerformance = {
+    polygonCount: 200_000,
+    maxPolygonBudget: 500_000,
+    textureResolutionPx: 2048,
+    maxTextureResolutionPx: 4096,
+    hasLod: true,
+    lodLevels: 3,
+    ktx2Ready: true,
+    meshoptReady: true,
+    dracoReady: false,
+    realTimeWebSuitable: true,
+  };
+  const goodScientificProvenance = {
+    datasetOrReference: 'Visible Human Project (NLM)',
+    reviewedBy: 'in-house anatomist review',
+    citationUrl: 'https://www.nlm.nih.gov/research/visible/visible_human.html',
+  };
+
+  function environmentCandidate(overrides: Partial<PremiumAssetCandidate> = {}): PremiumAssetCandidate {
+    return {
+      id: 'candidate-env',
+      assetClass: 'ENVIRONMENT_OR_PROP',
+      license: goodLicense,
+      provenance: goodProvenance,
+      anatomy: goodAnatomy,
+      performance: goodPerformance,
+      scientificProvenance: goodScientificProvenance,
+      ...overrides,
+    };
+  }
+
+  function anatomicalCandidate(overrides: Partial<PremiumAssetCandidate> = {}): PremiumAssetCandidate {
+    return { ...environmentCandidate(overrides), id: 'candidate-anatomy', assetClass: 'ANATOMICAL', ...overrides };
+  }
+
+  it('acceptable CC0 environment: APPROVED', () => {
+    const result = evaluatePremiumAssetAcceptance(environmentCandidate());
+    expect(result.decision).toBe('APPROVED');
+    expect(result.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('a complete, unambiguous anatomical candidate is also APPROVED — the happy path is reachable, not just the fallbacks', () => {
+    const result = evaluatePremiumAssetAcceptance(anatomicalCandidate());
+    expect(result.decision).toBe('APPROVED');
+  });
+
+  it('attribution-required anatomy: LEGAL_REVIEW_REQUIRED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      anatomicalCandidate({ license: { ...goodLicense, name: 'CC-BY-4.0', requiresAttribution: true } }),
+    );
+    expect(result.decision).toBe('LEGAL_REVIEW_REQUIRED');
+    expect(result.reasons.some((r) => r.toLowerCase().includes('attribution'))).toBe(true);
+  });
+
+  it('unclear "no AI" license: LEGAL_REVIEW_REQUIRED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ license: { ...goodLicense, aiRestriction: 'UNKNOWN' } }),
+    );
+    expect(result.decision).toBe('LEGAL_REVIEW_REQUIRED');
+    expect(result.reasons.some((r) => r.toLowerCase().includes('ai-related restriction'))).toBe(true);
+  });
+
+  it('inseparable anatomy: REJECTED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      anatomicalCandidate({ anatomy: { separateMeshes: false, stableMeshIds: [], supportsOrganPicking: false, supportsIsolation: false, supportsCrossSection: false } }),
+    );
+    expect(result.decision).toBe('REJECTED');
+    expect(result.reasons.some((r) => r.includes('organ picking/isolation/cross-section'))).toBe(true);
+  });
+
+  it('excessive geometry/textures: OPTIMIZATION_REQUIRED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ performance: { ...goodPerformance, polygonCount: 2_000_000, textureResolutionPx: 8192 } }),
+    );
+    expect(result.decision).toBe('OPTIMIZATION_REQUIRED');
+    expect(result.reasons.some((r) => r.includes('Polygon count'))).toBe(true);
+    expect(result.reasons.some((r) => r.includes('Texture resolution'))).toBe(true);
+  });
+
+  it('missing hashes: REJECTED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ provenance: { ...goodProvenance, sha256: {} } }),
+    );
+    expect(result.decision).toBe('REJECTED');
+    expect(result.reasons.some((r) => r.includes('No SHA-256'))).toBe(true);
+  });
+
+  it('redistribution restriction: REJECTED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ license: { ...goodLicense, permitsCommercialRedistribution: false } }),
+    );
+    expect(result.decision).toBe('REJECTED');
+    expect(result.reasons.some((r) => r.toLowerCase().includes('forbids commercial redistribution'))).toBe(true);
+  });
+
+  it('unclear redistribution permission (not explicitly denied): LEGAL_REVIEW_REQUIRED, not REJECTED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ license: { ...goodLicense, permitsCommercialRedistribution: 'UNKNOWN' } }),
+    );
+    expect(result.decision).toBe('LEGAL_REVIEW_REQUIRED');
+  });
+
+  it('missing scientific provenance on an otherwise-complete anatomical candidate: SCIENTIFIC_PROVENANCE_REQUIRED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      anatomicalCandidate({ scientificProvenance: { datasetOrReference: null, reviewedBy: null, citationUrl: null } }),
+    );
+    expect(result.decision).toBe('SCIENTIFIC_PROVENANCE_REQUIRED');
+  });
+
+  it('scientific provenance is never required for a non-anatomical environment asset', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ scientificProvenance: { datasetOrReference: null, reviewedBy: null, citationUrl: null } }),
+    );
+    expect(result.decision).toBe('APPROVED');
+  });
+
+  it('a non-pinned (mutable) source is REJECTED even with real hashes', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ provenance: { ...goodProvenance, immutableSource: false } }),
+    );
+    expect(result.decision).toBe('REJECTED');
+  });
+
+  it('a fabricated (non-hex, wrong-length) checksum is REJECTED, not silently accepted', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ provenance: { ...goodProvenance, sha256: { 'asset.glb': 'not-a-real-checksum' } } }),
+    );
+    expect(result.decision).toBe('REJECTED');
+  });
+
+  it('unknown values never pass: an all-unknown candidate is never APPROVED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      anatomicalCandidate({
+        license: { name: null, url: null, requiresAttribution: false, permitsCommercialRedistribution: 'UNKNOWN', aiRestriction: 'UNKNOWN' },
+        provenance: { sourceName: null, sourceUrl: null, sha256: {}, immutableSource: false },
+        performance: { polygonCount: null, maxPolygonBudget: 500_000, textureResolutionPx: null, maxTextureResolutionPx: 4096, hasLod: false, lodLevels: null, ktx2Ready: false, meshoptReady: false, dracoReady: false, realTimeWebSuitable: false },
+        scientificProvenance: { datasetOrReference: null, reviewedBy: null, citationUrl: null },
+      }),
+    );
+    expect(result.decision).not.toBe('APPROVED');
+    expect(result.decision).toBe('REJECTED');
+  });
+
+  it('every decision carries at least one concrete, non-empty reason', () => {
+    const decisions: PremiumAssetCandidate[] = [
+      environmentCandidate(),
+      environmentCandidate({ license: { ...goodLicense, aiRestriction: 'UNKNOWN' } }),
+      environmentCandidate({ performance: { ...goodPerformance, hasLod: false, lodLevels: null } }),
+      anatomicalCandidate({ scientificProvenance: { datasetOrReference: null, reviewedBy: null, citationUrl: null } }),
+    ];
+    for (const candidate of decisions) {
+      const result = evaluatePremiumAssetAcceptance(candidate);
+      expect(result.reasons.length).toBeGreaterThan(0);
+      for (const reason of result.reasons) expect(reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('missing LOD/compression readiness alone triggers OPTIMIZATION_REQUIRED', () => {
+    const result = evaluatePremiumAssetAcceptance(
+      environmentCandidate({ performance: { ...goodPerformance, hasLod: false, lodLevels: null, ktx2Ready: false, meshoptReady: false, dracoReady: false } }),
+    );
+    expect(result.decision).toBe('OPTIMIZATION_REQUIRED');
+  });
+
+  it('does not read from or write to WORLD_ENGINE_ASSET_MANIFEST — a pre-purchase screen, not a second registry', () => {
+    const before = WORLD_ENGINE_ASSET_MANIFEST.length;
+    evaluatePremiumAssetAcceptance(environmentCandidate());
+    evaluatePremiumAssetAcceptance(anatomicalCandidate());
+    expect(WORLD_ENGINE_ASSET_MANIFEST.length).toBe(before);
   });
 });

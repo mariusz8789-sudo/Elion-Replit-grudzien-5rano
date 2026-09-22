@@ -300,3 +300,215 @@ export function assetFileChecksum(runtimePath: string, fileName: string): string
   );
   return folder?.sha256[fileName] ?? null;
 }
+
+/* ============================================================================
+ * PREMIUM ASSET ACCEPTANCE GATE
+ *
+ * A second, fail-closed classification layer over the SAME provenance
+ * vocabulary the manifest above already uses (source, license, sha256) — not
+ * a second manifest or registry. It exists to pre-screen a CANDIDATE asset
+ * (typically a paid/licensed anatomical or premium environment asset under
+ * consideration, not yet purchased or added to WORLD_ENGINE_ASSET_MANIFEST)
+ * before any purchase or integration decision is made. Nothing here writes
+ * to, reads from, or duplicates WORLD_ENGINE_ASSET_MANIFEST; a candidate
+ * that comes back APPROVED still has to be added to the manifest above
+ * exactly like any other asset once actually acquired.
+ *
+ * Every unresolved (null/'UNKNOWN') input field is treated as a failure to
+ * classify, never as an implicit pass — "unknown values must never pass" is
+ * enforced structurally: only an EXPLICITLY good value at every checked
+ * field can reach APPROVED.
+ * ============================================================================
+ */
+
+export type PremiumAssetAcceptanceDecision =
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'LEGAL_REVIEW_REQUIRED'
+  | 'OPTIMIZATION_REQUIRED'
+  | 'SCIENTIFIC_PROVENANCE_REQUIRED';
+
+/** Whether AI-related restrictions apply. 'UNKNOWN' means the license text does not say clearly either way — never treated as 'NONE'. */
+export type PremiumAssetAiRestriction = 'NONE' | 'RESTRICTED' | 'UNKNOWN';
+
+/** Tri-state commercial redistribution permission. 'UNKNOWN' is distinct from `false`: an explicit denial is a REJECTED-tier fact, an unclear one is a LEGAL_REVIEW_REQUIRED-tier fact. */
+export type PremiumAssetRedistributionPermission = true | false | 'UNKNOWN';
+
+export interface PremiumAssetLicenseInfo {
+  readonly name: string | null;
+  readonly url: string | null;
+  readonly requiresAttribution: boolean;
+  readonly permitsCommercialRedistribution: PremiumAssetRedistributionPermission;
+  readonly aiRestriction: PremiumAssetAiRestriction;
+}
+
+export interface PremiumAssetProvenance {
+  readonly sourceName: string | null;
+  readonly sourceUrl: string | null;
+  /** Per-file SHA-256, same shape as `WorldAssetRecord.sha256`. Must be non-empty, real 64-hex digests. */
+  readonly sha256: Readonly<Record<string, string>>;
+  /** Pinned/content-addressed/versioned source, never a mutable "latest" link that can change under us. */
+  readonly immutableSource: boolean;
+}
+
+/** Anatomy-specific structural checks. Only evaluated when `assetClass === 'ANATOMICAL'`. */
+export interface PremiumAssetAnatomy {
+  readonly separateMeshes: boolean;
+  /** Stable, non-empty per-organ mesh identifiers, required whenever `separateMeshes` is true — organ picking has nothing stable to target otherwise. */
+  readonly stableMeshIds: readonly string[];
+  readonly supportsOrganPicking: boolean;
+  readonly supportsIsolation: boolean;
+  readonly supportsCrossSection: boolean;
+}
+
+export interface PremiumAssetPerformanceBudget {
+  readonly polygonCount: number | null;
+  readonly maxPolygonBudget: number;
+  readonly textureResolutionPx: number | null;
+  readonly maxTextureResolutionPx: number;
+  readonly hasLod: boolean;
+  readonly lodLevels: number | null;
+  readonly ktx2Ready: boolean;
+  readonly meshoptReady: boolean;
+  readonly dracoReady: boolean;
+  /** A real-time WebGL/WebGPU delivery judgement, caller-declared (this gate never re-derives it from the numbers above — it only checks the numbers against budgets and takes this flag as a separate, explicit fact). */
+  readonly realTimeWebSuitable: boolean;
+}
+
+/** Required only for `assetClass === 'ANATOMICAL'` — anatomical accuracy needs its own evidence trail, separate from ordinary source/license provenance. */
+export interface PremiumAssetScientificProvenance {
+  readonly datasetOrReference: string | null;
+  readonly reviewedBy: string | null;
+  readonly citationUrl: string | null;
+}
+
+export interface PremiumAssetCandidate {
+  readonly id: string;
+  readonly assetClass: 'ANATOMICAL' | 'ENVIRONMENT_OR_PROP';
+  readonly license: PremiumAssetLicenseInfo;
+  readonly provenance: PremiumAssetProvenance;
+  readonly anatomy: PremiumAssetAnatomy;
+  readonly performance: PremiumAssetPerformanceBudget;
+  readonly scientificProvenance: PremiumAssetScientificProvenance;
+}
+
+export interface PremiumAssetAcceptanceResult {
+  readonly candidateId: string;
+  readonly decision: PremiumAssetAcceptanceDecision;
+  /** Never empty — every decision, including APPROVED, carries at least one concrete reason. */
+  readonly reasons: readonly string[];
+}
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+function hasValidProvenance(p: PremiumAssetProvenance): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  if (p.sourceUrl === null || p.sourceUrl.trim() === '') reasons.push('No source URL recorded.');
+  if (!p.immutableSource) reasons.push('Source is not pinned/content-addressed/versioned — a mutable link can change under us.');
+  const digests = Object.values(p.sha256);
+  if (digests.length === 0) reasons.push('No SHA-256 checksums recorded for any file.');
+  else if (digests.some((d) => !SHA256_HEX.test(d))) reasons.push('One or more recorded checksums are not real 64-hex SHA-256 digests.');
+  return { ok: reasons.length === 0, reasons };
+}
+
+function redistributionReasons(license: PremiumAssetLicenseInfo): string[] {
+  return license.permitsCommercialRedistribution === false ? ['License explicitly forbids commercial redistribution.'] : [];
+}
+
+function aiRestrictionRejectedReasons(license: PremiumAssetLicenseInfo): string[] {
+  return license.aiRestriction === 'RESTRICTED' ? ['License explicitly restricts AI-related use.'] : [];
+}
+
+function anatomyInseparableReasons(anatomy: PremiumAssetAnatomy): string[] {
+  const reasons: string[] = [];
+  if (!anatomy.separateMeshes) reasons.push('Anatomy is not modeled as separate meshes — organ picking/isolation/cross-section cannot target individual structures.');
+  else if (anatomy.stableMeshIds.length === 0) reasons.push('Separate meshes are declared but carry no stable per-organ IDs.');
+  if (!anatomy.supportsOrganPicking) reasons.push('Does not support organ picking.');
+  if (!anatomy.supportsIsolation) reasons.push('Does not support organ isolation.');
+  if (!anatomy.supportsCrossSection) reasons.push('Does not support cross-section.');
+  return reasons;
+}
+
+function legalReviewReasons(license: PremiumAssetLicenseInfo): string[] {
+  const reasons: string[] = [];
+  if (license.name === null || license.name.trim() === '') reasons.push('No license name recorded.');
+  if (license.url === null || license.url.trim() === '') reasons.push('No license URL recorded.');
+  if (license.permitsCommercialRedistribution === 'UNKNOWN') reasons.push('Commercial redistribution permission is not clearly stated.');
+  if (license.aiRestriction === 'UNKNOWN') reasons.push('AI-related restriction language is unclear.');
+  if (license.requiresAttribution) reasons.push('License requires attribution — needs human confirmation the attribution flow is implemented before approval.');
+  return reasons;
+}
+
+function optimizationReasons(perf: PremiumAssetPerformanceBudget): string[] {
+  const reasons: string[] = [];
+  if (perf.polygonCount === null) reasons.push('Polygon count not recorded.');
+  else if (perf.polygonCount > perf.maxPolygonBudget) reasons.push(`Polygon count ${perf.polygonCount} exceeds budget ${perf.maxPolygonBudget}.`);
+  if (perf.textureResolutionPx === null) reasons.push('Texture resolution not recorded.');
+  else if (perf.textureResolutionPx > perf.maxTextureResolutionPx) reasons.push(`Texture resolution ${perf.textureResolutionPx}px exceeds budget ${perf.maxTextureResolutionPx}px.`);
+  if (!perf.hasLod || perf.lodLevels === null || perf.lodLevels < 1) reasons.push('No usable LOD chain.');
+  if (!perf.ktx2Ready) reasons.push('Not KTX2-ready.');
+  if (!perf.meshoptReady && !perf.dracoReady) reasons.push('Neither Meshopt nor Draco compression is ready.');
+  if (!perf.realTimeWebSuitable) reasons.push('Not declared real-time-web-suitable.');
+  return reasons;
+}
+
+function scientificProvenanceReasons(sp: PremiumAssetScientificProvenance): string[] {
+  const reasons: string[] = [];
+  if (sp.datasetOrReference === null || sp.datasetOrReference.trim() === '') reasons.push('No anatomical dataset/reference recorded.');
+  if (sp.citationUrl === null || sp.citationUrl.trim() === '') reasons.push('No citation URL recorded.');
+  return reasons;
+}
+
+/**
+ * Fail-closed premium asset acceptance gate. Priority order (most severe first):
+ *   1. REJECTED — broken provenance, an EXPLICIT redistribution/AI denial, or (for anatomical
+ *      candidates) structurally inseparable anatomy. These are known facts, not ambiguity — no
+ *      amount of review or optimization fixes them; a different asset is needed.
+ *   2. LEGAL_REVIEW_REQUIRED — an UNCLEAR/ambiguous legal fact (missing license name/url, unknown
+ *      redistribution or AI-restriction status, or attribution required). A human must resolve
+ *      the ambiguity; this is never auto-approved and never auto-rejected.
+ *   3. OPTIMIZATION_REQUIRED — legally and structurally fine, but exceeds polygon/texture budgets,
+ *      lacks LOD, or lacks KTX2/Meshopt/Draco readiness / real-time-web suitability.
+ *   4. SCIENTIFIC_PROVENANCE_REQUIRED — anatomical candidates only: no recorded dataset/reference
+ *      or citation backing the anatomical accuracy claim.
+ *   5. APPROVED — only when every checked field is an explicit, unambiguous pass.
+ * Never creates or touches WORLD_ENGINE_ASSET_MANIFEST — this is a pre-purchase/pre-integration
+ * screen, not a second registry.
+ */
+export function evaluatePremiumAssetAcceptance(candidate: PremiumAssetCandidate): PremiumAssetAcceptanceResult {
+  const isAnatomical = candidate.assetClass === 'ANATOMICAL';
+
+  const provenance = hasValidProvenance(candidate.provenance);
+  const rejectedReasons = [
+    ...provenance.reasons,
+    ...redistributionReasons(candidate.license),
+    ...aiRestrictionRejectedReasons(candidate.license),
+    ...(isAnatomical ? anatomyInseparableReasons(candidate.anatomy) : []),
+  ];
+  if (rejectedReasons.length > 0) {
+    return { candidateId: candidate.id, decision: 'REJECTED', reasons: rejectedReasons };
+  }
+
+  const legalReasons = legalReviewReasons(candidate.license);
+  if (legalReasons.length > 0) {
+    return { candidateId: candidate.id, decision: 'LEGAL_REVIEW_REQUIRED', reasons: legalReasons };
+  }
+
+  const perfReasons = optimizationReasons(candidate.performance);
+  if (perfReasons.length > 0) {
+    return { candidateId: candidate.id, decision: 'OPTIMIZATION_REQUIRED', reasons: perfReasons };
+  }
+
+  if (isAnatomical) {
+    const sciReasons = scientificProvenanceReasons(candidate.scientificProvenance);
+    if (sciReasons.length > 0) {
+      return { candidateId: candidate.id, decision: 'SCIENTIFIC_PROVENANCE_REQUIRED', reasons: sciReasons };
+    }
+  }
+
+  return {
+    candidateId: candidate.id,
+    decision: 'APPROVED',
+    reasons: ['Provenance, license, redistribution/AI terms, performance budget and (if anatomical) scientific provenance all pass explicitly.'],
+  };
+}

@@ -11,11 +11,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const custody = await import(path.join(HERE, '../../../scripts/d105-a2-custody.mjs'));
-const measurement = await import(path.join(HERE, '../../../scripts/d105-noise-floor-verified.mjs'));
+const custody = await import(pathToFileURL(path.join(HERE, '../../../scripts/d105-a2-custody.mjs')).href);
+const measurement = await import(pathToFileURL(path.join(HERE, '../../../scripts/d105-noise-floor-verified.mjs')).href);
 
 test('A2 arrived 8/8; after one re-transmission three chunks verify byte-exactly', () => {
   const r = custody.checkAllChunks();
@@ -172,7 +172,7 @@ test('the measurement uses real structure identity, never molecule_chembl_id', (
 });
 
 test('the sealed prereg fingerprint is carried through unchanged', async () => {
-  const prereg = await import(path.join(HERE, '../../../scripts/d102-readout-family-prereg.mjs'));
+  const prereg = await import(pathToFileURL(path.join(HERE, '../../../scripts/d102-readout-family-prereg.mjs')).href);
   assert.equal(prereg.PREREG_FINGERPRINT, 'f475467a12dff413');
 });
 

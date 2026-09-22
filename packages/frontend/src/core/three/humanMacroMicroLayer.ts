@@ -15,11 +15,12 @@ import { disposeSceneResources } from './graphics/lifecycle';
  * never a claim that an organ/cell/DNA is physically that size in the laboratory.
  */
 
-export type HumanMacroMicroLevel = 'body' | 'organ' | 'tissue' | 'cell' | 'organelle' | 'molecule';
+export type HumanMacroMicroLevel = 'body' | 'organ_system' | 'organ' | 'tissue' | 'cell' | 'organelle' | 'molecule';
 
 export interface HumanMacroMicroState {
   readonly level: HumanMacroMicroLevel;
   readonly selectedOrganId: string | null;
+  readonly selectedNodeId: string | null;
   readonly artifactKind: BiologyArtifact['kind'] | null;
   readonly evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION';
 }
@@ -27,7 +28,7 @@ export interface HumanMacroMicroState {
 export function macroMicroLevelForArtifact(artifact: BiologyArtifact | null): HumanMacroMicroLevel {
   if (!artifact) return 'organ';
   if (artifact.kind === 'histology') return 'tissue';
-  if (artifact.kind === 'hyperscope') return artifact.capture.request.magnification >= 500 ? 'organelle' : 'cell';
+  if (artifact.kind === 'hyperscope') return artifact.cell ? artifact.capture.request.magnification >= 500 ? 'organelle' : 'cell' : 'organ';
   if (artifact.kind === 'central-dogma') return 'molecule';
   return 'organ';
 }
@@ -192,6 +193,7 @@ export class HumanMacroMicroLayer {
   readonly group: THREE_NS.Group;
   private content: THREE_NS.Group | null = null;
   private selectedOrganId: string | null = null;
+  private selectedNodeId: string | null = 'body';
   private artifact: BiologyArtifact | null = null;
   private time = 0;
 
@@ -201,10 +203,13 @@ export class HumanMacroMicroLayer {
   }
 
   getState(): HumanMacroMicroState {
-    return { level: macroMicroLevelForArtifact(this.artifact), selectedOrganId: this.selectedOrganId, artifactKind: this.artifact?.kind ?? null, evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION' };
+    const node = this.manifest.nodes.find((entry) => entry.id === this.selectedNodeId);
+    const level = this.artifact ? macroMicroLevelForArtifact(this.artifact) : node?.kind === 'SYSTEM' ? 'organ_system' : this.selectedOrganId ? 'organ' : 'body';
+    return { level, selectedNodeId: this.selectedNodeId, selectedOrganId: this.selectedOrganId, artifactKind: this.artifact?.kind ?? null, evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION' };
   }
 
   setOrgan(organId: string | null): void {
+    this.selectedNodeId = this.manifest.nodes.find((entry) => entry.id === organId)?.id ?? null;
     this.selectedOrganId = organNode(this.manifest, organId)?.id ?? null;
     // New organ selection starts at the organ view until an experiment artifact is delivered.
     this.artifact = null; this.rebuild();

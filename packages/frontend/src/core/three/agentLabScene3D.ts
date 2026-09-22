@@ -1,5 +1,5 @@
 import type * as THREE_NS from 'three';
-import type { PostProcessingModules, PostProcessor, Sim3D } from './types';
+import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } from './types';
 import type { SimParams } from '../types';
 import { buildCharacter, type Character } from './characterRig';
 import { createBench, createCabinet, createMonitor, createShelfUnit } from './graphics/labKit';
@@ -25,8 +25,8 @@ import { BIOLOGY_SCENE, TWIN_CHAMBER } from '../scientificWorlds/biologyLabWorld
 import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/anatomyAtlas';
 import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
-import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
-import { evaluateHumanTwinAsset, loadHumanTwinBody, type HumanTwinTier, type LoadedHumanTwinBody } from './humanTwinAsset';
+import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type HumanTwinLodLevel, type HumanTwinLodState, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
+import { loadHumanTwinBodyResult, type HumanTwinTier, type HumanTwinPresentationState } from './humanTwinAsset';
 import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
 import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
@@ -54,6 +54,7 @@ import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
  */
 
 export type AgentCameraMode = 'VISOR' | 'SPECTATOR' | 'TWIN';
+export type HumanTwinLodPreference = 'AUTO' | 'FULL' | 'LOW';
 /** Which typed world the scene builds: the physics lab (default) or the V3 human-biology lab — one scene class, one pipeline. */
 export type SceneWorld = 'physics' | 'biology';
 export type SceneArtifact = LabArtifact | BiologyArtifact;
@@ -124,7 +125,58 @@ export class AgentLabScene3D implements Sim3D {
   /** D-132: the room probe must fire once the first full frame exists, never during init. */
   private probeTaken = false;
   private onTwinTier: ((tier: HumanTwinTier) => void) | null = null;
+  private twinLoad: HumanTwinPresentationState = { status: 'LOADING', diagnostics: null, insertedAtMs: null, firstRenderedAtMs: null };
+  private onTwinLoad: ((state: HumanTwinPresentationState) => void) | null = null;
+  private twinAbort: AbortController | null = null;
+  private twinLoadGeneration = 0;
+  private twinAssetDrawn = false;
+  private twinAnchor: THREE_NS.Group | null = null;
+  private twinLodPreference: HumanTwinLodPreference = 'AUTO';
+  private onTwinLod: ((state: HumanTwinLodState) => void) | null = null;
+  private selectedTwinNode: string | null = null;
+  private isolatedTwinNodes: readonly string[] = [];
+  private researchLayoutOpen = false;
+  setResearchLayout(open: boolean): void { this.researchLayoutOpen = open; }
   private lastWall: number | null = null;
+  private elapsedWallSeconds = 0;
+  private frameDeltaSeconds = 0;
+  private renderMetrics: ThreeRenderMetrics | null = null;
+  private pickCamera: THREE_NS.PerspectiveCamera | null = null;
+  private onOrganPicked: ((nodeId: string) => void) | null = null;
+  private lastPickedNode: string | null = null;
+  setOrganPickListener(listener: ((nodeId: string) => void) | null): void { this.onOrganPicked = listener; }
+  pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
+    if (type !== 'up' || !this.THREE || !this.pickCamera || !this.renderer || this.cameraMode !== 'TWIN') return;
+    const canvas = this.renderer.domElement;
+    const ray = new this.THREE.Raycaster();
+    ray.setFromCamera(new this.THREE.Vector2(x / canvas.clientWidth * 2 - 1, 1 - y / canvas.clientHeight * 2), this.pickCamera);
+    const organs = [...(this.twins[0]?.organs.values() ?? [])].filter((mesh) => mesh.visible);
+    const hit = ray.intersectObjects(organs, false).find((candidate) => {
+      const mesh = candidate.object as THREE_NS.Mesh;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      return materials.some((material) => !material.clippingPlanes?.some((plane) => plane.distanceToPoint(candidate.point) < 0));
+    });
+    const id = hit?.object.userData.nodeId;
+    if (typeof id === 'string') { this.lastPickedNode = id; this.onOrganPicked?.(id); }
+  }
+
+  onRenderMetrics(metrics: ThreeRenderMetrics): void { this.renderMetrics = metrics; }
+  getRuntimeDiagnostics() {
+    return {
+      ...this.controller.getDiagnostics(), wallSeconds: this.elapsedWallSeconds,
+      frameDeltaSeconds: this.frameDeltaSeconds, render: this.renderMetrics,
+      // The biology action machine uses AgentController, not TemporalEngine.
+      temporalEngineAdvances: 0, clockOwner: 'AgentController',
+      macroMicro: this.macroMicro?.getState() ?? null,
+      lastPickedNode: this.lastPickedNode,
+      twinLod: this.twins[0]?.getLodState() ?? null,
+      twinLodPreference: this.twinLodPreference,
+      organScreenPositions: this.THREE && this.pickCamera && this.renderer ? [...(this.twins[0]?.organs.entries() ?? [])].filter(([, mesh]) => mesh.visible).map(([id, mesh]) => {
+        const point = mesh.getWorldPosition(new this.THREE!.Vector3()).project(this.pickCamera!);
+        return { id, x: (point.x + 1) * this.renderer!.domElement.clientWidth / 2, y: (1 - point.y) * this.renderer!.domElement.clientHeight / 2 };
+      }) : [],
+    };
+  }
   private gate: VisualRealityResult | null = null;
   /** V7 presentation-only macro→micro lens embedded in this existing scene/renderer. */
   private macroMicro: HumanMacroMicroLayer | null = null;
@@ -136,6 +188,7 @@ export class AgentLabScene3D implements Sim3D {
 
   /** Biology: apply a V3 anatomy display mode to every twin in the scene (the chamber twin and the table twin). */
   setTwinView(mode: Parameters<typeof buildVisualLayerInstruction>[1], selectedNodeId: string | null): void {
+    this.selectedTwinNode = selectedNodeId;
     this.twinInstruction = buildVisualLayerInstruction(this.manifest, mode);
     for (const t of this.twins) t.setView(this.twinInstruction, selectedNodeId);
     this.macroMicro?.setOrgan(selectedNodeId);
@@ -143,11 +196,48 @@ export class AgentLabScene3D implements Sim3D {
 
   /** D-131: what the twin body is made of right now (a licensed CC0 asset, or the procedural proxy). */
   getTwinTier(): HumanTwinTier { return this.twinTier; }
+  getTwinLodState(): HumanTwinLodState | null { return this.twins[0]?.getLodState() ?? null; }
+  setTwinLodListener(listener: ((state: HumanTwinLodState) => void) | null): void { this.onTwinLod = listener; }
+  setTwinLodPreference(preference: HumanTwinLodPreference): void {
+    this.twinLodPreference = preference;
+    this.applyTwinLod();
+  }
+  getTwinLodPreference(): HumanTwinLodPreference { return this.twinLodPreference; }
+  private applyTwinLod(): void {
+    const twin = this.twins[0];
+    if (!twin) return;
+    const available = twin.getLodState().available;
+    let desired: HumanTwinLodLevel = 'PROXY_LOW';
+    if (available.includes('FULL_ASSET')) {
+      // Loader evidence requires one actual frame containing the licensed asset. Do not let an AUTO/LOW
+      // decision hide it between scene insertion and onAfterRender; switch down immediately after READY.
+      desired = this.twinLoad.status === 'LOADING' || this.twinLodPreference === 'FULL' || (this.twinLodPreference === 'AUTO' && this.cameraMode === 'TWIN' && detectRenderTier() !== 'low')
+        ? 'FULL_ASSET'
+        : 'PROXY_LOW';
+    }
+    twin.setLod(desired);
+    this.onTwinLod?.(twin.getLodState());
+  }
   /** D-131: the HUD subscribes so it can stop saying PROXY the moment the approved asset is in the scene. */
   setTwinTierListener(listener: ((tier: HumanTwinTier) => void) | null): void { this.onTwinTier = listener; }
+  getTwinLoadState(): HumanTwinPresentationState { return this.twinLoad; }
+  setTwinLoadListener(listener: ((state: HumanTwinPresentationState) => void) | null): void { this.onTwinLoad = listener; }
+  private publishTwinLoad(state: HumanTwinPresentationState): void { this.twinLoad = state; this.onTwinLoad?.(state); }
+  retryTwinLoad(): void {
+    if (!this.THREE || !this.twinAnchor || !this.scene || this.twinAbort || this.twinLoad.status === 'READY') return;
+    void this.upgradeTwinsToLicensedAsset(this.THREE, this.twinAnchor);
+  }
+  /** Called by the existing render loop AFTER its actual scene/composer render. */
+  onFrameRendered(): void {
+    if (this.twinLoad.status === 'LOADING' && this.twinLoad.insertedAtMs !== null && this.twinTier === 'LICENSED_CC0_ASSET' && this.twinAssetDrawn) {
+      this.publishTwinLoad({ ...this.twinLoad, status: 'READY', firstRenderedAtMs: performance.now() });
+      this.applyTwinLod();
+    }
+  }
 
   /** D-131: isolate anatomy nodes across every twin (empty list = back to the current display mode). */
   setTwinIsolated(nodeIds: readonly string[]): void {
+    this.isolatedTwinNodes = [...nodeIds];
     this.isolatedCount = nodeIds.length;
     for (const t of this.twins) t.setIsolated(nodeIds);
   }
@@ -179,7 +269,7 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   setUpdateListener(listener: ((u: AgentUpdate) => void) | null): void { this.onUpdate = listener; }
-  setCameraMode(mode: AgentCameraMode): void { this.cameraMode = mode; }
+  setCameraMode(mode: AgentCameraMode): void { this.cameraMode = mode; this.applyTwinLod(); }
   getCameraMode(): AgentCameraMode { return this.cameraMode; }
   setHighlight(stationId: string | null): void { this.highlightId = stationId; }
 
@@ -275,7 +365,10 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
+    this.twinAbort?.abort(); this.twinAbort = null; this.twinLoadGeneration++;
+    this.frames = 0; this.lastWall = null; this.elapsedWallSeconds = 0; this.frameDeltaSeconds = 0; this.renderMetrics = null;
     this.THREE = THREE; this.scene = scene;
+    this.pickCamera = camera;
     this.scratchA = new THREE.Vector3(); this.scratchB = new THREE.Vector3();
     this.spectatorPos = new THREE.Vector3(0, 2.2, 8); this.spectatorLook = new THREE.Vector3(0, 1.4, 0);
     // D-131: the TWIN camera starts already framing the chamber, so the first frame after a switch is correct.
@@ -409,20 +502,22 @@ export class AgentLabScene3D implements Sim3D {
     const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
     scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
     this.macroMicro = new HumanMacroMicroLayer(THREE, this.manifest);
-    this.macroMicro.group.position.set(TWIN_CHAMBER.position.x + 1.55, 1.35, TWIN_CHAMBER.position.z + 0.15);
+    this.macroMicro.group.position.set(TWIN_CHAMBER.position.x + 0.95, 1.35, TWIN_CHAMBER.position.z + 0.15);
+    this.macroMicro.group.scale.setScalar(0.68);
     scene.add(this.macroMicro.group);
     const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
     this.twinTier = twin.tier;
     // The asset is fetched only after its record passes the gate, and only then does it replace the proxy.
     // A refusal, a missing file or a decode error simply leaves the proxy standing — nothing is faked.
-    if (evaluateHumanTwinAsset().enabled) void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor, palette);
+    this.twinAnchor = chamber.anchor;
+    void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
     // Two manipulators flank the chamber (reference 2), sharing the ORPHEUS arm builder.
     for (const [x, z, heading, phase] of [[-2.1, 0.9, Math.PI * 0.35, 0.8], [2.1, 0.9, -Math.PI * 0.35, 2.4]] as const) {
       const arm = createManipulatorArm(THREE, { position: [x, 0, z], headingRadians: heading, scale: 1.25, phase, linkMaterial: palette.BRUSHED_METAL, jointMaterial: palette.POLISHED_METAL, baseMaterial: palette.PAINTED_METAL });
       scene.add(arm.group); this.arms.push(arm);
     }
-    createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 16, rim: 4 }, color: { key: 0xf2f7ff, rim: 0x8fd3ff }, castShadow: false });
+    createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 10, rim: 2 }, color: { key: 0xf2f7ff, rim: 0x8fd3ff }, castShadow: false });
     // Stations (pack ids), their practical lights, and the pack's hanging signs.
     for (const st of this.stationDefs) this.buildBiologyStationVisual(THREE, scene, palette, glass, st);
     const signText: Readonly<Record<string, [string, string]>> = { 'sign.neuro': ['Neuro Lab', 'sygnały · MODEL'], 'sign.micro': ['Hyperscope', 'mikroskopia wirtualna'], 'sign.orpheus': ['ORPHEUS', 'analizator koncepcyjny'] };
@@ -570,7 +665,9 @@ export class AgentLabScene3D implements Sim3D {
     // The render loop clamps dt to 0.05 s; on a slow (software) renderer that would make the agent walk at a fraction of
     // real time. The body follows the wall clock instead, capped at 0.2 s per frame so a stall never teleports it.
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const wall = this.lastWall === null ? dt : Math.min(0.2, (now - this.lastWall) / 1000);
+    this.frameDeltaSeconds = this.lastWall === null ? dt : Math.max(0, (now - this.lastWall) / 1000);
+    this.elapsedWallSeconds += this.frameDeltaSeconds;
+    const wall = Math.min(0.2, this.frameDeltaSeconds);
     this.lastWall = now;
     const u = this.controller.update(Math.max(dt, wall));
     this.lastUpdate = u;
@@ -612,8 +709,11 @@ export class AgentLabScene3D implements Sim3D {
       if (v.leds) v.leds.forEach((led, i) => { led.emissiveIntensity = 0.4 + 0.8 * (Math.sin(this.time * (1.3 + (i % 5) * 0.37) + i) > 0.2 ? 1 : 0.15); });
     }
     for (const a of this.arms) if (![...this.stations.values()].some((v) => v.arms?.includes(a))) a.update(this.time);
-    for (const sp of this.spinners) sp.rotation.y = this.time * (sp.name === 'carousel' ? 0.5 : 0.18);
-    if (this.chamberRing) this.chamberRing.emissiveIntensity = 1.2 + 0.4 * Math.sin(this.time * 1.4);
+    for (const sp of this.spinners) {
+      // A stable frontal body makes anatomical selection possible; equipment retains its animation.
+      sp.rotation.y = this.cameraMode === 'TWIN' && sp === this.twins[0]?.group ? 0 : this.time * (sp.name === 'carousel' ? 0.5 : 0.18);
+    }
+    if (this.chamberRing) this.chamberRing.emissiveIntensity = 0.55 + 0.1 * Math.sin(this.time * 1.4);
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
@@ -637,16 +737,17 @@ export class AgentLabScene3D implements Sim3D {
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
       if (this.chamberGlass) this.chamberGlass.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
-      // 3.3 m fits the whole 1.7 m body; the look target sits BELOW the body's centre so the figure rides
-      // in the upper two thirds of the frame, clear of the research dock at the bottom. 2.3 m moves in on
-      // a cut or an isolate, where the interesting thing is the torso rather than the whole person.
-      const dist = tight ? 2.3 : 3.3;
-      const height = tight ? 1.05 : 1.0;
+      // Desktop dedicates the centre-left to the whole body, with the research dock on the right.
+      // Portrait leaves room for the lower dock; an isolate/section moves closer to the torso.
+      const portrait = camera.aspect < 1;
+      const dist = portrait ? (tight ? 3.0 : 4.4) : (tight ? 2.3 : 2.75);
+      const height = tight ? 1.45 : 1.55;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
       const drift = Math.sin(this.time * 0.22) * 0.14;
       this.scratchA.set(TWIN_CHAMBER.position.x + drift, height, TWIN_CHAMBER.position.z + dist);
       this.twinCamPos.lerp(this.scratchA, 0.08);
-      this.scratchB.set(TWIN_CHAMBER.position.x, tight ? 0.86 : 0.38, TWIN_CHAMBER.position.z);
+      const panelOffset = this.researchLayoutOpen && !portrait ? 0.55 : 0;
+      this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, portrait ? 0.65 : 1.12, TWIN_CHAMBER.position.z);
       this.twinCamLook.lerp(this.scratchB, 0.12);
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
@@ -670,12 +771,34 @@ export class AgentLabScene3D implements Sim3D {
    * if the load fails the proxy stays exactly as it was. Only the BODY changes — organs, stations,
    * sessions, evidence and every epistemic label are untouched.
    */
-  private async upgradeTwinsToLicensedAsset(THREE: typeof THREE_NS, anchor: THREE_NS.Group, palette: GenesisMaterialPalette): Promise<void> {
-    let asset: LoadedHumanTwinBody | null;
-    try { asset = await loadHumanTwinBody(THREE, this.manifest.parameters.heightMeters); } catch { asset = null; }
-    if (!asset || this.scene === null) return; // disposed while loading, or the asset could not be read
+  private async upgradeTwinsToLicensedAsset(THREE: typeof THREE_NS, anchor: THREE_NS.Group): Promise<void> {
+    this.twinAbort?.abort();
+    const abort = new AbortController(); this.twinAbort = abort;
+    const generation = ++this.twinLoadGeneration;
+    this.twinAssetDrawn = false;
+    const ownerScene = this.scene;
+    this.publishTwinLoad({ status: 'LOADING', diagnostics: null, insertedAtMs: null, firstRenderedAtMs: null });
+    const result = await loadHumanTwinBodyResult(THREE, this.manifest.parameters.heightMeters, undefined, abort.signal);
+    // Identity, not merely `scene !== null`: this same Sim3D can be disposed and initialized again.
+    if (generation !== this.twinLoadGeneration || this.scene !== ownerScene || !this.scene || this.twinAnchor !== anchor) {
+      if (result.status === 'READY') disposeSceneResources(result.asset.root);
+      return;
+    }
+    this.twinAbort = null;
+    if (result.status !== 'READY') {
+      if (result.status !== 'CANCELLED') this.publishTwinLoad({ status: result.status, reason: result.reason, message: result.message, diagnostics: result.diagnostics, insertedAtMs: null, firstRenderedAtMs: null });
+      return;
+    }
+    const asset = result.asset;
+    for (const mesh of asset.meshes) {
+      const previous = mesh.onAfterRender;
+      mesh.onAfterRender = (...args) => {
+        previous.apply(mesh, args);
+        if (generation === this.twinLoadGeneration && this.scene === ownerScene) this.twinAssetDrawn = true;
+      };
+    }
     const old = this.twins[0];
-    if (!old) return;
+    if (!old) { disposeSceneResources(asset.root); return; }
     const upgraded = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, bodyAsset: asset });
     anchor.remove(old.group);
     this.spinners = this.spinners.filter((g) => g !== old.group);
@@ -683,12 +806,14 @@ export class AgentLabScene3D implements Sim3D {
     anchor.add(upgraded.group);
     this.twins[0] = upgraded;
     this.spinners.push(upgraded.group);
-    upgraded.setSurface(this.twinSurface);
     this.twinTier = upgraded.tier;
-    if (this.twinInstruction) upgraded.setView(this.twinInstruction, null);
+    if (this.twinInstruction) upgraded.setView(this.twinInstruction, this.selectedTwinNode);
+    upgraded.setSurface(this.twinSurface);
+    upgraded.setIsolated(this.isolatedTwinNodes);
     upgraded.setCutaway(this.cutawayState);
+    this.applyTwinLod();
     this.onTwinTier?.(upgraded.tier);
-    void palette;
+    this.publishTwinLoad({ status: 'LOADING', diagnostics: result.diagnostics, insertedAtMs: performance.now(), firstRenderedAtMs: null });
   }
 
   setupPostProcessing(modules: PostProcessingModules, renderer: THREE_NS.WebGLRenderer, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number): PostProcessor {
@@ -718,6 +843,8 @@ export class AgentLabScene3D implements Sim3D {
   onResize(): void { /* the camera is fully owned here; useThreeLoop keeps the aspect */ }
 
   dispose(): void {
+    this.twinLoadGeneration++; this.twinAbort?.abort(); this.twinAbort = null; this.twinAnchor = null;
+    this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;
     if (this.scene) disposeSceneResources(this.scene);
     this.character?.dispose();

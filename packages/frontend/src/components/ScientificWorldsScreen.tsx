@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useThreeLoop } from '../core/three/useThreeLoop';
-import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
+import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type HumanTwinLodPreference, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
 import { AgentController, type AgentReport } from '../core/scientificWorlds/agentController';
 import { planActions } from '../core/scientificWorlds/actionPlanner';
 import { parseWorldCommands, type ParsedCommands } from '../core/scientificWorlds/worldCommand';
@@ -12,7 +12,7 @@ import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyComma
 import { createDefaultAnatomyView, isolateAnatomyNode, setAnatomyMode, setCutaway } from '../core/scientificWorlds/humanLab/anatomyView';
 import type { AnatomyDisplayMode, AnatomyViewState } from '../core/scientificWorlds/humanLab/types';
 import { TWIN_ASSET_TIER } from '../core/three/biologyLabKit';
-import { humanTwinProvenanceLabel, type HumanTwinTier } from '../core/three/humanTwinAsset';
+import { humanTwinProvenanceLabel, type HumanTwinTier, type HumanTwinPresentationState } from '../core/three/humanTwinAsset';
 import { DEFAULT_CUTAWAY, type CutawayState } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { replayExperimentSession, type ExperimentRunner, type ExperimentSession, type ReplayVerdict } from '../core/scientificWorlds/experimentSession';
@@ -32,6 +32,7 @@ import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientif
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
+import { EXPLORER_ORGANS, explorerCommands } from '../core/scientificWorlds/humanExplorer';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -124,7 +125,11 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [bioArtifact, setBioArtifact] = useState<BiologyArtifact | null>(null);
   const [sessions, setSessions] = useState<ExperimentSession[]>([]);
   const [explorerOpen, setExplorerOpen] = useState(true);
+  useEffect(() => { sim.setResearchLayout(explorerOpen); }, [sim, explorerOpen]);
   const [twinTier, setTwinTier] = useState<HumanTwinTier>('PROXY');
+  const [twinLoad, setTwinLoad] = useState<HumanTwinPresentationState>(() => sim.getTwinLoadState());
+  const [twinLod, setTwinLod] = useState(() => sim.getTwinLodState());
+  const [twinLodPreference, setTwinLodPreference] = useState<HumanTwinLodPreference>('AUTO');
   const [cutaway, setCutawayState] = useState<CutawayState>(DEFAULT_CUTAWAY);
   const [curiosity, setCuriosity] = useState<CycleResult | null>(null);
   const [curiosityBusy, setCuriosityBusy] = useState(false);
@@ -137,7 +142,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [surface, setSurface] = useState<TwinSurfaceMode>('NORMAL');
   const [voice, setVoice] = useState(false);
   const [level, setLevel] = useState<GuideLevel>('EXPLORER');
-  const [evidenceOpen, setEvidenceOpen] = useState(true);
+  const [evidenceOpen, setEvidenceOpen] = useState(world !== 'biology');
   const [frames, setFrames] = useState(0);
   const logicalTime = useRef(0);
   const nextId = useRef(1);
@@ -171,6 +176,9 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
 
   useEffect(() => {
     sim.setTwinTierListener((tier) => setTwinTier(tier));
+    sim.setTwinLoadListener(setTwinLoad);
+    sim.setTwinLodListener(setTwinLod);
+    setTwinLoad(sim.getTwinLoadState());
     setTwinTier(sim.getTwinTier());
     sim.setUpdateListener((u) => {
       if (u.stationId) setStationId(u.stationId);
@@ -187,6 +195,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         const r = applyAnatomyInteraction(anatomyRef.current, u.interaction.parameters, sim.manifest);
         if (r.error) say('system', `Bliźniak: odmowa — ${r.error}.`);
         else {
+          // Selecting anatomy changes the displayed result, never the sealed history/ledger.
+          setBioArtifact(null); setSession(null); sessionRef.current = null;
           setAnatomy(r.state);
           sim.setTwinView(r.state.displayMode, r.state.selectedNodeId);
           sim.setTwinIsolated(r.state.isolatedNodeIds);
@@ -201,7 +211,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         if (report.deferred.some((d) => d.intent === 'ASK')) { /* the question is handed to Science Chat by the button below */ }
       }
     });
-    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); };
+    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); sim.setTwinLoadListener(null); sim.setTwinLodListener(null); };
   }, [sim, speak, say, world]);
 
   /** Typed commands from the Human Explorer's clicks: the same planner and controller as the command bar, no parser in between. */
@@ -222,6 +232,15 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   }, [def, runCommands, say]);
   const submitCommands = useCallback((commands: readonly WorldCommand[], label: string) => { say('user', label); runCommands({ commands, unresolved: [] }); }, [runCommands, say]);
   const nextLogicalTime = useCallback(() => { logicalTime.current += 1; return logicalTime.current; }, []);
+  useEffect(() => {
+    sim.setOrganPickListener((id) => {
+      const organ = EXPLORER_ORGANS.find((entry) => entry.organId === id);
+      if (!organ || !['IDLE', 'ARRIVED', 'BLOCKED'].includes(controller.getDiagnostics().state)) return;
+      const lt = nextLogicalTime();
+      submitCommands(explorerCommands(organ, 'organ', `Wybór narządu: ${id}`, lt), `Wybór narządu: ${id}`);
+    });
+    return () => sim.setOrganPickListener(null);
+  }, [sim, controller, nextLogicalTime, submitCommands]);
   /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
    *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
   const bridgeRef = useRef<ReturnType<typeof createScientificWorldsCognitiveCore> | null>(null);
@@ -279,7 +298,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
 
   return (
-    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? macroMicroLevelForArtifact(bioArtifact) : undefined}>
+    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
       <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
       {camera === 'VISOR' && (
         <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">
@@ -298,8 +317,20 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           <span className="sw-badge" data-testid="sw-agent-state">AGENT: {AGENT_STATE_LABEL_PL[agentState]}</span>
           {station && <span className="sw-badge">STANOWISKO: {station.label}</span>}
           <span className="sw-badge" data-testid="sw-camera-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : camera === 'TWIN' ? 'BLIŹNIAK' : 'OBSERWATOR'}</span>
-          {world === 'biology' && <span className="sw-badge" data-testid="sw-twin" data-tier={twinTier}>BLIŹNIAK: {anatomy.displayMode} · {anatomy.selectedNodeId} · {humanTwinProvenanceLabel(twinTier)}</span>}
+          {world === 'biology' && <span className="sw-badge" data-testid="sw-twin" data-tier={twinTier} data-lod={twinLod?.level ?? 'PROXY_LOW'} data-lod-diagnostics={JSON.stringify(twinLod)} data-load-state={twinLoad.status} data-load-reason={twinLoad.reason} data-load-diagnostics={JSON.stringify(twinLoad)}>
+            {twinLoad.status === 'LOADING' ? 'Ładowanie modelu człowieka…' : `BLIŹNIAK: ${anatomy.displayMode} · ${anatomy.selectedNodeId} · ${humanTwinProvenanceLabel(twinTier)}`}
+          </span>}
+          {world === 'biology' && twinLoad.status === 'ERROR' && <span className="sw-badge" role="status">Nie udało się załadować pełnego modelu. <button type="button" className="sw-btn sw-btn-mini" data-testid="sw-twin-retry" onClick={() => sim.retryTwinLoad()}>Ponów ładowanie</button></span>}
+          {world === 'biology' && twinLoad.status === 'BLOCKED' && <span className="sw-badge" role="status">Model nie jest zatwierdzony w rejestrze zasobów.</span>}
           {world === 'biology' && <button type="button" className="sw-btn sw-btn-mini" onClick={() => setExplorerOpen((o) => !o)} aria-expanded={explorerOpen} data-testid="sw-explorer-toggle">Human Explorer {explorerOpen ? '▾' : '▸'}</button>}
+          {world === 'biology' && <label className="sw-badge">LOD
+            <select className="sw-select" value={twinLodPreference} data-testid="sw-twin-lod" onChange={(event) => {
+              const preference = event.target.value as HumanTwinLodPreference;
+              setTwinLodPreference(preference); sim.setTwinLodPreference(preference);
+            }}>
+              <option value="AUTO">Auto</option><option value="FULL">Pełny GLB</option><option value="LOW">Proxy low</option>
+            </select>
+          </label>}
         </div>
         {agentState !== 'IDLE' && agentState !== 'BLOCKED' && <div className="sw-progress" aria-hidden="true"><span style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
         {blocked && <p className="cw-error" role="alert" data-testid="sw-blocked">Zablokowany: {blocked}</p>}
@@ -340,7 +371,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
             {curiosity?.terminal === 'AWAITING_HUMAN_APPROVAL' && <button type="button" className="sw-btn sw-btn-primary" onClick={() => void runCuriosity(true)} disabled={curiosityBusy} data-testid="sw-curiosity-approve">Zatwierdź i uruchom</button>}
             {curiosity && <span className="sw-badge" data-testid="sw-curiosity-terminal">{curiosity.terminal}</span>}
             {world === 'physics' && <button type="button" className="sw-btn" onClick={() => void runAgentic()} disabled={curiosityBusy} data-testid="sw-agentic-run">Pętla agentowa: foton (zatwierdzam)</button>}
-            {flagship && <span className="sw-badge" data-testid="sw-agentic-status">{flagship.trace.falsification.status} · replay {flagship.replayMatches ? 'MATCH' : 'DRIFT'}</span>}
+            {flagship && <span className="sw-badge" data-testid="sw-agentic-status">MIRROR EXPERIMENTAL / SYNTHETIC · {flagship.trace.falsification.status} · replay {flagship.replayMatches ? 'MATCH' : 'DRIFT'}</span>}
           </div>
         )}
       </section>

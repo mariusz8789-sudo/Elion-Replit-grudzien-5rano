@@ -290,6 +290,12 @@ export function createTemporalCinematicVisualResolver(
   options: TemporalCinematicVisualResolverOptions = {},
 ): TemporalCinematicVisualResolverHandle {
   const palette = createHighFidelityMaterialPalette(THREE);
+  if (options.interiorTargetRoomId) {
+    // Indoor epoxy is satin; the shared LAB_FLOOR preset is also used by wet exterior demos.
+    const floor = palette.floor as THREE_NS.MeshStandardMaterial;
+    floor.roughness = 0.72; floor.metalness = 0.03; floor.envMapIntensity = 0.3;
+    floor.normalScale.set(0.025, 0.025);
+  }
   const sharedMaterials = allHighFidelityMaterials(palette);
   const wet = /^(RAIN|STORM)$/i.test(options.weather ?? '');
   const personIds = graph.listEntities().filter(personLike).map((e) => e.id).sort();

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildWalkCameraPath, getRoadByIndex } from '../core/temporalCinematic/cameraPath';
+import { buildWalkCameraPath, getRoadByIndex, sampleCameraPath } from '../core/temporalCinematic/cameraPath';
 import { resolveEraProfile } from '../core/temporalCinematic/historicalEra';
 import { buildHistoricalWorldSpecification, historicalWorldId, resolvePlaceGeography } from '../core/temporalCinematic/historicalWorldParameters';
 import { parseTemporalCinematicPrompt } from '../core/temporalCinematic/promptParser';
 import { applyGeometryRenderReadiness } from '../core/temporalCinematic/renderReadiness';
 import { isRenderToVideoReady, TEMPORAL_CINEMATIC_RUNTIME_BLOCKERS } from '../core/temporalCinematic/renderRuntimeStatus';
-import { buildHistoricalScene, compareSameStreetAcrossYears } from '../core/temporalCinematic/temporalCinematicEngine';
+import { buildHistoricalScene, compareSameStreetAcrossYears, recordTemporalCaptureArtifact } from '../core/temporalCinematic/temporalCinematicEngine';
+import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import { generateSpecifiedWorld } from '../core/worldModel/specification/compiler';
+import { TemporalCinematicSim3D } from '../core/temporalCinematic/temporalCinematicSim3D';
 
 describe('Temporal Cinematic Engine — historical parameterization', () => {
   it('resolves a deterministic, year-independent geography profile for the same place', () => {
@@ -107,6 +109,27 @@ describe('Temporal Cinematic Engine — camera path', () => {
     const building = specified.graph.listEntities().find((e) => e.geometry?.kind === 'BUILDING')!;
     expect(() => buildWalkCameraPath(building)).toThrow();
   });
+
+  it('interpolates position and look target continuously between canonical keyframes', () => {
+    const path = {
+      roadEntityId: 'road:test',
+      startPoint: { x: 0, z: 0 },
+      endPoint: { x: 10, z: 20 },
+      totalDistanceM: Math.hypot(10, 20),
+      durationSeconds: 10,
+      keyframes: [
+        { t: 0, position: { x: 0, y: 1.7, z: 0 }, lookAt: { x: 2, y: 1.7, z: 4 } },
+        { t: 10, position: { x: 10, y: 2.7, z: 20 }, lookAt: { x: 12, y: 2.7, z: 24 } },
+      ],
+    } as const;
+    expect(sampleCameraPath(path, 2.5)).toEqual({
+      t: 2.5,
+      position: { x: 2.5, y: 1.95, z: 5 },
+      lookAt: { x: 4.5, y: 1.95, z: 9 },
+    });
+    expect(sampleCameraPath(path, -5).position).toEqual(path.keyframes[0].position);
+    expect(sampleCameraPath(path, 50).position).toEqual(path.keyframes[1].position);
+  });
 });
 
 describe('Temporal Cinematic Engine — prompt parser', () => {
@@ -170,5 +193,41 @@ describe('Temporal Cinematic Engine — honest runtime status', () => {
     for (const blocker of TEMPORAL_CINEMATIC_RUNTIME_BLOCKERS) {
       expect(blocker.code).toBe('BLOCKED_BY_RUNTIME');
     }
+  });
+});
+
+describe('Temporal Cinematic Engine — canonical capture evidence', () => {
+  it('links a real artifact hash and semantic fingerprint through the canonical ledger', () => {
+    const ledger = new EvidenceLedger({ now: () => 123 });
+    const contentHash = recordTemporalCaptureArtifact(ledger, {
+      worldId: 'historical:warsaw:2026',
+      place: 'Warsaw',
+      year: 2026,
+      seconds: 1.5,
+      artifactFile: 'street-1.5.png',
+      artifactSha256: 'a'.repeat(64),
+      semanticFingerprint: 'deadbeef',
+      viewMode: 'street',
+    });
+    expect(contentHash).toHaveLength(64);
+    expect(ledger.getActive()[0]?.claim).toContain('sha256=' + 'a'.repeat(64));
+    expect(ledger.verifyLedger()).toEqual({ ok: true, errors: [] });
+    expect(() => recordTemporalCaptureArtifact(ledger, {
+      worldId: 'x', place: 'x', year: 2026, seconds: 0, artifactFile: 'x.png', artifactSha256: 'bad', semanticFingerprint: 'deadbeef', viewMode: 'street',
+    })).toThrow(/INVALID_SHA256/);
+  });
+});
+
+describe('Temporal Cinematic Engine — real camera discontinuity guard', () => {
+  it('advances a continuity epoch on a seek and reports that no TAA history exists to reset', () => {
+    const scene = buildHistoricalScene({ place: 'Warsaw', year: 2026, durationSeconds: 12 });
+    if (!('keyframes' in scene.camera)) throw new Error('expected canonical walk camera');
+    const sim = new TemporalCinematicSim3D(scene.world.engine, scene.camera, { navigationMode: 'CINEMATIC' });
+    expect(sim.getPresentationSummary().continuityEpoch).toBe(0);
+    sim.seekTo(8);
+    const summary = sim.getPresentationSummary();
+    expect(summary.continuityEpoch).toBe(1);
+    expect(summary.lastDiscontinuity).toEqual({ fromSeconds: 0, toSeconds: 8, reason: 'SEEK' });
+    expect(summary.temporalAccumulation).toBe('NOT_PRESENT');
   });
 });

@@ -58,14 +58,14 @@ export interface WorldGrade {
 export const WORLD_GRADES: Readonly<Record<WorldGradeId, WorldGrade>> = {
   biology: {
     id: 'biology',
-    intent: 'Chłodna sterylna sala: głęboka czerń w tle, ciemna lustrzana posadzka, światło skupione na bliźniaku.',
+    intent: 'Chłodna sterylna sala: ciemna satynowa posadzka, czytelne materiały, światło skupione na bliźniaku.',
     background: 0x04080e,
     fog: { color: 0x071019, density: 0.034 },
     hemisphere: { sky: 0x9db6d8, ground: 0x10161d, intensity: 0.14 },
     environmentIntensity: 1.35,
-    exposure: 0.82,
-    bloom: { strength: 0.3, radius: 0.6, threshold: 0.88 },
-    floor: { color: 0x141a21, roughness: 0.26, metalness: 0.12, envMapIntensity: 0.9 },
+    exposure: 0.78,
+    bloom: { strength: 0.16, radius: 0.45, threshold: 1.05 },
+    floor: { color: 0x202a33, roughness: 0.58, metalness: 0.04, envMapIntensity: 0.35 },
   },
   physics: {
     id: 'physics',

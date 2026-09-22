@@ -86,7 +86,13 @@ const MAX_FLOORS_BY_BUILDING_TYPE: Readonly<Record<BuildingType, number>> = {
  * runs — the same fixed-order convention `worldGenerator.ts::spawnNode`
  * already establishes for generated children.
  */
-export function generateBuilding(parcel: GeneratedParcel, districtType: DistrictType, maxFloorsCap: number, rng: () => number): GeneratedBuilding {
+export function generateBuilding(
+  parcel: GeneratedParcel,
+  districtType: DistrictType,
+  maxFloorsCap: number,
+  rng: () => number,
+  requiredType?: BuildingType,
+): GeneratedBuilding {
   const marginX = Math.min(boundsWidth(parcel.bounds) * 0.4, Math.max(1, boundsWidth(parcel.bounds) * 0.1));
   const marginZ = Math.min(boundsDepth(parcel.bounds) * 0.4, Math.max(1, boundsDepth(parcel.bounds) * 0.1));
   const bounds: Bounds2D = {
@@ -97,7 +103,8 @@ export function generateBuilding(parcel: GeneratedParcel, districtType: District
   };
 
   const weights = BUILDING_TYPE_WEIGHTS_BY_DISTRICT[districtType];
-  const buildingType = pickWeighted(weights, rng);
+  const generatedType = pickWeighted(weights, rng);
+  const buildingType = requiredType ?? generatedType;
   const typeMax = MAX_FLOORS_BY_BUILDING_TYPE[buildingType];
   const cap = Math.max(1, Math.min(Math.floor(maxFloorsCap), typeMax));
   const floorRoll = rng();

@@ -1,0 +1,348 @@
+{
+  "startedAt": "2026-09-22T02:07:52.242Z",
+  "browser": "153.0.4234.48",
+  "executablePath": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "base": "http://127.0.0.1:5001",
+  "coldDefinition": "New Chromium process and empty context per load; OS filesystem cache is not purged.",
+  "loads": [],
+  "scenarios": [
+    {
+      "name": "HTTP error → explicit retry → full model",
+      "injected503": true,
+      "failureSamples": [
+        {
+          "tier": "PROXY",
+          "load": {
+            "status": "ERROR",
+            "reason": "HTTP_503",
+            "message": "Nie udało się pobrać modelu (HTTP 503).",
+            "diagnostics": {
+              "startedAtMs": 916.3000000119209,
+              "fetchStartedAtMs": 916.3000000119209,
+              "fetchCompletedAtMs": 4569.199999988079,
+              "decodeStartedAtMs": null,
+              "decodeCompletedAtMs": null,
+              "httpStatus": 503,
+              "bytes": null
+            },
+            "insertedAtMs": null,
+            "firstRenderedAtMs": null
+          },
+          "lod": "PROXY_LOW",
+          "lodDiagnostics": {
+            "level": "PROXY_LOW",
+            "available": [
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 6116,
+              "textureCount": 0
+            }
+          },
+          "runtime": {
+            "updateCount": 6,
+            "simulationSeconds": 0.3036000000059603,
+            "lastDeltaSeconds": 0.016800000000000183,
+            "state": "IDLE",
+            "stepIndex": -1,
+            "stepKind": null,
+            "targetId": null,
+            "stationId": null,
+            "progress": 0,
+            "timerSeconds": 0,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "no timed transition",
+            "wallSeconds": 3.6441999999880785,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.52380952380888,
+              "frameMs": 16.800000000000182,
+              "renderMs": 5.5999999940395355,
+              "drawCalls": 1622,
+              "triangles": 141513,
+              "geometries": 394,
+              "textures": 52,
+              "textureBytesEstimate": 14057472.000000002
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "PROXY_LOW",
+              "available": [
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 6116,
+                "textureCount": 0
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        }
+      ],
+      "failed": {
+        "tier": "PROXY",
+        "load": {
+          "status": "ERROR",
+          "reason": "HTTP_503",
+          "message": "Nie udało się pobrać modelu (HTTP 503).",
+          "diagnostics": {
+            "startedAtMs": 916.3000000119209,
+            "fetchStartedAtMs": 916.3000000119209,
+            "fetchCompletedAtMs": 4569.199999988079,
+            "decodeStartedAtMs": null,
+            "decodeCompletedAtMs": null,
+            "httpStatus": 503,
+            "bytes": null
+          },
+          "insertedAtMs": null,
+          "firstRenderedAtMs": null
+        },
+        "lod": "PROXY_LOW",
+        "lodDiagnostics": {
+          "level": "PROXY_LOW",
+          "available": [
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "runtime": {
+          "updateCount": 6,
+          "simulationSeconds": 0.3036000000059603,
+          "lastDeltaSeconds": 0.016800000000000183,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": null,
+          "progress": 0,
+          "timerSeconds": 0,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 3.6441999999880785,
+          "frameDeltaSeconds": 0.016599999994039535,
+          "render": {
+            "fps": 59.52380952380888,
+            "frameMs": 16.800000000000182,
+            "renderMs": 5.5999999940395355,
+            "drawCalls": 1622,
+            "triangles": 141513,
+            "geometries": 394,
+            "textures": 52,
+            "textureBytesEstimate": 14057472.000000002
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "body",
+            "selectedNodeId": null,
+            "selectedOrganId": null,
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": null,
+          "twinLod": {
+            "level": "PROXY_LOW",
+            "available": [
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 6116,
+              "textureCount": 0
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": []
+        },
+        "level": "body",
+        "macro": "body",
+        "selected": "body"
+      },
+      "recovered": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 4726.0999999940395,
+            "fetchStartedAtMs": 4726.0999999940395,
+            "fetchCompletedAtMs": 4831.5999999940395,
+            "decodeStartedAtMs": 4831.5999999940395,
+            "decodeCompletedAtMs": 4911.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4924.800000011921,
+          "firstRenderedAtMs": 8025.5999999940395
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 21,
+          "simulationSeconds": 0.5916999999940391,
+          "lastDeltaSeconds": 0.021599999994039536,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": null,
+          "progress": 0,
+          "timerSeconds": 0,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 3.901099999994039,
+          "frameDeltaSeconds": 0.021599999994039536,
+          "render": {
+            "fps": 59.52380952380888,
+            "frameMs": 16.800000000000182,
+            "renderMs": 3100.7999999821186,
+            "drawCalls": 1203,
+            "triangles": 427015,
+            "geometries": 388,
+            "textures": 66,
+            "textureBytesEstimate": 14057472.000000002
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "body",
+            "selectedNodeId": null,
+            "selectedOrganId": null,
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": null,
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": []
+        },
+        "level": "body",
+        "macro": "body",
+        "selected": "body"
+      }
+    },
+    {
+      "name": "navigation away during fetch → return",
+      "recovered": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 1511.5,
+            "fetchStartedAtMs": 1511.6000000238419,
+            "fetchCompletedAtMs": 1913.300000011921,
+            "decodeStartedAtMs": 1913.300000011921,
+            "decodeCompletedAtMs": 1984.800000011921,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 1996.7000000178814,
+          "firstRenderedAtMs": 2242.300000011921
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 14,
+          "simulationSeconds": 0.6809999999999998,
+          "lastDeltaSeconds": 0.2,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": null,
+          "progress": 0,
+          "timerSeconds": 0,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 0.701800000011921,
+          "frameDeltaSeconds": 0.247,
+          "render": {
+            "fps": 3.992015968063872,
+            "frameMs": 250.5,
+            "renderMs": 4.9000000059604645,
+            "drawCalls": 1223,
+            "triangles": 428219,
+            "geometries": 388,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "body",
+            "selectedNodeId": null,
+            "selectedOrganId": null,
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": null,
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": []
+        },
+        "level": "body",
+        "macro": "body",
+        "selected": "body"
+      }
+    }
+  ],
+  "errors": []
+}

@@ -132,15 +132,15 @@ function runScenario(): ScenarioResult {
   session.transition('RUNNING', 'EXECUTION_START');
 
   const unsafeCommand: DeviceCommand = { commandId: 'cmd-unsafe', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(500, 'K'), protocolId: protocol.protocolId };
-  const unsafeDecision = safety.evaluate({ device: rig.device, command: unsafeCommand, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
+  const unsafeDecision = safety.evaluate({ device: rig.device, command: unsafeCommand, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
   if (unsafeDecision.allowed) throw new Error('Unsafe command was not vetoed');
 
   const staleCommand: DeviceCommand = { commandId: 'cmd-stale', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(310, 'K'), protocolId: protocol.protocolId };
-  const staleDecision = safety.evaluate({ device: rig.device, command: staleCommand, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'STALE', calibrationValid: true });
+  const staleDecision = safety.evaluate({ device: rig.device, command: staleCommand, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'STALE', calibrationValid: true });
   if (staleDecision.allowed) throw new Error('Stale sensor command was not vetoed');
 
   const command: DeviceCommand = { commandId: 'cmd-safe', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(323.15, 'K'), protocolId: protocol.protocolId };
-  const decision = safety.evaluate({ device: rig.device, command, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
+  const decision = safety.evaluate({ device: rig.device, command, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
   if (!decision.allowed || decision.authorized === undefined) throw new Error(`Safe HIL command rejected: ${decision.reasons.join(',')}`);
   bridge.executeAuthorized(decision.authorized);
 

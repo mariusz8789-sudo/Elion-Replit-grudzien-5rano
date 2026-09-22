@@ -7,6 +7,24 @@ export type OrganSystemId =
 
 export type AnatomyKind = 'BODY' | 'SYSTEM' | 'REGION' | 'ORGAN' | 'TISSUE' | 'STRUCTURE' | 'CELL' | 'SUBCELLULAR';
 
+/** Representation metadata, never a probability of medical truth. */
+export interface AnatomyRepresentationMetadata {
+  readonly provenance: { readonly source: string; readonly description: string };
+  readonly confidence: { readonly status: 'UNKNOWN'; readonly reason: string }
+    | { readonly status: 'SOURCED'; readonly value: number; readonly source: string };
+  /** Physical source resolution is different from the dimensions of a rendered image. */
+  readonly resolution: { readonly status: 'UNSPECIFIED'; readonly reason: string }
+    | { readonly status: 'SOURCED'; readonly meters: number; readonly source: string };
+}
+
+/** Semantic membership is separate from parentId/children, which describe spatial containment. */
+export interface AnatomyRelationship {
+  readonly kind: 'SYSTEM_HAS_ORGAN';
+  readonly fromNodeId: string;
+  readonly toNodeId: string;
+  readonly provenance: { readonly source: string; readonly description: string };
+}
+
 export interface AnatomyNode {
   readonly id: string;
   readonly parentId: string | null;
@@ -21,6 +39,7 @@ export interface AnatomyNode {
   readonly assetSlot: string;
   readonly visibleByDefault: boolean;
   readonly epistemic: EpistemicLabel;
+  readonly representation: AnatomyRepresentationMetadata;
 }
 
 export interface HumanBodyParameters {
@@ -39,6 +58,7 @@ export interface HumanDigitalTwinManifest {
   readonly rootNodeId: string;
   readonly anatomyVersion: string;
   readonly nodes: readonly AnatomyNode[];
+  readonly relationships: readonly AnatomyRelationship[];
   readonly supportedSystems: readonly OrganSystemId[];
   readonly clinicalUse: 'NOT_A_MEDICAL_DEVICE';
   readonly notes: readonly string[];

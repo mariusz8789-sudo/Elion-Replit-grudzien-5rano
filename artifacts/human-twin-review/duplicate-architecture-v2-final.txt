@@ -1,0 +1,26 @@
+GENESIS duplicate architecture audit 2026-09-22
+Canonical declarations:
+[export class WorldGraph] count=1
+packages\frontend\src\core\worldModel\ecs\worldGraph.ts:67:export class WorldGraph {
+[export function generateWorld] count=1
+packages\frontend\src\core\worldModel\generation\worldGenerator.ts:34:export function generateWorld(blueprint: WorldBlueprint): GeneratedWorld {
+[export class TemporalEngine] count=1
+packages\frontend\src\core\worldModel\temporal\temporalEngine.ts:68:export class TemporalEngine {
+[export class WorldFrameRenderer] count=1
+packages\frontend\src\core\three\graphics\worldFrameRenderer.ts:137:export class WorldFrameRenderer {
+[export class EvidenceLedger] count=1
+packages\core\src\knowledge\EvidenceLedger.ts:17:export class EvidenceLedger {
+[export type MirrorState] count=1
+packages\core\src\flagship\mirrorTwin.ts:14:export type MirrorState = 'MIRROR_IDLE' | 'CONSENT_REQUIRED' | 'SCANNING' | 'SYNCING' | 'TWIN_READY' | 'DIVERGENCE_MODE' | 'CAPTURE' | 'REPLAY';
+[export type DeviceSafetyMode] count=1
+packages\frontend\src\core\lab\devicePorts.ts:4:export type DeviceSafetyMode = 'SIMULATION' | 'REHEARSAL' | 'READ_ONLY_TELEMETRY' | 'SHADOW' | 'HUMAN_APPROVAL_REQUIRED' | 'DEVICE_ACTUATION_BLOCKED';
+[AppendOnlyMetaMemory] count=0
+[core/visualStages] count=0
+Production route imports:
+98:const WorldDirectorScreen = lazy(() => import('./components/WorldDirectorScreen').then((m) => ({ default: m.WorldDirectorScreen })));
+99:const MetaCognitionScreen = lazy(() => import('./components/MetaCognitionScreen').then((m) => ({ default: m.MetaCognitionScreen })));
+100:const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
+358:      return <div className="app app-fullbleed"><HeavyRoute><WorldDirectorScreen /></HeavyRoute>{overlays}</div>;
+361:      return <div className="app"><TopBar title="◉ Meta‑Cognition / Self‑Audit" onSearch={() => setSearchOpen(true)} /><HeavyRoute><MetaCognitionScreen /></HeavyRoute>{overlays}</div>;
+364:      return <div className="app app-fullbleed"><HeavyRoute><MirrorStatusScreen /></HeavyRoute>{overlays}</div>;
+Reachability evidence: frontend full Vitest moduleReachability PASS; 623/623 files.

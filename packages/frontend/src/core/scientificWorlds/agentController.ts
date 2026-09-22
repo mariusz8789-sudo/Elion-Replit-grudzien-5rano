@@ -72,6 +72,22 @@ export interface AgentUpdate {
   readonly interaction: { readonly stationId: string; readonly parameters: Readonly<Record<string, string | number | boolean>> } | null;
 }
 
+export interface AgentTimingDiagnostics {
+  readonly updateCount: number;
+  readonly simulationSeconds: number;
+  readonly lastDeltaSeconds: number;
+  readonly state: AgentActionState;
+  readonly stepIndex: number;
+  readonly stepKind: ActionStep['kind'] | null;
+  readonly targetId: string | null;
+  readonly stationId: string | null;
+  readonly progress: number;
+  readonly timerSeconds: number;
+  readonly remainingWaypoints: number;
+  readonly blockedReason: string | null;
+  readonly transitionCondition: string;
+}
+
 const TWO_PI = Math.PI * 2;
 const wrap = (a: number): number => ((a + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
 
@@ -99,6 +115,10 @@ export class AgentController {
   private readonly interactSeconds: number;
   private readonly observeSeconds: number;
   private readonly reportSeconds: number;
+  private updateCount = 0;
+  private simulationSeconds = 0;
+  private lastDeltaSeconds = 0;
+  private lastProgress = 0;
 
   constructor(private readonly options: AgentControllerOptions) {
     this.position = { ...options.start.position };
@@ -118,6 +138,17 @@ export class AgentController {
   get station(): string | null { return this.currentStationId; }
   get session(): ExperimentSession | null { return this.lastSession; }
   get navigation(): NavigationPlan | null { return this.nav; }
+
+  getDiagnostics(): AgentTimingDiagnostics {
+    const kind = this.currentStep()?.kind ?? null;
+    const condition = kind === 'NAVIGATE' ? 'remainingWaypoints = 0' : kind === 'ALIGN' ? '|targetFacing - facing| < 0.03 rad'
+      : kind === 'REACH' ? `timer >= ${this.reachSeconds}s` : kind === 'INTERACT' ? `timer >= ${this.interactSeconds}s`
+      : kind === 'OBSERVE' ? `timer >= ${this.observeSeconds}s` : kind === 'REPORT' ? `timer >= ${this.reportSeconds}s`
+      : kind === 'EXECUTE' ? 'sealed session announced on next update' : 'no timed transition';
+    return { updateCount: this.updateCount, simulationSeconds: this.simulationSeconds, lastDeltaSeconds: this.lastDeltaSeconds,
+      state: this.context.state, stepIndex: this.stepIndex, stepKind: kind, targetId: this.context.targetId, stationId: this.currentStationId,
+      progress: this.lastProgress, timerSeconds: this.timer, remainingWaypoints: this.waypoints.length, blockedReason: this.context.blockedReason, transitionCondition: condition };
+  }
 
   /** Accepts a plan only when idle (or between plans); returns the refusal otherwise. */
   startPlan(plan: ActionPlan): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
@@ -179,6 +210,10 @@ export class AgentController {
         if (!station) { this.apply({ type: 'BLOCKED', reason: `unknown station ${step.stationId}` }); return; }
         // The operator faces the console: opposite of the station's own facing.
         this.targetFacing = wrap(station.facing + Math.PI);
+        // An observed run can be followed by another run at this same station.
+        // No NAVIGATE step exists to leave REPORTING, so settle the completed
+        // observation before starting the next alignment through the normal events.
+        if (this.context.state === 'REPORTING') this.apply({ type: 'REPORT_DONE' });
         if (this.context.state === 'IDLE') this.apply({ type: 'PLAN_STARTED', targetId: station.id });
         if (this.context.state === 'MOVING_TO_TARGET') this.apply({ type: 'WAYPOINT_REACHED', remaining: 0 });
         this.apply({ type: 'ALIGN_STARTED' });
@@ -211,6 +246,10 @@ export class AgentController {
   }
 
   update(dt: number): AgentUpdate {
+    dt = Number.isFinite(dt) ? Math.max(0, dt) : 0;
+    this.updateCount++;
+    this.simulationSeconds += dt;
+    this.lastDeltaSeconds = dt;
     const step = this.currentStep();
     let report: AgentReport | null = null;
     let sessionSealed: SessionWithArtifact | null = null;
@@ -288,6 +327,7 @@ export class AgentController {
         }
       }
     } else { this.speed = 0; }
+    this.lastProgress = progress;
     return { state: this.context.state, stepIndex: this.stepIndex, stepKind: this.currentStep()?.kind ?? null, stationId: this.currentStationId, report, sessionSealed, blockedReason: this.context.blockedReason, progress, interaction };
   }
 }

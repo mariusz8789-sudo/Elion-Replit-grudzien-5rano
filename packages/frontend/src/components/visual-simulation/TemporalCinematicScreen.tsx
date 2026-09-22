@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useThreeLoop } from '../../core/three/useThreeLoop';
 import { TemporalCinematicSim3D } from '../../core/temporalCinematic/temporalCinematicSim3D';
-import { buildHistoricalScene, type HistoricalScene } from '../../core/temporalCinematic/temporalCinematicEngine';
+import { buildHistoricalScene, recordTemporalCaptureArtifact, type HistoricalScene } from '../../core/temporalCinematic/temporalCinematicEngine';
 import type { CameraPath } from '../../core/temporalCinematic/cameraPath';
 import type { SimParams } from '../../core/types';
 import type { CinematicViewMode } from '../../core/temporalCinematic/cinematicShotDirector';
+import type { RoomType } from '../../core/worldModel/ecs/geometry';
+import { kernelLedger } from '../../core/agent/cyberReasoningKernel';
+import { canonicalJson, fnv1a } from '../../core/events/hash';
 
 /** One canonical capture hook; V6.1 adds deterministic seek-and-wait, not a second hook. */
 export interface GenesisTemporalCaptureHook {
@@ -16,7 +19,9 @@ export interface GenesisTemporalCaptureHook {
   seekTo(seconds: number): void;
   seekAndWait(seconds: number): Promise<void>;
   getCurrentTimeSeconds(): number;
-  getPresentationSummary(): { readonly viewMode: CinematicViewMode; readonly interiorRoomId: string | null; readonly interiorAssetSlotCount: number; readonly livingWorld: boolean };
+  getPresentationSummary(): ReturnType<TemporalCinematicSim3D['getPresentationSummary']>;
+  getInteractionTargets(): ReturnType<TemporalCinematicSim3D['getInteractionTargets']>;
+  recordCaptureArtifact(input: { readonly seconds: number; readonly artifactFile: string; readonly artifactSha256: string }): { readonly evidenceHash: string; readonly semanticFingerprint: string };
   debugEntitySummary(): readonly { id: string; position: readonly [number, number, number]; scale: number }[];
 }
 
@@ -37,6 +42,7 @@ export interface TemporalCinematicRouteParams {
   readonly weather?: string;
   readonly viewMode: CinematicViewMode;
   readonly generateInteriors: boolean;
+  readonly roomType?: RoomType;
 }
 
 export function parseTemporalCinematicRoute(hash: string): TemporalCinematicRouteParams | null {
@@ -60,6 +66,7 @@ export function parseTemporalCinematicRoute(hash: string): TemporalCinematicRout
     weather: weatherRaw?.trim() || undefined,
     viewMode,
     generateInteriors,
+    roomType: params.get('roomType') === 'MATERIALS_LAB' ? 'MATERIALS_LAB' : undefined,
   };
 }
 
@@ -98,6 +105,7 @@ export function TemporalCinematicScreen() {
       weather: route.weather,
       year: route.year,
       viewMode: route.viewMode,
+      roomType: route.roomType,
     });
   }, [outcome, route]);
 
@@ -116,6 +124,27 @@ export function TemporalCinematicScreen() {
       seekAndWait: async (seconds: number) => { sim.seekTo(seconds); await twoAnimationFrames(); },
       getCurrentTimeSeconds: () => sim.getCurrentTimeSeconds(),
       getPresentationSummary: () => sim.getPresentationSummary(),
+      getInteractionTargets: () => sim.getInteractionTargets(),
+      recordCaptureArtifact: (input) => {
+        const semanticFingerprint = fnv1a(canonicalJson({
+          worldId: outcome.scene.world.worldId,
+          place: outcome.scene.place,
+          year: outcome.scene.year,
+          seconds: input.seconds,
+          presentation: sim.getPresentationSummary(),
+        }));
+        const evidenceHash = recordTemporalCaptureArtifact(kernelLedger, {
+          worldId: outcome.scene.world.worldId,
+          place: outcome.scene.place,
+          year: outcome.scene.year,
+          seconds: input.seconds,
+          artifactFile: input.artifactFile,
+          artifactSha256: input.artifactSha256,
+          semanticFingerprint,
+          viewMode: route!.viewMode,
+        });
+        return { evidenceHash, semanticFingerprint };
+      },
       debugEntitySummary: () => sim.debugEntitySummary(),
     };
     window.__GENESIS_TEMPORAL_CAPTURE__ = hook;

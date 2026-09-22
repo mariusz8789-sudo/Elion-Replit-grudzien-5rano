@@ -183,7 +183,8 @@ export function useThreeLoop(
         let textureMemAt = 0;
         let cachedTextureBytes = 0;
         const loop = (now: number) => {
-          const dt = Math.min((now - last) / 1000, 0.05);
+          const wallDt = Math.max(0, (now - last) / 1000);
+          const dt = Math.min(wallDt, 0.05);
           last = now;
           if (runningRef.current) sim.update(dt, paramsRef.current);
           sim.syncScene(scene, camera);
@@ -242,14 +243,15 @@ export function useThreeLoop(
           renderer!.info.reset();
           if (post) post.render();
           else renderer!.render(scene, camera);
+          sim.onFrameRendered?.();
           const renderMs = performance.now() - renderStartedAt;
           if (now - textureMemAt > 1000) {
             textureMemAt = now;
             cachedTextureBytes = estimateSceneTextureMemory(scene).totalBytes;
           }
           sim.onRenderMetrics?.({
-            fps: 1 / Math.max(0.001, dt),
-            frameMs: dt * 1000,
+            fps: 1 / Math.max(0.001, wallDt),
+            frameMs: wallDt * 1000,
             renderMs,
             drawCalls: renderer!.info.render.calls,
             triangles: renderer!.info.render.triangles,

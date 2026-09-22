@@ -44,7 +44,7 @@ export function kelvinToColor(THREE: typeof THREE_NS, kelvin: number): THREE_NS.
 
 /** A matte, lightly-sheened epoxy floor (a biomedical facility floor, not the physics lab's worn wet concrete). */
 export function createEpoxyFloor(THREE: typeof THREE_NS): THREE_NS.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: 0x5f6870, roughness: 0.66, metalness: 0.04, normalMap: surfaceNormalFactory(THREE)(10, 10), normalScale: new THREE.Vector2(0.18, 0.18), envMapIntensity: 0.4 });
+  return new THREE.MeshStandardMaterial({ color: 0x5f6870, roughness: 0.66, metalness: 0.04, normalMap: surfaceNormalFactory(THREE)(10, 10), normalScale: new THREE.Vector2(0.035, 0.035), envMapIntensity: 0.4 });
 }
 
 /** Lumens on the pack's nodes onto three.js point/spot intensity at this room's exposure (documented mapping, not a photometric claim). */
@@ -192,6 +192,9 @@ export interface TwinHandle {
   readonly organs: ReadonlyMap<string, THREE_NS.Mesh>;
   /** What the body is made of: a licensed CC0 asset, or the procedural proxy. Anatomy stays MODEL either way. */
   readonly tier: HumanTwinTier;
+  /** Runtime geometry level. The low level reuses the existing procedural body; anatomy proxies are shared. */
+  setLod(level: HumanTwinLodLevel): void;
+  getLodState(): HumanTwinLodState;
   /** Apply a V3 visual-layer instruction (mode → visible asset slots, translucency, tint) and the selected node. */
   setView(instruction: VisualLayerInstruction, selectedNodeId: string | null): void;
   /** D-131: isolate the listed anatomy nodes (empty = show everything the current mode allows). */
@@ -202,6 +205,33 @@ export interface TwinHandle {
   setSurface(mode: TwinSurfaceMode): void;
   update(t: number): void;
   dispose(): void;
+}
+
+export type HumanTwinLodLevel = 'FULL_ASSET' | 'PROXY_LOW';
+export interface HumanTwinLodMetrics { readonly triangleCount: number; readonly textureCount: number }
+export interface HumanTwinLodState {
+  readonly level: HumanTwinLodLevel;
+  readonly available: readonly HumanTwinLodLevel[];
+  readonly metrics: HumanTwinLodMetrics;
+}
+
+function measureLod(root: THREE_NS.Object3D): HumanTwinLodMetrics {
+  let triangleCount = 0;
+  const textures = new Set<string>();
+  root.traverse((object) => {
+    const mesh = object as THREE_NS.Mesh;
+    if (!mesh.isMesh) return;
+    const geometry = mesh.geometry;
+    triangleCount += geometry.index ? geometry.index.count / 3 : (geometry.getAttribute('position')?.count ?? 0) / 3;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      if (!material) continue;
+      for (const value of Object.values(material)) {
+        const texture = value as THREE_NS.Texture;
+        if (texture?.isTexture) textures.add(texture.uuid);
+      }
+    }
+  });
+  return { triangleCount: Math.round(triangleCount), textureCount: textures.size };
 }
 
 export interface TwinProxyOptions {
@@ -234,6 +264,11 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   // D-131: with an approved licensed asset the GLB IS the body; the procedural rig stays built (the
   // Character handle is part of the contract) but is hidden, so no second body is ever on screen.
   const shellMaterials: THREE_NS.Material[] = [];
+  // The procedural body is the real low-LOD representation even when the licensed body is present.
+  // It receives the same surface controls and stays hidden until selected; no geometry is generated on a switch.
+  body.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.material = skin; m.castShadow = !holo; } });
+  shellMaterials.push(skin);
+  if (!isRimPatched(skin)) applyRimLight(THREE, skin, { color: new THREE.Color(opts.hologramHex ?? 0x7dd3fc), power: 3.0, intensity: holo ? 0.1 : 0.22 });
   if (asset) {
     body.root.visible = false;
     g.add(asset.root);
@@ -247,10 +282,6 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
         if (!isRimPatched(m)) applyRimLight(THREE, m, { color: rim, power: 3.0, intensity: 0.28 });
       }
     }
-  } else {
-    body.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.material = skin; m.castShadow = !holo; } });
-    shellMaterials.push(skin);
-    if (!isRimPatched(skin)) applyRimLight(THREE, skin, { color: new THREE.Color(opts.hologramHex ?? 0x7dd3fc), power: 3.0, intensity: holo ? 0.1 : 0.22 });
   }
   if (body.helmet) body.helmet.visible = false;
   g.add(body.root);
@@ -302,6 +333,16 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   const cutaway: CutawayHandle = createCutaway(THREE, opts.hologramHex ?? 0x7dd3fc);
   g.add(cutaway.indicator);
   let cutawayOn = false;
+  let lodLevel: HumanTwinLodLevel = asset ? 'FULL_ASSET' : 'PROXY_LOW';
+  const lodMetrics: Readonly<Record<HumanTwinLodLevel, HumanTwinLodMetrics>> = {
+    FULL_ASSET: asset ? measureLod(asset.root) : measureLod(body.root),
+    PROXY_LOW: measureLod(body.root),
+  };
+  const applyLod = (): void => {
+    const full = lodLevel === 'FULL_ASSET' && Boolean(asset);
+    body.root.visible = !full;
+    if (asset) asset.root.visible = full;
+  };
   const blink = asset?.morphs.get('eyeBlinkLeft') ?? null;
   const blinkR = asset?.morphs.get('eyeBlinkRight') ?? null;
 
@@ -328,14 +369,24 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
 
   return {
     group: g, body, organs, tier,
+    setLod(level) { lodLevel = level === 'FULL_ASSET' && !asset ? 'PROXY_LOW' : level; applyLod(); },
+    getLodState() {
+      return {
+        level: lodLevel,
+        available: asset ? ['FULL_ASSET', 'PROXY_LOW'] : ['PROXY_LOW'],
+        metrics: lodMetrics[lodLevel],
+      };
+    },
     setIsolated(nodeIds) { isolated = [...nodeIds]; applyOrgans(); },
     setSurface(mode) { surface = mode; applyOrgans(); },
     setCutaway(state) {
       cutawayOn = state.enabled;
-      const bounds = measureCutawayBounds(THREE, asset ? asset.root : body.root);
+      const visibleBody = lodLevel === 'FULL_ASSET' && asset ? asset.root : body.root;
+      const bounds = measureCutawayBounds(THREE, visibleBody);
       cutaway.apply(state, bounds);
       // The plane is attached to the body shell AND the organ proxies, so a cut opens the whole twin.
-      setClippingOnObject(asset ? asset.root : body.root, state.enabled ? cutaway.plane : null);
+      setClippingOnObject(body.root, state.enabled ? cutaway.plane : null);
+      if (asset) setClippingOnObject(asset.root, state.enabled ? cutaway.plane : null);
       for (const [, m] of organs) {
         const mat = m.material as THREE_NS.MeshStandardMaterial;
         mat.clippingPlanes = state.enabled ? [cutaway.plane] : null;

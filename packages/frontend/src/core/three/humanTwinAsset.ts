@@ -1,5 +1,6 @@
 import type * as THREE_NS from 'three';
 import { getWorldAssetRecord, isWorldAssetApproved, type WorldAssetRecord } from './assetGovernance';
+import { disposeSceneResources } from './graphics/lifecycle';
 
 /**
  * HUMAN DIGITAL TWIN — ASSET GATE AND LOADER (D-131).
@@ -75,6 +76,30 @@ export interface LoadedHumanTwinBody {
   readonly record: WorldAssetRecord;
 }
 
+/** Timings are browser monotonic-clock measurements, never simulated loading percentages. */
+export interface HumanTwinLoadDiagnostics {
+  startedAtMs: number;
+  fetchStartedAtMs: number | null;
+  fetchCompletedAtMs: number | null;
+  decodeStartedAtMs: number | null;
+  decodeCompletedAtMs: number | null;
+  httpStatus: number | null;
+  bytes: number | null;
+}
+
+export type HumanTwinLoadResult =
+  | { status: 'READY'; asset: LoadedHumanTwinBody; diagnostics: HumanTwinLoadDiagnostics }
+  | { status: 'ERROR' | 'BLOCKED' | 'CANCELLED'; reason: string; message: string; diagnostics: HumanTwinLoadDiagnostics };
+
+export interface HumanTwinPresentationState {
+  status: 'LOADING' | 'READY' | 'ERROR' | 'BLOCKED';
+  reason?: string;
+  message?: string;
+  diagnostics: HumanTwinLoadDiagnostics | null;
+  insertedAtMs: number | null;
+  firstRenderedAtMs: number | null;
+}
+
 /** Bounding height of a loaded object in metres, used to scale the asset to the manifest's 1:1 height. */
 function measureHeight(THREE: typeof THREE_NS, root: THREE_NS.Object3D): number {
   const box = new THREE.Box3().setFromObject(root);
@@ -92,12 +117,46 @@ export async function loadHumanTwinBody(
   targetHeightMeters: number,
   runtimePath: string = HUMAN_TWIN_RUNTIME_PATH,
 ): Promise<LoadedHumanTwinBody | null> {
+  // Compatibility for the existing street/cinematic avatar consumer.
+  const result = await loadHumanTwinBodyResult(THREE, targetHeightMeters, runtimePath);
+  return result.status === 'READY' ? result.asset : null;
+}
+
+/** One loader for both consumers; cancellation also covers decoding after the fetch has ended. */
+export async function loadHumanTwinBodyResult(
+  THREE: typeof THREE_NS,
+  targetHeightMeters: number,
+  runtimePath: string = HUMAN_TWIN_RUNTIME_PATH,
+  signal?: AbortSignal,
+): Promise<HumanTwinLoadResult> {
+  const diagnostics: HumanTwinLoadDiagnostics = {
+    startedAtMs: performance.now(), fetchStartedAtMs: null, fetchCompletedAtMs: null,
+    decodeStartedAtMs: null, decodeCompletedAtMs: null, httpStatus: null, bytes: null,
+  };
   const gate = evaluateHumanTwinAsset(runtimePath);
-  if (!gate.enabled || !gate.record) return null;
+  if (!gate.enabled || !gate.record) return { status: 'BLOCKED', reason: gate.reason, message: 'Model nie ma zatwierdzonego wpisu zasobu.', diagnostics };
+  let phase: 'FETCH' | 'DECODE' = 'FETCH';
+  let root: THREE_NS.Object3D | null = null;
   try {
+    signal?.throwIfAborted();
+    diagnostics.fetchStartedAtMs = performance.now();
+    const response = await fetch(runtimePath, { signal });
+    diagnostics.httpStatus = response.status;
+    if (!response.ok) {
+      diagnostics.fetchCompletedAtMs = performance.now();
+      return { status: 'ERROR', reason: `HTTP_${response.status}`, message: `Nie udało się pobrać modelu (HTTP ${response.status}).`, diagnostics };
+    }
+    const buffer = await response.arrayBuffer();
+    diagnostics.fetchCompletedAtMs = performance.now();
+    diagnostics.bytes = buffer.byteLength;
+    signal?.throwIfAborted();
+    phase = 'DECODE';
+    diagnostics.decodeStartedAtMs = performance.now();
     const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-    const gltf = await new GLTFLoader().loadAsync(runtimePath);
-    const root = gltf.scene as unknown as THREE_NS.Object3D;
+    const gltf = await new GLTFLoader().parseAsync(buffer, runtimePath.slice(0, runtimePath.lastIndexOf('/') + 1));
+    root = gltf.scene as unknown as THREE_NS.Object3D;
+    diagnostics.decodeCompletedAtMs = performance.now();
+    signal?.throwIfAborted();
     const meshes: THREE_NS.Mesh[] = [];
     const morphs = new Map<string, { mesh: THREE_NS.Mesh; index: number }>();
     root.traverse((o) => {
@@ -108,15 +167,23 @@ export async function loadHumanTwinBody(
       const dict = m.morphTargetDictionary;
       if (dict) for (const [name, index] of Object.entries(dict)) if (!morphs.has(name)) morphs.set(name, { mesh: m, index });
     });
-    if (!meshes.length) return null;
+    if (!meshes.length) {
+      disposeSceneResources(root);
+      return { status: 'ERROR', reason: 'EMPTY_MODEL', message: 'Plik modelu nie zawiera geometrii człowieka.', diagnostics };
+    }
     // Scale to the manifest's own 1:1 height: the twin's metre scale is the anatomy atlas's, not the asset's.
     const measured = measureHeight(THREE, root);
     const scale = targetHeightMeters / measured;
     root.scale.setScalar(scale);
     root.position.y = 0;
-    return { root, meshes, morphs, heightMeters: targetHeightMeters, tier: gate.tier, record: gate.record };
-  } catch {
-    return null; // A missing/corrupt file leaves the PROXY in place; it never fabricates a body.
+    return { status: 'READY', asset: { root, meshes, morphs, heightMeters: targetHeightMeters, tier: gate.tier, record: gate.record }, diagnostics };
+  } catch (error) {
+    if (root) disposeSceneResources(root);
+    const cancelled = signal?.aborted === true;
+    return {
+      status: cancelled ? 'CANCELLED' : 'ERROR', reason: cancelled ? 'CANCELLED' : `${phase}_FAILED`,
+      message: error instanceof Error ? error.message : String(error), diagnostics,
+    };
   }
 }
 

@@ -1,0 +1,134 @@
+{
+  "browser": "153.0.4234.48",
+  "surfaces": [
+    {
+      "mode": "desktop",
+      "greenPixels": 10847,
+      "animated": true,
+      "matrixWidth": 1440,
+      "matrixHeight": 900,
+      "humanMatrixAbsent": true
+    },
+    {
+      "mode": "mobile",
+      "greenPixels": 889,
+      "animated": true,
+      "matrixWidth": 390,
+      "matrixHeight": 844,
+      "humanMatrixAbsent": true
+    },
+    {
+      "mode": "reduced",
+      "greenPixels": 7380,
+      "animated": false,
+      "matrixWidth": 1440,
+      "matrixHeight": 900,
+      "humanMatrixAbsent": true
+    },
+    {
+      "label": "materials-compute",
+      "summary": {
+        "viewMode": "interior",
+        "interiorRoomId": "room:historical:vienna:2026-district-2-parcel-4-building-floor-1-room-left-0",
+        "interiorRoomType": "MATERIALS_LAB",
+        "interiorAssetSlots": [
+          {
+            "id": "asset-slot:historical:vienna:2026-district-2-parcel-4-building-floor-1-room-left-0-slot-0",
+            "slotType": "SPECTROMETER_STATION",
+            "rendered": true
+          },
+          {
+            "id": "asset-slot:historical:vienna:2026-district-2-parcel-4-building-floor-1-room-left-0-slot-1",
+            "slotType": "THERMAL_STAGE_STATION",
+            "rendered": true
+          },
+          {
+            "id": "asset-slot:historical:vienna:2026-district-2-parcel-4-building-floor-1-room-left-0-slot-2",
+            "slotType": "COMPUTE_STATION",
+            "rendered": true
+          }
+        ],
+        "interiorAssetSlotCount": 3,
+        "selectedAssetSlotId": null,
+        "selectedAssetSlotType": null,
+        "interactionCommand": null,
+        "continuityEpoch": 2,
+        "lastDiscontinuity": {
+          "fromSeconds": 1.5,
+          "toSeconds": 3,
+          "reason": "SEEK"
+        },
+        "temporalAccumulation": "NOT_PRESENT",
+        "livingWorld": false
+      },
+      "shots": [
+        {
+          "t": 0,
+          "file": "artifacts/human-twin-review/materials-compute-0.png",
+          "sha256": "7ddae761eaf990b4a49edbf5c9439be85218bc9fd229b50cc7dfd61465297f9e",
+          "evidenceHash": "17e0d357daf54b81ce256896f3070dd55b2e0b90b1757c3df2597160b767d6e3",
+          "semanticFingerprint": "71c72fca"
+        },
+        {
+          "t": 1.5,
+          "file": "artifacts/human-twin-review/materials-compute-1.5.png",
+          "sha256": "0ffab624c825682967b99ee7dfe9770fef30787038d1e7c6f752219e65bb485a",
+          "evidenceHash": "2e488422c6bd50e85ca13966c0bfa9b2ac2a144838c0da8de1565d0cd37b3747",
+          "semanticFingerprint": "eb2e3723"
+        },
+        {
+          "t": 3,
+          "file": "artifacts/human-twin-review/materials-compute-3.png",
+          "sha256": "8ea0c1790fd1077e59279b89806fb3d1592669f13e3dd326fe317adc656dd53d",
+          "evidenceHash": "14bcfe2347fb8419029e7937f5e1d044c4b2eba83e0507237bd14581937dc3d2",
+          "semanticFingerprint": "96f1a42a"
+        }
+      ]
+    },
+    {
+      "label": "street",
+      "summary": {
+        "viewMode": "street",
+        "interiorRoomId": null,
+        "interiorRoomType": null,
+        "interiorAssetSlots": [],
+        "interiorAssetSlotCount": 0,
+        "selectedAssetSlotId": null,
+        "selectedAssetSlotType": null,
+        "interactionCommand": null,
+        "continuityEpoch": 2,
+        "lastDiscontinuity": {
+          "fromSeconds": 1.5,
+          "toSeconds": 3,
+          "reason": "SEEK"
+        },
+        "temporalAccumulation": "NOT_PRESENT",
+        "livingWorld": true
+      },
+      "shots": [
+        {
+          "t": 0,
+          "file": "artifacts/human-twin-review/street-0.png",
+          "sha256": "5b21ef425b26bc98b8f941334ef0455afc1c8a308452a30572788178ccc061ec",
+          "evidenceHash": "dd0317e5bdd878cbaf12fb1af7f8467931db46a7697aab8a7804d940192ca632",
+          "semanticFingerprint": "e4780cad"
+        },
+        {
+          "t": 1.5,
+          "file": "artifacts/human-twin-review/street-1.5.png",
+          "sha256": "e808f53c2293b9e591c19e1884b0efea5cbb73013e7e38c5befe8934adaacbc7",
+          "evidenceHash": "3b1f7c5fd4ca308e9997fd07dd76c5bf4f79974b35f767f320d9340a459cb4c9",
+          "semanticFingerprint": "16305606"
+        },
+        {
+          "t": 3,
+          "file": "artifacts/human-twin-review/street-3.png",
+          "sha256": "a8c2bfb56a7438af745592d52e58c6a0b3989c095638bf001b1b327c26d55c0b",
+          "evidenceHash": "a146eb7a5aef104b19dce8a911117c66641408940c76e44253a1206e79861598",
+          "semanticFingerprint": "d4c4cacf"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

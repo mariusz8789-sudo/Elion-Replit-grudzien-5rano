@@ -25,7 +25,6 @@ import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
 import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
 import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
-import { isSuppressed as isHeavy3DRoute } from './components/MatrixDataStream';
 import { listExperiments } from './core/scienceMemory';
 
 /**
@@ -96,6 +95,9 @@ const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard'
 const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
 const SimWorldDashboard = lazy(() => import('./components/SimWorldDashboard').then((m) => ({ default: m.SimWorldDashboard })));
 const MythTheoryLab = lazy(() => import('./features/myths-theories/MythTheoryLab').then((m) => ({ default: m.MythTheoryLab })));
+const WorldDirectorScreen = lazy(() => import('./components/WorldDirectorScreen').then((m) => ({ default: m.WorldDirectorScreen })));
+const MetaCognitionScreen = lazy(() => import('./components/MetaCognitionScreen').then((m) => ({ default: m.MetaCognitionScreen })));
+const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -177,7 +179,10 @@ type Route =
   | { kind: 'cern-complex' }
   | { kind: 'scientific-worlds'; world?: 'physics' | 'biology' }
   | { kind: 'decipherment' }
-  | { kind: 'myths-theories' };
+  | { kind: 'myths-theories' }
+  | { kind: 'world-director' }
+  | { kind: 'meta-cognition' }
+  | { kind: 'mirror' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -248,6 +253,9 @@ function parseHash(): Route {
   if (h === '#/human-biology-lab' || h.startsWith('#/human-biology-lab?')) return { kind: 'scientific-worlds', world: 'biology' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
+  if (h === '#/world-director') return { kind: 'world-director' };
+  if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
+  if (h === '#/mirror') return { kind: 'mirror' };
   return { kind: 'home' };
 }
 
@@ -346,6 +354,15 @@ export default function App() {
   // gałęzi, React odmontowywałby go przy każdej zmianie trasy — dokładnie
   // to, czego "persystentne płótno" ma unikać.
   const renderRoute = () => {
+    if (route.kind === 'world-director') {
+      return <div className="app app-fullbleed"><HeavyRoute><WorldDirectorScreen /></HeavyRoute>{overlays}</div>;
+    }
+    if (route.kind === 'meta-cognition') {
+      return <div className="app"><TopBar title="◉ Meta‑Cognition / Self‑Audit" onSearch={() => setSearchOpen(true)} /><HeavyRoute><MetaCognitionScreen /></HeavyRoute>{overlays}</div>;
+    }
+    if (route.kind === 'mirror') {
+      return <div className="app app-fullbleed"><HeavyRoute><MirrorStatusScreen /></HeavyRoute>{overlays}</div>;
+    }
     if (route.kind === 'lab') {
       const lab = getLab(route.id);
       if (!lab) {
@@ -1338,28 +1355,17 @@ export default function App() {
     hasOpenInvestigation: false,
     savedExperimentCount: (() => { try { return listExperiments().length; } catch { return 0; } })(),
   });
-  // The same route list `MatrixDataStream.tsx` uses, read here for a DIFFERENT
-  // decision. Suppressing the background entirely on these routes was measured
-  // to be wrong: on #/genesis-world the 3D canvas is 1200x750 inside a
-  // 1440x900 viewport — 69% — so the sidebar, title strip, description block
-  // and margins (the other 31%) were left empty for no reason. What actually
-  // needs protecting on these screens is the frame budget, since a second rAF
-  // loop runs beside the 3D scene's own. So the background stays mounted and
-  // visible, and drops to LOW quality instead: fewer streams and particles,
-  // no glow blur, lower device-pixel-ratio cap (matrixEngine.ts::QUALITY).
-  const heavy3DRoute = isHeavy3DRoute(window.location.hash);
-
   return (
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
-      <ErrorBoundary>
+      {route.kind === 'home' && <ErrorBoundary>
         <LiveMatrixBackground
           className="matrix-datastream"
           {...toMatrixConfig(genesisVisualState)}
-          quality={heavy3DRoute ? 'LOW' : 'HIGH'}
+          style={{ background: '#020806', opacity: 0.55 }}
         />
-      </ErrorBoundary>
+      </ErrorBoundary>}
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —

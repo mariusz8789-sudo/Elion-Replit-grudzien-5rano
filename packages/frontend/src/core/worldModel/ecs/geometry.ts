@@ -84,6 +84,7 @@ export type RoomType =
   | 'MICROSCOPY_SUITE'
   | 'REACTOR_ROOM'
   | 'PUMP_ROOM'
+  | 'MATERIALS_LAB'
   | 'GENERIC';
 
 export type NavigationMode = 'WALK' | 'DRIVE' | 'STAIR' | 'ELEVATOR';

@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { ToyVulnerableApp, runAdaptiveInvestigation } from '../core/agent/cyberReasoningKernel';
+import { ToyVulnerableApp, runAdaptiveInvestigation, runSecurityTest } from '../core/agent/cyberReasoningKernel';
+
+const approvedOptions = {
+  approvalForRemediation: (remediation: { readonly remediationId: string }) => ({
+    remediationId: remediation.remediationId,
+    decidedBy: 'vitest-human-reviewer',
+    decidedAt: '2026-09-22T00:00:00.000Z',
+    decision: 'APPROVED' as const,
+  }),
+};
+const runApproved = (app: ToyVulnerableApp, maxSteps = 20) => runAdaptiveInvestigation(app, maxSteps, approvedOptions);
 
 /**
  * ADAPTIVE CYBER INVESTIGATION — integration tests for the real caller
@@ -13,8 +23,34 @@ import { ToyVulnerableApp, runAdaptiveInvestigation } from '../core/agent/cyberR
  */
 
 describe('runAdaptiveInvestigation — the planner is a real, wired caller', () => {
+  it('fails closed at the real remediation call site when no human approval exists', () => {
+    const app = new ToyVulnerableApp();
+    const result = runAdaptiveInvestigation(app);
+    expect(result.stopReason).toContain('HUMAN_APPROVAL_REQUIRED');
+    const proposal = result.steps.find((step) => step.remediation !== null);
+    expect(proposal?.testResult).toBeNull();
+
+    const hypothesis = result.hypotheses.find((entry) => entry.hypothesisId === 'hyp:AUTH_BYPASS::/admin')!;
+    expect(runSecurityTest(hypothesis, app, 'approval-block-proof').observedResult.statusCode).toBe(200);
+  });
+
+  it('enforces analyzer and patch-proposal budgets inside the real adaptive runtime', () => {
+    const analyzerLimited = runAdaptiveInvestigation(new ToyVulnerableApp(), 20, {
+      budget: { maxHypotheses: 16, maxAnalyzerRuns: 1, maxPatchProposals: 2 },
+      ...approvedOptions,
+    });
+    expect(analyzerLimited.stopReason).toBe('CYBER_BUDGET_EXHAUSTED: maxAnalyzerRuns=1');
+
+    const patchLimited = runAdaptiveInvestigation(new ToyVulnerableApp(), 20, {
+      budget: { maxHypotheses: 16, maxAnalyzerRuns: 20, maxPatchProposals: 0 },
+      ...approvedOptions,
+    });
+    expect(patchLimited.stopReason).toBe('CYBER_BUDGET_EXHAUSTED: maxPatchProposals=0');
+    expect(patchLimited.steps.find((step) => step.remediation !== null)?.testResult).toBeNull();
+  });
+
   it('L: the existing Cyber flow actually invokes the planner repeatedly, testing multiple distinct hypotheses adaptively (not a fixed single pass)', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     const testedHypothesisIds = new Set(result.steps.map((s) => s.hypothesisId).filter((id): id is string => id !== null));
     // 11 hypotheses arise from the real fixture's observed attack surface (traced by hand,
     // not copied from a prediction): /admin x2, /profile x3, /admin-backup-public x3, /ambiguous x3.
@@ -27,7 +63,7 @@ describe('runAdaptiveInvestigation — the planner is a real, wired caller', () 
   });
 
   it('F: falsification is tied to a structured comparison (status code + summary), never a free-form flag', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     const falsifiedSteps = result.steps.filter((s) => s.verdict?.assessment === 'FALSIFIED_WITHIN_PROTOCOL');
     expect(falsifiedSteps.length).toBeGreaterThan(0);
     for (const s of falsifiedSteps) {
@@ -38,7 +74,7 @@ describe('runAdaptiveInvestigation — the planner is a real, wired caller', () 
   });
 
   it('G + J: a falsified assessment never erases a prior SUPPORTED one — both remain in history as a preserved conflict', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     const adminAuthBypassHistory = result.assessmentHistory.get('hyp:AUTH_BYPASS::/admin')!;
     expect(adminAuthBypassHistory).toEqual(['SUPPORTED_WITHIN_PROTOCOL', 'FALSIFIED_WITHIN_PROTOCOL']);
     expect(result.conflicts).toContain('hyp:AUTH_BYPASS::/admin');
@@ -46,7 +82,7 @@ describe('runAdaptiveInvestigation — the planner is a real, wired caller', () 
   });
 
   it('K: the planner changes its selection after a meaningful result — a resolved hypothesis with no remediation is never reselected', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     // /profile's AUTH_BYPASS hypothesis is FALSIFIED with no remediation available for a
     // FALSIFIED hypothesis (createRemediation only ever returns non-null for /admin) — it
     // must be tested exactly once, never repeated.
@@ -56,7 +92,7 @@ describe('runAdaptiveInvestigation — the planner is a real, wired caller', () 
   });
 
   it('H: an inconclusive hypothesis is recognized as a repeat candidate and executed at most once more, never in an unbounded loop', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     const ambiguousSteps = result.steps.filter((s) => s.hypothesisId === 'hyp:AUTH_BYPASS::/ambiguous');
     expect(ambiguousSteps.length).toBe(2);
     expect(ambiguousSteps.every((s) => s.verdict!.assessment === 'INCONCLUSIVE')).toBe(true);
@@ -67,7 +103,7 @@ describe('runAdaptiveInvestigation — the planner is a real, wired caller', () 
   });
 
   it('I + M: a SUPPORTED hypothesis triggers the SAME planner to select independent replication, which drives the EXISTING remediation/retest/outcome-verification path', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     const replicationStep = result.steps.find((s) => s.hypothesisId === 'hyp:AUTH_BYPASS::/admin' && s.remediation !== null);
     expect(replicationStep).toBeDefined();
     expect(replicationStep!.remediation!.remediationId).toBe('admin-auth-fix'); // read from the target, not invented
@@ -86,12 +122,12 @@ describe('runAdaptiveInvestigation — the planner is a real, wired caller', () 
     // per-kind lookup used by the wired caller does mark INJECTION UNSAFE by policy, which
     // is the branch `cyberTestPlanner.test.ts` exercises directly (this fixture never
     // generates an INJECTION hypothesis, so it cannot be reached through this integration path).
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const result = runApproved(new ToyVulnerableApp());
     expect(result.hypotheses.every((h) => h.kind !== 'INJECTION')).toBe(true);
   });
 
   it('bounded by maxSteps when supplied smaller than the natural investigation length', () => {
-    const result = runAdaptiveInvestigation(new ToyVulnerableApp(), 3);
+    const result = runApproved(new ToyVulnerableApp(), 3);
     expect(result.steps.length).toBeLessThanOrEqual(3);
     expect(result.stopReason).toContain('maxSteps=3');
   });
@@ -103,7 +139,7 @@ describe('E2E: question -> competing hypotheses -> planner -> execution -> obser
 
     // 1. QUESTION (implicit): investigate the app's attack surface.
     // 2. COMPETING HYPOTHESES: the real kernel derives them from real observations.
-    const result = runAdaptiveInvestigation(app);
+    const result = runApproved(app);
     expect(result.observations.length).toBeGreaterThan(0);
     expect(result.hypotheses.some((h) => h.hypothesisId === 'hyp:AUTH_BYPASS::/admin')).toBe(true);
     expect(result.hypotheses.some((h) => h.hypothesisId === 'hyp:INFO_DISCLOSURE::/admin')).toBe(true);

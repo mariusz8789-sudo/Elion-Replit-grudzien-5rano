@@ -26,11 +26,12 @@ let detectCache = null;
 
 /** Wywołuje worker z jednym poleceniem JSON; zwraca sparsowany wynik lub rzuca. */
 function invoke(request) {
-  const out = execFileSync(PYTHON, [WORKER, JSON.stringify(request)], {
+  const out = execFileSync(PYTHON, [WORKER], {
+    input: JSON.stringify(request),
     timeout: TIMEOUT_MS,
     maxBuffer: 4 * 1024 * 1024,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
+    stdio: ['pipe', 'pipe', 'ignore'],
   });
   return JSON.parse(out);
 }
@@ -189,11 +190,12 @@ export function fingerprintBatch(smilesList, { chunkSize = 500 } = {}) {
   try {
     for (let offset = 0; offset < list.length; offset += chunkSize) {
       const chunk = list.slice(offset, offset + chunkSize);
-      const out = execFileSync(PYTHON, [WORKER, JSON.stringify({ cmd: 'batch_fingerprint', smilesList: chunk })], {
+      const out = execFileSync(PYTHON, [WORKER], {
+        input: JSON.stringify({ cmd: 'batch_fingerprint', smilesList: chunk }),
         timeout: Math.max(TIMEOUT_MS, 1_000 * chunk.length),
         maxBuffer: 256 * 1024 * 1024,
         encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
+        stdio: ['pipe', 'pipe', 'ignore'],
       });
       const r = JSON.parse(out);
       if (!r.ok) return { ok: false, error: r.error };
@@ -223,11 +225,12 @@ export function descriptorsBatch(smilesList, { chunkSize = 500 } = {}) {
   try {
     for (let offset = 0; offset < list.length; offset += chunkSize) {
       const chunk = list.slice(offset, offset + chunkSize);
-      const out = execFileSync(PYTHON, [WORKER, JSON.stringify({ cmd: 'batch_descriptors', smilesList: chunk })], {
+      const out = execFileSync(PYTHON, [WORKER], {
+        input: JSON.stringify({ cmd: 'batch_descriptors', smilesList: chunk }),
         timeout: Math.max(TIMEOUT_MS, 1_000 * chunk.length),
         maxBuffer: 256 * 1024 * 1024,
         encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
+        stdio: ['pipe', 'pipe', 'ignore'],
       });
       const r = JSON.parse(out);
       if (!r.ok) return { ok: false, error: r.error };
@@ -261,11 +264,12 @@ export function peptideParseBatch(smilesList, { chunkSize = 500 } = {}) {
   try {
     for (let offset = 0; offset < list.length; offset += chunkSize) {
       const chunk = list.slice(offset, offset + chunkSize);
-      const out = execFileSync(PYTHON, [WORKER, JSON.stringify({ cmd: 'batch_peptide_parse', smilesList: chunk })], {
+      const out = execFileSync(PYTHON, [WORKER], {
+        input: JSON.stringify({ cmd: 'batch_peptide_parse', smilesList: chunk }),
         timeout: Math.max(TIMEOUT_MS, 1_000 * chunk.length),
         maxBuffer: 256 * 1024 * 1024,
         encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
+        stdio: ['pipe', 'pipe', 'ignore'],
       });
       const r = JSON.parse(out);
       if (!r.ok) return { ok: false, error: r.error };

@@ -35,6 +35,49 @@ export interface CameraPath {
   readonly keyframes: readonly CameraKeyframe[];
 }
 
+function lerp(a: number, b: number, u: number): number {
+  return a + (b - a) * u;
+}
+
+/**
+ * Samples a camera path continuously at an arbitrary time. The sample is a
+ * pure interpolation of the two canonical keyframes bracketing `seconds`;
+ * it never chooses a nearest frame, so seeking and replay are stable between
+ * capture-frame timestamps as well as exactly on them.
+ */
+export function sampleCameraPath(path: CameraPath, seconds: number): CameraKeyframe {
+  const frames = path.keyframes;
+  if (frames.length === 0) throw new Error('sampleCameraPath: camera path has no keyframes');
+  const t = Math.max(frames[0]!.t, Math.min(frames[frames.length - 1]!.t, Number.isFinite(seconds) ? seconds : 0));
+  if (t <= frames[0]!.t) return { ...frames[0]!, t };
+  if (t >= frames[frames.length - 1]!.t) return { ...frames[frames.length - 1]!, t };
+
+  let low = 0;
+  let high = frames.length - 1;
+  while (high - low > 1) {
+    const mid = (low + high) >>> 1;
+    if (frames[mid]!.t <= t) low = mid;
+    else high = mid;
+  }
+  const a = frames[low]!;
+  const b = frames[high]!;
+  const span = b.t - a.t;
+  const u = span > 0 ? (t - a.t) / span : 0;
+  return {
+    t,
+    position: {
+      x: lerp(a.position.x, b.position.x, u),
+      y: lerp(a.position.y, b.position.y, u),
+      z: lerp(a.position.z, b.position.z, u),
+    },
+    lookAt: {
+      x: lerp(a.lookAt.x, b.lookAt.x, u),
+      y: lerp(a.lookAt.y, b.lookAt.y, u),
+      z: lerp(a.lookAt.z, b.lookAt.z, u),
+    },
+  };
+}
+
 /** The Nth road generated for this world (0-indexed, in `roadGenerator.ts`'s own deterministic emission order) — the SAME index resolves to the SAME (start,end) position across two worlds built from the same place, regardless of year (see historicalWorldParameters.ts's own doc on why). Returns `undefined` if the world has fewer than `index + 1` roads. */
 export function getRoadByIndex(graph: WorldGraph, index: number): WorldModelEntity | undefined {
   const roads = graph.listEntities().filter((e) => e.geometry?.kind === 'ROAD');

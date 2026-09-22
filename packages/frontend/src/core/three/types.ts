@@ -65,6 +65,8 @@ export interface ThreeRenderMetrics {
  * „Sceny 3D (Three.js)").
  */
 export interface Sim3D {
+  /** Notification after the existing renderer/composer has drawn the scene. No second render loop. */
+  onFrameRendered?(): void;
   /**
    * Kinowa prędkość auto-obrotu kamery wokół celu (stopnie/s), aktywna
    * dopóki użytkownik nie zacznie przeciągać — patrz useThreeLoop.ts.

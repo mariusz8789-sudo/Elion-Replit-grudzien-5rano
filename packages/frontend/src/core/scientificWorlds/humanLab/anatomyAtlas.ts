@@ -19,8 +19,12 @@ const SYSTEMS: readonly { id: OrganSystemId; label: string }[] = [
   { id: 'IMMUNE', label: 'Immune System' },
 ] as const;
 
-function node(args: Omit<AnatomyNode, 'children'>): AnatomyNode {
-  return { ...args, children: [] };
+function node(args: Omit<AnatomyNode, 'children' | 'representation'>): AnatomyNode {
+  return { ...args, children: [], representation: {
+    provenance: { source: 'GENESIS-ANATOMY-0.1', description: 'Procedural canonical atlas in humanLab/anatomyAtlas.ts; illustrative dimensions, not a measured subject or imported scan.' },
+    confidence: { status: 'UNKNOWN', reason: 'No calibrated confidence in this procedural representation has been supplied.' },
+    resolution: { status: 'UNSPECIFIED', reason: 'No source acquisition resolution; geometry and display scale are not scientific resolution.' },
+  } };
 }
 
 export function defaultHumanParameters(): HumanBodyParameters {
@@ -42,7 +46,7 @@ export function createHumanDigitalTwinManifest(twinId = `HDT-${stableHash(Date.n
     node({ id: 'abdomen', parentId: 'body', kind: 'REGION', label: 'Abdomen', scaleMeters: 0.28, positionMeters: P(0, 0.88, 0), dimensionsMeters: D(0.33, 0.45, 0.22), assetSlot: 'human.region.abdomen.glb', visibleByDefault: true, epistemic: 'MODEL' }),
     node({ id: 'pelvis', parentId: 'body', kind: 'REGION', label: 'Pelvis', scaleMeters: 0.20, positionMeters: P(0, 0.57, 0), dimensionsMeters: D(0.30, 0.24, 0.20), assetSlot: 'human.region.pelvis.glb', visibleByDefault: true, epistemic: 'MODEL' }),
   ];
-  const organs: Array<Omit<AnatomyNode, 'children'>> = [
+  const organs: AnatomyNode[] = [
     node({ id: 'brain', parentId: 'head', kind: 'ORGAN', label: 'Brain', latinLabel: 'Encephalon', system: 'NERVOUS', scaleMeters: 0.18, positionMeters: P(0, 1.69, 0), dimensionsMeters: D(0.14, 0.18, 0.17), assetSlot: 'human.organ.brain.high_fidelity.glb', visibleByDefault: false, epistemic: 'MODEL' }),
     node({ id: 'heart', parentId: 'thorax', kind: 'ORGAN', label: 'Heart', latinLabel: 'Cor', system: 'CARDIOVASCULAR', scaleMeters: 0.11, positionMeters: P(-0.055, 1.20, 0.015), dimensionsMeters: D(0.11, 0.13, 0.09), assetSlot: 'human.organ.heart.high_fidelity.glb', visibleByDefault: false, epistemic: 'MODEL' }),
     node({ id: 'left-lung', parentId: 'thorax', kind: 'ORGAN', label: 'Left Lung', system: 'RESPIRATORY', scaleMeters: 0.18, positionMeters: P(-0.10, 1.26, 0), dimensionsMeters: D(0.15, 0.34, 0.13), assetSlot: 'human.organ.lung.left.high_fidelity.glb', visibleByDefault: false, epistemic: 'MODEL' }),
@@ -67,6 +71,10 @@ export function createHumanDigitalTwinManifest(twinId = `HDT-${stableHash(Date.n
     rootNodeId: 'body',
     anatomyVersion: 'GENESIS-ANATOMY-0.1',
     nodes: finalized,
+    relationships: organs.filter((organ) => organ.system).map((organ) => ({
+      kind: 'SYSTEM_HAS_ORGAN', fromNodeId: `system:${organ.system!.toLowerCase()}`, toNodeId: organ.id,
+      provenance: { source: 'GENESIS-ANATOMY-0.1', description: `Declared primary system membership of ${organ.id} in the canonical atlas; not a claim of exhaustive biological membership.` },
+    })),
     supportedSystems: SYSTEMS.map((s) => s.id),
     clinicalUse: 'NOT_A_MEDICAL_DEVICE',
     notes: [
@@ -75,6 +83,16 @@ export function createHumanDigitalTwinManifest(twinId = `HDT-${stableHash(Date.n
       'Anatomical geometry is MODEL unless linked to a validated external dataset.',
     ],
   };
+}
+
+export function organsInSystem(manifest: HumanDigitalTwinManifest, systemNodeId: string): readonly AnatomyNode[] {
+  const ids = new Set(manifest.relationships.filter((edge) => edge.kind === 'SYSTEM_HAS_ORGAN' && edge.fromNodeId === systemNodeId).map((edge) => edge.toNodeId));
+  return manifest.nodes.filter((entry) => entry.kind === 'ORGAN' && ids.has(entry.id));
+}
+
+export function systemsForOrgan(manifest: HumanDigitalTwinManifest, organId: string): readonly AnatomyNode[] {
+  const ids = new Set(manifest.relationships.filter((edge) => edge.kind === 'SYSTEM_HAS_ORGAN' && edge.toNodeId === organId).map((edge) => edge.fromNodeId));
+  return manifest.nodes.filter((entry) => entry.kind === 'SYSTEM' && ids.has(entry.id));
 }
 
 export function getAnatomyNode(manifest: HumanDigitalTwinManifest, nodeId: string): AnatomyNode {

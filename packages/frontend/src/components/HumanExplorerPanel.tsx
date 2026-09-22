@@ -4,6 +4,8 @@ import { drawBiologyArtifact } from '../core/three/biologyStationKit';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { ExperimentSession } from '../core/scientificWorlds/experimentSession';
 import type { AnatomyViewState, HumanDigitalTwinManifest, OrganSystemId } from '../core/scientificWorlds/humanLab/types';
+import { organsInSystem } from '../core/scientificWorlds/humanLab/anatomyAtlas';
+import { BIOLOGY_WORLD_ID } from '../core/scientificWorlds/biologyLabWorld';
 import { VIRTUAL_MICROSCOPE_MAGNIFICATIONS } from '../core/scientificWorlds/humanLab/virtualMicroscope';
 import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_TEXT, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, systemCommands, type ExplorerOrgan, type ScaleLevel } from '../core/scientificWorlds/humanExplorer';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
@@ -57,15 +59,18 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const [organId, setOrganId] = useState<string>(() => (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId) ? anatomy.selectedNodeId : 'heart'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => { if (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId)) setOrganId(anatomy.selectedNodeId); }, [anatomy.selectedNodeId, organs]);
+  const selectedNode = manifest.nodes.find((node) => node.id === anatomy.selectedNodeId);
+  useEffect(() => { setSystem(selectedNode?.kind === 'SYSTEM' ? selectedNode.system ?? null : null); }, [selectedNode]);
 
   const organ = organs.find((o) => o.id === organId) ?? organs[0];
   const explorer: ExplorerOrgan | undefined = EXPLORER_ORGANS.find((e) => e.organId === organ?.id);
-  const visibleOrgans = system ? organs.filter((o) => o.system === system) : organs;
+  const visibleOrgans = system ? organsInSystem(manifest, `system:${system.toLowerCase()}`) : organs;
   const magnification = session?.experimentId === 'hyperscope-capture' && typeof session.outputs.magnification === 'number' ? session.outputs.magnification : null;
-  const level: ScaleLevel = levelOfSession(session?.experimentId ?? null, magnification, anatomy.selectedNodeId !== manifest.rootNodeId);
-  const path = explorer ? explorerPath(explorer, level) : [];
+  const level: ScaleLevel = selectedNode?.kind === 'BODY' ? 'body' : selectedNode?.kind === 'SYSTEM' ? 'organ_system'
+    : levelOfSession(session?.experimentId ?? null, magnification, selectedNode?.kind === 'ORGAN', session?.inputs.explorerLevel);
+  const path = explorer ? explorerPath(explorer, level, manifest) : [];
   const evidenceMode = path.at(-1)?.evidenceMode ?? 'ILLUSTRATIVE';
-  const imageSession = [...sessions].reverse().find((s) => s.experimentId === 'hyperscope-capture' || s.experimentId === 'histology-slide' || s.experimentId === 'imaging-frame' || s.experimentId === 'central-dogma') ?? null;
+  const imageSession = artifact && session ? session : null;
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -78,13 +83,13 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const zoom = (target: ScaleLevel): void => {
     if (!explorer) return;
     const lt = nextLogicalTime(); const label = `${t('explorer.zoom', locale)}: ${t(explorer.labelKey, locale)} → ${levelLabel(target, locale)}`;
-    run(explorerCommands(explorer, target, label, lt), label);
+    run(explorerCommands(explorer, target, label, lt, { manifest, selectedNodeId: anatomy.selectedNodeId, sessions, worldId: BIOLOGY_WORLD_ID, seed: 7 }), label);
   };
   const magnify = (m: number): void => { if (!explorer) return; const lt = nextLogicalTime(); const label = `${t('explorer.hyperscope', locale)} ${m}× · ${t(explorer.labelKey, locale)}`; run(magnificationCommands(explorer, m, label, lt), label); };
-  const pickSystem = (s: OrganSystemId): void => { setSystem((cur) => (cur === s ? null : s)); const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
+  const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
   return (
-    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-evidence-mode={evidenceMode}>
+    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode}>
       <header className="sw-ex-head">
         <span className="sw-badge" data-testid="sw-explorer-tier">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
         <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
@@ -108,6 +113,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
               <dt>{organ.label}</dt><dd className="sw-faint">{organ.latinLabel ?? '—'} · {organ.system ? SYSTEM_LABEL_PL[organ.system] : '—'}</dd>
               <dt>{t('explorer.scale', locale)}</dt><dd className="cw-mono">{organ.scaleMeters} m · {organ.dimensionsMeters.x}×{organ.dimensionsMeters.y}×{organ.dimensionsMeters.z} m</dd>
               <dt>{t('explorer.evidence', locale)}</dt><dd className="cw-mono">{organ.epistemic} · {manifest.clinicalUse}</dd>
+              <dt>Confidence / resolution</dt><dd className="cw-mono" data-testid="sw-explorer-source-metadata" title={organ.representation.provenance.description}>{organ.representation.confidence.status} / {organ.representation.resolution.status}</dd>
             </dl>
           )}
           {/* D-131: a real section plane and isolation. Clipping reveals the MODEL proxies inside the body —
@@ -158,8 +164,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <div className="sw-ex-title">{t('explorer.macroToMicro', locale)}</div>
         <ol className="sw-ex-rungs">
           {SCALE_LADDER.map((l) => {
-            const step = explorer ? explorerPath(explorer, l).at(-1) : null;
-            const runnable = l !== 'body' && !!explorer && (l === 'organ' || !!step?.experimentId);
+            const step = explorer ? explorerPath(explorer, l, manifest).at(-1) : null;
+            const runnable = !!explorer && (l === 'body' || l === 'organ' || (l === 'organ_system' && !!step?.nodeId) || !!step?.experimentId);
             return (
               <li key={l} className={`sw-ex-rung${l === level ? ' is-on' : ''}`}>
                 <button type="button" className="sw-ex-rung-btn" onClick={() => zoom(l)} disabled={busy || !runnable} title={l === 'atom' ? t('explorer.notModeled', locale) : step ? explorerTruthLabel(step.evidenceMode) : ''} data-testid={`sw-explorer-rung-${l}`}>

@@ -26,6 +26,12 @@ export interface StructuralDetailSpec {
   generateInteriors?: boolean;
   /** Opts into Phase 5 navigation-graph generation (NavNode/NavEdge/NavZone/SpawnPoint/ApproachPoint/InteractionPoint) derived from the generated geometry. Requires `generateInteriors` for indoor navigation to reach rooms — when interiors are off, navigation still covers the outdoor road/building-entrance graph. Defaults to false. */
   generateNavigation?: boolean;
+  /**
+   * Optional deterministic facilities that must exist in the generated city.
+   * Entries are assigned to the first generated parcels in order, while the
+   * normal generator still owns bounds, floors, interiors and graph identity.
+   */
+  requiredBuildingTypes?: readonly BuildingType[];
 }
 
 export const STRUCTURAL_DETAIL_DEFAULTS = {
@@ -35,3 +41,4 @@ export const STRUCTURAL_DETAIL_DEFAULTS = {
   maxFloors: 6,
   roomsPerFloorSide: 2,
 } as const;
+import type { BuildingType } from '../../ecs/geometry';

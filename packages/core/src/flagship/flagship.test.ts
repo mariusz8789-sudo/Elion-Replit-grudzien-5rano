@@ -38,6 +38,9 @@ describe('flagship layer (D-130) — contracts on canonical hashing, every state
     expect(m.identityScope).toBe('VISUAL_SESSION_PROXY');
     m = mirrorTransition(m, { type: 'DIVERGE', action: 'walks away' }, 0); expect(m.state).toBe('MIRROR_IDLE'); expect(m.refusals[0]).toMatch(/ILLEGAL_EVENT:DIVERGE@MIRROR_IDLE/);
     m = mirrorTransition(m, { type: 'ENTER_ZONE' }, 0);
+    expect(m.state).toBe('CONSENT_REQUIRED');
+    m = mirrorTransition(m, { type: 'CONSENT_DECLINED' }, 1); expect(m.state).toBe('CONSENT_REQUIRED'); expect(m.refusals).toContain('NO_CONSENT');
+    m = mirrorTransition(m, { type: 'CONSENT_GRANTED' }, 2); expect(m.state).toBe('SCANNING');
     m = mirrorTransition(m, { type: 'TELEMETRY', payload: { consent: false, containsRawImage: false, mode: 'MEDIAPIPE', confidence: 0.9, sentAt: 0, ttlMs: 1000 } }, 10); expect(m.state).toBe('SCANNING'); expect(m.refusals).toContain('NO_CONSENT');
     m = mirrorTransition(m, { type: 'TELEMETRY', payload: { consent: true, containsRawImage: false, mode: 'MEDIAPIPE', confidence: 0.9, sentAt: 0, ttlMs: 1000 } }, 10); expect(m.state).toBe('SYNCING');
     m = mirrorTransition(m, { type: 'SYNC_TICK', progress: 0.5 }, 20); expect(m.state).toBe('SYNCING'); expect(m.appearance.face).toBe('CAPTURE_PENDING');

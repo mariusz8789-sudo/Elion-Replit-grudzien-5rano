@@ -348,7 +348,8 @@ describe('the foundation stays a foundation', () => {
     // The module graph is the contract: if this ever pulls in session state,
     // storage or React, it has stopped being a foundation C3 can wire freely.
     const { readFileSync, readdirSync } = await import('node:fs');
-    const dir = new URL('../core/governance/', import.meta.url).pathname;
+    const { fileURLToPath } = await import('node:url');
+    const dir = fileURLToPath(new URL('../core/governance/', import.meta.url));
     for (const file of readdirSync(dir)) {
       const raw = readFileSync(`${dir}${file}`, 'utf8');
       // Strip comments first: these files DISCUSS Date.now() and storage in

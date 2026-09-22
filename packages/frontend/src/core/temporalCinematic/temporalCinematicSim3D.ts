@@ -2,6 +2,7 @@ import type * as THREE_NS from 'three';
 import type { PostProcessingModules, PostProcessor, Sim3D } from '../three/types';
 import type { SimParams } from '../types';
 import { WorldFrameRenderer } from '../three/graphics/worldFrameRenderer';
+import { InteractionController, applyHighlight, clearHighlight } from '../three/graphics/interaction';
 import { createSceneEnvironment, type SceneEnvironmentHandle } from '../three/graphics/sceneEnvironment';
 import { setupGraphicsPipeline, type GraphicsPipeline } from '../three/graphics/postProcessing';
 import { createHighFidelityWeatherRig, weatherProfile, type WeatherRig } from '../three/graphics/highFidelityWeather';
@@ -12,7 +13,8 @@ import { getFrameState } from '../worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../worldModel/bridge/graphicsWorldFrameAdapter';
 import type { WorldFrame as GraphicsWorldFrame } from '../three/graphics/worldFrame';
 import type { TemporalEngine } from '../worldModel/temporal/temporalEngine';
-import type { CameraKeyframe, CameraPath } from './cameraPath';
+import type { RoomType } from '../worldModel/ecs/geometry';
+import { sampleCameraPath, type CameraPath } from './cameraPath';
 import {
   createTemporalCinematicVisualResolver,
   estimateTemporalWorldGroundSize,
@@ -24,6 +26,11 @@ export interface TemporalCinematicPresentationOptions {
   readonly weather?: string;
   readonly year?: number;
   readonly viewMode?: CinematicViewMode;
+  readonly roomType?: RoomType;
+  readonly navigationMode?: 'WALK' | 'OBSERVER' | 'CINEMATIC';
+  readonly autoPlay?: boolean;
+  /** Receives only canonical generated ASSET_SLOT selections from the shared pointer pipeline. */
+  readonly onAssetSelection?: (selection: { readonly entityId: string; readonly slotType: string } | null) => void;
 }
 
 /**
@@ -31,7 +38,7 @@ export interface TemporalCinematicPresentationOptions {
  * Living-city ambience, generated-room presentation and shot grading remain presentation layers only.
  */
 export class TemporalCinematicSim3D implements Sim3D {
-  readonly disableOrbitControls = true;
+  readonly disableOrbitControls: boolean;
   readonly preserveDrawingBufferForCapture = true;
 
   private renderer: WorldFrameRenderer | null = null;
@@ -46,6 +53,14 @@ export class TemporalCinematicSim3D implements Sim3D {
   private readonly graphicsFrame: GraphicsWorldFrame;
   private readonly presentation: TemporalCinematicPresentationOptions;
   private readonly interiorTarget: ScientificInteriorTarget | null;
+  private readonly renderedSlotIds = new Set<string>();
+  private interaction: InteractionController | null = null;
+  private selectedAssetSlotId: string | null = null;
+  private selectedAssetObject: THREE_NS.Object3D | null = null;
+  private viewportWidth = 1;
+  private viewportHeight = 1;
+  private continuityEpoch = 0;
+  private lastDiscontinuity: { readonly fromSeconds: number; readonly toSeconds: number; readonly reason: 'SEEK' | 'LOOP_WRAP' } | null = null;
 
   constructor(
     private readonly engine: TemporalEngine,
@@ -53,22 +68,59 @@ export class TemporalCinematicSim3D implements Sim3D {
     presentation?: string | TemporalCinematicPresentationOptions,
   ) {
     this.presentation = typeof presentation === 'string' ? { weather: presentation } : (presentation ?? {});
-    this.interiorTarget = this.presentation.viewMode === 'interior' ? findScientificInteriorTarget(engine.graph) : null;
+    this.disableOrbitControls = this.presentation.navigationMode !== 'OBSERVER';
+    this.interiorTarget = this.presentation.viewMode === 'interior' ? findScientificInteriorTarget(engine.graph, this.presentation.roomType) : null;
     this.graphicsFrame = normalizeTemporalCinematicFrameHierarchy(toGraphicsWorldFrame(getFrameState(engine)), engine.graph);
   }
 
-  getPresentationSummary(): { readonly viewMode: CinematicViewMode; readonly interiorRoomId: string | null; readonly interiorAssetSlotCount: number; readonly livingWorld: boolean } {
+  getPresentationSummary() {
     return {
       viewMode: this.presentation.viewMode ?? 'street',
       interiorRoomId: this.interiorTarget?.roomId ?? null,
+      interiorRoomType: this.interiorTarget?.roomType ?? null,
+      interiorAssetSlots: (this.interiorTarget?.assetSlotIds ?? []).map((id) => {
+        const geometry = this.engine.graph.tryGetEntity(id)?.geometry;
+        return { id, slotType: geometry?.kind === 'ASSET_SLOT' ? geometry.slotType : null, rendered: this.renderedSlotIds.has(id) };
+      }),
       interiorAssetSlotCount: this.interiorTarget?.assetSlotIds.length ?? 0,
+      selectedAssetSlotId: this.selectedAssetSlotId,
+      selectedAssetSlotType: this.selectedAssetSlotId
+        ? (() => { const geometry = this.engine.graph.tryGetEntity(this.selectedAssetSlotId!)?.geometry; return geometry?.kind === 'ASSET_SLOT' ? geometry.slotType : null; })()
+        : null,
+      interactionCommand: this.selectedAssetSlotId ? { type: 'INSPECT_ENTITY' as const, entityId: this.selectedAssetSlotId } : null,
+      continuityEpoch: this.continuityEpoch,
+      lastDiscontinuity: this.lastDiscontinuity,
+      // This pipeline has no TAA/history accumulation buffer. The guard resets camera-dependent
+      // selection and DOF state without claiming a temporal-history reset that cannot exist.
+      temporalAccumulation: 'NOT_PRESENT' as const,
       livingWorld: this.presentation.viewMode !== 'interior',
     };
+  }
+
+  getInteractionTargets(): readonly { readonly id: string; readonly x: number; readonly y: number; readonly slotType: string }[] {
+    if (!this.THREE || !this.camera || !this.renderer || !this.interiorTarget) return [];
+    const point = new this.THREE.Vector3();
+    return this.interiorTarget.assetSlotIds.flatMap((id) => {
+      const object = this.renderer!.getObjectForEntity(id);
+      const geometry = this.engine.graph.tryGetEntity(id)?.geometry;
+      if (!object || geometry?.kind !== 'ASSET_SLOT') return [];
+      object.getWorldPosition(point);
+      point.project(this.camera!);
+      if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || point.z < -1 || point.z > 1) return [];
+      return [{
+        id,
+        x: (point.x + 1) * 0.5 * this.viewportWidth,
+        y: (1 - point.y) * 0.5 * this.viewportHeight,
+        slotType: geometry.slotType,
+      }];
+    });
   }
 
   init(THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, _w: number, _h: number): void {
     this.THREE = THREE;
     this.camera = camera;
+    this.viewportWidth = Math.max(1, _w);
+    this.viewportHeight = Math.max(1, _h);
     const weather = this.presentation.weather;
     const profile = weatherProfile(weather);
     const viewMode = this.presentation.viewMode ?? 'street';
@@ -99,12 +151,50 @@ export class TemporalCinematicSim3D implements Sim3D {
     }
 
     this.renderer = new WorldFrameRenderer(THREE, scene, {
-      resolveVisual: this.visualResolver.resolveVisual,
+      resolveVisual: (entity) => {
+        const visual = this.visualResolver!.resolveVisual(entity);
+        if (visual.kind === 'object' && this.interiorTarget?.assetSlotIds.includes(entity.id)) {
+          visual.object.traverse((object) => {
+            const mesh = object as THREE_NS.Mesh;
+            if (!mesh.isMesh) return;
+            const previous = mesh.onAfterRender;
+            mesh.onAfterRender = (...args) => { previous.apply(mesh, args); this.renderedSlotIds.add(entity.id); };
+          });
+        }
+        return visual;
+      },
       updateVisual: this.visualResolver.updateVisual,
       sharedMaterials: this.visualResolver.sharedMaterials,
     });
     this.renderer.sync(this.graphicsFrame);
-    this.applyCamera(camera);
+    if (this.interiorTarget) {
+      this.interaction = new InteractionController(THREE, {
+        camera,
+        resolver: this.renderer,
+        getTargets: () => this.interiorTarget!.assetSlotIds.flatMap((id) => {
+          const object = this.renderer?.getObjectForEntity(id);
+          return object ? [object] : [];
+        }),
+        onSelect: (id) => {
+          const geometry = id ? this.engine.graph.tryGetEntity(id)?.geometry : undefined;
+          const acceptedId = geometry?.kind === 'ASSET_SLOT' && this.interiorTarget?.assetSlotIds.includes(id!) ? id : null;
+          if (this.selectedAssetObject) clearHighlight(this.selectedAssetObject);
+          this.selectedAssetSlotId = acceptedId;
+          this.selectedAssetObject = acceptedId ? this.renderer?.getObjectForEntity(acceptedId) ?? null : null;
+          if (this.selectedAssetObject) applyHighlight(THREE, this.selectedAssetObject, 'select');
+          this.presentation.onAssetSelection?.(acceptedId && geometry?.kind === 'ASSET_SLOT'
+            ? { entityId: acceptedId, slotType: geometry.slotType }
+            : null);
+        },
+      });
+    }
+    if (this.presentation.navigationMode === 'OBSERVER') {
+      const frame = this.cameraPath.keyframes[Math.floor(this.cameraPath.keyframes.length / 2)] ?? this.cameraPath.keyframes[0];
+      if (frame) {
+        camera.position.set(frame.position.x + 16, frame.position.y + 12, frame.position.z + 16);
+        camera.lookAt(frame.lookAt.x, frame.lookAt.y, frame.lookAt.z);
+      }
+    } else this.applyCamera(camera);
   }
 
   setupPostProcessing(
@@ -123,7 +213,7 @@ export class TemporalCinematicSim3D implements Sim3D {
       width: w,
       height: h,
       qualityTier: 'cinematic',
-      toneMappingExposure: this.presentation.viewMode === 'interior' ? 1.0 : 1.08,
+      toneMappingExposure: this.presentation.viewMode === 'interior' ? 0.82 : 1.08,
       bloom: { strength: this.presentation.viewMode === 'interior' ? 0.32 : 0.26, radius: 0.5, threshold: 0.9 },
       ambientOcclusion: { enabled: true, minTier: 'high', radius: 0.5, blendIntensity: 0.86 },
       reflections: wet ? { enabled: true, minTier: 'cinematic', strength: 0.42, maxDistance: 10 } : { enabled: false },
@@ -134,22 +224,14 @@ export class TemporalCinematicSim3D implements Sim3D {
   }
 
   seekTo(seconds: number): void {
-    this.currentTimeSeconds = Math.max(0, Math.min(this.cameraPath.durationSeconds, seconds));
+    const next = Math.max(0, Math.min(this.cameraPath.durationSeconds, seconds));
+    const threshold = Math.max(0.25, this.cameraPath.durationSeconds / 120);
+    if (Math.abs(next - this.currentTimeSeconds) > threshold) this.guardDiscontinuity(this.currentTimeSeconds, next, 'SEEK');
+    this.currentTimeSeconds = next;
   }
   getCurrentTimeSeconds(): number { return this.currentTimeSeconds; }
   debugEntitySummary(): readonly { id: string; position: readonly [number, number, number]; scale: number }[] {
     return this.graphicsFrame.entities.map((e) => ({ id: e.id, position: e.position, scale: e.scale ?? 1 }));
-  }
-
-  private nearestKeyframe(): CameraKeyframe {
-    const frames = this.cameraPath.keyframes;
-    let best = frames[0]!;
-    let bestDelta = Infinity;
-    for (const frame of frames) {
-      const delta = Math.abs(frame.t - this.currentTimeSeconds);
-      if (delta < bestDelta) { bestDelta = delta; best = frame; }
-    }
-    return best;
   }
 
   private applyCamera(camera: THREE_NS.PerspectiveCamera): void {
@@ -158,36 +240,76 @@ export class TemporalCinematicSim3D implements Sim3D {
     if (viewMode === 'interior' && this.interiorTarget) {
       const target = this.interiorTarget;
       const u = this.cameraPath.durationSeconds > 0 ? this.currentTimeSeconds / this.cameraPath.durationSeconds : 0;
-      const angle = -0.55 + u * 1.1;
-      const radius = Math.max(2.1, Math.min(4.6, Math.max(target.widthM, target.depthM) * 0.42));
+      const angle = 0.45 + u * 0.35;
+      const radius = Math.min(4.6, Math.min(target.widthM, target.depthM) * 0.42);
+      const slots = target.assetSlotIds.flatMap((id) => {
+        const g = this.engine.graph.tryGetEntity(id)?.geometry;
+        return g?.kind === 'ASSET_SLOT' ? [g.position] : [];
+      });
+      const focusX = slots.length ? slots.reduce((sum, p) => sum + p.x, 0) / slots.length : target.center[0];
+      const focusZ = slots.length ? slots.reduce((sum, p) => sum + p.z, 0) / slots.length : target.center[2];
       camera.position.set(
-        target.center[0] + Math.sin(angle) * radius,
+        Math.min(target.center[0] + target.widthM / 2 - 0.4, Math.max(target.center[0] - target.widthM / 2 + 0.4, focusX + Math.sin(angle) * radius)),
         target.center[1] + 0.35 + Math.sin(this.currentTimeSeconds * 0.4) * 0.03,
-        target.center[2] + Math.cos(angle) * radius,
+        Math.min(target.center[2] + target.depthM / 2 - 0.4, Math.max(target.center[2] - target.depthM / 2 + 0.4, focusZ + Math.cos(angle) * radius)),
       );
-      camera.lookAt(target.center[0], target.center[1] - 0.15, target.center[2]);
+      camera.lookAt(focusX, target.center[1] - 0.15, focusZ);
     } else {
-      const frame = applyCinematicDrift(this.nearestKeyframe(), this.currentTimeSeconds, shot);
+      const navigationMode = this.presentation.navigationMode ?? 'CINEMATIC';
+      const base = sampleCameraPath(this.cameraPath, this.currentTimeSeconds);
+      const frame = navigationMode === 'WALK' ? base : applyCinematicDrift(base, this.currentTimeSeconds, shot);
       camera.position.set(frame.position.x, frame.position.y, frame.position.z);
       camera.lookAt(frame.lookAt.x, frame.lookAt.y, frame.lookAt.z);
     }
-    if (Math.abs(camera.fov - shot.fov) > 0.01) { camera.fov = shot.fov; camera.updateProjectionMatrix(); }
-    this.pipeline?.setDepthOfFieldEnabled(shot.dofEnabled);
+    const fov = this.presentation.navigationMode === 'WALK' ? 64 : shot.fov;
+    if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+    this.pipeline?.setDepthOfFieldEnabled(this.presentation.navigationMode === 'WALK' ? false : shot.dofEnabled);
     this.pipeline?.setFocusDistance(shot.focusDistance);
   }
 
+  private guardDiscontinuity(fromSeconds: number, toSeconds: number, reason: 'SEEK' | 'LOOP_WRAP'): void {
+    this.continuityEpoch += 1;
+    this.lastDiscontinuity = { fromSeconds, toSeconds, reason };
+    if (this.selectedAssetObject) clearHighlight(this.selectedAssetObject);
+    this.selectedAssetObject = null;
+    this.selectedAssetSlotId = null;
+    this.presentation.onAssetSelection?.(null);
+  }
+
   update(dt: number, _params: SimParams): void {
+    if (this.presentation.autoPlay && this.presentation.navigationMode !== 'OBSERVER' && this.cameraPath.durationSeconds > 0) {
+      const next = this.currentTimeSeconds + dt;
+      if (next >= this.cameraPath.durationSeconds) this.guardDiscontinuity(this.currentTimeSeconds, next % this.cameraPath.durationSeconds, 'LOOP_WRAP');
+      this.currentTimeSeconds = next % this.cameraPath.durationSeconds;
+    }
     this.environment?.update(dt);
     this.weatherRig?.update(dt, this.camera ?? undefined);
     this.livingWorld?.update(dt);
   }
 
+  onResize(w: number, h: number): void {
+    this.viewportWidth = Math.max(1, w);
+    this.viewportHeight = Math.max(1, h);
+  }
+
+  pointer(x: number, y: number, type: 'down' | 'move' | 'up'): void {
+    if (!this.interaction) return;
+    if (type === 'down') this.interaction.pointerDown(x, y);
+    else if (type === 'move') this.interaction.pointerMove(x, y, this.viewportWidth, this.viewportHeight);
+    else this.interaction.pointerUp(x, y, this.viewportWidth, this.viewportHeight);
+  }
+
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     this.renderer?.sync(this.graphicsFrame);
-    this.applyCamera(camera);
+    if (this.presentation.navigationMode !== 'OBSERVER') this.applyCamera(camera);
   }
 
   dispose(): void {
+    if (this.selectedAssetObject) clearHighlight(this.selectedAssetObject);
+    this.selectedAssetObject = null;
+    this.selectedAssetSlotId = null;
+    this.interaction = null;
+    this.renderedSlotIds.clear();
     this.renderer?.dispose(); this.renderer = null;
     this.livingWorld?.dispose(); this.livingWorld = null;
     this.weatherRig?.dispose(); this.weatherRig = null;

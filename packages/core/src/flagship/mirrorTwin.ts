@@ -11,8 +11,8 @@ import type { FaceTelemetryPayload } from '../mirror/GenesisMirrorBridge.js';
  * scripted action while the subject stays; both are in the trace so a
  * capture can be replayed deterministically.
  */
-export type MirrorState = 'MIRROR_IDLE' | 'SCANNING' | 'SYNCING' | 'TWIN_READY' | 'DIVERGENCE_MODE' | 'CAPTURE' | 'REPLAY';
-export type MirrorEvent = { type: 'ENTER_ZONE' } | { type: 'TELEMETRY'; payload: Pick<FaceTelemetryPayload, 'consent' | 'containsRawImage' | 'mode' | 'confidence' | 'sentAt' | 'ttlMs'> } | { type: 'SYNC_TICK'; progress: number } | { type: 'DIVERGE'; action: string } | { type: 'CAPTURE' } | { type: 'REPLAY' } | { type: 'RESET' };
+export type MirrorState = 'MIRROR_IDLE' | 'CONSENT_REQUIRED' | 'SCANNING' | 'SYNCING' | 'TWIN_READY' | 'DIVERGENCE_MODE' | 'CAPTURE' | 'REPLAY';
+export type MirrorEvent = { type: 'ENTER_ZONE' } | { type: 'CONSENT_GRANTED' } | { type: 'CONSENT_DECLINED' } | { type: 'TELEMETRY'; payload: Pick<FaceTelemetryPayload, 'consent' | 'containsRawImage' | 'mode' | 'confidence' | 'sentAt' | 'ttlMs'> } | { type: 'SYNC_TICK'; progress: number } | { type: 'DIVERGE'; action: string } | { type: 'CAPTURE' } | { type: 'REPLAY' } | { type: 'RESET' };
 
 export interface MirrorTwinSession {
   readonly sessionId: string; readonly state: MirrorState; readonly subjectRepresentationId: string; readonly twinRepresentationId: string;
@@ -21,7 +21,7 @@ export interface MirrorTwinSession {
 }
 
 const TRANSITIONS: Readonly<Record<MirrorState, readonly MirrorEvent['type'][]>> = {
-  MIRROR_IDLE: ['ENTER_ZONE'], SCANNING: ['TELEMETRY', 'RESET'], SYNCING: ['SYNC_TICK', 'RESET'], TWIN_READY: ['DIVERGE', 'CAPTURE', 'RESET'], DIVERGENCE_MODE: ['CAPTURE', 'DIVERGE', 'RESET'], CAPTURE: ['REPLAY', 'RESET'], REPLAY: ['RESET', 'CAPTURE'],
+  MIRROR_IDLE: ['ENTER_ZONE'], CONSENT_REQUIRED: ['CONSENT_GRANTED', 'CONSENT_DECLINED', 'RESET'], SCANNING: ['TELEMETRY', 'RESET'], SYNCING: ['SYNC_TICK', 'RESET'], TWIN_READY: ['DIVERGE', 'CAPTURE', 'RESET'], DIVERGENCE_MODE: ['CAPTURE', 'DIVERGE', 'RESET'], CAPTURE: ['REPLAY', 'RESET'], REPLAY: ['RESET', 'CAPTURE'],
 };
 function seal(s: Omit<MirrorTwinSession, 'fingerprint'>): MirrorTwinSession { return { ...s, fingerprint: sha256hex(stableStringify({ ...s, refusals: s.refusals })) }; }
 
@@ -33,7 +33,9 @@ export function createMirrorSession(sessionId: string, subjectRepresentationId: 
 export function mirrorTransition(s: MirrorTwinSession, e: MirrorEvent, now: number): MirrorTwinSession {
   if (!TRANSITIONS[s.state].includes(e.type)) return seal({ ...s, refusals: [...s.refusals, `ILLEGAL_EVENT:${e.type}@${s.state}`] });
   switch (e.type) {
-    case 'ENTER_ZONE': return seal({ ...s, state: 'SCANNING' });
+    case 'ENTER_ZONE': return seal({ ...s, state: 'CONSENT_REQUIRED' });
+    case 'CONSENT_GRANTED': return seal({ ...s, state: 'SCANNING' });
+    case 'CONSENT_DECLINED': return seal({ ...s, refusals: [...s.refusals, 'NO_CONSENT'] });
     case 'TELEMETRY': {
       if (!e.payload.consent) return seal({ ...s, refusals: [...s.refusals, 'NO_CONSENT'] });
       if (e.payload.containsRawImage !== false) return seal({ ...s, refusals: [...s.refusals, 'RAW_IMAGE_DETECTED'] });

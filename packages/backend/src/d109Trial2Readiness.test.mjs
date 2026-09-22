@@ -6,10 +6,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const readiness = await import(path.join(HERE, '../../../scripts/d109-trial2-readiness.mjs'));
+const readiness = await import(pathToFileURL(path.join(HERE, '../../../scripts/d109-trial2-readiness.mjs')).href);
 const gipr = await import('./campaign/giprQsar.mjs');
 
 test('TRIAL_2_STATUS is BLOCKED, and the reason is parsed from the sealed prereg text, not asserted', () => {

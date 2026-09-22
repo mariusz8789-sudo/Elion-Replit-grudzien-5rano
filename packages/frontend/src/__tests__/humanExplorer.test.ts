@@ -37,13 +37,13 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
   it('every explorer organ is an ORGAN node of the atlas; scale ladder is monotone', () => {
     for (const o of EXPLORER_ORGANS) expect(organById(manifest, o.organId)?.organId).toBe(o.organId);
     expect(organById(manifest, 'unicorn-horn')).toBeNull();
-    for (let i = 1; i < SCALE_LADDER.length; i++) expect(SCALE_METRES[SCALE_LADDER[i]]).toBeLessThan(SCALE_METRES[SCALE_LADDER[i - 1]]);
+    for (let i = 1; i < SCALE_LADDER.length; i++) expect(SCALE_METRES[SCALE_LADDER[i]]).toBeLessThanOrEqual(SCALE_METRES[SCALE_LADDER[i - 1]]);
   });
   it('the path down to a molecule runs histology → hyperscope 100× → 500× → central-dogma, all labelled non-observation', () => {
     const path = explorerPath(EXPLORER_ORGANS[0], 'molecule');
-    expect(path.map((s) => s.level)).toEqual(SCALE_LADDER.slice(0, 6));
-    expect(path.map((s) => s.experimentId)).toEqual([null, null, 'histology-slide', 'hyperscope-capture', 'hyperscope-capture', 'central-dogma']);
-    expect(path.map((s) => s.magnification)).toEqual([null, null, 40, 100, 500, null]);
+    expect(path.map((s) => s.level)).toEqual(SCALE_LADDER.slice(0, 7));
+    expect(path.map((s) => s.experimentId)).toEqual([null, null, null, 'histology-slide', 'hyperscope-capture', 'hyperscope-capture', 'central-dogma']);
+    expect(path.map((s) => s.magnification)).toEqual([null, null, null, 40, 100, 500, null]);
     for (const s of path) { expect(canClaimDirectObservation(s.evidenceMode)).toBe(false); expect(explorerTruthLabel(s.evidenceMode)).toMatch(/NOT_DIRECT_OBSERVATION$/); }
     expect(canClaimDirectObservation('REAL_IMAGE')).toBe(true); expect(explorerTruthLabel('REAL_DATASET')).toBe('REAL_DATASET');
   });
@@ -68,7 +68,7 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
     expect(new Set(a.map((c) => c.commandId)).size).toBe(a.length);
     const mol = explorerCommands(EXPLORER_ORGANS[1], 'molecule', 'y', 1);
     expect(mol[1].parameters?.mode).toBe('BRAIN');
-    expect(mol.at(-2)).toMatchObject({ targetEntityId: 'station:compute', parameters: {} });
+    expect(mol.at(-2)).toMatchObject({ targetEntityId: 'station:compute', parameters: { organId: 'brain', tissue: 'NEURAL', explorerLevel: 'molecule' } });
   });
   it('the biology command bridge routes a zoom clause through the explorer before the pack router', () => {
     const { commands: cmds, unresolved } = parseBiologyWorldCommands('przybliż do komórki serca', 3);
@@ -83,10 +83,10 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
     const dna = explorerCommands(organ, 'dna', 'z', 2);
     expect(dna.filter((c) => c.targetEntityId === 'station:compute').length).toBe(1);
     expect(magnificationCommands(organ, 500, 'm', 3).map((c) => c.intent)).toEqual(['NAVIGATE', 'RUN_EXPERIMENT', 'INSPECT']);
-    expect(magnificationCommands(organ, 500, 'm', 3)[1].parameters).toEqual({ magnification: 500, tissue: 'CARDIAC' });
-    expect(systemCommands('SKELETAL', 's', 4)[1].parameters).toEqual({ action: 'SET_ANATOMY_MODE', mode: 'XRAY' });
+    expect(magnificationCommands(organ, 500, 'm', 3)[1].parameters).toEqual({ magnification: 500, tissue: 'CARDIAC', organId: 'heart' });
+    expect(systemCommands('SKELETAL', 's', 4)[1].parameters).toEqual({ action: 'FOCUS_ANATOMY', focus: 'system:skeletal', mode: 'XRAY' });
     expect(levelOfSession('hyperscope-capture', 500, true)).toBe('organelle'); expect(levelOfSession('hyperscope-capture', 100, true)).toBe('cell');
-    expect(levelOfSession('central-dogma', null, true)).toBe('dna'); expect(levelOfSession(null, null, false)).toBe('body');
+    expect(levelOfSession('central-dogma', null, true)).toBe('molecule'); expect(levelOfSession('central-dogma', null, true, 'dna')).toBe('dna'); expect(levelOfSession(null, null, false)).toBe('body');
     expect(new Set(EXPLORER_ORGANS.map((o) => o.organId)).size).toBe(EXPLORER_ORGANS.length);
   });
   it('level labels come from i18n with the visible-key fallback for the untranslated level', () => {

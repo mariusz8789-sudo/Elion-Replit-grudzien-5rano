@@ -12,6 +12,7 @@ import { createColumn, createPipe, createPlatform } from '../three/graphics/prim
 const SCIENTIFIC_ROOM_PRIORITY: readonly RoomType[] = [
   'IMAGING_SUITE',
   'MICROSCOPY_SUITE',
+  'MATERIALS_LAB',
   'LAB_BENCH_ROOM',
   'REACTOR_ROOM',
   'WARD',
@@ -37,8 +38,8 @@ function floorLevelForRoom(graph: WorldGraph, room: WorldModelEntity): number {
   return floor?.geometry?.kind === 'FLOOR' ? floor.geometry.level : 0;
 }
 
-export function findScientificInteriorTarget(graph: WorldGraph): ScientificInteriorTarget | null {
-  const rooms = graph.listEntities().filter((e) => e.geometry?.kind === 'ROOM');
+export function findScientificInteriorTarget(graph: WorldGraph, roomType?: RoomType): ScientificInteriorTarget | null {
+  const rooms = graph.listEntities().filter((e) => e.geometry?.kind === 'ROOM' && (!roomType || e.geometry.roomType === roomType));
   if (rooms.length === 0) return null;
   rooms.sort((a, b) => {
     const ak = a.geometry?.kind === 'ROOM' ? SCIENTIFIC_ROOM_PRIORITY.indexOf(a.geometry.roomType) : 999;
@@ -100,6 +101,13 @@ export function createScientificRoomShell(
   const right = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, depth), palette.wall);
   right.position.set(width / 2, -1.25 + wallHeight / 2, 0);
   root.add(back, left, right);
+  const ceiling = new THREE.Mesh(new THREE.BoxGeometry(width, 0.08, depth), palette.wall);
+  ceiling.position.y = -1.25 + wallHeight;
+  root.add(ceiling);
+  for (let z = -depth / 2 + 1; z < depth / 2; z += 2) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(width, 0.1, 0.1), palette.dark);
+    beam.position.set(0, -1.25 + wallHeight - 0.12, z); root.add(beam);
+  }
 
   // Ceiling light strips are emissive geometry; the shared room/environment supplies actual light.
   for (const x of [-width * 0.24, width * 0.24]) {
@@ -167,6 +175,49 @@ function createPumpStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalett
   shadow(g); return g;
 }
 
+/** Procedural instrument geometry, not a spectroscopy solver or a measured spectrum. */
+function createSpectrometer(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
+  const g = new THREE.Group(); g.name = 'genesis-interior-spectrometer';
+  g.add(createBench(THREE, { position: [0, 0, 0], width: 1.6, depth: 0.8, height: 0.86, topMaterial: p.white, legMaterial: p.stainless }));
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.34, 0.42), p.medical);
+  housing.position.set(-0.18, 1.03, 0.02); g.add(housing);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 16), p.chrome);
+  tube.rotation.z = Math.PI / 2; tube.position.set(0.24, 1.03, 0.02); g.add(tube);
+  g.add(createPlatform(THREE, p.stainless, { position: [0.55, 0.92, 0.02], thickness: 0.03, shape: 'box', width: 0.18, depth: 0.18 }));
+  g.add(createMonitor(THREE, { position: [-0.45, 0.86, -0.16], width: 0.56, height: 0.35, standHeight: 0.18, frameMaterial: p.dark }));
+  g.userData.instrumentState = 'UNBOUND';
+  shadow(g); return g;
+}
+
+function createThermalStage(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
+  const g = new THREE.Group(); g.name = 'genesis-interior-thermal-stage';
+  g.add(createBench(THREE, { position: [0, 0, 0], width: 1.4, depth: 0.8, height: 0.86, topMaterial: p.white, legMaterial: p.stainless }));
+  const stage = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 28), p.medical);
+  stage.position.set(0, 0.93, 0); g.add(stage);
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 8, 32), p.chrome);
+  coil.rotation.x = Math.PI / 2; coil.position.set(0, 0.99, 0); g.add(coil);
+  const controller = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.23), p.dark);
+  controller.position.set(-0.45, 0.98, 0); g.add(controller);
+  g.userData.instrumentState = 'UNBOUND';
+  shadow(g); return g;
+}
+
+/** A canonical room workstation. The idle screen does not imply a running compute provider. */
+function createComputeStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
+  const g = new THREE.Group(); g.name = 'genesis-interior-compute-station';
+  g.add(createBench(THREE, { position: [0, 0, 0], width: 1.6, depth: 0.8, height: 0.78, topMaterial: p.dark, legMaterial: p.stainless }));
+  g.add(createMonitor(THREE, { position: [-0.2, 0.78, -0.18], width: 0.84, height: 0.48, standHeight: 0.16, frameMaterial: p.medical }));
+  g.add(createCabinet(THREE, { position: [0.56, 0, -0.05], width: 0.34, depth: 0.55, height: 0.68, bodyMaterial: p.dark, handleMaterial: p.stainless }));
+  const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.025, 0.16), p.medical);
+  keyboard.position.set(-0.2, 0.8, 0.17); g.add(keyboard);
+  for (let i = 0; i < 5; i += 1) {
+    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.016, 0.006), p.stainless);
+    vent.position.set(0.56, 0.26 + i * 0.055, 0.23); g.add(vent);
+  }
+  g.userData.computeBinding = 'UNBOUND';
+  shadow(g); return g;
+}
+
 function createLabBenchStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
   const g = new THREE.Group(); g.name = 'genesis-interior-lab-bench';
   g.add(createBench(THREE, { position: [0, 0, 0], width: 2.6, depth: 0.9, height: 0.88, topMaterial: p.white, legMaterial: p.stainless }));
@@ -193,6 +244,9 @@ export function createScientificAssetSlotVisual(
     case 'HOSPITAL_BED': return createHospitalBed(THREE, palette);
     case 'PUMP_STATION': return createPumpStation(THREE, palette);
     case 'LAB_BENCH_STATION': return createLabBenchStation(THREE, palette);
+    case 'SPECTROMETER_STATION': return createSpectrometer(THREE, palette);
+    case 'THERMAL_STAGE_STATION': return createThermalStage(THREE, palette);
+    case 'COMPUTE_STATION': return createComputeStation(THREE, palette);
     default:
       empty.userData.notModeledAssetSlot = slot.geometry.slotType;
       return empty;

@@ -84,6 +84,41 @@ const ASSET_SLOT_TYPE_BY_ROOM: Partial<Record<RoomType, string>> = {
   PUMP_ROOM: 'PUMP_STATION',
 };
 
+/** Physical equipment remains full size. Small rooms must not receive overlapping miniatures. */
+function scientificSlots(room: GeneratedRoom, side: 'left' | 'right'): GeneratedAssetSlot[] {
+  const { bounds, roomType } = room;
+  const width = boundsWidth(bounds);
+  const depth = boundsDepth(bounds);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+  const slot = (slotType: string, index: number, x: number, z: number): GeneratedAssetSlot => ({
+    ref: { kind: 'asset-slot', id: `${room.ref.id}-slot-${index}` },
+    position: { x, z }, roomRef: room.ref, slotType,
+  });
+
+  if (roomType === 'MATERIALS_LAB') {
+    // Keep the door-to-centre approach clear: all benches occupy the exterior half,
+    // away from the corridor wall. Dimensions cover the actual procedural meshes.
+    if (width < 4 || depth < 4) return [];
+    const x = centerX + (side === 'left' ? -1 : 1) * Math.min(width / 4, 2);
+    const spacing = Math.min(depth / 4, 1.5);
+    return [
+      slot('SPECTROMETER_STATION', 0, x, centerZ - spacing),
+      slot('THERMAL_STAGE_STATION', 1, x, centerZ),
+      slot('COMPUTE_STATION', 2, x, centerZ + spacing),
+    ];
+  }
+
+  const primary = ASSET_SLOT_TYPE_BY_ROOM[roomType];
+  const slots = primary ? [slot(primary, 0, centerX, centerZ)] : [];
+  // Preserve existing station ids/positions; the additional workstation is off
+  // the central door approach and separated from the existing laboratory bench.
+  if (roomType === 'LAB_BENCH_ROOM' && width >= 4 && depth >= 4) {
+    slots.push(slot('COMPUTE_STATION', 1, centerX, centerZ - Math.min(depth / 4, 2)));
+  }
+  return slots;
+}
+
 /**
  * Generates real per-floor interiors for `building`: a central corridor
  * flanked by `roomsPerSide` rooms on each side, every room DOOR-connected
@@ -148,7 +183,12 @@ export function generateBuildingInterior(building: GeneratedBuilding, roomsPerSi
           maxZ: building.bounds.minZ + (i + 1) * cellDepth,
         };
         const roomRef: EntityRef = { kind: 'room', id: `${buildingId}-floor-${level}-room-${side}-${i}` };
-        rooms.push({ ref: roomRef, bounds: roomBounds, roomType: upperRoomType, floorRef, buildingRef: building.ref });
+        // One materials room per research campus. Keep every other scientific
+        // room, its stable id, floor/corridor hierarchy and domain bindings intact.
+        const roomType = building.buildingType === 'RESEARCH_CAMPUS' && level === 1 && side === 'left' && i === 0
+          ? 'MATERIALS_LAB' : upperRoomType;
+        const room: GeneratedRoom = { ref: roomRef, bounds: roomBounds, roomType, floorRef, buildingRef: building.ref };
+        rooms.push(room);
 
         const doorX = side === 'left' ? corridorBounds.minX : corridorBounds.maxX;
         const doorZ = (roomBounds.minZ + roomBounds.maxZ) / 2;
@@ -159,15 +199,7 @@ export function generateBuildingInterior(building: GeneratedBuilding, roomsPerSi
           toRef: corridorRef,
         });
 
-        const slotType = ASSET_SLOT_TYPE_BY_ROOM[upperRoomType];
-        if (slotType) {
-          assetSlots.push({
-            ref: { kind: 'asset-slot', id: `${roomRef.id}-slot-0` },
-            position: { x: (roomBounds.minX + roomBounds.maxX) / 2, z: doorZ },
-            roomRef,
-            slotType,
-          });
-        }
+        assetSlots.push(...scientificSlots(room, side));
       }
     }
   }

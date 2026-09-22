@@ -285,26 +285,29 @@ describe('rendering', () => {
   /**
    * REGRESSION — proven by execution: v1 compared a unit-interval hash against
    * `amber * 10`, i.e. `< 1.2`, which is true for every possible value.
-   * Measured on 5000 streams: 100.0% amber at ATTENTION instead of ~12%.
+   * Measured on 5000 streams: 100.0% accented at ATTENTION instead of ~12%.
+   * The dashboard-only palette now uses a brighter GREEN accent, not amber.
    */
-  it('ATTENTION tints only a minority of streams amber — never the whole field', () => {
+  it('ATTENTION accents only a minority of streams in brighter green — never amber or the whole field', () => {
     const c = cfg({ seed: 21, activity: 4, quality: 'HIGH' });
     const ctx = recordingContext();
     const streams = buildStreams(1920, 1080, c);
     renderFrame(ctx, streams, [], c, 1920, 1080);
-    const amberFills = ctx.fills.filter((f) => f.startsWith('rgba(255,214,170')).length;
+    const accentFills = ctx.fills.filter((f) => f.startsWith('rgba(166,255,190')).length;
     const headFills = streams.length; // one head glyph per stream
-    const ratio = amberFills / headFills;
+    const ratio = accentFills / headFills;
     expect(ratio).toBeGreaterThan(0);     // the accent is genuinely present
     expect(ratio).toBeLessThan(0.35);     // ...and genuinely subtle
+    expect(ctx.fills.some((f) => f.startsWith('rgba(255,214,170'))).toBe(false);
   });
 
-  it('non-ATTENTION tiers show no amber at all', () => {
+  it('non-ATTENTION tiers show neither the attention accent nor amber', () => {
     for (const activity of [0, 1, 2, 3]) {
       const c = cfg({ seed: 21, activity });
       const ctx = recordingContext();
       renderFrame(ctx, buildStreams(1200, 800, c), [], c, 1200, 800);
       expect(ctx.fills.some((f) => f.startsWith('rgba(255,214,170'))).toBe(false);
+      expect(ctx.fills.some((f) => f.startsWith('rgba(166,255,190'))).toBe(false);
     }
   });
 

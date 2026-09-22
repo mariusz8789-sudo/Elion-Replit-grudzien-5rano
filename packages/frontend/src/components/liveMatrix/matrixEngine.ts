@@ -261,9 +261,9 @@ export function updateParticles(field: ParticleField, dt: number, cfg: MatrixCon
   }
 }
 
-// Far layer: deep teal-navy; mid: cyan; near: cool white. (Matrix green is a sparse head accent, below.)
+// Dashboard wallpaper: depth comes from three green luminance levels, never figures.
 const layerColor = (layer: number, alpha: number): string =>
-  layer === 0 ? `rgba(58,122,150,${alpha})` : layer === 1 ? `rgba(92,214,232,${alpha})` : `rgba(214,236,255,${alpha})`;
+  layer === 0 ? `rgba(20,92,48,${alpha})` : layer === 1 ? `rgba(42,196,92,${alpha})` : `rgba(134,242,167,${alpha})`;
 
 /**
  * The narrow surface the engine needs. `CanvasRenderingContext2D` satisfies it
@@ -291,7 +291,7 @@ export function renderFrame(
   const act = ACTIVITY[cfg.activity]!;
 
   ctx.shadowBlur = 0;
-  ctx.fillStyle = `rgba(7,11,23,${q.fade})`; // trail fade ⇒ smooth column falloff (navy, not green-black)
+  ctx.fillStyle = `rgba(2,8,6,${q.fade})`; // trail fade on a green-black field
   ctx.fillRect(0, 0, width, height);
 
   // Font changes are state changes on the 2D context; streams are grouped by
@@ -310,21 +310,20 @@ export function renderFrame(
     const font = `${s.fontSize}px ${MONO_FONT}`;
     if (font !== currentFont) { ctx.font = font; currentFont = font; }
 
-    // The matrix signature: roughly one column head in eight glows the classic green — a
-    // deliberate, sparse nod to the brand's DNA, never the whole field.
+    // A few brighter green heads provide depth without overpowering dashboard cards.
     const signature = !amber && hashUnit(s.seed, s.epoch, 11) < 0.125;
     if (glowOn) {
       ctx.shadowBlur = q.glowBlur * glowScale;
-      ctx.shadowColor = amber ? 'rgba(255,183,110,0.5)' : signature ? 'rgba(57,217,122,0.5)' : 'rgba(92,214,232,0.5)';
+      ctx.shadowColor = amber ? 'rgba(97,244,146,0.5)' : signature ? 'rgba(57,217,122,0.5)' : 'rgba(42,196,92,0.5)';
     }
 
     const headAlpha = Math.min(1, s.alpha * s.headBright + (s.layer === 2 ? 0.2 : 0.05));
     ctx.fillStyle = amber
-      ? `rgba(255,214,170,${headAlpha})`
+      ? `rgba(166,255,190,${headAlpha})`
       : signature
         ? `rgba(120,232,164,${headAlpha})` // matrix green signature head
         : s.layer === 2 && s.headBright > 0.92
-          ? `rgba(240,248,255,${headAlpha})` // sporadic near-white highlight
+          ? `rgba(201,255,216,${headAlpha})` // sporadic near-white highlight
           : layerColor(s.layer, headAlpha);
     ctx.fillText(set[hashGlyph(s.seed, s.epoch, headCell) % set.length]!, s.x, s.y);
 
@@ -342,9 +341,9 @@ export function renderFrame(
   if (particles.length > 0) {
     const particleFont = `12px ${MONO_FONT}`;
     if (particleFont !== currentFont) ctx.font = particleFont; // last font change of the frame
-    if (glowAllowed) { ctx.shadowBlur = q.glowBlur; ctx.shadowColor = 'rgba(140,220,255,0.5)'; }
+    if (glowAllowed) { ctx.shadowBlur = q.glowBlur; ctx.shadowColor = 'rgba(107,229,144,0.5)'; }
     for (const p of particles) {
-      ctx.fillStyle = `rgba(214,236,255,${p.alpha})`;
+      ctx.fillStyle = `rgba(134,242,167,${p.alpha})`;
       ctx.fillText(p.glyph, p.x, p.y);
     }
     ctx.shadowBlur = 0;
@@ -361,7 +360,7 @@ export function renderStatic(ctx: RenderContext, streams: readonly Stream[], cfg
   const q = QUALITY.REDUCED_MOTION;
   ctx.clearRect(0, 0, width, height);
   ctx.shadowBlur = 0;
-  ctx.fillStyle = '#070b17';
+  ctx.fillStyle = '#020806';
   ctx.fillRect(0, 0, width, height);
 
   const glowAllowed = q.glowBlur > 0 && cfg.glow !== 'LOW';
@@ -383,9 +382,9 @@ export function renderStatic(ctx: RenderContext, streams: readonly Stream[], cfg
 
     if (glowAllowed && s.layer >= 1) {
       ctx.shadowBlur = q.glowBlur;
-      ctx.shadowColor = 'rgba(92,214,232,0.5)';
+      ctx.shadowColor = 'rgba(42,196,92,0.5)';
     }
-    ctx.fillStyle = `rgba(240,248,255,${Math.min(1, s.alpha * s.headBright + 0.2)})`;
+    ctx.fillStyle = `rgba(201,255,216,${Math.min(1, s.alpha * s.headBright + 0.2)})`;
     ctx.fillText(set[hashGlyph(s.seed, s.epoch, headCell) % set.length]!, s.x, s.y);
     ctx.shadowBlur = 0;
   }

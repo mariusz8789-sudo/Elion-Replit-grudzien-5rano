@@ -77,6 +77,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  * no capability was lost — it stopped competing with the ten that matter.
  */
 export const MORE_ITEMS: readonly NavItem[] = [
+  { id: 'world-director', label: 'World Director', icon: '◉', hash: '#/world-director', description: 'Presety świata przez canonical WorldGraph i THREE.js' },
+  { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
+  { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },
   { id: 'tour', label: 'Genesis Tour — przewodnik głosowy', icon: '▶', hash: '#/tour' },
   { id: 'matrix', label: 'Matrix — HUD', icon: '◈', hash: '#/matrix' },
   { id: 'matrix-stage', label: 'Matrix — scena 3D', icon: '◈', hash: '#/matrix-stage' },

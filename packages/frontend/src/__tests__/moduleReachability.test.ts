@@ -39,7 +39,7 @@ function allSourceFiles(dir: string): string[] {
   });
 }
 
-const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.includes('/__tests__/');
+const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || /[\\/]__tests__[\\/]/.test(file);
 
 /** Relative specifier -> real file, trying the extensions Vite itself tries. */
 function resolveSpecifier(fromFile: string, specifier: string): string | null {
@@ -101,6 +101,9 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  'components/GenesisHoloBackdrop.tsx': 'Retired global WebGL backdrop: AppShell no longer mounts it under the dashboard-only Matrix direction. Kept for its existing lifecycle tests; the production dashboard uses the one existing LiveMatrixBackground instead.',
+  'components/MatrixDataStream.tsx': 'Retired global Canvas2D data-stream decoration. Its suppression helpers remain consumed only by the retired GenesisHoloBackdrop and their focused tests. No product route mounts this second backdrop.',
+  'components/holo/MatrixStage.ts': 'Retired WebGL code-rain stage used only by the unmounted GenesisHoloBackdrop and its route test. Retained source, deliberately not wired alongside the canonical LiveMatrixBackground.',
   // D-127: the delivered cognitive core (packages/core/src/cognitive) bound to the canonical systems with a real
   // approval gate. Which host (the Scientific Worlds screen, the chat, a campaign) issues goals to it is a product
   // decision, not a side effect of landing the bridge; scientificWorldsCognitive.test.ts drives the full loop.
@@ -359,12 +362,12 @@ describe('every module is reachable from the running application, or documented 
   it('reports the real reachability of the whole frontend source tree', () => {
     const files = allSourceFiles(SRC);
     const graph = importGraph(files);
-    const entries = files.filter((file) => /\/main\.tsx$/.test(file));
+    const entries = files.filter((file) => /[\\/]main\.tsx$/.test(file));
     expect(entries.length, 'expected exactly one browser entry point').toBe(1);
 
     const reachable = reachableFrom(graph, entries);
     const production = files.filter((file) => !isTest(file));
-    const orphans = production.filter((file) => !reachable.has(file)).map((file) => relative(SRC, file)).sort();
+    const orphans = production.filter((file) => !reachable.has(file)).map((file) => relative(SRC, file).replace(/\\/g, '/')).sort();
 
     const undocumented = orphans.filter((file) => !(file in ALLOWED_ORPHANS));
     const staleAllowlistEntries = Object.keys(ALLOWED_ORPHANS).filter((file) => !orphans.includes(file)).sort();

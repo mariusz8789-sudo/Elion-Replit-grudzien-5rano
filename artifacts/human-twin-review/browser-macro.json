@@ -1,0 +1,5351 @@
+{
+  "startedAt": "2026-09-22T02:00:05.691Z",
+  "browser": "153.0.4234.48",
+  "executablePath": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "base": "http://127.0.0.1:5001",
+  "coldDefinition": "New Chromium process and empty context per load; OS filesystem cache is not purged.",
+  "loads": [],
+  "scenarios": [
+    {
+      "level": "body",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 14,
+          "simulationSeconds": 0.8076000000059604,
+          "lastDeltaSeconds": 0.2,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": null,
+          "progress": 0,
+          "timerSeconds": 0,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 6.707199999988079,
+          "frameDeltaSeconds": 3.0354000000059607,
+          "render": {
+            "fps": 0.32897983353620425,
+            "frameMs": 3039.7,
+            "renderMs": 4.200000017881393,
+            "drawCalls": 1229,
+            "triangles": 429203,
+            "geometries": 388,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "body",
+            "selectedNodeId": null,
+            "selectedOrganId": null,
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": null,
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": []
+        },
+        "level": "body",
+        "macro": "body",
+        "selected": "body"
+      },
+      "samples": [
+        {
+          "wallMs": 1058,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 74,
+            "simulationSeconds": 1.8222000000953675,
+            "lastDeltaSeconds": 0.016700000000000728,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.11355212303562245,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 7.7051999999880785,
+            "frameDeltaSeconds": 0.01669999998807907,
+            "render": {
+              "fps": 59.88023952095547,
+              "frameMs": 16.700000000000728,
+              "renderMs": 4.700000017881393,
+              "drawCalls": 1181,
+              "triangles": 426791,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 2077,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 134,
+            "simulationSeconds": 2.82980000020266,
+            "lastDeltaSeconds": 0.016800000000001092,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.23113114957616165,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 8.707299999982117,
+            "frameDeltaSeconds": 0.016799999982118608,
+            "render": {
+              "fps": 59.52380952380565,
+              "frameMs": 16.80000000000109,
+              "renderMs": 4.799999982118607,
+              "drawCalls": 1181,
+              "triangles": 426791,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 3087,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 194,
+            "simulationSeconds": 3.8371000003218776,
+            "lastDeltaSeconds": 0.016600000000000364,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.34867516846827273,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 9.709299999982129,
+            "frameDeltaSeconds": 0.0165,
+            "render": {
+              "fps": 60.24096385542036,
+              "frameMs": 16.600000000000364,
+              "renderMs": 5.9000000059604645,
+              "drawCalls": 1181,
+              "triangles": 426791,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 4106,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 254,
+            "simulationSeconds": 4.845400000375526,
+            "lastDeltaSeconds": 0.016700000017881394,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.46633587951879785,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 10.711400000005975,
+            "frameDeltaSeconds": 0.016700000017881394,
+            "render": {
+              "fps": 59.88023952096199,
+              "frameMs": 16.69999999999891,
+              "renderMs": 4.699999988079071,
+              "drawCalls": 1181,
+              "triangles": 426791,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 5125,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 314,
+            "simulationSeconds": 5.854400000530499,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.5840782750973929,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 11.713299999982132,
+            "frameDeltaSeconds": 0.016399999976158142,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 4.699999988079071,
+              "drawCalls": 1179,
+              "triangles": 426767,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 6140,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 374,
+            "simulationSeconds": 6.867700000661637,
+            "lastDeltaSeconds": 0.01669999999999891,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.7023224469872903,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 12.715400000005976,
+            "frameDeltaSeconds": 0.01660000002384186,
+            "render": {
+              "fps": 59.88023952096199,
+              "frameMs": 16.69999999999891,
+              "renderMs": 6.199999988079071,
+              "drawCalls": 1183,
+              "triangles": 426795,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 7159,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 434,
+            "simulationSeconds": 7.873600000768928,
+            "lastDeltaSeconds": 0.01669999999999891,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.819703096845517,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 13.717400000005982,
+            "frameDeltaSeconds": 0.01660000002384186,
+            "render": {
+              "fps": 59.88023952096199,
+              "frameMs": 16.69999999999891,
+              "renderMs": 4.699999988079071,
+              "drawCalls": 1183,
+              "triangles": 426795,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 8173,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 494,
+            "simulationSeconds": 8.8805000008941,
+            "lastDeltaSeconds": 0.016899999999999638,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:human-study",
+            "stationId": null,
+            "progress": 0.9363723712366175,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 14.719599999994069,
+            "frameDeltaSeconds": 0.01669999998807907,
+            "render": {
+              "fps": 59.17159763313737,
+              "frameMs": 16.899999999999636,
+              "renderMs": 3.699999988079071,
+              "drawCalls": 1165,
+              "triangles": 418555,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 9186,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 554,
+            "simulationSeconds": 9.887800001037151,
+            "lastDeltaSeconds": 0.016899999976158143,
+            "state": "ALIGNING",
+            "stepIndex": 1,
+            "stepKind": "ALIGN",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 0.9242115615904931,
+            "timerSeconds": 0,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "|targetFacing - facing| < 0.03 rad",
+            "wallSeconds": 15.721799999982142,
+            "frameDeltaSeconds": 0.016899999976158143,
+            "render": {
+              "fps": 59.88023952095547,
+              "frameMs": 16.700000000000728,
+              "renderMs": 7,
+              "drawCalls": 1149,
+              "triangles": 413303,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 10201,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 614,
+            "simulationSeconds": 10.896200001102716,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "REACHING",
+            "stepIndex": 2,
+            "stepKind": "REACH",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 0.4111111111442168,
+            "timerSeconds": 0.3700000000297951,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.9s",
+            "wallSeconds": 16.723799999982145,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 4.800000011920929,
+              "drawCalls": 1149,
+              "triangles": 413303,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 11220,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 674,
+            "simulationSeconds": 11.904000001204043,
+            "lastDeltaSeconds": 0.016799999999999274,
+            "state": "INTERACTING",
+            "stepIndex": 3,
+            "stepKind": "INTERACT",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 0.5872500000298033,
+            "timerSeconds": 0.4698000000238427,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 17.725699999988095,
+            "frameDeltaSeconds": 0.01669999998807907,
+            "render": {
+              "fps": 59.5238095238121,
+              "frameMs": 16.799999999999272,
+              "renderMs": 5.700000017881393,
+              "drawCalls": 1149,
+              "triangles": 413303,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": null,
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 12238,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 734,
+            "simulationSeconds": 12.915200001198084,
+            "lastDeltaSeconds": 0.0165,
+            "state": "IDLE",
+            "stepIndex": -1,
+            "stepKind": null,
+            "targetId": null,
+            "stationId": "station:human-study",
+            "progress": 0,
+            "timerSeconds": 0.6070000000476794,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "no timed transition",
+            "wallSeconds": 18.727699999988086,
+            "frameDeltaSeconds": 0.015599999994039536,
+            "render": {
+              "fps": 60.6060606060606,
+              "frameMs": 16.5,
+              "renderMs": 5.5,
+              "drawCalls": 1151,
+              "triangles": 413327,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": "body",
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        }
+      ],
+      "wallMs": 12238,
+      "complete": true
+    },
+    {
+      "level": "organ_system",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 749,
+          "simulationSeconds": 13.166800001257686,
+          "lastDeltaSeconds": 0.01669999998807907,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:human-study",
+          "progress": 0,
+          "timerSeconds": 0.6070000000476794,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 18.978199999988085,
+          "frameDeltaSeconds": 0.01669999998807907,
+          "render": {
+            "fps": 60.6060606060606,
+            "frameMs": 16.5,
+            "renderMs": 6.200000017881393,
+            "drawCalls": 1149,
+            "triangles": 413303,
+            "geometries": 388,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "body",
+            "selectedNodeId": "body",
+            "selectedOrganId": null,
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": null,
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": []
+        },
+        "level": "body",
+        "macro": "body",
+        "selected": "body"
+      },
+      "samples": [
+        {
+          "wallMs": 1052,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 824,
+            "simulationSeconds": 14.423400001347114,
+            "lastDeltaSeconds": 0.017,
+            "state": "INTERACTING",
+            "stepIndex": 2,
+            "stepKind": "INTERACT",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 0.105,
+            "timerSeconds": 0.084,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 20.231000000000005,
+            "frameDeltaSeconds": 0.017,
+            "render": {
+              "fps": 59.88023952095547,
+              "frameMs": 16.700000000000728,
+              "renderMs": 6.300000011920929,
+              "drawCalls": 1149,
+              "triangles": 413303,
+              "geometries": 388,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "body",
+              "selectedNodeId": "body",
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": []
+          },
+          "level": "body",
+          "macro": "body",
+          "selected": "body"
+        },
+        {
+          "wallMs": 5845,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 867,
+            "simulationSeconds": 15.144700001418643,
+            "lastDeltaSeconds": 0.016700000000000728,
+            "state": "ARRIVED",
+            "stepIndex": 3,
+            "stepKind": "REPORT",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 1,
+            "timerSeconds": 0,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.6s",
+            "wallSeconds": 20.949199999988075,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.88023952095547,
+              "frameMs": 16.700000000000728,
+              "renderMs": 4092.399999976158,
+              "drawCalls": 1159,
+              "triangles": 498309,
+              "geometries": 389,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ_system",
+              "selectedNodeId": "system:cardiovascular",
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 570.1327954244421,
+                "y": 384.85303869238743
+              }
+            ]
+          },
+          "level": "organ_system",
+          "macro": "organ_system",
+          "selected": "system:cardiovascular"
+        },
+        {
+          "wallMs": 6859,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 927,
+            "simulationSeconds": 16.358500001472297,
+            "lastDeltaSeconds": 0.016900000005960463,
+            "state": "IDLE",
+            "stepIndex": -1,
+            "stepKind": null,
+            "targetId": null,
+            "stationId": "station:human-study",
+            "progress": 0,
+            "timerSeconds": 0.6106000000596141,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "no timed transition",
+            "wallSeconds": 26.04259999999405,
+            "frameDeltaSeconds": 0.016900000005960463,
+            "render": {
+              "fps": 59.5238095238121,
+              "frameMs": 16.799999999999272,
+              "renderMs": 4,
+              "drawCalls": 1139,
+              "triangles": 498069,
+              "geometries": 389,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ_system",
+              "selectedNodeId": "system:cardiovascular",
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.169733257556,
+                "y": 372.67621092248993
+              }
+            ]
+          },
+          "level": "organ_system",
+          "macro": "organ_system",
+          "selected": "system:cardiovascular"
+        }
+      ],
+      "wallMs": 6859,
+      "complete": true
+    },
+    {
+      "level": "organ",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 942,
+          "simulationSeconds": 16.61000000146038,
+          "lastDeltaSeconds": 0.017,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:human-study",
+          "progress": 0,
+          "timerSeconds": 0.6106000000596141,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 26.293099999994052,
+          "frameDeltaSeconds": 0.017,
+          "render": {
+            "fps": 59.5238095238121,
+            "frameMs": 16.799999999999272,
+            "renderMs": 4.4000000059604645,
+            "drawCalls": 1139,
+            "triangles": 498069,
+            "geometries": 389,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "organ_system",
+            "selectedNodeId": "system:cardiovascular",
+            "selectedOrganId": null,
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": null,
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": [
+            {
+              "id": "heart",
+              "x": 543.1729229121411,
+              "y": 372.67487903081496
+            }
+          ]
+        },
+        "level": "organ_system",
+        "macro": "organ_system",
+        "selected": "system:cardiovascular"
+      },
+      "samples": [
+        {
+          "wallMs": 1051,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1002,
+            "simulationSeconds": 17.615600001579566,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "INTERACTING",
+            "stepIndex": 2,
+            "stepKind": "INTERACT",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 0.06287499999999908,
+            "timerSeconds": 0.050299999999999276,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 27.295,
+            "frameDeltaSeconds": 0.016400000005960466,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 4.5999999940395355,
+              "drawCalls": 1139,
+              "triangles": 498069,
+              "geometries": 389,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ_system",
+              "selectedNodeId": "system:cardiovascular",
+              "selectedOrganId": null,
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.7470997665988,
+                "y": 372.91971900303497
+              }
+            ]
+          },
+          "level": "organ_system",
+          "macro": "organ_system",
+          "selected": "system:cardiovascular"
+        },
+        {
+          "wallMs": 2068,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1048,
+            "simulationSeconds": 18.57140000172857,
+            "lastDeltaSeconds": 0.2,
+            "state": "ARRIVED",
+            "stepIndex": 3,
+            "stepKind": "REPORT",
+            "targetId": "station:human-study",
+            "stationId": "station:human-study",
+            "progress": 0.33333333333333337,
+            "timerSeconds": 0.2,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.6s",
+            "wallSeconds": 28.326900000005967,
+            "frameDeltaSeconds": 0.28040000000596044,
+            "render": {
+              "fps": 3.739715781600578,
+              "frameMs": 267.40000000000146,
+              "renderMs": 3.699999988079071,
+              "drawCalls": 1145,
+              "triangles": 509341,
+              "geometries": 391,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.2130315114816,
+                "y": 373.1123149658937
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 3088,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1108,
+            "simulationSeconds": 19.577900001800067,
+            "lastDeltaSeconds": 0.016600000000002182,
+            "state": "IDLE",
+            "stepIndex": -1,
+            "stepKind": null,
+            "targetId": null,
+            "stationId": "station:human-study",
+            "progress": 0,
+            "timerSeconds": 0.6020000000655638,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "no timed transition",
+            "wallSeconds": 29.315900000005943,
+            "frameDeltaSeconds": 0.015800000011920928,
+            "render": {
+              "fps": 60.24096385541377,
+              "frameMs": 16.600000000002183,
+              "renderMs": 5.699999988079071,
+              "drawCalls": 1145,
+              "triangles": 509341,
+              "geometries": 391,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": null,
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.7648651218013,
+                "y": 373.33345439202503
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        }
+      ],
+      "wallMs": 3088,
+      "complete": true
+    },
+    {
+      "name": "real canvas raycast → canonical heart command",
+      "point": {
+        "id": "heart",
+        "x": 544.7648651218013,
+        "y": 373.33345439202503
+      },
+      "after": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 1251,
+          "simulationSeconds": 21.982100002002667,
+          "lastDeltaSeconds": 0.01680000001192093,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:human-study",
+          "progress": 1,
+          "timerSeconds": 0.6060000000357649,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 31.704499999999964,
+          "frameDeltaSeconds": 0.01680000001192093,
+          "render": {
+            "fps": 59.523809523824994,
+            "frameMs": 16.799999999995634,
+            "renderMs": 5.5999999940395355,
+            "drawCalls": 1145,
+            "triangles": 509341,
+            "geometries": 391,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "organ",
+            "selectedNodeId": "heart",
+            "selectedOrganId": "heart",
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": "heart",
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": [
+            {
+              "id": "heart",
+              "x": 545.4882248536098,
+              "y": 373.61366975747836
+            }
+          ]
+        },
+        "level": "organ",
+        "macro": "organ",
+        "selected": "heart"
+      }
+    },
+    {
+      "level": "tissue",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 1258,
+          "simulationSeconds": 22.0996000019967,
+          "lastDeltaSeconds": 0.016700000000004364,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:human-study",
+          "progress": 0,
+          "timerSeconds": 0.6060000000357649,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 31.820900000005924,
+          "frameDeltaSeconds": 0.01660000002384186,
+          "render": {
+            "fps": 59.88023952094244,
+            "frameMs": 16.700000000004366,
+            "renderMs": 3.699999988079071,
+            "drawCalls": 1145,
+            "triangles": 509341,
+            "geometries": 391,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "organ",
+            "selectedNodeId": "heart",
+            "selectedOrganId": "heart",
+            "artifactKind": null,
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": "heart",
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": [
+            {
+              "id": "heart",
+              "x": 545.498638582091,
+              "y": 373.61763275185496
+            }
+          ]
+        },
+        "level": "organ",
+        "macro": "organ",
+        "selected": "heart"
+      },
+      "samples": [
+        {
+          "wallMs": 1053,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1318,
+            "simulationSeconds": 23.10520000206224,
+            "lastDeltaSeconds": 0.01669999999999709,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.08573387733377591,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 32.822900000005966,
+            "frameDeltaSeconds": 0.01660000002384186,
+            "render": {
+              "fps": 59.88023952096852,
+              "frameMs": 16.69999999999709,
+              "renderMs": 4.199999988079071,
+              "drawCalls": 1173,
+              "triangles": 521805,
+              "geometries": 391,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 545.4833705935375,
+                "y": 373.6118217980226
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 2063,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1378,
+            "simulationSeconds": 24.110400002157608,
+            "lastDeltaSeconds": 0.01669999999999709,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.18858205535844919,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 33.82500000000004,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.88023952096852,
+              "frameMs": 16.69999999999709,
+              "renderMs": 4.699999988079071,
+              "drawCalls": 1177,
+              "triangles": 522829,
+              "geometries": 391,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 545.2845025674228,
+                "y": 373.53575470494593
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 3079,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1438,
+            "simulationSeconds": 25.287500002229123,
+            "lastDeltaSeconds": 0.18690000000596046,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.3090183768354836,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 34.997400000006046,
+            "frameDeltaSeconds": 0.18690000000596046,
+            "render": {
+              "fps": 5.443658138269003,
+              "frameMs": 183.6999999999971,
+              "renderMs": 4.199999988079071,
+              "drawCalls": 1222,
+              "triangles": 539829,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.9186025604808,
+                "y": 373.3938664056492
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 4099,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1498,
+            "simulationSeconds": 26.29480000228273,
+            "lastDeltaSeconds": 0.0165,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.41208141873753124,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 35.99619999998823,
+            "frameDeltaSeconds": 0.016299999982118608,
+            "render": {
+              "fps": 60.6060606060606,
+              "frameMs": 16.5,
+              "renderMs": 6.700000017881393,
+              "drawCalls": 1224,
+              "triangles": 540109,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.4031587815452,
+                "y": 373.18930288525195
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 5117,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1558,
+            "simulationSeconds": 27.30140000241383,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.5150728393536266,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 36.998099999994224,
+            "frameDeltaSeconds": 0.016400000005960466,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 5.300000011920929,
+              "drawCalls": 1224,
+              "triangles": 539429,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.8110470861883,
+                "y": 372.9464895194082
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 6137,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1618,
+            "simulationSeconds": 28.30820000251515,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.618084723193499,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 38.00029999998235,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 5.700000017881393,
+              "drawCalls": 1224,
+              "triangles": 539429,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.1765173630979,
+                "y": 372.67502990899646
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 7148,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1678,
+            "simulationSeconds": 29.314400002515104,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.7200037702967514,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 39.00240000000625,
+            "frameDeltaSeconds": 0.01660000002384186,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 7.199999988079071,
+              "drawCalls": 1226,
+              "triangles": 539453,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 542.5458839207629,
+                "y": 372.39063040156384
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 8152,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1738,
+            "simulationSeconds": 30.319800002693846,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.8228724115567824,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 40.004400000006285,
+            "frameDeltaSeconds": 0.0165,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 6.699999988079071,
+              "drawCalls": 1228,
+              "triangles": 539477,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 541.9591657757312,
+                "y": 372.1087425198736
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 9163,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1798,
+            "simulationSeconds": 31.32610000274746,
+            "lastDeltaSeconds": 0.0165,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:histology",
+            "stationId": null,
+            "progress": 0.925833137324715,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 41.00629999998246,
+            "frameDeltaSeconds": 0.016299999982118608,
+            "render": {
+              "fps": 60.6060606060606,
+              "frameMs": 16.5,
+              "renderMs": 5.800000011920929,
+              "drawCalls": 1183,
+              "triangles": 522221,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 541.4459787666434,
+                "y": 371.84338873373775
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 10172,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1858,
+            "simulationSeconds": 32.33270000277726,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "ALIGNING",
+            "stepIndex": 1,
+            "stepKind": "ALIGN",
+            "targetId": "station:histology",
+            "stationId": "station:histology",
+            "progress": 0.9128070389611576,
+            "timerSeconds": 0,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "|targetFacing - facing| < 0.03 rad",
+            "wallSeconds": 42.0082999999825,
+            "frameDeltaSeconds": 0.0165,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 8.700000017881393,
+              "drawCalls": 1177,
+              "triangles": 521053,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 541.0236000838387,
+                "y": 371.606323209672
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 11196,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1918,
+            "simulationSeconds": 33.33940000293225,
+            "lastDeltaSeconds": 0.01680000001192093,
+            "state": "REACHING",
+            "stepIndex": 2,
+            "stepKind": "REACH",
+            "targetId": "station:histology",
+            "stationId": "station:histology",
+            "progress": 0.3534444445371386,
+            "timerSeconds": 0.3181000000834247,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.9s",
+            "wallSeconds": 43.010500000000405,
+            "frameDeltaSeconds": 0.01680000001192093,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 5.699999988079071,
+              "drawCalls": 1177,
+              "triangles": 521053,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.6974521862261,
+                "y": 371.40661658235615
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 12211,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 1978,
+            "simulationSeconds": 34.34520000308729,
+            "lastDeltaSeconds": 0.01669999999999709,
+            "state": "INTERACTING",
+            "stepIndex": 3,
+            "stepKind": "INTERACT",
+            "targetId": "station:histology",
+            "stationId": "station:histology",
+            "progress": 0.5236250000819566,
+            "timerSeconds": 0.41890000006556527,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 44.01250000000044,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.88023952096852,
+              "frameMs": 16.69999999999709,
+              "renderMs": 4.5,
+              "drawCalls": 1177,
+              "triangles": 521053,
+              "geometries": 395,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organ",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": null,
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.4637273058868,
+                "y": 371.25065884008023
+              }
+            ]
+          },
+          "level": "organ",
+          "macro": "organ",
+          "selected": "heart"
+        },
+        {
+          "wallMs": 13218,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2038,
+            "simulationSeconds": 35.36260000320654,
+            "lastDeltaSeconds": 0.017,
+            "state": "OBSERVING",
+            "stepIndex": 5,
+            "stepKind": "OBSERVE",
+            "targetId": "station:histology",
+            "stationId": "station:histology",
+            "progress": 0.4386428571854257,
+            "timerSeconds": 0.614100000059596,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 1.4s",
+            "wallSeconds": 45.01490000000644,
+            "frameDeltaSeconds": 0.017,
+            "render": {
+              "fps": 59.523809523824994,
+              "frameMs": 16.799999999995634,
+              "renderMs": 4.699999988079071,
+              "drawCalls": 1353,
+              "triangles": 629165,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.3134598080868,
+                "y": 371.14250901960946
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        },
+        {
+          "wallMs": 14230,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2098,
+            "simulationSeconds": 36.369700003295975,
+            "lastDeltaSeconds": 0.01680000001192093,
+            "state": "REPORTING",
+            "stepIndex": 6,
+            "stepKind": "REPORT",
+            "targetId": "station:histology",
+            "stationId": "station:histology",
+            "progress": 0.36383333335320156,
+            "timerSeconds": 0.21830000001192093,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.6s",
+            "wallSeconds": 46.01690000000649,
+            "frameDeltaSeconds": 0.01680000001192093,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 6.9000000059604645,
+              "drawCalls": 1353,
+              "triangles": 629165,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.2370358541663,
+                "y": 371.0844373976933
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        }
+      ],
+      "wallMs": 14230,
+      "complete": true
+    },
+    {
+      "level": "tissue",
+      "replay": "MATCH"
+    },
+    {
+      "level": "cell",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 2128,
+          "simulationSeconds": 36.87610000334368,
+          "lastDeltaSeconds": 0.01660000002384186,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:histology",
+          "progress": 0,
+          "timerSeconds": 0.6064000000357557,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 46.51740000000652,
+          "frameDeltaSeconds": 0.01660000002384186,
+          "render": {
+            "fps": 60.24096385542696,
+            "frameMs": 16.599999999998545,
+            "renderMs": 4.0999999940395355,
+            "drawCalls": 1353,
+            "triangles": 629165,
+            "geometries": 439,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "tissue",
+            "selectedNodeId": "heart",
+            "selectedOrganId": "heart",
+            "artifactKind": "histology",
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": "heart",
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": [
+            {
+              "id": "heart",
+              "x": 540.2243149850524,
+              "y": 371.07453684331233
+            }
+          ]
+        },
+        "level": "tissue",
+        "macro": "tissue",
+        "selected": "heart",
+        "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+      },
+      "samples": [
+        {
+          "wallMs": 1039,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2188,
+            "simulationSeconds": 37.88220000339145,
+            "lastDeltaSeconds": 0.01669999999999709,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:microscopy",
+            "stationId": null,
+            "progress": 0.3057832653798188,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 47.51959999999464,
+            "frameDeltaSeconds": 0.0165,
+            "render": {
+              "fps": 59.88023952096852,
+              "frameMs": 16.69999999999709,
+              "renderMs": 5.700000017881393,
+              "drawCalls": 1353,
+              "triangles": 629165,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.2483729386194,
+                "y": 371.093201958022
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        },
+        {
+          "wallMs": 2042,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2248,
+            "simulationSeconds": 38.88870000342127,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:microscopy",
+            "stationId": null,
+            "progress": 0.6394825569184133,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 48.52169999998871,
+            "frameDeltaSeconds": 0.0165,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 6.5,
+              "drawCalls": 1406,
+              "triangles": 647613,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.3409078754377,
+                "y": 371.16282152683783
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        },
+        {
+          "wallMs": 3067,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2313,
+            "simulationSeconds": 39.978000003582245,
+            "lastDeltaSeconds": 0.016600000000005822,
+            "state": "ALIGNING",
+            "stepIndex": 1,
+            "stepKind": "ALIGN",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 1,
+            "timerSeconds": 0,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "|targetFacing - facing| < 0.03 rad",
+            "wallSeconds": 49.607199999988744,
+            "frameDeltaSeconds": 0.016400000005960466,
+            "render": {
+              "fps": 60.24096385540056,
+              "frameMs": 16.60000000000582,
+              "renderMs": 4.600000023841858,
+              "drawCalls": 1408,
+              "triangles": 647637,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.5270792155574,
+                "y": 371.2942421100712
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        },
+        {
+          "wallMs": 4085,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2368,
+            "simulationSeconds": 40.89900000371942,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "REACHING",
+            "stepIndex": 2,
+            "stepKind": "REACH",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.09311111111773547,
+            "timerSeconds": 0.08380000000596192,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.9s",
+            "wallSeconds": 50.52569999998878,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 4.800000011920929,
+              "drawCalls": 1410,
+              "triangles": 648341,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 540.7634286519844,
+                "y": 371.44848920278304
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        },
+        {
+          "wallMs": 5099,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2428,
+            "simulationSeconds": 41.90390000388639,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "INTERACTING",
+            "stepIndex": 3,
+            "stepKind": "INTERACT",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.2300000000372529,
+            "timerSeconds": 0.18400000002980232,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 51.5276999999888,
+            "frameDeltaSeconds": 0.01669999998807907,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 5.4000000059604645,
+              "drawCalls": 1410,
+              "triangles": 648341,
+              "geometries": 439,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "tissue",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "histology",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 541.1114380388979,
+                "y": 371.6573582338749
+              }
+            ]
+          },
+          "level": "tissue",
+          "macro": "tissue",
+          "selected": "heart",
+          "capture": "histology-slide · MODEL · 1b036c9ca5bef87f…"
+        },
+        {
+          "wallMs": 6116,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2488,
+            "simulationSeconds": 42.90980000417855,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "OBSERVING",
+            "stepIndex": 5,
+            "stepKind": "OBSERVE",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.26335714292100815,
+            "timerSeconds": 0.3687000000894114,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 1.4s",
+            "wallSeconds": 52.52979999998287,
+            "frameDeltaSeconds": 0.016399999976158142,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 8.700000017881393,
+              "drawCalls": 1278,
+              "triangles": 556261,
+              "geometries": 403,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "cell",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 541.5554213678806,
+                "y": 371.90178501829234
+              }
+            ]
+          },
+          "level": "cell",
+          "macro": "cell",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · 5fb00155233a3789…"
+        },
+        {
+          "wallMs": 7125,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2547,
+            "simulationSeconds": 43.92250000429779,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "OBSERVING",
+            "stepIndex": 5,
+            "stepKind": "OBSERVE",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.9867142858632875,
+            "timerSeconds": 1.3814000002086024,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 1.4s",
+            "wallSeconds": 53.532099999994855,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 7.5999999940395355,
+              "drawCalls": 1274,
+              "triangles": 556213,
+              "geometries": 403,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "cell",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 542.0870804313844,
+                "y": 372.17190333736744
+              }
+            ]
+          },
+          "level": "cell",
+          "macro": "cell",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · 5fb00155233a3789…"
+        },
+        {
+          "wallMs": 8145,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2607,
+            "simulationSeconds": 44.92860000433362,
+            "lastDeltaSeconds": 0.016700000017881394,
+            "state": "IDLE",
+            "stepIndex": -1,
+            "stepKind": null,
+            "targetId": null,
+            "stationId": "station:microscopy",
+            "progress": 0,
+            "timerSeconds": 0.6036999999821347,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "no timed transition",
+            "wallSeconds": 54.53390000000682,
+            "frameDeltaSeconds": 0.016700000017881394,
+            "render": {
+              "fps": 59.88023952096852,
+              "frameMs": 16.69999999999709,
+              "renderMs": 5.399999976158142,
+              "drawCalls": 1272,
+              "triangles": 556189,
+              "geometries": 403,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "cell",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 542.6871172887751,
+                "y": 372.45580075101924
+              }
+            ]
+          },
+          "level": "cell",
+          "macro": "cell",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · 5fb00155233a3789…"
+        }
+      ],
+      "wallMs": 8145,
+      "complete": true
+    },
+    {
+      "level": "cell",
+      "replay": "MATCH"
+    },
+    {
+      "level": "organelle",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 2637,
+          "simulationSeconds": 45.43150000437537,
+          "lastDeltaSeconds": 0.016700000017881394,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:microscopy",
+          "progress": 0,
+          "timerSeconds": 0.6036999999821347,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 55.03490000000686,
+          "frameDeltaSeconds": 0.016700000017881394,
+          "render": {
+            "fps": 59.88023952094244,
+            "frameMs": 16.700000000004366,
+            "renderMs": 6.5,
+            "drawCalls": 1270,
+            "triangles": 556165,
+            "geometries": 403,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "cell",
+            "selectedNodeId": "heart",
+            "selectedOrganId": "heart",
+            "artifactKind": "hyperscope",
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": "heart",
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": [
+            {
+              "id": "heart",
+              "x": 543.002749009104,
+              "y": 372.5982836815998
+            }
+          ]
+        },
+        "level": "cell",
+        "macro": "cell",
+        "selected": "heart",
+        "capture": "hyperscope-capture · MODEL · 5fb00155233a3789…"
+      },
+      "samples": [
+        {
+          "wallMs": 1039,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2697,
+            "simulationSeconds": 46.43660000457211,
+            "lastDeltaSeconds": 0.0165,
+            "state": "INTERACTING",
+            "stepIndex": 2,
+            "stepKind": "INTERACT",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.041750000007450584,
+            "timerSeconds": 0.03340000000596047,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 56.03700000000093,
+            "frameDeltaSeconds": 0.016400000005960466,
+            "render": {
+              "fps": 60.6060606060606,
+              "frameMs": 16.5,
+              "renderMs": 5.699999988079071,
+              "drawCalls": 1270,
+              "triangles": 556165,
+              "geometries": 403,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "cell",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.6406582525866,
+                "y": 372.87484224434047
+              }
+            ]
+          },
+          "level": "cell",
+          "macro": "cell",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · 5fb00155233a3789…"
+        },
+        {
+          "wallMs": 2052,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2757,
+            "simulationSeconds": 47.441800004727114,
+            "lastDeltaSeconds": 0.016900000005960463,
+            "state": "OBSERVING",
+            "stepIndex": 4,
+            "stepKind": "OBSERVE",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.1555000000085212,
+            "timerSeconds": 0.21770000001192968,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 1.4s",
+            "wallSeconds": 57.03909999999499,
+            "frameDeltaSeconds": 0.016900000005960463,
+            "render": {
+              "fps": 59.17159763315647,
+              "frameMs": 16.89999999999418,
+              "renderMs": 6.9000000059604645,
+              "drawCalls": 1264,
+              "triangles": 546189,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.2490027963912,
+                "y": 373.1269480576917
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 3060,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2817,
+            "simulationSeconds": 48.448300004792664,
+            "lastDeltaSeconds": 0.016799999999995634,
+            "state": "OBSERVING",
+            "stepIndex": 4,
+            "stepKind": "OBSERVE",
+            "targetId": "station:microscopy",
+            "stationId": "station:microscopy",
+            "progress": 0.8744285714839026,
+            "timerSeconds": 1.2242000000774635,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 1.4s",
+            "wallSeconds": 58.04100000000099,
+            "frameDeltaSeconds": 0.016400000005960466,
+            "render": {
+              "fps": 59.523809523824994,
+              "frameMs": 16.799999999995634,
+              "renderMs": 5.0999999940395355,
+              "drawCalls": 1264,
+              "triangles": 546189,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.7801130308027,
+                "y": 373.3394681673789
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 4079,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2877,
+            "simulationSeconds": 49.453000004929805,
+            "lastDeltaSeconds": 0.016599999999998546,
+            "state": "IDLE",
+            "stepIndex": -1,
+            "stepKind": null,
+            "targetId": null,
+            "stationId": "station:microscopy",
+            "progress": 0,
+            "timerSeconds": 0.6024000000715315,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "no timed transition",
+            "wallSeconds": 59.043099999995086,
+            "frameDeltaSeconds": 0.0165,
+            "render": {
+              "fps": 60.24096385542696,
+              "frameMs": 16.599999999998545,
+              "renderMs": 5.800000011920929,
+              "drawCalls": 1264,
+              "triangles": 546189,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 545.1895434237491,
+                "y": 373.4991781995493
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        }
+      ],
+      "wallMs": 4079,
+      "complete": true
+    },
+    {
+      "level": "organelle",
+      "replay": "MATCH"
+    },
+    {
+      "level": "molecule",
+      "before": {
+        "tier": "LICENSED_CC0_ASSET",
+        "load": {
+          "status": "READY",
+          "diagnostics": {
+            "startedAtMs": 968.5,
+            "fetchStartedAtMs": 968.5,
+            "fetchCompletedAtMs": 4625.5999999940395,
+            "decodeStartedAtMs": 4625.5999999940395,
+            "decodeCompletedAtMs": 4738.5,
+            "httpStatus": 200,
+            "bytes": 17667228
+          },
+          "insertedAtMs": 4751.9000000059605,
+          "firstRenderedAtMs": 7785.200000017881
+        },
+        "lod": "FULL_ASSET",
+        "lodDiagnostics": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "runtime": {
+          "updateCount": 2892,
+          "simulationSeconds": 49.704600004923854,
+          "lastDeltaSeconds": 0.01669999999999709,
+          "state": "IDLE",
+          "stepIndex": -1,
+          "stepKind": null,
+          "targetId": null,
+          "stationId": "station:microscopy",
+          "progress": 0,
+          "timerSeconds": 0.6024000000715315,
+          "remainingWaypoints": 0,
+          "blockedReason": null,
+          "transitionCondition": "no timed transition",
+          "wallSeconds": 59.2935999999951,
+          "frameDeltaSeconds": 0.01669999998807907,
+          "render": {
+            "fps": 59.88023952096852,
+            "frameMs": 16.69999999999709,
+            "renderMs": 4.300000011920929,
+            "drawCalls": 1264,
+            "triangles": 546189,
+            "geometries": 402,
+            "textures": 66,
+            "textureBytesEstimate": 53204309.33333334
+          },
+          "temporalEngineAdvances": 0,
+          "clockOwner": "AgentController",
+          "macroMicro": {
+            "level": "organelle",
+            "selectedNodeId": "heart",
+            "selectedOrganId": "heart",
+            "artifactKind": "hyperscope",
+            "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+          },
+          "lastPickedNode": "heart",
+          "twinLod": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "twinLodPreference": "AUTO",
+          "organScreenPositions": [
+            {
+              "id": "heart",
+              "x": 545.2684493969887,
+              "y": 373.529583093185
+            }
+          ]
+        },
+        "level": "organelle",
+        "macro": "organelle",
+        "selected": "heart",
+        "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+      },
+      "samples": [
+        {
+          "wallMs": 1059,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 2952,
+            "simulationSeconds": 50.710100005078885,
+            "lastDeltaSeconds": 0.01680000000000291,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:compute",
+            "stationId": null,
+            "progress": 0.23141158057464684,
+            "timerSeconds": 0,
+            "remainingWaypoints": 2,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 60.29569999998917,
+            "frameDeltaSeconds": 0.01669999998807907,
+            "render": {
+              "fps": 59.523809523799216,
+              "frameMs": 16.80000000000291,
+              "renderMs": 5.0999999940395355,
+              "drawCalls": 1262,
+              "triangles": 546165,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 545.4770850494963,
+                "y": 373.6094283528697
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 2073,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3012,
+            "simulationSeconds": 51.716400005174314,
+            "lastDeltaSeconds": 0.016600000000005822,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:compute",
+            "stationId": null,
+            "progress": 0.5224781122570961,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 61.297799999983255,
+            "frameDeltaSeconds": 0.016399999976158142,
+            "render": {
+              "fps": 60.24096385540056,
+              "frameMs": 16.60000000000582,
+              "renderMs": 5.5999999940395355,
+              "drawCalls": 1254,
+              "triangles": 544293,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 545.5026853107325,
+                "y": 373.6191722434748
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 3081,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3072,
+            "simulationSeconds": 52.72080000533531,
+            "lastDeltaSeconds": 0.016700000000004364,
+            "state": "MOVING_TO_TARGET",
+            "stepIndex": 0,
+            "stepKind": "NAVIGATE",
+            "targetId": "station:compute",
+            "stationId": null,
+            "progress": 0.8174336277379983,
+            "timerSeconds": 0,
+            "remainingWaypoints": 1,
+            "blockedReason": null,
+            "transitionCondition": "remainingWaypoints = 0",
+            "wallSeconds": 62.29969999998927,
+            "frameDeltaSeconds": 0.016599999994039535,
+            "render": {
+              "fps": 59.88023952094244,
+              "frameMs": 16.700000000004366,
+              "renderMs": 4.200000017881393,
+              "drawCalls": 1254,
+              "triangles": 544293,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 545.3429455712637,
+                "y": 373.5581830795332
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 4102,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3147,
+            "simulationSeconds": 53.978800005538005,
+            "lastDeltaSeconds": 0.01680000001192093,
+            "state": "ALIGNING",
+            "stepIndex": 1,
+            "stepKind": "ALIGN",
+            "targetId": "station:compute",
+            "stationId": "station:compute",
+            "progress": 0.9664467569445175,
+            "timerSeconds": 0,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "|targetFacing - facing| < 0.03 rad",
+            "wallSeconds": 63.55240000000721,
+            "frameDeltaSeconds": 0.01680000001192093,
+            "render": {
+              "fps": 59.523809523799216,
+              "frameMs": 16.80000000000291,
+              "renderMs": 5.299999982118607,
+              "drawCalls": 1254,
+              "triangles": 544293,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.9059378795959,
+                "y": 373.38890816356746
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 5113,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3207,
+            "simulationSeconds": 54.98460000561555,
+            "lastDeltaSeconds": 0.01680000000000291,
+            "state": "REACHING",
+            "stepIndex": 2,
+            "stepKind": "REACH",
+            "targetId": "station:compute",
+            "stationId": "station:compute",
+            "progress": 0.6893333334061837,
+            "timerSeconds": 0.6204000000655654,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.9s",
+            "wallSeconds": 64.55429999998341,
+            "frameDeltaSeconds": 0.016299999982118608,
+            "render": {
+              "fps": 59.523809523799216,
+              "frameMs": 16.80000000000291,
+              "renderMs": 4.600000023841858,
+              "drawCalls": 1254,
+              "triangles": 544293,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 544.4039963408493,
+                "y": 373.18964011651275
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 6137,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3267,
+            "simulationSeconds": 55.99080000574676,
+            "lastDeltaSeconds": 0.016700000017881394,
+            "state": "INTERACTING",
+            "stepIndex": 3,
+            "stepKind": "INTERACT",
+            "targetId": "station:compute",
+            "stationId": "station:compute",
+            "progress": 0.9012500001341325,
+            "timerSeconds": 0.721000000107306,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.8s",
+            "wallSeconds": 65.55650000000125,
+            "frameDeltaSeconds": 0.016700000017881394,
+            "render": {
+              "fps": 59.88023952096852,
+              "frameMs": 16.69999999999709,
+              "renderMs": 8.199999988079071,
+              "drawCalls": 1260,
+              "triangles": 544981,
+              "geometries": 402,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "organelle",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "hyperscope",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.8120625995742,
+                "y": 372.946913997649
+              }
+            ]
+          },
+          "level": "organelle",
+          "macro": "organelle",
+          "selected": "heart",
+          "capture": "hyperscope-capture · MODEL · b973fa6db410907b…"
+        },
+        {
+          "wallMs": 7155,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3327,
+            "simulationSeconds": 56.99820000584221,
+            "lastDeltaSeconds": 0.016700000000011643,
+            "state": "OBSERVING",
+            "stepIndex": 5,
+            "stepKind": "OBSERVE",
+            "targetId": "station:compute",
+            "stationId": "station:compute",
+            "progress": 0.6475714286438391,
+            "timerSeconds": 0.9066000001013746,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 1.4s",
+            "wallSeconds": 66.55840000000718,
+            "frameDeltaSeconds": 0.015900000005960466,
+            "render": {
+              "fps": 59.880239520916334,
+              "frameMs": 16.70000000001164,
+              "renderMs": 4.5999999940395355,
+              "drawCalls": 1356,
+              "triangles": 562821,
+              "geometries": 425,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "molecule",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "central-dogma",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 543.177590931667,
+                "y": 372.67550057089295
+              }
+            ]
+          },
+          "level": "molecule",
+          "macro": "molecule",
+          "selected": "heart",
+          "capture": "central-dogma · MODEL · 4050da70e87596bc…"
+        },
+        {
+          "wallMs": 8177,
+          "tier": "LICENSED_CC0_ASSET",
+          "load": {
+            "status": "READY",
+            "diagnostics": {
+              "startedAtMs": 968.5,
+              "fetchStartedAtMs": 968.5,
+              "fetchCompletedAtMs": 4625.5999999940395,
+              "decodeStartedAtMs": 4625.5999999940395,
+              "decodeCompletedAtMs": 4738.5,
+              "httpStatus": 200,
+              "bytes": 17667228
+            },
+            "insertedAtMs": 4751.9000000059605,
+            "firstRenderedAtMs": 7785.200000017881
+          },
+          "lod": "FULL_ASSET",
+          "lodDiagnostics": {
+            "level": "FULL_ASSET",
+            "available": [
+              "FULL_ASSET",
+              "PROXY_LOW"
+            ],
+            "metrics": {
+              "triangleCount": 83686,
+              "textureCount": 7
+            }
+          },
+          "runtime": {
+            "updateCount": 3387,
+            "simulationSeconds": 58.0034000059853,
+            "lastDeltaSeconds": 0.01680000001192093,
+            "state": "REPORTING",
+            "stepIndex": 6,
+            "stepKind": "REPORT",
+            "targetId": "station:compute",
+            "stationId": "station:compute",
+            "progress": 0.8373333333929384,
+            "timerSeconds": 0.502400000035763,
+            "remainingWaypoints": 0,
+            "blockedReason": null,
+            "transitionCondition": "timer >= 0.6s",
+            "wallSeconds": 67.56059999999525,
+            "frameDeltaSeconds": 0.01680000001192093,
+            "render": {
+              "fps": 59.523809523799216,
+              "frameMs": 16.80000000000291,
+              "renderMs": 6.299999982118607,
+              "drawCalls": 1358,
+              "triangles": 562845,
+              "geometries": 425,
+              "textures": 66,
+              "textureBytesEstimate": 53204309.33333334
+            },
+            "temporalEngineAdvances": 0,
+            "clockOwner": "AgentController",
+            "macroMicro": {
+              "level": "molecule",
+              "selectedNodeId": "heart",
+              "selectedOrganId": "heart",
+              "artifactKind": "central-dogma",
+              "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+            },
+            "lastPickedNode": "heart",
+            "twinLod": {
+              "level": "FULL_ASSET",
+              "available": [
+                "FULL_ASSET",
+                "PROXY_LOW"
+              ],
+              "metrics": {
+                "triangleCount": 83686,
+                "textureCount": 7
+              }
+            },
+            "twinLodPreference": "AUTO",
+            "organScreenPositions": [
+              {
+                "id": "heart",
+                "x": 542.5469266949644,
+                "y": 372.39111501638115
+              }
+            ]
+          },
+          "level": "molecule",
+          "macro": "molecule",
+          "selected": "heart",
+          "capture": "central-dogma · MODEL · 4050da70e87596bc…"
+        }
+      ],
+      "wallMs": 8177,
+      "complete": true
+    },
+    {
+      "level": "molecule",
+      "replay": "MATCH"
+    }
+  ],
+  "errors": []
+}

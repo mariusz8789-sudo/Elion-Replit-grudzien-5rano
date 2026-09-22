@@ -35,7 +35,7 @@ export const WORLDS: readonly WorldEntry[] = [
     id: 'human-biology-lab', preview: 'vessel', hash: '#/human-biology-lab', glyph: '🫀', title: 'Human Biology Lab', domain: 'Scientific Worlds', featured: true,
     purpose: 'Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope, powiększ, zbadaj próbkę przez ORPHEUS — agent wykonuje to przy dziewięciu stanowiskach V3.',
     real: 'Instrumenty V3 (Hyperscope, ORPHEUS, obrazowanie, histologia, neuro, fizjologia) to deterministyczne modele; każdy bieg to jedna sesja z hashami w EvidenceLedger; bliźniak = MODEL, nie wyrób medyczny.',
-    visual: 'Centralna komora bliźniaka, wielowarstwowy sufit, szklane ściany, manipulatory, Neuro Lab, Hyperscope, histologia, obrazowanie; bliźniak jako oznaczony PROXY (brak zatwierdzonego GLB).',
+    visual: 'Centralna komora bliźniaka, wielowarstwowy sufit, szklane ściany, manipulatory, Neuro Lab, Hyperscope, histologia i obrazowanie; pełny model CC0 ładuje się przez kontrolowany loader, a PROXY pozostaje jawnym fallbackiem.',
   },
   {
     id: 'city3d', preview: 'city', hash: '#/city3d', glyph: '◫', title: 'Miasto epidemiologiczne', domain: 'Epidemiology World', featured: true,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { HUMAN_TWIN_RUNTIME_PATH, evaluateHumanTwinAsset, humanTwinProvenanceLabel } from '../core/three/humanTwinAsset';
+import * as THREE from 'three';
+import { HUMAN_TWIN_RUNTIME_PATH, evaluateHumanTwinAsset, humanTwinProvenanceLabel, type LoadedHumanTwinBody } from '../core/three/humanTwinAsset';
+import { createTwinProxy } from '../core/three/biologyLabKit';
+import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
 import { DEFAULT_CUTAWAY, measureCutawayBounds, planeFromState, SECTION_AXIS_LABEL_PL, type CutawayBounds } from '../core/three/humanTwinCutaway';
 import { easeInOutCubic, selectionPulse } from '../core/three/humanTwinMaterials';
 import { getWorldAssetRecord } from '../core/three/assetGovernance';
@@ -124,6 +127,38 @@ describe('twin camera (D-131) — a third camera that frames the body, and chang
     // The surface is presentation: it can never change what the anatomy label says.
     scene.setTwinSurface('XRAY');
     expect(humanTwinProvenanceLabel(scene.getTwinTier())).toContain('ANATOMIA: MODEL');
+  });
+});
+
+describe('human twin runtime LOD — one twin, two body representations', () => {
+  it('switches the licensed GLB and existing proxy without replacing organ interaction meshes', () => {
+    const assetRoot = new THREE.Group(); assetRoot.name = 'licensed-body';
+    const assetMesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.7, 0.25), new THREE.MeshStandardMaterial());
+    assetRoot.add(assetMesh);
+    const asset = {
+      root: assetRoot, meshes: [assetMesh], morphs: new Map(), heightMeters: 1.75,
+      tier: 'LICENSED_CC0_ASSET', record: {} as LoadedHumanTwinBody['record'],
+    } satisfies LoadedHumanTwinBody;
+    const twin = createTwinProxy(THREE, createHumanDigitalTwinManifest('HDT-lod-test'), { skinHex: '#d9a58d', bodyAsset: asset });
+    const organs = twin.organs;
+
+    expect(twin.getLodState().level).toBe('FULL_ASSET');
+    expect(twin.getLodState().available).toEqual(['FULL_ASSET', 'PROXY_LOW']);
+    expect(assetRoot.visible).toBe(true);
+    expect(twin.body.root.visible).toBe(false);
+
+    twin.setLod('PROXY_LOW');
+    expect(twin.getLodState().level).toBe('PROXY_LOW');
+    expect(twin.getLodState().metrics.triangleCount).toBeGreaterThan(0);
+    expect(assetRoot.visible).toBe(false);
+    expect(twin.body.root.visible).toBe(true);
+    expect(twin.organs).toBe(organs);
+
+    twin.setLod('FULL_ASSET');
+    expect(assetRoot.visible).toBe(true);
+    expect(twin.body.root.visible).toBe(false);
+    expect(twin.organs).toBe(organs);
+    twin.dispose();
   });
 });
 

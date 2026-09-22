@@ -3,8 +3,10 @@ import type {
   AttackPathEdge,
   AttackSurface,
   AttackSurfaceAsset,
+  CyberCampaignBudget,
   CyberInvestigationResult,
   CyberObservation,
+  HumanApprovalRecord,
   ObservableExpectation,
   ObservedResult,
   RemediationAction,
@@ -13,6 +15,7 @@ import type {
   VulnerabilityHypothesis,
   VulnerabilityHypothesisKind,
 } from './cyberInvestigation';
+import { assertApprovalBeforePatch, PatchNotApprovedError } from './cyberInvestigation';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import {
   selectNextTest,
@@ -367,7 +370,14 @@ export function createRemediation(app: ToyVulnerableApp, hypothesis: Vulnerabili
   return { remediationId: control, targetAssetId: `ENDPOINT::${ep}`, description: `Enable ${control} on ${ep}` };
 }
 
-export function applyRemediation(app: ToyVulnerableApp, action: RemediationAction): void { app.applyRemediation(action.remediationId); }
+export function applyRemediation(
+  app: ToyVulnerableApp,
+  action: RemediationAction,
+  approval: HumanApprovalRecord | null,
+): void {
+  assertApprovalBeforePatch(action, approval);
+  app.applyRemediation(action.remediationId);
+}
 
 export function retest(hypothesis: VulnerabilityHypothesis, app: ToyVulnerableApp, suffix = 'retest'): SecurityTestResult {
   return runSecurityTest(hypothesis, app, suffix); // fresh execution, new testId
@@ -492,7 +502,28 @@ export interface AdaptiveInvestigationResult {
   readonly stopReason: string;
 }
 
-export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): AdaptiveInvestigationResult {
+export const DEFAULT_CYBER_CAMPAIGN_BUDGET: CyberCampaignBudget = Object.freeze({
+  maxHypotheses: 16,
+  maxAnalyzerRuns: 20,
+  maxPatchProposals: 2,
+});
+
+export interface AdaptiveInvestigationOptions {
+  readonly budget?: CyberCampaignBudget;
+  /**
+   * Returns a real approval decision for this exact remediation. Absence is
+   * fail-closed: the kernel reports HUMAN_APPROVAL_REQUIRED and never mutates
+   * the target. Tests may inject an explicit synthetic-fixture approval, but
+   * production callers must obtain the decision from their human-review UI.
+   */
+  readonly approvalForRemediation?: (remediation: RemediationAction) => HumanApprovalRecord | null;
+}
+
+export function runAdaptiveInvestigation(
+  app: ToyVulnerableApp,
+  maxSteps = 20,
+  options: AdaptiveInvestigationOptions = {},
+): AdaptiveInvestigationResult {
   const observations = collectObservations(app);
   const assets = generateAttackSurface(observations);
   const hypotheses = generateHypotheses(assets);
@@ -503,6 +534,12 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
   const steps: AdaptiveStep[] = [];
   let stopReason = '';
   let testCounter = 0;
+  let patchProposalsCreated = 0;
+  const startedHypotheses = new Set<string>();
+  const budget = options.budget ?? {
+    ...DEFAULT_CYBER_CAMPAIGN_BUDGET,
+    maxAnalyzerRuns: Math.min(DEFAULT_CYBER_CAMPAIGN_BUDGET.maxAnalyzerRuns, maxSteps),
+  };
 
   const currentAssessment = (id: string): HypothesisAssessment => {
     const history = assessmentHistory.get(id)!;
@@ -539,7 +576,14 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     }
 
     const assessments = new Map(hypotheses.map((h) => [h.hypothesisId, currentAssessment(h.hypothesisId)]));
-    const selection = selectNextTest(candidates, assessments);
+    const selection = selectNextTest(candidates, assessments, {
+      budget,
+      usage: {
+        hypothesesGenerated: startedHypotheses.size,
+        analyzerRunsExecuted: testCounter,
+        patchProposalsCreated,
+      },
+    });
 
     if (selection.selectedHypothesisId === null) {
       stopReason = selection.whySelected;
@@ -549,6 +593,12 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
 
     const h = hypotheses.find((x) => x.hypothesisId === selection.selectedHypothesisId)!;
     const selectedCandidate = candidates.find((c) => c.hypothesisId === h.hypothesisId)!;
+    if (testCounter >= budget.maxAnalyzerRuns) {
+      stopReason = `CYBER_BUDGET_EXHAUSTED: maxAnalyzerRuns=${budget.maxAnalyzerRuns}`;
+      steps.push({ stepIndex: i, selection, hypothesisId: null, testResult: null, verdict: null, remediation: null, outcomeVerification: null });
+      break;
+    }
+    if (selectedCandidate.identityKind === 'NEW') startedHypotheses.add(h.hypothesisId);
     const isReplication = selectedCandidate.identityKind === 'INDEPENDENT_REPLICATION';
     let remediation: RemediationAction | null = null;
     let outcomeVerification: OutcomeVerification | null = null;
@@ -557,7 +607,23 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     if (isReplication) {
       const priorTest = [...steps].reverse().find((s) => s.hypothesisId === h.hypothesisId)?.testResult ?? null;
       remediation = createRemediation(app, h);
-      if (remediation) applyRemediation(app, remediation);
+      if (remediation) {
+        if (patchProposalsCreated >= budget.maxPatchProposals) {
+          stopReason = `CYBER_BUDGET_EXHAUSTED: maxPatchProposals=${budget.maxPatchProposals}`;
+          steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult: null, verdict: null, remediation, outcomeVerification: null });
+          break;
+        }
+        patchProposalsCreated += 1;
+        const approval = options.approvalForRemediation?.(remediation) ?? null;
+        try {
+          applyRemediation(app, remediation, approval);
+        } catch (error) {
+          if (!(error instanceof PatchNotApprovedError)) throw error;
+          stopReason = `HUMAN_APPROVAL_REQUIRED: ${error.message}`;
+          steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult: null, verdict: null, remediation, outcomeVerification: null });
+          break;
+        }
+      }
       testResult = retest(h, app, `adaptive${testCounter++}`);
       if (priorTest) outcomeVerification = verifySecurityOutcome(priorTest, testResult);
       remediatedFor.add(h.hypothesisId);

@@ -162,11 +162,14 @@ export function generateCityGeometry(worldId: string, detail: StructuralDetailSp
   const parcelIds: EntityId[] = [];
   const buildingIds: EntityId[] = [];
   const buildingsForNav: BuildingForNavigation[] = [];
+  let buildingIndex = 0;
 
   for (const district of layout.districts) {
     const parcels = generateParcels(district, parcelsPerDistrict);
     const entries: ParcelWithBuilding[] = parcels.map((parcel) => {
-      const building = generateBuilding(parcel, district.districtType, maxFloors, rng);
+      const requiredType = detail.requiredBuildingTypes?.[buildingIndex];
+      const building = generateBuilding(parcel, district.districtType, maxFloors, rng, requiredType);
+      buildingIndex += 1;
       const interior = detail.generateInteriors ? generateBuildingInterior(building, roomsPerFloorSide) : undefined;
       parcelIds.push(entityId(parcel.ref));
       buildingIds.push(entityId(building.ref));

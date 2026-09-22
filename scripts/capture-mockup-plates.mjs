@@ -56,7 +56,7 @@ const PLATES = [
       // featureless procedural figure. A plate of the proxy presented as the licensed body would be a lie
       // about the product, so the capture blocks on the tier the HUD itself reports.
       await page.waitForFunction(
-        () => document.querySelector('[data-testid="sw-twin"]')?.getAttribute('data-tier') === 'LICENSED_CC0_ASSET',
+        () => { const twin = document.querySelector('[data-testid="sw-twin"]'); return twin?.getAttribute('data-tier') === 'LICENSED_CC0_ASSET' && twin.getAttribute('data-load-state') === 'READY'; },
         null,
         { timeout: 180_000 },
       );

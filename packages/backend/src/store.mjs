@@ -559,12 +559,18 @@ function migrate(db) {
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
 export function openDatabase(filename = ':memory:') {
   const db = new DatabaseSync(filename);
-  db.exec('PRAGMA foreign_keys = ON;');
-  if (filename !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
-  db.exec(SCHEMA);
-  migrate(db);
-  ensureAccessSchema(db);
-  return db;
+  try {
+    db.exec('PRAGMA foreign_keys = ON;');
+    if (filename !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+    db.exec(SCHEMA);
+    migrate(db);
+    ensureAccessSchema(db);
+    return db;
+  } catch (error) {
+    // A rejected migration must not leak the handle (or lock its files on Windows).
+    db.close();
+    throw error;
+  }
 }
 
 /* ---------------- Mapowanie wierszy → obiekty (camelCase, bez pól wrażliwych) ---------------- */

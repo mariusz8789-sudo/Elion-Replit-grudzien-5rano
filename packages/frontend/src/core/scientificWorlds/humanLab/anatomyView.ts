@@ -1,4 +1,5 @@
 import type { AnatomyDisplayMode, AnatomyViewState, HumanDigitalTwinManifest } from './types';
+import { getAnatomyNode, organsInSystem } from './anatomyAtlas';
 
 export function createDefaultAnatomyView(twinId: string): AnatomyViewState {
   return { twinId, selectedNodeId: 'body', displayMode: 'NORMAL', isolatedNodeIds: [], hiddenNodeIds: [], cutawayEnabled: false, explodedOffsetMeters: 0 };
@@ -14,8 +15,9 @@ export function selectAnatomyNode(state: AnatomyViewState, nodeId: string, manif
 }
 
 export function isolateAnatomyNode(state: AnatomyViewState, nodeId: string, manifest: HumanDigitalTwinManifest): AnatomyViewState {
-  selectAnatomyNode(state, nodeId, manifest);
-  return { ...state, selectedNodeId: nodeId, isolatedNodeIds: [nodeId], hiddenNodeIds: [] };
+  const selected = getAnatomyNode(manifest, nodeId);
+  const isolatedNodeIds = selected.kind === 'BODY' ? [] : selected.kind === 'SYSTEM' ? organsInSystem(manifest, nodeId).map((organ) => organ.id) : [nodeId];
+  return { ...state, selectedNodeId: nodeId, isolatedNodeIds, hiddenNodeIds: [] };
 }
 
 export function setCutaway(state: AnatomyViewState, enabled: boolean): AnatomyViewState {

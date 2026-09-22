@@ -214,7 +214,7 @@ h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-
    ===================================================================== */
 html { background: #000 !important; }
 .hud-scrim { display: none !important; }
-.matrix-datastream { display: none !important; }   /* the 2D stream is superseded by the 3D rain */
+.matrix-datastream { display: block; } /* One canonical dashboard background; no 3D figure layer. */
 .science-chat, .shell-chat, .shell-chat > *, .research-panel, .next-move-panel, .science-chat-log, .science-chat-suggest, .science-chat-form, .science-chat-head, .science-chat-capsule-wrap,
 .start-door, .start-ask, .start-status, .dash-card, .dash-tile, .settings-section, .gx-panel, .gx-glass, .world-card, .hall-card, .lab-card, .pilot-step, .matrix-card, .matrix-detail-panel,
 .gu-recipe, .gu-replay-col, .gu-cspace-row, .narrator, .evidence-capsule, .console-panel, .control-panel, .panel, .topbar, .shell-sidebar, .shell-mobilebar, .shell-sheet, .shell-hud, .topbar-ask {
@@ -489,4 +489,40 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-ex-section { margin-top: 0.45rem; border-top: 1px solid rgba(56, 189, 248, 0.16); padding-top: 0.4rem; }
 .sw-ex-slider { width: 100%; margin: 0.3rem 0 0.2rem; accent-color: #62f0a3; background: transparent; }
 .sw-ex-slider:disabled { opacity: 0.4; }
+
+/* Human Explorer: readable research dock, preserving the existing controls and scene. */
+.sw[data-world="biology"] .sw-hud-explorer {
+  background: rgba(5, 14, 23, 0.96); border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 12px; box-shadow: 0 12px 40px #0008; padding: 14px;
+}
+.sw[data-world="biology"] .sw-ex-title { font-size: 0.72rem; }
+.sw[data-world="biology"] .sw-ex-card { font-size: 0.8rem; }
+.sw[data-world="biology"] .sw-ex-systems .sw-chip,
+.sw[data-world="biology"] .sw-ex-organ-chip,
+.sw[data-world="biology"] .sw-ex-mags .sw-chip { font-size: 0.76rem; min-height: 32px; }
+.sw[data-world="biology"] .sw-hud-evidence { opacity: 1; }
+.sw[data-world="biology"] .sw-hud-evidence:not(.is-collapsed) { z-index: 20; background: #06101dfa; max-height: 75vh; border: 1px solid #7dd3fc55; border-radius: 12px; }
+.sw[data-world="biology"] .sw-hud-status { background: linear-gradient(100deg, #06101ded, #06101d44); border-radius: 0 0 12px 0; }
+@media (min-width: 901px) {
+  .sw[data-world="biology"].sw-explorer-open .sw-hud-explorer { top: 4.6rem; bottom: 3.4rem; right: 1rem; width: min(440px, 35vw); max-height: none; }
+  .sw[data-world="biology"] .sw-ex-body { grid-template-columns: 1fr; background: transparent; border: 0; padding: 0; }
+  .sw[data-world="biology"] .sw-ex-systems { flex-direction: row; flex-wrap: wrap; border-right: 0; padding-bottom: 0.65rem; border-bottom: 1px solid #7dd3fc33; }
+  .sw[data-world="biology"] .sw-ex-systems .sw-ex-title { flex-basis: 100%; }
+  .sw[data-world="biology"] .sw-ex-rungs { grid-template-columns: repeat(4, 1fr); }
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command { opacity: 1; pointer-events: auto; width: calc(100vw - 12.5rem - min(440px, 35vw) - 2rem); }
+  .sw[data-world="biology"].sw-cam-twin .sw-transcript { max-height: 12vh; }
+}
+@media (max-width: 900px) {
+  .sw[data-world="biology"] .sw-hud-explorer { bottom: calc(4rem + var(--safe-bottom)); max-height: 43dvh; width: calc(100vw - 1rem); right: 0.5rem; padding: 10px; }
+  .sw[data-world="biology"] .sw-hud-status { top: 2.5rem; width: 100vw; padding: 0.35rem; }
+  .sw[data-world="biology"] .sw-hud-evidence { top: 0; max-height: 35vh; }
+  .sw[data-world="biology"] .sw-badge { font-size: 0.62rem; }
+  .sw[data-world="biology"] .sw-chip, .sw[data-world="biology"] .sw-btn { min-height: 44px; }
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command { opacity: 1; pointer-events: auto; padding: 0.4rem; bottom: calc(3.4rem + var(--safe-bottom)); }
+  .sw[data-world="biology"].sw-explorer-open .sw-hud-explorer { bottom: calc(7.5rem + var(--safe-bottom)); max-height: 34dvh; }
+  .sw[data-world="biology"] .sw-hud-status > .sw-row { flex-wrap: wrap; }
+  .sw[data-world="biology"] .sw-hud-status .sw-btn { min-height: 32px; }
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command .sw-transcript,
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command .sw-quick { display: none; }
+}
 .sw-ex-section .sw-faint { font-size: 0.6rem; line-height: 1.35; margin: 0.2rem 0 0; }

@@ -1,16 +1,7 @@
-import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
-import { ErrorBoundary } from './ErrorBoundary';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
-
-/**
- * The 2040 ambient 3D layer (three.js) is lazy: the initial bundle must not
- * grow for a decoration. It renders BEHIND everything (see styles-2040.css,
- * `.holo-backdrop`), inside its own error boundary so a GPU failure can never
- * take the navigation down with it.
- */
-const GenesisHoloBackdrop = lazy(() => import('./GenesisHoloBackdrop').then((m) => ({ default: m.GenesisHoloBackdrop })));
 
 /**
  * Range sliders everywhere get a filled, glowing segment (styles-2040.css,
@@ -213,15 +204,7 @@ export function AppShell({ children, chat, chatInline = false }: {
 
   return (
     <>
-      {/* Ambient 3D layer: fixed, pointer-events:none, z-index below the Matrix
-          data stream. A sibling of `.shell` on purpose — `.shell` is its own
-          stacking context (z-index 1), so anything inside it would paint OVER
-          the data stream instead of under it. */}
-      <ErrorBoundary>
-        <Suspense fallback={null}>
-          <GenesisHoloBackdrop />
-        </Suspense>
-      </ErrorBoundary>
+      {/* App owns the single dashboard-only code wallpaper. Worlds own their own scenery. */}
       {/* Legibility scrim over the full-bleed world: a gradient, not a box, so
           the HUD stays borderless while text keeps its contrast. */}
       <div className="hud-scrim" aria-hidden="true" />

@@ -11,7 +11,7 @@ import { chromium } from 'playwright';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(REPO, 'artifacts', 'visual-e2e-v52-v7');
 const BASE = (process.env.E2E_BASE ?? 'http://127.0.0.1:8181').replace(/\/$/, '');
-const CHROME = [process.env.GENESIS_CHROMIUM_PATH, '/opt/pw-browsers/chromium', '/usr/bin/chromium'].find((p) => p && existsSync(p));
+const CHROME = [process.env.GENESIS_CHROMIUM_PATH, 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/opt/pw-browsers/chromium', '/usr/bin/chromium'].find((p) => p && existsSync(p));
 
 rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT, { recursive: true });
 const report = { capturedAt: new Date().toISOString(), base: BASE, chromium: CHROME ?? 'playwright-managed', checks: {}, artifacts: [], failures: [] };
@@ -22,8 +22,7 @@ function nonEmptyDifferent(a, b) {
 }
 async function twoRaf(page) { await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))); }
 async function browserLaunch() {
-  try { return await chromium.launch({ headless: true }); }
-  catch (first) { if (!CHROME) throw first; return chromium.launch({ headless: true, executablePath: CHROME, args: ['--no-sandbox'] }); }
+  return chromium.launch({ headless: true, ...(CHROME ? { executablePath: CHROME } : {}) });
 }
 async function newPage(browser, viewport = { width: 1280, height: 720 }) {
   const context = await browser.newContext({ viewport });
@@ -72,6 +71,10 @@ async function captureBiology(browser) {
   await page.locator('canvas[data-testid="sw-canvas"]').waitFor({ state: 'visible', timeout: 25_000 });
   await page.locator('[data-testid="sw-explorer"]').waitFor({ state: 'visible', timeout: 25_000 });
   const webgl = await hasWebgl(page, 'canvas[data-testid="sw-canvas"]');
+  await page.waitForFunction(() => {
+    const twin = document.querySelector('[data-testid="sw-twin"]');
+    return twin?.getAttribute('data-load-state') === 'READY' && twin.getAttribute('data-tier') === 'LICENSED_CC0_ASSET';
+  }, null, { timeout: 90_000 });
 
   await page.locator('[data-testid="sw-explorer-twin-camera"]').click();
   await page.locator('[data-testid="sw-explorer-organ-heart"]').click();
@@ -88,7 +91,7 @@ async function captureBiology(browser) {
     { testId: 'sw-explorer-rung-organelle', level: 'organelle', macro: 'organelle', file: 'biology-organelle.jpg', timeout: 240_000 },
     // Existing Human Explorer maps central-dogma session display to the DNA rung; V7's 3D layer
     // intentionally reports the visual as "molecule" because it shows DNA + the real peptide chain.
-    { testId: 'sw-explorer-rung-molecule', level: 'dna', macro: 'molecule', file: 'biology-molecule.jpg', timeout: 240_000 },
+    { testId: 'sw-explorer-rung-molecule', level: 'molecule', macro: 'molecule', file: 'biology-molecule.jpg', timeout: 240_000 },
   ];
   const stageResults = [];
   for (const stage of stages) {

@@ -1,6 +1,7 @@
 import type { PhysicalDimension, PhysicalQuantity, SupportedUnit } from './physicalQuantity';
 
 export type DeviceExecutionMode = 'SIMULATED' | 'REPLAY' | 'HARDWARE_IN_LOOP' | 'LIVE_READ_ONLY' | 'LIVE_CONTROLLED';
+export type DeviceSafetyMode = 'SIMULATION' | 'REHEARSAL' | 'READ_ONLY_TELEMETRY' | 'SHADOW' | 'HUMAN_APPROVAL_REQUIRED' | 'DEVICE_ACTUATION_BLOCKED';
 export type DeviceHealthState = 'HEALTHY' | 'DEGRADED' | 'FAULT' | 'OFFLINE';
 export type CapabilityAccess = 'READ' | 'WRITE' | 'READ_WRITE';
 
@@ -80,4 +81,22 @@ export interface DeviceAdapter {
   readonly device: LabDevice;
   read(channelId: string, sequence: number): DeviceMeasurement;
   execute(command: DeviceCommand): void;
+}
+
+export interface DeviceSafetyResolution {
+  readonly legacyMode: DeviceExecutionMode;
+  readonly mode: DeviceSafetyMode;
+  readonly requiresHumanReview: boolean;
+  readonly permitsGenericRealActuation: false;
+}
+
+/** Compatibility adapter: actuation-capable legacy modes remain explicitly approval-gated. */
+export function resolveDeviceSafetyMode(legacyMode: DeviceExecutionMode): DeviceSafetyResolution {
+  switch (legacyMode) {
+    case 'SIMULATED': return { legacyMode, mode: 'SIMULATION', requiresHumanReview: false, permitsGenericRealActuation: false };
+    case 'REPLAY': return { legacyMode, mode: 'REHEARSAL', requiresHumanReview: false, permitsGenericRealActuation: false };
+    case 'LIVE_READ_ONLY': return { legacyMode, mode: 'READ_ONLY_TELEMETRY', requiresHumanReview: false, permitsGenericRealActuation: false };
+    case 'HARDWARE_IN_LOOP':
+    case 'LIVE_CONTROLLED': return { legacyMode, mode: 'HUMAN_APPROVAL_REQUIRED', requiresHumanReview: true, permitsGenericRealActuation: false };
+  }
 }

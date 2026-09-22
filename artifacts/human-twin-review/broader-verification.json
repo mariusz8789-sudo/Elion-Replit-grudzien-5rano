@@ -1,0 +1,222 @@
+{
+  "backend": {
+    "command": "node --test <explicit paths from backend-local-test-files.txt> (Git cmd added to PATH)",
+    "exitCode": 1,
+    "total": 826,
+    "passed": 711,
+    "failed": 40,
+    "skipped": 75,
+    "cancelled": 0,
+    "excludedFiles": [
+      "dependencyAudit.test.mjs",
+      "apiSecurity.test.mjs",
+      "server.http.test.mjs"
+    ],
+    "exclusionReason": "All three contain tests which invoke npm audit. Automatic approval review rejected exporting dependency metadata to npm registry; these complete files were omitted to avoid indirect invocation. This is not a full backend-suite pass.",
+    "log": "backend-tests-no-audit-files.log",
+    "failureGroups": {
+      "packages\\backend\\src\\activityQsarV2.test.mjs": 2,
+      "packages\\backend\\src\\cmsOpenDataCompute.test.mjs": 1,
+      "packages\\backend\\src\\d105A2Custody.test.mjs": 12,
+      "packages\\backend\\src\\d108PerRowCustody.test.mjs": 7,
+      "packages\\backend\\src\\d109Trial2Readiness.test.mjs": 2,
+      "packages\\backend\\src\\glp1rQsar.test.mjs": 12,
+      "packages\\backend\\src\\glp1rQsarV2.test.mjs": 1,
+      "packages\\backend\\src\\heavyEngines.test.mjs": 1,
+      "packages\\backend\\src\\mounjaroTrack.test.mjs": 1,
+      "packages\\backend\\src\\provenance.test.mjs": 1
+    },
+    "failures": [
+      {
+        "location": "packages\\backend\\src\\activityQsarV2.test.mjs:41:1",
+        "name": "✖ ENGINE: refuses without a frozen gate, rather than fitting anyway (1.2371ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\activityQsarV2.test.mjs:47:1",
+        "name": "✖ ENGINE: refuses without a verified pin, rather than fitting anyway (1.2182ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\cmsOpenDataCompute.test.mjs:40:1",
+        "name": "✖ CMS Z→μμ real-data analysis returns fixed descriptive statistics when approved source data are configured (3.481ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:20:1",
+        "name": "✖ A2 arrived 8/8; after one re-transmission three chunks verify byte-exactly (15.362ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:55:1",
+        "name": "✖ the verified chunk-3 attempt is SHORTER than the rejected one — longer is not truer (3.7057ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:72:1",
+        "name": "✖ the frozen D-076/077 pin agrees with 6 of 7 overlapping structures (9.2401ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:79:1",
+        "name": "✖ the one disagreement is a deleted run that still parses — corruption here is SILENT (0.3459ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:91:1",
+        "name": "✖ every RDKit-unparseable structure sits in a chunk that already failed on hash (6.708ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:98:1",
+        "name": "✖ parse success does not confer custody: failed chunks are excluded in full (14.9035ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:110:1",
+        "name": "✖ coverage: 99 of 300 A1 molecules carry a custody-verified structure (0.2048ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:135:1",
+        "name": "✖ CAMP clears the sealed threshold: 28 groups against a required 20 (3.9928ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:142:1",
+        "name": "✖ C1 is CLOSED, on CAMP alone, with every other family still NOT_MEASURED (2.957ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:151:1",
+        "name": "✖ the measured CAMP noise floor sits ON the frozen MAX_MAE, not below it (3.0704ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:174:1",
+        "name": "✖ the sealed prereg fingerprint is carried through unchanged (0.2764ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d105A2Custody.test.mjs:217:1",
+        "name": "✖ after every re-transmission, custody still admits exactly three chunks (2.5919ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:29:1",
+        "name": "✖ per-row custody converges: 37 rows raw-verified, only 4 named as still bad (19.0438ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:37:1",
+        "name": "✖ chunk 1: 15 of 18 rows verify individually even though the whole chunk fails (1.7296ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:45:1",
+        "name": "✖ chunk 4 partial: every row WITH a declared hash verifies; rows without one are NOT_DECLARED, not silently trusted (1.6597ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:86:1",
+        "name": "✖ CHEMBL4088708 (the row chunk 1 originally lost) is not among the 37 raw-verified rows (1.7873ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:96:1",
+        "name": "✖ combined coverage: chunk-level 99 + per-row 32 new = 131 of 300 A1 molecules (52.0082ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:111:1",
+        "name": "✖ C1 remains CLOSED under the combined measurement, with more groups but the same status (54.3632ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d108PerRowCustody.test.mjs:119:1",
+        "name": "✖ the noise floor under combined identity is unchanged to 4 decimal places: 1.0005, still at MAX_MAE (47.4449ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d109Trial2Readiness.test.mjs:36:1",
+        "name": "✖ GIPR is currently BLOCKED on data volume alone, with the exact real counts (7.9609ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\d109Trial2Readiness.test.mjs:45:1",
+        "name": "✖ the GIPR split is a deterministic hash function, not a tunable ratio — the gap is a data problem, not a knob problem (2.0917ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:393:3",
+        "name": "✖ in this runtime the axis is genuinely BLOCKED, and says exactly why (5.0331ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:473:3",
+        "name": "✖ probeCapabilities().activityPredictor is COMPUTED — false here, with the reason attached (8.0115ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:522:3",
+        "name": "✖ on the real data the model TRAINS and is then REFUSED by the frozen gate on accuracy (0.3174ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:563:3",
+        "name": "✖ training is memoized but the memo is keyed on the pinned bytes, so drift cannot be served stale (0.4655ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:576:3",
+        "name": "✖ fingerprint() returns real Morgan bits and a real Murcko scaffold, deterministically (0.3343ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:594:3",
+        "name": "✖ D-078 BATCH: batched fingerprints are byte-identical to the per-molecule path (0.4685ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:612:3",
+        "name": "✖ D-078 BATCH: an unparseable molecule fails IN ITS OWN SLOT — indices never shift (0.202ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:625:3",
+        "name": "✖ D-078 BATCH: an empty list is a valid empty batch, not an error (0.1635ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:632:3",
+        "name": "✖ D-078 BATCH: a misaligned batch response fails closed — no row is reinterpreted (0.2212ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:640:3",
+        "name": "✖ an unparseable SMILES fails closed — never an all-zero vector passed off as a molecule (0.1907ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:647:3",
+        "name": "✖ different molecules give different fingerprints and scaffolds (the engine is discriminating, not constant) (0.1693ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsar.test.mjs:655:3",
+        "name": "✖ the real engine feeds the real training path: an RDKit-fingerprinted dataset reaches the gate (0.2174ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\glp1rQsarV2.test.mjs:81:3",
+        "name": "✖ descriptor names match the LIVE engine — a wrong name is a hard failure, not a zero (4.8062ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\heavyEngines.test.mjs:28:3",
+        "name": "✖ probe returns real runtime + honest per-engine statuses (7.5285ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\mounjaroTrack.test.mjs:112:3",
+        "name": "✖ the GIPR capability is COMPUTED from a real training attempt — and with real data it now fails on SIZE, not absence (3.1314ms)"
+      },
+      {
+        "location": "packages\\backend\\src\\provenance.test.mjs:57:3",
+        "name": "✖ returns a stable hash for repeated probes of an unchanged runtime (4.3348ms)"
+      }
+    ]
+  },
+  "core": {
+    "command": "npm run test:core -- --maxWorkers=2",
+    "exitCode": 0,
+    "filesPassed": 46,
+    "filesFailed": 0,
+    "testsPassed": 465,
+    "testsFailed": 0,
+    "log": "core-tests.log"
+  },
+  "csrn": {
+    "command": "npm run test --workspace=packages/csrn -- --maxWorkers=2",
+    "exitCode": 0,
+    "filesPassed": 5,
+    "testsPassed": 38
+  },
+  "productionBuild": {
+    "command": "npm run build (Git cmd added to PATH)",
+    "exitCode": 0,
+    "warning": "Some chunks exceed 750 kB after minification"
+  },
+  "diagnosis": [
+    "Only GLP1R and GIPR pinned JSON were restored from exact Git HEAD blobs after verifying SHA256 against both manifests; no scientific values were edited. v7 agent added exact -text attributes for them.",
+    "Four backend custody tests and core native engine fixture now use file: URLs for Windows ESM imports; assertions unchanged.",
+    "Future-schema SQLite failure path now closes its opened database handle; migration cleanup test passes.",
+    "Three temporal capture environment variables are documented in .env.example; envContract passes.",
+    "Dependency audit Windows npm.cmd launch was fixed; JSON registry errors return unavailable rather than fabricated success. Actual audit blocked by automatic approval review; no vulnerabilities result claimed.",
+    "Remaining backend failures include unavailable python3/RDKit and additional sealed custody/CMS raw-data byte mismatches. No additional scientific fixtures were changed.",
+    "Failure count increased because formerly failing-to-import custody files now execute their real assertions; compare individual tests rather than only file-import failures.",
+    "Full production build passed before these subsequent narrowly scoped backend/test fixes; root owns final frontend verification."
+  ]
+}

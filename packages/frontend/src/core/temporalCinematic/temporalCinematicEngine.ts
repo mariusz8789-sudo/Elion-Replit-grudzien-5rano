@@ -4,6 +4,8 @@ import { buildWalkCameraPath, getRoadByIndex, type CameraPath } from './cameraPa
 import { buildHistoricalWorldSpecification, populateHistoricalPedestrians, type HistoricalWorldRequest } from './historicalWorldParameters';
 import { applyGeometryRenderReadiness, type RenderReadinessReport } from './renderReadiness';
 import type { CameraMode } from './promptParser';
+import type { BuildingType } from '../worldModel/ecs/geometry';
+import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 
 /**
  * Canonical Temporal Cinematic orchestration. V6 only adds the option to ask the existing world
@@ -16,6 +18,9 @@ export interface BuildHistoricalSceneOptions {
   readonly cameraMode?: CameraMode;
   readonly roadIndex?: number;
   readonly generateInteriors?: boolean;
+  /** Scenic people are canonical WorldGraph entities, but remain optional presentation context. */
+  readonly populationEnabled?: boolean;
+  readonly requiredBuildingTypes?: readonly BuildingType[];
 }
 
 export interface HistoricalSceneCameraBlocked { readonly ok: false; readonly reason: string; }
@@ -32,11 +37,12 @@ export function buildHistoricalScene(options: BuildHistoricalSceneOptions): Hist
     place: options.place,
     year: options.year,
     generateInteriors: options.generateInteriors ?? false,
+    requiredBuildingTypes: options.requiredBuildingTypes,
   };
   const specification = buildHistoricalWorldSpecification(request);
   const world = createScientificWorld({ kind: 'specification', specification });
   const renderReadiness = applyGeometryRenderReadiness(world.engine.graph);
-  populateHistoricalPedestrians(world.engine.graph, specification.worldId);
+  if (options.populationEnabled ?? true) populateHistoricalPedestrians(world.engine.graph, specification.worldId);
   const camera = resolveCameraPath(world, options.cameraMode ?? 'walk', options);
   return { place: options.place, year: options.year, world, renderReadiness, camera };
 }
@@ -83,4 +89,30 @@ export function compareSameStreetAcrossYears(place: string, yearA: number, yearB
   const floorsB = buildingsB.map((b) => (b.geometry?.kind === 'BUILDING' ? b.geometry.floorCount : 0));
   const skylineDiffers = floorsA.length === floorsB.length && floorsA.some((f, i) => f !== floorsB[i]);
   return { place, yearA, yearB, sceneA, sceneB, sameStreetLocation, skylineDiffers };
+}
+
+export interface TemporalCaptureArtifactEvidence {
+  readonly worldId: string;
+  readonly place: string;
+  readonly year: number;
+  readonly seconds: number;
+  readonly artifactFile: string;
+  readonly artifactSha256: string;
+  readonly semanticFingerprint: string;
+  readonly viewMode: 'street' | 'interior';
+}
+
+/** Links a browser-produced capture artifact to the canonical EvidenceLedger. */
+export function recordTemporalCaptureArtifact(ledger: EvidenceLedger, input: TemporalCaptureArtifactEvidence): string {
+  if (!/^[a-f0-9]{64}$/i.test(input.artifactSha256)) throw new Error('TEMPORAL_CAPTURE_INVALID_SHA256');
+  if (!/^[a-f0-9]{8,}$/i.test(input.semanticFingerprint)) throw new Error('TEMPORAL_CAPTURE_INVALID_FINGERPRINT');
+  if (!Number.isFinite(input.seconds) || input.seconds < 0) throw new Error('TEMPORAL_CAPTURE_INVALID_TIME');
+  return ledger.addRecord({
+    sourceUrl: `genesis://temporal-capture/${input.worldId}/${encodeURIComponent(input.artifactFile)}`,
+    sourceTimestamp: null,
+    claim: `Browser capture artifact ${input.artifactFile}; sha256=${input.artifactSha256}; semanticFingerprint=${input.semanticFingerprint}; world=${input.worldId}; place=${input.place}; year=${input.year}; time=${input.seconds}; view=${input.viewMode}`,
+    claimType: 'observation',
+    confidence: 1,
+    provenance: { sourceKind: 'document', retrievedBy: 'Genesis Temporal Cinematic Capture', independentSourceIds: [] },
+  }).record.contentHash;
 }

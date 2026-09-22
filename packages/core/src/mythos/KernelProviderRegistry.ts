@@ -36,6 +36,10 @@ export class KernelProviderRegistry {
     return null;
   }
   list(): readonly string[] { return [...this.providers.keys()]; }
+  /** Read-only production introspection for Meta-Cognition; providers remain owned by this registry. */
+  describe(): readonly { readonly providerId: string; readonly capabilities: readonly string[] }[] {
+    return [...this.providers.values()].map((provider) => ({ providerId: provider.providerId, capabilities: [...provider.capabilities] }));
+  }
 }
 export const kernelRegistry = new KernelProviderRegistry();
 

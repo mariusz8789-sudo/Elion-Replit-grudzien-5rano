@@ -13,9 +13,8 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { REPO_ROOT, FRONTEND_SRC } from './fixtures/repoPaths';
 
-const REPO_ROOT = resolve(process.cwd(), '..', '..');
-const FRONTEND_SRC = resolve(process.cwd(), 'src');
 const BACKEND_SRC = resolve(REPO_ROOT, 'packages', 'backend', 'src');
 
 function allFiles(dir: string, exts: readonly string[]): string[] {
@@ -27,7 +26,7 @@ function allFiles(dir: string, exts: readonly string[]): string[] {
   });
 }
 
-const isTestFile = (f: string): boolean => f.includes('.test.') || f.includes('/__tests__/');
+const isTestFile = (f: string): boolean => f.includes('.test.') || /[\\/]__tests__[\\/]/.test(f);
 
 const ALL_SOURCE = [
   ...allFiles(FRONTEND_SRC, ['.ts', '.tsx']),
@@ -62,7 +61,7 @@ describe('no hardcoded WINNER verdict or PROMOTE outcome outside the real gate a
   it('canPromoteToWinnerRecord is defined in exactly one file — no shadow or duplicate gate', () => {
     const definers = ALL_SOURCE.filter((f) => /export function canPromoteToWinnerRecord/.test(readFileSync(f, 'utf8')));
     expect(definers).toHaveLength(1);
-    expect(definers[0]).toContain('orchestrator/winnerGate.ts');
+    expect(definers[0]).toContain(join('orchestrator', 'winnerGate.ts'));
   });
 });
 
@@ -140,7 +139,9 @@ describe('the recipe lock is structural: the LOCKED branch of MounjaroRecipeOutc
     // (`{ readonly status: 'X'; readonly recipe: Y }`), so the first `;` is
     // inside the first member, not the end of the type statement. The real
     // end is the blank line before the next top-level export.
-    const unionEnd = src.indexOf('\n\nexport const NON_CLINICAL_DISCLAIMER', unionStart);
+    const unionBoundary = /\r?\n\r?\nexport const NON_CLINICAL_DISCLAIMER/g;
+    unionBoundary.lastIndex = unionStart;
+    const unionEnd = unionBoundary.exec(src)?.index ?? -1;
     expect(unionEnd).toBeGreaterThan(unionStart);
     const unionBlock = src.slice(unionStart, unionEnd);
     // Each union member is one `{ ... }` object literal on its own `|` line.

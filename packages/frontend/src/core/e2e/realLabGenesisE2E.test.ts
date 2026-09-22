@@ -178,17 +178,17 @@ function runRealRepoScenario(runId: string) {
 
   // VETO 1/5: target out of range.
   const outOfRangeCommand: DeviceCommand = { commandId: 'cmd-out-of-range', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(500, 'K'), protocolId: protocol.protocolId };
-  const outOfRangeDecision = safety.evaluate({ device: rig.device, command: outOfRangeCommand, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
+  const outOfRangeDecision = safety.evaluate({ device: rig.device, command: outOfRangeCommand, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
   if (outOfRangeDecision.allowed) throw new Error('Out-of-range command was not vetoed');
 
   // VETO 2/5: stale sensor.
   const staleCommand: DeviceCommand = { commandId: 'cmd-stale', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(310, 'K'), protocolId: protocol.protocolId };
-  const staleDecision = safety.evaluate({ device: rig.device, command: staleCommand, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'STALE', calibrationValid: true });
+  const staleDecision = safety.evaluate({ device: rig.device, command: staleCommand, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'STALE', calibrationValid: true });
   if (staleDecision.allowed) throw new Error('Stale sensor command was not vetoed');
 
   // VETO 3/5: calibration invalid/expired.
   const expiredCalibrationCommand: DeviceCommand = { commandId: 'cmd-expired-cal', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(310, 'K'), protocolId: protocol.protocolId };
-  const expiredCalibrationDecision = safety.evaluate({ device: rig.device, command: expiredCalibrationCommand, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: false });
+  const expiredCalibrationDecision = safety.evaluate({ device: rig.device, command: expiredCalibrationCommand, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: false });
   if (expiredCalibrationDecision.allowed) throw new Error('Expired-calibration command was not vetoed');
 
   // VETO 4/5: missing human approval on a LIVE_CONTROLLED device.
@@ -199,12 +199,12 @@ function runRealRepoScenario(runId: string) {
 
   // VETO 5/5: emergency stop active.
   const emergencyStopCommand: DeviceCommand = { commandId: 'cmd-emergency-stop', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(310, 'K'), protocolId: protocol.protocolId };
-  const emergencyStopDecision = safety.evaluate({ device: rig.device, command: emergencyStopCommand, protocolValidated: true, humanApproved: false, emergencyStop: true, sensorQuality: 'VALID', calibrationValid: true });
+  const emergencyStopDecision = safety.evaluate({ device: rig.device, command: emergencyStopCommand, protocolValidated: true, humanApproved: true, emergencyStop: true, sensorQuality: 'VALID', calibrationValid: true });
   if (emergencyStopDecision.allowed) throw new Error('Emergency-stop command was not vetoed');
 
   // PASS CASE 2: valid simulated/HIL run.
   const command: DeviceCommand = { commandId: 'cmd-safe', deviceId: rig.device.identity.deviceId, channelId: 'heater.target', target: quantity(323.15, 'K'), protocolId: protocol.protocolId };
-  const decision = safety.evaluate({ device: rig.device, command, protocolValidated: true, humanApproved: false, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
+  const decision = safety.evaluate({ device: rig.device, command, protocolValidated: true, humanApproved: true, emergencyStop: false, sensorQuality: 'VALID', calibrationValid: true });
   if (!decision.allowed || decision.authorized === undefined) throw new Error(`Safe HIL command rejected: ${decision.reasons.join(',')}`);
   bridge.executeAuthorized(decision.authorized);
 

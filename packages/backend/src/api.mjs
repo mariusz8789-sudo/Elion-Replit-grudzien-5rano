@@ -75,7 +75,7 @@ import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
-import { buildScientificComputeReport } from './campaign/multiFidelity.mjs';
+import { buildCandidateResearchMatrix } from './campaign/scientificIntegration.mjs';
 import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   ingestKnowledgeMaterial,
   listKnowledgeMaterials,
@@ -519,7 +519,7 @@ export function handleApi(db, ctx) {
         if (seg[4] === 'decisions') return ok({ decisions: campaignStore.listDecisions(db, campaignId) });
         if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId) });
         if (seg[4] === 'graph') return ok({ graph: buildDiscoveryGraph(db, campaignId) });
-        if (seg[4] === 'report') return ok({ report: buildScientificComputeReport(db, campaignId) });
+        if (seg[4] === 'report') return ok({ report: buildCandidateResearchMatrix(db, campaignId) });
         if (seg[4] === 'why') return whyHandler(db, campaignId, ctx.query ?? {});
         if (seg[4] === 'science-runs') return ok({ scienceRuns: listScienceRuns(db, campaignId) });
         if (seg[4] === 'conflicts') {

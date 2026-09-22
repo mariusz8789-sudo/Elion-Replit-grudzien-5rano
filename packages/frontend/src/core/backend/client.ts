@@ -476,6 +476,49 @@ export interface RankedCandidate {
   capabilityGapCount: number; note: string;
 }
 
+export type ResearchIntakeStatus =
+  | 'RESOLVED' | 'PARTIALLY_RESOLVED' | 'BLOCKED_IDENTITY' | 'BLOCKED_TARGET'
+  | 'BLOCKED_SOURCE' | 'BLOCKED_MODALITY' | 'CONFLICTING_IDENTITY' | 'UNSUPPORTED';
+
+export interface ResearchIntakeCandidate {
+  candidateId: string | null;
+  label: string | null;
+  origin: 'SOURCE_BACKED_KNOWN_COMPOUND' | 'USER_SUPPLIED_COMPOUND' | 'GENERATED_HYPOTHESIS' | 'UNRESOLVED';
+  missingInformation: string[];
+  supportingEvidenceIds: string[];
+  synthesisReadiness: { classification: string; reasons: string[] } | null;
+  researchGateStatus: { verdict: string; reasons?: string[] } | null;
+}
+
+export interface ResearchIntakeResult {
+  contractVersion: string;
+  normalizedResearchQuestion: string;
+  status: ResearchIntakeStatus;
+  inputKind: string;
+  candidateMatrix: ResearchIntakeCandidate[];
+  blockedCapabilities: string[];
+  evidenceReferences: string[];
+  selectionExplanation: string;
+  selectedResearchPriorityCandidate: string | null;
+  nextExperiment: { requiredNextData: string[]; requiredSpecialistCapability: string | null; researchPlanPlaceholder: string };
+  limitations: string[];
+  deterministicFingerprint: string;
+}
+
+export interface ResearchIntakeResponse {
+  result: ResearchIntakeResult;
+  campaignDraft: { prepared: boolean; campaignId?: string; seededCandidateIds?: string[]; reason?: string } | null;
+}
+
+/** Governed question/name/formula/SMILES intake; the backend remains the sole identity and campaign authority. */
+export function runResearchIntake(
+  token: string,
+  projectId: string,
+  input: { originalQuery: string; declaredInputKind?: string; maxCandidateBudget?: number; prepareCampaignDraft?: boolean },
+): Promise<ApiResult<ResearchIntakeResponse>> {
+  return request<ResearchIntakeResponse>('POST', `/projects/${projectId}/research-intake`, { token, body: input });
+}
+
 export type ComputeValue = string | number | boolean;
 
 export interface ComputeRun {

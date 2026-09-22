@@ -3,7 +3,8 @@ import { useSession, getSession, getToken } from '../core/backend/session';
 import {
   listProjects, listCapabilities, listTargets, createTarget, listCandidates, createCandidate,
   getCandidatePassport, getCandidateRanking,
-  type Project, type Capability, type Target, type Candidate, type CandidatePassport, type RankedCandidate,
+  runResearchIntake,
+  type Project, type Capability, type Target, type Candidate, type CandidatePassport, type RankedCandidate, type ResearchIntakeResponse,
 } from '../core/backend/client';
 import { LockedScreen } from './LockedScreen';
 import { buildPinnedChEMBLCaffeineDiscovery } from '../core/biotechData/chembl';
@@ -72,6 +73,10 @@ function DrugWorkspace() {
   const [ranking, setRanking] = useState<RankedCandidate[]>([]);
   const [passport, setPassport] = useState<CandidatePassport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [researchQuestion, setResearchQuestion] = useState('');
+  const [researchIntake, setResearchIntake] = useState<ResearchIntakeResponse | null>(null);
+  const [researchIntakeBusy, setResearchIntakeBusy] = useState(false);
+  const [prepareCampaignDraft, setPrepareCampaignDraft] = useState(false);
   const [lastAuditRequestId, setLastAuditRequestId] = useState<string | null>(null);
   const [biotechReplay, setBiotechReplay] = useState<ReturnType<typeof replaySavedBiotechComparison> | null>(null);
   // Per-hypothesis compute: realne runy backendowego Fabric na wejściach, które
@@ -239,6 +244,26 @@ function DrugWorkspace() {
     if (r.ok) { setTargetName(''); setTargetIndication(''); setError(null); await reload(); } else setError(r.message);
   }
 
+  async function submitResearchIntake(e: React.FormEvent) {
+    e.preventDefault();
+    const token = getToken();
+    const originalQuery = researchQuestion.trim();
+    if (!token || !projectId || !originalQuery || researchIntakeBusy) return;
+    setResearchIntakeBusy(true); setError(null);
+    try {
+      const response = await runResearchIntake(token, projectId, {
+        originalQuery,
+        declaredInputKind: 'AUTO',
+        maxCandidateBudget: 8,
+        prepareCampaignDraft,
+      });
+      if (response.ok) setResearchIntake(response.data);
+      else setError(response.message);
+    } finally {
+      setResearchIntakeBusy(false);
+    }
+  }
+
   async function addCandidate(e: React.FormEvent) {
     e.preventDefault();
     const token = getToken();
@@ -316,6 +341,44 @@ function DrugWorkspace() {
           </label>
         )}
         {error && <div className="account-error" role="alert">{error}</div>}
+      </section>
+
+      <section className="settings-section" aria-label="Research intake">
+        <h2>Genesis Research Intake</h2>
+        <p className="settings-hint">
+          Wpisz chorobę, target, nazwę związku, CAS, PubChem CID, ChEMBL ID, wzór lub SMILES. Genesis rozwiązuje tożsamość i pokazuje wyłącznie kandydatów opartych na dostępnych źródłach. Wynik jest priorytetem badawczym, nie diagnozą, receptą ani potwierdzonym lekiem.
+        </p>
+        <form className="account-form" onSubmit={(event) => { void submitResearchIntake(event); }}>
+          <label className="account-field">
+            <span>Pytanie lub identyfikator badawczy</span>
+            <input value={researchQuestion} onChange={(event) => setResearchQuestion(event.target.value)} placeholder="np. GLP1R, type 2 diabetes, CHEMBL1784, CCO" data-testid="research-intake-query" />
+          </label>
+          <label className="account-field">
+            <span><input type="checkbox" checked={prepareCampaignDraft} onChange={(event) => setPrepareCampaignDraft(event.target.checked)} /> Przygotuj szkic istniejącej kampanii, jeśli tożsamość na to pozwala</span>
+          </label>
+          <button className="chip-btn primary" type="submit" disabled={!projectId || !researchQuestion.trim() || researchIntakeBusy} data-testid="research-intake-submit">
+            {researchIntakeBusy ? 'Sprawdzanie źródeł…' : 'Znajdź kandydatów badawczych'}
+          </button>
+        </form>
+        {researchIntake && (
+          <div className="cde-results" data-testid="research-intake-result" data-status={researchIntake.result.status}>
+            <div className="cde-result">
+              <span className="cde-result-label">{researchIntake.result.status} · {researchIntake.result.inputKind}</span>
+              <span className="cde-result-actual">{researchIntake.result.selectionExplanation}</span>
+              <span className="cde-result-bound">fingerprint: {researchIntake.result.deterministicFingerprint}</span>
+            </div>
+            {researchIntake.result.candidateMatrix.map((candidate) => (
+              <div className="cde-result" key={candidate.candidateId ?? `${candidate.origin}-${candidate.label ?? 'unresolved'}`}>
+                <span className="cde-result-label">{candidate.label ?? candidate.candidateId ?? 'Nierozwiązany kandydat'} · {candidate.origin}</span>
+                <span className="cde-result-actual">synteza: {candidate.synthesisReadiness?.classification ?? 'BLOCKED'} · gate: {candidate.researchGateStatus?.verdict ?? 'NIEOCENIONY'}</span>
+                <span className="cde-result-bound">{candidate.missingInformation.length ? `braki: ${candidate.missingInformation.join('; ')}` : `Evidence refs: ${candidate.supportingEvidenceIds.length}`}</span>
+              </div>
+            ))}
+            <p className="settings-hint"><strong>Następny eksperyment:</strong> {researchIntake.result.nextExperiment.researchPlanPlaceholder}</p>
+            {researchIntake.result.blockedCapabilities.length > 0 && <p className="settings-hint">BLOCKED: {researchIntake.result.blockedCapabilities.join(', ')}</p>}
+            {researchIntake.campaignDraft && <p className="settings-hint">Kampania: {researchIntake.campaignDraft.prepared ? `szkic ${researchIntake.campaignDraft.campaignId}` : `nie utworzono — ${researchIntake.campaignDraft.reason}`}</p>}
+          </div>
+        )}
       </section>
 
       {canUseAdminWorkflow ? <section className="settings-section">

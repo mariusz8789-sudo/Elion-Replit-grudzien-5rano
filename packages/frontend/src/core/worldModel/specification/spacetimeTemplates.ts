@@ -1,4 +1,3 @@
-import { timeDilationFactor } from '@genesis/core/supreme/SpacetimeCurvatureEngine.js';
 import { lorentzGamma } from '../../physics';
 import {
   gravityWellPotentialField,
@@ -22,9 +21,10 @@ const EMPTY_TEMPLATE_TAIL: Pick<TemplateResult, 'relationships' | 'postGenerate'
  * binding attached post-generation. Nothing here creates a second `WorldGraph`, a second
  * `WorldGenerator`, or a second physics solver: `QUANTUM` reuses the existing
  * `quantumTunneling.ts::addTunnelJunction` verbatim; `TIME_DILATION_LAB` and
- * `COSMOLOGY_SPACETIME` call the existing `lorentzGamma`/`SpacetimeCurvatureEngine`/
- * `spacetimeVisualization.ts` pure functions and record their REAL computed output, never a
- * fabricated number.
+ * `COSMOLOGY_SPACETIME` call the existing `lorentzGamma`/`spacetimeVisualization.ts` pure
+ * functions (plus `schwarzschildTimeDilationFactor` below, the same real formula
+ * `SpacetimeCurvatureEngine.ts` already computes, inlined for browser-bundle reasons — see
+ * its own comment) and record their REAL computed output, never a fabricated number.
  *
  * Grounding follows the ECS's own `GroundingLevel` scale (`ecs/types.ts`), the same one every
  * other template already uses — MODEL_ESTIMATE for a real-but-simplified model,
@@ -34,6 +34,20 @@ const EMPTY_TEMPLATE_TAIL: Pick<TemplateResult, 'relationships' | 'postGenerate'
 
 const G_EARTH_KG = 5.972e24;
 const R_EARTH_M = 6.371e6;
+
+// Schwarzschild static-observer time dilation — the EXACT same real formula
+// `@genesis/core/supreme/SpacetimeCurvatureEngine.ts::timeDilationFactor` already computes,
+// inlined here rather than imported: that file also imports `node:crypto` at module scope
+// for its own `sha256hex` helper, which is fine for a Node/core-only consumer but poisons this
+// browser-bundled frontend module (Vite cannot bundle `node:crypto` for the browser). Same
+// physics, no second implementation of the model itself, just avoiding a cross-package
+// server/browser boundary violation.
+const G_SI = 6.674e-11;
+const C_SI = 299_792_458;
+function schwarzschildTimeDilationFactor(massKg: number, radiusM: number): number {
+  const rs = (2 * G_SI * massKg) / (C_SI * C_SI);
+  return Math.sqrt(Math.max(0, 1 - rs / Math.max(radiusM, rs + 1e-9)));
+}
 
 function buildingNode(ref: { kind: string; id: string }, label: string, position: { x: number; y: number; z: number }, children?: WorldBlueprintNode[]): WorldBlueprintNode {
   return { ref, label, scaleLevel: 'BUILDING', spatial: { position }, ...(children ? { children } : {}) };
@@ -110,7 +124,7 @@ export const TIME_DILATION_LAB_TEMPLATE = (_spec: WorldSpecification): TemplateR
   const postGenerate = (graph: WorldGraph): void => {
     const beta = 0.8; // a real, declared demo velocity fraction (0.8c) — not fitted to any spec field.
     const gamma = lorentzGamma(beta);
-    const gravitationalFactor = timeDilationFactor(G_EARTH_KG, R_EARTH_M);
+    const gravitationalFactor = schwarzschildTimeDilationFactor(G_EARTH_KG, R_EARTH_M);
     const entity: WorldModelEntity = {
       id: entityId({ kind: 'relativity-demo', id: 'dilation-1' }),
       ref: { kind: 'relativity-demo', id: 'dilation-1' },

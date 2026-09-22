@@ -4,7 +4,8 @@ import type { Observation } from '../../world/scientificWorldState';
 import type { DomainSolver, SolverResult } from './solverRouter';
 
 /**
- * SPECIALIST SOLVER ADAPTERS (Work Item 6).
+ * SPECIALIST SOLVER ADAPTERS (Work Item 6; 1D diffusion added during the
+ * Universe Engine reference-package integration pass).
  *
  * Per-tick `DomainSolver`s registrable on the canonical `SolverRouter`
  * (`solverRouter.ts`, unmodified logic — only new solver values added here).
@@ -20,14 +21,6 @@ import type { DomainSolver, SolverResult } from './solverRouter';
  *    (`core/epidemic/sir.ts`) as a registrable `DomainSolver`. Adding a
  *    second one here would be exactly the duplicate architecture this
  *    integration exists to avoid.
- *  - 1D diffusion: every existing `DomainSolver` in this repo (kinematics,
- *    hydraulic friction, all 21 files under `worldModel/domains/`) advances
- *    ONE entity from its own state — none reach across `ctx.graph` to couple
- *    neighboring entities. A real 1D diffusion step needs exactly that
- *    (a concentration field split across spatially adjacent entities), which
- *    would introduce a new cross-entity coupling convention this integration
- *    was not asked to design and no existing solver establishes. Left out
- *    rather than forced into a single-entity shape it does not fit.
  *  - Exponential decay: multiple existing domains already model a decay term
  *    for a SPECIFIC real phenomenon (radioactive/thermal/chemical — see
  *    `particlePhysics.ts`, `fireThermal.ts`, `chemistryKinetics.ts`). A
@@ -39,6 +32,18 @@ import type { DomainSolver, SolverResult } from './solverRouter';
  *    addition here.
  *  - Newtonian kinematics: already `newtonianKinematicsSolver` in
  *    `solverRouter.ts`. Reused as-is, not reimplemented.
+ *
+ * 1D DIFFUSION — reconsidered and added below. A prior pass of this file
+ * rejected it on the theory that it needs cross-entity coupling via
+ * `ctx.graph`, which no existing solver establishes. That theory does not
+ * hold: `epidemicSEIR.ts` already couples FOUR named quantities (S/E/I/R)
+ * entirely WITHIN one entity's `domainState`, each tick, via RK4 — a
+ * bounded 1D diffusion field is the same shape (N named scalar grid points
+ * coupled by a local update rule), just with more named quantities (u0..u4)
+ * and a simpler explicit-Euler update. No cross-entity coupling is needed
+ * or added; `makeDiffusion1DSolver` below follows the exact same
+ * single-entity, named-domainState-keys convention as `epidemicSEIR.ts`
+ * and `makeLogisticGrowthSolver`.
  */
 
 export const SPECIALIST_SOLVERS_VERSION = '1.0.0';
@@ -149,3 +154,115 @@ export function makeLogisticGrowthSolver(baseParams: LogisticGrowthParams = DEFA
 }
 
 export const logisticGrowthSolver = makeLogisticGrowthSolver();
+
+// --- 1D diffusion (bounded, fixed 5-point grid, single entity) -------------------------------
+
+export const DIFFUSION_1D_SOLVER_ID = 'specialist-diffusion-1d-explicit-fd';
+export const DIFFUSION_1D_DOMAIN_ID = 'field-diffusion';
+export const DIFFUSION_1D_GRID_SIZE = 5;
+const DIFFUSION_1D_KEYS = ['u0', 'u1', 'u2', 'u3', 'u4'] as const;
+
+export interface Diffusion1DParams {
+  /** Diffusivity coefficient (length^2/time). Must be finite and >= 0. */
+  readonly diffusivity: number;
+  /** Grid spacing (length). Must be finite and > 0. */
+  readonly dx: number;
+}
+
+export const DEFAULT_DIFFUSION_1D_PARAMS: Diffusion1DParams = { diffusivity: 0.1, dx: 1 };
+
+/**
+ * One explicit-Euler finite-difference step over a FIXED 5-point grid (u0..u4). Boundary
+ * points (u0, u4) are held fixed (Dirichlet), matching the reference algorithm this was
+ * adapted from — only interior points (u1..u3) update. Throws on an unstable step
+ * (alpha = diffusivity*dt/dx^2 > 0.5) rather than silently returning a numerically wrong
+ * result — the same fail-loud convention the reference implementation used.
+ */
+export function diffusion1DStep(grid: readonly number[], params: Diffusion1DParams, dt: number): number[] {
+  if (grid.length !== DIFFUSION_1D_GRID_SIZE) throw new Error(`diffusion1DStep: expected a ${DIFFUSION_1D_GRID_SIZE}-point grid, got ${grid.length}`);
+  const alpha = (params.diffusivity * dt) / (params.dx * params.dx);
+  if (alpha > 0.5) throw new Error(`diffusion1DStep: unstable explicit step (alpha=${alpha.toFixed(4)} > 0.5) — reduce dt or diffusivity, or increase dx`);
+  const next = [...grid];
+  for (let i = 1; i < grid.length - 1; i += 1) {
+    next[i] = grid[i]! + alpha * (grid[i + 1]! - 2 * grid[i]! + grid[i - 1]!);
+  }
+  return next;
+}
+
+function readDiffusionGrid(state: Record<string, number> | undefined): number[] | null {
+  if (!state) return null;
+  const grid = DIFFUSION_1D_KEYS.map((key) => state[key]);
+  if (!grid.every(isFiniteNumber)) return null;
+  return grid as number[];
+}
+
+function effectiveDiffusionParams(base: Diffusion1DParams, state: Record<string, number> | undefined): Diffusion1DParams {
+  if (!state) return base;
+  const diffusivity = isFiniteNumber(state.diffusivity) ? state.diffusivity : base.diffusivity;
+  const dx = isFiniteNumber(state.dx) ? state.dx : base.dx;
+  return { diffusivity, dx };
+}
+
+/**
+ * One reusable solver bound to base params. Each entity's grid lives in its own `domainState`
+ * under keys `u0`..`u4`; `diffusivity`/`dx` may be overridden per-entity, same convention as
+ * `makeLogisticGrowthSolver`. A no-op (never a fabricated value) when the grid is missing/
+ * invalid, when params are invalid, or when the requested step would be numerically unstable —
+ * an unstable step is reported as UNGROUNDED_APPROXIMATION rather than thrown from inside a
+ * tick loop (the pure `diffusion1DStep` above still throws for direct callers).
+ */
+export function makeDiffusion1DSolver(baseParams: Diffusion1DParams = DEFAULT_DIFFUSION_1D_PARAMS): DomainSolver {
+  return (entity, ctx): SolverResult => {
+    const state = entity.domainState;
+    const grid = readDiffusionGrid(state);
+    if (!grid) return { patch: {}, grounding: 'MODEL_ESTIMATE' };
+    const params = effectiveDiffusionParams(baseParams, state);
+    if (!isFiniteNumber(params.diffusivity) || params.diffusivity < 0 || !isFiniteNumber(params.dx) || params.dx <= 0) {
+      return { patch: {}, grounding: 'MODEL_ESTIMATE' };
+    }
+    const dt = ctx.dt;
+    const alpha = (params.diffusivity * dt) / (params.dx * params.dx);
+    if (alpha > 0.5) {
+      return {
+        patch: { statusLabel: `diffusion step unstable (alpha=${alpha.toFixed(3)} > 0.5) — not advanced` },
+        grounding: 'UNGROUNDED_APPROXIMATION',
+      };
+    }
+    const nextGrid = diffusion1DStep(grid, params, dt);
+    const nextState: Record<string, number> = { ...state, diffusivity: params.diffusivity, dx: params.dx };
+    DIFFUSION_1D_KEYS.forEach((key, i) => { nextState[key] = nextGrid[i]!; });
+    const paramsHash = fnv1a(canonicalJson({ params, grid, dt, entityId: entity.id }));
+
+    const observation: Observation = {
+      observationId: `diffusion1d-obs:${entity.id}:${ctx.tick}`,
+      tick: ctx.tick,
+      statement: `${entity.label}: grid=[${nextGrid.map((v) => v.toFixed(3)).join(', ')}] (D=${params.diffusivity}, dx=${params.dx})`,
+      measurements: DIFFUSION_1D_KEYS.map((key, i) => ({
+        key, value: nextGrid[i]!, tick: ctx.tick, entity: entity.ref, provenance: [`${DIFFUSION_1D_SOLVER_ID}#diffusion1DStep`],
+      })),
+      provenance: [DIFFUSION_1D_SOLVER_ID],
+    };
+
+    const eventParameters = { grid: nextGrid, diffusivity: params.diffusivity, dx: params.dx };
+    const event: GenesisEvent = {
+      contractVersion: GENESIS_EVENT_CONTRACT_VERSION,
+      id: deterministicEventId('diffusion1d-evt', entity.id, ctx.tick, eventParameters),
+      type: 'field.diffusion1d.step',
+      timestamp: ctx.tick,
+      source: entity.ref,
+      affectedEntities: [entity.ref],
+      cause: 'explicit-fd-diffusion-step',
+      parameters: eventParameters,
+      provenance: { origin: 'model', modelId: DIFFUSION_1D_SOLVER_ID, paramsHash },
+    };
+
+    return {
+      patch: { domainState: nextState, statusLabel: `diffusion grid=[${nextGrid.map((v) => v.toFixed(2)).join(', ')}]` },
+      grounding: 'MODEL_ESTIMATE',
+      observation,
+      event,
+    };
+  };
+}
+
+export const diffusion1DSolver = makeDiffusion1DSolver();

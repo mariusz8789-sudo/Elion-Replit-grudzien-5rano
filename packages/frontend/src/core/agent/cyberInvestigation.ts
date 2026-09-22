@@ -42,7 +42,7 @@ import type { HypothesisAssessment } from '../experimentFabric/scientificDiscove
  * own, honest shape rather than a numeric relation bent to fit text.
  */
 
-export const CYBER_INVESTIGATION_CONTRACT_VERSION = '1.1.0';
+export const CYBER_INVESTIGATION_CONTRACT_VERSION = '1.2.0';
 
 /**
  * SCOPE / BUDGET / ANALYZER / APPROVAL (Work Item 5) — canonical types and
@@ -124,6 +124,42 @@ export interface AnalyzerRunResult {
   readonly ranAt: string;
   /** Finding identifiers this run produced — never a free-text summary standing in for structured findings. */
   readonly findingIds: readonly string[];
+}
+
+/**
+ * A finding's lifecycle (Universe Engine reference-package integration, item 11). Mirrors the
+ * reference package's `CyberFinding.status` state machine exactly, adapted onto this file's
+ * own real `assertApprovalBeforePatch` gate: a finding may only reach `PATCH_PROPOSED` before
+ * a patch exists, and `RETEST_PASS`/`RETEST_FAIL` only after a real retest ran (matching
+ * `CyberInvestigationResult.retestResult`/`retestVerdict`). Pure transition validator — this
+ * module does not persist finding state; the caller owns storage.
+ */
+export type CyberFindingStatus = 'OPEN' | 'PATCH_PROPOSED' | 'RETEST_PASS' | 'RETEST_FAIL';
+
+export interface CyberFindingTransition {
+  readonly ok: boolean;
+  readonly next: CyberFindingStatus | null;
+  readonly reason: string;
+}
+
+const ALLOWED_FINDING_TRANSITIONS: Readonly<Record<CyberFindingStatus, readonly CyberFindingStatus[]>> = {
+  OPEN: ['PATCH_PROPOSED'],
+  PATCH_PROPOSED: ['RETEST_PASS', 'RETEST_FAIL'],
+  RETEST_PASS: [],
+  RETEST_FAIL: ['PATCH_PROPOSED'],
+};
+
+/** Rejects any transition outside the declared state machine (e.g. OPEN -> RETEST_PASS, skipping a patch) rather than allowing it silently. */
+export function advanceFindingStatus(current: CyberFindingStatus, next: CyberFindingStatus): CyberFindingTransition {
+  const allowed = ALLOWED_FINDING_TRANSITIONS[current];
+  if (!allowed.includes(next)) {
+    return {
+      ok: false,
+      next: null,
+      reason: `${current} -> ${next} is not an allowed finding-lifecycle transition (allowed from ${current}: ${allowed.length ? allowed.join(', ') : 'none — terminal state'})`,
+    };
+  }
+  return { ok: true, next, reason: `${current} -> ${next}` };
 }
 
 export type HumanApprovalDecision = 'APPROVED' | 'REJECTED';

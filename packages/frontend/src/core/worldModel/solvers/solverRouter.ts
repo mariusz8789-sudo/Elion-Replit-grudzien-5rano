@@ -20,6 +20,14 @@ export {
   makeLogisticGrowthSolver,
   logisticGrowthSolver,
   type LogisticGrowthParams,
+  DIFFUSION_1D_SOLVER_ID,
+  DIFFUSION_1D_DOMAIN_ID,
+  DIFFUSION_1D_GRID_SIZE,
+  DEFAULT_DIFFUSION_1D_PARAMS,
+  diffusion1DStep,
+  makeDiffusion1DSolver,
+  diffusion1DSolver,
+  type Diffusion1DParams,
 } from './specialistSolvers';
 
 /**

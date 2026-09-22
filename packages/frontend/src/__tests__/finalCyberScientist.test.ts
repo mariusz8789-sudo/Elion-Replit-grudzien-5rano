@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  advanceFindingStatus,
   assertApprovalBeforePatch,
   assertAuthorizedScope,
   checkCyberBudget,
@@ -7,6 +8,7 @@ import {
   PatchNotApprovedError,
   type CyberBudgetUsage,
   type CyberCampaignBudget,
+  type CyberFindingStatus,
   type RemediationAction,
 } from '../core/agent/cyberInvestigation';
 import { selectNextTest, type CyberTestCandidate } from '../core/agent/cyberTestPlanner';
@@ -104,5 +106,36 @@ describe('assertApprovalBeforePatch — no patch application before approval', (
   it('does not throw for a matching, APPROVED record', () => {
     const approval = { remediationId: 'rem-1', decidedBy: 'reviewer-1', decidedAt: '2026-01-01T00:00:00Z', decision: 'APPROVED' as const };
     expect(() => assertApprovalBeforePatch(remediation, approval)).not.toThrow();
+  });
+});
+
+describe('advanceFindingStatus — finding lifecycle state machine', () => {
+  it('allows OPEN -> PATCH_PROPOSED', () => {
+    const t = advanceFindingStatus('OPEN', 'PATCH_PROPOSED');
+    expect(t.ok).toBe(true);
+    expect(t.next).toBe('PATCH_PROPOSED');
+  });
+
+  it('allows PATCH_PROPOSED -> RETEST_PASS and PATCH_PROPOSED -> RETEST_FAIL', () => {
+    expect(advanceFindingStatus('PATCH_PROPOSED', 'RETEST_PASS').ok).toBe(true);
+    expect(advanceFindingStatus('PATCH_PROPOSED', 'RETEST_FAIL').ok).toBe(true);
+  });
+
+  it('allows RETEST_FAIL -> PATCH_PROPOSED (a second attempt)', () => {
+    expect(advanceFindingStatus('RETEST_FAIL', 'PATCH_PROPOSED').ok).toBe(true);
+  });
+
+  it('rejects OPEN -> RETEST_PASS — skipping the patch step entirely', () => {
+    const t = advanceFindingStatus('OPEN', 'RETEST_PASS');
+    expect(t.ok).toBe(false);
+    expect(t.next).toBeNull();
+    expect(t.reason).toContain('OPEN -> RETEST_PASS');
+  });
+
+  it('rejects any transition out of the terminal RETEST_PASS state', () => {
+    const terminal: CyberFindingStatus = 'RETEST_PASS';
+    for (const next of ['OPEN', 'PATCH_PROPOSED', 'RETEST_FAIL'] as const) {
+      expect(advanceFindingStatus(terminal, next).ok).toBe(false);
+    }
   });
 });

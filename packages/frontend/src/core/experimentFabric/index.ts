@@ -160,6 +160,28 @@ export {
 } from '../metaCognition/decisionTrace';
 
 export {
+  PAIN_RESEARCH_USE_CASE_VERSION,
+  PAIN_RESEARCH_GOVERNANCE_ENVELOPE,
+  assertNoClinicalOrActuationParameters,
+  runPainResearchQuestion,
+  type PainResearchGovernance,
+  type PainResearchTarget,
+  type PainResearchQuestion,
+  type PainResearchReport,
+} from '../painDiscovery/painResearchUseCase';
+
+export {
+  META_COGNITIVE_EPISTEMIC_STATUS_VERSION,
+  isMetaCognitiveEpistemicStatus,
+  detectMetaContradiction,
+  recordMetaObservation,
+  type MetaCognitiveEpistemicStatus,
+  type MetaClaim,
+  type MetaContradictionDetectedEvent,
+  type MetaObservationRecordedEvent,
+} from '../metaCognition/epistemicStatus';
+
+export {
   SCIENTIFIC_INTEGRATION_VERSION,
   classifyOutcome,
   runScientificIntegrationCampaign,

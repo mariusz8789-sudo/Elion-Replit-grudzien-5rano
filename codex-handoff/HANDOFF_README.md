@@ -15,37 +15,65 @@ developing on. Commits:
 
 ## 1. What was done for real, in the repo, this round
 
-- **`packages/frontend/src/core/transferIntegration/genesisHashPort.ts`** (+ test): a real
-  `HashPort` adapter binding the transfer packages' own hash/fingerprint seam to this
-  repo's *already-canonical* `fnv1a`/`canonicalJson` (`core/events/hash.ts`), instead of
-  the reference-only FNV-1a reimplementation every vendor package ships for its own tests.
-  Both package families below (mega-pack-v2's `HashPort`, engine-suite's
-  `TextHashPort`/`ValueFingerprintPort` shape) can bind to this directly. Standalone-only
-  — nothing wires a transfer package into production yet, so it's listed in
-  `ALLOWED_ORPHANS` in `moduleReachability.test.ts`. 4/4 unit tests pass, `tsc --noEmit`
-  clean.
-- **`packages/frontend/src/core/visualStages/**`** + `core/e2e/visualStages*E2E.test.ts`
-  + related diffs to `scientificInteriorVisuals.ts`/`geometry.ts`/
-  `scripts/visual-e2e-v52-v7.mjs`: the V6/V6.1/V7 transfer package
-  (`genesis-v6-v61-v7-98pct-e2e.zip`), from earlier this session. Audit-first decision:
-  the repo already had a live V6/V6.1/V7 implementation bound to the canonical
-  WorldGraph/TemporalEngine/WorldFrameRenderer, so this package's own
-  `interiorLayoutCompiler`/`cameraPathPlanner`/`humanHierarchy` are kept **standalone-only**
-  (would otherwise be a second implementation — against this project's own "no second
-  WorldGraph/renderer/TemporalEngine/Human Digital Twin" rule). The one genuine gap this
-  found — a `MATERIALS_LAB` room kind — was instead added directly to the existing
-  canonical `scientificInteriorVisuals.ts`/`geometry.ts`, proven via the real-repo
-  `core/e2e/visualStagesGenesisE2E.test.ts`. All re-verified clean this round (`tsc
-  --noEmit`, `vitest run` on all touched/added test files).
+**Correction (after review):** an earlier version of this branch put `genesisHashPort.ts`
+and the full V6/V6.1/V7 `core/visualStages/**` tree inside production source
+(`packages/frontend/src/core/`), justified only by adding `ALLOWED_ORPHANS` entries to
+`moduleReachability.test.ts`. On review that's the wrong pattern: neither had a real
+production caller, so the entries were silencing the reachability check rather than
+documenting a load-bearing architectural decision (contrast the D-085 `agentBridge.ts`
+entry, which exists because wiring it in today would close a real import cycle). Both have
+been **removed from production source** and moved into `codex-handoff/` as explicit,
+independently buildable/testable transfer material instead — see
+`genesis-hash-port-adapter-proposal/` and `v6-v61-v7-transfer-package/` below.
+`moduleReachability.test.ts` now carries zero new `ALLOWED_ORPHANS` entries from this
+round.
+
+What actually landed in production source this round, and is real:
+
+- **`packages/frontend/src/core/temporalCinematic/scientificInteriorVisuals.ts`** +
+  **`core/worldModel/ecs/geometry.ts`**: a `MATERIALS_LAB` room kind + `SPECTROMETER_STATION`/
+  `THERMAL_STAGE_STATION` asset-slot renderers, added directly to the existing canonical
+  interior-visual system (no new architecture — same `RoomType` union, same
+  `createScientificAssetSlotVisual` switch every other station already goes through).
+  **Reachability is partial, disclosed precisely in item 6 below**: the render path is real,
+  imported production code, proven against the real `WorldGraph`/renderer by
+  `core/e2e/visualStagesGenesisE2E.test.ts` — but that test constructs its `WorldGraph`
+  directly rather than through the real content-generation pipeline, and
+  `interiorGenerator.ts`'s facility-category table has no entry that would ever route real
+  generated content to `MATERIALS_LAB`. Completing that routing is a content decision, not
+  made here.
+- **`scripts/visual-e2e-v52-v7.mjs`**: capture-script updates supporting the above.
 - **`artifacts/temporal-cinematic-e2e/`, `artifacts/visual-e2e-v52-v7/`**: the real-browser
   E2E capture evidence (screenshots + webm) backing the above, included so Codex/a human
   doesn't have to re-run the capture to see what was actually produced.
 
-Neither of these touches any file on the active release branch's current working set;
-both are additive, standalone, and documented as orphans pending a deliberate wiring
-decision — same convention already used for D-085, D-127, D-140 etc. in this repo.
+None of this touches any file on the active release branch's current working set.
 
 ## 2. What's included here for Codex (not yet bound to anything real)
+
+### `genesis-hash-port-adapter-proposal/`
+Real `HashPort` adapter binding the transfer packages' hash/fingerprint seam to this
+repo's already-canonical `fnv1a`/`canonicalJson` (`core/events/hash.ts`) — moved out of
+production source per the correction above. See its own `README.md` for why, and exactly
+how to re-apply it once a transfer package is actually being bound. 4/4 unit tests pass,
+but note it does not compile standalone as-is (it deliberately imports from the real
+repo's `core/events/hash.ts` by relative path).
+
+### `v6-v61-v7-transfer-package/`
+The full V6/V6.1/V7 transfer package (`genesis-v6-v61-v7-98pct-e2e.zip`) — moved out of
+production source per the correction above, now packaged as an independently
+buildable/testable standalone unit (own `package.json`/`tsconfig.json`). **Disclosed
+defect found while re-packaging it standalone**: its `tsconfig.json` uses this session's
+standard `moduleResolution: "nodenext"` convention (matching every other transfer package
+this session), and under that setting `tsc -p tsconfig.json` reports ~46 errors — mostly
+missing `.js` extensions on relative imports (valid under the real repo's actual
+`moduleResolution: "bundler"`, invalid under `nodenext`), plus a handful of real
+`noImplicitAny`/property-narrowing errors in `v7/hyperscopeNavigator.ts`,
+`v7/organPicking.ts`, `v7/provenanceLabels.ts`, and the standalone E2E test. `vitest run`
+still passes 4/4 (esbuild transpiles through the extension issue and doesn't enforce the
+same strict-any checks tsc does) — so the **behavior** was verified working, but the
+**standalone tsc build as packaged is not clean**. Not fixed here (would be "additional
+implementation" beyond what was asked); left for whoever picks this package up next.
 
 ### `genesis-integration-mega-pack-v2/`
 My own consolidated pack from earlier this session (SHA-256 of the zip I delivered:

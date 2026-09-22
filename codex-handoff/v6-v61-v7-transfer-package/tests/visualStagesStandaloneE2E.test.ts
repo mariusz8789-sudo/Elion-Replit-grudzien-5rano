@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { CameraState, CanonicalVisualRuntimePort, EvidenceEvent, EvidenceSink, RenderFrameProbe, VisualEntityState } from '../visualStages/contracts';
-import { deterministic } from '../visualStages/deterministic';
-import { instantiateScientificInterior } from '../visualStages/v6/interiorRuntime';
-import type { ScientificInteriorSpec } from '../visualStages/v6/interiorTypes';
-import { captureCinematicSequence } from '../visualStages/v61/cinematicRuntime';
-import type { CinematicShot } from '../visualStages/v61/cinematicTypes';
-import { runMacroMicroJourney } from '../visualStages/v7/macroMicroRuntime';
-import { createReferenceHumanManifest } from '../visualStages/v7/humanManifest';
-import { pickHumanNode } from '../visualStages/v7/organPicking';
-import { selectHumanLod } from '../visualStages/v7/humanLod';
-import { buildVisualStageCapabilityReport, type VisualCapabilityEntry, type VisualCapabilityId } from '../visualStages/capabilityReport';
+import type { CameraState, CanonicalVisualRuntimePort, EvidenceEvent, EvidenceSink, RenderFrameProbe, VisualEntityState } from '../src/contracts';
+import { deterministic } from '../src/deterministic';
+import { instantiateScientificInterior } from '../src/v6/interiorRuntime';
+import type { ScientificInteriorSpec } from '../src/v6/interiorTypes';
+import { captureCinematicSequence } from '../src/v61/cinematicRuntime';
+import type { CinematicShot } from '../src/v61/cinematicTypes';
+import { runMacroMicroJourney } from '../src/v7/macroMicroRuntime';
+import { createReferenceHumanManifest } from '../src/v7/humanManifest';
+import { pickHumanNode } from '../src/v7/organPicking';
+import { selectHumanLod } from '../src/v7/humanLod';
+import { buildVisualStageCapabilityReport, type VisualCapabilityEntry, type VisualCapabilityId } from '../src/capabilityReport';
 
 class RecordingEvidence implements EvidenceSink { readonly events:EvidenceEvent[]=[]; emit(event:EvidenceEvent):void{this.events.push(event)} }
 class FixtureVisualRuntime implements CanonicalVisualRuntimePort{

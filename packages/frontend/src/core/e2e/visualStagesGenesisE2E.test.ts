@@ -20,13 +20,25 @@ import type { BiologyArtifact } from '../scientificWorlds/biologyRunners';
  * `scientificInteriorVisuals.ts` (V6), `cinematicShotDirector.ts`/`cameraPath.ts` (V6.1),
  * `humanMacroMicroLayer.ts` (V7) — with its own real-browser Playwright proof
  * (`scripts/visual-e2e-v52-v7.mjs`). The newly-delivered `genesis-v6-v61-v7-98pct-e2e.zip` transfer
- * package (kept standalone-only in `core/visualStages/*` + `core/e2e/visualStagesStandaloneE2E.test.ts`)
- * is NOT bound here as a second parallel compiler/planner/hierarchy — doing so would violate the
- * mission's own "no second WorldGraph/renderer/TemporalEngine/Human Digital Twin" law. Instead, this
+ * package is NOT bound here as a second parallel compiler/planner/hierarchy — doing so would violate
+ * the mission's own "no second WorldGraph/renderer/TemporalEngine/Human Digital Twin" law, so it was
+ * kept out of production source entirely (see codex-handoff/v6-v61-v7-transfer-package/ — not
+ * imported by, or ALLOWED_ORPHANS-suppressed in, this repo's production source tree). Instead, this
  * file audits+proves the EXISTING canonical implementation against the transfer package's capability
  * matrix, and exercises the ONE genuine gap this session filled: a `MATERIALS_LAB` room kind (the
  * repo had IMAGING_SUITE/MICROSCOPY_SUITE/REACTOR_ROOM/etc. but no MATERIALS room, and
  * CLAUDE_DIRECTIVE.md's V6 acceptance explicitly requires "at least MATERIALS + IMAGING/BIOLOGY").
+ *
+ * IMPORTANT — reachability scope of the MATERIALS_LAB gap-fill: `buildInteriorGraph()` below
+ * constructs its `WorldGraph` directly (`roomEntity(id, 'MATERIALS_LAB', ...)`), the same way every
+ * other test in this suite does. This proves the RENDER path
+ * (`createScientificRoomShell`/`createScientificAssetSlotVisual`, both real, imported production
+ * code in `scientificInteriorVisuals.ts`) handles `MATERIALS_LAB`/`SPECTROMETER_STATION`/
+ * `THERMAL_STAGE_STATION` correctly. It does NOT prove the real content-GENERATION pipeline can
+ * produce such a room: `core/worldModel/generation/geometry/interiorGenerator.ts`'s facility-category
+ * -> RoomType table (`CHEMISTRY_LAB: 'REACTOR_ROOM'`, `IMAGING_CENTER: 'IMAGING_SUITE'`, etc.) has no
+ * entry routing to `MATERIALS_LAB` — adding one is a content/product decision (which facility
+ * category, if any, should become a materials lab) deliberately left unmade here.
  *
  * `window` stub + dynamic import: identical necessity/reasoning as D-140's real-repo E2E — importing
  * `core/agent/cyberReasoningKernel.ts` eagerly touches `core/storage.ts` at module load

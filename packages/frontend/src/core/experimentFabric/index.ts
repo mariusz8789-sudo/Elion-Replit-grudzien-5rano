@@ -160,6 +160,17 @@ export {
 } from '../metaCognition/decisionTrace';
 
 export {
+  SCIENTIFIC_INTEGRATION_VERSION,
+  classifyOutcome,
+  runScientificIntegrationCampaign,
+  type ScientificCampaignStatus,
+  type CycleMetrics,
+  type ScientificCampaignCycleReport,
+  type ScientificCampaignResult,
+  type RunScientificCampaignOptions,
+} from './scientificIntegration';
+
+export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,
   confirmCrossDomainOrchestration,

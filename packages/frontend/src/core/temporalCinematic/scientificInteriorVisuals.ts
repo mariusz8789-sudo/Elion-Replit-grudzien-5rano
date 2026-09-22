@@ -179,14 +179,55 @@ function createPumpStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalett
 function createSpectrometer(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
   const g = new THREE.Group(); g.name = 'genesis-interior-spectrometer';
   g.add(createBench(THREE, { position: [0, 0, 0], width: 1.6, depth: 0.8, height: 0.86, topMaterial: p.white, legMaterial: p.stainless }));
-  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.34, 0.42), p.medical);
-  housing.position.set(-0.18, 1.03, 0.02); g.add(housing);
-  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 16), p.chrome);
-  tube.rotation.z = Math.PI / 2; tube.position.set(0.24, 1.03, 0.02); g.add(tube);
-  g.add(createPlatform(THREE, p.stainless, { position: [0.55, 0.92, 0.02], thickness: 0.03, shape: 'box', width: 0.18, depth: 0.18 }));
-  g.add(createMonitor(THREE, { position: [-0.45, 0.86, -0.16], width: 0.56, height: 0.35, standHeight: 0.18, frameMaterial: p.dark }));
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.42, 0.48), p.medical);
+  housing.position.set(-0.12, 1.08, 0.02); g.add(housing);
+  const chamberGlass = createScientificGlass(THREE, { color: 0xaedcff, transmissive: false, thicknessMeters: 0.012 });
+  const chamber = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.28, 28, 1, true), chamberGlass);
+  chamber.position.set(0.47, 1.05, 0.02); g.add(chamber);
+  const sample = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.035, 20), p.chrome);
+  sample.position.set(0.47, 0.94, 0.02); g.add(sample);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.55, 12), p.blueGlow);
+  beam.rotation.z = Math.PI / 2; beam.position.set(0.18, 1.06, 0.02); g.add(beam);
+  g.add(createPlatform(THREE, p.stainless, { position: [0.47, 0.9, 0.02], thickness: 0.04, shape: 'box', width: 0.34, depth: 0.3 }));
+  const display = createInstrumentScreen(THREE, p, 0.48, 0.31);
+  display.position.set(-0.36, 1.37, 0.18); display.rotation.x = -0.14; g.add(display);
+  addStatusLamps(THREE, g, p, [-0.34, 0.94, 0.25], 4);
   g.userData.instrumentState = 'UNBOUND';
+  g.userData.visualProfile = 'MATERIALS_SPECTROMETER_CINEMATIC';
   shadow(g); return g;
+}
+
+function addStatusLamps(
+  THREE: typeof THREE_NS,
+  root: THREE_NS.Object3D,
+  p: HighFidelityMaterialPalette,
+  origin: readonly [number, number, number],
+  count: number,
+): void {
+  for (let i = 0; i < count; i += 1) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), p.blueGlow);
+    lamp.position.set(origin[0] + i * 0.052, origin[1], origin[2]);
+    root.add(lamp);
+  }
+}
+
+function createInstrumentScreen(
+  THREE: typeof THREE_NS,
+  p: HighFidelityMaterialPalette,
+  width: number,
+  height: number,
+): THREE_NS.Group {
+  const display = new THREE.Group();
+  const bezel = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.045), p.dark);
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.88, height * 0.78), p.blueGlow);
+  glass.position.z = 0.024;
+  display.add(bezel, glass);
+  for (let row = 0; row < 3; row += 1) {
+    const trace = new THREE.Mesh(new THREE.BoxGeometry(width * (0.42 + row * 0.13), 0.008, 0.004), p.white);
+    trace.position.set(-width * 0.12, height * (0.2 - row * 0.18), 0.03);
+    display.add(trace);
+  }
+  return display;
 }
 
 function createThermalStage(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
@@ -196,25 +237,40 @@ function createThermalStage(THREE: typeof THREE_NS, p: HighFidelityMaterialPalet
   stage.position.set(0, 0.93, 0); g.add(stage);
   const coil = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 8, 32), p.chrome);
   coil.rotation.x = Math.PI / 2; coil.position.set(0, 0.99, 0); g.add(coil);
+  for (let ring = 1; ring <= 3; ring += 1) {
+    const heatRing = new THREE.Mesh(new THREE.TorusGeometry(0.11 + ring * 0.025, 0.006, 6, 28), p.blueGlow);
+    heatRing.rotation.x = Math.PI / 2; heatRing.position.set(0, 1.046 + ring * 0.004, 0); g.add(heatRing);
+  }
   const controller = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.23), p.dark);
   controller.position.set(-0.45, 0.98, 0); g.add(controller);
+  const shieldMaterial = createScientificGlass(THREE, { color: 0x9ed8ef, transmissive: false, thicknessMeters: 0.01 });
+  const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.34, 32, 1, true), shieldMaterial);
+  shield.position.set(0, 1.09, 0); g.add(shield);
+  addStatusLamps(THREE, g, p, [-0.5, 1.06, 0.12], 3);
   g.userData.instrumentState = 'UNBOUND';
+  g.userData.visualProfile = 'THERMAL_STAGE_CINEMATIC';
   shadow(g); return g;
 }
 
 /** A canonical room workstation. The idle screen does not imply a running compute provider. */
 function createComputeStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
   const g = new THREE.Group(); g.name = 'genesis-interior-compute-station';
-  g.add(createBench(THREE, { position: [0, 0, 0], width: 1.6, depth: 0.8, height: 0.78, topMaterial: p.dark, legMaterial: p.stainless }));
-  g.add(createMonitor(THREE, { position: [-0.2, 0.78, -0.18], width: 0.84, height: 0.48, standHeight: 0.16, frameMaterial: p.medical }));
-  g.add(createCabinet(THREE, { position: [0.56, 0, -0.05], width: 0.34, depth: 0.55, height: 0.68, bodyMaterial: p.dark, handleMaterial: p.stainless }));
-  const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.025, 0.16), p.medical);
-  keyboard.position.set(-0.2, 0.8, 0.17); g.add(keyboard);
-  for (let i = 0; i < 5; i += 1) {
-    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.016, 0.006), p.stainless);
-    vent.position.set(0.56, 0.26 + i * 0.055, 0.23); g.add(vent);
+  g.add(createBench(THREE, { position: [0, 0, 0], width: 2.05, depth: 0.82, height: 0.78, topMaterial: p.dark, legMaterial: p.stainless }));
+  for (const x of [-0.48, 0.18]) {
+    const screen = createInstrumentScreen(THREE, p, 0.62, 0.38);
+    screen.position.set(x, 1.12, -0.2); screen.rotation.x = -0.06; g.add(screen);
   }
+  for (const x of [0.68, 0.91]) {
+    const rack = createCabinet(THREE, { position: [x, 0, -0.08], width: 0.2, depth: 0.58, height: 0.72, bodyMaterial: p.dark, handleMaterial: p.stainless });
+    g.add(rack);
+    for (let unit = 0; unit < 6; unit += 1) addStatusLamps(THREE, g, p, [x - 0.055, 0.18 + unit * 0.085, 0.22], 2);
+  }
+  const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.025, 0.16), p.medical);
+  keyboard.position.set(-0.18, 0.8, 0.18); g.add(keyboard);
+  const consoleGlow = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.018, 0.035), p.blueGlow);
+  consoleGlow.position.set(-0.16, 0.78, -0.37); g.add(consoleGlow);
   g.userData.computeBinding = 'UNBOUND';
+  g.userData.visualProfile = 'SCIENTIFIC_COMPUTE_CONSOLE_CINEMATIC';
   shadow(g); return g;
 }
 

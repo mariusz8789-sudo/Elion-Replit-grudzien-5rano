@@ -3,7 +3,7 @@
   "surfaces": [
     {
       "mode": "desktop",
-      "greenPixels": 10847,
+      "greenPixels": 10841,
       "animated": true,
       "matrixWidth": 1440,
       "matrixHeight": 900,
@@ -11,7 +11,7 @@
     },
     {
       "mode": "mobile",
-      "greenPixels": 889,
+      "greenPixels": 899,
       "animated": true,
       "matrixWidth": 390,
       "matrixHeight": 844,
@@ -59,29 +59,30 @@
           "reason": "SEEK"
         },
         "temporalAccumulation": "NOT_PRESENT",
-        "livingWorld": false
+        "livingWorld": false,
+        "spacetimeVisual": null
       },
       "shots": [
         {
           "t": 0,
           "file": "artifacts/human-twin-review/materials-compute-0.png",
-          "sha256": "7ddae761eaf990b4a49edbf5c9439be85218bc9fd229b50cc7dfd61465297f9e",
-          "evidenceHash": "17e0d357daf54b81ce256896f3070dd55b2e0b90b1757c3df2597160b767d6e3",
-          "semanticFingerprint": "71c72fca"
+          "sha256": "a7b4751ca6850a4d01b45f19b0acc6124fa8ce5944d3bec26518b1dc40932923",
+          "evidenceHash": "07ae2698c5dd4fe891a309294a75a299317679b7da1471ad1032d8a76ab02530",
+          "semanticFingerprint": "5251fec2"
         },
         {
           "t": 1.5,
           "file": "artifacts/human-twin-review/materials-compute-1.5.png",
-          "sha256": "0ffab624c825682967b99ee7dfe9770fef30787038d1e7c6f752219e65bb485a",
-          "evidenceHash": "2e488422c6bd50e85ca13966c0bfa9b2ac2a144838c0da8de1565d0cd37b3747",
-          "semanticFingerprint": "eb2e3723"
+          "sha256": "b8d66b6d30c46c7917c27224c6aa8b39ee652e13a6bdb2b7727d53b641a4ffa6",
+          "evidenceHash": "71c16661704903760d33ac9f2d30cd275631b27fc1c8e7f26044a1045ca6c4d7",
+          "semanticFingerprint": "e4544565"
         },
         {
           "t": 3,
           "file": "artifacts/human-twin-review/materials-compute-3.png",
-          "sha256": "8ea0c1790fd1077e59279b89806fb3d1592669f13e3dd326fe317adc656dd53d",
-          "evidenceHash": "14bcfe2347fb8419029e7937f5e1d044c4b2eba83e0507237bd14581937dc3d2",
-          "semanticFingerprint": "96f1a42a"
+          "sha256": "c8d52b4634a0d7a8de0602b558319ee8916e84aaa6002387b88305d1354c02f6",
+          "evidenceHash": "1850550e15c40bdd14840babe264c0bf8269394cd026f3490216dc34fdd86e72",
+          "semanticFingerprint": "3d6d3888"
         }
       ]
     },
@@ -103,29 +104,30 @@
           "reason": "SEEK"
         },
         "temporalAccumulation": "NOT_PRESENT",
-        "livingWorld": true
+        "livingWorld": true,
+        "spacetimeVisual": null
       },
       "shots": [
         {
           "t": 0,
           "file": "artifacts/human-twin-review/street-0.png",
-          "sha256": "5b21ef425b26bc98b8f941334ef0455afc1c8a308452a30572788178ccc061ec",
-          "evidenceHash": "dd0317e5bdd878cbaf12fb1af7f8467931db46a7697aab8a7804d940192ca632",
-          "semanticFingerprint": "e4780cad"
+          "sha256": "ec069dcd2bf32e0d016a300d70c6bbcb6e295c7a027e96aa6d2d01b88c8e838c",
+          "evidenceHash": "2d137015d4a9e9685bf4f00737b7d33fbd70194e58374f3667197bf285681ada",
+          "semanticFingerprint": "74b4e64f"
         },
         {
           "t": 1.5,
           "file": "artifacts/human-twin-review/street-1.5.png",
-          "sha256": "e808f53c2293b9e591c19e1884b0efea5cbb73013e7e38c5befe8934adaacbc7",
-          "evidenceHash": "3b1f7c5fd4ca308e9997fd07dd76c5bf4f79974b35f767f320d9340a459cb4c9",
-          "semanticFingerprint": "16305606"
+          "sha256": "ef79f54f884c4425ea28e1ca599fc461ec55dcb0bbd12960ca816b3dafb78409",
+          "evidenceHash": "9da070529fe16e343cf2b299351c1a079077129c60a3420f43d38a3d949b73f4",
+          "semanticFingerprint": "31f3b3e2"
         },
         {
           "t": 3,
           "file": "artifacts/human-twin-review/street-3.png",
-          "sha256": "a8c2bfb56a7438af745592d52e58c6a0b3989c095638bf001b1b327c26d55c0b",
-          "evidenceHash": "a146eb7a5aef104b19dce8a911117c66641408940c76e44253a1206e79861598",
-          "semanticFingerprint": "d4c4cacf"
+          "sha256": "e92601e7567681e8e61a6511a78b2ed35b9665df7ce4c0d5aa5fc71d5d304b1c",
+          "evidenceHash": "b2c0aae8c5036e0f50e3955c485597b2e9217a70b6e71f3d97b3a30fd8c62254",
+          "semanticFingerprint": "3f14f7d3"
         }
       ]
     }

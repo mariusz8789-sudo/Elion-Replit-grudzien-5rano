@@ -19,7 +19,21 @@ import type { WorldSpecification } from './worldSpecification';
 export const KNOWN_SCIENTIFIC_DOMAINS = ['chemistry', 'epidemiology', 'hydraulics', 'kinematics'] as const;
 export type KnownScientificDomain = (typeof KNOWN_SCIENTIFIC_DOMAINS)[number];
 
-const KNOWN_TEMPLATE_IDS = ['CITY', 'LABORATORY', 'WATER_SYSTEM', 'EPIDEMIOLOGY', 'INDUSTRIAL_SITE'] as const;
+const KNOWN_TEMPLATE_IDS = [
+  'CITY',
+  'LABORATORY',
+  'WATER_SYSTEM',
+  'EPIDEMIOLOGY',
+  'INDUSTRIAL_SITE',
+  'QUANTUM',
+  'TIME_DILATION_LAB',
+  'COSMOLOGY_SPACETIME',
+  'EINSTEIN_ROSEN_BRIDGE',
+  'MULTIVERSE_BRANCH',
+  'HISTORICAL_RECONSTRUCTION',
+  'DESERT_ALIEN',
+  'MARS_RESEARCH',
+] as const;
 const KNOWN_SCALE_LEVELS = [
   'PLANET',
   'REGION',
@@ -129,6 +143,22 @@ export function validateSpecification(spec: WorldSpecification): SpecificationVa
     for (const key of ['citySizeM', 'districtCount', 'parcelsPerDistrict', 'maxFloors', 'roomsPerFloorSide'] as const) {
       const value = spec.structuralDetail[key];
       if (value !== undefined && (!isFiniteNumber(value) || value <= 0)) err(`structuralDetail.${key}`, `${key} must be a positive finite number`);
+    }
+  }
+
+  if (spec.spacetime) {
+    const { branchCount, primaryMassScale, throatRadius, historicalYear } = spec.spacetime;
+    if (branchCount !== undefined && (!Number.isInteger(branchCount) || branchCount < 1 || branchCount > 12)) {
+      err('spacetime.branchCount', 'branchCount must be an integer between 1 and 12');
+    }
+    if (primaryMassScale !== undefined && (!isFiniteNumber(primaryMassScale) || primaryMassScale <= 0)) {
+      err('spacetime.primaryMassScale', 'primaryMassScale must be a positive finite number');
+    }
+    if (throatRadius !== undefined && (!isFiniteNumber(throatRadius) || throatRadius <= 0)) {
+      err('spacetime.throatRadius', 'throatRadius must be a positive finite number');
+    }
+    if (historicalYear !== undefined && (!Number.isInteger(historicalYear) || historicalYear < -10000 || historicalYear > 10000)) {
+      err('spacetime.historicalYear', 'historicalYear must be an integer between -10000 and 10000');
     }
   }
 

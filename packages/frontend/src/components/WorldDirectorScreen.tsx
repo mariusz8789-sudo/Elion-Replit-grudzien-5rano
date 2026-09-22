@@ -5,13 +5,16 @@ import { TemporalCinematicSim3D } from '../core/temporalCinematic/temporalCinema
 import { kernelLedger } from '../core/agent/cyberReasoningKernel';
 import {
   directGenesisWorld,
+  directGenesisPromptWorld,
   recordDirectedAssetInspection,
+  recordDirectedPromptWorld,
   recordDirectedWorld,
   type GenesisWorldLight,
   type GenesisWorldNavigation,
   type GenesisWorldPreset,
   type GenesisWorldWeather,
 } from '../core/worldDirector/genesisWorldDirector';
+import { buildSpacetimeCameraPath, type SpacetimeWorldDescriptor } from '../core/temporalCinematic/spacetimeWorldDescriptor';
 
 declare global {
   interface Window {
@@ -23,6 +26,12 @@ declare global {
       readonly evidenceHash: string;
       getPresentationSummary(): ReturnType<TemporalCinematicSim3D['getPresentationSummary']>;
       getInteractionTargets(): ReturnType<TemporalCinematicSim3D['getInteractionTargets']>;
+      getProductWorld(): {
+        readonly worldId: string;
+        readonly template: string;
+        readonly fingerprint: string;
+        readonly descriptor: SpacetimeWorldDescriptor;
+      } | null;
     };
   }
 }
@@ -35,37 +44,65 @@ export function WorldDirectorScreen(): JSX.Element {
   const [navigation, setNavigation] = useState<GenesisWorldNavigation>('CINEMATIC');
   const [assetSelection, setAssetSelection] = useState<{ readonly entityId: string; readonly slotType: string } | null>(null);
   const [assetEvidenceHash, setAssetEvidenceHash] = useState<string | null>(null);
+  const [worldPrompt, setWorldPrompt] = useState('Generate an Einstein-Rosen bridge and show a cinematic flythrough.');
+  const [submittedPrompt, setSubmittedPrompt] = useState(worldPrompt);
+  const productResolution = useMemo(() => {
+    try {
+      const value = directGenesisPromptWorld(submittedPrompt);
+      return { world: value, error: null };
+    } catch (error) {
+      return { world: null, error: error instanceof Error ? error.message : String(error) };
+    }
+  }, [submittedPrompt]);
+  const productWorld = productResolution.world;
+  const promptError = productResolution.error;
   const directed = useMemo(() => directGenesisWorld({ preset, populationEnabled, light, weather, navigation }), [preset, populationEnabled, light, weather, navigation]);
-  const sim = useMemo(() => new TemporalCinematicSim3D(directed.scene.world.engine, directed.scene.camera, {
+  const productCamera = useMemo(() => productWorld ? buildSpacetimeCameraPath(productWorld.descriptor) : null, [productWorld]);
+  const sim = useMemo(() => new TemporalCinematicSim3D(
+    productWorld?.runtime.engine ?? directed.scene.world.engine,
+    productCamera ?? directed.scene.camera,
+    {
     weather: directed.presentation.weather,
     year: directed.scene.year,
-    viewMode: directed.presentation.viewMode,
-    roomType: directed.presentation.roomType ?? undefined,
+    viewMode: productWorld ? 'street' : directed.presentation.viewMode,
+    roomType: productWorld ? undefined : directed.presentation.roomType ?? undefined,
     navigationMode: directed.presentation.navigationMode,
+    spacetimeDescriptor: productWorld?.descriptor,
     autoPlay: true,
     onAssetSelection: (selection) => {
       setAssetSelection(selection);
       setAssetEvidenceHash(selection ? recordDirectedAssetInspection(kernelLedger, directed, selection) : null);
     },
-  }), [directed]);
+    },
+  ), [directed, productCamera, productWorld]);
   const params = useMemo<SimParams>(() => ({}), []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true);
 
   useEffect(() => {
     if (loading || failed) return;
-    const evidenceHash = recordDirectedWorld(kernelLedger, directed);
+    const evidenceHash = productWorld
+      ? recordDirectedPromptWorld(kernelLedger, productWorld)
+      : recordDirectedWorld(kernelLedger, directed);
+    const activeWorldId = productWorld?.world.generated.worldId ?? directed.proof.worldId;
+    const activeEntityCount = productWorld?.runtime.engine.graph.listEntities().length ?? directed.proof.entityCount;
     const hook = {
       ready: true as const,
-      worldId: directed.proof.worldId,
+      worldId: activeWorldId,
       preset: directed.request.preset,
-      entityCount: directed.proof.entityCount,
+      entityCount: activeEntityCount,
       evidenceHash,
       getPresentationSummary: () => sim.getPresentationSummary(),
       getInteractionTargets: () => sim.getInteractionTargets(),
+      getProductWorld: () => productWorld ? ({
+        worldId: productWorld.world.generated.worldId,
+        template: productWorld.primaryTemplate,
+        fingerprint: productWorld.deterministicFingerprint,
+        descriptor: productWorld.descriptor,
+      }) : null,
     };
     window.__GENESIS_WORLD_DIRECTOR__ = hook;
     return () => { if (window.__GENESIS_WORLD_DIRECTOR__ === hook) delete window.__GENESIS_WORLD_DIRECTOR__; };
-  }, [directed, failed, loading, sim]);
+  }, [directed, failed, loading, productWorld, sim]);
 
   return (
     <main className="world-director" id="main-content" data-testid="world-director" data-preset={preset}>
@@ -74,6 +111,22 @@ export function WorldDirectorScreen(): JSX.Element {
         <span className="gx-eyebrow">Canonical World Director · THREE.js</span>
         <h1>Reżyser świata</h1>
         <p>Jeden pipeline: WorldSpecification → WorldGraph → WorldFrame → THREE.js.</p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSubmittedPrompt(worldPrompt.trim());
+          }}
+          data-testid="world-director-prompt-form"
+        >
+          <label>Prompt świata
+            <input
+              value={worldPrompt}
+              onChange={(event) => setWorldPrompt(event.target.value)}
+              data-testid="world-director-prompt"
+            />
+          </label>
+          <button type="submit" data-testid="world-director-generate">Generuj kanoniczny świat</button>
+        </form>
         <label>Preset
           <select value={preset} onChange={(event) => setPreset(event.target.value as GenesisWorldPreset)} data-testid="world-director-preset">
             <option value="MODERN_SCIENTIFIC_LAB">Nowoczesne laboratorium</option>
@@ -90,16 +143,41 @@ export function WorldDirectorScreen(): JSX.Element {
           <label>Kamera <select value={navigation} onChange={(event) => setNavigation(event.target.value as GenesisWorldNavigation)} data-testid="world-director-navigation"><option>WALK</option><option>OBSERVER</option><option>CINEMATIC</option></select></label>
         </div>
         <dl className="world-director-proof" data-testid="world-director-proof">
-          <div><dt>World ID</dt><dd>{directed.proof.worldId}</dd></div>
-          <div><dt>Encje</dt><dd>{directed.proof.entityCount}</dd></div>
-          <div><dt>Ludzie</dt><dd>{directed.proof.humanEntityCount}</dd></div>
-          <div><dt>ROOM / ASSET_SLOT</dt><dd>{directed.proof.roomCount} / {directed.proof.assetSlotCount}</dd></div>
+          <div><dt>World ID</dt><dd>{productWorld?.world.generated.worldId ?? directed.proof.worldId}</dd></div>
+          <div><dt>Encje</dt><dd>{productWorld?.runtime.engine.graph.listEntities().length ?? directed.proof.entityCount}</dd></div>
+          <div><dt>Ludzie</dt><dd>{productWorld ? productWorld.runtime.engine.graph.listEntities().filter((entity) => entity.ref.kind === 'human').length : directed.proof.humanEntityCount}</dd></div>
+          <div><dt>ROOM / ASSET_SLOT</dt><dd>{productWorld ? `${productWorld.runtime.engine.graph.listEntities().filter((entity) => entity.geometry?.kind === 'ROOM').length} / ${productWorld.runtime.engine.graph.listEntities().filter((entity) => entity.geometry?.kind === 'ASSET_SLOT').length}` : `${directed.proof.roomCount} / ${directed.proof.assetSlotCount}`}</dd></div>
           <div data-testid="world-director-selection"><dt>Wybrany instrument</dt><dd>{assetSelection ? `${assetSelection.slotType} · ${assetSelection.entityId}` : 'Kliknij instrument w scenie'}</dd></div>
           <div data-testid="world-director-selection-evidence"><dt>Evidence</dt><dd>{assetEvidenceHash ? assetEvidenceHash.slice(0, 16) : '—'}</dd></div>
+          <div data-testid="world-director-product-world"><dt>Świat z promptu</dt><dd>{productWorld ? `${productWorld.primaryTemplate} · ${productWorld.world.graph.listEntities().length} encji` : promptError ?? '—'}</dd></div>
+          <div data-testid="world-director-product-proof"><dt>Fingerprint</dt><dd>{productWorld?.deterministicFingerprint ?? '—'}</dd></div>
         </dl>
+        {productWorld ? <SpacetimeDescriptorPreview descriptor={productWorld.descriptor} /> : null}
         <span className="world-director-status" data-testid="world-director-status">{failed ? 'WEBGL ERROR' : loading ? 'LOADING' : 'LIVE · CANONICAL'}</span>
       </section>
     </main>
+  );
+}
+
+function SpacetimeDescriptorPreview({ descriptor }: { readonly descriptor: SpacetimeWorldDescriptor }): JSX.Element {
+  const primitives = descriptor.primitives.slice(0, 48);
+  return (
+    <section aria-label="Spacetime render descriptor" data-testid="world-director-spacetime-descriptor">
+      <strong>{descriptor.title}</strong>
+      <span>{descriptor.epistemic} · {descriptor.kind} · {descriptor.primitives.length} primitives</span>
+      <svg viewBox="0 0 320 120" role="img" aria-label={`${descriptor.title} descriptor preview`}>
+        <rect width="320" height="120" fill={descriptor.palette[0]} />
+        {primitives.map((primitive, index) => {
+          const x = 160 + Math.max(-140, Math.min(140, primitive.position[0] * 2));
+          const y = 60 + Math.max(-50, Math.min(50, primitive.position[2] * 0.8 + primitive.position[1] * -0.5));
+          if (primitive.shape === 'RING') {
+            return <ellipse key={primitive.id} cx={x} cy={y} rx={Math.max(3, primitive.scale[0] * 1.6)} ry={Math.max(1, primitive.scale[1] * 0.35)} fill="none" stroke={index % 2 ? descriptor.palette[1] : descriptor.palette[2]} opacity={primitive.intensity} />;
+          }
+          return <circle key={primitive.id} cx={x} cy={y} r={Math.max(1.5, primitive.scale[0] * 2)} fill={primitive.shape === 'SUN' ? descriptor.palette[2] : descriptor.palette[1]} opacity={Math.max(0.25, primitive.intensity)} />;
+        })}
+      </svg>
+      <small>{descriptor.limitations.join(' ')}</small>
+    </section>
   );
 }
 

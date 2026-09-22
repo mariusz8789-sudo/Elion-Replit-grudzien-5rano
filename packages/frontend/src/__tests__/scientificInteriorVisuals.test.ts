@@ -73,7 +73,21 @@ describe('V6 generated scientific interiors', () => {
       occupied.push(footprint);
       const interaction = graph.listEntities().find((entity) => entity.geometry?.kind === 'INTERACTION_POINT' && entityId(entity.geometry.targetRef) === slot.id);
       expect(interaction?.geometry?.kind === 'INTERACTION_POINT' && interaction.geometry.interactionKind).toBe('INSPECT');
-      if (slot.geometry.slotType === 'COMPUTE_STATION') expect(visual.userData.computeBinding).toBe('UNBOUND');
+      if (slot.geometry.slotType === 'COMPUTE_STATION') {
+        expect(visual.userData.computeBinding).toBe('UNBOUND');
+        expect(visual.userData.visualProfile).toBe('SCIENTIFIC_COMPUTE_CONSOLE_CINEMATIC');
+        expect(visual.children.length).toBeGreaterThan(6);
+      }
+      if (slot.geometry.slotType === 'SPECTROMETER_STATION') {
+        expect(visual.userData.instrumentState).toBe('UNBOUND');
+        expect(visual.userData.visualProfile).toBe('MATERIALS_SPECTROMETER_CINEMATIC');
+        expect(visual.children.length).toBeGreaterThan(7);
+      }
+      if (slot.geometry.slotType === 'THERMAL_STAGE_STATION') {
+        expect(visual.userData.instrumentState).toBe('UNBOUND');
+        expect(visual.userData.visualProfile).toBe('THERMAL_STAGE_CINEMATIC');
+        expect(visual.children.length).toBeGreaterThan(7);
+      }
     }
     const door = graph.listEntities().find((entity) => entity.geometry?.kind === 'DOOR' && entityId(entity.geometry.fromRef) === room.id);
     if (door?.geometry?.kind !== 'DOOR') throw new Error('Missing canonical room door');

@@ -25,6 +25,19 @@ export interface HumanMacroMicroState {
   readonly evidenceLabel: 'MODEL_NOT_DIRECT_OBSERVATION';
 }
 
+/**
+ * A reviewable description of this renderer's visual contract.  It is deliberately
+ * separate from the epistemic label: better lighting and denser geometry do not turn
+ * a pedagogical model into an observation or an anatomically validated mesh.
+ */
+export const HUMAN_VISUAL_QUALITY_PROFILE = Object.freeze({
+  tier: 'PROCEDURAL_CINEMATIC_MODEL',
+  source: 'CANONICAL_MANIFEST_OR_SEALED_ARTIFACT',
+  anatomicalPrecision: 'ILLUSTRATIVE_GEOMETRY',
+  palette: 'BIOMEDICAL_PBR',
+  motion: 'DETERMINISTIC_SCENE_TIME',
+} as const);
+
 export function macroMicroLevelForArtifact(artifact: BiologyArtifact | null): HumanMacroMicroLevel {
   if (!artifact) return 'organ';
   if (artifact.kind === 'histology') return 'tissue';
@@ -44,6 +57,44 @@ function markModel(root: THREE_NS.Object3D, level: HumanMacroMicroLevel): void {
   root.userData.epistemic = 'MODEL';
   root.userData.directObservation = false;
   root.userData.visualScaleNotPhysical = true;
+  root.userData.visualQuality = HUMAN_VISUAL_QUALITY_PROFILE.tier;
+  root.userData.sourceGeometry = HUMAN_VISUAL_QUALITY_PROFILE.source;
+  root.userData.anatomicalPrecision = HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision;
+}
+
+function createPresentationStage(THREE: typeof THREE_NS, root: THREE_NS.Group, radius = 0.72): THREE_NS.Group {
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius * 1.04, 0.055, 64),
+    new THREE.MeshPhysicalMaterial({ color: 0x07131d, roughness: 0.26, metalness: 0.72, clearcoat: 0.42, clearcoatRoughness: 0.2 }),
+  );
+  base.name = 'macro-stage:plinth'; base.position.y = -0.61; root.add(base);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.88, 0.012, 8, 80),
+    new THREE.MeshStandardMaterial({ color: 0x80dfff, emissive: 0x2d9bc2, emissiveIntensity: 0.85, roughness: 0.26 }),
+  );
+  ring.name = 'macro-stage:scale-ring'; ring.rotation.x = Math.PI / 2; ring.position.y = -0.577; root.add(ring);
+  const scanHalo = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.68, 0.006, 6, 72),
+    new THREE.MeshBasicMaterial({ color: 0x77d7ff, transparent: true, opacity: 0.28, depthWrite: false }),
+  );
+  scanHalo.name = 'macro-stage:scan-halo'; scanHalo.position.z = -0.34; root.add(scanHalo);
+  const rotor = new THREE.Group(); rotor.name = 'macro-rotor'; root.add(rotor);
+  return rotor;
+}
+
+function biologicalMaterial(THREE: typeof THREE_NS, color: number, options: { translucent?: boolean; emissive?: number; roughness?: number } = {}): THREE_NS.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    emissive: options.emissive ?? 0x12070a,
+    emissiveIntensity: 0.08,
+    roughness: options.roughness ?? 0.52,
+    metalness: 0,
+    clearcoat: 0.22,
+    clearcoatRoughness: 0.48,
+    transparent: options.translucent ?? false,
+    opacity: options.translucent ? 0.36 : 0.96,
+    depthWrite: !options.translucent,
+  });
 }
 
 function addShadows(root: THREE_NS.Object3D): void {
@@ -67,20 +118,27 @@ function organColor(id: string): number {
 
 function buildOrganModel(THREE: typeof THREE_NS, node: AnatomyNode): THREE_NS.Group {
   const root = new THREE.Group(); root.name = `macro-organ:${node.id}`;
+  const rotor = createPresentationStage(THREE, root, 0.7);
   const d = node.dimensionsMeters;
   const maxD = Math.max(d.x, d.y, d.z, 1e-6);
   const displayScale = 0.72 / maxD;
-  const mat = new THREE.MeshPhysicalMaterial({ color: organColor(node.id), roughness: 0.48, metalness: 0, clearcoat: 0.18, clearcoatRoughness: 0.55 });
+  const mat = biologicalMaterial(THREE, organColor(node.id), { emissive: 0x210a0d, roughness: 0.5 });
   const organ = new THREE.Mesh(new THREE.SphereGeometry(0.5, 36, 26), mat);
+  organ.name = 'organ:atlas-volume';
+  organ.userData.geometryRole = 'ATLAS_DIMENSION_ELLIPSOID';
   organ.scale.set(d.x * displayScale, d.y * displayScale, d.z * displayScale);
-  root.add(organ);
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0x8fd3ff, emissive: 0x4ab7ff, emissiveIntensity: 0.7, transparent: true, opacity: 0.55, roughness: 0.3 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.012, 8, 64), ringMat);
-  ring.rotation.x = Math.PI / 2; ring.position.y = -0.44; root.add(ring);
+  rotor.add(organ);
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.515, 36, 26), biologicalMaterial(THREE, organColor(node.id), { translucent: true, emissive: 0x41151b, roughness: 0.3 }));
+  shell.name = 'organ:scan-envelope'; shell.scale.copy(organ.scale); rotor.add(shell);
+  const contourMat = new THREE.MeshBasicMaterial({ color: 0x8fdcff, transparent: true, opacity: 0.35, depthWrite: false });
+  for (const [axis, rotation] of [['axial', [Math.PI / 2, 0, 0]], ['coronal', [0, 0, 0]], ['sagittal', [0, Math.PI / 2, 0]]] as const) {
+    const contour = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.005, 6, 72), contourMat);
+    contour.name = `organ:contour:${axis}`; contour.rotation.set(rotation[0], rotation[1], rotation[2]); rotor.add(contour);
+  }
   markModel(root, 'organ'); addShadows(root); return root;
 }
 
-function organelleMaterial(THREE: typeof THREE_NS, kind: Organelle['kind']): THREE_NS.MeshStandardMaterial {
+function organelleMaterial(THREE: typeof THREE_NS, kind: Organelle['kind']): THREE_NS.MeshPhysicalMaterial {
   const color = kind === 'NUCLEUS' ? 0x7f55c8
     : kind === 'MITOCHONDRION' ? 0xf09a54
       : kind === 'MEMBRANE' ? 0x66bde8
@@ -88,64 +146,85 @@ function organelleMaterial(THREE: typeof THREE_NS, kind: Organelle['kind']): THR
           : kind === 'GOLGI' ? 0xe8c65c
             : kind === 'RIBOSOME' ? 0xe077b1
               : 0xa7c77e;
-  return new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: kind === 'RIBOSOME' ? 0.18 : 0.08, roughness: 0.5, transparent: kind === 'MEMBRANE', opacity: kind === 'MEMBRANE' ? 0.28 : 0.92 });
+  return new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: kind === 'RIBOSOME' ? 0.18 : 0.07, roughness: kind === 'MEMBRANE' ? 0.24 : 0.48, clearcoat: 0.18, clearcoatRoughness: 0.45, transparent: kind === 'MEMBRANE', opacity: kind === 'MEMBRANE' ? 0.24 : 0.94, depthWrite: kind !== 'MEMBRANE' });
 }
 
 function addCellContents(THREE: typeof THREE_NS, root: THREE_NS.Group, cell: CellModel, scale = 1): void {
-  const shell = new THREE.Mesh(
-    new THREE.SphereGeometry(0.52 * scale, 40, 30),
-    new THREE.MeshPhysicalMaterial({ color: 0x7fc7dd, roughness: 0.32, transmission: 0, transparent: true, opacity: 0.15, clearcoat: 0.35, depthWrite: false }),
+  const cytoplasm = new THREE.Mesh(
+    new THREE.SphereGeometry(0.485 * scale, 48, 34),
+    new THREE.MeshPhysicalMaterial({ color: 0x315d69, emissive: 0x102b33, emissiveIntensity: 0.13, roughness: 0.58, transparent: true, opacity: 0.22, depthWrite: false }),
   );
-  root.add(shell);
+  cytoplasm.name = 'cell:cytoplasm'; root.add(cytoplasm);
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(0.52 * scale, 48, 34),
+    new THREE.MeshPhysicalMaterial({ color: 0x86def0, emissive: 0x1d6070, emissiveIntensity: 0.16, roughness: 0.22, transparent: true, opacity: 0.17, clearcoat: 0.48, clearcoatRoughness: 0.18, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  shell.name = 'cell:membrane'; root.add(shell);
   for (const o of cell.organelles) {
+    if (o.kind === 'MEMBRANE') continue;
     const mat = organelleMaterial(THREE, o.kind);
-    const radius = o.kind === 'NUCLEUS' ? 0.16 : Math.max(0.018, Math.min(0.075, o.scaleNormalized * 0.32));
-    const geo = o.kind === 'MITOCHONDRION'
-      ? new THREE.CapsuleGeometry(radius * 0.55, radius * 1.6, 5, 10)
-      : new THREE.SphereGeometry(radius, 18, 14);
+    const radius = o.kind === 'NUCLEUS' ? 0.17 : Math.max(0.022, Math.min(0.078, o.scaleNormalized * 0.34));
+    const geo = o.kind === 'MITOCHONDRION' ? new THREE.CapsuleGeometry(radius * 0.58, radius * 1.7, 6, 14)
+      : o.kind === 'ER' || o.kind === 'GOLGI' ? new THREE.TorusGeometry(radius * 1.45, radius * 0.25, 6, 22)
+        : new THREE.SphereGeometry(radius, 20, 15);
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = `cell:organelle:${o.kind.toLowerCase()}:${o.id}`;
     mesh.position.set((o.positionNormalized.x - 0.5) * 0.74 * scale, (o.positionNormalized.y - 0.5) * 0.74 * scale, (o.positionNormalized.z - 0.5) * 0.74 * scale);
-    if (o.kind === 'MITOCHONDRION') mesh.rotation.z = Math.PI / 2;
+    if (o.kind === 'MITOCHONDRION') mesh.rotation.set(o.positionNormalized.z * Math.PI, o.positionNormalized.x * Math.PI, Math.PI / 2);
+    else if (o.kind === 'ER' || o.kind === 'GOLGI') mesh.rotation.set(Math.PI / 2, o.positionNormalized.y * Math.PI, 0);
     root.add(mesh);
+    if (o.kind === 'NUCLEUS') {
+      const nucleolus = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.3, 14, 10), biologicalMaterial(THREE, 0xb885e6, { emissive: 0x381c5b, roughness: 0.44 }));
+      nucleolus.name = 'cell:nucleolus:illustrative'; nucleolus.position.copy(mesh.position).add(new THREE.Vector3(radius * 0.25, radius * 0.12, radius * 0.15)); root.add(nucleolus);
+    }
   }
 }
 
 function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
   const root = new THREE.Group(); root.name = `macro-tissue:${cell.tissueType}`;
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.16, 0.92), new THREE.MeshPhysicalMaterial({ color: 0xd69bad, roughness: 0.72, clearcoat: 0.08 }));
-  root.add(slab);
+  const rotor = createPresentationStage(THREE, root, 0.82);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.38, 0.13, 0.92, 8, 2, 6), biologicalMaterial(THREE, 0x7f3d52, { emissive: 0x260d17, roughness: 0.66 }));
+  slab.name = 'tissue:extracellular-matrix'; rotor.add(slab);
   // The repeated cells reuse the ACTUAL canonical CellModel organelle layout; only their placement in
   // this pedagogical tissue tile is illustrative and is explicitly tagged as such on the root.
   const positions: Array<[number, number, number]> = [[-0.42, 0.12, -0.22], [0, 0.13, -0.2], [0.42, 0.12, -0.18], [-0.22, 0.12, 0.23], [0.28, 0.12, 0.24]];
   for (const [i, p] of positions.entries()) {
     const cellRoot = new THREE.Group(); cellRoot.position.set(...p); cellRoot.scale.setScalar(0.27 + (i % 2) * 0.025);
-    addCellContents(THREE, cellRoot, cell); root.add(cellRoot);
+    cellRoot.name = `tissue:cell:${i}`; addCellContents(THREE, cellRoot, cell); rotor.add(cellRoot);
+  }
+  const fiberMat = new THREE.MeshStandardMaterial({ color: 0xe5a8bb, emissive: 0x35101b, emissiveIntensity: 0.12, roughness: 0.62 });
+  for (let i = 0; i < 6; i += 1) {
+    const z = -0.34 + i * 0.135;
+    const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(-0.64, 0.11, z), new THREE.Vector3(-0.22, 0.17 + (i % 2) * 0.025, z + 0.035), new THREE.Vector3(0.2, 0.12, z - 0.025), new THREE.Vector3(0.64, 0.16, z)]);
+    const fiber = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.009, 5, false), fiberMat); fiber.name = `tissue:matrix-fiber:${i}`; rotor.add(fiber);
   }
   markModel(root, 'tissue'); addShadows(root); return root;
 }
 
 function buildCellModelVisual(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
-  const root = new THREE.Group(); root.name = `macro-cell:${cell.cellId}`; addCellContents(THREE, root, cell, 1.25);
+  const root = new THREE.Group(); root.name = `macro-cell:${cell.cellId}`; const rotor = createPresentationStage(THREE, root, 0.78); addCellContents(THREE, rotor, cell, 1.25);
   markModel(root, 'cell'); addShadows(root); return root;
 }
 
 function buildOrganelleModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
   const root = new THREE.Group(); root.name = `macro-organelle:${cell.cellId}`;
+  const rotor = createPresentationStage(THREE, root, 0.82);
   const focus = cell.organelles.find((o) => o.kind === 'MITOCHONDRION') ?? cell.organelles.find((o) => o.kind !== 'MEMBRANE') ?? null;
   if (!focus) { markModel(root, 'organelle'); return root; }
   const mat = organelleMaterial(THREE, focus.kind);
   if (focus.kind === 'MITOCHONDRION') {
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.23, 0.82, 10, 24), mat); body.rotation.z = Math.PI / 2; root.add(body);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.23, 0.82, 10, 28), mat); body.name = 'organelle:mitochondrion-outer-membrane'; body.rotation.z = Math.PI / 2; rotor.add(body);
+    const inner = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.75, 10, 28), biologicalMaterial(THREE, 0xc95e38, { translucent: true, emissive: 0x512014, roughness: 0.38 })); inner.name = 'organelle:mitochondrion-inner-volume'; inner.rotation.z = Math.PI / 2; rotor.add(inner);
     // Cristae-like curves are a visual convention, not molecular ultrastructure data.
     for (let i = -3; i <= 3; i += 1) {
       const y = i * 0.08;
       const curve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(-0.28, y, 0), new THREE.Vector3(-0.12, y + 0.06, 0.04), new THREE.Vector3(0.02, y - 0.05, -0.03), new THREE.Vector3(0.25, y + 0.03, 0),
       ]);
-      root.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.012, 6, false), new THREE.MeshStandardMaterial({ color: 0xffd3a8, emissive: 0xf09a54, emissiveIntensity: 0.15, roughness: 0.5 })));
+      const crista = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.012, 6, false), new THREE.MeshStandardMaterial({ color: 0xffd3a8, emissive: 0xf09a54, emissiveIntensity: 0.15, roughness: 0.5 })); crista.name = `organelle:crista:${i + 3}`; rotor.add(crista);
     }
   } else {
-    root.add(new THREE.Mesh(new THREE.SphereGeometry(0.46, 40, 30), mat));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.46, 40, 30), mat); body.name = `organelle:${focus.kind.toLowerCase()}`; rotor.add(body);
   }
   markModel(root, 'organelle'); addShadows(root); return root;
 }
@@ -154,6 +233,7 @@ const BASE_COLORS: Readonly<Record<string, number>> = { A: 0x58b9ff, T: 0xff6b91
 
 function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArtifact, { kind: 'central-dogma' }>): THREE_NS.Group {
   const root = new THREE.Group(); root.name = `macro-dna:${artifact.report.contentHash.slice(0, 12)}`;
+  const rotor = createPresentationStage(THREE, root, 0.82);
   const dna = artifact.report.dna;
   const samples = Math.max(6, Math.min(48, dna.length));
   const left: THREE_NS.Vector3[] = []; const right: THREE_NS.Vector3[] = [];
@@ -164,16 +244,19 @@ function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArt
     const t = i / Math.max(1, samples - 1); const y = (t - 0.5) * height; const angle = t * Math.PI * 6.2;
     const a = new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
     const b = new THREE.Vector3(-a.x, y, -a.z); left.push(a); right.push(b);
+    const midpoint = a.clone().add(b).multiplyScalar(0.5);
+    const distance = a.distanceTo(b); const direction = b.clone().sub(a).normalize();
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, distance, 8), new THREE.MeshStandardMaterial({ color: BASE_COLORS[base] ?? 0xd9e5f2, emissive: BASE_COLORS[base] ?? 0xd9e5f2, emissiveIntensity: 0.08, roughness: 0.48 }));
+    rod.name = `dna:base-pair:${i}:${base}`; rod.position.copy(midpoint); rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction); rotor.add(rod);
     if (i % 2 === 0) {
-      const midpoint = a.clone().add(b).multiplyScalar(0.5);
-      const distance = a.distanceTo(b);
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, distance, 8), new THREE.MeshStandardMaterial({ color: BASE_COLORS[base] ?? 0xd9e5f2, roughness: 0.5 }));
-      rod.position.copy(midpoint); rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); root.add(rod);
+      for (const [strand, p, color] of [['a', a, 0x9fddff], ['b', b, 0xffa2b9]] as const) {
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(0.038, 12, 9), biologicalMaterial(THREE, color, { emissive: color, roughness: 0.34 })); bead.name = `dna:backbone-node:${strand}:${i}`; bead.position.copy(p); rotor.add(bead);
+      }
     }
   }
   const backboneA = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(left), 160, 0.028, 8, false), new THREE.MeshStandardMaterial({ color: 0x66baff, emissive: 0x274e78, emissiveIntensity: 0.18, roughness: 0.4 }));
   const backboneB = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(right), 160, 0.028, 8, false), new THREE.MeshStandardMaterial({ color: 0xff7097, emissive: 0x78344a, emissiveIntensity: 0.18, roughness: 0.4 }));
-  root.add(backboneA, backboneB);
+  backboneA.name = 'dna:backbone:a'; backboneB.name = 'dna:backbone:b'; rotor.add(backboneA, backboneB);
 
   // Translation product: actual peptide string from the canonical central-dogma report, rendered as
   // a bounded bead chain. No 3D protein fold is invented here.
@@ -184,7 +267,7 @@ function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArt
     const bead = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 9), new THREE.MeshStandardMaterial({ color: 0xb4e081, roughness: 0.55 }));
     bead.position.set((i - (shown - 1) / 2) * 0.095, Math.sin(i * 0.7) * 0.06, 0); peptideGroup.add(bead);
   }
-  root.add(peptideGroup);
+  peptideGroup.name = 'dna:translation-product'; rotor.add(peptideGroup);
   markModel(root, 'molecule'); addShadows(root); return root;
 }
 
@@ -241,7 +324,8 @@ export class HumanMacroMicroLayer {
     this.time += Math.max(0, Math.min(0.1, dt));
     if (!this.content) return;
     // Slow museum-like rotation: presentation only, deterministic for the same elapsed time.
-    this.content.rotation.y = this.time * 0.22;
+    const rotor = this.content.getObjectByName('macro-rotor');
+    if (rotor) rotor.rotation.y = this.time * 0.22;
   }
 
   dispose(): void {

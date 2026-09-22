@@ -1311,7 +1311,15 @@ kbd {
 .world-director-panel h1 { font-size: 1.45rem; letter-spacing: .02em; }
 .world-director-panel p { color: #8fa8b8; font-size: .82rem; line-height: 1.45; }
 .world-director-panel label { display: grid; gap: 5px; color: #91aebe; font: 700 .68rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
-.world-director-panel select { min-width: 0; color: #dcecf6; background: rgba(4, 12, 22, .86); border: 1px solid rgba(71, 213, 255, .22); border-radius: 6px; padding: 8px 9px; }
+.world-director-panel select, .world-director-panel input { min-width: 0; color: #dcecf6; background: rgba(4, 12, 22, .86); border: 1px solid rgba(71, 213, 255, .22); border-radius: 6px; padding: 8px 9px; }
+.world-director-panel form { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid rgba(71, 213, 255, .13); border-radius: 9px; background: linear-gradient(145deg, rgba(2, 10, 18, .78), rgba(8, 31, 47, .55)); }
+.world-director-panel form label { min-width: 0; }
+.world-director-panel form button { min-height: 34px; padding: 7px 10px; border: 1px solid rgba(83, 224, 255, .34); border-radius: 6px; color: #bff5ff; background: rgba(9, 77, 98, .45); font: 700 .62rem var(--font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.world-director-panel form button:hover { border-color: rgba(108, 239, 255, .72); background: rgba(13, 102, 127, .55); }
+.world-director-panel [data-testid='world-director-spacetime-descriptor'] { display: grid; gap: 5px; padding: 9px; border: 1px solid rgba(137, 109, 255, .24); border-radius: 9px; background: rgba(5, 8, 22, .72); }
+.world-director-panel [data-testid='world-director-spacetime-descriptor'] > strong { color: #ddf7ff; font-size: .78rem; }
+.world-director-panel [data-testid='world-director-spacetime-descriptor'] > span, .world-director-panel [data-testid='world-director-spacetime-descriptor'] > small { color: #819caf; font: .62rem/1.4 var(--font-mono); }
+.world-director-panel [data-testid='world-director-spacetime-descriptor'] svg { width: 100%; height: 104px; border-radius: 6px; box-shadow: inset 0 0 24px rgba(64, 176, 255, .1); }
 .world-director-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
 .world-director-row label:first-child:has(input[type='checkbox']) { grid-template-columns: auto 1fr; align-items: center; align-self: center; }
 .world-director-proof { display: grid; gap: 5px; margin: 0; padding-top: 10px; border-top: 1px solid rgba(71, 213, 255, .14); }
@@ -1354,6 +1362,7 @@ kbd {
 
 @media (max-width: 800px) {
   .world-director-panel { top: 10px; left: 10px; width: calc(100% - 20px); max-height: 52vh; overflow: auto; }
+  .world-director-panel form { grid-template-columns: 1fr; }
   .meta-cognition { padding: 14px; }
   .meta-state-grid { grid-template-columns: repeat(4, 1fr); }
   .meta-grid { grid-template-columns: 1fr; }

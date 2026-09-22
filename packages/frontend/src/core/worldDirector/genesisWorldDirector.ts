@@ -1,6 +1,8 @@
 import type { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import { buildHistoricalScene, type HistoricalScene } from '../temporalCinematic/temporalCinematicEngine';
 import type { CameraPath } from '../temporalCinematic/cameraPath';
+import { describeSpacetimeWorld, type SpacetimeWorldDescriptor } from '../temporalCinematic/spacetimeWorldDescriptor';
+import { resolveSpacetimeWorldPrompt, type ResolvedSpacetimeWorld } from '../worldModel/generation/spacetimeWorldProposal';
 
 /** Product presets resolved through the one canonical WorldSpecification pipeline. */
 export type GenesisWorldPreset = 'MODERN_SCIENTIFIC_LAB' | 'MODERN_CITY' | 'HISTORICAL_RECONSTRUCTION';
@@ -33,6 +35,18 @@ export interface GenesisDirectedWorld {
     readonly roomCount: number;
     readonly assetSlotCount: number;
   };
+}
+
+/**
+ * Natural-language product path for the supported spacetime/world presets.
+ * The parser is deterministic and bounded; realization always flows through
+ * the canonical WorldSpecification compiler and WorldGenerator.
+ */
+export type GenesisDirectedPromptWorld = ResolvedSpacetimeWorld & { readonly descriptor: SpacetimeWorldDescriptor };
+
+export function directGenesisPromptWorld(prompt: string): GenesisDirectedPromptWorld {
+  const resolved = resolveSpacetimeWorldPrompt(prompt);
+  return { ...resolved, descriptor: describeSpacetimeWorld(resolved.runtime.engine.graph, resolved.primaryTemplate) };
 }
 
 const PRESETS: Readonly<Record<GenesisWorldPreset, { readonly place: string; readonly year: number; readonly interior: boolean }>> = {
@@ -84,6 +98,19 @@ export function recordDirectedWorld(ledger: EvidenceLedger, directed: GenesisDir
     claimType: 'model',
     confidence: 1,
     provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director', independentSourceIds: [] },
+  }).record.contentHash;
+}
+
+/** Records the actually generated prompt world, including its deterministic graph fingerprint. */
+export function recordDirectedPromptWorld(ledger: EvidenceLedger, directed: GenesisDirectedPromptWorld): string {
+  const entities = directed.runtime.engine.graph.listEntities();
+  return ledger.addRecord({
+    sourceUrl: `genesis://world-director/prompt/${directed.world.generated.worldId}`,
+    sourceTimestamp: null,
+    claim: `World Director generated and presented canonical prompt world ${directed.world.generated.worldId}; template=${directed.primaryTemplate}; entities=${entities.length}; descriptor=${directed.descriptor.kind}; epistemic=${directed.descriptor.epistemic}; graphFingerprint=${directed.deterministicFingerprint}`,
+    claimType: 'model',
+    confidence: 1,
+    provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director prompt runtime', independentSourceIds: [] },
   }).record.contentHash;
 }
 

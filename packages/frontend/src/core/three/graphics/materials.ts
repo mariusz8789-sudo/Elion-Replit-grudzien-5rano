@@ -638,7 +638,9 @@ const MATERIAL_BUILDERS: {
   // Terrain/foliage-adjacent ground plane — a dark, near-fully-rough green so grass/dirt reads
   // correctly under directional light without any per-blade geometry.
   GROUND: (THREE, overrides) => {
-    const worn = makeWornSurface(THREE, 0x42534b, { roughness: 0.96, wear: 0.3, seed: 53 });
+    // Neutral compacted earth/urban verge. The former blue-green base became cyan under the day
+    // sky + ACES exposure, dominating every unbuilt parcel in cinematic city frames.
+    const worn = makeWornSurface(THREE, 0x454640, { roughness: 0.96, wear: 0.3, seed: 53 });
     worn.map.repeat.set(4, 4);
     worn.roughnessMap.repeat.set(4, 4);
     return new THREE.MeshStandardMaterial({

@@ -27,7 +27,32 @@ import type { WorldBlueprintNode, WorldBlueprintRelationship } from '../generati
  */
 
 /** The composable base world templates — see specification/templates.ts. A specification MAY request several at once ("CITY + LABORATORY + WATER_SYSTEM"), which the compiler composes into one coherent world, never separate disconnected demos. */
-export type WorldTemplateId = 'CITY' | 'LABORATORY' | 'WATER_SYSTEM' | 'EPIDEMIOLOGY' | 'INDUSTRIAL_SITE';
+export type WorldTemplateId =
+  | 'CITY'
+  | 'LABORATORY'
+  | 'WATER_SYSTEM'
+  | 'EPIDEMIOLOGY'
+  | 'INDUSTRIAL_SITE'
+  | 'QUANTUM'
+  | 'TIME_DILATION_LAB'
+  | 'COSMOLOGY_SPACETIME'
+  | 'EINSTEIN_ROSEN_BRIDGE'
+  | 'MULTIVERSE_BRANCH'
+  | 'HISTORICAL_RECONSTRUCTION'
+  | 'DESERT_ALIEN'
+  | 'MARS_RESEARCH';
+
+/** Parameters consumed only by the composable spacetime/world templates. */
+export interface SpacetimeWorldParameters {
+  /** Number of structural counterfactual branches to create (1..12). */
+  branchCount?: number;
+  /** Presentation-model scale, not a claim about an observed astronomical body. */
+  primaryMassScale?: number;
+  /** Render-model throat radius in world units for the hypothetical bridge. */
+  throatRadius?: number;
+  /** Historical year represented by a reconstruction request. */
+  historicalYear?: number;
+}
 
 export interface GeographySpec {
   /** Purely structural/topological flags consumed by the CITY template's procedural expansion (specification/templates.ts) — they do not imply a hydrology or terrain solver exists. */
@@ -118,4 +143,6 @@ export interface WorldSpecification {
   levelOfDetail?: 'LOW' | 'MEDIUM' | 'HIGH';
   groundingExpectations?: GroundingExpectation;
   provenanceNote?: string;
+  /** Optional typed inputs for spacetime/world templates; ignored by other templates. */
+  spacetime?: SpacetimeWorldParameters;
 }

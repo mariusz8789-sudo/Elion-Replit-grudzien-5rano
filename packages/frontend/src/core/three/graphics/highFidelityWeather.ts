@@ -19,9 +19,11 @@ export function weatherProfile(weather?: string): WeatherProfile {
     case 'DUST': return { density: 1800, speed: 4, color: 0xd7a36d, size: 0.05, opacity: 0.35, fogDensity: 0.034 };
     case 'FOG': return { density: 500, speed: 0.4, color: 0xe2edf7, size: 0.08, opacity: 0.18, fogDensity: 0.034 };
     case 'NIGHT': return { density: 350, speed: 0.4, color: 0x6882a6, size: 0.04, opacity: 0.18, fogDensity: 0.008 };
-    case 'CLOUDY': return { density: 0, speed: 0, color: 0xffffff, size: 0, opacity: 0, fogDensity: 0.012 };
+    case 'CLOUDY': return { density: 0, speed: 0, color: 0xffffff, size: 0, opacity: 0, fogDensity: 0.007 };
     case 'HEAT_HAZE': return { density: 0, speed: 0, color: 0xffffff, size: 0, opacity: 0, fogDensity: 0.006 };
-    default: return { density: 0, speed: 0, color: 0xffffff, size: 0, opacity: 0, fogDensity: 0.008 };
+    // Clear air still gets aerial perspective, but 0.008 erased mid-distance facade contrast in
+    // block-scale cinematic shots. 0.0035 keeps depth without turning a clear day into white fog.
+    default: return { density: 0, speed: 0, color: 0xffffff, size: 0, opacity: 0, fogDensity: 0.0035 };
   }
 }
 

@@ -32,6 +32,7 @@ import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
 import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
+import { createHolographicResearchCompanion, type HolographicResearchCompanion } from './holographicResearchCompanion';
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -86,6 +87,7 @@ export class AgentLabScene3D implements Sim3D {
   private THREE: typeof THREE_NS | null = null;
   private scene: THREE_NS.Scene | null = null;
   private character: Character | null = null;
+  private researchCompanion: HolographicResearchCompanion | null = null;
   private stations = new Map<string, StationVisual>();
   private dust: DustMotesHandle | null = null;
   private beacons: THREE_NS.MeshStandardMaterial[] = [];
@@ -137,6 +139,8 @@ export class AgentLabScene3D implements Sim3D {
   private isolatedTwinNodes: readonly string[] = [];
   private researchLayoutOpen = false;
   setResearchLayout(open: boolean): void { this.researchLayoutOpen = open; }
+  /** Visual-only acknowledgement that the ONE existing ScienceChat has been opened from this lab. */
+  engageResearchCompanion(): void { this.researchCompanion?.engage(this.time); }
   private lastWall: number | null = null;
   private elapsedWallSeconds = 0;
   private frameDeltaSeconds = 0;
@@ -171,6 +175,7 @@ export class AgentLabScene3D implements Sim3D {
       lastPickedNode: this.lastPickedNode,
       twinLod: this.twins[0]?.getLodState() ?? null,
       twinLodPreference: this.twinLodPreference,
+      researchCompanion: this.researchCompanion?.getDiagnostics() ?? null,
       organScreenPositions: this.THREE && this.pickCamera && this.renderer ? [...(this.twins[0]?.organs.entries() ?? [])].filter(([, mesh]) => mesh.visible).map(([id, mesh]) => {
         const point = mesh.getWorldPosition(new this.THREE!.Vector3()).project(this.pickCamera!);
         return { id, x: (point.x + 1) * this.renderer!.domElement.clientWidth / 2, y: (1 - point.y) * this.renderer!.domElement.clientHeight / 2 };
@@ -502,9 +507,13 @@ export class AgentLabScene3D implements Sim3D {
     const chamber = createTwinChamber(THREE, { position: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z], radius: TWIN_CHAMBER.radius, height: TWIN_CHAMBER.height, glass, palette, ceilingHeight: H });
     scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
     this.macroMicro = new HumanMacroMicroLayer(THREE, this.manifest);
-    this.macroMicro.group.position.set(TWIN_CHAMBER.position.x + 0.95, 1.35, TWIN_CHAMBER.position.z + 0.15);
-    this.macroMicro.group.scale.setScalar(0.68);
+    this.macroMicro.group.position.set(TWIN_CHAMBER.position.x + 1.12, 1.42, TWIN_CHAMBER.position.z + 0.08);
+    this.macroMicro.group.scale.setScalar(0.76);
     scene.add(this.macroMicro.group);
+    // A visual interface to the ONE global ScienceChat. It owns no reasoning,
+    // memory or agent loop and remains outside the twin chamber/camera cone.
+    this.researchCompanion = createHolographicResearchCompanion(THREE);
+    scene.add(this.researchCompanion.root);
     const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
     this.twinTier = twin.tier;
@@ -517,7 +526,7 @@ export class AgentLabScene3D implements Sim3D {
       const arm = createManipulatorArm(THREE, { position: [x, 0, z], headingRadians: heading, scale: 1.25, phase, linkMaterial: palette.BRUSHED_METAL, jointMaterial: palette.POLISHED_METAL, baseMaterial: palette.PAINTED_METAL });
       scene.add(arm.group); this.arms.push(arm);
     }
-    createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 10, rim: 2 }, color: { key: 0xf2f7ff, rim: 0x8fd3ff }, castShadow: false });
+    createHeroLight(THREE, scene, { target: [TWIN_CHAMBER.position.x, 1.3, TWIN_CHAMBER.position.z], keyDistance: 3.6, rimDistance: 2.6, intensity: { key: 8.4, rim: 2.4 }, color: { key: 0xe9f2ff, rim: 0x68c9ee }, castShadow: false });
     // Stations (pack ids), their practical lights, and the pack's hanging signs.
     for (const st of this.stationDefs) this.buildBiologyStationVisual(THREE, scene, palette, glass, st);
     const signText: Readonly<Record<string, [string, string]>> = { 'sign.neuro': ['Neuro Lab', 'sygnały · MODEL'], 'sign.micro': ['Hyperscope', 'mikroskopia wirtualna'], 'sign.orpheus': ['ORPHEUS', 'analizator koncepcyjny'] };
@@ -714,6 +723,7 @@ export class AgentLabScene3D implements Sim3D {
       sp.rotation.y = this.cameraMode === 'TWIN' && sp === this.twins[0]?.group ? 0 : this.time * (sp.name === 'carousel' ? 0.5 : 0.18);
     }
     if (this.chamberRing) this.chamberRing.emissiveIntensity = 0.55 + 0.1 * Math.sin(this.time * 1.4);
+    this.researchCompanion?.update(this.time, u?.state ?? 'IDLE');
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
@@ -740,13 +750,14 @@ export class AgentLabScene3D implements Sim3D {
       // Desktop dedicates the centre-left to the whole body, with the research dock on the right.
       // Portrait leaves room for the lower dock; an isolate/section moves closer to the torso.
       const portrait = camera.aspect < 1;
-      const dist = portrait ? (tight ? 3.0 : 4.4) : (tight ? 2.3 : 2.75);
+      const macroVisible = this.macroMicro?.group.visible === true;
+      const dist = portrait ? (tight ? 3.0 : 4.4) : (tight ? 2.3 : macroVisible ? 3.05 : 2.75);
       const height = tight ? 1.45 : 1.55;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
       const drift = Math.sin(this.time * 0.22) * 0.14;
       this.scratchA.set(TWIN_CHAMBER.position.x + drift, height, TWIN_CHAMBER.position.z + dist);
       this.twinCamPos.lerp(this.scratchA, 0.08);
-      const panelOffset = this.researchLayoutOpen && !portrait ? 0.55 : 0;
+      const panelOffset = !portrait && macroVisible ? 0.46 : this.researchLayoutOpen && !portrait ? 0.55 : 0;
       this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, portrait ? 0.65 : 1.12, TWIN_CHAMBER.position.z);
       this.twinCamLook.lerp(this.scratchB, 0.12);
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
@@ -762,7 +773,7 @@ export class AgentLabScene3D implements Sim3D {
       this.spectatorLook.lerp(this.scratchB.set(pose.position.x + fx * 0.8, 1.35, pose.position.z + fz * 0.8), 0.1);
       camera.position.copy(this.spectatorPos); camera.lookAt(this.spectatorLook);
     }
-    this.pipeline?.setFocusDistance(this.cameraMode === 'VISOR' ? 1.6 : this.cameraMode === 'TWIN' ? 2.4 : 3.4);
+    this.pipeline?.setFocusDistance(this.cameraMode === 'VISOR' ? 1.6 : this.cameraMode === 'TWIN' ? (this.macroMicro?.group.visible ? 2.8 : 2.4) : 3.4);
   }
 
   /**
@@ -846,6 +857,7 @@ export class AgentLabScene3D implements Sim3D {
     this.twinLoadGeneration++; this.twinAbort?.abort(); this.twinAbort = null; this.twinAnchor = null;
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;
+    this.researchCompanion?.dispose(); this.researchCompanion = null;
     if (this.scene) disposeSceneResources(this.scene);
     this.character?.dispose();
     for (const t of this.twins) t.dispose();

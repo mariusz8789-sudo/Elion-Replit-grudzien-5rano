@@ -11,6 +11,7 @@ import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_TEXT, explorerCommands, explorerPa
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
+import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 
 /**
  * HUMAN EXPLORER PANEL (D-130) — the reference UI's four blocks over the
@@ -89,9 +90,9 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
   return (
-    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode}>
+    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
       <header className="sw-ex-head">
-        <span className="sw-badge" data-testid="sw-explorer-tier">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
+        <span className="sw-badge" data-testid="sw-explorer-tier" title="Cinematic procedural presentation; geometry remains an illustrative scientific model.">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
         <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
         <span className={`sw-badge sw-ex-mode sw-ex-mode-${evidenceMode.toLowerCase()}`} data-testid="sw-explorer-evidence">{explorerTruthLabel(evidenceMode)}</span>
       </header>

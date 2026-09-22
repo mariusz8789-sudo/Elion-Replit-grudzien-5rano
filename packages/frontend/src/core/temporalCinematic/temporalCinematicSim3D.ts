@@ -15,6 +15,8 @@ import type { WorldFrame as GraphicsWorldFrame } from '../three/graphics/worldFr
 import type { TemporalEngine } from '../worldModel/temporal/temporalEngine';
 import type { RoomType } from '../worldModel/ecs/geometry';
 import { sampleCameraPath, type CameraPath } from './cameraPath';
+import type { SpacetimeWorldDescriptor } from './spacetimeWorldDescriptor';
+import { createSpacetimeWorldVisualLayer, type SpacetimeWorldVisualHandle } from '../three/spacetimeWorldVisuals';
 import {
   createTemporalCinematicVisualResolver,
   estimateTemporalWorldGroundSize,
@@ -29,8 +31,40 @@ export interface TemporalCinematicPresentationOptions {
   readonly roomType?: RoomType;
   readonly navigationMode?: 'WALK' | 'OBSERVER' | 'CINEMATIC';
   readonly autoPlay?: boolean;
+  /** Presentation-only geometry derived from the same canonical generated WorldGraph. */
+  readonly spacetimeDescriptor?: SpacetimeWorldDescriptor;
   /** Receives only canonical generated ASSET_SLOT selections from the shared pointer pipeline. */
   readonly onAssetSelection?: (selection: { readonly entityId: string; readonly slotType: string } | null) => void;
+}
+
+interface SpacetimePresentationProfile {
+  readonly environmentMode: 'OUTDOOR' | 'INDOOR';
+  readonly hourOfDay: number;
+  readonly fogDensity: number;
+  readonly ambientHaze: boolean;
+  readonly fillIntensity: number;
+  readonly sunIntensity: number;
+  readonly exposure: number;
+  readonly bloom: { readonly strength: number; readonly radius: number; readonly threshold: number };
+  readonly livingWorld: boolean;
+}
+
+/**
+ * Presentation-only grade for the descriptor-backed worlds. The canonical graph remains the sole
+ * source of world state; this function only prevents a deep-space model from inheriting the bright
+ * midday city sky and exposure used by the generic exterior runtime.
+ */
+export function spacetimePresentationProfile(kind: SpacetimeWorldDescriptor['kind']): SpacetimePresentationProfile {
+  switch (kind) {
+    case 'HISTORICAL_CITY':
+      return { environmentMode: 'OUTDOOR', hourOfDay: 18.1, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.34, sunIntensity: 1.7, exposure: 0.82, bloom: { strength: 0.2, radius: 0.46, threshold: 0.98 }, livingWorld: true };
+    case 'ALIEN_DESERT':
+      return { environmentMode: 'OUTDOOR', hourOfDay: 15.8, fogDensity: 0.0018, ambientHaze: true, fillIntensity: 0.48, sunIntensity: 1.8, exposure: 0.86, bloom: { strength: 0.28, radius: 0.58, threshold: 0.88 }, livingWorld: false };
+    case 'MARS_STATION':
+      return { environmentMode: 'OUTDOOR', hourOfDay: 15.4, fogDensity: 0.0016, ambientHaze: true, fillIntensity: 0.46, sunIntensity: 1.85, exposure: 0.86, bloom: { strength: 0.2, radius: 0.5, threshold: 0.96 }, livingWorld: false };
+    default:
+      return { environmentMode: 'INDOOR', hourOfDay: 21, fogDensity: 0, ambientHaze: false, fillIntensity: 0.08, sunIntensity: 0.72, exposure: 0.72, bloom: { strength: 0.46, radius: 0.72, threshold: 0.76 }, livingWorld: false };
+  }
 }
 
 /**
@@ -46,10 +80,12 @@ export class TemporalCinematicSim3D implements Sim3D {
   private environment: SceneEnvironmentHandle | null = null;
   private weatherRig: WeatherRig | null = null;
   private livingWorld: LivingWorldDecoratorHandle | null = null;
+  private spacetimeVisual: SpacetimeWorldVisualHandle | null = null;
   private pipeline: GraphicsPipeline | null = null;
   private THREE: typeof THREE_NS | null = null;
   private camera: THREE_NS.PerspectiveCamera | null = null;
   private currentTimeSeconds = 0;
+  private visualElapsedSeconds = 0;
   private readonly graphicsFrame: GraphicsWorldFrame;
   private readonly presentation: TemporalCinematicPresentationOptions;
   private readonly interiorTarget: ScientificInteriorTarget | null;
@@ -94,6 +130,7 @@ export class TemporalCinematicSim3D implements Sim3D {
       // selection and DOF state without claiming a temporal-history reset that cannot exist.
       temporalAccumulation: 'NOT_PRESENT' as const,
       livingWorld: this.presentation.viewMode !== 'interior',
+      spacetimeVisual: this.spacetimeVisual?.summary ?? null,
     };
   }
 
@@ -124,19 +161,47 @@ export class TemporalCinematicSim3D implements Sim3D {
     const weather = this.presentation.weather;
     const profile = weatherProfile(weather);
     const viewMode = this.presentation.viewMode ?? 'street';
+    const spacetimeProfile = this.presentation.spacetimeDescriptor
+      ? spacetimePresentationProfile(this.presentation.spacetimeDescriptor.kind)
+      : null;
 
     this.environment = createSceneEnvironment(THREE, scene, viewMode === 'interior'
-      ? { mode: 'INDOOR', groundSize: 0, tier: 'cinematic', ambientHaze: false, fillIntensity: 0.62, sunIntensity: 1.2 }
+      ? { mode: 'INDOOR', groundSize: 0, tier: 'cinematic', ambientHaze: false, fillIntensity: 0.3, sunIntensity: 0.92 }
+      : spacetimeProfile
+        ? {
+          mode: spacetimeProfile.environmentMode,
+          hourOfDay: spacetimeProfile.hourOfDay,
+          fogDensity: spacetimeProfile.fogDensity,
+          groundSize: 0,
+          tier: 'cinematic',
+          ambientHaze: spacetimeProfile.ambientHaze,
+          fillIntensity: spacetimeProfile.fillIntensity,
+          sunIntensity: spacetimeProfile.sunIntensity,
+          ambientHazeOptions: this.presentation.spacetimeDescriptor?.kind === 'ALIEN_DESERT'
+            ? { color: 0xd87538, opacity: 0.035, count: 120 }
+            : this.presentation.spacetimeDescriptor?.kind === 'MARS_STATION'
+              ? { color: 0xb95e43, opacity: 0.025, count: 90 }
+              : undefined,
+        }
       : {
         mode: 'OUTDOOR',
         hourOfDay: /NIGHT/i.test(weather ?? '') ? 21 : 14,
         fogDensity: profile.fogDensity,
-        groundSize: estimateTemporalWorldGroundSize(this.engine.graph),
+        // Spacetime/world descriptors own their context surface (curvature grid, desert,
+        // regolith, etc.); a generic opaque ground plane would hide the gravity well.
+        groundSize: this.presentation.spacetimeDescriptor ? 0 : estimateTemporalWorldGroundSize(this.engine.graph),
         tier: 'cinematic',
         ambientHaze: true,
       });
 
-    this.weatherRig = viewMode === 'street' ? createHighFidelityWeatherRig(THREE, scene, weather) : null;
+    if (this.presentation.spacetimeDescriptor) {
+      scene.background = new THREE.Color(this.presentation.spacetimeDescriptor.palette[0]);
+      if (spacetimeProfile?.environmentMode === 'INDOOR') scene.fog = null;
+    }
+
+    this.weatherRig = viewMode === 'street' && !this.presentation.spacetimeDescriptor
+      ? createHighFidelityWeatherRig(THREE, scene, weather)
+      : null;
     this.visualResolver = createTemporalCinematicVisualResolver(THREE, this.engine.graph, {
       weather,
       detailedHumanCount: 24,
@@ -144,7 +209,12 @@ export class TemporalCinematicSim3D implements Sim3D {
       interiorTargetRoomId: this.interiorTarget?.roomId ?? null,
     });
 
-    if (viewMode === 'street') {
+    if (this.presentation.spacetimeDescriptor) {
+      this.spacetimeVisual = createSpacetimeWorldVisualLayer(THREE, this.presentation.spacetimeDescriptor, this.engine.graph);
+      scene.add(this.spacetimeVisual.root);
+    }
+
+    if (viewMode === 'street' && (!spacetimeProfile || spacetimeProfile.livingWorld)) {
       this.livingWorld = createLivingWorldDecorator(THREE, scene, this.engine.graph, this.visualResolver.palette, {
         year: this.presentation.year,
       });
@@ -207,19 +277,32 @@ export class TemporalCinematicSim3D implements Sim3D {
   ): PostProcessor {
     if (!this.THREE) throw new Error('TemporalCinematicSim3D.setupPostProcessing called before init');
     const wet = /RAIN|STORM/i.test(this.presentation.weather ?? '');
+    const spacetimeProfile = this.presentation.spacetimeDescriptor
+      ? spacetimePresentationProfile(this.presentation.spacetimeDescriptor.kind)
+      : null;
     this.pipeline = setupGraphicsPipeline(this.THREE, modules, renderer, {
       scene,
       camera,
       width: w,
       height: h,
       qualityTier: 'cinematic',
-      toneMappingExposure: this.presentation.viewMode === 'interior' ? 0.82 : 1.08,
-      bloom: { strength: this.presentation.viewMode === 'interior' ? 0.32 : 0.26, radius: 0.5, threshold: 0.9 },
+      toneMappingExposure: spacetimeProfile?.exposure ?? (this.presentation.viewMode === 'interior' ? 0.68 : 1.08),
+      bloom: spacetimeProfile?.bloom ?? { strength: this.presentation.viewMode === 'interior' ? 0.15 : 0.26, radius: 0.45, threshold: this.presentation.viewMode === 'interior' ? 1.04 : 0.9 },
+      // Descriptor worlds already own a coherent sky/background and light balance. The generic IBL
+      // is intentionally disabled here because it replaced that context with a bright studio box.
+      ambient: spacetimeProfile?.environmentMode === 'INDOOR'
+        ? { mode: 'none' }
+        : this.presentation.viewMode === 'interior'
+          ? { mode: 'room-probe', probe: { position: [0, 1.4, 0], intensity: 0.58 } }
+          : undefined,
       ambientOcclusion: { enabled: true, minTier: 'high', radius: 0.5, blendIntensity: 0.86 },
       reflections: wet ? { enabled: true, minTier: 'cinematic', strength: 0.42, maxDistance: 10 } : { enabled: false },
       antiAliasing: { enabled: true, minTier: 'medium' },
       depthOfField: { enabled: true, minTier: 'high', focusDistance: 7.5, aperture: 0.00016, maxBlur: 0.004 },
     });
+    // `room-probe` starts with the shared studio fallback; keep it deliberately dim until/if a
+    // caller captures the actual room. This prevents pale walls and monitor bloom from clipping.
+    if (this.presentation.viewMode === 'interior') scene.environmentIntensity = 0.58;
     return this.pipeline;
   }
 
@@ -283,6 +366,8 @@ export class TemporalCinematicSim3D implements Sim3D {
       this.currentTimeSeconds = next % this.cameraPath.durationSeconds;
     }
     this.environment?.update(dt);
+    this.visualElapsedSeconds += dt;
+    this.spacetimeVisual?.update(this.visualElapsedSeconds);
     this.weatherRig?.update(dt, this.camera ?? undefined);
     this.livingWorld?.update(dt);
   }
@@ -311,6 +396,7 @@ export class TemporalCinematicSim3D implements Sim3D {
     this.interaction = null;
     this.renderedSlotIds.clear();
     this.renderer?.dispose(); this.renderer = null;
+    this.spacetimeVisual?.dispose(); this.spacetimeVisual = null;
     this.livingWorld?.dispose(); this.livingWorld = null;
     this.weatherRig?.dispose(); this.weatherRig = null;
     this.environment?.dispose(); this.environment = null;

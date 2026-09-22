@@ -294,6 +294,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const setTwinCamera = (on: boolean): void => { const next: AgentCameraMode = on ? 'TWIN' : 'SPECTATOR'; setCamera(next); sim.setCameraMode(next); };
   // D-131: the body shell's presentation. Stylised views of a model — no label, session or evidence changes.
   const applySurface = (mode: TwinSurfaceMode): void => { setSurface(mode); sim.setTwinSurface(mode); };
+  const openResearchCompanion = (): void => {
+    sim.engageResearchCompanion();
+    requestOpenScienceChat();
+  };
   const station = stationId ? def.stations.find((s) => s.id === stationId) ?? null : null;
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
 
@@ -337,6 +341,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         <div className="sw-actions">
           <button type="button" className="sw-btn" onClick={toggleCamera} data-testid="sw-camera">{camera === 'VISOR' ? 'Kamera obserwatora' : 'Wróć do wizjera'}</button>
           <button type="button" className={`sw-btn${voice ? ' is-on' : ''}`} onClick={() => setVoice((v) => !v)} aria-pressed={voice} data-testid="sw-voice">Głos {voice ? 'wł.' : 'wył.'}</button>
+          {world === 'biology' && <>
+            <span className="sw-badge" data-testid="sw-ai-companion-label">AI NAUKOWIEC · VISUAL_AI_COMPANION · MODEL</span>
+            <button type="button" className="sw-btn sw-btn-primary" onClick={openResearchCompanion} data-testid="sw-ai-companion-chat" aria-label="Porozmawiaj z holograficznym naukowcem przez istniejący ScienceChat">Porozmawiaj z hologramem · ScienceChat</button>
+          </>}
           <select className="sw-select" value={level} onChange={(e) => setLevel(e.target.value as GuideLevel)} aria-label="Poziom narracji" data-testid="sw-level">
             <option value="EXPLORER">Odkrywca</option><option value="SCIENTIST">Naukowiec</option><option value="AUDITOR">Audytor</option>
           </select>

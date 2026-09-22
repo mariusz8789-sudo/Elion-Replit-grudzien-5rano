@@ -17,7 +17,7 @@ import { buildCharacter, paletteFromSeed } from '../three/characterRig';
 import { loadHumanTwinBody, type LoadedHumanTwinBody } from '../three/humanTwinAsset';
 
 const FLOOR_HEIGHT_M = 3.5;
-const FACADE_TINTS = [0xb66a52, 0x8f745f, 0xa78d74, 0x7e6960, 0x9c8468, 0x6d7a72] as const;
+const FACADE_TINTS = [0x8f5749, 0x736357, 0x827267, 0x655b58, 0x786956, 0x59635e] as const;
 
 export interface TemporalCinematicVisualResolverOptions {
   weather?: string;
@@ -78,6 +78,7 @@ function createBuildingVisual(
   model: WorldModelEntity,
   frame: WorldFrameEntity,
   palette: HighFidelityMaterialPalette,
+  isNight: boolean,
 ): EntityVisualSpec {
   if (model.geometry?.kind !== 'BUILDING') return structuralNoop(THREE, 'building-missing-geometry');
   const geometry = model.geometry;
@@ -88,7 +89,13 @@ function createBuildingVisual(
   const height = Math.max(0.01, heightMeters / transformScale);
   const seed = seedFromId(frame.id);
   const tint = FACADE_TINTS[seed % FACADE_TINTS.length]!;
-  const wall = createPBRMaterial(THREE, 'BUILDING_FACADE', { color: tint }) as THREE_NS.MeshStandardMaterial;
+  // BUILDING_FACADE already paints a window grid into its albedo/emissive maps. This scene also
+  // adds real instanced window planes, so using both produced doubled grids and clipped white
+  // rectangles in film frames. Give the body a masonry surface and let the geometry own windows.
+  const wallKind = geometry.buildingType === 'INDUSTRIAL' || geometry.buildingType === 'WATER_RESEARCH_FACILITY'
+    ? 'CONCRETE'
+    : seed % 3 === 0 ? 'BRICK' : 'CONCRETE';
+  const wall = createPBRMaterial(THREE, wallKind, { color: tint }) as THREE_NS.MeshStandardMaterial;
   // BUILDING_FACADE's map/normalMap are baked at a fixed pixel size and, like every THREE.BoxGeometry
   // face, default to a single 0..1 UV tile regardless of the box's actual world-unit size — so at
   // real city scale (buildings up to ~30m wide) the same texture stretches roughly 10-30x too large,
@@ -108,13 +115,22 @@ function createBuildingVisual(
   const facadeRepeatV = Math.max(1, Math.round(realHeightM / facadeTileM));
   wall.map?.repeat.set(facadeRepeatU, facadeRepeatV);
   wall.normalMap?.repeat.set(facadeRepeatU, facadeRepeatV);
-  wall.emissiveMap?.repeat.set(facadeRepeatU, facadeRepeatV);
+  // This masonry material deliberately has no emissive window map; physical window geometry below
+  // is the single facade-lighting vocabulary for Temporal Cinematic.
   const roof = geometry.buildingType === 'INDUSTRIAL' || geometry.buildingType === 'WATER_RESEARCH_FACILITY'
     ? palette.stainless
     : palette.brick;
 
   const root = new THREE.Group();
   root.name = `genesis-world-building-${geometry.buildingType.toLowerCase()}`;
+  const windowMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.3,
+    metalness: 0.08,
+    envMapIntensity: 0.48,
+    side: THREE.FrontSide,
+  });
+  const isAlwaysOccupied = geometry.buildingType === 'HOSPITAL' || geometry.buildingType.includes('LAB');
   const building = createFacadeBuilding(THREE, {
     position: [0, 0, 0],
     width,
@@ -123,10 +139,14 @@ function createBuildingVisual(
     floorHeight: FLOOR_HEIGHT_M / transformScale,
     seed,
     wallMaterial: wall,
-    windowMaterial: palette.glass,
+    windowMaterial,
     roofMaterial: roof,
+    trimMaterial: palette.dark,
+    entranceMaterial: windowMaterial,
     rooftopEquipment: true,
-    litFraction: geometry.buildingType === 'HOSPITAL' || geometry.buildingType.includes('LAB') ? 0.62 : 0.42,
+    litFraction: isNight ? (isAlwaysOccupied ? 0.58 : 0.36) : (isAlwaysOccupied ? 0.18 : 0.08),
+    litColor: 0xc9965c,
+    unlitColor: 0x18232d,
   });
   // renderReadiness places the entity root at the building's vertical centre. createFacadeBuilding
   // uses a ground-level origin, so shift the generated building down by half its NORMALIZED height.
@@ -363,7 +383,7 @@ export function createTemporalCinematicVisualResolver(
     }
 
     switch (g.kind) {
-      case 'BUILDING': return createBuildingVisual(THREE, model, frame, palette);
+      case 'BUILDING': return createBuildingVisual(THREE, model, frame, palette, /NIGHT/i.test(options.weather ?? ''));
       case 'ROAD': return createRoadVisual(THREE, model, palette, wet);
       case 'INTERSECTION': return createIntersectionVisual(THREE, palette, wet);
       case 'FLOOR': case 'ROOM':

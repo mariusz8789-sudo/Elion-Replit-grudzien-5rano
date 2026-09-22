@@ -44,7 +44,19 @@ export function kelvinToColor(THREE: typeof THREE_NS, kelvin: number): THREE_NS.
 
 /** A matte, lightly-sheened epoxy floor (a biomedical facility floor, not the physics lab's worn wet concrete). */
 export function createEpoxyFloor(THREE: typeof THREE_NS): THREE_NS.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: 0x5f6870, roughness: 0.66, metalness: 0.04, normalMap: surfaceNormalFactory(THREE)(10, 10), normalScale: new THREE.Vector2(0.035, 0.035), envMapIntensity: 0.4 });
+  const floor = new THREE.MeshPhysicalMaterial({
+    color: 0x14232c,
+    roughness: 0.46,
+    metalness: 0.06,
+    clearcoat: 0.24,
+    clearcoatRoughness: 0.38,
+    normalMap: surfaceNormalFactory(THREE)(10, 10),
+    normalScale: new THREE.Vector2(0.026, 0.026),
+    envMapIntensity: 0.52,
+  });
+  floor.name = 'biology-epoxy-cinematic';
+  floor.userData.finish = 'MATTE_EPOXY_LOW_GLARE';
+  return floor;
 }
 
 /** Lumens on the pack's nodes onto three.js point/spot intensity at this room's exposure (documented mapping, not a photometric claim). */
@@ -259,7 +271,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   const tier: HumanTwinTier = asset ? asset.tier : 'PROXY';
   const holo = opts.hologram === true && !asset; const holoColor = opts.hologramHex ?? 0x9fe9ff;
   const skin = holo
-    ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(holoColor), emissive: new THREE.Color(holoColor), emissiveIntensity: 0.55, roughness: 0.35, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false })
+    ? new THREE.MeshPhysicalMaterial({ color: new THREE.Color(holoColor), emissive: new THREE.Color(holoColor), emissiveIntensity: 0.38, roughness: 0.32, metalness: 0, transparent: true, opacity: 0.34, depthWrite: false, clearcoat: 0.18, clearcoatRoughness: 0.3 })
     : new THREE.MeshPhysicalMaterial({ color: new THREE.Color(opts.skinHex), roughness: 0.42, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.5, transparent: true, opacity: 1, depthWrite: true });
   // D-131: with an approved licensed asset the GLB IS the body; the procedural rig stays built (the
   // Character handle is part of the contract) but is hidden, so no second body is ever on screen.
@@ -292,7 +304,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     const pts: number[] = []; const v = new THREE.Vector3();
     body.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (!m.isMesh || !m.visible) return; const pos = m.geometry.getAttribute('position'); for (let i = 0; i < pos.count; i += 2) { v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); pts.push(v.x, v.y, v.z); } });
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    cloudMat = new THREE.PointsMaterial({ color: holoColor, size: 0.012, transparent: true, opacity: 0.85, depthWrite: false });
+    cloudMat = new THREE.PointsMaterial({ color: holoColor, size: 0.009, transparent: true, opacity: 0.68, depthWrite: false, sizeAttenuation: true });
     cloud = new THREE.Points(geo, cloudMat); cloud.name = 'twin:points'; g.add(cloud);
   }
   const organs = new Map<string, THREE_NS.Mesh>();
@@ -301,7 +313,7 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   for (const n of manifest.nodes) {
     if (n.kind !== 'ORGAN') continue;
     const color = SYSTEM_COLOR[n.system ?? ''] ?? 0xc7a08a;
-    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, roughness: 0.55, transparent: true, opacity: 0.92 });
+    const mat = new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0.14, roughness: 0.52, clearcoat: 0.2, clearcoatRoughness: 0.48, transparent: true, opacity: 0.9 });
     organMats.push(mat);
     const m = new THREE.Mesh(sphere, mat); m.name = `organ:${n.id}`;
     m.position.set(n.positionMeters.x, n.positionMeters.y, n.positionMeters.z);
@@ -455,7 +467,7 @@ export interface TwinChamberOptions {
  */
 export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptions): { group: THREE_NS.Group; anchor: THREE_NS.Group; ring: THREE_NS.MeshStandardMaterial; glass: THREE_NS.Object3D } {
   const g = new THREE.Group(); g.position.set(...opts.position); g.name = 'twin:chamber';
-  g.add(createPlatform(THREE, opts.palette.POLISHED_METAL, { position: [0, 0.07, 0], thickness: 0.14, shape: 'disc', radius: opts.radius + 0.25, radialSegments: 48 }));
+  g.add(createPlatform(THREE, opts.palette.TECH_COMPOSITE, { position: [0, 0.07, 0], thickness: 0.14, shape: 'disc', radius: opts.radius + 0.25, radialSegments: 64 }));
   g.add(createPlatform(THREE, opts.palette.TECH_COMPOSITE, { position: [0, 0.17, 0], thickness: 0.06, shape: 'disc', radius: opts.radius + 0.05, radialSegments: 48 }));
   // Everything the twin camera opens: the glass shell and the ribs that stand in front of the body.
   const enclosure = new THREE.Group(); enclosure.name = 'twin:chamber-enclosure'; g.add(enclosure);
@@ -476,6 +488,8 @@ export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptio
   const ringsY = opts.ceilingHeight ?? opts.height + 1.0;
   for (const [r, w] of [[opts.radius + 0.6, 0.05], [opts.radius + 1.1, 0.04], [opts.radius + 1.6, 0.03]] as const) { const t = new THREE.Mesh(new THREE.TorusGeometry(r, w, 8, 72), ring); t.rotation.x = Math.PI / 2; t.position.y = ringsY - 0.5 - (r - opts.radius) * 0.18; g.add(t); }
   const floorRing = new THREE.Mesh(new THREE.RingGeometry(opts.radius + 0.55, opts.radius + 0.62, 72), ring); floorRing.rotation.x = -Math.PI / 2; floorRing.position.y = 0.004; g.add(floorRing);
+  const orientationRing = new THREE.Mesh(new THREE.RingGeometry(opts.radius + 0.31, opts.radius + 0.325, 96), new THREE.MeshStandardMaterial({ color: 0x294a5a, emissive: 0x143746, emissiveIntensity: 0.3, roughness: 0.45 }));
+  orientationRing.name = 'twin:chamber-orientation-ring'; orientationRing.rotation.x = -Math.PI / 2; orientationRing.position.y = 0.008; g.add(orientationRing);
   const anchor = new THREE.Group(); anchor.position.y = 0.2; g.add(anchor);
   return { group: g, anchor, ring, glass: enclosure };
 }

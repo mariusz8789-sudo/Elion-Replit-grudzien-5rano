@@ -84,6 +84,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "eslint": "^10.6.0",
+    "ffmpeg-static": "^5.2.0",
     "playwright": "^1.62.1",
     "prettier": "^3.9.4",
     "typescript-eslint": "^8.63.0"

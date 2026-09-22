@@ -76,6 +76,7 @@ import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
 import { buildCandidateResearchMatrix } from './campaign/scientificIntegration.mjs';
+import { resolveResearchIntake, prepareCampaignDraft, INPUT_KINDS as RESEARCH_INTAKE_INPUT_KINDS } from './campaign/researchIntake.mjs';
 import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   ingestKnowledgeMaterial,
   listKnowledgeMaterials,
@@ -472,6 +473,12 @@ export function handleApi(db, ctx) {
       }
     }
 
+    // ---- Research Intake: governed intake between a research question and the existing campaign engine ----
+    if (seg[2] === 'research-intake' && seg.length === 3) {
+      if (method === 'POST') return createResearchIntakeHandler(db, user, role, projectId, body);
+      return err(405, 'method_not_allowed');
+    }
+
     // ---- Scientific Acceleration Engine: kampanie naukowe (P1-P3, P10-P13) ----
     if (seg[2] === 'campaigns') {
       // /api/projects/:id/campaigns
@@ -769,6 +776,45 @@ function deleteTrialHandler(db, role, trialId) {
   if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Usunięcie próby wymaga roli editor lub wyższej.');
   deleteTrial(db, trialId);
   return ok({ ok: true });
+}
+
+/* ---------------- Research Intake (governed intake -> existing campaign/scientificIntegration) ---------------- */
+
+const RESEARCH_INTAKE_MAX_CANDIDATE_BUDGET = 50; // matches researchIntake.mjs's own internal clamp; documented here for the API surface.
+
+function sanitizeSecondaryIdentifier(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (typeof raw.inputKind !== 'string' || typeof raw.value !== 'string') return null;
+  return { inputKind: raw.inputKind, value: raw.value };
+}
+
+/**
+ * POST /api/projects/:id/research-intake — resolves a research question through the governed
+ * intake layer (researchIntake.mjs) and, only when explicitly requested, prepares an EXISTING
+ * campaign-compatible draft (campaignStore.createCampaign) — never a second campaign persistence
+ * model, never an automatic expensive-stage run. Editor+.
+ */
+async function createResearchIntakeHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Uruchomienie research intake wymaga roli editor lub wyższej.');
+  const originalQuery = typeof body?.originalQuery === 'string' ? body.originalQuery.trim() : '';
+  if (!originalQuery) return err(400, 'invalid_query', 'Podaj originalQuery.');
+  const declaredInputKind = typeof body?.declaredInputKind === 'string' ? body.declaredInputKind : 'AUTO';
+  if (declaredInputKind !== 'AUTO' && !RESEARCH_INTAKE_INPUT_KINDS.includes(declaredInputKind)) {
+    return err(400, 'invalid_input_kind', `Nieznany declaredInputKind: ${declaredInputKind}`);
+  }
+  const maxCandidateBudget = clampInt(body?.maxCandidateBudget, 1, RESEARCH_INTAKE_MAX_CANDIDATE_BUDGET, 5);
+  const secondaryIdentifier = sanitizeSecondaryIdentifier(body?.secondaryIdentifier);
+
+  const result = await resolveResearchIntake({ originalQuery, declaredInputKind, maxCandidateBudget, secondaryIdentifier });
+
+  let campaignDraft = null;
+  if (body?.prepareCampaignDraft === true) {
+    const prepared = prepareCampaignDraft(db, campaignStore, projectId, result, { createdBy: user.id });
+    campaignDraft = prepared.ok
+      ? { prepared: true, campaignId: prepared.campaign.id, seededCandidateIds: prepared.seededCandidateIds }
+      : { prepared: false, reason: prepared.reason };
+  }
+  return ok({ result, campaignDraft });
 }
 
 /* ---------------- Handlery Kampanii Naukowej (Scientific Acceleration Engine) ---------------- */

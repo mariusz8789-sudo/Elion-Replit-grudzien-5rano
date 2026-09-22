@@ -22,8 +22,14 @@ function nonEmptyDifferent(a, b) {
 }
 async function twoRaf(page) { await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))); }
 async function browserLaunch() {
-  try { return await chromium.launch({ headless: true }); }
-  catch (first) { if (!CHROME) throw first; return chromium.launch({ headless: true, executablePath: CHROME, args: ['--no-sandbox'] }); }
+  // Root-caused (D-141/V6-V6.1-V7 real-repo E2E pass): going straight to the known-good
+  // `executablePath` when it exists is not just faster than the old "try the bundled browser first,
+  // catch, then retry with executablePath" pattern -- the failed bare attempt left every SUBSEQUENT
+  // page in that same browser instance unable to ever paint into a visible canvas (confirmed via a
+  // reduced repro: identical navigation/params, only the launch path differed, reliably reproduced on
+  // both paths). Never spend an attempt on the bundled browser once `CHROME` is confirmed to exist.
+  if (CHROME) return chromium.launch({ headless: true, executablePath: CHROME, args: ['--no-sandbox'] });
+  return chromium.launch({ headless: true });
 }
 async function newPage(browser, viewport = { width: 1280, height: 720 }) {
   const context = await browser.newContext({ viewport });
@@ -42,7 +48,12 @@ async function captureTemporal(browser, name, query) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForFunction(() => window.__GENESIS_TEMPORAL_CAPTURE__?.ready === true, undefined, { timeout: 25_000 });
   const canvasSel = 'canvas[data-testid="temporal-cinematic-canvas"]';
-  await page.locator(canvasSel).waitFor({ state: 'visible', timeout: 20_000 });
+  // This sandbox's software-rendered (no GPU) WebGL first-paint has been measured elsewhere in this
+  // repo at 12-31s even for a static scene (see the file-level comment on `page.screenshot({clip})`
+  // below); 20s was too tight and produced a false failure under the SAME class of real slowness,
+  // not a code defect. 90s matches this repo's own established headroom convention for slow
+  // first-resource waits in this sandbox (see visual-e2e-v52-v7.mjs's biology-rung comments).
+  await page.locator(canvasSel).waitFor({ state: 'visible', timeout: 90_000 });
   const summary = await page.evaluate(() => window.__GENESIS_TEMPORAL_CAPTURE__?.getPresentationSummary?.() ?? null);
   const webgl = await hasWebgl(page, canvasSel);
   const duration = Number(query.duration ?? 3);
@@ -73,8 +84,14 @@ async function captureBiology(browser) {
   await page.locator('[data-testid="sw-explorer"]').waitFor({ state: 'visible', timeout: 25_000 });
   const webgl = await hasWebgl(page, 'canvas[data-testid="sw-canvas"]');
 
-  await page.locator('[data-testid="sw-explorer-twin-camera"]').click();
-  await page.locator('[data-testid="sw-explorer-organ-heart"]').click();
+  // Playwright's default `.click()` actionability timeout (30s) includes its own post-click
+  // "wait for scheduled navigations" step, which this sandbox's slow real simulated-time agent work
+  // (NAVIGATE->ALIGN->REACH->...) can outlast even though the click itself lands correctly (observed:
+  // the button already shows aria-selected=true/is-on when the wait times out). Same documented
+  // slowness class as the canvas-visibility and rung waits elsewhere in this file -- explicit
+  // per-click timeout, not a code defect.
+  await page.locator('[data-testid="sw-explorer-twin-camera"]').click({ timeout: 90_000 });
+  await page.locator('[data-testid="sw-explorer-organ-heart"]').click({ timeout: 90_000 });
   await twoRaf(page);
   const organ = path.join(OUT, 'biology-organ.jpg'); await page.screenshot({ path: organ, type: 'jpeg', quality: 92 }); report.artifacts.push(organ);
 
@@ -100,7 +117,7 @@ async function captureBiology(browser) {
     // produced a false failure. 210s matches this repo's existing precedent for slow first-resource
     // waits in this same sandbox (capture-mockup-plates.mjs's 180s licensed-asset wait) with headroom.
     await page.waitForFunction((id) => { const b = document.querySelector(`[data-testid="${id}"]`); return b instanceof HTMLButtonElement && !b.disabled; }, stage.testId, { timeout: 210_000 });
-    await button.click();
+    await button.click({ timeout: 90_000 });
     await page.waitForFunction(({ level, macro }) => {
       const explorer = document.querySelector('[data-testid="sw-explorer"]');
       const main = document.querySelector('[data-testid="scientific-worlds"]');

@@ -353,6 +353,53 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/lab/sensorIngestEngine.ts': 'D-140: sensor measurement ingestion with quality classification. Reached only by its own test suite and the E2E tests; no screen yet.',
   'core/lab/standaloneDeterminism.ts': 'D-140: explicit standalone-only LabRuntime fixture (RecordingEvidencePort, createStandaloneLabRuntime) kept in test scope only, per CLAUDE_DIRECTIVE.md -- the real-repo E2E uses genesisLabRuntime.ts instead. Reached only by core/e2e/realLabStandaloneE2E.test.ts and labCore.test.ts.',
   'core/lab/uncertaintyEngine.ts': 'D-140: measurement uncertainty combination. Reached only by its own test suite and the E2E tests; no screen yet.',
+
+  // --- D-141/V6-V6.1-V7 transfer package (genesis-v6-v61-v7-98pct-e2e.zip) ------------------------
+  // Audit-first decision (this session): this repo ALREADY had a live V6/V6.1/V7 implementation
+  // (commit a64b34ae) bound directly to the canonical WorldGraph/TemporalEngine/WorldFrameRenderer --
+  // core/temporalCinematic/scientificInteriorVisuals.ts (V6), cinematicShotDirector.ts/cameraPath.ts
+  // (V6.1), core/three/humanMacroMicroLayer.ts (V7) -- with its own real-browser Playwright proof
+  // (scripts/visual-e2e-v52-v7.mjs). Binding this NEW transfer package's own
+  // interiorLayoutCompiler/cameraPathPlanner/humanHierarchy as a second parallel implementation would
+  // violate the mission's own "no second WorldGraph/renderer/TemporalEngine/Human Digital Twin" law,
+  // so it is kept standalone-only (proven via core/e2e/visualStagesStandaloneE2E.test.ts, its own
+  // deterministic transfer harness) -- the genuine gap this session found and filled (a MATERIALS_LAB
+  // room kind) was added directly to the EXISTING canonical scientificInteriorVisuals.ts/geometry.ts
+  // instead, proven real-repo via core/e2e/visualStagesGenesisE2E.test.ts. Remove these entries only
+  // if a future pass deliberately replaces the existing canonical implementation with this package's.
+  'core/visualStages/capabilityReport.ts': 'V6/V6.1/V7 transfer package: 50-capability report builder. Reached only by its own standalone E2E test; kept standalone-only (see audit-first decision above).',
+  'core/visualStages/contracts.ts': 'V6/V6.1/V7 transfer package: CanonicalVisualRuntimePort seam contract. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/deterministic.ts': 'V6/V6.1/V7 transfer package: fnv1a32 determinism port. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/evidence.ts': 'V6/V6.1/V7 transfer package: evidence-emission helper. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v6/interiorCatalog.ts': 'V6/V6.1/V7 transfer package: room-kind asset catalog. Reached only by its own standalone E2E test/v6.test.ts; kept standalone-only -- the real repo already has its own canonical room/asset-slot system (scientificInteriorVisuals.ts).',
+  'core/visualStages/v6/interiorInteraction.ts': 'V6/V6.1/V7 transfer package: interaction-target inference. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v6/interiorLayoutCompiler.ts': 'V6/V6.1/V7 transfer package: deterministic interior layout compiler. Reached only by its own standalone E2E test/v6.test.ts; kept standalone-only.',
+  'core/visualStages/v6/interiorLighting.ts': 'V6/V6.1/V7 transfer package: room-kind lighting profile. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v6/interiorRuntime.ts': 'V6/V6.1/V7 transfer package: interior instantiation over CanonicalVisualRuntimePort. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v6/interiorTypes.ts': 'V6/V6.1/V7 transfer package: interior/asset-slot type contracts. Reached only by its own standalone E2E test/v6.test.ts; kept standalone-only.',
+  'core/visualStages/v61/cameraPathPlanner.ts': 'V6/V6.1/V7 transfer package: camera keyframe sampler/interpolator. Reached only by its own standalone E2E test/v61.test.ts; kept standalone-only -- the real repo already has its own canonical camera path (cameraPath.ts/cinematicShotDirector.ts).',
+  'core/visualStages/v61/captureManifest.ts': 'V6/V6.1/V7 transfer package: capture manifest builder. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v61/cinematicRuntime.ts': 'V6/V6.1/V7 transfer package: cinematic capture sequence runner over CanonicalVisualRuntimePort. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v61/cinematicTypes.ts': 'V6/V6.1/V7 transfer package: camera/capture type contracts. Reached only by its own standalone E2E test/v61.test.ts; kept standalone-only.',
+  'core/visualStages/v61/focusExposure.ts': 'V6/V6.1/V7 transfer package: camera optics clamping. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v61/temporalDiscontinuityGuard.ts': 'V6/V6.1/V7 transfer package: cut/seek history-reset detector. Reached only by its own standalone E2E test/v61.test.ts; kept standalone-only -- the real repo has no accumulation-buffer/TAA history to reset (confirmed absent by direct inspection of postProcessing.ts), so this concept has no real-repo analog to bind to.',
+  'core/visualStages/v7/humanHierarchy.ts': 'V6/V6.1/V7 transfer package: BODY->ORGAN_SYSTEM->ORGAN->TISSUE->CELL->ORGANELLE->MOLECULE hierarchy types. Reached only by its own standalone E2E test/v7.test.ts; kept standalone-only -- the real repo already has its own canonical Human Digital Twin (humanLab/anatomyAtlas.ts + humanMacroMicroLayer.ts).',
+  'core/visualStages/v7/humanLod.ts': 'V6/V6.1/V7 transfer package: LOD selection + scale-monotonicity validation. Reached only by its own standalone E2E test/v7.test.ts; kept standalone-only.',
+  'core/visualStages/v7/humanManifest.ts': 'V6/V6.1/V7 transfer package: reference human manifest builder. Reached only by its own standalone E2E test/v7.test.ts; kept standalone-only.',
+  'core/visualStages/v7/hyperscopeNavigator.ts': 'V6/V6.1/V7 transfer package: hierarchy descent/path navigator. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v7/macroMicroRuntime.ts': 'V6/V6.1/V7 transfer package: macro->micro journey runner over CanonicalVisualRuntimePort. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v7/organPicking.ts': 'V6/V6.1/V7 transfer package: organ-id lookup. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/v7/provenanceLabels.ts': 'V6/V6.1/V7 transfer package: epistemic-overlay builder. Reached only by its own standalone E2E test; kept standalone-only.',
+  'core/visualStages/vectorMath.ts': 'V6/V6.1/V7 transfer package: Vec3 math helpers. Reached only by its own standalone E2E test/v61.test.ts; kept standalone-only.',
+
+  // --- Genesis transfer-package integration seam (this session) -------------------------------
+  // Real HashPort adapter binding the transfer packages' own hash/fingerprint seam
+  // (GENESIS-INTEGRATION-MEGA-PACK-V2 and genesis-engine-suite-e2e-v1 both declare one) to this
+  // repo's canonical fnv1a/canonicalJson, so any future binding of those packages does not ship
+  // yet another private hash reimplementation. Nothing wires a transfer package into production
+  // yet -- that remains a Codex/human decision -- so this adapter itself is currently unreached
+  // outside its own test. Remove this entry once something binds it.
+  'core/transferIntegration/genesisHashPort.ts': 'Real HashPort adapter for the Genesis transfer packages (fnv1a/canonicalJson passthrough). Reached only by its own unit test; kept standalone-only pending a production binding decision.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {

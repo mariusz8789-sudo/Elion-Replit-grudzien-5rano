@@ -12,6 +12,7 @@ import { createColumn, createPipe, createPlatform } from '../three/graphics/prim
 const SCIENTIFIC_ROOM_PRIORITY: readonly RoomType[] = [
   'IMAGING_SUITE',
   'MICROSCOPY_SUITE',
+  'MATERIALS_LAB',
   'LAB_BENCH_ROOM',
   'REACTOR_ROOM',
   'WARD',
@@ -167,6 +168,30 @@ function createPumpStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalett
   shadow(g); return g;
 }
 
+/** V6 MATERIALS_LAB gap fill (D-141/V6 integration): real spectrometer instrument, reusing the same
+ * primitives/materials every other station here reuses — no second renderer, no new geometry kit. */
+function createSpectrometer(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
+  const g = new THREE.Group(); g.name = 'genesis-interior-spectrometer';
+  g.add(createBench(THREE, { position: [0, 0, 0], width: 1.6, depth: 0.75, height: 0.86, topMaterial: p.white, legMaterial: p.stainless }));
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.34, 0.42), p.dark); housing.position.set(-0.2, 1.03, 0); g.add(housing);
+  const beamTube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 16), p.chrome);
+  beamTube.rotation.z = Math.PI / 2; beamTube.position.set(0.25, 1.03, 0); g.add(beamTube);
+  const detector = createPlatform(THREE, p.stainless, { position: [0.55, 0.92, 0], thickness: 0.03, shape: 'box', width: 0.14, depth: 0.14 }); g.add(detector);
+  g.add(createMonitor(THREE, { position: [-0.55, 0.86, -0.14], width: 0.6, height: 0.4, standHeight: 0.14, frameMaterial: p.stainless, screenMaterial: p.blueGlow }));
+  shadow(g); return g;
+}
+
+/** V6 MATERIALS_LAB gap fill: thermal-controlled sample stage (heating/cooling sample-prep station). */
+function createThermalStage(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
+  const g = new THREE.Group(); g.name = 'genesis-interior-thermal-stage';
+  g.add(createBench(THREE, { position: [0, 0, 0], width: 1.4, depth: 0.7, height: 0.86, topMaterial: p.white, legMaterial: p.stainless }));
+  const stage = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.1, 28), p.medical); stage.position.set(0, 0.94, 0); g.add(stage);
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.02, 8, 32), p.chrome); coil.rotation.x = Math.PI / 2; coil.position.set(0, 1.0, 0); g.add(coil);
+  g.add(createColumn(THREE, p.stainless, { position: [-0.5, 0, 0], height: 0.42, radius: 0.06 }));
+  const readout = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), p.blueGlow); readout.position.set(-0.5, 1.05, 0); g.add(readout);
+  shadow(g); return g;
+}
+
 function createLabBenchStation(THREE: typeof THREE_NS, p: HighFidelityMaterialPalette): THREE_NS.Group {
   const g = new THREE.Group(); g.name = 'genesis-interior-lab-bench';
   g.add(createBench(THREE, { position: [0, 0, 0], width: 2.6, depth: 0.9, height: 0.88, topMaterial: p.white, legMaterial: p.stainless }));
@@ -193,6 +218,8 @@ export function createScientificAssetSlotVisual(
     case 'HOSPITAL_BED': return createHospitalBed(THREE, palette);
     case 'PUMP_STATION': return createPumpStation(THREE, palette);
     case 'LAB_BENCH_STATION': return createLabBenchStation(THREE, palette);
+    case 'SPECTROMETER_STATION': return createSpectrometer(THREE, palette);
+    case 'THERMAL_STAGE_STATION': return createThermalStage(THREE, palette);
     default:
       empty.userData.notModeledAssetSlot = slot.geometry.slotType;
       return empty;

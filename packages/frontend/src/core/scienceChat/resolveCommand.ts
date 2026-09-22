@@ -7,6 +7,8 @@ import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 import { parseObservationIntent } from '../lookingGlass/observationIntent';
 import { hasActiveObservationControl } from '../activeObservationControl';
+import type { PainResearchQuestion } from '../experimentFabric/painResearch';
+import type { PhysicsClaim, PhysicsClaimCategory } from '../experimentFabric/spacetimeIntegrity';
 import {
   hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
   hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
@@ -73,6 +75,14 @@ export type ChatAction =
    * side effect (running `runAdaptiveInvestigation`, formatting the summary) lives in
    * `ScienceChat.tsx`, exactly like every other action here — this resolver stays a pure function. */
   | { type: 'runCyber' }
+  /** Existing Science Chat entry into the ONE scientific campaign coordinator. */
+  | {
+      type: 'runScientificIntegration';
+      problemId: string;
+      purpose: 'PAIN_RESEARCH' | 'SPACETIME_INTEGRITY';
+      painQuestion?: PainResearchQuestion;
+      physicsClaims?: readonly PhysicsClaim[];
+    }
   /** KNOWLEDGE INGESTION — `/ingest <url …>`: the URLs the message itself contained, in order. The
    * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
    * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
@@ -336,9 +346,60 @@ function buildComparison(raw: string): { a: ModelConfig; b: ModelConfig } {
   return defaultComparison();
 }
 
+function resolveScientificIntegrationEntry(message: string, norm: string): ChatResponse | null {
+  if (/^\s*\/pain-research\b/i.test(message) || has(norm, 'badanie bolu', 'badanie nad bolem', 'zbadaj bol', 'pain research')) {
+    const statement = message.replace(/^\s*\/pain-research\b\s*/i, '').trim() || 'Explore a pain research question in the Human Digital Twin.';
+    const question: PainResearchQuestion = {
+      questionId: `pain:science-chat:${normalize(statement).replace(/\s+/g, '-').slice(0, 72) || 'question'}`,
+      statement,
+      target: { anatomyNodeId: 'anatomy:nervous-system', organSystem: 'NERVOUS', label: 'reported pain pathway' },
+    };
+    return {
+      text: 'Uruchamiam research-only Pain Discovery przez istniejący Scientific Integration Campaign. Zakres pozostaje SIMULATION_ONLY · NOT_A_MEDICAL_DEVICE · RESEARCH_PRIORITY_NOT_CLINICAL_EFFICACY. Bez modelu bólu wynik będzie uczciwie BLOCKED; nie wygeneruję diagnozy, dawkowania ani zalecenia.',
+      tag: 'MODEL', intent: 'PROPOSE_EXPERIMENT',
+      action: { type: 'runScientificIntegration', problemId: 'problem:intervention-timing', purpose: 'PAIN_RESEARCH', painQuestion: question },
+    };
+  }
+
+  const requested = /^\s*\/physics-claim\b/i.test(message)
+    || has(norm, 'zweryfikuj twierdzenie fizyczne', 'sprawdz twierdzenie fizyczne', 'validate physics claim');
+  if (!requested) return null;
+  const statement = message.replace(/^\s*\/physics-claim\b\s*/i, '').trim() || message.trim();
+  const claimNorm = normalize(statement);
+  const category: PhysicsClaimCategory | null = has(claimNorm, 'wormhole', 'einstein rosen', 'tunel czasoprzestrzenny') ? 'WORMHOLE'
+    : has(claimNorm, 'multiverse', 'multiwers', 'alternatywn', 'timeline') ? 'MULTIVERSE'
+      : has(claimNorm, 'time dilation', 'dylatacj czasu') ? 'TIME_DILATION'
+        : has(claimNorm, 'gravity well', 'studni grawit', 'krzywizn czasoprzestrzeni') ? 'GRAVITY_WELL'
+          : has(claimNorm, 'historical', 'historyczn', 'rekonstrukcj') ? 'HISTORICAL_RECONSTRUCTION'
+            : null;
+  if (category === null) {
+    return {
+      text: 'Nie rozpoznaję kategorii twierdzenia. Użyj `/physics-claim` z: wormhole, multiverse, time dilation, gravity well albo historical reconstruction.',
+      tag: 'SYSTEM', intent: 'HELP',
+    };
+  }
+  const sourceIds = Array.from(message.matchAll(/\bsource\s*[:=]\s*([A-Za-z0-9._/-]+)/gi), (match) => match[1]!);
+  const assignedLabel = category === 'WORMHOLE' ? 'HYPOTHESIS' as const
+    : category === 'MULTIVERSE' ? 'SIMULATION' as const
+      : category === 'HISTORICAL_RECONSTRUCTION'
+        ? (sourceIds.length > 0 ? 'RECONSTRUCTION' as const : 'INSUFFICIENT_EVIDENCE' as const)
+        : 'MODEL' as const;
+  const claim: PhysicsClaim = {
+    claimId: `physics:science-chat:${category.toLowerCase()}:${normalize(statement).replace(/\s+/g, '-').slice(0, 64)}`,
+    category, statement, assignedLabel, sourceIds,
+  };
+  return {
+    text: `Waliduję twierdzenie ${category} przez istniejący Scientific Integration Campaign. Etykieta wejściowa: ${assignedLabel}; EVIDENCE_BACKED wymaga jawnego source:<id>. Twierdzenia o podróży wstecz w czasie są odrzucane.`,
+    tag: 'MODEL', intent: 'VERIFY',
+    action: { type: 'runScientificIntegration', problemId: 'problem:particle-relativistic-kinetic-energy-velocity', purpose: 'SPACETIME_INTEGRITY', physicsClaims: [claim] },
+  };
+}
+
 export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): ChatResponse {
   const norm = normalize(message);
   if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM', intent: 'HELP' };
+  const scientificIntegrationEntry = resolveScientificIntegrationEntry(message, norm);
+  if (scientificIntegrationEntry) return scientificIntegrationEntry;
 
   // --- Knowledge ingestion: `/ingest <url>` (also "zaingestuj", "pobierz źródło"). URLs come from the RAW
   //     message (normalize() strips punctuation); with no URL the command explains itself instead of guessing.

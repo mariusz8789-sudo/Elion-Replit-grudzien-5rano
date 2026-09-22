@@ -118,4 +118,53 @@ describe('canonical spacetime Three.js visual layer', () => {
     expect(spacetimePresentationProfile('HISTORICAL_CITY')).toMatchObject({ environmentMode: 'OUTDOOR', livingWorld: true });
     expect(spacetimePresentationProfile('ALIEN_DESERT')).toMatchObject({ environmentMode: 'OUTDOOR', livingWorld: false });
   });
+
+  it('builds a dense but honestly labelled historical reconstruction context', () => {
+    const directed = directGenesisPromptWorld('Create a historical Boston battle reconstruction.');
+    const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
+    const townhouses: THREE.Object3D[] = [];
+    const figures: THREE.Object3D[] = [];
+    const smoke: THREE.Object3D[] = [];
+    handle.root.traverse((object) => {
+      if (object.name.startsWith('reconstruction-townhouse-')) townhouses.push(object);
+      if (object.name.startsWith('reconstruction-crowd-figure-')) figures.push(object);
+      if (object.name.startsWith('reconstruction-smoke-')) smoke.push(object);
+    });
+    expect(townhouses.length).toBeGreaterThanOrEqual(12);
+    expect(figures).toHaveLength(34);
+    expect(smoke).toHaveLength(35);
+    expect([...townhouses, ...figures, ...smoke].every((object) => object.userData.epistemic === 'RECONSTRUCTION')).toBe(true);
+    expect([...townhouses, ...figures, ...smoke].every((object) => object.userData.visualOnlyContext === true)).toBe(true);
+    handle.dispose();
+  });
+
+  it('renders the alien world with two suns, graph-counted detailed ruins, dust and atmosphere', () => {
+    const directed = directGenesisPromptWorld('Create a desert alien planet with ruins and two suns.');
+    const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
+    const ruinCount = directed.runtime.engine.graph.getEntity('ruins:alien-desert-complex').domainState?.structureCount;
+    const ruins = handle.root.children.filter((object) => object.name.startsWith('alien-ruin-complex-'));
+    expect(ruins).toHaveLength(Number(ruinCount));
+    expect(handle.root.getObjectByName('alien-primary-sun')).toBeTruthy();
+    expect(handle.root.getObjectByName('alien-secondary-sun')).toBeTruthy();
+    expect(handle.root.getObjectByName('alien-desert-atmospheric-dust')).toBeTruthy();
+    expect(handle.root.getObjectByName('alien-desert-atmosphere')).toBeTruthy();
+    expect(handle.root.children.filter((object) => object.name.startsWith('alien-desert-boulder-'))).toHaveLength(24);
+    expect(ruins.every((object) => object.userData.fictionInspired === true && object.userData.visualOnlyContext === true)).toBe(true);
+    handle.dispose();
+  });
+
+  it('renders a connected Mars research outpost with communications and field equipment', () => {
+    const directed = directGenesisPromptWorld('Create a Mars research world.');
+    const handle = createSpacetimeWorldVisualLayer(THREE, directed.descriptor, directed.runtime.engine.graph);
+    const moduleCount = directed.runtime.engine.graph.getEntity('building:mars-research-station').domainState?.habitatModules;
+    expect(handle.root.children.filter((object) => object.name.startsWith('mars-habitat-module-'))).toHaveLength(Number(moduleCount));
+    expect(handle.root.children.filter((object) => object.name.startsWith('mars-pressurized-connector-'))).toHaveLength(Number(moduleCount) - 1);
+    expect(handle.root.getObjectByName('mars-communications-dish')).toBeTruthy();
+    expect(handle.root.getObjectByName('mars-field-rover')).toBeTruthy();
+    expect(handle.root.getObjectByName('mars-solar-array-west')).toBeTruthy();
+    expect(handle.root.getObjectByName('mars-solar-array-east')).toBeTruthy();
+    expect(handle.root.getObjectByName('mars-regolith-dust')).toBeTruthy();
+    expect(handle.root.children.filter((object) => object.name.startsWith('mars-regolith-rock-'))).toHaveLength(30);
+    handle.dispose();
+  });
 });

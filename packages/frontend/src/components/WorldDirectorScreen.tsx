@@ -7,6 +7,7 @@ import {
   directGenesisWorld,
   directGenesisPromptWorld,
   recordDirectedAssetInspection,
+  recordDirectedPromptWorldArtifact,
   recordDirectedPromptWorld,
   recordDirectedWorld,
   type GenesisWorldLight,
@@ -15,6 +16,7 @@ import {
   type GenesisWorldWeather,
 } from '../core/worldDirector/genesisWorldDirector';
 import { buildSpacetimeCameraPath, type SpacetimeWorldDescriptor } from '../core/temporalCinematic/spacetimeWorldDescriptor';
+import { canonicalJson, fnv1a } from '../core/events/hash';
 
 declare global {
   interface Window {
@@ -24,6 +26,11 @@ declare global {
       readonly preset: GenesisWorldPreset;
       readonly entityCount: number;
       readonly evidenceHash: string;
+      readonly durationSeconds: number;
+      seekTo(seconds: number): void;
+      seekAndWait(seconds: number): Promise<void>;
+      getCurrentTimeSeconds(): number;
+      recordCaptureArtifact(input: { readonly seconds: number; readonly artifactFile: string; readonly artifactSha256: string }): { readonly evidenceHash: string; readonly semanticFingerprint: string };
       getPresentationSummary(): ReturnType<TemporalCinematicSim3D['getPresentationSummary']>;
       getInteractionTargets(): ReturnType<TemporalCinematicSim3D['getInteractionTargets']>;
       getProductWorld(): {
@@ -34,6 +41,10 @@ declare global {
       } | null;
     };
   }
+}
+
+function twoAnimationFrames(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
 export function WorldDirectorScreen(): JSX.Element {
@@ -91,6 +102,30 @@ export function WorldDirectorScreen(): JSX.Element {
       preset: directed.request.preset,
       entityCount: activeEntityCount,
       evidenceHash,
+      durationSeconds: productCamera?.durationSeconds ?? directed.scene.camera.durationSeconds,
+      seekTo: (seconds: number) => sim.seekTo(seconds),
+      seekAndWait: async (seconds: number) => { sim.seekTo(seconds); await twoAnimationFrames(); },
+      getCurrentTimeSeconds: () => sim.getCurrentTimeSeconds(),
+      recordCaptureArtifact: (input: { readonly seconds: number; readonly artifactFile: string; readonly artifactSha256: string }) => {
+        if (!productWorld) throw new Error('WORLD_DIRECTOR_PROMPT_WORLD_REQUIRED_FOR_CAPTURE');
+        const semanticFingerprint = fnv1a(canonicalJson({
+          worldId: productWorld.world.generated.worldId,
+          template: productWorld.primaryTemplate,
+          descriptor: productWorld.descriptor,
+          seconds: input.seconds,
+          presentation: sim.getPresentationSummary(),
+        }));
+        const captureEvidenceHash = recordDirectedPromptWorldArtifact(kernelLedger, {
+          worldId: productWorld.world.generated.worldId,
+          template: productWorld.primaryTemplate,
+          descriptorKind: productWorld.descriptor.kind,
+          seconds: input.seconds,
+          artifactFile: input.artifactFile,
+          artifactSha256: input.artifactSha256,
+          semanticFingerprint,
+        });
+        return { evidenceHash: captureEvidenceHash, semanticFingerprint };
+      },
       getPresentationSummary: () => sim.getPresentationSummary(),
       getInteractionTargets: () => sim.getInteractionTargets(),
       getProductWorld: () => productWorld ? ({
@@ -102,7 +137,7 @@ export function WorldDirectorScreen(): JSX.Element {
     };
     window.__GENESIS_WORLD_DIRECTOR__ = hook;
     return () => { if (window.__GENESIS_WORLD_DIRECTOR__ === hook) delete window.__GENESIS_WORLD_DIRECTOR__; };
-  }, [directed, failed, loading, productWorld, sim]);
+  }, [directed, failed, loading, productCamera, productWorld, sim]);
 
   return (
     <main className="world-director" id="main-content" data-testid="world-director" data-preset={preset}>

@@ -114,6 +114,34 @@ export function recordDirectedPromptWorld(ledger: EvidenceLedger, directed: Gene
   }).record.contentHash;
 }
 
+export interface DirectedPromptWorldArtifactEvidence {
+  readonly worldId: string;
+  readonly template: string;
+  readonly descriptorKind: string;
+  readonly seconds: number;
+  readonly artifactFile: string;
+  readonly artifactSha256: string;
+  readonly semanticFingerprint: string;
+}
+
+/** Links real browser pixels/video from a prompt world to the canonical ledger. */
+export function recordDirectedPromptWorldArtifact(
+  ledger: EvidenceLedger,
+  input: DirectedPromptWorldArtifactEvidence,
+): string {
+  if (!/^[a-f0-9]{64}$/i.test(input.artifactSha256)) throw new Error('WORLD_DIRECTOR_CAPTURE_INVALID_SHA256');
+  if (!/^[a-f0-9]{8,}$/i.test(input.semanticFingerprint)) throw new Error('WORLD_DIRECTOR_CAPTURE_INVALID_FINGERPRINT');
+  if (!Number.isFinite(input.seconds) || input.seconds < 0) throw new Error('WORLD_DIRECTOR_CAPTURE_INVALID_TIME');
+  return ledger.addRecord({
+    sourceUrl: `genesis://world-director/capture/${input.worldId}/${encodeURIComponent(input.artifactFile)}`,
+    sourceTimestamp: null,
+    claim: `Prompt-world capture ${input.artifactFile}; sha256=${input.artifactSha256}; semanticFingerprint=${input.semanticFingerprint}; world=${input.worldId}; template=${input.template}; descriptor=${input.descriptorKind}; time=${input.seconds}`,
+    claimType: 'observation',
+    confidence: 1,
+    provenance: { sourceKind: 'document', retrievedBy: 'Genesis World Director Cinematic Capture', independentSourceIds: [] },
+  }).record.contentHash;
+}
+
 /** Records the real UI INSPECT command against a canonical generated ASSET_SLOT. */
 export function recordDirectedAssetInspection(
   ledger: EvidenceLedger,

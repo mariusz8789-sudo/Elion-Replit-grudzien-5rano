@@ -17,6 +17,7 @@ import type {
 } from './cyberInvestigation';
 import { assertApprovalBeforePatch, PatchNotApprovedError } from './cyberInvestigation';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import type { EvidenceSink } from '../scientificWorlds/humanLab/contracts';
 import {
   selectNextTest,
   type CyberTestCandidate,
@@ -500,6 +501,24 @@ export interface AdaptiveInvestigationResult {
   /** Hypothesis ids whose history contains BOTH a SUPPORTED and a FALSIFIED entry — preserved, never averaged away. */
   readonly conflicts: readonly string[];
   readonly stopReason: string;
+  /** Canonical Evidence receipts produced by the real adaptive runtime path. */
+  readonly evidenceReceipts: readonly CyberEvidenceReceipt[];
+}
+
+export type CyberEvidenceEventType =
+  | 'CYBER_ANALYZER_EXECUTION'
+  | 'CYBER_ANALYZER_RESULT'
+  | 'CYBER_FINDING'
+  | 'CYBER_REMEDIATION_PROPOSED'
+  | 'CYBER_HUMAN_APPROVAL'
+  | 'CYBER_REMEDIATION_APPLIED'
+  | 'CYBER_RETEST_RESULT'
+  | 'CYBER_FINAL_PROOF_REPORT';
+
+export interface CyberEvidenceReceipt {
+  readonly eventType: CyberEvidenceEventType;
+  readonly recordId: string;
+  readonly contentHash: string;
 }
 
 export const DEFAULT_CYBER_CAMPAIGN_BUDGET: CyberCampaignBudget = Object.freeze({
@@ -510,6 +529,8 @@ export const DEFAULT_CYBER_CAMPAIGN_BUDGET: CyberCampaignBudget = Object.freeze(
 
 export interface AdaptiveInvestigationOptions {
   readonly budget?: CyberCampaignBudget;
+  /** Canonical EvidenceLedger adapter. Absence keeps the pure runtime usable without inventing evidence. */
+  readonly evidenceSink?: EvidenceSink;
   /**
    * Returns a real approval decision for this exact remediation. Absence is
    * fail-closed: the kernel reports HUMAN_APPROVAL_REQUIRED and never mutates
@@ -517,6 +538,24 @@ export interface AdaptiveInvestigationOptions {
    * production callers must obtain the decision from their human-review UI.
    */
   readonly approvalForRemediation?: (remediation: RemediationAction) => HumanApprovalRecord | null;
+}
+
+function emitCyberEvidence(
+  receipts: CyberEvidenceReceipt[],
+  sink: EvidenceSink | undefined,
+  eventType: CyberEvidenceEventType,
+  claim: string,
+  provenance: Readonly<Record<string, unknown>>,
+): void {
+  if (!sink) return;
+  const result = sink.addRecord({
+    sourceUrl: `genesis://cyber-scientist/${eventType.toLowerCase()}`,
+    claim: `[${eventType}] ${claim}`,
+    claimType: eventType,
+    confidence: 1,
+    provenance: { runtime: GENESIS_CYBER_KERNEL_ID, ...provenance },
+  });
+  receipts.push({ eventType, recordId: result.record.id, contentHash: result.record.contentHash });
 }
 
 export function runAdaptiveInvestigation(
@@ -532,6 +571,7 @@ export function runAdaptiveInvestigation(
   const attempts = new Map<string, number>();
   const remediatedFor = new Set<string>();
   const steps: AdaptiveStep[] = [];
+  const evidenceReceipts: CyberEvidenceReceipt[] = [];
   let stopReason = '';
   let testCounter = 0;
   let patchProposalsCreated = 0;
@@ -608,6 +648,9 @@ export function runAdaptiveInvestigation(
       const priorTest = [...steps].reverse().find((s) => s.hypothesisId === h.hypothesisId)?.testResult ?? null;
       remediation = createRemediation(app, h);
       if (remediation) {
+        emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_REMEDIATION_PROPOSED',
+          `Remediation ${remediation.remediationId} proposed for hypothesis ${h.hypothesisId}.`,
+          { hypothesisId: h.hypothesisId, remediationId: remediation.remediationId, targetAssetId: remediation.targetAssetId, description: remediation.description });
         if (patchProposalsCreated >= budget.maxPatchProposals) {
           stopReason = `CYBER_BUDGET_EXHAUSTED: maxPatchProposals=${budget.maxPatchProposals}`;
           steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult: null, verdict: null, remediation, outcomeVerification: null });
@@ -615,6 +658,11 @@ export function runAdaptiveInvestigation(
         }
         patchProposalsCreated += 1;
         const approval = options.approvalForRemediation?.(remediation) ?? null;
+        emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_HUMAN_APPROVAL',
+          approval === null
+            ? `No approval supplied for remediation ${remediation.remediationId}; action remains blocked.`
+            : `Human decision ${approval.decision} recorded for remediation ${remediation.remediationId}.`,
+          { remediationId: remediation.remediationId, decision: approval?.decision ?? 'MISSING', approvalRemediationId: approval?.remediationId ?? null });
         try {
           applyRemediation(app, remediation, approval);
         } catch (error) {
@@ -623,15 +671,36 @@ export function runAdaptiveInvestigation(
           steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult: null, verdict: null, remediation, outcomeVerification: null });
           break;
         }
+        emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_REMEDIATION_APPLIED',
+          `Approved remediation ${remediation.remediationId} applied to the bounded fixture.`,
+          { hypothesisId: h.hypothesisId, remediationId: remediation.remediationId });
       }
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_EXECUTION',
+        `Bounded retest started for hypothesis ${h.hypothesisId}.`,
+        { hypothesisId: h.hypothesisId, phase: 'RETEST', analyzerRun: testCounter });
       testResult = retest(h, app, `adaptive${testCounter++}`);
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_RESULT',
+        `Bounded retest ${testResult.testId} completed with status=${testResult.observedResult.statusCode}.`,
+        { hypothesisId: h.hypothesisId, phase: 'RETEST', testId: testResult.testId, observedResult: testResult.observedResult });
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_RETEST_RESULT',
+        `Retest ${testResult.testId} completed after remediation ${remediation?.remediationId ?? 'NONE'}.`,
+        { hypothesisId: h.hypothesisId, testId: testResult.testId, remediationId: remediation?.remediationId ?? null });
       if (priorTest) outcomeVerification = verifySecurityOutcome(priorTest, testResult);
       remediatedFor.add(h.hypothesisId);
     } else {
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_EXECUTION',
+        `Bounded analyzer started for hypothesis ${h.hypothesisId}.`,
+        { hypothesisId: h.hypothesisId, phase: 'VALIDATE', analyzerRun: testCounter });
       testResult = runSecurityTest(h, app, `adaptive${testCounter++}`);
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_RESULT',
+        `Bounded analyzer ${testResult.testId} completed with status=${testResult.observedResult.statusCode}.`,
+        { hypothesisId: h.hypothesisId, phase: 'VALIDATE', testId: testResult.testId, observedResult: testResult.observedResult });
     }
 
     const verdict = judgeVerdict(h, testResult);
+    emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_FINDING',
+      `Finding for hypothesis ${h.hypothesisId}: ${verdict.assessment}.`,
+      { hypothesisId: h.hypothesisId, testId: testResult.testId, assessment: verdict.assessment, reasoning: verdict.reasoning });
     assessmentHistory.get(h.hypothesisId)!.push(verdict.assessment);
     attempts.set(h.hypothesisId, (attempts.get(h.hypothesisId) ?? 0) + 1);
     steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult, verdict, remediation, outcomeVerification });
@@ -642,7 +711,11 @@ export function runAdaptiveInvestigation(
     .filter(([, history]) => history.includes('SUPPORTED_WITHIN_PROTOCOL') && history.includes('FALSIFIED_WITHIN_PROTOCOL'))
     .map(([id]) => id);
 
-  return { observations, assets, hypotheses, steps, assessmentHistory, conflicts, stopReason };
+  emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_FINAL_PROOF_REPORT',
+    `Cyber campaign finished: steps=${steps.length}, conflicts=${conflicts.length}, stop=${stopReason}.`,
+    { steps: steps.length, conflicts, stopReason, analyzerRunsExecuted: testCounter, patchProposalsCreated });
+
+  return { observations, assets, hypotheses, steps, assessmentHistory, conflicts, stopReason, evidenceReceipts };
 }
 
 // ================= SEAM TO SCIENCE MEMORY =================

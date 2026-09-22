@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
-import { directGenesisWorld, recordDirectedAssetInspection, recordDirectedWorld } from '../core/worldDirector/genesisWorldDirector';
+import { directGenesisWorld, recordDirectedAssetInspection, recordDirectedPromptWorldArtifact, recordDirectedWorld } from '../core/worldDirector/genesisWorldDirector';
 import { WorldGraph } from '../core/worldModel/ecs/worldGraph';
 
 describe('Genesis World Director — canonical production adapter', () => {
@@ -43,5 +43,21 @@ describe('Genesis World Director — canonical production adapter', () => {
     expect(ledger.getActive()[0]?.claim).toContain('INSPECT_ENTITY');
     expect(ledger.getActive()[0]?.claim).toContain('scientificResult=UNBOUND');
     expect(() => recordDirectedAssetInspection(ledger, directed, { entityId: directed.proof.worldId, slotType: 'COMPUTE_STATION' })).toThrow(/INVALID_ASSET_SELECTION/);
+  });
+
+  it('anchors real prompt-world frame/video hashes in the supplied canonical ledger', () => {
+    const ledger = new EvidenceLedger({ now: () => 44 });
+    const evidenceHash = recordDirectedPromptWorldArtifact(ledger, {
+      worldId: 'world:prompt:wormhole', template: 'EINSTEIN_ROSEN_BRIDGE', descriptorKind: 'WORMHOLE_RINGS',
+      seconds: 1.5, artifactFile: 'artifacts/vision-review/prompt-world-films/wormhole.mp4',
+      artifactSha256: 'a'.repeat(64), semanticFingerprint: 'b'.repeat(8),
+    });
+    expect(evidenceHash).toHaveLength(64);
+    expect(ledger.getActive()[0]?.claim).toContain('wormhole.mp4');
+    expect(ledger.verifyLedger().ok).toBe(true);
+    expect(() => recordDirectedPromptWorldArtifact(ledger, {
+      worldId: 'world:x', template: 'QUANTUM', descriptorKind: 'QUANTUM_BARRIER', seconds: 0,
+      artifactFile: 'bad.mp4', artifactSha256: 'not-a-hash', semanticFingerprint: '12345678',
+    })).toThrow(/INVALID_SHA256/);
   });
 });

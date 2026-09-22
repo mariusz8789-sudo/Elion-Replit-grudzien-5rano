@@ -329,6 +329,7 @@ function createHistoricalCity(THREE: typeof THREE_NS, root: THREE_NS.Group, desc
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), figureMaterial);
     head.position.y = 1.58;
     figure.add(body, head);
+    figure.name = `reconstruction-crowd-figure-${index}`;
     figure.position.set(center.x + Math.cos(angle) * radius, 0, center.z + Math.sin(angle) * radius);
     figure.userData.visualOnlyContext = true;
     figure.userData.epistemic = 'RECONSTRUCTION';
@@ -339,6 +340,7 @@ function createHistoricalCity(THREE: typeof THREE_NS, root: THREE_NS.Group, desc
   for (let plume = 0; plume < 5; plume += 1) {
     for (let puff = 0; puff < 7; puff += 1) {
       const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.8 + puff * 0.22, 12, 8), smokeMaterial);
+      smoke.name = `reconstruction-smoke-${plume}-${puff}`;
       smoke.position.set(center.x - 15 + plume * 7 + Math.sin(puff) * 0.7, 1.4 + puff * 1.25, center.z + 8 + Math.cos(plume) * 5);
       smoke.scale.set(1.4, 0.75, 1);
       smoke.userData.visualOnlyContext = true;
@@ -356,6 +358,7 @@ function createAlienDesert(
   animated: AnimatedObject[],
 ): void {
   const terrain = new THREE.Mesh(new THREE.PlaneGeometry(170, 130, 32, 24), material(THREE, '#7f3d1f', { roughness: 1 }));
+  terrain.name = 'alien-desert-dune-terrain';
   const positions = terrain.geometry.attributes.position;
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
@@ -368,49 +371,199 @@ function createAlienDesert(
   terrain.receiveShadow = true;
   root.add(terrain);
   const stone = material(THREE, '#362b29', { metalness: 0.12, roughness: 0.76 });
+  const carvedStone = material(THREE, '#5f3c35', { emissive: '#261317', metalness: 0.32, roughness: 0.54 });
   const structureCount = Math.max(1, Math.round(graph.tryGetEntity('ruins:alien-desert-complex')?.domainState?.structureCount ?? 1));
   for (let index = 0; index < structureCount; index += 1) {
-    const ruin = new THREE.Mesh(new THREE.BoxGeometry(2.2 + (index % 3), 8 + (index % 4) * 2.4, 2.4), stone);
-    ruin.position.set((index - 4) * 6, ruin.geometry.parameters.height / 2, 4 + Math.sin(index) * 12);
+    const ruin = new THREE.Group();
+    ruin.name = `alien-ruin-complex-${index}`;
+    ruin.position.set((index - (structureCount - 1) / 2) * 7.4, 0, 4 + Math.sin(index) * 12);
     ruin.rotation.y = index * 0.28;
-    ruin.castShadow = true;
     ruin.userData.fictionInspired = true;
+    ruin.userData.visualOnlyContext = true;
+    const height = 8 + (index % 4) * 2.4;
+    const pillarSpacing = 2.1 + (index % 3) * 0.35;
+    for (const side of [-1, 1]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.15, height, 1.45), stone);
+      pillar.position.set(side * pillarSpacing, height / 2, 0);
+      pillar.rotation.z = side * 0.035;
+      pillar.castShadow = true;
+      ruin.add(pillar);
+      for (let band = 0; band < 3; band += 1) {
+        const glyphBand = new THREE.Mesh(new THREE.BoxGeometry(1.23, 0.18, 1.52), carvedStone);
+        glyphBand.position.set(side * pillarSpacing, height * (0.32 + band * 0.18), 0);
+        ruin.add(glyphBand);
+      }
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(pillarSpacing * 2 + 1.3, 1.05, 1.6), stone);
+    lintel.position.y = height - 0.35;
+    lintel.castShadow = true;
+    const aperture = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.22, 8, 36), carvedStone);
+    aperture.position.set(0, height * 0.48, 0.84);
+    ruin.add(lintel, aperture);
     root.add(ruin);
   }
   descriptor.primitives.filter((primitive) => primitive.shape === 'SUN').forEach((primitive, index) => {
     const sun = new THREE.Mesh(new THREE.SphereGeometry(index ? 4.5 : 6.5, 32, 20), material(THREE, index ? '#7fcfff' : '#ffb24d', { emissive: index ? '#5fbfff' : '#ff7d2d', roughness: 0.3 }));
+    sun.name = index ? 'alien-secondary-sun' : 'alien-primary-sun';
     sun.position.copy(pointOf(THREE, primitive));
     root.add(sun);
+    const light = new THREE.PointLight(index ? 0x78cfff : 0xffb46a, index ? 3.2 : 4.8, 240, 1.2);
+    light.name = index ? 'alien-secondary-sun-light' : 'alien-primary-sun-light';
+    light.position.copy(sun.position);
+    root.add(light);
     animated.push({ object: sun, phase: index * 1.7, speed: 0.14, baseY: sun.position.y, mode: 'PULSE' });
   });
+
+  const rocks = material(THREE, '#4b2d27', { roughness: 0.94 });
+  for (let index = 0; index < 24; index += 1) {
+    const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45 + (index % 5) * 0.22, 0), rocks);
+    const angle = index * 2.399963;
+    const radius = 18 + ((index * 41) % 100) * 0.46;
+    boulder.name = `alien-desert-boulder-${index}`;
+    boulder.position.set(Math.cos(angle) * radius, 0.5, Math.sin(angle) * radius);
+    boulder.scale.y = 0.55 + (index % 3) * 0.2;
+    boulder.rotation.set(index * 0.17, index * 0.31, index * 0.09);
+    boulder.castShadow = true;
+    root.add(boulder);
+  }
+
+  const dustPositions = new Float32Array(780 * 3);
+  for (let index = 0; index < 780; index += 1) {
+    const angle = index * 2.399963;
+    const radius = 4 + ((index * 47) % 100) * 0.72;
+    dustPositions[index * 3] = Math.cos(angle) * radius;
+    dustPositions[index * 3 + 1] = 0.35 + ((index * 23) % 100) * 0.055;
+    dustPositions[index * 3 + 2] = Math.sin(angle) * radius;
+  }
+  const dustGeometry = new THREE.BufferGeometry();
+  dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+  const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xe0a067, size: 0.14, transparent: true, opacity: 0.34, depthWrite: false }));
+  dust.name = 'alien-desert-atmospheric-dust';
+  dust.userData.fictionInspired = true;
+  root.add(dust);
+  animated.push({ object: dust, phase: 0, speed: 0.012, baseY: 0, mode: 'ROTATE_Y' });
+
+  const atmosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(125, 32, 18),
+    new THREE.MeshBasicMaterial({ color: 0x8d3f2a, transparent: true, opacity: 0.085, depthWrite: false, side: THREE.BackSide }),
+  );
+  atmosphere.name = 'alien-desert-atmosphere';
+  atmosphere.userData.fictionInspired = true;
+  root.add(atmosphere);
 }
 
-function createMarsStation(THREE: typeof THREE_NS, root: THREE_NS.Group, descriptor: SpacetimeWorldDescriptor, graph: WorldGraph): void {
-  const terrain = new THREE.Mesh(new THREE.CircleGeometry(78, 64), material(THREE, '#6f2d20', { roughness: 1 }));
+function createMarsStation(
+  THREE: typeof THREE_NS,
+  root: THREE_NS.Group,
+  descriptor: SpacetimeWorldDescriptor,
+  graph: WorldGraph,
+  animated: AnimatedObject[],
+): void {
+  const terrain = new THREE.Mesh(new THREE.CircleGeometry(78, 96), material(THREE, '#6f2d20', { roughness: 1 }));
+  terrain.name = 'mars-regolith-terrain';
   terrain.rotation.x = -Math.PI / 2;
   terrain.receiveShadow = true;
   root.add(terrain);
   const habitatMaterial = material(THREE, '#c4cdd2', { metalness: 0.62, roughness: 0.28 });
   const glass = material(THREE, descriptor.palette[2], { emissive: '#173e55', opacity: 0.42, metalness: 0.1, roughness: 0.12 });
   const moduleCount = Math.max(1, Math.round(graph.tryGetEntity('building:mars-research-station')?.domainState?.habitatModules ?? 1));
+  const modulePositions: THREE_NS.Vector3[] = [];
   for (let index = 0; index < moduleCount; index += 1) {
     const module = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 10, 32), habitatMaterial);
+    module.name = `mars-habitat-module-${index}`;
     module.rotation.z = Math.PI / 2;
     module.position.set((index - 1.5) * 11, 4, Math.sin(index * 1.8) * 9);
+    modulePositions.push(module.position.clone());
     module.castShadow = true;
     module.userData.simulatedResearchHabitat = true;
     root.add(module);
     const window = new THREE.Mesh(new THREE.CircleGeometry(1.7, 24), glass);
+    window.name = `mars-habitat-window-${index}`;
     window.position.set(module.position.x + 5.02, module.position.y, module.position.z);
     window.rotation.y = Math.PI / 2;
     root.add(window);
   }
+  for (let index = 1; index < modulePositions.length; index += 1) {
+    const from = modulePositions[index - 1]!;
+    const to = modulePositions[index]!;
+    const midpoint = from.clone().lerp(to, 0.5);
+    const direction = to.clone().sub(from);
+    const connector = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, direction.length(), 20), habitatMaterial);
+    connector.name = `mars-pressurized-connector-${index - 1}`;
+    connector.position.copy(midpoint);
+    connector.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    connector.castShadow = true;
+    root.add(connector);
+  }
   for (let side = -1; side <= 1; side += 2) {
     const panel = new THREE.Mesh(new THREE.BoxGeometry(16, 0.18, 7), material(THREE, '#143f71', { emissive: '#06264a', metalness: 0.72, roughness: 0.18 }));
+    panel.name = side < 0 ? 'mars-solar-array-west' : 'mars-solar-array-east';
     panel.position.set(side * 19, 2.6, 15);
     panel.rotation.z = side * 0.08;
     root.add(panel);
   }
+
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.42, 12, 16), habitatMaterial);
+  mast.name = 'mars-communications-mast';
+  mast.position.set(3, 6, -17);
+  const dish = new THREE.Mesh(
+    new THREE.SphereGeometry(4.6, 32, 18, 0, Math.PI * 2, 0, Math.PI * 0.34),
+    material(THREE, '#dfe7ea', { metalness: 0.74, roughness: 0.22 }),
+  );
+  dish.name = 'mars-communications-dish';
+  dish.position.set(3, 12, -17);
+  dish.rotation.x = Math.PI * 0.62;
+  root.add(mast, dish);
+
+  const rover = new THREE.Group();
+  rover.name = 'mars-field-rover';
+  rover.position.set(-13, 1.2, -11);
+  rover.userData.simulatedResearchEquipment = true;
+  const roverBody = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.25, 3), habitatMaterial);
+  roverBody.position.y = 1.05;
+  roverBody.castShadow = true;
+  rover.add(roverBody);
+  const wheelMaterial = material(THREE, '#171819', { metalness: 0.42, roughness: 0.75 });
+  for (const x of [-1.65, 0, 1.65]) {
+    for (const z of [-1.75, 1.75]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.5, 18), wheelMaterial);
+      wheel.position.set(x, 0.55, z);
+      wheel.rotation.x = Math.PI / 2;
+      rover.add(wheel);
+    }
+  }
+  const sensorMast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 2.8, 12), habitatMaterial);
+  sensorMast.position.set(1.25, 3.1, 0);
+  const sensorHead = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.55, 0.7), glass);
+  sensorHead.position.set(1.25, 4.55, 0);
+  rover.add(sensorMast, sensorHead);
+  root.add(rover);
+
+  const regolithRocks = material(THREE, '#49221c', { roughness: 0.98 });
+  for (let index = 0; index < 30; index += 1) {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3 + (index % 6) * 0.16, 0), regolithRocks);
+    const angle = index * 2.399963;
+    const radius = 22 + ((index * 29) % 100) * 0.43;
+    rock.name = `mars-regolith-rock-${index}`;
+    rock.position.set(Math.cos(angle) * radius, 0.25, Math.sin(angle) * radius);
+    rock.scale.y = 0.55;
+    root.add(rock);
+  }
+
+  const dustPositions = new Float32Array(420 * 3);
+  for (let index = 0; index < 420; index += 1) {
+    const angle = index * 2.399963;
+    const radius = 6 + ((index * 37) % 100) * 0.62;
+    dustPositions[index * 3] = Math.cos(angle) * radius;
+    dustPositions[index * 3 + 1] = 0.3 + ((index * 19) % 100) * 0.025;
+    dustPositions[index * 3 + 2] = Math.sin(angle) * radius;
+  }
+  const dustGeometry = new THREE.BufferGeometry();
+  dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+  const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xc86d4d, size: 0.1, transparent: true, opacity: 0.28, depthWrite: false }));
+  dust.name = 'mars-regolith-dust';
+  root.add(dust);
+  animated.push({ object: dust, phase: 0, speed: 0.008, baseY: 0, mode: 'ROTATE_Y' });
 }
 
 /**
@@ -433,7 +586,7 @@ export function createSpacetimeWorldVisualLayer(
     case 'TIMELINE_BRANCHES': createTimelines(THREE, root, descriptor, animated); break;
     case 'HISTORICAL_CITY': createHistoricalCity(THREE, root, descriptor, graph); break;
     case 'ALIEN_DESERT': createAlienDesert(THREE, root, descriptor, graph, animated); break;
-    case 'MARS_STATION': createMarsStation(THREE, root, descriptor, graph); break;
+    case 'MARS_STATION': createMarsStation(THREE, root, descriptor, graph, animated); break;
   }
   root.traverse((object) => {
     object.userData.epistemic ??= descriptor.epistemic;

@@ -31,6 +31,8 @@ import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyb
 import { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop } from '../core/scienceMemory';
 import type { ScientificDiscoveryLoopResult } from '../core/experimentFabric/scientificDiscoveryLoop';
 import { continueResearchCampaign, isNoJustifiedNextQuestion, startResearchCampaign, type ResearchCycle } from '../core/experimentFabric/researchCampaign';
+import { runScientificIntegrationCampaign } from '../core/experimentFabric/scientificIntegration';
+import { createLedgerSink } from '../core/scientificWorlds/biologyRunners';
 import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
@@ -587,6 +589,10 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       track('ask_ai_used', { via: 'science-chat-natural-discovery', status: result.status });
       return;
     }
+    // Ask the ONE deterministic resolver first so the two scientific-integration
+    // commands cannot be swallowed by the broader Experiment Fabric domain parser.
+    const preliminary = resolveCommand(msg, null);
+    const isScientificIntegrationCommand = preliminary.action?.type === 'runScientificIntegration';
     const fabricRequest = parseScienceChatMessage(msg);
     // CHAT ENTRY FOR THE DISCOVERY LOOP. The Fabric parser recognises the DOMAIN of
     // nearly every declared research question and would plan ONE experiment for it,
@@ -596,7 +602,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     // handles it. Deliberately narrow: a loop marker on a question outside the catalog
     // keeps its existing Fabric behaviour instead of being hijacked into a refusal.
     const isFabricRequest = (fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown')
-      && !isDiscoveryLoopRequest(msg);
+      && !isDiscoveryLoopRequest(msg)
+      && !isScientificIntegrationCommand;
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
@@ -619,7 +626,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         }
       : null;
 
-    const res: ChatResponse = resolveCommand(msg, snapshot);
+    const res: ChatResponse = isScientificIntegrationCommand ? preliminary : resolveCommand(msg, snapshot);
     setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, intent: res.intent, equations: res.equations, todo: res.todo }]);
     setInput('');
     track('ask_ai_used', { via: 'science-chat' });
@@ -690,7 +697,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       // ETAP 1.5 — the real kernel, run synchronously right here, exactly like CyberWorkspace.tsx's
       // own `run()` does. The result lives in chat state so a follow-up "zapisz" can persist it
       // without re-running anything; there is deliberately no navigation away from the conversation.
-      const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+      const result = runAdaptiveInvestigation(new ToyVulnerableApp(), 20, {
+        evidenceSink: createLedgerSink(kernelLedger, 'science-chat-cyber'),
+      });
       setLastCyberRun(result);
       const counts = new Map<HypothesisAssessment, number>();
       for (const step of result.steps) if (step.verdict) counts.set(step.verdict.assessment, (counts.get(step.verdict.assessment) ?? 0) + 1);
@@ -698,10 +707,41 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       appendGenesis(
         `Gotowe. Zasoby: ${result.assets.length} · Hipotezy: ${result.hypotheses.length} · Kroki: ${result.steps.length} · Konflikty: ${result.conflicts.length}.\n`
         + `Werdykty — ${verdictLine}.\n`
+        + `Evidence — ${result.evidenceReceipts.length} rekordów; poprawka pozostaje blokowana bez jawnej zgody człowieka.\n`
         + (result.conflicts.length > 0 ? `Konflikty (potwierdzona i obalona naraz, nie uśrednione): ${result.conflicts.join(', ')}.\n` : '')
         + `Pełny widok krok po kroku (dlaczego ten test, obserwacja, remediacja): sekcja „Cyber" w menu.`,
         'WYNIK',
       );
+    } else if (a?.type === 'runScientificIntegration') {
+      appendGenesis('Uruchamiam ograniczoną kampanię przez canonical EvidenceLedger…', 'SYSTEM');
+      try {
+        const sink = createLedgerSink(kernelLedger, `science-chat-${a.purpose.toLowerCase()}`);
+        const result = await runScientificIntegrationCampaign(a.problemId, sink, {
+          maxCycles: 1,
+          ...(a.painQuestion === undefined ? {} : { painQuestion: a.painQuestion }),
+          ...(a.physicsClaims === undefined ? {} : { physicsClaims: a.physicsClaims }),
+        });
+        if (a.purpose === 'PAIN_RESEARCH') {
+          const pain = result.painResearchResult;
+          appendGenesis(
+            pain
+              ? `PAIN RESEARCH: ${pain.status}\n${pain.reason}\n${pain.governance.scope} · ${pain.governance.deviceClaim} · ${pain.governance.researchPriorityDisclaimer}\nEvidence: ${sink.hashes.length} rekordów.`
+              : 'PAIN RESEARCH: BLOCKED — kampania nie zwróciła raportu Pain Research.',
+            pain?.status === 'PARTIAL' ? 'MODEL' : 'SYSTEM',
+          );
+        } else {
+          const validations = result.spacetimeIntegrityResults ?? [];
+          appendGenesis(
+            validations.length > 0
+              ? validations.map((validation) => `${validation.claim.category}: ${validation.ok ? 'PASS' : 'REJECTED'} · wymagane ${validation.requiredLabel}${validation.reason ? ` · ${validation.reason}` : ''}`).join('\n')
+                + `\nEvidence: ${sink.hashes.length} rekordów.`
+              : 'SPACETIME INTEGRITY: BLOCKED — brak zwalidowanego twierdzenia.',
+            validations.every((validation) => validation.ok) ? 'MODEL' : 'SYSTEM',
+          );
+        }
+      } catch (error) {
+        appendGenesis(`Scientific Integration odrzucił żądanie: ${error instanceof Error ? error.message : String(error)}`, 'SYSTEM');
+      }
     } else if (a?.type === 'runDecipherment') {
       // ETAP 1.5 — same pattern, reusing DeciphermentWorkspace.tsx's own sequenceFromText/demo specs
       // instead of a second copy. `sequenceText` is null when the message had no plausible sequence.

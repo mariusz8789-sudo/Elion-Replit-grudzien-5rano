@@ -1,21 +1,27 @@
-import type {
-  AttackPath,
-  AttackPathEdge,
-  AttackSurface,
-  AttackSurfaceAsset,
-  CyberInvestigationResult,
-  CyberObservation,
-  ObservableExpectation,
-  ObservedResult,
-  RemediationAction,
-  SecurityTestResult,
-  SecurityVerdict,
-  VulnerabilityHypothesis,
-  VulnerabilityHypothesisKind,
+import {
+  assertApprovalBeforePatch,
+  assertAuthorizedScope,
+  type AttackPath,
+  type AttackPathEdge,
+  type AttackSurface,
+  type AttackSurfaceAsset,
+  type CyberCampaignBudget,
+  type CyberInvestigationResult,
+  type CyberObservation,
+  type CyberBudgetUsage,
+  type HumanApprovalRecord,
+  type ObservableExpectation,
+  type ObservedResult,
+  type RemediationAction,
+  type SecurityTestResult,
+  type SecurityVerdict,
+  type VulnerabilityHypothesis,
+  type VulnerabilityHypothesisKind,
 } from './cyberInvestigation';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
 import {
   selectNextTest,
+  type CyberBudgetContext,
   type CyberTestCandidate,
   type CyberTestSelection,
 } from './cyberTestPlanner';
@@ -492,7 +498,35 @@ export interface AdaptiveInvestigationResult {
   readonly stopReason: string;
 }
 
-export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): AdaptiveInvestigationResult {
+/**
+ * `scope`, `budget`, and `approvals` are all OPTIONAL trailing parameters, added without
+ * changing any existing call site's behavior: every current caller (ScienceChat.tsx,
+ * CyberWorkspace.tsx, the adaptive-investigation test suite) invokes this with 1-2 positional
+ * args and gets EXACTLY today's behavior — no scope check, no budget cap, remediation applies
+ * immediately. A caller that opts into any of the three gets a real, enforced primitive from
+ * cyberInvestigation.ts/cyberTestPlanner.ts, never a fabricated pass:
+ *  - `scope`: checked once via `assertAuthorizedScope` before any observation/execution begins;
+ *    an unauthorized scope throws immediately.
+ *  - `budget`: turned into a live `CyberBudgetContext` every step from the kernel's own real
+ *    counters (`attempts.size` = hypotheses actually started, `remediatedFor.size` = patch
+ *    proposals actually created; this kernel has no analyzer concept yet, so
+ *    `analyzerRunsExecuted` stays honestly 0) and passed to `selectNextTest`, which then refuses
+ *    to start a NEW hypothesis once `maxHypotheses` is reached.
+ *  - `approvals`: a lookup by `remediationId`, checked via `assertApprovalBeforePatch`
+ *    immediately before `applyRemediation` — no approval record, a REJECTED decision, or a
+ *    `remediationId` mismatch all throw `PatchNotApprovedError` rather than applying anyway.
+ */
+export function runAdaptiveInvestigation(
+  app: ToyVulnerableApp,
+  maxSteps = 20,
+  scope?: string,
+  budget?: CyberCampaignBudget,
+  approvals?: ReadonlyMap<string, HumanApprovalRecord>,
+): AdaptiveInvestigationResult {
+  if (scope !== undefined) {
+    const check = assertAuthorizedScope(scope);
+    if (!check.ok) throw new Error(`runAdaptiveInvestigation: ${check.reason}`);
+  }
   const observations = collectObservations(app);
   const assets = generateAttackSurface(observations);
   const hypotheses = generateHypotheses(assets);
@@ -539,7 +573,9 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     }
 
     const assessments = new Map(hypotheses.map((h) => [h.hypothesisId, currentAssessment(h.hypothesisId)]));
-    const selection = selectNextTest(candidates, assessments);
+    const usage: CyberBudgetUsage = { hypothesesGenerated: attempts.size, analyzerRunsExecuted: 0, patchProposalsCreated: remediatedFor.size };
+    const budgetContext: CyberBudgetContext | undefined = budget ? { budget, usage } : undefined;
+    const selection = selectNextTest(candidates, assessments, budgetContext);
 
     if (selection.selectedHypothesisId === null) {
       stopReason = selection.whySelected;
@@ -557,7 +593,10 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     if (isReplication) {
       const priorTest = [...steps].reverse().find((s) => s.hypothesisId === h.hypothesisId)?.testResult ?? null;
       remediation = createRemediation(app, h);
-      if (remediation) applyRemediation(app, remediation);
+      if (remediation) {
+        if (approvals) assertApprovalBeforePatch(remediation, approvals.get(remediation.remediationId) ?? null);
+        applyRemediation(app, remediation);
+      }
       testResult = retest(h, app, `adaptive${testCounter++}`);
       if (priorTest) outcomeVerification = verifySecurityOutcome(priorTest, testResult);
       remediatedFor.add(h.hypothesisId);

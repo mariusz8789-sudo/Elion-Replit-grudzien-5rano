@@ -136,6 +136,30 @@ export {
 } from './modelRouter';
 
 export {
+  SCIENTIFIC_METRICS_VERSION,
+  computePredictionError,
+  computeSurpriseScore,
+  computeInformationGain,
+  deriveKnowledgeGaps,
+  DEFAULT_KNOWLEDGE_GAP_THRESHOLD_SIGMA,
+  type PredictionErrorInput,
+  type PredictionErrorResult,
+  type InformationGainInput,
+  type KnowledgeGap,
+} from '../metaCognition/scientificMetrics';
+
+export {
+  DECISION_TRACE_VERSION,
+  assertNoHiddenReasoningOrSentienceClaim,
+  buildDecisionTrace,
+  type DecisionEvidenceRef,
+  type DecisionAlternativeStatus,
+  type DecisionAlternative,
+  type DecisionTraceInput,
+  type DecisionTrace,
+} from '../metaCognition/decisionTrace';
+
+export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,
   confirmCrossDomainOrchestration,

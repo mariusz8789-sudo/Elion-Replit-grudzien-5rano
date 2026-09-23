@@ -952,6 +952,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   return (
     <aside
       className={inline ? 'science-chat science-chat-inline' : 'science-chat'}
+      data-testid={inline ? 'science-chat-inline' : 'science-chat-drawer'}
       role={inline ? 'region' : 'dialog'}
       aria-label="Science Chat"
     >

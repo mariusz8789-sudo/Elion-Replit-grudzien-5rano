@@ -131,6 +131,35 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement' },
 ];
 
+/**
+ * The long module list stays complete, but the menu presents it by purpose.
+ * Science Chat remains one global action; these groups are destinations, not
+ * additional chat entry points.
+ */
+const RESEARCH_IDS = new Set([
+  'meta-cognition', 'science', 'virtual-bio', 'evidence', 'discovery-log', 'dossier', 'cde',
+  'campaign', 'pilot', 'precision', 'conflict', 'whatif', 'calibration', 'inquiry', 'timeline',
+]);
+const WORLD_IDS = new Set([
+  'world-director', 'mirror', 'tour', 'matrix', 'matrix-stage', 'matrix-map', 'world', 'simulation',
+  'collider', 'lab-fpv', 'cern-complex', 'cms-open-data', 'scientific-worlds', 'human-biology-lab',
+  'city3d', 'scientific-city', 'first-person-lab', 'molecule', 'cell-lab', 'looking-glass', 'world-proposal',
+]);
+const PUBLIC_IDS = new Set(['cyber', 'gov-campaign', 'clockwork', 'sovereign']);
+const LEARNING_IDS = new Set([
+  'myths-theories', 'decipherment', 'glossary', 'dome-world', 'protection-priority', 'geodesics',
+  'entanglement', 'decision-explorer',
+]);
+const groupedIds = new Set([...RESEARCH_IDS, ...WORLD_IDS, ...PUBLIC_IDS, ...LEARNING_IDS]);
+
+export const MORE_SECTIONS: readonly NavSection[] = [
+  { id: 'more-research', label: 'Badania i dowody', items: MORE_ITEMS.filter((item) => RESEARCH_IDS.has(item.id)) },
+  { id: 'more-worlds', label: 'Światy i laboratoria', items: MORE_ITEMS.filter((item) => WORLD_IDS.has(item.id)) },
+  { id: 'more-public', label: 'Administracja i bezpieczeństwo', items: MORE_ITEMS.filter((item) => PUBLIC_IDS.has(item.id)) },
+  { id: 'more-learning', label: 'Nauka i eksploracja', items: MORE_ITEMS.filter((item) => LEARNING_IDS.has(item.id)) },
+  { id: 'more-system', label: 'System i projekty', items: MORE_ITEMS.filter((item) => !groupedIds.has(item.id)) },
+];
+
 /** Flat view, for lookups and for the mobile primary bar. */
 export const NAV_ITEMS: readonly NavItem[] = [...NAV_SECTIONS.flatMap((section) => section.items), ...MORE_ITEMS];
 

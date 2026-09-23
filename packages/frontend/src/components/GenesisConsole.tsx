@@ -208,7 +208,7 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
   );
 
   return (
-    <div className="settings-view">
+    <main className="settings-view" id="main-content" tabIndex={-1}>
       <section className="settings-section">
         <h2>Genesis Research Console</h2>
         <textarea
@@ -430,6 +430,6 @@ export function GenesisConsole({ autoplay }: { readonly autoplay?: GuideMode | n
         <GovServicesPanel />
         <EvidenceSourceStatusPanel />
       </details>
-    </div>
+    </main>
   );
 }

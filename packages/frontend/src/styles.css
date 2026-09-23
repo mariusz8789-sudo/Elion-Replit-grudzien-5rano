@@ -4538,6 +4538,13 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .shell-nav-more:hover { color: var(--text-dim); }
 .shell-nav-more .shell-nav-badge { color: var(--text-faint); border-color: var(--border); }
 .shell-nav-section + .shell-nav-section { border-top: 1px solid var(--border); margin-top: var(--sp-2); padding-top: var(--sp-2); }
+.shell-nav-groups { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); }
+.shell-nav-subgroup { display: grid; gap: .15rem; min-width: 0; }
+.shell-nav-subgroup + .shell-nav-subgroup { padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+.shell-nav-subgroup-title {
+  margin: 0; padding: .2rem .6rem; color: var(--text-faint);
+  font: 700 .58rem/1.2 var(--font-mono); letter-spacing: .11em; text-transform: uppercase;
+}
 
 /* ==========================================================================
    CHAT-FIRST HOME. On Home the chat is not a panel over the app — it is the
@@ -5619,3 +5626,94 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .quantum-val { white-space: nowrap; }
 .quantum-model { color: var(--muted, #a9b3cf); }
 @media (max-width: 600px) { .quantum-row { grid-template-columns: minmax(3ch, auto) 1fr; } .quantum-val { grid-column: 2; font-size: .64rem; } }
+
+/* ==========================================================================
+   MOBILE LAYER SAFETY
+   The floating Science Chat is a bottom drawer on phones. It must occupy the
+   space above the command bar instead of using the whole viewport underneath
+   it. Keep this block late in the cascade: the legacy visual pass above used
+   to lower every floating panel to z-index 10 after the shell rules.
+   ========================================================================== */
+@media (max-width: 700px) {
+  html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
+  .shell, .shell-main, .shell-route, #main-content { min-width: 0; max-width: 100%; }
+  .shell-route { overflow-x: hidden; }
+
+  .shell-mobilebar {
+    z-index: 60;
+    padding-bottom: max(.35rem, var(--safe-bottom));
+  }
+
+  .science-chat:not(.science-chat-inline) {
+    left: .5rem;
+    right: .5rem;
+    top: auto;
+    bottom: calc(4.4rem + var(--safe-bottom));
+    z-index: 55;
+    width: auto;
+    height: min(68vh, 38rem);
+    height: min(68dvh, 38rem);
+    max-height: calc(100vh - 5.4rem - var(--safe-bottom) - env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - 5.4rem - var(--safe-bottom) - env(safe-area-inset-top, 0px));
+    border-radius: .9rem .9rem .35rem .35rem;
+    background: rgba(3, 10, 18, .98) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(115%) !important;
+    backdrop-filter: blur(22px) saturate(115%) !important;
+    overscroll-behavior: contain;
+  }
+
+  .science-chat:not(.science-chat-inline) .science-chat-head,
+  .science-chat:not(.science-chat-inline) .research-tools,
+  .science-chat:not(.science-chat-inline) .science-chat-form { flex: 0 0 auto; }
+  .science-chat:not(.science-chat-inline) .science-chat-log {
+    flex: 1 1 auto;
+    min-height: 4.5rem;
+    overscroll-behavior: contain;
+  }
+  .science-chat:not(.science-chat-inline) .next-move-panel {
+    flex: 0 1 auto;
+    max-height: min(24vh, 10rem);
+    max-height: min(24dvh, 10rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .science-chat:not(.science-chat-inline) .science-chat-suggest,
+  .science-chat:not(.science-chat-inline) .science-chat-capsule-wrap {
+    flex: 0 1 auto;
+    max-height: min(16vh, 6.5rem);
+    max-height: min(16dvh, 6.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .science-chat:not(.science-chat-inline) .science-chat-form {
+    padding-bottom: max(.6rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .science-chat-head > div,
+  .science-chat-log,
+  .sc-turn,
+  .sc-text,
+  .next-move-btn,
+  .science-chat-form input {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .science-chat:not(.science-chat-inline) .science-chat-suggest .chip-btn {
+    flex: 1 1 100%;
+    width: 100%;
+    white-space: normal;
+  }
+  .next-move-btn span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .next-move-head { align-items: flex-start; flex-direction: column; }
+  .next-move-head span { text-align: left; }
+  .next-move-grid { grid-template-columns: minmax(0, 1fr); }
+  .science-chat-form { align-items: stretch; }
+  .science-chat-form .primary-btn { flex: 0 0 auto; }
+}

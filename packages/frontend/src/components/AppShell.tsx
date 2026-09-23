@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_ITEMS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 
@@ -195,9 +195,16 @@ export function AppShell({ children, chat, chatInline = false }: {
           <span className="shell-nav-label">Wszystkie moduły</span>
           <span className="shell-nav-badge">{MORE_ITEMS.length}</span>
         </button>
-        {moreOpen && MORE_ITEMS.map((item) => (
-          <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
-        ))}
+        {moreOpen && <div className="shell-nav-groups">
+          {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
+            <section className="shell-nav-subgroup" key={group.id} aria-labelledby={`${group.id}-title`}>
+              <h3 className="shell-nav-subgroup-title" id={`${group.id}-title`}>{group.label}</h3>
+              {group.items.map((item) => (
+                <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
+              ))}
+            </section>
+          ))}
+        </div>}
       </div>
     </>
   );
@@ -232,7 +239,7 @@ export function AppShell({ children, chat, chatInline = false }: {
       {!chatInline && chat}
 
       {/* Mobile: a real command bar, not a shrunken sidebar. */}
-      <nav className="shell-mobilebar" aria-label="Nawigacja Genesis (mobile)">
+      <nav className="shell-mobilebar" aria-label="Nawigacja Genesis (mobile)" data-testid="mobile-navigation">
         {PRIMARY_NAV_ITEMS.map((item) => (
           <button
             key={item.id}

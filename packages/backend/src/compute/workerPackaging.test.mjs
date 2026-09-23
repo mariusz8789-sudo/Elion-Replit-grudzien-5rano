@@ -27,7 +27,9 @@ const PIP_WORKERS = Object.freeze({
 function pins(text) {
   const out = new Map();
   for (const raw of text.split('\n')) {
-    const line = raw.replace(/#.*$/, '').trim();
+    // Trim CRLF's trailing carriage return before stripping comments so this
+    // packaging contract behaves identically on Windows and Linux.
+    const line = raw.trim().replace(/#.*$/, '').trim();
     if (!line) continue;
     const m = /^([A-Za-z0-9_.-]+)==([A-Za-z0-9_.+!-]+)$/.exec(line);
     if (!m) throw new Error(`not an exact pin: "${line}"`);
@@ -80,6 +82,8 @@ describe('pip-based workers are fully pinned, binary-only and import-checked at 
 
   test('admet: torch is pinned from the CPU index, locked, and a CUDA build fails the image build', () => {
     const dockerfile = read('workers/admet/Dockerfile');
+    assert.match(dockerfile, /\blibxrender1\b/);
+    assert.match(dockerfile, /\blibxext6\b/);
     assert.match(dockerfile, /torch==2\.14\.0 --index-url https:\/\/download\.pytorch\.org\/whl\/cpu/);
     assert.match(dockerfile, /torch\.version\.cuda is None/);
     const lock = pins(read('workers/admet/constraints.txt'));
@@ -92,7 +96,7 @@ describe('pymeep worker is built only from conda-forge', () => {
   test('the explicit lock pins every package by conda-forge URL and md5', () => {
     const lock = read('workers/pymeep/conda-linux-64.lock');
     assert.match(lock, /^@EXPLICIT$/m);
-    const entries = lock.split('\n').filter((l) => l.startsWith('https://'));
+    const entries = lock.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('https://'));
     assert.ok(entries.length > 50);
     for (const entry of entries) assert.match(entry, /^https:\/\/conda\.anaconda\.org\/conda-forge\/(linux-64|noarch)\/[^#\s]+#[a-f0-9]{32}$/);
     assert.ok(entries.some((e) => /\/pymeep-1\.34\.0-nompi_py311[^/]*$/.test(e)), 'the verified pymeep build is locked');

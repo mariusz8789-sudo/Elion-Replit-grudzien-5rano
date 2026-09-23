@@ -8,6 +8,7 @@ import {
   type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification, type ScientificComputeReport,
 } from '../core/backend/client';
 import { LockedScreen } from './LockedScreen';
+import { LabValidationPanel } from './LabValidationPanel';
 import { parseDiscoveryGoal, buildCampaignRequest } from '../core/discovery/discoveryGoalIntent';
 import { parseCampaignWhyQuestion } from '../core/discovery/campaignWhyIntent';
 
@@ -551,6 +552,16 @@ function CampaignWorkspace() {
             </div>
           )}
         </section>
+      )}
+
+      {selected && projectId && (
+        <LabValidationPanel
+          projectId={projectId}
+          campaignId={selected.id}
+          candidates={candidates}
+          scienceRuns={scienceRuns}
+          onChanged={() => { void loadDetail(selected.id); }}
+        />
       )}
     </main>
   );

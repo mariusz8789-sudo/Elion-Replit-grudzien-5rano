@@ -886,3 +886,224 @@ export async function askCampaignWhy(
   const r = await request<{ why: WhyAnswer }>('GET', `/projects/${projectId}/campaigns/${campaignId}/why?${params.toString()}`, { token });
   return r.ok ? { ok: true, data: r.data.why } : r;
 }
+
+// === GENESIS LABORATORY CLOSED LOOP — governed external-lab validation (packages/backend/src/campaign/labClosedLoop.mjs) ===
+
+export interface LabValidationRequest {
+  requestId: string;
+  requestFingerprint: string;
+  campaignId: string;
+  candidateId: string;
+  objective: string;
+  endpointPlan: {
+    endpointId: string;
+    expectedUnit: string | null;
+    comparisonOutputKey: string | null;
+    rationale: string | null;
+  }[];
+  researchGate: { verdict: string; reason: string };
+  status: 'READY_FOR_EXTERNAL_LAB_REVIEW' | 'DRAFT_BLOCKED_BY_RESEARCH_GATE';
+  claimBoundary: string;
+}
+
+export interface LabObservationPayload {
+  observationId: string;
+  observationFingerprint: string;
+  requestId: string;
+  campaignId: string;
+  candidateId: string;
+  endpointId: string;
+  value: number | string | boolean;
+  unit: string;
+  observedAt: string;
+  methodReference: string;
+  source: {
+    labId: string;
+    providerType: 'CRO' | 'ACADEMIC_LAB' | 'INTERNAL_LAB' | 'OTHER_EXTERNAL';
+    externalObservationId: string;
+    sourceUri: string;
+  };
+  quality: { status: 'QC_PASSED' | 'QC_FAILED' | 'QC_UNKNOWN'; confidence: number; notes?: string | null };
+  status: 'INGESTED_UNREVIEWED';
+  evidenceClass: 'EXTERNAL_OBSERVATION';
+  clinicalEfficacy: 'UNKNOWN';
+  claimBoundary: string;
+}
+
+export interface LabObservationReview {
+  observationId: string;
+  candidateId: string;
+  requestId: string;
+  verdict: 'ACCEPTED_AS_OBSERVATION' | 'NEEDS_CLARIFICATION' | 'REJECTED_INTEGRITY';
+  reviewerId: string;
+  note: string | null;
+  status: string;
+  clinicalEfficacy: 'UNKNOWN';
+  claimBoundary: string;
+}
+
+export interface LabModelObservationComparison {
+  comparisonId: string;
+  campaignId: string;
+  candidateId: string;
+  scienceRunId: string;
+  observationId: string;
+  endpointId: string;
+  outputKey: string;
+  modelValue: number;
+  observedValue: number;
+  unit: string | null;
+  delta: number;
+  deltaAbs: number;
+  deltaRel: number;
+  verdict: 'AGREES_WITHIN_TOLERANCE' | 'DISAGREES_OUTSIDE_TOLERANCE';
+  clinicalEfficacy: 'UNKNOWN';
+  claimBoundary: string;
+}
+
+interface LabCampaignEvent<T = Record<string, unknown>> {
+  id: string;
+  campaignId: string;
+  generation: number;
+  type: string;
+  payload: T;
+  createdAt: number;
+}
+
+export interface LabValidationDossier {
+  contractVersion: string;
+  campaignId: string;
+  candidateId: string;
+  candidate: CampaignCandidate;
+  researchGate: { verdict: string; reason: string; message?: string };
+  scienceRuns: ScienceRun[];
+  requests: LabCampaignEvent<LabValidationRequest>[];
+  observations: {
+    event: LabCampaignEvent<LabObservationPayload>;
+    latestReview: LabCampaignEvent<LabObservationReview> | null;
+  }[];
+  evidenceLinks: LabCampaignEvent<{
+    observationId: string;
+    proposalId: string;
+    evidenceContentHash: string | null;
+    mode: 'PROPOSE_ONLY';
+    status: 'PENDING_HUMAN_PUBLICATION';
+  }>[];
+  comparisons: LabCampaignEvent<LabModelObservationComparison>[];
+  nextResearchAction: { action: string; reason: string; comparisonId?: string; claimBoundary?: string };
+  dossierFingerprint: string;
+  clinicalEfficacy: 'UNKNOWN';
+  claimBoundary: string;
+}
+
+export async function getCampaignLabValidationDossier(
+  token: string,
+  projectId: string,
+  campaignId: string,
+  candidateId: string,
+): Promise<ApiResult<LabValidationDossier>> {
+  const params = new URLSearchParams({ candidate: candidateId });
+  const result = await request<{ dossier: LabValidationDossier }>(
+    'GET',
+    `/projects/${projectId}/campaigns/${campaignId}/lab-validation?${params.toString()}`,
+    { token },
+  );
+  return result.ok ? { ok: true, data: result.data.dossier } : result;
+}
+
+export async function createCampaignLabValidationRequest(
+  token: string,
+  projectId: string,
+  campaignId: string,
+  body: {
+    candidateId: string;
+    objective: string;
+    endpointPlan: {
+      endpointId: string;
+      expectedUnit?: string;
+      comparisonOutputKey?: string;
+      rationale?: string;
+    }[];
+    externalProvider?: { providerId?: string; providerType?: string };
+    preregistrationRef?: string;
+  },
+): Promise<ApiResult<LabValidationRequest>> {
+  const result = await request<{ request: LabValidationRequest }>(
+    'POST',
+    `/projects/${projectId}/campaigns/${campaignId}/lab-validation`,
+    { token, body },
+  );
+  return result.ok ? { ok: true, data: result.data.request } : result;
+}
+
+export async function ingestCampaignLabObservation(
+  token: string,
+  projectId: string,
+  campaignId: string,
+  body: {
+    candidateId: string;
+    requestId: string;
+    observation: {
+      endpointId: string;
+      value: number | string | boolean;
+      unit: string;
+      observedAt: string;
+      methodReference: string;
+      source: {
+        labId: string;
+        providerType: 'CRO' | 'ACADEMIC_LAB' | 'INTERNAL_LAB' | 'OTHER_EXTERNAL';
+        externalObservationId: string;
+        sourceUri: string;
+      };
+      quality: { status: 'QC_PASSED' | 'QC_FAILED' | 'QC_UNKNOWN'; confidence: number; notes?: string };
+    };
+  },
+): Promise<ApiResult<LabObservationPayload>> {
+  const result = await request<{ observation: LabObservationPayload }>(
+    'POST',
+    `/projects/${projectId}/campaigns/${campaignId}/lab-validation/observations`,
+    { token, body },
+  );
+  return result.ok ? { ok: true, data: result.data.observation } : result;
+}
+
+export async function reviewCampaignLabObservation(
+  token: string,
+  projectId: string,
+  campaignId: string,
+  observationId: string,
+  body: {
+    candidateId: string;
+    verdict: 'ACCEPTED_AS_OBSERVATION' | 'NEEDS_CLARIFICATION' | 'REJECTED_INTEGRITY';
+    note?: string;
+  },
+): Promise<ApiResult<{ review: LabObservationReview; evidenceProposalId: string | null }>> {
+  const result = await request<{ review: LabObservationReview; evidenceProposal: { proposalId?: string } | null }>(
+    'POST',
+    `/projects/${projectId}/campaigns/${campaignId}/lab-validation/observations/${observationId}/review`,
+    { token, body },
+  );
+  return result.ok
+    ? { ok: true, data: { review: result.data.review, evidenceProposalId: result.data.evidenceProposal?.proposalId ?? null } }
+    : result;
+}
+
+export async function compareCampaignLabObservation(
+  token: string,
+  projectId: string,
+  campaignId: string,
+  body: {
+    candidateId: string;
+    scienceRunId: string;
+    observationId: string;
+    outputKey: string;
+    tolerance: { absolute?: number; relative?: number };
+  },
+): Promise<ApiResult<LabModelObservationComparison>> {
+  const result = await request<{ comparison: LabModelObservationComparison }>(
+    'POST',
+    `/projects/${projectId}/campaigns/${campaignId}/lab-validation/comparisons`,
+    { token, body },
+  );
+  return result.ok ? { ok: true, data: result.data.comparison } : result;
+}

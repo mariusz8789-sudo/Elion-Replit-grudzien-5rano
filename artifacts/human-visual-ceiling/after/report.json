@@ -1,0 +1,3107 @@
+{
+  "phase": "after",
+  "base": "http://127.0.0.1:5197",
+  "samples": [
+    {
+      "name": "desktop-establishing",
+      "runtime": {
+        "updateCount": 276,
+        "simulationSeconds": 5.495700000631827,
+        "lastDeltaSeconds": 0.016700000000000728,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 14.89019999998808,
+        "frameDeltaSeconds": 0.01669999998807907,
+        "render": {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 10.300000011920929,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 0
+      },
+      "explorer": {
+        "x": 200,
+        "y": 0,
+        "width": 1240,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 200
+      },
+      "dpr": 1,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 249.59375,
+            "y": 76,
+            "width": 250,
+            "height": 158.8125,
+            "top": 76,
+            "right": 499.59375,
+            "bottom": 234.8125,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 1109.171875,
+            "y": 76,
+            "width": 306.828125,
+            "height": 37.046875,
+            "top": 76,
+            "right": 1416,
+            "bottom": 113.046875,
+            "left": 1109.171875
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 249.59375,
+            "y": 751.46875,
+            "width": 388.984375,
+            "height": 73.53125,
+            "top": 751.46875,
+            "right": 638.578125,
+            "bottom": 825,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 1281.09375,
+            "y": 765.40625,
+            "width": 130.90625,
+            "height": 44.59375,
+            "top": 765.40625,
+            "right": 1412,
+            "bottom": 810,
+            "left": 1281.09375
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.52380952380565,
+          "frameMs": 16.80000000000109,
+          "renderMs": 17.399999976158142,
+          "drawCalls": 1169,
+          "triangles": 432427,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 9.800000011920929,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 9.800000011920929,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 11.100000023841858,
+          "drawCalls": 1169,
+          "triangles": 432427,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 7.300000011920929,
+          "drawCalls": 1169,
+          "triangles": 432427,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.5238095238121,
+          "frameMs": 16.799999999999272,
+          "renderMs": 7.600000023841858,
+          "drawCalls": 1169,
+          "triangles": 432427,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 61.34969325152964,
+          "frameMs": 16.30000000000109,
+          "renderMs": 9.100000023841858,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380565,
+          "frameMs": 16.80000000000109,
+          "renderMs": 9.600000023841858,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.600000023841858,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 9.400000035762787,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 9.400000035762787,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 61.34969325152964,
+          "frameMs": 16.30000000000109,
+          "renderMs": 10.399999976158142,
+          "drawCalls": 1167,
+          "triangles": 432403,
+          "geometries": 398,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "desktop-organ",
+      "runtime": {
+        "updateCount": 1236,
+        "simulationSeconds": 22.780800001549675,
+        "lastDeltaSeconds": 0.01669999998807907,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": "station:human-study",
+        "progress": 0,
+        "timerSeconds": 0.612900000083435,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 37.91959999996429,
+        "frameDeltaSeconds": 0.01669999998807907,
+        "render": {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 11,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "organ",
+          "selectedNodeId": "heart",
+          "selectedOrganId": "heart",
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:organs"
+            ],
+            "selectedLayerId": "layer:organs",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": [
+          {
+            "id": "heart",
+            "x": 251.07269102329602,
+            "y": 459.40917749596923
+          }
+        ]
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 0
+      },
+      "explorer": {
+        "x": 200,
+        "y": 0,
+        "width": 1240,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 200
+      },
+      "dpr": 1,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "organ",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 249.59375,
+            "y": 76,
+            "width": 180.234375,
+            "height": 139.3125,
+            "top": 76,
+            "right": 429.828125,
+            "bottom": 215.3125,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 1109.171875,
+            "y": 76,
+            "width": 306.828125,
+            "height": 37.046875,
+            "top": 76,
+            "right": 1416,
+            "bottom": 113.046875,
+            "left": 1109.171875
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 249.59375,
+            "y": 751.46875,
+            "width": 388.984375,
+            "height": 73.53125,
+            "top": 751.46875,
+            "right": 638.578125,
+            "bottom": 825,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 1269.09375,
+            "y": 765.40625,
+            "width": 142.90625,
+            "height": 44.59375,
+            "top": 765.40625,
+            "right": 1412,
+            "bottom": 810,
+            "left": 1269.09375
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 11.900000035762787,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 9.5,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523824994,
+          "frameMs": 16.799999999995634,
+          "renderMs": 9.300000011920929,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523824994,
+          "frameMs": 16.799999999995634,
+          "renderMs": 11.699999988079071,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 10.899999976158142,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 6,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 10.799999952316284,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 10.799999952316284,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 9.699999988079071,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 8.800000011920929,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 8.899999976158142,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 14,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "desktop-ghost",
+      "runtime": {
+        "updateCount": 1521,
+        "simulationSeconds": 27.754200001776088,
+        "lastDeltaSeconds": 0.017,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": "station:human-study",
+        "progress": 0,
+        "timerSeconds": 0.612900000083435,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 42.679399999976326,
+        "frameDeltaSeconds": 0.017,
+        "render": {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 31.899999976158142,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "organ",
+          "selectedNodeId": "heart",
+          "selectedOrganId": "heart",
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:organs"
+            ],
+            "selectedLayerId": "layer:organs",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": [
+          {
+            "id": "heart",
+            "x": 253.5663334555985,
+            "y": 458.9999156946552
+          }
+        ]
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 0
+      },
+      "explorer": {
+        "x": 200,
+        "y": 0,
+        "width": 1240,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 200
+      },
+      "dpr": 1,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "organ",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 249.59375,
+            "y": 76,
+            "width": 180.234375,
+            "height": 139.3125,
+            "top": 76,
+            "right": 429.828125,
+            "bottom": 215.3125,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 1109.171875,
+            "y": 76,
+            "width": 306.828125,
+            "height": 37.046875,
+            "top": 76,
+            "right": 1416,
+            "bottom": 113.046875,
+            "left": 1109.171875
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 249.59375,
+            "y": 751.46875,
+            "width": 388.984375,
+            "height": 73.53125,
+            "top": 751.46875,
+            "right": 638.578125,
+            "bottom": 825,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 1269.09375,
+            "y": 765.40625,
+            "width": 142.90625,
+            "height": 44.59375,
+            "top": 765.40625,
+            "right": 1412,
+            "bottom": 810,
+            "left": 1269.09375
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 10.199999988079071,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 10.199999988079071,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.9756097561192,
+          "frameMs": 16.39999999999418,
+          "renderMs": 23.399999976158142,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 9.5,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 11.799999952316284,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 10.199999988079071,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 10.699999988079071,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.171597633131,
+          "frameMs": 16.900000000001455,
+          "renderMs": 8.699999988079071,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.171597633131,
+          "frameMs": 16.900000000001455,
+          "renderMs": 14.5,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 9.399999976158142,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 9.399999976158142,
+          "drawCalls": 1149,
+          "triangles": 556757,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.9756097561192,
+          "frameMs": 16.39999999999418,
+          "renderMs": 12.199999988079071,
+          "drawCalls": 1147,
+          "triangles": 556733,
+          "geometries": 413,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "desktop-tissue",
+      "runtime": {
+        "updateCount": 2599,
+        "simulationSeconds": 47.29880000273048,
+        "lastDeltaSeconds": 0.016700000000004364,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": "station:histology",
+        "progress": 0,
+        "timerSeconds": 0.6069000001788155,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 61.459599999964865,
+        "frameDeltaSeconds": 0.01659999996423721,
+        "render": {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 15.099999964237213,
+          "drawCalls": 1807,
+          "triangles": 915497,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "tissue",
+          "selectedNodeId": "heart",
+          "selectedOrganId": "heart",
+          "artifactKind": "histology",
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:organs"
+            ],
+            "selectedLayerId": "layer:organs",
+            "lod": "LOW",
+            "crossSection": true,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": [
+          {
+            "id": "heart",
+            "x": 255.61128959684535,
+            "y": 458.6712363281589
+          }
+        ]
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 0
+      },
+      "explorer": {
+        "x": 200,
+        "y": 0,
+        "width": 1240,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 200
+      },
+      "dpr": 1,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "tissue",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 249.59375,
+            "y": 76,
+            "width": 180.234375,
+            "height": 139.3125,
+            "top": 76,
+            "right": 429.828125,
+            "bottom": 215.3125,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 1109.171875,
+            "y": 76,
+            "width": 306.828125,
+            "height": 37.046875,
+            "top": 76,
+            "right": 1416,
+            "bottom": 113.046875,
+            "left": 1109.171875
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 249.59375,
+            "y": 751.46875,
+            "width": 388.984375,
+            "height": 73.53125,
+            "top": 751.46875,
+            "right": 638.578125,
+            "bottom": 825,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 1256.765625,
+            "y": 765.40625,
+            "width": 155.234375,
+            "height": 44.59375,
+            "top": 765.40625,
+            "right": 1412,
+            "bottom": 810,
+            "left": 1256.765625
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 15.600000023841858,
+          "drawCalls": 1811,
+          "triangles": 915545,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523824994,
+          "frameMs": 16.799999999995634,
+          "renderMs": 13.099999964237213,
+          "drawCalls": 1811,
+          "triangles": 915545,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523824994,
+          "frameMs": 16.799999999995634,
+          "renderMs": 14.399999976158142,
+          "drawCalls": 1811,
+          "triangles": 915545,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523824994,
+          "frameMs": 16.799999999995634,
+          "renderMs": 14.399999976158142,
+          "drawCalls": 1811,
+          "triangles": 915545,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 16.30000001192093,
+          "drawCalls": 1809,
+          "triangles": 915541,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523824994,
+          "frameMs": 16.799999999995634,
+          "renderMs": 14.100000023841858,
+          "drawCalls": 1809,
+          "triangles": 915541,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 15.5,
+          "drawCalls": 1809,
+          "triangles": 915541,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 58.47953216374767,
+          "frameMs": 17.099999999998545,
+          "renderMs": 14.900000035762787,
+          "drawCalls": 1807,
+          "triangles": 915517,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 12.699999988079071,
+          "drawCalls": 1809,
+          "triangles": 915521,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.171597633131,
+          "frameMs": 16.900000000001455,
+          "renderMs": 13.800000011920929,
+          "drawCalls": 1809,
+          "triangles": 915521,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 15.300000011920929,
+          "drawCalls": 1807,
+          "triangles": 915497,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952094244,
+          "frameMs": 16.700000000004366,
+          "renderMs": 15.300000011920929,
+          "drawCalls": 1807,
+          "triangles": 915497,
+          "geometries": 568,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "desktop-cell",
+      "runtime": {
+        "updateCount": 3317,
+        "simulationSeconds": 59.90030000372065,
+        "lastDeltaSeconds": 0.016600000000005822,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": "station:microscopy",
+        "progress": 0,
+        "timerSeconds": 0.6137000000715636,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 73.7428999999767,
+        "frameDeltaSeconds": 0.0165,
+        "render": {
+          "fps": 60.24096385540056,
+          "frameMs": 16.60000000000582,
+          "renderMs": 11.899999976158142,
+          "drawCalls": 1318,
+          "triangles": 621313,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "cell",
+          "selectedNodeId": "heart",
+          "selectedOrganId": "heart",
+          "artifactKind": "hyperscope",
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:organs"
+            ],
+            "selectedLayerId": "layer:organs",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": 100
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": [
+          {
+            "id": "heart",
+            "x": 256.1990269407262,
+            "y": 458.5778893731733
+          }
+        ]
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 0
+      },
+      "explorer": {
+        "x": 200,
+        "y": 0,
+        "width": 1240,
+        "height": 900,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900,
+        "left": 200
+      },
+      "dpr": 1,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "cell",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 249.59375,
+            "y": 76,
+            "width": 180.234375,
+            "height": 139.3125,
+            "top": 76,
+            "right": 429.828125,
+            "bottom": 215.3125,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 1109.171875,
+            "y": 76,
+            "width": 306.828125,
+            "height": 37.046875,
+            "top": 76,
+            "right": 1416,
+            "bottom": 113.046875,
+            "left": 1109.171875
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 249.59375,
+            "y": 751.46875,
+            "width": 388.984375,
+            "height": 73.53125,
+            "top": 751.46875,
+            "right": 638.578125,
+            "bottom": 825,
+            "left": 249.59375
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 1288.0625,
+            "y": 765.40625,
+            "width": 123.9375,
+            "height": 44.59375,
+            "top": 765.40625,
+            "right": 1412,
+            "bottom": 810,
+            "left": 1288.0625
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.880239520916334,
+          "frameMs": 16.70000000001164,
+          "renderMs": 11.399999976158142,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 11.799999952316284,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385545338,
+          "frameMs": 16.59999999999127,
+          "renderMs": 12.300000011920929,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 12.5,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 12.5,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 11.399999976158142,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 11.300000011920929,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.523809523799216,
+          "frameMs": 16.80000000000291,
+          "renderMs": 11,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 11.5,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.17159763315647,
+          "frameMs": 16.89999999999418,
+          "renderMs": 11.600000023841858,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 12.600000023841858,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096852,
+          "frameMs": 16.69999999999709,
+          "renderMs": 12.600000023841858,
+          "drawCalls": 1316,
+          "triangles": 621289,
+          "geometries": 435,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "mobile-375-hero",
+      "runtime": {
+        "updateCount": 271,
+        "simulationSeconds": 5.12340000047685,
+        "lastDeltaSeconds": 0.01660000002384186,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 5.176300000011919,
+        "frameDeltaSeconds": 0.01660000002384186,
+        "render": {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 4.400000035762787,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "PROXY_LOW",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "top": 0,
+        "right": 375,
+        "bottom": 812,
+        "left": 0
+      },
+      "explorer": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "top": 0,
+        "right": 375,
+        "bottom": 812,
+        "left": 0
+      },
+      "dpr": 3,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 20,
+            "y": 65,
+            "width": 229.046875,
+            "height": 109.796875,
+            "top": 65,
+            "right": 249.046875,
+            "bottom": 174.796875,
+            "left": 20
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 14,
+            "y": 184,
+            "width": 347,
+            "height": 44,
+            "top": 184,
+            "right": 361,
+            "bottom": 228,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 14,
+            "y": 640.5625,
+            "width": 347,
+            "height": 60.4375,
+            "top": 640.5625,
+            "right": 361,
+            "bottom": 701,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 14,
+            "y": 706,
+            "width": 347,
+            "height": 44,
+            "top": 706,
+            "right": 361,
+            "bottom": 750,
+            "left": 14
+          }
+        },
+        {
+          "selector": "[data-testid=\"mobile-navigation\"]",
+          "rect": {
+            "x": 0,
+            "y": 759.015625,
+            "width": 375,
+            "height": 52.984375,
+            "top": 759.015625,
+            "right": 375,
+            "bottom": 812,
+            "left": 0
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 3.800000011920929,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.200000047683716,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.17159763313418,
+          "frameMs": 16.900000000000546,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.17159763313418,
+          "frameMs": 16.900000000000546,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.899999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.100000023841858,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.5,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 5,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 3.800000011920929,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "mobile-375-inspector",
+      "runtime": {
+        "updateCount": 543,
+        "simulationSeconds": 10.067300001299385,
+        "lastDeltaSeconds": 0.017900000035762788,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 10.054600000023838,
+        "frameDeltaSeconds": 0.017900000035762788,
+        "render": {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.5,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "PROXY_LOW",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "top": 0,
+        "right": 375,
+        "bottom": 812,
+        "left": 0
+      },
+      "explorer": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 812,
+        "top": 0,
+        "right": 375,
+        "bottom": 812,
+        "left": 0
+      },
+      "dpr": 3,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 20,
+            "y": 65,
+            "width": 229.046875,
+            "height": 109.796875,
+            "top": 65,
+            "right": 249.046875,
+            "bottom": 174.796875,
+            "left": 20
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 14,
+            "y": 184,
+            "width": 347,
+            "height": 44,
+            "top": 184,
+            "right": 361,
+            "bottom": 228,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 14,
+            "y": 640.5625,
+            "width": 347,
+            "height": 60.4375,
+            "top": 640.5625,
+            "right": 361,
+            "bottom": 701,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 14,
+            "y": 706,
+            "width": 347,
+            "height": 44,
+            "top": 706,
+            "right": 361,
+            "bottom": 750,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-inspector:not([hidden])",
+          "rect": {
+            "x": 14,
+            "y": 233,
+            "width": 347,
+            "height": 395,
+            "top": 233,
+            "right": 361,
+            "bottom": 628,
+            "left": 14
+          }
+        },
+        {
+          "selector": "[data-testid=\"mobile-navigation\"]",
+          "rect": {
+            "x": 0,
+            "y": 759.015625,
+            "width": 375,
+            "height": 52.984375,
+            "top": 759.015625,
+            "right": 375,
+            "bottom": 812,
+            "left": 0
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.52380952380565,
+          "frameMs": 16.80000000000109,
+          "renderMs": 5.199999988079071,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.97560975609891,
+          "frameMs": 16.399999999999636,
+          "renderMs": 4.5,
+          "drawCalls": 518,
+          "triangles": 54159,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.700000047683716,
+          "drawCalls": 518,
+          "triangles": 54159,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096199,
+          "frameMs": 16.69999999999891,
+          "renderMs": 4,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096199,
+          "frameMs": 16.69999999999891,
+          "renderMs": 4,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 3.800000011920929,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.400000035762787,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.600000023841858,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.17159763313737,
+          "frameMs": 16.899999999999636,
+          "renderMs": 4.300000011920929,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 3.900000035762787,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 3.900000035762787,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "mobile-390-hero",
+      "runtime": {
+        "updateCount": 271,
+        "simulationSeconds": 5.089200000870244,
+        "lastDeltaSeconds": 0.01669999999999982,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 5.160299999952316,
+        "frameDeltaSeconds": 0.01659999996423721,
+        "render": {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 3.599999964237213,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "PROXY_LOW",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844,
+        "top": 0,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "explorer": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844,
+        "top": 0,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "dpr": 3,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 20,
+            "y": 65,
+            "width": 229.046875,
+            "height": 109.796875,
+            "top": 65,
+            "right": 249.046875,
+            "bottom": 174.796875,
+            "left": 20
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 14,
+            "y": 184,
+            "width": 362,
+            "height": 44,
+            "top": 184,
+            "right": 376,
+            "bottom": 228,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 14,
+            "y": 672.5625,
+            "width": 362,
+            "height": 60.4375,
+            "top": 672.5625,
+            "right": 376,
+            "bottom": 733,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 14,
+            "y": 738,
+            "width": 362,
+            "height": 44,
+            "top": 738,
+            "right": 376,
+            "bottom": 782,
+            "left": 14
+          }
+        },
+        {
+          "selector": "[data-testid=\"mobile-navigation\"]",
+          "rect": {
+            "x": 0,
+            "y": 791.015625,
+            "width": 390,
+            "height": 52.984375,
+            "top": 791.015625,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.5238095238121,
+          "frameMs": 16.799999999999272,
+          "renderMs": 5.199999988079071,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.5238095238121,
+          "frameMs": 16.799999999999272,
+          "renderMs": 5.199999988079071,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.100000023841858,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.5238095238121,
+          "frameMs": 16.799999999999272,
+          "renderMs": 4,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 3.800000011920929,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.699999988079071,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 4.199999988079071,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 516,
+          "triangles": 53679,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 516,
+          "triangles": 53679,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 4.300000011920929,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "mobile-390-inspector",
+      "runtime": {
+        "updateCount": 548,
+        "simulationSeconds": 9.959400001823928,
+        "lastDeltaSeconds": 0.016800000000001092,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 10.00339999997615,
+        "frameDeltaSeconds": 0.01669999998807907,
+        "render": {
+          "fps": 59.52380952380565,
+          "frameMs": 16.80000000000109,
+          "renderMs": 4.800000011920929,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "PROXY_LOW",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844,
+        "top": 0,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "explorer": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844,
+        "top": 0,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "dpr": 3,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 20,
+            "y": 65,
+            "width": 229.046875,
+            "height": 109.796875,
+            "top": 65,
+            "right": 249.046875,
+            "bottom": 174.796875,
+            "left": 20
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 14,
+            "y": 184,
+            "width": 362,
+            "height": 44,
+            "top": 184,
+            "right": 376,
+            "bottom": 228,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 14,
+            "y": 672.5625,
+            "width": 362,
+            "height": 60.4375,
+            "top": 672.5625,
+            "right": 376,
+            "bottom": 733,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 14,
+            "y": 738,
+            "width": 362,
+            "height": 44,
+            "top": 738,
+            "right": 376,
+            "bottom": 782,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-inspector:not([hidden])",
+          "rect": {
+            "x": 14,
+            "y": 233,
+            "width": 362,
+            "height": 427,
+            "top": 233,
+            "right": 376,
+            "bottom": 660,
+            "left": 14
+          }
+        },
+        {
+          "selector": "[data-testid=\"mobile-navigation\"]",
+          "rect": {
+            "x": 0,
+            "y": 791.015625,
+            "width": 390,
+            "height": 52.984375,
+            "top": 791.015625,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.400000035762787,
+          "drawCalls": 518,
+          "triangles": 54159,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.300000011920929,
+          "drawCalls": 518,
+          "triangles": 54159,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.400000035762787,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.400000035762787,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.17159763313737,
+          "frameMs": 16.899999999999636,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.5238095238121,
+          "frameMs": 16.799999999999272,
+          "renderMs": 4.5,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096199,
+          "frameMs": 16.69999999999891,
+          "renderMs": 5.399999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.17159763313737,
+          "frameMs": 16.899999999999636,
+          "renderMs": 4.299999952316284,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.100000023841858,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.100000023841858,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "mobile-430-hero",
+      "runtime": {
+        "updateCount": 272,
+        "simulationSeconds": 5.136800001192095,
+        "lastDeltaSeconds": 0.016800000000000183,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 5.226699999988073,
+        "frameDeltaSeconds": 0.01659999996423721,
+        "render": {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.199999988079071,
+          "drawCalls": 516,
+          "triangles": 53679,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "PROXY_LOW",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 932,
+        "top": 0,
+        "right": 430,
+        "bottom": 932,
+        "left": 0
+      },
+      "explorer": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 932,
+        "top": 0,
+        "right": 430,
+        "bottom": 932,
+        "left": 0
+      },
+      "dpr": 3,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 20,
+            "y": 65,
+            "width": 229.046875,
+            "height": 109.796875,
+            "top": 65,
+            "right": 249.046875,
+            "bottom": 174.796875,
+            "left": 20
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 14,
+            "y": 184,
+            "width": 402,
+            "height": 44,
+            "top": 184,
+            "right": 416,
+            "bottom": 228,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 14,
+            "y": 760.5625,
+            "width": 402,
+            "height": 60.4375,
+            "top": 760.5625,
+            "right": 416,
+            "bottom": 821,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 14,
+            "y": 826,
+            "width": 402,
+            "height": 44,
+            "top": 826,
+            "right": 416,
+            "bottom": 870,
+            "left": 14
+          }
+        },
+        {
+          "selector": "[data-testid=\"mobile-navigation\"]",
+          "rect": {
+            "x": 0,
+            "y": 879.015625,
+            "width": 430,
+            "height": 52.984375,
+            "top": 879.015625,
+            "right": 430,
+            "bottom": 932,
+            "left": 0
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 3.800000011920929,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.600000023841858,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.699999988079071,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.97560975609891,
+          "frameMs": 16.399999999999636,
+          "renderMs": 4.300000011920929,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.5,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.600000023841858,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095873,
+          "frameMs": 16.699999999999818,
+          "renderMs": 4.300000011920929,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.97560975609891,
+          "frameMs": 16.399999999999636,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.97560975609891,
+          "frameMs": 16.399999999999636,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 515,
+          "triangles": 53327,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380888,
+          "frameMs": 16.800000000000182,
+          "renderMs": 4.199999988079071,
+          "drawCalls": 516,
+          "triangles": 53679,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    },
+    {
+      "name": "mobile-430-inspector",
+      "runtime": {
+        "updateCount": 549,
+        "simulationSeconds": 10.050600001704709,
+        "lastDeltaSeconds": 0.01669999999999891,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 10.119800000011917,
+        "frameDeltaSeconds": 0.01669999998807907,
+        "render": {
+          "fps": 59.88023952096199,
+          "frameMs": 16.69999999999891,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION",
+          "anatomyLayers": {
+            "visibleLayerIds": [
+              "layer:skin"
+            ],
+            "selectedLayerId": "layer:skin",
+            "lod": "LOW",
+            "crossSection": false,
+            "hyperscopeMagnification": null
+          }
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "PROXY_LOW",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 6116,
+            "textureCount": 0
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "researchCompanion": {
+          "classification": "VISUAL_AI_COMPANION",
+          "epistemicStatus": "MODEL",
+          "mode": "IDLE",
+          "connectedChat": "SCIENCE_CHAT",
+          "autonomousConsciousness": false
+        },
+        "organScreenPositions": []
+      },
+      "canvas": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 932,
+        "top": 0,
+        "right": 430,
+        "bottom": 932,
+        "left": 0
+      },
+      "explorer": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 932,
+        "top": 0,
+        "right": 430,
+        "bottom": 932,
+        "left": 0
+      },
+      "dpr": 3,
+      "renderDpr": 1,
+      "overflow": false,
+      "level": "body",
+      "ui": [
+        {
+          "selector": ".human-hero-heading",
+          "rect": {
+            "x": 20,
+            "y": 65,
+            "width": 229.046875,
+            "height": 109.796875,
+            "top": 65,
+            "right": 249.046875,
+            "bottom": 174.796875,
+            "left": 20
+          }
+        },
+        {
+          "selector": ".human-hero-tools",
+          "rect": {
+            "x": 14,
+            "y": 184,
+            "width": 402,
+            "height": 44,
+            "top": 184,
+            "right": 416,
+            "bottom": 228,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-path",
+          "rect": {
+            "x": 14,
+            "y": 760.5625,
+            "width": 402,
+            "height": 60.4375,
+            "top": 760.5625,
+            "right": 416,
+            "bottom": 821,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-hero-action",
+          "rect": {
+            "x": 14,
+            "y": 826,
+            "width": 402,
+            "height": 44,
+            "top": 826,
+            "right": 416,
+            "bottom": 870,
+            "left": 14
+          }
+        },
+        {
+          "selector": ".human-inspector:not([hidden])",
+          "rect": {
+            "x": 14,
+            "y": 233,
+            "width": 402,
+            "height": 515,
+            "top": 233,
+            "right": 416,
+            "bottom": 748,
+            "left": 14
+          }
+        },
+        {
+          "selector": "[data-testid=\"mobile-navigation\"]",
+          "rect": {
+            "x": 0,
+            "y": 879.015625,
+            "width": 430,
+            "height": 52.984375,
+            "top": 879.015625,
+            "right": 430,
+            "bottom": 932,
+            "left": 0
+          }
+        }
+      ],
+      "timing": [
+        {
+          "fps": 60.24096385542696,
+          "frameMs": 16.599999999998545,
+          "renderMs": 4.5,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 7.699999988079071,
+          "drawCalls": 518,
+          "triangles": 54159,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 5,
+          "drawCalls": 518,
+          "triangles": 54159,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380565,
+          "frameMs": 16.80000000000109,
+          "renderMs": 4.099999964237213,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.52380952380565,
+          "frameMs": 16.80000000000109,
+          "renderMs": 4.099999964237213,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952095547,
+          "frameMs": 16.700000000000728,
+          "renderMs": 10.5,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 11.299999952316284,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.6060606060606,
+          "frameMs": 16.5,
+          "renderMs": 5.399999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 4.699999988079071,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 58.47953216374144,
+          "frameMs": 17.100000000000364,
+          "renderMs": 8.699999988079071,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        {
+          "fps": 59.88023952096199,
+          "frameMs": 16.69999999999891,
+          "renderMs": 3.899999976158142,
+          "drawCalls": 517,
+          "triangles": 53727,
+          "geometries": 413,
+          "textures": 45,
+          "textureBytesEstimate": 53204309.33333334
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

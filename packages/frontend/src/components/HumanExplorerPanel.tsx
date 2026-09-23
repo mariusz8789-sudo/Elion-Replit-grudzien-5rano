@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { t, getLocale } from '../core/i18n';
 import { drawBiologyArtifact } from '../core/three/biologyStationKit';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
@@ -13,6 +13,7 @@ import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../c
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
+import './HumanExplorerHero.css';
 
 /**
  * HUMAN EXPLORER PANEL (D-130) — the reference UI's four blocks over the
@@ -25,6 +26,7 @@ import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspect
  * no session the microscope shows its empty state.
  */
 export interface HumanExplorerPanelProps {
+  readonly researchControls?: ReactNode;
   readonly manifest: HumanDigitalTwinManifest;
   /** D-131: the live section state, owned by the screen (the V3 anatomy state remains the single source of truth). */
   readonly cutaway: CutawayState;
@@ -54,8 +56,9 @@ const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY
 const SURFACE_MODES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['TRANSLUCENT', 'Prześwit'], ['XRAY', 'RTG (model)'], ['GHOST', 'Duch']];
 const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope', 'histology', 'imaging', 'central-dogma', 'neuro']);
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const organs = useMemo(() => manifest.nodes.filter((n) => n.kind === 'ORGAN'), [manifest]);
   const [system, setSystem] = useState<OrganSystemId | null>(null);
   const [organId, setOrganId] = useState<string>(() => (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId) ? anatomy.selectedNodeId : 'heart'));
@@ -91,7 +94,23 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
   return (
-    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
+    <section className="sw-hud sw-hud-explorer human-hero" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
+      <div className="human-hero-heading">
+        <span className="human-eyebrow">GENESIS / HUMAN EXPLORER</span>
+        <h1>{level === 'body' ? 'Człowiek.' : levelLabel(level, locale)}</h1>
+        <p>{level === 'body' ? 'Od całego ciała do jego najmniejszych struktur.' : `${organ?.label ?? 'Anatomia'} · ${SCALE_TEXT[level]}`}</p>
+        <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
+      </div>
+      <div className="human-hero-tools" aria-label="Widok modelu">
+        {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} disabled={busy} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
+        <button type="button" className="sw-chip human-inspector-toggle" aria-expanded={inspectorOpen} aria-controls="human-inspector" onClick={() => setInspectorOpen(!inspectorOpen)} data-testid="human-inspector-toggle">{inspectorOpen ? 'Zamknij ×' : 'Poznaj model +'}</button>
+      </div>
+      <nav className="human-hero-path" aria-label="Od ciała do komórki">
+        {(['body', 'organ', 'tissue', 'cell'] as const).map((target, index) => <button key={target} type="button" aria-current={level === target ? 'step' : undefined} onClick={() => { onTwinCamera(true); zoom(target); }} disabled={busy || !explorer} data-testid={`human-hero-${target}`}><span>0{index + 1}</span><strong>{levelLabel(target, locale)}</strong></button>)}
+      </nav>
+      <div className="human-hero-action"><button type="button" className="sw-btn sw-btn-primary" disabled={busy || !explorer} onClick={() => { onTwinCamera(true); zoom(level === 'body' ? 'organ' : level === 'organ' ? 'tissue' : level === 'tissue' ? 'cell' : 'body'); }}>{busy ? 'Trwa wykonanie…' : level === 'body' ? 'Poznaj serce →' : level === 'organ' ? 'Zobacz tkankę →' : level === 'tissue' ? 'Zobacz komórkę →' : 'Wróć do ciała'}</button></div>
+      <div id="human-inspector" className="human-inspector" hidden={!inspectorOpen} data-testid="human-inspector" onKeyDown={(event) => { if (event.key === 'Escape') setInspectorOpen(false); }}>
+      <h2>Model i struktury</h2>
       <header className="sw-ex-head">
         <span className="sw-badge" data-testid="sw-explorer-tier" title="Cinematic procedural presentation; geometry remains an illustrative scientific model.">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
         <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
@@ -181,6 +200,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
             );
           })}
         </ol>
+      </div>
+      {researchControls}
       </div>
     </section>
   );

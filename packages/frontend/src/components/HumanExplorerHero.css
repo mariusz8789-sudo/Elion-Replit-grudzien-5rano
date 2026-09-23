@@ -1,0 +1,56 @@
+/* One subject, one path, one inspector. Scoped to the existing biology view. */
+.sw[data-world="biology"].sw-explorer-open .human-hero.sw-hud-explorer {
+  position: absolute; inset: 0; width: 100%; max-height: none; padding: 0;
+  border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible;
+  pointer-events: none; display: block;
+}
+@media (min-width: 721px) {
+  .sw[data-world="biology"].sw-explorer-open .human-hero.sw-hud-explorer { left: 12.5rem; width: calc(100% - 12.5rem); }
+}
+.human-hero-heading { position: absolute; top: 76px; left: 4%; max-width: 330px; text-shadow: 0 2px 20px #000; background: radial-gradient(ellipse at left, #04101ac9, transparent 75%); }
+.human-eyebrow { color: #a5c9d8; letter-spacing: .2em; font-size: 10px; }
+.human-hero-heading h1 { color: #f0f8fc; font-size: clamp(28px, 3vw, 48px); line-height: 1.1; letter-spacing: -.045em; font-weight: 450; margin: 10px 0; }
+.human-hero-heading p { color: #b8c7ce; font-size: 13px; line-height: 1.5; max-width: 250px; margin: 0 0 12px; }
+.human-model-label { display: block; color: #9eabb6; font-size: 10px; }
+.human-hero-tools { position: absolute; top: 76px; right: 24px; display: flex; gap: 5px; pointer-events: auto; }
+.human-hero-tools .sw-chip { background: #06101de6; padding: 9px 12px; border-color: #54748565; font-size: 11px; }
+.human-hero-tools .sw-chip.is-on { background: #173940; border-color: #8ce0d6; }
+.human-hero-path { position: absolute; left: 4%; bottom: 75px; display: flex; gap: 2px; pointer-events: auto; background: #04101de8; border: 1px solid #52778766; border-radius: 16px; padding: 5px; }
+.human-hero-path button { border: 0; background: none; color: #98aab5; padding: 12px 20px; cursor: pointer; border-radius: 11px; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.human-hero-path button span { font-size: 9px; letter-spacing: .18em; opacity: .65; }
+.human-hero-path button strong { font-weight: 500; font-size: 12px; }
+.human-hero-path button[aria-current="step"] { color: #e6ffff; background: #14353e; box-shadow: inset 0 -2px #80dbd1; }
+.human-hero-path button:disabled { opacity: .45; cursor: wait; }
+.human-hero-action { position: absolute; bottom: 90px; right: 28px; pointer-events: auto; }
+.human-hero-action .sw-btn { padding: 12px 20px; border-radius: 24px; background: #d6eee9; color: #07232b; border-color: #d6eee9; font-size: 12px; text-shadow: none; }
+.human-inspector { position: absolute; top: 126px; bottom: 150px; right: 24px; width: min(350px, 30%); padding: 18px; background: #07111bf5; border: 1px solid #456578; border-radius: 16px; box-shadow: 0 16px 50px #0008; overflow: auto; overscroll-behavior: contain; pointer-events: auto; }
+.human-inspector[hidden] { display: none; }
+.human-inspector h2 { margin: 0 0 16px; font-size: 17px; font-weight: 500; color: #ecf7ff; }
+.human-inspector .sw-ex-body { display: flex; flex-direction: column; }
+.human-inspector .sw-ex-head { gap: 8px; margin-bottom: 16px; }
+.human-inspector .sw-ex-card { overflow-wrap: anywhere; }
+.human-inspector .sw-ex-rungs { display: grid; grid-template-columns: repeat(3, 1fr); }
+.human-inspector .human-advanced { margin-top: 18px; border-top: 1px solid #52778755; padding-top: 14px; }
+.human-advanced summary { cursor: pointer; color: #a4c8d6; font-size: 12px; padding: 10px 0; }
+.sw[data-world="biology"] .human-inspector .sw-hud { position: static; width: auto; max-height: none; padding: 8px 0; background: none; border: 0; box-shadow: none; }
+.human-inspector .sw-ex-organ-list { max-height: 180px; overflow: auto; }
+.human-inspector .sw-ex-scope { min-width: 0; }
+.human-inspector .sw-ex-canvas { width: 100%; }
+.human-inspector .sw-form { display: flex; flex-wrap: wrap; }
+.human-inspector .sw-input { min-width: 0; width: 100%; }
+.human-hero :is(button,summary):focus-visible { outline: 2px solid #c6fff3; outline-offset: 3px; }
+@media (max-width: 900px) {
+  .human-hero-heading { top: 65px; left: 20px; max-width: 260px; }
+  .human-hero-heading h1 { font-size: 30px; margin: 7px 0; }
+  .human-hero-heading p { font-size: 11px; margin-bottom: 6px; }
+  .human-hero-tools { top: 184px; left: 14px; right: 14px; gap: 4px; justify-content: center; }
+  .human-hero-tools .sw-chip { padding: 8px 10px; min-height: 38px; font-size: 10px; }
+  .human-hero-path { bottom: calc(111px + env(safe-area-inset-bottom, 0px)); left: 14px; right: 14px; justify-content: space-between; border-radius: 12px; padding: 4px; }
+  .human-hero-path button { flex: 1; padding: 8px 4px; align-items: center; min-width: 0; }
+  .human-hero-path button strong { font-size: 10px; }
+  .human-hero-action { bottom: calc(62px + env(safe-area-inset-bottom, 0px)); left: 14px; right: 14px; text-align: center; }
+  .human-hero-action .sw-btn { min-height: 40px; width: 100%; padding: 8px; }
+  .human-inspector { top: 233px; bottom: calc(184px + env(safe-area-inset-bottom, 0px)); left: 14px; right: 14px; width: auto; padding: 14px; }
+  .human-inspector .sw-ex-head { display: flex; flex-wrap: wrap; }
+  .human-inspector .sw-badge { white-space: normal; overflow-wrap: anywhere; }
+}

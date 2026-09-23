@@ -124,8 +124,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [artifactKind, setArtifactKind] = useState<string | null>(null);
   const [bioArtifact, setBioArtifact] = useState<BiologyArtifact | null>(null);
   const [sessions, setSessions] = useState<ExperimentSession[]>([]);
-  const [explorerOpen, setExplorerOpen] = useState(true);
-  useEffect(() => { sim.setResearchLayout(explorerOpen); }, [sim, explorerOpen]);
+  const explorerOpen = true;
+  useEffect(() => { sim.setResearchLayout(false); if (world === 'biology') sim.setCameraMode('TWIN'); }, [sim, world]);
   const [twinTier, setTwinTier] = useState<HumanTwinTier>('PROXY');
   const [twinLoad, setTwinLoad] = useState<HumanTwinPresentationState>(() => sim.getTwinLoadState());
   const [twinLod, setTwinLod] = useState(() => sim.getTwinLodState());
@@ -137,7 +137,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [replay, setReplay] = useState<ReplayVerdict | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [text, setText] = useState('');
-  const [camera, setCamera] = useState<AgentCameraMode>('VISOR');
+  const [camera, setCamera] = useState<AgentCameraMode>(world === 'biology' ? 'TWIN' : 'VISOR');
   /** D-131: how the twin's BODY shell is drawn (skin / translucent / stylised x-ray / ghost). */
   const [surface, setSurface] = useState<TwinSurfaceMode>('NORMAL');
   const [voice, setVoice] = useState(false);
@@ -301,20 +301,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const station = stationId ? def.stations.find((s) => s.id === stationId) ?? null : null;
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
 
-  return (
-    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
-      <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
-      {camera === 'VISOR' && (
-        <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">
-          <div className="sw-visor-frame" />
-          <div className="sw-visor-glare" />
-          <div className="sw-visor-breath" />
-          {working && <div className="sw-reticle" />}
-        </div>
-      )}
-      {loading && <div className="sw-loading" role="status">Ładowanie laboratorium…</div>}
-      {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
-
+  const researchControls = <>
       <section className="sw-hud sw-hud-status" aria-label="Stan agenta" data-testid="sw-status">
         <div className="sw-badges">
           <span className="sw-badge">ŚWIAT: {def.label}</span>
@@ -326,7 +313,6 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           </span>}
           {world === 'biology' && twinLoad.status === 'ERROR' && <span className="sw-badge" role="status">Nie udało się załadować pełnego modelu. <button type="button" className="sw-btn sw-btn-mini" data-testid="sw-twin-retry" onClick={() => sim.retryTwinLoad()}>Ponów ładowanie</button></span>}
           {world === 'biology' && twinLoad.status === 'BLOCKED' && <span className="sw-badge" role="status">Model nie jest zatwierdzony w rejestrze zasobów.</span>}
-          {world === 'biology' && <button type="button" className="sw-btn sw-btn-mini" onClick={() => setExplorerOpen((o) => !o)} aria-expanded={explorerOpen} data-testid="sw-explorer-toggle">Human Explorer {explorerOpen ? '▾' : '▸'}</button>}
           {world === 'biology' && <label className="sw-badge">LOD
             <select className="sw-select" value={twinLodPreference} data-testid="sw-twin-lod" onChange={(event) => {
               const preference = event.target.value as HumanTwinLodPreference;
@@ -384,17 +370,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         )}
       </section>
 
-      {world === 'biology' && explorerOpen && (
-        <HumanExplorerPanel
-          manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions}
-          busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
-          twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds}
-          twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
-          surface={surface} onSurface={applySurface}
-          onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
-          onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
-        />
-      )}
+</>;
+  const commandControls = (
       <section className="sw-hud sw-hud-command" aria-label="Polecenia" data-testid="sw-command">
         <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">
           {transcript.map((e) => <li key={e.id} className={`sw-line sw-line-${e.who}`}>{e.text}</li>)}
@@ -408,6 +385,36 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           {def.quick.map((q) => <button key={q.label} type="button" className="sw-chip" onClick={() => submit(q.text)} data-testid={`sw-quick-${q.label.split(' ')[0].toLowerCase()}`}>{q.label}</button>)}
         </div>
       </section>
+  );
+
+  return (
+    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
+      <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
+      {camera === 'VISOR' && (
+        <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">
+          <div className="sw-visor-frame" />
+          <div className="sw-visor-glare" />
+          <div className="sw-visor-breath" />
+          {working && <div className="sw-reticle" />}
+        </div>
+      )}
+      {loading && <div className="sw-loading" role="status">Ładowanie laboratorium…</div>}
+      {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
+
+      {world !== 'biology' && researchControls}
+      {world === 'biology' && explorerOpen && (
+        <HumanExplorerPanel
+          manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions}
+          busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
+          twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds}
+          twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
+          surface={surface} onSurface={applySurface}
+          researchControls={<details className="human-advanced"><summary>Badania i narzędzia</summary>{researchControls}{commandControls}</details>}
+          onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
+          onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
+        />
+      )}
+      {world !== 'biology' && commandControls}
     </main>
   );
 }

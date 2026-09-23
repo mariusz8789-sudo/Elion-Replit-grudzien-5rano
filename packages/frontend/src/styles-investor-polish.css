@@ -1,0 +1,108 @@
+/* Final presentation pass: stronger hierarchy and legibility on the existing
+ * canonical surfaces. This file changes presentation only; scientific state,
+ * classifications, controls and runtime behavior remain untouched. */
+
+.shell-main {
+  background:
+    radial-gradient(circle at 72% 8%, rgba(61, 205, 224, 0.075), transparent 30rem),
+    radial-gradient(circle at 18% 92%, rgba(82, 121, 255, 0.06), transparent 34rem),
+    linear-gradient(145deg, rgba(2, 7, 11, 0.96), rgba(1, 5, 9, 0.985));
+}
+
+.shell-sidebar {
+  background: linear-gradient(180deg, rgba(3, 10, 14, 0.985), rgba(2, 7, 11, 0.99)) !important;
+  box-shadow: 18px 0 56px rgba(0, 0, 0, 0.28);
+}
+
+.shell-nav-item { min-height: 2.7rem; }
+
+.shell-nav-item.active {
+  background: linear-gradient(90deg, rgba(98, 240, 163, 0.12), rgba(75, 190, 229, 0.035)) !important;
+}
+
+.start { isolation: isolate; }
+
+.start-head {
+  padding: clamp(1rem, 2vw, 1.55rem);
+  border: 1px solid rgba(129, 234, 244, 0.16);
+  border-left-color: rgba(129, 234, 244, 0.55);
+  background: linear-gradient(135deg, rgba(4, 13, 18, 0.9), rgba(4, 10, 17, 0.66));
+  box-shadow: 0 28px 80px -54px rgba(88, 224, 239, 0.8);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.start-brand {
+  max-height: 11rem;
+  object-fit: contain;
+}
+
+.start-title {
+  max-width: 18ch;
+  color: #f7fbff;
+  text-shadow: 0 2px 32px rgba(94, 226, 239, 0.14) !important;
+}
+
+.start-lede { color: #cad5e2 !important; }
+
+.start-ask,
+.start-door,
+.start-status {
+  background-color: rgba(3, 11, 16, 0.88) !important;
+  backdrop-filter: blur(20px) saturate(128%);
+}
+
+.start-door { min-height: 12.5rem; }
+
+.start-door-title,
+.start-door-cta { letter-spacing: 0.01em; }
+
+.settings-view {
+  width: min(100%, 92rem);
+  margin-inline: auto;
+}
+
+.settings-view .settings-section {
+  background:
+    linear-gradient(145deg, rgba(5, 15, 20, 0.94), rgba(3, 9, 14, 0.88)) !important;
+  border-color: rgba(112, 224, 235, 0.2) !important;
+  box-shadow: 0 22px 70px -58px rgba(94, 226, 239, 0.9);
+}
+
+.settings-view .settings-section > h2,
+.settings-view .section-label {
+  color: #f3fbff;
+  letter-spacing: 0.04em;
+}
+
+.gdd-screen .settings-section:first-child {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(74, 210, 224, 0.14), transparent 20rem),
+    linear-gradient(140deg, rgba(7, 21, 27, 0.97), rgba(3, 10, 15, 0.92)) !important;
+}
+
+.gdd-screen .chip-btn.primary {
+  min-height: 2.9rem;
+  font-weight: 750;
+  letter-spacing: 0.025em;
+}
+
+.gdd-table-wrap {
+  border: 1px solid rgba(112, 224, 235, 0.14);
+  background: rgba(0, 5, 9, 0.46);
+}
+
+.gdd-table tbody tr:hover { background: rgba(94, 226, 239, 0.05); }
+
+@media (max-width: 900px) {
+  .start-head { padding: 1rem; }
+  .start-brand { max-height: 8rem; }
+  .start-door { min-height: auto; }
+  .settings-view { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-nav-item,
+  .start-door,
+  .gdd-table tbody tr { transition: none !important; }
+}
+

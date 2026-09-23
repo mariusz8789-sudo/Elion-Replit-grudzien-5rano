@@ -53,3 +53,26 @@ then run with the existing Chromium/API E2E against the staging URL.
 Do not deploy automatically from this document. Linking the Railway project,
 adding the volume/domain, setting secrets, and triggering the first staging
 deployment remain operator actions.
+
+## Scientific workers (optional, CPU-only)
+
+Three additional private Railway services can isolate heavier engines from the
+public web/API service:
+
+- `packages/backend/workers/chem-light/Dockerfile` — PySCF + Biopython
+- `packages/backend/workers/structural/Dockerfile` — OpenMM + Vina + Meeko
+- `packages/backend/workers/admet/Dockerfile` — ADMET-AI
+
+Each image builds from the repository root and exposes `GET /health`,
+`GET /engines`, and `POST /engines/<engineId>/reference-case`. Set
+`GENESIS_WORKER_GROUP` to `chem-light`, `structural`, or `admet`; Railway
+injects `PORT`.
+
+Keep these services on Railway's private network and do not assign public
+domains. The current campaign runtime still executes scientific adapters in
+process, so these workers are deployment-ready isolation targets and health
+probes, not a claimed remote Virtual Lab dispatch path. RDKit and the
+checksum-pinned CMS Open Data analysis remain embedded in the main service.
+Run `npm run railway-worker-readiness` for the honest local-reference matrix.
+See `docs/RAILWAY_SCIENTIFIC_WORKERS.md` for dependency pins, resource
+estimates, the untested PyMeep proposal, and remaining external blockers.

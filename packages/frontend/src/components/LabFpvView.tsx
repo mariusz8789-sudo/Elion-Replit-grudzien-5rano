@@ -22,6 +22,16 @@ import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
 
 const REAGENT_IDS = Object.keys(SPECIES);
 
+export const LAB_CAMPUS_DOORS = Object.freeze([
+  { id: 'cern', label: 'CERN · collision hall', hash: '#/cern-complex', classification: 'TOY_MC_MODEL + separate CMS data route' },
+  { id: 'cms-data', label: 'CMS Open Data room', hash: '#/physics/cms-z', classification: 'CHECKSUM-BOUND EXTERNAL DATA' },
+  { id: 'human', label: 'Human Biology Lab', hash: '#/human-biology-lab', classification: 'MODEL / SIMULATION' },
+  { id: 'molecule', label: 'Molecular Lab', hash: '#/molecule', classification: 'CANONICAL WORLD STATE' },
+  { id: 'cell', label: 'Cell & Microscopy Lab', hash: '#/cell-lab', classification: 'SIMULATION' },
+  { id: 'virtual-bio', label: 'Virtual Biology Lab', hash: '#/virtual-bio', classification: 'IN-SILICO' },
+  { id: 'research', label: 'Campaign & External Lab', hash: '#/campaign', classification: 'COMPUTATIONAL + GOVERNED HANDOFF' },
+] as const);
+
 /** Pure boundary to the provider, unit-testable without WebGL. */
 export function runMix(seed: number, reagents: Readonly<Record<string, number>>, ignition: boolean, T0: number): ThermoLabAnalysis | { error: string } {
   const p = kernelRegistry.resolve('thermodynamic-reaction-sim');
@@ -113,6 +123,15 @@ export function LabFpvView(): JSX.Element {
           <p className="col-lede">Odmierz reagenty w molach, zdecyduj o zapłonie i zmieszaj. Silnik termodynamiczny liczy ΔH, ΔS, ΔG z tablicowych danych standardowych (NIST/CRC), odczynnik ograniczający i temperaturę adiabatyczną; stanowisko 3D tylko to maluje. Każde zmieszanie ma hash w EvidenceLedger. Klik w scenę blokuje kursor; WASD porusza.</p>
         </div>
       </header>
+
+      <nav className="lab-campus-doors" aria-label="Genesis laboratory campus doors" data-testid="lab-campus-doors">
+        {LAB_CAMPUS_DOORS.map((door) => (
+          <button key={door.id} type="button" className="lab-campus-door" data-testid={`lab-door-${door.id}`} onClick={() => { window.location.hash = door.hash; }}>
+            <span className="lab-campus-door-light" aria-hidden="true" />
+            <strong>{door.label}</strong><small>{door.classification}</small><span>ENTER →</span>
+          </button>
+        ))}
+      </nav>
 
       <div className="lab-grid">
         <div className="col-stage lab-stage" ref={hostRef} data-testid="lab-stage" onClick={() => handleRef.current?.lock()}>

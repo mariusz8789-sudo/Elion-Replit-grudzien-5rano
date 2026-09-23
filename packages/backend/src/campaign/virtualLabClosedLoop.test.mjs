@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDatabase, createUser, createProject } from '../store.mjs';
+import { openDatabase, createUser, createProject, getScienceRun } from '../store.mjs';
 import { hashPassword } from '../auth.mjs';
 import * as campaignStore from './persistence.mjs';
 import {
@@ -18,6 +18,23 @@ import {
 } from './virtualLabClosedLoop.mjs';
 import * as knowledgeApi from '../knowledgeApi.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
+
+/** A real, valid, minimal PDB fixture (2x ALA) — the SAME reference structure Biopython's own
+ *  worker uses for its own reference case (compute/protein_worker.py's REFERENCE_PDB). Never
+ *  fetched, never invented: a real, well-formed PDB text a caller could plausibly supply. */
+const REAL_REFERENCE_PDB = `HEADER    GENESIS REFERENCE (software validation)
+ATOM      1  N   ALA A   1      -0.677  -1.230  -0.491  1.00  0.00           N
+ATOM      2  CA  ALA A   1      -0.001   0.064  -0.491  1.00  0.00           C
+ATOM      3  C   ALA A   1       1.499  -0.110  -0.491  1.00  0.00           C
+ATOM      4  O   ALA A   1       2.030  -1.227  -0.502  1.00  0.00           O
+ATOM      5  CB  ALA A   1      -0.509   0.856   0.708  1.00  0.00           C
+ATOM      6  N   ALA A   2       2.203   1.006  -0.480  1.00  0.00           N
+ATOM      7  CA  ALA A   2       3.660   1.014  -0.469  1.00  0.00           C
+ATOM      8  C   ALA A   2       4.220   2.428  -0.469  1.00  0.00           C
+ATOM      9  O   ALA A   2       3.486   3.417  -0.485  1.00  0.00           O
+ATOM     10  CB  ALA A   2       4.180   0.271   0.759  1.00  0.00           C
+END
+`;
 
 /**
  * Genesis Virtual Lab Closed Loop — the IN-SILICO computational experiment
@@ -126,17 +143,173 @@ describe('Test: molecular-docking — execute when available, otherwise fail clo
   });
 });
 
-describe('Test: BLOCKED_UNBOUND_ENGINE — a real toolchain capability with no campaign-level execution binding', () => {
-  test('molecular-dynamics is a real, AVAILABLE toolchain engine (OpenMM) but has no wired campaign execution path here — honestly BLOCKED_UNBOUND_ENGINE, never fabricated', () => {
+describe('Test: engine bindings — molecular-dynamics (OpenMM)', () => {
+  // Item 1 & 2: this branches on the REAL toolchain capability status measured in THIS runtime —
+  // it never hardcodes "AVAILABLE" merely because OpenMM was available in a different container.
+  test('OpenMM executes a real bounded reference run when the toolchain reports molecular-dynamics AVAILABLE, and fails closed (BLOCKED_RUNTIME_UNAVAILABLE) otherwise', () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
-    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'MD stability probe (unbound capability).', requestedCapability: 'molecular-dynamics' });
+    const planned = planVirtualExperiment(db, {
+      campaignId, candidateId, hypothesis: 'OpenMM real bounded TIP3P reference execution.',
+      requestedCapability: 'molecular-dynamics', params: { steps: 100 },
+    });
+    assert.equal(planned.ok, true);
     const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
-    assert.equal(executed.result.status, EXECUTION_STATUS.BLOCKED_UNBOUND_ENGINE);
-    assert.equal(executed.result.scienceRunId, null);
-    assert.equal(executed.result.derivedOutput, null);
-    assert.equal(executed.result.epistemicClassification, EPISTEMIC_CLASSIFICATION.UNKNOWN);
+    assert.equal(executed.ok, true);
+
+    if (capabilityAvailable('molecular-dynamics')) {
+      assert.equal(executed.result.status, EXECUTION_STATUS.EXECUTED, 'toolchain reports AVAILABLE, so this must be a real EXECUTED result, never a fabricated one');
+      assert.equal(executed.result.selectedEngine.engineName, 'OpenMM');
+      assert.ok(executed.result.scienceRunId, 'a real ScienceRun must be persisted');
+      assert.ok(typeof executed.result.derivedOutput.potentialEnergyMinimizedKjmol === 'number');
+      assert.ok(typeof executed.result.derivedOutput.steps === 'number');
+    } else {
+      assert.equal(executed.result.status, EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE, 'toolchain reports NOT AVAILABLE, so execution must honestly fail closed, never fabricate a result');
+      assert.equal(executed.result.scienceRunId, null);
+    }
   });
 
+  // Item 3: the OpenMM result must persist as the SAME canonical ScienceRun every other capability
+  // uses (store.mjs's saveScienceRun/getScienceRun) — no parallel persistence path.
+  test('a real OpenMM execution persists as a canonical ScienceRun with real engine/capability/output fields', { skip: !capabilityAvailable('molecular-dynamics') && 'molecular-dynamics is not AVAILABLE in this runtime — nothing to persist' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'OpenMM ScienceRun persistence check.', requestedCapability: 'molecular-dynamics', params: { steps: 100 } });
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(executed.result.status, EXECUTION_STATUS.EXECUTED);
+    const run = getScienceRun(db, executed.result.scienceRunId);
+    assert.ok(run, 'the ScienceRun must be independently readable through the canonical store, not just embedded in the event payload');
+    assert.equal(run.engine, 'OpenMM');
+    assert.equal(run.capability, 'molecular-dynamics');
+    assert.equal(run.campaignId, campaignId);
+    assert.equal(run.candidateId, candidateId);
+    assert.ok(run.provenance, 'provenance must be recorded');
+    assert.ok(run.outputHash, 'a real output fingerprint must be recorded');
+  });
+
+  // Item 8: idempotency — re-executing the SAME plan must dedupe, never re-invoke OpenMM twice.
+  test('re-executing the SAME OpenMM plan is idempotent — dedupes to the SAME ScienceRun', () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'OpenMM idempotency check.', requestedCapability: 'molecular-dynamics', params: { steps: 100 } });
+    const first = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    const second = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(second.deduped, true);
+    assert.equal(first.result.status, second.result.status);
+    assert.equal(first.result.scienceRunId, second.result.scienceRunId);
+  });
+
+  // Item 7: replay must use verify.mjs's real, unmodified REPLAY_UNSUPPORTED fallback for this
+  // capability — never a fabricated MATCH for a non-bit-reproducible MD trajectory.
+  test('replaying an OpenMM result never claims MATCH — canonical verify.mjs REPLAY_UNSUPPORTED semantics', { skip: !capabilityAvailable('molecular-dynamics') && 'molecular-dynamics is not AVAILABLE in this runtime — nothing to replay' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'OpenMM replay check.', requestedCapability: 'molecular-dynamics', params: { steps: 100 } });
+    executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    const replayed = replayVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(replayed.ok, true);
+    assert.equal(replayed.replay.replayStatus, REPLAY_STATUS.UNSUPPORTED);
+    assert.notEqual(replayed.replay.replayStatus, REPLAY_STATUS.MATCH, 'must never claim a fabricated MATCH for a capability the underlying adapter cannot deterministically replay');
+  });
+
+  // Item 9: no forbidden epistemic promotion for an MD result either.
+  test('an OpenMM result (no expectation given) is COMPUTATIONAL_HYPOTHESIS, never a forbidden clinical/lab classification', { skip: !capabilityAvailable('molecular-dynamics') && 'molecular-dynamics is not AVAILABLE in this runtime' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'OpenMM epistemic classification check.', requestedCapability: 'molecular-dynamics', params: { steps: 100 } });
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(executed.result.epistemicClassification, EPISTEMIC_CLASSIFICATION.COMPUTATIONAL_HYPOTHESIS);
+    assert.equal(FORBIDDEN_EPISTEMIC_PROMOTIONS.includes(executed.result.epistemicClassification), false);
+    assert.equal(executed.result.clinicalEfficacy, 'UNKNOWN');
+  });
+});
+
+describe('Test: engine bindings — protein-structure-ingestion (Biopython)', () => {
+  // Item 4: real execution through the real adapter when supported.
+  test('protein-structure-ingestion executes through the real Biopython adapter for a real, caller-supplied PDB text', { skip: !capabilityAvailable('protein-structure-ingestion') && 'protein-structure-ingestion is not AVAILABLE in this runtime' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, {
+      campaignId, candidateId, hypothesis: 'Real Biopython structural validation of a caller-supplied PDB.',
+      requestedCapability: 'protein-structure-ingestion', params: { pdbText: REAL_REFERENCE_PDB },
+    });
+    assert.equal(planned.ok, true);
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(executed.result.status, EXECUTION_STATUS.EXECUTED);
+    assert.equal(executed.result.selectedEngine.engineName, 'Biopython');
+    assert.ok(executed.result.scienceRunId, 'a real ScienceRun must be persisted');
+    assert.ok(executed.result.derivedOutput, 'a real structural report must be returned');
+    assert.ok(Array.isArray(executed.result.derivedOutput.chains), 'the real Biopython report shape must be preserved, not reshaped/invented');
+  });
+
+  // Item 5: missing/invalid protein input is refused honestly — never invents/fetches a structure.
+  test('missing or too-short protein input is refused with BLOCKED_INVALID_INPUT, never a fabricated result', () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const noText = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'No PDB supplied.', requestedCapability: 'protein-structure-ingestion' });
+    const executedNoText = executeVirtualExperiment(db, { campaignId, candidateId, executionId: noText.plan.executionId });
+    assert.equal(executedNoText.result.status, EXECUTION_STATUS.BLOCKED_INVALID_INPUT);
+    assert.equal(executedNoText.result.scienceRunId, null);
+
+    const { campaignId: campaignId2, candidateId: candidateId2 } = seedCampaignAndCandidate(db);
+    const tooShort = planVirtualExperiment(db, { campaignId: campaignId2, candidateId: candidateId2, hypothesis: 'PDB text too short.', requestedCapability: 'protein-structure-ingestion', params: { pdbText: 'ATOM 1' } });
+    const executedShort = executeVirtualExperiment(db, { campaignId: campaignId2, candidateId: candidateId2, executionId: tooShort.plan.executionId });
+    assert.equal(executedShort.result.status, EXECUTION_STATUS.BLOCKED_INVALID_INPUT);
+    assert.equal(executedShort.result.scienceRunId, null);
+  });
+
+  // Item 3 (persistence) mirrored for protein-structure-ingestion.
+  test('a real Biopython execution persists as a canonical ScienceRun with real engine/capability/provenance fields', { skip: !capabilityAvailable('protein-structure-ingestion') && 'protein-structure-ingestion is not AVAILABLE in this runtime' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Biopython ScienceRun persistence check.', requestedCapability: 'protein-structure-ingestion', params: { pdbText: REAL_REFERENCE_PDB } });
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    const run = getScienceRun(db, executed.result.scienceRunId);
+    assert.ok(run);
+    assert.equal(run.engine, 'Biopython');
+    assert.equal(run.capability, 'protein-structure-ingestion');
+    assert.ok(run.provenance);
+    assert.ok(run.outputHash);
+    assert.equal(run.inputs.sourcePdbByteLength, REAL_REFERENCE_PDB.length, 'the real caller-supplied PDB text length must be recorded — never a fabricated source');
+  });
+
+  // Item 8: idempotency for protein ingestion too.
+  test('re-executing the SAME protein-structure-ingestion plan is idempotent — dedupes to the SAME ScienceRun', { skip: !capabilityAvailable('protein-structure-ingestion') && 'protein-structure-ingestion is not AVAILABLE in this runtime' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Biopython idempotency check.', requestedCapability: 'protein-structure-ingestion', params: { pdbText: REAL_REFERENCE_PDB } });
+    const first = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    const second = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(second.deduped, true);
+    assert.equal(first.result.scienceRunId, second.result.scienceRunId);
+  });
+
+  // Item 7: replay must use verify.mjs's canonical REPLAY_UNSUPPORTED fallback for this capability too
+  // (no REPLAYERS entry exists for protein-structure-ingestion) — never a fabricated MATCH.
+  test('replaying a protein-structure-ingestion result never claims MATCH — canonical verify.mjs REPLAY_UNSUPPORTED semantics', { skip: !capabilityAvailable('protein-structure-ingestion') && 'protein-structure-ingestion is not AVAILABLE in this runtime' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Biopython replay check.', requestedCapability: 'protein-structure-ingestion', params: { pdbText: REAL_REFERENCE_PDB } });
+    executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    const replayed = replayVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(replayed.ok, true);
+    assert.equal(replayed.replay.replayStatus, REPLAY_STATUS.UNSUPPORTED);
+    assert.notEqual(replayed.replay.replayStatus, REPLAY_STATUS.MATCH);
+  });
+
+  // Item 9: no forbidden epistemic promotion for a protein-ingestion result either.
+  test('a protein-structure-ingestion result (no expectation given) is COMPUTATIONAL_HYPOTHESIS, never a forbidden clinical/lab classification', { skip: !capabilityAvailable('protein-structure-ingestion') && 'protein-structure-ingestion is not AVAILABLE in this runtime' }, () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Biopython epistemic classification check.', requestedCapability: 'protein-structure-ingestion', params: { pdbText: REAL_REFERENCE_PDB } });
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(executed.result.epistemicClassification, EPISTEMIC_CLASSIFICATION.COMPUTATIONAL_HYPOTHESIS);
+    assert.equal(FORBIDDEN_EPISTEMIC_PROMOTIONS.includes(executed.result.epistemicClassification), false);
+    assert.equal(executed.result.clinicalEfficacy, 'UNKNOWN');
+  });
+
+  // Item 6: no Evidence proposal is created for a BLOCKED (invalid-input) protein execution.
+  test('no Evidence proposal can be built for a BLOCKED_INVALID_INPUT protein-structure-ingestion result', () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Blocked protein input, no evidence.', requestedCapability: 'protein-structure-ingestion' });
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(executed.result.status, EXECUTION_STATUS.BLOCKED_INVALID_INPUT);
+    const bridge = buildVirtualExperimentEvidenceInput({ result: executed.result });
+    assert.equal(bridge.ok, false);
+    assert.equal(bridge.error, 'result_not_executed');
+  });
+});
+
+describe('Test: BLOCKED_UNBOUND_ENGINE — a real toolchain capability with no campaign-level execution binding', () => {
   test('maxwell-fdtd (PyMeep) is genuinely not installed in this runtime AND unbound at the campaign layer — still honestly BLOCKED_UNBOUND_ENGINE', () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'FDTD probe.', requestedCapability: 'maxwell-fdtd' });
@@ -195,7 +368,7 @@ describe('Test: deterministic replay', () => {
 
   test('replaying a plan that was never executed (BLOCKED_UNBOUND_ENGINE) is refused, never a fabricated MATCH', () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
-    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Cannot replay what never ran.', requestedCapability: 'molecular-dynamics' });
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Cannot replay what never ran.', requestedCapability: 'maxwell-fdtd' });
     executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
     const replayed = replayVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
     assert.equal(replayed.ok, false);
@@ -270,7 +443,7 @@ describe('Test: canonical Evidence proposal (propose-only, same ledger, never au
 
   test('proposing Evidence for a BLOCKED (never-executed) result is refused', () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
-    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Blocked, no evidence.', requestedCapability: 'molecular-dynamics' });
+    const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Blocked, no evidence.', requestedCapability: 'maxwell-fdtd' });
     const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
     const bridge = buildVirtualExperimentEvidenceInput({ result: executed.result });
     assert.equal(bridge.ok, false);

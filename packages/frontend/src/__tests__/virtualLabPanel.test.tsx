@@ -21,6 +21,7 @@ describe('VirtualLabPanel', () => {
     expect(html).toContain('Execute with registered engine');
     expect(html).toContain('Replay result');
     expect(html).toContain('Clinical efficacy: UNKNOWN');
-    expect(html).toContain('Molecular dynamics (currently unbound)');
+    expect(html).toContain('Molecular dynamics (OpenMM bounded reference)');
+    expect(html).toContain('Protein structure ingestion (Biopython)');
   });
 });

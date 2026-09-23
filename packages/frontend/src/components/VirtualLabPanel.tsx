@@ -23,7 +23,8 @@ const CAPABILITIES: readonly { id: VirtualLabCapability; label: string }[] = [
   { id: 'toxicity-risk-estimation', label: 'Toxicity risk estimation' },
   { id: 'molecular-docking', label: 'Docking (Vina/Meeko)' },
   { id: 'quantum-chemistry', label: 'Quantum chemistry (PySCF)' },
-  { id: 'molecular-dynamics', label: 'Molecular dynamics (currently unbound)' },
+  { id: 'molecular-dynamics', label: 'Molecular dynamics (OpenMM bounded reference)' },
+  { id: 'protein-structure-ingestion', label: 'Protein structure ingestion (Biopython)' },
 ];
 
 /** Product UI over the canonical backend Virtual Lab loop. It never computes scientific values in the browser. */
@@ -34,6 +35,7 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
   const [capability, setCapability] = useState<VirtualLabCapability>('molecular-descriptors');
   const [outputKey, setOutputKey] = useState('crippenLogP');
   const [threshold, setThreshold] = useState('2.5');
+  const [pdbText, setPdbText] = useState('');
   const [dossier, setDossier] = useState<VirtualLabDossier | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,14 +63,18 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
     const token = getToken();
     if (!token || !candidateId || !hypothesis.trim()) return;
     const numericThreshold = Number(threshold);
-    const expectation = outputKey.trim() && Number.isFinite(numericThreshold)
+    const expectation = capability === 'molecular-descriptors' && outputKey.trim() && Number.isFinite(numericThreshold)
       ? { outputKey: outputKey.trim(), comparator: 'LTE' as const, threshold: numericThreshold }
       : null;
+    const params = capability === 'protein-structure-ingestion'
+      ? { pdbText }
+      : capability === 'molecular-dynamics' ? { steps: 300 } : {};
     setBusy(true);
     const response = await planVirtualLabExperiment(token, projectId, campaignId, {
       candidateId,
       hypothesis: hypothesis.trim(),
       requestedCapability: capability,
+      params,
       expectation,
     });
     setBusy(false);
@@ -119,6 +125,9 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
         <label className="account-field"><span>Engine capability</span><select value={capability} onChange={(event) => setCapability(event.target.value as VirtualLabCapability)} data-testid="virtual-lab-capability">{CAPABILITIES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
         <label className="account-field"><span>Expected numeric output key (optional)</span><input value={outputKey} onChange={(event) => setOutputKey(event.target.value)} /></label>
         <label className="account-field"><span>Expected maximum (optional)</span><input value={threshold} onChange={(event) => setThreshold(event.target.value)} /></label>
+        {capability === 'protein-structure-ingestion' && (
+          <label className="account-field"><span>Caller-supplied PDB text</span><textarea value={pdbText} onChange={(event) => setPdbText(event.target.value)} placeholder="Paste a provenance-controlled PDB structure; Genesis will not invent or fetch one." /></label>
+        )}
         <div className="pilot-actions">
           <button className="chip-btn" disabled={busy || !candidateId || !hypothesis.trim()} onClick={() => { void plan(); }} data-testid="virtual-lab-plan">Plan experiment</button>
           <button className="chip-btn" disabled={busy || !dossier?.plans.length} onClick={() => { void execute(); }} data-testid="virtual-lab-execute">Execute with registered engine</button>

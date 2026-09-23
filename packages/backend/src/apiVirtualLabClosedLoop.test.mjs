@@ -216,7 +216,7 @@ describe('Test: BLOCKED_UNBOUND_ENGINE via the API — never a fabricated result
     const project = makeProject(owner.token);
     const { campaignId, candidateId } = seedCampaignAndCandidate(db, project.id, owner.user.id);
     const planned = await call('POST', `/api/projects/${project.id}/campaigns/${campaignId}/virtual-lab`, {
-      token: owner.token, body: { candidateId, hypothesis: 'MD probe.', requestedCapability: 'molecular-dynamics' },
+      token: owner.token, body: { candidateId, hypothesis: 'FDTD probe.', requestedCapability: 'maxwell-fdtd' },
     });
     const executed = await call('POST', `/api/projects/${project.id}/campaigns/${campaignId}/virtual-lab/execute`, {
       token: owner.token, body: { candidateId, executionId: planned.body.plan.executionId },

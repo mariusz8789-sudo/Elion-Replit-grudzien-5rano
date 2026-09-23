@@ -40,3 +40,21 @@ test('Government campaign executes its pinned source-backed candidate funnel', a
   await expect(page.getByText(/Evidence.*provenance|Źródła.*status/i).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('Government services exposes the pinned comparison, claim audit and frozen trigger', async ({ page }) => {
+  const errors = collectUnexpectedErrors(page);
+  await page.goto('/#/research-console');
+  await page.getByText(/Inne eksperymenty i usługi/i).click();
+  const services = page.locator('section.settings-section').filter({ hasText: 'D-063 — Government Services' });
+  await expect(services.getByText(/D-063 — Government Services/i)).toBeVisible({ timeout: 30_000 });
+  await expect(services.getByText(/Nothing is computed until you click/i)).toBeVisible();
+
+  await services.getByRole('button', { name: /Run all three \(PRODUCTION\)/i }).click();
+
+  await expect(services.getByRole('heading', { name: /Candidate vs frozen baseline/i })).toBeVisible({ timeout: 30_000 });
+  await expect(services.getByRole('heading', { name: /Claim substantiation audit/i })).toBeVisible();
+  await expect(services.getByRole('heading', { name: /Sovereign parametric trigger/i })).toBeVisible();
+  await expect(services.getByText(/not a regulatory or derived number/i)).toBeVisible();
+  await expect(services.getByText(/Nothing is computed until you click/i)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

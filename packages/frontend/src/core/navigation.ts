@@ -53,7 +53,7 @@ export interface NavSection {
  * "Simulation") — an inventory that asked the visitor to already know
  * Genesis before moving. These six name what a person wants to DO: start,
  * ask, see discoveries, enter the 3D worlds, check the evidence, adjust
- * settings. Every former entry is still reachable — the ones that left the
+ * a guided demo. Every former entry is still reachable — the ones that left the
  * top level moved into `MORE_ITEMS` behind one disclosure. Nothing was
  * deleted; it stopped being shouted.
  */
@@ -62,12 +62,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: 'main',
     label: '',
     items: [
-      { id: 'home', label: 'Start', icon: '◉', hash: '#/', primary: true, description: 'Pytanie, ostatnie odkrycia, wejścia do światów' },
-      { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', primary: true, description: 'Zadaj pytanie zwykłym językiem' },
+      { id: 'home', label: 'Początek', icon: '◉', hash: '#/', primary: true, description: 'Najważniejsze wejścia i ostatnia aktywność' },
+      { id: 'investor-demo', label: 'LIVE', icon: '▶', hash: '#/investor-demo', primary: true, description: 'Prowadzona historia: eksperyment, wynik i dowód' },
       { id: 'discover', label: 'Odkrycia', icon: '◎', hash: '#/research-console', primary: true, description: 'Kandydaci, dowody, falsyfikacja, Winner Gate' },
-      { id: 'worlds', label: 'Światy 3D', icon: '◈', hash: '#/worlds', primary: true, description: 'Miasto, laboratorium, molekuła, Discovery Hall' },
-      { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', primary: true, description: 'Zapisane przebiegi, evidence, replay' },
-      { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
+      { id: 'worlds', label: 'Nexus', icon: '◈', hash: '#/worlds', primary: true, description: 'Wizualne laboratoria i symulacje Genesis' },
+      { id: 'memory', label: 'Dowody', icon: '▣', hash: '#/memory', primary: true, description: 'Przebiegi, pochodzenie i replay' },
+      { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', description: 'Jeden kontekstowy dialog z Genesis' },
     ],
   },
 ];
@@ -77,6 +77,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  * no capability was lost — it stopped competing with the ten that matter.
  */
 export const MORE_ITEMS: readonly NavItem[] = [
+  { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
   { id: 'world-director', label: 'World Director', icon: '◉', hash: '#/world-director', description: 'Presety świata przez canonical WorldGraph i THREE.js' },
   { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
   { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },

@@ -192,8 +192,7 @@ export function AppShell({ children, chat, chatInline = false }: {
       <div className="shell-nav-section">
         <button className="shell-nav-more" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
           <span className="shell-nav-icon" aria-hidden="true">{moreOpen ? '−' : '+'}</span>
-          <span className="shell-nav-label">Wszystkie moduły</span>
-          <span className="shell-nav-badge">{MORE_ITEMS.length}</span>
+          <span className="shell-nav-label">Biblioteka</span>
         </button>
         {moreOpen && <div className="shell-nav-groups">
           {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
@@ -252,7 +251,7 @@ export function AppShell({ children, chat, chatInline = false }: {
         ))}
         <button className="shell-mobilebar-item" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen}>
           <span aria-hidden="true">☰</span>
-          <span>Więcej</span>
+          <span>Menu</span>
         </button>
       </nav>
 

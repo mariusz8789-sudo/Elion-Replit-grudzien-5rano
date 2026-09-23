@@ -120,3 +120,68 @@ export function publishProposal(proposalId, approverId) {
 export function rejectProposal(proposalId, approverId) {
   return ledger.rejectProposal(proposalId, approverId) ? { ok: true } : { ok: false, error: 'not_pending' };
 }
+
+/**
+ * Structured-evidence entry point for an already-ingested, human-reviewed
+ * artifact (e.g. an external lab observation, via `campaign/labEvidenceBridge.mjs`).
+ *
+ * Reuses the SAME process-wide canonical `ledger` every other proposal helper
+ * in this file uses — no second EvidenceLedger — and remains propose-only:
+ * publication stays the existing human `publishProposal`/`rejectProposal` flow.
+ */
+export function proposeStructuredEvidence(input) {
+  if (!input || typeof input !== 'object') return { ok: false, error: 'invalid_evidence_input' };
+  const allowedClaimTypes = new Set(['observation', 'reported_claim', 'hypothesis', 'model', 'conclusion']);
+  const allowedSourceKinds = new Set(['video', 'document', 'peer_reviewed', 'archive', 'dataset', 'web']);
+  if (!allowedClaimTypes.has(input.claimType)) return { ok: false, error: 'invalid_claim_type' };
+  if (!allowedSourceKinds.has(input.provenance?.sourceKind)) return { ok: false, error: 'invalid_source_kind' };
+  if (typeof input.sourceUrl !== 'string' || !input.sourceUrl.trim()) return { ok: false, error: 'source_url_required' };
+  if (typeof input.claim !== 'string' || !input.claim.trim()) return { ok: false, error: 'claim_required' };
+  if (typeof input.confidence !== 'number' || !Number.isFinite(input.confidence)) return { ok: false, error: 'confidence_required' };
+  if (typeof input.sourceTimestamp !== 'string' || !Number.isFinite(Date.parse(input.sourceTimestamp))) {
+    return { ok: false, error: 'valid_source_timestamp_required' };
+  }
+  if (!Array.isArray(input.provenance?.independentSourceIds)
+    || !input.provenance.independentSourceIds.some((id) => typeof id === 'string' && id.trim())) {
+    return { ok: false, error: 'independent_source_id_required' };
+  }
+
+  const normalized = {
+    sourceUrl: input.sourceUrl.trim().slice(0, 2000),
+    sourceTimestamp: typeof input.sourceTimestamp === 'string' ? input.sourceTimestamp : null,
+    claim: input.claim.trim().slice(0, 5000),
+    claimType: input.claimType,
+    confidence: Math.min(1, Math.max(0, input.confidence)),
+    provenance: {
+      sourceKind: input.provenance.sourceKind,
+      ...(typeof input.provenance.author === 'string' && input.provenance.author.trim()
+        ? { author: input.provenance.author.trim().slice(0, 500) }
+        : {}),
+      retrievedBy: String(input.provenance.retrievedBy ?? 'genesis-structured-evidence').slice(0, 500),
+      independentSourceIds: Array.isArray(input.provenance.independentSourceIds)
+        ? input.provenance.independentSourceIds.filter((id) => typeof id === 'string' && id.trim()).slice(0, 64)
+        : [],
+    },
+  };
+
+  const contentHash = ledger.contentHashOf(normalized);
+  const existing = ledger.getProposals().find(
+    (entry) => entry.record.contentHash === contentHash && (entry.status === 'pending' || entry.status === 'approved'),
+  );
+  const proposalId = existing?.proposalId ?? ledger.propose(normalized);
+  const proposal = existing ?? ledger.getProposals().find((entry) => entry.proposalId === proposalId);
+  return {
+    ok: true,
+    mode: 'PROPOSE_ONLY',
+    proposalId,
+    deduped: Boolean(existing),
+    record: proposal ? {
+      id: proposal.record.id,
+      status: proposal.record.status,
+      contentHash: proposal.record.contentHash,
+      claimType: proposal.record.claimType,
+      sourceKind: proposal.record.provenance.sourceKind,
+    } : null,
+    ledgerOk: ledger.verifyLedger().ok,
+  };
+}

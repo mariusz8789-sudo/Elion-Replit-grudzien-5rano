@@ -10,9 +10,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'protein_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable('GENESIS_BIOPYTHON_PYTHON');
 const TIMEOUT_MS = 30_000;
 
 let detectCache = null;

@@ -17,6 +17,8 @@ import type { RoomType } from '../worldModel/ecs/geometry';
 import { sampleCameraPath, type CameraPath } from './cameraPath';
 import type { SpacetimeWorldDescriptor } from './spacetimeWorldDescriptor';
 import { createSpacetimeWorldVisualLayer, type SpacetimeWorldVisualHandle } from '../three/spacetimeWorldVisuals';
+import { createEvidenceFieldVisual, type EvidenceFieldVisualHandle } from '../three/evidenceFieldVisual';
+import type { EvidenceFieldDescriptor } from '../worldModel/visualization/evidenceField';
 import {
   createTemporalCinematicVisualResolver,
   estimateTemporalWorldGroundSize,
@@ -33,6 +35,8 @@ export interface TemporalCinematicPresentationOptions {
   readonly autoPlay?: boolean;
   /** Presentation-only geometry derived from the same canonical generated WorldGraph. */
   readonly spacetimeDescriptor?: SpacetimeWorldDescriptor;
+  /** Read-only visualization of canonical WorldGraph/Evidence/Replay state. */
+  readonly evidenceField?: EvidenceFieldDescriptor;
   /** Receives only canonical generated ASSET_SLOT selections from the shared pointer pipeline. */
   readonly onAssetSelection?: (selection: { readonly entityId: string; readonly slotType: string } | null) => void;
 }
@@ -89,6 +93,7 @@ export class TemporalCinematicSim3D implements Sim3D {
   private weatherRig: WeatherRig | null = null;
   private livingWorld: LivingWorldDecoratorHandle | null = null;
   private spacetimeVisual: SpacetimeWorldVisualHandle | null = null;
+  private evidenceFieldVisual: EvidenceFieldVisualHandle | null = null;
   private pipeline: GraphicsPipeline | null = null;
   private THREE: typeof THREE_NS | null = null;
   private camera: THREE_NS.PerspectiveCamera | null = null;
@@ -139,6 +144,7 @@ export class TemporalCinematicSim3D implements Sim3D {
       temporalAccumulation: 'NOT_PRESENT' as const,
       livingWorld: this.presentation.viewMode !== 'interior',
       spacetimeVisual: this.spacetimeVisual?.summary ?? null,
+      evidenceField: this.evidenceFieldVisual?.summary ?? null,
     };
   }
 
@@ -207,6 +213,11 @@ export class TemporalCinematicSim3D implements Sim3D {
     if (this.presentation.spacetimeDescriptor) {
       scene.background = new THREE.Color(this.presentation.spacetimeDescriptor.palette[0]);
       if (spacetimeProfile?.environmentMode === 'INDOOR') scene.fog = null;
+    }
+
+    if (this.presentation.evidenceField) {
+      this.evidenceFieldVisual = createEvidenceFieldVisual(THREE, this.presentation.evidenceField);
+      scene.add(this.evidenceFieldVisual.root);
     }
 
     this.weatherRig = viewMode === 'street' && !this.presentation.spacetimeDescriptor
@@ -420,6 +431,7 @@ export class TemporalCinematicSim3D implements Sim3D {
     this.renderedSlotIds.clear();
     this.renderer?.dispose(); this.renderer = null;
     this.spacetimeVisual?.dispose(); this.spacetimeVisual = null;
+    this.evidenceFieldVisual?.dispose(); this.evidenceFieldVisual = null;
     this.livingWorld?.dispose(); this.livingWorld = null;
     this.weatherRig?.dispose(); this.weatherRig = null;
     this.environment?.dispose(); this.environment = null;

@@ -17,9 +17,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'rdkit_worker.py');
-const PYTHON = process.env.GENESIS_RDKIT_PYTHON ?? process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable('GENESIS_RDKIT_PYTHON');
 const TIMEOUT_MS = 10_000;
 
 let detectCache = null;

@@ -8,9 +8,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const PROBE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'env_probe.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable();
 
 let cache = null;
 

@@ -64,9 +64,15 @@ export interface DeviceMeasurement {
   readonly quantity: PhysicalQuantity;
   readonly sourceTimestamp: string;
   readonly ingestSequence: number;
+  readonly sourceKind: 'SIMULATED_DEVICE' | 'RECORDED_MEASUREMENT' | 'REAL_INSTRUMENT';
+  readonly sourceMode: DeviceExecutionMode;
   readonly calibrationId?: string;
   readonly uncertainty?: number;
   readonly provenance: readonly string[];
+  /** Optional immutable raw payload supplied by a real adapter; never fabricated by the ingest layer. */
+  readonly rawPayload?: string | readonly number[];
+  /** Hash of the exact device configuration active for this reading, when the adapter can provide it. */
+  readonly configurationFingerprint?: string;
 }
 
 export interface DeviceCommand {

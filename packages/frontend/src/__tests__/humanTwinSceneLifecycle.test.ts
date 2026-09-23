@@ -59,6 +59,29 @@ function acknowledgeDraw(ready: Extract<humanLoader.HumanTwinLoadResult, { statu
 }
 
 describe('human asset replacement in the real AgentLabScene3D lifecycle', () => {
+  it('mounts premium lab and human presentation under the canonical scene lifecycle', () => {
+    vi.spyOn(humanLoader, 'loadHumanTwinBodyResult').mockReturnValue(new Promise(() => {}));
+    const { sim, scene } = initialize();
+    const labDetail = scene.getObjectByName('premium-lab-detail:biology');
+    const humanDetail = scene.getObjectByName('premium-human-twin-presentation');
+    expect(labDetail?.userData.presentationOnly).toBe(true);
+    expect(humanDetail?.userData.directObservation).toBe(false);
+    const premiumMaterials = new Set<THREE.Material>();
+    for (const root of [labDetail, humanDetail]) root?.traverse((object) => {
+      const material = (object as THREE.Mesh).material;
+      if (!material) return;
+      for (const entry of Array.isArray(material) ? material : [material]) premiumMaterials.add(entry);
+    });
+    const materialDisposals = [...premiumMaterials].map((material) => vi.spyOn(material, 'dispose'));
+    sim.dispose();
+    expect(labDetail?.parent).toBeNull();
+    expect(humanDetail?.parent).toBeNull();
+    expect(materialDisposals.length).toBeGreaterThan(0);
+    // Shared batched materials can be reached from several meshes; Three.js disposal is
+    // idempotent, so the lifecycle contract is that every owned material is reached at least once.
+    for (const dispose of materialDisposals) expect(dispose).toHaveBeenCalled();
+  });
+
   it('keeps LOADING until frame acknowledgement and preserves the selected view, isolation, surface and camera', async () => {
     const request = deferred<humanLoader.HumanTwinLoadResult>();
     vi.spyOn(humanLoader, 'loadHumanTwinBodyResult').mockReturnValue(request.promise);

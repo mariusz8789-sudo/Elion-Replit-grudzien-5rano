@@ -4,6 +4,7 @@ import type { AnatomyNode, CellModel, HumanDigitalTwinManifest, Organelle } from
 import { CANONICAL_ANATOMY_LAYER_SHELL, type CanonicalAnatomyLayerId } from '../scientificWorlds/humanLab/anatomyAtlas';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { attachAnatomyLayerShellMetadata, resolveAnatomyLayerShell, type AnatomyLayerPresentation } from './anatomyIntegrationShell';
+import { addPremiumCellMembraneDetail, addPremiumOrganSurfaceDetail } from './premiumMacroMicroDetails';
 
 /**
  * V7 — HUMAN MACRO → MICRO VISUAL LAYER.
@@ -139,6 +140,7 @@ function buildOrganModel(THREE: typeof THREE_NS, node: AnatomyNode): THREE_NS.Gr
   rotor.add(organ);
   const shell = new THREE.Mesh(new THREE.SphereGeometry(0.515, 36, 26), biologicalMaterial(THREE, organColor(node.id), { translucent: true, emissive: 0x41151b, roughness: 0.3 }));
   shell.name = 'organ:scan-envelope'; shell.scale.copy(organ.scale); rotor.add(shell);
+  addPremiumOrganSurfaceDetail(THREE, rotor, node.id, organ.scale);
   const contourMat = new THREE.MeshBasicMaterial({ color: 0x8fdcff, transparent: true, opacity: 0.35, depthWrite: false });
   for (const [axis, rotation] of [['axial', [Math.PI / 2, 0, 0]], ['coronal', [0, 0, 0]], ['sagittal', [0, Math.PI / 2, 0]]] as const) {
     const contour = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.005, 6, 72), contourMat);
@@ -169,6 +171,7 @@ function addCellContents(THREE: typeof THREE_NS, root: THREE_NS.Group, cell: Cel
     new THREE.MeshPhysicalMaterial({ color: 0x86def0, emissive: 0x1d6070, emissiveIntensity: 0.16, roughness: 0.22, transparent: true, opacity: 0.17, clearcoat: 0.48, clearcoatRoughness: 0.18, depthWrite: false, side: THREE.DoubleSide }),
   );
   shell.name = 'cell:membrane'; root.add(shell);
+  addPremiumCellMembraneDetail(THREE, root, scale);
   // Cytoskeleton: deterministic microtubule/actin-like paths, explicitly illustrative.
   const cytoskeletonMaterial = new THREE.MeshPhysicalMaterial({ color: 0x85d5c5, emissive: 0x184b43, emissiveIntensity: 0.12, roughness: 0.38, clearcoat: 0.2 });
   for (let index = 0; index < 7; index += 1) {
@@ -287,6 +290,17 @@ function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArt
   const samples = Math.max(6, Math.min(48, dna.length));
   const left: THREE_NS.Vector3[] = []; const right: THREE_NS.Vector3[] = [];
   const radius = 0.42; const height = 1.55;
+  const basePairGeometry = new THREE.CylinderGeometry(0.011, 0.011, radius * 2, 8);
+  const nucleotideGeometry = new THREE.SphereGeometry(0.024, 10, 8);
+  const backboneNodeGeometry = new THREE.SphereGeometry(0.038, 12, 9);
+  const basePairMaterials: Record<string, THREE_NS.MeshStandardMaterial> = {};
+  const nucleotideMaterials: Record<string, THREE_NS.MeshPhysicalMaterial> = {};
+  const basePairMaterial = (base: string) => basePairMaterials[base] ??= new THREE.MeshStandardMaterial({ color: BASE_COLORS[base] ?? 0xd9e5f2, emissive: BASE_COLORS[base] ?? 0xd9e5f2, emissiveIntensity: 0.08, roughness: 0.48 });
+  const nucleotideMaterial = (base: string) => nucleotideMaterials[base] ??= biologicalMaterial(THREE, BASE_COLORS[base] ?? 0xd9e5f2, { emissive: BASE_COLORS[base] ?? 0xd9e5f2, roughness: 0.36 });
+  const backboneMaterials = {
+    a: biologicalMaterial(THREE, 0x9fddff, { emissive: 0x9fddff, roughness: 0.34 }),
+    b: biologicalMaterial(THREE, 0xffa2b9, { emissive: 0xffa2b9, roughness: 0.34 }),
+  };
   for (let i = 0; i < samples; i += 1) {
     const srcIndex = Math.min(dna.length - 1, Math.floor((i / Math.max(1, samples - 1)) * Math.max(0, dna.length - 1)));
     const base = dna[srcIndex] ?? 'A';
@@ -294,15 +308,15 @@ function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArt
     const a = new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
     const b = new THREE.Vector3(-a.x, y, -a.z); left.push(a); right.push(b);
     const midpoint = a.clone().add(b).multiplyScalar(0.5);
-    const distance = a.distanceTo(b); const direction = b.clone().sub(a).normalize();
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, distance, 8), new THREE.MeshStandardMaterial({ color: BASE_COLORS[base] ?? 0xd9e5f2, emissive: BASE_COLORS[base] ?? 0xd9e5f2, emissiveIntensity: 0.08, roughness: 0.48 }));
+    const direction = b.clone().sub(a).normalize();
+    const rod = new THREE.Mesh(basePairGeometry, basePairMaterial(base));
     rod.name = `dna:base-pair:${i}:${base}`; rod.position.copy(midpoint); rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction); rotor.add(rod);
     if (i % 2 === 0) {
-      for (const [strand, p, color] of [['a', a, 0x9fddff], ['b', b, 0xffa2b9]] as const) {
-        const bead = new THREE.Mesh(new THREE.SphereGeometry(0.038, 12, 9), biologicalMaterial(THREE, color, { emissive: color, roughness: 0.34 })); bead.name = `dna:backbone-node:${strand}:${i}`; bead.position.copy(p); rotor.add(bead);
+      for (const [strand, p] of [['a', a], ['b', b]] as const) {
+        const bead = new THREE.Mesh(backboneNodeGeometry, backboneMaterials[strand]); bead.name = `dna:backbone-node:${strand}:${i}`; bead.position.copy(p); rotor.add(bead);
       }
     }
-    const pairedBase = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), biologicalMaterial(THREE, BASE_COLORS[base] ?? 0xd9e5f2, { emissive: BASE_COLORS[base] ?? 0xd9e5f2, roughness: 0.36 }));
+    const pairedBase = new THREE.Mesh(nucleotideGeometry, nucleotideMaterial(base));
     pairedBase.name = `dna:nucleotide:${i}:${base}`; pairedBase.position.copy(a).lerp(b, 0.34); rotor.add(pairedBase);
   }
   const backboneA = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(left), 160, 0.028, 8, false), new THREE.MeshStandardMaterial({ color: 0x66baff, emissive: 0x274e78, emissiveIntensity: 0.18, roughness: 0.4 }));
@@ -314,8 +328,10 @@ function buildMoleculeModel(THREE: typeof THREE_NS, artifact: Extract<BiologyArt
   const peptide = artifact.report.translation.peptide;
   const peptideGroup = new THREE.Group(); peptideGroup.position.set(0, -1.0, 0);
   const shown = Math.min(24, peptide.length);
+  const peptideGeometry = new THREE.SphereGeometry(0.045, 12, 9);
+  const peptideMaterial = new THREE.MeshStandardMaterial({ color: 0xb4e081, roughness: 0.55 });
   for (let i = 0; i < shown; i += 1) {
-    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 9), new THREE.MeshStandardMaterial({ color: 0xb4e081, roughness: 0.55 }));
+    const bead = new THREE.Mesh(peptideGeometry, peptideMaterial);
     bead.position.set((i - (shown - 1) / 2) * 0.095, Math.sin(i * 0.7) * 0.06, 0); peptideGroup.add(bead);
   }
   peptideGroup.name = 'dna:translation-product'; rotor.add(peptideGroup);

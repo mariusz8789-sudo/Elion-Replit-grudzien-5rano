@@ -58,7 +58,7 @@ def _rigidify(pdbqt):
 
 
 def _sha(text):
-    return hashlib.sha256(text.encode()).hexdigest()[:16]
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def _run_dock(req, out_dir):
@@ -134,9 +134,9 @@ def _run_dock(req, out_dir):
         "bestAffinityKcalMol": best, "poses": poses,
         "ligandAtoms": int(len(lig_xyz)),
         "artifacts": [
-            {"kind": "receptor_pdbqt", "path": rec_path, "sha256_16": _sha(rec_pdbqt)},
-            {"kind": "ligand_pdbqt", "path": lig_path, "sha256_16": _sha(lig_pdbqt)},
-            {"kind": "docked_pdbqt", "path": out_path, "sha256_16": _sha(open(out_path).read())},
+            {"kind": "receptor_pdbqt", "path": rec_path, "sha256": _sha(rec_pdbqt)},
+            {"kind": "ligand_pdbqt", "path": lig_path, "sha256": _sha(lig_pdbqt)},
+            {"kind": "docked_pdbqt", "path": out_path, "sha256": _sha(open(out_path).read())},
         ],
         "inputHash": _sha(json.dumps({"lig": lig_smiles, "rec": req.get("receptorSmiles") or req.get("receptorPdbqtPath") or "provided",
                                       "center": center, "box": box, "ex": exhaustiveness, "seed": seed}, sort_keys=True)),

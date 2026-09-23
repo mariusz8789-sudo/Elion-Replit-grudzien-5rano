@@ -95,6 +95,12 @@ describe('Test 1: valid SMILES resolves through the existing (RDKit) identity pa
     assert.equal(result.inputKind, 'SMILES');
     assert.equal(result.candidateMatrix.length, 1);
     assert.equal(result.candidateMatrix[0].origin, 'USER_SUPPLIED_COMPOUND');
+    assert.equal(result.candidateMatrix[0].computationalDossier.status, 'COMPUTED');
+    assert.equal(result.candidateMatrix[0].computationalDossier.evidenceClass, 'COMPUTATIONAL');
+    assert.equal(result.candidateMatrix[0].efficacyStatus, 'COMPUTATIONAL_HYPOTHESIS');
+    assert.equal(result.candidateMatrix[0].computationalDossier.canonicalSmiles, result.resolvedIdentity.normalizedStructure.smiles);
+    assert.match(result.candidateMatrix[0].computationalDossier.replayIdentity, /^[a-f0-9]{16}$/);
+    assert.match(result.candidateMatrix[0].computationalDossier.limitations[0], /not biological activity/i);
   });
 });
 

@@ -10,6 +10,7 @@ import {
 import { buildCellModel, createHistologySlide } from '../core/scientificWorlds/humanLab/histology';
 import {
   attachAnatomyLayerShellMetadata,
+  evaluateAnatomySoftwareReadiness,
   evaluateAnatomyVisualAsset,
   resolveAnatomyLayerShell,
 } from '../core/three/anatomyIntegrationShell';
@@ -62,6 +63,27 @@ describe('canonical anatomy integration shell and scientific macro→micro visua
     expect(root.userData.canonicalAnatomyLayerShell).toHaveLength(6);
     expect(evaluateAnatomyVisualAsset('/assets/not-registered/anatomy.glb')).toEqual({ mayLoadVisualAsset: false, status: 'BLOCKED_UNVERIFIED_OR_UNKNOWN', assetId: null, license: null, anatomicalValidity: 'NOT_ESTABLISHED' });
     expect(evaluateAnatomyVisualAsset('/assets/genesis-hf/characters/mpfb-lod0.glb')).toMatchObject({ mayLoadVisualAsset: true, status: 'APPROVED_VISUAL_ASSET', anatomicalValidity: 'NOT_ESTABLISHED' });
+  });
+
+  it('reports the honest software-readiness terminal status: software is proven, but no layer has a real segmented premium asset yet', () => {
+    const report = evaluateAnatomySoftwareReadiness(manifest, '/assets/genesis-hf/characters/mpfb-lod0.glb');
+    expect(report.shellLogicProven).toBe(true);
+    expect(report.placeholderAssetProof).toMatchObject({
+      runtimePath: '/assets/genesis-hf/characters/mpfb-lod0.glb',
+      gate: { mayLoadVisualAsset: true, status: 'APPROVED_VISUAL_ASSET' },
+    });
+    expect(report.layerAssetStatuses).toHaveLength(6);
+    // None of the six canonical layers' OWN asset slots are registered runtime assets today — honest, not fabricated.
+    expect(report.layerAssetStatuses.every((entry) => entry.gate.mayLoadVisualAsset === false)).toBe(true);
+    expect(report.status).toBe('EXTERNAL_ASSET_REQUIRED');
+    expect(report.reasons.join(' ')).toMatch(/no premium model is fabricated/);
+  });
+
+  it('never claims software readiness against an unapproved placeholder — a broken proof is never silently upgraded to EXTERNAL_ASSET_REQUIRED\'s happy reasons', () => {
+    const report = evaluateAnatomySoftwareReadiness(manifest, '/assets/not-registered/anatomy.glb');
+    expect(report.placeholderAssetProof.gate.mayLoadVisualAsset).toBe(false);
+    expect(report.status).toBe('EXTERNAL_ASSET_REQUIRED');
+    expect(report.reasons.some((r) => r.includes('Placeholder asset gate proof failed'))).toBe(true);
   });
 
   it('makes tissue, cell, organelle and DNA scales structurally distinct while retaining MODEL metadata', () => {

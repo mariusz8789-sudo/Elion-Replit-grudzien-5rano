@@ -11,6 +11,8 @@ import {
   GENESIS_TOOLS,
   WORLD_DECISION_TOOL,
   WORLD_DIFF_TOOL,
+  WORLD_SW4_EPIDEMIOLOGY_CITY_TOOL,
+  HUMAN_TWIN_ACTIVITY_TOOL,
 } from '../core/agent/genesisAgentTools';
 import { compareBranches } from '../core/worldModel/bridge/worldFrameState';
 import { CAPABILITY_CODE, solverCapabilityFor } from '../core/worldModel/capability/solverCapability';
@@ -56,9 +58,18 @@ describe('Every declared tool wraps a real function', () => {
     const names = GENESIS_AGENT_TOOLS.list().map((t) => t.name);
     expect(names).toEqual([...names].sort());
     expect(GENESIS_AGENT_TOOLS.get(WORLD_DIFF_TOOL)).toBeDefined();
-    expect(GENESIS_AGENT_TOOLS.byDomain('flood-hydrology').length).toBe(names.length);
+    // Every flood tool is flood-hydrology; SW-4 and Human Twin are two declared domain exceptions.
+    expect(GENESIS_AGENT_TOOLS.byDomain('flood-hydrology').length).toBe(names.length - 2);
     expect(GENESIS_AGENT_TOOLS.byTag('decide').map((t) => t.name)).toContain(WORLD_DECISION_TOOL);
     expect(GENESIS_AGENT_TOOLS.byDomain('no-such-domain')).toEqual([]);
+  });
+
+  it('runs the canonical Human Twin activity model with honest limitations', () => {
+    const run = GENESIS_TOOLS.humanTwinActivityTool.invoke({ twinId: 'agent-human', seed: 4, activity: 0.7, durationSeconds: 60, executionId: 'agent-human-run-1' });
+    expect(GENESIS_AGENT_TOOLS.get(HUMAN_TWIN_ACTIVITY_TOOL)).toBeDefined();
+    expect(run.status).toBe('EXECUTED_SIMPLIFIED_MODEL');
+    expect(run.outputState?.clinicalUse).toBe('NOT_A_MEDICAL_DEVICE');
+    expect(run.limitations.join(' ')).toMatch(/not clinically validated/i);
   });
 
   it('refuses to register the same tool name twice', () => {
@@ -84,7 +95,10 @@ describe('Tool capability is read from the registry, never restated more favoura
     expect(toolOutputNeedsQualifier(tool)).toBe(true);
     // And the qualifier is the registry's own caveat text, not a new one.
     expect(toolOutputQualifier(tool)).toBe(flood.caveat);
-    expect(GENESIS_AGENT_TOOLS.fullyModelled()).toEqual([]);
+    // SW-4's epidemiology tool is genuinely, fully MODELLED (a real RK4 SEIR solver, not an
+    // approximation) — it is the one real exception to "every declared tool needs a qualifier",
+    // asserted from the registry rather than hardcoded away.
+    expect(GENESIS_AGENT_TOOLS.fullyModelled().map((t) => t.name)).toEqual([WORLD_SW4_EPIDEMIOLOGY_CITY_TOOL]);
   });
 
   it('reports no qualifier for a fully modelled tool', () => {

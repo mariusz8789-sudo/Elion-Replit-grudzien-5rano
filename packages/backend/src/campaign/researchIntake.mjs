@@ -29,6 +29,7 @@ import { loadGiprPin } from './giprQsar.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
 import { fetchBiotechSource } from '../biotechProxy.mjs';
 import { sha256Hex16 } from '../provenance.mjs';
+import { fingerprint as rdkitFingerprint } from '../compute/rdkitAdapter.mjs';
 
 export const RESEARCH_INTAKE_CONTRACT_VERSION = '1.0.0';
 
@@ -488,7 +489,41 @@ function candidateDossier(overrides) {
     falsificationStatus: 'NOT_RUN',
     researchGateStatus: null,
     synthesisReadiness: null,
+    computationalDossier: null,
+    efficacyStatus: 'UNKNOWN',
     ...overrides,
+  };
+}
+
+/** One source-backed computational dossier over the already-canonical molecule identity. */
+export function buildComputationalCandidateDossier(identity, precomputedDescriptors = null) {
+  const smiles = identity?.normalizedStructure?.smiles;
+  if (!smiles) return { status: 'BLOCKED_IDENTITY', evidenceClass: 'UNKNOWN', limitations: ['A normalized structure is required before cheminformatics can execute.'] };
+  const descriptors = precomputedDescriptors ?? rdkitDescribe(smiles);
+  const fingerprint = rdkitFingerprint(smiles);
+  if (!descriptors.ok || !fingerprint.ok) {
+    return {
+      status: 'BLOCKED_BY_RUNTIME', evidenceClass: 'UNKNOWN',
+      limitations: [descriptors.reason ?? descriptors.error ?? fingerprint.reason ?? fingerprint.error ?? 'RDKit unavailable.'],
+    };
+  }
+  const basis = {
+    canonicalMoleculeId: identity.canonicalIdentityId,
+    canonicalSmiles: fingerprint.canonicalSmiles,
+    source: { sourceUrl: identity.sourceUrl, sourceIdentifier: identity.sourceIdentifier, checksum: identity.checksum },
+    identityFingerprint: fingerprint.fingerprint,
+    descriptors: descriptors.data,
+    computationVersion: descriptors.engine,
+  };
+  return {
+    status: 'COMPUTED',
+    ...basis,
+    rawOutputs: { morganRadius: 2, morganBits: fingerprint.nBits, bitVector: fingerprint.bits },
+    derivedOutputs: descriptors.data,
+    uncertainty: { kind: 'NOT_APPLICABLE_EXACT_ALGORITHM', note: 'Descriptors and fingerprint are deterministic calculations for the supplied structure.' },
+    evidenceClass: 'COMPUTATIONAL',
+    limitations: ['Cheminformatics identity and descriptors are not biological activity, safety, efficacy, or clinical evidence.'],
+    replayIdentity: sha256Hex16(basis),
   };
 }
 
@@ -515,26 +550,30 @@ export function discoverBundledCandidates(targetKeys, maxCandidates) {
     const remaining = maxCandidates - candidates.length;
     for (const row of pin.rows.slice(0, remaining)) {
       const desc = rdkitDescribe(row.canonicalSmiles);
+      const identity = identityRecord({
+        canonicalIdentityId: `chembl:${row.moleculeId}`,
+        originalInput: row.moleculeId,
+        normalizedStructure: {
+          smiles: row.canonicalSmiles,
+          formula: desc.ok ? desc.data.molecularFormula : null,
+          inchi: desc.ok ? desc.data.inchi : null,
+          inchiKey: desc.ok ? desc.data.inchiKey : null,
+        },
+        sourceUrl: row.sourceUrl ?? null,
+        sourceIdentifier: row.moleculeId,
+        retrievedAt: row.fetchedAt ?? null,
+        checksum: pin.contentSha256,
+        status: 'RESOLVED',
+        reason: `Bundled, hash-verified ChEMBL activity row for ${target.label} (${target.targetChemblId}, ${target.organism}).`,
+      });
+      const computationalDossier = buildComputationalCandidateDossier(identity, desc);
       candidates.push(candidateDossier({
         candidateId: `known-${row.moleculeId}`,
         origin: 'SOURCE_BACKED_KNOWN_COMPOUND',
-        identity: identityRecord({
-          canonicalIdentityId: `chembl:${row.moleculeId}`,
-          originalInput: row.moleculeId,
-          normalizedStructure: {
-            smiles: row.canonicalSmiles,
-            formula: desc.ok ? desc.data.molecularFormula : null,
-            inchi: desc.ok ? desc.data.inchi : null,
-            inchiKey: desc.ok ? desc.data.inchiKey : null,
-          },
-          sourceUrl: row.sourceUrl ?? null,
-          sourceIdentifier: row.moleculeId,
-          retrievedAt: row.fetchedAt ?? null,
-          checksum: pin.contentSha256,
-          status: 'RESOLVED',
-          reason: `Bundled, hash-verified ChEMBL activity row for ${target.label} (${target.targetChemblId}, ${target.organism}).`,
-        }),
+        identity,
         provenance: { sourceUrl: row.sourceUrl ?? null, sourceId: row.sourceId ?? row.moleculeId, retrievedAt: row.fetchedAt ?? null, targetChemblId: row.targetId ?? target.targetChemblId, pActivity: row.pActivity ?? null },
+        computationalDossier,
+        efficacyStatus: computationalDossier.status === 'COMPUTED' ? 'COMPUTATIONAL_HYPOTHESIS' : 'UNKNOWN',
       }));
     }
   }
@@ -545,12 +584,15 @@ export function discoverBundledCandidates(targetKeys, maxCandidates) {
 export function candidateFromResolvedIdentity(identity, { userSuppliedStructure }) {
   const origin = identity.status !== 'RESOLVED' ? 'UNRESOLVED' : userSuppliedStructure ? 'USER_SUPPLIED_COMPOUND' : 'SOURCE_BACKED_KNOWN_COMPOUND';
   const missing = identity.status === 'RESOLVED' ? [] : [identity.reason];
+  const computationalDossier = identity.status === 'RESOLVED' ? buildComputationalCandidateDossier(identity) : null;
   return candidateDossier({
     candidateId: contentCandidateId('direct', { id: identity.canonicalIdentityId, input: identity.originalInput, status: identity.status }),
     origin,
     identity,
     provenance: identity.sourceUrl ? { sourceUrl: identity.sourceUrl, sourceId: identity.sourceIdentifier, retrievedAt: identity.retrievedAt } : null,
     missingInformation: missing,
+    computationalDossier,
+    efficacyStatus: computationalDossier?.status === 'COMPUTED' ? 'COMPUTATIONAL_HYPOTHESIS' : 'UNKNOWN',
   });
 }
 

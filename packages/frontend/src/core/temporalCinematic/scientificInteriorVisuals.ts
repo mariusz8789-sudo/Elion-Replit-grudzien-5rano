@@ -7,6 +7,7 @@ import { createBench, createCabinet, createMonitor } from '../three/graphics/lab
 import { createScientificGlass } from '../three/graphics/materials';
 import { createColumn, createPipe, createPlatform } from '../three/graphics/primitives';
 import { InstanceBatch } from '../three/graphics/instancing';
+import { enhanceScientificAssetSlotVisual } from './premiumScientificInteriorDetail';
 
 /** V6 — canonical generated-room visuals. No second lab world and no second renderer. */
 
@@ -396,18 +397,20 @@ export function createScientificAssetSlotVisual(
 ): THREE_NS.Group {
   const empty = new THREE.Group(); empty.name = 'genesis-empty-asset-slot';
   if (slot.geometry?.kind !== 'ASSET_SLOT') return empty;
+  let visual: THREE_NS.Group;
   switch (slot.geometry.slotType) {
-    case 'IMAGING_SCANNER': return createScanner(THREE, palette);
-    case 'MICROSCOPE_STATION': return createMicroscope(THREE, palette);
-    case 'REACTOR_VESSEL': return createReactor(THREE, palette);
-    case 'HOSPITAL_BED': return createHospitalBed(THREE, palette);
-    case 'PUMP_STATION': return createPumpStation(THREE, palette);
-    case 'LAB_BENCH_STATION': return createLabBenchStation(THREE, palette);
-    case 'SPECTROMETER_STATION': return createSpectrometer(THREE, palette);
-    case 'THERMAL_STAGE_STATION': return createThermalStage(THREE, palette);
-    case 'COMPUTE_STATION': return createComputeStation(THREE, palette);
+    case 'IMAGING_SCANNER': visual = createScanner(THREE, palette); break;
+    case 'MICROSCOPE_STATION': visual = createMicroscope(THREE, palette); break;
+    case 'REACTOR_VESSEL': visual = createReactor(THREE, palette); break;
+    case 'HOSPITAL_BED': visual = createHospitalBed(THREE, palette); break;
+    case 'PUMP_STATION': visual = createPumpStation(THREE, palette); break;
+    case 'LAB_BENCH_STATION': visual = createLabBenchStation(THREE, palette); break;
+    case 'SPECTROMETER_STATION': visual = createSpectrometer(THREE, palette); break;
+    case 'THERMAL_STAGE_STATION': visual = createThermalStage(THREE, palette); break;
+    case 'COMPUTE_STATION': visual = createComputeStation(THREE, palette); break;
     default:
       empty.userData.notModeledAssetSlot = slot.geometry.slotType;
       return empty;
   }
+  return enhanceScientificAssetSlotVisual(THREE, visual, slot.geometry.slotType, palette);
 }

@@ -12,6 +12,7 @@ import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
+import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
 
 /**
  * HUMAN EXPLORER PANEL (D-130) — the reference UI's four blocks over the
@@ -115,6 +116,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
               <dt>{t('explorer.scale', locale)}</dt><dd className="cw-mono">{organ.scaleMeters} m · {organ.dimensionsMeters.x}×{organ.dimensionsMeters.y}×{organ.dimensionsMeters.z} m</dd>
               <dt>{t('explorer.evidence', locale)}</dt><dd className="cw-mono">{organ.epistemic} · {manifest.clinicalUse}</dd>
               <dt>Confidence / resolution</dt><dd className="cw-mono" data-testid="sw-explorer-source-metadata" title={organ.representation.provenance.description}>{organ.representation.confidence.status} / {organ.representation.resolution.status}</dd>
+              <dt>Provenance</dt><dd className="cw-mono" data-testid="sw-explorer-provenance">{organ.representation.provenance.source}</dd>
+              <dt>Observation</dt><dd data-testid="sw-explorer-observation-status">No validated subject observation attached · illustrative generic model</dd>
             </dl>
           )}
           {/* D-131: a real section plane and isolation. Clipping reveals the MODEL proxies inside the body —
@@ -159,6 +162,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
           {imageSession
             ? <p className="sw-faint cw-mono" data-testid="sw-explorer-capture">{imageSession.experimentId} · {imageSession.epistemicStatus} · {imageSession.contentHash.slice(0, 16)}…</p>
             : <p className="sw-faint" data-testid="sw-explorer-empty">{t('explorer.noCapture', locale)}</p>}
+          <HumanExperimentSessionInspector session={session} />
         </div>
       </div>
       <div className="sw-ex-strip" role="group" aria-label={t('explorer.macroToMicro', locale)}>

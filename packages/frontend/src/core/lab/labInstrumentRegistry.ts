@@ -12,7 +12,7 @@ export class LabInstrumentRegistry {
     this.devices.set(id, device);
     emitLabEvidence(this.runtime, {
       type: 'DEVICE_REGISTERED', modelId: 'D140_INSTRUMENT_REGISTRY', solverId: 'registry-v1', input: device.identity,
-      result: device, epistemicStatus: 'MEASURED', evidenceClass: 'DERIVED', provenance: device.provenance,
+      result: device, epistemicStatus: 'HYBRID_DERIVED', evidenceClass: 'DERIVED', provenance: device.provenance,
     });
   }
 

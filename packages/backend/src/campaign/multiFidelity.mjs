@@ -97,8 +97,11 @@ export function dockCandidate(db, ctx, cand, receptor) {
     inputs: { ...dockSpec, receptorKind: r.data.receptorKind },
     outputs: { bestAffinityKcalMol: r.data.bestAffinityKcalMol, nPoses: r.data.nPoses, poses: r.data.poses },
     units: { bestAffinityKcalMol: 'kcal/mol' },
-    warnings: r.data.receptorKind === 'small_molecule_standin' ? ['receptor is a small-molecule rigid stand-in (software-validation), not a protein target'] : [],
-    provenance: { engine: `AutoDock Vina ${r.data.vinaVersion} + Meeko ${r.data.meekoVersion}`, receptorKind: r.data.receptorKind },
+    warnings: [
+      ...(r.data.receptorKind === 'small_molecule_standin' ? ['receptor is a small-molecule rigid stand-in (software-validation), not a protein target'] : []),
+      ...(r.data.artifactDurability === 'EPHEMERAL_TEMP' ? ['docking artifacts are in an ephemeral temp directory; configure GENESIS_ARTIFACT_DIR on durable storage before production docking'] : []),
+    ],
+    provenance: { engine: `AutoDock Vina ${r.data.vinaVersion} + Meeko ${r.data.meekoVersion}`, receptorKind: r.data.receptorKind, artifactDurability: r.data.artifactDurability },
     inputHash: r.data.inputHash, outputHash: sha16(r.data.poses),
     artifacts: r.data.artifacts, durationMs: Date.now() - t0, environmentHash: envHash(),
   });

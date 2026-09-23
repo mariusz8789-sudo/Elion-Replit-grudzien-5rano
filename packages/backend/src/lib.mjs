@@ -165,7 +165,9 @@ export const SECURITY_HEADERS = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
   'referrer-policy': 'strict-origin-when-cross-origin',
-  'permissions-policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  // Mirror may request a same-origin camera only after explicit user consent.
+  // Cross-origin frames, microphone and location remain blocked.
+  'permissions-policy': 'camera=(self), microphone=(), geolocation=(), interest-cohort=()',
   // `blob:` w img-src/connect-src (D-131): GLTFLoader rozpakowuje tekstury WŁASNEGO,
   // już pobranego z 'self' pliku .glb do obiektów Blob i czyta je przez
   // URL.createObjectURL (ImageBitmapLoader używa do tego fetch, stąd connect-src).

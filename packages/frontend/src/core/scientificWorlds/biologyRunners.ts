@@ -76,11 +76,20 @@ export function createLedgerSink(ledger: EvidenceLedger, worldId: string): Evide
   return {
     hashes,
     addRecord(input: EvidenceRecordInput) {
+      const normalizedClaimType = input.claimType.trim().toUpperCase();
+      const ledgerClaimType = normalizedClaimType === 'MEASUREMENT'
+        || normalizedClaimType === 'OBSERVATION'
+        || normalizedClaimType === 'REAL_OBSERVATION'
+        || normalizedClaimType === 'LAB_RESULT'
+        ? 'observation'
+        : normalizedClaimType.includes('HYPOTHESIS')
+          ? 'hypothesis'
+          : 'model';
       const res = ledger.addRecord({
         sourceUrl: `${input.sourceUrl}?world=${encodeURIComponent(worldId)}`,
         sourceTimestamp: null,
         claim: `${input.claim} provenance=${canonicalJson(input.provenance)}`,
-        claimType: 'model',
+        claimType: ledgerClaimType,
         confidence: Math.min(1, Math.max(0, input.confidence)),
         provenance: { sourceKind: 'dataset', retrievedBy: `human-biology-lab:${input.claimType}`, independentSourceIds: [] },
       });

@@ -167,6 +167,8 @@ describe('SECURITY_HEADERS', () => {
     assert.ok(SECURITY_HEADERS['content-security-policy'].includes("frame-ancestors 'none'"));
     assert.ok(SECURITY_HEADERS['referrer-policy']);
     assert.ok(SECURITY_HEADERS['permissions-policy']);
+    assert.match(SECURITY_HEADERS['permissions-policy'], /camera=\(self\)/);
+    assert.doesNotMatch(SECURITY_HEADERS['permissions-policy'], /microphone=\(self\)/);
   });
 
   test('allows blob: only for own-origin GLB textures, and nothing remote (D-131)', () => {

@@ -33,6 +33,8 @@ import { evaluateVisualReality, type VisualRealityResult } from './graphics/visu
 import { buildBiologyStation, drawBiologyArtifact, drawBiologyIdle, drawEvidenceWall, buildBiologyArtifact3D, type Readout } from './biologyStationKit';
 import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
 import { createHolographicResearchCompanion, type HolographicResearchCompanion } from './holographicResearchCompanion';
+import { createPremiumLabDetail, type PremiumLabDetailHandle } from './premiumLabDetail';
+import { createPremiumHumanDetail, type PremiumHumanDetailHandle } from './premiumHumanDetail';
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -88,6 +90,8 @@ export class AgentLabScene3D implements Sim3D {
   private scene: THREE_NS.Scene | null = null;
   private character: Character | null = null;
   private researchCompanion: HolographicResearchCompanion | null = null;
+  private premiumLabDetail: PremiumLabDetailHandle | null = null;
+  private premiumHumanDetail: PremiumHumanDetailHandle | null = null;
   private stations = new Map<string, StationVisual>();
   private dust: DustMotesHandle | null = null;
   private beacons: THREE_NS.MeshStandardMaterial[] = [];
@@ -454,6 +458,11 @@ export class AgentLabScene3D implements Sim3D {
     character.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = false; } });
     scene.add(character.root); this.character = character;
 
+    this.premiumLabDetail = createPremiumLabDetail(THREE, {
+      world: 'physics', room: this.room, ceilingY: CEILING_Y, stations: this.stationDefs, tier,
+    });
+    scene.add(this.premiumLabDetail.root);
+
     applyShadowPolicy(THREE, scene);
   }
 
@@ -550,6 +559,17 @@ export class AgentLabScene3D implements Sim3D {
     const character = buildCharacter(THREE, { height: 1.78, suit: { fabric: 0xe9edf2, trim: 0x7dd3fc, gloves: 0x263340, boots: 0x1a1f26, visor: 0x8fd3ff, lamp: 0x62f0a3 } });
     character.root.traverse((o) => { const m = o as THREE_NS.Mesh; if (m.isMesh) { m.castShadow = true; m.receiveShadow = false; } });
     scene.add(character.root); this.character = character;
+    this.premiumLabDetail = createPremiumLabDetail(THREE, {
+      world: 'biology', room: this.room, ceilingY: H, stations: this.stationDefs, tier,
+    });
+    scene.add(this.premiumLabDetail.root);
+    this.premiumHumanDetail = createPremiumHumanDetail(THREE, {
+      center: [TWIN_CHAMBER.position.x, 0, TWIN_CHAMBER.position.z],
+      height: TWIN_CHAMBER.height,
+      radius: TWIN_CHAMBER.radius,
+      tier,
+    });
+    scene.add(this.premiumHumanDetail.root);
     this.setTwinView('NORMAL', null);
     applyShadowPolicy(THREE, scene);
   }
@@ -683,6 +703,8 @@ export class AgentLabScene3D implements Sim3D {
     this.onUpdate?.(u);
     this.dust?.update(dt);
     this.macroMicro?.update(dt);
+    this.premiumLabDetail?.update(this.time);
+    this.premiumHumanDetail?.update(this.time);
   }
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
@@ -858,6 +880,8 @@ export class AgentLabScene3D implements Sim3D {
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;
     this.researchCompanion?.dispose(); this.researchCompanion = null;
+    this.premiumHumanDetail?.dispose(); this.premiumHumanDetail = null;
+    this.premiumLabDetail?.dispose(); this.premiumLabDetail = null;
     if (this.scene) disposeSceneResources(this.scene);
     this.character?.dispose();
     for (const t of this.twins) t.dispose();

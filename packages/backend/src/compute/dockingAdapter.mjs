@@ -15,11 +15,13 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dock_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable('GENESIS_DOCKING_PYTHON');
 const TIMEOUT_MS = 300_000; // dokowanie bywa kosztowne; twardy limit chroni serwer
 const ARTIFACT_BASE = process.env.GENESIS_ARTIFACT_DIR ?? path.join(tmpdir(), 'genesis-science');
+const ARTIFACT_DURABILITY = process.env.GENESIS_ARTIFACT_DIR ? 'CONFIGURED_DURABLE_PATH' : 'EPHEMERAL_TEMP';
 
 let detectCache = null;
 
@@ -109,7 +111,7 @@ export function dock(spec) {
       seed: spec.seed ?? 42,
       outDir,
     });
-    return r.ok ? { ok: true, data: r } : { ok: false, error: r.error };
+    return r.ok ? { ok: true, data: { ...r, artifactDurability: ARTIFACT_DURABILITY } } : { ok: false, error: r.error };
   } catch (err) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }

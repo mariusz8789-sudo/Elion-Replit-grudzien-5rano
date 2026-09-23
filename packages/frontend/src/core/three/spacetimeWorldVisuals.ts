@@ -2,6 +2,8 @@ import type * as THREE_NS from 'three';
 import type { SpacetimeRenderPrimitive, SpacetimeWorldDescriptor } from '../temporalCinematic/spacetimeWorldDescriptor';
 import type { WorldGraph } from '../worldModel/ecs/worldGraph';
 import { disposeSceneResources } from './graphics/lifecycle';
+import { detectRenderTier } from './quality';
+import { createPremiumSpacetimeDetail } from './premiumSpacetimeDetail';
 
 export interface SpacetimeWorldVisualSummary {
   readonly kind: SpacetimeWorldDescriptor['kind'];
@@ -927,6 +929,8 @@ export function createSpacetimeWorldVisualLayer(
     case 'MARS_STATION': createMarsStation(THREE, root, descriptor, graph, animated); break;
     case 'UNDERWATER_CITY': createUnderwaterCity(THREE, root, descriptor, graph, animated); break;
   }
+  const premium = createPremiumSpacetimeDetail(THREE, descriptor, graph, detectRenderTier());
+  root.add(premium.root);
   root.traverse((object) => {
     object.userData.epistemic ??= descriptor.epistemic;
     object.userData.sourceEntityIds ??= [...descriptor.sourceEntityIds];
@@ -954,6 +958,7 @@ export function createSpacetimeWorldVisualLayer(
           entry.object.scale.setScalar(scale);
         }
       }
+      premium.update(elapsedSeconds);
     },
     dispose() {
       if (disposed) return;

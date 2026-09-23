@@ -13,6 +13,12 @@ import {
   type WorldEvidenceBundle,
   type WorldEvidenceBundleInput,
 } from '../worldModel/evidence/worldEvidenceBundle';
+import {
+  getSw4RenderState,
+  runSw4EpidemiologyCityScenario,
+  type Sw4EpidemiologyCityOptions,
+  type Sw4RenderState,
+} from '../worldModel/scenarios/sw4EpidemiologyCity';
 import { AgentToolRegistry, declareTool, type AgentTool, type ErasedAgentTool } from './agentTool';
 
 /**
@@ -38,6 +44,7 @@ export const WORLD_COUNTERFACTUAL_TOOL = 'world.counterfactual.assess';
 export const WORLD_DIFF_TOOL = 'world.counterfactual.diff';
 export const WORLD_DECISION_TOOL = 'world.decision.evaluate';
 export const WORLD_EVIDENCE_TOOL = 'world.evidence.bundle';
+export const WORLD_SW4_EPIDEMIOLOGY_CITY_TOOL = 'world.sw4.epidemiologyCity.run';
 
 /**
  * Diffing two branches carries the capability of the science that produced
@@ -88,6 +95,31 @@ const decisionTool: AgentTool<DecisionEvaluationInput, DecisionReport> = declare
   invoke: (input) => evaluateDecision(input),
 });
 
+/**
+ * SW-4: runs the deterministic generated-city epidemic scenario
+ * (`worldModel/scenarios/sw4EpidemiologyCity.ts`) end-to-end and returns only
+ * the read-only render state a caller needs — never the live engine, so
+ * invoking this tool can never leak a mutable simulation handle into an
+ * agent/chat context. `EPIDEMIC`'s capability is read from the SAME
+ * `solverCapabilityFor` registry as everywhere else in this file, so a real
+ * change to that judgement changes this tool with it.
+ */
+const sw4EpidemiologyCityTool: AgentTool<Sw4EpidemiologyCityOptions, Sw4RenderState> = declareTool({
+  name: WORLD_SW4_EPIDEMIOLOGY_CITY_TOOL,
+  domain: 'epidemiology',
+  description: 'Compiles a deterministic generated city, attaches the real SEIR population, runs the real solver for N ticks, and returns the resulting read-only S/E/I/R/D state.',
+  capabilityTags: ['simulate'],
+  capability: solverCapabilityFor('EPIDEMIC'),
+  inputSchema: [
+    { name: 'seed', type: 'number', required: true, description: 'Deterministic PRNG seed for the generated city and its population.' },
+    { name: 'populationCount', type: 'number', required: false, description: 'Total city population (SEIR N0). Defaults to the real solver\'s own DEFAULT_EPIDEMIC.population.' },
+    { name: 'epidemicParams', type: 'object', required: false, description: 'Real EpidemicParams overrides (r0, infectiousDays, incubationDays, ifr, interventionDay, interventionEffect).' },
+    { name: 'ticks', type: 'number', required: true, description: 'Number of real solver ticks to advance.' },
+    { name: 'dtDays', type: 'number', required: false, description: 'Tick length in days. Defaults to 1.' },
+  ],
+  invoke: (options) => getSw4RenderState(runSw4EpidemiologyCityScenario(options)),
+});
+
 const evidenceTool: AgentTool<WorldEvidenceBundleInput, WorldEvidenceBundle> = declareTool({
   name: WORLD_EVIDENCE_TOOL,
   domain: 'flood-hydrology',
@@ -112,8 +144,8 @@ const evidenceTool: AgentTool<WorldEvidenceBundleInput, WorldEvidenceBundle> = d
 export const GENESIS_AGENT_TOOLS = new AgentToolRegistry(
   // Erased for the registry's listing role only. Invocation goes through the
   // concrete tools exported below, where the compiler still checks the input.
-  [diffTool, assessTool, decisionTool, evidenceTool] as readonly unknown[] as readonly ErasedAgentTool[],
+  [diffTool, assessTool, decisionTool, evidenceTool, sw4EpidemiologyCityTool] as readonly unknown[] as readonly ErasedAgentTool[],
 );
 
 /** The concrete, type-safe handles. Invoke through these, discover through the registry. */
-export const GENESIS_TOOLS = { diffTool, assessTool, decisionTool, evidenceTool } as const;
+export const GENESIS_TOOLS = { diffTool, assessTool, decisionTool, evidenceTool, sw4EpidemiologyCityTool } as const;

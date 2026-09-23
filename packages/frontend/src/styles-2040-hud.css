@@ -526,3 +526,43 @@ input, select, textarea { background: transparent !important; border: 1px solid 
   .sw[data-world="biology"].sw-cam-twin .sw-hud-command .sw-quick { display: none; }
 }
 .sw-ex-section .sw-faint { font-size: 0.6rem; line-height: 1.35; margin: 0.2rem 0 0; }
+
+/* Human Explorer — hierarchy pass. Reading order is: current selection → macro→micro path → epistemic
+   status → controls grouped by intent (navigate · view · observe) → provenance on demand. On phones the
+   controls fold into a drawer so the anatomy viewport is never covered by default. */
+.sw-hud-explorer .sw-ex-head { justify-content: space-between; align-items: flex-start; gap: 0.6rem; flex-wrap: nowrap; }
+.sw-ex-selection { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.sw-ex-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #7dd3fc; }
+.sw-ex-selection-name { font-size: 1.05rem; line-height: 1.2; color: #f1fbff; overflow-wrap: anywhere; }
+.sw-ex-selection-meta { font-size: 0.72rem; color: #a9c6bb; overflow-wrap: anywhere; }
+.sw-ex-drawer-toggle { display: none; flex: 0 0 auto; }
+.sw-ex-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.4rem; }
+.sw-ex-boundary { flex-basis: 100%; font-size: 0.66rem; color: #8fb3c4; }
+.sw-ex-drawer { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.sw-ex-group + .sw-ex-group { border-top: 1px solid rgba(125, 211, 252, 0.16); padding-top: 0.55rem; }
+.sw-ex-group .sw-ex-section, .sw-ex-group.sw-ex-section { margin-top: 0; }
+.sw-ex-navigate { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.sw-ex-rung.is-on .sw-ex-rung-name::after { content: ''; display: block; height: 2px; margin-top: 0.12rem; background: #62f0a3; border-radius: 1px; }
+.sw-ex-provenance { border: 1px solid rgba(125, 211, 252, 0.18); border-radius: 8px; padding: 0.35rem 0.55rem; background: rgba(2, 6, 14, 0.4); }
+.sw-ex-provenance > summary { cursor: pointer; font-size: 0.68rem; color: #9fc6d6; letter-spacing: 0.02em; list-style-position: inside; }
+.sw-ex-provenance[open] > summary { margin-bottom: 0.4rem; }
+.sw-ex-provenance .sw-ex-card { font-size: 0.7rem; }
+.sw[data-world="biology"] .sw-ex-provenance .sw-ex-card { font-size: 0.72rem; }
+@media (max-width: 900px) {
+  .sw-ex-drawer-toggle { display: inline-flex; align-items: center; }
+  /* Closed drawer: selection, path and status only — a compact rail over the bottom navigation. */
+  .sw-hud-explorer[data-drawer="closed"] .sw-ex-drawer { display: none; }
+  /* The path scrolls sideways in one row instead of wrapping into a second block of chips. */
+  .sw-hud-explorer .sw-ex-rungs, .sw[data-world="biology"] .sw-hud-explorer .sw-ex-rungs { display: flex; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; gap: 0.3rem; padding-bottom: 0.15rem; }
+  .sw-hud-explorer .sw-ex-rung { flex: 0 0 auto; min-width: 4.6rem; scroll-snap-align: start; }
+  .sw-hud-explorer .sw-ex-rung + .sw-ex-rung::before { display: none; }
+  .sw-ex-selection-name { font-size: 0.95rem; }
+  /* Closed rail budget: the toggle in the status bar already names the panel, and the selection line
+     already carries the scale, so the eyebrow, the path title and the scale badge are dropped here. */
+  .sw-hud-explorer .sw-ex-eyebrow, .sw-hud-explorer .sw-ex-strip > .sw-ex-title, .sw-hud-explorer .sw-ex-scale { display: none; }
+  .sw-hud-explorer .sw-ex-strip { padding: 0.3rem 0.4rem; }
+  .sw-hud-explorer .sw-ex-rung-btn { padding: 0.25rem 0.2rem; }
+  .sw-hud-explorer, .sw[data-world="biology"] .sw-hud-explorer { gap: 0.35rem; }
+  .sw-ex-boundary { font-size: 0.62rem; }
+  .sw-ex-canvas { max-height: 22dvh; }
+}

@@ -85,11 +85,21 @@ export interface CutawayHandle {
  */
 export function createCutaway(THREE: typeof THREE_NS, color = 0x7dd3fc): CutawayHandle {
   const plane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
-  const geo = new THREE.PlaneGeometry(1.6, 2.4);
+  // A unit quad, scaled to the body's own extent on the plane, so the section frame always hugs the twin.
+  const geo = new THREE.PlaneGeometry(1, 1);
   const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
   const indicator: THREE_NS.Mesh<THREE_NS.BufferGeometry, THREE_NS.MeshBasicMaterial> = new THREE.Mesh(geo, mat);
   indicator.name = 'twin:section-plane';
   indicator.visible = false;
+  // A crisp frame at the cut: the faint fill alone reads as haze, the outline reads as a deliberate section.
+  const edges = new THREE.EdgesGeometry(geo);
+  const edgeMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false });
+  const outline = new THREE.LineSegments(edges, edgeMat);
+  outline.name = 'twin:section-outline';
+  indicator.add(outline);
+  const centre = new THREE.Vector3();
+  const onPlane = new THREE.Vector3();
+  const facing = new THREE.Vector3();
   return {
     plane,
     indicator,
@@ -99,14 +109,40 @@ export function createCutaway(THREE: typeof THREE_NS, color = 0x7dd3fc): Cutaway
       plane.constant = p.constant;
       indicator.visible = state.enabled;
       if (!state.enabled) return;
-      // Sit the indicator on the plane, facing along its normal.
-      const centre = new THREE.Vector3((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2, (bounds.minZ + bounds.maxZ) / 2);
-      const onPlane = plane.projectPoint(centre, new THREE.Vector3());
-      indicator.position.copy(onPlane);
-      indicator.lookAt(onPlane.clone().add(plane.normal));
+      // `bounds` and the plane are in WORLD space (that is what material clipping uses), while the
+      // indicator lives inside the twin's group. Position it through the parent, or it lands offset by
+      // the chamber's own position.
+      centre.set((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2, (bounds.minZ + bounds.maxZ) / 2);
+      plane.projectPoint(centre, onPlane);
+      facing.copy(onPlane).add(plane.normal);
+      const parent = indicator.parent;
+      if (parent) { parent.updateMatrixWorld(true); indicator.position.copy(parent.worldToLocal(onPlane.clone())); } else indicator.position.copy(onPlane);
+      indicator.lookAt(facing);
+      const sx = bounds.maxX - bounds.minX; const sy = bounds.maxY - bounds.minY; const sz = bounds.maxZ - bounds.minZ;
+      const [w, h] = state.axis === 'SAGITTAL' ? [sz, sy] : state.axis === 'CORONAL' ? [sx, sy] : [sx, sz];
+      indicator.scale.set(Math.max(0.05, w * 1.08), Math.max(0.05, h * 1.04), 1);
     },
-    dispose() { geo.dispose(); mat.dispose(); },
+    dispose() { geo.dispose(); mat.dispose(); edges.dispose(); edgeMat.dispose(); },
   };
+}
+
+/**
+ * While a cut is open, a single-sided shell shows nothing where it was cut: the viewer looks into a
+ * hole. Rendering the back faces of the cut materials turns the opening into a readable shell wall.
+ * The original side is remembered and restored exactly when the cut closes.
+ */
+const ORIGINAL_SIDE = new WeakMap<THREE_NS.Material, THREE_NS.Side>();
+export function setSectionShellSides(THREE: typeof THREE_NS, materials: Iterable<THREE_NS.Material>, open: boolean): void {
+  for (const m of materials) {
+    if (open) {
+      if (!ORIGINAL_SIDE.has(m)) ORIGINAL_SIDE.set(m, m.side);
+      if (m.side !== THREE.DoubleSide) { m.side = THREE.DoubleSide; m.needsUpdate = true; }
+    } else if (ORIGINAL_SIDE.has(m)) {
+      const side = ORIGINAL_SIDE.get(m)!;
+      ORIGINAL_SIDE.delete(m);
+      if (m.side !== side) { m.side = side; m.needsUpdate = true; }
+    }
+  }
 }
 
 /**

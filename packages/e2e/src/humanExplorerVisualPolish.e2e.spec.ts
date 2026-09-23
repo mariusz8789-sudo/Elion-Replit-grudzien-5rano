@@ -1,0 +1,93 @@
+/* Proprietary / All Rights Reserved - Genesis OS */
+// Human Explorer visual polish (Playwright, real Chromium, production server). Geometry and DOM only:
+// this spec deliberately takes NO screenshots and records NO video.
+import { test, expect, type Page } from '@playwright/test';
+
+const chromiumPath = process.env.CHROME ?? process.env.GENESIS_CHROMIUM_PATH;
+test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } : {}) }, screenshot: 'off', video: 'off', trace: 'off' });
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
+});
+
+async function openExplorer(page: Page): Promise<void> {
+  await page.goto('/#/human-biology-lab');
+  await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-world', 'biology', { timeout: 60_000 });
+  await expect(page.getByTestId('sw-explorer')).toBeVisible({ timeout: 60_000 });
+}
+
+async function box(page: Page, testId: string) {
+  const b = await page.getByTestId(testId).boundingBox();
+  if (!b) throw new Error(`${testId} has no layout box`);
+  return b;
+}
+
+for (const viewport of [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }] as const) {
+  test(`mobile ${viewport.width}×${viewport.height}: compact rail, drawer, no overflow, viewport uncovered`, async ({ page }) => {
+    test.setTimeout(600_000);
+    page.setDefaultTimeout(240_000);
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.setViewportSize(viewport);
+    await openExplorer(page);
+
+    const explorer = page.getByTestId('sw-explorer');
+    await expect(explorer).toHaveAttribute('data-drawer', 'closed');
+    await expect(page.getByTestId('sw-explorer-selection')).toBeVisible();
+    await expect(page.getByTestId('sw-explorer-rung-organ')).toBeVisible();
+    await expect(page.getByTestId('sw-explorer-observation-status')).toBeVisible();
+    await expect(page.getByTestId('sw-explorer-organ')).toBeHidden();
+
+    const overflow = await page.evaluate(() => ({ vw: window.innerWidth, doc: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
+    expect(overflow.doc, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.vw + 1);
+    expect(overflow.body, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.vw + 1);
+
+    // The closed rail leaves most of the anatomy viewport free, and the bottom navigation never covers it.
+    const rail = await box(page, 'sw-explorer');
+    expect(rail.height / viewport.height, `rail ${rail.height}px of ${viewport.height}px`).toBeLessThan(0.3);
+    const nav = await box(page, 'mobile-navigation');
+    expect(rail.y + rail.height).toBeLessThanOrEqual(nav.y + 1);
+
+    // The drawer opens the grouped controls and stays inside the viewport, above the bottom navigation.
+    await page.getByTestId('sw-explorer-drawer-toggle').click();
+    await expect(explorer).toHaveAttribute('data-drawer', 'open');
+    await expect(page.getByTestId('sw-explorer-organ')).toBeVisible();
+    const open = await box(page, 'sw-explorer');
+    expect(open.y).toBeGreaterThanOrEqual(0);
+    expect(open.y + open.height).toBeLessThanOrEqual(nav.y + 1);
+    expect(open.x + open.width).toBeLessThanOrEqual(viewport.width + 1);
+    await page.getByTestId('sw-explorer-drawer-toggle').click();
+    await expect(explorer).toHaveAttribute('data-drawer', 'closed');
+    expect(errors).toEqual([]);
+  });
+}
+
+test('desktop: grouped controls stay reachable; presentation changes never seal a session', async ({ page }) => {
+  // Software GL in CI renders a frame every few seconds at this size (the same on the base commit);
+  // actions wait for the main thread, exactly as in scientific-worlds.e2e.spec.ts.
+  test.setTimeout(900_000);
+  page.setDefaultTimeout(300_000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openExplorer(page);
+  await expect.poll(async () => Number(await page.getByTestId('scientific-worlds').getAttribute('data-frames')), { timeout: 300_000 }).toBeGreaterThanOrEqual(2);
+  await expect(page.getByTestId('sw-explorer-drawer-toggle')).toBeHidden();
+  await expect(page.getByTestId('sw-explorer-organ')).toBeVisible();
+  await expect(page.getByTestId('sw-explorer-provenance')).toBeHidden();
+  await page.getByTestId('sw-explorer-provenance-details').locator('summary').click();
+  await expect(page.getByTestId('sw-explorer-provenance')).toBeVisible();
+
+  const capture = await page.getByTestId('sw-explorer-scope').getAttribute('data-capture');
+  await page.getByTestId('sw-explorer-twin-camera').click();
+  await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
+  await page.getByTestId('sw-explorer-cut-toggle').click();
+  await expect(page.getByTestId('sw-explorer-section')).toHaveAttribute('data-cutaway', 'on');
+  await page.getByTestId('sw-explorer-axis-coronal').click();
+  await page.getByTestId('sw-explorer-surface-xray').click();
+  await expect(page.getByTestId('sw-explorer-surface')).toHaveAttribute('data-surface', 'XRAY');
+  await expect(page.getByTestId('sw-explorer-observation-status')).toContainText('No validated subject observation attached');
+  await expect(page.getByTestId('sw-explorer-tier')).toContainText('MODEL');
+  await expect(page.getByTestId('sw-explorer-scope')).toHaveAttribute('data-capture', capture ?? '');
+  expect(errors).toEqual([]);
+});

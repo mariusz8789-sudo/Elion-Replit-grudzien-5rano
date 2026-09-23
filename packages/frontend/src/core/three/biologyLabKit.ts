@@ -6,8 +6,8 @@ import { createPracticalLight } from './graphics/lighting';
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import type { VisualLayerInstruction } from '../scientificWorlds/humanLab/visualModes';
 import { NEURO_REGIONS } from '../scientificWorlds/humanLab/neuroLab';
-import { applyRimLight, isRimPatched, selectionPulse, setSurfaceMode, type TwinSurfaceMode } from './humanTwinMaterials';
-import { createCutaway, measureCutawayBounds, setClippingOnObject, type CutawayHandle, type CutawayState } from './humanTwinCutaway';
+import { applyRimLight, isRimPatched, selectionPulse, setMaterialRimIntensity, setMaterialXray, setSurfaceMode, type TwinSurfaceMode } from './humanTwinMaterials';
+import { createCutaway, measureCutawayBounds, setClippingOnObject, setSectionShellSides, type CutawayHandle, type CutawayState } from './humanTwinCutaway';
 import type { LoadedHumanTwinBody, HumanTwinTier } from './humanTwinAsset';
 
 /**
@@ -196,6 +196,8 @@ export function createManipulatorArm(THREE: typeof THREE_NS, opts: ManipulatorOp
 }
 
 /** Colours per organ system, for the proxies (a legend, not tissue rendering). */
+/** Selection silhouette: a cool white fresnel rim that reads against every organ colour and the dark lab. */
+const SELECTION_RIM_INTENSITY = 1.35;
 const SYSTEM_COLOR: Readonly<Record<string, number>> = { NERVOUS: 0xeab96b, CARDIOVASCULAR: 0xd24a4a, RESPIRATORY: 0xe7a099, DIGESTIVE: 0xc98c5a, URINARY: 0xb07a6a, ENDOCRINE: 0xd9b8e8 };
 
 export interface TwinHandle {
@@ -310,10 +312,15 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
   const organs = new Map<string, THREE_NS.Mesh>();
   const sphere = new THREE.SphereGeometry(1, 22, 16);
   const organMats: THREE_NS.MeshStandardMaterial[] = [];
+  const selectionRim = new THREE.Color(0xd8f6ff);
   for (const n of manifest.nodes) {
     if (n.kind !== 'ORGAN') continue;
     const color = SYSTEM_COLOR[n.system ?? ''] ?? 0xc7a08a;
-    const mat = new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0.14, roughness: 0.52, clearcoat: 0.2, clearcoatRoughness: 0.48, transparent: true, opacity: 0.9 });
+    // Opaque by default: a fully shown organ must write depth, or overlapping organs sort by object centre
+    // and pop through each other. Only a dimmed (isolation context) organ goes transparent — see applyOrgans.
+    const mat = new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0.14, roughness: 0.52, clearcoat: 0.2, clearcoatRoughness: 0.48 });
+    // A dormant fresnel rim: the selection highlight is a bright silhouette, not just a brighter fill.
+    applyRimLight(THREE, mat, { color: selectionRim, power: 2.2, intensity: 0 });
     organMats.push(mat);
     const m = new THREE.Mesh(sphere, mat); m.name = `organ:${n.id}`;
     m.position.set(n.positionMeters.x, n.positionMeters.y, n.positionMeters.z);
@@ -332,7 +339,6 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
       const radius = Math.cbrt((r.volumeMl * 1e-6 * 3) / (4 * Math.PI));
       const m = new THREE.Mesh(sphere, regionMat); m.scale.setScalar(radius); m.position.set(r.positionMeters.x, r.positionMeters.y, r.positionMeters.z); m.name = `region:${r.id}`; regions.add(m);
     }
-    const brainMesh = organs.get('brain'); if (brainMesh) { (brainMesh.material as THREE_NS.MeshStandardMaterial).opacity = 0.35; }
   }
   regions.visible = false; g.add(regions);
   let selected: THREE_NS.Mesh | null = null;
@@ -364,19 +370,39 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     if (!isolated.length) return byMode;
     return isolated.includes(id);
   };
+  const bodySlot = manifest.nodes.find((n) => n.id === 'body')?.assetSlot ?? '';
   const applyOrgans = (): void => {
+    const focus = lastSelected !== null && organs.has(lastSelected) && !isolated.length;
     for (const [id, m] of organs) {
       const slot = String(m.userData.assetSlot);
       m.visible = organVisible(id, slot, lastInstr);
-      const mat = m.material as THREE_NS.MeshStandardMaterial;
-      mat.emissiveIntensity = lastSelected === id ? 0.9 : 0.22;
-      // Isolation dims whatever is still shown but is not the isolated node, so context stays readable.
-      mat.opacity = !isolated.length || isolated.includes(id) ? 0.92 : 0.12;
+      const mat = m.material as THREE_NS.MeshPhysicalMaterial;
+      // Isolation dims whatever is still shown but is not the isolated node, so context stays readable;
+      // the brain opens up while its regions are displayed inside it.
+      const dimmed = isolated.length > 0 && !isolated.includes(id);
+      const opacity = dimmed ? 0.12 : id === 'brain' && regions.visible ? 0.35 : 1;
+      const transparent = opacity < 1;
+      if (mat.transparent !== transparent) { mat.transparent = transparent; mat.needsUpdate = true; }
+      mat.opacity = opacity; mat.depthWrite = !transparent;
+      // With a selection, the rest steps back a little so the eye lands on the selected organ.
+      mat.emissiveIntensity = lastSelected === id ? 0.9 : focus ? 0.1 : 0.22;
+      setMaterialRimIntensity(mat, lastSelected === id ? SELECTION_RIM_INTENSITY : 0);
     }
-    // The body shell steps back when a node is isolated, so the isolated organ is actually visible.
-    const shellMode: TwinSurfaceMode = isolated.length ? 'GHOST' : surface;
-    for (const m of shellMaterials) setSurfaceMode(m, shellMode);
-    if (cloudMat) cloudMat.opacity = isolated.length ? 0.1 : cloudMat.opacity;
+    // The body shell steps back when a node is isolated, AND whenever the current display mode does not
+    // include the body at all (brain, vascular, nervous, organ, tissue and cell views): a faint reference
+    // silhouette keeps the organs' scale without hiding them behind skin.
+    const bodyShown = lastInstr ? lastInstr.visibleAssetSlots.includes(bodySlot) : true;
+    const shellMode: TwinSurfaceMode = isolated.length || !bodyShown ? 'GHOST' : surface;
+    for (const m of shellMaterials) {
+      if (holo && m === skin) {
+        // The hologram proxy keeps its own translucency budget; NORMAL must not turn it into a solid cyan body.
+        skin.transparent = true; skin.depthWrite = false;
+        skin.opacity = shellMode === 'GHOST' ? 0.06 : shellMode === 'TRANSLUCENT' ? 0.2 : 0.42;
+        setMaterialXray(skin, shellMode === 'XRAY' ? 1 : 0);
+        skin.needsUpdate = true;
+      } else setSurfaceMode(m, shellMode);
+    }
+    if (cloudMat) cloudMat.opacity = isolated.length || !bodyShown ? 0.1 : cloudMat.opacity;
   };
 
   return {
@@ -404,21 +430,14 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
         mat.clippingPlanes = state.enabled ? [cutaway.plane] : null;
         mat.needsUpdate = true;
       }
+      // An open cut shows the shell wall instead of a hole; closed, every material is single-sided again.
+      setSectionShellSides(THREE, [...shellMaterials, ...organMats], state.enabled);
     },
     setView(instr, selectedNodeId) {
-      const bodySlot = manifest.nodes.find((n) => n.id === 'body')?.assetSlot ?? '';
       const bodyVisible = instr.visibleAssetSlots.includes(bodySlot);
-      // The body slot absent from the instruction: a faint reference silhouette so organs keep their scale (presentation, not data).
-      skin.opacity = holo ? (bodyVisible ? (instr.translucent ? 0.2 : 0.42) : 0.06) : bodyVisible ? (instr.translucent ? 0.24 : 1) : 0.07;
-      skin.depthWrite = !holo && skin.opacity > 0.9;
+      // Shell opacity is resolved in applyOrgans (surface mode + a GHOST silhouette when the body slot is absent).
       if (cloudMat) cloudMat.opacity = bodyVisible ? (instr.translucent ? 0.35 : 0.85) : 0.12;
       tint.set(instr.tint); skin.emissive.copy(tint).multiplyScalar(instr.translucent ? 0.35 : 0.0);
-      for (const [id, m] of organs) {
-        const slot = String(m.userData.assetSlot);
-        m.visible = instr.visibleAssetSlots.includes(slot);
-        const mat = m.material as THREE_NS.MeshStandardMaterial;
-        mat.emissiveIntensity = selectedNodeId === id ? 0.9 : 0.22;
-      }
       regions.visible = instr.mode === 'BRAIN' || instr.mode === 'NERVOUS';
       selected = selectedNodeId ? organs.get(selectedNodeId) ?? null : null;
       lastInstr = instr; lastSelected = selectedNodeId;
@@ -429,7 +448,11 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
     update(t) {
       if (!holo && !asset) body.update('idle', t, 0);
       if (cloudMat) cloudMat.opacity = Math.max(0.1, cloudMat.opacity) * (0.92 + 0.08 * Math.sin(t * 2.2));
-      if (selected) (selected.material as THREE_NS.MeshStandardMaterial).emissiveIntensity = 0.55 + 0.45 * selectionPulse(t);
+      if (selected) {
+        const pulse = selectionPulse(t);
+        (selected.material as THREE_NS.MeshStandardMaterial).emissiveIntensity = 0.55 + 0.45 * pulse;
+        setMaterialRimIntensity(selected.material as THREE_NS.Material, SELECTION_RIM_INTENSITY * (0.7 + 0.3 * pulse));
+      }
       // D-131: the asset's own ARKit blendshapes give the twin a blink — presentation only, deterministic
       // in scene time, never part of a session, an experiment input or an evidence record.
       if (blink || blinkR) {

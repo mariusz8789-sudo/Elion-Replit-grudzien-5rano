@@ -60,6 +60,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const [system, setSystem] = useState<OrganSystemId | null>(null);
   const [organId, setOrganId] = useState<string>(() => (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId) ? anatomy.selectedNodeId : 'heart'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Mobile: the controls live in a compact drawer so the anatomy viewport stays uncovered (CSS ignores it on desktop).
+  const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => { if (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId)) setOrganId(anatomy.selectedNodeId); }, [anatomy.selectedNodeId, organs]);
   const selectedNode = manifest.nodes.find((node) => node.id === anatomy.selectedNodeId);
   useEffect(() => { setSystem(selectedNode?.kind === 'SYSTEM' ? selectedNode.system ?? null : null); }, [selectedNode]);
@@ -90,81 +92,24 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const magnify = (m: number): void => { if (!explorer) return; const lt = nextLogicalTime(); const label = `${t('explorer.hyperscope', locale)} ${m}× · ${t(explorer.labelKey, locale)}`; run(magnificationCommands(explorer, m, label, lt), label); };
   const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
+  // One clear current selection: the node the V3 anatomy state points at, named at the level it is shown.
+  const selectionName = selectedNode?.kind === 'SYSTEM' && selectedNode.system ? `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[selectedNode.system]}`
+    : selectedNode?.kind === 'BODY' ? t('explorer.body', locale) : organ?.label ?? t('explorer.body', locale);
+  const selectionMeta = selectedNode?.kind === 'SYSTEM' || selectedNode?.kind === 'BODY'
+    ? `${levelLabel(level, locale)} · ${SCALE_TEXT[level]}`
+    : [organ?.latinLabel, organ?.system ? SYSTEM_LABEL_PL[organ.system] : null, `${levelLabel(level, locale)} · ${SCALE_TEXT[level]}`].filter(Boolean).join(' · ');
+
   return (
-    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
+    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision} data-drawer={drawerOpen ? 'open' : 'closed'}>
+      {/* 1 — WHERE AM I: the current selection, then the macro → micro path it sits on. */}
       <header className="sw-ex-head">
-        <span className="sw-badge" data-testid="sw-explorer-tier" title="Cinematic procedural presentation; geometry remains an illustrative scientific model.">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
-        <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
-        <span className={`sw-badge sw-ex-mode sw-ex-mode-${evidenceMode.toLowerCase()}`} data-testid="sw-explorer-evidence">{explorerTruthLabel(evidenceMode)}</span>
+        <div className="sw-ex-selection" data-testid="sw-explorer-selection">
+          <span className="sw-ex-eyebrow">{t('explorer.humanExplorer', locale)}</span>
+          <strong className="sw-ex-selection-name">{selectionName}</strong>
+          <span className="sw-ex-selection-meta">{selectionMeta}</span>
+        </div>
+        <button type="button" className="sw-chip sw-ex-drawer-toggle" onClick={() => setDrawerOpen((o) => !o)} aria-expanded={drawerOpen} aria-controls="sw-ex-drawer" data-testid="sw-explorer-drawer-toggle">Sterowanie {drawerOpen ? '▾' : '▸'}</button>
       </header>
-      <div className="sw-ex-body">
-        <nav className="sw-ex-systems" aria-label={t('explorer.systemsRail', locale)}>
-          <div className="sw-ex-title">{t('explorer.systemsRail', locale)}</div>
-          {manifest.supportedSystems.map((s) => (
-            <button key={s} type="button" className={`sw-chip sw-ex-system${system === s ? ' is-on' : ''}`} onClick={() => pickSystem(s)} disabled={busy} data-testid={`sw-explorer-system-${s.toLowerCase()}`}>{SYSTEM_LABEL_PL[s]}</button>
-          ))}
-        </nav>
-        <div className="sw-ex-organ" data-testid="sw-explorer-organ" data-organ={organ?.id}>
-          <div className="sw-ex-organ-list" role="listbox" aria-label={t('explorer.organ', locale)}>
-            {visibleOrgans.map((o) => (
-              <button key={o.id} type="button" role="option" aria-selected={o.id === organ?.id} className={`sw-chip sw-ex-organ-chip${o.id === organ?.id ? ' is-on' : ''}`} onClick={() => { setOrganId(o.id); const e = EXPLORER_ORGANS.find((x) => x.organId === o.id); if (e) { const lt = nextLogicalTime(); const label = `${t('explorer.organ', locale)}: ${o.label}`; run(explorerCommands(e, 'organ', label, lt), label); } }} disabled={busy} data-testid={`sw-explorer-organ-${o.id}`}>{o.label}</button>
-            ))}
-          </div>
-          {organ && (
-            <dl className="sw-ex-card">
-              <dt>{organ.label}</dt><dd className="sw-faint">{organ.latinLabel ?? '—'} · {organ.system ? SYSTEM_LABEL_PL[organ.system] : '—'}</dd>
-              <dt>{t('explorer.scale', locale)}</dt><dd className="cw-mono">{organ.scaleMeters} m · {organ.dimensionsMeters.x}×{organ.dimensionsMeters.y}×{organ.dimensionsMeters.z} m</dd>
-              <dt>{t('explorer.evidence', locale)}</dt><dd className="cw-mono">{organ.epistemic} · {manifest.clinicalUse}</dd>
-              <dt>Confidence / resolution</dt><dd className="cw-mono" data-testid="sw-explorer-source-metadata" title={organ.representation.provenance.description}>{organ.representation.confidence.status} / {organ.representation.resolution.status}</dd>
-              <dt>Provenance</dt><dd className="cw-mono" data-testid="sw-explorer-provenance">{organ.representation.provenance.source}</dd>
-              <dt>Observation</dt><dd data-testid="sw-explorer-observation-status">No validated subject observation attached · illustrative generic model</dd>
-            </dl>
-          )}
-          {/* D-131: a real section plane and isolation. Clipping reveals the MODEL proxies inside the body —
-              it is a schematic section, never a medical cross-section, and the label says so. */}
-          <div className="sw-ex-section" data-testid="sw-explorer-section" data-cutaway={cutaway.enabled ? 'on' : 'off'}>
-            <div className="sw-ex-title">{t('explorer.section', locale)}</div>
-            <div className="sw-ex-mags">
-              <button type="button" className={`sw-chip${cutaway.enabled ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, enabled: !cutaway.enabled })} disabled={busy} data-testid="sw-explorer-cut-toggle">{t('explorer.cutaway', locale)}</button>
-              {(['SAGITTAL', 'CORONAL', 'AXIAL'] as const).map((axis: SectionAxis) => (
-                <button key={axis} type="button" className={`sw-chip${cutaway.axis === axis ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, axis, enabled: true })} disabled={busy} title={SECTION_AXIS_LABEL_PL[axis]} data-testid={`sw-explorer-axis-${axis.toLowerCase()}`}>{SECTION_AXIS_LABEL_PL[axis].split(' ')[0]}</button>
-              ))}
-              <button type="button" className={`sw-chip${cutaway.flipped ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, flipped: !cutaway.flipped, enabled: true })} disabled={busy} data-testid="sw-explorer-cut-flip">↔</button>
-            </div>
-            <input className="sw-ex-slider" type="range" min={0} max={1} step={0.01} value={cutaway.position} disabled={busy || !cutaway.enabled}
-              onChange={(e) => onCutaway({ ...cutaway, position: Number(e.target.value) })} aria-label={t('explorer.section', locale)} data-testid="sw-explorer-cut-position" />
-            <div className="sw-ex-mags">
-              <button type="button" className={`sw-chip${isolated.length ? ' is-on' : ''}`} onClick={() => onIsolate(isolated.length ? [] : organ ? [organ.id] : [])} disabled={busy || !organ} data-testid="sw-explorer-isolate">{isolated.length ? t('explorer.showAll', locale) : t('explorer.isolate', locale)}</button>
-              {/* Both agent cameras follow the suited agent, which leaves the twin a distant figure inside its
-                  chamber. This one frames the body itself — the only way to actually READ a section or an
-                  isolated organ. It is a camera, not a claim: no label, session or evidence changes with it. */}
-              <button type="button" className={`sw-chip${twinCamera ? ' is-on' : ''}`} onClick={() => onTwinCamera(!twinCamera)} data-testid="sw-explorer-twin-camera">{t('explorer.twinCamera', locale)}</button>
-            </div>
-            {/* The body shell's presentation. The "X-ray" is a fresnel shell over a licensed 3D model —
-                a stylised view that lets the atlas volumes read through the skin. It is NOT a radiograph,
-                and it upgrades no epistemic status: the anatomy under it stays MODEL. */}
-            <div className="sw-ex-mags" data-testid="sw-explorer-surface" data-surface={surface}>
-              {SURFACE_MODES.map(([mode, label]) => (
-                <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} onClick={() => onSurface(mode)} disabled={busy} data-testid={`sw-explorer-surface-${mode.toLowerCase()}`}>{label}</button>
-              ))}
-            </div>
-            <p className="sw-faint" data-testid="sw-explorer-section-note">{t('explorer.sectionNote', locale)}</p>
-          </div>
-        </div>
-        <div className="sw-ex-scope" data-testid="sw-explorer-scope" data-capture={imageSession?.sessionId ?? ''}>
-          <div className="sw-ex-title">{t('explorer.hyperscope', locale)} · {t('explorer.magnification', locale)}</div>
-          <div className="sw-ex-mags">
-            {VIRTUAL_MICROSCOPE_MAGNIFICATIONS.map((m) => (
-              <button key={m} type="button" className={`sw-chip${magnification === m ? ' is-on' : ''}`} onClick={() => magnify(m)} disabled={busy || !explorer} data-testid={`sw-explorer-mag-${m}`}>{m}×</button>
-            ))}
-          </div>
-          <canvas ref={canvasRef} className="sw-ex-canvas" width={512} height={288} aria-label="Microscope field" />
-          {imageSession
-            ? <p className="sw-faint cw-mono" data-testid="sw-explorer-capture">{imageSession.experimentId} · {imageSession.epistemicStatus} · {imageSession.contentHash.slice(0, 16)}…</p>
-            : <p className="sw-faint" data-testid="sw-explorer-empty">{t('explorer.noCapture', locale)}</p>}
-          <HumanExperimentSessionInspector session={session} />
-        </div>
-      </div>
       <div className="sw-ex-strip" role="group" aria-label={t('explorer.macroToMicro', locale)}>
         <div className="sw-ex-title">{t('explorer.macroToMicro', locale)}</div>
         <ol className="sw-ex-rungs">
@@ -172,7 +117,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
             const step = explorer ? explorerPath(explorer, l, manifest).at(-1) : null;
             const runnable = !!explorer && (l === 'body' || l === 'organ' || (l === 'organ_system' && !!step?.nodeId) || !!step?.experimentId);
             return (
-              <li key={l} className={`sw-ex-rung${l === level ? ' is-on' : ''}`}>
+              <li key={l} className={`sw-ex-rung${l === level ? ' is-on' : ''}`} aria-current={l === level ? 'step' : undefined}>
                 <button type="button" className="sw-ex-rung-btn" onClick={() => zoom(l)} disabled={busy || !runnable} title={l === 'atom' ? t('explorer.notModeled', locale) : step ? explorerTruthLabel(step.evidenceMode) : ''} data-testid={`sw-explorer-rung-${l}`}>
                   <span className="sw-ex-rung-name">{levelLabel(l, locale)}</span>
                   <span className="sw-ex-rung-scale cw-mono">{SCALE_TEXT[l]}</span>
@@ -181,6 +126,92 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
             );
           })}
         </ol>
+      </div>
+      {/* The epistemic boundary stays on screen at every size; the detail behind it is one click away. */}
+      <div className="sw-ex-status">
+        <span className={`sw-badge sw-ex-mode sw-ex-mode-${evidenceMode.toLowerCase()}`} data-testid="sw-explorer-evidence">{explorerTruthLabel(evidenceMode)}</span>
+        <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
+        <span className="sw-badge" data-testid="sw-explorer-tier" title="Cinematic procedural presentation; geometry remains an illustrative scientific model.">{twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
+        <span className="sw-ex-boundary" data-testid="sw-explorer-observation-status">No validated subject observation attached · illustrative generic model</span>
+      </div>
+      <div id="sw-ex-drawer" className="sw-ex-drawer">
+        <div className="sw-ex-body">
+          {/* 2 — NAVIGATE: body system, then organ. */}
+          <div className="sw-ex-group sw-ex-navigate" role="group" aria-label="Nawiguj">
+            <nav className="sw-ex-systems" aria-label={t('explorer.systemsRail', locale)}>
+              <div className="sw-ex-title">{t('explorer.systemsRail', locale)}</div>
+              {manifest.supportedSystems.map((s) => (
+                <button key={s} type="button" className={`sw-chip sw-ex-system${system === s ? ' is-on' : ''}`} onClick={() => pickSystem(s)} disabled={busy} aria-pressed={system === s} data-testid={`sw-explorer-system-${s.toLowerCase()}`}>{SYSTEM_LABEL_PL[s]}</button>
+              ))}
+            </nav>
+            <div className="sw-ex-organ" data-testid="sw-explorer-organ" data-organ={organ?.id}>
+              <div className="sw-ex-title">{t('explorer.organ', locale)}</div>
+              <div className="sw-ex-organ-list" role="listbox" aria-label={t('explorer.organ', locale)}>
+                {visibleOrgans.map((o) => (
+                  <button key={o.id} type="button" role="option" aria-selected={o.id === organ?.id} className={`sw-chip sw-ex-organ-chip${o.id === organ?.id ? ' is-on' : ''}`} onClick={() => { setOrganId(o.id); const e = EXPLORER_ORGANS.find((x) => x.organId === o.id); if (e) { const lt = nextLogicalTime(); const label = `${t('explorer.organ', locale)}: ${o.label}`; run(explorerCommands(e, 'organ', label, lt), label); } }} disabled={busy} data-testid={`sw-explorer-organ-${o.id}`}>{o.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* 3 — VIEW: how the model is shown. Presentation only: no session, no evidence changes here.
+              D-131: a real section plane and isolation. Clipping reveals the MODEL proxies inside the body —
+              it is a schematic section, never a medical cross-section, and the label says so. */}
+          <div className="sw-ex-group sw-ex-section" data-testid="sw-explorer-section" data-cutaway={cutaway.enabled ? 'on' : 'off'}>
+            <div className="sw-ex-title">{t('explorer.section', locale)}</div>
+            <div className="sw-ex-mags">
+              <button type="button" className={`sw-chip${cutaway.enabled ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, enabled: !cutaway.enabled })} disabled={busy} aria-pressed={cutaway.enabled} data-testid="sw-explorer-cut-toggle">{t('explorer.cutaway', locale)}</button>
+              {(['SAGITTAL', 'CORONAL', 'AXIAL'] as const).map((axis: SectionAxis) => (
+                <button key={axis} type="button" className={`sw-chip${cutaway.axis === axis ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, axis, enabled: true })} disabled={busy} title={SECTION_AXIS_LABEL_PL[axis]} data-testid={`sw-explorer-axis-${axis.toLowerCase()}`}>{SECTION_AXIS_LABEL_PL[axis].split(' ')[0]}</button>
+              ))}
+              <button type="button" className={`sw-chip${cutaway.flipped ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, flipped: !cutaway.flipped, enabled: true })} disabled={busy} aria-label="Odwróć stronę przekroju" data-testid="sw-explorer-cut-flip">↔</button>
+            </div>
+            <input className="sw-ex-slider" type="range" min={0} max={1} step={0.01} value={cutaway.position} disabled={busy || !cutaway.enabled}
+              onChange={(e) => onCutaway({ ...cutaway, position: Number(e.target.value) })} aria-label={t('explorer.section', locale)} data-testid="sw-explorer-cut-position" />
+            <div className="sw-ex-mags">
+              <button type="button" className={`sw-chip${isolated.length ? ' is-on' : ''}`} onClick={() => onIsolate(isolated.length ? [] : organ ? [organ.id] : [])} disabled={busy || !organ} data-testid="sw-explorer-isolate">{isolated.length ? t('explorer.showAll', locale) : t('explorer.isolate', locale)}</button>
+              {/* Both agent cameras follow the suited agent, which leaves the twin a distant figure inside its
+                  chamber. This one frames the body itself — the only way to actually READ a section or an
+                  isolated organ. It is a camera, not a claim: no label, session or evidence changes with it. */}
+              <button type="button" className={`sw-chip${twinCamera ? ' is-on' : ''}`} onClick={() => onTwinCamera(!twinCamera)} aria-pressed={twinCamera} data-testid="sw-explorer-twin-camera">{t('explorer.twinCamera', locale)}</button>
+            </div>
+            {/* The body shell's presentation. The "X-ray" is a fresnel shell over a licensed 3D model —
+                a stylised view that lets the atlas volumes read through the skin. It is NOT a radiograph,
+                and it upgrades no epistemic status: the anatomy under it stays MODEL. */}
+            <div className="sw-ex-mags" data-testid="sw-explorer-surface" data-surface={surface}>
+              {SURFACE_MODES.map(([mode, label]) => (
+                <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} onClick={() => onSurface(mode)} disabled={busy} aria-pressed={surface === mode} data-testid={`sw-explorer-surface-${mode.toLowerCase()}`}>{label}</button>
+              ))}
+            </div>
+            <p className="sw-faint" data-testid="sw-explorer-section-note">{t('explorer.sectionNote', locale)}</p>
+          </div>
+          {/* 4 — OBSERVE: the Hyperscope, drawn only from a sealed session. */}
+          <div className="sw-ex-group sw-ex-scope" data-testid="sw-explorer-scope" data-capture={imageSession?.sessionId ?? ''}>
+            <div className="sw-ex-title">{t('explorer.hyperscope', locale)} · {t('explorer.magnification', locale)}</div>
+            <div className="sw-ex-mags">
+              {VIRTUAL_MICROSCOPE_MAGNIFICATIONS.map((m) => (
+                <button key={m} type="button" className={`sw-chip${magnification === m ? ' is-on' : ''}`} onClick={() => magnify(m)} disabled={busy || !explorer} aria-pressed={magnification === m} data-testid={`sw-explorer-mag-${m}`}>{m}×</button>
+              ))}
+            </div>
+            <canvas ref={canvasRef} className="sw-ex-canvas" width={512} height={288} aria-label="Microscope field" />
+            {imageSession
+              ? <p className="sw-faint cw-mono" data-testid="sw-explorer-capture">{imageSession.experimentId} · {imageSession.epistemicStatus} · {imageSession.contentHash.slice(0, 16)}…</p>
+              : <p className="sw-faint" data-testid="sw-explorer-empty">{t('explorer.noCapture', locale)}</p>}
+            <HumanExperimentSessionInspector session={session} />
+          </div>
+        </div>
+        {/* Provenance and the full epistemic record: always available, never in the way. */}
+        {organ && (
+          <details className="sw-ex-provenance" data-testid="sw-explorer-provenance-details">
+            <summary>{t('explorer.provenance', locale)} · {organ.label} · {organ.epistemic}</summary>
+            <dl className="sw-ex-card">
+              <dt>{organ.label}</dt><dd className="sw-faint">{organ.latinLabel ?? '—'} · {organ.system ? SYSTEM_LABEL_PL[organ.system] : '—'}</dd>
+              <dt>{t('explorer.scale', locale)}</dt><dd className="cw-mono">{organ.scaleMeters} m · {organ.dimensionsMeters.x}×{organ.dimensionsMeters.y}×{organ.dimensionsMeters.z} m</dd>
+              <dt>{t('explorer.evidence', locale)}</dt><dd className="cw-mono">{organ.epistemic} · {manifest.clinicalUse}</dd>
+              <dt>Confidence / resolution</dt><dd className="cw-mono" data-testid="sw-explorer-source-metadata" title={organ.representation.provenance.description}>{organ.representation.confidence.status} / {organ.representation.resolution.status}</dd>
+              <dt>Provenance</dt><dd className="cw-mono" data-testid="sw-explorer-provenance">{organ.representation.provenance.source}</dd>
+            </dl>
+          </details>
+        )}
       </div>
     </section>
   );

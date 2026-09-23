@@ -21,7 +21,10 @@ RUN apt-get update \
 COPY packages/backend/requirements-admet.txt packages/backend/requirements-admet.txt
 RUN python3 -m venv /opt/genesis-science \
     && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
+       --upgrade pip setuptools wheel \
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
        torch --index-url https://download.pytorch.org/whl/cpu \
+       --extra-index-url https://pypi.org/simple \
     && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
        -r packages/backend/requirements-admet.txt
 ENV GENESIS_PYTHON=/opt/genesis-science/bin/python

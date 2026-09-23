@@ -54,6 +54,17 @@ export function LabValidationPanel({ projectId, campaignId, candidates, scienceR
     () => scienceRuns.filter((run) => run.candidateId === candidateId),
     [scienceRuns, candidateId],
   );
+  const journey = useMemo(() => {
+    const reviewed = dossier?.observations.some((entry) => entry.latestReview !== null) ?? false;
+    return [
+      { label: 'Kandydat', detail: 'wybrany do sprawdzenia', done: Boolean(candidateId) },
+      { label: 'Obliczenia', detail: 'wyniki in silico', done: candidateRuns.length > 0 },
+      { label: 'Plan', detail: 'zamrożone kryteria', done: (dossier?.requests.length ?? 0) > 0 },
+      { label: 'Laboratorium', detail: 'realna obserwacja', done: (dossier?.observations.length ?? 0) > 0 },
+      { label: 'Weryfikacja', detail: 'niezależny przegląd', done: reviewed },
+      { label: 'Porównanie', detail: 'model kontra pomiar', done: (dossier?.comparisons.length ?? 0) > 0 },
+    ];
+  }, [candidateId, candidateRuns.length, dossier]);
   const [scienceRunId, setScienceRunId] = useState('');
 
   useEffect(() => {
@@ -181,15 +192,30 @@ export function LabValidationPanel({ projectId, campaignId, candidates, scienceR
   }
 
   return (
-    <section className="settings-section" aria-label="Laboratory validation closed loop" data-testid="lab-validation-panel">
-      <h3>Laboratory Validation Loop</h3>
+    <section className="settings-section lab-journey" aria-label="Droga kandydata przez laboratorium" data-testid="lab-validation-panel">
+      <div className="lab-journey-heading">
+        <div>
+          <span className="gx-eyebrow">GENESIS · JEDNO LABORATORIUM</span>
+          <h3>Kandydat przechodzi od obliczeń do realnej walidacji</h3>
+        </div>
+        <span className="lab-journey-boundary">POMIAR FIZYCZNY WYMAGA LABORATORIUM</span>
+      </div>
       <p className="settings-hint">
-        Candidate → external validation request → real external observation → human review → Evidence proposal → model-vs-observation.
-        Genesis does not execute a wet-lab protocol here and does not convert a model estimate into clinical efficacy.
+        Genesis najpierw ogranicza liczbę kandydatów obliczeniowo, a potem przygotowuje najmniejszy potrzebny eksperyment,
+        zamraża kryteria i przyjmuje wynik z rzeczywistego laboratorium. Nie udaje telemetrii urządzeń ani skuteczności klinicznej.
       </p>
 
+      <ol className="lab-journey-steps" aria-label="Etapy drogi kandydata">
+        {journey.map((step, index) => (
+          <li key={step.label} className={step.done ? 'is-done' : ''} aria-current={!step.done && journey.slice(0, index).every((item) => item.done) ? 'step' : undefined}>
+            <span className="lab-journey-index">{step.done ? '✓' : index + 1}</span>
+            <span><strong>{step.label}</strong><small>{step.detail}</small></span>
+          </li>
+        ))}
+      </ol>
+
       <label className="account-field">
-        <span>Candidate</span>
+        <span>Kandydat kierowany do laboratorium</span>
         <select value={candidateId} onChange={(event) => setCandidateId(event.target.value)} data-testid="lab-validation-candidate">
           {candidates.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>{candidate.canonicalSmiles} · {candidate.id}</option>
@@ -200,14 +226,14 @@ export function LabValidationPanel({ projectId, campaignId, candidates, scienceR
       {dossier && (
         <div className="cde-results">
           <div className="cde-result">
-            <span className="cde-result-label">Research gate</span>
+            <span className="cde-result-label">Brama badawcza</span>
             <span className="cde-result-actual">{dossier.researchGate.verdict} · {dossier.researchGate.reason}</span>
-            <span className="cde-result-bound">next: {dossier.nextResearchAction.action}</span>
+            <span className="cde-result-bound">następny krok: {dossier.nextResearchAction.action}</span>
           </div>
           <div className="cde-result">
-            <span className="cde-result-label">Closed-loop state</span>
+            <span className="cde-result-label">Stan drogi kandydata</span>
             <span className="cde-result-actual" data-testid="lab-validation-counts">
-              {dossier.requests.length} request(s) · {dossier.observations.length} observation(s) · {dossier.comparisons.length} comparison(s)
+              planów: {dossier.requests.length} · obserwacji: {dossier.observations.length} · porównań: {dossier.comparisons.length}
             </span>
             <span className="cde-result-bound">fingerprint: {dossier.dossierFingerprint}</span>
           </div>
@@ -215,16 +241,17 @@ export function LabValidationPanel({ projectId, campaignId, candidates, scienceR
       )}
 
       <div className="account-form">
-        <label className="account-field"><span>Validation objective</span><input value={objective} onChange={(e) => setObjective(e.target.value)} /></label>
-        <label className="account-field"><span>Endpoint ID</span><input value={endpointId} onChange={(e) => setEndpointId(e.target.value)} placeholder="e.g. target-binding-score" /></label>
-        <label className="account-field"><span>Expected unit</span><input value={expectedUnit} onChange={(e) => setExpectedUnit(e.target.value)} /></label>
-        <label className="account-field"><span>Model output key to compare</span><input value={comparisonOutputKey} onChange={(e) => setComparisonOutputKey(e.target.value)} /></label>
-        <label className="account-field"><span>Pre-registered absolute tolerance</span><input value={plannedAbsoluteTolerance} onChange={(e) => setPlannedAbsoluteTolerance(e.target.value)} /></label>
-        <button className="chip-btn" onClick={() => { void createRequest(); }} disabled={!candidateId || !endpointId.trim() || !expectedUnit.trim() || !comparisonOutputKey.trim() || !plannedAbsoluteTolerance.trim()} data-testid="lab-validation-create-request">Create validation request</button>
+        <h4>1 · Przygotuj eksperyment dla realnego laboratorium</h4>
+        <label className="account-field"><span>Cel walidacji</span><input value={objective} onChange={(e) => setObjective(e.target.value)} /></label>
+        <label className="account-field"><span>Mierzony parametr</span><input value={endpointId} onChange={(e) => setEndpointId(e.target.value)} placeholder="np. target-binding-score" /></label>
+        <label className="account-field"><span>Oczekiwana jednostka</span><input value={expectedUnit} onChange={(e) => setExpectedUnit(e.target.value)} /></label>
+        <label className="account-field"><span>Wynik modelu do porównania</span><input value={comparisonOutputKey} onChange={(e) => setComparisonOutputKey(e.target.value)} /></label>
+        <label className="account-field"><span>Dopuszczalna różnica (ustalana przed pomiarem)</span><input value={plannedAbsoluteTolerance} onChange={(e) => setPlannedAbsoluteTolerance(e.target.value)} /></label>
+        <button className="chip-btn" onClick={() => { void createRequest(); }} disabled={!candidateId || !endpointId.trim() || !expectedUnit.trim() || !comparisonOutputKey.trim() || !plannedAbsoluteTolerance.trim()} data-testid="lab-validation-create-request">Przygotuj zlecenie laboratoryjne</button>
       </div>
 
       <div className="account-form">
-        <h4>Ingest externally produced observation</h4>
+        <h4>2 · Przyjmij wynik wykonany poza Genesis</h4>
         <label className="account-field"><span>Lab/provider ID</span><input value={labId} onChange={(e) => setLabId(e.target.value)} /></label>
         <label className="account-field"><span>External observation ID</span><input value={externalObservationId} onChange={(e) => setExternalObservationId(e.target.value)} /></label>
         <label className="account-field"><span>Source URI</span><input value={sourceUri} onChange={(e) => setSourceUri(e.target.value)} /></label>
@@ -235,26 +262,26 @@ export function LabValidationPanel({ projectId, campaignId, candidates, scienceR
         <label className="account-field"><span>Raw artifact SHA-256</span><input value={rawPayloadSha256} onChange={(e) => setRawPayloadSha256(e.target.value)} placeholder="64 hexadecimal characters" /></label>
         <label className="account-field"><span>Quality control</span><select value={qualityStatus} onChange={(e) => setQualityStatus(e.target.value as typeof qualityStatus)}><option value="QC_UNKNOWN">QC unknown</option><option value="QC_PASSED">QC passed</option><option value="QC_FAILED">QC failed</option></select></label>
         <label className="account-field"><span>Observation confidence (0–1)</span><input value={confidence} onChange={(e) => setConfidence(e.target.value)} /></label>
-        <button className="chip-btn" onClick={() => { void ingestObservation(); }} data-testid="lab-validation-ingest">Ingest observation</button>
-        <button className="chip-btn" onClick={() => { void acceptLatestObservation(); }} disabled={!dossier?.observations.length} data-testid="lab-validation-accept">Independent admin review: accept latest</button>
+        <button className="chip-btn" onClick={() => { void ingestObservation(); }} data-testid="lab-validation-ingest">Przyjmij realną obserwację</button>
+        <button className="chip-btn" onClick={() => { void acceptLatestObservation(); }} disabled={!dossier?.observations.length} data-testid="lab-validation-accept">Niezależny przegląd: zaakceptuj obserwację</button>
       </div>
 
       <div className="account-form">
-        <h4>Compare model to accepted observation</h4>
+        <h4>3 · Porównaj przewidywanie z pomiarem</h4>
         <label className="account-field">
-          <span>Scientific run</span>
+          <span>Wynik obliczeniowy</span>
           <select value={scienceRunId} onChange={(event) => setScienceRunId(event.target.value)}>
-            <option value="">Select run</option>
+            <option value="">Wybierz wykonanie</option>
             {candidateRuns.map((run) => <option key={run.id} value={run.id}>{run.capability} · {run.id}</option>)}
           </select>
         </label>
-        <p className="settings-hint">Comparison uses the output key, unit and tolerance frozen in the validation request.</p>
-        <button className="chip-btn" onClick={() => { void compareLatest(); }} data-testid="lab-validation-compare">Compare</button>
+        <p className="settings-hint">Porównanie używa parametru, jednostki i tolerancji zamrożonych przed otrzymaniem wyniku.</p>
+        <button className="chip-btn" onClick={() => { void compareLatest(); }} data-testid="lab-validation-compare">Porównaj model z pomiarem</button>
       </div>
 
       {message && <p className="settings-hint" role="status">{message}</p>}
       <p className="dossier-boundary">
-        External observation ≠ clinical efficacy. Agreement within tolerance is a model/observation comparison only.
+        Obserwacja laboratoryjna ≠ skuteczność kliniczna. Zgodność w tolerancji oznacza wyłącznie zgodność modelu z tym pomiarem.
       </p>
     </section>
   );

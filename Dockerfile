@@ -52,9 +52,11 @@ COPY --from=build /app/packages/frontend/dist packages/frontend/dist
 # Katalog musi należeć do użytkownika `node`, bo proces nie jest rootem.
 ENV GENESIS_DB_PATH=/data/genesis.db
 RUN mkdir -p /data && chown -R node:node /data
-# Railway mounts its volume at the path set in the service config; this VOLUME keeps the durability
-# contract (P0.2) explicit for every other container runtime and for the dbDurability test.
-VOLUME ["/data"]
+# Railway rejects Dockerfile VOLUME instructions. Persistence is therefore an
+# explicit deployment contract: the Railway service must mount its managed
+# volume at /data (documented in RAILWAY_DEPLOY.md). GENESIS_DB_PATH remains
+# outside /app so replacing the image cannot silently move the database back
+# into the ephemeral application layer.
 
 # Railway mounts volumes as root. The entrypoint repairs only the dedicated
 # /data mount ownership and immediately drops privileges; the Node server never

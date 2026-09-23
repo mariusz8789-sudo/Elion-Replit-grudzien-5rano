@@ -1,0 +1,4 @@
+# Pinned to the version verified against the live reference case in this repo
+# (packages/backend/src/compute/dockingAdapter.mjs / dock_worker.py). The Python
+# binding is used directly (no separate `vina` CLI binary is required).
+vina==1.2.7

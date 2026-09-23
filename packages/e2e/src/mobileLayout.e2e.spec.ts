@@ -87,10 +87,6 @@ for (const viewport of VIEWPORTS) {
       expect(nextMoveBox.y + nextMoveBox.height).toBeLessThanOrEqual(drawerBox.y + drawerBox.height + 1);
     }
     await expectInsideViewport(page);
-    if (viewport.width === 390) {
-      await page.screenshot({ path: 'artifacts/mobile-ui-fix/research-console-after-390x844.png', fullPage: false });
-    }
-
     await drawer.getByRole('button', { name: 'Zamknij Science Chat' }).click();
     await expect(drawer).toHaveCount(0);
     await expect(primaryContent(page, '#/research-console')).toBeVisible();

@@ -17,3 +17,12 @@ test('production image points the canonical adapter at its isolated interpreter'
   assert.match(dockerfile, /ENV GENESIS_RDKIT_PYTHON=\/opt\/genesis-science\/bin\/python/);
   assert.doesNotMatch(dockerfile, /ENV GENESIS_RDKIT_PYTHON=(?:python|python3)\s*$/m);
 });
+
+test('container repairs Railway volume permissions then runs Genesis as non-root', () => {
+  const entrypoint = readFileSync(path.join(REPO, 'scripts/container-entrypoint.sh'), 'utf8');
+  assert.match(dockerfile, /apt-get install[^\n]*python3[^\n]*gosu/);
+  assert.match(dockerfile, /ENTRYPOINT \["\/usr\/local\/bin\/genesis-entrypoint"\]/);
+  assert.match(entrypoint, /chown -R node:node \/data/);
+  assert.match(entrypoint, /exec gosu node "\$@"/);
+  assert.doesNotMatch(entrypoint, /^\s*(?:eval|sh -c)\b/m);
+});

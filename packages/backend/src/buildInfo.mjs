@@ -93,11 +93,18 @@ function readGitHeadFrom(repoDir) {
 export function resolveBuildInfo({ env = process.env, repoDir, readGitHead } = {}) {
   const reader = readGitHead ?? (() => (repoDir ? readGitHeadFrom(repoDir) : null));
   const fromEnv = String(env.GENESIS_COMMIT ?? '').trim();
+  const fromRailway = String(env.RAILWAY_GIT_COMMIT_SHA ?? '').trim();
   let commit = null;
   let commitSource = 'unavailable';
   if (FULL_SHA.test(fromEnv)) {
     commit = fromEnv;
     commitSource = 'env';
+  } else if (FULL_SHA.test(fromRailway)) {
+    // Railway exposes the triggering GitHub SHA at runtime. The production
+    // image intentionally omits .git, so this is the authoritative fallback
+    // when a manual GENESIS_COMMIT build arg was not supplied.
+    commit = fromRailway;
+    commitSource = 'railway';
   } else {
     const fromGit = reader();
     if (FULL_SHA.test(String(fromGit ?? ''))) {

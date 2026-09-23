@@ -34,7 +34,7 @@ RUN npm ci --omit=dev --workspace=packages/backend && npm cache clean --force
 # engines remain honest BLOCKED_LIBRARY states until a dedicated compute image
 # is selected. A venv avoids modifying Debian's externally-managed Python.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates \
+    && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates gosu \
     && rm -rf /var/lib/apt/lists/*
 COPY packages/backend/requirements-rdkit.txt packages/backend/requirements-rdkit.txt
 RUN python3 -m venv /opt/genesis-science \
@@ -56,8 +56,12 @@ RUN mkdir -p /data && chown -R node:node /data
 # contract (P0.2) explicit for every other container runtime and for the dbDurability test.
 VOLUME ["/data"]
 
-# Proces bez roota
-USER node
+# Railway mounts volumes as root. The entrypoint repairs only the dedicated
+# /data mount ownership and immediately drops privileges; the Node server never
+# handles requests as root. This also works unchanged outside Railway.
+COPY scripts/container-entrypoint.sh /usr/local/bin/genesis-entrypoint
+RUN chmod 0755 /usr/local/bin/genesis-entrypoint
+ENTRYPOINT ["/usr/local/bin/genesis-entrypoint"]
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "packages/backend/src/start.mjs"]

@@ -27,6 +27,14 @@ test('P0.3 resolveBuildInfo bierze commit ze środowiska i NIE wymyśla go, gdy 
   const fromGit = resolveBuildInfo({ env: {}, readGitHead: () => 'f' .repeat(40) });
   assert.equal(fromGit.commitSource, 'git');
 
+  const fromRailway = resolveBuildInfo({ env: { RAILWAY_GIT_COMMIT_SHA: 'b'.repeat(40) }, readGitHead: () => null });
+  assert.equal(fromRailway.commit, 'b'.repeat(40));
+  assert.equal(fromRailway.commitSource, 'railway');
+
+  const explicitWins = resolveBuildInfo({ env: { GENESIS_COMMIT: 'a'.repeat(40), RAILWAY_GIT_COMMIT_SHA: 'b'.repeat(40) }, readGitHead: () => null });
+  assert.equal(explicitWins.commit, 'a'.repeat(40));
+  assert.equal(explicitWins.commitSource, 'env');
+
   // Brak obu źródeł → jawne 'unknown', nigdy zmyślony hash ani puste pole.
   const unknown = resolveBuildInfo({ env: {}, readGitHead: () => null });
   assert.equal(unknown.commit, 'unknown');

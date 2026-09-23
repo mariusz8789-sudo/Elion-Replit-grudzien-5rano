@@ -250,6 +250,8 @@ function freePort() {
   });
 }
 
+const CONTAINER_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+
 /**
  * Starts workerEntrypoint.mjs as its own OS process — optionally as an
  * unprivileged uid/gid, like the image's `USER node` — with a fresh random token
@@ -260,7 +262,8 @@ export async function spawnLocalWorker({ workerGroup, python, uid = null, gid = 
   const port = await freePort();
   const tmpdir = mkdtempSync(path.join(os.tmpdir(), `genesis-worker-${workerGroup}-`));
   if (uid !== null) chownSync(tmpdir, uid, gid ?? uid);
-  const childEnv = { PATH: process.env.PATH, HOME: tmpdir, TMPDIR: tmpdir, NODE_ENV: 'production' };
+  // The worker images' PATH (node:22-slim), not the caller's: no user-local interpreter leaks in.
+  const childEnv = { PATH: CONTAINER_PATH, HOME: tmpdir, TMPDIR: tmpdir, NODE_ENV: 'production' };
   Object.assign(childEnv, {
     PORT: String(port), GENESIS_WORKER_GROUP: workerGroup, GENESIS_SCIENTIFIC_WORKER_TOKEN: token,
     ...(python ? { GENESIS_PYTHON: python } : {}), ...env,

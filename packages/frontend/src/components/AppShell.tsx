@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_ITEMS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
+import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
 

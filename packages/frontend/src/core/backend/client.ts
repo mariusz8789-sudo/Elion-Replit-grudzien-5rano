@@ -435,8 +435,12 @@ export interface Capability {
   id: string;
   label: string;
   category: string;
-  status: 'AVAILABLE' | 'NOT_IMPLEMENTED' | 'EXTERNAL_ENGINE_REQUIRED' | 'MODEL_NOT_VALID_FOR_DOMAIN';
+  status: 'AVAILABLE' | 'NOT_IMPLEMENTED' | 'EXTERNAL_ENGINE_REQUIRED' | 'MODEL_NOT_VALID_FOR_DOMAIN' | 'BLOCKED_BY_RUNTIME';
   modelId?: string;
+  engine?: string | null;
+  version?: string | null;
+  fingerprint?: string;
+  executionStatus?: string;
   requires?: string;
   adapter?: string;
   note?: string;

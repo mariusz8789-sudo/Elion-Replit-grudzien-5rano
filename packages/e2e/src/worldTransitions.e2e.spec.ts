@@ -32,6 +32,9 @@ test('supported prompt becomes a canonical WorldGraph and a visible World Direct
   await page.getByTestId('world-director-generate').click();
   await expect(page.getByTestId('world-director-product-world')).toContainText('MARS_RESEARCH', { timeout: 30_000 });
   await expect(page.getByTestId('world-director-product-proof')).not.toContainText('—');
+  await page.getByTestId('world-director-local-video-check').click();
+  await expect(page.getByTestId('world-director-generative-status')).toContainText(/BLOCKED_MODEL_UNAVAILABLE|BLOCKED_GPU_UNAVAILABLE|BLOCKED_RUNTIME/);
+  await expect(page.getByTestId('world-director-generative-status')).toContainText('VISUALIZATION ONLY');
 
   expect(errors, errors.join('\n')).toEqual([]);
 });

@@ -21,7 +21,7 @@ const FPS = FRAME_COUNT / DURATION_SECONDS;
 const executablePath = process.env.CHROMIUM_PATH
   ?? ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/chromium'].find(existsSync);
 
-const CASES = [
+const ALL_CASES = [
   ['wormhole', 'Generate an Einstein-Rosen bridge and create a cinematic flythrough.', 'EINSTEIN_ROSEN_BRIDGE', 'WORMHOLE_RINGS'],
   ['boston', 'Create a historical Boston battle reconstruction with people, streets, smoke and cinematic shots.', 'HISTORICAL_RECONSTRUCTION', 'HISTORICAL_CITY'],
   ['alien-desert', 'Create a desert alien planet with ruins and two suns.', 'DESERT_ALIEN', 'ALIEN_DESERT'],
@@ -30,7 +30,23 @@ const CASES = [
   ['cosmology', 'Create a cosmology world showing gravity wells, dark matter and time dilation.', 'COSMOLOGY_SPACETIME', 'GRAVITY_WELL_GRID'],
   ['timelines', 'Create 5 alternative timeline worlds.', 'MULTIVERSE_BRANCH', 'TIMELINE_BRANCHES'],
   ['time-dilation', 'Create a time dilation laboratory with relativistic clocks.', 'TIME_DILATION_LAB', 'RELATIVISTIC_CLOCKS'],
+  ['underwater', 'Create a cinematic underwater research city.', 'UNDERWATER_RESEARCH_CITY', 'UNDERWATER_CITY'],
 ];
+
+// Final release validation normally needs one representative film, while the
+// broader visual audit can still request every case. Keeping selection here
+// avoids a second capture pipeline and prevents an eight-film render when a
+// caller deliberately asks for a cheap, focused proof.
+const requestedCases = (process.env.GENESIS_PROMPT_FILM_CASES ?? 'all')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+const CASES = requestedCases.includes('all')
+  ? ALL_CASES
+  : ALL_CASES.filter(([slug]) => requestedCases.includes(slug));
+if (CASES.length === 0) {
+  throw new Error(`GENESIS_PROMPT_FILM_CASES did not match a known case: ${requestedCases.join(', ')}`);
+}
 
 const sha256File = (filePath) => createHash('sha256').update(readFileSync(filePath)).digest('hex');
 const distinct = (values) => new Set(values).size === values.length;
@@ -152,5 +168,7 @@ const ok = report.films.length === CASES.length
   && report.films.every((film) => film.frameHashesDistinct && film.video.status === 'AVAILABLE' && film.video.format === 'MP4' && film.video.codec === 'H264' && film.decoder.ok && /^[a-f0-9]{64}$/i.test(film.video.sha256) && /^[a-f0-9]{64}$/i.test(film.video.evidenceHash));
 writeFileSync(path.join(OUT, 'manifest.json'), `${JSON.stringify({ ...report, status: ok ? 'PASS' : 'FAIL' }, null, 2)}\n`);
 for (const film of report.films) console.log(`${film.slug}: frames=${film.frames.length} distinct=${film.frameHashesDistinct} video=${film.video.status}/${film.video.format ?? '-'} decoder=${film.decoder.ok}`);
-console.log(ok ? 'PASSED: eight prompt worlds produced real canonical H264/MP4 films with Evidence.' : `FAILED: inspect ${path.join(OUT, 'manifest.json')}`);
+console.log(ok
+  ? `PASSED: ${CASES.length} prompt world(s) produced real canonical H264/MP4 film(s) with Evidence.`
+  : `FAILED: inspect ${path.join(OUT, 'manifest.json')}`);
 process.exit(ok ? 0 : 1);

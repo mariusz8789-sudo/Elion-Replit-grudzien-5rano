@@ -117,6 +117,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'scientific-city', label: 'Scientific City', icon: '🏗', hash: '#/scientific-city' },
   { id: 'first-person-lab', label: 'Laboratorium 1. osoby', icon: '🔬', hash: '#/first-person-lab' },
   { id: 'molecule', label: 'Molecule Lab', icon: '🧪', hash: '#/molecule' },
+  { id: 'chemistry-live-lab', label: 'Chemistry Live Lab — chemia na żywo', icon: '⚗', hash: '#/chemistry-live-lab', description: 'Układ okresowy, eksperymenty krok po kroku na modelach Genesis; szkoła, studia, badania' },
   { id: 'cell-lab', label: 'Virtual Cell Lab', icon: '🧫', hash: '#/cell-lab' },
   { id: 'looking-glass', label: 'Looking Glass', icon: '🔭', hash: '#/looking-glass' },
   { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },
@@ -149,7 +150,7 @@ const WORLD_IDS = new Set([
 const PUBLIC_IDS = new Set(['cyber', 'gov-campaign', 'clockwork', 'sovereign']);
 const LEARNING_IDS = new Set([
   'myths-theories', 'decipherment', 'glossary', 'dome-world', 'protection-priority', 'geodesics',
-  'entanglement', 'decision-explorer',
+  'entanglement', 'decision-explorer', 'chemistry-live-lab',
 ]);
 const groupedIds = new Set([...RESEARCH_IDS, ...WORLD_IDS, ...PUBLIC_IDS, ...LEARNING_IDS]);
 

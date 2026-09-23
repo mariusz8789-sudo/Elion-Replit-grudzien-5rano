@@ -67,6 +67,7 @@ const CharacterLabScreen = lazy(() => import('./components/visual-simulation/Cha
 const GenesisWorldScreen = lazy(() => import('./components/visual-simulation/GenesisWorldScreen').then((m) => ({ default: m.GenesisWorldScreen })));
 const TemporalCinematicScreen = lazy(() => import('./components/visual-simulation/TemporalCinematicScreen').then((m) => ({ default: m.TemporalCinematicScreen })));
 const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/MoleculeLabScreen').then((m) => ({ default: m.MoleculeLabScreen })));
+const ChemistryLiveLabScreen = lazy(() => import('./components/ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
 const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
 const EvidenceShowcaseScreen = lazy(() => import('./components/visual-simulation/EvidenceShowcaseScreen').then((m) => ({ default: m.EvidenceShowcaseScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
@@ -160,6 +161,7 @@ type Route =
   | { kind: 'genesis-world' }
   | { kind: 'temporal-cinematic' }
   | { kind: 'molecule' }
+  | { kind: 'chemistry-live-lab' }
   | { kind: 'cell-lab' }
   | { kind: 'evidence-showcase' }
   | { kind: 'hf-slice' }
@@ -233,6 +235,7 @@ function parseHash(): Route {
   // Canvas-2D `registerLab()` registry's own route match above (`^#\/lab\/`), which would resolve
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
   if (h === '#/molecule') return { kind: 'molecule' };
+  if (h === '#/chemistry-live-lab') return { kind: 'chemistry-live-lab' };
   if (h === '#/cell-lab') return { kind: 'cell-lab' };
   if (h === '#/evidence' || h === '#/evidence-showcase' || h === '#/evidence-case-study' || h === '#/case-study') return { kind: 'evidence-showcase' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
@@ -1100,6 +1103,18 @@ export default function App() {
           <TopBar title="Molecule World" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <MoleculeLabScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'chemistry-live-lab') {
+      return (
+        <div className="app">
+          <TopBar title="Chemistry Live Lab" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <ChemistryLiveLabScreen />
           </HeavyRoute>
           {overlays}
         </div>

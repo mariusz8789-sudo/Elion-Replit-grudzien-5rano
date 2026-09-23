@@ -57,6 +57,9 @@ export function validateModelDescriptor(raw, { checkpointRoot = null, verifyHash
   if (!/^[a-f0-9]{64}$/i.test(raw.checkpointFingerprint)) {
     return { ok: false, error: 'invalid_checkpoint_fingerprint', reason: 'checkpointFingerprint must be a 64-hex-char SHA-256 digest' };
   }
+  if (typeof raw.modelId !== 'string' || !/^[A-Za-z0-9._-]+$/.test(raw.modelId)) {
+    return { ok: false, error: 'invalid_model_id', reason: 'modelId may contain only letters, numbers, dot, underscore and hyphen' };
+  }
 
   if (checkpointRoot !== null) {
     const resolvedRoot = path.resolve(checkpointRoot);

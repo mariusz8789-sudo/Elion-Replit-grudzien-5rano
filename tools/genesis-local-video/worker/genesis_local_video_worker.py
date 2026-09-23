@@ -33,6 +33,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -73,10 +74,14 @@ def load_plugged_adapter(model_id: str):
     """Looks for adapters/<model_id>.py exposing generate(request) -> dict.
     Returns None (never raises) when nothing is plugged in — this is the
     honest default in this branch."""
-    if not model_id:
+    if not model_id or re.fullmatch(r"[A-Za-z0-9._-]+", model_id) is None:
         return None
     candidate = ADAPTERS_DIR / f"{model_id}.py"
     if not candidate.is_file():
+        return None
+    try:
+        candidate.resolve(strict=True).relative_to(ADAPTERS_DIR.resolve(strict=True))
+    except (OSError, ValueError):
         return None
     spec = importlib.util.spec_from_file_location(f"genesis_video_adapter_{model_id}", candidate)
     if spec is None or spec.loader is None:

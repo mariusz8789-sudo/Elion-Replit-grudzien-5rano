@@ -48,6 +48,16 @@ const validControlInput = () => normalizeControlInput({
 }).input;
 
 describe('Test: adapter pre-flight (available()) — BLOCKED-shaped reasons (items 1-3, 5)', () => {
+  test('an unsafe modelId is rejected before a worker can resolve an adapter path', () => {
+    const { modelsRoot, checkpointPath, checkpointFingerprint } = makeCheckpoint();
+    const adapter = createLocalWorkerAdapter({
+      modelId: '../outside', checkpointPath, checkpointFingerprint,
+      approvedModelsRoot: modelsRoot, outputRoot: freshDir('genesis-out-'), workerScript: REAL_WORKER_SCRIPT,
+    });
+    const r = adapter.available();
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /unsafe path characters/);
+  });
   test('missing checkpoint file is BLOCKED (item 1)', () => {
     const { modelsRoot } = makeCheckpoint();
     const adapter = createLocalWorkerAdapter({
@@ -121,6 +131,14 @@ describe('Test: unsafe path rejection (item 6)', () => {
 });
 
 describe('Test: worker execution outcomes (items 4, 7, 8, 9, 10)', () => {
+  test('auto selects DirectML for a detected DirectML runtime instead of incorrectly forcing CUDA', async () => {
+    const { modelsRoot, checkpointPath, checkpointFingerprint } = makeCheckpoint();
+    const workerScript = withPluggedWorker('directml-model', 'from pathlib import Path\ndef generate(request):\n    Path(request["outputPath"]).write_text(request["device"])\n    return {"ok": True, "outputPath": request["outputPath"]}\n');
+    const adapter = createLocalWorkerAdapter({ modelId: 'directml-model', checkpointPath, checkpointFingerprint, approvedModelsRoot: modelsRoot, outputRoot: freshDir('genesis-out-'), workerScript, pythonExecutable: PYTHON });
+    const result = await adapter.generate({ capability: 'TEXT_TO_VIDEO', controlInput: validControlInput(), model: {}, runtime: { gpu: { available: true }, cuda: { available: false }, onnxruntimeDirectml: { available: true } } });
+    assert.equal(result.ok, true);
+    assert.equal(readFileSync(result.outputPath, 'utf8'), 'directml');
+  });
   test('a plugged adapter that raises ImportError for a missing package never becomes GENERATED (item 4)', async () => {
     const { modelsRoot, checkpointPath, checkpointFingerprint } = makeCheckpoint();
     const workerScript = withPluggedWorker('missing-pkg-model', 'def generate(request):\n    import genesis_definitely_missing_package_xyz\n    return {"ok": True}\n');

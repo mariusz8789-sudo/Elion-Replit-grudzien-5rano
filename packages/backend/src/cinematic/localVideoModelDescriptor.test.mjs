@@ -43,6 +43,12 @@ describe('Test: model descriptor never admits an unverified checkpoint', () => {
     assert.equal(r.error, 'checkpoint_hash_mismatch');
   });
 
+  test('a modelId containing path traversal is rejected', () => {
+    const r = validateModelDescriptor(realDescriptor({ modelId: '../outside' }));
+    assert.equal(r.ok, false);
+    assert.equal(r.error, 'invalid_model_id');
+  });
+
   test('every required field is individually required', () => {
     for (const field of requiredDescriptorFields()) {
       const d = realDescriptor(); delete d[field];

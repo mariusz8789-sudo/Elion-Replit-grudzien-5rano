@@ -31,7 +31,7 @@
  * file and computes its real SHA-256, and alone assigns the final status.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -52,6 +52,17 @@ function resolveWithinRoot(root, candidate) {
   if (resolved === resolvedRoot) return null; // the root itself is never a valid file target
   if (!resolved.startsWith(resolvedRoot + path.sep)) return null;
   return resolved;
+}
+
+function isWithin(root, candidate) {
+  return candidate.startsWith(root + path.sep);
+}
+
+function automaticDevice(runtime) {
+  if (runtime?.cuda?.available) return 'cuda';
+  if (runtime?.onnxruntimeDirectml?.available) return 'directml';
+  if (runtime?.otherAccelerators?.rocm?.available) return 'rocm';
+  return 'cpu';
 }
 
 /**
@@ -92,6 +103,7 @@ export function createLocalWorkerAdapter(config) {
    *  FAILED_GENERATION one layer up through executeGeneration. */
   function available() {
     if (!modelId) return { ok: false, reason: 'adapter misconfigured: modelId is required' };
+    if (!/^[A-Za-z0-9._-]+$/.test(modelId)) return { ok: false, reason: 'adapter misconfigured: modelId contains unsafe path characters' };
     if (!workerScript || !existsSync(workerScript)) {
       return { ok: false, reason: `worker script not found at "${workerScript}"` };
     }
@@ -108,6 +120,17 @@ export function createLocalWorkerAdapter(config) {
     if (!existsSync(resolvedCheckpoint) || !statSync(resolvedCheckpoint).isFile()) {
       return { ok: false, reason: `checkpoint file does not exist at "${resolvedCheckpoint}"` };
     }
+    let realModelsRoot;
+    let realCheckpoint;
+    try {
+      realModelsRoot = realpathSync(path.resolve(approvedModelsRoot));
+      realCheckpoint = realpathSync(resolvedCheckpoint);
+    } catch (err) {
+      return { ok: false, reason: `checkpoint path could not be resolved safely: ${String(err?.message ?? err).slice(0, 160)}` };
+    }
+    if (!isWithin(realModelsRoot, realCheckpoint)) {
+      return { ok: false, reason: 'checkpointPath resolves through a symlink outside the approved models root — refused' };
+    }
     if (!checkpointFingerprint || !/^[a-f0-9]{64}$/i.test(checkpointFingerprint)) {
       return { ok: false, reason: 'no valid 64-hex checkpointFingerprint configured for this model' };
     }
@@ -120,7 +143,7 @@ export function createLocalWorkerAdapter(config) {
     } catch (err) {
       return { ok: false, reason: `cannot create/access outputRoot "${outputRoot}": ${String(err?.message ?? err).slice(0, 160)}` };
     }
-    return { ok: true, resolvedCheckpoint, checkpointSha256: actualHash };
+    return { ok: true, resolvedCheckpoint: realCheckpoint, checkpointSha256: actualHash };
   }
 
   /** Kills the currently in-flight worker process, if any. The canonical
@@ -154,6 +177,20 @@ export function createLocalWorkerAdapter(config) {
     } else {
       outputPath = path.join(path.resolve(outputRoot), `${randomUUID()}.mp4`);
     }
+    if (existsSync(outputPath)) return { ok: false, reason: 'requested outputLocation already exists — refusing to overwrite it' };
+    let realOutputRoot;
+    try {
+      realOutputRoot = realpathSync(path.resolve(outputRoot));
+      const parent = path.dirname(outputPath);
+      mkdirSync(parent, { recursive: true });
+      const realParent = realpathSync(parent);
+      if (!isWithin(realOutputRoot, realParent) && realParent !== realOutputRoot) {
+        return { ok: false, reason: 'requested outputLocation resolves through a symlink outside the approved output root — refused' };
+      }
+      outputPath = path.join(realParent, path.basename(outputPath));
+    } catch (err) {
+      return { ok: false, reason: `requested outputLocation could not be resolved safely: ${String(err?.message ?? err).slice(0, 160)}` };
+    }
 
     const request = {
       requestId: randomUUID(),
@@ -174,7 +211,7 @@ export function createLocalWorkerAdapter(config) {
       durationSeconds: controlInput?.durationSeconds ?? null,
       config: controlInput?.modelConfiguration ?? null,
       outputPath,
-      device: runtime?.gpu?.available && device === 'auto' ? 'cuda' : device,
+      device: device === 'auto' ? automaticDevice(runtime) : device,
     };
 
     const outcome = await runWorkerOnce({ pythonExecutable, workerScript, request, timeoutMs, onSpawn: (child) => { currentChild = child; }, onSettle: () => { currentChild = null; } });
@@ -185,6 +222,10 @@ export function createLocalWorkerAdapter(config) {
     }
     if (statSync(outputPath).size === 0) {
       return { ok: false, reason: 'worker reported success but the output file is empty — refused' };
+    }
+    const realOutput = realpathSync(outputPath);
+    if (!isWithin(realOutputRoot, realOutput)) {
+      return { ok: false, reason: 'worker output resolves outside the approved output root — refused' };
     }
 
     return { ok: true, outputPath, limitations: Array.isArray(outcome.limitations) ? outcome.limitations : [] };

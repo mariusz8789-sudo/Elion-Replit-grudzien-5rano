@@ -467,8 +467,10 @@ Promise, following the router's existing async precedent
 +        });
 ```
 
-**`.env.example` (not modified here — add after the existing
-`GENESIS_WORKER_GROUP=` block):**
+**`.env.example` (applied on this branch — additive block after the existing
+`GENESIS_WORKER_GROUP=` block).** The repository's own P0.4 contract test
+(`envContract.test.mjs`) fails whenever code reads an undocumented variable,
+so documenting these only in prose would have left the suite red:
 
 ```
 # Prywatne workery naukowe Railway (główny serwis web/API). Ustaw URL grupy,

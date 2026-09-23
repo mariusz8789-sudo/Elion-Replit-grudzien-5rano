@@ -1,0 +1,5 @@
+# Ligand/receptor preparation for AutoDock Vina, pinned to the version verified
+# in this repo (packages/backend/src/compute/dockingAdapter.mjs / dock_worker.py).
+# Meeko depends on RDKit; the "structural" worker installs requirements-rdkit.txt
+# alongside this file so both land in the same interpreter.
+meeko==0.8.0

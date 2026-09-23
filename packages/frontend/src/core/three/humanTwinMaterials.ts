@@ -100,6 +100,9 @@ export function setMaterialRimIntensity(material: THREE_NS.Material, intensity: 
 
 export function isRimPatched(material: THREE_NS.Material): boolean { return PATCHED.has(material); }
 
+/** The current rim intensity of a patched material (null if unpatched) — read-back for the selection highlight. */
+export function getMaterialRimIntensity(material: THREE_NS.Material): number | null { return PATCHED.get(material)?.uRimIntensity.value ?? null; }
+
 /**
  * Put a material into one of the four surface modes. Transparency is turned on only where a mode
  * needs it, so the opaque path stays fast for NORMAL.

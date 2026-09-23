@@ -83,6 +83,8 @@ interface StationVisual {
 
 const FLOOR_Y = 0;
 const CEILING_Y = 3.6;
+/** createTwinChamber lifts its anchor 0.2 m above the floor; the twin stands on it. */
+const TWIN_ANCHOR_HEIGHT = 0.2;
 
 export class AgentLabScene3D implements Sim3D {
   disableOrbitControls = true;
@@ -119,6 +121,15 @@ export class AgentLabScene3D implements Sim3D {
   private cutawayState: CutawayState = DEFAULT_CUTAWAY;
   /** D-131: how many anatomy nodes are isolated — the TWIN camera moves in when the view narrows to one organ. */
   private isolatedCount = 0;
+  /** Presentation-only yaw of the chamber twin; eased to a frontal pose while it is being studied or cut. */
+  private twinYaw = 0;
+  private lastSpinTime: number | null = null;
+  /** A cut opened while the twin was turning is re-measured once the frontal pose has settled. */
+  private cutawaySettled = true;
+  /** World height of the selected organ, so an isolate frames the organ itself (null = no organ selected). */
+  private selectedOrganFocusY: number | null = null;
+  /** Arms owned by a station, precomputed so the frame loop does not rebuild arrays per arm per frame. */
+  private stationArmSet: Set<unknown> | null = null;
   /** D-131: the smoothed TWIN-camera pose, so switching cameras eases instead of cutting. */
   private twinCamPos: THREE_NS.Vector3 | null = null;
   private twinCamLook: THREE_NS.Vector3 | null = null;
@@ -198,6 +209,9 @@ export class AgentLabScene3D implements Sim3D {
   /** Biology: apply a V3 anatomy display mode to every twin in the scene (the chamber twin and the table twin). */
   setTwinView(mode: Parameters<typeof buildVisualLayerInstruction>[1], selectedNodeId: string | null): void {
     this.selectedTwinNode = selectedNodeId;
+    const organ = selectedNodeId ? this.manifest.nodes.find((n) => n.id === selectedNodeId && n.kind === 'ORGAN') : undefined;
+    // The chamber anchor lifts the twin 0.2 m off the plinth; organ positions are in the twin's own space.
+    this.selectedOrganFocusY = organ ? organ.positionMeters.y + TWIN_ANCHOR_HEIGHT : null;
     this.twinInstruction = buildVisualLayerInstruction(this.manifest, mode);
     for (const t of this.twins) t.setView(this.twinInstruction, selectedNodeId);
     this.macroMicro?.setOrgan(selectedNodeId);
@@ -254,6 +268,7 @@ export class AgentLabScene3D implements Sim3D {
   /** D-131: the section plane. A cut reveals the MODEL proxies inside the body; it is not a medical cross-section. */
   setTwinCutaway(state: CutawayState): void {
     this.cutawayState = state;
+    if (state.enabled && Math.abs(this.twinYaw - Math.round(this.twinYaw / (Math.PI * 2)) * Math.PI * 2) > 1e-3) this.cutawaySettled = false;
     if (this.renderer) this.renderer.localClippingEnabled = state.enabled;
     for (const t of this.twins) t.setCutaway(state);
   }
@@ -548,7 +563,7 @@ export class AgentLabScene3D implements Sim3D {
     scene.add(createMezzanine(THREE, { position: [cx, 0, this.room.minZ + 1.9], headingRadians: 0, length: W - 1.2, depth: 1.8, height: 2.75, slabMaterial: palette.PAINTED_METAL, railMaterial: palette.BRUSHED_METAL, glass }));
     scene.add(createHoloPanel(THREE, { position: [-3, 1.75, -3.6], headingRadians: 0, title: 'Neuro Lab', lines: ['regiony: NEURO_REGIONS (11)', 'sygnały: model seeded', 'etykieta: SIMULATION', 'brak danych klinicznych'] }));
     scene.add(createHoloPanel(THREE, { position: [-6, 1.8, 3.5], headingRadians: Math.PI / 2, title: 'Imaging Center', lines: ['XRAY · CT · MRI-like · USG-like', 'przekroje z atlasu (MODEL)', 'diagnostyka: ZABRONIONA'] }));
-    scene.add(createHoloPanel(THREE, { position: [1.9, 2.0, 0.4], headingRadians: Math.PI * 0.25, width: 1.0, height: 0.6, title: 'Human Digital Twin', lines: ['skala 1:1 · 1.78 m', 'ciało: PROXY (brak GLB)', 'narządy: atlas MODEL', 'NOT_A_MEDICAL_DEVICE'] }));
+    scene.add(createHoloPanel(THREE, { position: [1.9, 2.0, 0.4], headingRadians: Math.PI * 0.25, width: 1.0, height: 0.6, title: 'Human Digital Twin', lines: ['skala 1:1 · 1.78 m', 'ciało: CC0 lub PROXY (patrz HUD)', 'narządy: atlas MODEL', 'NOT_A_MEDICAL_DEVICE'] }));
     // Wall dressing on the solid walls: cabinets and a shelf, conduit at height.
     for (let i = 0; i < 2; i++) createAndAdd(scene, createElectricalCabinet(THREE, { position: [this.room.minX + 0.4, 0, -7.5 + i * 1.1], headingRadians: Math.PI / 2, width: 0.8, depth: 0.5, height: 2.0, bodyMaterial: palette.PAINTED_METAL, doorMaterial: palette.BRUSHED_METAL, hazardStripeMaterial: laneMat }));
     createAndAdd(scene, createShelfUnit(THREE, { position: [this.room.minX + 0.35, 0, 8.2], width: 1.4, depth: 0.5, height: 2.1, shelfCount: 5, material: palette.BRUSHED_METAL, frameMaterial: palette.PAINTED_METAL }));
@@ -739,17 +754,32 @@ export class AgentLabScene3D implements Sim3D {
       if (v.arms) for (const a of v.arms) { a.setActive(active); a.update(this.time); }
       if (v.leds) v.leds.forEach((led, i) => { led.emissiveIntensity = 0.4 + 0.8 * (Math.sin(this.time * (1.3 + (i % 5) * 0.37) + i) > 0.2 ? 1 : 0.15); });
     }
-    for (const a of this.arms) if (![...this.stations.values()].some((v) => v.arms?.includes(a))) a.update(this.time);
+    if (!this.stationArmSet) { this.stationArmSet = new Set(); for (const v of this.stations.values()) for (const a of v.arms ?? []) this.stationArmSet.add(a); }
+    for (const a of this.arms) if (!this.stationArmSet.has(a)) a.update(this.time);
+    const spinDt = Math.max(0, this.time - (this.lastSpinTime ?? this.time)); this.lastSpinTime = this.time;
+    const reducedMotionSpin = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     for (const sp of this.spinners) {
-      // A stable frontal body makes anatomical selection possible; equipment retains its animation.
-      sp.rotation.y = this.cameraMode === 'TWIN' && sp === this.twins[0]?.group ? 0 : this.time * (sp.name === 'carousel' ? 0.5 : 0.18);
+      if (sp !== this.twins[0]?.group) { sp.rotation.y = this.time * (sp.name === 'carousel' ? 0.5 : 0.18); continue; }
+      // A stable frontal body makes anatomical selection possible, and a section plane is only
+      // meaningful on a body that is not turning through it. The twin EASES to its nearest frontal
+      // pose (the short way round) instead of snapping, and resumes turning from where it is.
+      const hold = this.cameraMode === 'TWIN' || this.cutawayState.enabled;
+      if (hold) {
+        const front = Math.round(this.twinYaw / (Math.PI * 2)) * Math.PI * 2;
+        this.twinYaw += (front - this.twinYaw) * (reducedMotionSpin ? 1 : cameraDampingFactor(Math.min(0.2, spinDt), 4));
+        if (Math.abs(front - this.twinYaw) < 1e-3) {
+          this.twinYaw = front;
+          if (!this.cutawaySettled) { this.cutawaySettled = true; if (this.cutawayState.enabled) for (const t of this.twins) t.setCutaway(this.cutawayState); }
+        }
+      } else this.twinYaw += spinDt * 0.18;
+      sp.rotation.y = this.twinYaw;
     }
     if (this.chamberRing) this.chamberRing.emissiveIntensity = 0.55 + 0.1 * Math.sin(this.time * 1.4);
     this.researchCompanion?.update(this.time, u?.state ?? 'IDLE');
     // Camera presentation uses elapsed time, so slow devices settle at the same pace.
     // Cap tab-resume stalls and respect reduced motion without changing controller time.
     const cameraDt = Math.min(0.2, this.frameDeltaSeconds);
-    const reducedMotion = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    const reducedMotion = reducedMotionSpin;
     const cameraEase = (speed: number) => reducedMotion ? 1 : cameraDampingFactor(cameraDt, speed);
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
@@ -779,13 +809,17 @@ export class AgentLabScene3D implements Sim3D {
       const portrait = camera.aspect < 1;
       const macroVisible = this.macroMicro?.group.visible === true;
       const dist = portrait ? (tight ? 3.0 : 4.4) : (tight ? 2.3 : macroVisible ? 3.05 : 2.75);
-      const height = tight ? 1.45 : 1.55;
+      // An isolated organ is framed at its own height (brain, heart, kidneys...), not always at the torso.
+      const organFocus = this.isolatedCount > 0 ? this.selectedOrganFocusY : null;
+      const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : tight ? 1.45 : 1.55;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
       const drift = reducedMotion ? 0 : Math.sin(this.time * 0.22) * 0.14;
       this.scratchA.set(TWIN_CHAMBER.position.x + drift, height, TWIN_CHAMBER.position.z + dist);
       this.twinCamPos.lerp(this.scratchA, cameraEase(5));
       const panelOffset = !portrait && macroVisible ? 0.46 : this.researchLayoutOpen && !portrait ? 0.55 : 0;
-      this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, portrait ? 0.65 : 1.12, TWIN_CHAMBER.position.z);
+      // Portrait keeps the subject in the upper half, above the lower research dock.
+      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : portrait ? 0.65 : 1.12;
+      this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, lookY, TWIN_CHAMBER.position.z);
       this.twinCamLook.lerp(this.scratchB, cameraEase(7.7));
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
@@ -896,6 +930,7 @@ export class AgentLabScene3D implements Sim3D {
     this.beacons = [];
     this.character = null; this.scene = null; this.THREE = null; this.pipeline = null; this.renderer = null; this.gate = null;
     this.probeTaken = false;
+    this.stationArmSet = null; this.lastSpinTime = null;
   }
 }
 

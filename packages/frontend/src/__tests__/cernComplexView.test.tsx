@@ -58,5 +58,8 @@ describe('CernComplexView — static render (no WebGL)', () => {
     expect(html).toContain('EMPIRICAL_ESTIMATE_MODEL');
     expect(html).toContain('TOY_MC_MODEL');
     expect(html).toContain('REAL CMS DATA');
+    expect(html).toContain('ZDERZ PROTONY [Q]');
+    expect(html).toContain('WIĄZKI: GOTOWE');
+    expect(html).toContain('przeciwbieżne wiązki');
   });
 });

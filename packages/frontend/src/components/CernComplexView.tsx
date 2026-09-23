@@ -102,8 +102,14 @@ export function CernComplexView(): JSX.Element {
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
   const [replayStatus, setReplayStatus] = useState<'NOT_RUN' | 'MATCH' | 'DRIFT'>('NOT_RUN');
   const [detailLevel, setDetailLevel] = useState<DetailLevel>('SCHOOL');
+  const [collisionViewState, setCollisionViewState] = useState<'IDLE' | 'PLAYING' | 'VISIBLE'>('IDLE');
   const [hashes, setHashes] = useState<string[]>([]);
   const batchIndexRef = useRef(0);
+  const collisionViewTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
@@ -341,11 +347,17 @@ export function CernComplexView(): JSX.Element {
     batchIndexRef.current += 4;
     setError(null); setBatch(a); setBatchStart(startIndex); setSelectedEventIndex(0); setReplayStatus('NOT_RUN'); pushHash(a.ledgerContentHash);
     stageRef.current?.showEvent(a, 0);
+    setCollisionViewState('PLAYING');
+    if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
+    collisionViewTimerRef.current = window.setTimeout(() => setCollisionViewState('VISIBLE'), 2400);
   };
   const selectEvent = (index: number): void => {
     if (!batch?.events[index]) return;
     setSelectedEventIndex(index);
     stageRef.current?.showEvent(batch, index);
+    setCollisionViewState('PLAYING');
+    if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
+    collisionViewTimerRef.current = window.setTimeout(() => setCollisionViewState('VISIBLE'), 2400);
   };
   const verifyReplay = (): void => {
     if (!batch) return;
@@ -371,6 +383,9 @@ export function CernComplexView(): JSX.Element {
           <span className="cern-badge">SCIENTIFIC OS</span>
           <span className="cern-badge" data-testid="cern-badge-mode">MODE: {mode}</span>
           <span className="cern-badge">√s: 13 TeV · batch: {batch ? batch.events.length : 0}</span>
+          <span className={`cern-badge${collisionViewState === 'PLAYING' ? ' is-hot' : ''}`} data-testid="cern-live-collision-state">
+            {collisionViewState === 'IDLE' ? 'WIĄZKI: GOTOWE' : collisionViewState === 'PLAYING' ? 'LIVE: ZDERZENIE PROTONÓW' : 'ZDARZENIE: WIDOCZNE'}
+          </span>
           <span className={`cern-badge${r?.formed ? ' is-hot' : ''}`} data-testid="cern-badge-horizon">HORIZON: {r?.formed ? `FORMED (${bh?.label.toUpperCase()})` : 'NONE'} · r_s: {r?.bh ? `${r.bh.rsM.toExponential(3)} m` : '—'}</span>
           <span className="cern-badge">RENDER: {quality.toUpperCase()}</span>
         </div>
@@ -382,7 +397,7 @@ export function CernComplexView(): JSX.Element {
           ))}
         </div>
         <div className="cern-modes" role="group" aria-label="Akcje">
-          <button type="button" className="cern-mode" onClick={collide} data-testid="cern-collide">COLLIDE [Q]</button>
+          <button type="button" className="cern-mode" onClick={collide} data-testid="cern-collide">ZDERZ PROTONY [Q]</button>
           <button type="button" className="cern-mode" onClick={formHorizon} data-testid="cern-horizon">HORIZON [E]</button>
           <button type="button" className="cern-mode" onClick={synthesize} data-testid="cern-crystal">CRYSTAL [R]</button>
           <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/physics/cms-z'; }} data-testid="cern-cms-open-data">REAL CMS DATA</button>
@@ -392,7 +407,7 @@ export function CernComplexView(): JSX.Element {
             <button key={level} type="button" className={`cern-mode${detailLevel === level ? ' is-active' : ''}`} aria-pressed={detailLevel === level} data-testid={`cern-detail-${level}`} onClick={() => setDetailLevel(level)}>{level}</button>
           ))}
         </div>
-        <p className="cern-hint">Klawisze 1–4 przełączają tryb; Q zderza paczkę 4 zdarzeń, E próbuje horyzontu (ADD, 14 TeV), R syntetyzuje kryształ. W trybie WALK i TUNNEL klik w scenę blokuje kursor, WASD porusza.</p>
+        <p className="cern-hint">Q uruchamia cztery modelowe zderzenia proton–proton. Najpierw widzisz przeciwbieżne wiązki, potem punkt zderzenia i tory cząstek końcowych w polu magnetycznym. Klawisze 1–4 zmieniają punkt obserwacji.</p>
         {hashes.length > 0 && (
           <div className="cern-hashes" data-testid="cern-hashes">
             {hashes.map((h, i) => <span key={`${h}-${i}`} className="cw-mono">contentHash: {h.slice(0, 24)}…</span>)}

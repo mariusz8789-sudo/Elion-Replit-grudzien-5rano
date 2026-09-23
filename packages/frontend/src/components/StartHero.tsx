@@ -2,8 +2,6 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { listExperiments } from '../core/scienceMemory';
-import { getLabs } from '../core/registry';
-import { WORLDS } from './WorldsHubScreen';
 import { AskGenesisMic } from './guide/AskGenesisMic';
 
 /** Holographic engine core — three.js, lazy: the Start route loads it only after first paint. */
@@ -31,7 +29,6 @@ export function StartHero(): React.ReactElement {
   const [holo, setHolo] = useState(false);
   useEffect(() => { setHolo(true); }, []);
   const records = useMemo(() => { try { return listExperiments().length; } catch { return 0; } }, []);
-  const labs = useMemo(() => getLabs().length, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,16 +105,14 @@ export function StartHero(): React.ReactElement {
         </a>
         <a className="start-door" href="#/worlds" data-testid="door-worlds">
           <span className="start-door-glyph" aria-hidden="true">◈</span>
-          <span className="start-door-title">Wejdź do laboratorium 3D</span>
-          <span className="start-door-text">Miasto epidemiologiczne, wirtualne laboratorium, Molecule World, Discovery Hall — sceny, które pokazują stan realnych modeli.</span>
-          <span className="start-door-cta">Wybierz świat →</span>
+          <span className="start-door-title">Zobacz eksperyment LIVE</span>
+          <span className="start-door-text">Obserwuj model krok po kroku, zmieniaj warunki i sprawdzaj, skąd pochodzi każdy wynik.</span>
+          <span className="start-door-cta">Otwórz LIVE →</span>
         </a>
       </div>
 
       <ul className="start-status" aria-label="Stan systemu">
         <li><span className="start-status-value">{records}</span><span className="start-status-label">zapisanych przebiegów w Pamięci Naukowej</span></li>
-        <li><span className="start-status-value">{WORLDS.length}</span><span className="start-status-label">światów 3D gotowych do wejścia</span></li>
-        <li><span className="start-status-value">{labs}</span><span className="start-status-label">laboratoriów z realną fizyką</span></li>
         <li><span className={`start-status-value start-status-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</span><span className="start-status-label">backend {healthLabel}</span></li>
       </ul>
     </section>

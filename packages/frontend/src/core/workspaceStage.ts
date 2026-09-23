@@ -30,17 +30,17 @@ export type WorkspaceStageKind =
 
 export const STAGE_LABEL: Record<WorkspaceStageKind, string> = {
   DASHBOARD: 'Misja',
-  CITY3D: 'Miasto 3D',
-  SCIENTIFIC_CITY: 'Scientific City',
-  WORLD: 'World Engine',
+  CITY3D: 'Pulse',
+  SCIENTIFIC_CITY: 'Atlas',
+  WORLD: 'Nexus',
 };
 
 /** What each stage really is, shown in the workspace so the label never overclaims. */
 export const STAGE_NOTE: Record<WorkspaceStageKind, string> = {
   DASHBOARD: 'Stan pracy: aktywna misja, pętla naukowa, status systemu, następny krok.',
-  CITY3D: 'Realny renderer WebGL (core/three/epidemicCity3D.ts) — agenci, stany i ruch pochodzą z symulacji epidemii, nie z animacji.',
-  SCIENTIFIC_CITY: 'Realny przebieg międzydziedzinowy (pompa ↔ szpital) na tym samym WorldGraph.',
-  WORLD: 'World Engine: WorldGraph, Discovery Loop, scenariusze i solvery domenowe.',
+  CITY3D: 'Przebieg epidemii na żywo: agenci, stany i ruch pochodzą z realnej symulacji.',
+  SCIENTIFIC_CITY: 'Powiązania infrastruktury i zdrowia w jednym scenariuszu.',
+  WORLD: 'Hipotezy, scenariusze i modele połączone w jeden przebieg.',
 };
 
 type Listener = (stage: WorkspaceStageKind) => void;

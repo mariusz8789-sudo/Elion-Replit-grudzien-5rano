@@ -71,9 +71,9 @@ function StepWelcome() {
       </div>
       <h2>Witaj w Genesis Physics</h2>
       <p>
-        Interaktywna platforma naukowa — 13 laboratoriów, każde uruchamia
-        prawdziwą fizykę i matematykę na żywo. To nie są animacje: liczby
-        na ekranie to wynik realnych równań, liczonych w Twojej przeglądarce.
+        Zadaj pytanie, obserwuj wykonanie i sprawdź dowody. Genesis prowadzi
+        od hipotezy do wyniku, pokazując wyraźnie, co jest pomiarem, modelem
+        albo wizualizacją.
       </p>
     </div>
   );
@@ -134,14 +134,14 @@ function StepStart({ onStart, onGoHome }: { onStart: () => void; onGoHome: () =>
     <div className="onboarding-step">
       <h2>Gotowy?</h2>
       <p>
-        Najlepszy pierwszy krok: Discovery Timeline — jedna ciągła podróż
-        przez 13,8 miliarda lat historii Wszechświata, bez ekranów ładowania.
+        Zacznij od krótkiego przebiegu LIVE albo wpisz własne pytanie. Resztę
+        narzędzi znajdziesz później w Bibliotece.
       </p>
       <button className="chip-btn onboarding-start-btn" onClick={onStart} autoFocus>
-        🌌 Zacznij podróż
+        ▶ Uruchom LIVE
       </button>
       <button className="onboarding-later" onClick={onGoHome}>
-        Może innym razem — pokaż laboratoria
+        Najpierw zadaj pytanie
       </button>
     </div>
   );

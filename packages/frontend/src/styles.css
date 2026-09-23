@@ -1338,6 +1338,12 @@ kbd {
 .lab-campus-door small { color: #8aa8b8; font-size: .68rem; letter-spacing: .05em; }
 .lab-campus-door > span:last-child { color: #67e8f9; font-size: .72rem; font-weight: 700; }
 .lab-campus-door-light { position: absolute; top: .35rem; right: .45rem; width: .4rem; height: .4rem; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 9px #22d3ee; }
+.lab-quick-gates { display: flex; align-items: stretch; gap: .5rem; padding: .55rem 1rem; overflow-x: auto; border-block: 1px solid rgba(82, 211, 255, .2); background: rgba(3, 10, 20, .94); scrollbar-width: thin; }
+.lab-quick-gates > span { align-self: center; flex: 0 0 auto; color: #7193a8; font: 700 .64rem/1 var(--font-mono); letter-spacing: .14em; }
+.lab-quick-gates button { display: grid; grid-template-columns: auto; flex: 0 0 auto; min-width: 118px; gap: .16rem; padding: .55rem .75rem; color: #dff8ff; text-align: left; border: 1px solid rgba(125, 211, 252, .26); border-radius: 10px; background: rgba(10, 27, 42, .9); cursor: pointer; }
+.lab-quick-gates button.primary { border-color: rgba(34, 211, 238, .72); background: linear-gradient(135deg, rgba(7, 63, 78, .98), rgba(5, 25, 43, .98)); box-shadow: inset 0 0 18px rgba(34, 211, 238, .08); }
+.lab-quick-gates button:hover, .lab-quick-gates button:focus-visible { border-color: #67e8f9; transform: translateY(-1px); }
+.lab-quick-gates small { color: #86a8ba; font: 600 .62rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; }
 .cern-event-panel { border-color: rgba(34, 211, 238, .5); }
 .cern-origin { margin: .4rem 0 .65rem; padding: .45rem .55rem; border-left: 3px solid #f59e0b; color: #fde68a; background: rgba(120, 53, 15, .22); font: 700 .7rem/1.4 ui-monospace, monospace; }
 .cern-event-tabs, .cern-replay-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .5rem 0; }

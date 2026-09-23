@@ -2,8 +2,11 @@
 
 This document is the reference for the private Railway scientific workers:
 `claude/genesis-railway-scientific-workers` (images, pins, readiness matrix —
-§1–§8) and `claude/genesis-railway-remote-dispatch` (the canonical remote
-execution path from the Virtual Lab to those workers — §9). It covers every
+§1–§8), `claude/genesis-railway-remote-dispatch` (the canonical remote
+execution path from the Virtual Lab to those workers — §9) and
+`claude/genesis-railway-worker-runtime-validation` (clean-room runtime
+validation of every worker, the fixes it forced, and PyMeep via conda-forge —
+§10). It covers every
 heavy scientific engine in the canonical registry
 (`packages/backend/src/campaign/toolchain.mjs`) plus the two non-toolchain,
 stdlib-only data adapters, the worker grouping decision, the HTTP seam, and
@@ -29,10 +32,10 @@ local reference-case results are produced by
 | Biopython | 1.88 | BSD | RAILWAY_CPU_WORKER | chem-light | none | `requirements-biopython.txt`: `biopython==1.88` |
 | OpenMM | 8.6.1 | MIT/LGPL | RAILWAY_CPU_WORKER | structural | none (CPU platform used explicitly; no CUDA/OpenCL driver required) | `requirements-openmm.txt`: `openmm==8.6.1` |
 | AutoDock Vina (Python binding) | 1.2.7 | Apache-2.0 | RAILWAY_CPU_WORKER | structural | none | `requirements-vina.txt`: `vina==1.2.7` |
-| Meeko | 0.8.0 | LGPL | RAILWAY_CPU_WORKER | structural (paired with Vina; needs RDKit) | none | `requirements-meeko.txt`: `meeko==0.8.0` (+ `requirements-rdkit.txt` in the same worker) |
+| Meeko | 0.8.0 | LGPL | RAILWAY_CPU_WORKER | structural (paired with Vina; needs RDKit) | none | `requirements-meeko.txt`: `meeko==0.8.0`, `scipy==1.17.1`, `gemmi==0.7.5` (undeclared runtime imports — §10.3) (+ `requirements-rdkit.txt` in the same worker) |
 | ADMET-AI (ADMET) | 2.0.1 | MIT | RAILWAY_CPU_WORKER | admet (isolated) | none | `requirements-admet.txt`: `admet-ai==2.0.1` (pulls `torch`, `chemprop`, `lightning`, `pandas`, `seaborn`) |
 | ADMET-AI (toxicity) | 2.0.1 | MIT | RAILWAY_CPU_WORKER | admet (same engine as above, different capabilityId) | none | same as ADMET |
-| PyMeep | not installed | GPL-2.0-or-later | GENUINE_EXTERNAL_BLOCKER | — (proposal only) | HDF5, MPICH/OpenMPI, harminv, libctl, guile, swig, GSL — conda-forge only | not pip-installable; see §5 |
+| PyMeep | 1.34.0 (conda-forge `nompi_py311h1b602b3_101`, in a separate env) | GPL-2.0-or-later | RAILWAY_CPU_WORKER (readiness only — no execution contract) | pymeep (alone) | HDF5, harminv, libctl, guile, GSL, FFTW — all from conda-forge, none from apt | not pip-installable (PyPI `meep` is an unrelated package); `workers/pymeep/conda-linux-64.lock` — see §5 |
 | CMS Open Data Z→μμ (record 5208) | dataset present, checksum-verified | CC0-1.0 (dataset) | EMBEDDED_MAIN_SERVICE | — | none | none — Python stdlib only (`csv`/`hashlib`/`statistics`) |
 | DepMap 24Q2 senescence panel | data not present | DepMap Public 24Q2 terms | GENUINE_EXTERNAL_BLOCKER today | — | none | none — Python stdlib only; blocked purely on `GENESIS_DEPMAP_24Q2_DATA_DIR` not being populated with the (uncommitted, large) hash-verified dataset |
 
@@ -64,7 +67,10 @@ or structural.
   `statistics`, `sys`, `pathlib`). They already run wherever the main
   service's `python3` runs; their only real blocker is data presence, not
   runtime.
-- **PyMeep**: no working worker. See §5.
+- **PyMeep**: its own `pymeep` worker, built from a conda-forge explicit lock
+  (it cannot share a pip venv, and its HDF5/guile stack would bloat the other
+  images). It reports readiness only: `maxwell-fdtd` has no execution
+  contract, so no main-service URL variable exists for it. See §5.
 
 ## 3. Worker HTTP contract
 
@@ -75,8 +81,11 @@ route, the authenticated execution endpoint, is specified in §9:
 
 - `GET /health` — `{ ok, workerGroup, engineIds, uptimeSeconds, node,
   contractVersion, executableCapabilities, executionAuth }`.
-- `GET /engines` — `listToolchain()` filtered to this worker's allowlist
-  (same redacted shape as `GET /api/compute/toolchain`).
+- `GET /engines` — `getTool()` for each engine in this worker's allowlist
+  only (same redacted shape as `GET /api/compute/toolchain`). It previously
+  called `listToolchain()` and filtered afterwards, which ran the reference
+  case of every engine in the registry, including engines the worker does not
+  ship (§10.3).
 - `POST /engines/:toolId/reference-case` — calls `getTool(toolId)` (runs the
   real reference case, cached per process exactly like the main service) and
   returns `{ ok, requestId, toolId, workerGroup, durationMs, outputHash,
@@ -106,7 +115,7 @@ Bounding, concretely:
   no absolute local filesystem path or interpreter path ever leaves the
   worker.
 - **Non-root / clean shutdown**: every worker Dockerfile runs
-  `USER node` (or `USER genesis` for the PyMeep proposal) after setup, and
+  `USER node` after setup, and
   `workerEntrypoint.mjs` handles `SIGTERM`/`SIGINT` by closing the HTTP
   server before exiting.
 - **No arbitrary execution**: the HTTP layer never accepts a shell command,
@@ -126,7 +135,14 @@ the convention already used by `start.mjs`).
 - `packages/backend/workers/chem-light/Dockerfile`
 - `packages/backend/workers/structural/Dockerfile`
 - `packages/backend/workers/admet/Dockerfile`
-- `packages/backend/workers/pymeep/Dockerfile.proposal` (untested — see §5)
+- `packages/backend/workers/pymeep/Dockerfile` (conda-forge explicit lock — see §5)
+
+The pip workers install with `--only-binary=:all:` (the slim image has no
+compiler, so a missing wheel must fail the build rather than start a source
+build) and `-c packages/backend/workers/<group>/constraints.txt`, a full
+transitive lock taken from the clean-room install in §10. Each build ends with
+an import check of every runtime module, so a missing undeclared dependency
+fails `docker build` rather than a reference case in production.
 
 Each follows the same shape as the root Dockerfile's existing Python venv
 pattern: `node:22-slim` base, `apt-get install python3 python3-venv
@@ -150,35 +166,49 @@ reference case in this exact Linux x86_64 sandbox. Codex or CI, which do have
 Docker daemon access, should run one real `docker build` + `docker run` +
 `curl /health` per worker before relying on them.
 
-## 5. PyMeep — genuine external blocker (real feasibility check performed)
+## 5. PyMeep — feasible through conda-forge (LOCAL_RUNTIME_VERIFIED)
 
-Rule: PyMeep must be tested for real installation feasibility before being
-declared blocked — not just assumed blocked. This was tested here, honestly,
-and failed for a documented reason rather than skipped:
+The earlier assessment (no conda here, therefore blocked) is superseded. A
+legal Linux/conda route was found and executed end to end:
 
-1. `pip index versions meep` → `meep (1.0.6)`. Installing it
-   (`pip install meep` dry-run) resolves to a real PyPI package — but its
-   dependencies are `gitapi`/`hgapi`: this is a **namespace collision**, an
-   unrelated git/hg release-automation tool, not the MIT electromagnetics
-   FDTD engine `meepAdapter.mjs`/`meep_worker.py` expect. Installing it would
-   satisfy `import meep` while providing zero FDTD capability — exactly the
-   silent-fake result this repository's adapters are built to refuse, so it
-   was **not** installed.
-2. The real PyMeep is documented upstream as conda-forge only. `which conda
-   mamba micromamba` found none of the three in this sandbox.
-3. `docker info` confirmed no reachable Docker daemon here (client-only), so
-   a conda-forge-based container could not be built or its reference case
-   run from this environment either.
+1. **PyPI is not a route.** `pip index versions meep` → `meep (1.0.6)`, an
+   unrelated git/hg release tool (`gitapi`/`hgapi`). It satisfies `import meep`
+   with zero FDTD capability, so it is never installed; `workerPackaging.test.mjs`
+   fails if any worker Dockerfile `pip install`s it.
+2. **micromamba from conda-forge itself.** `micro.mamba.pm` and GitHub
+   releases are not reachable from this sandbox, but conda-forge ships
+   micromamba as an ordinary package:
+   `https://conda.anaconda.org/conda-forge/linux-64/micromamba-2.0.5-0.tar.bz2`
+   (BSD-3-Clause, SHA-256
+   `bfc2e3a414d651af7508c49998a12b5cf3c7029d56c5ef37c9a3248cd7faef78`).
+3. **Environment.** `micromamba create -c conda-forge python=3.11 "pymeep=*=nompi*"`
+   resolved to `pymeep 1.34.0 nompi_py311h1b602b3_101` (the serial build — the
+   adapter runs one bounded 2-D cell, MPI is unnecessary). It was exported as
+   an `@EXPLICIT` lock of 115 packages, every line a conda-forge URL + md5:
+   `packages/backend/workers/pymeep/conda-linux-64.lock`.
+4. **Reproducibility.** A second environment created only from that lock
+   (`micromamba create -p … --file conda-linux-64.lock`, no solver) gave the
+   identical reference result.
+5. **Real reference case, from a separate worker process as uid 65534.**
+   `meep_worker.py`'s 1-D slab: transmittance `0.8895759491718322` vs the
+   analytic `0.8888888888888888` (tolerance 0.003) and PEC reflectance
+   `0.9999995703` → `AVAILABLE`, output hash `4ca2ee3656f4d7c6…`. The worker's
+   `/health`, `/engines`, reference-case, auth, leakage and shutdown checks all
+   passed (§10.2).
 
-Given both the pip and conda paths are genuinely unavailable here, PyMeep is
-classified `GENUINE_EXTERNAL_BLOCKER` / `BLOCKED_RUNTIME` — never `READY` —
-in `railwayWorkerReadiness.mjs`. A documented, best-effort
-`packages/backend/workers/pymeep/Dockerfile.proposal` (conda-forge miniforge
-base, `conda install -c conda-forge pymeep=*=mpi_mpich_*`) is committed for
-whoever next has Docker daemon access to actually build and validate. It is
-named `.proposal`, not `Dockerfile`, specifically so nothing accidentally
-treats it as a working, tested artifact — rename it to `Dockerfile` only
-after a real build passes `meep_worker.py`'s reference case.
+`packages/backend/workers/pymeep/Dockerfile` (replacing `Dockerfile.proposal`)
+does exactly that inside `node:22-slim`: downloads micromamba, verifies it with
+`sha256sum -c`, creates `/opt/genesis-meep` from the lock only, checks
+`import meep`, removes micromamba and its cache, and sets
+`GENESIS_MEEP_PYTHON=/opt/genesis-meep/bin/python`. The environment is about
+629 MB on disk.
+
+What remains is not a software blocker: this Dockerfile has not been built
+by a Docker daemon (none here), and `maxwell-fdtd` still has no remote
+execution contract, so the Virtual Lab keeps it `BLOCKED_UNBOUND_ENGINE`.
+`railwayWorkerReadiness.mjs` reports PyMeep as
+`LOCAL_REFERENCE_PASS_PENDING_RAILWAY` where `GENESIS_MEEP_PYTHON` points at a
+working env, and `BLOCKED_RUNTIME` (naming the lock) elsewhere — never `READY`.
 
 ## 6. Shared-file patches from the worker-preparation branch
 
@@ -242,6 +272,10 @@ in the main image. See docs/RAILWAY_SCIENTIFIC_WORKERS.md for the full matrix
 and the genuine PyMeep blocker.
 ```
 
+(The last sentence is out of date after §5; replace "and the genuine PyMeep
+blocker" with "and the conda-forge PyMeep worker (readiness only)" when this
+file is next touched.)
+
 ## 7. Railway resource expectations (estimated, not Railway-measured)
 
 No worker has actually run on Railway from this branch — these are estimates
@@ -252,18 +286,26 @@ from package sizes verified in this sandbox, not a Railway benchmark:
 | chem-light | ~400–600MB (python3-venv + pyscf + biopython + numpy/scipy) | 512MB–1GB | 1 vCPU |
 | structural | ~700MB–1.1GB (adds rdkit + openmm's bundled CPU/OpenCL/CUDA shared libs, unused on CPU, + vina + meeko) | 1–2GB | 1–2 vCPU |
 | admet | ~2–3GB (CPU-only torch ≈1.2GB verified here + chemprop + lightning + admet-ai bundled model weights) | 2–4GB (PyTorch model load observed to take several seconds even on CPU) | 1–2 vCPU |
-| pymeep (proposal, untested) | ~1–2GB (miniforge + conda-forge pymeep + MPI runtime), unverified | unverified | unverified |
+| pymeep (readiness only) | ~0.9GB (conda env 629MB measured + node:22-slim), no MPI | 512MB–1GB | 1 vCPU |
+
+Measured clean-room environment sizes (§10.2): chem-light 472MB,
+structural 440MB, pymeep 629MB. The admet venv measured 6.1GB only because
+this sandbox could not reach the PyTorch CPU index and PyPI's torch pulls the
+CUDA runtime; the image installs `torch==2.14.0` from the CPU index and fails
+the build if a CUDA build lands, so the ~2–3GB estimate stands.
 
 ## 8. Genuine external blockers (deliverable R)
 
-- **PyMeep** — see §5. No pip path exists; conda-forge path untested here for
-  lack of conda and a reachable Docker daemon.
+- **PyMeep** — no longer a software blocker (§5): the conda-forge env builds
+  and passes its reference case. The image is unbuilt (no daemon), and
+  `maxwell-fdtd` has no execution contract, which is a product decision, not a
+  runtime gap.
 - **DepMap 24Q2 dataset** — the multi-file, hash-pinned CRISPR dataset
   (`CRISPRGeneEffect.csv`, `Model.csv`, two Achilles control files) is not
   committed in-repo (unlike the CMS `Zmumu.csv`, which is). An operator must
   set `GENESIS_DEPMAP_24Q2_DATA_DIR` to a copy matching the SHA-256 pins in
   `depmap_worker.py` before this capability leaves `DATA_REQUIRED`.
-- **Real Docker build/run verification for the three real worker Dockerfiles**
+- **Real Docker build/run verification for the four worker Dockerfiles**
   — written and reviewed against the proven root-Dockerfile pattern, but not
   actually `docker build`/`docker run`-tested from this sandbox (no daemon).
 
@@ -529,3 +571,185 @@ No worker has run on Railway. Before any worker may be called READY:
    `campaign/multiFidelity.mjs` build its QM/docking/ADMET ScienceRuns via
    `buildScienceRunRecord`, removing the remaining duplicated record shape
    (currently guarded by the parity tests).
+
+## 10. Runtime validation (`claude/genesis-railway-worker-runtime-validation`)
+
+### 10.1 Verification levels
+
+| Level | Meaning | Achieved here |
+| --- | --- | --- |
+| `LOCAL_RUNTIME_VERIFIED` | A clean environment built only from the worker's pinned files, and `workerEntrypoint.mjs` started as its own non-root process, probed over authenticated HTTP | **yes — all four groups** |
+| `LOCAL_CONTAINER_VERIFIED` | The same probe against a `docker run` of `packages/backend/workers/<group>/Dockerfile` | no — the sandbox has a Docker client but no daemon |
+| `RAILWAY_VERIFIED` | The same probe run inside the Railway project against the worker's private URL | no — nothing was deployed (out of scope) |
+
+The probe is `packages/backend/src/compute/workerRuntimeProbe.mjs`, run through
+`scripts/verify-scientific-worker-runtime.mjs`. It returns the requested
+level only if every check passes; otherwise it returns `FAILED`. The same
+command covers all three levels:
+
+```
+# LOCAL_RUNTIME_VERIFIED
+node scripts/verify-scientific-worker-runtime.mjs --spawn --group structural \
+     --python /opt/genesis-science/bin/python --uid 65534 --gid 65534
+# LOCAL_CONTAINER_VERIFIED / RAILWAY_VERIFIED (token read from the environment, never printed)
+GENESIS_SCIENTIFIC_WORKER_TOKEN=… node scripts/verify-scientific-worker-runtime.mjs \
+     --url http://127.0.0.1:8090 --group structural --level LOCAL_CONTAINER_VERIFIED
+```
+
+The probe runs these checks:
+- `health`: ok, group, contract version, `executionAuth: configured`, and the executable capabilities
+- `engine-inventory`: exactly the allowlist
+- `reference-case:<tool>`: `AVAILABLE` plus an output hash
+- `execute:<capability>`: a real deterministic fixture
+- `execution-id-preserved`, `input-fingerprint`
+- `idempotent-replay`: same id and input, `idempotentReplay: true`, same output fingerprint, no second run
+- `idempotency-conflict`: same id with different input returns `409`
+- `timeout-then-idempotent-retry`: a client timeout, then the retry with the same id still succeeds
+- `auth-required`: anonymous and wrong-token requests both return `401`
+- `group-allowlist`: a capability of another group returns `CAPABILITY_NOT_IN_WORKER`
+- `no-secret-or-path-leakage`: every raw response is scanned for the token, the worker's temporary directory, the interpreter path and `/root`/`/home`
+
+In spawn mode two more checks run: `runs-as-requested-non-root-uid` (read from `/proc/<pid>/status`) and `clean-shutdown-on-SIGTERM`.
+
+### 10.2 Results (LOCAL_RUNTIME_VERIFIED, 2026-09-23)
+
+Each environment was a fresh `python3.11 -m venv`, installed with `pip install
+--only-binary=:all: -c constraints.txt -r requirements-*.txt` exactly as its
+Dockerfile does. PyMeep's was a micromamba env created from
+`conda-linux-64.lock`. The system Python's packages were not visible to it,
+and all other `GENESIS_*_PYTHON` variables were unset. Each worker ran as uid/gid
+65534, from a directory readable by that user.
+
+| Group | Engine (version) | Reference case | Real execution | Checks | Shutdown |
+| --- | --- | --- | --- | --- | --- |
+| chem-light | PySCF 2.14.0 | AVAILABLE | `quantum-chemistry` (water, RHF/STO-3G) 586 ms | 20/20 | exit 0, 7 ms |
+| chem-light | Biopython 1.88 | AVAILABLE | `protein-structure-ingestion` 175 ms | ″ | ″ |
+| structural | OpenMM 8.6.1 (CPU platform) | AVAILABLE | `molecular-dynamics` 100 steps, 2 267 ms | 20/20 | exit 0, 8 ms |
+| structural | Vina 1.2.7 + Meeko 0.8.0 | AVAILABLE (reference best affinity −2.226 kcal/mol) | `molecular-docking` phenol/indole, seed 7, 1 202 ms | ″ | ″ |
+| admet | ADMET-AI 2.0.1 (admet) | AVAILABLE | `admet-estimation` aspirin 11 249 ms (includes model load) | 20/20 | exit 0, 7 ms |
+| admet | ADMET-AI 2.0.1 (toxicity) | AVAILABLE | `toxicity-risk-estimation` 5 939 ms | ″ | ″ |
+| pymeep | PyMeep 1.34.0 (conda-forge, nompi) | AVAILABLE (T = 0.88958 vs 0.88889 analytic) | none — no execution contract | 7/7 | exit 0, 10 ms |
+
+End-to-end through the canonical path: `executeVirtualExperimentDispatched`
+was run with the three worker URLs pointing at those separately spawned
+non-root workers and a shared token. For all five executable capabilities:
+- `dispatch.mode` was `REMOTE_EXECUTION`, with exactly one ScienceRun whose `provenance.execution.mode` is `REMOTE_EXECUTION`.
+- A second identical execute was deduplicated: no second ScienceRun and no second worker run.
+- The Evidence bridge produced one `PROPOSE_ONLY` proposal, the same proposal on retry, and one link.
+- `campaign/verify.mjs` replayed QM, docking and ADMET to `REPLAY_MATCH`. The engines are installed in this main runtime too; production reports `REPLAY_BLOCKED_BY_RUNTIME`. Protein and MD replayed to `REPLAY_UNSUPPORTED`, unchanged by design.
+
+No second ledger, registry, replay engine or pipeline was added.
+
+CMS Open Data (record 5208, Z→μμ) stays embedded in the main service. Its
+worker was run with a bare stdlib-only venv interpreter:
+- the SHA-256 `7782778f8417d2c732f4a64efcbfceb6192c97c3bcfd21c0cf1322d38ed965d1` matched
+- 10 000 events, 169 ms
+- `AVAILABLE`
+- the 8 CMS adapter tests pass
+
+It needs `python3` in the main image and no pip packages.
+
+### 10.3 Defects the clean-room run found and fixed
+
+1. **Meeko's undeclared dependencies.** meeko 0.8.0's metadata declares no
+   dependencies, yet `import meeko` imports scipy and gemmi. A clean
+   structural install therefore left docking `BLOCKED_BY_RUNTIME`
+   ("No module named 'scipy'", then "'gemmi'"). The sandbox's system Python
+   had hidden this. `requirements-meeko.txt` now pins `scipy==1.17.1` and
+   `gemmi==0.7.5`, and the structural build now import-checks
+   `rdkit, openmm, vina, meeko, scipy, gemmi`.
+2. **Unpinned transitive versions.** Only top-level packages were pinned.
+   Each pip worker now has a full lock, `workers/<group>/constraints.txt`,
+   taken from the verified install: chem-light 5, structural 9, admet 67
+   packages. The admet lock excludes CUDA-only wheels. A pip dry-run of the
+   admet image's install resolves with 0 mismatches against its lock.
+3. **Torch unpinned, and possibly a CUDA build.** The admet image now
+   installs `torch==2.14.0` from the CPU index (binary only). The build fails
+   if `torch.version.cuda` is not `None`.
+4. **Source builds in a compiler-less image.** All pip installs use
+   `--only-binary=:all:`.
+5. **`GET /engines` ran every registry engine.** It called `listToolchain()`
+   and filtered afterwards. That executed the reference case of engines the
+   worker does not ship, including heavy ones, on every inventory call. It now
+   calls `getTool()` for the allowlist only.
+6. **PyMeep.** The untested `Dockerfile.proposal` (miniforge + MPI) was
+   replaced by a real `Dockerfile` built from the verified explicit lock
+   (§5). `railwayWorkerReadiness.mjs` and the contract comments were updated
+   to match.
+
+`workerPackaging.test.mjs` statically guards all of the above, including
+mutation-style failures. Examples: removing gemmi from the meeko requirements
+fails the suite, and so does a pip `meep` in any Dockerfile.
+
+### 10.4 Environment variables per service (names only; never commit values)
+
+| Service | Variable | Source |
+| --- | --- | --- |
+| main web/API | `GENESIS_CHEM_LIGHT_WORKER_URL`, `GENESIS_STRUCTURAL_WORKER_URL`, `GENESIS_ADMET_WORKER_URL` | set per environment (private `*.railway.internal` URL); unset = local execution |
+| main web/API | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | secret, ≥ 32 chars, identical on every worker |
+| main web/API | `GENESIS_RDKIT_PYTHON` | existing; baked into the root image |
+| worker chem-light / structural / admet | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | secret, same value as the main service |
+| worker chem-light / structural / admet | `PORT` | injected by Railway (image default 8090) |
+| worker chem-light / structural / admet | `GENESIS_WORKER_GROUP`, `GENESIS_PYTHON`, `TMPDIR`, `NODE_ENV` | baked into the image; do not override |
+| worker pymeep | `PORT` | injected by Railway |
+| worker pymeep | `GENESIS_WORKER_GROUP`, `GENESIS_MEEP_PYTHON`, `TMPDIR`, `NODE_ENV` | baked into the image |
+| worker pymeep | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | set it anyway: pymeep has no execution route, but the acceptance probe requires `/health` to report `executionAuth: configured` for every worker |
+
+There is no `GENESIS_PYMEEP_WORKER_URL`: the main service has nothing to send
+to it.
+
+### 10.5 Proposed patch for `.github/workflows/railway-scientific-workers.yml` (Codex-owned; not applied)
+
+The workflow is `workflow_dispatch` only and is not on the default branch, so
+GitHub cannot dispatch it yet. It runs workers without a token, so it cannot
+exercise execution, auth or idempotency. Once it can run, this change makes
+its green result mean `LOCAL_CONTAINER_VERIFIED`:
+
+```diff
+         include:
+           - group: chem-light
+ …
+           - group: admet
+             dockerfile: packages/backend/workers/admet/Dockerfile
+             engines: admet toxicity
++          - group: pymeep
++            dockerfile: packages/backend/workers/pymeep/Dockerfile
++            engines: pymeep
+     steps:
+       - uses: actions/checkout@v7
++      - uses: actions/setup-node@v4
++        with:
++          node-version: 22
++      - name: Generate an ephemeral worker token
++        run: echo "GENESIS_SCIENTIFIC_WORKER_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+ …
+           docker run -d --name "genesis-worker-${{ matrix.group }}" \
+             -p 8090:8090 \
+             -e PORT=8090 \
+             -e GENESIS_WORKER_GROUP="${{ matrix.group }}" \
++            -e GENESIS_SCIENTIFIC_WORKER_TOKEN \
+             "genesis-worker-${{ matrix.group }}:ci"
+ …
++      - name: Full worker contract probe (LOCAL_CONTAINER_VERIFIED)
++        run: |
++          node scripts/verify-scientific-worker-runtime.mjs \
++            --url http://127.0.0.1:8090 --group "${{ matrix.group }}" \
++            --level LOCAL_CONTAINER_VERIFIED --out "/tmp/probe-${{ matrix.group }}.json"
+```
+
+No `npm ci` is needed: the probe and everything it imports load from a bare
+checkout, using only Node built-ins (verified from a copy of `packages/backend/src`
+with no `node_modules`).
+
+### 10.6 Remaining blockers (environmental, not software)
+
+- No `docker build` of any worker image has run: this sandbox has no Docker
+  daemon. The `apt-get` steps and the micromamba download inside `node:22-slim`
+  have not been executed. Everything they install was executed.
+- `download.pytorch.org` is blocked here by proxy policy, so the admet image's
+  `torch==2.14.0` from the CPU index was not fetched. The build's CUDA
+  assertion guards it. The ADMET results above ran on the PyPI torch 2.14.0
+  wheel.
+- No Railway execution: `RAILWAY_VERIFIED` is not claimed for any worker. §9.9
+  steps 2–6 still apply, with the probe in `--level RAILWAY_VERIFIED` as the
+  per-worker acceptance check.

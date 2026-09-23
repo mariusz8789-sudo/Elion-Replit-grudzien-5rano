@@ -23,12 +23,17 @@ COPY packages/backend/requirements-rdkit.txt packages/backend/requirements-rdkit
 COPY packages/backend/requirements-openmm.txt packages/backend/requirements-openmm.txt
 COPY packages/backend/requirements-vina.txt packages/backend/requirements-vina.txt
 COPY packages/backend/requirements-meeko.txt packages/backend/requirements-meeko.txt
+COPY packages/backend/workers/structural/constraints.txt packages/backend/workers/structural/constraints.txt
+# The import check covers meeko's undeclared runtime imports (scipy, gemmi):
+# without them docking silently degraded to BLOCKED_BY_RUNTIME at run time.
 RUN python3 -m venv /opt/genesis-science \
-    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: \
+       -c packages/backend/workers/structural/constraints.txt \
        -r packages/backend/requirements-rdkit.txt \
        -r packages/backend/requirements-openmm.txt \
        -r packages/backend/requirements-vina.txt \
-       -r packages/backend/requirements-meeko.txt
+       -r packages/backend/requirements-meeko.txt \
+    && /opt/genesis-science/bin/python -c "import rdkit, openmm, vina, meeko, scipy, gemmi"
 ENV GENESIS_PYTHON=/opt/genesis-science/bin/python
 
 COPY packages/backend/src packages/backend/src

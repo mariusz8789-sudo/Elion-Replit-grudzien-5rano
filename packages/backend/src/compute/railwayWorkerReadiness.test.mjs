@@ -59,10 +59,12 @@ describe('railway worker readiness matrix — worker grouping', () => {
   test('admet groups exactly admet and toxicity, isolated from the other workers', () => {
     assert.deepEqual([...REPORT.workerGroups.admet].sort(), ['admet', 'toxicity']);
   });
-  test('rdkit and pymeep are never assigned to any Railway worker group', () => {
+  test('rdkit is never assigned to a Railway worker group', () => {
     const grouped = new Set(Object.values(REPORT.workerGroups).flat());
     assert.ok(!grouped.has('rdkit'), 'rdkit stays embedded in the main service');
-    assert.ok(!grouped.has('pymeep'), 'pymeep has no working worker (genuine external blocker)');
+  });
+  test('pymeep runs alone in its own conda-forge worker group', () => {
+    assert.deepEqual(REPORT.workerGroups.pymeep, ['pymeep']);
   });
 });
 
@@ -72,11 +74,17 @@ describe('railway worker readiness matrix — honest classifications', () => {
     assert.equal(rdkit.deploymentClass, DEPLOYMENT_CLASS.EMBEDDED_MAIN_SERVICE);
   });
 
-  test('pymeep is a genuine external blocker with a documented, specific reason', () => {
+  test('pymeep is a Railway CPU worker whose readiness is whatever its real reference case says here', () => {
     const pymeep = REPORT.engines.find((e) => e.toolId === 'pymeep');
-    assert.equal(pymeep.deploymentClass, DEPLOYMENT_CLASS.GENUINE_EXTERNAL_BLOCKER);
-    assert.equal(pymeep.readinessStatus, READINESS_STATUS.BLOCKED_RUNTIME);
-    assert.ok(pymeep.reason && pymeep.reason.includes('conda-forge'), 'reason must explain the real conda-forge dependency');
+    assert.equal(pymeep.deploymentClass, DEPLOYMENT_CLASS.RAILWAY_CPU_WORKER);
+    assert.equal(pymeep.workerGroup, 'pymeep');
+    if (pymeep.localToolStatus === 'AVAILABLE') {
+      assert.equal(pymeep.readinessStatus, READINESS_STATUS.LOCAL_REFERENCE_PASS_PENDING_RAILWAY);
+    } else {
+      assert.equal(pymeep.readinessStatus, READINESS_STATUS.BLOCKED_RUNTIME);
+      assert.ok(pymeep.reason.includes('conda-linux-64.lock'), 'the reason must point at the verified conda-forge lock');
+      assert.ok(!pymeep.reason.includes('Dockerfile.proposal'), 'no stale pointer to the removed proposal');
+    }
   });
 
   test('cms-open-data-zmumu needs no pinned package or worker (stdlib-only, data committed in-repo)', () => {

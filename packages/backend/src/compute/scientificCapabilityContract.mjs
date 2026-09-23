@@ -33,7 +33,7 @@ export const WORKER_GROUPS = Object.freeze({
   'chem-light': Object.freeze(['pyscf', 'biopython']),
   structural: Object.freeze(['openmm', 'vina']),
   admet: Object.freeze(['admet', 'toxicity']),
-  // Not built/tested (see workers/pymeep/Dockerfile.proposal) and has no
+  // Built from workers/pymeep/conda-linux-64.lock (conda-forge). It has no
   // execution contract below, so a pymeep worker can only report readiness.
   pymeep: Object.freeze(['pymeep']),
 });

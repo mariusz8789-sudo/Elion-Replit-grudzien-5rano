@@ -5,7 +5,7 @@
  *
  * Routes:
  *   GET  /health                                  liveness + what this worker may execute
- *   GET  /engines                                 listToolchain() for this worker's allowlist
+ *   GET  /engines                                 the toolchain entry of each engine in this worker's allowlist
  *   POST /engines/:toolId/reference-case          the tool's own reference case (unauthenticated, as before)
  *   POST /capabilities/:capabilityId/execute      authenticated, bounded execution of ONE real
  *                                                 candidate computation (compute/scientificCapabilityContract.mjs)
@@ -27,7 +27,7 @@
  */
 import http from 'node:http';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { getTool, listToolchain, listToolIds } from '../campaign/toolchain.mjs';
+import { getTool, listToolIds } from '../campaign/toolchain.mjs';
 import { redact } from '../redact.mjs';
 import { sha256Hex16, snapshotEnvironment } from '../provenance.mjs';
 import {
@@ -254,7 +254,9 @@ export function createWorkerServer({
       }
 
       if (req.method === 'GET' && url.pathname === '/engines') {
-        const matrix = listToolchain().filter((t) => allowed.has(t.toolId));
+        // getTool() per allowlisted id: listToolchain() would run the reference
+        // case of every registry engine — engines this image does not even contain.
+        const matrix = [...allowed].map((toolId) => getTool(toolId));
         return jsonResponse(res, 200, { ok: true, workerGroup, engines: matrix });
       }
 

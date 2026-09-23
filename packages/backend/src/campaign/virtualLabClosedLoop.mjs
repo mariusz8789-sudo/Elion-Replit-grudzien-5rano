@@ -13,6 +13,10 @@
  *   - the ONE toolchain/engine registry    -> ./toolchain.mjs
  *   - the ONE real single-candidate solver execution + Scientific Run
  *     persistence path (docking/QM/ADMET)  -> ./multiFidelity.mjs
+ *   - the ONE real OpenMM/Biopython adapters (bounded MD reference case,
+ *     real PDB structural validation) -> ../compute/mdAdapter.mjs,
+ *     ../compute/proteinAdapter.mjs (this module persists their Scientific
+ *     Runs directly — no campaign-level wrapper existed for them yet)
  *   - the ONE deterministic replay engine  -> ./verify.mjs
  *   - the ONE safety/research gate         -> ./scientificIntegration.mjs
  *   - the ONE clinical-language guard      -> ./researchIntake.mjs
@@ -40,6 +44,8 @@ import { researchGateVerdict } from './scientificIntegration.mjs';
 import { capabilityAvailable, getTool } from './toolchain.mjs';
 import { dockCandidate, qmCandidate, admetToxicityStage } from './multiFidelity.mjs';
 import { descriptors as rdkitDescriptors } from '../compute/rdkitAdapter.mjs';
+import * as md from '../compute/mdAdapter.mjs';
+import * as protein from '../compute/proteinAdapter.mjs';
 import { verifyScienceRun, VERDICT as REPLAY_VERDICT } from './verify.mjs';
 import { assertNoClinicalLanguage } from './researchIntake.mjs';
 
@@ -109,10 +115,15 @@ const ALLOWED_CAPABILITIES = new Set([
 ]);
 
 /** Capabilities that actually have a campaign-level, single-candidate, PERSISTED execution path
- *  today (multiFidelity.mjs). A capability absent from this set is a real toolchain member that
- *  may even be AVAILABLE at the raw-engine level, but has no wired campaign execution binding —
- *  BLOCKED_UNBOUND_ENGINE, never fabricated. */
-const BOUND_CAPABILITIES = new Set(['molecular-descriptors', 'quantum-chemistry', 'molecular-docking', 'admet-estimation', 'toxicity-risk-estimation']);
+ *  today (multiFidelity.mjs for docking/QM/ADMET/toxicity; this module directly for descriptors/
+ *  molecular-dynamics/protein-structure-ingestion). A capability absent from this set is a real
+ *  toolchain member that may even be AVAILABLE at the raw-engine level, but has no wired campaign
+ *  execution binding — BLOCKED_UNBOUND_ENGINE, never fabricated. `maxwell-fdtd` remains
+ *  deliberately unbound: no campaign-level PyMeep execution path exists yet. */
+const BOUND_CAPABILITIES = new Set([
+  'molecular-descriptors', 'quantum-chemistry', 'molecular-docking', 'admet-estimation', 'toxicity-risk-estimation',
+  'molecular-dynamics', 'protein-structure-ingestion',
+]);
 
 /** Bounded autonomy — a hard ceiling on virtual experiments per campaign. There is no autonomous
  *  loop in this module (every stage requires an explicit caller call), so this ceiling is the
@@ -267,6 +278,62 @@ function dispatchExecution(db, ctx, candidate, requestedCapability, params) {
     });
     return { ok: true, run };
   }
+  if (requestedCapability === 'molecular-dynamics') {
+    // Bounded reference execution ONLY — the existing OpenMM adapter exposes no per-candidate
+    // simulation entry point, only a documented reference case (TIP3P water box, minimization +
+    // short NVT). This proves the real engine executes for real; it does not simulate the
+    // campaign candidate's own structure (an honest limitation, surfaced below, not hidden).
+    const rawSteps = params?.steps;
+    const steps = Number.isFinite(rawSteps) ? Math.min(Math.max(Math.trunc(rawSteps), 100), 5000) : 300;
+    const t0 = Date.now();
+    const r = md.referenceCase({ steps });
+    if (!r.ok) return { ok: false, engineFailure: true, reason: r.reason ?? r.error };
+    const snap = snapshotEnvironment();
+    const run = saveScienceRun(db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: candidate.id,
+      engine: 'OpenMM', engineVersion: r.version ?? null, capability: 'molecular-dynamics',
+      method: r.case ?? `OpenMM bounded reference case (${steps} steps)`, status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+      inputs: { steps, referenceSystem: 'TIP3P water box (LangevinMiddleIntegrator, 300 K target, 0.002 ps timestep — the adapter\'s own documented bounded reference; not the campaign candidate structure)' },
+      outputs: r.data,
+      units: { potentialEnergyInitialKjmol: 'kJ/mol', potentialEnergyMinimizedKjmol: 'kJ/mol', potentialEnergyProductionKjmol: 'kJ/mol', temperatureK: 'K', timestepPs: 'ps' },
+      provenance: { engine: `OpenMM ${r.version ?? ''}`.trim(), platform: r.platform ?? null, referenceCase: r.case ?? null, expectation: r.expectation ?? null },
+      inputHash: sha16({ steps, case: r.case }), outputHash: sha16(r.data),
+      artifacts: [], durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
+    });
+    return {
+      ok: true, run,
+      extraLimitations: [
+        'This bounded reference execution runs a fixed TIP3P water box, independent of the campaign candidate\'s own molecular structure — it proves OpenMM executes for real, but does not currently simulate this specific candidate.',
+        'Random seed and box size are fixed by the underlying adapter and not currently exposed as caller-configurable parameters. Bit-level trajectory reproducibility is not guaranteed by the underlying PME/FFT implementation even single-threaded — deterministic replay is REPLAY_UNSUPPORTED for this capability, never a fabricated MATCH.',
+      ],
+    };
+  }
+  if (requestedCapability === 'protein-structure-ingestion') {
+    const pdbText = typeof params?.pdbText === 'string' ? params.pdbText : '';
+    if (pdbText.trim().length < 20) {
+      return { ok: false, blocked: EXECUTION_STATUS.BLOCKED_INVALID_INPUT, reason: 'protein-structure-ingestion requires a real params.pdbText (PDB-format text, at least 20 characters) — this module never invents or fetches a structure on the caller\'s behalf.' };
+    }
+    const t0 = Date.now();
+    const r = protein.validatePdb(pdbText);
+    if (!r.ok) return { ok: false, engineFailure: true, reason: r.reason ?? r.error };
+    const snap = snapshotEnvironment();
+    const run = saveScienceRun(db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: candidate.id,
+      engine: 'Biopython', engineVersion: r.version ?? null, capability: 'protein-structure-ingestion',
+      method: 'Biopython PDBParser structural validation', status: 'ok', evidenceClass: 'DETERMINISTIC',
+      inputs: { sourcePdbSha256: sha16({ pdb: pdbText }), sourcePdbByteLength: pdbText.length },
+      outputs: r.report, units: {},
+      provenance: { engine: `Biopython ${r.version ?? ''}`.trim() },
+      inputHash: sha16({ pdb: pdbText }), outputHash: sha16(r.report),
+      artifacts: [], durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
+    });
+    return {
+      ok: true, run,
+      extraLimitations: r.report?.needsPreparation
+        ? [`This structure needs preparation before further use: ${(r.report.preparationReasons ?? []).join('; ') || 'see the persisted report\'s preparationReasons'}. Nothing was silently modified or assumed.`]
+        : [],
+    };
+  }
   return { ok: false, blocked: EXECUTION_STATUS.BLOCKED_UNBOUND_ENGINE, reason: 'unreachable' };
 }
 
@@ -323,7 +390,11 @@ export function executeVirtualExperiment(db, { campaignId, candidateId, executio
     selectedEngine: tool ? { toolId: tool.toolId, engineName: tool.engineName, engineVersion: tool.version } : { toolId: null, engineName: run.engine, engineVersion: run.engineVersion },
     derivedOutput: run.outputs,
     epistemicClassification,
-    limitations: [...(tool?.assumptions ? [tool.assumptions] : []), ...(budgetExceeded ? [`Measured compute time ${(durationMs / 1000).toFixed(2)}s exceeded the declared budget of ${plan.payload.budget.maxComputeSeconds}s.`] : [])],
+    limitations: [
+      ...(tool?.assumptions ? [tool.assumptions] : []),
+      ...(dispatch.extraLimitations ?? []),
+      ...(budgetExceeded ? [`Measured compute time ${(durationMs / 1000).toFixed(2)}s exceeded the declared budget of ${plan.payload.budget.maxComputeSeconds}s.`] : []),
+    ],
     provenanceRefs: [`science-run:${run.id}`, ...(tool?.fingerprint ? [`toolchain:${tool.fingerprint}`] : [])],
     outputFingerprint: run.outputHash,
     durationMs,
@@ -331,7 +402,11 @@ export function executeVirtualExperiment(db, { campaignId, candidateId, executio
 }
 
 function toolIdForCapability(capabilityId) {
-  const map = { 'molecular-descriptors': 'rdkit', 'quantum-chemistry': 'pyscf', 'molecular-docking': 'vina', 'admet-estimation': 'admet', 'toxicity-risk-estimation': 'toxicity' };
+  const map = {
+    'molecular-descriptors': 'rdkit', 'quantum-chemistry': 'pyscf', 'molecular-docking': 'vina',
+    'admet-estimation': 'admet', 'toxicity-risk-estimation': 'toxicity',
+    'molecular-dynamics': 'openmm', 'protein-structure-ingestion': 'biopython',
+  };
   return map[capabilityId] ?? null;
 }
 

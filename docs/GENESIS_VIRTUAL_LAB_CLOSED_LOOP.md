@@ -35,6 +35,7 @@ external measurement.
 | Campaign/candidate persistence, append-only events | `campaign/persistence.mjs` | `getCampaign`/`getCandidate`/`addEvent`/`listEvents` — same calls every other campaign module uses |
 | Toolchain/engine registry + validated availability | `campaign/toolchain.mjs` | `capabilityAvailable(capabilityId)`, `getTool(toolId)` |
 | Real single-candidate execution + Scientific Run persistence | `campaign/multiFidelity.mjs` | `dockCandidate`, `qmCandidate`, `admetToxicityStage` called directly, unmodified |
+| Real bounded MD reference execution + real PDB structural validation | `compute/mdAdapter.mjs`, `compute/proteinAdapter.mjs` | `md.referenceCase({ steps })`, `protein.validatePdb(pdbText)` called directly, unmodified — this module persists their results as `ScienceRun`s itself (no campaign-level wrapper existed for either engine before this branch) |
 | Deterministic replay | `campaign/verify.mjs` | `verifyScienceRun(db, scienceRunId)` — its `MATCH`/`DRIFT`/`ENGINE_VERSION_CHANGED`/`BLOCKED_BY_RUNTIME`/`REPLAY_UNSUPPORTED` verdicts are mapped 1:1 onto this module's `REPLAY_STATUS` |
 | Safety/research gate (bounded autonomy: stop on safety veto) | `campaign/scientificIntegration.mjs` | `researchGateVerdict(db, campaignId, candidateId)`, checked at both plan AND execute time |
 | Clinical-language guard on the hypothesis text | `campaign/researchIntake.mjs` | `assertNoClinicalLanguage(hypothesis)` — the SAME guard the research-intake pipeline uses, not a weaker reimplementation |
@@ -71,11 +72,12 @@ external measurement.
 `EXECUTION_STATUS`: `EXECUTED_COMPUTATIONAL_EXPERIMENT`, `BLOCKED_UNBOUND_ENGINE`,
 `BLOCKED_RUNTIME_UNAVAILABLE`, `BLOCKED_INVALID_INPUT`, `FAILED_ENGINE`.
 
-- **`BLOCKED_UNBOUND_ENGINE`**: the requested capability is a real, possibly even `AVAILABLE`,
-  toolchain member (e.g. `molecular-dynamics` — OpenMM is genuinely `AVAILABLE` in this
-  environment), but no campaign-level, single-candidate, persisted execution path exists for it
-  yet (`multiFidelity.mjs` only wires docking/QM/ADMET/toxicity/descriptors). This module never
-  writes a new adapter to fill that gap — it reports the gap honestly.
+- **`BLOCKED_UNBOUND_ENGINE`**: the requested capability is a real toolchain member with no
+  campaign-level, single-candidate, persisted execution path bound to it yet. As of this branch
+  this applies only to `maxwell-fdtd` (PyMeep) — `molecular-dynamics` (OpenMM) and
+  `protein-structure-ingestion` (Biopython) are now bound directly by this module (see "Results"
+  below); no campaign-level path exists for `maxwell-fdtd` and this module never writes a new
+  adapter to fill that gap — it reports the gap honestly.
 - **`BLOCKED_RUNTIME_UNAVAILABLE`**: the capability IS bound at the campaign layer, but
   `toolchain.capabilityAvailable()` reports it is not `AVAILABLE` right now (e.g. PyMeep —
   genuinely not installed in this environment: `pymeep_unavailable: No module named 'meep'`).
@@ -146,15 +148,35 @@ cross-campaign candidate with 404/400, never a leak):
 
 - **Real engines executed** (genuinely `AVAILABLE` in this environment, proven by real calls in
   both test suites): RDKit (`molecular-descriptors`), AutoDock Vina + Meeko
-  (`molecular-docking`), ADMET-AI (`admet-estimation`, `toxicity-risk-estimation`). PySCF
-  (`quantum-chemistry`) is also genuinely `AVAILABLE` and wired, exercised in the module-level
-  test suite.
-- **Blocked engines**: `molecular-dynamics` (OpenMM — genuinely `AVAILABLE` at the toolchain
-  level, but `BLOCKED_UNBOUND_ENGINE` — no campaign execution binding exists for it yet, in this
-  branch or the base it was built on); `protein-structure-ingestion` (Biopython — same reason);
-  `maxwell-fdtd` (PyMeep — both `BLOCKED_UNBOUND_ENGINE` AND genuinely not installed,
-  `BLOCKED_BY_RUNTIME` at the toolchain layer, confirmed directly: `pymeep_unavailable: No module
-  named 'meep'`).
+  (`molecular-docking`), ADMET-AI (`admet-estimation`, `toxicity-risk-estimation`), OpenMM
+  (`molecular-dynamics`), Biopython (`protein-structure-ingestion`). PySCF (`quantum-chemistry`)
+  is also genuinely `AVAILABLE` and wired, exercised in the module-level test suite.
+  - **`molecular-dynamics` (OpenMM)** binds directly to the existing `../compute/mdAdapter.mjs`'s
+    `referenceCase({ steps })` — the ONLY per-call entry point that adapter exposes (no
+    per-candidate simulation entry point exists anywhere in this repo). This proves OpenMM
+    genuinely executes a real, bounded TIP3P water-box minimization + short NVT run through this
+    module, persisted as a canonical `ScienceRun` (`engine: 'OpenMM'`). Two honest, explicitly
+    surfaced limitations (never hidden): (1) the reference system is independent of the campaign
+    candidate's own molecular structure — this proves the engine executes, it does not currently
+    simulate the specific candidate; (2) the adapter forwards only `steps` to the underlying
+    worker — random seed and box size are fixed server-side (`boxNm`/`seed` are NOT exposed as
+    caller-configurable through this adapter, confirmed by reading `compute/md_worker.py`
+    directly), and the integrator name is never serialized into the worker's JSON response, so
+    bit-level trajectory reproducibility is not claimed. `verify.mjs` has no `REPLAYERS` entry for
+    `molecular-dynamics`, so replay always and honestly reports `REPLAY_UNSUPPORTED`, never a
+    fabricated `MATCH`.
+  - **`protein-structure-ingestion` (Biopython)** binds directly to the existing
+    `../compute/proteinAdapter.mjs`'s `validatePdb(pdbText)` — the one real, general-purpose,
+    per-caller-input entry point that adapter exposes. The caller must supply real PDB-format
+    text (at least 20 characters); this module never fetches, invents, or fabricates a structure
+    on the caller's behalf. Missing/too-short input is refused with `BLOCKED_INVALID_INPUT` before
+    the adapter is even invoked. A real, valid PDB produces a real Biopython structural report
+    (chains/residues/hetero atoms/`needsPreparation`), persisted as a canonical `ScienceRun`
+    (`engine: 'Biopython'`); `verify.mjs` likewise has no `REPLAYERS` entry for this capability, so
+    replay always and honestly reports `REPLAY_UNSUPPORTED`.
+- **Blocked engine**: `maxwell-fdtd` (PyMeep — `BLOCKED_UNBOUND_ENGINE` (no campaign execution
+  binding exists for it) AND genuinely not installed, `BLOCKED_BY_RUNTIME` at the toolchain layer,
+  confirmed directly: `pymeep_unavailable: No module named 'meep'`).
 - **Evidence**: propose-only, on the same `EvidenceLedger` singleton `knowledgeApi.mjs` already
   serves every other caller from. Verified pending, never auto-published, via a real end-to-end
   API test.

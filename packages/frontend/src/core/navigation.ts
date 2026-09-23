@@ -88,6 +88,8 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'simulation', label: 'Generator symulacji', icon: '🔭', hash: '#/generate' },
   { id: 'science', label: 'Drug Discovery', icon: '🧬', hash: '#/drug' },
   { id: 'cyber', label: 'Cyber', icon: '🛡', hash: '#/cyber' },
+  { id: 'virtual-bio', label: 'Virtual Lab — biologia', icon: '🧫', hash: '#/virtual-bio', description: 'Bezpieczne modele in-silico (komórka, PBPK, receptor, AMR) z uczciwym FAILED_CLOSED' },
+  { id: 'gov-campaign', label: 'Government Drug Discovery — demo dla sektora publicznego', icon: '🏛', hash: '#/gov-campaign', description: 'Pełna kampania na realnej puli kandydatów: screening, falsyfikacja, bramka bezpieczeństwa, werdykt' },
   { id: 'clockwork', label: 'CLOCKWORK — terminy urzędu', icon: '⏱', hash: '#/clockwork' },
   { id: 'collider', label: 'Collider — komora detektora', icon: '⚛', hash: '#/collider' },
   { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },

@@ -14,7 +14,7 @@ import { setupGraphicsPipeline, type GraphicsPipeline } from './graphics/postPro
 import { applyShadowPolicy } from './graphics/shadowPolicy';
 import { disposeSceneResources } from './graphics/lifecycle';
 import { detectRenderTier, recommendedShadowMapSize, tierAllowsBloom } from './quality';
-import { configureCinematicCamera } from './graphics/cinematicCamera';
+import { cameraDampingFactor, configureCinematicCamera } from './graphics/cinematicCamera';
 import type { AgentController, AgentUpdate } from '../scientificWorlds/agentController';
 import type { LabStation } from '../scientificWorlds/labWorld';
 import type { LabArtifact } from '../scientificWorlds/experimentRunners';
@@ -746,6 +746,11 @@ export class AgentLabScene3D implements Sim3D {
     }
     if (this.chamberRing) this.chamberRing.emissiveIntensity = 0.55 + 0.1 * Math.sin(this.time * 1.4);
     this.researchCompanion?.update(this.time, u?.state ?? 'IDLE');
+    // Camera presentation uses elapsed time, so slow devices settle at the same pace.
+    // Cap tab-resume stalls and respect reduced motion without changing controller time.
+    const cameraDt = Math.min(0.2, this.frameDeltaSeconds);
+    const reducedMotion = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    const cameraEase = (speed: number) => reducedMotion ? 1 : cameraDampingFactor(cameraDt, speed);
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
@@ -758,7 +763,7 @@ export class AgentLabScene3D implements Sim3D {
       this.scratchB.set(this.scratchA.x + fx * Math.cos(pitch), this.scratchA.y - Math.sin(pitch), this.scratchA.z + fz * Math.cos(pitch));
       camera.lookAt(this.scratchB);
       // Head bob while walking: presentation only.
-      if (moving) camera.position.y += Math.sin(pose.gait * Math.PI) * 0.012;
+      if (moving && !reducedMotion) camera.position.y += Math.sin(pose.gait * Math.PI) * 0.012;
       if (ch.helmet) ch.helmet.visible = false;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = false; });
     } else if (this.cameraMode === 'TWIN' && this.twinCamPos && this.twinCamLook) {
@@ -776,12 +781,12 @@ export class AgentLabScene3D implements Sim3D {
       const dist = portrait ? (tight ? 3.0 : 4.4) : (tight ? 2.3 : macroVisible ? 3.05 : 2.75);
       const height = tight ? 1.45 : 1.55;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
-      const drift = Math.sin(this.time * 0.22) * 0.14;
+      const drift = reducedMotion ? 0 : Math.sin(this.time * 0.22) * 0.14;
       this.scratchA.set(TWIN_CHAMBER.position.x + drift, height, TWIN_CHAMBER.position.z + dist);
-      this.twinCamPos.lerp(this.scratchA, 0.08);
+      this.twinCamPos.lerp(this.scratchA, cameraEase(5));
       const panelOffset = !portrait && macroVisible ? 0.46 : this.researchLayoutOpen && !portrait ? 0.55 : 0;
       this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, portrait ? 0.65 : 1.12, TWIN_CHAMBER.position.z);
-      this.twinCamLook.lerp(this.scratchB, 0.12);
+      this.twinCamLook.lerp(this.scratchB, cameraEase(7.7));
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
       if (this.chamberGlass) this.chamberGlass.visible = true;
@@ -791,8 +796,8 @@ export class AgentLabScene3D implements Sim3D {
       // keep the spectator inside the room
       target.x = Math.max(this.room.minX + 0.5, Math.min(this.room.maxX - 0.5, target.x));
       target.z = Math.max(this.room.minZ + 0.5, Math.min(this.room.maxZ - 0.5, target.z));
-      this.spectatorPos.lerp(target, 0.06);
-      this.spectatorLook.lerp(this.scratchB.set(pose.position.x + fx * 0.8, 1.35, pose.position.z + fz * 0.8), 0.1);
+      this.spectatorPos.lerp(target, cameraEase(3.7));
+      this.spectatorLook.lerp(this.scratchB.set(pose.position.x + fx * 0.8, 1.35, pose.position.z + fz * 0.8), cameraEase(6.3));
       camera.position.copy(this.spectatorPos); camera.lookAt(this.spectatorLook);
     }
     this.pipeline?.setFocusDistance(this.cameraMode === 'VISOR' ? 1.6 : this.cameraMode === 'TWIN' ? (this.macroMicro?.group.visible ? 2.8 : 2.4) : 3.4);

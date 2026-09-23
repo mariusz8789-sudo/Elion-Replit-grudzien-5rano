@@ -70,13 +70,15 @@ export function applyRimLight(THREE: typeof THREE_NS, material: THREE_NS.Materia
       .replace('#include <fog_vertex>', '#include <fog_vertex>\n  vGenesisViewPos = - mvPosition.xyz;\n  vGenesisNormal = normalize( transformedNormal );');
     shader.fragmentShader = `uniform vec3 uRimColor;\nuniform float uRimPower;\nuniform float uRimIntensity;\nuniform float uXray;\nvarying vec3 vGenesisViewPos;\nvarying vec3 vGenesisNormal;\n${shader.fragmentShader}`
       .replace(
-        '#include <dithering_fragment>',
-        `#include <dithering_fragment>
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
   // Fresnel: 1 at grazing angles, 0 head-on. One term drives both the rim light and the x-ray shell.
-  float genesisFresnel = pow( 1.0 - abs( dot( normalize( vGenesisNormal ), normalize( vGenesisViewPos ) ) ), uRimPower );
-  gl_FragColor.rgb += uRimColor * genesisFresnel * uRimIntensity;
+  float genesisFresnel = pow( clamp( 1.0 - abs( dot( normalize( vGenesisNormal ), normalize( vGenesisViewPos ) ) ), 0.0, 1.0 ), uRimPower );
+  // Add in linear HDR space so ACES, fog and premultiplied alpha treat the rim like the rest of the material.
+  totalEmissiveRadiance += uRimColor * genesisFresnel * uRimIntensity;
   // X-ray: the surface fades head-on and survives at the edges, so interior objects read through it.
-  gl_FragColor.a = mix( gl_FragColor.a, clamp( genesisFresnel * 0.9 + 0.06, 0.0, 1.0 ), uXray );`,
+  // Preserve the material/texture opacity budget, especially the 6% GHOST shell.
+  diffuseColor.a *= mix( 1.0, clamp( genesisFresnel * 0.9 + 0.06, 0.0, 1.0 ), uXray );`,
       );
   };
   material.needsUpdate = true;

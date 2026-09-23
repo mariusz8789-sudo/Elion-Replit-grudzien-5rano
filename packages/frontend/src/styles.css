@@ -5452,6 +5452,8 @@ a.chip-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .guide-title { font-weight: 700; color: var(--text); letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.7rem; }
 .guide-state { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-faint); letter-spacing: 0.08em; }
 .guide-source { margin-left: auto; font-size: 0.68rem; color: var(--text-faint); }
+.context-guide-launch { position: fixed; right: 1rem; bottom: calc(1rem + var(--safe-bottom)); z-index: 60; box-shadow: 0 0 30px rgba(92, 214, 232, 0.22); }
+.context-guide { z-index: 61; }
 .guide-close { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; color: var(--text-dim); border: 1px solid var(--border); }
 .guide-close:hover { color: var(--text); border-color: var(--border-strong); }
 .guide-caption { margin: 0; font-size: 1.05rem; line-height: 1.5; color: var(--text); min-height: 1.5em; text-wrap: pretty; }

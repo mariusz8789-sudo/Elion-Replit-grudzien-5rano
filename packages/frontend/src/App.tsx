@@ -26,6 +26,8 @@ import { ScienceChat } from './components/ScienceChat';
 import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
 import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
 import { listExperiments } from './core/scienceMemory';
+import { ContextualRouteGuide } from './components/guide/ContextualRouteGuide';
+import type { ContextualGuideSurface } from './core/guide/contextualGuideContent';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -272,6 +274,19 @@ export default function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
   const lastLabId = useRef<string | null>(null);
 
+  const contextualGuideSurface: ContextualGuideSurface | null = (() => {
+    switch (route.kind) {
+      case 'cern-complex': return 'CERN';
+      case 'cyber': return 'CYBER';
+      case 'mirror': return 'MIRROR';
+      case 'world-director': return 'WORLD_DIRECTOR';
+      case 'virtual-bio': return 'VIRTUAL_LAB';
+      case 'campaign': return 'CAMPAIGN';
+      case 'scientific-worlds': return route.world === 'biology' ? 'HUMAN_EXPLORER' : null;
+      default: return null;
+    }
+  })();
+
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
     window.addEventListener('hashchange', onHash);
@@ -333,6 +348,7 @@ export default function App() {
     <>
       {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      <ContextualRouteGuide surface={contextualGuideSurface} />
     </>
   );
 

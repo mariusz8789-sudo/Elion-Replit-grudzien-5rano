@@ -138,13 +138,15 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toHaveAttribute('data-world', 'biology');
     await expect(page.getByTestId('sw-twin')).toContainText('NORMAL');
-    await expect(page.getByTestId('sw-twin')).toContainText('PROXY');
+    await expect(page.getByTestId('sw-twin')).toHaveAttribute('data-lod', 'PROXY_LOW');
     await settled(page, 3);
     await page.screenshot({ path: SHOTS.bioIdle });
 
-    await page.getByTestId('sw-input').fill('Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope, powiększ 5×, a potem zbadaj próbkę przez Orpheus i pokaż mi Evidence.');
+    // Run the two experiments as two observable stages. A single compound sentence is accepted,
+    // but the second result can replace the first card before a learner has time to inspect it.
+    await page.getByTestId('sw-input').fill('Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope i powiększ 5×.');
     await page.getByTestId('sw-send').click();
-    await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem 7 polecenia');
+    await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem');
     await waitState(page, ['MOVING_TO_TARGET']);
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioWalking });
@@ -154,6 +156,9 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioBrain });
     // Hyperscope 5×: a MODEL session (digital zoom of the model — never an observation).
+    const evidence = page.getByTestId('sw-evidence');
+    const evidenceToggle = evidence.locator('button[aria-expanded]').first();
+    if ((await evidenceToggle.getAttribute('aria-expanded')) !== 'true') await evidenceToggle.click();
     await expect(page.getByTestId('sw-session')).toBeVisible({ timeout: 400_000 });
     await expect(page.getByTestId('sw-epistemic')).toHaveText('MODEL');
     await expect(page.getByTestId('sw-outputs')).toContainText('magnification: 5');
@@ -163,6 +168,9 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioHyperscope });
     // ORPHEUS: a SIMULATION session on the same contract, biosafety ACCESS_RESTRICTED (conceptual-only protocol).
+    await waitState(page, ['IDLE'], 400_000);
+    await page.getByTestId('sw-input').fill('Zbadaj próbkę przez Orpheus i pokaż mi Evidence.');
+    await page.getByTestId('sw-send').click();
     await expect.poll(async () => page.getByTestId('sw-session').getAttribute('data-session-id'), { timeout: 400_000 }).not.toBe(first);
     await expect(page.getByTestId('sw-epistemic')).toHaveText('SIMULATION');
     await expect(page.getByTestId('sw-outputs')).toContainText('biosafety: ACCESS_RESTRICTED');
@@ -182,17 +190,28 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     const explorer = page.getByTestId('sw-explorer');
     await expect(explorer).toBeVisible();
     await expect(page.getByTestId('sw-explorer-evidence')).toContainText('NOT_DIRECT_OBSERVATION');
+    // The evidence drawer deliberately floats over the world. Close it before operating the
+    // anatomy dock, exactly as a user would, so the acceptance path tests real hit targets.
+    if ((await evidenceToggle.getAttribute('aria-expanded')) === 'true') {
+      await evidenceToggle.click();
+      await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'false');
+    }
     await page.getByTestId('sw-explorer-organ-heart').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Narząd: Heart');
-    await waitState(page, ['IDLE'], 400_000);
-    await expect(page.getByTestId('sw-twin')).toContainText('heart');
-    await page.getByTestId('sw-explorer-rung-cell').click();
+    await expect(page.getByTestId('sw-explorer-organ')).toHaveAttribute('data-organ', 'heart');
+    const cellRung = page.getByTestId('sw-explorer-rung-cell');
+    await expect(cellRung).toBeDisabled({ timeout: 10_000 });
+    await expect(cellRung).toBeEnabled({ timeout: 400_000 });
+    await cellRung.click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Komórka');
-    await expect.poll(async () => page.getByTestId('sw-session').getAttribute('data-session-id'), { timeout: 400_000 }).not.toBe(first);
+    // Evidence is collapsed so the anatomy controls remain clickable. The Explorer's capture ID is
+    // the same sealed session identity projected into the visible microscope surface.
+    await expect.poll(async () => page.getByTestId('sw-explorer-scope').getAttribute('data-capture'), { timeout: 400_000 }).not.toBe('');
     await expect.poll(async () => explorer.getAttribute('data-level'), { timeout: 400_000 }).toBe('cell');
     await expect(page.getByTestId('sw-explorer-capture')).toContainText('hyperscope-capture');
     await expect(page.getByTestId('sw-explorer-scale')).toContainText('10 µm');
     await waitState(page, ['IDLE'], 400_000);
+    const cellCaptureId = await page.getByTestId('sw-explorer-scope').getAttribute('data-capture');
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioExplorer });
 
@@ -234,7 +253,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await settled(page, 4);
     await page.screenshot({ path: SHOTS.bioCutaway });
     // Cutting and isolating are presentation: they must not seal a session or add evidence.
-    await expect(page.getByTestId('sw-session')).toHaveAttribute('data-session-id', /.+/);
+    await expect(page.getByTestId('sw-explorer-scope')).toHaveAttribute('data-capture', cellCaptureId ?? '');
 
 
     const harness = new VisualFidelityHarness();

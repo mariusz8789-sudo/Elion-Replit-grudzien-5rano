@@ -19,13 +19,19 @@ function setup() {
 }
 
 describe('capabilities manifest (public)', () => {
-  test('lists capabilities; advanced methods are not AVAILABLE', () => {
+  test('lists capabilities and exposes reference-validated runtime status', () => {
     const r = call('GET', '/api/compute/capabilities');
     assert.equal(r.status, 200);
     const byId = new Map(r.body.capabilities.map((c) => [c.id, c]));
     assert.equal(byId.get('molecular-weight').status, 'AVAILABLE');
-    assert.notEqual(byId.get('docking').status, 'AVAILABLE');
-    assert.notEqual(byId.get('admet').status, 'AVAILABLE');
+    for (const id of ['docking', 'molecular-dynamics', 'quantum-chemistry', 'admet', 'toxicity']) {
+      const capability = byId.get(id);
+      assert.ok(['AVAILABLE', 'BLOCKED_BY_RUNTIME'].includes(capability.status));
+      if (capability.status === 'AVAILABLE') {
+        assert.equal(capability.executionStatus, 'VALIDATED_REFERENCE_CASE');
+        assert.ok(capability.engine);
+      } else assert.ok(capability.requires);
+    }
   });
 });
 
@@ -75,9 +81,14 @@ describe('candidate passport (honest)', () => {
     assert.equal(r.status, 200);
     const pass = r.body.passport;
     assert.ok(Math.abs(pass.calculatedProperties.molarMassGmol - 194.19) < 0.1);
-    // capability gaps must be present and visible
+    // Every runtime capability gap must be present and visible, while an
+    // installed reference-validated engine must not remain falsely blocked.
+    const capabilities = call('GET', '/api/compute/capabilities').body.capabilities;
     const gapIds = pass.capabilityGaps.map((g) => g.id);
-    for (const need of ['docking', 'admet', 'toxicity']) assert.ok(gapIds.includes(need), `brak luki ${need}`);
+    for (const id of ['docking', 'admet', 'toxicity']) {
+      const capability = capabilities.find((c) => c.id === id);
+      assert.equal(gapIds.includes(id), capability.status !== 'AVAILABLE', `niespójny status luki ${id}`);
+    }
     // no fabricated docking/ADMET numbers anywhere in score components
     assert.ok(pass.scoreComponents.every((c) => ['calculated', 'heuristic'].includes(c.kind)));
     // honest verdict language

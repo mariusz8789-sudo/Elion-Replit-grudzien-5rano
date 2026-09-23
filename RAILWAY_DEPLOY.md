@@ -76,3 +76,10 @@ checksum-pinned CMS Open Data analysis remain embedded in the main service.
 Run `npm run railway-worker-readiness` for the honest local-reference matrix.
 See `docs/RAILWAY_SCIENTIFIC_WORKERS.md` for dependency pins, resource
 estimates, the untested PyMeep proposal, and remaining external blockers.
+
+Before creating Railway worker services, manually run the GitHub Actions
+workflow **Railway scientific workers — real container gate** on the exact
+candidate commit. It builds and starts all three pinned images and requires a
+real `AVAILABLE` reference result from every provisioned engine. The workflow
+is deliberately `workflow_dispatch` only because ADMET's CPU image is several
+gigabytes; it does not consume CI resources on every source commit.

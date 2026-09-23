@@ -21,6 +21,10 @@
  *   - the ONE safety/research gate         -> ./scientificIntegration.mjs
  *   - the ONE clinical-language guard      -> ./researchIntake.mjs
  *   - the ONE EvidenceLedger propose seam  -> ../knowledgeApi.mjs (wired by api.mjs, not imported here)
+ *   - the ONE remote execution contract    -> ../compute/scientificCapabilityContract.mjs +
+ *     ../compute/remoteScientificWorkerClient.mjs (executeVirtualExperimentDispatched only):
+ *     a configured private worker runs the engine, while this module still owns
+ *     authorization, ScienceRun persistence, classification, Evidence and replay
  *
  * This module creates NO second campaign engine, NO second EvidenceLedger, NO
  * second toolchain/solver registry, NO second persistence system, and NO
@@ -43,11 +47,20 @@ import { sha256Hex16 as sha16, snapshotEnvironment } from '../provenance.mjs';
 import { researchGateVerdict } from './scientificIntegration.mjs';
 import { capabilityAvailable, getTool } from './toolchain.mjs';
 import { dockCandidate, qmCandidate, admetToxicityStage } from './multiFidelity.mjs';
-import { descriptors as rdkitDescriptors } from '../compute/rdkitAdapter.mjs';
+import { descriptors as rdkitDescriptors, embed3d } from '../compute/rdkitAdapter.mjs';
 import * as md from '../compute/mdAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
 import { verifyScienceRun, VERDICT as REPLAY_VERDICT } from './verify.mjs';
 import { assertNoClinicalLanguage } from './researchIntake.mjs';
+import {
+  DISPATCH_STATE,
+  WORKER_CONTRACT_VERSION,
+  buildMolecularDynamicsRun,
+  buildProteinStructureRun,
+  buildScienceRunRecord,
+  validateCapabilityInput,
+} from '../compute/scientificCapabilityContract.mjs';
+import { createRemoteScientificWorkerClient, resolveWorkerConfig, routeCapability } from '../compute/remoteScientificWorkerClient.mjs';
 
 export const VIRTUAL_LAB_CONTRACT_VERSION = '1.0.0';
 
@@ -56,6 +69,8 @@ export const VIRTUAL_EVENT = Object.freeze({
   RESULT: 'VIRTUAL_EXPERIMENT_RESULT',
   REPLAY: 'VIRTUAL_EXPERIMENT_REPLAY',
   EVIDENCE_PROPOSED: 'VIRTUAL_EXPERIMENT_EVIDENCE_PROPOSED',
+  /** Audit record of a retryable remote-transport failure; deliberately NOT a RESULT, so a retry can still execute. */
+  DISPATCH_FAILED: 'VIRTUAL_EXPERIMENT_DISPATCH_FAILED',
 });
 
 export const SCIENTIFIC_EXECUTION_EVENT = Object.freeze({
@@ -310,24 +325,13 @@ function dispatchExecution(db, ctx, candidate, requestedCapability, params) {
     const r = md.referenceCase({ steps });
     if (!r.ok) return { ok: false, engineFailure: true, reason: r.reason ?? r.error };
     const snap = snapshotEnvironment();
+    // Same builder the remote path uses, so a local and a remote OpenMM run persist identically.
+    const record = buildMolecularDynamicsRun({ steps, engineResult: r });
     const run = saveScienceRun(db, {
       projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: candidate.id,
-      engine: 'OpenMM', engineVersion: r.version ?? null, capability: 'molecular-dynamics',
-      method: r.case ?? `OpenMM bounded reference case (${steps} steps)`, status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
-      inputs: { steps, referenceSystem: 'TIP3P water box (LangevinMiddleIntegrator, 300 K target, 0.002 ps timestep — the adapter\'s own documented bounded reference; not the campaign candidate structure)' },
-      outputs: r.data,
-      units: { potentialEnergyInitialKjmol: 'kJ/mol', potentialEnergyMinimizedKjmol: 'kJ/mol', potentialEnergyProductionKjmol: 'kJ/mol', temperatureK: 'K', timestepPs: 'ps' },
-      provenance: { engine: `OpenMM ${r.version ?? ''}`.trim(), platform: r.platform ?? null, referenceCase: r.case ?? null, expectation: r.expectation ?? null },
-      inputHash: sha16({ steps, case: r.case }), outputHash: sha16(r.data),
-      artifacts: [], durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
+      ...record.run, durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
     });
-    return {
-      ok: true, run,
-      extraLimitations: [
-        'This bounded reference execution runs a fixed TIP3P water box, independent of the campaign candidate\'s own molecular structure — it proves OpenMM executes for real, but does not currently simulate this specific candidate.',
-        'Random seed and box size are fixed by the underlying adapter and not currently exposed as caller-configurable parameters. Bit-level trajectory reproducibility is not guaranteed by the underlying PME/FFT implementation even single-threaded — deterministic replay is REPLAY_UNSUPPORTED for this capability, never a fabricated MATCH.',
-      ],
-    };
+    return { ok: true, run, extraLimitations: record.extraLimitations };
   }
   if (requestedCapability === 'protein-structure-ingestion') {
     const pdbText = typeof params?.pdbText === 'string' ? params.pdbText : '';
@@ -335,22 +339,12 @@ function dispatchExecution(db, ctx, candidate, requestedCapability, params) {
     const r = protein.validatePdb(pdbText);
     if (!r.ok) return { ok: false, engineFailure: true, reason: r.reason ?? r.error };
     const snap = snapshotEnvironment();
+    const record = buildProteinStructureRun({ pdbText, report: r.report, version: r.version });
     const run = saveScienceRun(db, {
       projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: candidate.id,
-      engine: 'Biopython', engineVersion: r.version ?? null, capability: 'protein-structure-ingestion',
-      method: 'Biopython PDBParser structural validation', status: 'ok', evidenceClass: 'DETERMINISTIC',
-      inputs: { sourcePdbSha256: sha16({ pdb: pdbText }), sourcePdbByteLength: pdbText.length },
-      outputs: r.report, units: {},
-      provenance: { engine: `Biopython ${r.version ?? ''}`.trim() },
-      inputHash: sha16({ pdb: pdbText }), outputHash: sha16(r.report),
-      artifacts: [], durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
+      ...record.run, durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
     });
-    return {
-      ok: true, run,
-      extraLimitations: r.report?.needsPreparation
-        ? [`This structure needs preparation before further use: ${(r.report.preparationReasons ?? []).join('; ') || 'see the persisted report\'s preparationReasons'}. Nothing was silently modified or assumed.`]
-        : [],
-    };
+    return { ok: true, run, extraLimitations: record.extraLimitations };
   }
   return { ok: false, blocked: EXECUTION_STATUS.BLOCKED_UNBOUND_ENGINE, reason: 'unreachable' };
 }
@@ -373,50 +367,341 @@ function evaluateExpectation(outputs, expectation) {
  * existing result rather than re-running the engine.
  */
 export function executeVirtualExperiment(db, { campaignId, candidateId, executionId, executedBy = null } = {}) {
+  const prepared = prepareExecution(db, { campaignId, candidateId, executionId });
+  if (prepared.early) return prepared.early;
+  return executeLocally(db, prepared, { executedBy, dispatch: null });
+}
+
+/** Shared by the local and routed entry points: tenancy link, plan lookup, idempotent result reuse. */
+function prepareExecution(db, { campaignId, candidateId, executionId }) {
   const linked = requireCampaignCandidate(db, campaignId, candidateId);
-  if (!linked.ok) return linked;
+  if (!linked.ok) return { early: linked };
 
   const plan = findEvent(db, campaignId, (e) => e.type === VIRTUAL_EVENT.PLANNED && e.payload?.executionId === executionId);
-  if (!plan || plan.payload?.candidateId !== candidateId) return { ok: false, error: 'plan_not_found' };
+  if (!plan || plan.payload?.candidateId !== candidateId) return { early: { ok: false, error: 'plan_not_found' } };
 
   const existingResult = findEvent(db, campaignId, (e) => e.type === VIRTUAL_EVENT.RESULT && e.payload?.executionId === executionId);
-  if (existingResult) return { ok: true, deduped: true, eventId: existingResult.id, result: existingResult.payload };
+  if (existingResult) return { early: { ok: true, deduped: true, eventId: existingResult.id, result: existingResult.payload } };
+  return { linked, plan };
+}
 
-  const gate = researchGateVerdict(db, campaignId, candidateId);
-  if (gate.reason === 'SAFETY_VETO') {
-    return persistResult(db, linked, plan.payload, { status: EXECUTION_STATUS.BLOCKED_INVALID_INPUT, reason: 'Research gate SAFETY_VETO at execution time.' });
-  }
-
-  const t0 = Date.now();
-  const dispatch = dispatchExecution(db, { projectId: plan.payload.projectId, campaignId, candidateId }, linked.candidate, plan.payload.requestedCapability, plan.payload.params);
-  const durationMs = Date.now() - t0;
-
-  if (!dispatch.ok) {
-    if (dispatch.blocked) return persistResult(db, linked, plan.payload, { status: dispatch.blocked, reason: dispatch.reason, executedBy });
-    return persistResult(db, linked, plan.payload, { status: EXECUTION_STATUS.FAILED_ENGINE, reason: dispatch.reason ?? 'engine_failed', executedBy });
-  }
-
-  const run = dispatch.run;
-  const tool = getTool(toolIdForCapability(plan.payload.requestedCapability));
-  const epistemicClassification = assertAllowedEpistemicClassification(evaluateExpectation(run.outputs, plan.payload.expectation));
-  const budgetExceeded = plan.payload.budget?.maxComputeSeconds != null && durationMs / 1000 > plan.payload.budget.maxComputeSeconds;
-
+/** The veto is enforced continuously, not only at plan time — for local AND remote execution. */
+function persistSafetyVetoIfAny(db, { linked, plan }, dispatch) {
+  const gate = researchGateVerdict(db, plan.payload.campaignId, plan.payload.candidateId);
+  if (gate.reason !== 'SAFETY_VETO') return null;
   return persistResult(db, linked, plan.payload, {
+    status: EXECUTION_STATUS.BLOCKED_INVALID_INPUT,
+    reason: 'Research gate SAFETY_VETO at execution time.',
+    ...(dispatch ? { dispatch: { ...dispatch, state: DISPATCH_STATE.BLOCKED_INVALID_INPUT } } : {}),
+  });
+}
+
+function executeLocally(db, prepared, { executedBy, dispatch }) {
+  const vetoed = persistSafetyVetoIfAny(db, prepared, dispatch);
+  if (vetoed) return vetoed;
+  const { linked, plan } = prepared;
+  const t0 = Date.now();
+  let outcome = dispatchExecution(db, { projectId: plan.payload.projectId, campaignId: plan.payload.campaignId, candidateId: plan.payload.candidateId }, linked.candidate, plan.payload.requestedCapability, plan.payload.params);
+  const durationMs = Date.now() - t0;
+  if (dispatch?.remoteCapable && outcome.blocked === EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE) {
+    // No local engine AND no worker configured for it: say both, precisely.
+    outcome = {
+      ...outcome,
+      dispatchState: DISPATCH_STATE.BLOCKED_WORKER_NOT_CONFIGURED,
+      reason: `${outcome.reason} No scientific worker is configured for it either (${dispatch.envName} is not set).`,
+    };
+  }
+  return finalizeExecution(db, prepared, outcome, { durationMs, executedBy, dispatch });
+}
+
+/** Maps a persisted execution status onto the dispatch vocabulary for the route that produced it. */
+function dispatchStateForStatus(status, mode) {
+  if (status === EXECUTION_STATUS.EXECUTED) return mode;
+  if (status === EXECUTION_STATUS.BLOCKED_INVALID_INPUT) return DISPATCH_STATE.BLOCKED_INVALID_INPUT;
+  if (status === EXECUTION_STATUS.FAILED_ENGINE) return DISPATCH_STATE.ENGINE_FAILED;
+  return DISPATCH_STATE.BLOCKED_ENGINE_UNAVAILABLE;
+}
+
+/**
+ * The ONE place a completed dispatch becomes a persisted RESULT — local and remote alike — so
+ * the scientific classification boundary (evaluateExpectation + the forbidden-promotion guard)
+ * cannot differ between the two routes.
+ */
+function finalizeExecution(db, { linked, plan }, outcome, { durationMs, executedBy, dispatch }) {
+  const p = plan.payload;
+  const withDispatch = (extra) => (dispatch
+    ? { ...extra, dispatch: { ...dispatch, state: outcome.dispatchState ?? dispatchStateForStatus(extra.status, dispatch.mode) } }
+    : extra);
+
+  if (!outcome.ok) {
+    if (outcome.blocked) return persistResult(db, linked, p, withDispatch({ status: outcome.blocked, reason: outcome.reason, executedBy }));
+    return persistResult(db, linked, p, withDispatch({ status: EXECUTION_STATUS.FAILED_ENGINE, reason: outcome.reason ?? 'engine_failed', executedBy }));
+  }
+
+  const run = outcome.run;
+  const tool = getTool(toolIdForCapability(p.requestedCapability));
+  const epistemicClassification = assertAllowedEpistemicClassification(evaluateExpectation(run.outputs, p.expectation));
+  const budgetExceeded = p.budget?.maxComputeSeconds != null && durationMs / 1000 > p.budget.maxComputeSeconds;
+  // A remotely executed engine is identified by what the worker proved it ran, not by
+  // whatever happens (or does not happen) to be installed in this service.
+  const selectedEngine = outcome.remoteEngine
+    ? { toolId: outcome.remoteEngine.toolId, engineName: tool?.engineName ?? outcome.remoteEngine.name, engineVersion: outcome.remoteEngine.version }
+    : tool ? { toolId: tool.toolId, engineName: tool.engineName, engineVersion: tool.version } : { toolId: null, engineName: run.engine, engineVersion: run.engineVersion };
+
+  return persistResult(db, linked, p, withDispatch({
     status: EXECUTION_STATUS.EXECUTED,
     executedBy,
     scienceRunId: run.id,
-    selectedEngine: tool ? { toolId: tool.toolId, engineName: tool.engineName, engineVersion: tool.version } : { toolId: null, engineName: run.engine, engineVersion: run.engineVersion },
+    selectedEngine,
     derivedOutput: run.outputs,
     epistemicClassification,
     limitations: [
       ...(tool?.assumptions ? [tool.assumptions] : []),
-      ...(dispatch.extraLimitations ?? []),
-      ...(budgetExceeded ? [`Measured compute time ${(durationMs / 1000).toFixed(2)}s exceeded the declared budget of ${plan.payload.budget.maxComputeSeconds}s.`] : []),
+      ...(outcome.extraLimitations ?? []),
+      ...(budgetExceeded ? [`Measured compute time ${(durationMs / 1000).toFixed(2)}s exceeded the declared budget of ${p.budget.maxComputeSeconds}s.`] : []),
     ],
-    provenanceRefs: [`science-run:${run.id}`, ...(tool?.fingerprint ? [`toolchain:${tool.fingerprint}`] : [])],
+    provenanceRefs: outcome.provenanceRefs ?? [`science-run:${run.id}`, ...(tool?.fingerprint ? [`toolchain:${tool.fingerprint}`] : [])],
     outputFingerprint: run.outputHash,
     durationMs,
+  }));
+}
+
+/* ------------------------- routed (local | private worker) execution ------------------------- */
+
+/** Transport-level failures: audited, returned as retryable, and never persisted as a RESULT. */
+const RETRYABLE_DISPATCH_STATES = new Set([
+  DISPATCH_STATE.BLOCKED_WORKER_NOT_CONFIGURED,
+  DISPATCH_STATE.BLOCKED_WORKER_UNAVAILABLE,
+  DISPATCH_STATE.WORKER_TIMEOUT,
+  DISPATCH_STATE.WORKER_RESPONSE_INVALID,
+]);
+const EXECUTION_STATUS_FOR_DISPATCH = Object.freeze({
+  [DISPATCH_STATE.BLOCKED_INVALID_INPUT]: EXECUTION_STATUS.BLOCKED_INVALID_INPUT,
+  [DISPATCH_STATE.ENGINE_FAILED]: EXECUTION_STATUS.FAILED_ENGINE,
+  [DISPATCH_STATE.BLOCKED_ENGINE_UNAVAILABLE]: EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE,
+  [DISPATCH_STATE.BLOCKED_WORKER_NOT_CONFIGURED]: EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE,
+  [DISPATCH_STATE.BLOCKED_WORKER_UNAVAILABLE]: EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE,
+  [DISPATCH_STATE.WORKER_TIMEOUT]: EXECUTION_STATUS.FAILED_ENGINE,
+  [DISPATCH_STATE.WORKER_RESPONSE_INVALID]: EXECUTION_STATUS.FAILED_ENGINE,
+});
+
+const REMOTE_LIMITATION = (workerGroup) =>
+  `Executed by the private "${workerGroup}" scientific worker (remote contract ${WORKER_CONTRACT_VERSION}). This service verified the engine identity, `
+  + 'the input and output fingerprints and the result schema before persisting this ScienceRun. Replay re-executes through this service\'s canonical '
+  + 'replay engine and reports REPLAY_BLOCKED_BY_RUNTIME where the engine is not installed here.';
+
+/** Concurrent calls for the same execution share one in-flight dispatch (never two worker runs). */
+const inFlightDispatches = new Map();
+
+function blockedInput(reason, errors = null) {
+  return { ok: false, state: DISPATCH_STATE.BLOCKED_INVALID_INPUT, status: EXECUTION_STATUS.BLOCKED_INVALID_INPUT, reason: errors?.length ? `${reason} ${errors.join('; ')}` : reason };
+}
+function onlyKeys(params, allowed) {
+  if (params === null || params === undefined) return { ok: true, value: {} };
+  if (typeof params !== 'object' || Array.isArray(params)) return { ok: false, unexpected: ['params'] };
+  const unexpected = Object.keys(params).filter((k) => !allowed.includes(k));
+  return unexpected.length ? { ok: false, unexpected } : { ok: true, value: params };
+}
+
+/**
+ * Builds the worker request for a governed plan — in THIS service, from the persisted candidate
+ * and plan params only. Params are strict per capability: anything else (including an attempt to
+ * pass outputs or a classification) blocks the experiment instead of being forwarded or ignored.
+ */
+function buildRemoteWorkerInput(capabilityId, candidate, rawParams) {
+  const allowedParams = {
+    'quantum-chemistry': ['method', 'basis'],
+    'protein-structure-ingestion': ['pdbText'],
+    'molecular-dynamics': ['steps'],
+    'molecular-docking': ['receptor'],
+    'admet-estimation': [],
+    'toxicity-risk-estimation': [],
+  }[capabilityId];
+  const params = onlyKeys(rawParams, allowedParams ?? []);
+  if (!params.ok) return blockedInput(`params contains fields that ${capabilityId} does not accept: ${params.unexpected.join(', ')}.`);
+  const p = params.value;
+  let input;
+
+  if (capabilityId === 'quantum-chemistry') {
+    // Geometry comes from this service's embedded RDKit (seeded ETKDG + MMFF, so a retry
+    // produces the identical geometry and therefore the identical worker fingerprint).
+    const emb = embed3d(candidate.canonicalSmiles);
+    if (!emb.ok) {
+      return emb.error === 'BLOCKED_BY_RUNTIME'
+        ? { ok: false, state: DISPATCH_STATE.BLOCKED_ENGINE_UNAVAILABLE, status: EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE, reason: 'RDKit (embedded in this service) is required to prepare the 3D geometry sent to the quantum-chemistry worker.' }
+        : { ok: false, state: DISPATCH_STATE.ENGINE_FAILED, status: EXECUTION_STATUS.FAILED_ENGINE, reason: 'embed_failed: RDKit could not embed a 3D geometry for this candidate.' };
+    }
+    input = {
+      smiles: candidate.canonicalSmiles,
+      method: p.method ?? 'RHF',
+      basis: p.basis ?? 'sto-3g',
+      charge: emb.charge ?? 0,
+      forceField: emb.forceField,
+      atoms: emb.atoms.map((a) => ({ element: a.element, x: a.x, y: a.y, z: a.z })),
+    };
+  } else if (capabilityId === 'protein-structure-ingestion') {
+    const pdbText = typeof p.pdbText === 'string' ? p.pdbText : '';
+    if (pdbText.trim().length < 20) {
+      return blockedInput('protein-structure-ingestion requires a real params.pdbText (PDB-format text, at least 20 characters) — this module never invents or fetches a structure on the caller\'s behalf.');
+    }
+    input = { pdbText };
+  } else if (capabilityId === 'molecular-dynamics') {
+    const rawSteps = p.steps;
+    input = { steps: Number.isFinite(rawSteps) ? Math.min(Math.max(Math.trunc(rawSteps), 100), 5000) : 300 };
+  } else if (capabilityId === 'molecular-docking') {
+    const receptorCheck = onlyKeys(p.receptor, ['receptorSmiles', 'receptorPdbqt', 'center', 'boxSize', 'exhaustiveness', 'nPoses', 'seed']);
+    if (!receptorCheck.ok) return blockedInput(`params.receptor contains unsupported fields: ${receptorCheck.unexpected.join(', ')}.`);
+    const r = receptorCheck.value;
+    // Same defaults as multiFidelity.dockCandidate, so a remote dock asks for exactly what a local one would.
+    input = {
+      ligandSmiles: candidate.canonicalSmiles,
+      ...(r.receptorSmiles !== undefined ? { receptorSmiles: r.receptorSmiles } : {}),
+      ...(r.receptorPdbqt !== undefined ? { receptorPdbqt: r.receptorPdbqt } : {}),
+      ...(r.center !== undefined ? { center: r.center } : {}),
+      boxSize: r.boxSize ?? [22, 22, 22],
+      exhaustiveness: r.exhaustiveness ?? 8,
+      nPoses: r.nPoses ?? 5,
+      seed: r.seed ?? 42,
+    };
+  } else if (capabilityId === 'admet-estimation' || capabilityId === 'toxicity-risk-estimation') {
+    input = { smiles: candidate.canonicalSmiles };
+  } else {
+    return blockedInput(`No remote execution contract exists for "${capabilityId}".`);
+  }
+
+  const validated = validateCapabilityInput(capabilityId, input);
+  if (!validated.ok) return blockedInput(`The ${capabilityId} request is outside its bounded schema:`, validated.errors);
+  return { ok: true, input };
+}
+
+async function executeRemotely(db, prepared, route, { workerConfig, client, executedBy }) {
+  const { linked, plan } = prepared;
+  const p = plan.payload;
+  const dispatchBase = { mode: DISPATCH_STATE.REMOTE_EXECUTION, workerGroup: route.workerGroup, workerContractVersion: WORKER_CONTRACT_VERSION };
+
+  const vetoed = persistSafetyVetoIfAny(db, prepared, dispatchBase);
+  if (vetoed) return vetoed;
+
+  const built = buildRemoteWorkerInput(p.requestedCapability, linked.candidate, p.params);
+  if (!built.ok) {
+    return persistResult(db, linked, p, { status: built.status, reason: built.reason, executedBy, dispatch: { ...dispatchBase, state: built.state } });
+  }
+
+  const workerClient = client ?? createRemoteScientificWorkerClient({ config: workerConfig });
+  const t0 = Date.now();
+  const outcome = await workerClient.execute({ capabilityId: p.requestedCapability, executionId: p.executionId, input: built.input });
+  const durationMs = Date.now() - t0;
+
+  // Everything below is synchronous, so the check and the writes cannot interleave with another
+  // call in this process: an execution that completed meanwhile is reused, never persisted twice.
+  const existing = findEvent(db, p.campaignId, (e) => e.type === VIRTUAL_EVENT.RESULT && e.payload?.executionId === p.executionId);
+  if (existing) return { ok: true, deduped: true, eventId: existing.id, result: existing.payload };
+
+  const dispatch = {
+    ...dispatchBase,
+    state: outcome.state,
+    attempts: outcome.attempts ?? 1,
+    httpStatus: outcome.httpStatus ?? null,
+    ...(outcome.ok ? {
+      inputFingerprint: outcome.inputFingerprint,
+      outputFingerprint: outcome.outputFingerprint,
+      environmentFingerprint: outcome.environmentFingerprint,
+      engineFingerprint: outcome.engine.fingerprint,
+      idempotentReplay: outcome.idempotentReplay,
+      roundTripMs: outcome.roundTripMs,
+    } : { error: outcome.error }),
+  };
+
+  if (!outcome.ok) {
+    if (RETRYABLE_DISPATCH_STATES.has(outcome.state)) {
+      const eventId = campaignStore.addEvent(db, {
+        campaignId: p.campaignId,
+        generation: linked.candidate.generation,
+        type: VIRTUAL_EVENT.DISPATCH_FAILED,
+        payload: {
+          contractVersion: VIRTUAL_LAB_CONTRACT_VERSION,
+          executionId: p.executionId, campaignId: p.campaignId, candidateId: p.candidateId,
+          requestedCapability: p.requestedCapability,
+          executedBy: boundedString(executedBy, 160) || null,
+          dispatch, reason: outcome.reason ?? null, retryable: true,
+          attemptedAt: new Date().toISOString(),
+        },
+      });
+      return {
+        ok: false, error: outcome.state, status: EXECUTION_STATUS_FOR_DISPATCH[outcome.state],
+        reason: outcome.reason ?? outcome.error, retryable: true, eventId, dispatch,
+      };
+    }
+    return persistResult(db, linked, p, {
+      status: EXECUTION_STATUS_FOR_DISPATCH[outcome.state] ?? EXECUTION_STATUS.FAILED_ENGINE,
+      reason: outcome.reason ?? outcome.error, executedBy, dispatch,
+    });
+  }
+
+  const record = buildScienceRunRecord(p.requestedCapability, { input: built.input, result: outcome.result, engineVersion: outcome.engine.version });
+  const run = saveScienceRun(db, {
+    projectId: p.projectId, campaignId: p.campaignId, candidateId: p.candidateId,
+    ...record.run,
+    provenance: {
+      ...record.run.provenance,
+      execution: {
+        mode: DISPATCH_STATE.REMOTE_EXECUTION,
+        workerGroup: route.workerGroup,
+        workerContractVersion: WORKER_CONTRACT_VERSION,
+        executionId: p.executionId,
+        inputFingerprint: outcome.inputFingerprint,
+        outputFingerprint: outcome.outputFingerprint,
+        environmentFingerprint: outcome.environmentFingerprint,
+        engineFingerprint: outcome.engine.fingerprint,
+      },
+    },
+    // The engine ran on the worker, so its duration and environment are the worker's.
+    durationMs: outcome.durationMs,
+    environmentHash: outcome.environmentFingerprint,
   });
+
+  return finalizeExecution(db, prepared, {
+    ok: true,
+    run,
+    remoteEngine: outcome.engine,
+    extraLimitations: [...record.extraLimitations, REMOTE_LIMITATION(route.workerGroup)],
+    provenanceRefs: [`science-run:${run.id}`, ...(outcome.engine.fingerprint ? [`worker-toolchain:${outcome.engine.fingerprint}`] : [])],
+  }, { durationMs, executedBy, dispatch });
+}
+
+/**
+ * Routed execution — the entry point for callers that may use private scientific workers
+ * (api.mjs). Always returns a Promise.
+ *
+ * Routing (compute/remoteScientificWorkerClient.mjs::routeCapability):
+ *   - RDKit descriptors and capabilities without a remote contract: LOCAL, unchanged.
+ *   - A worker-capable capability whose group URL is NOT configured: LOCAL, unchanged; if the
+ *     engine is not installed here either, the persisted result says BLOCKED_WORKER_NOT_CONFIGURED.
+ *   - A worker-capable capability whose group URL IS configured: REMOTE. A failed remote call
+ *     never falls back to a local or different engine — no capability currently permits that.
+ */
+export async function executeVirtualExperimentDispatched(db, { campaignId, candidateId, executionId, executedBy = null } = {}, {
+  workerConfig = resolveWorkerConfig(),
+  client = null,
+} = {}) {
+  const prepared = prepareExecution(db, { campaignId, candidateId, executionId });
+  if (prepared.early) return prepared.early;
+
+  const route = routeCapability(prepared.plan.payload.requestedCapability, workerConfig);
+  if (route.route !== 'REMOTE') {
+    const dispatch = route.remoteCapable
+      ? { mode: DISPATCH_STATE.LOCAL_EXECUTION, workerGroup: null, remoteCapable: true, envName: route.envName }
+      : { mode: DISPATCH_STATE.LOCAL_EXECUTION, workerGroup: null };
+    return executeLocally(db, prepared, { executedBy, dispatch });
+  }
+
+  const key = `${campaignId}\u0000${executionId}`;
+  const pending = inFlightDispatches.get(key);
+  if (pending) return pending;
+  const run = executeRemotely(db, prepared, route, { workerConfig, client, executedBy })
+    .finally(() => inFlightDispatches.delete(key));
+  inFlightDispatches.set(key, run);
+  return run;
 }
 
 function toolIdForCapability(capabilityId) {
@@ -451,6 +736,9 @@ function persistResult(db, linked, plan, extra) {
     reason: extra.reason ?? null,
     clinicalEfficacy: 'UNKNOWN',
     claimBoundary: CLAIM_BOUNDARY,
+    // Where the engine actually ran (LOCAL_EXECUTION | REMOTE_EXECUTION) and the precise dispatch
+    // state. Present only for routed executions; the plain local entry point's payload is unchanged.
+    ...(extra.dispatch ? { dispatch: extra.dispatch } : {}),
   };
   const eventId = campaignStore.addEvent(db, { campaignId: plan.campaignId, generation: linked.candidate.generation, type: VIRTUAL_EVENT.RESULT, payload });
   return { ok: true, deduped: false, eventId, result: payload };
@@ -566,7 +854,10 @@ export function deriveNextVirtualAction(dossier) {
 
   const latestPlan = dossier.plans[dossier.plans.length - 1];
   const result = dossier.results.find((r) => r.payload.executionId === latestPlan.payload.executionId)?.payload ?? null;
-  if (!result) return { action: 'EXECUTE_VIRTUAL_EXPERIMENT', reason: 'PLANNED_NOT_EXECUTED' };
+  if (!result) {
+    const failedDispatch = (dossier.dispatchFailures ?? []).some((f) => f.payload.executionId === latestPlan.payload.executionId);
+    return { action: 'EXECUTE_VIRTUAL_EXPERIMENT', reason: failedDispatch ? 'REMOTE_DISPATCH_FAILED_RETRYABLE' : 'PLANNED_NOT_EXECUTED' };
+  }
 
   if (result.status === EXECUTION_STATUS.BLOCKED_UNBOUND_ENGINE) return { action: 'ESCALATE_TO_EXTERNAL_VALIDATION', reason: 'NO_IN_SILICO_BINDING_FOR_CAPABILITY' };
   if (result.status === EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE) return { action: 'AWAIT_ENGINE_AVAILABILITY', reason: 'ENGINE_NOT_AVAILABLE_IN_RUNTIME' };
@@ -598,7 +889,7 @@ export function deriveNextVirtualAction(dossier) {
  * Adapter progress/iteration events are absent until an adapter supplies real
  * telemetry; no percentages or solver steps are inferred here.
  */
-export function projectScientificExecutionTimeline({ plans = [], results = [], replays = [], evidenceLinks = [] } = {}) {
+export function projectScientificExecutionTimeline({ plans = [], results = [], replays = [], evidenceLinks = [], dispatchFailures = [] } = {}) {
   const timeline = [];
   const typeOrder = new Map([
     [SCIENTIFIC_EXECUTION_EVENT.INPUT_VALIDATED, 0],
@@ -651,6 +942,10 @@ export function projectScientificExecutionTimeline({ plans = [], results = [], r
       add(event, SCIENTIFIC_EXECUTION_EVENT.EXECUTION_BLOCKED, `${result.status}: ${result.reason ?? 'Execution blocked.'}`, 'BLOCKED');
     }
   }
+  for (const event of dispatchFailures) {
+    const failed = event.payload;
+    add(event, SCIENTIFIC_EXECUTION_EVENT.EXECUTION_BLOCKED, `${failed.dispatch?.state ?? 'REMOTE_DISPATCH_FAILED'} (retryable): ${failed.reason ?? 'Remote worker dispatch failed.'}`, 'BLOCKED');
+  }
   for (const event of evidenceLinks) {
     add(event, SCIENTIFIC_EXECUTION_EVENT.EVIDENCE_PROPOSED, `Proposal ${event.payload.proposalId} is pending human publication.`);
   }
@@ -679,9 +974,10 @@ export function buildVirtualLabDossier(db, campaignId, candidateId) {
   const results = events.filter((e) => e.type === VIRTUAL_EVENT.RESULT && e.payload?.candidateId === candidateId);
   const replays = events.filter((e) => e.type === VIRTUAL_EVENT.REPLAY && e.payload?.candidateId === candidateId);
   const evidenceLinks = events.filter((e) => e.type === VIRTUAL_EVENT.EVIDENCE_PROPOSED && e.payload?.candidateId === candidateId);
+  const dispatchFailures = events.filter((e) => e.type === VIRTUAL_EVENT.DISPATCH_FAILED && e.payload?.candidateId === candidateId);
 
-  const executionTimeline = projectScientificExecutionTimeline({ plans, results, replays, evidenceLinks });
-  const dossier = { contractVersion: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId, candidate: linked.candidate, plans, results, replays, evidenceLinks, executionTimeline, clinicalEfficacy: 'UNKNOWN', claimBoundary: CLAIM_BOUNDARY };
+  const executionTimeline = projectScientificExecutionTimeline({ plans, results, replays, evidenceLinks, dispatchFailures });
+  const dossier = { contractVersion: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId, candidate: linked.candidate, plans, results, replays, evidenceLinks, dispatchFailures, executionTimeline, clinicalEfficacy: 'UNKNOWN', claimBoundary: CLAIM_BOUNDARY };
   return {
     ok: true,
     dossier: {

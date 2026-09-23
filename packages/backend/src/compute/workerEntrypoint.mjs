@@ -3,19 +3,12 @@
  * packages/backend/workers/<group>/Dockerfile). Reads GENESIS_WORKER_GROUP,
  * resolves it to its fixed engine allowlist, and starts the HTTP seam from
  * workerServer.mjs. See docs/RAILWAY_SCIENTIFIC_WORKERS.md for the grouping
- * rationale and the exact patch Codex applies to route traffic here.
+ * rationale and the remote-execution contract.
  */
 import { createWorkerServer } from './workerServer.mjs';
+import { WORKER_GROUPS } from './scientificCapabilityContract.mjs';
 
-export const WORKER_GROUPS = Object.freeze({
-  'chem-light': Object.freeze(['pyscf', 'biopython']),
-  structural: Object.freeze(['openmm', 'vina']),
-  admet: Object.freeze(['admet', 'toxicity']),
-  // Not built/tested here (see workers/pymeep/Dockerfile.proposal); listed so
-  // the seam is ready the moment a real conda-forge image passes the
-  // reference case, without another code change.
-  pymeep: Object.freeze(['pymeep']),
-});
+export { WORKER_GROUPS };
 
 function main() {
   const workerGroup = process.env.GENESIS_WORKER_GROUP;
@@ -28,9 +21,12 @@ function main() {
     process.exit(1);
   }
   const port = Number(process.env.PORT || 8090);
-  const server = createWorkerServer({ workerGroup, engineIds });
+  const server = createWorkerServer({ workerGroup, engineIds, authToken: process.env.GENESIS_SCIENTIFIC_WORKER_TOKEN });
   server.listen(port, () => {
-    console.log(`Genesis scientific worker [${workerGroup}] listening on :${port} (engines: ${engineIds.join(', ')})`);
+    console.log(
+      `Genesis scientific worker [${workerGroup}] listening on :${port} (engines: ${engineIds.join(', ')}; ` +
+        `execution endpoint ${server.executionAuthConfigured ? 'enabled' : 'DISABLED — GENESIS_SCIENTIFIC_WORKER_TOKEN missing or shorter than 32 characters'})`,
+    );
   });
   const shutdown = (signal) => {
     console.log(`${signal} received, closing worker [${workerGroup}]`);

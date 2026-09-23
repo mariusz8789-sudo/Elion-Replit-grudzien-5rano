@@ -89,7 +89,7 @@ import {
 import { buildLabObservationEvidenceInput } from './campaign/labEvidenceBridge.mjs';
 import {
   planVirtualExperiment,
-  executeVirtualExperiment,
+  executeVirtualExperimentDispatched,
   replayVirtualExperiment,
   linkVirtualExperimentEvidenceProposal,
   buildVirtualExperimentEvidenceInput,
@@ -757,23 +757,27 @@ export function handleApi(db, ctx) {
       }
       if (seg.length === 6 && seg[4] === 'virtual-lab' && seg[5] === 'execute' && method === 'POST') {
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
-        const executed = executeVirtualExperiment(db, {
+        // Asynchronous like /api/knowledge/ingest: a configured private scientific worker may run
+        // the engine (server.mjs awaits handleApi's result). Unconfigured capabilities run locally.
+        return executeVirtualExperimentDispatched(db, {
           campaignId, candidateId: body.candidateId, executionId: body.executionId, executedBy: user.id,
+        }).then((executed) => {
+          // A retryable worker-transport failure is not a result: 503, nothing persisted but an audit event.
+          if (!executed.ok) return err(executed.retryable ? 503 : 400, executed.error, executed.reason);
+          let evidenceProposal = null;
+          if (executed.result.status === 'EXECUTED_COMPUTATIONAL_EXPERIMENT') {
+            const bridge = buildVirtualExperimentEvidenceInput({ result: executed.result });
+            if (!bridge.ok) return err(400, bridge.error);
+            const proposed = proposeStructuredEvidence(bridge.input);
+            if (!proposed.ok) return err(400, proposed.error);
+            evidenceProposal = proposed;
+            linkVirtualExperimentEvidenceProposal(db, {
+              campaignId, candidateId: body.candidateId, executionId: executed.result.executionId,
+              proposalId: proposed.proposalId, evidenceContentHash: proposed.record?.contentHash ?? null,
+            });
+          }
+          return ok({ result: executed.result, evidenceProposal, deduped: executed.deduped }, 201);
         });
-        if (!executed.ok) return err(400, executed.error);
-        let evidenceProposal = null;
-        if (executed.result.status === 'EXECUTED_COMPUTATIONAL_EXPERIMENT') {
-          const bridge = buildVirtualExperimentEvidenceInput({ result: executed.result });
-          if (!bridge.ok) return err(400, bridge.error);
-          const proposed = proposeStructuredEvidence(bridge.input);
-          if (!proposed.ok) return err(400, proposed.error);
-          evidenceProposal = proposed;
-          linkVirtualExperimentEvidenceProposal(db, {
-            campaignId, candidateId: body.candidateId, executionId: executed.result.executionId,
-            proposalId: proposed.proposalId, evidenceContentHash: proposed.record?.contentHash ?? null,
-          });
-        }
-        return ok({ result: executed.result, evidenceProposal, deduped: executed.deduped }, 201);
       }
       if (seg.length === 7 && seg[4] === 'virtual-lab' && seg[6] === 'replay' && method === 'POST') {
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');

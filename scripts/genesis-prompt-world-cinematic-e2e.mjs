@@ -50,6 +50,7 @@ if (CASES.length === 0) {
 
 const sha256File = (filePath) => createHash('sha256').update(readFileSync(filePath)).digest('hex');
 const distinct = (values) => new Set(values).size === values.length;
+const greatestCommonDivisor = (a, b) => (b === 0 ? a : greatestCommonDivisor(b, a % b));
 
 function decoderCheck(capability, videoPath) {
   if (capability.status !== 'AVAILABLE' || !videoPath) return { ok: false, reason: 'encoder unavailable or video missing' };
@@ -107,6 +108,9 @@ try {
     await canvas.waitFor({ state: 'visible', timeout: 30_000 });
     const canvasBox = await canvas.boundingBox();
     if (!canvasBox) throw new Error(`${slug}: canvas has no bounding box`);
+    const captureWidth = Math.round(canvasBox.width);
+    const captureHeight = Math.round(canvasBox.height);
+    const aspectDivisor = greatestCommonDivisor(captureWidth, captureHeight);
     const hookState = await page.evaluate(() => {
       const hook = window.__GENESIS_WORLD_DIRECTOR__;
       if (!hook) throw new Error('WORLD_DIRECTOR_HOOK_MISSING');
@@ -144,7 +148,12 @@ try {
     const frameHashesDistinct = distinct(frames.map((frame) => frame.sha256));
     const film = {
       slug, prompt, template, descriptorKind, hookState,
-      cameraPlan: { source: 'canonical Spacetime CameraPath', mode: 'CINEMATIC', durationSeconds: captureDuration, fps: FPS, aspectRatio: '16:9', frameTimesSeconds: frames.map((frame) => frame.seconds) },
+      cameraPlan: {
+        source: 'canonical Spacetime CameraPath', mode: 'CINEMATIC', durationSeconds: captureDuration, fps: FPS,
+        frameSizePixels: { width: captureWidth, height: captureHeight },
+        aspectRatio: `${captureWidth / aspectDivisor}:${captureHeight / aspectDivisor}`,
+        frameTimesSeconds: frames.map((frame) => frame.seconds),
+      },
       frames: frames.map((frame) => ({ ...frame, path: path.relative(REPO, frame.path).replaceAll('\\', '/') })),
       video: video.outputPath ? { ...video, outputPath: path.relative(REPO, video.outputPath).replaceAll('\\', '/') } : video,
       decoder,

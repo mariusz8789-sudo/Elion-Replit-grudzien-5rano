@@ -1319,6 +1319,18 @@ kbd {
 .world-director-prompt-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
 .world-director-prompt-suggestions button { padding: 6px 8px; border: 1px solid rgba(83, 224, 255, .2); border-radius: 999px; color: #9ed9e8; background: rgba(4, 22, 34, .72); font: 600 .58rem/1.2 var(--font-mono); cursor: pointer; }
 .world-director-prompt-suggestions button:hover { border-color: rgba(108, 239, 255, .58); color: #d7f8ff; background: rgba(10, 66, 83, .64); }
+.experiment-playback { margin-top: 1rem; padding: .9rem; border: 1px solid rgba(78, 205, 196, .28); border-radius: 14px; background: rgba(4, 14, 24, .58); }
+.experiment-playback > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.experiment-playback-stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .5rem; margin: .8rem 0; padding: 0; list-style: none; }
+.experiment-playback-stages li { display: grid; gap: .25rem; min-height: 96px; padding: .65rem; border: 1px solid rgba(148, 163, 184, .22); border-radius: 10px; }
+.experiment-playback-stages li[data-state="RECORDED"] { border-color: rgba(74, 222, 128, .48); }
+.experiment-playback-stages li[data-state="RUNNING"] { border-color: rgba(56, 189, 248, .65); box-shadow: 0 0 16px rgba(56, 189, 248, .14); }
+.experiment-playback-stages li[data-state="BLOCKED"] { border-color: rgba(251, 146, 60, .55); }
+.experiment-playback-stages small { color: var(--muted); overflow-wrap: anywhere; }
+.experiment-output-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .4rem; }
+.experiment-output-facts div { padding: .45rem .55rem; border-radius: 8px; background: rgba(15, 23, 42, .58); }
+.experiment-output-facts dt { color: var(--muted); font-size: .72rem; }
+.experiment-output-facts dd { margin: .18rem 0 0; overflow-wrap: anywhere; }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] { display: grid; gap: 5px; padding: 9px; border: 1px solid rgba(137, 109, 255, .24); border-radius: 9px; background: rgba(5, 8, 22, .72); }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] > strong { color: #ddf7ff; font-size: .78rem; }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] > span, .world-director-panel [data-testid='world-director-spacetime-descriptor'] > small { color: #819caf; font: .62rem/1.4 var(--font-mono); }

@@ -9,6 +9,7 @@ import {
   type VirtualLabDossier,
 } from '../core/backend/client';
 import { getToken } from '../core/backend/session';
+import { ComputationalExperimentPlayback } from './ComputationalExperimentPlayback';
 
 interface Props {
   projectId: string;
@@ -142,6 +143,13 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
           <div className="cde-result"><span className="cde-result-label">Next action</span><span className="cde-result-actual">{dossier.nextAction.action}</span><span className="cde-result-bound">{dossier.nextAction.reason}</span></div>
         </div>
       )}
+      <ComputationalExperimentPlayback
+        plan={dossier?.plans.at(-1)?.payload ?? null}
+        result={latestResult}
+        replay={latestReplay}
+        evidenceProposalCount={dossier?.evidenceLinks.length ?? 0}
+        executing={busy}
+      />
       {latestResult?.derivedOutput && <details><summary>Computational output</summary><pre className="evidence">{JSON.stringify(latestResult.derivedOutput, null, 2)}</pre></details>}
       {message && <p className="settings-hint" role="status">{message}</p>}
       <p className="dossier-boundary">Clinical efficacy: UNKNOWN. The browser displays persisted backend state and performs no scientific derivation.</p>

@@ -16,6 +16,10 @@ import {
   type GenesisWorldWeather,
 } from '../core/worldDirector/genesisWorldDirector';
 import { buildSpacetimeCameraPath, type SpacetimeWorldDescriptor } from '../core/temporalCinematic/spacetimeWorldDescriptor';
+import {
+  buildGenerativeCinematicControlPackage,
+  type GenerativeCinematicControlPackage,
+} from '../core/temporalCinematic/generativeCinematicAdapter';
 import { canonicalJson, fnv1a } from '../core/events/hash';
 import {
   directSw4World,
@@ -46,6 +50,7 @@ declare global {
         readonly descriptor: SpacetimeWorldDescriptor;
       } | null;
       getSw4State(): Sw4RenderState | null;
+      getGenerativeControlPackage(): GenerativeCinematicControlPackage | null;
     };
   }
 }
@@ -169,6 +174,15 @@ export function WorldDirectorScreen(): JSX.Element {
         descriptor: productWorld.descriptor,
       }) : null,
       getSw4State: () => sw4World?.renderState ?? null,
+      getGenerativeControlPackage: () => productWorld && productCamera ? buildGenerativeCinematicControlPackage({
+        mode: 'TEXT_TO_VIDEO',
+        prompt: submittedPrompt,
+        worldId: productWorld.world.generated.worldId,
+        scientificStateFingerprint: productWorld.deterministicFingerprint,
+        epistemicStatus: productWorld.descriptor.epistemic,
+        durationSeconds: productCamera.durationSeconds,
+        cameraKeyframes: productCamera.keyframes,
+      }) : null,
     };
     window.__GENESIS_WORLD_DIRECTOR__ = hook;
     return () => { if (window.__GENESIS_WORLD_DIRECTOR__ === hook) delete window.__GENESIS_WORLD_DIRECTOR__; };
@@ -233,6 +247,7 @@ export function WorldDirectorScreen(): JSX.Element {
           <div data-testid="world-director-selection-evidence"><dt>Evidence</dt><dd>{assetEvidenceHash ? assetEvidenceHash.slice(0, 16) : '—'}</dd></div>
           <div data-testid="world-director-product-world"><dt>Świat z promptu</dt><dd>{sw4World ? `SW-4 · ${sw4World.engine.graph.listEntities().length} encji` : productWorld ? `${productWorld.primaryTemplate} · ${productWorld.world.graph.listEntities().length} encji` : promptError ?? '—'}</dd></div>
           <div data-testid="world-director-product-proof"><dt>Fingerprint</dt><dd>{sw4World?.renderState.worldStateFingerprint ?? productWorld?.deterministicFingerprint ?? '—'}</dd></div>
+          <div data-testid="world-director-generative-status"><dt>AI cinematic</dt><dd>{productWorld ? 'ADAPTER READY · PROVIDER NOT CONNECTED · VISUALIZATION ONLY' : '—'}</dd></div>
         </dl>
         {sw4World ? <Sw4WorldPreview
           state={sw4World.renderState}

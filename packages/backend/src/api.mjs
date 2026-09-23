@@ -81,6 +81,7 @@ import {
   buildLabValidationDossier,
   compareModelToLabObservation,
   createLabValidationRequest,
+  findLabEvidenceProposal,
   ingestExternalLabObservation,
   linkLabEvidenceProposal,
   reviewExternalLabObservation,
@@ -545,6 +546,9 @@ export function handleApi(db, ctx) {
               endpointPlan: body.endpointPlan,
               externalProvider: body.externalProvider ?? null,
               preregistrationRef: body.preregistrationRef ?? null,
+              preclinicalProtocol: body.preclinicalProtocol ?? null,
+              requiredWetLabId: body.requiredWetLabId ?? null,
+              governedManualRequest: body.governedManualRequest ?? null,
               requestedBy: user.id,
             });
             if (!result.ok) return err(400, result.error);
@@ -580,7 +584,12 @@ export function handleApi(db, ctx) {
           observation: body.observation,
           ingestedBy: user.id,
         });
-        if (!result.ok) return err(400, result.error);
+        if (!result.ok) {
+          // Item 4 — surface which existing observation this one conflicts with, not just the code.
+          return result.error === 'external_observation_conflict'
+            ? { status: 400, body: { error: result.error, existingObservationId: result.existingObservationId } }
+            : err(400, result.error);
+        }
         return ok({ observation: result.observation, eventId: result.eventId, deduped: result.deduped }, 201);
       }
       // /api/projects/:id/campaigns/:cid/lab-validation/observations/:observationId/review (editor+) —
@@ -600,22 +609,30 @@ export function handleApi(db, ctx) {
 
         let evidenceProposal = null;
         if (reviewed.review.verdict === 'ACCEPTED_AS_OBSERVATION') {
-          const bridge = buildLabObservationEvidenceInput({ observation: reviewed.observation, review: reviewed.review });
-          if (!bridge.ok) return err(400, bridge.error);
-          const proposed = proposeStructuredEvidence(bridge.input);
-          if (!proposed.ok) return err(400, proposed.error);
-          evidenceProposal = proposed;
-          linkLabEvidenceProposal(db, {
-            campaignId,
-            candidateId: body.candidateId,
-            observationId: seg[6],
-            proposalId: proposed.proposalId,
-            evidenceContentHash: proposed.record?.contentHash ?? null,
-          });
+          // Item 7 — idempotent: a repeated/deduped ACCEPTED review (or a retry of this same call)
+          // reuses the EXISTING evidence proposal rather than minting a second one on the ledger.
+          const existingLink = findLabEvidenceProposal(db, campaignId, seg[6]);
+          if (existingLink) {
+            evidenceProposal = { ok: true, mode: 'PROPOSE_ONLY', proposalId: existingLink.proposalId, deduped: true };
+          } else {
+            const bridge = buildLabObservationEvidenceInput({ observation: reviewed.observation, review: reviewed.review });
+            if (!bridge.ok) return err(400, bridge.error);
+            const proposed = proposeStructuredEvidence(bridge.input);
+            if (!proposed.ok) return err(400, proposed.error);
+            evidenceProposal = proposed;
+            linkLabEvidenceProposal(db, {
+              campaignId,
+              candidateId: body.candidateId,
+              observationId: seg[6],
+              proposalId: proposed.proposalId,
+              evidenceContentHash: proposed.record?.contentHash ?? null,
+            });
+          }
         }
         return ok({ review: reviewed.review, evidenceProposal }, 201);
       }
-      // /api/projects/:id/campaigns/:cid/lab-validation/comparisons (editor+) — model-vs-observation, explicit tolerance required
+      // /api/projects/:id/campaigns/:cid/lab-validation/comparisons (editor+) — model-vs-observation;
+      // outputKey/unit/tolerance are frozen on the original request's endpointPlan, never chosen here.
       if (seg.length === 6 && seg[4] === 'lab-validation' && seg[5] === 'comparisons' && method === 'POST') {
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
         const result = compareModelToLabObservation(db, {
@@ -623,11 +640,14 @@ export function handleApi(db, ctx) {
           candidateId: body.candidateId,
           scienceRunId: body.scienceRunId,
           observationId: body.observationId,
-          outputKey: body.outputKey,
-          tolerance: body.tolerance,
           comparedBy: user.id,
         });
-        if (!result.ok) return err(400, result.error);
+        if (!result.ok) {
+          // Item 6 — surface the frozen/model/observation units on a mismatch, not just the code.
+          return result.error === 'unit_mismatch'
+            ? { status: 400, body: { error: result.error, modelUnit: result.modelUnit, observationUnit: result.observationUnit, expectedUnit: result.expectedUnit } }
+            : err(400, result.error);
+        }
         return ok({ comparison: result.comparison, eventId: result.eventId, deduped: result.deduped }, 201);
       }
       // /api/projects/:id/campaigns/:cid/science-runs/:runId[/verify|/verifications]

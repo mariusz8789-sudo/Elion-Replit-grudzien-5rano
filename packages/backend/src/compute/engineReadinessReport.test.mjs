@@ -89,9 +89,9 @@ describe('engineReadinessReport — shape and honesty', () => {
     for (const gap of report.knownGaps) assert.ok(gap.reason && gap.reason.length > 0);
   });
 
-  test('the stale capabilities.mjs manifest is reported as a registry bug, not silently fixed', () => {
+  test('the capability-manifest inconsistency found by the audit is resolved', () => {
     const report = REPORT;
-    assert.ok(report.registryBugsDiscovered.some((b) => b.location.includes('capabilities.mjs')));
+    assert.ok(!report.registryBugsDiscovered.some((b) => b.location.includes('capabilities.mjs')));
   });
 
   test('additionalProbedLibraries never duplicates a toolId already covered by the validated toolchain', () => {

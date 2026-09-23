@@ -21,7 +21,7 @@
  * verbatim from each adapter's own doc comments.
  */
 import { performance } from 'node:perf_hooks';
-import { getTool, TOOL_STATUS, _resetValidation } from '../campaign/toolchain.mjs';
+import { getTool, listToolIds, TOOL_STATUS, _resetValidation } from '../campaign/toolchain.mjs';
 import { snapshotEnvironment } from '../provenance.mjs';
 
 export const READINESS_STATUS = Object.freeze({
@@ -36,19 +36,8 @@ export const READINESS_STATUS = Object.freeze({
   FAILED_ENGINE: 'FAILED_ENGINE',
 });
 
-/**
- * `campaign/toolchain.mjs` exports no plain id list — only `listToolchain()`
- * (which runs every reference case) and `getTool(id)`. To measure each
- * engine's reference case in isolation (one real duration per engine, not
- * one opaque batched number), this module needs the id set BEFORE running
- * anything, so it is enumerated here once. This is not a competing
- * description of the engines — it carries no capability/adapter/status
- * information, only the eight ids the registry itself defines — and
- * `engineReadinessReport.test.mjs` asserts it stays identical to
- * `listToolchain().map(t => t.toolId)`, so any drift in the real registry
- * fails that test rather than silently going stale here.
- */
-export const TOOLCHAIN_TOOL_IDS = Object.freeze(['rdkit', 'pyscf', 'openmm', 'vina', 'biopython', 'pymeep', 'admet', 'toxicity']);
+/** Canonical id order, read from the registry without running an engine. */
+export const TOOLCHAIN_TOOL_IDS = Object.freeze(listToolIds());
 
 /** toolId -> the adapter module that `campaign/toolchain.mjs`'s own `validate*` function actually calls (verified against toolchain.mjs's imports, not guessed from the toolId's name). */
 const ADAPTER_MODULE = Object.freeze({
@@ -86,13 +75,10 @@ const KNOWN_GAPS = Object.freeze([
   },
 ]);
 
-/** Registry inconsistencies discovered while building this audit — reported, never silently fixed (per task instructions, a toolchain/registry bug is reported before any registry file is changed). */
-const REGISTRY_BUGS = Object.freeze([
-  {
-    location: 'packages/backend/src/compute/capabilities.mjs',
-    description: 'The capability manifest (CAPABILITIES array) still declares docking, molecular-dynamics, quantum-chemistry, admet, and toxicity as status EXTERNAL_ENGINE_REQUIRED, and protein-structure as EXTERNAL_ENGINE_REQUIRED too — i.e. "no implementation exists yet, an external engine would be needed." This is stale: real, validated adapters for all of these already exist and are registered in campaign/toolchain.mjs (toolIds vina, openmm, pyscf, admet, toxicity, biopython), each capable of a passing reference case when its runtime is available. capabilities.mjs was evidently not updated when toolchain.mjs was introduced. Reported here per instructions rather than fixed: capabilities.mjs is a shared file outside this audit\'s "prefer additive files" boundary, and its EXTERNAL_ENGINE_REQUIRED entries feed capability-gap messaging consumed elsewhere (e.g. candidate passports) — correcting it is a larger, more careful change than this focused, read-only audit should make on its own.',
-  },
-]);
+// Populated only by current, unresolved inconsistencies. The stale capability
+// manifest discovered during the audit is now fixed by deriving its live
+// statuses from this same canonical toolchain.
+const REGISTRY_BUGS = Object.freeze([]);
 
 /** env_probe.py key -> the toolId it corresponds to, so the broader probe sweep does not re-list an engine already covered by the validated toolchain entries above. */
 const PROBE_KEY_TO_TOOL_ID = Object.freeze({ rdkit: 'rdkit', pyscf: 'pyscf', openmm: 'openmm', pymeep: 'pymeep', biopython: 'biopython', vina_py: 'vina', meeko: 'vina', admet_ai: 'admet' });

@@ -261,6 +261,11 @@ export function listToolchain() {
   return TOOLS.map(present);
 }
 
+/** Canonical ids without triggering any reference-case execution. */
+export function listToolIds() {
+  return TOOLS.map((tool) => tool.toolId);
+}
+
 export function getTool(toolId) {
   const t = TOOLS.find((x) => x.toolId === toolId);
   return t ? present(t) : null;

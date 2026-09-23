@@ -58,6 +58,21 @@ export const VIRTUAL_EVENT = Object.freeze({
   EVIDENCE_PROPOSED: 'VIRTUAL_EXPERIMENT_EVIDENCE_PROPOSED',
 });
 
+export const SCIENTIFIC_EXECUTION_EVENT = Object.freeze({
+  EXPERIMENT_PLANNED: 'EXPERIMENT_PLANNED',
+  INPUT_VALIDATED: 'INPUT_VALIDATED',
+  ENGINE_SELECTED: 'ENGINE_SELECTED',
+  ENGINE_OUTPUT_AVAILABLE: 'ENGINE_OUTPUT_AVAILABLE',
+  RESULT_CREATED: 'RESULT_CREATED',
+  EVIDENCE_PROPOSED: 'EVIDENCE_PROPOSED',
+  REPLAY_MATCH: 'REPLAY_MATCH',
+  REPLAY_DRIFT: 'REPLAY_DRIFT',
+  REPLAY_BLOCKED: 'REPLAY_BLOCKED',
+  EXECUTION_BLOCKED: 'EXECUTION_BLOCKED',
+  EXECUTION_FAILED: 'EXECUTION_FAILED',
+  EXECUTION_COMPLETED: 'EXECUTION_COMPLETED',
+});
+
 /** Required execution statuses (exact vocabulary) — never manufacture a successful result. */
 export const EXECUTION_STATUS = Object.freeze({
   EXECUTED: 'EXECUTED_COMPUTATIONAL_EXPERIMENT',
@@ -576,6 +591,83 @@ export function deriveNextVirtualAction(dossier) {
   return { action: 'RUN_ADDITIONAL_VIRTUAL_EXPERIMENT', reason: 'UNKNOWN_CLASSIFICATION' };
 }
 
+/**
+ * Read-only projection of the append-only campaign records into the canonical
+ * scientific lifecycle vocabulary. This is deliberately not another event
+ * bus: every item points back to the campaign event that proves it happened.
+ * Adapter progress/iteration events are absent until an adapter supplies real
+ * telemetry; no percentages or solver steps are inferred here.
+ */
+export function projectScientificExecutionTimeline({ plans = [], results = [], replays = [], evidenceLinks = [] } = {}) {
+  const timeline = [];
+  const typeOrder = new Map([
+    [SCIENTIFIC_EXECUTION_EVENT.INPUT_VALIDATED, 0],
+    [SCIENTIFIC_EXECUTION_EVENT.EXPERIMENT_PLANNED, 1],
+    [SCIENTIFIC_EXECUTION_EVENT.ENGINE_SELECTED, 2],
+    [SCIENTIFIC_EXECUTION_EVENT.ENGINE_OUTPUT_AVAILABLE, 3],
+    [SCIENTIFIC_EXECUTION_EVENT.RESULT_CREATED, 4],
+    [SCIENTIFIC_EXECUTION_EVENT.EXECUTION_COMPLETED, 5],
+    [SCIENTIFIC_EXECUTION_EVENT.EXECUTION_BLOCKED, 5],
+    [SCIENTIFIC_EXECUTION_EVENT.EXECUTION_FAILED, 5],
+    [SCIENTIFIC_EXECUTION_EVENT.EVIDENCE_PROPOSED, 6],
+    [SCIENTIFIC_EXECUTION_EVENT.REPLAY_MATCH, 7],
+    [SCIENTIFIC_EXECUTION_EVENT.REPLAY_DRIFT, 7],
+    [SCIENTIFIC_EXECUTION_EVENT.REPLAY_BLOCKED, 7],
+  ]);
+  const detailText = (value) => {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return 'No additional detail recorded.';
+    try { return JSON.stringify(value); } catch { return String(value); }
+  };
+  const add = (source, type, detail, status = 'RECORDED') => {
+    timeline.push({
+      id: `${source.id}:${type}`,
+      type,
+      status,
+      occurredAt: source.createdAt,
+      executionId: source.payload?.executionId ?? null,
+      sourceEventId: source.id,
+      sourceEventType: source.type,
+      detail: detailText(detail),
+    });
+  };
+
+  for (const event of plans) {
+    add(event, SCIENTIFIC_EXECUTION_EVENT.INPUT_VALIDATED, `Validated governed input ${event.payload.inputFingerprint}.`);
+    add(event, SCIENTIFIC_EXECUTION_EVENT.EXPERIMENT_PLANNED, `Planned ${event.payload.requestedCapability}.`);
+  }
+  for (const event of results) {
+    const result = event.payload;
+    if (result.status === EXECUTION_STATUS.EXECUTED) {
+      if (result.selectedEngine) {
+        add(event, SCIENTIFIC_EXECUTION_EVENT.ENGINE_SELECTED, `${result.selectedEngine.engineName} ${result.selectedEngine.engineVersion ?? 'version unavailable'}.`);
+      }
+      add(event, SCIENTIFIC_EXECUTION_EVENT.ENGINE_OUTPUT_AVAILABLE, `Output fingerprint ${result.outputFingerprint ?? 'unavailable'}.`);
+      add(event, SCIENTIFIC_EXECUTION_EVENT.RESULT_CREATED, `${result.epistemicClassification}; ScienceRun ${result.scienceRunId}.`);
+      add(event, SCIENTIFIC_EXECUTION_EVENT.EXECUTION_COMPLETED, `Real bounded engine call completed in ${result.durationMs ?? 0} ms.`);
+    } else if (result.status === EXECUTION_STATUS.FAILED_ENGINE) {
+      add(event, SCIENTIFIC_EXECUTION_EVENT.EXECUTION_FAILED, result.reason ?? 'Engine execution failed.', 'FAILED');
+    } else {
+      add(event, SCIENTIFIC_EXECUTION_EVENT.EXECUTION_BLOCKED, `${result.status}: ${result.reason ?? 'Execution blocked.'}`, 'BLOCKED');
+    }
+  }
+  for (const event of evidenceLinks) {
+    add(event, SCIENTIFIC_EXECUTION_EVENT.EVIDENCE_PROPOSED, `Proposal ${event.payload.proposalId} is pending human publication.`);
+  }
+  for (const event of replays) {
+    const replay = event.payload;
+    const type = replay.replayStatus === REPLAY_STATUS.MATCH
+      ? SCIENTIFIC_EXECUTION_EVENT.REPLAY_MATCH
+      : replay.replayStatus === REPLAY_STATUS.DRIFT
+        ? SCIENTIFIC_EXECUTION_EVENT.REPLAY_DRIFT
+        : SCIENTIFIC_EXECUTION_EVENT.REPLAY_BLOCKED;
+    add(event, type, replay.detail, type === SCIENTIFIC_EXECUTION_EVENT.REPLAY_MATCH ? 'RECORDED' : 'BLOCKED');
+  }
+  return timeline.sort((a, b) => a.occurredAt - b.occurredAt
+    || (typeOrder.get(a.type) ?? 99) - (typeOrder.get(b.type) ?? 99)
+    || a.id.localeCompare(b.id));
+}
+
 /** Read-only aggregate for API/UI and subsequent reasoning. Mirrors labClosedLoop.mjs's own
  *  buildLabValidationDossier shape/spirit without importing it (different event types/domain). */
 export function buildVirtualLabDossier(db, campaignId, candidateId) {
@@ -588,7 +680,8 @@ export function buildVirtualLabDossier(db, campaignId, candidateId) {
   const replays = events.filter((e) => e.type === VIRTUAL_EVENT.REPLAY && e.payload?.candidateId === candidateId);
   const evidenceLinks = events.filter((e) => e.type === VIRTUAL_EVENT.EVIDENCE_PROPOSED && e.payload?.candidateId === candidateId);
 
-  const dossier = { contractVersion: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId, candidate: linked.candidate, plans, results, replays, evidenceLinks, clinicalEfficacy: 'UNKNOWN', claimBoundary: CLAIM_BOUNDARY };
+  const executionTimeline = projectScientificExecutionTimeline({ plans, results, replays, evidenceLinks });
+  const dossier = { contractVersion: VIRTUAL_LAB_CONTRACT_VERSION, campaignId, candidateId, candidate: linked.candidate, plans, results, replays, evidenceLinks, executionTimeline, clinicalEfficacy: 'UNKNOWN', claimBoundary: CLAIM_BOUNDARY };
   return {
     ok: true,
     dossier: {

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ComputationalExperimentPlayback, experimentPlaybackStages } from '../components/ComputationalExperimentPlayback';
-import type { VirtualExperimentPlan, VirtualExperimentReplay, VirtualExperimentResult } from '../core/backend/client';
+import type { ScientificExecutionEvent, VirtualExperimentPlan, VirtualExperimentReplay, VirtualExperimentResult } from '../core/backend/client';
 
 const plan: VirtualExperimentPlan = {
   executionId: 'exec-1', inputFingerprint: 'input-fp', campaignId: 'c', candidateId: 'candidate', candidateSmiles: 'CCO',
@@ -11,8 +11,12 @@ const result: VirtualExperimentResult = {
   executionId: 'exec-1', campaignId: 'c', candidateId: 'candidate', hypothesis: 'h', requestedCapability: 'molecular-descriptors',
   status: 'EXECUTED_COMPUTATIONAL_EXPERIMENT', scienceRunId: 'run-1', selectedEngine: { toolId: 'rdkit', engineName: 'RDKit', engineVersion: '2026.3.6' },
   derivedOutput: { crippenLogP: 1.2, atoms: 3 }, epistemicClassification: 'IN_SILICO_SUPPORT', limitations: [], provenanceRefs: ['run-1'],
-  outputFingerprint: 'output-fp', replayStatus: 'NOT_YET_REPLAYED', reason: null, clinicalEfficacy: 'UNKNOWN', claimBoundary: 'computational only',
+  outputFingerprint: 'output-fp', replayStatus: 'NOT_YET_REPLAYED', reason: null, durationMs: 42, executedAt: '2026-09-23T00:00:00.000Z', clinicalEfficacy: 'UNKNOWN', claimBoundary: 'computational only',
 };
+const events: ScientificExecutionEvent[] = [
+  { id: 'event-1:ENGINE_SELECTED', type: 'ENGINE_SELECTED', status: 'RECORDED', occurredAt: 1, executionId: 'exec-1', sourceEventId: 'event-1', sourceEventType: 'VIRTUAL_EXPERIMENT_RESULT', detail: 'RDKit 2026.3.6.' },
+  { id: 'event-1:EXECUTION_COMPLETED', type: 'EXECUTION_COMPLETED', status: 'RECORDED', occurredAt: 1, executionId: 'exec-1', sourceEventId: 'event-1', sourceEventType: 'VIRTUAL_EXPERIMENT_RESULT', detail: 'Real bounded engine call completed in 42 ms.' },
+];
 const replay: VirtualExperimentReplay = {
   executionId: 'exec-1', scienceRunId: 'run-1', verificationId: 'verify-1', underlyingVerdict: 'MATCH', replayStatus: 'REPLAY_MATCH',
   detail: 'same output', clinicalEfficacy: 'UNKNOWN', claimBoundary: 'computational only',
@@ -37,5 +41,24 @@ describe('ComputationalExperimentPlayback', () => {
     expect(html).toContain('crippenLogP');
     expect(html).toContain('REPLAY_MATCH');
     expect(html).not.toContain('clinical efficacy confirmed');
+  });
+
+  it('renders canonical execution records without inventing progress', () => {
+    const html = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} events={events} />);
+    expect(html).toContain('ENGINE SELECTED');
+    expect(html).toContain('Real bounded engine call completed in 42 ms.');
+    expect(html).not.toContain('ENGINE PROGRESS');
+    expect(html).not.toContain('%');
+  });
+
+  it('uses the same canonical events for school and research presentation depths', () => {
+    const school = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} events={events} level="SCHOOL" />);
+    const research = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} events={events} level="RESEARCH" />);
+    expect(school).toContain('Genesis selected the scientific program');
+    expect(school).not.toContain('source VIRTUAL_EXPERIMENT_RESULT');
+    expect(research).toContain('source VIRTUAL_EXPERIMENT_RESULT');
+    expect(research).toContain('Output fingerprint: output-fp');
+    expect((school.match(/data-event-type=/g) ?? []).length).toBe(events.length);
+    expect((research.match(/data-event-type=/g) ?? []).length).toBe(events.length);
   });
 });

@@ -1159,8 +1159,21 @@ export interface VirtualExperimentResult {
   outputFingerprint: string | null;
   replayStatus: string;
   reason: string | null;
+  durationMs: number;
+  executedAt: string;
   clinicalEfficacy: 'UNKNOWN';
   claimBoundary: string;
+}
+
+export interface ScientificExecutionEvent {
+  id: string;
+  type: 'EXPERIMENT_PLANNED' | 'INPUT_VALIDATED' | 'ENGINE_SELECTED' | 'ENGINE_OUTPUT_AVAILABLE' | 'RESULT_CREATED' | 'EVIDENCE_PROPOSED' | 'REPLAY_MATCH' | 'REPLAY_DRIFT' | 'REPLAY_BLOCKED' | 'EXECUTION_BLOCKED' | 'EXECUTION_FAILED' | 'EXECUTION_COMPLETED';
+  status: 'RECORDED' | 'BLOCKED' | 'FAILED';
+  occurredAt: number;
+  executionId: string | null;
+  sourceEventId: string;
+  sourceEventType: string;
+  detail: string;
 }
 
 export interface VirtualExperimentReplay {
@@ -1169,7 +1182,7 @@ export interface VirtualExperimentReplay {
   verificationId: string;
   underlyingVerdict: string;
   replayStatus: 'REPLAY_MATCH' | 'REPLAY_DRIFT' | 'REPLAY_ENGINE_VERSION_CHANGED' | 'REPLAY_BLOCKED_BY_RUNTIME' | 'REPLAY_UNSUPPORTED';
-  detail: string;
+  detail: string | Record<string, unknown>;
   clinicalEfficacy: 'UNKNOWN';
   claimBoundary: string;
 }
@@ -1183,6 +1196,7 @@ export interface VirtualLabDossier {
   results: LabCampaignEvent<VirtualExperimentResult>[];
   replays: LabCampaignEvent<VirtualExperimentReplay>[];
   evidenceLinks: LabCampaignEvent<{ executionId: string; proposalId: string; mode: 'PROPOSE_ONLY'; status: 'PENDING_HUMAN_PUBLICATION' }>[];
+  executionTimeline: ScientificExecutionEvent[];
   nextAction: { action: string; reason: string; claimBoundary?: string };
   dossierFingerprint: string;
   clinicalEfficacy: 'UNKNOWN';

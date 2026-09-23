@@ -125,6 +125,17 @@ test.describe('Genesis computational + external Lab loops — real API and real 
     await expect(virtualLab.getByTestId('virtual-lab-dossier')).toContainText('pending proposal');
     await virtualLab.getByTestId('virtual-lab-replay').click();
     await expect(virtualLab.getByTestId('virtual-lab-dossier')).toContainText('REPLAY_MATCH', { timeout: 20_000 });
+    const executionEvents = virtualLab.getByTestId('scientific-execution-events');
+    await expect(executionEvents).toContainText('ENGINE SELECTED');
+    await expect(executionEvents).toContainText('EXECUTION COMPLETED');
+    await expect(executionEvents).toContainText('EVIDENCE PROPOSED');
+    await expect(executionEvents).toContainText('REPLAY MATCH');
+    await expect(executionEvents).not.toContainText('ENGINE PROGRESS');
+
+    await virtualLab.getByTestId('experiment-presentation-level').selectOption('SCHOOL');
+    await expect(executionEvents).toContainText('Genesis selected the scientific program');
+    await virtualLab.getByTestId('experiment-presentation-level').selectOption('RESEARCH');
+    await expect(virtualLab.getByTestId('research-execution-details')).toContainText('Output fingerprint');
 
     // Create a real governed external-validation request. No external observation is invented.
     await panel.getByLabel('Endpoint ID').fill('e2e-endpoint');

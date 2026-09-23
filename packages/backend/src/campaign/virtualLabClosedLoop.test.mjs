@@ -10,6 +10,7 @@ import {
   linkVirtualExperimentEvidenceProposal,
   buildVirtualExperimentEvidenceInput,
   buildVirtualLabDossier,
+  projectScientificExecutionTimeline,
   EXECUTION_STATUS,
   REPLAY_STATUS,
   EPISTEMIC_CLASSIFICATION,
@@ -481,6 +482,54 @@ describe('Test: next-action reasoning stays in-silico — never generates a wet-
     const a = buildVirtualLabDossier(db, campaignId, candidateId);
     const b = buildVirtualLabDossier(db, campaignId, candidateId);
     assert.equal(a.dossier.dossierFingerprint, b.dossier.dossierFingerprint);
+  });
+});
+
+describe('Test: scientific execution timeline is a projection of real campaign records', () => {
+  test('a real RDKit execution, Evidence proposal link and replay expose traceable lifecycle events', () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, {
+      campaignId, candidateId, hypothesis: 'Timeline reference execution.', requestedCapability: 'molecular-descriptors',
+    });
+    const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    assert.equal(executed.result.status, 'EXECUTED_COMPUTATIONAL_EXPERIMENT');
+    linkVirtualExperimentEvidenceProposal(db, {
+      campaignId, candidateId, executionId: planned.plan.executionId, proposalId: 'proposal-timeline-1',
+    });
+    replayVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+
+    const dossier = buildVirtualLabDossier(db, campaignId, candidateId).dossier;
+    const types = dossier.executionTimeline.map((event) => event.type);
+    assert.ok(types.includes('INPUT_VALIDATED'));
+    assert.ok(types.includes('EXPERIMENT_PLANNED'));
+    assert.ok(types.includes('ENGINE_SELECTED'));
+    assert.ok(types.includes('ENGINE_OUTPUT_AVAILABLE'));
+    assert.ok(types.includes('RESULT_CREATED'));
+    assert.ok(types.includes('EVIDENCE_PROPOSED'));
+    assert.ok(types.includes('EXECUTION_COMPLETED'));
+    assert.ok(types.includes('REPLAY_MATCH'));
+    assert.equal(types.includes('ENGINE_PROGRESS'), false, 'no progress is fabricated when the adapter exposes none');
+    assert.equal(types.includes('ENGINE_STEP'), false, 'no solver steps are fabricated when the adapter exposes none');
+    assert.ok(dossier.executionTimeline.every((event) => event.sourceEventId && event.sourceEventType));
+  });
+
+  test('a blocked registered capability produces EXECUTION_BLOCKED and never completion', () => {
+    const { campaignId, candidateId } = seedCampaignAndCandidate(db);
+    const planned = planVirtualExperiment(db, {
+      campaignId, candidateId, hypothesis: 'Honest blocked timeline.', requestedCapability: 'maxwell-fdtd',
+    });
+    executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
+    const timeline = buildVirtualLabDossier(db, campaignId, candidateId).dossier.executionTimeline;
+    assert.ok(timeline.some((event) => event.type === 'EXECUTION_BLOCKED' && event.status === 'BLOCKED'));
+    assert.equal(timeline.some((event) => event.type === 'EXECUTION_COMPLETED'), false);
+  });
+
+  test('the projector is deterministic and does not mutate its append-only inputs', () => {
+    const source = { id: 'e1', type: 'VIRTUAL_EXPERIMENT_PLANNED', createdAt: 1, payload: { executionId: 'x', inputFingerprint: 'fp', requestedCapability: 'molecular-descriptors' } };
+    const input = { plans: [source], results: [], replays: [], evidenceLinks: [] };
+    const before = JSON.stringify(input);
+    assert.deepEqual(projectScientificExecutionTimeline(input), projectScientificExecutionTimeline(input));
+    assert.equal(JSON.stringify(input), before);
   });
 });
 

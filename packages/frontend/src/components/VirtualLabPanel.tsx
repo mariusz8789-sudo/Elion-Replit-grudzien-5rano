@@ -9,7 +9,7 @@ import {
   type VirtualLabDossier,
 } from '../core/backend/client';
 import { getToken } from '../core/backend/session';
-import { ComputationalExperimentPlayback } from './ComputationalExperimentPlayback';
+import { ComputationalExperimentPlayback, type ExperimentPresentationLevel } from './ComputationalExperimentPlayback';
 
 interface Props {
   projectId: string;
@@ -40,6 +40,7 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
   const [dossier, setDossier] = useState<VirtualLabDossier | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [presentationLevel, setPresentationLevel] = useState<ExperimentPresentationLevel>('UNIVERSITY');
 
   async function refresh(nextCandidateId = candidateId) {
     const token = getToken();
@@ -149,7 +150,14 @@ export function VirtualLabPanel({ projectId, campaignId, candidates, onChanged }
         replay={latestReplay}
         evidenceProposalCount={dossier?.evidenceLinks.length ?? 0}
         executing={busy}
+        events={dossier?.executionTimeline ?? []}
+        level={presentationLevel}
       />
+      <label className="account-field experiment-detail-level"><span>Explanation depth</span>
+        <select value={presentationLevel} onChange={(event) => setPresentationLevel(event.target.value as ExperimentPresentationLevel)} data-testid="experiment-presentation-level">
+          <option value="SCHOOL">School</option><option value="UNIVERSITY">University</option><option value="RESEARCH">Research</option>
+        </select>
+      </label>
       {latestResult?.derivedOutput && <details><summary>Computational output</summary><pre className="evidence">{JSON.stringify(latestResult.derivedOutput, null, 2)}</pre></details>}
       {message && <p className="settings-hint" role="status">{message}</p>}
       <p className="dossier-boundary">Clinical efficacy: UNKNOWN. The browser displays persisted backend state and performs no scientific derivation.</p>

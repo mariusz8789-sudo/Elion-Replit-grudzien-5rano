@@ -1327,6 +1327,11 @@ kbd {
 .experiment-playback-stages li[data-state="RUNNING"] { border-color: rgba(56, 189, 248, .65); box-shadow: 0 0 16px rgba(56, 189, 248, .14); }
 .experiment-playback-stages li[data-state="BLOCKED"] { border-color: rgba(251, 146, 60, .55); }
 .experiment-playback-stages small { color: var(--muted); overflow-wrap: anywhere; }
+.experiment-execution-events { display: grid; gap: .4rem; margin: .7rem 0; padding: 0; list-style: none; }
+.experiment-execution-events li { display: grid; grid-template-columns: minmax(180px, .7fr) 2fr; gap: .25rem .75rem; padding: .55rem .7rem; border-left: 3px solid rgba(74, 222, 128, .55); background: rgba(15, 23, 42, .52); }
+.experiment-execution-events li[data-state="BLOCKED"], .experiment-execution-events li[data-state="FAILED"] { border-left-color: rgba(251, 146, 60, .72); }
+.experiment-execution-events small { grid-column: 1 / -1; color: var(--muted); overflow-wrap: anywhere; }
+.experiment-detail-level { margin-top: .75rem; }
 .experiment-output-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .4rem; }
 .experiment-output-facts div { padding: .45rem .55rem; border-radius: 8px; background: rgba(15, 23, 42, .58); }
 .experiment-output-facts dt { color: var(--muted); font-size: .72rem; }

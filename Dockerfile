@@ -26,6 +26,21 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/backend/package.json packages/backend/
 RUN npm ci --omit=dev --workspace=packages/backend && npm cache clean --force
+
+# The staging product promises at least one real Virtual Lab engine. A bare
+# node:slim runtime has no Python/RDKit, so every molecular experiment would be
+# BLOCKED even though CI and the host validation are green. Install only the
+# small, pinned, reference-tested RDKit runtime here; the heavier optional
+# engines remain honest BLOCKED_LIBRARY states until a dedicated compute image
+# is selected. A venv avoids modifying Debian's externally-managed Python.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY packages/backend/requirements-rdkit.txt packages/backend/requirements-rdkit.txt
+RUN python3 -m venv /opt/genesis-science \
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir -r packages/backend/requirements-rdkit.txt
+ENV GENESIS_RDKIT_PYTHON=/opt/genesis-science/bin/python
+
 COPY packages/backend/src packages/backend/src
 COPY knowledge knowledge
 COPY --from=build /app/packages/frontend/dist packages/frontend/dist

@@ -18,7 +18,7 @@ Statuses:
 
 | Subsystem | Product proof | Status | Honest boundary / external dependency |
 | --- | --- | --- | --- |
-| Candidate → campaign → Virtual Lab | `#/campaign`; real backend campaign, ScienceRun and Virtual Lab API; Chromium closed-loop coverage | `COMPLETE_E2E` | Only engines with a passing live reference case are READY. |
+| Candidate → campaign → Virtual Lab | `#/campaign`; real backend campaign, ScienceRun and Virtual Lab API; Chromium closed-loop coverage | `COMPLETE_E2E` | Only engines with a passing live reference case are READY. The production image includes the pinned RDKit runtime; heavier engines remain explicit optional capabilities. |
 | Lab Closed Loop | governed request, immutable external observation, independent review, Evidence proposal and comparison; API/browser coverage | `COMPLETE_E2E` | Stops at handoff until a real external laboratory submits an observation. |
 | Evidence / provenance / replay | canonical ledger, content hashes, replay MATCH/DRIFT/BLOCKED states, result inspector | `COMPLETE_E2E` | Computational output is not wet-lab or clinical evidence. |
 | SW-4 / World Director | `#/scientific-worlds`, `#/world-director`; BASELINE/A/B/C, canonical SEIR and Evidence Field | `COMPLETE_E2E` | Modelled epidemic scenarios, not observed public-health outcomes. |

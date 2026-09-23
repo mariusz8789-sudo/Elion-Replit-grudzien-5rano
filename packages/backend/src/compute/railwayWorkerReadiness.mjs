@@ -58,8 +58,9 @@ function statusFromToolStatus(toolStatus) {
  * install (verified in this runtime) that must not destabilize the other
  * workers' memory footprint. RDKit itself stays embedded in the main service
  * Dockerfile (already installed there; not duplicated by this task). PyMeep
- * has no working Railway/CPU-worker path today (see below) — it is a genuine
- * external blocker, not merely unassigned to a worker.
+ * runs in its own "pymeep" worker built from a conda-forge lock (see below);
+ * it serves its reference case only — the Virtual Lab's maxwell-fdtd
+ * capability has no execution binding.
  */
 const ENGINE_DEPLOYMENT = Object.freeze({
   rdkit: { deploymentClass: DEPLOYMENT_CLASS.EMBEDDED_MAIN_SERVICE, workerGroup: null },
@@ -69,21 +70,17 @@ const ENGINE_DEPLOYMENT = Object.freeze({
   vina: { deploymentClass: DEPLOYMENT_CLASS.RAILWAY_CPU_WORKER, workerGroup: 'structural' },
   admet: { deploymentClass: DEPLOYMENT_CLASS.RAILWAY_CPU_WORKER, workerGroup: 'admet' },
   toxicity: { deploymentClass: DEPLOYMENT_CLASS.RAILWAY_CPU_WORKER, workerGroup: 'admet' },
-  pymeep: { deploymentClass: DEPLOYMENT_CLASS.GENUINE_EXTERNAL_BLOCKER, workerGroup: null },
+  pymeep: { deploymentClass: DEPLOYMENT_CLASS.RAILWAY_CPU_WORKER, workerGroup: 'pymeep' },
 });
 
 const PYMEEP_BLOCK_REASON =
-  'Real PyMeep (MIT electromagnetic FDTD) is distributed only via the conda-forge ' +
-  'channel with a native dependency chain (HDF5, MPICH/OpenMPI, harminv, libctl, ' +
-  'guile, swig, GSL); it is not on PyPI. The PyPI package named "meep" (checked in ' +
-  'this sandbox: version 1.0.6) is an unrelated release-automation tool, not the ' +
-  'electromagnetics engine, and installing it would collide with the adapter\'s ' +
-  '`import meep` without providing FDTD support. No conda/mamba/micromamba is present ' +
-  'in this build environment and the Docker daemon is not reachable here (client-only ' +
-  'Docker CLI, no /var/run/docker.sock) to build/test a conda-forge-based image. A ' +
-  'proposed, UNTESTED worker Dockerfile is committed at ' +
-  'packages/backend/workers/pymeep/Dockerfile.proposal for Codex or a Docker-capable ' +
-  'environment to actually build and validate against meep_worker.py\'s reference case.';
+  'PyMeep (MIT electromagnetic FDTD) is not installed in this process. It is distributed ' +
+  'through conda-forge only — the PyPI package named "meep" is an unrelated release tool ' +
+  'and must never be installed. The pymeep worker image (packages/backend/workers/pymeep/' +
+  'Dockerfile) builds it from packages/backend/workers/pymeep/conda-linux-64.lock ' +
+  '(pymeep 1.34.0, nompi, python 3.11); an environment created from that lock passed ' +
+  'meep_worker.py\'s Fresnel reference case. Locally, set GENESIS_MEEP_PYTHON to such an ' +
+  'environment\'s interpreter.';
 
 function toolchainReadinessEntries() {
   return Object.keys(ENGINE_DEPLOYMENT).map((toolId) => {

@@ -19,14 +19,21 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY packages/backend/requirements-admet.txt packages/backend/requirements-admet.txt
+COPY packages/backend/workers/admet/constraints.txt packages/backend/workers/admet/constraints.txt
+# torch is pinned to the version verified with admet-ai 2.0.1 / chemprop 2.3.1
+# (an unpinned install took whatever the CPU index published that day). The
+# final check fails the build if a CUDA torch ever replaces the CPU build.
 RUN python3 -m venv /opt/genesis-science \
     && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
        --upgrade pip setuptools wheel \
-    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
-       torch --index-url https://download.pytorch.org/whl/cpu \
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: \
+       -c packages/backend/workers/admet/constraints.txt \
+       torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu \
        --extra-index-url https://pypi.org/simple \
-    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
-       -r packages/backend/requirements-admet.txt
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: \
+       -c packages/backend/workers/admet/constraints.txt \
+       -r packages/backend/requirements-admet.txt \
+    && /opt/genesis-science/bin/python -c "import sys, torch, admet_ai, chemprop; sys.exit(0 if torch.version.cuda is None else 'CUDA torch installed in the CPU-only admet image')"
 ENV GENESIS_PYTHON=/opt/genesis-science/bin/python
 
 COPY package.json package-lock.json ./

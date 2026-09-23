@@ -3,3 +3,9 @@
 # Meeko depends on RDKit; the "structural" worker installs requirements-rdkit.txt
 # alongside this file so both land in the same interpreter.
 meeko==0.8.0
+# meeko 0.8.0 declares NO dependencies in its package metadata, yet `import meeko`
+# imports scipy (molecule_pdbqt.py, receptor_pdbqt.py) and gemmi (chemtempgen.py).
+# A clean install without these two left docking BLOCKED_BY_RUNTIME
+# ("No module named 'scipy'", then "... 'gemmi'"); pinned to the verified versions.
+scipy==1.17.1
+gemmi==0.7.5

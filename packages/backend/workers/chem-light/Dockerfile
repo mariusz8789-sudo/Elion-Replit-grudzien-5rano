@@ -23,10 +23,16 @@ RUN npm ci --omit=dev --workspace=packages/backend && npm cache clean --force
 
 COPY packages/backend/requirements-pyscf.txt packages/backend/requirements-pyscf.txt
 COPY packages/backend/requirements-biopython.txt packages/backend/requirements-biopython.txt
+COPY packages/backend/workers/chem-light/constraints.txt packages/backend/workers/chem-light/constraints.txt
+# --only-binary: this slim image has no compiler, so a source build must fail
+# here, loudly, rather than half-install. The constraints file locks every
+# transitive version to the set verified by scripts/verify-scientific-worker-runtime.mjs.
 RUN python3 -m venv /opt/genesis-science \
-    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir \
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: \
+       -c packages/backend/workers/chem-light/constraints.txt \
        -r packages/backend/requirements-pyscf.txt \
-       -r packages/backend/requirements-biopython.txt
+       -r packages/backend/requirements-biopython.txt \
+    && /opt/genesis-science/bin/python -c "import pyscf, Bio"
 ENV GENESIS_PYTHON=/opt/genesis-science/bin/python
 
 COPY packages/backend/src packages/backend/src

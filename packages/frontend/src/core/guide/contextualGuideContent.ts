@@ -1,6 +1,7 @@
 export type ContextualGuideSurface =
   | 'CERN'
   | 'CYBER'
+  | 'GOVERNMENT'
   | 'MIRROR'
   | 'WORLD_DIRECTOR'
   | 'VIRTUAL_LAB'
@@ -53,6 +54,22 @@ const GUIDES: Readonly<Record<ContextualGuideSurface, readonly ContextualGuideSt
       en: 'Read the remediation proposal and retest result separately. A proposal is not a confirmed fix until an independent retest produces a result.',
       plainPl: 'Najpierw propozycja naprawy, potem osobny test, czy zadziałała.',
       plainEn: 'First comes a proposed fix, then a separate test of whether it worked.',
+    },
+  ],
+  GOVERNMENT: [
+    {
+      key: 'government-scope',
+      pl: 'Government Drug Discovery prowadzi źródłową kampanię badawczą nad kandydatami. Wyniki modeli i reguł selekcji pozostają wynikami in silico, a nie rekomendacją refundacyjną ani dowodem skuteczności klinicznej.',
+      en: 'Government Drug Discovery runs a source-backed candidate research campaign. Model outputs and selection rules remain in-silico results, not a reimbursement recommendation or proof of clinical efficacy.',
+      plainPl: 'To kampania badawcza na danych i modelach. Nie jest decyzją medyczną ani urzędową.',
+      plainEn: 'This is a data-and-model research campaign. It is not a medical or government decision.',
+    },
+    {
+      key: 'government-evidence',
+      pl: 'Sprawdź źródło kandydata, bramki bezpieczeństwa, werdykt i ograniczenia. Evidence zachowuje provenance, a odrzucony lub niepotwierdzony kandydat nie jest promowany do terapii.',
+      en: 'Inspect the candidate source, safety gates, verdict and limitations. Evidence retains provenance, and a rejected or unconfirmed candidate is never promoted to a therapy.',
+      plainPl: 'Sprawdź źródła i ograniczenia. Kandydat pozostaje kandydatem, dopóki dowody go nie potwierdzą.',
+      plainEn: 'Check sources and limitations. A candidate stays a candidate until evidence supports it.',
     },
   ],
   MIRROR: [

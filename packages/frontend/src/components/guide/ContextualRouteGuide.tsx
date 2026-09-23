@@ -5,6 +5,7 @@ import { useVoiceEngine } from '../../core/guide/guideRuntime';
 const TITLE: Record<ContextualGuideSurface, string> = {
   CERN: 'CERN',
   CYBER: 'Cyber',
+  GOVERNMENT: 'Government',
   MIRROR: 'Mirror',
   WORLD_DIRECTOR: 'World Director',
   VIRTUAL_LAB: 'Virtual Lab',

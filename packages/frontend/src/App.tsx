@@ -278,6 +278,7 @@ export default function App() {
     switch (route.kind) {
       case 'cern-complex': return 'CERN';
       case 'cyber': return 'CYBER';
+      case 'gov-campaign': return 'GOVERNMENT';
       case 'mirror': return 'MIRROR';
       case 'world-director': return 'WORLD_DIRECTOR';
       case 'virtual-bio': return 'VIRTUAL_LAB';

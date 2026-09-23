@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('one voice guide explains model boundaries across CERN, World Director and Mirror', async ({ page }) => {
+test('one voice guide explains model boundaries across all governed product surfaces', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -36,6 +36,26 @@ test('one voice guide explains model boundaries across CERN, World Director and 
   await expect(page.getByTestId('context-guide-caption')).toContainText('kalibracji');
   await page.getByTestId('context-guide-next').click();
   await expect(page.getByTestId('context-guide-caption')).toContainText('nie jest kopią medyczną');
+
+  await page.goto('/#/cyber');
+  await page.getByTestId('context-guide-start').click();
+  await expect(page.getByTestId('context-guide-caption')).toContainText('kontrolowane dochodzenie');
+
+  await page.goto('/#/gov-campaign');
+  await page.getByTestId('context-guide-start').click();
+  await expect(page.getByTestId('context-guide-caption')).toContainText('nie rekomendacją refundacyjną');
+
+  await page.goto('/#/virtual-bio');
+  await page.getByTestId('context-guide-start').click();
+  await expect(page.getByTestId('context-guide-caption')).toContainText('eksperymenty obliczeniowe');
+
+  await page.goto('/#/campaign');
+  await page.getByTestId('context-guide-start').click();
+  await expect(page.getByTestId('context-guide-caption')).toContainText('Wybierz kandydata');
+
+  await page.goto('/#/human-biology-lab');
+  await page.getByTestId('context-guide-start').click();
+  await expect(page.getByTestId('context-guide-caption')).toContainText('Nie przedstawia anatomii konkretnego pacjenta');
 
   const unexpected = errors.filter((entry) => !entry.includes('Failed to load resource'));
   expect(unexpected, errors.join('\n')).toEqual([]);

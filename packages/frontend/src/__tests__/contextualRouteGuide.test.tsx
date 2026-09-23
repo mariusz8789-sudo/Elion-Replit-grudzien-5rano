@@ -4,7 +4,7 @@ import { ContextualRouteGuide } from '../components/guide/ContextualRouteGuide';
 import { contextualGuideSteps, type ContextualGuideSurface } from '../core/guide/contextualGuideContent';
 
 const SURFACES: readonly ContextualGuideSurface[] = [
-  'CERN', 'CYBER', 'MIRROR', 'WORLD_DIRECTOR', 'VIRTUAL_LAB', 'CAMPAIGN', 'HUMAN_EXPLORER',
+  'CERN', 'CYBER', 'GOVERNMENT', 'MIRROR', 'WORLD_DIRECTOR', 'VIRTUAL_LAB', 'CAMPAIGN', 'HUMAN_EXPLORER',
 ];
 
 describe('contextual product guide', () => {
@@ -32,6 +32,7 @@ describe('contextual product guide', () => {
     expect(contextualGuideSteps('CAMPAIGN').map((step) => step.pl).join(' ')).toContain('in silico');
     expect(contextualGuideSteps('VIRTUAL_LAB').map((step) => step.pl).join(' ').toLowerCase()).toContain('nie oznacza fizycznego pomiaru');
     expect(contextualGuideSteps('HUMAN_EXPLORER').map((step) => step.pl).join(' ')).toContain('Nie przedstawia anatomii konkretnego pacjenta');
+    expect(contextualGuideSteps('GOVERNMENT').map((step) => step.pl).join(' ')).toContain('nie rekomendacją refundacyjną');
   });
 
   it('renders one opt-in launcher and does not speak automatically', () => {

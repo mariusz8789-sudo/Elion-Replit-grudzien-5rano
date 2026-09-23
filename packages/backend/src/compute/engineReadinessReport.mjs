@@ -23,6 +23,10 @@
 import { performance } from 'node:perf_hooks';
 import { getTool, listToolIds, TOOL_STATUS, _resetValidation } from '../campaign/toolchain.mjs';
 import { snapshotEnvironment } from '../provenance.mjs';
+import { redact, redactDeep } from '../redact.mjs';
+
+/** Re-exported for this module's own tests; the canonical implementation lives in ../redact.mjs, shared with campaign/toolchain.mjs. */
+export const _redact = redact;
 
 export const READINESS_STATUS = Object.freeze({
   READY: 'READY',
@@ -83,26 +87,6 @@ const REGISTRY_BUGS = Object.freeze([]);
 /** env_probe.py key -> the toolId it corresponds to, so the broader probe sweep does not re-list an engine already covered by the validated toolchain entries above. */
 const PROBE_KEY_TO_TOOL_ID = Object.freeze({ rdkit: 'rdkit', pyscf: 'pyscf', openmm: 'openmm', pymeep: 'pymeep', biopython: 'biopython', vina_py: 'vina', meeko: 'vina', admet_ai: 'admet' });
 
-const UNIX_PATH_RE = /\/(?:[^\s"'<>]+\/)+[^\s"'<>]*/g;
-const WIN_PATH_RE = /[A-Za-z]:\\(?:[^\s"'<>\\]+\\)*[^\s"'<>\\]*/g;
-
-/** Strips absolute filesystem paths from a live (subprocess/environment-derived) string. Never applied to this module's own static, repo-relative constants. */
-export function _redact(value) {
-  if (typeof value !== 'string') return value;
-  return value.replace(UNIX_PATH_RE, '<path-redacted>').replace(WIN_PATH_RE, '<path-redacted>');
-}
-
-function redactDeep(value) {
-  if (typeof value === 'string') return _redact(value);
-  if (Array.isArray(value)) return value.map(redactDeep);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = redactDeep(v);
-    return out;
-  }
-  return value;
-}
-
 function isNonEmptyEnv(name) {
   if (!name) return false;
   const v = process.env[name];
@@ -160,7 +144,7 @@ function toEngineEntry(toolId, durationMs) {
   return {
     toolId: tool.toolId,
     engineName: tool.engineName,
-    version: _redact(tool.version),
+    version: redact(tool.version),
     capability: tool.capabilityId,
     domain: tool.domain,
     adapterModule: ADAPTER_MODULE[toolId],
@@ -173,12 +157,12 @@ function toEngineEntry(toolId, durationMs) {
     readiness,
     sourceStatus: tool.status,
     referenceCaseStatus: referenceCaseStatus(tool),
-    blocker: readiness === READINESS_STATUS.READY ? null : _redact(tool.reason ?? tool.failureReason ?? null),
+    blocker: readiness === READINESS_STATUS.READY ? null : redact(tool.reason ?? tool.failureReason ?? null),
     limitations: tool.assumptions,
     evidenceClass: tool.evidenceClass,
     license: tool.license,
     evidence: tool.validation ?? null,
-    provenance: { ...tool.provenance, environment: _redact(tool.environment) },
+    provenance: { ...tool.provenance, environment: redact(tool.environment) },
     fingerprint: tool.fingerprint,
     durationMs,
   };
@@ -205,7 +189,7 @@ function additionalProbedLibraries(probedEngines) {
       module: info.module ?? null,
       binary: info.binary ?? null,
       status: info.status ?? null,
-      version: _redact(info.version ?? null),
+      version: redact(info.version ?? null),
       note: 'Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it.',
     });
   }

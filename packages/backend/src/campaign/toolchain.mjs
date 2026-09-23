@@ -10,6 +10,7 @@
  * nie wypełniamy luki LLM-em ani heurystyką udającą walidowany model.
  */
 import { createHash } from 'node:crypto';
+import { redact } from '../redact.mjs';
 import { detect as rdkitDetect, descriptors, transform } from '../compute/rdkitAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as md from '../compute/mdAdapter.mjs';
@@ -246,14 +247,19 @@ function present(tool) {
     toolId: tool.toolId, capabilityId: tool.capabilityId, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
     version: v.version ?? null, status: v.status, environment, provenance,
   })).digest('hex').slice(0, 16);
+  // The fingerprint is computed from the TRUE environment string above (so it stays a precise,
+  // stable identity of the real runtime); only the copy returned to callers — which can reach an
+  // unauthenticated HTTP response via GET /api/compute/toolchain/:toolId — is redacted, since a
+  // configured interpreter env var (GENESIS_RDKIT_PYTHON etc.) or an adapter's subprocess error
+  // text can legitimately contain an absolute local filesystem path.
   return {
     toolId: tool.toolId, capabilityId: tool.capabilityId, domain: tool.domain,
     engineName: tool.engineName, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
     license: tool.license, modelDomain: tool.modelDomain, assumptions: tool.assumptions,
     evidenceClass: tool.evidenceClass, status: v.status, availability: v.status === TOOL_STATUS.AVAILABLE,
     executionStatus: v.status === TOOL_STATUS.AVAILABLE ? 'VALIDATED_REFERENCE_CASE' : 'NOT_EXECUTED',
-    version: v.version ?? null, engine: v.engine ?? null, environment, provenance,
-    fingerprint, validation: v.evidence ?? null, reason: v.reason ?? null, failureReason: v.reason ?? null,
+    version: v.version ?? null, engine: v.engine ?? null, environment: redact(environment), provenance,
+    fingerprint, validation: v.evidence ?? null, reason: redact(v.reason ?? null), failureReason: redact(v.reason ?? null),
   };
 }
 

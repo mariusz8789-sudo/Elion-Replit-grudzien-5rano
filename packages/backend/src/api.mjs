@@ -117,6 +117,9 @@ import { runSpeculative } from './speculativeApi.mjs';
 import { runIngest, listProposals, publishProposal, rejectProposal, proposeStructuredEvidence } from './knowledgeApi.mjs';
 import { runQuantum, describeQuantum } from './quantumApi.mjs';
 import { evaluateManifold, systemTelemetry } from './manifoldApi.mjs';
+import { detectRuntime as detectLocalVideoRuntime } from './cinematic/localVideoRuntime.mjs';
+import { planGeneration as planLocalVideoGeneration } from './cinematic/genesisVideoEngine.mjs';
+import { listSupportedCapabilities as listLocalVideoCapabilities } from './cinematic/videoControlContract.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -124,9 +127,43 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
 const TRIAL_STATUSES = new Set(['baseline', 'draft', 'promising', 'failed']);
+let localVideoRuntimeCache = null;
+let localVideoRuntimeCachedAt = 0;
+const LOCAL_VIDEO_RUNTIME_CACHE_MS = 60_000;
 
 const ok = (body, status = 200) => ({ status, body });
 const err = (status, error, message) => ({ status, body: { error, ...(message ? { message } : {}) } });
+
+function localVideoRuntimeStatus() {
+  if (!localVideoRuntimeCache || Date.now() - localVideoRuntimeCachedAt > LOCAL_VIDEO_RUNTIME_CACHE_MS) {
+    localVideoRuntimeCache = detectLocalVideoRuntime();
+    localVideoRuntimeCachedAt = Date.now();
+  }
+  return localVideoRuntimeCache;
+}
+
+function publicLocalVideoRuntime(runtime) {
+  const packageStatus = (value) => ({ available: value?.available === true, version: value?.version ?? null });
+  return {
+    os: runtime.os,
+    cpu: runtime.cpu,
+    ram: runtime.ram,
+    storage: { available: runtime.storage?.available === true, freeBytes: runtime.storage?.availableBytes ?? runtime.storage?.freeBytes ?? null, totalBytes: runtime.storage?.totalBytes ?? null },
+    gpu: {
+      available: runtime.gpu?.available === true,
+      devices: (runtime.gpu?.gpus ?? runtime.gpu?.devices ?? []).map((gpu) => ({ name: gpu.name ?? null, vramMb: gpu.vramMb ?? null })),
+      source: runtime.gpu?.source ?? null,
+    },
+    cuda: packageStatus(runtime.cuda),
+    python: packageStatus(runtime.python),
+    pytorch: packageStatus(runtime.pytorch),
+    diffusers: packageStatus(runtime.diffusers),
+    transformers: packageStatus(runtime.transformers),
+    onnxruntimeDirectml: packageStatus(runtime.onnxruntimeDirectml),
+    ffmpeg: { ...packageStatus(runtime.ffmpeg), source: runtime.ffmpeg?.source ?? null },
+    localModels: { configured: runtime.localModels?.configured === true, checkpointCount: runtime.localModels?.checkpoints?.length ?? 0 },
+  };
+}
 
 /** Płaski słownik liczb skończonych — parametry/wyjścia próby nigdy nie są zagnieżdżone. */
 function sanitizeNumberMap(obj, maxKeys = 64) {
@@ -164,6 +201,37 @@ export function handleApi(db, ctx) {
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
   if (seg[0] === 'compute') {
+    if (seg[1] === 'local-video' && seg[2] === 'runtime' && seg.length === 3 && method === 'GET') {
+      return ok({
+        capabilities: listLocalVideoCapabilities(),
+        runtime: publicLocalVideoRuntime(localVideoRuntimeStatus()),
+        mediaClass: 'GENERATED_MEDIA',
+        mediaScope: 'VISUALIZATION_ONLY',
+        evidenceEligible: false,
+        scientificStateMutation: false,
+      });
+    }
+    if (seg[1] === 'local-video' && seg[2] === 'plan' && seg.length === 3 && method === 'POST') {
+      try {
+        const plan = planLocalVideoGeneration(body, { runtime: localVideoRuntimeStatus() });
+        if (!plan.ok && !plan.status) return err(400, plan.error ?? 'invalid_control_package', plan.reason);
+        return ok({
+          plan: {
+            ready: plan.ok === true,
+            status: plan.status,
+            reason: plan.reason ?? null,
+            controlPackageFingerprint: plan.input?.controlPackageFingerprint ?? null,
+            sourceScientificStateFingerprint: plan.input?.sourceScientificStateFingerprint ?? body.sourceScientificStateFingerprint ?? null,
+            mediaClass: 'GENERATED_MEDIA',
+            mediaScope: 'VISUALIZATION_ONLY',
+            evidenceEligible: false,
+            scientificStateMutation: false,
+          },
+        });
+      } catch (error) {
+        return err(400, 'scientific_state_promotion_rejected', error instanceof Error ? error.message : String(error));
+      }
+    }
     if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilities() });
     if (seg[1] === 'models' && seg.length === 2 && method === 'GET') return ok({ models: listModels() });
     if (seg[1] === 'models' && seg.length === 3 && method === 'GET') {

@@ -198,20 +198,18 @@ container. This is an honest, real result — not a placeholder.
 - No network call anywhere in this branch. No API key is read, required,
   or referenced.
 
-## 6. How Codex should attach an API route later
+## 6. Integrated API admission seam
 
-This branch deliberately does not touch `api.mjs`. To wire it up:
+The canonical router exposes two public, read-only/admission surfaces:
 
-```js
-import { executeGeneration, planGeneration } from './cinematic/genesisVideoEngine.mjs';
-import { detectRuntime } from './cinematic/localVideoRuntime.mjs';
-// POST /api/projects/:id/campaigns/:cid/cinematic/video/plan  -> planGeneration(body)
-// POST /api/projects/:id/campaigns/:cid/cinematic/video/execute -> executeGeneration(body, { runner: <realAdapterInstance> })
-// GET  /api/cinematic/video/runtime -> detectRuntime()
-```
+- `GET /api/compute/local-video/runtime` returns a sanitized hardware/runtime summary.
+- `POST /api/compute/local-video/plan` validates a canonical control package and returns an honest `READY` or `BLOCKED_*` result.
 
-The route handler owns auth/project-scoping exactly like every other
-campaign route; this module has no opinion on either.
+No production execution endpoint is exposed until a real local runner and
+registered checkpoint exist. The API strips executable paths, model-directory
+paths and checkpoint filenames. World Director consumes these endpoints and
+shows the observed admission state without promoting generated media to
+Evidence or changing scientific state.
 
 ## 7. How to register a real local model adapter (Stage B)
 

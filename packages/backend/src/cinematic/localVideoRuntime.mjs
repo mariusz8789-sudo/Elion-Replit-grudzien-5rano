@@ -19,6 +19,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, statfsSync } from 'node:fs';
 import os from 'node:os';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const PROBE_TIMEOUT_MS = 2500;
 const MODEL_EXTENSIONS = new Set(['.safetensors', '.ckpt', '.bin', '.pt', '.onnx', '.gguf']);
@@ -76,6 +79,27 @@ function probeNvidiaGpu() {
   return { available: gpus.length > 0, gpus };
 }
 
+function probeWindowsGpu() {
+  if (os.platform() !== 'win32') return { available: false, gpus: [], reason: 'Windows registry GPU probe is not applicable' };
+  const names = run('reg', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Video', '/s', '/v', 'DriverDesc']);
+  const memory = run('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\DirectX', '/v', 'MaxDedicatedVideoMemory']);
+  if (!names.ok) return { available: false, gpus: [], reason: names.reason ?? 'Windows GPU registry query failed' };
+  const uniqueNames = [...new Set([...names.output.matchAll(/DriverDesc\s+REG_SZ\s+(.+)/gi)].map((match) => match[1].trim()).filter(Boolean))];
+  const hex = memory.ok ? /MaxDedicatedVideoMemory\s+REG_QWORD\s+0x([0-9a-f]+)/i.exec(memory.output)?.[1] : null;
+  const vramBytes = hex ? Number.parseInt(hex, 16) : null;
+  const vramMb = Number.isFinite(vramBytes) ? Math.round(vramBytes / (1024 * 1024)) : null;
+  const gpus = uniqueNames.map((name) => ({ name, vramMb, driverVersion: null, accelerator: /nvidia/i.test(name) ? 'CUDA_CANDIDATE' : /amd|radeon/i.test(name) ? 'DIRECTML_OR_ROCM_CANDIDATE' : 'UNKNOWN' }));
+  return { available: gpus.length > 0, gpus, source: 'WINDOWS_REGISTRY', ...(gpus.length === 0 ? { reason: 'Windows registry exposed no display adapter names' } : {}) };
+}
+
+function probeGpu() {
+  const nvidia = probeNvidiaGpu();
+  if (nvidia.available) return { ...nvidia, source: 'NVIDIA_SMI' };
+  const windows = probeWindowsGpu();
+  if (windows.available) return windows;
+  return { available: false, gpus: [], reason: `${nvidia.reason ?? 'NVIDIA unavailable'}; ${windows.reason ?? 'no alternative GPU probe'}` };
+}
+
 function probeCuda() {
   const r = run('nvcc', ['--version']);
   if (r.ok) {
@@ -112,11 +136,32 @@ function probePythonPackage(pkg) {
   return { available: true, version: r.output.trim() || null };
 }
 
+function probePythonDistribution(distribution) {
+  const py = probePython();
+  if (!py.available) return { available: false, version: null, reason: 'no python executable to inspect' };
+  const r = run(py.executable, ['-m', 'pip', 'show', distribution]);
+  if (!r.ok) return { available: false, version: null, reason: `${distribution} is not installed in the active Python runtime` };
+  const version = /^Version:\s*(.+)$/im.exec(r.output)?.[1]?.trim() ?? null;
+  return { available: true, version };
+}
+
 function probeFfmpeg() {
   const r = run('ffmpeg', ['-version']);
-  if (!r.ok) return { available: false, version: null, reason: r.reason };
-  const match = /ffmpeg version\s+(\S+)/i.exec(r.output);
-  return { available: true, version: match?.[1] ?? null };
+  if (r.ok) {
+    const match = /ffmpeg version\s+(\S+)/i.exec(r.output);
+    return { available: true, version: match?.[1] ?? null, source: 'SYSTEM_PATH', executable: 'ffmpeg' };
+  }
+  try {
+    const binary = require('ffmpeg-static');
+    if (typeof binary === 'string' && existsSync(binary)) {
+      const bundled = run(binary, ['-version']);
+      if (bundled.ok) {
+        const match = /ffmpeg version\s+(\S+)/i.exec(bundled.output);
+        return { available: true, version: match?.[1] ?? null, source: 'NPM_FFMPEG_STATIC', executable: binary };
+      }
+    }
+  } catch { /* package is optional outside the Genesis monorepo */ }
+  return { available: false, version: null, reason: r.reason };
 }
 
 /** Lists (never loads) configured local model checkpoints. The directory
@@ -148,7 +193,8 @@ function entryExt(name) {
  */
 export function detectRuntime() {
   const safe = (fn, fallback) => { try { return fn(); } catch (err) { return { ...fallback, reason: String(err?.message ?? err).slice(0, 200) }; } };
-  const gpu = safe(probeNvidiaGpu, { available: false, gpus: [] });
+  const gpu = safe(probeGpu, { available: false, gpus: [] });
+  const onnxruntimeDirectml = safe(() => probePythonDistribution('onnxruntime-directml'), { available: false, version: null });
   return {
     probedAt: new Date().toISOString(),
     os: safe(probeOperatingSystem, {}),
@@ -162,6 +208,8 @@ export function detectRuntime() {
     otherAccelerators: safe(probeOtherAccelerators, {}),
     pytorch: safe(() => probePythonPackage('torch'), { available: false, version: null }),
     diffusers: safe(() => probePythonPackage('diffusers'), { available: false, version: null }),
+    transformers: safe(() => probePythonPackage('transformers'), { available: false, version: null }),
+    onnxruntimeDirectml,
     ffmpeg: safe(probeFfmpeg, { available: false, version: null }),
     localModels: safe(probeLocalModels, { configured: false, directory: null, checkpoints: [] }),
   };

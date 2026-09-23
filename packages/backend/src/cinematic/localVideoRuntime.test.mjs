@@ -9,7 +9,7 @@ describe('Test: local runtime discovery is read-only, structured, and never thro
   test('detectRuntime() returns a fully structured, non-throwing result on THIS real machine', () => {
     assert.doesNotThrow(() => detectRuntime());
     const r = detectRuntime();
-    for (const key of ['os', 'cpu', 'python', 'ram', 'storage', 'cuda', 'gpu', 'otherAccelerators', 'pytorch', 'diffusers', 'ffmpeg', 'localModels']) {
+    for (const key of ['os', 'cpu', 'python', 'ram', 'storage', 'cuda', 'gpu', 'otherAccelerators', 'pytorch', 'diffusers', 'transformers', 'onnxruntimeDirectml', 'ffmpeg', 'localModels']) {
       assert.ok(Object.prototype.hasOwnProperty.call(r, key), `missing key "${key}"`);
     }
     assert.equal(typeof r.probedAt, 'string');
@@ -30,6 +30,15 @@ describe('Test: local runtime discovery is read-only, structured, and never thro
     const r = detectRuntime();
     assert.ok(r.ram.totalBytes > 0);
     assert.ok(r.storage.availableBytes === null || r.storage.availableBytes >= 0);
+  });
+
+  test('a detected GPU always includes an observed adapter name and never a fabricated VRAM value', () => {
+    const r = detectRuntime();
+    if (r.gpu.available) {
+      assert.ok(r.gpu.gpus.length > 0);
+      assert.equal(typeof r.gpu.gpus[0].name, 'string');
+      assert.ok(r.gpu.gpus[0].vramMb === null || r.gpu.gpus[0].vramMb > 0);
+    }
   });
 
   test('never exposes raw process.env — only the one explicitly-documented model-dir variable', () => {

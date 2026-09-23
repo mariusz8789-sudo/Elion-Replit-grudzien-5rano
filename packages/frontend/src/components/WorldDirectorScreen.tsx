@@ -27,6 +27,7 @@ import {
   type Sw4ComparisonBranch,
 } from '../core/worldDirector/sw4WorldDirectorAdapter';
 import type { Sw4RenderState } from '../core/worldModel/scenarios/sw4EpidemiologyCity';
+import { getLocalVideoRuntime, planLocalVideoGeneration } from '../core/backend/client';
 
 declare global {
   interface Window {
@@ -82,6 +83,8 @@ export function WorldDirectorScreen(): JSX.Element {
   })();
   const [worldPrompt, setWorldPrompt] = useState(initialPrompt);
   const [submittedPrompt, setSubmittedPrompt] = useState(worldPrompt);
+  const [localVideoAdmission, setLocalVideoAdmission] = useState<{ readonly status: string; readonly detail: string } | null>(null);
+  const [localVideoChecking, setLocalVideoChecking] = useState(false);
   const [sw4Branch, setSw4Branch] = useState<Sw4ComparisonBranch>('BASELINE');
   const sw4Resolution = useMemo(() => {
     if (!isSw4WorldPrompt(submittedPrompt)) return { world: null, error: null };
@@ -125,6 +128,34 @@ export function WorldDirectorScreen(): JSX.Element {
   ), [directed, productCamera, productWorld, sw4World]);
   const params = useMemo<SimParams>(() => ({}), []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true);
+
+  const checkLocalVideoAdmission = async (): Promise<void> => {
+    if (!productWorld || !productCamera) return;
+    setLocalVideoChecking(true);
+    const runtime = await getLocalVideoRuntime();
+    if (!runtime.ok) {
+      setLocalVideoAdmission({ status: 'BLOCKED_RUNTIME', detail: runtime.message });
+      setLocalVideoChecking(false);
+      return;
+    }
+    const plan = await planLocalVideoGeneration({
+      capability: 'TEXT_TO_VIDEO',
+      worldId: productWorld.world.generated.worldId,
+      scenarioId: productWorld.primaryTemplate,
+      sourceScientificStateFingerprint: productWorld.deterministicFingerprint,
+      promptOrShotDescription: submittedPrompt,
+      cameraTrajectory: productCamera.keyframes,
+      cameraMetadata: { durationSeconds: productCamera.durationSeconds, epistemicStatus: productWorld.descriptor.epistemic },
+      durationSeconds: productCamera.durationSeconds,
+    });
+    if (!plan.ok) {
+      setLocalVideoAdmission({ status: 'BLOCKED_RUNTIME', detail: plan.message });
+    } else {
+      const gpuName = runtime.data.runtime.gpu.devices?.[0]?.name ?? (runtime.data.runtime.gpu.available ? 'GPU detected' : 'GPU unavailable');
+      setLocalVideoAdmission({ status: plan.data.status, detail: `${gpuName} · ${plan.data.reason ?? 'local model admitted'}` });
+    }
+    setLocalVideoChecking(false);
+  };
 
   useEffect(() => {
     if (loading || failed) return;
@@ -247,8 +278,16 @@ export function WorldDirectorScreen(): JSX.Element {
           <div data-testid="world-director-selection-evidence"><dt>Evidence</dt><dd>{assetEvidenceHash ? assetEvidenceHash.slice(0, 16) : '—'}</dd></div>
           <div data-testid="world-director-product-world"><dt>Świat z promptu</dt><dd>{sw4World ? `SW-4 · ${sw4World.engine.graph.listEntities().length} encji` : productWorld ? `${productWorld.primaryTemplate} · ${productWorld.world.graph.listEntities().length} encji` : promptError ?? '—'}</dd></div>
           <div data-testid="world-director-product-proof"><dt>Fingerprint</dt><dd>{sw4World?.renderState.worldStateFingerprint ?? productWorld?.deterministicFingerprint ?? '—'}</dd></div>
-          <div data-testid="world-director-generative-status"><dt>AI cinematic</dt><dd>{productWorld ? 'ADAPTER READY · PROVIDER NOT CONNECTED · VISUALIZATION ONLY' : '—'}</dd></div>
+          <div data-testid="world-director-generative-status"><dt>AI cinematic</dt><dd>{productWorld ? `${localVideoAdmission?.status ?? 'CONTROL_READY_MODEL_NOT_CHECKED'} · VISUALIZATION ONLY` : '—'}</dd></div>
         </dl>
+        {productWorld ? (
+          <div className="world-director-row">
+            <button type="button" onClick={() => void checkLocalVideoAdmission()} disabled={localVideoChecking} data-testid="world-director-local-video-check">
+              {localVideoChecking ? 'Sprawdzanie runtime…' : 'Sprawdź lokalny AI-video'}
+            </button>
+            {localVideoAdmission ? <small data-testid="world-director-local-video-detail">{localVideoAdmission.detail}</small> : null}
+          </div>
+        ) : null}
         {sw4World ? <Sw4WorldPreview
           state={sw4World.renderState}
           replayStatus={sw4World.replayStatus}

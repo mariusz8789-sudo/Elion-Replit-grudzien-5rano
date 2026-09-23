@@ -1217,3 +1217,59 @@ export async function replayVirtualLabExperiment(token: string, projectId: strin
   const result = await request<{ replay: VirtualExperimentReplay }>('POST', `/projects/${projectId}/campaigns/${campaignId}/virtual-lab/${executionId}/replay`, { token, body: { candidateId } });
   return result.ok ? { ok: true, data: result.data.replay } : result;
 }
+
+export type LocalVideoCapability = 'TEXT_TO_VIDEO' | 'IMAGE_TO_VIDEO' | 'VIDEO_TO_VIDEO' | 'FRAME_ENHANCEMENT' | 'TEMPORAL_UPSCALE';
+export type LocalVideoPlanStatus = 'READY' | 'BLOCKED_MODEL_UNAVAILABLE' | 'BLOCKED_GPU_UNAVAILABLE' | 'BLOCKED_RUNTIME' | 'BLOCKED_UNSUPPORTED_CAPABILITY';
+
+export interface LocalVideoRuntimeStatus {
+  capabilities: LocalVideoCapability[];
+  runtime: {
+    os: unknown;
+    cpu: unknown;
+    ram: { totalBytes?: number | null; freeBytes?: number | null };
+    storage: { available: boolean; freeBytes: number | null; totalBytes: number | null };
+    gpu: { available: boolean; devices?: Array<{ name?: string; vramMb?: number | null }>; source?: string | null };
+    python: { available: boolean; version: string | null };
+    pytorch: { available: boolean; version: string | null };
+    diffusers: { available: boolean; version: string | null };
+    transformers: { available: boolean; version: string | null };
+    onnxruntimeDirectml: { available: boolean; version: string | null };
+    ffmpeg: { available: boolean; version: string | null; source: string | null };
+    localModels: { configured: boolean; checkpointCount: number };
+  };
+  mediaClass: 'GENERATED_MEDIA';
+  mediaScope: 'VISUALIZATION_ONLY';
+  evidenceEligible: false;
+  scientificStateMutation: false;
+}
+
+export interface LocalVideoPlan {
+  ready: boolean;
+  status: LocalVideoPlanStatus;
+  reason: string | null;
+  controlPackageFingerprint: string | null;
+  sourceScientificStateFingerprint: string | null;
+  mediaClass: 'GENERATED_MEDIA';
+  mediaScope: 'VISUALIZATION_ONLY';
+  evidenceEligible: false;
+  scientificStateMutation: false;
+}
+
+export function getLocalVideoRuntime(): Promise<ApiResult<LocalVideoRuntimeStatus>> {
+  return request('GET', '/compute/local-video/runtime');
+}
+
+export async function planLocalVideoGeneration(input: {
+  capability: LocalVideoCapability;
+  worldId: string;
+  scenarioId?: string | null;
+  sourceScientificStateFingerprint: string;
+  promptOrShotDescription?: string | null;
+  cameraTrajectory?: unknown;
+  cameraMetadata?: unknown;
+  durationSeconds?: number | null;
+  sourceRenderHash?: string | null;
+}): Promise<ApiResult<LocalVideoPlan>> {
+  const result = await request<{ plan: LocalVideoPlan }>('POST', '/compute/local-video/plan', { body: input });
+  return result.ok ? { ok: true, data: result.data.plan } : result;
+}

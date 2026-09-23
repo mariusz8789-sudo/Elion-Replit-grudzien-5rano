@@ -75,12 +75,13 @@ export function createModelRegistry() {
   const models = new Map();
   const key = (capability, modelId) => `${capability}::${modelId ?? '*'}`;
   return {
-    registerLocalModel({ capability, modelId, version = null, checkpointFingerprint = null, requiresPython = true, requiresDevice = 'gpu' }) {
+    registerLocalModel({ capability, modelId, version = null, checkpointFingerprint = null, requiresPython = true, requiresDevice = 'gpu', requiresPackages = [], requiredAccelerator = null }) {
       if (!isKnownCapability(capability)) throw new Error(`cannot register a model for unknown capability "${capability}"`);
-      models.set(key(capability, modelId), { capability, modelId, version, checkpointFingerprint, requiresPython, requiresDevice });
+      const descriptor = { capability, modelId, version, checkpointFingerprint, requiresPython, requiresDevice, requiresPackages: [...requiresPackages], requiredAccelerator };
+      models.set(key(capability, modelId), descriptor);
       // Also index under the capability wildcard so a caller who did not
       // request a specific modelId can still resolve the registered one.
-      if (!models.has(key(capability, undefined))) models.set(key(capability, undefined), { capability, modelId, version, checkpointFingerprint, requiresPython, requiresDevice });
+      if (!models.has(key(capability, undefined))) models.set(key(capability, undefined), descriptor);
     },
     resolveModel({ capability, modelId }) {
       const exact = models.get(key(capability, modelId));
@@ -120,12 +121,12 @@ export function planGeneration(rawInput, { runtime = null, modelRegistry = DEFAU
   }
 
   if (!isKnownCapability(normalized.capability)) {
-    return { ok: false, status: STATUS.BLOCKED_UNSUPPORTED_CAPABILITY, reason: `"${normalized.capability}" is not a supported capability` };
+    return { ok: false, status: STATUS.BLOCKED_UNSUPPORTED_CAPABILITY, input: normalized, reason: `"${normalized.capability}" is not a supported capability` };
   }
 
   const missingRef = missingRequiredReference(normalized);
   if (missingRef !== null) {
-    return { ok: false, error: 'missing_required_reference', reason: missingRef };
+    return { ok: false, error: 'missing_required_reference', input: normalized, reason: missingRef };
   }
 
   const detectedRuntime = runtime ?? detectRuntime();
@@ -135,17 +136,29 @@ export function planGeneration(rawInput, { runtime = null, modelRegistry = DEFAU
   if (!model.exists) {
     return {
       ok: false, status: STATUS.BLOCKED_MODEL_UNAVAILABLE,
+      input: normalized, runtime: detectedRuntime,
       reason: `no local model is registered for capability "${normalized.capability}"${modelId ? ` / modelId "${modelId}"` : ''} — no model was downloaded or bundled by this branch`,
     };
   }
 
   const requestedDevice = normalized.modelConfiguration?.device ?? model.requiresDevice ?? 'gpu';
   if (requestedDevice === 'gpu' && detectedRuntime.gpu?.available !== true) {
-    return { ok: false, status: STATUS.BLOCKED_GPU_UNAVAILABLE, reason: 'the selected model requires a GPU device, and this runtime honestly reports none available' };
+    return { ok: false, status: STATUS.BLOCKED_GPU_UNAVAILABLE, input: normalized, runtime: detectedRuntime, model, reason: 'the selected model requires a GPU device, and this runtime honestly reports none available' };
   }
 
   if (model.requiresPython !== false && detectedRuntime.python?.available !== true) {
-    return { ok: false, status: STATUS.BLOCKED_RUNTIME, reason: 'the selected model requires a local Python runtime, and this runtime honestly reports none available' };
+    return { ok: false, status: STATUS.BLOCKED_RUNTIME, input: normalized, runtime: detectedRuntime, model, reason: 'the selected model requires a local Python runtime, and this runtime honestly reports none available' };
+  }
+  for (const packageName of model.requiresPackages ?? []) {
+    if (detectedRuntime[packageName]?.available !== true) {
+      return { ok: false, status: STATUS.BLOCKED_RUNTIME, input: normalized, runtime: detectedRuntime, model, reason: `the selected model requires runtime package "${packageName}", which is unavailable` };
+    }
+  }
+  if (model.requiredAccelerator === 'CUDA' && detectedRuntime.cuda?.available !== true) {
+    return { ok: false, status: STATUS.BLOCKED_RUNTIME, input: normalized, runtime: detectedRuntime, model, reason: 'the selected model requires CUDA, which is unavailable' };
+  }
+  if (model.requiredAccelerator === 'DIRECTML' && detectedRuntime.onnxruntimeDirectml?.available !== true) {
+    return { ok: false, status: STATUS.BLOCKED_RUNTIME, input: normalized, runtime: detectedRuntime, model, reason: 'the selected model requires ONNX Runtime DirectML, which is unavailable' };
   }
 
   return { ok: true, status: STATUS.READY, input: normalized, runtime: detectedRuntime, model };
@@ -153,14 +166,28 @@ export function planGeneration(rawInput, { runtime = null, modelRegistry = DEFAU
 
 function referenceHashes(normalizedInput) {
   const out = {};
+  const basis = {};
   for (const field of ['referenceImage', 'referenceVideo', 'depthReference', 'normalsReference', 'segmentationReference', 'sourceRenderHash']) {
     const value = normalizedInput[field];
-    out[field] = typeof value === 'string' && value.length > 0 ? sha256Hex(value) : null;
+    if (typeof value !== 'string' || value.length === 0) {
+      out[field] = null;
+      basis[field] = null;
+    } else if (field === 'sourceRenderHash' && /^[a-f0-9]{64}$/i.test(value)) {
+      out[field] = value.toLowerCase();
+      basis[field] = 'DECLARED_SHA256';
+    } else if (existsSync(value) && statSync(value).isFile()) {
+      out[field] = sha256Hex(readFileSync(value));
+      basis[field] = 'FILE_BYTES';
+    } else {
+      out[field] = sha256Hex(value);
+      basis[field] = 'REFERENCE_STRING';
+    }
   }
-  return out;
+  return { hashes: out, basis };
 }
 
 function baseRecord({ input, model, runtime, status, reason = null, durationMs = 0, testOnly = false }) {
+  const references = input ? referenceHashes(input) : { hashes: {}, basis: {} };
   return {
     executionId: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -173,7 +200,8 @@ function baseRecord({ input, model, runtime, status, reason = null, durationMs =
     generationConfiguration: input?.modelConfiguration ?? null,
     sourceScientificStateFingerprint: input?.sourceScientificStateFingerprint ?? null,
     controlPackageFingerprint: input?.controlPackageFingerprint ?? null,
-    inputReferenceHashes: input ? referenceHashes(input) : {},
+    inputReferenceHashes: references.hashes,
+    inputReferenceHashBasis: references.basis,
     outputPath: null,
     outputSha256: null,
     status,

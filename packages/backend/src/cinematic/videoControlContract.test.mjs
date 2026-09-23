@@ -58,7 +58,7 @@ describe('Test: scientific-state-promotion rejection (item 12)', () => {
 
 describe('Test: control input normalization — explicit absence, never manufactured', () => {
   test('every optional reference field is present and explicitly null when the caller omitted it', () => {
-    const r = normalizeControlInput({ capability: 'TEXT_TO_VIDEO', worldId: 'w1' });
+    const r = normalizeControlInput({ capability: 'TEXT_TO_VIDEO', worldId: 'w1', sourceScientificStateFingerprint: 'science-fp' });
     assert.equal(r.ok, true);
     assert.equal(r.input.referenceImage, null);
     assert.equal(r.input.referenceVideo, null);
@@ -67,15 +67,21 @@ describe('Test: control input normalization — explicit absence, never manufact
   });
 
   test('a supplied reference is preserved verbatim, never altered or invented', () => {
-    const r = normalizeControlInput({ capability: 'IMAGE_TO_VIDEO', worldId: 'w1', referenceImage: 'sha256:abc123-real-caller-supplied-image' });
+    const r = normalizeControlInput({ capability: 'IMAGE_TO_VIDEO', worldId: 'w1', sourceScientificStateFingerprint: 'science-fp', referenceImage: 'sha256:abc123-real-caller-supplied-image' });
     assert.equal(r.ok, true);
     assert.equal(r.input.referenceImage, 'sha256:abc123-real-caller-supplied-image');
   });
 
   test('a missing worldId is refused', () => {
-    const r = normalizeControlInput({ capability: 'TEXT_TO_VIDEO' });
+    const r = normalizeControlInput({ capability: 'TEXT_TO_VIDEO', sourceScientificStateFingerprint: 'science-fp' });
     assert.equal(r.ok, false);
     assert.equal(r.error, 'world_id_required');
+  });
+
+  test('a missing scientific-state fingerprint is refused instead of generating unbound media', () => {
+    const r = normalizeControlInput({ capability: 'TEXT_TO_VIDEO', worldId: 'w1' });
+    assert.equal(r.ok, false);
+    assert.equal(r.error, 'source_scientific_state_fingerprint_required');
   });
 
   test('a non-object input is refused, never coerced', () => {
@@ -98,8 +104,8 @@ describe('Test: fingerprinting is deterministic (item 16)', () => {
   });
 
   test('normalizeControlInput assigns the SAME controlPackageFingerprint to two equivalent raw calls', () => {
-    const r1 = normalizeControlInput({ capability: 'TEXT_TO_VIDEO', worldId: 'w1', promptOrShotDescription: 'dolly in' });
-    const r2 = normalizeControlInput({ promptOrShotDescription: 'dolly in', capability: 'TEXT_TO_VIDEO', worldId: 'w1' });
+    const r1 = normalizeControlInput({ capability: 'TEXT_TO_VIDEO', worldId: 'w1', sourceScientificStateFingerprint: 'science-fp', promptOrShotDescription: 'dolly in' });
+    const r2 = normalizeControlInput({ promptOrShotDescription: 'dolly in', capability: 'TEXT_TO_VIDEO', sourceScientificStateFingerprint: 'science-fp', worldId: 'w1' });
     assert.equal(r1.input.controlPackageFingerprint, r2.input.controlPackageFingerprint);
   });
 

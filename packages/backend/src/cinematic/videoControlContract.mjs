@@ -133,13 +133,15 @@ export function normalizeControlInput(rawInput) {
   if (typeof worldId !== 'string' || worldId.trim().length === 0) {
     return { ok: false, error: 'world_id_required', reason: 'control input requires a real worldId' };
   }
+  if (typeof sourceScientificStateFingerprint !== 'string' || sourceScientificStateFingerprint.trim().length === 0) {
+    return { ok: false, error: 'source_scientific_state_fingerprint_required', reason: 'control input requires the canonical scientific-state fingerprint it visualizes' };
+  }
 
   const normalized = {
     capability,
     worldId: worldId.trim(),
     scenarioId: typeof scenarioId === 'string' && scenarioId.trim() ? scenarioId.trim() : null,
-    sourceScientificStateFingerprint: typeof sourceScientificStateFingerprint === 'string' && sourceScientificStateFingerprint.trim()
-      ? sourceScientificStateFingerprint.trim() : null,
+    sourceScientificStateFingerprint: sourceScientificStateFingerprint.trim(),
   };
   for (const field of OPTIONAL_REFERENCE_FIELDS) {
     normalized[field] = field in rawInput && rawInput[field] !== undefined ? rawInput[field] : null;

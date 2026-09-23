@@ -1338,6 +1338,10 @@ kbd {
 .lab-campus-door small { color: #8aa8b8; font-size: .68rem; letter-spacing: .05em; }
 .lab-campus-door > span:last-child { color: #67e8f9; font-size: .72rem; font-weight: 700; }
 .lab-campus-door-light { position: absolute; top: .35rem; right: .45rem; width: .4rem; height: .4rem; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 9px #22d3ee; }
+.cern-event-panel { border-color: rgba(34, 211, 238, .5); }
+.cern-origin { margin: .4rem 0 .65rem; padding: .45rem .55rem; border-left: 3px solid #f59e0b; color: #fde68a; background: rgba(120, 53, 15, .22); font: 700 .7rem/1.4 ui-monospace, monospace; }
+.cern-event-tabs, .cern-replay-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .5rem 0; }
+.cern-replay-row strong { color: #67e8f9; font: 700 .72rem/1.4 ui-monospace, monospace; }
 .experiment-output-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .4rem; }
 .experiment-output-facts div { padding: .45rem .55rem; border-radius: 8px; background: rgba(15, 23, 42, .58); }
 .experiment-output-facts dt { color: var(--muted); font-size: .72rem; }

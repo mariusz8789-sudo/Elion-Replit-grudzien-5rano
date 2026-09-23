@@ -39,6 +39,12 @@ test.describe('CERN Complex 5D — cameras, physics, visual fidelity gate', () =
     await expect(page.getByText('MODE: CONSOLE')).toBeVisible();
     await page.keyboard.press('q'); await settled(page);
     await expect(page.getByText(/contentHash:/).first()).toBeVisible();
+    await expect(page.getByTestId('cern-event-origin')).toContainText('TOY_MC_MODEL');
+    await page.getByTestId('cern-event-2').click();
+    await page.getByTestId('cern-detail-RESEARCH').click();
+    await expect(page.getByTestId('cern-event-readout')).toContainText(/EVT-[0-9A-F]+/);
+    await page.getByTestId('cern-replay').click();
+    await expect(page.getByTestId('cern-replay-status')).toHaveText('REPLAY: MATCH');
     await page.screenshot({ path: SHOTS.console });
     // The HUD panels are the honest readout of the same providers: 13 TeV alone forms nothing, the ADD scenario is labelled speculative.
     // (Done before TUNNEL: entering the ring requests pointer lock, which is where mouse clicks stop being ordinary.)

@@ -78,7 +78,9 @@ export function latticeInstances(sites: readonly LatticeSite[], spacing = 0.16):
   return { positions, colors };
 }
 
-interface Stage { readonly setMode: (m: CameraMode) => void; readonly lock: () => void; readonly setLattice: (sites: readonly LatticeSite[]) => void; readonly setBlackHole: (rs: number, tempK: number) => void; readonly setLens: (rs: number) => void; readonly showEvent: (a: CollisionBatchAnalysis) => void; }
+interface Stage { readonly setMode: (m: CameraMode) => void; readonly lock: () => void; readonly setLattice: (sites: readonly LatticeSite[]) => void; readonly setBlackHole: (rs: number, tempK: number) => void; readonly setLens: (rs: number) => void; readonly showEvent: (a: CollisionBatchAnalysis, index?: number) => void; }
+
+type DetailLevel = 'SCHOOL' | 'UNIVERSITY' | 'RESEARCH';
 
 export function CernComplexView(): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -96,6 +98,10 @@ export function CernComplexView(): JSX.Element {
   const [fpv, setFpv] = useState('0.0, 1.6, 4.0');
   const [quality, setQuality] = useState<PostQuality>('cinematic');
   const [batch, setBatch] = useState<CollisionBatchAnalysis | null>(null);
+  const [batchStart, setBatchStart] = useState(0);
+  const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [replayStatus, setReplayStatus] = useState<'NOT_RUN' | 'MATCH' | 'DRIFT'>('NOT_RUN');
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>('SCHOOL');
   const [hashes, setHashes] = useState<string[]>([]);
   const batchIndexRef = useRef(0);
 
@@ -262,7 +268,7 @@ export function CernComplexView(): JSX.Element {
       },
       setBlackHole: (rs, tempK) => { bhMat.uniforms.uRs.value = rs; bhMat.uniforms.uDiskIn.value = rs * 3; bhMat.uniforms.uDiskOut.value = rs * 12; bhMat.uniforms.uTempK.value = tempK; },
       setLens: (rs) => { pipeline.setLens({ rs, glass: 0.6, center: [0.5, 0.5] }); },
-      showEvent: (a) => { if (colliderLayer) colliderLayer.dispose(); colliderLayer = createColliderLayer(holo as unknown as THREE.Scene, a.events[0], { pixelRatio: dpr, scale: 0.0042 }); },
+      showEvent: (a, index = 0) => { if (colliderLayer) colliderLayer.dispose(); colliderLayer = createColliderLayer(holo as unknown as THREE.Scene, a.events[index] ?? a.events[0], { pixelRatio: dpr, scale: 0.0042 }); },
     };
 
     let raf = 0; let last = performance.now(); const t0 = last; let frameCount = 0; let fpsN = 0; let fpsAcc = 0; let budgetN = 0; let budgetAcc = 0; let lastFramesPush = 0;
@@ -329,17 +335,32 @@ export function CernComplexView(): JSX.Element {
   };
   /** [Q]: four events of the seeded run, anchored as one batch; the first one is shown as the hologram. */
   const collide = (): void => {
-    const a = requestBatch('cern-complex-v2', 4, batchIndexRef.current);
+    const startIndex = batchIndexRef.current;
+    const a = requestBatch('cern-complex-v2', 4, startIndex);
     if ('error' in a) { setError(a.error); return; }
     batchIndexRef.current += 4;
-    setError(null); setBatch(a); pushHash(a.ledgerContentHash);
-    stageRef.current?.showEvent(a);
+    setError(null); setBatch(a); setBatchStart(startIndex); setSelectedEventIndex(0); setReplayStatus('NOT_RUN'); pushHash(a.ledgerContentHash);
+    stageRef.current?.showEvent(a, 0);
+  };
+  const selectEvent = (index: number): void => {
+    if (!batch?.events[index]) return;
+    setSelectedEventIndex(index);
+    stageRef.current?.showEvent(batch, index);
+  };
+  const verifyReplay = (): void => {
+    if (!batch) return;
+    const replay = requestBatch('cern-complex-v2', batch.events.length, batchStart);
+    if ('error' in replay) { setError(replay.error); return; }
+    const originalHashes = batch.events.map((event) => event.eventHash);
+    const replayHashes = replay.events.map((event) => event.eventHash);
+    setReplayStatus(originalHashes.length === replayHashes.length && originalHashes.every((hash, index) => hash === replayHashes[index]) ? 'MATCH' : 'DRIFT');
   };
   const actionsRef = useRef({ collide, formHorizon, synthesize });
   actionsRef.current = { collide, formHorizon, synthesize };
   const stop = (e: SyntheticEvent): void => { e.stopPropagation(); };
   const r = bh?.result ?? null;
   const c = mat?.crystal ?? null;
+  const selectedEvent = batch?.events[selectedEventIndex] ?? null;
 
   return (
     <main id="main-content" className="cern" aria-label="Kompleks CERN" data-testid="cern-complex" data-mode={mode} data-frames={frames}>
@@ -366,6 +387,11 @@ export function CernComplexView(): JSX.Element {
           <button type="button" className="cern-mode" onClick={synthesize} data-testid="cern-crystal">CRYSTAL [R]</button>
           <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/physics/cms-z'; }} data-testid="cern-cms-open-data">REAL CMS DATA</button>
         </div>
+        <div className="cern-modes" role="group" aria-label="Poziom wyjaśnienia">
+          {(['SCHOOL', 'UNIVERSITY', 'RESEARCH'] as const).map((level) => (
+            <button key={level} type="button" className={`cern-mode${detailLevel === level ? ' is-active' : ''}`} aria-pressed={detailLevel === level} data-testid={`cern-detail-${level}`} onClick={() => setDetailLevel(level)}>{level}</button>
+          ))}
+        </div>
         <p className="cern-hint">Klawisze 1–4 przełączają tryb; Q zderza paczkę 4 zdarzeń, E próbuje horyzontu (ADD, 14 TeV), R syntetyzuje kryształ. W trybie WALK i TUNNEL klik w scenę blokuje kursor, WASD porusza.</p>
         {hashes.length > 0 && (
           <div className="cern-hashes" data-testid="cern-hashes">
@@ -376,6 +402,23 @@ export function CernComplexView(): JSX.Element {
         <p className="cern-faint">Etykiety: COLLIDE — TOY_MC_MODEL (nie PYTHIA/Geant4); mikro czarna dziura — HYPOTHESIS (4D, wymaga energii Plancka) lub SPECULATIVE (scenariusz ADD, brak dowodów); kryształy — EMPIRICAL_ESTIMATE_MODEL (oszacowania, nie DFT). REAL CMS DATA otwiera osobną analizę opublikowanych danych CMS 2011. Obraz 3D jest wizualizacją, nie pomiarem.</p>
       </div>
       <aside className="cern-hud cern-hud-right" aria-label="Sterownia" onKeyDown={stop} onKeyUp={stop}>
+        {batch && selectedEvent && (
+          <section className="cern-panel cern-event-panel" data-testid="cern-event-panel" data-origin={batch.label}>
+            <h2>Zdarzenia zderzenia · collision-batch</h2>
+            <p className="cern-origin" data-testid="cern-event-origin">ŹRÓDŁO: {batch.label} · MODEL EDUKACYJNY, NIE DANE DETEKTORA</p>
+            <div className="cern-event-tabs" role="group" aria-label="Zdarzenia w paczce">
+              {batch.events.map((event, index) => (
+                <button key={event.eventHash} type="button" className={`cern-mode${selectedEventIndex === index ? ' is-active' : ''}`} aria-pressed={selectedEventIndex === index} data-testid={`cern-event-${index}`} onClick={() => selectEvent(index)}>EVT {index + 1}</button>
+              ))}
+            </div>
+            <dl className="cw-readout" data-testid="cern-event-readout">
+              <dt>Proces</dt><dd className="cw-mono">pp → {selectedEvent.process} · {selectedEvent.finals.length} cząstek końcowych</dd>
+              {detailLevel !== 'SCHOOL' && <><dt>Parametry modelu</dt><dd className="cw-mono">pT {selectedEvent.hardPT} GeV · y {selectedEvent.y} · φ {selectedEvent.phi}</dd><dt>Przekrój modelowy</dt><dd className="cw-mono">{selectedEvent.crossSectionPb} pb</dd></>}
+              {detailLevel === 'RESEARCH' && <><dt>Id / seed</dt><dd className="cw-mono">{selectedEvent.eventId} · {selectedEvent.seed}</dd><dt>Hash zdarzenia</dt><dd className="cw-mono cw-wrap">{selectedEvent.eventHash}</dd><dt>Ledger paczki</dt><dd className="cw-mono cw-wrap">{batch.ledgerContentHash}</dd></>}
+            </dl>
+            <div className="cern-replay-row"><button type="button" className="cw-btn" onClick={verifyReplay} data-testid="cern-replay">Zweryfikuj replay</button><strong data-testid="cern-replay-status">REPLAY: {replayStatus}</strong></div>
+          </section>
+        )}
         <section className="cern-panel" data-testid="cern-bh-panel">
           <h2>Horyzont zdarzeń · micro-blackhole-sim</h2>
           <div className="cern-controls">

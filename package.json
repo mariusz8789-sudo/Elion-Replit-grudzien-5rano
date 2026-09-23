@@ -28,6 +28,7 @@
     "compute:bundle:quantum-worker": "esbuild packages/core/src/engine/quantum/quantumWorkerEntry.ts --bundle --format=esm --platform=node --target=node22 --banner:js=\"/* eslint-disable @typescript-eslint/no-unused-vars -- esbuild bundle of packages/core/src/engine/quantum/quantumWorkerEntry.ts; regenerate with npm run compute:bundle:quantum-worker, do not edit */\" --outfile=packages/backend/src/compute/quantum-worker.mjs",
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
+    "engine-readiness": "node scripts/engine-readiness-report.mjs",
     "e2e:discovery": "node scripts/discovery-e2e.mjs",
     "repro": "node scripts/repro-demo.mjs",
     "db:backup": "node scripts/db-backup.mjs",

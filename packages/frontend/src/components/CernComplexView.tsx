@@ -364,6 +364,7 @@ export function CernComplexView(): JSX.Element {
           <button type="button" className="cern-mode" onClick={collide} data-testid="cern-collide">COLLIDE [Q]</button>
           <button type="button" className="cern-mode" onClick={formHorizon} data-testid="cern-horizon">HORIZON [E]</button>
           <button type="button" className="cern-mode" onClick={synthesize} data-testid="cern-crystal">CRYSTAL [R]</button>
+          <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/physics/cms-z'; }} data-testid="cern-cms-open-data">REAL CMS DATA</button>
         </div>
         <p className="cern-hint">Klawisze 1–4 przełączają tryb; Q zderza paczkę 4 zdarzeń, E próbuje horyzontu (ADD, 14 TeV), R syntetyzuje kryształ. W trybie WALK i TUNNEL klik w scenę blokuje kursor, WASD porusza.</p>
         {hashes.length > 0 && (
@@ -372,7 +373,7 @@ export function CernComplexView(): JSX.Element {
           </div>
         )}
         <p className="cern-faint cw-mono">FPV: {fpv} · {fps} FPS · KERNEL: /cyber (single)</p>
-        <p className="cern-faint">Etykiety: mikro czarna dziura — HYPOTHESIS (4D, wymaga energii Plancka) lub SPECULATIVE (scenariusz ADD, brak dowodów); kryształy — EMPIRICAL_ESTIMATE_MODEL (oszacowania, nie DFT). Obraz jest wizualizacją, nie pomiarem.</p>
+        <p className="cern-faint">Etykiety: COLLIDE — TOY_MC_MODEL (nie PYTHIA/Geant4); mikro czarna dziura — HYPOTHESIS (4D, wymaga energii Plancka) lub SPECULATIVE (scenariusz ADD, brak dowodów); kryształy — EMPIRICAL_ESTIMATE_MODEL (oszacowania, nie DFT). REAL CMS DATA otwiera osobną analizę opublikowanych danych CMS 2011. Obraz 3D jest wizualizacją, nie pomiarem.</p>
       </div>
       <aside className="cern-hud cern-hud-right" aria-label="Sterownia" onKeyDown={stop} onKeyUp={stop}>
         <section className="cern-panel" data-testid="cern-bh-panel">

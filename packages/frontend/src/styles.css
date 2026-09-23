@@ -1316,6 +1316,9 @@ kbd {
 .world-director-panel form label { min-width: 0; }
 .world-director-panel form button { min-height: 34px; padding: 7px 10px; border: 1px solid rgba(83, 224, 255, .34); border-radius: 6px; color: #bff5ff; background: rgba(9, 77, 98, .45); font: 700 .62rem var(--font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
 .world-director-panel form button:hover { border-color: rgba(108, 239, 255, .72); background: rgba(13, 102, 127, .55); }
+.world-director-prompt-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.world-director-prompt-suggestions button { padding: 6px 8px; border: 1px solid rgba(83, 224, 255, .2); border-radius: 999px; color: #9ed9e8; background: rgba(4, 22, 34, .72); font: 600 .58rem/1.2 var(--font-mono); cursor: pointer; }
+.world-director-prompt-suggestions button:hover { border-color: rgba(108, 239, 255, .58); color: #d7f8ff; background: rgba(10, 66, 83, .64); }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] { display: grid; gap: 5px; padding: 9px; border: 1px solid rgba(137, 109, 255, .24); border-radius: 9px; background: rgba(5, 8, 22, .72); }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] > strong { color: #ddf7ff; font-size: .78rem; }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] > span, .world-director-panel [data-testid='world-director-spacetime-descriptor'] > small { color: #819caf; font: .62rem/1.4 var(--font-mono); }

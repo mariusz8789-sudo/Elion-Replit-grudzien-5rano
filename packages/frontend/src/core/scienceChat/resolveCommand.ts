@@ -645,6 +645,16 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Published CERN data: route to the checksum-pinned, read-only CMS dataset analysis.
+  if (has(norm, 'prawdziwe dane cern', 'dane cms', 'cms open data', 'real cern data', 'real cms data', 'z do mionow', 'z mumu')) {
+    return {
+      text: 'Otwieram analizę CMS Open Data: 10 000 opublikowanych, checksumowo zweryfikowanych zdarzeń Z→μμ z 2011 roku. To analiza historycznych danych offline — nie aktywny zderzacz, nie symulacja detektora i nie nowe odkrycie.',
+      tag: 'FAKT',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/physics/cms-z' },
+    };
+  }
+
   // --- Particle physics / collider (C2, integracja propozycji Qwena) — REALNA domena na tym samym
   //     WorldGraph co powódź/chemia/epidemia: `domains/particlePhysics.ts` (relatywistyczna kinematyka,
   //     relatywistyczny Breit-Wigner, stałe PDG) + `particlePhysicsLeverCatalog.ts`. Nie ma osobnego
@@ -696,7 +706,8 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   }
   if (
     /\b(create|generate|build|stworz|wygeneruj|zbuduj)\b/.test(norm)
-    && /\b(world|city|colony|planet|civilization|swiat|miasto|koloni|planete|cywilizacj)\b/.test(norm)
+    && /\b(world|city|colony|planet|civilization|film|movie|cinematic|swiat|miasto|koloni|planete|cywilizacj)\b/.test(norm)
+    && /\b(world|city|colony|planet|civilization|film|movie|cinematic|mars|universe|cosmos|wormhole|ocean|underwater|historical|alien|swiat|miasto|koloni|planete|cywilizacj|wszechswiat|kosmos|tunel|ocean|podwodn|historycz|obc)\b/.test(norm)
   ) {
     return {
       text: 'Przekazuję Twój prompt do kanonicznego World Directora. Jeśli żądany typ świata nie jest obsługiwany, generator odmówi jawnie zamiast podstawiać inną scenę.',

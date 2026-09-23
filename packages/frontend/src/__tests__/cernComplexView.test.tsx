@@ -49,11 +49,13 @@ describe('CernComplexView — static render (no WebGL)', () => {
   it('renders the stage, the four camera modes, both provider panels and no readout before any run', () => {
     expect(html).toContain('data-testid="cern-complex"');
     expect(html).toContain('data-mode="WALK"');
-    for (const id of ['cern-stage', 'cern-mode-WALK', 'cern-mode-GLASS', 'cern-mode-CONSOLE', 'cern-mode-TUNNEL', 'cern-sqrts', 'cern-add', 'cern-simulate', 'cern-preset', 'cern-synthesize']) expect(html).toContain(`data-testid="${id}"`);
+    for (const id of ['cern-stage', 'cern-mode-WALK', 'cern-mode-GLASS', 'cern-mode-CONSOLE', 'cern-mode-TUNNEL', 'cern-cms-open-data', 'cern-sqrts', 'cern-add', 'cern-simulate', 'cern-preset', 'cern-synthesize']) expect(html).toContain(`data-testid="${id}"`);
     expect(Object.keys(MODE_LABEL)).toEqual(['WALK', 'GLASS', 'CONSOLE', 'TUNNEL']);
     expect(html).not.toContain('cern-bh-readout');
     expect(html).not.toContain('cern-mat-readout');
     expect(html).toContain('SPECULATIVE');
     expect(html).toContain('EMPIRICAL_ESTIMATE_MODEL');
+    expect(html).toContain('TOY_MC_MODEL');
+    expect(html).toContain('REAL CMS DATA');
   });
 });

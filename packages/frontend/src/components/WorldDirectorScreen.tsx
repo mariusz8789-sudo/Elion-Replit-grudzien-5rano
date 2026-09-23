@@ -50,6 +50,14 @@ declare global {
   }
 }
 
+const CINEMATIC_PROMPT_SUGGESTIONS = [
+  'Create a cinematic underwater research city.',
+  'Generate an Einstein-Rosen bridge and create a cinematic flythrough.',
+  'Create a Mars research world with habitats, dust and cinematic shots.',
+  'Create a historical Boston battle reconstruction with streets, smoke and cinematic shots.',
+  'Create a desert alien civilization with ruins, two suns and a cinematic camera.',
+] as const;
+
 function twoAnimationFrames(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
@@ -189,6 +197,18 @@ export function WorldDirectorScreen(): JSX.Element {
           </label>
           <button type="submit" data-testid="world-director-generate">Generuj kanoniczny świat</button>
         </form>
+        <div className="world-director-prompt-suggestions" aria-label="Propozycje filmowych promptów">
+          {CINEMATIC_PROMPT_SUGGESTIONS.map((suggestion) => (
+            <button
+              type="button"
+              className="chip-btn tiny"
+              key={suggestion}
+              onClick={() => { setWorldPrompt(suggestion); setSubmittedPrompt(suggestion); }}
+            >
+              {suggestion.replace(/^Create |^Generate /, '').replace(/\.$/, '')}
+            </button>
+          ))}
+        </div>
         <label>Preset
           <select value={preset} onChange={(event) => setPreset(event.target.value as GenesisWorldPreset)} data-testid="world-director-preset">
             <option value="MODERN_SCIENTIFIC_LAB">Nowoczesne laboratorium</option>

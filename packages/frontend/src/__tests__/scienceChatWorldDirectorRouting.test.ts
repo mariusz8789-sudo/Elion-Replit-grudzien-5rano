@@ -11,8 +11,17 @@ describe('Science Chat → canonical worlds', () => {
     expect(resolveCommand('Open CERN', null).action).toEqual({ type: 'openRoute', hash: '#/cern-complex' });
   });
 
+  it('routes an explicit request for real CERN data to the checksum-pinned CMS analysis', () => {
+    expect(resolveCommand('Pokaż prawdziwe dane CERN z CMS Open Data', null).action).toEqual({ type: 'openRoute', hash: '#/physics/cms-z' });
+  });
+
   it('forwards the unchanged free-form world prompt instead of generating a second world in chat', () => {
     const prompt = 'Create a cinematic underwater research city';
+    expect(resolveCommand(prompt, null).action).toEqual({ type: 'openWorldPrompt', prompt });
+  });
+
+  it('routes a cinematic film request to the same canonical World Director', () => {
+    const prompt = 'Stwórz film o Marsie z kinową kamerą';
     expect(resolveCommand(prompt, null).action).toEqual({ type: 'openWorldPrompt', prompt });
   });
 });

@@ -69,7 +69,8 @@ export const LAB_STATIONS: readonly LabStation[] = [
 /** Central instrument island the agent must walk around. */
 export const LAB_OBSTACLES: readonly Obstacle[] = [
   ...LAB_STATIONS.map((s) => s.footprint),
-  fp(0, 0.4, 2.2, 1.4),
+  // Glass Human Digital Twin chamber at the centre of the main laboratory.
+  fp(0, 0.4, 2.2, 2.2),
   fp(-5.6, 3.6, 1.6, 1.0),
   fp(5.4, 3.8, 1.8, 1.0),
 ];

@@ -24,6 +24,25 @@ describe('Science Chat → canonical worlds', () => {
     const prompt = 'Stwórz film o Marsie z kinową kamerą';
     expect(resolveCommand(prompt, null).action).toEqual({ type: 'openWorldPrompt', prompt });
   });
+
+  it('routes the public product worlds without exposing internal module selection', () => {
+    expect(resolveCommand('Pokaż serce człowieka', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?focus=heart&level=organ' });
+    expect(resolveCommand('Pokaż tkankę wątroby', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?focus=liver&level=tissue' });
+    expect(resolveCommand('Pokaż komórki płuca', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?focus=left-lung&level=cell' });
+    expect(resolveCommand('Pokaż Multiverse Nexus', null).action).toEqual({ type: 'openRoute', hash: '#/lab/multiverse' });
+    expect(resolveCommand('Otwórz Reality Navigator', null).action).toEqual({ type: 'openRoute', hash: '#/reality' });
+    expect(resolveCommand('Pokaż maszynę czasu', null).action).toEqual({ type: 'openRoute', hash: '#/myths-theories' });
+    expect(resolveCommand('Pokaż SW-4', null).action).toEqual({ type: 'openRoute', hash: '#/world-director?prompt=SW-4%20epidemic%20city' });
+  });
+
+  it('separates CERN toy execution from published CMS data', () => {
+    const toy = resolveCommand('Zderz protony w CERN', null);
+    expect(toy.action).toEqual({ type: 'openRoute', hash: '#/cern-complex?action=collision' });
+    expect(toy.text).toMatch(/TOY_MC_MODEL/);
+    const real = resolveCommand('Pokaż prawdziwe dane CERN z CMS Open Data', null);
+    expect(real.action).toEqual({ type: 'openRoute', hash: '#/physics/cms-z' });
+    expect(real.text).toMatch(/historycznych danych offline/i);
+  });
 });
 
 describe('Underwater Research City canonical path', () => {

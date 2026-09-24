@@ -14,6 +14,12 @@ async function openLab(page: Page): Promise<void> {
   await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
   await page.goto('/#/scientific-worlds');
   await expect(page.getByTestId('scientific-worlds')).toBeVisible();
+  // The main product world must be inhabited: its central glass chamber uses
+  // the same governed Human Digital Twin runtime as Human Explorer.
+  await expect.poll(async () => {
+    const raw = await page.getByTestId('scientific-worlds').getAttribute('data-runtime-diagnostics');
+    return raw ? (JSON.parse(raw) as { twins?: number }).twins : 0;
+  }).toBe(1);
 }
 
 for (const viewport of VIEWPORTS) {

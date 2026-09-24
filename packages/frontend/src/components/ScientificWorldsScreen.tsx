@@ -240,6 +240,32 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   }, [def, runCommands, say]);
   const submitCommands = useCallback((commands: readonly WorldCommand[], label: string) => { say('user', label); runCommands({ commands, unresolved: [] }); }, [runCommands, say]);
   const nextLogicalTime = useCallback(() => { logicalTime.current += 1; return logicalTime.current; }, []);
+  const chatHumanHandoffConsumed = useRef(false);
+  useEffect(() => {
+    if (world !== 'biology' || chatHumanHandoffConsumed.current) return;
+    const query = window.location.hash.split('?')[1] ?? '';
+    const params = new URLSearchParams(query);
+    const focus = params.get('focus');
+    const level = params.get('level');
+    if (!focus) return;
+    chatHumanHandoffConsumed.current = true;
+    if (focus === 'body') {
+      const next = createDefaultAnatomyView(TWIN_ID);
+      setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId); sim.setTwinIsolated([]);
+      return;
+    }
+    const organ = EXPLORER_ORGANS.find((entry) => entry.organId === focus);
+    if (organ) {
+      const target = level === 'cell' ? 'cell' : level === 'tissue' ? 'tissue' : 'organ';
+      const lt = nextLogicalTime();
+      submitCommands(explorerCommands(organ, target, `Chat: ${focus} → ${target}`, lt), `Chat: ${focus} → ${target}`);
+      return;
+    }
+    if (bodyParts3dStructure(focus)) {
+      const next = isolateAnatomyNode(setAnatomyMode(createDefaultAnatomyView(TWIN_ID), 'ORGANS'), focus, sim.manifest);
+      setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId); sim.setTwinIsolated(next.isolatedNodeIds);
+    }
+  }, [nextLogicalTime, sim, submitCommands, world]);
   useEffect(() => {
     sim.setOrganPickListener((id) => {
       const organ = EXPLORER_ORGANS.find((entry) => entry.organId === id);

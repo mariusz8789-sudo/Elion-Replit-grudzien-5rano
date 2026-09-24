@@ -250,7 +250,7 @@ function parseHash(): Route {
   if (h === '#/clockwork') return { kind: 'clockwork' };
   if (h === '#/collider') return { kind: 'collider' };
   if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
-  if (h === '#/cern-complex') return { kind: 'cern-complex' };
+  if (h === '#/cern-complex' || h.startsWith('#/cern-complex?')) return { kind: 'cern-complex' };
   if (h === '#/scientific-worlds' || h.startsWith('#/scientific-worlds?')) return { kind: 'scientific-worlds' };
   if (h === '#/human-biology-lab' || h.startsWith('#/human-biology-lab?')) return { kind: 'scientific-worlds', world: 'biology' };
   if (h === '#/decipherment') return { kind: 'decipherment' };

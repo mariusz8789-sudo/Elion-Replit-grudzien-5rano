@@ -3,7 +3,7 @@ import type { PostProcessingModules, PostProcessor, Sim3D, ThreeRenderMetrics } 
 import type { SimParams } from '../types';
 import { buildCharacter, type Character } from './characterRig';
 import { createBench, createCabinet, createMonitor, createShelfUnit } from './graphics/labKit';
-import { createGlassChamber, createPipe, createPlatform } from './graphics/primitives';
+import { createGlassChamber, createPipe } from './graphics/primitives';
 import { createConduitRun, createElectricalCabinet } from './graphics/electricalKit';
 import { createWallSign } from './graphics/signageKit';
 import { createGenesisMaterialPalette, createEmissiveInstrumentMaterial, createScientificGlass, createScreenMaterial, makeReadoutSurface, type GenesisMaterialPalette } from './graphics/materials';
@@ -224,6 +224,7 @@ export class AgentLabScene3D implements Sim3D {
       temporalEngineAdvances: 0, clockOwner: 'AgentController',
       macroMicro: this.macroMicro?.getState() ?? null,
       lastPickedNode: this.lastPickedNode,
+      twins: this.twins.length,
       twinLod: this.twins[0]?.getLodState() ?? null,
       twinLodPreference: this.twinLodPreference,
       researchCompanion: this.researchCompanion?.getDiagnostics() ?? null,
@@ -555,13 +556,22 @@ export class AgentLabScene3D implements Sim3D {
       const m = createEmissiveInstrumentMaterial(THREE, { color: 0xf0b35c, intensity: 1.2, baseColor: 0x3a2a10 }) as THREE_NS.MeshStandardMaterial;
       const b = new THREE.Mesh(beaconGeo, m); b.position.set(x, 3.0, z); scene.add(b); this.beacons.push(m);
     }
-    // Central instrument island (a sealed sample chamber on a platform) — the obstacle at (0, 0.4).
-    scene.add(createPlatform(THREE, palette.BRUSHED_METAL, { position: [0, 0, 0.4], thickness: 0.12, shape: 'box', width: 2.2, depth: 1.4 }));
+    // The main laboratory is built around the same governed Human Digital Twin
+    // used by Human Explorer. It is a visual laboratory presence, not a patient
+    // or clinical claim. Selecting anatomy still opens the dedicated contextual
+    // explorer; this chamber owns no second anatomy or science runtime.
     const islandGlass = labGlass(THREE, 0xbfe9ff);
-    scene.add(createGlassChamber(THREE, islandGlass, { position: [0, 0.12, 0.4], height: 1.5, radiusBottom: 0.45, radiusTop: 0.42, openEnded: false }));
-    const islandCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 1), createEmissiveInstrumentMaterial(THREE, { color: 0x8fd3ff, intensity: 1.4, baseColor: 0x123047 }));
-    islandCore.position.set(0, 0.85, 0.4); islandCore.name = 'island-core'; scene.add(islandCore);
-    createHeroLight(THREE, scene, { target: [0, 0.9, 0.4], keyDistance: 3.2, rimDistance: 2.4, intensity: { key: 14, rim: 3 }, color: { key: 0xeaf4ff, rim: 0x7fdcff }, castShadow: false });
+    const mainTwinPosition: [number, number, number] = [0, 0, 0.4];
+    const chamber = createTwinChamber(THREE, { position: mainTwinPosition, radius: 0.88, height: 2.65, glass: islandGlass, palette, ceilingHeight: CEILING_Y });
+    chamber.group.name = 'main-lab-human-chamber';
+    scene.add(chamber.group); this.chamberRing = chamber.ring; this.chamberGlass = chamber.glass;
+    const twin = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, hologram: true });
+    twin.group.name = 'main-lab-human-presence';
+    chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
+    this.twinTier = twin.tier;
+    this.twinAnchor = chamber.anchor;
+    void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
+    createHeroLight(THREE, scene, { target: [0, 1.3, 0.4], keyDistance: 3.4, rimDistance: 2.5, intensity: { key: 12, rim: 3.2 }, color: { key: 0xeaf4ff, rim: 0x7fdcff }, castShadow: false });
 
     // Stations from the typed world definition.
     for (const st of this.stationDefs) this.buildStation(THREE, scene, palette, st);

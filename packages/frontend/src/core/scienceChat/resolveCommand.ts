@@ -575,6 +575,55 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- HUMAN EXPLORER — route into the existing central glass-chamber twin.
+  // The query is a handoff only: ScientificWorldsScreen consumes it through
+  // the existing explorerCommands → planner → controller path. No anatomy
+  // state or second human runtime is created here.
+  const humanRequested = has(norm, 'pokaz czlowieka', 'pokaz czlowieka w laboratorium', 'digital twin', 'human digital twin', 'human explorer', 'pokaz serce', 'pokaz watrobe', 'pokaz pluca', 'pokaz aorte', 'pokaz mozg', 'pokaz nerke', 'pokaz zoladek', 'show human', 'show heart', 'show liver', 'show lungs', 'show aorta', 'show brain', 'show kidney', 'show stomach')
+    || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ)\w*\b/.test(norm);
+  if (humanRequested) {
+    const focus = /\b(aort)\w*\b/.test(norm) ? 'aorta'
+      : /\b(watrob|liver)\w*\b/.test(norm) ? 'liver'
+        : /\b(pluc|lung)\w*\b/.test(norm) ? 'left-lung'
+          : /\b(mozg|brain)\w*\b/.test(norm) ? 'brain'
+            : /\b(nerk|kidney)\w*\b/.test(norm) ? 'left-kidney'
+              : /\b(zolad|stomach)\w*\b/.test(norm) ? 'stomach'
+                : /\b(serc|heart)\w*\b/.test(norm) ? 'heart' : 'body';
+    const level = /\b(komork|cell)\w*\b/.test(norm) ? 'cell' : /\b(tkank|tissue)\w*\b/.test(norm) ? 'tissue' : 'organ';
+    return {
+      text: `Otwieram człowieka w centralnej komorze Laboratorium i ustawiam widok: ${focus === 'body' ? 'ciało' : focus} → ${level}. Anatomia jest modelem referencyjnym, nie obrazem pacjenta; tkanka i komórka pozostają jawną symulacją edukacyjną.`,
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: `#/human-biology-lab?focus=${focus}&level=${level}` },
+    };
+  }
+
+  // --- ADVANCED WORLDS — distinct, honest entrances to existing surfaces. ---
+  if (has(norm, 'multiverse', 'multiwersum', 'wieloswiat', 'wieloświat', 'multiverse nexus')) {
+    return {
+      text: 'Otwieram Multiverse Nexus — matematyczne i scenariuszowe porównanie wariantów. To MODEL/SCENARIO, nie dowód fizycznego multiwersum.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/lab/multiverse' },
+    };
+  }
+  if (has(norm, 'maszyna czasu', 'maszyne czasu', 'wehikul czasu', 'wehikuł czasu', 'time machine', 'podroz w czasie', 'podróż w czasie')) {
+    return {
+      text: 'Otwieram istniejący sandbox czasoprzestrzeni. THEORETICAL MODEL — Genesis może obliczać i wizualizować modele względności oraz hipotezy, ale nie przedstawia działającej fizycznej maszyny czasu.',
+      tag: 'HIPOTEZA', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/myths-theories' },
+    };
+  }
+  if (has(norm, 'reality navigator', 'nawigator rzeczywistosci', 'nawigator rzeczywistości')) {
+    return {
+      text: 'Otwieram Reality Navigator — porównanie rozgałęzionych scenariuszy oznaczonych jako MODEL/SCENARIO.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/reality' },
+    };
+  }
+  if (has(norm, 'sw 4', 'sw4', 'epidemia sw 4', 'epidemia sw4')) {
+    return {
+      text: 'Otwieram SW-4 w istniejącym World Directorze: deterministyczny model SEIR w wygenerowanym mieście z Evidence i replay. To symulacja scenariusza, nie prognoza epidemii.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/world-director?prompt=SW-4%20epidemic%20city' },
+    };
+  }
+
   // --- Observer at the Junction — handoff do istniejącego Reality Navigatora.
   //     To interaktywny model/scenario, nie dowód fizycznego multiwersum.
   if (has(norm, 'observer at the junction', 'obserwator na skrzyzowaniu', 'rownolegla rzeczywistosc', 'równoległa rzeczywistość', 'alternatywna rzeczywistosc', 'alternatywna rzeczywistość', 'most asgard', 'most einsteina rosena', 'most einsteina-rosena', 'wormhole', 'tunel czasoprzestrzenny', 'portal do innego swiata', 'portal do innego świata', 'wieloswiat', 'wieloświat')) {
@@ -652,6 +701,16 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'FAKT',
       intent: 'OPEN_SIMULATION',
       action: { type: 'openRoute', hash: '#/physics/cms-z' },
+    };
+  }
+
+  // A requested collision starts the existing deterministic toy batch in the
+  // existing CERN scene. The query flag only asks that screen to press its own
+  // canonical Q action after the renderer is ready.
+  if (has(norm, 'zderz protony', 'uruchom zderzenie cern', 'pokaz zderzenie cern', 'toy collision', 'run cern collision', 'proton proton collision')) {
+    return {
+      text: 'Otwieram CERN i uruchamiam istniejące modelowe zderzenie proton–proton. TOY_MC_MODEL — to obliczeniowa wizualizacja, nie telemetria detektora ani PYTHIA/Geant4.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/cern-complex?action=collision' },
     };
   }
 

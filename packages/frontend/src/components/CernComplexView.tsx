@@ -106,6 +106,7 @@ export function CernComplexView(): JSX.Element {
   const [hashes, setHashes] = useState<string[]>([]);
   const batchIndexRef = useRef(0);
   const collisionViewTimerRef = useRef<number | null>(null);
+  const chatActionConsumedRef = useRef(false);
 
   useEffect(() => () => {
     if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
@@ -369,6 +370,21 @@ export function CernComplexView(): JSX.Element {
   };
   const actionsRef = useRef({ collide, formHorizon, synthesize });
   actionsRef.current = { collide, formHorizon, synthesize };
+  useEffect(() => {
+    if (chatActionConsumedRef.current) return;
+    const query = window.location.hash.split('?')[1] ?? '';
+    if (new URLSearchParams(query).get('action') !== 'collision') return;
+    chatActionConsumedRef.current = true;
+    // The scene owns the action. Wait only for its renderer handle; no fake
+    // progress or duplicate collision implementation is introduced here.
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts++;
+      if (stageRef.current) { window.clearInterval(timer); actionsRef.current.collide(); }
+      else if (attempts >= 120) window.clearInterval(timer);
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, []);
   const stop = (e: SyntheticEvent): void => { e.stopPropagation(); };
   const r = bh?.result ?? null;
   const c = mat?.crystal ?? null;

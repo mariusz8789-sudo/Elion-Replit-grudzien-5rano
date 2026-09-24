@@ -27,6 +27,7 @@ import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../sci
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type HumanTwinLodLevel, type HumanTwinLodState, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
 import { loadHumanTwinBodyResult, type HumanTwinTier, type HumanTwinPresentationState } from './humanTwinAsset';
+import { REFERENCE_ANATOMY_IDLE, bodyParts3dStructure, loadBodyParts3dPilot, selectBodyParts3dLod, type ReferenceAnatomyPart, type ReferenceAnatomyState } from './bodyParts3dPilot';
 import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
 import type { TwinSurfaceMode } from './humanTwinMaterials';
 import { evaluateVisualReality, type VisualRealityResult } from './graphics/visualRealityGate';
@@ -152,6 +153,14 @@ export class AgentLabScene3D implements Sim3D {
   private twinLoadGeneration = 0;
   private twinAssetDrawn = false;
   private twinAnchor: THREE_NS.Group | null = null;
+  /**
+   * BodyParts3D pilot: approved reference geometry for five atlas nodes, loaded once on first need and applied
+   * to every twin (the proxy and the licensed-body upgrade alike). The scene owns these geometries.
+   */
+  private referenceParts: readonly ReferenceAnatomyPart[] = [];
+  private referenceState: ReferenceAnatomyState = REFERENCE_ANATOMY_IDLE;
+  private referenceAbort: AbortController | null = null;
+  private onReferenceAnatomy: ((state: ReferenceAnatomyState) => void) | null = null;
   private twinLodPreference: HumanTwinLodPreference = 'AUTO';
   private onTwinLod: ((state: HumanTwinLodState) => void) | null = null;
   private selectedTwinNode: string | null = null;
@@ -236,12 +245,50 @@ export class AgentLabScene3D implements Sim3D {
   /** Biology: apply a V3 anatomy display mode to every twin in the scene (the chamber twin and the table twin). */
   setTwinView(mode: Parameters<typeof buildVisualLayerInstruction>[1], selectedNodeId: string | null): void {
     this.selectedTwinNode = selectedNodeId;
-    const organ = selectedNodeId ? this.manifest.nodes.find((n) => n.id === selectedNodeId && n.kind === 'ORGAN') : undefined;
-    // The chamber anchor lifts the twin 0.2 m off the plinth; organ positions are in the twin's own space.
-    this.selectedOrganFocusY = organ ? organ.positionMeters.y + TWIN_ANCHOR_HEIGHT : null;
     this.twinInstruction = buildVisualLayerInstruction(this.manifest, mode);
+    this.refreshOrganFocus();
     for (const t of this.twins) t.setView(this.twinInstruction, selectedNodeId);
     this.macroMicro?.setOrgan(selectedNodeId);
+    const instruction = this.twinInstruction;
+    const shown = this.manifest.nodes.some((n) => bodyParts3dStructure(n.id) && instruction.visibleAssetSlots.includes(n.assetSlot));
+    if (shown || (selectedNodeId && bodyParts3dStructure(selectedNodeId))) this.ensureReferenceAnatomy();
+  }
+
+  /** The organ the camera frames: the centre of its CURRENT geometry (reference mesh or ellipsoid), in world height. */
+  private refreshOrganFocus(): void {
+    const id = this.selectedTwinNode;
+    const organ = id ? this.manifest.nodes.find((n) => n.id === id && n.kind === 'ORGAN') : undefined;
+    // The chamber anchor lifts the twin 0.2 m off the plinth; organ positions are in the twin's own space.
+    const focus = organ ? this.twins[0]?.getOrganFocus(organ.id)?.y ?? organ.positionMeters.y : null;
+    this.selectedOrganFocusY = focus === null ? null : focus + TWIN_ANCHOR_HEIGHT;
+  }
+
+  getReferenceAnatomyState(): ReferenceAnatomyState { return this.referenceState; }
+  setReferenceAnatomyListener(listener: ((state: ReferenceAnatomyState) => void) | null): void { this.onReferenceAnatomy = listener; }
+  private publishReferenceAnatomy(state: ReferenceAnatomyState): void { this.referenceState = state; this.onReferenceAnatomy?.(state); }
+
+  /**
+   * Fetch the approved BodyParts3D pilot meshes once, at the level of detail this device should draw. Each file
+   * passes the registry gate before it is requested; whatever fails keeps its procedural proxy and is reported.
+   */
+  private ensureReferenceAnatomy(): void {
+    if (this.world !== 'biology' || !this.THREE || this.referenceState.status !== 'IDLE') return;
+    const ownerScene = this.scene;
+    const lod = selectBodyParts3dLod();
+    const abort = new AbortController(); this.referenceAbort = abort;
+    this.publishReferenceAnatomy({ status: 'LOADING', lod, nodes: {}, diagnostics: [] });
+    void loadBodyParts3dPilot(lod, abort.signal).then((result) => {
+      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) {
+        for (const part of result.parts) part.geometry.dispose();
+        return;
+      }
+      this.referenceAbort = null;
+      this.referenceParts = result.parts;
+      for (const t of this.twins) t.applyReferenceAnatomy(result.parts);
+      this.refreshOrganFocus();
+      const status = result.parts.length === result.diagnostics.length ? 'READY' : result.parts.length ? 'PARTIAL' : 'FAILED';
+      this.publishReferenceAnatomy({ status, lod, nodes: Object.fromEntries(result.parts.map((p) => [p.nodeId, p.provenance])), diagnostics: result.diagnostics });
+    });
   }
 
   /** D-131: what the twin body is made of right now (a licensed CC0 asset, or the procedural proxy). */
@@ -290,6 +337,7 @@ export class AgentLabScene3D implements Sim3D {
     this.isolatedTwinNodes = [...nodeIds];
     this.isolatedCount = nodeIds.length;
     for (const t of this.twins) t.setIsolated(nodeIds);
+    if (nodeIds.some((id) => bodyParts3dStructure(id))) this.ensureReferenceAnatomy();
   }
 
   /** D-131: the section plane. A cut reveals the MODEL proxies inside the body; it is not a medical cross-section. */
@@ -971,6 +1019,7 @@ export class AgentLabScene3D implements Sim3D {
     const old = this.twins[0];
     if (!old) { disposeSceneResources(asset.root); return; }
     const upgraded = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, bodyAsset: asset });
+    upgraded.applyReferenceAnatomy(this.referenceParts);
     anchor.remove(old.group);
     this.spinners = this.spinners.filter((g) => g !== old.group);
     old.dispose();
@@ -1015,6 +1064,8 @@ export class AgentLabScene3D implements Sim3D {
 
   dispose(): void {
     this.twinLoadGeneration++; this.twinAbort?.abort(); this.twinAbort = null; this.twinAnchor = null;
+    // Reference meshes still attached to the scene are disposed by the traversal below; a load in flight is dropped.
+    this.referenceAbort?.abort(); this.referenceAbort = null; this.referenceParts = []; this.referenceState = REFERENCE_ANATOMY_IDLE;
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;
     this.researchCompanion?.dispose(); this.researchCompanion = null;

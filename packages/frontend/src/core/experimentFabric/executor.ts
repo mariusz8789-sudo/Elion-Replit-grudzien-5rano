@@ -32,6 +32,7 @@ import { runSolarSystemScenario } from '../../labs/experiments/universe-solar-sy
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
 import { Genesis5DManifoldEngine, type Manifold5DPoint } from '../../../../core/src/engine/manifold/Genesis5DManifoldEngine.js';
 import { runLungExposureModel, type LungExposure, type LungTimelineYears } from '../../labs/experiments/biology-lung-exposure';
+import { runPreventionEducation, type PreventionStage, type PreventionTarget, type PreventionTopic } from '../../labs/experiments/preventionLabCatalog';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
 import { buildBohrModelGraph } from '../modelGraph/bohrModelGraph';
@@ -783,6 +784,26 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         warnings: ['MODEL · EDUCATIONAL SIMULATION · NOT CLINICAL DIAGNOSIS', solved.caveat],
         validity: 'Jakościowe porównanie edukacyjne. Nie odwzorowuje dawki, indywidualnego ryzyka, badania obrazowego ani czynności płuc.',
         assumptions: ['1/5/10 lat wybiera wariant prezentacji, a nie kliniczną prognozę.', 'Wizualizacja pokazuje kierunek możliwych zmian wyłącznie tam, gdzie wskazuje go źródło.'],
+        visualization: ['numeric', 'scene-3d'], route: model.route,
+      };
+    }
+    case 'biology-prevention-education': {
+      const topic = typeof params.topic === 'string' ? params.topic : '';
+      const target = typeof params.target === 'string' ? params.target : '';
+      const stage = typeof params.stage === 'string' ? params.stage : '';
+      const topics: readonly string[] = ['cigarette', 'vaping', 'alcohol', 'cannabis', 'harmful-drugs'];
+      const targets: readonly string[] = ['lungs', 'heart', 'brain', 'liver', 'whole-body'];
+      const stages: readonly string[] = ['immediate', 'short-term', 'repeated-use', 'long-term'];
+      if (!topics.includes(topic) || !targets.includes(target) || !stages.includes(stage)) throw new Error('Unsupported Prevention Lab topic, target or stage.');
+      const solved = runPreventionEducation(topic as PreventionTopic, target as PreventionTarget, stage as PreventionStage);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `${solved.topicLabel}: szkolna prezentacja profilaktyczna — ${solved.target}, etap ${solved.stage}.`,
+        outputs: { ...solved },
+        units: { topic: '', topicLabel: '', target: '', stage: '', affectedOrgans: '', explanation: '', stageExplanation: '', warning: '', classification: '', presentation: '', clinicalUse: '', evidenceLabel: '', visualizationFocus: '', limitations: '', sources: 'URL', nextSteps: '' },
+        warnings: ['EDUCATIONAL MODEL · SIMULATION · NOT MEDICAL DIAGNOSIS', solved.warning],
+        validity: 'Jakościowa, szkolna prezentacja profilaktyczna. Nie jest modelem toksykologicznym, kalkulatorem dawki, oceną zatrucia ani prognozą dla konkretnej osoby.',
+        assumptions: ['Wybrany etap porządkuje treść edukacyjną i nie opisuje ustalonej osi klinicznej.', 'Opis dotyczy ogólnych zagrożeń wskazanych w jawnych źródłach instytucjonalnych.'],
         visualization: ['numeric', 'scene-3d'], route: model.route,
       };
     }

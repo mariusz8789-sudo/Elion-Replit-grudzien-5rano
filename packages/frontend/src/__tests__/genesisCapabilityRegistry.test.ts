@@ -26,6 +26,7 @@ describe('canonical Genesis capability registry', () => {
     expect(getGenesisCapability('physics-black-hole')).toMatchObject({ execution: { kind: 'fabric-model', id: 'einstein-schwarzschild' }, readiness: 'AVAILABLE' });
     expect(getGenesisCapability('physics-three-body')).toMatchObject({ execution: { kind: 'fabric-model', id: 'universe-three-body' }, readiness: 'AVAILABLE' });
     expect(getGenesisCapability('manifold-5d')).toMatchObject({ execution: { kind: 'fabric-model', id: 'math-manifold-5d' }, readiness: 'AVAILABLE', evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL' });
+    expect(getGenesisCapability('school-health-prevention-lab')).toMatchObject({ execution: { kind: 'fabric-model', id: 'biology-prevention-education' }, readiness: 'AVAILABLE', evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL' });
   });
 
   it.each([
@@ -42,6 +43,7 @@ describe('canonical Genesis capability registry', () => {
     ['Otwórz laboratorium czasoprzestrzeni', 'spacetime'],
     ['Pokaż silnik 5D', 'manifold-5d'],
     ['Pokaż wpływ palenia papierosów na płuca', 'biology-lung-impact'],
+    ['Pokaż wpływ alkoholu na mózg', 'school-health-prevention-lab'],
     ['Pokaż wormhole', 'wormhole'],
     ['Pokaż maszynę czasu', 'time-machine'],
   ])('maps %s to %s', (message, id) => {

@@ -97,7 +97,7 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
     // nie rozszerzenie zdolności — żadna inna bramka dopuszczenia nie
     // została poluzowana. Te same dwie dźwignie są jedynymi osiami, po
     // których wolno przemiatać hipotezy scenariuszowe.
-    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-lung-exposure', 'biology-dna-helix', 'biology-protein-folding-hp', 'biology.city', 'scenario-timeline'],
+    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-lung-exposure', 'biology-prevention-education', 'biology-dna-helix', 'biology-protein-folding-hp', 'biology.city', 'scenario-timeline'],
     concepts: ['populacja logistyczna', 'błona', 'DNA', 'białko', 'epidemia'],
     parameters: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed', 'sequence', 'temperatureC', 'sequenceKey', 'temperature', 'steps', 'r0', 'seed', 'scenarioId', 'interventionStartDay'], units: ['1/czas', 'osobn.', 'dni', '°C', 'nm'],
     assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej. Helisa DNA używa geometrii B-DNA oraz reguły Wallace’a dla krótkich presetów, bez pełnej termodynamiki sekwencji, atomistyki i dynamiki molekularnej. Model HP folding redukuje białko do H/P i siatki 2D; seedowany Metropolis może zatrzymać się w minimum lokalnym i nie przewiduje struktury ani funkcji realnego białka.'],

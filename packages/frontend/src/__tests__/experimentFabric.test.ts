@@ -1610,6 +1610,40 @@ describe('educational lung exposure model', () => {
   });
 });
 
+describe('School Health / Prevention Lab V1', () => {
+  it.each([
+    ['Pokaż wpływ palenia na serce', 'cigarette', 'heart', 'heart'],
+    ['Pokaż wpływ e-papierosów', 'vaping', 'lungs', 'left-lung'],
+    ['Pokaż wpływ alkoholu na mózg', 'alcohol', 'brain', 'brain'],
+    ['Pokaż wpływ alkoholu na wątrobę długoterminowo', 'alcohol', 'liver', 'liver'],
+    ['Pokaż wpływ marihuany na organizm', 'cannabis', 'brain', 'brain'],
+    ['Pokaż wpływ narkotyków na organizm', 'harmful-drugs', 'brain', 'brain'],
+  ])('routes %s through the canonical educational Fabric', (message, topic, target, focus) => {
+    const request = parseScienceChatMessage(message);
+    const run = runExperiment(request);
+    expect(request.modelId).toBe('biology-prevention-education');
+    expect(request.parameters).toMatchObject({ topic, target, focus });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs).toMatchObject({ topic, target, classification: 'EDUCATIONAL_MODEL', presentation: 'SIMULATION', clinicalUse: 'NOT_MEDICAL_DIAGNOSIS' });
+    expect(run.result.route).toMatchObject({ kind: 'product-route', hash: expect.stringContaining('simulation=prevention-lab') });
+  });
+
+  it('keeps generic harmful-drug content overview-only and replay deterministic', () => {
+    const request = parseScienceChatMessage('Pokaż wpływ narkotyków na organizm');
+    const first = runExperiment(request);
+    const second = runExperiment(request);
+    expect(first.result.outputs.evidenceLabel).toBe('EDUCATIONAL_OVERVIEW_ONLY');
+    expect(first.result.validity?.toLocaleLowerCase('pl-PL')).toContain('nie jest modelem toksykologicznym');
+    expect(second.provenance.runFingerprint).toBe(first.provenance.runFingerprint);
+  });
+
+  it('does not turn an unrelated prevention topic into a supported simulation', () => {
+    const request = parseScienceChatMessage('Pokaż wpływ nieznanej substancji X na organizm');
+    expect(request.modelId).toBeUndefined();
+    expect(request.domainId).toBe('unknown');
+  });
+});
+
 describe('Experiment output validation', () => {
   it('accepts finite ordered series', () => {
     expect(() => validateExperimentOutputs({ profile: [0, 0.25, 1] })).not.toThrow();

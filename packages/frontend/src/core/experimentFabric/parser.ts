@@ -75,6 +75,34 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
       : /(?:papieros|palen|tytoni|smoking|cigarette)/.test(normalized)
         ? 'cigarette'
         : /(?:zdrowe?\s+p[łl]uc|healthy\s+lungs?)/.test(normalized) ? 'healthy' : undefined;
+  const preventionTopic = /(?:e[- ]?papieros|vaping|vape)/.test(normalized)
+    ? 'vaping'
+    : /(?:alkohol|alcohol)/.test(normalized)
+      ? 'alcohol'
+      : /(?:marihuan|konopi|cannabis)/.test(normalized)
+        ? 'cannabis'
+        : /(?:papieros|palen|tytoni|smoking|cigarette)/.test(normalized)
+          ? 'cigarette'
+          : /(?:narkotyk|substancj[a-ząćęłńóśźż]*\s+psychoaktywn|harmful\s+drugs?|drug\s+abuse)/.test(normalized) ? 'harmful-drugs' : undefined;
+  const preventionTarget = /(?:w[aą]trob|liver)/.test(normalized)
+    ? 'liver'
+    : /(?:m[oó]zg|brain|pami[eę][cć]|uwag|judgment|koordynac|reakcj)/.test(normalized)
+      ? 'brain'
+      : /(?:serc|kr[aą][zż]eni|heart|circulation)/.test(normalized)
+        ? 'heart'
+        : /(?:p[łl]uc|pluc|oddech|airway|lungs?)/.test(normalized)
+          ? 'lungs'
+          : 'whole-body';
+  const preventionStage = /(?:natychmiast|od\s+razu|immediate)/.test(normalized)
+    ? 'immediate'
+    : /(?:d[łl]ugotermin|wiele\s+lat|long[- ]?term)/.test(normalized)
+      ? 'long-term'
+      : /(?:regularn|powtarzan|wielokrotn|repeated)/.test(normalized)
+        ? 'repeated-use'
+        : 'short-term';
+  const preventionResolvedTarget = preventionTarget === 'whole-body'
+    ? preventionTopic === 'cigarette' || preventionTopic === 'vaping' ? 'lungs' : 'brain'
+    : preventionTarget;
   const kerrSpin = firstNumber(normalized, /\b(?:spin|a\s*\/\s*m)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
   const temperatureK = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*k\b/);
   const isingTemperature = firstNumber(normalized, /\b(?:t|temperatura)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?!\s*k\b)/);
@@ -169,6 +197,12 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (manifoldHyperspaceAmplitude !== undefined) params.hyperspaceAmplitude = manifoldHyperspaceAmplitude;
   if (lungExposureYears !== undefined) params.years = lungExposureYears;
   if (lungExposure !== undefined) params.exposure = lungExposure;
+  if (preventionTopic !== undefined) {
+    params.topic = preventionTopic;
+    params.target = preventionResolvedTarget;
+    params.stage = preventionStage;
+    params.focus = preventionResolvedTarget === 'lungs' ? 'left-lung' : preventionResolvedTarget;
+  }
   if (kerrSpin !== undefined) params.spin = kerrSpin;
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
   if (isingTemperature !== undefined) params.temperature = isingTemperature;
@@ -380,6 +414,9 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (/\b(tesserakt|tesseract|hipersześcian|hiperszescian|hiper[- ]?sześcian|hiper[- ]?szescian)\b/.test(normalized)) return request('mathematics', 'math-tesseract-4d', 'scene-3d', ['angleXWDeg', 'angleYZDeg', 'doubleRotation']);
   if (/(?:silnik\s*5d|manifold\s*5d|rozmaitoś[a-ząćęłńóśźż]*\s*5d|rozmaitos[a-ząćęłńóśźż]*\s*5d|geometri[a-ząćęłńóśźż]*\s*5d|ścieżk[a-ząćęłńóśźż]*\s*5d|sciezk[a-ząćęłńóśźż]*\s*5d)/.test(normalized)) return request('mathematics', 'math-manifold-5d', 'scene-3d', ['sampleCount', 'temporalStep', 'hyperspaceAmplitude']);
   if (/(?:p[łl]uc|pluc|lungs?)/.test(normalized) && (lungExposure !== undefined || /(?:wp[łl]yw|wplyw|por[oó]wnaj|porownaj|uszkodzon)/.test(normalized))) return request('biology', 'biology-lung-exposure', 'scene-3d', ['exposure', 'years']);
+  if (preventionTopic !== undefined && /(?:poka[zż]|wp[łl]yw|wplyw|co\s+robi|organizm|m[oó]zg|w[aą]trob|serc|uzale[zż]n|health|effect)/.test(normalized)) {
+    return request('biology', 'biology-prevention-education', 'scene-3d', ['topic', 'target', 'stage', 'focus']);
+  }
   if (/\b(rozkład normalny|rozklad normalny|gauss|z-score|z score)\b/.test(normalized)) {
     return request('mathematics', 'math-gaussian', 'graph', ['mean', 'sigma', 'xValue']);
   }

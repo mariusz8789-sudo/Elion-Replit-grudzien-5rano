@@ -35,6 +35,7 @@ import { HumanMacroMicroLayer } from './humanMacroMicroLayer';
 import { createHolographicResearchCompanion, type HolographicResearchCompanion } from './holographicResearchCompanion';
 import { createPremiumLabDetail, type PremiumLabDetailHandle } from './premiumLabDetail';
 import { createPremiumHumanDetail, type PremiumHumanDetailHandle } from './premiumHumanDetail';
+import { createSpacetimePhotonArtifact3D, updateSpacetimePhotonArtifact3D } from './spacetimePhotonArtifact3D';
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -389,6 +390,12 @@ export class AgentLabScene3D implements Sim3D {
       // The curve is drawn on the desk screen (see redrawScreen); a small bar over the desk marks the peak day.
       const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.05), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xf05555, emissiveIntensity: 1.8 }));
       bar.position.set(0.9, 1.35, 0); g.add(bar);
+    } else if (artifact.kind === 'spacetime') {
+      const stateDrivenVisual = createSpacetimePhotonArtifact3D(THREE, artifact.report);
+      // Keep the adapter's named root as the station artifact. This lets the
+      // frame loop advance only its presentation marker, without rotating the
+      // solver-defined comparison geometry like the other holograms.
+      g.add(stateDrivenVisual);
     }
     v.group.add(g); v.artifactGroup = g;
     this.redrawScreen(v, artifact);
@@ -670,6 +677,8 @@ export class AgentLabScene3D implements Sim3D {
       const hallWall = new THREE.Mesh(new THREE.PlaneGeometry(6, 4), palette.CONCRETE); hallWall.position.set(0, 1.8, -1.6); hall.add(hallWall);
       light.position.set(st.position.x + Math.sin(st.facing) * -2.4, 1.6, st.position.z + Math.cos(st.facing) * -2.4); light.color.setHex(0xff9a3c); light.intensity = 5; light.distance = 6;
       const rail = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.05, 0.05), palette.POLISHED_METAL); rail.position.set(0, 1.05, 0.5); group.add(rail);
+      const readout = makeReadoutSurface(THREE, 384, 176); screen = readout;
+      group.add(createMonitor(THREE, { position: [0.82, 1.02, 0.42], width: 0.78, height: 0.36, standHeight: 0.12, frameMaterial: palette.PAINTED_METAL, screenMaterial: createScreenMaterial(THREE, readout.texture, { emissiveIntensity: 0.9 }) }));
     }
     this.stations.set(st.id, { station: st, group, statusMaterial: status, light, screen, artifactGroup: null });
     if (screen) this.drawIdleScreen(screen, st);
@@ -767,7 +776,11 @@ export class AgentLabScene3D implements Sim3D {
       const base = active ? 1.8 + 0.6 * Math.sin(this.time * 6) : highlighted ? 1.3 : 0.7;
       v.statusMaterial.emissiveIntensity += (base - v.statusMaterial.emissiveIntensity) * 0.15;
       v.light.intensity += ((active ? 4.5 : 2.4) - v.light.intensity) * 0.1;
-      if (v.artifactGroup) v.artifactGroup.rotation.y = this.time * 0.35;
+      if (v.artifactGroup) {
+        const spacetime = v.artifactGroup.children.find((child) => child.name === 'artifact:spacetime') as THREE_NS.Group | undefined;
+        if (spacetime) updateSpacetimePhotonArtifact3D(spacetime, this.time);
+        else v.artifactGroup.rotation.y = this.time * 0.35;
+      }
     }
     for (const b of this.beacons) b.emissiveIntensity = 0.9 + 0.7 * (0.5 + 0.5 * Math.sin(this.time * 2.6));
     // Biology: twins idle, manipulators sweep (faster at the active bay), LEDs tick, the chamber ring and the carousel/hologram turn slowly.

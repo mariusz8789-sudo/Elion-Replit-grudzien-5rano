@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
@@ -157,6 +157,7 @@ export function AppShell({ children, chat, chatInline = false }: {
 }): JSX.Element {
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuCloseRef = useRef<HTMLButtonElement>(null);
   /** The long tail of modules, collapsed by default — see MORE_ITEMS. */
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -165,6 +166,21 @@ export function AppShell({ children, chat, chatInline = false }: {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    menuCloseRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   const active = activeNavId(hash);
   useRangeFillPainter();
@@ -249,20 +265,28 @@ export function AppShell({ children, chat, chatInline = false }: {
             <span>{item.label.split(' ')[0]}</span>
           </button>
         ))}
-        <button className="shell-mobilebar-item" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen}>
+        <button
+          className={`shell-mobilebar-item${menuOpen ? ' active' : ''}`}
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          aria-controls="genesis-mobile-menu"
+        >
           <span aria-hidden="true">☰</span>
           <span>Menu</span>
         </button>
       </nav>
 
       {menuOpen && (
-        <div className="shell-sheet" role="dialog" aria-label="Pełne menu Genesis">
-          <div className="shell-sheet-head">
-            <strong>Genesis</strong>
-            <button className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
+        <>
+          <button className="shell-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu" tabIndex={-1} />
+          <div id="genesis-mobile-menu" className="shell-sheet" role="dialog" aria-modal="true" aria-label="Pełne menu Genesis">
+            <div className="shell-sheet-head">
+              <span><strong>Menu</strong><small>Wybierz obszar Genesis</small></span>
+              <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
+            </div>
+            <div className="shell-sheet-body">{sections}</div>
           </div>
-          <div className="shell-sheet-body">{sections}</div>
-        </div>
+        </>
       )}
     </div>
     </>

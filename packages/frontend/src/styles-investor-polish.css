@@ -98,6 +98,124 @@
   .start-brand { max-height: 8rem; }
   .start-door { min-height: auto; }
   .settings-view { width: 100%; }
+
+  /* The global menu is a compact command drawer. It must never become a
+     second full-screen page or inherit the desktop rail's loose geometry. */
+  .shell-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0 0 calc(3.9rem + var(--safe-bottom));
+    z-index: 70;
+    border: 0;
+    background: rgba(0, 4, 8, 0.58);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+
+  .shell-sheet {
+    display: flex !important;
+    position: fixed !important;
+    inset: auto 0.55rem calc(4.25rem + var(--safe-bottom)) !important;
+    z-index: 80 !important;
+    width: auto !important;
+    height: min(64dvh, 34rem) !important;
+    max-height: calc(100dvh - 6rem - var(--safe-bottom)) !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(119, 232, 242, 0.28) !important;
+    border-radius: 1rem !important;
+    background: rgba(3, 10, 15, 0.985) !important;
+    box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.66) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(118%) !important;
+    backdrop-filter: blur(24px) saturate(118%) !important;
+  }
+
+  .shell-sheet-head {
+    min-height: 3.8rem;
+    padding: 0.55rem 0.65rem 0.55rem 1rem !important;
+    background: rgba(5, 17, 22, 0.98);
+  }
+
+  .shell-sheet-head > span { display: grid; gap: 0.12rem; min-width: 0; }
+  .shell-sheet-head strong { color: #f2fbff; font-size: 0.82rem; letter-spacing: 0.12em; }
+  .shell-sheet-head small { color: #8faaa1; font-size: 0.66rem; letter-spacing: 0.02em; }
+
+  .shell-sheet-close {
+    display: grid !important;
+    place-items: center;
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0 !important;
+    border: 1px solid rgba(119, 232, 242, 0.24) !important;
+    border-radius: 999px;
+    background: rgba(119, 232, 242, 0.08) !important;
+    color: #f4fcff !important;
+    font-size: 1.25rem !important;
+  }
+
+  .shell-sheet-body {
+    min-height: 0;
+    padding: 0.45rem 0.55rem 0.9rem !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .shell-sheet .shell-nav-section {
+    display: grid !important;
+    gap: 0.18rem !important;
+    padding: 0.15rem 0 !important;
+    position: static !important;
+  }
+
+  .shell-sheet .shell-nav-section-title {
+    margin: 0.55rem 0 0.2rem !important;
+    padding: 0 0.65rem !important;
+    font-size: 0.61rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .shell-sheet .shell-nav-item,
+  .shell-sheet .shell-nav-more {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: 1.35rem minmax(0, 1fr) auto;
+    align-items: center !important;
+    gap: 0.58rem !important;
+    width: 100% !important;
+    min-height: 2.8rem !important;
+    margin: 0 !important;
+    padding: 0.48rem 0.65rem !important;
+    border: 0 !important;
+    border-radius: 0.65rem !important;
+    background: transparent !important;
+    text-align: left !important;
+  }
+
+  .shell-sheet .shell-nav-item.active {
+    background: rgba(103, 225, 238, 0.09) !important;
+    box-shadow: inset 2px 0 0 rgba(103, 225, 238, 0.9) !important;
+  }
+
+  .shell-sheet .shell-nav-icon { width: 1.35rem !important; }
+  .shell-sheet .shell-nav-text { display: block !important; min-width: 0 !important; }
+  .shell-sheet .shell-nav-label {
+    display: block !important;
+    overflow: hidden !important;
+    color: #e7f4f5 !important;
+    font-size: 0.86rem !important;
+    line-height: 1.2 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .shell-sheet .shell-nav-desc { display: none !important; }
+  .shell-sheet .shell-nav-groups { display: grid !important; gap: 0.4rem !important; }
+  .shell-sheet .shell-nav-subgroup { position: static !important; }
+  .shell-sheet .shell-nav-subgroup-title {
+    margin: 0.55rem 0 0.16rem !important;
+    padding: 0 0.65rem !important;
+    font-size: 0.61rem !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

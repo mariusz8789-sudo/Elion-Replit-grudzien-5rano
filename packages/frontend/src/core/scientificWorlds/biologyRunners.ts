@@ -148,11 +148,11 @@ export function createBiologyExperimentRunner(worldId: string, ledger: EvidenceL
         const magnification = magnificationFrom(inputs.magnification);
         const mode = scopeModeFor(magnification, inputs.mode);
         const capture = createMicroscopeCapture(new GenesisHyperscope(sink), specimen.specimenId, magnification, mode, seed);
-        const cell = magnification >= 100 ? buildCellModel(createHistologySlide(specimen.specimenId, tissue), seed) : null;
+        const cell = magnification >= 100 || tissue === 'BLOOD' ? buildCellModel(createHistologySlide(specimen.specimenId, tissue), seed) : null;
         return {
-          outputs: { captureId: capture.captureId, specimenId: specimen.specimenId, magnification, mode, fieldOfViewUm: r(capture.request.fieldOfViewMicrometers, 2), resolutionMultiplier: r(capture.visualResolutionMultiplier, 2), instrumentLabel: capture.epistemic, sourceNote: capture.sourceNote, cellOrganelles: cell?.organelles.length ?? 0 },
+          outputs: { captureId: capture.captureId, specimenId: specimen.specimenId, tissue, specimenKind: tissue === 'BLOOD' ? 'REFERENCE_BLOOD_SMEAR' : 'REFERENCE_TISSUE', magnification, mode, fieldOfViewUm: r(capture.request.fieldOfViewMicrometers, 2), resolutionMultiplier: r(capture.visualResolutionMultiplier, 2), instrumentLabel: capture.epistemic, sourceNote: capture.sourceNote, cellOrganelles: cell?.organelles.length ?? 0, ...(tissue === 'BLOOD' ? { modeledComponents: 'ERYTHROCYTES,LEUKOCYTE,PLATELETS', diagnosticUse: 'PROHIBITED' } : {}) },
           evidenceHashes: sink.hashes, epistemicStatus: sessionStatusFor(capture.epistemic), engineLabel: `HYPERSCOPE_${mode}`,
-          steps: ['virtual specimen', `mode ${mode} at ${magnification}×`, 'capture record', cell ? 'cell model at this magnification' : 'no cell model below 100×', 'ledger commit'],
+          steps: ['virtual specimen', `mode ${mode} at ${magnification}×`, 'capture record', tissue === 'BLOOD' ? 'reference blood-cell population model' : cell ? 'cell model at this magnification' : 'no cell model below 100×', 'ledger commit'],
           artifact: { kind: 'hyperscope', capture, cell },
         };
       }

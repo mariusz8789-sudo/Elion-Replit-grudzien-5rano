@@ -33,7 +33,7 @@ import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientif
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
-import { EXPLORER_ORGANS, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
 import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
 
 /**
@@ -141,6 +141,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [replay, setReplay] = useState<ReplayVerdict | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [text, setText] = useState('');
+  const [chatPrompt, setChatPrompt] = useState('');
   const [camera, setCamera] = useState<AgentCameraMode>(world === 'biology' ? 'TWIN' : 'VISOR');
   /** D-131: how the twin's BODY shell is drawn (skin / translucent / stylised x-ray / ghost). */
   const [surface, setSurface] = useState<TwinSurfaceMode>('NORMAL');
@@ -247,6 +248,16 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     const params = new URLSearchParams(query);
     const focus = params.get('focus');
     const level = params.get('level');
+    const specimen = params.get('specimen');
+    if (specimen === 'blood') {
+      chatHumanHandoffConsumed.current = true;
+      const requested = Number(params.get('magnification') ?? 500);
+      const magnification = [1, 5, 25, 100, 500, 1000].includes(requested) ? requested : 500;
+      const lt = nextLogicalTime();
+      const label = `Chat: krew pod mikroskopem ${magnification}×`;
+      submitCommands(bloodMagnificationCommands(magnification, label, lt), label);
+      return;
+    }
     if (!focus) return;
     chatHumanHandoffConsumed.current = true;
     if (focus === 'body') {
@@ -419,11 +430,14 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const commandControls = (
       <section className="sw-hud sw-hud-command" aria-label="Polecenia" data-testid="sw-command">
         <div className="sw-lab-primary">
-          <button type="button" className="sw-btn sw-btn-primary" onClick={() => requestOpenScienceChat()} data-testid="sw-ask">✦ Zapytaj Genesis</button>
+          <form className="sw-lab-chat" onSubmit={(event) => { event.preventDefault(); const prompt = chatPrompt.trim(); requestOpenScienceChat(prompt || undefined); setChatPrompt(''); }} role="search" aria-label="Co chcesz zbadać?">
+            <label htmlFor="sw-lab-chat-input">Co chcesz zbadać?</label>
+            <div><input id="sw-lab-chat-input" className="sw-input" value={chatPrompt} onChange={(event) => setChatPrompt(event.target.value)} placeholder="Np. znajdź kandydatów dla A1" data-testid="sw-lab-chat-input" /><button type="submit" className="sw-btn sw-btn-primary" data-testid="sw-ask">Zapytaj Genesis →</button></div>
+          </form>
           {world === 'physics' && <nav className="sw-domain-rail" aria-label="Strefy laboratorium">
-            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat()}>Drug Discovery</button>
-            <button type="button" className="sw-chip" onClick={() => submit('Idź do syntezatora')}>Chemistry</button>
-            <button type="button" className="sw-chip" onClick={() => submit('Idź do konsoli zderzacza')}>Physics</button>
+            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Znajdź kandydatów dla receptora A1 i porównaj ich właściwości.')}>Drug Discovery · kandydaci</button>
+            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Uruchom miareczkowanie kwasu octowego.')}>Chemistry · miareczkowanie</button>
+            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Pokaż eksperyment z czarną dziurą.')}>Physics · czarna dziura</button>
           </nav>}
           <button type="button" className="sw-btn" onClick={() => setControlsOpen((open) => !open)} aria-expanded={controlsOpen} aria-controls="sw-advanced-controls" data-testid="sw-controls">{controlsOpen ? 'Ukryj sterowanie' : 'Sterowanie'}</button>
         </div>

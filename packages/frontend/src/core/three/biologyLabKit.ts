@@ -512,7 +512,8 @@ export interface TwinChamberOptions {
   ceilingHeight?: number;
 }
 
-/** The central sealed twin chamber: disc plinth, glass cylinder, capped crown with a ring of light, and a base ring. Returns the anchor the twin stands on. */
+/** The central twin chamber: an optically open glass enclosure. The subject must remain readable
+ * on a narrow mobile camera, so structural members never cross the viewing cone. */
 /**
  * The chamber returns its enclosure as well (D-131): the glass shell plus the twelve ribs that stand
  * between a close camera and the body. The twin camera opens that vitrine while it is framing the twin —
@@ -523,24 +524,21 @@ export function createTwinChamber(THREE: typeof THREE_NS, opts: TwinChamberOptio
   const g = new THREE.Group(); g.position.set(...opts.position); g.name = 'twin:chamber';
   g.add(createPlatform(THREE, opts.palette.TECH_COMPOSITE, { position: [0, 0.07, 0], thickness: 0.14, shape: 'disc', radius: opts.radius + 0.25, radialSegments: 64 }));
   g.add(createPlatform(THREE, opts.palette.TECH_COMPOSITE, { position: [0, 0.17, 0], thickness: 0.06, shape: 'disc', radius: opts.radius + 0.05, radialSegments: 48 }));
-  // Everything the twin camera opens: the glass shell and the ribs that stand in front of the body.
+  // Everything the twin camera opens: the glass shell. Earlier versions added twelve ribs and four
+  // pilasters around it; on mobile they read as prison bars and obscured the hero subject.
   const enclosure = new THREE.Group(); enclosure.name = 'twin:chamber-enclosure'; g.add(enclosure);
   enclosure.add(createGlassChamber(THREE, opts.glass, { position: [0, 0.2, 0], height: opts.height, radiusBottom: opts.radius, radiusTop: opts.radius, openEnded: false, radialSegments: 48 }));
   const crown = new THREE.Mesh(new THREE.CylinderGeometry(opts.radius + 0.2, opts.radius + 0.1, 0.18, 48), opts.palette.BRUSHED_METAL); crown.position.y = opts.height + 0.29; g.add(crown);
   const ring = createEmissiveInstrumentMaterial(THREE, { color: 0x8fd3ff, intensity: 1.4, baseColor: 0x123047 });
   const top = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.02, 0.03, 10, 64), ring); top.rotation.x = Math.PI / 2; top.position.y = opts.height + 0.19; g.add(top);
   const bottom = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.08, 0.03, 10, 64), ring); bottom.rotation.x = Math.PI / 2; bottom.position.y = 0.21; g.add(bottom);
-  // Reference look: vertical ribs around the glass, four pilasters, a segmented LED ring in the base, an emitter inside, concentric light rings overhead.
-  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, opts.height, 0.05), opts.palette.POLISHED_METAL); rib.position.set(Math.cos(a) * (opts.radius + 0.01), opts.height / 2 + 0.2, Math.sin(a) * (opts.radius + 0.01)); rib.rotation.y = -a; enclosure.add(rib); }
-  // The four pilasters belong to the vitrine too: from the twin camera's distance they cut straight
-  // across the figure's arms, so they open with the glass and the ribs.
-  for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; enclosure.add(createColumn(THREE, opts.palette.PAINTED_METAL, { position: [Math.cos(a) * (opts.radius + 0.18), 0.14, Math.sin(a) * (opts.radius + 0.18)], height: opts.height + 0.1, radius: 0.045 })); }
+  // A clean base light ring and emitter provide the premium apparatus cue without a cage.
   const ledGeo = new THREE.BoxGeometry(0.06, 0.05, 0.02);
   for (let i = 0; i < 48; i++) { const a = (i / 48) * Math.PI * 2; const led = new THREE.Mesh(ledGeo, ring); led.position.set(Math.cos(a) * (opts.radius + 0.22), 0.1, Math.sin(a) * (opts.radius + 0.22)); led.rotation.y = -a; g.add(led); }
   const emitter = createPracticalLight(THREE, g as unknown as THREE_NS.Scene, { position: [0, opts.height * 0.62, 0], color: 0x9fe9ff, intensity: 5, distance: 4.5, decay: 2 });
   emitter.name = 'twin:emitter';
   const ringsY = opts.ceilingHeight ?? opts.height + 1.0;
-  for (const [r, w] of [[opts.radius + 0.6, 0.05], [opts.radius + 1.1, 0.04], [opts.radius + 1.6, 0.03]] as const) { const t = new THREE.Mesh(new THREE.TorusGeometry(r, w, 8, 72), ring); t.rotation.x = Math.PI / 2; t.position.y = ringsY - 0.5 - (r - opts.radius) * 0.18; g.add(t); }
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(opts.radius + 0.55, 0.035, 8, 72), ring); halo.rotation.x = Math.PI / 2; halo.position.y = ringsY - 0.62; halo.name = 'twin:chamber-ceiling-halo'; g.add(halo);
   const floorRing = new THREE.Mesh(new THREE.RingGeometry(opts.radius + 0.55, opts.radius + 0.62, 72), ring); floorRing.rotation.x = -Math.PI / 2; floorRing.position.y = 0.004; g.add(floorRing);
   const orientationRing = new THREE.Mesh(new THREE.RingGeometry(opts.radius + 0.31, opts.radius + 0.325, 96), new THREE.MeshStandardMaterial({ color: 0x294a5a, emissive: 0x143746, emissiveIntensity: 0.3, roughness: 0.45 }));
   orientationRing.name = 'twin:chamber-orientation-ring'; orientationRing.rotation.x = -Math.PI / 2; orientationRing.position.y = 0.008; g.add(orientationRing);

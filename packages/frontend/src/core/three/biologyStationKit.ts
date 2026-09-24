@@ -244,6 +244,22 @@ function seeded(hash: string): () => number {
   return () => { state = (state + 0x6D2B79F5) >>> 0; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
+function drawBloodSmear(ctx: CanvasRenderingContext2D, cx: number, cy: number, rad: number, hash: string): void {
+  const rnd = seeded(hash); const count = 34;
+  for (let i = 0; i < count; i += 1) {
+    const angle = rnd() * Math.PI * 2; const distance = Math.sqrt(rnd()) * rad * 0.9;
+    const x = cx + Math.cos(angle) * distance; const y = cy + Math.sin(angle) * distance;
+    const radius = rad * (0.07 + rnd() * 0.025);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rnd() * Math.PI);
+    ctx.fillStyle = 'rgba(205,55,72,.9)'; ctx.beginPath(); ctx.ellipse(0, 0, radius, radius * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(110,18,34,.38)'; ctx.beginPath(); ctx.ellipse(0, 0, radius * 0.44, radius * 0.25, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+  // One leukocyte and several platelets make the modeled composition readable.
+  ctx.fillStyle = 'rgba(229,220,242,.95)'; ctx.beginPath(); ctx.arc(cx + rad * 0.27, cy - rad * 0.18, rad * 0.13, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(89,54,142,.9)'; ctx.beginPath(); ctx.arc(cx + rad * 0.25, cy - rad * 0.18, rad * 0.075, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 9; i += 1) { ctx.fillStyle = '#d9b3e8'; ctx.beginPath(); ctx.arc(cx + (rnd() - 0.5) * rad * 1.65, cy + (rnd() - 0.5) * rad * 1.65, rad * 0.018, 0, Math.PI * 2); ctx.fill(); }
+}
+
 export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact, manifest: HumanDigitalTwinManifest): void {
   const { ctx, canvas, texture } = r; const W = canvas.width; const H = canvas.height;
   const small = `${Math.round(H * 0.065)}px monospace`; const mid = `${Math.round(H * 0.075)}px monospace`;
@@ -273,7 +289,9 @@ export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact,
       ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.clip();
       ctx.fillStyle = c.request.mode === 'SUBCELLULAR_MODEL' ? '#1d2a3a' : '#2b3446'; ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
       const rnd = seeded(c.outputHash);
-      if (artifact.cell) {
+      if (artifact.cell?.tissueType === 'BLOOD') {
+        drawBloodSmear(ctx, cx, cy, rad, c.outputHash);
+      } else if (artifact.cell) {
         for (const o of artifact.cell.organelles) { const x = cx + (o.positionNormalized.x - 0.5) * rad * 1.6; const y = cy + (o.positionNormalized.y - 0.5) * rad * 1.6; ctx.fillStyle = o.kind === 'NUCLEUS' ? 'rgba(200,120,150,0.85)' : o.kind === 'MITOCHONDRION' ? 'rgba(240,180,90,0.85)' : 'rgba(160,200,170,0.75)'; ctx.beginPath(); ctx.ellipse(x, y, o.scaleNormalized * rad * 1.3, o.scaleNormalized * rad * 0.9, rnd() * 3, 0, Math.PI * 2); ctx.fill(); }
       } else {
         const n = 40 + Math.round(rnd() * 60);
@@ -282,7 +300,10 @@ export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact,
       ctx.restore();
       ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#e6f2ec'; ctx.font = small;
-      [`FOV ${c.request.fieldOfViewMicrometers.toFixed(1)} µm`, `res ×${c.visualResolutionMultiplier.toFixed(1)}`, c.captureId, c.epistemic].forEach((t, i) => ctx.fillText(t, W * 0.62, H * 0.3 + i * H * 0.11));
+      const readouts = artifact.cell?.tissueType === 'BLOOD'
+        ? [`FOV ${c.request.fieldOfViewMicrometers.toFixed(1)} µm`, 'erytrocyty · leukocyt', 'płytki krwi', c.epistemic]
+        : [`FOV ${c.request.fieldOfViewMicrometers.toFixed(1)} µm`, `res ×${c.visualResolutionMultiplier.toFixed(1)}`, c.captureId, c.epistemic];
+      readouts.forEach((t, i) => ctx.fillText(t, W * 0.62, H * 0.3 + i * H * 0.11));
       ctx.fillStyle = '#f0b35c'; ctx.fillText('powiększenie ≠ nowe dowody', W * 0.62, H - 14);
       break;
     }
@@ -290,7 +311,8 @@ export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact,
       frame(r, `PREPARAT · ${artifact.slide.tissueType} · ${artifact.slide.stain}`);
       const cx = W * 0.33; const cy = H * 0.56; const rad = H * 0.34;
       ctx.fillStyle = artifact.slide.stain === 'H_AND_E' ? '#f1d6e0' : '#101826'; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
-      for (const o of artifact.cell.organelles) { const x = cx + (o.positionNormalized.x - 0.5) * rad * 1.5; const y = cy + (o.positionNormalized.y - 0.5) * rad * 1.5; ctx.fillStyle = o.kind === 'NUCLEUS' ? '#5a2d6b' : o.kind === 'MITOCHONDRION' ? '#c2606f' : '#8a5a7a'; ctx.beginPath(); ctx.ellipse(x, y, o.scaleNormalized * rad * 1.2, o.scaleNormalized * rad * 0.85, 0.4, 0, Math.PI * 2); ctx.fill(); }
+      if (artifact.slide.tissueType === 'BLOOD') drawBloodSmear(ctx, cx, cy, rad, artifact.slide.slideId);
+      else for (const o of artifact.cell.organelles) { const x = cx + (o.positionNormalized.x - 0.5) * rad * 1.5; const y = cy + (o.positionNormalized.y - 0.5) * rad * 1.5; ctx.fillStyle = o.kind === 'NUCLEUS' ? '#5a2d6b' : o.kind === 'MITOCHONDRION' ? '#c2606f' : '#8a5a7a'; ctx.beginPath(); ctx.ellipse(x, y, o.scaleNormalized * rad * 1.2, o.scaleNormalized * rad * 0.85, 0.4, 0, Math.PI * 2); ctx.fill(); }
       ctx.fillStyle = '#e6f2ec'; ctx.font = small;
       [artifact.slide.slideId, artifact.cell.cellId, `${artifact.cell.organelles.length} organelli`, artifact.slide.preparationStatus].forEach((t, i) => ctx.fillText(t, W * 0.62, H * 0.3 + i * H * 0.11));
       ctx.fillStyle = '#f0b35c'; ctx.fillText('MODEL', W * 0.62, H - 14);

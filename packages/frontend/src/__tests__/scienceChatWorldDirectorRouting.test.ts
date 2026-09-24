@@ -29,6 +29,7 @@ describe('Science Chat → canonical worlds', () => {
     expect(resolveCommand('Pokaż serce człowieka', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?focus=heart&level=organ' });
     expect(resolveCommand('Pokaż tkankę wątroby', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?focus=liver&level=tissue' });
     expect(resolveCommand('Pokaż komórki płuca', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?focus=left-lung&level=cell' });
+    expect(resolveCommand('Pokaż krew pod mikroskopem', null).action).toEqual({ type: 'openRoute', hash: '#/human-biology-lab?specimen=blood&magnification=500' });
     expect(resolveCommand('Pokaż Multiverse Nexus', null).action).toEqual({ type: 'openRoute', hash: '#/lab/multiverse' });
     expect(resolveCommand('Otwórz Reality Navigator', null).action).toEqual({ type: 'openRoute', hash: '#/reality' });
     expect(resolveCommand('Pokaż maszynę czasu', null).action).toEqual({ type: 'openRoute', hash: '#/myths-theories' });

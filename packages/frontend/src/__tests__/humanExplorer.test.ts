@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setLocale, t, localeDirection, isLocale, SUPPORTED_LOCALES } from '../core/i18n';
-import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_METRES, canClaimDirectObservation, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, organById, parseExplorerZoom, systemCommands } from '../core/scientificWorlds/humanExplorer';
+import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_METRES, bloodMagnificationCommands, canClaimDirectObservation, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, organById, parseExplorerZoom, systemCommands } from '../core/scientificWorlds/humanExplorer';
 import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
 import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
 import { MUSEUM_CALM, chunkForSpeech, epistemicStatusLine, museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
@@ -84,6 +84,7 @@ describe('human explorer — BODY→MOLECULE ladder on the V3 atlas and canonica
     expect(dna.filter((c) => c.targetEntityId === 'station:compute').length).toBe(1);
     expect(magnificationCommands(organ, 500, 'm', 3).map((c) => c.intent)).toEqual(['NAVIGATE', 'RUN_EXPERIMENT', 'INSPECT']);
     expect(magnificationCommands(organ, 500, 'm', 3)[1].parameters).toEqual({ magnification: 500, tissue: 'CARDIAC', organId: 'heart' });
+    expect(bloodMagnificationCommands(500, 'blood', 3)[1].parameters).toEqual({ magnification: 500, tissue: 'BLOOD', specimenKind: 'REFERENCE_BLOOD_SMEAR' });
     expect(systemCommands('SKELETAL', 's', 4)[1].parameters).toEqual({ action: 'FOCUS_ANATOMY', focus: 'system:skeletal', mode: 'XRAY' });
     expect(levelOfSession('hyperscope-capture', 500, true)).toBe('organelle'); expect(levelOfSession('hyperscope-capture', 100, true)).toBe('cell');
     expect(levelOfSession('central-dogma', null, true)).toBe('molecule'); expect(levelOfSession('central-dogma', null, true, 'dna')).toBe('dna'); expect(levelOfSession(null, null, false)).toBe('body');

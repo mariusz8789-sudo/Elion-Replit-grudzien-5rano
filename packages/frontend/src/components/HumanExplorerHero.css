@@ -54,6 +54,8 @@
 .human-readout { background: #020a10; border: 1px solid #395c6e; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .human-readout span { color: #87a8bc; font-size: 10px; letter-spacing: .1em; }
 .human-readout output { color: #c6f7e8; font-size: 26px; font-variant-numeric: tabular-nums; }
+.human-specimen-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0 4px; }
+.human-specimen-picker .sw-chip { min-height: 42px; white-space: normal; }
 .human-tab .sw-ex-mags { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; margin: 12px 0; }
 .human-tab .sw-ex-mags .sw-chip { min-height: 38px; border-radius: 6px; }
 .human-tab .sw-ex-mags .sw-chip[aria-pressed="true"] { background: #214a50; border-color: #a2ded3; color: #edfffa; }

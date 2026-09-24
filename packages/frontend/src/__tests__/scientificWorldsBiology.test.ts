@@ -91,6 +91,13 @@ describe('biology runners — pack instruments sealed as canonical sessions on t
     expect(high.outputs.mode).toBe('CELL_MODEL'); expect(high.outputs.cellOrganelles).toBe(8);
     expect(runner('hyperscope-capture', 1, { magnification: 7 }).outputs.magnification).toBe(5);
   });
+  it('models a reference blood smear without inventing organelles inside mature erythrocytes', () => {
+    const blood = runner('hyperscope-capture', 4, { magnification: 500, tissue: 'BLOOD', specimenKind: 'REFERENCE_BLOOD_SMEAR' });
+    expect(blood.outputs).toMatchObject({ tissue: 'BLOOD', specimenKind: 'REFERENCE_BLOOD_SMEAR', modeledComponents: 'ERYTHROCYTES,LEUKOCYTE,PLATELETS', diagnosticUse: 'PROHIBITED', cellOrganelles: 0 });
+    expect(blood.epistemicStatus).toBe('MODEL');
+    expect(blood.artifact.kind === 'hyperscope' ? blood.artifact.cell?.organelles : null).toEqual([]);
+    expect(replayExperimentSession(createExperimentSession({ worldId: BIOLOGY_WORLD_ID, stationId: 'station:microscopy', experimentId: 'hyperscope-capture', seed: 4, inputs: { magnification: 500, tissue: 'BLOOD', specimenKind: 'REFERENCE_BLOOD_SMEAR' }, logicalTime: 1 }, runner).session, runner).status).toBe('MATCH');
+  });
   it('orpheus is deterministic per seed, labelled SIMULATION, and its conceptual-only protocol is ACCESS_RESTRICTED for biosafety', () => {
     const a = runner('orpheus-scan', 5, {}); const b = runner('orpheus-scan', 5, {}); const c = runner('orpheus-scan', 6, {});
     expect(a.outputs).toEqual(b.outputs); expect(a.outputs.outputHash).not.toBe(c.outputs.outputHash);

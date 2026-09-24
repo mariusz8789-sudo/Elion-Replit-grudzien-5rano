@@ -579,6 +579,13 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
   // The query is a handoff only: ScientificWorldsScreen consumes it through
   // the existing explorerCommands → planner → controller path. No anatomy
   // state or second human runtime is created here.
+  const bloodMicroscopeRequested = /\b(krew|krwi|blood)\b/.test(norm) && /\b(mikroskop|microscope|powieksz|zbadaj|badaj|pokaz)\w*\b/.test(norm);
+  if (bloodMicroscopeRequested) {
+    return {
+      text: 'Otwieram Hyperscope z referencyjnym modelem rozmazu krwi. Zobaczysz erytrocyty, leukocyt i płytki krwi. To model edukacyjny bez próbki pacjenta, morfologii ani diagnozy.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/human-biology-lab?specimen=blood&magnification=500' },
+    };
+  }
   const humanRequested = has(norm, 'pokaz czlowieka', 'pokaz czlowieka w laboratorium', 'digital twin', 'human digital twin', 'human explorer', 'pokaz serce', 'pokaz watrobe', 'pokaz pluca', 'pokaz aorte', 'pokaz mozg', 'pokaz nerke', 'pokaz zoladek', 'show human', 'show heart', 'show liver', 'show lungs', 'show aorta', 'show brain', 'show kidney', 'show stomach')
     || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ)\w*\b/.test(norm);
   if (humanRequested) {

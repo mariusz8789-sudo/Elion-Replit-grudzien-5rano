@@ -155,6 +155,17 @@ export function magnificationCommands(organ: ExplorerOrgan, magnification: numbe
   ];
 }
 
+/** A reference blood smear in the existing Hyperscope. This is a generated educational
+ * specimen, never a patient sample or diagnostic measurement. */
+export function bloodMagnificationCommands(magnification: number, text: string, logicalTime: number): readonly WorldCommand[] {
+  const id = (i: number): string => `cmd-${fnv1a(`${text}|${logicalTime}|blood-magnification|${i}`)}`;
+  return [
+    { commandId: id(0), text, intent: 'NAVIGATE', targetEntityId: 'station:microscopy', requestedAtLogicalTime: logicalTime },
+    { commandId: id(1), text, intent: 'RUN_EXPERIMENT', targetEntityId: 'station:microscopy', parameters: { magnification, tissue: 'BLOOD', specimenKind: 'REFERENCE_BLOOD_SMEAR' }, requestedAtLogicalTime: logicalTime },
+    { commandId: id(2), text, intent: 'INSPECT', parameters: { provenance: true, result: true }, requestedAtLogicalTime: logicalTime },
+  ];
+}
+
 /** The twin's display mode for a body system (the systems rail) — the V3 visual modes, through the anatomy table's interaction. */
 export function systemDisplayMode(system: string): 'XRAY' | 'VASCULAR' | 'NERVOUS' | 'ORGANS' {
   return system === 'SKELETAL' ? 'XRAY' : system === 'CARDIOVASCULAR' || system === 'LYMPHATIC' ? 'VASCULAR' : system === 'NERVOUS' ? 'NERVOUS' : 'ORGANS';

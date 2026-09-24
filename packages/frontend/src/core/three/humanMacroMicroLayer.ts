@@ -247,6 +247,29 @@ function buildTissueModel(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Gro
   markModel(root, 'tissue'); addShadows(root); return root;
 }
 
+function buildBloodModel(THREE: typeof THREE_NS): THREE_NS.Group {
+  const root = new THREE.Group(); root.name = 'macro-tissue:BLOOD';
+  const rotor = createPresentationStage(THREE, root, 0.82);
+  const red = biologicalMaterial(THREE, 0xb52f42, { emissive: 0x32070d, roughness: 0.46 });
+  const pale = biologicalMaterial(THREE, 0xe4dce8, { emissive: 0x31243a, roughness: 0.55 });
+  const nucleus = biologicalMaterial(THREE, 0x67428f, { emissive: 0x1c0d31, roughness: 0.5 });
+  for (let index = 0; index < 22; index += 1) {
+    const cell = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.045, 12, 30), red);
+    cell.name = `blood:erythrocyte:${index}`;
+    const angle = index * 2.399963229728653; const radius = 0.12 + (index % 6) * 0.11;
+    cell.position.set(Math.cos(angle) * radius, ((index * 7) % 9 - 4) * 0.055, Math.sin(angle) * radius);
+    cell.rotation.set(angle * 0.31, angle * 0.17, angle); rotor.add(cell);
+  }
+  const whiteCell = new THREE.Mesh(new THREE.SphereGeometry(0.13, 26, 18), pale); whiteCell.name = 'blood:leukocyte'; whiteCell.position.set(0.24, 0.12, 0.04); rotor.add(whiteCell);
+  const whiteNucleus = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), nucleus); whiteNucleus.name = 'blood:leukocyte:nucleus'; whiteNucleus.position.copy(whiteCell.position); whiteNucleus.scale.set(1.1, 0.85, 0.9); rotor.add(whiteNucleus);
+  for (let index = 0; index < 8; index += 1) {
+    const platelet = new THREE.Mesh(new THREE.SphereGeometry(0.018, 9, 7), pale); platelet.name = `blood:platelet:${index}`;
+    platelet.position.set(Math.cos(index * 1.9) * 0.48, -0.2 + (index % 4) * 0.12, Math.sin(index * 1.9) * 0.42); rotor.add(platelet);
+  }
+  root.userData.modeledComponents = ['ERYTHROCYTES_WITHOUT_NUCLEI', 'LEUKOCYTE', 'PLATELETS'];
+  root.userData.diagnosticUse = 'PROHIBITED'; markModel(root, 'tissue'); addShadows(root); return root;
+}
+
 function buildCellModelVisual(THREE: typeof THREE_NS, cell: CellModel): THREE_NS.Group {
   const root = new THREE.Group(); root.name = `macro-cell:${cell.cellId}`; const rotor = createPresentationStage(THREE, root, 0.78); addCellContents(THREE, rotor, cell, 1.25);
   markModel(root, 'cell'); addShadows(root); return root;
@@ -398,9 +421,9 @@ export class HumanMacroMicroLayer {
   private rebuild(): void {
     this.refreshAnatomyLayers();
     const artifact = this.artifact;
-    if (artifact?.kind === 'histology') { this.replace(buildTissueModel(this.THREE, artifact.cell)); return; }
+    if (artifact?.kind === 'histology') { this.replace(artifact.slide.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : buildTissueModel(this.THREE, artifact.cell)); return; }
     if (artifact?.kind === 'hyperscope' && artifact.cell) {
-      this.replace(artifact.capture.request.magnification >= 500 ? buildOrganelleModel(this.THREE, artifact.cell) : buildCellModelVisual(this.THREE, artifact.cell)); return;
+      this.replace(artifact.cell.tissueType === 'BLOOD' ? buildBloodModel(this.THREE) : artifact.capture.request.magnification >= 500 ? buildOrganelleModel(this.THREE, artifact.cell) : buildCellModelVisual(this.THREE, artifact.cell)); return;
     }
     if (artifact?.kind === 'central-dogma') { this.replace(buildMoleculeModel(this.THREE, artifact)); return; }
     const organ = organNode(this.manifest, this.selectedOrganId);

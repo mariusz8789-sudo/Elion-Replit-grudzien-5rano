@@ -7,7 +7,7 @@ import type { AnatomyViewState, HumanDigitalTwinManifest, OrganSystemId } from '
 import { organsInSystem } from '../core/scientificWorlds/humanLab/anatomyAtlas';
 import { BIOLOGY_WORLD_ID } from '../core/scientificWorlds/biologyLabWorld';
 import { VIRTUAL_MICROSCOPE_MAGNIFICATIONS } from '../core/scientificWorlds/humanLab/virtualMicroscope';
-import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_TEXT, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, systemCommands, type ExplorerOrgan, type ScaleLevel } from '../core/scientificWorlds/humanExplorer';
+import { EXPLORER_ORGANS, SCALE_LADDER, SCALE_TEXT, bloodMagnificationCommands, explorerCommands, explorerPath, explorerTruthLabel, levelLabel, levelOfSession, magnificationCommands, systemCommands, type ExplorerOrgan, type ScaleLevel } from '../core/scientificWorlds/humanExplorer';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
@@ -62,7 +62,8 @@ const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope',
 
 export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const initialBlood = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('specimen') === 'blood';
+  const [inspectorOpen, setInspectorOpen] = useState(initialBlood);
   const [peek, setPeek] = useState<'closed' | 'hover' | 'pinned'>('closed');
   const [search, setSearch] = useState('');
   const heroRef = useRef<HTMLElement>(null);
@@ -75,7 +76,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
     document.addEventListener('pointerdown', dismiss); document.addEventListener('keydown', dismiss);
     return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', dismiss); };
   }, []);
-  const [activeTab, setActiveTab] = useState<'explore' | 'microscope' | 'section' | 'research'>('explore');
+  const [activeTab, setActiveTab] = useState<'explore' | 'microscope' | 'section' | 'research'>(initialBlood ? 'microscope' : 'explore');
+  const [microscopeSpecimen, setMicroscopeSpecimen] = useState<'selected-tissue' | 'blood'>(initialBlood ? 'blood' : 'selected-tissue');
   const organs = useMemo(() => manifest.nodes.filter((n) => n.kind === 'ORGAN'), [manifest]);
   const [system, setSystem] = useState<OrganSystemId | null>(null);
   const [organId, setOrganId] = useState<string>(() => (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId) ? anatomy.selectedNodeId : 'heart'));
@@ -110,7 +112,12 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
     const lt = nextLogicalTime(); const label = `${t('explorer.zoom', locale)}: ${t(explorer.labelKey, locale)} → ${levelLabel(target, locale)}`;
     run(explorerCommands(explorer, target, label, lt, { manifest, selectedNodeId: anatomy.selectedNodeId, sessions, worldId: BIOLOGY_WORLD_ID, seed: 7 }), label);
   };
-  const magnify = (m: number): void => { if (!explorer) return; const lt = nextLogicalTime(); const label = `${t('explorer.hyperscope', locale)} ${m}× · ${t(explorer.labelKey, locale)}`; run(magnificationCommands(explorer, m, label, lt), label); };
+  const magnify = (m: number): void => {
+    if (!explorer && microscopeSpecimen !== 'blood') return;
+    const lt = nextLogicalTime();
+    const label = microscopeSpecimen === 'blood' ? `Mikroskop ${m}× · krew (model referencyjny)` : `${t('explorer.hyperscope', locale)} ${m}× · ${t(explorer!.labelKey, locale)}`;
+    run(microscopeSpecimen === 'blood' ? bloodMagnificationCommands(m, label, lt) : magnificationCommands(explorer!, m, label, lt), label);
+  };
   const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
   return (
@@ -191,19 +198,24 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
 
       </div>
       <div className="human-tab" id="human-panel-microscope" role="tabpanel" aria-labelledby="human-tab-microscope" hidden={activeTab !== 'microscope'}>
-        <div className="human-readout"><span>HYPERSCOPE / pole modelowe</span><output data-testid="human-magnification-readout">{magnification ? `${magnification}×` : 'Brak ekspozycji'}</output></div>
-        <p className="human-instrument-note">Wybierz powiększenie, aby uruchomić istniejący mikroskop. Podgląd pochodzi z wykonanej sesji.</p>
+        <div className="human-readout"><span>HYPERSCOPE / {microscopeSpecimen === 'blood' ? 'KREW REFERENCYJNA' : 'TKANKA NARZĄDU'}</span><output data-testid="human-magnification-readout">{magnification ? `${magnification}×` : 'Wybierz powiększenie'}</output></div>
+        <p className="human-instrument-note">Wybierz preparat i powiększenie. To model edukacyjny bez próbki pacjenta i bez diagnozy.</p>
         <div className="sw-ex-scope" data-testid="sw-explorer-scope" data-capture={imageSession?.sessionId ?? ''}>
+          <div className="human-specimen-picker" role="group" aria-label="Preparat mikroskopowy">
+            <button type="button" className={`sw-chip${microscopeSpecimen === 'selected-tissue' ? ' is-on' : ''}`} aria-pressed={microscopeSpecimen === 'selected-tissue'} onClick={() => setMicroscopeSpecimen('selected-tissue')} disabled={!explorer || busy} data-testid="human-specimen-tissue">Tkanka: {organ?.label ?? 'narząd'}</button>
+            <button type="button" className={`sw-chip${microscopeSpecimen === 'blood' ? ' is-on' : ''}`} aria-pressed={microscopeSpecimen === 'blood'} onClick={() => setMicroscopeSpecimen('blood')} disabled={busy} data-testid="human-specimen-blood">Krew</button>
+          </div>
           <div className="sw-ex-title">{t('explorer.hyperscope', locale)} · {t('explorer.magnification', locale)}</div>
           <div className="sw-ex-mags">
             {VIRTUAL_MICROSCOPE_MAGNIFICATIONS.map((m) => (
-              <button key={m} type="button" className={`sw-chip${magnification === m ? ' is-on' : ''}`} onClick={() => magnify(m)} disabled={busy || !explorer} aria-pressed={magnification === m} data-testid={`sw-explorer-mag-${m}`}>{m}×</button>
+              <button key={m} type="button" className={`sw-chip${magnification === m ? ' is-on' : ''}`} onClick={() => magnify(m)} disabled={busy || (!explorer && microscopeSpecimen !== 'blood')} aria-pressed={magnification === m} data-testid={`sw-explorer-mag-${m}`}>{m}×</button>
             ))}
           </div>
           <canvas ref={canvasRef} className="sw-ex-canvas" width={512} height={288} aria-label="Microscope field" />
           {imageSession
             ? <p className="sw-faint cw-mono" data-testid="sw-explorer-capture">{imageSession.experimentId} · {imageSession.epistemicStatus} · {imageSession.contentHash.slice(0, 16)}…</p>
             : <p className="sw-faint" data-testid="sw-explorer-empty">{t('explorer.noCapture', locale)}</p>}
+          {microscopeSpecimen === 'blood' && <p className="human-instrument-note" data-testid="human-blood-scope-note">Model pokazuje erytrocyty bez jąder, leukocyt i płytki krwi. Nie przedstawia wyniku morfologii ani obrazu pacjenta.</p>}
 
         </div>
 

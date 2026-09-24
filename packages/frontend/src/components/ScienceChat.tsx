@@ -31,6 +31,7 @@ import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/ag
 import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyberInvestigation, saveCyberInvestigationToMemory } from '../core/scienceMemory';
 import { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop } from '../core/scienceMemory';
 import type { ScientificDiscoveryLoopResult } from '../core/experimentFabric/scientificDiscoveryLoop';
+import type { ExperimentRoute, ExperimentValue } from '../core/experimentFabric/types';
 import { continueResearchCampaign, isNoJustifiedNextQuestion, startResearchCampaign, type ResearchCycle } from '../core/experimentFabric/researchCampaign';
 import { runScientificIntegrationCampaign } from '../core/experimentFabric/scientificIntegration';
 import { createLedgerSink } from '../core/scientificWorlds/biologyRunners';
@@ -47,6 +48,17 @@ import {
 /** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
  * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
  * workspace's own rendering of the same result. */
+function productRouteHash(route: Extract<ExperimentRoute, { kind: 'product-route' }>, values: Readonly<Record<string, ExperimentValue>>): string {
+  const [path, query = ''] = route.hash.split('?');
+  const params = new URLSearchParams(query);
+  for (const key of route.parameterQueryKeys ?? []) {
+    const value = values[key];
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const encoded = params.toString();
+  return encoded ? `${path}?${encoded}` : path;
+}
+
 const INGEST_SKIP_LABEL: Record<string, string> = {
   REQUIRES_OFFICIAL_API: 'wymaga oficjalnego API i klucza w środowisku (bez scrapingu)',
   LEGAL_GATE_PENDING: 'domena poza rejestrem zweryfikowanych źródeł',
@@ -267,6 +279,8 @@ export function formatFabricRun(run: ExperimentRun): string {
     ? '\nŚwiat 3D używa tej samej instancji modelu z tego przebiegu.'
     : run.result.route.kind === 'lab'
       ? `\nWizualizacja: laboratorium ${run.result.route.labId}.`
+      : run.result.route.kind === 'product-route'
+        ? '\nWizualizacja: istniejący świat produktu.'
       : '';
   const biotech = run.result.biologicalTarget && run.result.biologicalEvidence
     ? `\nBiotech target: ${run.result.biologicalTarget.label} (${run.result.biologicalTarget.id}). Evidence: ${run.result.biologicalEvidence.id}. Status evidence: ${run.result.biologicalEvidence.status}.`
@@ -508,6 +522,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;
+        } else if (run.result.status === 'completed' && run.result.route.kind === 'product-route') {
+          window.location.hash = productRouteHash(run.result.route, run.provenance.parameterSnapshot);
+          setOpen(false);
         } else if (run.result.status === 'hypothetical_visualization' && run.result.route.kind === 'hypothetical-visualization') {
           const legendView = run.provenance.parameterSnapshot.viewMode === 'physics' ? '&legendView=physics' : '';
           window.location.hash = `${run.result.route.hash}${legendView}`;

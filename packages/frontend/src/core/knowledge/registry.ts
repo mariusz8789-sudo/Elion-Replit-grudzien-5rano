@@ -97,11 +97,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
     // nie rozszerzenie zdolności — żadna inna bramka dopuszczenia nie
     // została poluzowana. Te same dwie dźwignie są jedynymi osiami, po
     // których wolno przemiatać hipotezy scenariuszowe.
-    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-dna-helix', 'biology-protein-folding-hp', 'biology.city', 'scenario-timeline'],
+    capability: 'REAL_ENGINE', realModels: ['biology-logistic', 'biology-lung-exposure', 'biology-dna-helix', 'biology-protein-folding-hp', 'biology.city', 'scenario-timeline'],
     concepts: ['populacja logistyczna', 'błona', 'DNA', 'białko', 'epidemia'],
     parameters: ['growthRate', 'carryingCapacity', 'initialPopulation', 'timeElapsed', 'sequence', 'temperatureC', 'sequenceKey', 'temperature', 'steps', 'r0', 'seed', 'scenarioId', 'interventionStartDay'], units: ['1/czas', 'osobn.', 'dni', '°C', 'nm'],
     assumptions: ['Modele biologiczne są edukacyjne i nie stanowią diagnozy ani prognozy medycznej. Helisa DNA używa geometrii B-DNA oraz reguły Wallace’a dla krótkich presetów, bez pełnej termodynamiki sekwencji, atomistyki i dynamiki molekularnej. Model HP folding redukuje białko do H/P i siatki 2D; seedowany Metropolis może zatrzymać się w minimum lokalnym i nie przewiduje struktury ani funkcji realnego białka.'],
-    possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'oblicz helisę DNA', 'uruchom model HP fałdowania', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / B-DNA Wallace / HP Metropolis / ModelGraph',
+    possibleExperiments: ['zasymuluj epidemię', 'pokaż rozwój epidemii w mieście', 'pokaż edukacyjny wpływ palenia na płuca', 'oblicz helisę DNA', 'uruchom model HP fałdowania', 'wzrost populacji'], requiredSolver: 'EpidemicCitySimulation / qualitative lung exposure education model / B-DNA Wallace / HP Metropolis / ModelGraph',
     visualization: ['numeric', 'graph', 'world-3d', 'scene-3d'], dependencies: ['mathematics', 'thermodynamics'], keywords: ['epidemia', 'seir', 'seird', 'sir', 'zakaż', 'populacja', 'dna', 'helisa', 'wallace', 'miasto', 'choroba'],
   },
   {
@@ -157,11 +157,11 @@ const DOMAIN_REGISTRY: readonly KnowledgeDomainDescriptor[] = [
   },
   {
     id: 'mathematics', title: 'Matematyka i modele numeryczne', sourceFile: 'mathematics.md', scale: 'meta',
-    capability: 'REAL_ENGINE', realModels: ['math-gaussian', 'math-tesseract-4d'],
-    concepts: ['algebra', 'rachunek', 'ODE', 'RK4', 'bezpieczny parser', 'rotacja 4D', 'projekcja 4D→3D'], parameters: ['mean', 'sigma', 'xValue', 'angleXWDeg', 'angleYZDeg', 'doubleRotation'], units: ['°'],
-    assumptions: ['Parser wyrażeń jest sandboxem danych, nie wykonuje kodu użytkownika. Tesserakt jest dokładną geometrią w 4D oraz projekcją 4D→3D; nie stanowi twierdzenia o fizycznych dodatkowych wymiarach ani multiwersum.'],
-    possibleExperiments: ['oblicz rozkład normalny', 'obróć i rzutuj tesserakt 4D'], requiredSolver: 'math-gaussian / tesseract linear algebra / safe expression parser',
-    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: [], keywords: ['matematyka', 'gauss', 'normalny', 'równanie', 'ode', 'tesserakt', 'tesseract', '4d', 'projekcja'],
+    capability: 'REAL_ENGINE', realModels: ['math-gaussian', 'math-tesseract-4d', 'math-manifold-5d'],
+    concepts: ['algebra', 'rachunek', 'ODE', 'RK4', 'bezpieczny parser', 'rotacja 4D', 'projekcja 4D→3D', 'geometria dyskretna R⁵'], parameters: ['mean', 'sigma', 'xValue', 'angleXWDeg', 'angleYZDeg', 'doubleRotation', 'sampleCount', 'temporalStep', 'hyperspaceAmplitude'], units: ['°'],
+    assumptions: ['Parser wyrażeń jest sandboxem danych, nie wykonuje kodu użytkownika. Tesserakt jest dokładną geometrią w 4D oraz projekcją 4D→3D; silnik 5D oblicza geometrię ścieżki w R⁵. Żaden z nich nie stanowi twierdzenia o fizycznych dodatkowych wymiarach ani multiwersum.'],
+    possibleExperiments: ['oblicz rozkład normalny', 'obróć i rzutuj tesserakt 4D', 'oblicz geometrię ścieżki 5D'], requiredSolver: 'math-gaussian / tesseract linear algebra / Genesis5DManifoldEngine / safe expression parser',
+    visualization: ['numeric', 'graph', 'scene-3d'], dependencies: [], keywords: ['matematyka', 'gauss', 'normalny', 'równanie', 'ode', 'tesserakt', 'tesseract', '4d', '5d', 'manifold', 'rozmaitość', 'projekcja'],
   },
   {
     id: 'multiverse', title: 'Modele alternatywnych wszechświatów', sourceFile: 'multiverse.md', scale: 'cosmic',

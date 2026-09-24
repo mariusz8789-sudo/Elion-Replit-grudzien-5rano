@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { t, getLocale } from '../core/i18n';
 import { drawBiologyArtifact } from '../core/three/biologyStationKit';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
@@ -13,6 +13,7 @@ import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../c
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 import { BODYPARTS3D_ATTRIBUTION, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
+import { runLungExposureModel, type LungExposure, type LungTimelineYears } from '../labs/experiments/biology-lung-exposure';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
 import './HumanExplorerHero.css';
 
@@ -62,7 +63,13 @@ const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope',
 
 export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
-  const initialBlood = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('specimen') === 'blood';
+  const initialQuery = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+  const initialBlood = initialQuery.get('specimen') === 'blood';
+  const initialLungSimulation = initialQuery.get('simulation') === 'lung-exposure';
+  const initialExposure = (['healthy', 'cigarette', 'vaping', 'cannabis'].includes(initialQuery.get('exposure') ?? '') ? initialQuery.get('exposure') : 'cigarette') as LungExposure;
+  const initialYears = ([1, 5, 10].includes(Number(initialQuery.get('years'))) ? Number(initialQuery.get('years')) : 1) as LungTimelineYears;
+  const [lungExposure] = useState<LungExposure>(initialExposure);
+  const [lungYears, setLungYears] = useState<LungTimelineYears>(initialYears);
   const [inspectorOpen, setInspectorOpen] = useState(initialBlood);
   const [peek, setPeek] = useState<'closed' | 'hover' | 'pinned'>('closed');
   const [search, setSearch] = useState('');
@@ -98,6 +105,13 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const referenceNodes = referenceAnatomy?.nodes ?? {};
   const reference = organ ? referenceNodes[organ.id] ?? null : null;
   const referenceShown = Object.keys(referenceNodes).length > 0;
+  const lungModel = initialLungSimulation ? runLungExposureModel(lungExposure, lungYears) : null;
+  const setLungTimeline = (years: LungTimelineYears): void => {
+    setLungYears(years);
+    const [path, query = ''] = window.location.hash.split('?');
+    const next = new URLSearchParams(query); next.set('years', String(years)); next.set('exposure', lungExposure);
+    window.history.replaceState(null, '', `${path}?${next.toString()}`);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -139,6 +153,17 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
         {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])}>{BODYPARTS3D_ATTRIBUTION}</span>}
       </div>
+      {lungModel && <aside className="human-lung-compare" data-testid="human-lung-exposure" data-exposure={lungExposure} data-years={lungYears}>
+        <header><span>MODEL</span><span>EDUCATIONAL SIMULATION</span><span>NOT CLINICAL DIAGNOSIS</span></header>
+        <h2>Zdrowe płuca <b>vs</b> {lungExposure === 'cigarette' ? 'palenie papierosów' : lungExposure === 'vaping' ? 'e-papierosy' : lungExposure === 'cannabis' ? 'palenie marihuany' : 'punkt odniesienia'}</h2>
+        <div className="human-lung-panels" aria-label="Porównanie płuc">
+          <div className="human-lung-panel is-healthy"><i aria-hidden="true">◖ ◗</i><strong>Zdrowe</strong><small>referencyjny model</small></div>
+          <div className="human-lung-panel is-exposed" style={{ '--lung-impact': lungModel.visualSeverity } as CSSProperties}><i aria-hidden="true">◖ ◗</i><strong>Ekspozycja</strong><small>{lungModel.evidenceStrength.replaceAll('_', ' ')}</small></div>
+        </div>
+        <div className="human-lung-timeline" role="group" aria-label="Oś czasu prezentacji">{([1, 5, 10] as const).map(years => <button key={years} type="button" aria-pressed={lungYears === years} onClick={() => setLungTimeline(years)}>{years} {years === 1 ? 'rok' : 'lat'}</button>)}</div>
+        <dl><div><dt>Zapalenie</dt><dd>{lungModel.inflammation}</dd></div><div><dt>Drogi oddechowe</dt><dd>{lungModel.airwayNarrowing}</dd></div><div><dt>Śluz</dt><dd>{lungModel.mucusBurden}</dd></div><div><dt>Pęcherzyki / pojemność</dt><dd>{lungModel.alveolarDamage} / {lungModel.reducedCapacity}</dd></div></dl>
+        <p>{lungModel.caveat}</p>
+      </aside>}
       <div className="human-hero-tools" aria-label="Widok modelu">
         {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} disabled={busy} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
         <button type="button" className="sw-chip human-inspector-toggle" aria-expanded={inspectorOpen} aria-controls="human-inspector" onClick={() => setInspectorOpen(!inspectorOpen)} data-testid="human-inspector-toggle">{inspectorOpen ? 'Zamknij ×' : 'Instrumenty +'}</button>

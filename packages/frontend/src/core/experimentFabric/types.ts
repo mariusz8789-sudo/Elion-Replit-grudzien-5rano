@@ -87,6 +87,7 @@ export type ExperimentRoute =
   | { kind: 'live-world'; target: 'epidemic-city'; hash: '#/hf-slice' | '#/city3d' | '#/city' }
   | { kind: 'hypothetical-visualization'; scenarioId: 'philadelphia-legend'; hash: '#/hf-slice?scenario=philadelphia' }
   | { kind: 'lab'; labId: string; experimentId?: string }
+  | { kind: 'product-route'; hash: string; parameterQueryKeys?: readonly string[] }
   | { kind: 'none' };
 
 export interface ExperimentProvenance {

@@ -83,7 +83,16 @@
 .human-context-close { position: absolute; right: 6px; top: 6px; border: 0; background: transparent; color: #acc6ce; width: 30px; height: 30px; cursor: pointer; }
 .human-context-action { align-self: flex-start; border: 0; padding: 6px 0; background: transparent; color: #b2ebdf; font-size: 12px; cursor: pointer; }
 .human-organ-search { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #3c5b6b; border-radius: 6px; padding: 10px; margin-top: 12px; background: #030e16; color: #e2f3f5; }
+.human-lung-compare { position: absolute; right: 24px; top: 126px; width: min(390px, 34%); padding: 16px; border: 1px solid #52778788; border-radius: 16px; background: #06111bed; box-shadow: 0 18px 55px #0009; color: #e8f4f7; pointer-events: auto; backdrop-filter: blur(12px); }
+.human-lung-compare header { display: flex; flex-wrap: wrap; gap: 5px; }
+.human-lung-compare header span { padding: 4px 7px; border: 1px solid #4e8e95; border-radius: 999px; color: #a9e7dd; font-size: 8px; letter-spacing: .08em; }
+.human-lung-compare h2 { margin: 12px 0; font-size: 16px; font-weight: 500; }.human-lung-compare h2 b { color: #77cfc4; font-weight: 500; }
+.human-lung-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }.human-lung-panel { min-height: 88px; display: grid; place-items: center; align-content: center; gap: 3px; border: 1px solid #315367; border-radius: 11px; background: radial-gradient(circle at 50% 40%, #154852, #07121c 70%); }.human-lung-panel i { color: #e7aaa3; font-style: normal; font-size: 34px; letter-spacing: -9px; }.human-lung-panel.is-exposed i { color: color-mix(in srgb, #e7aaa3 calc((1 - var(--lung-impact)) * 100%), #4a302b); filter: saturate(calc(1 - var(--lung-impact))); }.human-lung-panel strong { font-size: 11px; }.human-lung-panel small { color: #8da5af; font-size: 8px; text-align: center; }
+.human-lung-timeline { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin: 10px 0; }.human-lung-timeline button { min-height: 36px; border: 1px solid #365c69; border-radius: 8px; background: #081923; color: #b7cbd2; }.human-lung-timeline button[aria-pressed="true"] { border-color: #9de0d8; background: #173f43; color: #effffb; }
+.human-lung-compare dl { margin: 8px 0; font-size: 9px; }.human-lung-compare dl div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid #27414b; }.human-lung-compare dd { margin: 0; color: #d5aaa2; text-align: right; }.human-lung-compare p { margin: 8px 0 0; color: #91a7b5; font-size: 9px; line-height: 1.45; }
 @media (max-width: 900px) {
+  .human-lung-compare { top: auto; left: 14px; right: 14px; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 34dvh; overflow: auto; padding: 12px; }
+  .human-lung-compare h2 { font-size: 14px; margin: 8px 0; }.human-lung-panel { min-height: 58px; }.human-lung-panel i { font-size: 25px; }.human-lung-compare dl { display: none; }
   .human-context { top: auto; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); left: 14px; right: 14px; width: auto; max-height: 30dvh; overflow: auto; padding: 14px; gap: 5px; }
   .human-context.is-left { left: 14px; right: 14px; }
   .human-hero:is(.has-context, .has-inspector) .human-hero-path,

@@ -64,6 +64,17 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   const tesseractAngleXWDeg = firstNumber(normalized, /\b(?:xw|kąt\s*xw|kat\s*xw|angle\s*xw)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
   const tesseractAngleYZDeg = firstNumber(normalized, /\b(?:yz|kąt\s*yz|kat\s*yz|angle\s*yz)\s*[=:]?\s*(-?\d+(?:[.,]\d+)?)/);
   const tesseractDoubleRotation = /(?:podwójn[a-ząćęłńóśźż]*\s+rotac[a-ząćęłńóśźż]*|podwojn[a-ząćęłńóśźż]*\s+rotac[a-ząćęłńóśźż]*|double rotation)/.test(normalized);
+  const manifoldSampleCount = firstNumber(normalized, /(?:punkty|punktów|punktow|samples?)\s*[=:]?\s*(\d+)/);
+  const manifoldTemporalStep = firstNumber(normalized, /(?:krok\s+(?:czasu|t)|temporal\s*step)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const manifoldHyperspaceAmplitude = firstNumber(normalized, /(?:amplituda\s+(?:w|hiperprzestrzeni)|hyperspace\s*amplitude)\s*[=:]?\s*(\d+(?:[.,]\d+)?)/);
+  const lungExposureYears = firstNumber(normalized, /\b(1|5|10)\s*(?:rok|roku|lat|years?)\b/);
+  const lungExposure = /(?:e[- ]?papieros|vaping|vape)/.test(normalized)
+    ? 'vaping'
+    : /(?:marihuan|konopi|cannabis)/.test(normalized)
+      ? 'cannabis'
+      : /(?:papieros|palen|tytoni|smoking|cigarette)/.test(normalized)
+        ? 'cigarette'
+        : /(?:zdrowe?\s+p[łl]uc|healthy\s+lungs?)/.test(normalized) ? 'healthy' : undefined;
   const kerrSpin = firstNumber(normalized, /\b(?:spin|a\s*\/\s*m)\s*[=:]?\s*(0(?:[.,]\d+)?|1(?:[.,]0+)?)/);
   const temperatureK = firstNumber(normalized, /\b(\d+(?:[.,]\d+)?)\s*k\b/);
   const isingTemperature = firstNumber(normalized, /\b(?:t|temperatura)\s*[=:]?\s*(\d+(?:[.,]\d+)?)(?!\s*k\b)/);
@@ -153,6 +164,11 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
   if (tesseractAngleXWDeg !== undefined) params.angleXWDeg = tesseractAngleXWDeg;
   if (tesseractAngleYZDeg !== undefined) params.angleYZDeg = tesseractAngleYZDeg;
   if (tesseractDoubleRotation) params.doubleRotation = true;
+  if (manifoldSampleCount !== undefined) params.sampleCount = manifoldSampleCount;
+  if (manifoldTemporalStep !== undefined) params.temporalStep = manifoldTemporalStep;
+  if (manifoldHyperspaceAmplitude !== undefined) params.hyperspaceAmplitude = manifoldHyperspaceAmplitude;
+  if (lungExposureYears !== undefined) params.years = lungExposureYears;
+  if (lungExposure !== undefined) params.exposure = lungExposure;
   if (kerrSpin !== undefined) params.spin = kerrSpin;
   if (temperatureK !== undefined) params.temperatureK = temperatureK;
   if (isingTemperature !== undefined) params.temperature = isingTemperature;
@@ -362,6 +378,8 @@ export function parseScienceChatMessage(text: string): StructuredExperimentReque
     return request('electrodynamics', 'photon-energy', 'graph', ['wavelengthNm']);
   }
   if (/\b(tesserakt|tesseract|hipersześcian|hiperszescian|hiper[- ]?sześcian|hiper[- ]?szescian)\b/.test(normalized)) return request('mathematics', 'math-tesseract-4d', 'scene-3d', ['angleXWDeg', 'angleYZDeg', 'doubleRotation']);
+  if (/(?:silnik\s*5d|manifold\s*5d|rozmaitoś[a-ząćęłńóśźż]*\s*5d|rozmaitos[a-ząćęłńóśźż]*\s*5d|geometri[a-ząćęłńóśźż]*\s*5d|ścieżk[a-ząćęłńóśźż]*\s*5d|sciezk[a-ząćęłńóśźż]*\s*5d)/.test(normalized)) return request('mathematics', 'math-manifold-5d', 'scene-3d', ['sampleCount', 'temporalStep', 'hyperspaceAmplitude']);
+  if (/(?:p[łl]uc|pluc|lungs?)/.test(normalized) && (lungExposure !== undefined || /(?:wp[łl]yw|wplyw|por[oó]wnaj|porownaj|uszkodzon)/.test(normalized))) return request('biology', 'biology-lung-exposure', 'scene-3d', ['exposure', 'years']);
   if (/\b(rozkład normalny|rozklad normalny|gauss|z-score|z score)\b/.test(normalized)) {
     return request('mathematics', 'math-gaussian', 'graph', ['mean', 'sigma', 'xValue']);
   }

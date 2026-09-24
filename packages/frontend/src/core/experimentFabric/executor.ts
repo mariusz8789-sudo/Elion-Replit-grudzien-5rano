@@ -30,6 +30,8 @@ import { runCollisionScenario } from '../../labs/experiments/universe-collision'
 import { runStarLifeScenario } from '../../labs/experiments/universe-starlife';
 import { runSolarSystemScenario } from '../../labs/experiments/universe-solar-system';
 import { runThreeBodyScenario, type ThreeBodyPreset } from '../../labs/experiments/universe-threebody';
+import { Genesis5DManifoldEngine, type Manifold5DPoint } from '../../../../core/src/engine/manifold/Genesis5DManifoldEngine.js';
+import { runLungExposureModel, type LungExposure, type LungTimelineYears } from '../../labs/experiments/biology-lung-exposure';
 import { EventRegistry, EventStream, ingestTransmissions } from '../events';
 import { buildAtmosphericEscapeGraph } from '../modelGraph/atmosphericEscapeGraph';
 import { buildBohrModelGraph } from '../modelGraph/bohrModelGraph';
@@ -676,6 +678,45 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
       };
     }
+    case 'math-manifold-5d': {
+      const sampleCount = Math.round(numberParam(params, 'sampleCount', 64));
+      const temporalStep = numberParam(params, 'temporalStep', 0.05);
+      const hyperspaceAmplitude = numberParam(params, 'hyperspaceAmplitude', 0.75);
+      const points: Manifold5DPoint[] = Array.from({ length: sampleCount }, (_, index) => {
+        const u = sampleCount === 1 ? 0 : index / (sampleCount - 1);
+        const angle = u * Math.PI * 2;
+        return {
+          x: Math.cos(angle) * 2,
+          y: Math.sin(angle) * 2,
+          z: u * 4 - 2,
+          temporalT: index * temporalStep,
+          hyperspaceW: hyperspaceAmplitude * Math.sin(angle * 2),
+        };
+      });
+      const solved = new Genesis5DManifoldEngine({ now: () => 0 }).evaluatePath(points);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Obliczono deterministyczną geometrię ścieżki ${solved.pointCount} punktów w R⁵; dowód ${solved.cryptographicProof.slice(0, 12)}…`,
+        outputs: {
+          pointCount: solved.pointCount,
+          pathLength: solved.pathLength,
+          metricTensor: solved.metricTensor,
+          metricRankLowerBound: solved.metricRankLowerBound,
+          curvatureMean: solved.curvature.mean,
+          curvatureMax: solved.curvature.max,
+          temporalStabilityIndex: solved.temporalStabilityIndex,
+          selfIntersectionFree: solved.selfIntersectionFree,
+          sdfMeanDistance: solved.sdf.meanDistance,
+          sdfInsideFraction: solved.sdf.insideFraction,
+          cryptographicProof: solved.cryptographicProof,
+        },
+        units: { pointCount: 'punkty', pathLength: 'jednostki R⁵', metricTensor: 'macierz Grama 5×5', metricRankLowerBound: '', curvatureMean: '1/jednostka', curvatureMax: '1/jednostka', temporalStabilityIndex: '', selfIntersectionFree: '', sdfMeanDistance: 'jednostki sceny', sdfInsideFraction: '', cryptographicProof: 'SHA-256' },
+        warnings: ['GEOMETRIC_MODEL: to obliczenie ścieżki w R⁵, nie dowód istnienia fizycznego piątego wymiaru ani model czasoprzestrzeni.'],
+        validity: 'Dyskretna geometria zadanej parametrycznej polilinii w R⁵; metryka Grama i krzywizna są obliczone przez istniejący Genesis5DManifoldEngine.',
+        assumptions: ['Ścieżka wejściowa jest deterministyczną helisą testową.', 'Współrzędne t i w są osiami matematycznymi bez automatycznej interpretacji fizycznej.'],
+        visualization: ['numeric', 'scene-3d'], route: model.route,
+      };
+    }
     case 'biology-protein-folding-hp': {
       const sequenceKey = typeof params.sequenceKey === 'string' ? params.sequenceKey : 'classic';
       const solved = runProteinFoldingScenario({
@@ -727,6 +768,22 @@ function executeRealModel(request: StructuredExperimentRequest, onLiveWorld?: (s
         contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed', summary: 'Wykonano istniejący model wzrostu logistycznego.',
         outputs: details.outputs, units: details.units, warnings: [], validity: 'Stałe r i K; bez struktury wiekowej, opóźnień i stochastyki.',
         assumptions: details.assumptions, visualization: ['numeric', 'graph'], route: model.route,
+      };
+    }
+    case 'biology-lung-exposure': {
+      const exposure = (typeof params.exposure === 'string' ? params.exposure : 'cigarette') as LungExposure;
+      const requestedYears = Math.round(numberParam(params, 'years', 1));
+      const years = ([1, 5, 10] as const).reduce((best, value) => Math.abs(value - requestedYears) < Math.abs(best - requestedYears) ? value : best, 1) as LungTimelineYears;
+      const solved = runLungExposureModel(exposure, years);
+      return {
+        contractVersion: EXPERIMENT_FABRIC_VERSION, status: 'completed',
+        summary: `Przygotowano edukacyjne porównanie płuc: ${exposure}, ${years} ${years === 1 ? 'rok' : 'lat'}.`,
+        outputs: { ...solved, sources: solved.sources.join(', ') },
+        units: { exposure: '', years: 'lat', classification: '', epistemicLabel: '', clinicalUse: '', evidenceStrength: '', inflammation: '', airwayNarrowing: '', mucusBurden: '', alveolarDamage: '', reducedCapacity: '', visualSeverity: 'rendering-only 0–1', caveat: '', sources: 'URL' },
+        warnings: ['MODEL · EDUCATIONAL SIMULATION · NOT CLINICAL DIAGNOSIS', solved.caveat],
+        validity: 'Jakościowe porównanie edukacyjne. Nie odwzorowuje dawki, indywidualnego ryzyka, badania obrazowego ani czynności płuc.',
+        assumptions: ['1/5/10 lat wybiera wariant prezentacji, a nie kliniczną prognozę.', 'Wizualizacja pokazuje kierunek możliwych zmian wyłącznie tam, gdzie wskazuje go źródło.'],
+        visualization: ['numeric', 'scene-3d'], route: model.route,
       };
     }
     case 'einstein-chirp-mass': {

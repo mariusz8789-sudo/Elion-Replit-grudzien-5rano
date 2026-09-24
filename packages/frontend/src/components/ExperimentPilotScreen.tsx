@@ -37,8 +37,19 @@ import { buildStructuredRequestFromModel } from '../core/experimentFabric/struct
 import { track } from '../core/analytics';
 import { saveHypothesisLoopToMemory, saveScientificEvidencePackToMemory } from '../core/scienceMemory';
 import { buildExperimentGraph, executeNextExperiment, type ExperimentGraph } from '../core/experimentFabric/experimentGraph';
-import type { ExperimentRun } from '../core/experimentFabric/types';
+import type { ExperimentRoute, ExperimentRun } from '../core/experimentFabric/types';
 import { runExperiment } from '../core/experimentFabric/executor';
+
+function productRouteHash(route: Extract<ExperimentRoute, { kind: 'product-route' }>, values: Readonly<Record<string, ExperimentValue>>): string {
+  const [path, query = ''] = route.hash.split('?');
+  const params = new URLSearchParams(query);
+  for (const key of route.parameterQueryKeys ?? []) {
+    const value = values[key];
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const encoded = params.toString();
+  return encoded ? `${path}?${encoded}` : path;
+}
 import { GOVERNED_PREPAREDNESS_QUESTIONS, governedCounterfactualParameters, resolvePreparednessQuestion, type PreparednessResolution } from '../core/simulation/preparednessQuestions';
 import {
   deriveNarrowedHypothesisProblem,
@@ -349,6 +360,8 @@ export function ExperimentPilotScreen() {
       window.location.hash = `#/lab/${route.labId}`;
     } else if (route.kind === 'hypothetical-visualization') {
       window.location.hash = route.hash;
+    } else if (route.kind === 'product-route') {
+      window.location.hash = productRouteHash(route, run.provenance.parameterSnapshot);
     } else {
       setError('Ten wynik nie ma zarejestrowanej trasy wizualizacji.');
     }

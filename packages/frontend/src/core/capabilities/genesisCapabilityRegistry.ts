@@ -127,9 +127,21 @@ const capabilities: readonly GenesisCapability[] = [
   },
   {
     id: 'manifold-5d', label: '5D Manifold', description: 'Existing backend manifold evaluation shown in the Matrix Stage.',
-    userIntents: ['pokaż silnik 5d', 'otwórz 5d', '5d manifold', 'matrix stage'], domain: 'advanced-worlds', selectionMode: 'DIRECT_ROUTE',
-    execution: { kind: 'route', id: '#/matrix-stage' }, readiness: 'PARTIAL', epistemicLabel: 'MODEL', visualizationRoute: '#/matrix-stage',
-    evidenceSupport: 'PARTIAL', replaySupport: 'PARTIAL', nextExperimentSupport: false, limitations: ['The engine is live; canonical experiment handoff is still partial.'], runtimeStatusSource: '/api/manifold/evaluate',
+    userIntents: ['pokaż silnik 5d', 'otwórz 5d', '5d manifold', 'matrix stage'], domain: 'advanced-worlds', selectionMode: 'FABRIC',
+    execution: { kind: 'fabric-model', id: 'math-manifold-5d' }, readiness: 'AVAILABLE', epistemicLabel: 'MODEL', visualizationRoute: '#/matrix-stage',
+    evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['GEOMETRIC_MODEL in R⁵; no claim of a physical fifth dimension.'], runtimeStatusSource: '/api/manifold/evaluate',
+  },
+  {
+    id: 'biology-lung-impact', label: 'Educational lung impact', description: 'Qualitative healthy-versus-exposure lung presentation inside the existing Human Laboratory.',
+    userIntents: ['pokaż wpływ palenia papierosów na płuca', 'pokaż wpływ e-papierosów na płuca', 'pokaż wpływ marihuany na płuca', 'porównaj zdrowe płuca i płuca po paleniu', 'show smoking effects on lungs'], domain: 'human-biology', selectionMode: 'FABRIC',
+    execution: { kind: 'fabric-model', id: 'biology-lung-exposure' }, readiness: 'AVAILABLE', epistemicLabel: 'EDUCATIONAL_MODEL', visualizationRoute: '#/human-biology-lab?simulation=lung-exposure',
+    evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['MODEL / EDUCATIONAL SIMULATION / NOT CLINICAL DIAGNOSIS.', 'Timeline controls presentation intensity and is not an individual prognosis.'], showInShowcase: true,
+  },
+  {
+    id: 'virtual-animals', label: 'Virtual animals', description: 'Planned comparative anatomy simulations for dog, cat, horse, cow, bird and fish.',
+    userIntents: ['pokaż wirtualnego psa', 'pokaż anatomię kota', 'wirtualny koń', 'wirtualna krowa', 'wirtualny ptak', 'wirtualna ryba', 'porównaj człowieka ze zwierzęciem'], domain: 'comparative-biology', selectionMode: 'UNAVAILABLE',
+    execution: { kind: 'route', id: 'NOT_IMPLEMENTED' }, readiness: 'NOT_IMPLEMENTED', epistemicLabel: 'MODEL', visualizationRoute: null,
+    evidenceSupport: 'NONE', replaySupport: 'NONE', nextExperimentSupport: false, limitations: ['No animal anatomy or disease state is fabricated.'], blockedReason: 'No governed comparative-anatomy assets or registered animal simulation model are present in the repository.',
   },
   {
     id: 'wormhole', label: 'Wormhole', description: 'Existing World Director spacetime scene, clearly labelled theoretical.',
@@ -156,7 +168,7 @@ const capabilities: readonly GenesisCapability[] = [
     ['biopython', 'AVAILABLE', 'PARTIAL'],
     ['admet', 'AVAILABLE', 'CANONICAL'],
     ['toxicity', 'AVAILABLE', 'CANONICAL'],
-    ['pymeep', 'BLOCKED_BY_RUNTIME', 'NONE'],
+    ['pymeep', 'AVAILABLE', 'CANONICAL'],
   ] as const).map(([worker, readiness, replaySupport]): GenesisCapability => ({
     id: `worker-${worker}`, label: `${worker} worker`, description: readiness === 'AVAILABLE'
       ? 'Existing private Railway worker with a successful canonical real execution proof.'

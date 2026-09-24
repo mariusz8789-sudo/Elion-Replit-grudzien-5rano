@@ -25,6 +25,7 @@ describe('canonical Genesis capability registry', () => {
     expect(getGenesisCapability('chemistry-titration')).toMatchObject({ execution: { kind: 'fabric-model', id: 'chemistry-titration' }, readiness: 'AVAILABLE' });
     expect(getGenesisCapability('physics-black-hole')).toMatchObject({ execution: { kind: 'fabric-model', id: 'einstein-schwarzschild' }, readiness: 'AVAILABLE' });
     expect(getGenesisCapability('physics-three-body')).toMatchObject({ execution: { kind: 'fabric-model', id: 'universe-three-body' }, readiness: 'AVAILABLE' });
+    expect(getGenesisCapability('manifold-5d')).toMatchObject({ execution: { kind: 'fabric-model', id: 'math-manifold-5d' }, readiness: 'AVAILABLE', evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL' });
   });
 
   it.each([
@@ -40,6 +41,7 @@ describe('canonical Genesis capability registry', () => {
     ['Pokaż multiwersum', 'multiverse'],
     ['Otwórz laboratorium czasoprzestrzeni', 'spacetime'],
     ['Pokaż silnik 5D', 'manifold-5d'],
+    ['Pokaż wpływ palenia papierosów na płuca', 'biology-lung-impact'],
     ['Pokaż wormhole', 'wormhole'],
     ['Pokaż maszynę czasu', 'time-machine'],
   ])('maps %s to %s', (message, id) => {
@@ -62,16 +64,21 @@ describe('canonical Genesis capability registry', () => {
     ['Otwórz Reality Navigator', '#/reality'],
     ['Pokaż multiwersum', '#/lab/multiverse'],
     ['Otwórz laboratorium czasoprzestrzeni', '#/lab/spacetime'],
-    ['Pokaż silnik 5D', '#/matrix-stage'],
     ['Pokaż wormhole', '#/world-director?prompt=wormhole'],
     ['Pokaż maszynę czasu', '#/myths-theories'],
   ])('routes %s through the registry to %s', (message, hash) => {
     expect(resolveCommand(message, null).action).toEqual({ type: 'openRoute', hash });
   });
 
-  it('does not call optional workers AVAILABLE because the service process is online', () => {
+  it('only calls workers AVAILABLE after persisted real execution proof', () => {
     const workers = listGenesisCapabilities().filter(({ domain }) => domain === 'compute-worker');
-    expect(workers.length).toBeGreaterThan(0);
-    expect(workers.every(({ readiness }) => readiness === 'BLOCKED_BY_RUNTIME')).toBe(true);
+    expect(workers.filter(({ readiness }) => readiness === 'AVAILABLE').map(({ id }) => id).sort()).toEqual([
+      'worker-admet', 'worker-biopython', 'worker-openmm', 'worker-pymeep', 'worker-pyscf', 'worker-toxicity', 'worker-vina',
+    ]);
+    expect(getGenesisCapability('worker-pymeep')).toMatchObject({ readiness: 'AVAILABLE', selectionMode: 'CUSTOM_FLOW', replaySupport: 'CANONICAL' });
+  });
+
+  it('keeps virtual animals fail-closed until governed assets and models exist', () => {
+    expect(matchGenesisCapabilityIntent('Pokaż wirtualnego psa')).toMatchObject({ id: 'virtual-animals', readiness: 'NOT_IMPLEMENTED', selectionMode: 'UNAVAILABLE' });
   });
 });

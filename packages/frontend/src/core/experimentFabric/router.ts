@@ -415,10 +415,26 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Realny graf rozkładu normalnego.',
   },
   {
+    id: 'math-manifold-5d', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-5d-manifold@1.0.0',
+    parameters: [
+      number('sampleCount', 'Liczba punktów ścieżki', '', 8, 256, 64),
+      number('temporalStep', 'Krok współrzędnej t', '', 0, 10, 0.05),
+      number('hyperspaceAmplitude', 'Amplituda współrzędnej w', '', 0, 10, 0.75),
+    ],
+    route: { kind: 'product-route', hash: '#/matrix-stage', parameterQueryKeys: ['sampleCount', 'temporalStep', 'hyperspaceAmplitude'] }, knowledgeSources: ['mathematics.md'],
+    rationale: 'Istniejący deterministyczny silnik geometrii dyskretnej ścieżki w R⁵. Oblicza metrykę Grama, krzywiznę, przecięcia i SHA-256; nie modeluje fizycznego piątego wymiaru.',
+  },
+  {
     id: 'math-tesseract-4d', domainId: 'mathematics', modelVersion: '1.0.0', engine: 'genesis-tesseract-linear-algebra@1.0.0',
     parameters: [number('angleXWDeg', 'Kąt rotacji XW', '°', -360, 360, 0), number('angleYZDeg', 'Kąt rotacji YZ', '°', -360, 360, 0), boolean('doubleRotation', 'Podwójna rotacja XW + YZ', false)],
     route: { kind: 'lab', labId: 'multiverse', experimentId: 'tesseract' }, knowledgeSources: ['mathematics.md', 'multiverse.md'],
     rationale: 'Istniejąca dokładna algebra liniowa: obrót tesseraktu 4D w płaszczyznach XW/YZ i perspektywiczna projekcja 4D→3D. Nie jest modelem fizycznych dodatkowych wymiarów ani teorią multiwersum.',
+  },
+  {
+    id: 'biology-lung-exposure', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-lung-exposure-education@1.0.0',
+    parameters: [text('exposure', 'Rodzaj ekspozycji', 'cigarette'), number('years', 'Oś czasu', 'lat', 1, 10, 1)],
+    route: { kind: 'product-route', hash: '#/human-biology-lab?focus=left-lung&level=organ&simulation=lung-exposure', parameterQueryKeys: ['exposure', 'years'] }, knowledgeSources: ['biology.md'],
+    rationale: 'Jakościowy model edukacyjny oparty na jawnych źródłach CDC. Intensywność służy wyłącznie prezentacji; nie jest pomiarem, rokowaniem ani diagnozą.',
   },
   {
     id: 'biology-logistic', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',

@@ -7,6 +7,8 @@
  */
 import { createWorkerServer } from './workerServer.mjs';
 import { WORKER_GROUPS } from './scientificCapabilityContract.mjs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 export { WORKER_GROUPS };
 
@@ -37,6 +39,6 @@ function main() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main();
 }

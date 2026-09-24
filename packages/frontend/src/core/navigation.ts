@@ -47,36 +47,36 @@ export interface NavSection {
 }
 
 /**
- * THE MENU IS SIX ENTRIES, in a layperson's words (D-118).
+ * The primary product has four entry points. The user asks Genesis, enters
+ * the connected Laboratory, or opens the contextual Human view. Every
+ * specialist screen remains in MORE_ITEMS behind one disclosure.
  *
- * The previous ten were the system's own vocabulary ("Matrix", "Cyber",
- * "Simulation") — an inventory that asked the visitor to already know
- * Genesis before moving. These six name what a person wants to DO: start,
- * ask, see discoveries, enter the 3D worlds, check the evidence, adjust
- * a guided demo. Every former entry is still reachable — the ones that left the
- * top level moved into `MORE_ITEMS` behind one disclosure. Nothing was
- * deleted; it stopped being shouted.
+ * The previous inventory asked the visitor to understand Genesis before
+ * using it. Every former entry remains reachable in `MORE_ITEMS`; it simply
+ * stopped competing with the connected journey.
  */
 export const NAV_SECTIONS: readonly NavSection[] = [
   {
     id: 'main',
     label: '',
     items: [
-      { id: 'home', label: 'Początek', icon: '◉', hash: '#/', primary: true, description: 'Najważniejsze wejścia i ostatnia aktywność' },
-      { id: 'investor-demo', label: 'LIVE', icon: '▶', hash: '#/investor-demo', primary: true, description: 'Prowadzona historia: eksperyment, wynik i dowód' },
-      { id: 'discover', label: 'Odkrycia', icon: '◎', hash: '#/research-console', primary: true, description: 'Kandydaci, dowody, falsyfikacja, Winner Gate' },
-      { id: 'worlds', label: 'Nexus', icon: '◈', hash: '#/worlds', primary: true, description: 'Wizualne laboratoria i symulacje Genesis' },
-      { id: 'memory', label: 'Dowody', icon: '▣', hash: '#/memory', primary: true, description: 'Przebiegi, pochodzenie i replay' },
-      { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', description: 'Jeden kontekstowy dialog z Genesis' },
+      { id: 'home', label: 'Genesis', icon: '◉', hash: '#/', primary: true, description: 'Jedno pytanie rozpoczyna badanie' },
+      { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', primary: true, description: 'Jeden dialog prowadzący całe badanie' },
+      { id: 'campaign', label: 'Laboratorium', icon: '⌬', hash: '#/campaign', primary: true, description: 'Kandydat, eksperyment, wynik, Evidence i replay' },
+      { id: 'human-biology-lab', label: 'Człowiek', icon: '◎', hash: '#/human-biology-lab', primary: true, description: 'Eksploracja ciała od narządu do komórki' },
     ],
   },
 ];
 
 /**
  * Everything the menu no longer shouts. Reachable behind one disclosure, so
- * no capability was lost — it stopped competing with the ten that matter.
+ * no capability was lost — it stopped competing with the primary journey.
  */
 export const MORE_ITEMS: readonly NavItem[] = [
+  { id: 'investor-demo', label: 'Prowadzone demo', icon: '▶', hash: '#/investor-demo', description: 'Eksperyment, wynik i dowód w jednym przebiegu' },
+  { id: 'discover', label: 'Odkrycia', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
+  { id: 'worlds', label: 'Wizualizacje', icon: '◈', hash: '#/worlds', description: 'Laboratoria i symulacje przestrzenne Genesis' },
+  { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
   { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
   { id: 'world-director', label: 'World Director', icon: '◉', hash: '#/world-director', description: 'Presety świata przez canonical WorldGraph i THREE.js' },
   { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
@@ -97,7 +97,6 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex' },
   { id: 'cms-open-data', label: 'CMS Open Data — prawdziwe dane CERN', icon: '📊', hash: '#/physics/cms-z', description: 'Checksumowo zweryfikowane 10 000 zdarzeń Z→μμ z CERN Open Data; analiza offline, nie aktywny LHC' },
   { id: 'scientific-worlds', label: 'Światy naukowe — agent w laboratorium', icon: '⛑', hash: '#/scientific-worlds' },
-  { id: 'human-biology-lab', label: 'Human Biology Lab — cyfrowy bliźniak', icon: '🫀', hash: '#/human-biology-lab' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
   {
     id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
@@ -107,7 +106,6 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
   { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },
   { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde' },
-  { id: 'campaign', label: 'Kampania naukowa', icon: '⚡', hash: '#/campaign' },
   { id: 'pilot', label: 'Pilot eksperymentu', icon: '🧪', hash: '#/pilot' },
   { id: 'precision', label: 'Precision Reference', icon: '🔬', hash: '#/molecular-reference-analysis' },
   { id: 'conflict', label: 'Konflikt modeli', icon: '⚖', hash: '#/conflict' },
@@ -138,12 +136,12 @@ export const MORE_ITEMS: readonly NavItem[] = [
  * additional chat entry points.
  */
 const RESEARCH_IDS = new Set([
-  'meta-cognition', 'science', 'virtual-bio', 'evidence', 'discovery-log', 'dossier', 'cde',
-  'campaign', 'pilot', 'precision', 'conflict', 'whatif', 'calibration', 'inquiry', 'timeline',
+  'investor-demo', 'discover', 'memory', 'meta-cognition', 'science', 'virtual-bio', 'evidence',
+  'discovery-log', 'dossier', 'cde', 'pilot', 'precision', 'conflict', 'whatif', 'calibration', 'inquiry', 'timeline',
 ]);
 const WORLD_IDS = new Set([
-  'world-director', 'mirror', 'tour', 'matrix', 'matrix-stage', 'matrix-map', 'world', 'simulation',
-  'collider', 'lab-fpv', 'cern-complex', 'cms-open-data', 'scientific-worlds', 'human-biology-lab',
+  'worlds', 'world-director', 'mirror', 'tour', 'matrix', 'matrix-stage', 'matrix-map', 'world', 'simulation',
+  'collider', 'lab-fpv', 'cern-complex', 'cms-open-data', 'scientific-worlds',
   'city3d', 'scientific-city', 'first-person-lab', 'molecule', 'cell-lab', 'looking-glass', 'world-proposal',
 ]);
 const PUBLIC_IDS = new Set(['cyber', 'gov-campaign', 'clockwork', 'sovereign']);

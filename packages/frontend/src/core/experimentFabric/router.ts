@@ -437,6 +437,17 @@ const ROUTER_MODELS: readonly RouterModel[] = [
     rationale: 'Jakościowy model edukacyjny oparty na jawnych źródłach CDC. Intensywność służy wyłącznie prezentacji; nie jest pomiarem, rokowaniem ani diagnozą.',
   },
   {
+    id: 'biology-prevention-education', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-prevention-catalog@1.0.0',
+    parameters: [
+      text('topic', 'Temat profilaktyczny', 'cigarette'),
+      text('target', 'Obszar organizmu', 'lungs'),
+      text('stage', 'Etap edukacyjny', 'short-term'),
+      text('focus', 'Węzeł wizualizacji Human Lab', 'left-lung'),
+    ],
+    route: { kind: 'product-route', hash: '#/human-biology-lab?simulation=prevention-lab&level=organ', parameterQueryKeys: ['topic', 'target', 'stage', 'focus'] }, knowledgeSources: ['biology.md'],
+    rationale: 'Szkolny model profilaktyczny oparty na stałym katalogu źródeł CDC, NIAAA i NIDA. Nie oblicza dawki, zatrucia, ryzyka indywidualnego ani diagnozy.',
+  },
+  {
     id: 'biology-logistic', domainId: 'biology', modelVersion: '1.0.0', engine: 'genesis-model-graph@1.0.0',
     parameters: [number('growthRate', 'Tempo wzrostu r', '1/czas', 0, 5, 0.5), number('carryingCapacity', 'Pojemność K', 'osobn.', 1, 1e9, 1000), number('initialPopulation', 'Populacja początkowa N₀', 'osobn.', 1, 1e9, 10), number('timeElapsed', 'Czas t', 'czas', 0, 1000, 10)],
     route: { kind: 'lab', labId: 'biology' }, knowledgeSources: ['biology.md', 'mathematics.md'],

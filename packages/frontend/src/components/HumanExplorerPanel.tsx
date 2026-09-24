@@ -14,6 +14,7 @@ import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 import { BODYPARTS3D_ATTRIBUTION, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
 import { runLungExposureModel, type LungExposure, type LungTimelineYears } from '../labs/experiments/biology-lung-exposure';
+import { PREVENTION_STAGES, runPreventionEducation, type PreventionStage, type PreventionTarget, type PreventionTopic } from '../labs/experiments/preventionLabCatalog';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
 import './HumanExplorerHero.css';
 
@@ -60,17 +61,28 @@ const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY
 /** D-131: the four body-shell presentations. `RTG (model)` names itself a model so the chip can never read as a radiograph. */
 const SURFACE_MODES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['TRANSLUCENT', 'Prześwit'], ['XRAY', 'RTG (model)'], ['GHOST', 'Duch']];
 const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope', 'histology', 'imaging', 'central-dogma', 'neuro']);
+const PREVENTION_TOPICS: readonly PreventionTopic[] = ['cigarette', 'vaping', 'alcohol', 'cannabis', 'harmful-drugs'];
+const PREVENTION_TARGETS: readonly PreventionTarget[] = ['lungs', 'heart', 'brain', 'liver', 'whole-body'];
+const PREVENTION_TARGET_LABEL_PL: Readonly<Record<PreventionTarget, string>> = { lungs: 'płuca', heart: 'serce', brain: 'mózg', liver: 'wątroba', 'whole-body': 'organizm' };
 
 export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
   const initialQuery = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
   const initialBlood = initialQuery.get('specimen') === 'blood';
   const initialLungSimulation = initialQuery.get('simulation') === 'lung-exposure';
+  const initialPreventionSimulation = initialQuery.get('simulation') === 'prevention-lab';
   const initialExposure = (['healthy', 'cigarette', 'vaping', 'cannabis'].includes(initialQuery.get('exposure') ?? '') ? initialQuery.get('exposure') : 'cigarette') as LungExposure;
   const initialYears = ([1, 5, 10].includes(Number(initialQuery.get('years'))) ? Number(initialQuery.get('years')) : 1) as LungTimelineYears;
+  const initialPreventionTopic = (PREVENTION_TOPICS.includes(initialQuery.get('topic') as PreventionTopic) ? initialQuery.get('topic') : 'cigarette') as PreventionTopic;
+  const initialPreventionTarget = (PREVENTION_TARGETS.includes(initialQuery.get('target') as PreventionTarget) ? initialQuery.get('target') : 'lungs') as PreventionTarget;
+  const initialPreventionStage = (PREVENTION_STAGES.includes(initialQuery.get('stage') as PreventionStage) ? initialQuery.get('stage') : 'short-term') as PreventionStage;
   const [lungSimulation, setLungSimulation] = useState(initialLungSimulation);
   const [lungExposure, setLungExposure] = useState<LungExposure>(initialExposure);
   const [lungYears, setLungYears] = useState<LungTimelineYears>(initialYears);
+  const [preventionSimulation, setPreventionSimulation] = useState(initialPreventionSimulation);
+  const [preventionTopic, setPreventionTopic] = useState<PreventionTopic>(initialPreventionTopic);
+  const [preventionTarget, setPreventionTarget] = useState<PreventionTarget>(initialPreventionTarget);
+  const [preventionStage, setPreventionStage] = useState<PreventionStage>(initialPreventionStage);
   const [inspectorOpen, setInspectorOpen] = useState(initialBlood);
   const [peek, setPeek] = useState<'closed' | 'hover' | 'pinned'>('closed');
   const [search, setSearch] = useState('');
@@ -97,9 +109,16 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
       const query = new URLSearchParams(routeHash.split('?')[1] ?? '');
       const exposure = query.get('exposure');
       const years = Number(query.get('years'));
+      const topic = query.get('topic') as PreventionTopic;
+      const target = query.get('target') as PreventionTarget;
+      const stage = query.get('stage') as PreventionStage;
       setLungSimulation(query.get('simulation') === 'lung-exposure');
+      setPreventionSimulation(query.get('simulation') === 'prevention-lab');
       if (['healthy', 'cigarette', 'vaping', 'cannabis'].includes(exposure ?? '')) setLungExposure(exposure as LungExposure);
       if ([1, 5, 10].includes(years)) setLungYears(years as LungTimelineYears);
+      if (PREVENTION_TOPICS.includes(topic)) setPreventionTopic(topic);
+      if (PREVENTION_TARGETS.includes(target)) setPreventionTarget(target);
+      if (PREVENTION_STAGES.includes(stage)) setPreventionStage(stage);
     };
     window.addEventListener('hashchange', syncFromRoute);
     window.addEventListener('genesis-product-route', syncFromRoute);
@@ -124,10 +143,17 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const reference = organ ? referenceNodes[organ.id] ?? null : null;
   const referenceShown = Object.keys(referenceNodes).length > 0;
   const lungModel = lungSimulation ? runLungExposureModel(lungExposure, lungYears) : null;
+  const preventionModel = preventionSimulation ? runPreventionEducation(preventionTopic, preventionTarget, preventionStage) : null;
   const setLungTimeline = (years: LungTimelineYears): void => {
     setLungYears(years);
     const [path, query = ''] = window.location.hash.split('?');
     const next = new URLSearchParams(query); next.set('years', String(years)); next.set('exposure', lungExposure);
+    window.history.replaceState(null, '', `${path}?${next.toString()}`);
+  };
+  const setPreventionTimeline = (stage: PreventionStage): void => {
+    setPreventionStage(stage);
+    const [path, query = ''] = window.location.hash.split('?');
+    const next = new URLSearchParams(query); next.set('stage', stage);
     window.history.replaceState(null, '', `${path}?${next.toString()}`);
   };
 
@@ -181,6 +207,14 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <div className="human-lung-timeline" role="group" aria-label="Oś czasu prezentacji">{([1, 5, 10] as const).map(years => <button key={years} type="button" aria-pressed={lungYears === years} onClick={() => setLungTimeline(years)}>{years} {years === 1 ? 'rok' : 'lat'}</button>)}</div>
         <dl><div><dt>Zapalenie</dt><dd>{lungModel.inflammation}</dd></div><div><dt>Drogi oddechowe</dt><dd>{lungModel.airwayNarrowing}</dd></div><div><dt>Śluz</dt><dd>{lungModel.mucusBurden}</dd></div><div><dt>Pęcherzyki / pojemność</dt><dd>{lungModel.alveolarDamage} / {lungModel.reducedCapacity}</dd></div></dl>
         <p>{lungModel.caveat}</p>
+      </aside>}
+      {preventionModel && <aside className="human-lung-compare human-prevention-card" data-testid="school-prevention-lab" data-topic={preventionTopic} data-target={preventionModel.target} data-stage={preventionStage}>
+        <header><span>EDUCATIONAL MODEL</span><span>SIMULATION</span><span>NOT MEDICAL DIAGNOSIS</span></header>
+        <h2>{preventionModel.topicLabel} <b>→</b> {PREVENTION_TARGET_LABEL_PL[preventionModel.target]}</h2>
+        <p className="human-prevention-lead">{preventionModel.explanation}</p>
+        <div className="human-lung-timeline human-prevention-timeline" role="group" aria-label="Etap edukacyjny">{PREVENTION_STAGES.map(stage => <button key={stage} type="button" aria-pressed={preventionStage === stage} onClick={() => setPreventionTimeline(stage)}>{stage === 'immediate' ? 'Od razu' : stage === 'short-term' ? 'Krótko' : stage === 'repeated-use' ? 'Powtarzanie' : 'Długi czas'}</button>)}</div>
+        <dl><div><dt>Co pokazujemy</dt><dd>{preventionModel.stageExplanation}</dd></div><div><dt>Stan wiedzy</dt><dd>{preventionModel.evidenceLabel.replaceAll('_', ' ')}</dd></div><div><dt>Następny krok</dt><dd>{preventionModel.nextSteps.split(' | ')[0]}</dd></div></dl>
+        <p className="human-prevention-warning">{preventionModel.warning}</p>
       </aside>}
       <div className="human-hero-tools" aria-label="Widok modelu">
         {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} disabled={busy} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}

@@ -138,6 +138,13 @@ const capabilities: readonly GenesisCapability[] = [
     evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['MODEL / EDUCATIONAL SIMULATION / NOT CLINICAL DIAGNOSIS.', 'Timeline controls presentation intensity and is not an individual prognosis.'], showInShowcase: true,
   },
   {
+    id: 'school-health-prevention-lab', label: 'School Health / Prevention Lab', description: 'Age-appropriate prevention education for smoking, vaping, alcohol, cannabis and generic harmful-drug risks inside the existing Human Laboratory.',
+    userIntents: ['pokaż co palenie robi z płucami', 'pokaż wpływ e-papierosów', 'pokaż wpływ alkoholu na mózg', 'pokaż wpływ marihuany na organizm', 'pokaż wpływ narkotyków na organizm'], domain: 'human-biology', selectionMode: 'FABRIC',
+    execution: { kind: 'fabric-model', id: 'biology-prevention-education' }, readiness: 'AVAILABLE', epistemicLabel: 'EDUCATIONAL_MODEL', visualizationRoute: '#/human-biology-lab?simulation=prevention-lab',
+    evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true,
+    limitations: ['EDUCATIONAL MODEL / SIMULATION / NOT MEDICAL DIAGNOSIS.', 'No dose advice, toxicology calculation, patient prediction or instructions for harmful use.', 'Generic harmful-drug requests return EDUCATIONAL_OVERVIEW_ONLY.'], showInShowcase: true,
+  },
+  {
     id: 'virtual-animals', label: 'Virtual animals', description: 'Planned comparative anatomy simulations for dog, cat, horse, cow, bird and fish.',
     userIntents: ['pokaż wirtualnego psa', 'pokaż anatomię kota', 'wirtualny koń', 'wirtualna krowa', 'wirtualny ptak', 'wirtualna ryba', 'porównaj człowieka ze zwierzęciem'], domain: 'comparative-biology', selectionMode: 'UNAVAILABLE',
     execution: { kind: 'route', id: 'NOT_IMPLEMENTED' }, readiness: 'NOT_IMPLEMENTED', epistemicLabel: 'MODEL', visualizationRoute: null,

@@ -87,6 +87,10 @@ export const PROBE_FIXTURES = Object.freeze({
     input: { smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
     variant: () => ({ smiles: 'CCO' }),
   },
+  'maxwell-fdtd': {
+    input: { n1: 1, n2: 2, frequency: 1, resolution: 80 },
+    variant: (input) => ({ ...input, n2: 1.5 }),
+  },
 });
 
 function executableCapabilitiesFor(workerGroup) {

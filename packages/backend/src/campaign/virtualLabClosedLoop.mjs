@@ -50,6 +50,7 @@ import { dockCandidate, qmCandidate, admetToxicityStage } from './multiFidelity.
 import { descriptors as rdkitDescriptors, embed3d } from '../compute/rdkitAdapter.mjs';
 import * as md from '../compute/mdAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
+import * as meep from '../compute/meepAdapter.mjs';
 import { verifyScienceRun, VERDICT as REPLAY_VERDICT } from './verify.mjs';
 import { assertNoClinicalLanguage } from './researchIntake.mjs';
 import {
@@ -148,11 +149,10 @@ const ALLOWED_CAPABILITIES = new Set([
  *  today (multiFidelity.mjs for docking/QM/ADMET/toxicity; this module directly for descriptors/
  *  molecular-dynamics/protein-structure-ingestion). A capability absent from this set is a real
  *  toolchain member that may even be AVAILABLE at the raw-engine level, but has no wired campaign
- *  execution binding — BLOCKED_UNBOUND_ENGINE, never fabricated. `maxwell-fdtd` remains
- *  deliberately unbound: no campaign-level PyMeep execution path exists yet. */
+ *  execution binding — BLOCKED_UNBOUND_ENGINE, never fabricated. */
 const BOUND_CAPABILITIES = new Set([
   'molecular-descriptors', 'quantum-chemistry', 'molecular-docking', 'admet-estimation', 'toxicity-risk-estimation',
-  'molecular-dynamics', 'protein-structure-ingestion',
+  'molecular-dynamics', 'protein-structure-ingestion', 'maxwell-fdtd',
 ]);
 
 /** Bounded autonomy — a hard ceiling on virtual experiments per campaign. There is no autonomous
@@ -346,6 +346,26 @@ function dispatchExecution(db, ctx, candidate, requestedCapability, params) {
     });
     return { ok: true, run, extraLimitations: record.extraLimitations };
   }
+  if (requestedCapability === 'maxwell-fdtd') {
+    const input = {
+      n1: params?.n1 ?? 1,
+      n2: params?.n2 ?? 2,
+      frequency: params?.frequency ?? 1,
+      resolution: params?.resolution ?? 80,
+    };
+    const validated = validateCapabilityInput(requestedCapability, input);
+    if (!validated.ok) return { ok: false, blocked: EXECUTION_STATUS.BLOCKED_INVALID_INPUT, reason: `maxwell-fdtd input is outside its bounded schema: ${validated.errors.join('; ')}` };
+    const t0 = Date.now();
+    const r = meep.interfaceTransmission(input);
+    if (!r.ok) return { ok: false, engineFailure: true, reason: r.reason ?? r.error };
+    const snap = snapshotEnvironment();
+    const record = buildScienceRunRecord(requestedCapability, { input, result: { data: r.data, meta: r.meta }, engineVersion: r.version });
+    const run = saveScienceRun(db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: candidate.id,
+      ...record.run, durationMs: Date.now() - t0, environmentHash: snap.ok ? snap.hash : null,
+    });
+    return { ok: true, run, extraLimitations: record.extraLimitations };
+  }
   return { ok: false, blocked: EXECUTION_STATUS.BLOCKED_UNBOUND_ENGINE, reason: 'unreachable' };
 }
 
@@ -516,6 +536,7 @@ function buildRemoteWorkerInput(capabilityId, candidate, rawParams) {
     'molecular-docking': ['receptor'],
     'admet-estimation': [],
     'toxicity-risk-estimation': [],
+    'maxwell-fdtd': ['n1', 'n2', 'frequency', 'resolution'],
   }[capabilityId];
   const params = onlyKeys(rawParams, allowedParams ?? []);
   if (!params.ok) return blockedInput(`params contains fields that ${capabilityId} does not accept: ${params.unexpected.join(', ')}.`);
@@ -565,6 +586,13 @@ function buildRemoteWorkerInput(capabilityId, candidate, rawParams) {
     };
   } else if (capabilityId === 'admet-estimation' || capabilityId === 'toxicity-risk-estimation') {
     input = { smiles: candidate.canonicalSmiles };
+  } else if (capabilityId === 'maxwell-fdtd') {
+    input = {
+      n1: p.n1 ?? 1,
+      n2: p.n2 ?? 2,
+      frequency: p.frequency ?? 1,
+      resolution: p.resolution ?? 80,
+    };
   } else {
     return blockedInput(`No remote execution contract exists for "${capabilityId}".`);
   }

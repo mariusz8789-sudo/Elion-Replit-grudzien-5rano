@@ -10,9 +10,8 @@
 # An environment created from that lock passed meep_worker.py's Fresnel
 # reference case with the identical result as the original solve.
 #
-# This worker serves /health, /engines and the reference case. It has no
-# capability-execution contract: the Virtual Lab's maxwell-fdtd capability is
-# deliberately unbound (campaign/virtualLabClosedLoop.mjs).
+# This worker serves /health, /engines, the reference case and the bounded
+# maxwell-fdtd capability through the canonical authenticated worker contract.
 #
 # Standalone image, built from the repository root:
 #   docker build -f packages/backend/workers/pymeep/Dockerfile -t genesis-worker-pymeep .

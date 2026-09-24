@@ -26,6 +26,7 @@ import * as docking from './dockingAdapter.mjs';
 import * as protein from './proteinAdapter.mjs';
 import * as md from './mdAdapter.mjs';
 import * as admet from './admetAdapter.mjs';
+import * as meep from './meepAdapter.mjs';
 
 export const WORKER_CONTRACT_VERSION = '1.0.0';
 
@@ -33,8 +34,8 @@ export const WORKER_GROUPS = Object.freeze({
   'chem-light': Object.freeze(['pyscf', 'biopython']),
   structural: Object.freeze(['openmm', 'vina']),
   admet: Object.freeze(['admet', 'toxicity']),
-  // Built from workers/pymeep/conda-linux-64.lock (conda-forge). It has no
-  // execution contract below, so a pymeep worker can only report readiness.
+  // Built from workers/pymeep/conda-linux-64.lock (conda-forge). The bounded
+  // contract below exposes only the existing 1D dielectric-interface adapter.
   pymeep: Object.freeze(['pymeep']),
 });
 
@@ -450,6 +451,68 @@ const CAPABILITY_CONTRACTS = Object.freeze({
           artifacts: result.artifacts.map((a) => ({ ...a, location: 'REMOTE_WORKER_EPHEMERAL' })),
         },
         extraLimitations: [],
+      };
+    },
+  },
+
+  'maxwell-fdtd': {
+    toolId: 'pymeep',
+    engineName: 'PyMeep',
+    validateInput(input) {
+      const errors = [];
+      if (checkShape(input, { required: ['n1', 'n2', 'frequency', 'resolution'] }, 'input', errors)) {
+        checkFinite(input.n1, 1, 4, 'input.n1', errors);
+        checkFinite(input.n2, 1, 4, 'input.n2', errors);
+        checkFinite(input.frequency, 0.2, 2, 'input.frequency', errors);
+        checkInt(input.resolution, 40, 160, 'input.resolution', errors);
+      }
+      return done(errors, input);
+    },
+    execute(value) {
+      const r = meep.interfaceTransmission(value);
+      if (!r.ok) return engineFailure(r);
+      return {
+        ok: true,
+        engineVersion: String(r.version ?? ''),
+        result: { data: r.data, meta: pick(r.meta, ['method', 'dimension', 'polarization', 'measurement', 'modelScope']) },
+      };
+    },
+    validateResult(result, input) {
+      const errors = [];
+      const fields = [
+        'n1', 'n2', 'frequency', 'resolution', 'computedReflectance', 'computedTransmittance',
+        'analyticReflectance', 'analyticTransmittance', 'reflectanceAbsoluteError',
+        'transmittanceAbsoluteError', 'energyClosure', 'incidentFlux', 'reflectedFlux',
+      ];
+      if (checkShape(result, { required: ['data', 'meta'] }, 'result', errors)) {
+        if (!isPlainObject(result.data)) pushError(errors, 'result.data: must be an object');
+        else {
+          for (const field of fields) checkFinite(result.data[field], -1e12, 1e12, `result.data.${field}`, errors);
+          if (result.data.n1 !== input.n1 || result.data.n2 !== input.n2) pushError(errors, 'result.data: refractive indices do not match the request');
+          if (result.data.frequency !== input.frequency || result.data.resolution !== input.resolution) pushError(errors, 'result.data: numerical settings do not match the request');
+        }
+        if (checkShape(result.meta, { required: ['method', 'dimension', 'polarization', 'measurement', 'modelScope'] }, 'result.meta', errors)) {
+          for (const field of ['method', 'dimension', 'polarization', 'measurement', 'modelScope']) checkShortString(result.meta[field], 240, `result.meta.${field}`, errors);
+          if (result.meta.method !== 'FDTD') pushError(errors, 'result.meta.method: must be FDTD');
+        }
+      }
+      return done(errors, result);
+    },
+    buildRun({ input, result, engineVersion }) {
+      return {
+        run: {
+          engine: 'PyMeep', engineVersion, capability: 'maxwell-fdtd',
+          method: '1D normal-incidence Maxwell FDTD with incident-field subtraction', status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+          inputs: { n1: input.n1, n2: input.n2, frequency: input.frequency, resolution: input.resolution },
+          outputs: result.data,
+          units: { frequency: 'c / length unit', resolution: 'pixels / length unit', incidentFlux: 'Meep units', reflectedFlux: 'Meep units' },
+          provenance: { engine: `PyMeep ${engineVersion}`, source: 'compute/meep_worker.py via compute/meepAdapter.mjs', method: result.meta.measurement },
+          inputHash: sha16(input), outputHash: sha16(result.data), artifacts: [],
+        },
+        extraLimitations: [
+          'Bounded 1D, normal-incidence simulation of a planar interface between lossless, non-dispersive dielectrics.',
+          'This is a numerical MODEL_ESTIMATE, not a physical measurement and not a general 2D/3D electromagnetic simulation.',
+        ],
       };
     },
   },

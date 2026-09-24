@@ -310,12 +310,12 @@ describe('Test: engine bindings — protein-structure-ingestion (Biopython)', ()
   });
 });
 
-describe('Test: BLOCKED_UNBOUND_ENGINE — a real toolchain capability with no campaign-level execution binding', () => {
-  test('maxwell-fdtd (PyMeep) is genuinely not installed in this runtime AND unbound at the campaign layer — still honestly BLOCKED_UNBOUND_ENGINE', () => {
+describe('Test: bounded PyMeep binding — honest local runtime state', () => {
+  test('maxwell-fdtd is wired at the campaign layer and fails closed when PyMeep is not installed locally', () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'FDTD probe.', requestedCapability: 'maxwell-fdtd' });
     const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
-    assert.equal(executed.result.status, EXECUTION_STATUS.BLOCKED_UNBOUND_ENGINE);
+    assert.equal(executed.result.status, EXECUTION_STATUS.BLOCKED_RUNTIME_UNAVAILABLE);
   });
 });
 
@@ -367,7 +367,7 @@ describe('Test: deterministic replay', () => {
     assert.equal(replayed.replay.underlyingVerdict, 'MATCH');
   });
 
-  test('replaying a plan that was never executed (BLOCKED_UNBOUND_ENGINE) is refused, never a fabricated MATCH', () => {
+  test('replaying a plan blocked by a missing runtime is refused, never a fabricated MATCH', () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Cannot replay what never ran.', requestedCapability: 'maxwell-fdtd' });
     executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });

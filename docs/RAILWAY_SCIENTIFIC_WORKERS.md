@@ -35,7 +35,7 @@ local reference-case results are produced by
 | Meeko | 0.8.0 | LGPL | RAILWAY_CPU_WORKER | structural (paired with Vina; needs RDKit) | none | `requirements-meeko.txt`: `meeko==0.8.0`, `scipy==1.17.1`, `gemmi==0.7.5` (undeclared runtime imports — §10.3) (+ `requirements-rdkit.txt` in the same worker) |
 | ADMET-AI (ADMET) | 2.0.1 | MIT | RAILWAY_CPU_WORKER | admet (isolated) | none | `requirements-admet.txt`: `admet-ai==2.0.1` (pulls `torch`, `chemprop`, `lightning`, `pandas`, `seaborn`) |
 | ADMET-AI (toxicity) | 2.0.1 | MIT | RAILWAY_CPU_WORKER | admet (same engine as above, different capabilityId) | none | same as ADMET |
-| PyMeep | 1.34.0 (conda-forge `nompi_py311h1b602b3_101`, in a separate env) | GPL-2.0-or-later | RAILWAY_CPU_WORKER (readiness only — no execution contract) | pymeep (alone) | HDF5, harminv, libctl, guile, GSL, FFTW — all from conda-forge, none from apt | not pip-installable (PyPI `meep` is an unrelated package); `workers/pymeep/conda-linux-64.lock` — see §5 |
+| PyMeep | 1.34.0 (conda-forge `nompi_py311h1b602b3_101`, in a separate env) | GPL-2.0-or-later | RAILWAY_CPU_WORKER (bounded 1D interface contract) | pymeep (alone) | HDF5, harminv, libctl, guile, GSL, FFTW — all from conda-forge, none from apt | not pip-installable (PyPI `meep` is an unrelated package); `workers/pymeep/conda-linux-64.lock` — see §5 |
 | CMS Open Data Z→μμ (record 5208) | dataset present, checksum-verified | CC0-1.0 (dataset) | EMBEDDED_MAIN_SERVICE | — | none | none — Python stdlib only (`csv`/`hashlib`/`statistics`) |
 | DepMap 24Q2 senescence panel | data not present | DepMap Public 24Q2 terms | GENUINE_EXTERNAL_BLOCKER today | — | none | none — Python stdlib only; blocked purely on `GENESIS_DEPMAP_24Q2_DATA_DIR` not being populated with the (uncommitted, large) hash-verified dataset |
 
@@ -203,9 +203,9 @@ does exactly that inside `node:22-slim`: downloads micromamba, verifies it with
 `GENESIS_MEEP_PYTHON=/opt/genesis-meep/bin/python`. The environment is about
 629 MB on disk.
 
-What remains is not a software blocker: this Dockerfile has not been built
-by a Docker daemon (none here), and `maxwell-fdtd` still has no remote
-execution contract, so the Virtual Lab keeps it `BLOCKED_UNBOUND_ENGINE`.
+What remains is deployment proof: this Dockerfile has not been built
+by a Docker daemon in this workspace. `maxwell-fdtd` now has a bounded remote
+execution contract for the existing 1-D dielectric-interface reference case.
 `railwayWorkerReadiness.mjs` reports PyMeep as
 `LOCAL_REFERENCE_PASS_PENDING_RAILWAY` where `GENESIS_MEEP_PYTHON` points at a
 working env, and `BLOCKED_RUNTIME` (naming the lock) elsewhere — never `READY`.
@@ -384,8 +384,9 @@ main-service-only key anywhere in the result (`epistemicClassification`,
 | `GENESIS_CHEM_LIGHT_WORKER_URL` | main web/API | private URL of the chem-light worker, e.g. `http://genesis-worker-chem-light.railway.internal:8090` |
 | `GENESIS_STRUCTURAL_WORKER_URL` | main web/API | private URL of the structural worker |
 | `GENESIS_ADMET_WORKER_URL` | main web/API | private URL of the admet worker |
+| `GENESIS_PYMEEP_WORKER_URL` | main web/API | private URL of the pymeep worker |
 | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | main **and** every worker | shared bearer secret, ≥ 32 characters (e.g. `openssl rand -hex 32`); shorter counts as not configured |
-| `GENESIS_WORKER_GROUP` | each worker (existing) | `chem-light` \| `structural` \| `admet` |
+| `GENESIS_WORKER_GROUP` | each worker (existing) | `chem-light` \| `structural` \| `admet` \| `pymeep` |
 
 A URL must be `https://…`, or `http://` only for `*.railway.internal`,
 `localhost`, `127.0.0.1`, `[::1]`; URLs with credentials, a query or a
@@ -394,7 +395,9 @@ fragment are refused.
 ### 9.4 Routing rules
 
 - `molecular-descriptors` (RDKit) is always LOCAL — embedded in the main image.
-- `maxwell-fdtd` (PyMeep) has no remote contract: it stays `BLOCKED_UNBOUND_ENGINE`.
+- `maxwell-fdtd` (PyMeep) routes to the `pymeep` worker when
+  `GENESIS_PYMEEP_WORKER_URL` is set. Its public contract is deliberately
+  bounded to the existing 1-D dielectric-interface FDTD case.
 - A worker capability whose group URL variable is **unset** runs LOCAL,
   exactly as before. If its engine is not installed locally either, the
   persisted result is `BLOCKED_RUNTIME_UNAVAILABLE` with
@@ -521,6 +524,7 @@ so documenting these only in prose would have left the suite red:
 GENESIS_CHEM_LIGHT_WORKER_URL=
 GENESIS_STRUCTURAL_WORKER_URL=
 GENESIS_ADMET_WORKER_URL=
+GENESIS_PYMEEP_WORKER_URL=
 # Wspólny sekret (≥ 32 znaki) — ustaw identycznie w serwisie web/API i w każdym
 # workerze. Nigdy nie commituj wartości.
 GENESIS_SCIENTIFIC_WORKER_TOKEN=
@@ -533,8 +537,8 @@ GENESIS_SCIENTIFIC_WORKER_TOKEN=
 Keep these services on Railway's private network and do not assign public
 domains. Set the same `GENESIS_SCIENTIFIC_WORKER_TOKEN` (at least 32
 characters) on the web/API service and on every worker. On the web/API
-service, set `GENESIS_CHEM_LIGHT_WORKER_URL`, `GENESIS_STRUCTURAL_WORKER_URL`
-and/or `GENESIS_ADMET_WORKER_URL` to each worker's private URL (for example
+service, set `GENESIS_CHEM_LIGHT_WORKER_URL`, `GENESIS_STRUCTURAL_WORKER_URL`,
+`GENESIS_ADMET_WORKER_URL` and/or `GENESIS_PYMEEP_WORKER_URL` to each worker's private URL (for example
 `http://<worker-service>.railway.internal:<PORT>`); the Virtual Lab then
 executes those capabilities on the worker and still persists the ScienceRun,
 classification, Evidence proposal and replay in the main service. A group
@@ -685,7 +689,7 @@ fails the suite, and so does a pip `meep` in any Dockerfile.
 
 | Service | Variable | Source |
 | --- | --- | --- |
-| main web/API | `GENESIS_CHEM_LIGHT_WORKER_URL`, `GENESIS_STRUCTURAL_WORKER_URL`, `GENESIS_ADMET_WORKER_URL` | set per environment (private `*.railway.internal` URL); unset = local execution |
+| main web/API | `GENESIS_CHEM_LIGHT_WORKER_URL`, `GENESIS_STRUCTURAL_WORKER_URL`, `GENESIS_ADMET_WORKER_URL`, `GENESIS_PYMEEP_WORKER_URL` | set per environment (private `*.railway.internal` URL); unset = local execution |
 | main web/API | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | secret, ≥ 32 chars, identical on every worker |
 | main web/API | `GENESIS_RDKIT_PYTHON` | existing; baked into the root image |
 | worker chem-light / structural / admet | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | secret, same value as the main service |
@@ -693,10 +697,7 @@ fails the suite, and so does a pip `meep` in any Dockerfile.
 | worker chem-light / structural / admet | `GENESIS_WORKER_GROUP`, `GENESIS_PYTHON`, `TMPDIR`, `NODE_ENV` | baked into the image; do not override |
 | worker pymeep | `PORT` | injected by Railway |
 | worker pymeep | `GENESIS_WORKER_GROUP`, `GENESIS_MEEP_PYTHON`, `TMPDIR`, `NODE_ENV` | baked into the image |
-| worker pymeep | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | set it anyway: pymeep has no execution route, but the acceptance probe requires `/health` to report `executionAuth: configured` for every worker |
-
-There is no `GENESIS_PYMEEP_WORKER_URL`: the main service has nothing to send
-to it.
+| worker pymeep | `GENESIS_SCIENTIFIC_WORKER_TOKEN` | secret, same value as the main service; required for bounded `maxwell-fdtd` execution |
 
 ### 10.5 Proposed patch for `.github/workflows/railway-scientific-workers.yml` (Codex-owned; not applied)
 

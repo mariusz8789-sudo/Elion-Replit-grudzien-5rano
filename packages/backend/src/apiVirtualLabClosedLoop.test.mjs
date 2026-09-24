@@ -210,8 +210,8 @@ describe('Test: honest client-input rejection — never a fabricated success', (
   });
 });
 
-describe('Test: BLOCKED_UNBOUND_ENGINE via the API — never a fabricated result', () => {
-  test('a capability with no campaign-level execution binding is honestly blocked, and produces no Evidence proposal', async () => {
+describe('Test: missing PyMeep runtime via the API — never a fabricated result', () => {
+  test('a wired capability with no local runtime is honestly blocked, and produces no Evidence proposal', async () => {
     const owner = register('vlab-unbound@lab.org');
     const project = makeProject(owner.token);
     const { campaignId, candidateId } = seedCampaignAndCandidate(db, project.id, owner.user.id);
@@ -222,7 +222,7 @@ describe('Test: BLOCKED_UNBOUND_ENGINE via the API — never a fabricated result
       token: owner.token, body: { candidateId, executionId: planned.body.plan.executionId },
     });
     assert.equal(executed.status, 201);
-    assert.equal(executed.body.result.status, 'BLOCKED_UNBOUND_ENGINE');
+    assert.equal(executed.body.result.status, 'BLOCKED_RUNTIME_UNAVAILABLE');
     assert.equal(executed.body.evidenceProposal, null);
   });
 });

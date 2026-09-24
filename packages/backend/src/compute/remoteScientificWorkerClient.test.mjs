@@ -96,10 +96,11 @@ describe('worker configuration and routing', () => {
 
   test('RDKit descriptors always stay LOCAL; worker capabilities go REMOTE only when their group URL is set', () => {
     const all = configFor({
-      GENESIS_CHEM_LIGHT_WORKER_URL: 'http://a.railway.internal', GENESIS_STRUCTURAL_WORKER_URL: 'http://b.railway.internal', GENESIS_ADMET_WORKER_URL: 'http://c.railway.internal',
+      GENESIS_CHEM_LIGHT_WORKER_URL: 'http://a.railway.internal', GENESIS_STRUCTURAL_WORKER_URL: 'http://b.railway.internal', GENESIS_ADMET_WORKER_URL: 'http://c.railway.internal', GENESIS_PYMEEP_WORKER_URL: 'http://d.railway.internal',
     });
     assert.equal(routeCapability('molecular-descriptors', all).route, 'LOCAL');
-    assert.equal(routeCapability('maxwell-fdtd', all).route, 'LOCAL', 'PyMeep has no remote contract');
+    assert.equal(routeCapability('maxwell-fdtd', all).route, 'REMOTE');
+    assert.equal(routeCapability('maxwell-fdtd', all).workerGroup, 'pymeep');
     for (const cap of ['quantum-chemistry', 'protein-structure-ingestion']) assert.equal(routeCapability(cap, all).workerGroup, 'chem-light');
     for (const cap of ['molecular-dynamics', 'molecular-docking']) assert.equal(routeCapability(cap, all).workerGroup, 'structural');
     for (const cap of ['admet-estimation', 'toxicity-risk-estimation']) assert.equal(routeCapability(cap, all).workerGroup, 'admet');

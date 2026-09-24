@@ -42,6 +42,7 @@ import { getScienceRun, saveScienceRunVerification, listScienceRunVerifications 
 import * as docking from '../compute/dockingAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
+import * as meep from '../compute/meepAdapter.mjs';
 import { embed3d, descriptors } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
 import { endpointCategories, splitAdmetPrediction } from './multiFidelity.mjs';
@@ -75,6 +76,7 @@ const TOLERANCE = {
   // SMILES -- no batched-inference floating-point non-associativity like
   // ADMET-AI's, so MATCH requires a bit-exact replay, same as docking/QM.
   'molecular-descriptors': 0,
+  'maxwell-fdtd': 1e-9,
 };
 
 /** Re-executes the underlying engine for one capability. Returns { ok, error?, engineVersion?, outputHash?, output? }. */
@@ -106,6 +108,12 @@ const REPLAYERS = {
     const r = descriptors(inputs.smiles);
     if (!r.ok) return { ok: false, error: r.error };
     return { ok: true, engineVersion: r.engine, outputHash: sha16(r.data), output: r.data };
+  },
+  'maxwell-fdtd': (inputs) => {
+    if (!capabilityAvailable('maxwell-fdtd')) return { ok: false, error: 'BLOCKED_BY_RUNTIME' };
+    const r = meep.interfaceTransmission(inputs);
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, engineVersion: r.version, outputHash: sha16(r.data), output: r.data };
   },
 };
 

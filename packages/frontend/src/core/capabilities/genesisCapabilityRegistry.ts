@@ -81,7 +81,7 @@ const capabilities: readonly GenesisCapability[] = [
     id: 'cern-cms-open-data', label: 'CMS Open Data', description: 'Published CMS event data in the existing analysis route.',
     userIntents: ['pokaż prawdziwe dane cms', 'uruchom cms open data', 'cms open data', 'real cms data'], domain: 'cern', selectionMode: 'DIRECT_ROUTE',
     execution: { kind: 'route', id: '#/physics/cms-z' }, readiness: 'AVAILABLE', epistemicLabel: 'EXTERNAL_REAL_OBSERVATION', visualizationRoute: '#/physics/cms-z',
-    evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['Published external dataset; not a live LHC detector feed.'], showInShowcase: true,
+    evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['Opublikowany zewnętrzny zbiór historycznych danych offline; to nie jest transmisja na żywo z detektora LHC.'], showInShowcase: true,
   },
   {
     id: 'cern-toy-collision', label: 'CERN collision model', description: 'Immediate toy collision in the existing CERN complex.',

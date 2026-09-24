@@ -37,6 +37,7 @@ export const WORKER_URL_ENV = Object.freeze({
   'chem-light': 'GENESIS_CHEM_LIGHT_WORKER_URL',
   structural: 'GENESIS_STRUCTURAL_WORKER_URL',
   admet: 'GENESIS_ADMET_WORKER_URL',
+  pymeep: 'GENESIS_PYMEEP_WORKER_URL',
 });
 export const WORKER_TOKEN_ENV = 'GENESIS_SCIENTIFIC_WORKER_TOKEN';
 export const MAX_WORKER_RESPONSE_BYTES = 8 * 1024 * 1024;
@@ -49,6 +50,7 @@ export const DEFAULT_TIMEOUT_MS = Object.freeze({
   'molecular-docking': 330_000,
   'admet-estimation': 150_000,
   'toxicity-risk-estimation': 150_000,
+  'maxwell-fdtd': 150_000,
 });
 
 const SUCCESS_KEYS = Object.freeze([

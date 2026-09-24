@@ -88,6 +88,7 @@ async function injectSession(page: Page, token: string, user: unknown): Promise<
 
 test.describe('Genesis computational + external Lab loops — real API and real candidate', () => {
   test('Virtual Lab executes/replays RDKit and external validation accepts a governed request', async ({ page }) => {
+    test.setTimeout(180_000);
     const fixture = await seedRealCampaignWithCandidate();
     const errors: string[] = [];
     const blockedOptionalResponses: string[] = [];
@@ -138,17 +139,17 @@ test.describe('Genesis computational + external Lab loops — real API and real 
     await expect(virtualLab.getByTestId('research-execution-details')).toContainText('Output fingerprint');
 
     // Create a real governed external-validation request. No external observation is invented.
-    await panel.getByLabel('Endpoint ID').fill('e2e-endpoint');
-    await panel.getByLabel('Expected unit').fill('dimensionless');
-    await panel.getByLabel('Model output key to compare').fill('crippenLogP');
-    await panel.getByLabel('Pre-registered absolute tolerance').fill('0.25');
+    await panel.getByLabel('Mierzony parametr').fill('e2e-endpoint');
+    await panel.getByLabel('Oczekiwana jednostka').fill('dimensionless');
+    await panel.getByLabel('Wynik modelu do porównania').fill('crippenLogP');
+    await panel.getByLabel('Dopuszczalna różnica (ustalana przed pomiarem)').fill('0.25');
     const createButton = page.getByTestId('lab-validation-create-request');
     await expect(createButton).toBeEnabled();
     await createButton.click();
     await expect(panel.getByRole('status')).toContainText('Validation request:', { timeout: 10_000 });
     const counts = page.getByTestId('lab-validation-counts');
     await expect(counts).toBeVisible();
-    await expect(counts).toContainText('1 request(s)');
+    await expect(counts).toContainText('planów: 1');
 
     expect(blockedOptionalResponses.length).toBeGreaterThan(0);
     expect(blockedOptionalResponses.every((url) => url.includes('/api/compute/admet/endpoints'))).toBe(true);

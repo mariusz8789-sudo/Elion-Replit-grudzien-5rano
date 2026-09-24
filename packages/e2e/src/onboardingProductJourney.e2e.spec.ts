@@ -36,3 +36,16 @@ test('the ready example enters the one Chat and creates a canonical titration pl
   await expect(chat).toContainText('Oblicz miareczkowanie kwasowo-zasadowe NaOH.');
   await expect(chat).toContainText(/chemistry-titration|miareczkowanie/i);
 });
+
+test('one Chat opens the existing live black-hole model in its 3D laboratory', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
+  await page.goto('/');
+
+  const chat = page.getByTestId('science-chat-inline');
+  await chat.getByLabel('Wiadomość do Science Chat').fill('Pokaż czarną dziurę');
+  await chat.getByRole('button', { name: 'Wyślij' }).click();
+  await expect(page).toHaveURL(/#\/lab\/einstein$/);
+  await expect(page.getByRole('img', { name: /Scena 3D: Einstein Lab/i })).toBeVisible();
+});

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
+import { matchGenesisCapabilityIntent } from '../core/capabilities/genesisCapabilityRegistry';
 import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
 import { QuantumHistogram } from './QuantumHistogram';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
@@ -554,7 +555,10 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       track('ask_ai_used', { via: 'science-chat-precision-reference', compound: precisionQuestion.compound, target: precisionQuestion.target });
       return;
     }
-    const isNaturalDiscovery = /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg) && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);
+    const selectedCapability = matchGenesisCapabilityIntent(msg);
+    const isNaturalDiscovery = selectedCapability?.id === 'drug-discovery'
+      && /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg)
+      && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);
     if (isNaturalDiscovery) {
       const namedReference = naturalReferenceFromMessage(msg);
       const referenceCompound = namedReference ?? rawReferenceFromMessage(msg);

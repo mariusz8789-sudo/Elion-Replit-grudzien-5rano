@@ -29,7 +29,7 @@ const HIT_VERT = /* glsl */ `
 attribute float aEnergy; attribute float aKind; uniform float uPixelRatio; uniform float uReveal; varying float vE; varying float vK;
 void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv; vE = aEnergy; vK = aKind; gl_PointSize = (4.0 + 26.0 * min(1.0, aEnergy / 400.0)) * uPixelRatio; }`;
 const HIT_FRAG = /* glsl */ `
-precision highp float; varying float vE; varying float vK;
+precision highp float; uniform float uReveal; varying float vE; varying float vK;
 void main(){ vec2 uv = gl_PointCoord - 0.5; float d = length(uv)*2.0; if (d>1.0) discard; float a = pow(1.0-d,2.0) * smoothstep(0.48,0.62,uReveal); vec3 col = vK < 0.5 ? vec3(0.2,0.9,0.6) : vec3(1.0,0.6,0.2); gl_FragColor = vec4(col*a*(0.4+0.6*min(1.0,vE/300.0)), a); }`;
 const typeOf = (pdg: number): number => (pdg === 22 ? 4 : Math.abs(pdg) === 11 || Math.abs(pdg) === 13 ? 0 : Math.abs(pdg) === 211 ? 1 : Math.abs(pdg) === 12 || Math.abs(pdg) === 14 ? 3 : 2);
 const SEG = 48;

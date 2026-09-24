@@ -13,6 +13,7 @@ import {
   hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
   hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
 } from './discoveryQuestions';
+import { matchGenesisCapabilityIntent, type GenesisCapability } from '../capabilities/genesisCapabilityRegistry';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -221,6 +222,23 @@ function recipeFor(ctx: ChatSimSnapshot): SimulationRecipe | undefined {
 }
 
 const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
+
+function registryRoute(capability: GenesisCapability): ChatResponse | null {
+  if (capability.selectionMode === 'UNAVAILABLE') {
+    return {
+      text: `${capability.label}: ${capability.readiness}. ${capability.blockedReason ?? capability.limitations.join(' ')}`,
+      tag: capability.epistemicLabel === 'THEORETICAL_MODEL' ? 'HIPOTEZA' : 'SYSTEM',
+      intent: 'OPEN_SIMULATION', todo: true,
+    };
+  }
+  if (capability.selectionMode !== 'DIRECT_ROUTE' || !capability.visualizationRoute) return null;
+  const label = capability.epistemicLabel.replaceAll('_', ' ');
+  return {
+    text: `Otwieram ${capability.label}. ${label}. ${capability.limitations[0] ?? ''}`.trim(),
+    tag: capability.epistemicLabel === 'THEORETICAL_MODEL' ? 'HIPOTEZA' : capability.epistemicLabel === 'EXTERNAL_REAL_OBSERVATION' ? 'FAKT' : 'MODEL',
+    intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: capability.visualizationRoute },
+  };
+}
 
 /**
  * Best-effort extraction of a candidate glyph sequence from a chat message,
@@ -603,6 +621,14 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       intent: 'OPEN_SIMULATION',
       action: { type: 'openRoute', hash: `#/human-biology-lab?focus=${focus}&level=${level}` },
     };
+  }
+
+  // Canonical product routing. This is metadata over existing routes only;
+  // Experiment Fabric and custom Drug Discovery execution remain their current runners.
+  const registeredCapability = matchGenesisCapabilityIntent(message);
+  if (registeredCapability) {
+    const routed = registryRoute(registeredCapability);
+    if (routed) return routed;
   }
 
   // --- ADVANCED WORLDS — distinct, honest entrances to existing surfaces. ---

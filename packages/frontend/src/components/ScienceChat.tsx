@@ -523,8 +523,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;
         } else if (run.result.status === 'completed' && run.result.route.kind === 'product-route') {
-          window.location.hash = productRouteHash(run.result.route, run.provenance.parameterSnapshot);
-          window.dispatchEvent(new Event('genesis-product-route'));
+          const targetHash = productRouteHash(run.result.route, run.provenance.parameterSnapshot);
+          window.location.hash = targetHash;
+          window.dispatchEvent(new CustomEvent('genesis-product-route', { detail: targetHash }));
           setOpen(false);
         } else if (run.result.status === 'hypothetical_visualization' && run.result.route.kind === 'hypothetical-visualization') {
           const legendView = run.provenance.parameterSnapshot.viewMode === 'physics' ? '&legendView=physics' : '';

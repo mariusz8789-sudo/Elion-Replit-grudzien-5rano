@@ -92,8 +92,9 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => { if (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId)) setOrganId(anatomy.selectedNodeId); }, [anatomy.selectedNodeId, organs]);
   useEffect(() => {
-    const syncFromRoute = (): void => {
-      const query = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    const syncFromRoute = (event?: Event): void => {
+      const routeHash = event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : window.location.hash;
+      const query = new URLSearchParams(routeHash.split('?')[1] ?? '');
       const exposure = query.get('exposure');
       const years = Number(query.get('years'));
       setLungSimulation(query.get('simulation') === 'lung-exposure');

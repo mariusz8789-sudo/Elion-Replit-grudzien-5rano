@@ -361,8 +361,9 @@ export function ExperimentPilotScreen() {
     } else if (route.kind === 'hypothetical-visualization') {
       window.location.hash = route.hash;
     } else if (route.kind === 'product-route') {
-      window.location.hash = productRouteHash(route, run.provenance.parameterSnapshot);
-      window.dispatchEvent(new Event('genesis-product-route'));
+      const targetHash = productRouteHash(route, run.provenance.parameterSnapshot);
+      window.location.hash = targetHash;
+      window.dispatchEvent(new CustomEvent('genesis-product-route', { detail: targetHash }));
     } else {
       setError('Ten wynik nie ma zarejestrowanej trasy wizualizacji.');
     }

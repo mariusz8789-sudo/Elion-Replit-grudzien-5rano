@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * GENESIS — BodyParts3D 4.0 PILOT CONVERTER (OBJ → web GLB)
  * ==========================================================

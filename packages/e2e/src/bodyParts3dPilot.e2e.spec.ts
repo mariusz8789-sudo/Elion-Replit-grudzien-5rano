@@ -58,8 +58,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 390, height: 844 }
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.setViewportSize(viewport);
     const requested = await isolateLiver(page);
-    const d = await expectPilotLoaded(page, 'MOBILE', requested);
-    console.log(`[bp3d] mobile ${viewport.width}: ${d.map((x) => `${x.runtimePath.split('/').pop()} ${x.bytes} B ${Math.round(x.loadMs)} ms`).join(' · ')}`);
+    await expectPilotLoaded(page, 'MOBILE', requested);
     await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
     const overflow = await page.evaluate(() => ({ vw: window.innerWidth, doc: document.documentElement.scrollWidth }));
     expect(overflow.doc, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.vw + 1);
@@ -76,10 +75,8 @@ test('desktop: full level loads, raycast picks the isolated reference liver, car
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.setViewportSize({ width: 1440, height: 900 });
-  const heapBefore = await page.evaluate(() => (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null).catch(() => null);
   const requested = await isolateLiver(page);
-  const d = await expectPilotLoaded(page, 'DESKTOP', requested);
-  const heapAfter = await page.evaluate(() => (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null);
+  await expectPilotLoaded(page, 'DESKTOP', requested);
   await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
 
   // Real raycast through the existing pointer path: click where the isolated liver projects on the canvas.
@@ -93,12 +90,12 @@ test('desktop: full level loads, raycast picks the isolated reference liver, car
     return { x: r.left, y: r.top };
   });
   const target = { x: box.x + liver.x, y: box.y + liver.y };
-  console.log(`[bp3d] desktop pick at ${Math.round(target.x)},${Math.round(target.y)} over ${await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName ?? 'none', target)}`);
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName ?? 'none', target)).toBe('CANVAS');
   await page.mouse.click(target.x, target.y);
   await expect.poll(async () => (await diagnostics(page)).lastPickedNode, { timeout: 300_000 }).toBe('liver');
   const render = (await diagnostics(page)).render;
-  console.log(`[bp3d] desktop: ${d.map((x) => `${x.runtimePath.split('/').pop()} ${x.bytes} B ${Math.round(x.loadMs)} ms`).join(' · ')}`);
-  console.log(`[bp3d] desktop render: drawCalls=${render?.drawCalls} triangles=${render?.triangles} · JS heap ${heapBefore} → ${heapAfter} B`);
+  expect(render?.drawCalls).toBeGreaterThan(0);
+  expect(render?.triangles).toBeGreaterThan(0);
 
   await page.getByTestId('human-tab-research').click();
   await expect(page.getByTestId('sw-explorer-reference')).toHaveAttribute('data-fma', 'FMA7197');

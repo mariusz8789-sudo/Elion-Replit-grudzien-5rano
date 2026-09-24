@@ -7,20 +7,9 @@ import { AskGenesisMic } from './guide/AskGenesisMic';
 /** Holographic engine core — three.js, lazy: the Start route loads it only after first paint. */
 const EngineCoreHolo = lazy(() => import('./holo/EngineCoreHolo').then((m) => ({ default: m.EngineCoreHolo })));
 
-/**
- * START HERO — the first thing a visitor sees (D-118). One question box,
- * three doors (ask / see a discovery / enter a 3D world), one status strip.
- * Every number on the strip is a real read (Science Memory, backend health,
- * registered labs, resolvable worlds); nothing is a placeholder.
- */
+/** START HERO — one conversation and one connected Laboratory. */
 
 type Health = 'checking' | 'online' | 'no-key' | 'offline';
-
-const SUGGESTIONS: readonly string[] = [
-  'Znajdź bezpieczniejszą alternatywę dla semaglutydu',
-  'Zasymuluj epidemię z R0=5 przez 10 dni',
-  'Co by było, gdyby zamknąć szkoły w dniu 12?',
-];
 
 export function StartHero(): React.ReactElement {
   const [ask, setAsk] = useState('');
@@ -54,10 +43,9 @@ export function StartHero(): React.ReactElement {
       <header className="start-head">
         <img className="start-brand" src="/brand/genesis-lockup.png" alt="Genesis Physics — Scientific OS" width={1200} height={400} decoding="async" />
         <span className="gx-eyebrow">genesis-physics.com</span>
-        <h1 className="start-title">Zadaj pytanie. Genesis przeprowadzi badanie.</h1>
+        <h1 className="start-title">Zapytaj. Genesis przygotuje eksperyment.</h1>
         <p className="start-lede">
-          Kandydaci, dowody, próba obalenia własnej hipotezy, bramka zwycięzcy — w jednym przebiegu, z odciskiem każdego etapu.
-          Wynik możesz odtworzyć jutro, na innej maszynie.
+          Jeden dialog prowadzi do jednego laboratorium. Eksperyment, wynik, dowód i replay pozostają częścią tej samej sesji.
         </p>
       </header>
 
@@ -80,35 +68,9 @@ export function StartHero(): React.ReactElement {
         <AskGenesisMic lang="pl" onText={(t) => setAsk(t)} className="chip-btn start-ask-mic" />
         <button type="submit" className="chip-btn primary start-ask-send" disabled={!ask.trim()}>Zapytaj</button>
       </form>
-      <div className="start-guide-row">
-        <a className="chip-btn primary" href="#/research-console?guide=1" data-testid="start-guided">✦ Zobacz, jak to działa</a>
-        <a className="chip-btn" href="#/tour" data-testid="start-tour">▶ Genesis Tour — 3 minuty z przewodnikiem</a>
-      </div>
-      <div className="start-suggest" aria-label="Przykładowe pytania">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} type="button" className="chip-btn tiny" onClick={() => submit(s)}>{s}</button>
-        ))}
-      </div>
-
-      <div className="start-doors">
-        <button type="button" className="start-door" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">
-          <span className="start-door-glyph" aria-hidden="true">✦</span>
-          <span className="start-door-title">Zadaj pytanie</span>
-          <span className="start-door-text">Zwykłym językiem. Genesis dobierze model, uruchomi go i pokaże, co jest realne, a co jest oszacowaniem.</span>
-          <span className="start-door-cta">Napisz wyżej →</span>
-        </button>
-        <a className="start-door start-door-accent" href="#/research-console" data-testid="door-discover">
-          <span className="start-door-glyph" aria-hidden="true">◎</span>
-          <span className="start-door-title">Zobacz odkrycie</span>
-          <span className="start-door-text">Pełny 20-etapowy proces na prawdziwych danych ChEMBL i ClinicalTrials.gov: kandydaci → dowody → falsyfikacja → Winner Gate → Research Recipe.</span>
-          <span className="start-door-cta">Uruchom proces →</span>
-        </a>
-        <a className="start-door" href="#/worlds" data-testid="door-worlds">
-          <span className="start-door-glyph" aria-hidden="true">◈</span>
-          <span className="start-door-title">Zobacz eksperyment LIVE</span>
-          <span className="start-door-text">Obserwuj model krok po kroku, zmieniaj warunki i sprawdzaj, skąd pochodzi każdy wynik.</span>
-          <span className="start-door-cta">Otwórz LIVE →</span>
-        </a>
+      <div className="start-primary-actions" aria-label="Główne wejścia Genesis">
+        <button type="button" className="chip-btn" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">✦ Zapytaj Genesis</button>
+        <a className="chip-btn primary" href="#/scientific-worlds" data-testid="door-laboratory">⌬ Wejdź do laboratorium</a>
       </div>
 
       <ul className="start-status" aria-label="Stan systemu">

@@ -44,6 +44,19 @@
 
 .start-lede { color: #cad5e2 !important; }
 
+.start-primary-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0.85rem auto 0;
+}
+
+.start-primary-actions .chip-btn {
+  min-height: 2.9rem;
+  padding-inline: 1.1rem;
+}
+
 .start-ask,
 .start-door,
 .start-status {

@@ -4474,7 +4474,7 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   .shell-sidebar { display: none; }
   .shell-main { padding-bottom: calc(3.9rem + var(--safe-bottom)); }
   .shell-mobilebar {
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     padding: 0.35rem 0.2rem calc(0.35rem + var(--safe-bottom));
     background: var(--glass-strong);

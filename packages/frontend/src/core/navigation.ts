@@ -47,9 +47,9 @@ export interface NavSection {
 }
 
 /**
- * The primary product has four entry points. The user asks Genesis, enters
- * the connected Laboratory, or opens the contextual Human view. Every
- * specialist screen remains in MORE_ITEMS behind one disclosure.
+ * The primary product has one conversation and one Laboratory. Genesis is
+ * the home entry; every specialist screen remains in MORE_ITEMS behind one
+ * disclosure.
  *
  * The previous inventory asked the visitor to understand Genesis before
  * using it. Every former entry remains reachable in `MORE_ITEMS`; it simply
@@ -62,8 +62,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       { id: 'home', label: 'Genesis', icon: '◉', hash: '#/', primary: true, description: 'Jedno pytanie rozpoczyna badanie' },
       { id: 'chat', label: 'Zapytaj', icon: '✦', kind: 'chat', primary: true, description: 'Jeden dialog prowadzący całe badanie' },
-      { id: 'campaign', label: 'Laboratorium', icon: '⌬', hash: '#/campaign', primary: true, description: 'Kandydat, eksperyment, wynik, Evidence i replay' },
-      { id: 'human-biology-lab', label: 'Człowiek', icon: '◎', hash: '#/human-biology-lab', primary: true, description: 'Eksploracja ciała od narządu do komórki' },
+      { id: 'scientific-worlds', label: 'Laboratorium', icon: '⌬', hash: '#/scientific-worlds', primary: true, description: 'Jedna przestrzeń dla eksperymentów Genesis' },
     ],
   },
 ];
@@ -77,6 +76,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'discover', label: 'Odkrycia', icon: '◎', hash: '#/research-console', description: 'Kandydaci, dowody, falsyfikacja i Winner Gate' },
   { id: 'worlds', label: 'Wizualizacje', icon: '◈', hash: '#/worlds', description: 'Laboratoria i symulacje przestrzenne Genesis' },
   { id: 'memory', label: 'Dowody i pamięć', icon: '▣', hash: '#/memory', description: 'Przebiegi, pochodzenie i replay' },
+  { id: 'human-biology-lab', label: 'Człowiek — eksploracja', icon: '◎', hash: '#/human-biology-lab', description: 'Opcjonalna eksploracja ciała od narządu do komórki' },
   { id: 'settings', label: 'Ustawienia', icon: '⚙', hash: '#/settings', description: 'Konto, projekty, tryb badawczy' },
   { id: 'world-director', label: 'World Director', icon: '◉', hash: '#/world-director', description: 'Presety świata przez canonical WorldGraph i THREE.js' },
   { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
@@ -96,7 +96,6 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
   { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex' },
   { id: 'cms-open-data', label: 'CMS Open Data — prawdziwe dane CERN', icon: '📊', hash: '#/physics/cms-z', description: 'Checksumowo zweryfikowane 10 000 zdarzeń Z→μμ z CERN Open Data; analiza offline, nie aktywny LHC' },
-  { id: 'scientific-worlds', label: 'Światy naukowe — agent w laboratorium', icon: '⛑', hash: '#/scientific-worlds' },
   { id: 'projects', label: 'Projekty (chmura)', icon: '☁', hash: '#/projects' },
   {
     id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
@@ -106,6 +105,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'discovery-log', label: 'Dziennik odkryć', icon: '🏆', hash: '#/discovery-log' },
   { id: 'dossier', label: 'Candidate Dossier', icon: '🗂', hash: '#/dossier' },
   { id: 'cde', label: 'Silnik odkryć (CDE)', icon: '🧭', hash: '#/cde' },
+  { id: 'campaign', label: 'Zaawansowana kampania naukowa', icon: '⚡', hash: '#/campaign', description: 'Techniczny widok kandydatów, planów, Evidence i replay' },
   { id: 'pilot', label: 'Pilot eksperymentu', icon: '🧪', hash: '#/pilot' },
   { id: 'precision', label: 'Precision Reference', icon: '🔬', hash: '#/molecular-reference-analysis' },
   { id: 'conflict', label: 'Konflikt modeli', icon: '⚖', hash: '#/conflict' },
@@ -137,11 +137,11 @@ export const MORE_ITEMS: readonly NavItem[] = [
  */
 const RESEARCH_IDS = new Set([
   'investor-demo', 'discover', 'memory', 'meta-cognition', 'science', 'virtual-bio', 'evidence',
-  'discovery-log', 'dossier', 'cde', 'pilot', 'precision', 'conflict', 'whatif', 'calibration', 'inquiry', 'timeline',
+  'discovery-log', 'dossier', 'cde', 'campaign', 'pilot', 'precision', 'conflict', 'whatif', 'calibration', 'inquiry', 'timeline',
 ]);
 const WORLD_IDS = new Set([
   'worlds', 'world-director', 'mirror', 'tour', 'matrix', 'matrix-stage', 'matrix-map', 'world', 'simulation',
-  'collider', 'lab-fpv', 'cern-complex', 'cms-open-data', 'scientific-worlds',
+  'collider', 'lab-fpv', 'cern-complex', 'cms-open-data', 'human-biology-lab',
   'city3d', 'scientific-city', 'first-person-lab', 'molecule', 'cell-lab', 'looking-glass', 'world-proposal',
 ]);
 const PUBLIC_IDS = new Set(['cyber', 'gov-campaign', 'clockwork', 'sovereign']);

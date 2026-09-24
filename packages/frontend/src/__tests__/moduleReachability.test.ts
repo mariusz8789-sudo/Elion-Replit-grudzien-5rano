@@ -123,6 +123,7 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // exercises it against the real agent exports and asserts the import
   // direction stays one-way.
   'core/agent/agentBridge.ts': 'D-085 composer; unwired pending a deliberate campaignOrchestrator decision (wiring it INTO hypothesisLoop would close an import cycle).',
+  'core/capabilities/genesis9dProductAudit.ts': 'Product audit record only: it keeps the seven existing 9D modules classified as KEEP_PROTOTYPE or NOT_USEFUL and is intentionally not a public runtime entry point.',
 
   // --- Temporal Cinematic Engine (place+year -> historical WorldGraph -> camera
   // path -> real browser WebGL render, see TemporalCinematicScreen.tsx and the

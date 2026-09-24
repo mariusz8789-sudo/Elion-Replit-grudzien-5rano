@@ -67,7 +67,8 @@ const PREVENTION_TARGET_LABEL_PL: Readonly<Record<PreventionTarget, string>> = {
 
 export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
-  const initialQuery = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+  const initialHash = typeof window === 'undefined' ? '' : window.location.hash;
+  const initialQuery = new URLSearchParams(initialHash.split('?')[1] ?? '');
   const initialBlood = initialQuery.get('specimen') === 'blood';
   const initialLungSimulation = initialQuery.get('simulation') === 'lung-exposure';
   const initialPreventionSimulation = initialQuery.get('simulation') === 'prevention-lab';

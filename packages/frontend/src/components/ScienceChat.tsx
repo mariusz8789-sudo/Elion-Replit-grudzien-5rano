@@ -990,7 +990,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     >
       <header className="science-chat-head">
         <div>
-          <strong>💬 Science Chat</strong>
+          <strong>GENESIS</strong>
           <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
           {projectAccess && <span className="science-chat-ctx" title="Poziom egzekwowany przez backend">dostęp: {projectAccess.accessLevel} · {projectAccess.canRun ? 'run dozwolony' : 'run zablokowany'}</span>}
         </div>
@@ -999,16 +999,19 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
       <DiscoveryStageRail stage={stage} />
 
-      <div className="research-tools" aria-label="Research workspace tools">
-        {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit', 'access'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
-      </div>
-      {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
-      {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
-      {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} loading={researchAccessLoading} />}
-      {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}
+      <details className="science-chat-secondary science-chat-research">
+        <summary>Szczegóły badawcze</summary>
+        <div className="research-tools" aria-label="Research workspace tools">
+          {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit', 'access'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
+        </div>
+        {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
+        {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
+        {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
+        {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} loading={researchAccessLoading} />}
+        {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
+        {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
+        {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}
+      </details>
 
       <div className="science-chat-log" ref={scrollRef}>
         {turns.map((t, i) => (
@@ -1046,10 +1049,10 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           <button className="chip-btn" disabled={backendConfirmationPending} onClick={() => void send('anuluj plan')}>Anuluj plan</button>
         </div>
       )}
-      <div className="next-move-panel" aria-label="Next Move">
-        <div className="next-move-head"><strong>NEXT MOVE</strong><span>Nie kończymy na odpowiedzi — wybierz kierunek badania.</span></div>
+      <details className="next-move-panel" aria-label="Next Move">
+        <summary>Następny eksperyment</summary>
         <div className="next-move-grid">{NEXT_MOVES.map((move) => <button key={move.label} className="next-move-btn" onClick={() => void send(move.prompt)} disabled={backendConfirmationPending}><strong>{move.label}</strong><span>{move.prompt}</span></button>)}</div>
-      </div>
+      </details>
 
       {biotechWorkspaceSuggested && (
         <div className="science-chat-suggest" aria-label="Przejście do Drug Discovery">
@@ -1058,11 +1061,14 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         </div>
       )}
 
-      <div className="science-chat-suggest">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} className="chip-btn" onClick={() => send(s)}>{s}</button>
-        ))}
-      </div>
+      <details className="science-chat-secondary science-chat-examples">
+        <summary>Przykłady pytań</summary>
+        <div className="science-chat-suggest">
+          {SUGGESTIONS.map((s) => (
+            <button key={s} className="chip-btn" onClick={() => send(s)}>{s}</button>
+          ))}
+        </div>
+      </details>
 
       <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <input

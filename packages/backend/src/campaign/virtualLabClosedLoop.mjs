@@ -51,7 +51,7 @@ import { descriptors as rdkitDescriptors, embed3d } from '../compute/rdkitAdapte
 import * as md from '../compute/mdAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
 import * as meep from '../compute/meepAdapter.mjs';
-import { verifyScienceRun, VERDICT as REPLAY_VERDICT } from './verify.mjs';
+import { verifyScienceRun, verifyScienceRunDispatched, VERDICT as REPLAY_VERDICT } from './verify.mjs';
 import { assertNoClinicalLanguage } from './researchIntake.mjs';
 import {
   DISPATCH_STATE,
@@ -799,6 +799,40 @@ export function replayVirtualExperiment(db, { campaignId, candidateId, execution
     [REPLAY_VERDICT.REPLAY_UNSUPPORTED]: REPLAY_STATUS.UNSUPPORTED,
   }[verification.verification.verdict] ?? REPLAY_STATUS.UNSUPPORTED;
 
+  const payload = {
+    contractVersion: VIRTUAL_LAB_CONTRACT_VERSION,
+    executionId, campaignId, candidateId,
+    scienceRunId: resultEvent.payload.scienceRunId,
+    verificationId: verification.verification.id,
+    underlyingVerdict: verification.verification.verdict,
+    replayStatus,
+    detail: verification.verification.detail,
+    clinicalEfficacy: 'UNKNOWN',
+    claimBoundary: CLAIM_BOUNDARY,
+  };
+  const eventId = campaignStore.addEvent(db, { campaignId, generation: linked.candidate.generation, type: VIRTUAL_EVENT.REPLAY, payload });
+  return { ok: true, eventId, replay: payload };
+}
+
+/** Public/API replay path. It preserves the synchronous local verifier above,
+ * but reuses the configured canonical worker dispatch when the run was remote. */
+export async function replayVirtualExperimentDispatched(db, { campaignId, candidateId, executionId } = {}) {
+  const linked = requireCampaignCandidate(db, campaignId, candidateId);
+  if (!linked.ok) return linked;
+  const resultEvent = findEvent(db, campaignId, (e) => e.type === VIRTUAL_EVENT.RESULT && e.payload?.executionId === executionId);
+  if (!resultEvent || resultEvent.payload?.candidateId !== candidateId) return { ok: false, error: 'result_not_found' };
+  if (resultEvent.payload.status !== EXECUTION_STATUS.EXECUTED || !resultEvent.payload.scienceRunId) {
+    return { ok: false, error: 'not_executed_cannot_replay' };
+  }
+  const verification = await verifyScienceRunDispatched(db, resultEvent.payload.scienceRunId);
+  if (!verification.ok) return { ok: false, error: verification.error ?? 'replay_failed' };
+  const replayStatus = {
+    [REPLAY_VERDICT.MATCH]: REPLAY_STATUS.MATCH,
+    [REPLAY_VERDICT.DRIFT]: REPLAY_STATUS.DRIFT,
+    [REPLAY_VERDICT.ENGINE_VERSION_CHANGED]: REPLAY_STATUS.ENGINE_VERSION_CHANGED,
+    [REPLAY_VERDICT.BLOCKED_BY_RUNTIME]: REPLAY_STATUS.BLOCKED_BY_RUNTIME,
+    [REPLAY_VERDICT.REPLAY_UNSUPPORTED]: REPLAY_STATUS.UNSUPPORTED,
+  }[verification.verification.verdict] ?? REPLAY_STATUS.UNSUPPORTED;
   const payload = {
     contractVersion: VIRTUAL_LAB_CONTRACT_VERSION,
     executionId, campaignId, candidateId,

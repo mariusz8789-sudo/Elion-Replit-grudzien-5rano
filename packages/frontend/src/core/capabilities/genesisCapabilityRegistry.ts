@@ -149,11 +149,27 @@ const capabilities: readonly GenesisCapability[] = [
     execution: { kind: 'route', id: 'NOT_IMPLEMENTED' }, readiness: 'PROTOTYPE', epistemicLabel: 'PROTOTYPE', visualizationRoute: null,
     evidenceSupport: 'NONE', replaySupport: 'NONE', nextExperimentSupport: false, limitations: ['Modules must be reviewed and connected individually.'], blockedReason: 'No canonical public runtime consumer; mounting the package as a second product is rejected.',
   },
-  ...(['pyscf', 'openmm', 'vina', 'biopython', 'pymeep', 'admet', 'toxicity'] as const).map((worker): GenesisCapability => ({
-    id: `worker-${worker}`, label: `${worker} worker`, description: 'Optional scientific worker exposed only when its runtime dependency is present.',
-    userIntents: [], domain: 'compute-worker', selectionMode: 'UNAVAILABLE', execution: { kind: 'worker', id: worker }, readiness: 'BLOCKED_BY_RUNTIME', epistemicLabel: 'MODEL', visualizationRoute: null,
-    evidenceSupport: 'NONE', replaySupport: 'NONE', nextExperimentSupport: false, limitations: ['A healthy service process does not make this worker available.'],
-    blockedReason: `Public Railway runtime reports ${worker} dependency unavailable.`, runtimeStatusSource: '/api/health/compute',
+  ...([
+    ['pyscf', 'AVAILABLE', 'CANONICAL'],
+    ['openmm', 'AVAILABLE', 'PARTIAL'],
+    ['vina', 'AVAILABLE', 'CANONICAL'],
+    ['biopython', 'AVAILABLE', 'PARTIAL'],
+    ['admet', 'AVAILABLE', 'CANONICAL'],
+    ['toxicity', 'AVAILABLE', 'CANONICAL'],
+    ['pymeep', 'BLOCKED_BY_RUNTIME', 'NONE'],
+  ] as const).map(([worker, readiness, replaySupport]): GenesisCapability => ({
+    id: `worker-${worker}`, label: `${worker} worker`, description: readiness === 'AVAILABLE'
+      ? 'Existing private Railway worker with a successful canonical real execution proof.'
+      : 'Optional scientific worker awaiting a deployed and verified runtime.',
+    userIntents: [], domain: 'compute-worker', selectionMode: readiness === 'AVAILABLE' ? 'CUSTOM_FLOW' : 'UNAVAILABLE',
+    execution: { kind: 'worker', id: worker }, readiness, epistemicLabel: 'MODEL', visualizationRoute: '#/drug',
+    evidenceSupport: readiness === 'AVAILABLE' ? 'CANONICAL' : 'NONE', replaySupport,
+    nextExperimentSupport: readiness === 'AVAILABLE',
+    limitations: replaySupport === 'PARTIAL'
+      ? ['Real execution and canonical Evidence are available; deterministic replay is not supported for this capability.']
+      : ['Availability requires both current worker health and a persisted real remote ScienceRun proof.'],
+    ...(readiness === 'AVAILABLE' ? {} : { blockedReason: 'No configured, live Railway worker with a successful canonical execution proof.' }),
+    runtimeStatusSource: '/api/health',
   })),
 ];
 

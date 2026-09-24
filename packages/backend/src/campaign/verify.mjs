@@ -47,6 +47,8 @@ import { embed3d, descriptors } from '../compute/rdkitAdapter.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
 import { endpointCategories, splitAdmetPrediction } from './multiFidelity.mjs';
 import { sha256Hex16 as sha16, maxRelativeDiff } from '../provenance.mjs';
+import { buildScienceRunRecord } from '../compute/scientificCapabilityContract.mjs';
+import { createRemoteScientificWorkerClient, resolveWorkerConfig, routeCapability } from '../compute/remoteScientificWorkerClient.mjs';
 
 export const VERDICT = {
   MATCH: 'MATCH',
@@ -184,6 +186,75 @@ export function verifyScienceRun(db, runId) {
     replayEngineVersion: result.replayEngineVersion ?? null,
     detail: result.detail ?? {},
   });
+  return { ok: true, verification: saved };
+}
+
+function classifyReplay(run, replay) {
+  const versionChanged = run.engineVersion != null && replay.engineVersion != null && run.engineVersion !== replay.engineVersion;
+  const hashMatch = run.outputHash != null && run.outputHash === replay.outputHash;
+  const tolerance = TOLERANCE[run.capability] ?? 0;
+  const relDiff = hashMatch ? 0 : maxRelativeDiff(run.outputs, replay.output);
+  const withinTolerance = hashMatch || (Number.isFinite(relDiff) && relDiff <= tolerance);
+  const verdict = versionChanged ? VERDICT.ENGINE_VERSION_CHANGED : withinTolerance ? VERDICT.MATCH : VERDICT.DRIFT;
+  return {
+    verdict,
+    originalOutputHash: run.outputHash,
+    replayOutputHash: replay.outputHash,
+    originalEngineVersion: run.engineVersion,
+    replayEngineVersion: replay.engineVersion,
+    detail: { hashMatch, versionChanged, maxRelativeDiff: relDiff, tolerance, replayOutput: replay.output, executionMode: 'REMOTE_EXECUTION' },
+  };
+}
+
+function remoteReplayInput(run) {
+  if (run.capability === 'quantum-chemistry') {
+    const emb = embed3d(run.inputs.smiles);
+    if (!emb.ok) return { ok: false, error: emb.error ?? 'embed_failed' };
+    return { ok: true, input: { ...run.inputs, charge: run.inputs.charge ?? emb.charge ?? 0, forceField: run.inputs.forceField ?? emb.forceField, atoms: emb.atoms } };
+  }
+  if (run.capability === 'molecular-docking') {
+    const input = { ...run.inputs };
+    delete input.receptorKind;
+    return { ok: true, input };
+  }
+  if (['admet-estimation', 'toxicity-risk-estimation', 'maxwell-fdtd'].includes(run.capability)) {
+    return { ok: true, input: run.inputs };
+  }
+  return { ok: false, error: 'REPLAY_UNSUPPORTED' };
+}
+
+/**
+ * Canonical replay with the same local verifier as before, plus one thin remote
+ * path when the original capability is routed to an existing scientific worker.
+ * The worker still returns only a validated computation; this main service owns
+ * comparison and the append-only verification row.
+ */
+export async function verifyScienceRunDispatched(db, runId, { workerConfig = resolveWorkerConfig(), client = null } = {}) {
+  const run = getScienceRun(db, runId);
+  if (!run) return { ok: false, error: 'run_not_found' };
+  const route = routeCapability(run.capability, workerConfig);
+  if (route.route !== 'REMOTE') return verifyScienceRun(db, runId);
+
+  const prepared = remoteReplayInput(run);
+  if (!prepared.ok) return verifyScienceRun(db, runId);
+  const workerClient = client ?? createRemoteScientificWorkerClient({ config: workerConfig });
+  const outcome = await workerClient.execute({ capabilityId: run.capability, executionId: `REPLAY-${run.id}`, input: prepared.input });
+  let result;
+  if (!outcome.ok) {
+    result = {
+      verdict: outcome.state === 'BLOCKED_ENGINE_UNAVAILABLE' || outcome.state === 'BLOCKED_WORKER_NOT_CONFIGURED' || outcome.state === 'BLOCKED_WORKER_UNAVAILABLE' || outcome.state === 'WORKER_TIMEOUT'
+        ? VERDICT.BLOCKED_BY_RUNTIME : VERDICT.REPLAY_UNSUPPORTED,
+      originalOutputHash: run.outputHash,
+      replayOutputHash: null,
+      originalEngineVersion: run.engineVersion,
+      replayEngineVersion: null,
+      detail: { reason: outcome.error ?? outcome.state, executionMode: 'REMOTE_EXECUTION' },
+    };
+  } else {
+    const canonical = buildScienceRunRecord(run.capability, { input: prepared.input, result: outcome.result, engineVersion: outcome.engine.version });
+    result = classifyReplay(run, { engineVersion: outcome.engine.version, outputHash: canonical.run.outputHash, output: canonical.run.outputs });
+  }
+  const saved = saveScienceRunVerification(db, { scienceRunId: runId, ...result });
   return { ok: true, verification: saved };
 }
 

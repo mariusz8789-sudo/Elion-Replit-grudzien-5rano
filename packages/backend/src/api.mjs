@@ -90,7 +90,7 @@ import { buildLabObservationEvidenceInput } from './campaign/labEvidenceBridge.m
 import {
   planVirtualExperiment,
   executeVirtualExperimentDispatched,
-  replayVirtualExperiment,
+  replayVirtualExperimentDispatched,
   linkVirtualExperimentEvidenceProposal,
   buildVirtualExperimentEvidenceInput,
   buildVirtualLabDossier,
@@ -781,9 +781,10 @@ export function handleApi(db, ctx) {
       }
       if (seg.length === 7 && seg[4] === 'virtual-lab' && seg[6] === 'replay' && method === 'POST') {
         if (!atLeast(role, 'editor')) return err(403, 'forbidden');
-        const result = replayVirtualExperiment(db, { campaignId, candidateId: body.candidateId, executionId: seg[5] });
-        if (!result.ok) return err(400, result.error);
-        return ok({ replay: result.replay, eventId: result.eventId }, 201);
+        return replayVirtualExperimentDispatched(db, { campaignId, candidateId: body.candidateId, executionId: seg[5] }).then((result) => {
+          if (!result.ok) return err(400, result.error);
+          return ok({ replay: result.replay, eventId: result.eventId }, 201);
+        });
       }
       // /api/projects/:id/campaigns/:cid/science-runs/:runId[/verify|/verifications]
       if (seg.length >= 6 && seg[4] === 'science-runs') {

@@ -43,6 +43,7 @@ import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
 import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
+import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -60,6 +61,9 @@ const VERSION = process.env.npm_package_version ?? '1.0.0';
 // 'unknown' zamiast zmyślać.
 const BUILD = resolveBuildInfo({ env: process.env, repoDir: path.resolve(__dirname, '../../..') });
 const startedAt = Date.now();
+let scientificRuntimeCache = null;
+let scientificRuntimeCachedAt = 0;
+const SCIENTIFIC_RUNTIME_CACHE_MS = 15_000;
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
@@ -370,7 +374,7 @@ function serveStatic(req, res) {
 /* ---------------- Serwer ---------------- */
 const staticAvailable = existsSync(path.join(STATIC_DIR, 'index.html'));
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Ustawione na starcie przez setHeader — writeHead() w dalszym kodzie
   // dopisuje nagłówki specyficzne dla trasy bez usuwania tych globalnych.
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
@@ -379,6 +383,11 @@ const server = http.createServer((req, res) => {
     // Stan bazy z WYKONANEGO zapytania kontrolnego — `db ? 'ready' : ...` nie
     // widziało przypadku, w którym obiekt istnieje, a baza nie odpowiada.
     const dbState = checkDatabaseState(db);
+    if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
+      scientificRuntimeCache = await buildScientificRuntimeStatus(db);
+      scientificRuntimeCachedAt = Date.now();
+    }
+    const effectiveByTool = new Map(scientificRuntimeCache.engines.map((engine) => [engine.id, engine]));
     return json(res, 200, {
       ok: true,
       version: VERSION,
@@ -403,7 +412,12 @@ const server = http.createServer((req, res) => {
       // endpoint reported eight anonymous tools: you could see one AVAILABLE and
       // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
       // disclosure anonymised at exactly the surface an operator inspects.
-      toolchain: listToolchain().map((tool) => ({ id: tool.toolId ?? tool.id ?? tool.name ?? 'unknown', status: tool.status, version: tool.version ?? null })),
+      toolchain: listToolchain().map((tool) => {
+        const id = tool.toolId ?? tool.id ?? tool.name ?? 'unknown';
+        const remote = effectiveByTool.get(id);
+        return { id, status: remote?.status === 'AVAILABLE' ? 'AVAILABLE' : tool.status, version: remote?.version ?? tool.version ?? null };
+      }),
+      scientificWorkers: scientificRuntimeCache,
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);

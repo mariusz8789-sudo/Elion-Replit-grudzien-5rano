@@ -503,7 +503,7 @@ describe('production topology — a main service WITHOUT PySCF dispatching to a 
       hypothesis: 'Topology probe', requestedCapability: 'quantum-chemistry', expectation: { outputKey: 'energyHartree', comparator: 'LTE', threshold: 0 } });
     const executed = await vlab.executeVirtualExperimentDispatched(db, { campaignId: campaign.id, candidateId, executionId: planned.plan.executionId });
     const replay = executed.ok && executed.result.scienceRunId
-      ? vlab.replayVirtualExperiment(db, { campaignId: campaign.id, candidateId, executionId: planned.plan.executionId }) : null;
+      ? await vlab.replayVirtualExperimentDispatched(db, { campaignId: campaign.id, candidateId, executionId: planned.plan.executionId }) : null;
     process.stdout.write(JSON.stringify({ localQm: capabilityAvailable('quantum-chemistry'), executed, replay }));
   `;
   const runChild = async (env) => {
@@ -514,7 +514,7 @@ describe('production topology — a main service WITHOUT PySCF dispatching to a 
     return JSON.parse(stdout);
   };
 
-  test('with the chem-light worker configured, QM executes remotely; replay is honestly BLOCKED_BY_RUNTIME here', { skip: !QM_ON && missing('PySCF (for the worker)') }, async () => {
+  test('with the chem-light worker configured, QM executes and replays remotely while the main process has no PySCF', { skip: !QM_ON && missing('PySCF (for the worker)') }, async () => {
     const out = await runChild({ GENESIS_SCIENTIFIC_WORKER_TOKEN: TEST_WORKER_TOKEN, GENESIS_CHEM_LIGHT_WORKER_URL: chem.url });
     assert.equal(out.localQm, false, 'the main service really has no PySCF');
     assert.equal(out.executed.ok, true, JSON.stringify(out.executed));
@@ -523,7 +523,7 @@ describe('production topology — a main service WITHOUT PySCF dispatching to a 
     assert.equal(out.executed.result.selectedEngine.engineName, 'PySCF');
     assert.match(out.executed.result.selectedEngine.engineVersion, /^\d+\.\d+/, 'the version the worker proved, not the absent local one');
     assert.equal(out.executed.result.epistemicClassification, EPISTEMIC_CLASSIFICATION.IN_SILICO_SUPPORT);
-    assert.equal(out.replay.replay.replayStatus, REPLAY_STATUS.BLOCKED_BY_RUNTIME);
+    assert.equal(out.replay.replay.replayStatus, REPLAY_STATUS.MATCH);
   });
 
   test('without any worker configured, the same experiment is persisted as BLOCKED_WORKER_NOT_CONFIGURED', async () => {

@@ -1803,6 +1803,16 @@ kbd {
 .chip-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .chip-btn.primary { border-color: var(--cyan); color: var(--cyan); }
 
+/* The scientific scene is the default experience. Numeric controls and the
+   long analysis remain available without occupying the visual stage. */
+.lab-advanced-controls { margin: .7rem 0 0; border: 1px solid var(--border); border-radius: 10px; background: rgba(4, 13, 23, .76); }
+.lab-advanced-controls > summary { cursor: pointer; list-style: none; padding: .7rem .85rem; color: var(--text-dim); font: 650 .72rem/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.lab-advanced-controls > summary::-webkit-details-marker { display: none; }
+.lab-advanced-controls > summary::after { content: ' +'; color: var(--cyan); }
+.lab-advanced-controls[open] > summary { color: var(--text); border-bottom: 1px solid var(--border); }
+.lab-advanced-controls[open] > summary::after { content: ' −'; }
+.lab-advanced-controls-body { padding: .75rem; }
+
 .account-panel { display: flex; flex-direction: column; gap: 0.75rem; }
 .account-tabs { display: flex; gap: 0.4rem; }
 .account-tab {

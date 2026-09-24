@@ -200,17 +200,22 @@ function BelowStage({
   return (
     <>
       <HonestyBadge level={exp.honesty} note={exp.honestyNote} />
-      <Controls defs={exp.params} params={params} onChange={(k, v) => setParams((p) => ({ ...p, [k]: v }))} />
-      <NarratorPanel
-        blocks={blocks}
-        askContext={buildContext(
-          { id: lab.id, name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
-          expLabel,
-          params,
-          stats,
-          blocks,
-        )}
-      />
+      <details className="lab-advanced-controls">
+        <summary>Parametry i analiza</summary>
+        <div className="lab-advanced-controls-body">
+          <Controls defs={exp.params} params={params} onChange={(k, v) => setParams((p) => ({ ...p, [k]: v }))} />
+          <NarratorPanel
+            blocks={blocks}
+            askContext={buildContext(
+              { id: lab.id, name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
+              expLabel,
+              params,
+              stats,
+              blocks,
+            )}
+          />
+        </div>
+      </details>
     </>
   );
 }

@@ -180,6 +180,29 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void { this.renderMetrics = metrics; }
+  /** Presentation bounds only, used to keep contextual controls off the subject. */
+  getHumanSubjectBounds() {
+    if (!this.THREE || !this.pickCamera || !this.renderer || this.world !== 'biology') return null;
+    const root = this.macroMicro?.group.visible ? this.macroMicro.group : this.twins[0]?.group;
+    if (!root) return null;
+    const box = new this.THREE.Box3();
+    root.traverseVisible((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      if (mesh.geometry.boundingBox) box.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+    });
+    if (box.isEmpty()) return null;
+    const points = [box.min.x, box.max.x].flatMap((x) => [box.min.y, box.max.y].flatMap((y) => [box.min.z, box.max.z].map((z) => new this.THREE!.Vector3(x, y, z).project(this.pickCamera!))));
+    const width = this.renderer.domElement.clientWidth;
+    const height = this.renderer.domElement.clientHeight;
+    return {
+      left: Math.min(...points.map((point) => (point.x + 1) * width / 2)),
+      right: Math.max(...points.map((point) => (point.x + 1) * width / 2)),
+      top: Math.min(...points.map((point) => (1 - point.y) * height / 2)),
+      bottom: Math.max(...points.map((point) => (1 - point.y) * height / 2)),
+    };
+  }
   getRuntimeDiagnostics() {
     return {
       ...this.controller.getDiagnostics(), wallSeconds: this.elapsedWallSeconds,
@@ -784,6 +807,7 @@ export class AgentLabScene3D implements Sim3D {
     // Camera.
     const fx = Math.sin(pose.facing); const fz = Math.cos(pose.facing);
     if (this.cameraMode === 'VISOR') {
+      if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = true;
       if (this.chamberGlass) this.chamberGlass.visible = true;
       ch.head.getWorldPosition(this.scratchA);
       // Just inside the visor glass, so the suit's arms and gloves stay in frame below.
@@ -803,27 +827,30 @@ export class AgentLabScene3D implements Sim3D {
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
       if (this.chamberGlass) this.chamberGlass.visible = false;
+      if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = false;
       const tight = this.isolatedCount > 0 || this.cutawayState.enabled;
       // Desktop dedicates the centre-left to the whole body, with the research dock on the right.
       // Portrait leaves room for the lower dock; an isolate/section moves closer to the torso.
       const portrait = camera.aspect < 1;
       const macroVisible = this.macroMicro?.group.visible === true;
-      const dist = portrait ? (tight ? 3.0 : 4.4) : (tight ? 2.3 : macroVisible ? 3.05 : 2.75);
+      const dist = portrait ? (macroVisible ? 3.1 : tight ? 3.0 : 4.0) : (macroVisible ? 1.7 : tight ? 2.3 : 2.5);
       // An isolated organ is framed at its own height (brain, heart, kidneys...), not always at the torso.
       const organFocus = this.isolatedCount > 0 ? this.selectedOrganFocusY : null;
-      const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : tight ? 1.45 : 1.55;
+      const height = organFocus !== null ? Math.min(1.95, Math.max(0.95, organFocus + 0.2)) : macroVisible ? 1.58 : tight ? 1.45 : 1.4;
       // A very slight drift keeps the shot alive without becoming a ride; it is presentation only.
-      const drift = reducedMotion ? 0 : Math.sin(this.time * 0.22) * 0.14;
-      this.scratchA.set(TWIN_CHAMBER.position.x + drift, height, TWIN_CHAMBER.position.z + dist);
+      const drift = reducedMotion ? 0 : Math.sin(this.time * 0.22) * 0.035;
+      const subjectOffset = macroVisible ? 1.12 : 0;
+      this.scratchA.set(TWIN_CHAMBER.position.x + subjectOffset + drift, height, TWIN_CHAMBER.position.z + dist);
       this.twinCamPos.lerp(this.scratchA, cameraEase(5));
-      const panelOffset = !portrait && macroVisible ? 0.46 : this.researchLayoutOpen && !portrait ? 0.55 : 0;
+      const panelOffset = subjectOffset + (this.researchLayoutOpen && !portrait ? 0.35 : 0);
       // Portrait keeps the subject in the upper half, above the lower research dock.
-      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : portrait ? 0.65 : 1.12;
+      const lookY = organFocus !== null ? organFocus - (portrait ? 0.32 : 0) : macroVisible ? 1.42 : portrait ? 1.03 : 1.08;
       this.scratchB.set(TWIN_CHAMBER.position.x + panelOffset, lookY, TWIN_CHAMBER.position.z);
       this.twinCamLook.lerp(this.scratchB, cameraEase(7.7));
       camera.position.copy(this.twinCamPos); camera.lookAt(this.twinCamLook);
     } else {
       if (this.chamberGlass) this.chamberGlass.visible = true;
+      if (this.premiumHumanDetail) this.premiumHumanDetail.root.visible = true;
       if (ch.helmet) ch.helmet.visible = true;
       ch.head.children.forEach((c) => { if ((c as THREE_NS.Mesh).isMesh) c.visible = true; });
       const target = this.scratchA.set(pose.position.x - fx * 3.4, Math.min(2.15, this.ceilingY - 0.6), pose.position.z - fz * 3.4);

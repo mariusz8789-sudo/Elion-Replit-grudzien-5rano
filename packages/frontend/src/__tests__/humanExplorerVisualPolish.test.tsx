@@ -124,31 +124,28 @@ describe('Human Explorer panel hierarchy', () => {
   );
   const at = (testId: string) => html.indexOf(`data-testid="${testId}"`);
 
-  it('reads selection → macro-to-micro path → status → controls, and the path covers BODY … CELL', () => {
-    expect(at('sw-explorer-selection')).toBeGreaterThan(-1);
+  it('keeps the selected subject ahead of the compact BODY → ORGAN → TISSUE → CELL path', () => {
+    expect(html.indexOf('class="human-hero-heading"')).toBeGreaterThan(-1);
     expect(html).toContain('>Heart<');
-    expect(at('sw-explorer-selection')).toBeLessThan(at('sw-explorer-rung-body'));
+    expect(html.indexOf('class="human-hero-heading"')).toBeLessThan(at('human-hero-body'));
+    for (const rung of ['body', 'organ', 'tissue', 'cell']) expect(at(`human-hero-${rung}`)).toBeGreaterThan(-1);
     for (const rung of ['body', 'organ_system', 'organ', 'tissue', 'cell']) expect(at(`sw-explorer-rung-${rung}`)).toBeGreaterThan(-1);
-    expect(at('sw-explorer-rung-cell')).toBeLessThan(at('sw-explorer-evidence'));
-    expect(at('sw-explorer-evidence')).toBeLessThan(at('sw-explorer-organ'));
-    expect(at('sw-explorer-organ')).toBeLessThan(at('sw-explorer-section'));
-    expect(at('sw-explorer-section')).toBeLessThan(at('sw-explorer-scope'));
+    expect(at('human-inspector-toggle')).toBeLessThan(at('human-inspector'));
   });
 
-  it('keeps the observation boundary visible and moves provenance into a secondary disclosure', () => {
+  it('keeps observation and provenance in the collapsed research instrument', () => {
     const boundary = at('sw-explorer-observation-status');
-    const details = html.indexOf('<details');
     expect(boundary).toBeGreaterThan(-1);
-    expect(details).toBeGreaterThan(boundary);
     expect(html).toContain('No validated subject observation attached');
-    expect(at('sw-explorer-provenance')).toBeGreaterThan(details);
-    expect(at('sw-explorer-source-metadata')).toBeGreaterThan(details);
-    expect(html).not.toMatch(/<details[^>]*open/);
+    expect(at('sw-explorer-provenance')).toBeGreaterThan(at('human-panel-research'));
+    expect(at('sw-explorer-source-metadata')).toBeGreaterThan(at('human-panel-research'));
+    expect(html).toMatch(/id="human-panel-research"[^>]*hidden/);
   });
 
-  it('exposes a drawer toggle (closed by default) for the mobile compact rail', () => {
-    expect(html).toContain('data-drawer="closed"');
-    expect(html).toMatch(/data-testid="sw-explorer-drawer-toggle"[^>]*|aria-expanded="false"/);
-    expect(html).toContain('aria-controls="sw-ex-drawer"');
+  it('exposes one collapsed instrument drawer instead of overlaying the scene', () => {
+    expect(html).toContain('data-testid="human-inspector-toggle"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-controls="human-inspector"');
+    expect(html).toMatch(/id="human-inspector"[^>]*hidden/);
   });
 });

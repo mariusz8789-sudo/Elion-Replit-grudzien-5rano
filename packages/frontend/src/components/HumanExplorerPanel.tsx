@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { t, getLocale } from '../core/i18n';
 import { drawBiologyArtifact } from '../core/three/biologyStationKit';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
@@ -13,6 +13,7 @@ import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../c
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
+import './HumanExplorerHero.css';
 
 /**
  * HUMAN EXPLORER PANEL (D-130) — the reference UI's four blocks over the
@@ -25,6 +26,8 @@ import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspect
  * no session the microscope shows its empty state.
  */
 export interface HumanExplorerPanelProps {
+  readonly subjectBounds?: { left: number; right: number; top: number; bottom: number } | null;
+  readonly researchControls?: ReactNode;
   readonly manifest: HumanDigitalTwinManifest;
   /** D-131: the live section state, owned by the screen (the V3 anatomy state remains the single source of truth). */
   readonly cutaway: CutawayState;
@@ -54,21 +57,33 @@ const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY
 const SURFACE_MODES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['TRANSLUCENT', 'Prześwit'], ['XRAY', 'RTG (model)'], ['GHOST', 'Duch']];
 const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope', 'histology', 'imaging', 'central-dogma', 'neuro']);
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [peek, setPeek] = useState<'closed' | 'hover' | 'pinned'>('closed');
+  const [search, setSearch] = useState('');
+  const heroRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const dismiss = (event: PointerEvent | KeyboardEvent): void => {
+      if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
+      if (event instanceof PointerEvent && (event.target as Element)?.closest('.human-context, .human-subject-target')) return;
+      setPeek('closed');
+    };
+    document.addEventListener('pointerdown', dismiss); document.addEventListener('keydown', dismiss);
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', dismiss); };
+  }, []);
+  const [activeTab, setActiveTab] = useState<'explore' | 'microscope' | 'section' | 'research'>('explore');
   const organs = useMemo(() => manifest.nodes.filter((n) => n.kind === 'ORGAN'), [manifest]);
   const [system, setSystem] = useState<OrganSystemId | null>(null);
   const [organId, setOrganId] = useState<string>(() => (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId) ? anatomy.selectedNodeId : 'heart'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Mobile: the controls live in a compact drawer so the anatomy viewport stays uncovered (CSS ignores it on desktop).
-  const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => { if (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId)) setOrganId(anatomy.selectedNodeId); }, [anatomy.selectedNodeId, organs]);
   const selectedNode = manifest.nodes.find((node) => node.id === anatomy.selectedNodeId);
   useEffect(() => { setSystem(selectedNode?.kind === 'SYSTEM' ? selectedNode.system ?? null : null); }, [selectedNode]);
 
   const organ = organs.find((o) => o.id === organId) ?? organs[0];
   const explorer: ExplorerOrgan | undefined = EXPLORER_ORGANS.find((e) => e.organId === organ?.id);
-  const visibleOrgans = system ? organsInSystem(manifest, `system:${system.toLowerCase()}`) : organs;
+  const visibleOrgans = (system ? organsInSystem(manifest, `system:${system.toLowerCase()}`) : organs).filter(o => `${o.label} ${o.latinLabel}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const magnification = session?.experimentId === 'hyperscope-capture' && typeof session.outputs.magnification === 'number' ? session.outputs.magnification : null;
   const level: ScaleLevel = selectedNode?.kind === 'BODY' ? 'body' : selectedNode?.kind === 'SYSTEM' ? 'organ_system'
     : levelOfSession(session?.experimentId ?? null, magnification, selectedNode?.kind === 'ORGAN', session?.inputs.explorerLevel);
@@ -92,24 +107,61 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const magnify = (m: number): void => { if (!explorer) return; const lt = nextLogicalTime(); const label = `${t('explorer.hyperscope', locale)} ${m}× · ${t(explorer.labelKey, locale)}`; run(magnificationCommands(explorer, m, label, lt), label); };
   const pickSystem = (s: OrganSystemId): void => { const lt = nextLogicalTime(); const label = `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[s]}`; run(systemCommands(s, label, lt), label); };
 
-  // One clear current selection: the node the V3 anatomy state points at, named at the level it is shown.
-  const selectionName = selectedNode?.kind === 'SYSTEM' && selectedNode.system ? `${t('explorer.systems', locale)}: ${SYSTEM_LABEL_PL[selectedNode.system]}`
-    : selectedNode?.kind === 'BODY' ? t('explorer.body', locale) : organ?.label ?? t('explorer.body', locale);
-  const selectionMeta = selectedNode?.kind === 'SYSTEM' || selectedNode?.kind === 'BODY'
-    ? `${levelLabel(level, locale)} · ${SCALE_TEXT[level]}`
-    : [organ?.latinLabel, organ?.system ? SYSTEM_LABEL_PL[organ.system] : null, `${levelLabel(level, locale)} · ${SCALE_TEXT[level]}`].filter(Boolean).join(' · ');
-
   return (
-    <section className="sw-hud sw-hud-explorer" aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision} data-drawer={drawerOpen ? 'open' : 'closed'}>
-      {/* 1 — WHERE AM I: the current selection, then the macro → micro path it sits on. */}
-      <header className="sw-ex-head">
-        <div className="sw-ex-selection" data-testid="sw-explorer-selection">
-          <span className="sw-ex-eyebrow">{t('explorer.humanExplorer', locale)}</span>
-          <strong className="sw-ex-selection-name">{selectionName}</strong>
-          <span className="sw-ex-selection-meta">{selectionMeta}</span>
-        </div>
-        <button type="button" className="sw-chip sw-ex-drawer-toggle" onClick={() => setDrawerOpen((o) => !o)} aria-expanded={drawerOpen} aria-controls="sw-ex-drawer" data-testid="sw-explorer-drawer-toggle">Sterowanie {drawerOpen ? '▾' : '▸'}</button>
-      </header>
+    <section ref={heroRef} className={`sw-hud sw-hud-explorer human-hero${inspectorOpen ? ' has-inspector' : peek !== 'closed' ? ' has-context' : ''}`} aria-label="Human Explorer" data-testid="sw-explorer" data-level={level} data-selected-node={anatomy.selectedNodeId} data-evidence-mode={evidenceMode} data-visual-quality={HUMAN_VISUAL_QUALITY_PROFILE.tier} data-anatomical-precision={HUMAN_VISUAL_QUALITY_PROFILE.anatomicalPrecision}>
+      {subjectBounds && !inspectorOpen && <button type="button" className="human-subject-target" data-testid="human-subject-target" data-subject-bounds={JSON.stringify(subjectBounds)} style={{ left: `clamp(8px, ${subjectBounds.right - (heroRef.current?.offsetLeft ?? 0) + 10}px, calc(100% - 46px))`, top: `clamp(240px, ${(subjectBounds.top + subjectBounds.bottom) / 2}px, calc(100% - 200px))` }} aria-label={`Informacje o modelu: ${level === 'body' ? 'ciało człowieka' : organ?.label}`} aria-expanded={peek !== 'closed'} onPointerEnter={event => { if (event.pointerType === 'mouse' && peek !== 'pinned') setPeek('hover'); }} onPointerLeave={() => { if (peek === 'hover') setPeek('closed'); }} onFocus={() => { if (peek !== 'pinned') setPeek('hover'); }} onBlur={() => { if (peek === 'hover') setPeek('closed'); }} onClick={() => setPeek(peek === 'pinned' ? 'closed' : 'pinned')}>+</button>}
+      {peek !== 'closed' && !inspectorOpen && <aside className={`human-context${subjectBounds && subjectBounds.right > (heroRef.current?.parentElement?.clientWidth ?? 1440) - 300 ? ' is-left' : ''}`} data-testid="human-context" aria-label="Wybrany model">
+        <button type="button" className="human-context-close" aria-label="Zamknij informacje" onClick={() => setPeek('closed')}>×</button>
+        <strong>{level === 'body' ? 'Ciało człowieka' : organ?.label}</strong>
+        <span>{level === 'body' ? 'Anatomia' : organ?.system ? SYSTEM_LABEL_PL[organ.system] : 'Struktura'} · {SCALE_TEXT[level]}</span>
+        <small>ILLUSTRATIVE_MODEL · geometria poglądowa</small>
+        <button type="button" className="human-context-action" onClick={() => { setInspectorOpen(true); setActiveTab('explore'); setPeek('closed'); }}>Otwórz instrumenty →</button>
+      </aside>}
+      <div className="human-hero-heading">
+        <span className="human-eyebrow">GENESIS / HUMAN EXPLORER</span>
+        <h1>{level === 'body' ? 'Człowiek.' : levelLabel(level, locale)}</h1>
+        <p>{level === 'body' ? 'Od całego ciała do jego najmniejszych struktur.' : `${organ?.label ?? 'Anatomia'} · ${SCALE_TEXT[level]}`}</p>
+        <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
+      </div>
+      <div className="human-hero-tools" aria-label="Widok modelu">
+        {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} disabled={busy} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
+        <button type="button" className="sw-chip human-inspector-toggle" aria-expanded={inspectorOpen} aria-controls="human-inspector" onClick={() => setInspectorOpen(!inspectorOpen)} data-testid="human-inspector-toggle">{inspectorOpen ? 'Zamknij ×' : 'Instrumenty +'}</button>
+      </div>
+      <nav className="human-hero-path" aria-label="Od ciała do komórki">
+        {(['body', 'organ', 'tissue', 'cell'] as const).map((target, index) => <button key={target} type="button" aria-current={level === target ? 'step' : undefined} onClick={() => { onTwinCamera(true); zoom(target); }} disabled={busy || !explorer} data-testid={`human-hero-${target}`}><span>0{index + 1}</span><strong>{levelLabel(target, locale)}</strong></button>)}
+      </nav>
+      <div className="human-hero-action"><button type="button" className="sw-btn sw-btn-primary" disabled={busy || !explorer} onClick={() => { onTwinCamera(true); zoom(level === 'body' ? 'organ' : level === 'organ' ? 'tissue' : level === 'tissue' ? 'cell' : 'body'); }}>{busy ? 'Trwa wykonanie…' : level === 'body' ? `Poznaj ${organ?.label ?? 'narząd'} →` : level === 'organ' ? 'Zobacz tkankę →' : level === 'tissue' ? 'Zobacz komórkę →' : 'Wróć do ciała'}</button></div>
+      <div id="human-inspector" className="human-inspector" hidden={!inspectorOpen} data-testid="human-inspector" onKeyDown={(event) => { if (event.key === 'Escape') setInspectorOpen(false); }}>
+      <h2>Instrumenty Human Explorer</h2>
+      <div className="human-inspector-tabs" role="tablist" aria-label="Narzędzia eksploracji">
+        {([['explore', 'Odkrywaj'], ['microscope', 'Mikroskop'], ['section', 'Przekrój'], ['research', 'Badania']] as const).map(([tab, label]) => (
+          <button key={tab} type="button" role="tab" id={`human-tab-${tab}`} aria-controls={`human-panel-${tab}`} aria-selected={activeTab === tab} tabIndex={activeTab === tab ? 0 : -1} data-testid={`human-tab-${tab}`} onClick={() => setActiveTab(tab)} onKeyDown={(event) => {
+            const tabs = ['explore', 'microscope', 'section', 'research'] as const;
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault(); const next = tabs[(tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : 3)) % 4];
+            setActiveTab(next); document.getElementById(`human-tab-${next}`)?.focus();
+          }}>{label}</button>
+        ))}
+      </div>
+      <div className="human-tab" id="human-panel-explore" role="tabpanel" aria-labelledby="human-tab-explore" hidden={activeTab !== 'explore'}>
+        <p className="human-instrument-note">Wybierz strukturę i skalę. Każdy poziom korzysta z istniejącego modelu.</p>
+        <details className="human-selector"><summary>Układ <strong>{system ? SYSTEM_LABEL_PL[system] : 'Wszystkie'}</strong></summary>
+        <nav className="sw-ex-systems" aria-label={t('explorer.systemsRail', locale)}>
+          <div className="sw-ex-title">{t('explorer.systemsRail', locale)}</div>
+          {manifest.supportedSystems.map((s) => (
+            <button key={s} type="button" className={`sw-chip sw-ex-system${system === s ? ' is-on' : ''}`} onClick={() => pickSystem(s)} disabled={busy} data-testid={`sw-explorer-system-${s.toLowerCase()}`}>{SYSTEM_LABEL_PL[s]}</button>
+          ))}
+        </nav>
+        </details>
+        <details className="human-selector" open><summary>Narząd <strong>{organ?.label ?? '—'}</strong></summary>
+          <input className="human-organ-search" type="search" aria-label="Szukaj narządu" placeholder="Szukaj narządu…" value={search} onChange={event => setSearch(event.target.value)} />
+          <div className="sw-ex-organ-list" role="listbox" aria-label={t('explorer.organ', locale)}>
+            {visibleOrgans.map((o) => (
+              <button key={o.id} type="button" role="option" aria-selected={o.id === organ?.id} className={`sw-chip sw-ex-organ-chip${o.id === organ?.id ? ' is-on' : ''}`} onClick={() => { setOrganId(o.id); const e = EXPLORER_ORGANS.find((x) => x.organId === o.id); if (e) { const lt = nextLogicalTime(); const label = `${t('explorer.organ', locale)}: ${o.label}`; run(explorerCommands(e, 'organ', label, lt), label); } }} disabled={busy} data-testid={`sw-explorer-organ-${o.id}`}>{o.label}</button>
+            ))}
+          </div>
+
+        </details>
       <div className="sw-ex-strip" role="group" aria-label={t('explorer.macroToMicro', locale)}>
         <div className="sw-ex-title">{t('explorer.macroToMicro', locale)}</div>
         <ol className="sw-ex-rungs">
@@ -117,7 +169,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
             const step = explorer ? explorerPath(explorer, l, manifest).at(-1) : null;
             const runnable = !!explorer && (l === 'body' || l === 'organ' || (l === 'organ_system' && !!step?.nodeId) || !!step?.experimentId);
             return (
-              <li key={l} className={`sw-ex-rung${l === level ? ' is-on' : ''}`} aria-current={l === level ? 'step' : undefined}>
+              <li key={l} className={`sw-ex-rung${l === level ? ' is-on' : ''}`}>
                 <button type="button" className="sw-ex-rung-btn" onClick={() => zoom(l)} disabled={busy || !runnable} title={l === 'atom' ? t('explorer.notModeled', locale) : step ? explorerTruthLabel(step.evidenceMode) : ''} data-testid={`sw-explorer-rung-${l}`}>
                   <span className="sw-ex-rung-name">{levelLabel(l, locale)}</span>
                   <span className="sw-ex-rung-scale cw-mono">{SCALE_TEXT[l]}</span>
@@ -127,52 +179,49 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
           })}
         </ol>
       </div>
-      {/* The epistemic boundary stays on screen at every size; the detail behind it is one click away. */}
-      <div className="sw-ex-status">
-        <span className={`sw-badge sw-ex-mode sw-ex-mode-${evidenceMode.toLowerCase()}`} data-testid="sw-explorer-evidence">{explorerTruthLabel(evidenceMode)}</span>
-        <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
-        <span className="sw-badge" data-testid="sw-explorer-tier" title="Cinematic procedural presentation; geometry remains an illustrative scientific model.">{twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
-        <span className="sw-ex-boundary" data-testid="sw-explorer-observation-status">No validated subject observation attached · illustrative generic model</span>
+
       </div>
-      <div id="sw-ex-drawer" className="sw-ex-drawer">
-        <div className="sw-ex-body">
-          {/* 2 — NAVIGATE: body system, then organ. */}
-          <div className="sw-ex-group sw-ex-navigate" role="group" aria-label="Nawiguj">
-            <nav className="sw-ex-systems" aria-label={t('explorer.systemsRail', locale)}>
-              <div className="sw-ex-title">{t('explorer.systemsRail', locale)}</div>
-              {manifest.supportedSystems.map((s) => (
-                <button key={s} type="button" className={`sw-chip sw-ex-system${system === s ? ' is-on' : ''}`} onClick={() => pickSystem(s)} disabled={busy} aria-pressed={system === s} data-testid={`sw-explorer-system-${s.toLowerCase()}`}>{SYSTEM_LABEL_PL[s]}</button>
-              ))}
-            </nav>
-            <div className="sw-ex-organ" data-testid="sw-explorer-organ" data-organ={organ?.id}>
-              <div className="sw-ex-title">{t('explorer.organ', locale)}</div>
-              <div className="sw-ex-organ-list" role="listbox" aria-label={t('explorer.organ', locale)}>
-                {visibleOrgans.map((o) => (
-                  <button key={o.id} type="button" role="option" aria-selected={o.id === organ?.id} className={`sw-chip sw-ex-organ-chip${o.id === organ?.id ? ' is-on' : ''}`} onClick={() => { setOrganId(o.id); const e = EXPLORER_ORGANS.find((x) => x.organId === o.id); if (e) { const lt = nextLogicalTime(); const label = `${t('explorer.organ', locale)}: ${o.label}`; run(explorerCommands(e, 'organ', label, lt), label); } }} disabled={busy} data-testid={`sw-explorer-organ-${o.id}`}>{o.label}</button>
-                ))}
-              </div>
-            </div>
+      <div className="human-tab" id="human-panel-microscope" role="tabpanel" aria-labelledby="human-tab-microscope" hidden={activeTab !== 'microscope'}>
+        <div className="human-readout"><span>HYPERSCOPE / pole modelowe</span><output data-testid="human-magnification-readout">{magnification ? `${magnification}×` : 'Brak ekspozycji'}</output></div>
+        <p className="human-instrument-note">Wybierz powiększenie, aby uruchomić istniejący mikroskop. Podgląd pochodzi z wykonanej sesji.</p>
+        <div className="sw-ex-scope" data-testid="sw-explorer-scope" data-capture={imageSession?.sessionId ?? ''}>
+          <div className="sw-ex-title">{t('explorer.hyperscope', locale)} · {t('explorer.magnification', locale)}</div>
+          <div className="sw-ex-mags">
+            {VIRTUAL_MICROSCOPE_MAGNIFICATIONS.map((m) => (
+              <button key={m} type="button" className={`sw-chip${magnification === m ? ' is-on' : ''}`} onClick={() => magnify(m)} disabled={busy || !explorer} aria-pressed={magnification === m} data-testid={`sw-explorer-mag-${m}`}>{m}×</button>
+            ))}
           </div>
-          {/* 3 — VIEW: how the model is shown. Presentation only: no session, no evidence changes here.
-              D-131: a real section plane and isolation. Clipping reveals the MODEL proxies inside the body —
-              it is a schematic section, never a medical cross-section, and the label says so. */}
-          <div className="sw-ex-group sw-ex-section" data-testid="sw-explorer-section" data-cutaway={cutaway.enabled ? 'on' : 'off'}>
+          <canvas ref={canvasRef} className="sw-ex-canvas" width={512} height={288} aria-label="Microscope field" />
+          {imageSession
+            ? <p className="sw-faint cw-mono" data-testid="sw-explorer-capture">{imageSession.experimentId} · {imageSession.epistemicStatus} · {imageSession.contentHash.slice(0, 16)}…</p>
+            : <p className="sw-faint" data-testid="sw-explorer-empty">{t('explorer.noCapture', locale)}</p>}
+
+        </div>
+
+      </div>
+      <div className="human-tab" id="human-panel-section" role="tabpanel" aria-labelledby="human-tab-section" hidden={activeTab !== 'section'}>
+          <div className="sw-ex-section" data-testid="sw-explorer-section" data-cutaway={cutaway.enabled ? 'on' : 'off'}>
             <div className="sw-ex-title">{t('explorer.section', locale)}</div>
             <div className="sw-ex-mags">
               <button type="button" className={`sw-chip${cutaway.enabled ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, enabled: !cutaway.enabled })} disabled={busy} aria-pressed={cutaway.enabled} data-testid="sw-explorer-cut-toggle">{t('explorer.cutaway', locale)}</button>
               {(['SAGITTAL', 'CORONAL', 'AXIAL'] as const).map((axis: SectionAxis) => (
-                <button key={axis} type="button" className={`sw-chip${cutaway.axis === axis ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, axis, enabled: true })} disabled={busy} title={SECTION_AXIS_LABEL_PL[axis]} data-testid={`sw-explorer-axis-${axis.toLowerCase()}`}>{SECTION_AXIS_LABEL_PL[axis].split(' ')[0]}</button>
+                <button key={axis} type="button" className={`sw-chip${cutaway.axis === axis ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, axis, enabled: true })} disabled={busy} aria-pressed={cutaway.axis === axis} title={SECTION_AXIS_LABEL_PL[axis]} data-testid={`sw-explorer-axis-${axis.toLowerCase()}`}>{SECTION_AXIS_LABEL_PL[axis].split(' ')[0]}</button>
               ))}
-              <button type="button" className={`sw-chip${cutaway.flipped ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, flipped: !cutaway.flipped, enabled: true })} disabled={busy} aria-label="Odwróć stronę przekroju" data-testid="sw-explorer-cut-flip">↔</button>
+              <button type="button" className={`sw-chip${cutaway.flipped ? ' is-on' : ''}`} onClick={() => onCutaway({ ...cutaway, flipped: !cutaway.flipped, enabled: true })} disabled={busy} aria-pressed={cutaway.flipped} aria-label="Odwróć stronę przekroju" data-testid="sw-explorer-cut-flip">Odwróć ↔</button>
             </div>
-            <input className="sw-ex-slider" type="range" min={0} max={1} step={0.01} value={cutaway.position} disabled={busy || !cutaway.enabled}
-              onChange={(e) => onCutaway({ ...cutaway, position: Number(e.target.value) })} aria-label={t('explorer.section', locale)} data-testid="sw-explorer-cut-position" />
+            <div className="human-depth-instrument">
+            <label htmlFor="human-section-depth">Położenie płaszczyzny <output data-testid="human-depth-readout">{Math.round(cutaway.position * 100)}%</output></label>
+            <input id="human-section-depth" className="sw-ex-slider" type="range" min={0} max={1} step={0.01} value={cutaway.position} disabled={busy || !cutaway.enabled}
+              onChange={(e) => onCutaway({ ...cutaway, position: Number(e.target.value) })} aria-label={t('explorer.section', locale)} aria-valuetext={`${Math.round(cutaway.position * 100)}% zakresu modelu`} data-testid="sw-explorer-cut-position" />
+            <div className="human-depth-ticks"><span>0%</span><span>Środek · 50%</span><span>100%</span></div>
+            <p className="human-instrument-note">{SECTION_AXIS_LABEL_PL[cutaway.axis]} · {cutaway.flipped ? 'odwrócona strona' : 'standardowa strona'}</p>
+            </div>
             <div className="sw-ex-mags">
-              <button type="button" className={`sw-chip${isolated.length ? ' is-on' : ''}`} onClick={() => onIsolate(isolated.length ? [] : organ ? [organ.id] : [])} disabled={busy || !organ} data-testid="sw-explorer-isolate">{isolated.length ? t('explorer.showAll', locale) : t('explorer.isolate', locale)}</button>
+              <button type="button" className={`sw-chip${isolated.length ? ' is-on' : ''}`} onClick={() => onIsolate(isolated.length ? [] : organ ? [organ.id] : [])} disabled={busy || !organ} aria-pressed={isolated.length > 0} data-testid="sw-explorer-isolate">{isolated.length ? t('explorer.showAll', locale) : t('explorer.isolate', locale)}</button>
               {/* Both agent cameras follow the suited agent, which leaves the twin a distant figure inside its
                   chamber. This one frames the body itself — the only way to actually READ a section or an
                   isolated organ. It is a camera, not a claim: no label, session or evidence changes with it. */}
-              <button type="button" className={`sw-chip${twinCamera ? ' is-on' : ''}`} onClick={() => onTwinCamera(!twinCamera)} aria-pressed={twinCamera} data-testid="sw-explorer-twin-camera">{t('explorer.twinCamera', locale)}</button>
+              <button type="button" className={`sw-chip${twinCamera ? ' is-on' : ''}`} onClick={() => onTwinCamera(!twinCamera)} data-testid="sw-explorer-twin-camera">{t('explorer.twinCamera', locale)}</button>
             </div>
             {/* The body shell's presentation. The "X-ray" is a fresnel shell over a licensed 3D model —
                 a stylised view that lets the atlas volumes read through the skin. It is NOT a radiograph,
@@ -184,34 +233,27 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
             </div>
             <p className="sw-faint" data-testid="sw-explorer-section-note">{t('explorer.sectionNote', locale)}</p>
           </div>
-          {/* 4 — OBSERVE: the Hyperscope, drawn only from a sealed session. */}
-          <div className="sw-ex-group sw-ex-scope" data-testid="sw-explorer-scope" data-capture={imageSession?.sessionId ?? ''}>
-            <div className="sw-ex-title">{t('explorer.hyperscope', locale)} · {t('explorer.magnification', locale)}</div>
-            <div className="sw-ex-mags">
-              {VIRTUAL_MICROSCOPE_MAGNIFICATIONS.map((m) => (
-                <button key={m} type="button" className={`sw-chip${magnification === m ? ' is-on' : ''}`} onClick={() => magnify(m)} disabled={busy || !explorer} aria-pressed={magnification === m} data-testid={`sw-explorer-mag-${m}`}>{m}×</button>
-              ))}
-            </div>
-            <canvas ref={canvasRef} className="sw-ex-canvas" width={512} height={288} aria-label="Microscope field" />
-            {imageSession
-              ? <p className="sw-faint cw-mono" data-testid="sw-explorer-capture">{imageSession.experimentId} · {imageSession.epistemicStatus} · {imageSession.contentHash.slice(0, 16)}…</p>
-              : <p className="sw-faint" data-testid="sw-explorer-empty">{t('explorer.noCapture', locale)}</p>}
-            <HumanExperimentSessionInspector session={session} />
-          </div>
-        </div>
-        {/* Provenance and the full epistemic record: always available, never in the way. */}
-        {organ && (
-          <details className="sw-ex-provenance" data-testid="sw-explorer-provenance-details">
-            <summary>{t('explorer.provenance', locale)} · {organ.label} · {organ.epistemic}</summary>
+
+      </div>
+      <div className="human-tab" id="human-panel-research" role="tabpanel" aria-labelledby="human-tab-research" hidden={activeTab !== 'research'}>
+      <header className="sw-ex-head">
+        <span className="sw-badge" data-testid="sw-explorer-tier" title="Cinematic procedural presentation; geometry remains an illustrative scientific model.">{t('explorer.humanExplorer', locale).toUpperCase()} · {twinTier === 'LICENSED_CC0_ASSET' ? 'CC0' : 'PROXY'} · {t('explorer.anatomyModel', locale)}</span>
+        <span className="sw-badge sw-ex-scale" data-testid="sw-explorer-scale">{t('explorer.scale', locale)}: {levelLabel(level, locale)} · {SCALE_TEXT[level]}</span>
+        <span className={`sw-badge sw-ex-mode sw-ex-mode-${evidenceMode.toLowerCase()}`} data-testid="sw-explorer-evidence">{explorerTruthLabel(evidenceMode)}</span>
+      </header>          {organ && (
             <dl className="sw-ex-card">
               <dt>{organ.label}</dt><dd className="sw-faint">{organ.latinLabel ?? '—'} · {organ.system ? SYSTEM_LABEL_PL[organ.system] : '—'}</dd>
               <dt>{t('explorer.scale', locale)}</dt><dd className="cw-mono">{organ.scaleMeters} m · {organ.dimensionsMeters.x}×{organ.dimensionsMeters.y}×{organ.dimensionsMeters.z} m</dd>
               <dt>{t('explorer.evidence', locale)}</dt><dd className="cw-mono">{organ.epistemic} · {manifest.clinicalUse}</dd>
               <dt>Confidence / resolution</dt><dd className="cw-mono" data-testid="sw-explorer-source-metadata" title={organ.representation.provenance.description}>{organ.representation.confidence.status} / {organ.representation.resolution.status}</dd>
               <dt>Provenance</dt><dd className="cw-mono" data-testid="sw-explorer-provenance">{organ.representation.provenance.source}</dd>
+              <dt>Observation</dt><dd data-testid="sw-explorer-observation-status">No validated subject observation attached · illustrative generic model</dd>
             </dl>
-          </details>
-        )}
+          )}
+
+        <HumanExperimentSessionInspector session={session} />
+        {researchControls}
+      </div>
       </div>
     </section>
   );

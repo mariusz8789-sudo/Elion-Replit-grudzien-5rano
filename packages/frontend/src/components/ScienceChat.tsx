@@ -524,6 +524,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           window.location.hash = `#/lab/${run.result.route.labId}`;
         } else if (run.result.status === 'completed' && run.result.route.kind === 'product-route') {
           window.location.hash = productRouteHash(run.result.route, run.provenance.parameterSnapshot);
+          window.dispatchEvent(new Event('genesis-product-route'));
           setOpen(false);
         } else if (run.result.status === 'hypothetical_visualization' && run.result.route.kind === 'hypothetical-visualization') {
           const legendView = run.provenance.parameterSnapshot.viewMode === 'physics' ? '&legendView=physics' : '';

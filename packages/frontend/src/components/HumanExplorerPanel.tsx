@@ -101,7 +101,11 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
       if ([1, 5, 10].includes(years)) setLungYears(years as LungTimelineYears);
     };
     window.addEventListener('hashchange', syncFromRoute);
-    return () => window.removeEventListener('hashchange', syncFromRoute);
+    window.addEventListener('genesis-product-route', syncFromRoute);
+    return () => {
+      window.removeEventListener('hashchange', syncFromRoute);
+      window.removeEventListener('genesis-product-route', syncFromRoute);
+    };
   }, []);
   const selectedNode = manifest.nodes.find((node) => node.id === anatomy.selectedNodeId);
   useEffect(() => { setSystem(selectedNode?.kind === 'SYSTEM' ? selectedNode.system ?? null : null); }, [selectedNode]);

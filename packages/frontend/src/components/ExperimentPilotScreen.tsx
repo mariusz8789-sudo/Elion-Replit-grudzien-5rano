@@ -362,6 +362,7 @@ export function ExperimentPilotScreen() {
       window.location.hash = route.hash;
     } else if (route.kind === 'product-route') {
       window.location.hash = productRouteHash(route, run.provenance.parameterSnapshot);
+      window.dispatchEvent(new Event('genesis-product-route'));
     } else {
       setError('Ten wynik nie ma zarejestrowanej trasy wizualizacji.');
     }

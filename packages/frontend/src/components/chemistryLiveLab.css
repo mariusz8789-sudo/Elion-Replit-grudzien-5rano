@@ -47,10 +47,11 @@
 .cll-ptable-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; padding-bottom: 0.25rem; }
 .cll-ptable {
   display: grid;
-  grid-template-columns: repeat(18, minmax(1.9rem, 1fr));
+  grid-template-columns: repeat(18, minmax(1.55rem, 1fr));
   grid-template-rows: repeat(10, auto);
   gap: 2px;
-  min-width: 36rem;
+  /* Fits the desktop column without scrolling (18 × ~1.55rem); only phones scroll it sideways. */
+  min-width: 29.5rem;
 }
 .cll-el {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

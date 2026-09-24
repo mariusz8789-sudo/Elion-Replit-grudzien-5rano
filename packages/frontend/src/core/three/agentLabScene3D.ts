@@ -569,6 +569,10 @@ export class AgentLabScene3D implements Sim3D {
     twin.group.name = 'main-lab-human-presence';
     chamber.anchor.add(twin.group); this.twins.push(twin); this.spinners.push(twin.group);
     this.twinTier = twin.tier;
+    // This is the hero subject of the primary product world. Once the approved
+    // CC0 body has loaded, keep that body visible instead of silently dropping
+    // back to the blocky proxy merely because the lab camera is in VISOR mode.
+    this.twinLodPreference = 'FULL';
     this.twinAnchor = chamber.anchor;
     void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
     createHeroLight(THREE, scene, { target: [0, 1.3, 0.4], keyDistance: 3.4, rimDistance: 2.5, intensity: { key: 12, rim: 3.2 }, color: { key: 0xeaf4ff, rim: 0x7fdcff }, castShadow: false });

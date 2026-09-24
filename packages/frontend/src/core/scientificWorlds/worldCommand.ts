@@ -73,6 +73,12 @@ const VERBS: Readonly<Record<Exclude<WorldCommandIntent, 'ASK'>, readonly string
 const CLAUSE_SPLIT = /(?:[.;!?]\s*|\s+(?:potem|nastepnie|a nastepnie|a potem|then|and then|oraz potem)\s+)/;
 
 const COMPOSITIONS: readonly string[] = ['NaCl', 'SrTiO3', 'MgO', 'Cu', 'Fe'];
+const TITRATION_ACIDS: readonly { readonly id: string; readonly names: readonly string[] }[] = [
+  { id: 'acetic', names: ['octow', 'acetic'] },
+  { id: 'formic', names: ['mrowk', 'formic'] },
+  { id: 'benzoic', names: ['benzoes', 'benzoic'] },
+  { id: 'hcn', names: ['cyjanowodor', 'hcn'] },
+];
 
 /**
  * Every intent a clause carries, in execution order: "idź do X i uruchom Y"
@@ -107,6 +113,11 @@ function findStation(clause: string, catalog: CommandCatalog): StationDescriptor
 function extractParameters(original: string, clause: string, intent: WorldCommandIntent): Record<string, CommandParameterValue> {
   const p: Record<string, CommandParameterValue> = {};
   for (const c of COMPOSITIONS) { if (new RegExp(`\\b${c}\\b`, 'i').test(original)) { p.composition = c; break; } }
+  for (const acid of TITRATION_ACIDS) {
+    if (acid.names.some((name) => clause.includes(name))) { p.acid = acid.id; break; }
+  }
+  const titrationVolume = clause.match(/(\d+(?:[.,]\d+)?)\s*ml/);
+  if (titrationVolume && /miarecz|titr|naoh|biuret|burett/.test(clause)) p.vb = Number(titrationVolume[1].replace(',', '.'));
   const tev = clause.match(/(\d+(?:[.,]\d+)?)\s*tev/);
   if (tev) p.sqrtSGeV = Math.round(Number(tev[1].replace(',', '.')) * 1000);
   const add = clause.match(/(?:prog\w*|threshold)\s*(?:add)?\s*(\d+(?:[.,]\d+)?)/);

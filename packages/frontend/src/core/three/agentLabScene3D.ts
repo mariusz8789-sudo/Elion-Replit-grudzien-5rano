@@ -36,6 +36,7 @@ import { createHolographicResearchCompanion, type HolographicResearchCompanion }
 import { createPremiumLabDetail, type PremiumLabDetailHandle } from './premiumLabDetail';
 import { createPremiumHumanDetail, type PremiumHumanDetailHandle } from './premiumHumanDetail';
 import { createSpacetimePhotonArtifact3D, updateSpacetimePhotonArtifact3D } from './spacetimePhotonArtifact3D';
+import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
 
 /**
  * SCIENTIFIC WORLDS — THE AGENT LABORATORY (Sim3D).
@@ -80,6 +81,8 @@ interface StationVisual {
   readonly artifactAnchor?: THREE_NS.Group;
   readonly leds?: readonly THREE_NS.MeshStandardMaterial[];
   readonly twin?: TwinHandle;
+  /** Chemistry station: a schematic droplet shown only while the real runner is in EXECUTING. */
+  readonly procedureDroplet?: THREE_NS.Mesh;
 }
 
 const FLOOR_Y = 0;
@@ -368,6 +371,23 @@ export class AgentLabScene3D implements Sim3D {
       }
       bondGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
       g.add(new THREE.LineSegments(bondGeo, new THREE.LineBasicMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.45 })));
+    } else if (artifact.kind === 'titration') {
+      // Final apparatus state is derived only from the sealed canonical model result.
+      // The colour is a deliberately schematic pH indicator, not measured wet-lab telemetry.
+      const acidic = artifact.ph < 6.5; const basic = artifact.ph > 8;
+      const indicatorColor = acidic ? 0xf0b35c : basic ? 0xc084fc : 0x62f0a3;
+      const flaskFill = Math.min(0.34, 0.12 + (artifact.vb / 60) * 0.22);
+      const flaskLiquid = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12 + flaskFill * 0.2, 0.205, flaskFill, 24),
+        new THREE.MeshPhysicalMaterial({ color: indicatorColor, roughness: 0.18, metalness: 0, transparent: true, opacity: 0.72, emissive: indicatorColor, emissiveIntensity: 0.12 }),
+      );
+      flaskLiquid.position.set(0.25, 0.92 + flaskFill / 2, -0.08); g.add(flaskLiquid);
+      const remaining = Math.max(0, 1 - artifact.vb / 60);
+      if (remaining > 0) {
+        const h = 0.72 * remaining;
+        const buretteLiquid = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, h, 12), new THREE.MeshStandardMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.82, emissive: 0x164e63, emissiveIntensity: 0.25 }));
+        buretteLiquid.position.set(0.25, 2.05 + (0.72 - h) / 2, -0.08); g.add(buretteLiquid);
+      }
     } else if (artifact.kind === 'collision') {
       const pts: number[] = []; const cols: number[] = [];
       for (const f of artifact.finals) {
@@ -639,7 +659,26 @@ export class AgentLabScene3D implements Sim3D {
     const status = createEmissiveInstrumentMaterial(THREE, { color: 0x38bdf8, intensity: 0.7, baseColor: 0x0f1a26 }) as THREE_NS.MeshStandardMaterial;
     let screen: StationVisual['screen'];
     const light = createPracticalLight(THREE, scene, { position: [st.position.x + Math.sin(st.facing) * 0.6, 1.9, st.position.z + Math.cos(st.facing) * 0.6], color: 0x9fd7f9, intensity: 2.4, distance: 4, decay: 2 });
-    if (st.kind === 'synthesizer') {
+    if (st.kind === 'titration') {
+      group.add(createBench(THREE, { position: [0, 0, 0], width: 2.4, depth: 1.2, height: 0.88, topMaterial: palette.CERAMIC, legMaterial: palette.PAINTED_METAL }));
+      const glass = labGlass(THREE, 0xcfe9ff);
+      // Burette, stopcock and receiving flask form a readable apparatus silhouette from both cameras.
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.55, 12), palette.POLISHED_METAL); stand.position.set(-0.15, 1.68, -0.08); group.add(stand);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.05, 0.45), palette.BRUSHED_METAL); base.position.set(-0.05, 0.915, -0.08); group.add(base);
+      const burette = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.82, 18, 1, true), glass); burette.position.set(0.25, 2.05, -0.08); group.add(burette);
+      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.022, 0.2, 10), glass); tip.position.set(0.25, 1.54, -0.08); group.add(tip);
+      const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.06), palette.POLISHED_METAL); clamp.position.set(0.05, 2.08, -0.08); group.add(clamp);
+      const stopcock = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.035), status); stopcock.position.set(0.25, 1.66, -0.08); group.add(stopcock);
+      const flask = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.23, 0.42, 24, 1, true), glass); flask.position.set(0.25, 1.12, -0.08); group.add(flask);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.18, 18, 1, true), glass); neck.position.set(0.25, 1.42, -0.08); group.add(neck);
+      const droplet = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), createEmissiveInstrumentMaterial(THREE, { color: 0x8fd3ff, intensity: 0.6, baseColor: 0x164e63 }));
+      droplet.scale.y = 1.5; droplet.visible = false; group.add(droplet);
+      const readout = makeReadoutSurface(THREE, 384, 224); screen = readout;
+      group.add(createMonitor(THREE, { position: [-0.72, 0.88, -0.28], width: 0.92, height: 0.56, standHeight: 0.12, frameMaterial: palette.PAINTED_METAL, screenMaterial: createScreenMaterial(THREE, readout.texture, { emissiveIntensity: 0.9 }) }));
+      this.stations.set(st.id, { station: st, group, statusMaterial: status, light, screen, artifactGroup: null, procedureDroplet: droplet });
+      this.drawIdleScreen(readout, st);
+      return;
+    } else if (st.kind === 'synthesizer') {
       group.add(createBench(THREE, { position: [0, 0, 0], width: 2.4, depth: 1.2, height: 0.9, topMaterial: palette.BRUSHED_METAL, legMaterial: palette.PAINTED_METAL }));
       const glass = labGlass(THREE, 0xd8f2ff);
       // Chamber at the back of the bench, console at the front edge: from the operator's standoff the hands and the lattice are both in frame.
@@ -719,6 +758,22 @@ export class AgentLabScene3D implements Sim3D {
       ctx.fillText('SYNTEZA · ESTYMATA', 14, 30);
       ctx.fillStyle = '#e6f2ec'; ctx.font = `${Math.round(canvas.height * 0.08)}px monospace`;
       ctx.fillText(artifact.name, 14, 66); ctx.fillText(`${artifact.lattice} · a=${artifact.aPm} pm`, 14, 94); ctx.fillText(`${artifact.sites.length} węzłów`, 14, 122);
+    } else if (artifact.kind === 'titration') {
+      ctx.fillText('MIARECZKOWANIE · MODEL', 14, 28);
+      const x0 = 30; const y0 = canvas.height - 38; const w = canvas.width - 54; const h = canvas.height - 92;
+      ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.moveTo(x0, y0); ctx.lineTo(x0, y0 - h); ctx.stroke();
+      ctx.strokeStyle = '#5cd6e8'; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 60; i++) {
+        const point = runTitrationScenario({ acid: artifact.acid, vb: i });
+        const x = x0 + (i / 60) * w; const y = y0 - (point.ph / 14) * h;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      const markerX = x0 + (artifact.vb / 60) * w; const markerY = y0 - (artifact.ph / 14) * h;
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(markerX, markerY, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#f0b35c'; ctx.setLineDash([3, 3]); ctx.beginPath(); const eqX = x0 + (artifact.veq / 60) * w; ctx.moveTo(eqX, y0); ctx.lineTo(eqX, y0 - h); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#e6f2ec'; ctx.font = `${Math.round(canvas.height * 0.06)}px monospace`;
+      ctx.fillText(`${artifact.vb.toFixed(1)} mL NaOH · pH ${artifact.ph.toFixed(2)} · Veq ${artifact.veq.toFixed(1)} mL`, 14, canvas.height - 10);
     } else if (artifact.kind === 'collision') {
       ctx.fillText('ZDERZENIE · TOY MC', 14, 30);
       ctx.fillStyle = '#e6f2ec'; ctx.font = `${Math.round(canvas.height * 0.08)}px monospace`;
@@ -776,10 +831,14 @@ export class AgentLabScene3D implements Sim3D {
       const base = active ? 1.8 + 0.6 * Math.sin(this.time * 6) : highlighted ? 1.3 : 0.7;
       v.statusMaterial.emissiveIntensity += (base - v.statusMaterial.emissiveIntensity) * 0.15;
       v.light.intensity += ((active ? 4.5 : 2.4) - v.light.intensity) * 0.1;
+      if (v.procedureDroplet) {
+        v.procedureDroplet.visible = u?.stationId === v.station.id && u.state === 'EXECUTING';
+        v.procedureDroplet.position.set(0.25, 1.57 - ((this.time * 0.9) % 1) * 0.12, -0.08);
+      }
       if (v.artifactGroup) {
         const spacetime = v.artifactGroup.children.find((child) => child.name === 'artifact:spacetime') as THREE_NS.Group | undefined;
         if (spacetime) updateSpacetimePhotonArtifact3D(spacetime, this.time);
-        else v.artifactGroup.rotation.y = this.time * 0.35;
+        else if (v.artifactGroup.name !== 'artifact:titration') v.artifactGroup.rotation.y = this.time * 0.35;
       }
     }
     for (const b of this.beacons) b.emissiveIntensity = 0.9 + 0.7 * (0.5 + 0.5 * Math.sin(this.time * 2.6));

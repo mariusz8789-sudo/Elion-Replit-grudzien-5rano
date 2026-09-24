@@ -13,7 +13,7 @@ import type { CommandCatalog, StationDescriptor } from './worldCommand';
 
 /** Stations of the human-biology lab (V3 pack): the ids are the pack's own `station:*` ids, unchanged. */
 export type BiologyStationKind = 'human-study' | 'neuro' | 'microscopy' | 'histology' | 'imaging' | 'orpheus' | 'compute' | 'evidence' | 'safety';
-export type StationKind = 'synthesizer' | 'collider' | 'epidemiology' | 'window' | 'airlock' | BiologyStationKind;
+export type StationKind = 'synthesizer' | 'titration' | 'collider' | 'epidemiology' | 'window' | 'airlock' | BiologyStationKind;
 
 export interface LabStation extends StationDescriptor {
   readonly kind: StationKind;
@@ -43,6 +43,11 @@ export const LAB_STATIONS: readonly LabStation[] = [
     id: 'st-synthesizer', kind: 'synthesizer', label: 'Syntezator kryształów', experimentId: 'crystal-synthesis',
     keywords: ['syntezator', 'syntezatora', 'syntezatorze', 'synteza', 'syntezie', 'kryształ', 'krysztal', 'crystal', 'synthesizer', 'lattice', 'sieć krystaliczna'],
     position: { x: -4.2, z: -3.2 }, facing: 0, standoff: 1.3, consoleHeight: 0.95, footprint: fp(-4.2, -3.2, 2.4, 1.2),
+  },
+  {
+    id: 'st-titration', kind: 'titration', label: 'Stanowisko miareczkowania', experimentId: 'chemistry-titration',
+    keywords: ['stanowisko miareczkowania', 'miareczkowanie', 'miareczkowania', 'miareczkuj', 'titracja', 'titracji', 'titration', 'kwas-zasada', 'kwas zasada', 'biureta', 'burette'],
+    position: { x: 4.25, z: 2.55 }, facing: Math.PI, standoff: 1.25, consoleHeight: 0.98, footprint: fp(4.25, 2.55, 2.4, 1.2),
   },
   {
     id: 'st-collider', kind: 'collider', label: 'Konsola zderzacza', experimentId: 'collision-batch',

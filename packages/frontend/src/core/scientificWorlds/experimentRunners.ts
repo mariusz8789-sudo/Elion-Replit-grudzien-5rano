@@ -8,6 +8,7 @@ import { DEFAULT_EPIDEMIC, simulateEpidemic, type EpidemicParams, type EpidemicP
 import { canonicalJson } from '../events/hash';
 import type { ExperimentRunResult, ExperimentRunner, SessionInputs } from './experimentSession';
 import { ION_PRESETS } from './ionPresets';
+import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
 
 /**
  * SCIENTIFIC WORLDS — EXPERIMENT RUNNERS.
@@ -23,14 +24,18 @@ import { ION_PRESETS } from './ionPresets';
  * a model to a fact.
  */
 
-export type LabExperimentId = 'crystal-synthesis' | 'collision-batch' | 'micro-blackhole' | 'seir-epidemic' | 'spacetime-photon';
+export type LabExperimentId = 'crystal-synthesis' | 'chemistry-titration' | 'collision-batch' | 'micro-blackhole' | 'seir-epidemic' | 'spacetime-photon';
 
 export interface CrystalArtifact { readonly kind: 'crystal'; readonly sites: readonly LatticeSite[]; readonly lattice: string; readonly name: string; readonly aPm: number; }
 export interface CollisionArtifact { readonly kind: 'collision'; readonly finals: readonly FinalParticle[]; readonly process: string; readonly eventId: string; readonly batchSize: number; }
 export interface BlackHoleArtifact { readonly kind: 'blackhole'; readonly formed: boolean; readonly rsM: number | null; readonly temperatureK: number | null; }
 export interface EpidemicArtifact { readonly kind: 'epidemic'; readonly series: readonly EpidemicPoint[]; readonly params: EpidemicParams; }
 export interface SpacetimeArtifact { readonly kind: 'spacetime'; readonly report: SpacetimePhotonReport; }
-export type LabArtifact = CrystalArtifact | CollisionArtifact | BlackHoleArtifact | EpidemicArtifact | SpacetimeArtifact;
+export interface TitrationArtifact {
+  readonly kind: 'titration'; readonly acid: string; readonly acidName: string; readonly ka: number;
+  readonly vb: number; readonly ph: number; readonly veq: number; readonly pKa: number;
+}
+export type LabArtifact = CrystalArtifact | TitrationArtifact | CollisionArtifact | BlackHoleArtifact | EpidemicArtifact | SpacetimeArtifact;
 
 const CTX = (worldId: string) => ({ kernelId: 'genesis-cyber-kernel', route: '#/scientific-worlds', operatorId: `AGENT:${worldId}` });
 
@@ -58,6 +63,28 @@ export function epidemicParamsFrom(inputs: SessionInputs): EpidemicParams {
 export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedger): ExperimentRunner<LabArtifact> {
   return (experimentId, seed, inputs): ExperimentRunResult<LabArtifact> => {
     switch (experimentId as LabExperimentId) {
+      case 'chemistry-titration': {
+        // This is the same bounded charge-balance runner exposed by the canonical backend Fabric model.
+        // The lab's default ends at equivalence so a bare "run titration" command produces an observable procedure.
+        const acid = str(inputs.acid, 'acetic');
+        const vb = num(inputs.vb, 25);
+        const result = runTitrationScenario({ acid, vb });
+        const record = ledger.addRecord({
+          sourceUrl: `genesis://worlds/${worldId}/chemistry-titration/${seed}`,
+          sourceTimestamp: null,
+          claim: `Weak-acid/NaOH charge-balance scenario acid=${result.acid} vb=${result.vb}mL pH=${result.ph} Veq=${result.veq}mL`,
+          claimType: 'model', confidence: 1,
+          provenance: { sourceKind: 'dataset', retrievedBy: 'chemistry-titration-shared-runner', independentSourceIds: [] },
+        });
+        return {
+          outputs: { acid: result.acid, acidName: result.acidName, ka: result.ka, vb: result.vb, ph: result.ph, veq: result.veq, pKa: result.pKa },
+          evidenceHashes: [record.record.contentHash],
+          epistemicStatus: 'MODEL',
+          engineLabel: 'Genesis weak-acid charge-balance titration (shared frontend/backend runner)',
+          steps: ['bounded weak-acid scenario', 'NaOH dose', 'charge-balance root solve with water autoionisation', 'pH and equivalence state', 'ledger commit'],
+          artifact: { kind: 'titration', ...result },
+        };
+      }
       case 'crystal-synthesis': {
         const p = kernelRegistry.resolve('crystal-synthesis-sim');
         if (!p) throw new Error('MATERIALS_PROVIDER_NOT_REGISTERED');

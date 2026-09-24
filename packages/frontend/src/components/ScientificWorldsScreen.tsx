@@ -33,6 +33,7 @@ import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 import { EXPLORER_ORGANS, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -52,6 +53,7 @@ import { EXPLORER_ORGANS, explorerCommands } from '../core/scientificWorlds/huma
 const STATE_NAMES: readonly AgentActionState[] = ['IDLE', 'MOVING_TO_TARGET', 'ARRIVED', 'ALIGNING', 'REACHING', 'INTERACTING', 'EXECUTING', 'OBSERVING', 'REPORTING', 'RETURNING', 'BLOCKED'];
 
 export const QUICK_COMMANDS: readonly { readonly label: string; readonly text: string }[] = [
+  { label: 'Miareczkowanie', text: 'Podejdź do stanowiska miareczkowania i przeprowadź titrację kwasu octowego, dodając 25 mL NaOH. Potem pokaż wynik i dowody.' },
   { label: 'Synteza NaCl', text: 'Idź do syntezatora kryształów i uruchom próbę NaCl. Potem pokaż mi, co otrzymałeś i skąd to pochodzi.' },
   { label: 'Zderzacz 13 TeV', text: 'Podejdź do konsoli zderzacza i uruchom paczkę zderzeń przy 13 TeV.' },
   { label: 'Epidemia', text: 'Idź do pulpitu epidemiologicznego i zasymuluj epidemię.' },
@@ -144,6 +146,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [level, setLevel] = useState<GuideLevel>('EXPLORER');
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [chemistryCardOpen, setChemistryCardOpen] = useState(true);
   const [frames, setFrames] = useState(0);
   const logicalTime = useRef(0);
   const nextId = useRef(1);
@@ -190,6 +193,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         setSessions((list) => [...list.slice(-40), sealed]);
         if (world === 'biology') setBioArtifact(artifact as BiologyArtifact);
         if (sealed.stationId) sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
+        if (sealed.experimentId === 'chemistry-titration') setChemistryCardOpen(true);
         sim.noteSealedSession(sealed);
       }
       if (u.interaction && u.interaction.stationId === 'station:human-study') {
@@ -301,6 +305,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   };
   const station = stationId ? def.stations.find((s) => s.id === stationId) ?? null : null;
   const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
+  const titrationResult = session?.experimentId === 'chemistry-titration' ? {
+    acid: String(session.outputs.acid), acidName: String(session.outputs.acidName),
+    vb: Number(session.outputs.vb), ph: Number(session.outputs.ph), veq: Number(session.outputs.veq), pKa: Number(session.outputs.pKa),
+  } : null;
 
   const researchControls = <>
       <section className="sw-hud sw-hud-status" aria-label="Stan agenta" data-testid="sw-status">
@@ -411,6 +419,26 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       )}
       {loading && <div className="sw-loading" role="status">Ładowanie laboratorium…</div>}
       {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
+
+      {world === 'physics' && chemistryCardOpen && titrationResult && (
+        <aside className="sw-chemistry-context" aria-label="Wynik miareczkowania" data-testid="sw-titration-context">
+          <div className="sw-chemistry-head">
+            <div><span>CHEMIA · MODEL OBLICZENIOWY</span><strong>pH {titrationResult.ph.toFixed(2)}</strong></div>
+            <button type="button" className="sw-context-close" onClick={() => setChemistryCardOpen(false)} aria-label="Zamknij wynik miareczkowania">×</button>
+          </div>
+          <p>{titrationResult.acidName.split(' (')[0]} · {titrationResult.vb.toFixed(1)} mL NaOH · {titrationRegion(titrationResult.vb, titrationResult.veq)}</p>
+          <details>
+            <summary>Otwórz wykres</summary>
+            <svg className="sw-titration-plot" viewBox="0 0 300 100" role="img" aria-label="Krzywa pH względem objętości NaOH">
+              <path d="M0 100H300M0 0V100" />
+              <polyline points={titrationPolyline(titrationResult.acid)} />
+              <line x1={(titrationResult.veq / 60) * 300} x2={(titrationResult.veq / 60) * 300} y1="0" y2="100" />
+              <circle cx={(titrationResult.vb / 60) * 300} cy={100 - (titrationResult.ph / 14) * 100} r="3" />
+            </svg>
+            <small>Bilans ładunku · Veq {titrationResult.veq.toFixed(1)} mL · pKa {titrationResult.pKa.toFixed(2)}. Aparatura jest rekonstrukcją edukacyjną, nie telemetrią wet-lab.</small>
+          </details>
+        </aside>
+      )}
 
       {world !== 'biology' && researchControls}
       {world === 'biology' && explorerOpen && (

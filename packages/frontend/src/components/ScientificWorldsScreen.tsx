@@ -142,7 +142,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [surface, setSurface] = useState<TwinSurfaceMode>('NORMAL');
   const [voice, setVoice] = useState(false);
   const [level, setLevel] = useState<GuideLevel>('EXPLORER');
-  const [evidenceOpen, setEvidenceOpen] = useState(world !== 'biology');
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [frames, setFrames] = useState(0);
   const logicalTime = useRef(0);
   const nextId = useRef(1);
@@ -304,10 +305,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const researchControls = <>
       <section className="sw-hud sw-hud-status" aria-label="Stan agenta" data-testid="sw-status">
         <div className="sw-badges">
-          <span className="sw-badge">ŚWIAT: {def.label}</span>
-          <span className="sw-badge" data-testid="sw-agent-state">AGENT: {AGENT_STATE_LABEL_PL[agentState]}</span>
+          <span className="sw-badge">GENESIS · {def.label}</span>
+          <span className="sw-badge" data-testid="sw-agent-state">{AGENT_STATE_LABEL_PL[agentState]}</span>
           {station && <span className="sw-badge">STANOWISKO: {station.label}</span>}
-          <span className="sw-badge" data-testid="sw-camera-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : camera === 'TWIN' ? 'BLIŹNIAK' : 'OBSERWATOR'}</span>
+          <span className="sw-badge sw-research-only" data-testid="sw-camera-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : camera === 'TWIN' ? 'BLIŹNIAK' : 'OBSERWATOR'}</span>
           {world === 'biology' && <span className="sw-badge" data-testid="sw-twin" data-tier={twinTier} data-lod={twinLod?.level ?? 'PROXY_LOW'} data-lod-diagnostics={JSON.stringify(twinLod)} data-load-state={twinLoad.status} data-load-reason={twinLoad.reason} data-load-diagnostics={JSON.stringify(twinLoad)}>
             {twinLoad.status === 'LOADING' ? 'Ładowanie modelu człowieka…' : `BLIŹNIAK: ${anatomy.displayMode} · ${anatomy.selectedNodeId} · ${humanTwinProvenanceLabel(twinTier)}`}
           </span>}
@@ -324,7 +325,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         </div>
         {agentState !== 'IDLE' && agentState !== 'BLOCKED' && <div className="sw-progress" aria-hidden="true"><span style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
         {blocked && <p className="cw-error" role="alert" data-testid="sw-blocked">Zablokowany: {blocked}</p>}
-        <div className="sw-actions">
+        {controlsOpen && <div className="sw-actions sw-research-only">
           <button type="button" className="sw-btn" onClick={toggleCamera} data-testid="sw-camera">{camera === 'VISOR' ? 'Kamera obserwatora' : 'Wróć do wizjera'}</button>
           <button type="button" className={`sw-btn${voice ? ' is-on' : ''}`} onClick={() => setVoice((v) => !v)} aria-pressed={voice} data-testid="sw-voice">Głos {voice ? 'wł.' : 'wył.'}</button>
           {world === 'biology' && <>
@@ -334,7 +335,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           <select className="sw-select" value={level} onChange={(e) => setLevel(e.target.value as GuideLevel)} aria-label="Poziom narracji" data-testid="sw-level">
             <option value="EXPLORER">Odkrywca</option><option value="SCIENTIST">Naukowiec</option><option value="AUDITOR">Audytor</option>
           </select>
-        </div>
+        </div>}
       </section>
 
       <section className={`sw-hud sw-hud-evidence${evidenceOpen ? '' : ' is-collapsed'}`} aria-label="Dowody i sesja" data-testid="sw-evidence">
@@ -373,16 +374,26 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
 </>;
   const commandControls = (
       <section className="sw-hud sw-hud-command" aria-label="Polecenia" data-testid="sw-command">
-        <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">
-          {transcript.map((e) => <li key={e.id} className={`sw-line sw-line-${e.who}`}>{e.text}</li>)}
-        </ol>
-        <form className="sw-form" onSubmit={onSubmit}>
-          <input className="sw-input" value={text} onChange={(e) => setText(e.target.value)} placeholder={world === 'biology' ? 'Napisz polecenie, np. „Otwórz wirtualnego człowieka, pokaż mózg”' : 'Napisz polecenie, np. „Idź do syntezatora i uruchom próbę NaCl”'} aria-label="Polecenie dla agenta" data-testid="sw-input" />
-          <button type="submit" className="sw-btn sw-btn-primary" data-testid="sw-send">Wyślij</button>
-          <button type="button" className="sw-btn" onClick={() => requestOpenScienceChat()} data-testid="sw-ask">Zapytaj</button>
-        </form>
-        <div className="sw-quick">
-          {def.quick.map((q) => <button key={q.label} type="button" className="sw-chip" onClick={() => submit(q.text)} data-testid={`sw-quick-${q.label.split(' ')[0].toLowerCase()}`}>{q.label}</button>)}
+        <div className="sw-lab-primary">
+          <button type="button" className="sw-btn sw-btn-primary" onClick={() => requestOpenScienceChat()} data-testid="sw-ask">✦ Zapytaj Genesis</button>
+          {world === 'physics' && <nav className="sw-domain-rail" aria-label="Strefy laboratorium">
+            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat()}>Drug Discovery</button>
+            <button type="button" className="sw-chip" onClick={() => submit('Idź do syntezatora')}>Chemistry</button>
+            <button type="button" className="sw-chip" onClick={() => submit('Idź do konsoli zderzacza')}>Physics</button>
+          </nav>}
+          <button type="button" className="sw-btn" onClick={() => setControlsOpen((open) => !open)} aria-expanded={controlsOpen} aria-controls="sw-advanced-controls">{controlsOpen ? 'Ukryj sterowanie' : 'Sterowanie'}</button>
+        </div>
+        <div id="sw-advanced-controls" className="sw-advanced-controls" hidden={!controlsOpen}>
+          <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">
+            {transcript.map((e) => <li key={e.id} className={`sw-line sw-line-${e.who}`}>{e.text}</li>)}
+          </ol>
+          <form className="sw-form" onSubmit={onSubmit}>
+            <input className="sw-input" value={text} onChange={(e) => setText(e.target.value)} placeholder={world === 'biology' ? 'Polecenie dla laboratorium' : 'Zaawansowane polecenie dla stanowiska'} aria-label="Polecenie dla agenta" data-testid="sw-input" />
+            <button type="submit" className="sw-btn sw-btn-primary" data-testid="sw-send">Wykonaj</button>
+          </form>
+          <div className="sw-quick">
+            {def.quick.map((q) => <button key={q.label} type="button" className="sw-chip" onClick={() => submit(q.text)} data-testid={`sw-quick-${q.label.split(' ')[0].toLowerCase()}`}>{q.label}</button>)}
+          </div>
         </div>
       </section>
   );

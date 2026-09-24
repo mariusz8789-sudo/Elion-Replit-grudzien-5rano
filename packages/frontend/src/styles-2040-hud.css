@@ -418,11 +418,24 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-input { flex: 1; min-width: 0; background: rgba(2, 6, 14, 0.7) !important; border: 1px solid rgba(98, 240, 163, 0.35); color: #eafff4; font: inherit; font-size: 0.9rem; padding: 0.55rem 0.7rem; border-radius: 6px; }
 .sw-quick { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .sw-chip { background: rgba(2, 6, 14, 0.55); border: 1px solid rgba(125, 211, 252, 0.3); color: #9fd7f9; font: inherit; font-size: 0.68rem; padding: 0.25rem 0.55rem; border-radius: 999px; cursor: pointer; }
+.sw-research-only { display: none; }
+.sw-lab-primary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; padding: 0.45rem; border: 1px solid rgba(125, 211, 252, 0.18); border-radius: 10px; background: rgba(2, 8, 17, 0.82); backdrop-filter: blur(12px); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28); }
+.sw-lab-primary > .sw-btn-primary { min-height: 42px; padding-inline: 0.85rem; }
+.sw-domain-rail { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 0.3rem; }
+.sw-domain-rail .sw-btn { min-height: 38px; }
+.sw-advanced-controls { display: flex; flex-direction: column; gap: 0.45rem; max-height: min(46vh, 430px); overflow: auto; overscroll-behavior: contain; }
+.sw-advanced-controls[hidden] { display: none; }
 @media (max-width: 900px) {
   .sw-hud-status { width: 58vw; padding: 0.6rem; }
   .sw-hud-evidence { width: 42vw; max-height: 40vh; padding: 0.6rem; }
   .sw-hud-evidence.is-collapsed { width: auto; }
   .sw-hud-command { width: 100vw; padding: 0.5rem 0.6rem calc(4.2rem + var(--safe-bottom)); }
+  .sw-lab-primary { gap: 0.3rem; padding: 0.35rem; }
+  .sw-lab-primary > .sw-btn-primary { flex: 1 1 100%; }
+  .sw-domain-rail { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .sw-domain-rail::-webkit-scrollbar { display: none; }
+  .sw-domain-rail .sw-btn { flex: 0 0 auto; }
+  .sw-advanced-controls { max-height: 34dvh; }
   .sw-transcript { max-height: 18vh; font-size: 0.72rem; }
   .sw-badge { font-size: 0.52rem; }
   .sw-btn, .sw-chip, .sw-input { min-height: 40px; }

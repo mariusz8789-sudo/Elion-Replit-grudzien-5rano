@@ -14,10 +14,16 @@ describe('ScientificWorldsScreen — static render (no WebGL)', () => {
   it('renders the canvas, the visor, the three HUD safe zones, an empty transcript and no session', () => {
     expect(html).toContain('data-testid="scientific-worlds"');
     expect(html).toContain('data-agent-state="IDLE"');
-    for (const id of ['sw-canvas', 'sw-visor', 'sw-status', 'sw-evidence', 'sw-command', 'sw-input', 'sw-send', 'sw-camera', 'sw-voice', 'sw-level', 'sw-no-session', 'sw-quick-synteza']) expect(html).toContain(`data-testid="${id}"`);
+    for (const id of ['sw-canvas', 'sw-visor', 'sw-status', 'sw-evidence', 'sw-command', 'sw-input', 'sw-send', 'sw-quick-synteza']) expect(html).toContain(`data-testid="${id}"`);
+    for (const id of ['sw-camera', 'sw-voice', 'sw-level']) expect(html).not.toContain(`data-testid="${id}"`);
     expect(html).not.toContain('data-testid="sw-session"');
     expect(html).not.toContain('sw-line-');
-    expect(html).toContain('AGENT: bezczynny');
+    expect(html).toContain('GENESIS · LABORATORIUM');
+    expect(html).toContain('>bezczynny<');
+    expect(html).toContain('aria-expanded="false"');
+    for (const domain of ['Drug Discovery', 'Chemistry', 'Physics']) expect(html).toContain(domain);
+    expect(html).toContain('id="sw-advanced-controls"');
+    expect(html).toContain('hidden=""');
   });
   it('every quick command parses into at least one command the lab accepts', () => {
     for (const q of QUICK_COMMANDS) {

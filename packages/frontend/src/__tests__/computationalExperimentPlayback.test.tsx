@@ -61,4 +61,13 @@ describe('ComputationalExperimentPlayback', () => {
     expect((school.match(/data-event-type=/g) ?? []).length).toBe(events.length);
     expect((research.match(/data-event-type=/g) ?? []).length).toBe(events.length);
   });
+
+  it('keeps raw fingerprints behind the explicit Research depth', () => {
+    const school = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} level="SCHOOL" />);
+    const research = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} level="RESEARCH" />);
+    expect(school).not.toContain('input-fp');
+    expect(school).not.toContain('output-fp');
+    expect(research).toContain('input-fp');
+    expect(research).toContain('output-fp');
+  });
 });

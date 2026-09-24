@@ -211,7 +211,6 @@ const MERGE_STATUS_LABEL: Record<MergeRequest['status'], string> = {
 function ProjectDetail({ project, onBack }: { project: Project; onBack: () => void }) {
   useEffect(() => {
     setActiveKnowledgeProject(project);
-    return () => setActiveKnowledgeProject(null);
   }, [project]);
 
   const [members, setMembers] = useState<Member[] | null>(null);

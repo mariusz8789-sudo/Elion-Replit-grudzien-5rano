@@ -42,12 +42,15 @@ function recordedDetail(value: unknown): string {
 
 export function experimentPlaybackStages(input: Props): readonly PlaybackStage[] {
   const { plan, result, replay, evidenceProposalCount, executing } = input;
+  const showResearchIdentifiers = input.level === 'RESEARCH';
   const executed = result?.status === 'EXECUTED_COMPUTATIONAL_EXPERIMENT';
   const blocked = Boolean(result && !executed);
   return [
     {
       id: 'input', label: '1 · Input locked', state: plan ? 'RECORDED' : 'WAITING',
-      detail: plan ? `${plan.requestedCapability} · ${plan.inputFingerprint}` : 'No governed plan yet',
+      detail: plan
+        ? `${plan.requestedCapability}${showResearchIdentifiers ? ` · ${plan.inputFingerprint}` : ''}`
+        : 'No governed plan yet',
     },
     {
       id: 'engine', label: '2 · Registered engine', state: executing ? 'RUNNING' : blocked ? 'BLOCKED' : result ? 'RECORDED' : 'WAITING',
@@ -58,7 +61,9 @@ export function experimentPlaybackStages(input: Props): readonly PlaybackStage[]
     },
     {
       id: 'result', label: '3 · Computational result', state: blocked ? 'BLOCKED' : executed ? 'RECORDED' : 'WAITING',
-      detail: executed ? `${result.epistemicClassification} · ${result.outputFingerprint ?? 'fingerprint unavailable'}` : result?.reason ?? 'No result recorded',
+      detail: executed
+        ? `${result.epistemicClassification}${showResearchIdentifiers ? ` · ${result.outputFingerprint ?? 'fingerprint unavailable'}` : ''}`
+        : result?.reason ?? 'No result recorded',
     },
     {
       id: 'evidence', label: '4 · Evidence proposal', state: evidenceProposalCount > 0 ? 'RECORDED' : executed ? 'WAITING' : blocked ? 'BLOCKED' : 'WAITING',

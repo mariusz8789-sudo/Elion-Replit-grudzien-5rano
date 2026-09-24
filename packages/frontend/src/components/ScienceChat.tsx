@@ -36,6 +36,12 @@ import { createLedgerSink } from '../core/scientificWorlds/biologyRunners';
 import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
+import { UnifiedResearchJourney } from './UnifiedResearchJourney';
+import {
+  drugDiscoveryRequestFromMessage,
+  resolveResearchProject,
+  type DrugDiscoveryChatRequest,
+} from '../core/scienceChat/unifiedResearchJourney';
 
 /** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
  * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
@@ -398,6 +404,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   // Research Campaign — the last real Research Cycle this conversation ran, so
   // "kontynuuj badanie" can advance it by EXACTLY its own real nextExperiment.request.
   const [lastResearchCycle, setLastResearchCycle] = useState<ResearchCycle | null>(null);
+  const [drugJourneyRequest, setDrugJourneyRequest] = useState<DrugDiscoveryChatRequest | null>(null);
+  const [drugJourneyProject, setDrugJourneyProject] = useState<ActiveKnowledgeProject | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -534,6 +542,30 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       } finally {
         setBackendConfirmationPending(false);
       }
+      return;
+    }
+    const drugRequest = drugDiscoveryRequestFromMessage(msg);
+    if (drugRequest) {
+      setInput('');
+      setTurns((turnsNow) => [...turnsNow, { role: 'user', text: msg }, {
+        role: 'genesis',
+        text: `Rozumiem cel: ${drugRequest.researchQuery}. Przekazuję go do canonical Research Intake i wybieram do trzech kandydatów do testu RDKit w Laboratorium.`,
+        tag: 'MODEL',
+      }]);
+      const token = getToken();
+      if (!token) {
+        setTurns((turnsNow) => [...turnsNow, { role: 'genesis', text: 'BLOCKED — zaloguj się, aby Genesis mogło zapisać governed campaign, Evidence proposal i replay w projekcie.', tag: 'SYSTEM' }]);
+        return;
+      }
+      const resolvedProject = await resolveResearchProject(token);
+      if (!resolvedProject.ok) {
+        setTurns((turnsNow) => [...turnsNow, { role: 'genesis', text: `BLOCKED — ${resolvedProject.message}`, tag: 'SYSTEM' }]);
+        return;
+      }
+      setDrugJourneyProject(resolvedProject.data);
+      setDrugJourneyRequest(drugRequest);
+      setResearchPanel(null);
+      track('ask_ai_used', { via: 'science-chat-unified-drug-journey' });
       return;
     }
     const precisionQuestion = precisionQuestionFromMessage(msg);
@@ -994,6 +1026,17 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           </div>
         ))}
       </div>
+
+      {drugJourneyRequest && drugJourneyProject && (
+        <UnifiedResearchJourney
+          request={drugJourneyRequest}
+          project={drugJourneyProject}
+          onActivateLaboratory={() => {
+            setOpen(true);
+            window.location.hash = '#/scientific-worlds';
+          }}
+        />
+      )}
 
       {lastEvidenceCapsule && <div className="science-chat-capsule-wrap"><EvidenceCapsule capsule={lastEvidenceCapsule} /></div>}
 

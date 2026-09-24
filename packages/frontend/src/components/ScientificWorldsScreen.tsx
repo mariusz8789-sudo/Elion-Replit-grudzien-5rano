@@ -389,7 +389,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
             <button type="button" className="sw-chip" onClick={() => submit('Idź do syntezatora')}>Chemistry</button>
             <button type="button" className="sw-chip" onClick={() => submit('Idź do konsoli zderzacza')}>Physics</button>
           </nav>}
-          <button type="button" className="sw-btn" onClick={() => setControlsOpen((open) => !open)} aria-expanded={controlsOpen} aria-controls="sw-advanced-controls">{controlsOpen ? 'Ukryj sterowanie' : 'Sterowanie'}</button>
+          <button type="button" className="sw-btn" onClick={() => setControlsOpen((open) => !open)} aria-expanded={controlsOpen} aria-controls="sw-advanced-controls" data-testid="sw-controls">{controlsOpen ? 'Ukryj sterowanie' : 'Sterowanie'}</button>
         </div>
         <div id="sw-advanced-controls" className="sw-advanced-controls" hidden={!controlsOpen}>
           <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">

@@ -16,9 +16,13 @@ describe('StartHero', () => {
     const html = renderToStaticMarkup(<StartHero />);
     expect(html).toContain('data-testid="start-hero"');
     expect(html).toContain('class="start-ask-input"');
-    for (const id of ['door-ask', 'door-laboratory']) expect(html).toContain(`data-testid="${id}"`);
+    for (const id of ['door-ask', 'door-laboratory', 'door-guided-demo']) expect(html).toContain(`data-testid="${id}"`);
     expect(html).toContain('href="#/scientific-worlds"');
     expect(html).not.toContain('data-testid="door-discover"');
+    expect(html).toContain('Pytanie');
+    expect(html).toContain('Evidence');
+    expect(html).toContain('Replay');
+    expect(html).toContain('Następny eksperyment');
     expect(html).toContain('zapisanych przebiegów');
     expect(html).toContain('sprawdzanie…'); // effects do not run statically: the honest pre-fetch state
     expect(html).not.toContain('undefined');

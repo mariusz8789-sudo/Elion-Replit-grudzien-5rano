@@ -63,11 +63,12 @@ test('canonical titration runs in the laboratory and replays without fake progre
   await page.getByTestId('sw-quick-miareczkowanie').click();
   const result = page.getByTestId('sw-titration-context');
   await expect(result).toBeVisible({ timeout: 240_000 });
-  await expect(result).toContainText('CHEMIA · MODEL OBLICZENIOWY');
+  await expect(result).toContainText('EDUCATIONAL PROCEDURE MODEL');
+  await expect(result).toContainText('Wynik');
   await expect(result).toContainText('pH');
   await expect(result).toContainText('rekonstrukcją edukacyjną');
 
-  await page.getByTestId('sw-evidence').getByRole('button').click();
+  await result.getByRole('button', { name: 'Evidence + replay' }).click();
   await expect(page.getByTestId('sw-session')).toBeVisible();
   await page.getByTestId('sw-replay').click();
   await expect(page.getByTestId('sw-replay-verdict')).toHaveText(/MATCH/);

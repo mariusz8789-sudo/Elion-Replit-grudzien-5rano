@@ -1782,6 +1782,15 @@ kbd {
   text-decoration: underline; text-underline-offset: 3px;
 }
 .onboarding-later:hover { color: var(--text); }
+.onboarding-kicker { color: var(--cyan); font: 700 0.68rem/1.2 var(--font-mono); letter-spacing: 0.14em; }
+.onboarding-flow { display: grid; gap: 0.45rem; list-style: none; margin: 0.35rem 0 0; padding: 0; }
+.onboarding-flow li { display: grid; grid-template-columns: 1.8rem 1fr; gap: 0 0.65rem; align-items: center; padding: 0.55rem 0.65rem; border: 1px solid var(--border); background: rgba(8, 18, 28, 0.7); }
+.onboarding-flow li > span { grid-row: 1 / 3; color: var(--cyan); font: 700 0.72rem/1 var(--font-mono); }
+.onboarding-flow strong { font-size: 0.84rem; }
+.onboarding-flow small { color: var(--text-dim); font-size: 0.72rem; }
+.onboarding-truth { display: grid; gap: 0.3rem; margin-top: 0.25rem; }
+.onboarding-truth span { color: var(--text-dim); font-size: 0.69rem; line-height: 1.35; }
+.onboarding-truth b { color: var(--text); font-family: var(--font-mono); margin-right: 0.35rem; }
 @media (prefers-reduced-motion: reduce) {
   .onboarding-panel { animation: none; }
   .onboarding-demo-dot { transition: none; }
@@ -5572,6 +5581,10 @@ a.chip-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .guide-volume { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; color: var(--text-dim); }
 .guide-volume input { width: 6rem; accent-color: var(--cyan); }
 .start-guide-row { display: flex; gap: 0.5rem; flex-wrap: wrap; position: relative; margin-top: -0.6rem; }
+.start-journey { position: relative; display: flex; flex-wrap: wrap; gap: 0.35rem 0.8rem; list-style: none; margin: 0; padding: 0; color: var(--text-dim); font-size: 0.72rem; }
+.start-journey li { display: inline-flex; align-items: center; gap: 0.3rem; }
+.start-journey li:not(:last-child)::after { content: '→'; color: var(--text-faint); margin-left: 0.45rem; }
+.start-journey span { color: var(--cyan); font: 650 0.62rem/1 var(--font-mono); }
 .ask-mic { min-width: 2.4rem; }
 .ask-mic-on { border-color: var(--red); color: var(--red); animation: pulse 1.2s ease-in-out infinite; }
 .hall-tour-end { font-size: 0.82rem; color: var(--green); align-self: center; }

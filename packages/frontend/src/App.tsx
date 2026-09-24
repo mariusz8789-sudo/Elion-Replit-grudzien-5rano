@@ -359,7 +359,7 @@ export default function App() {
         onFinish={(destination) => {
           markOnboardingComplete();
           setOnboardingOpen(false);
-          if (destination === 'timeline') window.location.hash = '#/timeline';
+          if (destination === 'laboratory') window.location.hash = '#/scientific-worlds';
         }}
       />
     );
@@ -1141,9 +1141,6 @@ export default function App() {
           <HeavyRoute>
             <StartHero />
           </HeavyRoute>
-          <HeavyRoute>
-            <WorkspaceStage />
-          </HeavyRoute>
           {/* D-118: everything Home used to shout (launcher lists, research zone, the 3D command
               centre, the capability showcase, the scale journey, the labs grid) stays reachable
               behind ONE disclosure. Nothing was deleted; it stopped competing with the question box. */}
@@ -1154,6 +1151,9 @@ export default function App() {
           </div>
           {homeMoreOpen && (
           <div className="home-more-body">
+          <HeavyRoute>
+            <WorkspaceStage />
+          </HeavyRoute>
           <div className="section-label">Zacznij tutaj</div>
           <div className="home-launcher">
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>

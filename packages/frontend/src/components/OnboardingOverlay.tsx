@@ -1,24 +1,17 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useFocusTrap } from '../core/useFocusTrap';
 import { track } from '../core/analytics';
 
 /**
- * Wprowadzenie przy pierwszym uruchomieniu — 4 krótkie, interaktywne kroki
- * zamiast ściany tekstu (patrz core/onboarding.ts dla trwałości "widziane").
- * Cel: w mniej niż 2 minuty użytkownik wie, czym jest Genesis OS, że
- * parametry są przeciągalne, że Narrator AI tłumaczy obserwacje, i gdzie
- * zacząć. Pomijalne w każdej chwili — pominięcie liczy się tak samo jak
- * ukończenie (patrz onFinish poniżej).
+ * Pierwsze uruchomienie wyjaśnia produkt na jednym ekranie. Nie uczy
+ * wewnętrznych modułów ani kontrolek: pokazuje jedną drogę od pytania do
+ * odtwarzalnego wyniku i prowadzi do istniejącego Laboratorium.
  */
-export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timeline' | 'home') => void }) {
-  const [step, setStep] = useState(0);
+export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'laboratory' | 'home') => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
   useFocusTrap(panelRef, true);
 
-  const totalSteps = 4;
-  const isLast = step === totalSteps - 1;
-
-  const finish = (destination: 'timeline' | 'home') => {
+  const finish = (destination: 'laboratory' | 'home') => {
     track('onboarding_finished');
     onFinish(destination);
   };
@@ -35,113 +28,37 @@ export function OnboardingOverlay({ onFinish }: { onFinish: (destination: 'timel
           Pomiń →
         </button>
 
-        {step === 0 && <StepWelcome />}
-        {step === 1 && <StepInteractive />}
-        {step === 2 && <StepNarrator />}
-        {step === 3 && <StepStart onStart={() => finish('timeline')} onGoHome={() => finish('home')} />}
-
-        <div className="onboarding-dots" aria-hidden="true">
-          {Array.from({ length: totalSteps }, (_, i) => (
-            <span key={i} className={`onboarding-dot ${i === step ? 'active' : ''}`} />
-          ))}
-        </div>
-
-        {!isLast && (
-          <div className="onboarding-nav">
-            {step > 0 && (
-              <button className="chip-btn" onClick={() => setStep((s) => s - 1)}>
-                ← Wstecz
-              </button>
-            )}
-            <button className="chip-btn onboarding-next" onClick={() => setStep((s) => s + 1)} autoFocus={step === 0}>
-              Dalej →
-            </button>
-          </div>
-        )}
+        <ProductIntroduction onStart={() => finish('laboratory')} onGoHome={() => finish('home')} />
       </div>
     </div>
   );
 }
 
-function StepWelcome() {
+function ProductIntroduction({ onStart, onGoHome }: { onStart: () => void; onGoHome: () => void }) {
   return (
     <div className="onboarding-step">
-      <div className="onboarding-icons" aria-hidden="true">
-        <span>🌌</span><span>⚛️</span><span>🧬</span><span>∑</span>
-      </div>
-      <h2>Witaj w Genesis Physics</h2>
+      <span className="onboarding-kicker">ONE CHAT · ONE LABORATORY</span>
+      <h2>Zadajesz pytanie. Genesis przygotowuje eksperyment.</h2>
       <p>
-        Zadaj pytanie, obserwuj wykonanie i sprawdź dowody. Genesis prowadzi
-        od hipotezy do wyniku, pokazując wyraźnie, co jest pomiarem, modelem
-        albo wizualizacją.
+        Nie musisz wybierać silnika ani szukać modułu. Genesis prowadzi jedną
+        sesję od pytania do wyniku, dowodu i powtórzenia.
       </p>
-    </div>
-  );
-}
-
-function StepInteractive() {
-  const [v, setV] = useState(30);
-  return (
-    <div className="onboarding-step">
-      <h2>Przesuwaj — wszystko reaguje na żywo</h2>
-      <p>Każdy parametr symulacji jest przeciągalny. Spróbuj teraz:</p>
-      <div className="control onboarding-demo-control">
-        <label>
-          <span>Przykładowy parametr</span>
-          <span className="val">{v}%</span>
-        </label>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={v}
-          aria-label="Przykładowy przeciągalny suwak"
-          onChange={(e) => setV(Number(e.target.value))}
-        />
+      <ol className="onboarding-flow" aria-label="Przebieg pracy Genesis">
+        <li><span>1</span><strong>Pytanie</strong><small>Opisz cel zwykłym językiem.</small></li>
+        <li><span>2</span><strong>Laboratorium</strong><small>Genesis wybiera obsługiwany model.</small></li>
+        <li><span>3</span><strong>Wynik</strong><small>Obserwujesz rzeczywiste wykonanie modelu.</small></li>
+        <li><span>4</span><strong>Evidence + replay</strong><small>Sprawdzasz pochodzenie i powtarzalność.</small></li>
+      </ol>
+      <div className="onboarding-truth" aria-label="Rodzaje doświadczeń">
+        <span><b>LIVE COMPUTATIONAL</b> prawdziwe obliczenie</span>
+        <span><b>EDUCATIONAL MODEL</b> procedura edukacyjna</span>
+        <span><b>REAL OBSERVATION</b> wyłącznie dane zewnętrzne lub pomiar</span>
       </div>
-      <div className="onboarding-demo-visual" aria-hidden="true">
-        <span
-          className="onboarding-demo-dot"
-          style={{ transform: `scale(${0.4 + v / 80})`, opacity: 0.35 + v / 160 }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function StepNarrator() {
-  return (
-    <div className="onboarding-step">
-      <h2>Narrator AI tłumaczy, co widzisz</h2>
-      <p>
-        Pod każdą symulacją Narrator opisuje realne wielkości fizyczne z
-        aktualnych parametrów — zawsze aktywny, bez czekania. Możesz też
-        zapytać go wprost o to, co się dzieje.
-      </p>
-      <div className="nblock insight onboarding-narrator-demo">
-        <div className="ntitle">Przykład</div>
-        <div className="nbody">
-          „Zwiększyłeś energię pakietu ponad wysokość bariery — dokładnie
-          tak zachowuje się prawdziwe równanie Schrödingera."
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepStart({ onStart, onGoHome }: { onStart: () => void; onGoHome: () => void }) {
-  return (
-    <div className="onboarding-step">
-      <h2>Gotowy?</h2>
-      <p>
-        Zacznij od krótkiego przebiegu LIVE albo wpisz własne pytanie. Resztę
-        narzędzi znajdziesz później w Bibliotece.
-      </p>
       <button className="chip-btn onboarding-start-btn" onClick={onStart} autoFocus>
-        ▶ Uruchom LIVE
+        Wejdź do Laboratorium →
       </button>
       <button className="onboarding-later" onClick={onGoHome}>
-        Najpierw zadaj pytanie
+        Najpierw zadaj własne pytanie
       </button>
     </div>
   );

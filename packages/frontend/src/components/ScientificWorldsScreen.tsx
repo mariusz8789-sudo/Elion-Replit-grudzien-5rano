@@ -423,10 +423,14 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       {world === 'physics' && chemistryCardOpen && titrationResult && (
         <aside className="sw-chemistry-context" aria-label="Wynik miareczkowania" data-testid="sw-titration-context">
           <div className="sw-chemistry-head">
-            <div><span>CHEMIA · MODEL OBLICZENIOWY</span><strong>pH {titrationResult.ph.toFixed(2)}</strong></div>
+            <div><span>EDUCATIONAL PROCEDURE MODEL</span><strong>Wynik · pH {titrationResult.ph.toFixed(2)}</strong></div>
             <button type="button" className="sw-context-close" onClick={() => setChemistryCardOpen(false)} aria-label="Zamknij wynik miareczkowania">×</button>
           </div>
           <p>{titrationResult.acidName.split(' (')[0]} · {titrationResult.vb.toFixed(1)} mL NaOH · {titrationRegion(titrationResult.vb, titrationResult.veq)}</p>
+          <div className="sw-context-actions">
+            <button type="button" className="sw-btn sw-btn-primary" onClick={() => setEvidenceOpen(true)}>Evidence + replay</button>
+            <button type="button" className="sw-btn" onClick={() => requestOpenScienceChat('Zaproponuj następny eksperyment po tym miareczkowaniu.')}>Następny eksperyment</button>
+          </div>
           <details>
             <summary>Otwórz wykres</summary>
             <svg className="sw-titration-plot" viewBox="0 0 300 100" role="img" aria-label="Krzywa pH względem objętości NaOH">

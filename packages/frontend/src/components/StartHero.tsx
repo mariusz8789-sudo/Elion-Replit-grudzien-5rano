@@ -71,7 +71,12 @@ export function StartHero(): React.ReactElement {
       <div className="start-primary-actions" aria-label="Główne wejścia Genesis">
         <button type="button" className="chip-btn" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">✦ Zapytaj Genesis</button>
         <a className="chip-btn primary" href="#/scientific-worlds" data-testid="door-laboratory">⌬ Wejdź do laboratorium</a>
+        <button type="button" className="chip-btn start-guided-demo" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">▶ Zobacz gotowy przykład</button>
       </div>
+
+      <ol className="start-journey" aria-label="Jak działa Genesis">
+        <li><span>01</span>Pytanie</li><li><span>02</span>Laboratorium</li><li><span>03</span>Wynik</li><li><span>04</span>Evidence</li><li><span>05</span>Replay</li><li><span>06</span>Następny eksperyment</li>
+      </ol>
 
       <ul className="start-status" aria-label="Stan systemu">
         <li><span className="start-status-value">{records}</span><span className="start-status-label">zapisanych przebiegów w Pamięci Naukowej</span></li>

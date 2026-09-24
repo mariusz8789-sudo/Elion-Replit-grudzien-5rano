@@ -395,6 +395,8 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .sw-chemistry-head strong { font-size: 1.6rem; line-height: 1; }
 .sw-context-close { border: 0; background: transparent; color: #dbeafe; cursor: pointer; font-size: 1.2rem; line-height: 1; }
 .sw-chemistry-context p, .sw-chemistry-context small { margin: .5rem 0 0; color: rgba(230,242,236,.72); font-size: .72rem; }
+.sw-context-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.sw-context-actions .sw-btn { min-height: 36px; }
 .sw-chemistry-context summary { margin-top: .55rem; color: #9fd7f9; cursor: pointer; font: 600 .7rem/1.4 var(--font-mono); }
 .sw-titration-plot { display: block; width: 100%; height: 94px; margin-top: .45rem; overflow: visible; }
 .sw-titration-plot path { fill: none; stroke: rgba(148,163,184,.35); stroke-width: 1; }

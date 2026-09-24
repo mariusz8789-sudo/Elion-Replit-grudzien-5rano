@@ -26,8 +26,14 @@ async function isolateLiver(page: Page): Promise<string[]> {
   expect(requested).toEqual([]);
   await page.getByTestId('human-inspector-toggle').click();
   await page.getByTestId('sw-explorer-organ-liver').click();
+  // The liver chip runs the agent's FOCUS command, which may already isolate the organ; the isolate
+  // button is a toggle, so it is pressed only if the isolation is not already on.
+  await expect(page.getByTestId('sw-explorer')).toHaveAttribute('data-selected-node', 'liver', { timeout: 300_000 });
   await page.getByTestId('human-tab-section').click();
-  await page.getByTestId('sw-explorer-isolate').click();
+  const isolate = page.getByTestId('sw-explorer-isolate');
+  await expect(isolate).toBeEnabled({ timeout: 300_000 });
+  if (await isolate.getAttribute('aria-pressed') !== 'true') await isolate.click();
+  await expect(isolate).toHaveAttribute('aria-pressed', 'true');
   return requested;
 }
 

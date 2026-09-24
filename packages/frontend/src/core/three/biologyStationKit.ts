@@ -93,20 +93,21 @@ export function buildBiologyStation(THREE: typeof THREE_NS, ctx: StationKitConte
     }
     case 'microscopy': {
       // Hyperscope hero: heavy base, column, cantilever arm, stacked optical head over a stage with a specimen dome, ring light, side readout; a second, simpler microscope beside it.
-      group.add(createBench(THREE, { position: [0, 0, 0], width: 2.8, depth: 1.4, height: 0.9, topMaterial: P.BRUSHED_METAL, legMaterial: P.PAINTED_METAL }));
-      const base = createPlatform(THREE, P.PAINTED_METAL, { position: [0.2, 0.95, -0.3], thickness: 0.1, shape: 'box', width: 0.9, depth: 0.7 }); group.add(base);
+      group.add(createBench(THREE, { position: [0, 0, 0], width: 2.8, depth: 1.4, height: 0.9, topMaterial: P.TECH_COMPOSITE, legMaterial: P.PAINTED_METAL }));
+      const base = createPlatform(THREE, P.CERAMIC, { position: [0.2, 0.95, -0.3], thickness: 0.1, shape: 'box', width: 0.82, depth: 0.72 }); group.add(base);
       group.add(createColumn(THREE, P.BRUSHED_METAL, { position: [0.2, 1.0, -0.6], height: 1.05, radius: 0.09 }));
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.6), P.BRUSHED_METAL); arm.position.set(0.2, 2.0, -0.32); group.add(arm);
-      const headMats = [P.POLISHED_METAL, P.PAINTED_METAL, P.BRUSHED_METAL];
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.14, 0.6), P.CERAMIC); arm.position.set(0.2, 2.0, -0.32); group.add(arm);
+      const headMats = [P.CERAMIC, P.TECH_COMPOSITE, P.BRUSHED_METAL];
       for (const [i, r, h, y] of [[0, 0.16, 0.22, 1.86], [1, 0.12, 0.28, 1.62], [2, 0.08, 0.26, 1.36]] as const) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, h, 28), headMats[i]); seg.position.set(0.2, y, -0.05); group.add(seg); }
       const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.06, 20), ctx.glass); lens.position.set(0.2, 1.21, -0.05); group.add(lens);
-      const ringLight = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.02, 10, 48), status); ringLight.rotation.x = Math.PI / 2; ringLight.position.set(0.2, 1.26, -0.05); group.add(ringLight);
-      const stage = createPlatform(THREE, P.POLISHED_METAL, { position: [0.2, 1.02, -0.05], thickness: 0.04, shape: 'disc', radius: 0.2 }); group.add(stage);
+      const ringLight = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.012, 8, 32), status); ringLight.rotation.x = Math.PI / 2; ringLight.position.set(0.2, 1.26, -0.05); group.add(ringLight);
+      const stage = createPlatform(THREE, P.TECH_COMPOSITE, { position: [0.2, 1.02, -0.05], thickness: 0.04, shape: 'disc', radius: 0.22 }); group.add(stage);
       group.add(createGlassChamber(THREE, ctx.glass, { position: [0.2, 1.04, -0.05], height: 0.16, radiusBottom: 0.15, radiusTop: 0.15, openEnded: false, radialSegments: 32 }));
       artifactAnchor.position.set(0.2, 1.12, -0.05);
       // The precision microscope: a compact column with binocular tubes.
       group.add(createColumn(THREE, P.PAINTED_METAL, { position: [-0.9, 0.9, -0.3], height: 0.42, radius: 0.05 }));
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.16), P.PAINTED_METAL); body.position.set(-0.9, 1.35, -0.2); group.add(body);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.19), P.CERAMIC); body.position.set(-0.9, 1.35, -0.2); group.add(body);
+      const focus = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.035, 16), P.TECH_COMPOSITE); focus.rotation.z = Math.PI / 2; focus.position.set(-0.80, 1.30, -0.2); group.add(focus);
       for (const dx of [-0.035, 0.035]) { const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 12), P.BRUSHED_METAL); tube.position.set(-0.9 + dx, 1.5, -0.1); tube.rotation.x = -0.6; group.add(tube); }
       const stage2 = createPlatform(THREE, P.BRUSHED_METAL, { position: [-0.9, 1.0, -0.2], thickness: 0.03, shape: 'box', width: 0.3, depth: 0.24 }); group.add(stage2);
       screen = readout(THREE, 384, 224);

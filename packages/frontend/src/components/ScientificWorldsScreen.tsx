@@ -409,7 +409,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds}
           twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
           surface={surface} onSurface={applySurface}
-          researchControls={<details className="human-advanced"><summary>Badania i narzędzia</summary>{researchControls}{commandControls}</details>}
+          subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}
+          researchControls={<>{commandControls}{researchControls}</>}
           onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
           onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
         />

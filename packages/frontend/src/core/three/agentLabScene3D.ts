@@ -169,6 +169,23 @@ export class AgentLabScene3D implements Sim3D {
   }
 
   onRenderMetrics(metrics: ThreeRenderMetrics): void { this.renderMetrics = metrics; }
+  /** Presentation bounds only, used to keep contextual controls off the subject. */
+  getHumanSubjectBounds() {
+    if (!this.THREE || !this.pickCamera || !this.renderer || this.world !== 'biology') return null;
+    const root = this.macroMicro?.group.visible ? this.macroMicro.group : this.twins[0]?.group;
+    if (!root) return null;
+    const box = new this.THREE.Box3();
+    root.traverseVisible((node) => {
+      const mesh = node as THREE_NS.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      if (mesh.geometry.boundingBox) box.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+    });
+    if (box.isEmpty()) return null;
+    const points = [box.min.x, box.max.x].flatMap(x => [box.min.y, box.max.y].flatMap(y => [box.min.z, box.max.z].map(z => new this.THREE!.Vector3(x, y, z).project(this.pickCamera!))));
+    const width = this.renderer.domElement.clientWidth, height = this.renderer.domElement.clientHeight;
+    return { left: Math.min(...points.map(p => (p.x + 1) * width / 2)), right: Math.max(...points.map(p => (p.x + 1) * width / 2)), top: Math.min(...points.map(p => (1 - p.y) * height / 2)), bottom: Math.max(...points.map(p => (1 - p.y) * height / 2)) };
+  }
   getRuntimeDiagnostics() {
     return {
       ...this.controller.getDiagnostics(), wallSeconds: this.elapsedWallSeconds,

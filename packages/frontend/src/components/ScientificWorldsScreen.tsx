@@ -9,10 +9,11 @@ import { createLabExperimentRunner } from '../core/scientificWorlds/experimentRu
 import { createBiologyExperimentRunner } from '../core/scientificWorlds/biologyRunners';
 import { BIOLOGY_CATALOG, BIOLOGY_OBSTACLES, BIOLOGY_ROOM, BIOLOGY_SPAWN, BIOLOGY_STATIONS, BIOLOGY_WORLD_ID } from '../core/scientificWorlds/biologyLabWorld';
 import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
-import { createDefaultAnatomyView, isolateAnatomyNode, setAnatomyMode, setCutaway } from '../core/scientificWorlds/humanLab/anatomyView';
+import { createDefaultAnatomyView, isolateAnatomyNode, selectAnatomyNode, setAnatomyMode, setCutaway } from '../core/scientificWorlds/humanLab/anatomyView';
 import type { AnatomyDisplayMode, AnatomyViewState } from '../core/scientificWorlds/humanLab/types';
 import { TWIN_ASSET_TIER } from '../core/three/biologyLabKit';
 import { humanTwinProvenanceLabel, type HumanTwinTier, type HumanTwinPresentationState } from '../core/three/humanTwinAsset';
+import { bodyParts3dStructure, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
 import { DEFAULT_CUTAWAY, type CutawayState } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { replayExperimentSession, type ExperimentRunner, type ExperimentSession, type ReplayVerdict } from '../core/scientificWorlds/experimentSession';
@@ -128,6 +129,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   useEffect(() => { sim.setResearchLayout(false); if (world === 'biology') sim.setCameraMode('TWIN'); }, [sim, world]);
   const [twinTier, setTwinTier] = useState<HumanTwinTier>('PROXY');
   const [twinLoad, setTwinLoad] = useState<HumanTwinPresentationState>(() => sim.getTwinLoadState());
+  const [referenceAnatomy, setReferenceAnatomy] = useState<ReferenceAnatomyState>(() => sim.getReferenceAnatomyState());
   const [twinLod, setTwinLod] = useState(() => sim.getTwinLodState());
   const [twinLodPreference, setTwinLodPreference] = useState<HumanTwinLodPreference>('AUTO');
   const [cutaway, setCutawayState] = useState<CutawayState>(DEFAULT_CUTAWAY);
@@ -177,6 +179,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   useEffect(() => {
     sim.setTwinTierListener((tier) => setTwinTier(tier));
     sim.setTwinLoadListener(setTwinLoad);
+    sim.setReferenceAnatomyListener(setReferenceAnatomy);
     sim.setTwinLodListener(setTwinLod);
     setTwinLoad(sim.getTwinLoadState());
     setTwinTier(sim.getTwinTier());
@@ -211,7 +214,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         if (report.deferred.some((d) => d.intent === 'ASK')) { /* the question is handed to Science Chat by the button below */ }
       }
     });
-    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); sim.setTwinLoadListener(null); sim.setTwinLodListener(null); };
+    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); sim.setTwinLoadListener(null); sim.setTwinLodListener(null); sim.setReferenceAnatomyListener(null); };
   }, [sim, speak, say, world]);
 
   /** Typed commands from the Human Explorer's clicks: the same planner and controller as the command bar, no parser in between. */
@@ -235,6 +238,13 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   useEffect(() => {
     sim.setOrganPickListener((id) => {
       const organ = EXPLORER_ORGANS.find((entry) => entry.organId === id);
+      // A reference-atlas structure with no explorer ladder (the aorta) is still selectable: the pick
+      // updates the anatomy view directly — no agent session, no macro→micro claim.
+      if (!organ && bodyParts3dStructure(id)) {
+        const next = selectAnatomyNode(anatomyRef.current, id, sim.manifest);
+        setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId);
+        return;
+      }
       if (!organ || !['IDLE', 'ARRIVED', 'BLOCKED'].includes(controller.getDiagnostics().state)) return;
       const lt = nextLogicalTime();
       submitCommands(explorerCommands(organ, 'organ', `Wybór narządu: ${id}`, lt), `Wybór narządu: ${id}`);
@@ -406,7 +416,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         <HumanExplorerPanel
           manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions}
           busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
-          twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds}
+          twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds} referenceAnatomy={referenceAnatomy}
           twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
           surface={surface} onSurface={applySurface}
           subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}

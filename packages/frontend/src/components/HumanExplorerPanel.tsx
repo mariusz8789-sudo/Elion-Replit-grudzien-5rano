@@ -12,6 +12,7 @@ import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../core/three/humanTwinCutaway';
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
+import { BODYPARTS3D_ATTRIBUTION, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
 import './HumanExplorerHero.css';
 
@@ -50,6 +51,8 @@ export interface HumanExplorerPanelProps {
   readonly busy: boolean;
   readonly onCommands: (commands: readonly WorldCommand[], label: string, logicalTime: number) => void;
   readonly nextLogicalTime: () => number;
+  /** BodyParts3D pilot: which atlas nodes are drawn from the approved reference atlas (generic, never a patient). */
+  readonly referenceAnatomy?: ReferenceAnatomyState;
 }
 
 const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY: 'Skórny', SKELETAL: 'Szkieletowy', MUSCULAR: 'Mięśniowy', NERVOUS: 'Nerwowy', ENDOCRINE: 'Dokrewny', CARDIOVASCULAR: 'Krążenia', LYMPHATIC: 'Limfatyczny', RESPIRATORY: 'Oddechowy', DIGESTIVE: 'Pokarmowy', URINARY: 'Moczowy', REPRODUCTIVE: 'Rozrodczy', IMMUNE: 'Immunologiczny' };
@@ -57,7 +60,7 @@ const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY
 const SURFACE_MODES: readonly (readonly [TwinSurfaceMode, string])[] = [['NORMAL', 'Skóra'], ['TRANSLUCENT', 'Prześwit'], ['XRAY', 'RTG (model)'], ['GHOST', 'Duch']];
 const IMAGE_KINDS: ReadonlySet<BiologyArtifact['kind']> = new Set(['hyperscope', 'histology', 'imaging', 'central-dogma', 'neuro']);
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [peek, setPeek] = useState<'closed' | 'hover' | 'pinned'>('closed');
@@ -90,6 +93,9 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const path = explorer ? explorerPath(explorer, level, manifest) : [];
   const evidenceMode = path.at(-1)?.evidenceMode ?? 'ILLUSTRATIVE';
   const imageSession = artifact && session ? session : null;
+  const referenceNodes = referenceAnatomy?.nodes ?? {};
+  const reference = organ ? referenceNodes[organ.id] ?? null : null;
+  const referenceShown = Object.keys(referenceNodes).length > 0;
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -114,7 +120,9 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <button type="button" className="human-context-close" aria-label="Zamknij informacje" onClick={() => setPeek('closed')}>×</button>
         <strong>{level === 'body' ? 'Ciało człowieka' : organ?.label}</strong>
         <span>{level === 'body' ? 'Anatomia' : organ?.system ? SYSTEM_LABEL_PL[organ.system] : 'Struktura'} · {SCALE_TEXT[level]}</span>
-        <small>ILLUSTRATIVE_MODEL · geometria poglądowa</small>
+        {reference && level !== 'body'
+          ? <small data-testid="human-context-reference">REFERENCE_ATLAS · BodyParts3D {reference.fmaId} · model ogólny, nie pacjent</small>
+          : <small>ILLUSTRATIVE_MODEL · geometria poglądowa</small>}
         <button type="button" className="human-context-action" onClick={() => { setInspectorOpen(true); setActiveTab('explore'); setPeek('closed'); }}>Otwórz instrumenty →</button>
       </aside>}
       <div className="human-hero-heading">
@@ -122,6 +130,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <h1>{level === 'body' ? 'Człowiek.' : levelLabel(level, locale)}</h1>
         <p>{level === 'body' ? 'Od całego ciała do jego najmniejszych struktur.' : `${organ?.label ?? 'Anatomia'} · ${SCALE_TEXT[level]}`}</p>
         <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
+        {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])}>{BODYPARTS3D_ATTRIBUTION}</span>}
       </div>
       <div className="human-hero-tools" aria-label="Widok modelu">
         {SURFACE_MODES.filter(([mode]) => mode !== 'TRANSLUCENT').map(([mode, label]) => <button key={mode} type="button" className={`sw-chip${surface === mode ? ' is-on' : ''}`} aria-pressed={surface === mode} onClick={() => onSurface(mode)} disabled={busy} data-testid={`human-mode-${mode.toLowerCase()}`}>{label}</button>)}
@@ -248,6 +257,11 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
               <dt>Confidence / resolution</dt><dd className="cw-mono" data-testid="sw-explorer-source-metadata" title={organ.representation.provenance.description}>{organ.representation.confidence.status} / {organ.representation.resolution.status}</dd>
               <dt>Provenance</dt><dd className="cw-mono" data-testid="sw-explorer-provenance">{organ.representation.provenance.source}</dd>
               <dt>Observation</dt><dd data-testid="sw-explorer-observation-status">No validated subject observation attached · illustrative generic model</dd>
+              {reference && <>
+                <dt>Geometria</dt><dd className="cw-mono" data-testid="sw-explorer-reference" data-fma={reference.fmaId} data-bp={reference.representationId} data-lod={reference.lod}>{reference.source} · {reference.fmaId} · {reference.representationId} · {reference.elementCount} FJ · {reference.lod} · {reference.triangles.toLocaleString('pl-PL')} Δ</dd>
+                <dt>Zakres</dt><dd data-testid="sw-explorer-reference-scope">Ogólny model referencyjny (jedno ciało atlasu) · nie pacjent · nie do diagnozy · tkanki i komórki pozostają MODELEM</dd>
+                <dt>Licencja</dt><dd className="sw-faint">{reference.attribution}</dd>
+              </>}
             </dl>
           )}
 

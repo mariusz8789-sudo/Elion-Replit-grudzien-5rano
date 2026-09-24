@@ -16,13 +16,14 @@ const context = (sessions: readonly ExperimentSession[] = [], selectedNodeId = '
 
 describe('canonical anatomy semantic relationships', () => {
   it('connects system to organ without changing spatial containment', () => {
-    expect(organsInSystem(manifest, 'system:cardiovascular').map((node) => node.id)).toEqual(['heart']);
+    // The aorta joined the atlas with the BodyParts3D pilot (FMA3734) as the cardiovascular system's second organ node.
+    expect(organsInSystem(manifest, 'system:cardiovascular').map((node) => node.id)).toEqual(['heart', 'aorta']);
     expect(systemsForOrgan(manifest, 'heart').map((node) => node.id)).toEqual(['system:cardiovascular']);
     expect(manifest.nodes.find((node) => node.id === 'heart')?.parentId).toBe('thorax');
     expect(descendants(manifest, 'thorax').map((node) => node.id)).toContain('heart');
     const view = isolateAnatomyNode(createDefaultAnatomyView(manifest.twinId), 'system:cardiovascular', manifest);
     expect(view.selectedNodeId).toBe('system:cardiovascular');
-    expect(view.isolatedNodeIds).toEqual(['heart']);
+    expect(view.isolatedNodeIds).toEqual(['heart', 'aorta']);
     expect(isolateAnatomyNode(view, 'body', manifest).isolatedNodeIds).toEqual([]);
     expect(explorerPath(heart, 'organ', manifest).map((node) => node.nodeId)).toEqual(['body', 'system:cardiovascular', 'heart']);
   });

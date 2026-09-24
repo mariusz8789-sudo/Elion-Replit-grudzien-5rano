@@ -9,6 +9,7 @@ import { NEURO_REGIONS } from '../scientificWorlds/humanLab/neuroLab';
 import { applyRimLight, isRimPatched, selectionPulse, setMaterialRimIntensity, setMaterialXray, setSurfaceMode, type TwinSurfaceMode } from './humanTwinMaterials';
 import { createCutaway, measureCutawayBounds, setClippingOnObject, setSectionShellSides, type CutawayHandle, type CutawayState } from './humanTwinCutaway';
 import type { LoadedHumanTwinBody, HumanTwinTier } from './humanTwinAsset';
+import type { ReferenceAnatomyPart } from './bodyParts3dPilot';
 
 /**
  * GENESIS GRAPHICS ENGINE — HUMAN BIOLOGY LAB KIT (architecture + the twin).
@@ -217,6 +218,14 @@ export interface TwinHandle {
   setCutaway(state: CutawayState): void;
   /** D-131: the surface presentation of the BODY shell (x-ray is a stylised view of a model, never a radiograph). */
   setSurface(mode: TwinSurfaceMode): void;
+  /**
+   * BodyParts3D pilot: draw these atlas nodes with the approved reference geometry instead of their ellipsoid.
+   * The SAME organ mesh (id, material, picking, isolation, highlight, clipping) receives the new geometry and
+   * transform; geometry ownership stays with the caller, so a twin rebuild can reuse it.
+   */
+  applyReferenceAnatomy(parts: readonly ReferenceAnatomyPart[]): void;
+  /** Twin-local centre of an organ's CURRENT geometry (ellipsoid or reference mesh) — the camera framing target. */
+  getOrganFocus(nodeId: string): { x: number; y: number; z: number } | null;
   update(t: number): void;
   dispose(): void;
 }
@@ -416,6 +425,28 @@ export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTw
       };
     },
     setIsolated(nodeIds) { isolated = [...nodeIds]; applyOrgans(); },
+    applyReferenceAnatomy(parts) {
+      for (const part of parts) {
+        const m = organs.get(part.nodeId);
+        if (!m) continue;
+        m.geometry = part.geometry;
+        m.position.set(...part.position);
+        m.rotation.set(0, 0, 0);
+        m.scale.setScalar(part.scale);
+        // Reference geometry stays owned by whoever loaded it (the scene); dispose() below never touches it.
+        m.userData = { ...m.userData, referenceAnatomy: part.provenance };
+      }
+    },
+    getOrganFocus(nodeId) {
+      const m = organs.get(nodeId);
+      if (!m) return null;
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      const box = m.geometry.boundingBox!.clone();
+      m.updateMatrix();
+      box.applyMatrix4(m.matrix);
+      const c = box.getCenter(new THREE.Vector3());
+      return { x: c.x, y: c.y, z: c.z };
+    },
     setSurface(mode) { surface = mode; applyOrgans(); },
     setCutaway(state) {
       cutawayOn = state.enabled;

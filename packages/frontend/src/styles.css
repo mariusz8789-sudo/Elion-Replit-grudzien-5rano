@@ -1399,6 +1399,9 @@ kbd {
 .experiment-output-facts div { padding: .45rem .55rem; border-radius: 8px; background: rgba(15, 23, 42, .58); }
 .experiment-output-facts dt { color: var(--muted); font-size: .72rem; }
 .experiment-output-facts dd { margin: .18rem 0 0; overflow-wrap: anywhere; }
+.experiment-live-output { display: grid; gap: .45rem; padding: .65rem; border: 1px solid rgba(56, 189, 248, .38); border-radius: 10px; background: radial-gradient(circle at 15% 0%, rgba(56, 189, 248, .12), transparent 52%), rgba(3, 12, 22, .78); }
+.experiment-live-output-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; color: #7dd3fc; font: 700 .68rem/1.3 var(--font-mono); letter-spacing: .08em; }
+.experiment-live-output-head small { color: var(--muted); font: 500 .68rem/1.3 var(--font-mono); letter-spacing: 0; }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] { display: grid; gap: 5px; padding: 9px; border: 1px solid rgba(137, 109, 255, .24); border-radius: 9px; background: rgba(5, 8, 22, .72); }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] > strong { color: #ddf7ff; font-size: .78rem; }
 .world-director-panel [data-testid='world-director-spacetime-descriptor'] > span, .world-director-panel [data-testid='world-director-spacetime-descriptor'] > small { color: #819caf; font: .62rem/1.4 var(--font-mono); }

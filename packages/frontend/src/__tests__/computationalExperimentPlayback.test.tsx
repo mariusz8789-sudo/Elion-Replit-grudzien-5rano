@@ -37,8 +37,9 @@ describe('ComputationalExperimentPlayback', () => {
 
   it('labels the view as computational and renders only real output facts', () => {
     const html = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} />);
-    expect(html).toContain('COMPUTATIONAL · NOT WET-LAB TELEMETRY');
-    expect(html).toContain('crippenLogP');
+    expect(html).toContain('LIVE COMPUTATIONAL EXPERIMENT');
+    expect(html).toContain('REAL ENGINE · NOT WET-LAB TELEMETRY');
+    expect(html).toContain('logP (Crippen)');
     expect(html).toContain('REPLAY_MATCH');
     expect(html).not.toContain('clinical efficacy confirmed');
   });
@@ -60,6 +61,14 @@ describe('ComputationalExperimentPlayback', () => {
     expect(research).toContain('Output fingerprint: output-fp');
     expect((school.match(/data-event-type=/g) ?? []).length).toBe(events.length);
     expect((research.match(/data-event-type=/g) ?? []).length).toBe(events.length);
+  });
+
+  it('shows a bounded real engine output in the simple school view', () => {
+    const school = renderToStaticMarkup(<ComputationalExperimentPlayback plan={plan} result={result} replay={replay} evidenceProposalCount={1} executing={false} level="SCHOOL" />);
+    expect(school).toContain('data-testid="experiment-live-output"');
+    expect(school).toContain('RDKit 2026.3.6');
+    expect(school).toContain('logP (Crippen)');
+    expect(school).toContain('1.2');
   });
 
   it('keeps raw fingerprints behind the explicit Research depth', () => {

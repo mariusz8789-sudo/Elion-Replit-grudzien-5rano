@@ -40,6 +40,23 @@ function recordedDetail(value: unknown): string {
   try { return JSON.stringify(value); } catch { return String(value); }
 }
 
+const OUTPUT_LABELS: Readonly<Record<string, string>> = {
+  molecularWeight: 'Masa cząsteczkowa',
+  crippenLogP: 'logP (Crippen)',
+  hBondDonors: 'Donory wiązań H',
+  hBondAcceptors: 'Akceptory wiązań H',
+  rotatableBonds: 'Wiązania obrotowe',
+  ringCount: 'Pierścienie',
+  tpsa: 'TPSA',
+  fractionCsp3: 'Frakcja Csp3',
+  lipinskiViolations: 'Naruszenia Lipińskiego',
+  atoms: 'Atomy',
+};
+
+function outputLabel(key: string): string {
+  return OUTPUT_LABELS[key] ?? key.replaceAll('_', ' ');
+}
+
 export function experimentPlaybackStages(input: Props): readonly PlaybackStage[] {
   const { plan, result, replay, evidenceProposalCount, executing } = input;
   const showResearchIdentifiers = input.level === 'RESEARCH';
@@ -88,8 +105,8 @@ export function ComputationalExperimentPlayback(props: Props): JSX.Element {
   return (
     <section className="experiment-playback" data-testid="computational-experiment-playback" data-level={level} aria-label="Computational experiment playback">
       <header>
-        <strong>LIVE STATUS / AUDIT PLAYBACK</strong>
-        <span className="pill pill-warn">COMPUTATIONAL · NOT WET-LAB TELEMETRY</span>
+        <strong>LIVE COMPUTATIONAL EXPERIMENT</strong>
+        <span className="pill pill-warn">REAL ENGINE · NOT WET-LAB TELEMETRY</span>
       </header>
       <ol className="experiment-playback-stages">
         {stages.map((stage) => (
@@ -109,10 +126,13 @@ export function ComputationalExperimentPlayback(props: Props): JSX.Element {
           ))}
         </ol>
       )}
-      {visibleFacts.length > 0 && level !== 'SCHOOL' && (
-        <dl className="experiment-output-facts" data-testid="experiment-output-facts">
-          {visibleFacts.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}
-        </dl>
+      {visibleFacts.length > 0 && (
+        <section className="experiment-live-output" data-testid="experiment-live-output" aria-label="Real engine output">
+          <div className="experiment-live-output-head"><span>REAL ENGINE OUTPUT</span><small>{props.result?.selectedEngine ? `${props.result.selectedEngine.engineName} ${props.result.selectedEngine.engineVersion ?? ''}`.trim() : 'registered engine'}</small></div>
+          <dl className="experiment-output-facts" data-testid="experiment-output-facts">
+            {visibleFacts.map(([key, value]) => <div key={key}><dt>{outputLabel(key)}</dt><dd>{value}</dd></div>)}
+          </dl>
+        </section>
       )}
       {level === 'RESEARCH' && props.result && (
         <details data-testid="research-execution-details"><summary>Research provenance and limitations</summary>

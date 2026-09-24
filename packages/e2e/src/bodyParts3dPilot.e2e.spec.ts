@@ -83,13 +83,18 @@ test('desktop: full level loads, raycast picks the isolated reference liver, car
   await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
 
   // Real raycast through the existing pointer path: click where the isolated liver projects on the canvas.
-  const canvas = page.locator('canvas').first();
   await expect.poll(async () => (await diagnostics(page)).organScreenPositions.map((o) => o.id).join(','), { timeout: 300_000 }).toBe('liver');
   const frame = Number(await page.getByTestId('scientific-worlds').getAttribute('data-frames'));
   await expect.poll(async () => Number(await page.getByTestId('scientific-worlds').getAttribute('data-frames')), { timeout: 300_000 }).toBeGreaterThan(frame + 3);
   const liver = (await diagnostics(page)).organScreenPositions.find((o) => o.id === 'liver')!;
-  const box = (await canvas.boundingBox())!;
-  await page.mouse.click(box.x + liver.x, box.y + liver.y);
+  // The scene renderer is the largest visible canvas (the microscope canvas sits in a hidden tab).
+  const box = await page.evaluate(() => {
+    const r = [...document.querySelectorAll('canvas')].map((c) => c.getBoundingClientRect()).filter((b) => b.width > 0 && b.height > 0).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+    return { x: r.left, y: r.top };
+  });
+  const target = { x: box.x + liver.x, y: box.y + liver.y };
+  console.log(`[bp3d] desktop pick at ${Math.round(target.x)},${Math.round(target.y)} over ${await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName ?? 'none', target)}`);
+  await page.mouse.click(target.x, target.y);
   await expect.poll(async () => (await diagnostics(page)).lastPickedNode, { timeout: 300_000 }).toBe('liver');
   const render = (await diagnostics(page)).render;
   console.log(`[bp3d] desktop: ${d.map((x) => `${x.runtimePath.split('/').pop()} ${x.bytes} B ${Math.round(x.loadMs)} ms`).join(' · ')}`);

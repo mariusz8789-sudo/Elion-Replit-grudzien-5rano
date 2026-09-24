@@ -68,7 +68,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const initialLungSimulation = initialQuery.get('simulation') === 'lung-exposure';
   const initialExposure = (['healthy', 'cigarette', 'vaping', 'cannabis'].includes(initialQuery.get('exposure') ?? '') ? initialQuery.get('exposure') : 'cigarette') as LungExposure;
   const initialYears = ([1, 5, 10].includes(Number(initialQuery.get('years'))) ? Number(initialQuery.get('years')) : 1) as LungTimelineYears;
-  const [lungExposure] = useState<LungExposure>(initialExposure);
+  const [lungSimulation, setLungSimulation] = useState(initialLungSimulation);
+  const [lungExposure, setLungExposure] = useState<LungExposure>(initialExposure);
   const [lungYears, setLungYears] = useState<LungTimelineYears>(initialYears);
   const [inspectorOpen, setInspectorOpen] = useState(initialBlood);
   const [peek, setPeek] = useState<'closed' | 'hover' | 'pinned'>('closed');
@@ -90,6 +91,18 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const [organId, setOrganId] = useState<string>(() => (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId) ? anatomy.selectedNodeId : 'heart'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => { if (anatomy.selectedNodeId && organs.some((o) => o.id === anatomy.selectedNodeId)) setOrganId(anatomy.selectedNodeId); }, [anatomy.selectedNodeId, organs]);
+  useEffect(() => {
+    const syncFromRoute = (): void => {
+      const query = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+      const exposure = query.get('exposure');
+      const years = Number(query.get('years'));
+      setLungSimulation(query.get('simulation') === 'lung-exposure');
+      if (['healthy', 'cigarette', 'vaping', 'cannabis'].includes(exposure ?? '')) setLungExposure(exposure as LungExposure);
+      if ([1, 5, 10].includes(years)) setLungYears(years as LungTimelineYears);
+    };
+    window.addEventListener('hashchange', syncFromRoute);
+    return () => window.removeEventListener('hashchange', syncFromRoute);
+  }, []);
   const selectedNode = manifest.nodes.find((node) => node.id === anatomy.selectedNodeId);
   useEffect(() => { setSystem(selectedNode?.kind === 'SYSTEM' ? selectedNode.system ?? null : null); }, [selectedNode]);
 
@@ -105,7 +118,7 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
   const referenceNodes = referenceAnatomy?.nodes ?? {};
   const reference = organ ? referenceNodes[organ.id] ?? null : null;
   const referenceShown = Object.keys(referenceNodes).length > 0;
-  const lungModel = initialLungSimulation ? runLungExposureModel(lungExposure, lungYears) : null;
+  const lungModel = lungSimulation ? runLungExposureModel(lungExposure, lungYears) : null;
   const setLungTimeline = (years: LungTimelineYears): void => {
     setLungYears(years);
     const [path, query = ''] = window.location.hash.split('?');

@@ -236,3 +236,57 @@
   .start-door,
   .gdd-table tbody tr { transition: none !important; }
 }
+
+/* Mobile home is one composed screen: a short visual identity above the one
+   conversation. The full desktop hero must never turn into a second page of
+   controls competing with Chat. */
+@media (max-width: 900px) {
+  .shell-main-split {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden !important;
+  }
+  .shell-main-split .shell-route {
+    flex: 0 0 min(32dvh, 17rem) !important;
+    min-height: 12rem;
+    overflow: hidden !important;
+  }
+  .shell-main-split .shell-chat {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    border-top-color: rgba(119, 232, 242, 0.18);
+  }
+  .shell-main-split .home-dashboard,
+  .shell-main-split .start { height: 100%; min-height: 0; overflow: hidden; }
+  .shell-main-split .start { display: block; padding: 0; }
+  .shell-main-split .start-head {
+    position: absolute;
+    inset: auto 1rem 1rem;
+    z-index: 2;
+    max-width: min(21rem, calc(100% - 2rem));
+    padding: 0;
+  }
+  .shell-main-split .start-title {
+    margin: 0;
+    font-size: clamp(1.35rem, 7vw, 1.9rem);
+    line-height: 1.06;
+  }
+  .shell-main-split .start-brand,
+  .shell-main-split .start .gx-eyebrow,
+  .shell-main-split .start-lede,
+  .shell-main-split .start-ask,
+  .shell-main-split .start-primary-actions,
+  .shell-main-split .start-journey,
+  .shell-main-split .start-status,
+  .shell-main-split .home-more,
+  .shell-main-split .home-more-body { display: none !important; }
+  .shell-main-split .start-holo {
+    position: absolute;
+    inset: -30% -12% auto auto;
+    width: min(78vw, 21rem);
+    height: min(78vw, 21rem);
+    min-height: 0;
+    margin: 0;
+    opacity: .72;
+  }
+}

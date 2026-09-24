@@ -4720,6 +4720,22 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
   padding: var(--sp-2);
 }
 
+/* The conversation starts as a calm scientific prompt, not a manual. */
+.science-chat-empty { margin: auto; width: min(100%, 30rem); padding: 1.25rem; text-align: center; }
+.science-chat-empty > span { color: var(--cyan); font: 650 .62rem/1.2 var(--font-mono); letter-spacing: .16em; }
+.science-chat-empty h2 { margin: .55rem 0 .35rem; font-size: clamp(1.35rem, 4vw, 2rem); }
+.science-chat-empty p { margin: 0 auto 1rem; max-width: 34ch; color: var(--text-dim); line-height: 1.5; }
+.science-chat-empty > div { display: flex; justify-content: center; flex-wrap: wrap; gap: .45rem; }
+.science-chat-empty button { padding: .48rem .8rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text); background: rgba(92, 214, 232, .06); cursor: pointer; }
+.science-chat-empty button:hover { border-color: var(--cyan); background: rgba(92, 214, 232, .13); }
+.sc-long-answer > summary { cursor: pointer; list-style: none; display: grid; gap: .55rem; }
+.sc-long-answer > summary::-webkit-details-marker { display: none; }
+.sc-long-answer > summary b { color: var(--cyan); font: 650 .68rem/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.sc-long-answer[open] > summary { display: none; }
+.sc-long-answer > div { white-space: pre-wrap; }
+.science-chat-next-action { flex: 0 0 auto; display: flex; justify-content: flex-end; padding: .5rem .7rem; border-top: 1px solid var(--border); }
+.science-chat-capsule-wrap > .evidence-capsule { margin: .55rem; }
+
 /* Genesis background fabric. Fixed behind everything, never interactive,
    never a scroll or hit-test participant. `mix-blend-mode: screen` lets it
    read as light in the scene rather than as a sheet of text pasted on top. */
@@ -5819,6 +5835,11 @@ html, body, #root { min-height: 100%; background: #000 !important; }
     text-overflow: clip;
     white-space: normal;
   }
+
+  .science-chat-log { padding: .65rem; gap: .55rem; }
+  .sc-turn { max-width: 94%; }
+  .sc-text { font-size: .92rem; line-height: 1.52; }
+  .science-chat-empty { padding: 1rem .5rem; }
 }
 
 @media (max-width: 480px) {

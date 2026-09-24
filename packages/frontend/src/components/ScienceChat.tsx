@@ -76,15 +76,6 @@ interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag;
 
 type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
 
-const NEXT_MOVES = [
-  { label: 'TEST THIS', prompt: 'Zaproponuj test dla ostatniej hipotezy.' },
-  { label: 'CHALLENGE IT', prompt: 'Spróbuj obalić ostatnią hipotezę.' },
-  { label: 'FIND COUNTEREVIDENCE', prompt: 'Znajdź kontrdowody dla ostatniego wyniku.' },
-  { label: 'BUILD MODEL', prompt: 'Zbuduj jawny model dla tego pytania.' },
-  { label: 'COMPARE HYPOTHESES', prompt: 'Porównaj konkurencyjne hipotezy dla tego pytania.' },
-  { label: 'GO DEEPER', prompt: 'Idź głębiej: pokaż założenia, niepewności i ograniczenia.' },
-] as const;
-
 function latestUserQuestion(turns: readonly ChatTurn[]): string | null {
   return [...turns].reverse().find((turn) => turn.role === 'user')?.text ?? null;
 }
@@ -337,33 +328,22 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
   );
 }
 
-const SUGGESTIONS = [
-  'Zasymuluj epidemię z R0=5 przez 10 dni seed=12',
-  'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
-  'Pokaż diagram Minkowskiego beta=0.5',
-  'Oblicz promień Schwarzschilda dla 2 masy Słońca',
-  'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda',
-  'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km',
-  'Oblicz energię relatywistyczną cząstki beta=0.8',
-  'Pokaż życie gwiazdy o masie 10 masy Słońca',
-  'Obróć tesserakt: XW=45, YZ=30, podwójna rotacja',
-  'Pokaż zderzenie galaktyk: stosunek mas=1.25, 24 mln lat',
-  'Porównaj krzywą rotacji galaktyki MOND',
-  'Zbadaj problem trzech ciał',
-  'Zwiększ masę 2×',
-  'Co się zmieniło?',
-  'Pokaż równanie',
-  'Porównaj SIR R0=1.5 z SIR R0=3',
-  'Pokaż Evidence i Replay',
-  'Zaproponuj kolejny eksperyment',
-  'Zapisz eksperyment',
-  'Pokaż zapisane',
-  'Otwórz kampanię naukową',
-  'Uruchom model pompa–rurociąg: przepływ wody',
-  'Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å',
-  'Pokaż tunelowanie pakietu falowego 1D: bariera=1 szerokość=3',
-  'Uruchom model Isinga: temperatura=2.2 seed=42',
-];
+const QUICK_STARTS = [
+  { label: 'Lek', prompt: 'Porównaj właściwości aspiryny w laboratorium.' },
+  { label: 'Chemia', prompt: 'Uruchom miareczkowanie kwasowo-zasadowe NaOH.' },
+  { label: 'Fizyka', prompt: 'Pokaż czarną dziurę 3D i trajektorię światła.' },
+] as const;
+
+function TurnText({ turn }: { turn: ChatTurn }) {
+  if (turn.role !== 'genesis' || turn.text.length < 520) return <>{turn.text}</>;
+  const firstLine = turn.text.split(/\n|(?<=[.!?])\s/)[0] ?? turn.text.slice(0, 180);
+  return (
+    <details className="sc-long-answer">
+      <summary><span>{firstLine}</span><b>Czytaj więcej</b></summary>
+      <div>{turn.text}</div>
+    </details>
+  );
+}
 
 /**
  * `inline` turns this from a floating panel into the main workspace column
@@ -376,11 +356,7 @@ const SUGGESTIONS = [
 export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [turns, setTurns] = useState<ChatTurn[]>([{
-    role: 'genesis',
-    text: 'Cześć! Jestem Science Chat. Możesz napisać np. „uruchom trzęsienie ziemi magnitude=5.4 depth=12 km”, potwierdzić plan, a następnie zobaczyć wynik w City3D z Evidence i Replay. Obsługuję też istniejące laboratoria i sterowanie otwartą symulacją.',
-    tag: 'SYSTEM',
-  }]);
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const [biotechWorkspaceSuggested, setBiotechWorkspaceSuggested] = useState(false);
@@ -991,7 +967,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       <header className="science-chat-head">
         <div>
           <strong>GENESIS</strong>
-          <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
+          {ctxName && <span className="science-chat-ctx">Aktywne: {ctxName}</span>}
           {projectAccess && <span className="science-chat-ctx" title="Poziom egzekwowany przez backend">dostęp: {projectAccess.accessLevel} · {projectAccess.canRun ? 'run dozwolony' : 'run zablokowany'}</span>}
         </div>
         {!inline && <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>}
@@ -999,7 +975,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
       <DiscoveryStageRail stage={stage} />
 
-      <details className="science-chat-secondary science-chat-research">
+      {(turns.length > 0 || pendingGuidedPlan || lastEvidenceCapsule) && <details className="science-chat-secondary science-chat-research">
         <summary>Szczegóły badawcze</summary>
         <div className="research-tools" aria-label="Research workspace tools">
           {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit', 'access'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
@@ -1011,9 +987,17 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
         {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
         {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}
-      </details>
+      </details>}
 
       <div className="science-chat-log" ref={scrollRef}>
+        {turns.length === 0 && (
+          <section className="science-chat-empty" aria-label="Rozpocznij badanie">
+            <span>ONE CHAT · ONE LAB</span>
+            <h2>Co chcesz zbadać?</h2>
+            <p>Opisz cel. Genesis wybierze właściwe laboratorium i pokaże wynik.</p>
+            <div>{QUICK_STARTS.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
+          </section>
+        )}
         {turns.map((t, i) => (
           <div key={i} className={`sc-turn sc-${t.role}`}>
             {t.role === 'genesis' && t.tag && (
@@ -1021,7 +1005,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
                 {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · TODO' : ''}
               </span>
             )}
-            <div className="sc-text">{t.text}</div>
+            <div className="sc-text"><TurnText turn={t} /></div>
             {t.quantum && <QuantumHistogram data={t.quantum} />}
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
@@ -1041,7 +1025,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         />
       )}
 
-      {lastEvidenceCapsule && <div className="science-chat-capsule-wrap"><EvidenceCapsule capsule={lastEvidenceCapsule} /></div>}
+      {lastEvidenceCapsule && <details className="science-chat-capsule-wrap science-chat-secondary"><summary>Wynik potwierdzony · Evidence i replay</summary><EvidenceCapsule capsule={lastEvidenceCapsule} /></details>}
 
       {pendingGuidedPlan?.status === 'READY_FOR_CONFIRMATION' && (
         <div className="science-chat-suggest" aria-label="Potwierdzenie planu eksperymentu">
@@ -1049,10 +1033,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           <button className="chip-btn" disabled={backendConfirmationPending} onClick={() => void send('anuluj plan')}>Anuluj plan</button>
         </div>
       )}
-      <details className="next-move-panel" aria-label="Next Move">
-        <summary>Następny eksperyment</summary>
-        <div className="next-move-grid">{NEXT_MOVES.map((move) => <button key={move.label} className="next-move-btn" onClick={() => void send(move.prompt)} disabled={backendConfirmationPending}><strong>{move.label}</strong><span>{move.prompt}</span></button>)}</div>
-      </details>
+      {lastEvidenceCapsule && <div className="science-chat-next-action"><button type="button" className="chip-btn primary" onClick={() => void send('Zaproponuj kolejny eksperyment.')} disabled={backendConfirmationPending}>Następny eksperyment →</button></div>}
 
       {biotechWorkspaceSuggested && (
         <div className="science-chat-suggest" aria-label="Przejście do Drug Discovery">
@@ -1061,22 +1042,13 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         </div>
       )}
 
-      <details className="science-chat-secondary science-chat-examples">
-        <summary>Przykłady pytań</summary>
-        <div className="science-chat-suggest">
-          {SUGGESTIONS.map((s) => (
-            <button key={s} className="chip-btn" onClick={() => send(s)}>{s}</button>
-          ))}
-        </div>
-      </details>
-
       <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <input
           className="generator-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={backendConfirmationPending}
-          placeholder="Napisz komendę lub pytanie…"
+          placeholder="Co chcesz zbadać?"
           aria-label="Wiadomość do Science Chat"
         />
         <button className="primary-btn" type="submit" disabled={!input.trim() || backendConfirmationPending}>Wyślij</button>

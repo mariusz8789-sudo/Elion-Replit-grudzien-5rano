@@ -226,7 +226,8 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await humanTab(page, 'explore');
     await page.getByTestId('sw-explorer-organ-heart').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Narząd: Heart');
-    await expect(page.getByTestId('sw-explorer-organ')).toHaveAttribute('data-organ', 'heart');
+    // The organ card with data-organ was merged away (7c262fa9); the chosen organ is the selected chip.
+    await expect(page.getByTestId('sw-explorer-organ-heart')).toHaveAttribute('aria-selected', 'true');
     const cellRung = page.getByTestId('sw-explorer-rung-cell');
     await expect(cellRung).toBeDisabled({ timeout: 10_000 });
     await expect(cellRung).toBeEnabled({ timeout: 400_000 });

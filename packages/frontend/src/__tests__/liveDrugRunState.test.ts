@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest';
+import { projectDrugRun, type CampaignEventRecord } from '../core/liveExperiment/drugRunState';
+import type { CampaignCandidate } from '../core/backend/client';
+
+const cand = (id: string, generation: number, smiles: string, parent: string | null, transformation: string | null, status = 'retained'): CampaignCandidate => ({
+  id, generation, parentSmiles: parent, transformation, canonicalSmiles: smiles, valid: true,
+  descriptors: { mw: 78.1 }, objectiveVector: {}, constraintViolations: [], pareto: generation === 1, status, rejectedReason: status === 'rejected' ? 'constraint:mw' : null, runIds: [],
+});
+let seq = 0;
+const ev = (type: string, generation: number, payload: Record<string, unknown>): CampaignEventRecord => ({ seq: ++seq, id: `e${seq}`, generation, type, payload, createdAt: 1000 + seq });
+
+const candidates = [cand('c0', 0, 'c1ccccc1', null, null), cand('c1', 1, 'Cc1ccccc1', 'c1ccccc1', 'add-methyl'), cand('c2', 1, 'Oc1ccccc1', 'c1ccccc1', 'add-hydroxyl', 'rejected')];
+const events = [
+  ev('OBJECTIVE_RECEIVED', 0, {}),
+  ev('GENERATION_COMPLETED', 1, {}),
+  ev('STOPPING_CONDITION_REACHED', 1, { stopReason: 'BUDGET_EXHAUSTED' }),
+  ev('STAGE_RESULT', 1, { stage: 'admet', candidateId: 'c1', reason: 'ADMET_COMPUTED', admetRunId: 'r-admet' }),
+  ev('STAGE_SELECTION', 1, { stage: 'docking', candidateId: 'c1', reason: 'SELECTED_FOR_DOCKING' }),
+  ev('STAGE_RESULT', 1, { stage: 'docking', candidateId: 'c1', reason: 'DOCKING_RESULT_RETAINED', bestAffinityKcalMol: -5.4, runId: 'r-dock' }),
+  ev('STAGE_BLOCKED', 1, { stage: 'quantum', blocker: 'BLOCKED_BY_RUNTIME' }),
+];
+
+describe('projectDrugRun — one read model of the live drug run', () => {
+  it('copies persisted facts and computes nothing scientific', () => {
+    const s = projectDrugRun({ events, candidates, maxGenerations: 2, jobRunning: false });
+    expect(s.stage).toBe('COMPLETED');
+    expect(s.generationsCompleted).toBe(1);
+    expect(s.lastSeq).toBe(events.at(-1)!.seq);
+    const c1 = s.candidates.find((c) => c.id === 'c1')!;
+    expect(c1.stages.docking).toEqual({ status: 'COMPUTED', value: -5.4, unit: 'kcal/mol', runId: 'r-dock', reason: 'DOCKING_RESULT_RETAINED' });
+    expect(c1.stages.admet?.runId).toBe('r-admet');
+    expect(s.blocked).toEqual([{ stage: 'quantum', blocker: 'BLOCKED_BY_RUNTIME' }]);
+    expect(s.lineage).toEqual([
+      { parent: 'c1ccccc1', transformation: 'add-methyl', product: 'Cc1ccccc1', status: 'retained' },
+      { parent: 'c1ccccc1', transformation: 'add-hydroxyl', product: 'Oc1ccccc1', status: 'rejected' },
+    ]);
+    expect(s.progress.docking).toEqual({ done: 1, planned: 1 });
+  });
+
+  it('mid-run: the stage follows the latest persisted activity, and a new event changes the state hash', () => {
+    const partial = projectDrugRun({ events: events.slice(0, 5), candidates, maxGenerations: 2, jobRunning: true });
+    expect(partial.stage).toBe('DOCKING');
+    expect(partial.progress.docking).toEqual({ done: 0, planned: 1 });
+    const later = projectDrugRun({ events: events.slice(0, 6), candidates, maxGenerations: 2, jobRunning: true });
+    expect(later.stateHash).not.toBe(partial.stateHash);
+  });
+
+  it('is deterministic and order-independent in its inputs', () => {
+    const a = projectDrugRun({ events, candidates, maxGenerations: 2, jobRunning: false });
+    const b = projectDrugRun({ events: [...events].reverse(), candidates: [...candidates].reverse(), maxGenerations: 2, jobRunning: false });
+    expect(b.stateHash).toBe(a.stateHash);
+  });
+});

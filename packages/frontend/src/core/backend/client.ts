@@ -745,6 +745,12 @@ export async function listCampaignCandidates(token: string, projectId: string, c
   return r.ok ? { ok: true, data: r.data.candidates } : r;
 }
 
+/** Append-only campaign events after `afterSeq` (0 = all), in insertion order — the live run's source of truth. */
+export async function listCampaignEvents(token: string, projectId: string, campaignId: string, afterSeq = 0): Promise<ApiResult<import('../liveExperiment/drugRunState').CampaignEventRecord[]>> {
+  const r = await request<{ events: import('../liveExperiment/drugRunState').CampaignEventRecord[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/events?after=${Math.max(0, Math.floor(afterSeq))}`, { token });
+  return r.ok ? { ok: true, data: r.data.events } : r;
+}
+
 export async function listCampaignDecisions(token: string, projectId: string, campaignId: string): Promise<ApiResult<CampaignDecision[]>> {
   const r = await request<{ decisions: CampaignDecision[] }>('GET', `/projects/${projectId}/campaigns/${campaignId}/decisions`, { token });
   return r.ok ? { ok: true, data: r.data.decisions } : r;

@@ -561,7 +561,11 @@ export function openDatabase(filename = ':memory:') {
   const db = new DatabaseSync(filename);
   try {
     db.exec('PRAGMA foreign_keys = ON;');
-    if (filename !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
+    if (filename !== ':memory:') {
+      db.exec('PRAGMA journal_mode = WAL;');
+      // A heavy job writes from a worker thread on its own connection; wait for the lock instead of failing.
+      db.exec('PRAGMA busy_timeout = 5000;');
+    }
     db.exec(SCHEMA);
     migrate(db);
     ensureAccessSchema(db);

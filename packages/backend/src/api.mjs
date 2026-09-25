@@ -668,7 +668,7 @@ export function handleApi(db, ctx) {
           return ok({ candidates: campaignStore.listCandidates(db, campaignId, Number.isFinite(gen) ? gen : null) });
         }
         if (seg[4] === 'decisions') return ok({ decisions: campaignStore.listDecisions(db, campaignId) });
-        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId) });
+        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId, { afterSeq: ctx.query?.after }) });
         if (seg[4] === 'graph') return ok({ graph: buildDiscoveryGraph(db, campaignId) });
         if (seg[4] === 'report') return ok({ report: buildCandidateResearchMatrix(db, campaignId) });
         if (seg[4] === 'why') return whyHandler(db, campaignId, ctx.query ?? {});

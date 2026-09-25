@@ -5896,3 +5896,15 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 /* One place, several views (city 3D/2D, CERN hall/detector): the tab row under the TopBar. */
 .view-switch { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.4rem 1rem; }
 .view-switch .chip-btn[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+
+/* Drug journey: the frozen hypothesis and plan shown before the live lab run. */
+.journey-hypothesis { display: grid; gap: 0.45rem; padding: 0.75rem 0.9rem; border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 0.6rem; background: rgba(8, 18, 32, 0.6); }
+.journey-hypothesis > span { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--cyan, #67e8f9); }
+.journey-hypothesis p { margin: 0; }
+.journey-hypothesis ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.2rem; }
+.journey-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* Drug bench live panel in the laboratory. */
+.sw-drug-live .sw-drug-dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; margin: 0.4rem 0; }
+.sw-drug-live .sw-drug-dl dt { color: #94a3b8; }
+.sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }
+.sw-drug-note { font-size: 0.75rem; color: #94a3b8; margin: 0.3rem 0 0; }

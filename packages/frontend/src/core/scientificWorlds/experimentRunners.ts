@@ -9,6 +9,8 @@ import { canonicalJson } from '../events/hash';
 import type { ExperimentRunResult, ExperimentRunner, SessionInputs } from './experimentSession';
 import { ION_PRESETS } from './ionPresets';
 import { runTitrationScenario } from '../../labs/experiments/chemistry-titration';
+import { getLiveDrugRun } from '../liveExperiment/liveDrugRun';
+import type { LiveDrugRunState } from '../liveExperiment/drugRunState';
 
 /**
  * SCIENTIFIC WORLDS — EXPERIMENT RUNNERS.
@@ -24,7 +26,7 @@ import { runTitrationScenario } from '../../labs/experiments/chemistry-titration
  * a model to a fact.
  */
 
-export type LabExperimentId = 'crystal-synthesis' | 'chemistry-titration' | 'collision-batch' | 'micro-blackhole' | 'seir-epidemic' | 'spacetime-photon';
+export type LabExperimentId = 'crystal-synthesis' | 'chemistry-titration' | 'collision-batch' | 'micro-blackhole' | 'seir-epidemic' | 'spacetime-photon' | 'drug-candidate-run';
 
 export interface CrystalArtifact { readonly kind: 'crystal'; readonly sites: readonly LatticeSite[]; readonly lattice: string; readonly name: string; readonly aPm: number; }
 export interface CollisionArtifact { readonly kind: 'collision'; readonly finals: readonly FinalParticle[]; readonly process: string; readonly eventId: string; readonly batchSize: number; }
@@ -35,7 +37,11 @@ export interface TitrationArtifact {
   readonly kind: 'titration'; readonly acid: string; readonly acidName: string; readonly ka: number;
   readonly vb: number; readonly ph: number; readonly veq: number; readonly pKa: number;
 }
+/** The drug bench: the live run's own read model, exactly as the backend pipeline persisted it. */
+export interface DrugRunArtifact { readonly kind: 'drug-run'; readonly campaignId: string; readonly state: LiveDrugRunState; }
 export type LabArtifact = CrystalArtifact | TitrationArtifact | CollisionArtifact | BlackHoleArtifact | EpidemicArtifact | SpacetimeArtifact;
+/** Everything the lab runner can seal: the scene-drawn artifacts plus the drug bench's run state (drawn by its own layer). */
+export type LabRunnerArtifact = LabArtifact | DrugRunArtifact;
 
 const CTX = (worldId: string) => ({ kernelId: 'genesis-cyber-kernel', route: '#/scientific-worlds', operatorId: `AGENT:${worldId}` });
 
@@ -60,8 +66,8 @@ export function epidemicParamsFrom(inputs: SessionInputs): EpidemicParams {
   };
 }
 
-export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedger): ExperimentRunner<LabArtifact> {
-  return (experimentId, seed, inputs): ExperimentRunResult<LabArtifact> => {
+export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedger): ExperimentRunner<LabRunnerArtifact> {
+  return (experimentId, seed, inputs): ExperimentRunResult<LabRunnerArtifact> => {
     switch (experimentId as LabExperimentId) {
       case 'chemistry-titration': {
         // This is the same bounded charge-balance runner exposed by the canonical backend Fabric model.
@@ -175,6 +181,40 @@ export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedge
           engineLabel: a.label,
           steps: ['inputs: mass, impact parameter, emitter/receiver distances (defaults: Sun, solar limb, 1 AU)', 'flat baseline: same geometry with M = 0', 'first-order Shapiro delay and Einstein deflection', 'regime check (b > 20 r_s)', 'ledger commit'],
           artifact: { kind: 'spacetime', report: r },
+        };
+      }
+      case 'drug-candidate-run': {
+        // The bench computes nothing: the backend campaign (RDKit → ADMET-AI → Vina → PySCF) already ran while the
+        // agent worked the console. This seals THAT run's persisted state; replay re-reads the same state.
+        const campaignId = String(inputs.campaign ?? '');
+        const run = getLiveDrugRun(campaignId);
+        if (!run) throw new Error(`DRUG_RUN_NOT_STARTED ${campaignId}`);
+        if (run.phase === 'FAILED') throw new Error(`DRUG_RUN_FAILED ${run.error ?? ''}`.trim());
+        if (run.phase !== 'DONE') throw new Error('DRUG_RUN_STILL_COMPUTING');
+        const st = run.state;
+        const retained = st.candidates.filter((c) => c.status === 'retained');
+        const affinities = st.candidates.map((c) => c.stages.docking).filter((m) => m?.status === 'COMPUTED' || m?.status === 'PASSED').map((m) => m!.value).filter((v): v is number => v !== null);
+        const gaps = st.candidates.map((c) => c.stages.quantum).filter((m) => m?.status === 'COMPUTED').map((m) => m!.value).filter((v): v is number => v !== null);
+        const record = ledger.addRecord({
+          sourceUrl: `genesis://worlds/${worldId}/drug-candidate-run/${campaignId}`,
+          sourceTimestamp: null,
+          claim: `Drug campaign ${campaignId}: ${st.candidates.length} candidates (${retained.length} retained), stop=${st.stopReason ?? 'n/a'}, state=${st.stateHash}`,
+          claimType: 'model', confidence: 1,
+          provenance: { sourceKind: 'dataset', retrievedBy: 'drug-bench-live-run', independentSourceIds: [] },
+        });
+        return {
+          outputs: {
+            campaignId, stateHash: st.stateHash, candidates: st.candidates.length, retained: retained.length,
+            generations: st.generationsCompleted, stopReason: st.stopReason ?? 'NONE',
+            ...(affinities.length ? { bestAffinityKcalMol: Math.min(...affinities) } : {}),
+            ...(gaps.length ? { homoLumoGapEv: gaps[0]! } : {}),
+            blockedStages: st.blocked.map((b) => b.stage).join(',') || 'NONE',
+          },
+          evidenceHashes: [record.record.contentHash],
+          epistemicStatus: 'MODEL',
+          engineLabel: 'Backend campaign pipeline: RDKit descriptors/transforms, ADMET-AI, AutoDock Vina, PySCF (MODEL_ESTIMATE)',
+          steps: ['campaign generation (RDKit)', 'ADMET/toxicity estimates', 'docking (Vina)', 'quantum chemistry (PySCF)', 'persisted events → read model', 'ledger commit'],
+          artifact: { kind: 'drug-run', campaignId, state: st },
         };
       }
       default:

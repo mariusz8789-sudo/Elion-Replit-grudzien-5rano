@@ -55,6 +55,12 @@ export interface AgentControllerOptions {
   readonly reportSeconds?: number;
   /** Seed for every experiment this agent runs, unless the command carries its own. */
   readonly defaultSeed?: number;
+  /**
+   * A station whose engine runs outside this frame (a backend pipeline) returns its real state here;
+   * the agent stays EXECUTING at the console until `ready`, reporting `progress` from the engine, and
+   * only then seals the session through the runner. `null` (or no gate) = the synchronous path.
+   */
+  readonly engineGate?: (stationId: string, experimentId: string, inputs: Readonly<Record<string, unknown>>) => { readonly ready: boolean; readonly progress: number } | null;
 }
 
 export interface AgentUpdate {
@@ -119,6 +125,8 @@ export class AgentController {
   private simulationSeconds = 0;
   private lastDeltaSeconds = 0;
   private lastProgress = 0;
+  /** True while an EXECUTE step waits for an out-of-frame engine (see `engineGate`). */
+  private awaitingEngine = false;
 
   constructor(private readonly options: AgentControllerOptions) {
     this.position = { ...options.start.position };
@@ -144,7 +152,7 @@ export class AgentController {
     const condition = kind === 'NAVIGATE' ? 'remainingWaypoints = 0' : kind === 'ALIGN' ? '|targetFacing - facing| < 0.03 rad'
       : kind === 'REACH' ? `timer >= ${this.reachSeconds}s` : kind === 'INTERACT' ? `timer >= ${this.interactSeconds}s`
       : kind === 'OBSERVE' ? `timer >= ${this.observeSeconds}s` : kind === 'REPORT' ? `timer >= ${this.reportSeconds}s`
-      : kind === 'EXECUTE' ? 'sealed session announced on next update' : 'no timed transition';
+      : kind === 'EXECUTE' ? (this.awaitingEngine ? 'engine gate ready (real run finished)' : 'sealed session announced on next update') : 'no timed transition';
     return { updateCount: this.updateCount, simulationSeconds: this.simulationSeconds, lastDeltaSeconds: this.lastDeltaSeconds,
       state: this.context.state, stepIndex: this.stepIndex, stepKind: kind, targetId: this.context.targetId, stationId: this.currentStationId,
       progress: this.lastProgress, timerSeconds: this.timer, remainingWaypoints: this.waypoints.length, blockedReason: this.context.blockedReason, transitionCondition: condition };
@@ -163,6 +171,7 @@ export class AgentController {
   }
 
   reset(): void {
+    this.awaitingEngine = false;
     this.context = INITIAL_AGENT_CONTEXT; this.plan = null; this.stepIndex = -1; this.waypoints = []; this.nav = null; this.timer = 0; this.reach = 0; this.speed = 0; this.headPitch = 0;
   }
 
@@ -224,24 +233,32 @@ export class AgentController {
       case 'EXECUTE': {
         this.apply({ type: 'INTERACTION_DONE' });
         if (this.context.state !== 'EXECUTING') return;
-        const seed = typeof step.inputs.seed === 'number' ? step.inputs.seed : (this.options.defaultSeed ?? 7);
-        const { seed: _omit, ...inputs } = step.inputs;
-        void _omit;
-        try {
-          this.logicalTime++;
-          const sealed = createExperimentSession({ worldId: this.options.worldId, stationId: step.stationId, experimentId: step.experimentId, seed, inputs, logicalTime: this.logicalTime }, this.options.runner);
-          this.sealed = sealed;
-          this.lastSession = sealed.session;
-          this.apply({ type: 'EXECUTION_DONE', sessionId: sealed.session.sessionId });
-        } catch (e) {
-          this.lastSession = null;
-          this.apply({ type: 'BLOCKED', reason: e instanceof Error ? e.message : String(e) });
-        }
+        const gate = this.options.engineGate?.(step.stationId, step.experimentId, step.inputs) ?? null;
+        if (gate && !gate.ready) { this.awaitingEngine = true; return; }
+        this.executeNow(step);
         break;
       }
       case 'OBSERVE': if (this.context.state === 'EXECUTING') this.apply({ type: 'EXECUTION_DONE', sessionId: this.lastSession?.sessionId ?? 'none' }); break;
       case 'REPORT': if (this.context.state === 'OBSERVING') this.apply({ type: 'OBSERVATION_DONE' }); else if (this.context.state === 'IDLE' || this.context.state === 'ARRIVED') { /* report-only plan: no body work */ } break;
       case 'DEFER': break;
+    }
+  }
+
+  /** Seals the session for an EXECUTE step through the runner (the engine result already exists). */
+  private executeNow(step: Extract<ActionStep, { kind: 'EXECUTE' }>): void {
+    this.awaitingEngine = false;
+    const seed = typeof step.inputs.seed === 'number' ? step.inputs.seed : (this.options.defaultSeed ?? 7);
+    const { seed: _omit, ...inputs } = step.inputs;
+    void _omit;
+    try {
+      this.logicalTime++;
+      const sealed = createExperimentSession({ worldId: this.options.worldId, stationId: step.stationId, experimentId: step.experimentId, seed, inputs, logicalTime: this.logicalTime }, this.options.runner);
+      this.sealed = sealed;
+      this.lastSession = sealed.session;
+      this.apply({ type: 'EXECUTION_DONE', sessionId: sealed.session.sessionId });
+    } catch (e) {
+      this.lastSession = null;
+      this.apply({ type: 'BLOCKED', reason: e instanceof Error ? e.message : String(e) });
     }
   }
 
@@ -300,6 +317,13 @@ export class AgentController {
           break;
         }
         case 'EXECUTE': {
+          if (this.awaitingEngine) {
+            // The engine is still computing: hands stay at the console, progress is the engine's own.
+            const gate = this.options.engineGate?.(step.stationId, step.experimentId, step.inputs) ?? { ready: true, progress: 1 };
+            progress = gate.progress;
+            if (gate.ready) this.executeNow(step);
+            break;
+          }
           // Sealed on entry (advanceStep); one frame later the artifact is announced and we move on.
           sessionSealed = this.sealed; this.sealed = null; progress = 1;
           if (s === 'OBSERVING' || s === 'BLOCKED') this.advanceStep();

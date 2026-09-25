@@ -13,7 +13,7 @@ import type { CommandCatalog, StationDescriptor } from './worldCommand';
 
 /** Stations of the human-biology lab (V3 pack): the ids are the pack's own `station:*` ids, unchanged. */
 export type BiologyStationKind = 'human-study' | 'neuro' | 'microscopy' | 'histology' | 'imaging' | 'orpheus' | 'compute' | 'evidence' | 'safety';
-export type StationKind = 'synthesizer' | 'titration' | 'collider' | 'epidemiology' | 'window' | 'airlock' | BiologyStationKind;
+export type StationKind = 'synthesizer' | 'titration' | 'collider' | 'epidemiology' | 'window' | 'airlock' | 'drug-bench' | BiologyStationKind;
 
 export interface LabStation extends StationDescriptor {
   readonly kind: StationKind;
@@ -63,6 +63,13 @@ export const LAB_STATIONS: readonly LabStation[] = [
     id: 'st-window', kind: 'window', label: 'Okno obserwacyjne', experimentId: 'spacetime-photon',
     keywords: ['okno', 'okna', 'szyba', 'window', 'glass', 'obserwacyjne', 'observation', 'foton', 'photon', 'czasoprzestrze', 'spacetime', 'shapiro', 'ugięcie', 'ugiecie', 'światł', 'swiatl', 'light'],
     position: { x: 6.6, z: 1.5 }, facing: -Math.PI / 2, standoff: 1.2, consoleHeight: 1.1, footprint: fp(6.6, 1.5, 0.4, 3.2),
+  },
+  {
+    // Drug discovery at the bench: the backend campaign pipeline (RDKit → ADMET-AI → Vina → PySCF) runs
+    // while the agent works the console; the bench shows that run's own persisted state.
+    id: 'st-drug-bench', kind: 'drug-bench', label: 'Stanowisko odkrywania leków', experimentId: 'drug-candidate-run',
+    keywords: ['stanowisko leków', 'stanowisko lekow', 'odkrywanie leków', 'odkrywanie lekow', 'kandydat na lek', 'kandydata na lek', 'drug bench', 'drug candidate', 'dokowanie', 'docking', 'admet'],
+    position: { x: -4.4, z: 1.0 }, facing: Math.PI / 2, standoff: 1.3, consoleHeight: 0.95, footprint: fp(-4.4, 1.0, 1.2, 2.4),
   },
 ];
 

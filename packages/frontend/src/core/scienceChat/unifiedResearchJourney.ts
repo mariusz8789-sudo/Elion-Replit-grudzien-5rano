@@ -108,15 +108,21 @@ async function waitForCampaign(token: string, projectId: string, campaignId: str
   throw new Error('Candidate discovery is still running on the backend. Reopen this journey to inspect the persisted campaign state.');
 }
 
-export async function prepareDrugResearchJourney(input: {
+export interface DraftedDrugJourney {
+  project: ActiveKnowledgeProject;
+  request: DrugDiscoveryChatRequest;
+  intake: ResearchIntakeResponse;
+  campaignId: string;
+}
+
+/** Governed intake only: grounds the question and prepares (does not start) the canonical campaign. */
+export async function draftDrugResearchJourney(input: {
   token: string;
   project: ActiveKnowledgeProject;
   request: DrugDiscoveryChatRequest;
   onEvent?: (event: DrugJourneyEvent) => void;
   api?: JourneyApi;
-  wait?: (ms: number) => Promise<void>;
-  maxPolls?: number;
-}): Promise<PreparedDrugJourney> {
+}): Promise<DraftedDrugJourney> {
   const api = input.api ?? DEFAULT_API;
   input.onEvent?.({ type: 'INTAKE_STARTED' });
   const intake = await api.runResearchIntake(input.token, input.project.id, {
@@ -130,27 +136,59 @@ export async function prepareDrugResearchJourney(input: {
   if (!draft?.prepared || !draft.campaignId) {
     throw new Error(draft?.reason ?? intake.data.result.selectionExplanation ?? `Research intake stopped with ${intake.data.result.status}.`);
   }
+  return { project: input.project, request: input.request, intake: intake.data, campaignId: draft.campaignId };
+}
 
-  const started = await api.startCampaign(input.token, input.project.id, draft.campaignId);
+/** Runs the drafted campaign in the chat (the quick RDKit path) and selects up to three candidates. */
+export async function continueDrugResearchJourney(input: {
+  token: string;
+  draft: DraftedDrugJourney;
+  onEvent?: (event: DrugJourneyEvent) => void;
+  api?: JourneyApi;
+  wait?: (ms: number) => Promise<void>;
+  maxPolls?: number;
+}): Promise<PreparedDrugJourney> {
+  const api = input.api ?? DEFAULT_API;
+  const { project, campaignId } = input.draft;
+  const started = await api.startCampaign(input.token, project.id, campaignId);
   if (!started.ok) throw new Error(started.message);
   input.onEvent?.({ type: 'CAMPAIGN_STARTED' });
   const campaign = await waitForCampaign(
     input.token,
-    input.project.id,
-    draft.campaignId,
+    project.id,
+    campaignId,
     api,
     input.wait ?? ((ms) => new Promise((resolve) => window.setTimeout(resolve, ms))),
     input.maxPolls ?? 120,
   );
   if (campaign.status !== 'completed') throw new Error(`Candidate campaign stopped with ${campaign.status}.`);
 
-  const listed = await api.listCampaignCandidates(input.token, input.project.id, draft.campaignId);
+  const listed = await api.listCampaignCandidates(input.token, project.id, campaignId);
   if (!listed.ok) throw new Error(listed.message);
   const eligible = listed.data.filter((candidate) => candidate.valid && candidate.status === 'retained');
   const candidates = (eligible.length > 0 ? eligible : listed.data.filter((candidate) => candidate.valid)).slice(0, 3);
   if (candidates.length === 0) throw new Error('The canonical campaign completed without a valid candidate to test.');
   input.onEvent?.({ type: 'CAMPAIGN_FINISHED', count: candidates.length });
-  return { project: input.project, request: input.request, intake: intake.data, campaignId: draft.campaignId, candidates };
+  return { ...input.draft, candidates };
+}
+
+export async function prepareDrugResearchJourney(input: {
+  token: string;
+  project: ActiveKnowledgeProject;
+  request: DrugDiscoveryChatRequest;
+  onEvent?: (event: DrugJourneyEvent) => void;
+  api?: JourneyApi;
+  wait?: (ms: number) => Promise<void>;
+  maxPolls?: number;
+}): Promise<PreparedDrugJourney> {
+  const draft = await draftDrugResearchJourney(input);
+  return continueDrugResearchJourney({ ...input, draft });
+}
+
+/** The live lab handoff: the drug bench of the one laboratory runs this drafted campaign in front of the user. */
+export function liveLabHash(draft: DraftedDrugJourney): string {
+  const q = new URLSearchParams({ station: 'st-drug-bench', project: draft.project.id, campaign: draft.campaignId, subject: draft.request.researchQuery });
+  return `#/scientific-worlds?${q.toString()}`;
 }
 
 export async function executeDrugResearchJourney(input: {

@@ -2,6 +2,8 @@ import type { ExperimentSession, ReplayVerdict } from '../scientificWorlds/exper
 import type { CycleResult } from '../scientificWorlds/curiosityCycle';
 import type { ChemistryRun } from '../chemistryEducation';
 import type { ResearchIntakeResult } from '../backend/client';
+import type { LiveDrugRunState } from '../liveExperiment/drugRunState';
+import type { DrugHypothesis, DrugHypothesisResult } from '../liveExperiment/drugHypothesis';
 
 /**
  * ONE PUBLIC OUTCOME CONTRACT — result → Evidence → Replay → Next Experiment.
@@ -43,7 +45,7 @@ export interface NextExperimentView {
   /** What must exist before it can run (data, capability, human approval). */
   readonly requires: readonly string[];
   /** Who proposed it — always an existing producer, never this module. */
-  readonly source: 'CURIOSITY_CYCLE' | 'RESEARCH_INTAKE';
+  readonly source: 'CURIOSITY_CYCLE' | 'RESEARCH_INTAKE' | 'LIVE_RUN';
   /** The UI action that starts it, if the source offers one. */
   readonly action: 'APPROVE_AND_RUN' | null;
 }
@@ -158,5 +160,41 @@ export function outcomeFromResearchIntake(result: ResearchIntakeResult): Scienti
       ? { title: n.researchPlanPlaceholder, rationale: result.selectedResearchPriorityCandidate ? `Priorytet: ${result.selectedResearchPriorityCandidate}` : 'Priorytet nie został wybrany.', requires, source: 'RESEARCH_INTAKE', action: null }
       : null,
     nextUnavailableReason: n.researchPlanPlaceholder ? null : 'Backend nie zaproponował następnego eksperymentu.',
+  };
+}
+
+/**
+ * Live drug run at the lab bench: the sealed session, the frozen hypothesis and its verdict, the engine
+ * runs that stand behind every measurement (their backend ids), and the next experiment the result implies.
+ */
+export function outcomeFromDrugLiveRun(input: {
+  readonly session: ExperimentSession;
+  readonly replay: ReplayVerdict | null;
+  readonly state: LiveDrugRunState;
+  readonly hypothesis: DrugHypothesis;
+  readonly result: DrugHypothesisResult;
+  readonly next: { readonly title: string; readonly rationale: string; readonly requires: readonly string[] };
+}): ScientificOutcomeView {
+  const { session, replay, state, hypothesis, result } = input;
+  const runIds = [...new Set(state.candidates.flatMap((c) => Object.values(c.stages).map((m) => m?.runId).filter((id): id is string => Boolean(id))))];
+  return {
+    pillar: 'DRUG_DISCOVERY',
+    title: `Hipoteza: ${result.verdict}`,
+    epistemicLabel: `MODEL_ESTIMATE · ${session.engineLabel}`,
+    summary: `${hypothesis.statement} — ${result.criteria.map((c) => `${c.id}: ${c.status} (${c.observed})`).join(' · ')}`,
+    evidence: {
+      status: 'SEALED_SESSION',
+      reason: 'Sesja stanowiska zapieczętowana ze stanu runu zapisanego przez backend; każdy pomiar ma swój ScienceRun.',
+      identifiers: [
+        { label: 'Hipoteza (zamrożona)', value: hypothesis.fingerprint, testId: 'drug-hypothesis-fingerprint' },
+        { label: 'Stan runu', value: state.stateHash, testId: 'drug-state-hash' },
+        ...session.evidenceHashes.map((h) => ({ label: 'EvidenceLedger', value: `contentHash ${h}`, testId: 'sw-ledger-hash' })),
+        ...runIds.map((id) => ({ label: 'ScienceRun', value: id })),
+        { label: 'Hash sesji', value: session.contentHash, testId: 'sw-content-hash' },
+      ],
+    },
+    replay: replayView(replay, true, ''),
+    next: { title: input.next.title, rationale: input.next.rationale, requires: input.next.requires, source: 'LIVE_RUN', action: null },
+    nextUnavailableReason: null,
   };
 }

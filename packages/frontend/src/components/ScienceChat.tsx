@@ -545,7 +545,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       setInput('');
       setTurns((turnsNow) => [...turnsNow, { role: 'user', text: msg }, {
         role: 'genesis',
-        text: `Rozumiem cel: ${drugRequest.researchQuery}. Przekazuję go do canonical Research Intake i wybieram do trzech kandydatów do testu RDKit w Laboratorium.`,
+        text: `Rozumiem cel: ${drugRequest.researchQuery}. Przekazuję go do Research Intake. Zanim uruchomię jakikolwiek silnik, pokażę hipotezę z zamrożonymi kryteriami i plan — eksperyment wykona się na żywo przy stanowisku leków w Laboratorium.`,
         tag: 'MODEL',
       }]);
       const token = getToken();
@@ -1047,6 +1047,12 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           onActivateLaboratory={() => {
             setOpen(true);
             window.location.hash = '#/scientific-worlds';
+          }}
+          onOpenLiveLab={(hash) => {
+            // The live run happens in the laboratory: the chat steps aside so the bench is in view.
+            window.location.hash = hash;
+            window.dispatchEvent(new CustomEvent('genesis-product-route'));
+            if (!inline) setOpen(false);
           }}
         />
       )}

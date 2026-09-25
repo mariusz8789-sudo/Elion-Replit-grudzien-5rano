@@ -102,3 +102,16 @@ describe('ONE CHAT drug research journey', () => {
     expect(outcomes[0].dossier.nextAction.action).toBe('COMPARE_CANDIDATES');
   });
 });
+
+describe('live lab handoff from the ONE chat', () => {
+  it('drafts without starting the campaign and hands the lab a station query with the frozen subject', async () => {
+    const { draftDrugResearchJourney, liveLabHash } = await import('../core/scienceChat/unifiedResearchJourney');
+    const port = api();
+    const draft = await draftDrugResearchJourney({ token: 'token', project: { id: 'project-1', name: 'Research' }, request: { sourceText: 'Find candidates for aspirin', researchQuery: 'aspirin' }, api: port });
+    expect(port.startCampaign).not.toHaveBeenCalled();
+    const hash = liveLabHash(draft);
+    expect(hash.startsWith('#/scientific-worlds?')).toBe(true);
+    const q = new URLSearchParams(hash.split('?')[1]);
+    expect(Object.fromEntries(q)).toEqual({ station: 'st-drug-bench', project: 'project-1', campaign: 'campaign-1', subject: 'aspirin' });
+  });
+});

@@ -38,10 +38,14 @@ import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '.
 /** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
 const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
 import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
-import { nextFromCuriosity, outcomeFromLabSession } from '../core/product/scientificOutcome';
+import { nextFromCuriosity, outcomeFromDrugLiveRun, outcomeFromLabSession, type ScientificOutcomeView } from '../core/product/scientificOutcome';
+import { buildDrugHypothesis, evaluateDrugHypothesis, getDrugHypothesis, nextDrugExperiment } from '../core/liveExperiment/drugHypothesis';
 import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcomePanel';
 import { LoadingStatus } from './LoadingStatus';
 import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
+import { getToken } from '../core/backend/session';
+import { getLiveDrugRun, liveDrugRunGate, startLiveDrugRun, subscribeLiveDrugRuns, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
+import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -121,8 +125,33 @@ export function describePlan(commandCount: number, unresolved: readonly string[]
 export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?: SceneWorld } = {}): JSX.Element {
   const def = WORLDS[world];
   const runner = useMemo(() => def.runner(kernelLedger), [def]);
-  const controller = useMemo(() => new AgentController({ room: def.room, obstacles: def.obstacles, stations: def.stations, start: def.spawn, runner, worldId: def.id, defaultSeed: 7 }), [def, runner]);
+  const controller = useMemo(() => new AgentController({
+    room: def.room, obstacles: def.obstacles, stations: def.stations, start: def.spawn, runner, worldId: def.id, defaultSeed: 7,
+    // The drug bench: pressing the console starts the REAL backend campaign; the agent keeps working until it ends.
+    engineGate: (_stationId, experimentId, inputs) => {
+      if (experimentId !== 'drug-candidate-run') return null;
+      const campaignId = String(inputs.campaign ?? '');
+      const projectId = String(inputs.project ?? '');
+      if (!getLiveDrugRun(campaignId)) {
+        const token = getToken();
+        if (!token || !campaignId || !projectId) return { ready: true, progress: 1 };
+        void startLiveDrugRun({ token, projectId, campaignId });
+      }
+      return liveDrugRunGate(campaignId);
+    },
+  }), [def, runner]);
   const sim = useMemo(() => new AgentLabScene3D(controller, def.stations, def.room, world), [controller, def, world]);
+  const benchLayer = useMemo(() => new DrugBenchLayer(), []);
+  const loopSim = useMemo(() => (world === 'physics' ? withDrugBenchLayer(sim, benchLayer) : sim), [sim, benchLayer, world]);
+  const [drugRun, setDrugRun] = useState<LiveDrugRun | null>(null);
+  const [benchSceneHash, setBenchSceneHash] = useState<string | null>(null);
+  const [benchAtoms, setBenchAtoms] = useState(0);
+  const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
+  useEffect(() => subscribeLiveDrugRuns((run) => {
+    benchLayer.setRun(run);
+    setDrugRun(run);
+    if (run.durationMs && run.phase === 'DONE') recordDuration('drug-run', run.durationMs);
+  }), [benchLayer]);
   const [anatomy, setAnatomy] = useState<AnatomyViewState>(() => createDefaultAnatomyView(TWIN_ID));
   const anatomyRef = useRef(anatomy); anatomyRef.current = anatomy;
   const params = useMemo(() => ({}), []);
@@ -187,8 +216,11 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     setAgentState((prev) => { const next = STATE_NAMES[s.agentState ?? 0] ?? 'IDLE'; return prev === next ? prev : next; });
     setProgress((p) => (Math.abs(p - (s.progress ?? 0)) > 0.02 ? s.progress ?? 0 : p));
     setFrames((f) => (s.frames && s.frames - f >= 10 ? s.frames : f));
+    const hash = s.drugBenchHash ? (s.drugBenchHash >>> 0).toString(16).padStart(8, '0') : null;
+    setBenchSceneHash((prev) => (prev === hash ? prev : hash));
+    setBenchAtoms((prev) => (prev === (s.drugBenchAtoms ?? 0) ? prev : s.drugBenchAtoms ?? 0));
   }, []);
-  const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
+  const { canvasRef, loading, failed } = useThreeLoop(loopSim, params, true, onStats);
   // Measured load time of this world: the next visit counts down from it (never a guessed number).
   const loadStartedAt = useRef(performance.now());
   const [loadEstimate] = useState(() => estimateDuration(`lab:${world}`));
@@ -214,7 +246,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         setSession(sealed); sessionRef.current = sealed; setReplay(null); setArtifactKind((artifact as SceneArtifact).kind);
         setSessions((list) => [...list.slice(-40), sealed]);
         if (world === 'biology') setBioArtifact(artifact as BiologyArtifact);
-        if (sealed.stationId) sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
+        // The drug bench draws its own run state (DrugBenchLayer); every other station's artifact goes to the scene.
+        if (sealed.stationId && (artifact as { kind?: string }).kind !== 'drug-run') sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
         if (sealed.experimentId === 'chemistry-titration') setChemistryCardOpen(true);
         sim.noteSealedSession(sealed);
       }
@@ -410,6 +443,18 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     vb: Number(session.outputs.vb), ph: Number(session.outputs.ph), veq: Number(session.outputs.veq), pKa: Number(session.outputs.pKa),
   } : null;
 
+  /** The one outcome panel: a drug bench session carries its frozen hypothesis and verdict; every other station its session. */
+  const sessionOutcome = (sealed: ExperimentSession): ScientificOutcomeView => {
+    const campaignId = String(sealed.inputs.campaign ?? '');
+    const run = sealed.experimentId === 'drug-candidate-run' ? getLiveDrugRun(campaignId) : null;
+    if (run) {
+      const hypothesis = getDrugHypothesis(campaignId) ?? buildDrugHypothesis(String(sealed.inputs.subject ?? focusCandidate(run.state)?.smiles ?? 'kandydat'));
+      const result = evaluateDrugHypothesis(hypothesis, run.state, focusCandidate(run.state));
+      return outcomeFromDrugLiveRun({ session: sealed, replay, state: run.state, hypothesis, result, next: nextDrugExperiment(result, run.state) });
+    }
+    return outcomeFromLabSession(sealed, replay, curiosity, def.stations.find((st) => st.id === sealed.stationId)?.label);
+  };
+
   const researchControls = <>
       <section className="sw-hud sw-hud-status" aria-label="Stan agenta" data-testid="sw-status">
         <div className="sw-badges">
@@ -461,7 +506,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           <p className="sw-faint" data-testid="sw-no-session">Brak sesji. Każdy eksperyment tworzy jedną sesję z hashem treści, odciskiem replay i wpisem w EvidenceLedger.</p>
         ))}
         {evidenceOpen && (session
-          ? <ScientificOutcomePanel outcome={outcomeFromLabSession(session, replay, curiosity, def.stations.find((st) => st.id === session.stationId)?.label)} onReplay={doReplay} testIds={{ replay: 'sw-replay', replayStatus: 'sw-replay-verdict' }} nextActions={curiosityActions} />
+          ? <ScientificOutcomePanel outcome={sessionOutcome(session)} showSummary={session.experimentId === 'drug-candidate-run'} onReplay={doReplay} testIds={{ replay: 'sw-replay', replayStatus: 'sw-replay-verdict' }} nextActions={curiosityActions} />
           : <NextExperimentPanel outcome={{ next: nextFromCuriosity(curiosity), nextUnavailableReason: 'Brak propozycji. „Ciekawość: zaproponuj” uruchamia cykl ciekawości na lukach w dowodach.' }} actions={curiosityActions} />)}
       </section>
 
@@ -520,6 +565,31 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       )}
       {loading && <div className="sw-loading"><LoadingStatus label="Ładowanie laboratorium" estimateMs={loadEstimate} testId="sw-loading-status" /></div>}
       {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
+
+      {world === 'physics' && drugRun && (() => {
+        const st = drugRun.state;
+        const focus = focusCandidate(st);
+        const running = drugRun.phase === 'RUNNING_CAMPAIGN' || drugRun.phase === 'RUNNING_STAGE';
+        return (
+          <aside className="sw-chemistry-context sw-drug-live" aria-label="Odkrywanie leków na żywo" data-testid="drug-bench-live"
+            data-phase={drugRun.phase} data-stage={st.stage} data-state-hash={st.stateHash} data-scene-hash={benchSceneHash ?? ''}
+            data-candidates={st.candidates.length} data-last-seq={st.lastSeq} data-scene-atoms={benchAtoms} data-focus-smiles={focus?.smiles ?? ''}>
+            <div className="sw-chemistry-head"><strong>Odkrywanie leków · na żywo</strong><span className="sw-badge">MODEL_ESTIMATE</span></div>
+            {running && <p><LoadingStatus label={`Silnik liczy: ${st.stage}`} estimateMs={drugRunEstimate} testId="drug-bench-loading" /></p>}
+            {drugRun.phase === 'FAILED' && <p role="alert">Run zatrzymany: {drugRun.error}</p>}
+            <dl className="sw-drug-dl">
+              <dt>Generacje</dt><dd>{st.generationsCompleted}/{st.maxGenerations}</dd>
+              <dt>Kandydaci</dt><dd>{st.candidates.length} (zachowani {st.candidates.filter((c) => c.status === 'retained').length})</dd>
+              <dt>Fokus</dt><dd className="cw-mono">{focus?.smiles ?? '—'}</dd>
+              <dt>ADMET</dt><dd>{focus?.stages.admet?.status ?? '—'}</dd>
+              <dt>Docking (Vina)</dt><dd>{focus?.stages.docking?.value != null ? `${focus.stages.docking.value.toFixed(2)} kcal/mol` : focus?.stages.docking?.status ?? '—'}</dd>
+              <dt>QM (PySCF)</dt><dd>{focus?.stages.quantum?.value != null ? `${focus.stages.quantum.value.toFixed(2)} eV` : focus?.stages.quantum?.status ?? '—'}</dd>
+              {st.blocked.length > 0 && <><dt>Zablokowane</dt><dd>{st.blocked.map((b) => `${b.stage}: ${b.blocker}`).join(' · ')}</dd></>}
+            </dl>
+            <p className="sw-drug-note">Receptor dockingu to zastępcza mała cząsteczka (nie białko). Transformacje to obliczenia in-silico, nie synteza w laboratorium.</p>
+          </aside>
+        );
+      })()}
 
       {world === 'physics' && chemistryCardOpen && titrationResult && (
         <aside className="sw-chemistry-context" aria-label="Wynik miareczkowania" data-testid="sw-titration-context">

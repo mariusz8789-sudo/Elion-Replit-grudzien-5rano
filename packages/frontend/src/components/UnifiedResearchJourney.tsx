@@ -2,32 +2,40 @@ import { useEffect, useMemo, useState } from 'react';
 import { getToken } from '../core/backend/session';
 import type { ActiveKnowledgeProject } from '../core/backend/knowledgeProjectContext';
 import {
+  continueDrugResearchJourney,
+  draftDrugResearchJourney,
   executeDrugResearchJourney,
-  prepareDrugResearchJourney,
+  liveLabHash,
+  type DraftedDrugJourney,
   type CandidateExperimentOutcome,
   type DrugDiscoveryChatRequest,
   type PreparedDrugJourney,
 } from '../core/scienceChat/unifiedResearchJourney';
 import type { VirtualExperimentPlan, VirtualExperimentResult } from '../core/backend/client';
 import { ComputationalExperimentPlayback } from './ComputationalExperimentPlayback';
+import { buildDrugHypothesis, registerDrugHypothesis } from '../core/liveExperiment/drugHypothesis';
 
 interface Props {
   request: DrugDiscoveryChatRequest;
   project: ActiveKnowledgeProject;
   onActivateLaboratory: () => void;
+  /** Opens the drug bench of the one laboratory, which runs the drafted campaign live. */
+  onOpenLiveLab?: (hash: string) => void;
 }
 
-type JourneyPhase = 'DISCOVERING' | 'READY' | 'EXECUTING' | 'COMPLETE' | 'BLOCKED';
+type JourneyPhase = 'DISCOVERING' | 'PLANNED' | 'PREPARING' | 'READY' | 'EXECUTING' | 'COMPLETE' | 'BLOCKED';
 
 function shortCandidate(smiles: string): string {
   return smiles.length > 32 ? `${smiles.slice(0, 29)}…` : smiles;
 }
 
 /** One compact surface over the canonical intake, campaign, Virtual Lab, Evidence and replay APIs. */
-export function UnifiedResearchJourney({ request, project, onActivateLaboratory }: Props): JSX.Element {
+export function UnifiedResearchJourney({ request, project, onActivateLaboratory, onOpenLiveLab }: Props): JSX.Element {
   const [phase, setPhase] = useState<JourneyPhase>('DISCOVERING');
   const [detail, setDetail] = useState('STARTED · grounding the question and discovering source-backed candidates');
   const [prepared, setPrepared] = useState<PreparedDrugJourney | null>(null);
+  const [draft, setDraft] = useState<DraftedDrugJourney | null>(null);
+  const hypothesis = useMemo(() => buildDrugHypothesis(request.researchQuery), [request.researchQuery]);
   const [outcomes, setOutcomes] = useState<CandidateExperimentOutcome[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [livePlan, setLivePlan] = useState<VirtualExperimentPlan | null>(null);
@@ -39,6 +47,7 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory 
     setPhase('DISCOVERING');
     setDetail('STARTED · grounding the question and discovering source-backed candidates');
     setPrepared(null);
+    setDraft(null);
     setOutcomes([]);
     setSelectedIndex(0);
     setLivePlan(null);
@@ -48,21 +57,19 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory 
       setDetail('BLOCKED · sign in to run the governed project workflow');
       return () => { current = false; };
     }
-    void prepareDrugResearchJourney({
+    void draftDrugResearchJourney({
       token,
       project,
       request,
       onEvent: (event) => {
         if (!current) return;
-        if (event.type === 'CANDIDATES_FOUND') setDetail(`FINISHED · intake found ${event.count} source-backed candidate option(s); canonical campaign STARTED`);
-        if (event.type === 'CAMPAIGN_STARTED') setDetail('STARTED · canonical candidate campaign is running');
-        if (event.type === 'CAMPAIGN_FINISHED') setDetail(`FINISHED · ${event.count} candidates are ready for laboratory testing`);
+        if (event.type === 'CANDIDATES_FOUND') setDetail(`FINISHED · intake found ${event.count} source-backed candidate option(s); campaign prepared, not started`);
       },
     }).then((next) => {
       if (!current) return;
-      setPrepared(next);
-      setPhase('READY');
-      setDetail(`FINISHED · ${next.candidates.length} candidates selected for a bounded RDKit test`);
+      setDraft(next);
+      setPhase('PLANNED');
+      setDetail('PLAN · hypothesis frozen before any engine runs — confirm to run it live in the laboratory');
     }).catch((error: unknown) => {
       if (!current) return;
       setPhase('BLOCKED');
@@ -70,6 +77,33 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory 
     });
     return () => { current = false; };
   }, [project, request]);
+
+  function openLiveLab(): void {
+    if (!draft) return;
+    registerDrugHypothesis(draft.campaignId, hypothesis);
+    const hash = liveLabHash(draft);
+    if (onOpenLiveLab) onOpenLiveLab(hash); else window.location.hash = hash;
+  }
+
+  async function prepareInChat(): Promise<void> {
+    const token = getToken();
+    if (!token || !draft) return;
+    setPhase('PREPARING');
+    setDetail('STARTED · canonical candidate campaign is running');
+    try {
+      const next = await continueDrugResearchJourney({
+        token,
+        draft,
+        onEvent: (event) => { if (event.type === 'CAMPAIGN_FINISHED') setDetail(`FINISHED · ${event.count} candidates are ready for laboratory testing`); },
+      });
+      setPrepared(next);
+      setPhase('READY');
+      setDetail(`FINISHED · ${next.candidates.length} candidates selected for a bounded RDKit test`);
+    } catch (error) {
+      setPhase('BLOCKED');
+      setDetail(`BLOCKED · ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   async function execute(): Promise<void> {
     const token = getToken();
@@ -120,6 +154,21 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory 
               <span>Candidate {index + 1}</span><strong>{shortCandidate(candidate.canonicalSmiles)}</strong>
             </button>
           ))}
+        </div>
+      )}
+
+      {phase === 'PLANNED' && (
+        <div className="journey-hypothesis" data-testid="drug-hypothesis" data-fingerprint={hypothesis.fingerprint}>
+          <span>HIPOTEZA · zamrożona przed uruchomieniem</span>
+          <p>{hypothesis.statement}</p>
+          <ol aria-label="Kryteria falsyfikacji">{hypothesis.criteria.map((c) => <li key={c.id}>{c.label}</li>)}</ol>
+          <span>PLAN · istniejące silniki</span>
+          <ol aria-label="Plan eksperymentu">{hypothesis.plan.map((p) => <li key={p.stage}><strong>{p.engine}</strong> — {p.label}</li>)}</ol>
+          <small>Odcisk hipotezy: <code>{hypothesis.fingerprint}</code> · wyniki to MODEL_ESTIMATE, nie pomiar laboratoryjny.</small>
+          <div className="journey-actions">
+            <button className="primary-btn journey-start" type="button" onClick={openLiveLab} data-testid="drug-open-live-lab">Uruchom na żywo w laboratorium</button>
+            <button className="chip-btn" type="button" onClick={() => { void prepareInChat(); }}>Szybki test RDKit w czacie</button>
+          </div>
         </div>
       )}
 

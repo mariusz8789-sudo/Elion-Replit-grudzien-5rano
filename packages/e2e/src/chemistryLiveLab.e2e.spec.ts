@@ -38,6 +38,9 @@ async function openChemistryPanel(page: Page): Promise<void> {
 const currentStageKind = (page: Page) => page.locator('[data-state="current"]').getAttribute('data-kind');
 
 test.describe('Chemistry Live Lab', () => {
+  // Chemistry now lives inside the WebGL Laboratory; in headless software-GL a frame takes ~1 s, so every
+  // actionability check is slow. Same budget convention as mainLaboratoryProduct / scientific-worlds.
+  test.setTimeout(600_000);
   test('menu → element → titration → live stages → observation → equation → three levels → replay', async ({ page }) => {
     const errors = collectErrors(page);
     await openFromMenu(page);

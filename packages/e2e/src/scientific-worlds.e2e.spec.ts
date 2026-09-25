@@ -205,7 +205,9 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await page.screenshot({ path: SHOTS.bioOrpheus });
     await page.getByTestId('sw-replay').click();
     await expect(page.getByTestId('sw-replay-verdict')).toHaveText(/MATCH/);
+    // The biology world opens on the twin camera (926e6b43); the camera button cycles TWIN → VISOR → SPECTATOR.
     await page.getByTestId('sw-camera').click();
+    if ((await root.getAttribute('data-camera')) !== 'SPECTATOR') await page.getByTestId('sw-camera').click();
     await expect(root).toHaveAttribute('data-camera', 'SPECTATOR');
     await settled(page, 2);
     await page.screenshot({ path: SHOTS.bioSpectator });

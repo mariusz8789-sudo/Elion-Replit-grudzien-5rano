@@ -8,6 +8,9 @@ test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } 
 async function openMoreMenu(page: Page): Promise<void> {
   const more = page.locator('.shell-nav-more');
   if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
+  // Alternative screens of one capability are folded under it; unfold them all.
+  const folded = page.locator('.shell-nav-variants-toggle[aria-expanded="false"]');
+  while (await folded.count() > 0) await folded.first().click();
 }
 
 async function gotoViaMenu(page: Page, label: string, expectHeading: string | RegExp): Promise<void> {

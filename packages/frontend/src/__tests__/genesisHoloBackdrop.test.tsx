@@ -83,7 +83,7 @@ describe('AppShell — 2040 chrome mounts without breaking the frame', () => {
 
   it('keeps the existing navigation contract intact (labels, planned badge, more-disclosure)', () => {
     const html = renderToStaticMarkup(<AppShell>x</AppShell>);
-    expect(html).toContain('Biblioteka');
+    expect(html).toContain('Tryb badawczy');
     expect(html).toContain('genesis-physics.com');
     expect(html).toContain('aria-current="page"');
   });

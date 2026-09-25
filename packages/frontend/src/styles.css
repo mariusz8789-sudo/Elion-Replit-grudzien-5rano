@@ -4658,6 +4658,14 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 .shell-nav-groups { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); }
 .shell-nav-subgroup { display: grid; gap: .15rem; min-width: 0; }
 .shell-nav-subgroup + .shell-nav-subgroup { padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+/* Research mode: one entry per capability; its alternative screens fold under it. */
+.shell-nav-capability { display: grid; gap: .1rem; min-width: 0; }
+.shell-nav-variants-toggle {
+  justify-self: start; margin-left: 2.1rem; padding: .15rem .4rem; border-radius: var(--r-sm);
+  font: 600 .62rem/1.3 var(--font-mono); letter-spacing: .04em; color: var(--text-faint);
+}
+.shell-nav-variants-toggle:hover { color: var(--text-dim); }
+.shell-nav-variants { display: grid; gap: .1rem; margin-left: 1.4rem; padding-left: .5rem; border-left: 1px solid var(--border); }
 .shell-nav-subgroup-title {
   margin: 0; padding: .2rem .6rem; color: var(--text-faint);
   font: 700 .58rem/1.2 var(--font-mono); letter-spacing: .11em; text-transform: uppercase;

@@ -862,6 +862,12 @@ export async function listCampaignConflicts(token: string, projectId: string, ca
  * compute — e.g. reloading the ADMET-AI model). Appends to an audit history,
  * never overwrites a prior verification.
  */
+/** One persisted Science Run (docking runs carry the top Vina pose and the pocket that lines it). */
+export async function getScienceRun(token: string, projectId: string, campaignId: string, runId: string): Promise<ApiResult<ScienceRun>> {
+  const r = await request<{ scienceRun: ScienceRun }>('GET', `/projects/${projectId}/campaigns/${campaignId}/science-runs/${runId}`, { token });
+  return r.ok ? { ok: true, data: r.data.scienceRun } : r;
+}
+
 export async function verifyScienceRun(
   token: string, projectId: string, campaignId: string, runId: string,
 ): Promise<ApiResult<ScienceRunVerification>> {
@@ -879,7 +885,7 @@ export async function listScienceRunVerifications(
 export async function runCampaignStage(
   token: string, projectId: string, campaignId: string,
   config: {
-    docking?: { enabled: boolean; budget?: number };
+    docking?: { enabled: boolean; budget?: number; targetId?: string; receptor?: { exhaustiveness?: number; nPoses?: number } };
     quantum?: { enabled: boolean; budget?: number };
     admet?: { enabled: boolean; thresholds?: Record<string, { max?: number; min?: number }> };
   },

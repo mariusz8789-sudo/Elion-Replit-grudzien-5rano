@@ -51,3 +51,36 @@ describe('projectDrugRun — one read model of the live drug run', () => {
     expect(b.stateHash).toBe(a.stateHash);
   });
 });
+
+describe('projectDrugRun — the real protein docking steps and pose', () => {
+  const dockEvents: CampaignEventRecord[] = [
+    ev('STAGE_PROGRESS', 1, { stage: 'docking', step: 'RECEPTOR_PREPARED', targetId: 'ABL1_1IEP', pdbId: '1IEP', chain: 'A', protein: 'ABL1', receptorPdbqtSha256: 'b'.repeat(64), sourceSha256: 'c'.repeat(64), receptorAtoms: 2702, center: [15.19, 53.903, 16.917], boxSize: [20, 20, 20], meekoVersion: '0.8.0' }),
+    ev('STAGE_SELECTION', 1, { stage: 'docking', candidateId: 'c1', reason: 'SELECTED_FOR_DOCKING' }),
+    ev('STAGE_PROGRESS', 1, { stage: 'docking', step: 'LIGAND_PREPARED', candidateId: 'c1', ligandPdbqtSha256: 'd'.repeat(64), atoms: 68 }),
+    ev('STAGE_PROGRESS', 1, { stage: 'docking', step: 'VINA_STARTED', candidateId: 'c1', targetId: 'ABL1_1IEP', exhaustiveness: 8, seed: 42 }),
+    ev('STAGE_RESULT', 1, { stage: 'docking', candidateId: 'c1', reason: 'DOCKING_RESULT_RETAINED', bestAffinityKcalMol: -11.4, runId: 'r-dock', targetId: 'ABL1_1IEP', poseSha256: 'e'.repeat(64) }),
+  ];
+  const dockingRuns = [{
+    id: 'r-dock',
+    outputs: { poseSha256: 'e'.repeat(64), pose: { atoms: [['C', 1, 2, 3], ['N', 2, 3, 4]], bonds: [[0, 1, 1.5]] }, pocket: { residues: ['TYR253:A'], atoms: [['C', 0, 0, 0, 0]] } },
+    provenance: { engine: 'AutoDock Vina 1.2.7 + Meeko 0.8.0' },
+  }];
+
+  it('carries the prepared target, the latest docking step and the pose from the Science Run', () => {
+    const s = projectDrugRun({ events: dockEvents, candidates, maxGenerations: 1, jobRunning: false, dockingRuns });
+    expect(s.target).toEqual({ targetId: 'ABL1_1IEP', pdbId: '1IEP', chain: 'A', protein: 'ABL1', receptorPdbqtSha256: 'b'.repeat(64), sourceSha256: 'c'.repeat(64), receptorAtoms: 2702, center: [15.19, 53.903, 16.917], boxSize: [20, 20, 20], meekoVersion: '0.8.0' });
+    const c1 = s.candidates.find((c) => c.id === 'c1')!;
+    expect(c1.dockingStep).toBe('POSE_SCORED');
+    expect(c1.pose).toEqual({ runId: 'r-dock', poseSha256: 'e'.repeat(64), atoms: [['C', 1, 2, 3], ['N', 2, 3, 4]], bonds: [[0, 1, 1.5]], pocketResidues: ['TYR253:A'], pocketAtoms: [['C', 0, 0, 0, 0]], engine: 'AutoDock Vina 1.2.7 + Meeko 0.8.0' });
+  });
+
+  it('the step only moves forward, and without the Science Run there is no pose to show', () => {
+    const midRun = projectDrugRun({ events: dockEvents.slice(0, 4), candidates, maxGenerations: 1, jobRunning: true, dockingRuns: [] });
+    const c1 = midRun.candidates.find((c) => c.id === 'c1')!;
+    expect(c1.dockingStep).toBe('VINA_STARTED');
+    expect(c1.pose).toBeNull();
+    const noRun = projectDrugRun({ events: dockEvents, candidates, maxGenerations: 1, jobRunning: false, dockingRuns: [] });
+    expect(noRun.candidates.find((c) => c.id === 'c1')!.pose).toBeNull();
+    expect(noRun.stateHash).not.toBe(projectDrugRun({ events: dockEvents, candidates, maxGenerations: 1, jobRunning: false, dockingRuns }).stateHash);
+  });
+});

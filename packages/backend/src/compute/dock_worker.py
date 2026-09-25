@@ -9,9 +9,18 @@ capability as unavailable (never faked).
 Commands:
   detect                      -> { ok, vinaVersion, meekoVersion }
   reference {outDir}          -> documented software-integration reference dock
-  dock {ligandSmiles, receptorSmiles|receptorPdbqt, center, boxSize, exhaustiveness,
-        nPoses, seed, outDir}
-                              -> real prepared artifacts + Vina poses/scores
+  dock {ligandSmiles, receptorSmiles|receptorPdbqt|receptorPdbqtPath, ligandPdbqtPath?,
+        center, boxSize, exhaustiveness, nPoses, seed, outDir}
+                              -> real prepared artifacts + Vina poses/scores; with a protein
+                                 receptor also the top pose (atoms, bonds, PDBQT text) and the
+                                 receptor residues lining it
+  prepare_receptor {pdbPath, center, boxSize, outDir}
+                              -> deterministic Meeko receptor preparation of a vetted PDB file
+  prepare_ligand {ligandSmiles, seed, outDir}
+                              -> deterministic RDKit ETKDG/MMFF + Meeko ligand PDBQT
+  redock {pdbPath, ligandSdfPath, center, boxSize, exhaustiveness, seed, outDir}
+                              -> re-docks the co-crystallised ligand and reports the heavy-atom
+                                 RMSD of the top pose against the crystal pose
 
 IMPORTANT SCIENTIFIC HONESTY:
 - Docking scores are MODEL_ESTIMATE (Vina empirical scoring function, kcal/mol),
@@ -75,7 +84,13 @@ def _run_dock(req, out_dir):
     lig_smiles = req.get("ligandSmiles")
     if not lig_smiles:
         raise ValueError("ligandSmiles_required")
-    lig_pdbqt, lig_xyz = _prep(str(lig_smiles), seed)
+    if req.get("ligandPdbqtPath"):
+        # Ligand already prepared by `prepare_ligand` (same _prep, same seed) — reuse the exact file.
+        with open(str(req["ligandPdbqtPath"]), "r") as handle:
+            lig_pdbqt = handle.read()
+        lig_xyz = [l for l in lig_pdbqt.splitlines() if l.startswith(("ATOM", "HETATM"))]
+    else:
+        lig_pdbqt, lig_xyz = _prep(str(lig_smiles), seed)
 
     # Receptor: prepared rigid PDBQT provided, or a small-molecule stand-in from SMILES.
     receptor_kind = "provided_pdbqt"
@@ -123,9 +138,18 @@ def _run_dock(req, out_dir):
         poses.append({"rank": i + 1, "affinityKcalMol": round(float(e[0]), 3)})
     best = poses[0]["affinityKcalMol"] if poses else None
 
+    pose = pocket = None
+    pose_pdbqt = None
+    if receptor_kind == "provided_pdbqt" and poses:
+        pose, pose_pdbqt = _top_pose(open(out_path).read())
+        pocket = _pocket(rec_pdbqt, pose["atoms"])
+
     import vina as vina_mod
     import meeko as meeko_mod
     return {
+        "pose": pose, "pocket": pocket, "posePdbqt": pose_pdbqt,
+        "poseSha256": _sha(pose_pdbqt) if pose_pdbqt else None,
+        "ligandPdbqtSha256": _sha(lig_pdbqt),
         "vinaVersion": getattr(vina_mod, "__version__", "?"),
         "meekoVersion": getattr(meeko_mod, "__version__", "?"),
         "receptorKind": receptor_kind,
@@ -138,9 +162,131 @@ def _run_dock(req, out_dir):
             {"kind": "ligand_pdbqt", "path": lig_path, "sha256": _sha(lig_pdbqt)},
             {"kind": "docked_pdbqt", "path": out_path, "sha256": _sha(open(out_path).read())},
         ],
-        "inputHash": _sha(json.dumps({"lig": lig_smiles, "rec": req.get("receptorSmiles") or req.get("receptorPdbqtPath") or "provided",
+        "inputHash": _sha(json.dumps({"lig": lig_smiles, "rec": req.get("receptorSmiles") or _sha(rec_pdbqt),
                                       "center": center, "box": box, "ex": exhaustiveness, "seed": seed}, sort_keys=True)),
     }
+
+
+def _top_pose(docked_text):
+    """Top-ranked Vina pose as heavy atoms + bonds (Meeko rebuilds the RDKit molecule from the PDBQT)."""
+    from meeko import PDBQTMolecule, RDKitMolCreate
+    from rdkit import Chem
+    model1 = []
+    for line in docked_text.splitlines():
+        model1.append(line)
+        if line.startswith("ENDMDL"):
+            break
+    model1_text = "\n".join(model1) + "\n"
+    pm = PDBQTMolecule(docked_text, skip_typing=True)
+    mol = RDKitMolCreate.from_pdbqt_mol(pm)[0]
+    first = mol.GetConformers()[0]
+    single = Chem.Mol(mol)
+    single.RemoveAllConformers()
+    single.AddConformer(Chem.Conformer(first), assignId=True)
+    heavy = Chem.RemoveHs(single)
+    conf = heavy.GetConformer()
+    atoms = []
+    for a in heavy.GetAtoms():
+        p = conf.GetAtomPosition(a.GetIdx())
+        atoms.append([a.GetSymbol(), round(p.x, 3), round(p.y, 3), round(p.z, 3)])
+    bonds = [[b.GetBeginAtomIdx(), b.GetEndAtomIdx(), 1.5 if b.GetIsAromatic() else float(b.GetBondTypeAsDouble())]
+             for b in heavy.GetBonds()]
+    return {"atoms": atoms, "bonds": bonds, "smiles": Chem.MolToSmiles(heavy)}, model1_text
+
+
+def _pocket(rec_pdbqt, pose_atoms, cutoff=4.5):
+    """Receptor residues with any heavy atom within `cutoff` Å of the pose; all their heavy atoms."""
+    import numpy as np
+    recs = []
+    for l in rec_pdbqt.splitlines():
+        if not l.startswith(("ATOM", "HETATM")):
+            continue
+        ad = l[77:79].strip()
+        if ad in ("H", "HD", "HS"):
+            continue
+        name = l[12:16].strip()
+        res = "%s%s:%s" % (l[17:20].strip(), l[22:26].strip(), l[21].strip())
+        el = ad[0] if ad not in ("OA", "NA", "SA", "Cl", "CL", "Br", "BR") else {"OA": "O", "NA": "N", "SA": "S"}.get(ad, ad.capitalize())
+        recs.append((res, name, el, float(l[30:38]), float(l[38:46]), float(l[46:54])))
+    if not recs:
+        return {"residues": [], "atoms": [], "cutoffA": cutoff}
+    rxyz = np.array([[r[3], r[4], r[5]] for r in recs])
+    lxyz = np.array([[a[1], a[2], a[3]] for a in pose_atoms])
+    d = np.sqrt(((rxyz[:, None, :] - lxyz[None, :, :]) ** 2).sum(-1)).min(axis=1)
+    near = []
+    for i, r in enumerate(recs):
+        if d[i] <= cutoff and r[0] not in near:
+            near.append(r[0])
+    keep = set(near)
+    atoms = [[r[2], round(r[3], 3), round(r[4], 3), round(r[5], 3), near.index(r[0])] for r in recs if r[0] in keep]
+    return {"residues": near, "atoms": atoms, "cutoffA": cutoff}
+
+
+def _prepare_receptor(req, out_dir):
+    """Deterministic receptor preparation: stable residue ordering, then Meeko mk_prepare_receptor."""
+    import subprocess
+    import meeko as meeko_mod
+    pdb_path = str(req["pdbPath"])
+    raw = open(pdb_path).read()
+    lines = raw.splitlines()
+    atoms = [(i, l) for i, l in enumerate(lines) if l.startswith(("ATOM", "HETATM"))]
+    ordered = sorted(atoms, key=lambda t: (t[1][21], int(t[1][22:26]), t[1][26], t[0]))
+    reordered = any(a[0] != b[0] for a, b in zip(atoms, ordered))
+    ordered_text = "\n".join(l for _, l in ordered) + "\nEND\n"
+    os.makedirs(out_dir, exist_ok=True)
+    ordered_path = os.path.join(out_dir, "receptor_ordered.pdb")
+    with open(ordered_path, "w") as f:
+        f.write(ordered_text)
+    center = [float(c) for c in req["center"]][:3]
+    box = [float(b) for b in req.get("boxSize", [20, 20, 20])][:3]
+    base = os.path.join(out_dir, "receptor")
+    args = ["--read_pdb", ordered_path, "-o", base, "-p", "-v",
+            "--box_size", *["%.3f" % b for b in box], "--box_center", *["%.3f" % c for c in center]]
+    proc = subprocess.run([sys.executable, "-m", "meeko.cli.mk_prepare_receptor", *args],
+                          capture_output=True, text=True, timeout=240)
+    pdbqt_path = base + ".pdbqt"
+    if proc.returncode != 0 or not os.path.exists(pdbqt_path):
+        raise ValueError("receptor_prep_failed: %s" % (proc.stderr or proc.stdout)[-160:])
+    pdbqt = open(pdbqt_path).read()
+    n_atoms = sum(1 for l in pdbqt.splitlines() if l.startswith(("ATOM", "HETATM")))
+    return {
+        "receptorPdbqtPath": pdbqt_path, "receptorPdbqtSha256": _sha(pdbqt),
+        "sourceSha256": _sha(raw), "orderedSha256": _sha(ordered_text),
+        "sourceAtoms": len(atoms), "reordered": reordered, "receptorAtoms": n_atoms,
+        "meekoVersion": getattr(meeko_mod, "__version__", "?"),
+        "preparation": {
+            "step1": "keep ATOM/HETATM records; stable sort by (chain, residue number, insertion code, file order)",
+            "step2": "meeko mk_prepare_receptor --read_pdb (templates, Gasteiger charges from template, AD4 atom types) -> rigid PDBQT",
+            "arguments": ["--read_pdb", "<ordered.pdb>", "-p", "-v", "--box_size", *["%.3f" % b for b in box], "--box_center", *["%.3f" % c for c in center]],
+        },
+        "center": center, "boxSize": box,
+    }
+
+
+def _redock(req, out_dir):
+    """Crystal-ligand redocking: dock the co-crystallised ligand from its SMILES, RMSD vs crystal pose."""
+    from rdkit import Chem
+    from rdkit.Chem import rdMolAlign
+    xtal = Chem.MolFromMolFile(str(req["ligandSdfPath"]), removeHs=False)
+    if xtal is None:
+        raise ValueError("ligand_sdf_unreadable")
+    ref = Chem.RemoveHs(xtal)
+    smiles = Chem.MolToSmiles(ref)
+    rec = _prepare_receptor(req, os.path.join(out_dir, "receptor"))
+    r = _run_dock({"ligandSmiles": smiles, "receptorPdbqtPath": rec["receptorPdbqtPath"], "center": rec["center"],
+                   "boxSize": rec["boxSize"], "exhaustiveness": req.get("exhaustiveness", 8), "nPoses": 1,
+                   "seed": req.get("seed", 42)}, os.path.join(out_dir, "dock"))
+    from meeko import PDBQTMolecule, RDKitMolCreate
+    pm = PDBQTMolecule(open(r["artifacts"][2]["path"]).read(), skip_typing=True)
+    mol = Chem.RemoveHs(RDKitMolCreate.from_pdbqt_mol(pm)[0])
+    single = Chem.Mol(mol)
+    single.RemoveAllConformers()
+    single.AddConformer(Chem.Conformer(mol.GetConformers()[0]), assignId=True)
+    # Symmetry-aware heavy-atom RMSD, in place (no superposition): the pose is judged in the crystal frame.
+    rmsd = rdMolAlign.CalcRMS(single, ref)
+    return {"ligandSmiles": smiles, "rmsdA": round(float(rmsd), 3), "bestAffinityKcalMol": r["bestAffinityKcalMol"],
+            "receptor": rec, "vinaVersion": r["vinaVersion"], "meekoVersion": r["meekoVersion"],
+            "poseSha256": r["poseSha256"], "seed": r["seed"], "exhaustiveness": r["exhaustiveness"]}
 
 
 def main():
@@ -183,6 +329,30 @@ def main():
             print(json.dumps({"ok": True, **r}))
         except Exception as e:  # noqa: BLE001
             print(json.dumps({"ok": False, "error": "dock_reference_failed: %s" % str(e)[:180]}))
+        return
+
+    if cmd in ("prepare_receptor", "prepare_ligand", "redock"):
+        try:
+            out_dir = req.get("outDir") or os.path.join(os.getcwd(), "_" + cmd)
+            if cmd == "prepare_receptor":
+                r = _prepare_receptor(req, out_dir)
+            elif cmd == "redock":
+                r = _redock(req, out_dir)
+            else:
+                seed = int(req.get("seed", 42))
+                pdbqt, xyz = _prep(str(req["ligandSmiles"]), seed)
+                os.makedirs(out_dir, exist_ok=True)
+                path = os.path.join(out_dir, "ligand.pdbqt")
+                with open(path, "w") as f:
+                    f.write(pdbqt)
+                import meeko as meeko_mod
+                from rdkit import rdBase
+                r = {"ligandPdbqtPath": path, "ligandPdbqtSha256": _sha(pdbqt), "atoms": int(len(xyz)), "seed": seed,
+                     "preparation": "RDKit AddHs + ETKDGv3(randomSeed=%d) + MMFF94 (UFF fallback) 500 iters -> Meeko MoleculePreparation -> PDBQT" % seed,
+                     "rdkitVersion": rdBase.rdkitVersion, "meekoVersion": getattr(meeko_mod, "__version__", "?")}
+            print(json.dumps({"ok": True, **r}))
+        except Exception as e:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": "%s_failed: %s" % (cmd, str(e)[:180])}))
         return
 
     if cmd == "dock":

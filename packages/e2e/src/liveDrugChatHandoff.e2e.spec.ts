@@ -28,13 +28,15 @@ test('the one chat freezes the hypothesis and plan, then confirmation runs it li
   await page.goto('/');
 
   const chat = page.getByTestId('science-chat-inline');
-  await chat.getByLabel('Wiadomość do Science Chat').fill('Find drug candidates for CC(=O)Oc1ccccc1C(=O)O');
+  await chat.getByLabel('Wiadomość do Science Chat').fill('Find drug candidates for Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1');
   await chat.getByRole('button', { name: 'Wyślij' }).click();
 
   const hypothesis = page.getByTestId('drug-hypothesis');
   await expect(hypothesis).toBeVisible({ timeout: 120_000 });
   await expect(hypothesis).toContainText('HIPOTEZA');
   await expect(hypothesis).toContainText('AutoDock Vina');
+  await expect(hypothesis).toContainText('PDB 1IEP');
+  await expect(hypothesis).toContainText('krytyczne — falsyfikator');
   expect(await hypothesis.getAttribute('data-fingerprint')).toMatch(/^[0-9a-f]{8}$/);
 
   await page.getByTestId('drug-open-live-lab').click();

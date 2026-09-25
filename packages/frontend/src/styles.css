@@ -5901,9 +5901,23 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .journey-hypothesis { display: grid; gap: 0.45rem; padding: 0.75rem 0.9rem; border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 0.6rem; background: rgba(8, 18, 32, 0.6); }
 .journey-hypothesis > span { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--cyan, #67e8f9); }
 .journey-hypothesis p { margin: 0; }
+.journey-hypothesis .journey-target { font-size: 0.82rem; color: var(--cyan, #67e8f9); }
+.journey-hypothesis li em { font-style: normal; font-size: 0.72rem; opacity: 0.75; letter-spacing: 0.04em; }
 .journey-hypothesis ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.2rem; }
 .journey-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 /* Drug bench live panel in the laboratory. */
+/* The bench procedure sits on the LEFT of the canvas so it never covers the result panel's controls. */
+.sw-drug-live { left: 1rem; right: auto; width: min(360px, calc(100vw - 2rem)); max-height: min(62vh, 620px); overflow: auto; }
+.sw-drug-live.is-compact { max-height: min(40vh, 380px); }
+.sw-procedure { list-style: none; counter-reset: step; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.sw-procedure-step { counter-increment: step; display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.1rem 0.4rem; padding: 0.3rem 0.4rem; border-left: 2px solid rgba(148, 163, 184, 0.35); border-radius: 0 0.35rem 0.35rem 0; background: rgba(15, 23, 42, 0.45); }
+.sw-procedure-step::before { content: counter(step); grid-row: span 3; align-self: start; font: 600 0.7rem/1.5 var(--font-mono, monospace); color: #94a3b8; }
+.sw-procedure-step.is-active { border-left-color: #22d3ee; background: rgba(8, 47, 73, 0.55); }
+.sw-procedure-step.is-done { border-left-color: #4ade80; }
+.sw-procedure-step.is-blocked { border-left-color: #f87171; }
+.sw-procedure-title { font-size: 0.78rem; color: #e2e8f0; }
+.sw-procedure-label { font-size: 0.62rem; letter-spacing: 0.06em; color: #7dd3fc; }
+.sw-procedure-detail { font-size: 0.7rem; color: rgba(226, 232, 240, 0.78); overflow-wrap: anywhere; }
 .sw-drug-live .sw-drug-dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; margin: 0.4rem 0; }
 .sw-drug-live .sw-drug-dl dt { color: #94a3b8; }
 .sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }

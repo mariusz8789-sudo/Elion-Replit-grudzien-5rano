@@ -46,6 +46,8 @@ import { estimateDuration, recordDuration } from '../core/product/durationEstima
 import { getToken } from '../core/backend/session';
 import { getLiveDrugRun, liveDrugRunGate, startLiveDrugRun, subscribeLiveDrugRuns, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
+import { labProcedureOf } from '../core/liveExperiment/labProcedure';
+import type { DockingStep } from '../core/liveExperiment/drugRunState';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -61,6 +63,16 @@ import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/live
  * placeholder number: the log starts empty and every line comes from a
  * real command, session or verdict.
  */
+
+/** What the bench shows for each persisted docking step (the backend writes a step only once it is done). */
+const DOCKING_STEP_LABEL: Record<DockingStep | 'NONE', string> = {
+  NONE: '—',
+  SELECTED: 'kandydat wybrany do dokowania',
+  LIGAND_PREPARED: 'ligand przygotowany (RDKit + Meeko)',
+  VINA_STARTED: 'Vina liczy',
+  POSE_SCORED: 'poza wyznaczona i oceniona',
+  FAILED: 'dokowanie nie powiodło się',
+};
 
 const STATE_NAMES: readonly AgentActionState[] = ['IDLE', 'MOVING_TO_TARGET', 'ARRIVED', 'ALIGNING', 'REACHING', 'INTERACTING', 'EXECUTING', 'OBSERVING', 'REPORTING', 'RETURNING', 'BLOCKED'];
 
@@ -147,11 +159,20 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [benchSceneHash, setBenchSceneHash] = useState<string | null>(null);
   const [benchAtoms, setBenchAtoms] = useState(0);
   const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
+  const [benchPoseAtoms, setBenchPoseAtoms] = useState(0);
+  // A live drug run is something to WATCH: the view leaves the visor once, so the bench procedure is
+  // visible. The camera button still switches back, and nothing forces it again afterwards.
+  const benchViewSwitched = useRef(false);
   useEffect(() => subscribeLiveDrugRuns((run) => {
     benchLayer.setRun(run);
     setDrugRun(run);
+    if (!benchViewSwitched.current) {
+      benchViewSwitched.current = true;
+      setCamera('SPECTATOR');
+      sim.setCameraMode('SPECTATOR');
+    }
     if (run.durationMs && run.phase === 'DONE') recordDuration('drug-run', run.durationMs);
-  }), [benchLayer]);
+  }), [benchLayer, sim]);
   const [anatomy, setAnatomy] = useState<AnatomyViewState>(() => createDefaultAnatomyView(TWIN_ID));
   const anatomyRef = useRef(anatomy); anatomyRef.current = anatomy;
   const params = useMemo(() => ({}), []);
@@ -219,6 +240,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     const hash = s.drugBenchHash ? (s.drugBenchHash >>> 0).toString(16).padStart(8, '0') : null;
     setBenchSceneHash((prev) => (prev === hash ? prev : hash));
     setBenchAtoms((prev) => (prev === (s.drugBenchAtoms ?? 0) ? prev : s.drugBenchAtoms ?? 0));
+    setBenchPoseAtoms((prev) => (prev === (s.drugBenchPoseAtoms ?? 0) ? prev : s.drugBenchPoseAtoms ?? 0));
   }, []);
   const { canvasRef, loading, failed } = useThreeLoop(loopSim, params, true, onStats);
   // Measured load time of this world: the next visit counts down from it (never a guessed number).
@@ -570,23 +592,50 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         const st = drugRun.state;
         const focus = focusCandidate(st);
         const running = drugRun.phase === 'RUNNING_CAMPAIGN' || drugRun.phase === 'RUNNING_STAGE';
+        // One procedure reading of the same canonical state that drives the bench, the scientist and the cameras.
+        const sealedHere = session?.experimentId === 'drug-candidate-run';
+        const hypothesis = getDrugHypothesis(drugRun.campaignId) ?? buildDrugHypothesis(focus?.smiles ?? 'kandydat');
+        const verdict = drugRun.phase === 'DONE' ? evaluateDrugHypothesis(hypothesis, st, focus).verdict : null;
+        const procedure = labProcedureOf(st, focus, {
+          sealed: sealedHere,
+          verdict,
+          replay: sealedHere && replay ? (replay.status === 'MATCH' ? 'MATCH' : 'MISMATCH') : null,
+        });
         return (
-          <aside className="sw-chemistry-context sw-drug-live" aria-label="Odkrywanie leków na żywo" data-testid="drug-bench-live"
+          <aside className={`sw-chemistry-context sw-drug-live${running ? '' : ' is-compact'}`} aria-label="Odkrywanie leków na żywo" data-testid="drug-bench-live"
+            data-procedure={procedure.activeId ?? (drugRun.phase === 'DONE' ? 'FINISHED' : '')}
+            data-procedure-done={procedure.phases.filter((x) => x.status === 'DONE').map((x) => x.id).join(',')}
             data-phase={drugRun.phase} data-stage={st.stage} data-state-hash={st.stateHash} data-scene-hash={benchSceneHash ?? ''}
-            data-candidates={st.candidates.length} data-last-seq={st.lastSeq} data-scene-atoms={benchAtoms} data-focus-smiles={focus?.smiles ?? ''}>
-            <div className="sw-chemistry-head"><strong>Odkrywanie leków · na żywo</strong><span className="sw-badge">MODEL_ESTIMATE</span></div>
+            data-candidates={st.candidates.length} data-last-seq={st.lastSeq} data-scene-atoms={benchAtoms} data-focus-smiles={focus?.smiles ?? ''}
+            data-target={st.target?.targetId ?? ''} data-docking-step={focus?.dockingStep ?? ''} data-pose-atoms={focus?.pose?.atoms.length ?? 0} data-scene-pose-atoms={benchPoseAtoms}>
+            <div className="sw-chemistry-head"><strong>Przebieg eksperymentu</strong><span className="sw-badge">{running ? 'W TOKU' : 'ZAKOŃCZONY'}</span></div>
+            <ol className="sw-procedure" aria-label="Kolejne etapy eksperymentu">
+              {procedure.phases.map((ph) => (
+                <li key={ph.id} data-phase-id={ph.id} data-status={ph.status} className={`sw-procedure-step is-${ph.status.toLowerCase()}`}>
+                  <span className="sw-procedure-title">{ph.title}</span>
+                  <span className="sw-procedure-label">{ph.evidence}</span>
+                  {ph.detail && <span className="sw-procedure-detail">{ph.detail}</span>}
+                </li>
+              ))}
+            </ol>
             {running && <p><LoadingStatus label={`Silnik liczy: ${st.stage}`} estimateMs={drugRunEstimate} testId="drug-bench-loading" /></p>}
             {drugRun.phase === 'FAILED' && <p role="alert">Run zatrzymany: {drugRun.error}</p>}
             <dl className="sw-drug-dl">
+              <dt>Cel białkowy</dt><dd>{st.target ? `${st.target.protein} · PDB ${st.target.pdbId}, łańcuch ${st.target.chain} (${st.target.receptorAtoms} atomów)` : 'receptor jeszcze nieprzygotowany'}</dd>
               <dt>Generacje</dt><dd>{st.generationsCompleted}/{st.maxGenerations}</dd>
               <dt>Kandydaci</dt><dd>{st.candidates.length} (zachowani {st.candidates.filter((c) => c.status === 'retained').length})</dd>
               <dt>Fokus</dt><dd className="cw-mono">{focus?.smiles ?? '—'}</dd>
               <dt>ADMET</dt><dd>{focus?.stages.admet?.status ?? '—'}</dd>
+              <dt>Krok dokowania</dt><dd>{DOCKING_STEP_LABEL[focus?.dockingStep ?? 'NONE']}</dd>
               <dt>Docking (Vina)</dt><dd>{focus?.stages.docking?.value != null ? `${focus.stages.docking.value.toFixed(2)} kcal/mol` : focus?.stages.docking?.status ?? '—'}</dd>
+              <dt>Poza w kieszeni</dt><dd>{focus?.pose ? `${focus.pose.atoms.length} atomów, reszty: ${focus.pose.pocketResidues.slice(0, 6).join(', ')}${focus.pose.pocketResidues.length > 6 ? '…' : ''}` : '—'}</dd>
               <dt>QM (PySCF)</dt><dd>{focus?.stages.quantum?.value != null ? `${focus.stages.quantum.value.toFixed(2)} eV` : focus?.stages.quantum?.status ?? '—'}</dd>
               {st.blocked.length > 0 && <><dt>Zablokowane</dt><dd>{st.blocked.map((b) => `${b.stage}: ${b.blocker}`).join(' · ')}</dd></>}
             </dl>
-            <p className="sw-drug-note">Receptor dockingu to zastępcza mała cząsteczka (nie białko). Transformacje to obliczenia in-silico, nie synteza w laboratorium.</p>
+            <p className="sw-drug-note">
+              Geometria RDKit i przebieg Vina to REAL ENGINE OUTPUT; wynik Vina pozostaje estymatą funkcji oceniającej przy sztywnym receptorze, nie zmierzonym powinowactwem.
+              Predykcje ADMET to MODEL_ESTIMATE. Przekształcenia cząsteczek to COMPUTATIONAL TRANSFORMATION — obliczenia, nie synteza w laboratorium.
+            </p>
           </aside>
         );
       })()}

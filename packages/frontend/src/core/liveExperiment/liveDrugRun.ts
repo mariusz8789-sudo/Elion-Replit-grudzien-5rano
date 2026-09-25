@@ -1,12 +1,13 @@
-import { getCampaign, getProjectJob, listCampaignCandidates, listCampaignEvents, runCampaignStage, startCampaign } from '../backend/client';
-import { projectDrugRun, type CampaignEventRecord, type LiveDrugRunState } from './drugRunState';
+import { getCampaign, getProjectJob, getScienceRun, listCampaignCandidates, listCampaignEvents, runCampaignStage, startCampaign } from '../backend/client';
+import { projectDrugRun, type CampaignEventRecord, type DockingRunRecord, type LiveDrugRunState } from './drugRunState';
 import type { CampaignCandidate } from '../backend/client';
 
 /**
  * LIVE DRUG RUN — drives ONE real campaign through the existing backend pipeline and publishes its
  * read model as it changes. It starts nothing the backend would not start from `#/campaign`: the
  * campaign run (RDKit generation), then the existing multi-fidelity stage (ADMET-AI, Vina, PySCF) on
- * a budget of one candidate each. Every state it publishes is `projectDrugRun` over what the backend
+ * a budget of one candidate each, docking against the vetted protein target (PDB 1IEP, chain A).
+ * A docking result's Science Run is fetched once by id so the state carries the real Vina pose. Every state it publishes is `projectDrugRun` over what the backend
  * persisted; the scientist in the lab, the bench hologram and the outcome panel all subscribe here.
  */
 
@@ -22,7 +23,12 @@ export interface LiveDrugRun {
   readonly durationMs: number | null;
 }
 
-export const LIVE_STAGE_CONFIG = { admet: { enabled: true }, docking: { enabled: true, budget: 1 }, quantum: { enabled: true, budget: 1 } } as const;
+export const LIVE_DOCKING_TARGET = 'ABL1_1IEP';
+export const LIVE_STAGE_CONFIG = {
+  admet: { enabled: true },
+  docking: { enabled: true, budget: 1, targetId: LIVE_DOCKING_TARGET, receptor: { exhaustiveness: 8, nPoses: 5 } },
+  quantum: { enabled: true, budget: 1 },
+} as const;
 
 const runs = new Map<string, LiveDrugRun>();
 const listeners = new Set<(run: LiveDrugRun) => void>();
@@ -57,12 +63,13 @@ export async function startLiveDrugRun(opts: { readonly token: string; readonly 
   const startedAt = performance.now();
   let events: CampaignEventRecord[] = [];
   let candidates: CampaignCandidate[] = [];
+  const dockingRuns = new Map<string, DockingRunRecord>();
   let maxGenerations = 1;
   let phase: LivePhase = 'IDLE';
   const emit = (jobRunning: boolean, error: string | null = null, done = false): LiveDrugRun => {
     const run: LiveDrugRun = {
       campaignId, projectId, phase, error,
-      state: projectDrugRun({ events, candidates, maxGenerations, jobRunning }),
+      state: projectDrugRun({ events, candidates, maxGenerations, jobRunning, dockingRuns: [...dockingRuns.values()] }),
       durationMs: done ? Math.round(performance.now() - startedAt) : null,
     };
     publish(run);
@@ -73,6 +80,13 @@ export async function startLiveDrugRun(opts: { readonly token: string; readonly 
     const [e, c] = await Promise.all([listCampaignEvents(token, projectId, campaignId, after), listCampaignCandidates(token, projectId, campaignId)]);
     if (e.ok) events = [...events, ...e.data];
     if (c.ok) candidates = c.data;
+    const pending = events
+      .filter((x) => x.type === 'STAGE_RESULT' && x.payload.stage === 'docking' && typeof x.payload.runId === 'string' && !dockingRuns.has(x.payload.runId as string))
+      .map((x) => x.payload.runId as string);
+    for (const runId of pending) {
+      const run = await getScienceRun(token, projectId, campaignId, runId);
+      if (run.ok) dockingRuns.set(runId, { id: run.data.id, outputs: run.data.outputs, provenance: run.data.provenance });
+    }
   };
   const follow = async (jobId: string): Promise<string | null> => {
     for (;;) {

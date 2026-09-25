@@ -1,9 +1,14 @@
 import type * as THREE_NS from 'three';
 import { createAtomSphere, createBond, elementStyleOf } from '../three/graphics/moleculeKit';
+import { createBench, createCabinet, createMonitor } from '../three/graphics/labKit';
+import { createGenesisMaterialPalette, createScreenMaterial, createScientificGlass, makeReadoutSurface } from '../three/graphics/materials';
+import { createManipulatorArm, type ManipulatorHandle } from '../three/biologyLabKit';
+import { CameraRig } from '../three/graphics/cameraRig';
+import { labProcedureOf, type BenchFocus, type LabProcedure } from './labProcedure';
 import { createBackendGeometrySource, type MoleculeGeometrySource, type MoleculeMaterialisation } from '../worldModel/domains/molecularStructure';
 import type { Sim3D } from '../three/types';
 import type { LiveDrugRun } from './liveDrugRun';
-import type { LiveCandidate, LiveDrugRunState } from './drugRunState';
+import type { DockedPose, LiveCandidate, LiveDrugRunState } from './drugRunState';
 
 /**
  * DRUG BENCH LAYER — the live drug run drawn at the bench of the ONE main laboratory.
@@ -11,7 +16,9 @@ import type { LiveCandidate, LiveDrugRunState } from './drugRunState';
  * Presentation only, and only of `LiveDrugRunState`: every object below is derived from the state the
  * backend persisted (candidates, lineage, stage measurements). The molecule is the real RDKit
  * conformer of the focused candidate (`chem-rdkit-embed3d`, the same source as Molecule Lab). Nothing
- * animates a result that has not been computed: a stage ring grows only when a measurement exists.
+ * animates a result that has not been computed: a stage ring grows only when a measurement exists, and
+ * the docked pose appears in its pocket only once Vina has actually produced it (the pose and the
+ * receptor residues around it come from the persisted Science Run, in the receptor's own frame).
  *
  * Added through the scene's public surface: a layer on the station group `station:<id>` the scene
  * already builds, inside the same renderer — no second canvas, no second scene, no edit of core/three.
@@ -40,11 +47,23 @@ export class DrugBenchLayer {
   private molecule: THREE_NS.Group | null = null;
   private cloud: THREE_NS.Group | null = null;
   private rings: THREE_NS.Group | null = null;
-  private screen: { canvas: HTMLCanvasElement; texture: THREE_NS.CanvasTexture } | null = null;
+  private pocket: THREE_NS.Group | null = null;
+  private rack: THREE_NS.Group | null = null;
+  private vialGlass: THREE_NS.Material | null = null;
+  private analyserLid: THREE_NS.Mesh | null = null;
+  private analyserLamp: THREE_NS.Mesh | null = null;
+  private analyserScreen: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; texture: THREE_NS.CanvasTexture } | null = null;
+  private busyLamp: THREE_NS.Mesh | null = null;
+  private arm: ManipulatorHandle | null = null;
+  private readonly anchors = new Map<BenchFocus, THREE_NS.Object3D>();
+  private procedure: LabProcedure | null = null;
+  private screen: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; texture: THREE_NS.CanvasTexture } | null = null;
   private state: LiveDrugRunState | null = null;
   private builtHash: string | null = null;
   private moleculeSmiles: string | null = null;
   private moleculeAtoms = 0;
+  private poseAtoms = 0;
+  private poseSha: string | null = null;
   private readonly conformers = new Map<string, Promise<MoleculeMaterialisation | null>>();
   private time = 0;
 
@@ -52,6 +71,9 @@ export class DrugBenchLayer {
 
   get renderedStateHash(): string | null { return this.builtHash; }
   get atomsShown(): number { return this.moleculeAtoms; }
+  /** Heavy atoms of the docked pose currently drawn in the pocket (0 until Vina produced one). */
+  get poseAtomsShown(): number { return this.poseAtoms; }
+  get poseHashShown(): string | null { return this.poseSha; }
 
   setRun(run: LiveDrugRun | null): void { this.state = run?.state ?? null; }
 
@@ -60,26 +82,55 @@ export class DrugBenchLayer {
     const station = scene.getObjectByName(`station:${DRUG_BENCH_STATION_ID}`);
     if (!station) return;
     const root = new THREE.Group(); root.name = 'drug-bench:layer';
-    // The bench itself: a lab table and a holographic plinth (the scene draws only an empty group for new station kinds).
-    const top = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 1.05), new THREE.MeshStandardMaterial({ color: 0xd6dde6, roughness: 0.35, metalness: 0.2 }));
-    top.position.set(0, 0.93, 0); root.add(top);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.6, metalness: 0.5 });
-    for (const [x, z] of [[-1.05, -0.45], [1.05, -0.45], [-1.05, 0.45], [1.05, 0.45]] as const) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.06), legMat); leg.position.set(x, 0.45, z); root.add(leg);
-    }
-    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.08, 40), new THREE.MeshStandardMaterial({ color: 0x0b1220, emissive: 0x0e7490, emissiveIntensity: 0.9, roughness: 0.3 }));
-    plinth.position.set(0, 1.01, 0); root.add(plinth);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.9, 40, 1, true), new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide }));
-    beam.position.set(0, 1.5, 0); root.add(beam);
-    // A readout panel behind the plinth, drawn from the state (canvas texture on the same renderer).
-    const canvas = document.createElement('canvas'); canvas.width = 768; canvas.height = 384;
-    const texture = new THREE.CanvasTexture(canvas);
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshBasicMaterial({ map: texture, transparent: true }));
-    panel.position.set(0, 1.62, -0.52); root.add(panel);
-    this.screen = { canvas, texture };
+    const mat = createGenesisMaterialPalette(THREE);
+    const glass = createScientificGlass(THREE);
+    // The bench of a real workstation: work surface, sample rack, ADMET analyser, docking console + monitor.
+    root.add(createBench(THREE, { position: [0, 0, 0], width: 2.6, depth: 1.05, height: 0.93, topMaterial: mat.CERAMIC, legMaterial: mat.BRUSHED_METAL }));
+    root.add(createCabinet(THREE, { position: [-1.5, 0, -0.1], width: 0.62, depth: 0.6, height: 1.05, bodyMaterial: mat.PAINTED_METAL, doorMaterial: mat.BRUSHED_METAL }));
+
+    // Sample rack: one vial per persisted candidate (filled in as the engine writes them).
+    this.rack = new THREE.Group(); this.rack.position.set(-0.72, 0.93, 0.12); root.add(this.rack);
+    const rackBody = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.22), mat.BRUSHED_METAL);
+    rackBody.position.set(0, 0.025, 0); this.rack.add(rackBody);
+    this.vialGlass = glass;
+
+    // ADMET analyser: a bench instrument with a lid, a status lamp and its own small readout.
+    const analyser = new THREE.Group(); analyser.position.set(-1.5, 1.05, -0.1); root.add(analyser);
+    analyser.add(new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, 0.5), mat.TECH_COMPOSITE));
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 0.34), mat.POLISHED_METAL);
+    lid.position.set(0, 0.185, 0.02); analyser.add(lid); this.analyserLid = lid;
+    this.analyserLamp = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x22d3ee, emissiveIntensity: 0 }));
+    this.analyserLamp.position.set(0.2, 0.06, 0.26); analyser.add(this.analyserLamp);
+    const analyserReadout = makeReadoutSurface(THREE, 384, 192);
+    this.analyserScreen = analyserReadout;
+    const analyserPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.21), createScreenMaterial(THREE, analyserReadout.texture, { emissiveIntensity: 0.55 }));
+    analyserPanel.position.set(0, 0.06, 0.251); analyser.add(analyserPanel);
+
+    // Docking workstation: console deck, keyboard, busy lamp and the big monitor the results appear on.
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.03, 0.3), mat.BRUSHED_METAL);
+    deck.position.set(0.55, 0.95, 0.26); deck.rotation.x = -0.18; root.add(deck);
+    this.busyLamp = new THREE.Mesh(new THREE.SphereGeometry(0.028, 14, 10), new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0xf59e0b, emissiveIntensity: 0 }));
+    this.busyLamp.position.set(0.95, 0.99, 0.26); root.add(this.busyLamp);
+    const readout = makeReadoutSurface(THREE, 768, 384);
+    this.screen = { canvas: readout.canvas, texture: readout.texture, ctx: readout.ctx };
+    root.add(createMonitor(THREE, { position: [0.55, 0.93, -0.26], width: 0.86, height: 0.5, standHeight: 0.26, frameMaterial: mat.BRUSHED_METAL, screenMaterial: createScreenMaterial(THREE, readout.texture, { emissiveIntensity: 0.6 }) }));
+
+    // The manipulator that moves the sample: it only works while a real step is under way.
+    this.arm = createManipulatorArm(THREE, { position: [-0.15, 0.93, -0.3], headingRadians: Math.PI, scale: 0.55, linkMaterial: mat.BRUSHED_METAL, jointMaterial: mat.POLISHED_METAL, baseMaterial: mat.PAINTED_METAL });
+    root.add(this.arm.group);
+
+    // The two holograms above the bench: the candidate molecule and the receptor pocket with the pose.
+    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.06, 36), new THREE.MeshStandardMaterial({ color: 0x0b1220, emissive: 0x0e7490, emissiveIntensity: 0.9, roughness: 0.3 }));
+    plinth.position.set(0, 0.96, 0); root.add(plinth);
     this.molecule = new THREE.Group(); this.molecule.position.set(0, HOLO_Y, 0.05); root.add(this.molecule);
     this.cloud = new THREE.Group(); this.cloud.position.set(0, 1.25, 0.05); root.add(this.cloud);
-    this.rings = new THREE.Group(); this.rings.position.set(0, 1.06, 0); root.add(this.rings);
+    this.rings = new THREE.Group(); this.rings.position.set(0, 1.0, 0); root.add(this.rings);
+    this.pocket = new THREE.Group(); this.pocket.position.set(0.95, HOLO_Y - 0.06, 0.05); root.add(this.pocket);
+    // Anchors the camera frames: their world position follows the station, so no coordinate is hard-coded twice.
+    for (const [focus, pos] of [['BENCH', [0, 1.2, 0.5]], ['SAMPLES', [-0.72, 1.05, 0.2]], ['ANALYSER', [-1.5, 1.2, 0.2]], ['RECEPTOR', [0.95, HOLO_Y, 0.05]], ['WORKSTATION', [0.55, 1.15, 0.1]], ['POSE', [0.95, HOLO_Y, 0.05]], ['MONITOR', [0.55, 1.35, -0.2]]] as const) {
+      const anchor = new THREE.Object3D(); anchor.position.set(pos[0], pos[1], pos[2]); anchor.name = `drug-bench:focus:${focus}`;
+      root.add(anchor); this.anchors.set(focus, anchor);
+    }
     station.add(root);
     this.root = root;
     this.drawPanel(null);
@@ -91,9 +142,46 @@ export class DrugBenchLayer {
     if (this.molecule) this.molecule.rotation.y += dt * 0.35;
     const state = this.state;
     const hash = state?.stateHash ?? null;
-    if (hash === this.builtHash || !this.THREE || !this.root) return;
-    this.builtHash = hash;
-    this.rebuild(state);
+    if (hash !== this.builtHash && this.THREE && this.root) {
+      this.builtHash = hash;
+      this.procedure = labProcedureOf(state, state ? focusCandidate(state) : null);
+      this.rebuild(state);
+    }
+    this.driveInstruments(dt);
+  }
+
+  /**
+   * The instruments read the procedure, which reads the canonical state: an instrument works only while
+   * a phase that a persisted record put into ACTIVE is under way. Nothing here invents a step.
+   */
+  private driveInstruments(dt: number): void {
+    const phases = this.procedure?.phases ?? [];
+    const statusOf = (id: string) => phases.find((p) => p.id === id)?.status ?? 'PENDING';
+    const loading = statusOf('LOAD') === 'ACTIVE';
+    const analysed = statusOf('LOAD') === 'DONE';
+    const docking = statusOf('EXECUTE') === 'ACTIVE';
+    const preparing = statusOf('CONFIGURE') === 'ACTIVE';
+    const working = loading || docking || preparing;
+    if (this.arm) { this.arm.setActive(working); this.arm.update(this.time); }
+    if (this.analyserLid) this.analyserLid.position.z = 0.02 + (loading || analysed ? 0 : 0.12);
+    if (this.analyserLamp) {
+      const m = this.analyserLamp.material as THREE_NS.MeshStandardMaterial;
+      m.emissiveIntensity = loading ? 0.6 + Math.sin(this.time * 4) * 0.35 : analysed ? 0.5 : 0;
+    }
+    if (this.busyLamp) {
+      const m = this.busyLamp.material as THREE_NS.MeshStandardMaterial;
+      m.emissiveIntensity = docking ? 0.7 + Math.sin(this.time * 6) * 0.3 : statusOf('MEASURE') === 'DONE' ? 0.35 : 0;
+    }
+    void dt;
+  }
+
+  /** Vials are rebuilt with the state; the rack body itself (its first child) stays. */
+  private clearVials(): void {
+    if (!this.rack) return;
+    for (const child of [...this.rack.children].filter((c) => c.name.startsWith('drug-vial:'))) {
+      this.rack.remove(child);
+      child.traverse((o) => { const m = o as THREE_NS.Mesh; m.geometry?.dispose?.(); });
+    }
   }
 
   private clear(group: THREE_NS.Group | null): void {
@@ -108,23 +196,25 @@ export class DrugBenchLayer {
     const THREE = this.THREE!;
     this.drawPanel(state);
     this.clear(this.cloud); this.clear(this.rings);
-    if (!state) { this.clear(this.molecule); this.moleculeSmiles = null; this.moleculeAtoms = 0; return; }
-    // Candidate constellation: one bead per persisted candidate, generation by generation around the plinth.
-    const byGen = new Map<number, LiveCandidate[]>();
-    for (const c of state.candidates) byGen.set(c.generation, [...(byGen.get(c.generation) ?? []), c]);
+    this.clearVials();
+    if (!state) { this.clear(this.molecule); this.clear(this.pocket); this.moleculeSmiles = null; this.moleculeAtoms = 0; this.poseAtoms = 0; this.poseSha = null; return; }
     const focus = focusCandidate(state);
-    for (const [generation, list] of byGen) {
-      const radius = 0.5 + generation * 0.14;
-      list.forEach((c, i) => {
-        const a = (i / list.length) * Math.PI * 2 + generation * 0.4;
-        const measured = Boolean(c.stages.docking?.value ?? c.stages.quantum?.value);
-        const color = c.status === 'rejected' ? 0x475569 : measured ? 0xfbbf24 : 0x67e8f9;
-        const bead = new THREE.Mesh(new THREE.SphereGeometry(c === focus ? 0.035 : 0.022, 14, 10), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: c.status === 'rejected' ? 0.1 : 0.7, transparent: c.status === 'rejected', opacity: c.status === 'rejected' ? 0.45 : 1 }));
-        bead.position.set(Math.cos(a) * radius, generation * 0.05, Math.sin(a) * radius);
-        bead.name = `drug-candidate:${c.id}`;
-        this.cloud!.add(bead);
-      });
-    }
+    // Sample rack: one vial per persisted candidate. A rejected candidate's vial stays dark and capped;
+    // the one being worked on glows. Nothing is placed for a candidate the backend has not written.
+    state.candidates.forEach((c, i) => {
+      const column = i % 6, row = Math.floor(i / 6);
+      const vial = new THREE.Group();
+      vial.position.set(-0.19 + column * 0.076, 0.05, -0.05 + row * 0.08);
+      vial.name = `drug-vial:${c.id}`;
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.085, 16, 1, true), this.vialGlass!);
+      body.position.y = 0.043; vial.add(body);
+      const colour = c.status === 'rejected' ? 0x475569 : c === focus ? 0xfbbf24 : 0x38bdf8;
+      const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 14), new THREE.MeshStandardMaterial({ color: colour, emissive: colour, emissiveIntensity: c.status === 'rejected' ? 0.05 : c === focus ? 0.8 : 0.35, transparent: true, opacity: 0.85 }));
+      liquid.position.y = 0.028; vial.add(liquid);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.012, 14), new THREE.MeshStandardMaterial({ color: c.status === 'rejected' ? 0x334155 : 0x0ea5e9, roughness: 0.6 }));
+      cap.position.y = 0.09; vial.add(cap);
+      this.rack!.add(vial);
+    });
     // Stage rings: an arc per stage, its length = measured / planned. No measurement → no arc.
     (['admet', 'docking', 'quantum'] as const).forEach((stage, i) => {
       const p = state.progress[stage];
@@ -134,7 +224,44 @@ export class DrugBenchLayer {
       ring.rotation.x = -Math.PI / 2; ring.name = `drug-stage:${stage}`;
       this.rings!.add(ring);
     });
+    this.showPose(focus?.pose ?? null);
     if (focus && focus.smiles !== this.moleculeSmiles) void this.showMolecule(focus.smiles);
+  }
+
+  /**
+   * The real docking result: the receptor residues lining the pocket as a faint cage, and inside it the
+   * top Vina pose, both in the receptor's own frame (centred on the pose so the bench can show it).
+   */
+  private showPose(pose: DockedPose | null): void {
+    const THREE = this.THREE!;
+    this.clear(this.pocket);
+    this.poseAtoms = 0;
+    this.poseSha = pose?.poseSha256 ?? null;
+    if (!pose || !pose.atoms.length) return;
+    const n = pose.atoms.length;
+    const mean = (axis: 1 | 2 | 3) => pose.atoms.reduce((a, t) => a + t[axis], 0) / n;
+    const c = [mean(1), mean(2), mean(3)];
+    const place = (x: number, y: number, z: number): [number, number, number] => [(x - c[0]!) * MOLECULE_SCALE, (y - c[1]!) * MOLECULE_SCALE, (z - c[2]!) * MOLECULE_SCALE];
+    const pocketMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.28, depthWrite: false });
+    for (const [, x, y, z] of pose.pocketAtoms) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), pocketMat);
+      dot.position.set(...place(x, y, z));
+      this.pocket!.add(dot);
+    }
+    const positions = pose.atoms.map(([, x, y, z]) => place(x, y, z));
+    pose.atoms.forEach(([element], i) => {
+      const atom = createAtomSphere(THREE, { element, radius: elementStyleOf(element).radius * MOLECULE_SCALE * 1.5 });
+      atom.position.set(...positions[i]!);
+      this.pocket!.add(atom);
+    });
+    const bondMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, emissive: 0x854d0e, emissiveIntensity: 0.4 });
+    for (const [a, b, order] of pose.bonds) {
+      const from = positions[a], to = positions[b];
+      if (!from || !to) continue;
+      this.pocket!.add(createBond(THREE, { from, to, order: Math.round(order) || 1, aromatic: order === 1.5, material: bondMat, aromaticMaterial: bondMat, radius: 0.007 }));
+    }
+    this.pocket!.name = `drug-pose:${pose.poseSha256.slice(0, 12)}`;
+    this.poseAtoms = n;
   }
 
   private async showMolecule(smiles: string): Promise<void> {
@@ -168,33 +295,66 @@ export class DrugBenchLayer {
     this.moleculeAtoms = n;
   }
 
+  /** The workstation monitor: what the engines wrote, in plain language, with its epistemic label. */
   private drawPanel(state: LiveDrugRunState | null): void {
+    this.drawAnalyser(state);
     if (!this.screen) return;
-    const { canvas, texture } = this.screen;
-    const g = canvas.getContext('2d');
-    if (!g) return;
+    const { canvas, texture, ctx: g } = this.screen;
     g.clearRect(0, 0, canvas.width, canvas.height);
-    g.fillStyle = 'rgba(8,18,32,0.86)'; g.fillRect(0, 0, canvas.width, canvas.height);
+    g.fillStyle = 'rgba(8,18,32,0.94)'; g.fillRect(0, 0, canvas.width, canvas.height);
     g.strokeStyle = '#22d3ee'; g.lineWidth = 3; g.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-    g.fillStyle = '#a5f3fc'; g.font = 'bold 30px monospace';
-    g.fillText('ODKRYWANIE LEKÓW · NA ŻYWO', 24, 48);
-    g.font = '24px monospace'; g.fillStyle = '#e2e8f0';
-    if (!state) { g.fillText('Czekam na uruchomienie runu…', 24, 100); texture.needsUpdate = true; return; }
+    g.fillStyle = '#a5f3fc'; g.font = 'bold 28px monospace';
+    g.fillText('STANOWISKO DOKOWANIA', 24, 44);
+    g.font = '22px monospace'; g.fillStyle = '#e2e8f0';
+    if (!state) { g.fillText('Czekam na uruchomienie eksperymentu…', 24, 96); texture.needsUpdate = true; return; }
     const focus = focusCandidate(state);
+    const procedure = this.procedure ?? labProcedureOf(state, focus);
+    const active = procedure.phases.find((p) => p.id === procedure.activeId) ?? null;
     const lines = [
-      `Etap: ${state.stage}   generacje ${state.generationsCompleted}/${state.maxGenerations}`,
-      `Kandydaci: ${state.candidates.length} (zachowani ${state.candidates.filter((c) => c.status === 'retained').length})`,
-      `Fokus: ${focus?.smiles.slice(0, 34) ?? '—'}`,
-      `Docking: ${fmt(focus?.stages.docking?.value, 'kcal/mol')}   QM gap: ${fmt(focus?.stages.quantum?.value, 'eV')}`,
-      `ADMET: ${focus?.stages.admet?.status ?? '—'}${state.blocked.length ? `   BLOCKED: ${state.blocked.map((b) => b.stage).join(',')}` : ''}`,
-      `MODEL_ESTIMATE · stan ${state.stateHash}`,
+      `Etap: ${active ? active.title : 'zakończony'}`,
+      active?.detail ? `   ${active.detail.slice(0, 52)}` : '',
+      `Cel: ${state.target ? `PDB ${state.target.pdbId}:${state.target.chain}, ${state.target.receptorAtoms} atomów` : '—'}`,
+      `Kandydat: ${focus?.smiles.slice(0, 40) ?? '—'}`,
+      `Vina: ${fmt(focus?.stages.docking?.value, 'kcal/mol')}   QM: ${fmt(focus?.stages.quantum?.value, 'eV')}`,
+      `Poza: ${focus?.pose ? `${focus.pose.atoms.length} atomów w kieszeni` : '—'}`,
+      `${active?.evidence ?? 'REAL_ENGINE_OUTPUT'} · stan ${state.stateHash}`,
     ];
-    lines.forEach((line, i) => g.fillText(line, 24, 100 + i * 44));
+    lines.forEach((line, i) => { if (line) g.fillText(line, 24, 92 + i * 38); });
     texture.needsUpdate = true;
   }
 
+  /** The ADMET analyser's own small screen: model predictions, never presented as a measurement. */
+  private drawAnalyser(state: LiveDrugRunState | null): void {
+    if (!this.analyserScreen) return;
+    const { canvas, texture, ctx: g } = this.analyserScreen;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.fillStyle = 'rgba(4,14,26,0.95)'; g.fillRect(0, 0, canvas.width, canvas.height);
+    g.fillStyle = '#5eead4'; g.font = 'bold 22px monospace';
+    g.fillText('ANALIZATOR ADMET', 14, 32);
+    g.font = '18px monospace'; g.fillStyle = '#cbd5e1';
+    g.fillText('MODEL_ESTIMATE', 14, 58);
+    const endpoints = state ? focusCandidate(state)?.stages.admet?.endpoints : null;
+    if (!endpoints) { g.fillText('brak predykcji', 14, 96); texture.needsUpdate = true; return; }
+    Object.entries(endpoints).slice(0, 4).forEach(([k, v], i) => g.fillText(`${k}: ${v.toFixed(2)}`, 14, 92 + i * 26));
+    texture.needsUpdate = true;
+  }
+
+  /**
+   * Where the camera should look right now: the world position of the anchor belonging to the active
+   * phase (the bench itself before anything starts). Null while the layer is not attached.
+   */
+  cameraTarget(out: THREE_NS.Vector3): { readonly focus: BenchFocus; readonly radius: number } | null {
+    if (!this.root || !this.THREE) return null;
+    const focus = this.procedure?.phases.find((p) => p.id === this.procedure?.activeId)?.focus ?? 'BENCH';
+    const anchor = this.anchors.get(focus) ?? this.anchors.get('BENCH');
+    if (!anchor) return null;
+    anchor.getWorldPosition(out);
+    const radius = focus === 'BENCH' ? 1.5 : focus === 'WORKSTATION' ? 0.85 : 0.5;
+    return { focus, radius };
+  }
+
   dispose(): void {
-    this.clear(this.molecule); this.clear(this.cloud); this.clear(this.rings);
+    this.clear(this.molecule); this.clear(this.cloud); this.clear(this.rings); this.clear(this.pocket);
     this.root?.parent?.remove(this.root);
     this.screen?.texture.dispose();
     this.root = null; this.THREE = null;
@@ -209,18 +369,39 @@ function fmt(v: number | null | undefined, unit: string): string { return typeof
  */
 export function withDrugBenchLayer<T extends Sim3D>(sim: T, layer: DrugBenchLayer): T {
   let last = typeof performance !== 'undefined' ? performance.now() : 0;
+  let rig: CameraRig | null = null;
+  let scratch: THREE_NS.Vector3 | null = null;
+  let framed: string | null = null;
   return new Proxy(sim, {
     get(target, key, receiver) {
-      if (key === 'init') return (THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number) => { target.init(THREE, scene, camera, w, h); layer.attach(THREE, scene); };
+      if (key === 'init') return (THREE: typeof THREE_NS, scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera, w: number, h: number) => {
+        target.init(THREE, scene, camera, w, h);
+        layer.attach(THREE, scene);
+        scratch = new THREE.Vector3();
+        rig = new CameraRig(THREE, { intent: 'SCIENTIFIC', target: [0, 1.2, 0], targetRadius: 1.5 });
+      };
       if (key === 'syncScene') return (scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera) => {
         target.syncScene(scene, camera);
-        const now = performance.now(); layer.sync(Math.min(0.1, (now - last) / 1000)); last = now;
+        const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now;
+        layer.sync(dt);
+        // Bench camera: while a run is live and the viewer is watching the room (not wearing the visor),
+        // the shot follows the phase the canonical state is in. The scene still owns every other frame.
+        const mode = (target as { getCameraMode?: () => string }).getCameraMode?.();
+        if (!rig || !scratch || mode !== 'SPECTATOR') { framed = null; return; }
+        const shot = layer.cameraTarget(scratch);
+        if (!shot) { framed = null; return; }
+        const key2 = `${shot.focus}:${shot.radius}`;
+        if (key2 !== framed) { rig.frame({ intent: shot.focus === 'BENCH' ? 'SCIENTIFIC' : 'MACRO', target: scratch.toArray(), targetRadius: shot.radius, elevationDeg: 16 }); framed = key2; }
+        rig.setTarget(scratch.toArray());
+        const transform = rig.update(dt, 1.6);
+        camera.position.set(...transform.position);
+        camera.lookAt(transform.lookAt[0], transform.lookAt[1], transform.lookAt[2]);
       };
       if (key === 'dispose') return () => { layer.dispose(); target.dispose?.(); };
       if (key === 'getStats') return () => {
         const base = target.getStats?.() ?? {};
         const hash = layer.renderedStateHash;
-        return { ...base, drugBenchHash: hash ? Number.parseInt(hash, 16) : 0, drugBenchAtoms: layer.atomsShown };
+        return { ...base, drugBenchHash: hash ? Number.parseInt(hash, 16) : 0, drugBenchAtoms: layer.atomsShown, drugBenchPoseAtoms: layer.poseAtomsShown };
       };
       const value = Reflect.get(target, key, receiver) as unknown;
       return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;

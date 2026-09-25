@@ -95,6 +95,7 @@ import {
   buildVirtualExperimentEvidenceInput,
   buildVirtualLabDossier,
 } from './campaign/virtualLabClosedLoop.mjs';
+import { listDockingTargets } from './compute/dockingTargets.mjs';
 import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   ingestKnowledgeMaterial,
   listKnowledgeMaterials,
@@ -1165,6 +1166,8 @@ function sanitizeStageConfig(body) {
       enabled: true,
       budget: clampInt(body.docking.budget, 1, 8, 2),
       mode: ['pareto', 'diverse', 'explicit'].includes(body.docking.mode) ? body.docking.mode : 'pareto',
+      // A vetted protein target is named by registry id only (files + hashes live in the backend).
+      ...(listDockingTargets().includes(body.docking.targetId) ? { targetId: body.docking.targetId } : {}),
       receptor: {
         // Tylko SMILES zastępnika lub gotowy PDBQT — brak wstrzykiwania dowolnych ścieżek.
         receptorSmiles: typeof r.receptorSmiles === 'string' ? r.receptorSmiles.slice(0, 200) : 'c1ccc2[nH]ccc2c1',

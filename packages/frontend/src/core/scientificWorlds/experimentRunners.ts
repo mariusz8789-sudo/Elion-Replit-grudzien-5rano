@@ -37,6 +37,12 @@ export interface TitrationArtifact {
   readonly kind: 'titration'; readonly acid: string; readonly acidName: string; readonly ka: number;
   readonly vb: number; readonly ph: number; readonly veq: number; readonly pKa: number;
 }
+/** The docked pose of the focused candidate, for the sealed session's outputs (empty until Vina produced one). */
+function poseOutputs(state: LiveDrugRunState): Record<string, string | number> {
+  const pose = state.candidates.find((c) => c.pose)?.pose;
+  return pose ? { poseSha256: pose.poseSha256, poseAtoms: pose.atoms.length, pocketResidues: pose.pocketResidues.length } : {};
+}
+
 /** The drug bench: the live run's own read model, exactly as the backend pipeline persisted it. */
 export interface DrugRunArtifact { readonly kind: 'drug-run'; readonly campaignId: string; readonly state: LiveDrugRunState; }
 export type LabArtifact = CrystalArtifact | TitrationArtifact | CollisionArtifact | BlackHoleArtifact | EpidemicArtifact | SpacetimeArtifact;
@@ -198,7 +204,7 @@ export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedge
         const record = ledger.addRecord({
           sourceUrl: `genesis://worlds/${worldId}/drug-candidate-run/${campaignId}`,
           sourceTimestamp: null,
-          claim: `Drug campaign ${campaignId}: ${st.candidates.length} candidates (${retained.length} retained), stop=${st.stopReason ?? 'n/a'}, state=${st.stateHash}`,
+          claim: `Drug campaign ${campaignId}: ${st.candidates.length} candidates (${retained.length} retained), target=${st.target ? `${st.target.pdbId}:${st.target.chain}` : 'none'}, stop=${st.stopReason ?? 'n/a'}, state=${st.stateHash}`,
           claimType: 'model', confidence: 1,
           provenance: { sourceKind: 'dataset', retrievedBy: 'drug-bench-live-run', independentSourceIds: [] },
         });
@@ -209,11 +215,13 @@ export function createLabExperimentRunner(worldId: string, ledger: EvidenceLedge
             ...(affinities.length ? { bestAffinityKcalMol: Math.min(...affinities) } : {}),
             ...(gaps.length ? { homoLumoGapEv: gaps[0]! } : {}),
             blockedStages: st.blocked.map((b) => b.stage).join(',') || 'NONE',
+            ...(st.target ? { targetPdbId: st.target.pdbId, targetChain: st.target.chain, receptorPdbqtSha256: st.target.receptorPdbqtSha256 } : {}),
+            ...poseOutputs(st),
           },
           evidenceHashes: [record.record.contentHash],
           epistemicStatus: 'MODEL',
-          engineLabel: 'Backend campaign pipeline: RDKit descriptors/transforms, ADMET-AI, AutoDock Vina, PySCF (MODEL_ESTIMATE)',
-          steps: ['campaign generation (RDKit)', 'ADMET/toxicity estimates', 'docking (Vina)', 'quantum chemistry (PySCF)', 'persisted events → read model', 'ledger commit'],
+          engineLabel: 'Backend campaign pipeline: RDKit transforms/descriptors and AutoDock Vina (REAL_ENGINE_OUTPUT), ADMET-AI (MODEL_ESTIMATE), PySCF',
+          steps: ['computational transformations (RDKit)', 'ADMET/toxicity estimates (MODEL_ESTIMATE)', 'receptor preparation (Meeko)', 'ligand preparation (RDKit + Meeko)', 'docking (AutoDock Vina)', 'quantum chemistry (PySCF)', 'persisted events → read model', 'ledger commit'],
           artifact: { kind: 'drug-run', campaignId, state: st },
         };
       }

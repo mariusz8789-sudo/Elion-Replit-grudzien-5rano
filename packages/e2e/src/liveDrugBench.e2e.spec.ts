@@ -5,7 +5,8 @@ const chromiumPath = process.env.CHROME ?? process.env.GENESIS_CHROMIUM_PATH;
 test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } : {}) } });
 
 const API = process.env.GENESIS_BASE_URL ?? 'http://127.0.0.1:8080';
-const ASPIRIN = 'CC(=O)Oc1ccccc1C(=O)O';
+/** Imatinib: the co-crystallised, NON-COVALENT ligand of the docking target (PDB 1IEP, chain A). */
+const IMATINIB = 'Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1';
 
 async function api(path: string, token: string | null, body?: unknown): Promise<Record<string, any>> {
   const r = await fetch(`${API}${path}`, {
@@ -18,9 +19,10 @@ async function api(path: string, token: string | null, body?: unknown): Promise<
 
 /**
  * LIVE EXPERIMENT ACCEPTANCE (drug bench): the scientist walks to the bench of the ONE lab, the REAL
- * backend campaign runs (RDKit → ADMET-AI → Vina → PySCF), and while it computes the scene shows the
- * SAME state the backend persisted — proven by the scene's rendered state hash equalling the read
- * model's hash at several intermediate points. Then the session is sealed and replays to MATCH.
+ * backend campaign runs (RDKit → ADMET-AI → Vina against the real protein PDB 1IEP chain A → PySCF),
+ * and while it computes the scene shows the SAME state the backend persisted — proven by the scene's
+ * rendered state hash equalling the read model's hash at several intermediate points. The docked pose
+ * the scene draws is the one Vina produced. Then the session is sealed and replays to MATCH.
  */
 test('drug bench: live state in the scene equals the backend run, end to end for one candidate', async ({ page }) => {
   test.setTimeout(900_000);
@@ -29,7 +31,7 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   const project = await api('/api/projects', token, { name: 'Live drug bench' });
   const projectId: string = project.project.id;
   const campaign = await api(`/api/projects/${projectId}/campaigns`, token, {
-    objective: `Live drug bench ${Date.now()}`, domain: 'DRUG_DISCOVERY', startingSmiles: [ASPIRIN],
+    objective: `Live drug bench ${Date.now()}`, domain: 'DRUG_DISCOVERY', startingSmiles: [IMATINIB],
     budget: { maxGenerations: 2, maxGeneratedCandidates: 6 },
   });
   const campaignId: string = campaign.campaign.id;
@@ -46,12 +48,16 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   // While the engines compute: collect every state the scene has caught up with.
   const matched = new Set<string>();
   const seen = new Set<string>();
+  const dockingSteps = new Set<string>();
+  const procedurePhases: string[] = [];
   const deadline = Date.now() + 700_000;
   let phase = '';
   while (Date.now() < deadline) {
-    const snap = await live.evaluate((el) => ({ phase: el.getAttribute('data-phase') ?? '', state: el.getAttribute('data-state-hash') ?? '', scene: el.getAttribute('data-scene-hash') ?? '' }));
+    const snap = await live.evaluate((el) => ({ phase: el.getAttribute('data-phase') ?? '', state: el.getAttribute('data-state-hash') ?? '', scene: el.getAttribute('data-scene-hash') ?? '', step: el.getAttribute('data-docking-step') ?? '', procedure: el.getAttribute('data-procedure') ?? '' }));
     phase = snap.phase;
     if (snap.state) seen.add(snap.state);
+    if (snap.step) dockingSteps.add(snap.step);
+    if (snap.procedure && procedurePhases.at(-1) !== snap.procedure) procedurePhases.push(snap.procedure);
     if (snap.state && snap.state === snap.scene) matched.add(snap.state);
     if (phase === 'DONE' || phase === 'FAILED') break;
     await page.waitForTimeout(400);
@@ -71,6 +77,32 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   // The focused candidate's real RDKit conformer is on the bench.
   await expect.poll(async () => Number(await live.getAttribute('data-scene-atoms')), { timeout: 60_000 }).toBeGreaterThan(10);
 
+  // The docking ran against the real protein, step by step, and the pose Vina produced is in the scene.
+  expect(await live.getAttribute('data-target')).toBe('ABL1_1IEP');
+  // The panel followed the run live (a step shorter than the poll interval can be missed), and the
+  // backend's own events hold the full sequence, each written only once that step actually completed.
+  expect([...dockingSteps]).toContain('POSE_SCORED');
+  expect(dockingSteps.size, 'the bench showed the docking advancing, not just its result').toBeGreaterThan(1);
+  const steps = (events.events as { type: string; payload: Record<string, any> }[])
+    .filter((e) => e.payload?.stage === 'docking')
+    .map((e) => e.payload.step ?? e.payload.reason);
+  expect(steps).toEqual(['RECEPTOR_PREPARED', 'SELECTED_FOR_DOCKING', 'LIGAND_PREPARED', 'VINA_STARTED', 'DOCKING_RESULT_RETAINED']);
+  expect(Number(await live.getAttribute('data-pose-atoms'))).toBeGreaterThan(20);
+  await expect.poll(async () => Number(await live.getAttribute('data-scene-pose-atoms')), { timeout: 60_000 })
+    .toBe(Number(await live.getAttribute('data-pose-atoms')));
+  await expect(live).toContainText('PDB 1IEP');
+
+  // The bench procedure a viewer can follow: the phases appeared in their laboratory order, each only
+  // once the record that proves it existed, and the finished run has them all behind it.
+  const ORDER = ['PREPARE', 'LOAD', 'CONFIGURE', 'EXECUTE', 'OBSERVE', 'MEASURE', 'INTERPRET', 'EVIDENCE', 'REPLAY'];
+  const seenPhases = procedurePhases.filter((p) => ORDER.includes(p));
+  expect(seenPhases.length, 'the panel followed the procedure while the engines ran').toBeGreaterThan(1);
+  expect(seenPhases.map((p) => ORDER.indexOf(p))).toEqual([...seenPhases.map((p) => ORDER.indexOf(p))].sort((a, b) => a - b));
+  const doneNow = (await live.getAttribute('data-procedure-done') ?? '').split(',');
+  expect(doneNow).toEqual(expect.arrayContaining(['PREPARE', 'LOAD', 'CONFIGURE', 'EXECUTE', 'OBSERVE', 'MEASURE']));
+  await expect(live).toContainText('REAL_ENGINE_OUTPUT');
+  await expect(live).toContainText('MODEL_ESTIMATE');
+
   // The scientist seals the session from that run: the one outcome panel carries the frozen hypothesis,
   // its verdict, the engine runs, and replay reproduces the sealed session.
   await expect(page.getByTestId('sw-agent-state')).toHaveText(/bezczynny/i, { timeout: 180_000 });
@@ -79,6 +111,8 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   await expect(page.getByText(/Hipoteza: (SUPPORTED|WEAKENED|FALSIFIED|UNRESOLVED)/)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('drug-hypothesis-fingerprint')).toBeVisible();
   await expect(page.getByTestId('drug-state-hash')).toContainText(finalHash!);
+  await expect(page.getByTestId('drug-receptor')).toContainText('PDB 1IEP, łańcuch A');
+  await expect(page.getByTestId('drug-pose-hash')).toBeVisible();
   await expect(page.getByTestId('sw-replay')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('sw-replay').click();
   await expect(page.getByTestId('sw-replay-verdict')).toContainText('MATCH', { timeout: 60_000 });

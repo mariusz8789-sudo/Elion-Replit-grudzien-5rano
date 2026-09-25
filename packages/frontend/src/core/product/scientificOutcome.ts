@@ -177,17 +177,33 @@ export function outcomeFromDrugLiveRun(input: {
 }): ScientificOutcomeView {
   const { session, replay, state, hypothesis, result } = input;
   const runIds = [...new Set(state.candidates.flatMap((c) => Object.values(c.stages).map((m) => m?.runId).filter((id): id is string => Boolean(id))))];
+  const focus = state.candidates.find((c) => c.pose) ?? null;
+  const target = state.target;
   return {
     pillar: 'DRUG_DISCOVERY',
     title: `Hipoteza: ${result.verdict}`,
-    epistemicLabel: `MODEL_ESTIMATE · ${session.engineLabel}`,
-    summary: `${hypothesis.statement} — ${result.criteria.map((c) => `${c.id}: ${c.status} (${c.observed})`).join(' · ')}`,
+    epistemicLabel: `REAL_ENGINE_OUTPUT (RDKit, Vina) + MODEL_ESTIMATE (ADMET-AI) · ${session.engineLabel}`,
+    summary: `${hypothesis.statement} — ${result.criteria.map((c) => `${c.id}: ${c.status} (${c.observed})`).join(' · ')} → ${result.verdict} (${result.rule}).`,
     evidence: {
       status: 'SEALED_SESSION',
-      reason: 'Sesja stanowiska zapieczętowana ze stanu runu zapisanego przez backend; każdy pomiar ma swój ScienceRun.',
+      reason: 'Sesja stanowiska zapieczętowana ze stanu runu zapisanego przez backend; każdy pomiar ma swój ScienceRun, a docking — przygotowany receptor, ligand i pozę z sumami kontrolnymi.',
       identifiers: [
         { label: 'Hipoteza (zamrożona)', value: hypothesis.fingerprint, testId: 'drug-hypothesis-fingerprint' },
         { label: 'Stan runu', value: state.stateHash, testId: 'drug-state-hash' },
+        ...(target ? [
+          { label: 'Receptor', value: `${target.protein} · PDB ${target.pdbId}, łańcuch ${target.chain}, ${target.receptorAtoms} atomów`, testId: 'drug-receptor' },
+          { label: 'Struktura źródłowa (sha256)', value: target.sourceSha256 },
+          { label: 'Przygotowany receptor PDBQT (sha256)', value: target.receptorPdbqtSha256 },
+          { label: 'Przygotowanie receptora', value: `Meeko ${target.meekoVersion} mk_prepare_receptor, deterministyczne` },
+          { label: 'Kieszeń (pudełko dokowania)', value: `środek [${target.center.join(', ')}] Å, rozmiar [${target.boxSize.join(', ')}] Å` },
+        ] : [{ label: 'Receptor', value: 'nieprzygotowany — kryterium dokowania nierozstrzygnięte', testId: 'drug-receptor' }]),
+        ...(focus?.pose ? [
+          { label: 'Ligand', value: focus.smiles },
+          { label: 'Silnik dokowania', value: focus.pose.engine },
+          { label: 'Poza (sha256)', value: focus.pose.poseSha256, testId: 'drug-pose-hash' },
+          { label: 'Wynik dokowania', value: `${focus.stages.docking?.value?.toFixed(2) ?? '—'} kcal/mol (estymata funkcji oceniającej, nie pomiar)` },
+          { label: 'Reszty kieszeni', value: focus.pose.pocketResidues.join(', ') },
+        ] : []),
         ...session.evidenceHashes.map((h) => ({ label: 'EvidenceLedger', value: `contentHash ${h}`, testId: 'sw-ledger-hash' })),
         ...runIds.map((id) => ({ label: 'ScienceRun', value: id })),
         { label: 'Hash sesji', value: session.contentHash, testId: 'sw-content-hash' },

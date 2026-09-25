@@ -161,10 +161,16 @@ export function UnifiedResearchJourney({ request, project, onActivateLaboratory,
         <div className="journey-hypothesis" data-testid="drug-hypothesis" data-fingerprint={hypothesis.fingerprint}>
           <span>HIPOTEZA · zamrożona przed uruchomieniem</span>
           <p>{hypothesis.statement}</p>
-          <ol aria-label="Kryteria falsyfikacji">{hypothesis.criteria.map((c) => <li key={c.id}>{c.label}</li>)}</ol>
+          <p className="journey-target">Cel: {hypothesis.target.protein} · PDB {hypothesis.target.pdbId}, łańcuch {hypothesis.target.chain}</p>
+          <ol aria-label="Kryteria falsyfikacji">{hypothesis.criteria.map((c) => (
+            <li key={c.id}>{c.label} <em>{c.critical ? '[krytyczne — falsyfikator]' : '[niekrytyczne]'} · {c.evidence === 'REAL_ENGINE_OUTPUT' ? 'wynik silnika' : 'estymata modelu'}</em></li>
+          ))}</ol>
           <span>PLAN · istniejące silniki</span>
-          <ol aria-label="Plan eksperymentu">{hypothesis.plan.map((p) => <li key={p.stage}><strong>{p.engine}</strong> — {p.label}</li>)}</ol>
-          <small>Odcisk hipotezy: <code>{hypothesis.fingerprint}</code> · wyniki to MODEL_ESTIMATE, nie pomiar laboratoryjny.</small>
+          <ol aria-label="Plan eksperymentu">{hypothesis.plan.map((p) => <li key={p.stage}><strong>{p.engine}</strong> — {p.label} <em>{p.evidence}</em></li>)}</ol>
+          <small>
+            Odcisk hipotezy: <code>{hypothesis.fingerprint}</code>. Werdykt liczą reguły, nie model językowy: niespełnione kryterium krytyczne to FALSIFIED.
+            Wyniki są obliczeniowe — docking to estymata funkcji oceniającej, nie zmierzone powinowactwo; przekształcenia cząsteczek to COMPUTATIONAL TRANSFORMATION, nie synteza.
+          </small>
           <div className="journey-actions">
             <button className="primary-btn journey-start" type="button" onClick={openLiveLab} data-testid="drug-open-live-lab">Uruchom na żywo w laboratorium</button>
             <button className="chip-btn" type="button" onClick={() => { void prepareInChat(); }}>Szybki test RDKit w czacie</button>

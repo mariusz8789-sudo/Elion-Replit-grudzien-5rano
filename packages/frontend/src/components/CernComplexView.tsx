@@ -417,6 +417,7 @@ export function CernComplexView(): JSX.Element {
           <button type="button" className="cern-mode" onClick={formHorizon} data-testid="cern-horizon">HORIZON [E]</button>
           <button type="button" className="cern-mode" onClick={synthesize} data-testid="cern-crystal">CRYSTAL [R]</button>
           <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/physics/cms-z'; }} data-testid="cern-cms-open-data">REAL CMS DATA</button>
+          <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/cern-complex?room=detector'; }} data-testid="cern-detector-room">KOMORA DETEKTORA</button>
         </div>
         <div className="cern-modes" role="group" aria-label="Poziom wyjaśnienia">
           {(['SCHOOL', 'UNIVERSITY', 'RESEARCH'] as const).map((level) => (

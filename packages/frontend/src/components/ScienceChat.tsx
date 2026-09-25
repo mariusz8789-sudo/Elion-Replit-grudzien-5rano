@@ -624,6 +624,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     // commands cannot be swallowed by the broader Experiment Fabric domain parser.
     const preliminary = resolveCommand(msg, null);
     const isScientificIntegrationCommand = preliminary.action?.type === 'runScientificIntegration';
+    // `/świat …` is an explicit command: the question goes to Looking Glass even when it names a domain the Fabric knows.
+    const isLookingGlassCommand = preliminary.action?.type === 'openRoute' && preliminary.action.hash.startsWith('#/looking-glass?');
     const fabricRequest = parseScienceChatMessage(msg);
     // CHAT ENTRY FOR THE DISCOVERY LOOP. The Fabric parser recognises the DOMAIN of
     // nearly every declared research question and would plan ONE experiment for it,
@@ -634,7 +636,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     // keeps its existing Fabric behaviour instead of being hijacked into a refusal.
     const isFabricRequest = (fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown')
       && !isDiscoveryLoopRequest(msg)
-      && !isScientificIntegrationCommand;
+      && !isScientificIntegrationCommand
+      && !isLookingGlassCommand;
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
@@ -657,7 +660,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         }
       : null;
 
-    const res: ChatResponse = isScientificIntegrationCommand ? preliminary : resolveCommand(msg, snapshot);
+    const res: ChatResponse = isScientificIntegrationCommand || isLookingGlassCommand ? preliminary : resolveCommand(msg, snapshot);
     setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, intent: res.intent, equations: res.equations, todo: res.todo }]);
     setInput('');
     track('ask_ai_used', { via: 'science-chat' });

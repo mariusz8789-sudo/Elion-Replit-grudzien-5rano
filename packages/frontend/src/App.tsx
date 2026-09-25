@@ -184,7 +184,7 @@ type Route =
   | { kind: 'meta-cognition' }
   | { kind: 'mirror' };
 
-function parseHash(): Route {
+export function parseHash(): Route {
   const h = window.location.hash;
   const lab = h.match(/^#\/lab\/([\w-]+)/);
   if (lab) return { kind: 'lab', id: lab[1] };
@@ -220,13 +220,16 @@ function parseHash(): Route {
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
-  if (h === '#/city') return { kind: 'city' };
-  if (h === '#/city3d') return { kind: 'city3d' };
+  // One epidemic city: `#/city3d` (WebGL) and its 2D performance view `#/city3d?view=2d`; `#/city` is the old alias of the 2D view.
+  if (h === '#/city' || (h.startsWith('#/city3d?') && new URLSearchParams(h.split('?')[1]).get('view') === '2d')) return { kind: 'city' };
+  if (h === '#/city3d' || h.startsWith('#/city3d?')) return { kind: 'city3d' };
   if (h === '#/scientific-city') return { kind: 'scientific-city' };
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/genesis-world') return { kind: 'genesis-world' };
-  if (h === '#/temporal-cinematic' || h.startsWith('#/temporal-cinematic?')) return { kind: 'temporal-cinematic' };
+  // Temporal cinematic (place + year) is a World Director mode (`#/world-director?mode=temporal&place=…&year=…`);
+  // `#/temporal-cinematic?…` stays as the alias the capture scripts drive.
+  if (h === '#/temporal-cinematic' || h.startsWith('#/temporal-cinematic?') || (h.startsWith('#/world-director?') && new URLSearchParams(h.split('?')[1]).get('mode') === 'temporal')) return { kind: 'temporal-cinematic' };
   // Deliberately just `#/molecule`, never `#/lab/molecule` — that shape is claimed by the OLD
   // Canvas-2D `registerLab()` registry's own route match above (`^#\/lab\/`), which would resolve
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
@@ -234,7 +237,7 @@ function parseHash(): Route {
   if (h === '#/cell-lab') return { kind: 'cell-lab' };
   if (h === '#/evidence' || h === '#/evidence-showcase' || h === '#/evidence-case-study' || h === '#/case-study') return { kind: 'evidence-showcase' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
-  if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
+  if (h === '#/looking-glass' || h.startsWith('#/looking-glass?') || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/discovery-hall' || h.startsWith('#/discovery-hall?')) return { kind: 'discovery-hall' };
@@ -247,7 +250,8 @@ function parseHash(): Route {
   if (h === '#/matrix-map') return { kind: 'matrix-map' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/clockwork') return { kind: 'clockwork' };
-  if (h === '#/collider') return { kind: 'collider' };
+  // The detector chamber is a room of the one CERN complex (`#/cern-complex?room=detector`); `#/collider` is its old alias.
+  if (h === '#/collider' || (h.startsWith('#/cern-complex?') && new URLSearchParams(h.split('?')[1]).get('room') === 'detector')) return { kind: 'collider' };
   if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
   if (h === '#/cern-complex' || h.startsWith('#/cern-complex?')) return { kind: 'cern-complex' };
   if (h === '#/scientific-worlds' || h.startsWith('#/scientific-worlds?')) return { kind: 'scientific-worlds' };
@@ -275,7 +279,7 @@ export default function App() {
 
   const contextualGuideSurface: ContextualGuideSurface | null = (() => {
     switch (route.kind) {
-      case 'cern-complex': return 'CERN';
+      case 'cern-complex': case 'collider': return 'CERN';
       case 'cyber': return 'CYBER';
       case 'gov-campaign': return 'GOVERNMENT';
       case 'mirror': return 'MIRROR';
@@ -750,7 +754,8 @@ export default function App() {
     if (route.kind === 'collider') {
       return (
         <div className="app">
-          <TopBar title="⚛ Genesis Collider — komora detektora" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="⚛ Kompleks CERN — komora detektora" onSearch={() => setSearchOpen(true)} />
+          <ViewSwitch label="Kompleks CERN" options={[{ label: 'Hala i tunel', hash: '#/cern-complex' }, { label: 'Komora detektora', hash: '#/cern-complex?room=detector', active: true }]} />
           <HeavyRoute>
             <ColliderChamber />
           </HeavyRoute>
@@ -883,7 +888,8 @@ export default function App() {
     if (route.kind === 'city') {
       return (
         <div className="app">
-          <TopBar title="🏙 Epidemia w małym mieście — tryb wydajnościowy 2D" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Miasto epidemiologiczne — widok 2D" onSearch={() => setSearchOpen(true)} />
+          <ViewSwitch label="Widok miasta" options={[{ label: '3D (WebGL)', hash: '#/city3d' }, { label: '2D (wydajnościowy)', hash: '#/city3d?view=2d', active: true }]} />
           <HeavyRoute>
             <VisualSimulationScreen />
           </HeavyRoute>
@@ -896,6 +902,7 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="Miasto epidemiologiczne" onSearch={() => setSearchOpen(true)} />
+          <ViewSwitch label="Widok miasta" options={[{ label: '3D (WebGL)', hash: '#/city3d', active: true }, { label: '2D (wydajnościowy)', hash: '#/city3d?view=2d' }]} />
           <HeavyRoute>
             <City3DWebGLScreen />
           </HeavyRoute>
@@ -1390,6 +1397,19 @@ export default function App() {
 /** Route titles were written with a leading emoji; the chrome shows the Genesis mark instead (D-118). */
 export function cleanRouteTitle(title: string): string {
   return title.replace(/^[^\p{L}\p{N}]+\s*/u, '').trim();
+}
+
+/** One place, several views of it: a tab row under the TopBar that switches between the views' routes. */
+function ViewSwitch({ label, options }: { label: string; options: readonly { label: string; hash: string; active?: boolean }[] }) {
+  return (
+    <nav className="view-switch" aria-label={label}>
+      {options.map((option) => (
+        <button key={option.hash} type="button" className="chip-btn" aria-pressed={Boolean(option.active)} onClick={() => { window.location.hash = option.hash; }}>
+          {option.label}
+        </button>
+      ))}
+    </nav>
+  );
 }
 
 function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {

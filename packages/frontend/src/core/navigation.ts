@@ -99,7 +99,7 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'universe', label: 'Wszechświat — problem trzech ciał', icon: '🪐', hash: '#/lab/universe', description: 'Deterministyczny integrator trzech ciał' },
   { id: 'cms-open-data', label: 'CMS Open Data — prawdziwe dane CERN', icon: '📊', hash: '#/physics/cms-z', description: 'Checksumowo zweryfikowane 10 000 zdarzeń Z→μμ z CERN Open Data; analiza offline, nie aktywny LHC' },
   { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex', variantOf: 'cms-open-data' },
-  { id: 'collider', label: 'Collider — komora detektora', icon: '⚛', hash: '#/collider', variantOf: 'cms-open-data' },
+  { id: 'collider', label: 'Kompleks CERN — komora detektora', icon: '⚛', hash: '#/cern-complex?room=detector', variantOf: 'cms-open-data' },
   { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
   { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement', variantOf: 'lab-fpv' },
   { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },

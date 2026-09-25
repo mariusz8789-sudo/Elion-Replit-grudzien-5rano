@@ -3306,13 +3306,9 @@ body:has(.gid-shell) .science-chat-fab { display: none; }
 }
 .lg-alternative b { color: #6f93b5; margin-right: 0.35rem; }
 
-.lg-composer { display: flex; gap: 0.6rem; align-items: flex-end; }
-.lg-input {
-  flex: 1; resize: none; padding: 0.75rem 0.9rem; border-radius: 0.75rem;
-  background: #0d1420; border: 1px solid #26344a; color: #e6eefa;
-  font: inherit; line-height: 1.5;
-}
-.lg-input:focus { outline: none; border-color: #3d7fbf; box-shadow: 0 0 0 3px #3d7fbf25; }
+.lg-composer { display: flex; gap: 0.6rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.lg-hint { margin: 0; color: #9fb4cc; font-size: 0.9rem; }
+.lg-hint code { color: #cfe6ff; }
 .lg-send {
   padding: 0.72rem 1.2rem; border-radius: 0.7rem; border: 1px solid #3d7fbf60;
   background: #16283c; color: #cfe6ff; font-weight: 600; cursor: pointer;
@@ -5896,3 +5892,7 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .so-verdict-drift { color: var(--red); }
 .so-next { border-color: var(--border-strong); }
 @media (max-width: 640px) { .so-id { grid-template-columns: 1fr; gap: 0; } }
+
+/* One place, several views (city 3D/2D, CERN hall/detector): the tab row under the TopBar. */
+.view-switch { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.4rem 1rem; }
+.view-switch .chip-btn[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }

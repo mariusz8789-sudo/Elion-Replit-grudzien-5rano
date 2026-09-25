@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   listRouterModels,
   getRouterModel,
-  parseScienceChatMessage,
   planEvidenceGuidedExperiment,
   confirmEvidenceGuidedExperiment,
   confirmEarthquakeEvidenceGuidedExperiment,
@@ -64,6 +63,7 @@ import {
 } from '../core/experimentFabric/hypothesisLoop';
 import { explainWhyBeliefChanged } from '../core/experimentFabric/beliefChangeRun';
 import { setPendingScenario } from '../core/scenarioBridge';
+import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { setPendingExperimentWorld, setPendingScenarioTimeline } from '../core/experimentFabric/worldHandoff';
 import { analyzeExperimentResult } from '../core/experimentAnalysis';
 import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
@@ -82,7 +82,9 @@ import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
  * Dwa deterministyczne wejścia (żadne nie jest LLM):
  *  - ustrukturyzowany formularz (wybór modelu + pola z jego własnego
  *    `parameterSchema`, przez `buildStructuredRequestFromModel`);
- *  - wolny tekst przez ISTNIEJĄCY, deterministyczny `parseScienceChatMessage`.
+ *  - protokół A/B (prerejestrowany sweep).
+ * Pytanie zwykłym zdaniem idzie do JEDNEGO Science Chatu (ten sam parser `parseScienceChatMessage`),
+ * nie do drugiego pola tekstowego tutaj.
  */
 
 type Phase = 'draft' | 'planned' | 'running' | 'ran' | 'capsuled';
@@ -110,13 +112,12 @@ function downloadJson(filename: string, content: string): void {
 
 export function ExperimentPilotScreen() {
   const models = useMemo(() => listRouterModels(), []);
-  const [inputMode, setInputMode] = useState<'structured' | 'freeText' | 'protocol'>(() => {
+  const [inputMode, setInputMode] = useState<'structured' | 'protocol'>(() => {
     const mode = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('mode');
     return mode === 'protocol' ? 'protocol' : 'structured';
   });
   const [modelId, setModelId] = useState<string>(() => (getRouterModel('epidemic-city') ? 'epidemic-city' : models[0]?.id ?? ''));
   const [paramInputs, setParamInputs] = useState<Record<string, string>>({});
-  const [freeText, setFreeText] = useState('');
   const [seedInput, setSeedInput] = useState('');
 
   const [phase, setPhase] = useState<Phase>('draft');
@@ -282,9 +283,7 @@ export function ExperimentPilotScreen() {
     setError(null);
     resetDownstream();
     try {
-      const request = inputMode === 'freeText'
-        ? parseScienceChatMessage(freeText)
-        : selectedModel
+      const request = selectedModel
           ? buildStructuredRequestFromModel(
               selectedModel,
               Object.fromEntries(
@@ -725,7 +724,7 @@ export function ExperimentPilotScreen() {
 
       <div className="pilot-intro">
         <p>
-          Reprodukowalny eksperyment krok po kroku: wybierz model (albo opisz go zwykłym zdaniem), zobacz jawny plan
+          Reprodukowalny eksperyment krok po kroku: wybierz model (pytanie zwykłym zdaniem zadasz w Science Chacie), zobacz jawny plan
           zanim cokolwiek się policzy, potwierdź, uruchom istniejący silnik, i zamień prawdziwy wynik w przenośny,
           odtwarzalny dowód metody — Scenario Capsule do pobrania.
         </p>
@@ -736,10 +735,9 @@ export function ExperimentPilotScreen() {
         <div className="pilot-mode-switch" role="tablist" aria-label="Sposób wprowadzania eksperymentu">
           <button className="chip-btn" aria-pressed={inputMode === 'structured'} onClick={() => setInputMode('structured')}>Pojedynczy run</button>
           <button className="chip-btn" aria-pressed={inputMode === 'protocol'} onClick={() => { setInputMode('protocol'); setPhase('draft'); resetDownstream(); }}>Protocol / A-B</button>
-          <button className="chip-btn" aria-pressed={inputMode === 'freeText'} onClick={() => setInputMode('freeText')}>Zwykły tekst</button>
+          <button className="chip-btn" onClick={() => requestOpenScienceChat()} title="Pytanie zwykłym zdaniem zadajesz w jednym Science Chacie">Zwykły tekst → czat</button>
         </div>
 
-        {inputMode === 'structured' || inputMode === 'protocol' ? (
           <div className="pilot-form">
             <label className="pilot-field">
               <span>Model</span>
@@ -775,20 +773,6 @@ export function ExperimentPilotScreen() {
               </>
             )}
           </div>
-        ) : (
-          <div className="pilot-form">
-            <label className="pilot-field">
-              <span>Opisz eksperyment jednym zdaniem (deterministyczny parser, bez LLM)</span>
-              <textarea
-                className="pilot-input pilot-textarea"
-                rows={2}
-                placeholder="np. „symuluj epidemię w mieście r0=3 90 dni”"
-                value={freeText}
-                onChange={(e) => setFreeText(e.target.value)}
-              />
-            </label>
-          </div>
-        )}
 
         {inputMode === 'protocol' && selectedModel && (
           <div className="pilot-protocol-form">
@@ -805,7 +789,7 @@ export function ExperimentPilotScreen() {
           </div>
         )}
 
-        <button className="chip-btn pilot-primary" onClick={inputMode === 'protocol' ? handleBuildProtocol : handleBuildPlan} disabled={inputMode === 'freeText' ? !freeText.trim() : !selectedModel}>
+        <button className="chip-btn pilot-primary" onClick={inputMode === 'protocol' ? handleBuildProtocol : handleBuildPlan} disabled={!selectedModel}>
           {inputMode === 'protocol' ? 'Zarejestruj protokół' : 'Zbuduj plan'}
         </button>
       </section>

@@ -101,5 +101,12 @@ Bez duplikatu: miareczkowanie/pH (`physics.ts` + adaptery), Arrhenius (`chemistr
      - ścisły canonicalizer w `lab/standaloneDeterminism.ts` (odrzuca NaN, ta sama kolejność kluczy);
      - osadzony, samodzielny weryfikator w `integrityEnvelope.ts`;
      - osobny pakiet `packages/csrn`.
-3. **Menu i czat:** pola pytań z `#/pilot`, `#/research-console` i `LookingGlassChat` kierować do jednego czatu. `#/collider` do `#/cern-complex`, `#/city` do `#/city3d` (tryb 2D), `#/temporal-cinematic` do `#/world-director`.
+3. **Menu i czat — ZROBIONE.**
+   - `#/pilot`: tryb „Zwykły tekst” był drugim polem na ten sam parser czatu (`parseScienceChatMessage`). Usunięty, przycisk otwiera jeden Science Chat. Zostały tryby, których czat nie ma: formularz modelu z parametrami i protokół A/B.
+   - `LookingGlassChat`: bez własnego pola tekstowego. Pytanie zadaje się w Science Chat komendą `/świat <opis>` (też `/swiat`, `/lg`). Czat otwiera `#/looking-glass?q=…`, a ekran tylko pokazuje świat z `openLookingGlass`. Przykłady wysyłają pytanie przez czat.
+   - `#/research-console`: **zostaje, to nie duplikat.** Jego pole zasila inny silnik (`core/orchestrator/nl` `parseProblem` → orkiestrator odkryć z wyborem źródła SANDBOX / REAL_PRODUCTION / REAL_SYNTHETIC_WINNER_DEMO). Czat tego nie robi.
+   - `#/collider` → pokój kompleksu CERN `#/cern-complex?room=detector`. W hali CERN jest przycisk „KOMORA DETEKTORA”, a obie strony łączy przełącznik widoków. Stary hash to alias. Komora zostaje osobnym widokiem, bo ma sterowanie, którego hala nie ma: seed, numer zdarzenia, pT min, proces.
+   - `#/city` → widok `#/city3d?view=2d` z przełącznikiem 3D/2D pod paskiem. Stary hash to alias. Z ekranu 3D usunięty zdublowany przycisk „Tryb 2D”.
+   - `#/temporal-cinematic` → tryb World Directora `#/world-director?mode=temporal&place=…&year=…`. W World Directorze są przyciski „Film czasowy: Warszawa 1900 / 2026”. Stary hash zostaje, bo używają go skrypty capture.
+   - Testy: `routeAliases.test.ts` (aliasy i tryby) oraz `scienceChat.test.ts` (`/świat`).
 4. **[Astra] Laboratorium:** przenieść dźwignię interwencji i narrację Discovery Hall na główną scenę, potem wycofać `labScene3D.ts` + `FirstPersonLabScreen` + `InvestorDemoScreen` (~4 900 LOC) i złożyć `#/lab-fpv` do stanowiska chemii.

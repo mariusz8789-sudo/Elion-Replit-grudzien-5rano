@@ -621,7 +621,8 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
     expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
     expect(reviewed.plan.modelVersion).toBe('1.1.0');
-    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    // The titration result is shown at the main-Laboratory station, which runs the same shared runner.
+    expect(reviewed.plan.route).toEqual({ kind: 'product-route', hash: '#/scientific-worlds?station=st-titration', parameterQueryKeys: ['acid', 'vb'] });
     expect(reviewed.disclosure.rationale).toContain('nie danymi jednego pomiaru');
     expect(chemistry?.realModels).toContain('chemistry-titration');
   });

@@ -3,7 +3,7 @@ import { useThreeLoop } from '../core/three/useThreeLoop';
 import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type HumanTwinLodPreference, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
 import { AgentController, type AgentReport } from '../core/scientificWorlds/agentController';
 import { planActions } from '../core/scientificWorlds/actionPlanner';
-import { parseWorldCommands, type ParsedCommands } from '../core/scientificWorlds/worldCommand';
+import { parseWorldCommands, stationHandoffCommand, type ParsedCommands } from '../core/scientificWorlds/worldCommand';
 import { LAB_CATALOG, LAB_OBSTACLES, LAB_ROOM, LAB_SPAWN, LAB_STATIONS, LAB_WORLD_ID, type LabStation } from '../core/scientificWorlds/labWorld';
 import { createLabExperimentRunner } from '../core/scientificWorlds/experimentRunners';
 import { createBiologyExperimentRunner } from '../core/scientificWorlds/biologyRunners';
@@ -277,6 +277,30 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId); sim.setTwinIsolated(next.isolatedNodeIds);
     }
   }, [nextLogicalTime, sim, submitCommands, world]);
+  /**
+   * The ONE main Laboratory is where chemistry and physics requests land: `?station=<id>&…` (from the chat,
+   * the research-mode menu or an Experiment Fabric product route) becomes one validated RUN_EXPERIMENT at
+   * that station. Each distinct handoff runs once; the station's own runner does the science.
+   */
+  const stationHandoffConsumed = useRef<string | null>(null);
+  useEffect(() => {
+    if (world !== 'physics') return;
+    const consume = (): void => {
+      const query = window.location.hash.split('?')[1] ?? '';
+      if (!query || stationHandoffConsumed.current === query) return;
+      const command = stationHandoffCommand(query, def.catalog, nextLogicalTime());
+      if (!command) return;
+      stationHandoffConsumed.current = query;
+      submitCommands([command], command.text);
+    };
+    consume();
+    window.addEventListener('hashchange', consume);
+    window.addEventListener('genesis-product-route', consume);
+    return () => {
+      window.removeEventListener('hashchange', consume);
+      window.removeEventListener('genesis-product-route', consume);
+    };
+  }, [def.catalog, nextLogicalTime, submitCommands, world]);
   useEffect(() => {
     sim.setOrganPickListener((id) => {
       const organ = EXPLORER_ORGANS.find((entry) => entry.organId === id);

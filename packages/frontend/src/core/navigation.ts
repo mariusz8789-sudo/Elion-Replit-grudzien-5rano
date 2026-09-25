@@ -93,8 +93,9 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'chemistry-classic', label: 'Chemia — laboratorium klasyczne', icon: '⚗', hash: '#/lab/chemistry', variantOf: 'chemistry' },
   { id: 'molecule', label: 'Molecule Lab', icon: '🧪', hash: '#/molecule', variantOf: 'chemistry' },
   // — Fizyka —
-  { id: 'physics', label: 'Fizyka — foton przy czarnej dziurze', icon: '🕳', hash: '#/scientific-worlds?station=st-window', description: 'Okno obserwacyjne głównego Laboratorium' },
-  { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics', variantOf: 'physics' },
+  { id: 'physics', label: 'Fizyka — światło w zakrzywionej czasoprzestrzeni', icon: '🕳', hash: '#/scientific-worlds?station=st-window', description: 'Okno obserwacyjne głównego Laboratorium: opóźnienie Shapiro i ugięcie w słabym polu (MODEL)' },
+  { id: 'black-hole', label: 'Czarna dziura — Schwarzschild', icon: '🕳', hash: '#/lab/einstein', description: 'Promień horyzontu i geodezyjne zerowe (RK4) — osobny model od okna obserwacyjnego' },
+  { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics', variantOf: 'black-hole' },
   { id: 'universe', label: 'Wszechświat — problem trzech ciał', icon: '🪐', hash: '#/lab/universe', description: 'Deterministyczny integrator trzech ciał' },
   { id: 'cms-open-data', label: 'CMS Open Data — prawdziwe dane CERN', icon: '📊', hash: '#/physics/cms-z', description: 'Checksumowo zweryfikowane 10 000 zdarzeń Z→μμ z CERN Open Data; analiza offline, nie aktywny LHC' },
   { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex', variantOf: 'cms-open-data' },
@@ -157,7 +158,7 @@ export const RESEARCH_MODE_LABEL = 'Tryb badawczy';
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
   { id: 'more-drug', label: 'Odkrywanie leków', ids: ['science'] },
   { id: 'more-chemistry', label: 'Chemia', ids: ['chemistry'] },
-  { id: 'more-physics', label: 'Fizyka', ids: ['physics', 'universe', 'cms-open-data', 'lab-fpv', 'myths-theories'] },
+  { id: 'more-physics', label: 'Fizyka', ids: ['physics', 'black-hole', 'universe', 'cms-open-data', 'lab-fpv', 'myths-theories'] },
   { id: 'more-human', label: 'Człowiek i biologia', ids: ['human-biology-lab'] },
   { id: 'more-evidence', label: 'Dowody i pamięć', ids: ['memory'] },
   { id: 'more-worlds', label: 'Światy i symulacje', ids: ['worlds', 'whatif'] },

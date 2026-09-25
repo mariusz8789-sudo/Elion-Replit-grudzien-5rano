@@ -390,7 +390,8 @@ const ROUTER_MODELS: readonly RouterModel[] = [
   {
     id: 'chemistry-titration', domainId: 'chemistry', modelVersion: '1.1.0', engine: 'genesis-charge-balance@1.0.0',
     parameters: [text('acid', 'Kwas', 'acetic'), number('vb', 'Objętość NaOH', 'mL', 0, 60, 0)],
-    route: { kind: 'none' }, knowledgeSources: ['chemistry.md'],
+    // Shown at the titration station of the ONE main Laboratory, which runs the same shared runner.
+    route: { kind: 'product-route', hash: '#/scientific-worlds?station=st-titration', parameterQueryKeys: ['acid', 'vb'] }, knowledgeSources: ['chemistry.md'],
     rationale: 'Rzeczywisty backendowy Fabric wykonuje ten sam bilans ładunku słabego kwasu i NaOH co Chemistry Lab dla czterech kanonicznych kwasów. Parametry laboratoryjne są ustalonym scenariuszem, nie danymi jednego pomiaru, automatyczną identyfikacją kwasu ani titracją dowolnej próbki.',
     capability: 'BACKEND_REAL_ENGINE',
   },

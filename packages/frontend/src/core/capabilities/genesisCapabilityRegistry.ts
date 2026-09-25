@@ -62,7 +62,7 @@ const capabilities: readonly GenesisCapability[] = [
   {
     id: 'chemistry-titration', label: 'Chemistry', description: 'Existing deterministic acid-base titration through Experiment Fabric and the Chemistry station.',
     userIntents: ['uruchom miareczkowanie', 'pokaż miareczkowanie', 'titration experiment', 'chemistry experiment'], domain: 'chemistry', selectionMode: 'FABRIC',
-    execution: { kind: 'fabric-model', id: 'chemistry-titration' }, readiness: 'AVAILABLE', epistemicLabel: 'LIVE_COMPUTATIONAL_EXPERIMENT', visualizationRoute: '#/lab/chemistry',
+    execution: { kind: 'fabric-model', id: 'chemistry-titration' }, readiness: 'AVAILABLE', epistemicLabel: 'LIVE_COMPUTATIONAL_EXPERIMENT', visualizationRoute: '#/scientific-worlds?station=st-titration',
     evidenceSupport: 'CANONICAL', replaySupport: 'CANONICAL', nextExperimentSupport: true, limitations: ['Educational computational chemistry; not a physical measurement.'], showInShowcase: true,
   },
   {

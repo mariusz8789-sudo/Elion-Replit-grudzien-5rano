@@ -209,8 +209,9 @@ export function projectDrugRun(input: {
   for (const e of events) {
     if (e.type === 'GENERATION_COMPLETED') generationsCompleted = Math.max(generationsCompleted, e.generation);
     else if (e.type === 'STOPPING_CONDITION_REACHED') {
+      // The campaign's own stop event ends the GENERATION loop, not the run: the heavy stages
+      // (ADMET, docking, QM) are persisted after it. Only `jobRunning === false` ends the run.
       stopReason = str(e.payload.stopReason) ?? 'STOPPED';
-      lastStage = stopReason === 'CANCELLED_BY_USER' ? 'CANCELLED' : 'COMPLETED';
     } else if (e.type === 'STAGE_BLOCKED') blocked.push({ stage: str(e.payload.stage) ?? 'unknown', blocker: str(e.payload.blocker) ?? 'BLOCKED' });
     else if (e.type === 'MODEL_CONFLICT') { const id = str(e.payload.candidateId); if (id) conflicts.add(id); }
     else if (e.type === 'STAGE_PROGRESS' && e.payload.stage === 'docking') {

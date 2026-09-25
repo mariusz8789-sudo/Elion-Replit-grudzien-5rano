@@ -84,3 +84,16 @@ describe('projectDrugRun — the real protein docking steps and pose', () => {
     expect(noRun.stateHash).not.toBe(projectDrugRun({ events: dockEvents, candidates, maxGenerations: 1, jobRunning: false, dockingRuns }).stateHash);
   });
 });
+
+describe('projectDrugRun — the campaign stop event does not end the run', () => {
+  it('while a heavy stage still runs, the state shows the live stage, not COMPLETED', () => {
+    const mid: CampaignEventRecord[] = [
+      ev('GENERATION_COMPLETED', 1, {}),
+      ev('STOPPING_CONDITION_REACHED', 1, { stopReason: 'BUDGET_EXHAUSTED' }),
+      ev('STAGE_PROGRESS', 1, { stage: 'docking', step: 'VINA_STARTED', candidateId: 'c1' }),
+    ];
+    expect(projectDrugRun({ events: mid, candidates, maxGenerations: 1, jobRunning: true }).stage).toBe('DOCKING');
+    expect(projectDrugRun({ events: mid.slice(0, 2), candidates, maxGenerations: 1, jobRunning: true }).stage).toBe('GENERATING');
+    expect(projectDrugRun({ events: mid, candidates, maxGenerations: 1, jobRunning: false }).stage).toBe('COMPLETED');
+  });
+});

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useThreeLoop } from '../core/three/useThreeLoop';
 import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type HumanTwinLodPreference, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
 import { AgentController, type AgentReport } from '../core/scientificWorlds/agentController';
@@ -34,6 +34,9 @@ import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
 import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+
+/** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
+const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
 import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
 
 /**
@@ -149,6 +152,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [level, setLevel] = useState<GuideLevel>('EXPLORER');
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  /** The chemistry panel docked in the Laboratory: periodic table, experiments, levels; titration runs at the station. */
+  const [chemistryOpen, setChemistryOpen] = useState(false);
   const [chemistryCardOpen, setChemistryCardOpen] = useState(true);
   const [frames, setFrames] = useState(0);
   const logicalTime = useRef(0);
@@ -291,6 +296,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       const command = stationHandoffCommand(query, def.catalog, nextLogicalTime());
       if (!command) return;
       stationHandoffConsumed.current = query;
+      if (command.targetEntityId === 'st-titration') setChemistryOpen(true);
       submitCommands([command], command.text);
     };
     consume();
@@ -460,7 +466,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           </form>
           {world === 'physics' && <nav className="sw-domain-rail" aria-label="Strefy laboratorium">
             <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Znajdź kandydatów dla receptora A1 i porównaj ich właściwości.')}>Drug Discovery · kandydaci</button>
-            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Uruchom miareczkowanie kwasu octowego.')}>Chemistry · miareczkowanie</button>
+            <button type="button" className={`sw-chip${chemistryOpen ? ' is-on' : ''}`} aria-pressed={chemistryOpen} onClick={() => setChemistryOpen((open) => !open)} data-testid="sw-chemistry-toggle">Chemistry · laboratorium chemii</button>
             <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Pokaż eksperyment z czarną dziurą.')}>Physics · czarna dziura</button>
           </nav>}
           <button type="button" className="sw-btn" onClick={() => setControlsOpen((open) => !open)} aria-expanded={controlsOpen} aria-controls="sw-advanced-controls" data-testid="sw-controls">{controlsOpen ? 'Ukryj sterowanie' : 'Sterowanie'}</button>
@@ -483,6 +489,18 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   return (
     <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
       <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
+      {world === 'physics' && chemistryOpen && (
+        <Suspense fallback={<div className="sw-loading" role="status">Ładowanie chemii…</div>}>
+          <ChemistryLabPanel
+            embedded
+            onClose={() => setChemistryOpen(false)}
+            onTitrationStart={(acid) => {
+              const command = stationHandoffCommand(`station=st-titration&acid=${encodeURIComponent(acid)}`, def.catalog, nextLogicalTime());
+              if (command) submitCommands([command], command.text);
+            }}
+          />
+        </Suspense>
+      )}
       {camera === 'VISOR' && (
         <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">
           <div className="sw-visor-frame" />

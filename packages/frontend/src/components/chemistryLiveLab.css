@@ -1,0 +1,176 @@
+/* Chemistry Live Lab — scoped to .cll. Uses the global design tokens (styles.css :root). */
+
+.cll {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem 1rem calc(5rem + var(--safe-bottom));
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.cll *, .cll *::before, .cll *::after { box-sizing: border-box; }
+.cll h1 { font-size: 1.5rem; margin: 0.1rem 0 0.35rem; }
+.cll h2 { font-size: 1.05rem; margin: 0 0 0.6rem; }
+.cll h3 { font-size: 1rem; margin: 0.4rem 0; }
+.cll h4 { font-size: 0.9rem; margin: 0 0 0.25rem; color: var(--text-dim); }
+.cll code { font-family: var(--font-mono); font-size: 0.85em; overflow-wrap: anywhere; }
+.cll-dim { color: var(--text-dim); font-size: var(--fs-meta); }
+.cll-eyebrow { margin: 0; font-size: var(--fs-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); }
+
+.cll-header { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; justify-content: space-between; }
+.cll-levels { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.cll-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.9rem;
+  min-width: 0;
+}
+
+.cll-prompt form { display: flex; gap: 0.5rem; }
+.cll-prompt input {
+  flex: 1; min-width: 0;
+  background: var(--bg-raised); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 0.55rem 0.7rem; font-size: var(--fs-body);
+}
+.cll-ok { color: var(--green); margin: 0.5rem 0 0; font-size: var(--fs-meta); }
+.cll-refuse { color: var(--gold); margin: 0.5rem 0 0; font-size: var(--fs-meta); }
+
+.cll-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 1rem; align-items: start; }
+.cll-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+/* Periodic table: scrolls inside its own box on narrow screens — never the page. */
+.cll-ptable-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; padding-bottom: 0.25rem; }
+.cll-ptable {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(1.55rem, 1fr));
+  grid-template-rows: repeat(10, auto);
+  gap: 2px;
+  /* Fits the desktop column without scrolling (18 × ~1.55rem); only phones scroll it sideways. */
+  min-width: 29.5rem;
+}
+.cll-el {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  aspect-ratio: 1 / 1.05; padding: 0;
+  background: var(--bg-raised); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  font-size: 0.62rem; line-height: 1.05; cursor: pointer;
+}
+.cll-el:hover, .cll-el:focus-visible { border-color: var(--cyan); outline: none; }
+.cll-el.is-selected { background: rgba(92, 214, 232, 0.2); border-color: var(--cyan); }
+.cll-el-lanthanide, .cll-el-actinide { background: rgba(167, 139, 250, 0.08); }
+.cll-el-z { font-size: 0.5rem; color: var(--text-faint); }
+.cll-el-sym { font-weight: 700; font-size: 0.72rem; }
+
+.cll-element-head { display: flex; gap: 0.75rem; align-items: center; }
+.cll-element-sym { font-size: 1.8rem; font-weight: 800; color: var(--cyan); min-width: 2.6rem; text-align: center; }
+.cll-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.4rem 1rem; margin: 0.7rem 0; }
+.cll-facts div { min-width: 0; }
+.cll-facts dt { font-size: var(--fs-micro); color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+.cll-facts dd { margin: 0; font-size: var(--fs-meta); }
+.cll-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.cll-catalog { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.cll-exp {
+  width: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem 0.6rem; align-items: center;
+  text-align: left; padding: 0.6rem 0.7rem; border-radius: 10px;
+  background: var(--bg-raised); color: var(--text); border: 1px solid var(--border); cursor: pointer;
+}
+.cll-exp.is-active { border-color: var(--cyan); background: rgba(92, 214, 232, 0.08); }
+.cll-kind { font-family: var(--font-mono); font-size: 0.62rem; padding: 0.1rem 0.4rem; border-radius: 999px; }
+.cll-kind-edu { background: rgba(240, 179, 92, 0.14); color: var(--gold); }
+.cll-kind-comp { background: rgba(110, 231, 160, 0.14); color: var(--green); }
+
+.cll-question { color: var(--text-dim); margin: 0 0 0.7rem; }
+.cll-params { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.6rem; margin-bottom: 0.7rem; }
+.cll-params label { display: flex; flex-direction: column; gap: 0.25rem; font-size: var(--fs-meta); color: var(--text-dim); min-width: 0; }
+.cll-params select, .cll-params input {
+  width: 100%; min-width: 0; background: var(--bg-raised); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 8px; padding: 0.45rem 0.5rem; font-size: var(--fs-body);
+}
+.cll-plan-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.cll-status, .cll-badge { font-size: var(--fs-micro); padding: 0.2rem 0.55rem; border-radius: 999px; font-weight: 600; }
+.cll-status-ok { background: rgba(110, 231, 160, 0.16); color: var(--green); }
+.cll-status-blocked { background: rgba(240, 179, 92, 0.16); color: var(--gold); }
+.cll-badge { background: var(--bg-elevated); color: var(--text-dim); font-family: var(--font-mono); }
+.cll-concept { margin-top: 0.6rem; padding: 0.6rem; border-radius: 10px; border: 1px dashed var(--border-strong); font-size: var(--fs-meta); }
+.cll-teacher { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.6rem; font-size: var(--fs-meta); }
+.cll-start { margin-top: 0.8rem; }
+.cll-start:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cll-live { display: flex; flex-direction: column; gap: 0.7rem; }
+.cll-epistemic { margin: 0; padding: 0.45rem 0.6rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
+.cll-epistemic-edu { background: rgba(240, 179, 92, 0.14); color: var(--gold); border: 1px solid rgba(240, 179, 92, 0.35); }
+.cll-epistemic-comp { background: rgba(110, 231, 160, 0.12); color: var(--green); border: 1px solid rgba(110, 231, 160, 0.3); }
+
+.cll-stage { position: relative; height: 260px; border-radius: 12px; overflow: hidden; background: #05060f; border: 1px solid var(--border); }
+.cll-canvas { display: block; width: 100%; height: 100%; }
+.cll-stage-badge { position: absolute; left: 0.5rem; bottom: 0.4rem; font-size: 0.62rem; color: var(--text-faint); pointer-events: none; }
+.cll-stage-note { position: absolute; inset: auto 0.5rem 1.6rem; font-size: var(--fs-meta); color: var(--text-dim); pointer-events: none; }
+
+.cll-controls { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.cll-stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; max-height: 22rem; overflow-y: auto; }
+.cll-stage-item { display: grid; grid-template-columns: 8.2rem minmax(0, 1fr); gap: 0.1rem 0.6rem; padding: 0.4rem 0.5rem; border-radius: 8px; border: 1px solid transparent; font-size: var(--fs-meta); }
+.cll-stage-item.is-current { border-color: var(--cyan); background: rgba(92, 214, 232, 0.08); }
+.cll-stage-item.is-pending { opacity: 0.45; }
+.cll-stage-kind { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-faint); padding-top: 0.1rem; }
+.cll-stage-label { font-weight: 600; min-width: 0; }
+.cll-stage-detail { grid-column: 2; color: var(--text-dim); min-width: 0; overflow-wrap: anywhere; }
+
+.cll-observation { display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; align-items: baseline; padding: 0.6rem; border-radius: 10px; background: var(--bg-raised); }
+.cll-observation strong { font-size: 1.3rem; color: var(--cyan); }
+.cll-origin { font-size: var(--fs-micro); color: var(--text-faint); }
+.cll-equation { margin: 0; }
+
+.cll-exec { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; font-size: var(--fs-meta); }
+.cll-exec li { display: flex; flex-wrap: wrap; gap: 0.2rem 0.5rem; padding: 0.3rem 0.45rem; border-radius: 6px; background: var(--bg-raised); min-width: 0; }
+.cll-exec li span { min-width: 0; overflow-wrap: anywhere; color: var(--text-dim); }
+.cll-exec-failed code, .cll-exec-blocked code { color: var(--gold); }
+.cll-exec-recorded code { color: var(--green); }
+
+.cll-result { border-top: 1px solid var(--border); padding-top: 0.6rem; }
+.cll-summary { font-weight: 700; margin: 0.2rem 0; overflow-wrap: anywhere; }
+.cll-sections { display: grid; gap: 0.5rem; margin: 0.6rem 0; }
+.cll-section p { margin: 0; font-size: var(--fs-meta); color: var(--text); overflow-wrap: anywhere; }
+
+.cll-quiz { margin: 0.6rem 0; }
+.cll-quiz-q { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.7rem; margin: 0 0 0.5rem; }
+.cll-quiz-q legend { font-size: var(--fs-meta); font-weight: 600; padding: 0 0.3rem; }
+.cll-quiz-q label { display: flex; gap: 0.45rem; align-items: center; font-size: var(--fs-meta); padding: 0.2rem 0; }
+.cll-quiz-q label.is-right { color: var(--green); }
+.cll-quiz-q label.is-wrong { color: var(--red); }
+.cll-quiz-feedback { font-size: var(--fs-meta); color: var(--text-dim); margin: 0.3rem 0 0; }
+
+.cll-proof { display: grid; gap: 0.4rem; font-size: var(--fs-meta); }
+.cll-proof p { margin: 0; overflow-wrap: anywhere; }
+.cll-proof .chip-btn { justify-self: start; }
+.cll-limits { margin-top: 0.5rem; font-size: var(--fs-meta); }
+
+@media (max-width: 900px) {
+  .cll-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .cll { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .cll h1 { font-size: 1.25rem; }
+  .cll-stage { height: 220px; }
+  .cll-stage-item { grid-template-columns: minmax(0, 1fr); }
+  .cll-stage-detail { grid-column: 1; }
+  .cll-prompt form { flex-direction: column; }
+}
+
+/* Inside the main Laboratory: a docked panel over the scene, not a page. */
+.cll.cll-embedded {
+  position: absolute; z-index: 6; top: 4.5rem; right: 1rem; bottom: 1rem;
+  width: min(46rem, calc(100% - 2rem)); overflow-y: auto; padding: 1rem;
+  background: rgba(6, 12, 20, 0.94); border: 1px solid rgba(143, 211, 255, 0.22); border-radius: 12px;
+}
+.cll.cll-embedded .cll-grid { grid-template-columns: 1fr; }
+.cll.cll-embedded .cll-header h2 { margin: 0.2rem 0; font-size: 1.25rem; }
+.cll-close { margin-left: auto; }
+@media (max-width: 720px) {
+  .cll.cll-embedded { top: auto; left: 0.5rem; right: 0.5rem; bottom: 4.5rem; width: auto; max-height: 62vh; }
+}

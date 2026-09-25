@@ -43,6 +43,16 @@ const setPanel = async (page: Page, panel: 'evidence' | 'controls', open: boolea
   if (((await toggle.getAttribute('aria-expanded')) === 'true') !== open) await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', String(open));
 };
+// Human Explorer (biology) keeps its tools in inspector tabs: explore (organs, zoom ladder), microscope,
+// section (cutaway, surface, twin camera) and research (commands, evidence) — the test opens the tab a
+// person would use for each step.
+const humanTab = async (page: Page, tab: 'explore' | 'microscope' | 'section' | 'research'): Promise<void> => {
+  const toggle = page.getByTestId('human-inspector-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  const tabButton = page.getByTestId(`human-tab-${tab}`);
+  if ((await tabButton.getAttribute('aria-selected')) !== 'true') await tabButton.click();
+  await expect(tabButton).toHaveAttribute('aria-selected', 'true');
+};
 test.describe('Scientific Worlds — command → agent → session → evidence → replay', () => {
   test.setTimeout(1_500_000);
   test('desktop: the acceptance sentence end to end, through the visor', async ({ page }) => {
@@ -156,6 +166,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
 
     // Run the two experiments as two observable stages. A single compound sentence is accepted,
     // but the second result can replace the first card before a learner has time to inspect it.
+    await humanTab(page, 'research');
     await setPanel(page, 'controls', true);
     await page.getByTestId('sw-input').fill('Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope i powiększ 5×.');
     await page.getByTestId('sw-send').click();
@@ -210,6 +221,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
       await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'false');
     }
     await setPanel(page, 'controls', false);
+    await humanTab(page, 'explore');
     await page.getByTestId('sw-explorer-organ-heart').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Narząd: Heart');
     await expect(page.getByTestId('sw-explorer-organ')).toHaveAttribute('data-organ', 'heart');
@@ -237,6 +249,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await expect(page.getByTestId('sw-explorer-tier')).toContainText('CC0');
     // Both agent cameras leave the twin a distant figure in its chamber; the twin camera frames the body,
     // which is the only way a screenshot can show whether the licensed asset actually rendered.
+    await humanTab(page, 'section');
     await page.getByTestId('sw-explorer-twin-camera').click();
     await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-camera', 'TWIN');
     await expect(page.getByTestId('sw-camera-badge')).toContainText('BLIŹNIAK');

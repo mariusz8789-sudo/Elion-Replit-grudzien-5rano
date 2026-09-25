@@ -6,11 +6,11 @@
  * który API zapisuje w istniejącym magazynie projektu.
  */
 
-import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { sha256Hex } from './determinism.mjs';
 
 export const KNOWLEDGE_INGESTION_VERSION = '1.0.0';
 export const MAX_KNOWLEDGE_FILE_BYTES = 5 * 1024 * 1024;
@@ -31,9 +31,7 @@ const ALLOWED_EXTENSION_BY_MIME = new Map([
   ['application/json', new Set(['.json'])],
 ]);
 
-export function sha256Hex(bytes) {
-  return createHash('sha256').update(bytes).digest('hex');
-}
+export { sha256Hex };
 
 function normalizeFilename(value) {
   const name = path.basename(String(value ?? '').replaceAll('\\', '/')).trim();

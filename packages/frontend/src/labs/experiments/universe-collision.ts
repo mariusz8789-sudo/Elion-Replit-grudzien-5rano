@@ -1,4 +1,5 @@
 import type { ExperimentDef, Sim, SimParams } from '../../core/types';
+import { mulberry32 } from '@genesis/core/determinism.js';
 
 /**
  * Zderzenie galaktyk — ograniczony problem trzech ciał (metoda
@@ -24,16 +25,6 @@ export interface CollisionInitialState {
 
 const SOFT2 = 90; // zmiękczenie grawitacji (px²)
 
-/** Stabilny PRNG dla powtarzalnych warunków początkowych — nie zmienia równań ruchu. */
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let value = Math.imul(state ^ (state >>> 15), 1 | state);
-    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
 
 /** Ten sam ratio/retro zawsze mapuje się na ten sam układ początkowy cząstek próbnych. */
 export function collisionSeedFor({ ratio, retro }: { ratio: number; retro: boolean }): number {

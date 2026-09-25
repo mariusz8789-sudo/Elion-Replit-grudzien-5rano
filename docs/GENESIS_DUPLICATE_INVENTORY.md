@@ -83,6 +83,23 @@ Bez duplikatu: miareczkowanie/pH (`physics.ts` + adaptery), Arrhenius (`chemistr
 
    Po weryfikacji **nie** usunięto dwóch pozycji, bo są żywe: `agent/genuineDiscoveryOrchestrator.ts` (używają go `proofLadder`, `discoveryRecordBridge` i skrypt `genuine-discovery:e2e01`) oraz `genesisCityWorld2.ts` (używają go `genesisScientificCity3` i kompilator świata).
    Po usunięciu łańcucha UI osierocone mogą być `core/src/city-enterprise` i `ui/src/render`. Wymagają osobnego sprawdzenia.
-2. **Poprawność:** jeden canonicalizer JSON (jedna reguła sortowania), jeden `fnv1a`, jeden `sha256`, jeden `mulberry32`, jeden typ `ReplayVerdict`.
+2. **Hashe i PRNG: ZROBIONE.**
+   - **Jedno źródło w TypeScript:** `packages/core/src/determinism.ts` (`canonicalJson`, `fnv1a`, `fnv1aUint`, `stableHash`, `sha256Hex`, `mulberry32`).
+   - **Bliźniak w backendzie:** `packages/backend/src/determinism.mjs`. Reguła jest ta sama i sprawdza ją test bajt w bajt w `determinism.test.ts`.
+   - **Reguła kanonicznego JSON:** klucze sortowane po jednostkach kodu UTF-16 (jak RFC 8785), nigdy przez `localeCompare`, i semantyka JSON (klucze z `undefined` są pomijane).
+   - **Przepięte kopie:**
+     - EvidenceLedger, expansionHash, cognitive/hash, humanLab/hash, `events/hash`;
+     - mirror, city-enterprise, `ui/render`, `ui/cern`, `ui/mirror`;
+     - 14 kopii mulberry32 (warianty zapisu sprawdzone: 200 000 ziaren, 0 różnic);
+     - 7 kopii FNV-1a i integrityEnvelope;
+     - backend: provenance, videoControlContract, 5 kopii `sha256Hex`, `spatialProjectIngestion`.
+   - **Jedno słownictwo replay:** `matrixFoundation/replayVerdict.ts`. Sesja, paczka dowodów i benchmark biorą z niego podzbiory. Benchmark mówi teraz `DRIFT` zamiast `MISMATCH`.
+   - **Skutek:** odcisk prerejestracji w artefakcie D-116 się zmienił. Artefakt wydano ponownie (`npm run winner-record:emit`), łańcuch audytu dopisano (2 ogniwa, stare nienaruszone). Werdykt WINNER LIRAGLUTIDE i replay MATCH są bez zmian.
+   - **Świadomie zostawione:**
+     - `core/three/*` (warstwa wizualna, Astra);
+     - `components/liveMatrix/matrixEngine.ts` (kontrakt: tylko React);
+     - ścisły canonicalizer w `lab/standaloneDeterminism.ts` (odrzuca NaN, ta sama kolejność kluczy);
+     - osadzony, samodzielny weryfikator w `integrityEnvelope.ts`;
+     - osobny pakiet `packages/csrn`.
 3. **Menu i czat:** pola pytań z `#/pilot`, `#/research-console` i `LookingGlassChat` kierować do jednego czatu. `#/collider` do `#/cern-complex`, `#/city` do `#/city3d` (tryb 2D), `#/temporal-cinematic` do `#/world-director`.
 4. **[Astra] Laboratorium:** przenieść dźwignię interwencji i narrację Discovery Hall na główną scenę, potem wycofać `labScene3D.ts` + `FirstPersonLabScreen` + `InvestorDemoScreen` (~4 900 LOC) i złożyć `#/lab-fpv` do stanowiska chemii.

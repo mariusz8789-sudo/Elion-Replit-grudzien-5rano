@@ -6,13 +6,13 @@
     "scenarioId": "GOV-DRUG-DISCOVERY-E2E-02-LOWER-HARM",
     "mode": "PRODUCTION",
     "verdict": "WINNER",
-    "auditFingerprint": "6615057e",
+    "auditFingerprint": "34c5b23c",
     "recipeFingerprint": "7ddcabe9",
     "record": {
       "kind": "WINNER_RECORD",
       "winnerId": "CHEMBL4084119",
       "candidateName": "LIRAGLUTIDE",
-      "recordFingerprint": "b6207e9c",
+      "recordFingerprint": "890a7310",
       "gateOutcome": "REQUIRES_HUMAN_APPROVAL",
       "gateFingerprint": "cf987dda"
     },
@@ -84,7 +84,7 @@
       {
         "stage": "10_FREEZE_PREREG",
         "status": "OK",
-        "fingerprint": "e4d1c845"
+        "fingerprint": "488aab8d"
       },
       {
         "stage": "11_EXPERIMENT_PLAN",
@@ -138,8 +138,8 @@
       }
     ]
   },
-  "sha256": "8072bb69456741adeb480b85a55ed261f6280e44d06190d1382b317843d41ad7",
-  "previousSha256": null,
-  "chainIndex": 0,
-  "sealedAt": "2026-09-16T21:34:16.149Z"
+  "sha256": "662998957497b9c7873b05c8d7d893a7332af6c72eee8c3592bc78b0b2fe9e10",
+  "previousSha256": "8072bb69456741adeb480b85a55ed261f6280e44d06190d1382b317843d41ad7",
+  "chainIndex": 1,
+  "sealedAt": "2026-09-25T03:41:39.972Z"
 }

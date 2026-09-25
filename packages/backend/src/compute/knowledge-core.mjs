@@ -1,5 +1,20 @@
 /* esbuild bundle of packages/core/src/knowledge/ingestion/serverEntry.ts; regenerate with npm run compute:bundle:knowledge, do not edit */
 
+// packages/core/src/knowledge/evidenceTypes.ts
+var KNOWLEDGE_DISCLAIMER = "To jest pomoc edukacyjna, nie porada medyczna, prawna, finansowa ani in\u017Cynierska. Twierdzenia z film\xF3w i narracji traktujemy jako hipotezy do weryfikacji, nie jako fakty.";
+
+// packages/core/src/knowledge/classifyClaim.ts
+var canReachVerified = (sourceKind) => sourceKind !== "video";
+function classifyClaim(i) {
+  const conf = Math.min(1, Math.max(0, i.confidence));
+  if (conf < 0.15) return "rejected";
+  const hasIndependent = i.independentSourceIds.length >= 1;
+  if (canReachVerified(i.sourceKind) && hasIndependent && conf >= 0.8 && i.claimType !== "hypothesis") return "verified";
+  if (conf >= 0.5) return "candidate";
+  return "unverified";
+}
+var statusLabelPl = (s) => s === "verified" ? "potwierdzone przez niezale\u017Cne \u017Ar\xF3d\u0142a" : s === "candidate" ? "wst\u0119pny kandydat \u2014 wymaga weryfikacji" : s === "unverified" ? "niezweryfikowane" : "odrzucone";
+
 // packages/core/src/knowledge/sha256.ts
 var K = new Uint32Array([
   1116352408,
@@ -141,32 +156,27 @@ function sha256HexSync(text) {
   return hex;
 }
 
-// packages/core/src/knowledge/evidenceTypes.ts
-var KNOWLEDGE_DISCLAIMER = "To jest pomoc edukacyjna, nie porada medyczna, prawna, finansowa ani in\u017Cynierska. Twierdzenia z film\xF3w i narracji traktujemy jako hipotezy do weryfikacji, nie jako fakty.";
-
-// packages/core/src/knowledge/classifyClaim.ts
-var canReachVerified = (sourceKind) => sourceKind !== "video";
-function classifyClaim(i) {
-  const conf = Math.min(1, Math.max(0, i.confidence));
-  if (conf < 0.15) return "rejected";
-  const hasIndependent = i.independentSourceIds.length >= 1;
-  if (canReachVerified(i.sourceKind) && hasIndependent && conf >= 0.8 && i.claimType !== "hypothesis") return "verified";
-  if (conf >= 0.5) return "candidate";
-  return "unverified";
+// packages/core/src/determinism.ts
+function sortKeysDeep(value) {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value !== null && typeof value === "object") {
+    const withJson = value;
+    if (typeof withJson.toJSON === "function") return sortKeysDeep(withJson.toJSON());
+    const record = value;
+    const out = {};
+    for (const key of Object.keys(record).sort()) out[key] = sortKeysDeep(record[key]);
+    return out;
+  }
+  return value;
 }
-var statusLabelPl = (s) => s === "verified" ? "potwierdzone przez niezale\u017Cne \u017Ar\xF3d\u0142a" : s === "candidate" ? "wst\u0119pny kandydat \u2014 wymaga weryfikacji" : s === "unverified" ? "niezweryfikowane" : "odrzucone";
+function canonicalJson(value) {
+  return JSON.stringify(sortKeysDeep(value)) ?? "null";
+}
+function sha256Hex(text) {
+  return sha256HexSync(text);
+}
 
 // packages/core/src/knowledge/EvidenceLedger.ts
-var stableStringify = (v) => {
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
-  if (typeof v === "object") {
-    const o = v;
-    return "{" + Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
-  }
-  return JSON.stringify(v);
-};
-var sha256hex = (t) => sha256HexSync(t);
 var EvidenceLedger = class _EvidenceLedger {
   constructor(clock) {
     this.clock = clock;
@@ -211,7 +221,7 @@ var EvidenceLedger = class _EvidenceLedger {
     return l;
   }
   contentHashOf(i) {
-    return sha256hex(stableStringify({ sourceUrl: i.sourceUrl, claim: i.claim, claimType: i.claimType, sourceTimestamp: i.sourceTimestamp, provenance: i.provenance }));
+    return sha256Hex(canonicalJson({ sourceUrl: i.sourceUrl, claim: i.claim, claimType: i.claimType, sourceTimestamp: i.sourceTimestamp, provenance: i.provenance }));
   }
   buildRecord(i, contentHash) {
     const status = classifyClaim({ claimType: i.claimType, sourceKind: i.provenance.sourceKind, independentSourceIds: i.provenance.independentSourceIds, confidence: i.confidence });
@@ -221,7 +231,7 @@ var EvidenceLedger = class _EvidenceLedger {
     const prev = this.entries.length ? this.entries[this.entries.length - 1].hash : "GENESIS";
     const at = this.clock.now();
     const index = this.entries.length;
-    const entry = Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256hex(stableStringify({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at });
+    const entry = Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256Hex(canonicalJson({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at });
     this.entries.push(entry);
     for (const fn of this.listeners) fn(entry, this);
   }
@@ -240,7 +250,7 @@ var EvidenceLedger = class _EvidenceLedger {
   propose(i) {
     const contentHash = this.contentHashOf(i);
     const rec = this.byHash.get(contentHash) ?? this.buildRecord(i, contentHash);
-    const proposalId = "PR-" + sha256hex(stableStringify({ contentHash, at: this.clock.now(), n: this.proposals.size })).slice(0, 12);
+    const proposalId = "PR-" + sha256Hex(canonicalJson({ contentHash, at: this.clock.now(), n: this.proposals.size })).slice(0, 12);
     this.proposals.set(proposalId, { proposalId, record: rec, status: "pending", approverId: null });
     this.append("PROPOSE", rec);
     return proposalId;
@@ -282,7 +292,7 @@ var EvidenceLedger = class _EvidenceLedger {
     let prev = "GENESIS";
     for (const e of this.entries) {
       if (e.prevHash !== prev) errors.push("CHAIN_BREAK@" + e.index);
-      if (e.hash !== sha256hex(stableStringify({ index: e.index, kind: e.kind, recordId: e.recordId, contentHash: e.contentHash, prevHash: e.prevHash, at: e.at }))) errors.push("HASH_MISMATCH@" + e.index);
+      if (e.hash !== sha256Hex(canonicalJson({ index: e.index, kind: e.kind, recordId: e.recordId, contentHash: e.contentHash, prevHash: e.prevHash, at: e.at }))) errors.push("HASH_MISMATCH@" + e.index);
       prev = e.hash;
     }
     return { ok: errors.length === 0, errors };
@@ -467,7 +477,7 @@ var OmniIngestionController = class _OmniIngestionController {
       }
       for (const it of res.items) fetched.push(it);
     }
-    return { fetched, skipped, batchFingerprint: sha256hex(stableStringify({ urls, fetched })), at: this.clock.now() };
+    return { fetched, skipped, batchFingerprint: sha256Hex(canonicalJson({ urls, fetched })), at: this.clock.now() };
   }
 };
 

@@ -491,14 +491,10 @@ export function contentHash(input: { labId: string; experimentId: string; params
   const canonical = JSON.stringify({
     labId: input.labId,
     experimentId: input.experimentId,
-    params: Object.fromEntries(Object.entries(input.params).sort(([a], [b]) => a.localeCompare(b))),
+    // Code-unit key order (never localeCompare, whose order depends on the runtime's locale).
+    params: Object.fromEntries(Object.entries(input.params).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
   });
-  let h = 0x811c9dc5;
-  for (let i = 0; i < canonical.length; i++) {
-    h ^= canonical.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16).padStart(8, '0');
+  return fnv1a(canonical);
 }
 
 function validParams(value: unknown): value is SimParams {

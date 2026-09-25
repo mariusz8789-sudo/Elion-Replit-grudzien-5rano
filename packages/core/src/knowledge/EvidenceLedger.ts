@@ -1,13 +1,10 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
-import { sha256HexSync } from './sha256.js';
 import type { Clock, EvidenceRecord, LedgerEntry, Proposal, ProvenanceInfo, ClaimType } from './evidenceTypes.js';
 import { KNOWLEDGE_DISCLAIMER } from './evidenceTypes.js';
 import { classifyClaim } from './classifyClaim.js';
-export const stableStringify = (v: unknown): string => { if (v === null) return 'null'; if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']'; if (typeof v === 'object') { const o = v as Record<string, unknown>; return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}'; } return JSON.stringify(v); };
-/** SHA-256 hex of a UTF-8 string. Pure, isomorphic (browser + node); bit-identical to node:crypto — see sha256.test.ts. */
-export const sha256hex = (t: string): string => sha256HexSync(t);
-/** Deterministic PRNG (mulberry32), same as the copy in city-enterprise/; the postmythos engines import it from here. */
-export const mulberry32 = (seed: number): (() => number) => { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+// The canonical JSON, SHA-256 and PRNG live in ../determinism.ts; these names stay for the engines that import them from here.
+import { canonicalJson as stableStringify, sha256Hex as sha256hex, mulberry32 } from '../determinism.js';
+export { stableStringify, sha256hex, mulberry32 };
 export interface NewEvidenceInput { readonly sourceUrl: string; readonly sourceTimestamp: string | null; readonly claim: string; readonly claimType: ClaimType; readonly confidence: number; readonly provenance: ProvenanceInfo; }
 export interface AddResult { readonly record: EvidenceRecord; readonly deduped: boolean; }
 /** The whole ledger as plain JSON: entries verbatim (their hashes fold the original `at`, so a restore reproduces the chain bit for bit), records, proposals, the active order and the version. */

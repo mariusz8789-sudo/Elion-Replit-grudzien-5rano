@@ -7,7 +7,6 @@
  * report with runtime environment + a content hash for reproducibility
  * comparison across runs (Priority B groundwork).
  */
-import { createHash } from 'node:crypto';
 import { probeEnvironment } from '../compute/scienceEnv.mjs';
 import { runRdkitBenchmark } from './rdkitBenchmark.mjs';
 import { runQmBenchmark } from './qmBenchmark.mjs';
@@ -15,6 +14,7 @@ import { runMdBenchmark } from './mdBenchmark.mjs';
 import { runAdmetBenchmark } from './admetBenchmark.mjs';
 import { runDockingBenchmark } from './dockingBenchmark.mjs';
 import { runProteinBenchmark } from './proteinBenchmark.mjs';
+import { sha256Hex } from '../determinism.mjs';
 
 const BENCHMARKS = [
   { id: 'rdkit', run: runRdkitBenchmark },
@@ -40,7 +40,7 @@ function stripTiming(value) {
 }
 
 function sha256(obj) {
-  return createHash('sha256').update(JSON.stringify(stripTiming(obj))).digest('hex');
+  return sha256Hex(JSON.stringify(stripTiming(obj)));
 }
 
 /**

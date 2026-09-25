@@ -1,3 +1,4 @@
+import { canonicalJson as canonicalJsonOf } from '@genesis/core/determinism.js';
 /**
  * INTEGRITY ENVELOPE — tamper detection for exported scientific records.
  *
@@ -66,18 +67,9 @@ export interface VerificationResult {
   readonly status: IntegrityCertificateStatus;
 }
 
+/** Input is already `normalizeForHashing`-ed (a plain JSON value), so the ONE canonical JSON applies byte for byte. */
 function canonicalize(value: unknown): string {
-  if (value === null || value === undefined) return 'null';
-  const type = typeof value;
-  if (type === 'string' || type === 'number' || type === 'boolean') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((item) => canonicalize(item)).join(',')}]`;
-  if (type === 'object') {
-    const obj = value as Record<string, unknown>;
-    const sortedKeys = Object.keys(obj).sort();
-    return `{${sortedKeys.map((key) => `${JSON.stringify(key)}:${canonicalize(obj[key])}`).join(',')}}`;
-  }
-  // Functions, symbols, bigint — matches JSON.stringify's own "cannot represent, drop/error" territory.
-  return 'null';
+  return canonicalJsonOf(value);
 }
 
 /** Exactly what `JSON.stringify(record)` will actually produce — see the module doc for why this precedes canonicalization. */

@@ -141,7 +141,7 @@ describe('benchmarkHarness — replay and fingerprint (also §10: result changes
   it('a config change moves the runFingerprint — a run that behaves differently can never look identical to one that did not', () => {
     const a = assembleResult(dataset, [mkResult()], { seed: 1 });
     const b = assembleResult(dataset, [mkResult()], { seed: 2 });
-    expect(compareReplay(a, b)).toBe('MISMATCH');
+    expect(compareReplay(a, b)).toBe('DRIFT');
   });
 
   it('SCORE MANIPULATION / silent result change: a different per-case outcome with the SAME per-case runFingerprint would be a scorer bug — this harness ties the fingerprint to the outcome-bearing fields, so a genuine outcome change always moves it', () => {

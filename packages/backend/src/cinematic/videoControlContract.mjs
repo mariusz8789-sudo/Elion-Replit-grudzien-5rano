@@ -22,7 +22,7 @@
  * campaign/*, knowledgeApi.mjs, or any shared registry) so it stays
  * additive and independently cherry-pickable.
  */
-import { createHash } from 'node:crypto';
+import { canonicalJson, sha256Hex as canonicalSha256Hex } from '../determinism.mjs';
 
 /** Canonical capability identifiers. No competing vocabulary is introduced. */
 export const CAPABILITY = Object.freeze({
@@ -80,28 +80,16 @@ export function assertNoScientificStatePromotion(rawInput) {
 
 /** Full SHA-256 hex digest (64 chars) — provenance-grade, never truncated. */
 export function sha256Hex(data) {
-  const buf = Buffer.isBuffer(data) ? data : Buffer.from(typeof data === 'string' ? data : JSON.stringify(data));
-  return createHash('sha256').update(buf).digest('hex');
+  return canonicalSha256Hex(Buffer.isBuffer(data) || typeof data === 'string' ? data : JSON.stringify(data));
 }
 
-/** Deterministic key ordering so two structurally-equal inputs always
- *  fingerprint identically regardless of property insertion order. */
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value !== null && typeof value === 'object') {
-    const out = {};
-    for (const key of Object.keys(value).sort()) out[key] = canonicalize(value[key]);
-    return out;
-  }
-  return value;
-}
 
 /** SHA-256 of the canonicalized JSON form of a control input — the ONE
  *  "control-package fingerprint" every downstream provenance record uses.
  *  Equivalent inputs (same values, any key order) always produce the same
  *  fingerprint (test #16). */
 export function computeControlFingerprint(controlInput) {
-  return sha256Hex(JSON.stringify(canonicalize(controlInput)));
+  return sha256Hex(canonicalJson(controlInput));
 }
 
 /** Optional reference fields. Absence is explicit: every one of these is

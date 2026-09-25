@@ -1,17 +1,12 @@
 /**
- * EARTHQUAKE MODULE — isolated seeded PRNG (mulberry32).
+ * EARTHQUAKE MODULE — seeded unit interval.
  *
- * Genesis's epidemic core already has a seeded PRNG (`core/epidemic/agents.ts`'s
- * `makeRng`), but this module deliberately does not import it: importing
- * anything from `core/epidemic/` or `core/simulation/` would blur the
- * isolation boundary this vertical slice is required to prove (see the
- * isolation test in earthquakeVerticalSlice.test.ts). This is a completely
- * independent, single-purpose implementation.
+ * The module stays isolated from `core/epidemic/` and `core/simulation/` (see the isolation test in
+ * earthquakeVerticalSlice.test.ts); the PRNG itself is the ONE mulberry32 in @genesis/core/determinism
+ * — the first draw of `mulberry32(seed)`, bit-identical to the former local copy.
  */
+import { mulberry32 } from '@genesis/core/determinism.js';
+
 export function seededUnitInterval(seed: number): number {
-  let a = (seed >>> 0) + 0x6d2b79f5;
-  a = a >>> 0;
-  let t = Math.imul(a ^ (a >>> 15), 1 | a);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  return mulberry32(seed)();
 }

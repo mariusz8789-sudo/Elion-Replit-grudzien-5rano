@@ -72,6 +72,8 @@ test('Multiverse Nexus is reachable and labels portals as a navigation metaphor'
   // The honesty note is collapsed behind its question (90660e64); a learner opens it to read the boundary.
   await page.getByText('Co dokładnie liczy ten model?').first().click();
   await expect(page.getByText(/metafora nawigacyjna Genesis OS/i)).toBeVisible();
+  // The narrator lives under the lab's collapsed 'Parametry i analiza' (d0580d1a).
+  await page.getByText('Parametry i analiza').first().click();
   await expect(page.getByText(/Wszystkie portale w tej sali/i)).toBeVisible();
   await expect(page.getByText(/Universe Lab z realnymi, obliczonymi parametrami/i)).toBeVisible();
 

@@ -176,6 +176,11 @@ export function outcomeFromDrugLiveRun(input: {
   readonly hypothesis: DrugHypothesis;
   readonly result: DrugHypothesisResult;
   readonly next: { readonly title: string; readonly rationale: string; readonly requires: readonly string[] };
+  /** What the SERVER stored: the criteria registered before the run and the sealed record of the result. */
+  readonly memory?: {
+    readonly preregistration: { readonly status: string; readonly recordId: string | null; readonly error: string | null } | null;
+    readonly sealed: { readonly status: string; readonly recordId: string | null; readonly check: string | null; readonly error: string | null } | null;
+  } | null;
 }): ScientificOutcomeView {
   const { session, replay, state, hypothesis, result } = input;
   const runIds = [...new Set(state.candidates.flatMap((c) => Object.values(c.stages).map((m) => m?.runId).filter((id): id is string => Boolean(id))))];
@@ -210,10 +215,22 @@ export function outcomeFromDrugLiveRun(input: {
           { label: 'Powtórka silnika (docking)', value: `${input.engineReplay.verdict}${input.engineReplay.runId ? ` · ScienceRun ${input.engineReplay.runId}` : ''}`, testId: 'drug-engine-replay' },
           ...(input.engineReplay.originalHash ? [{ label: 'Wynik pierwotny / powtórzony', value: `${input.engineReplay.originalHash} / ${input.engineReplay.replayHash ?? '—'}` }] : []),
         ] : []),
-        ...(input.engineReplay ? [
-          { label: 'Powtórka silnika (docking)', value: `${input.engineReplay.verdict}${input.engineReplay.runId ? ` · ScienceRun ${input.engineReplay.runId}` : ''}`, testId: 'drug-engine-replay' },
-          ...(input.engineReplay.originalHash ? [{ label: 'Wynik pierwotny / powtórzony', value: `${input.engineReplay.originalHash} / ${input.engineReplay.replayHash ?? '—'}` }] : []),
-        ] : []),
+        // Server-side scientific memory: where the criteria and the sealed result actually live, so the
+        // record survives this browser. A refusal is shown as a refusal, never omitted.
+        ...(input.memory?.preregistration ? [{
+          label: 'Rejestracja kryteriów (serwer)',
+          value: input.memory.preregistration.error
+            ? `ODMOWA — ${input.memory.preregistration.error}`
+            : `${input.memory.preregistration.status} · ${input.memory.preregistration.recordId ?? '—'}`,
+          testId: 'drug-preregistration',
+        }] : []),
+        ...(input.memory?.sealed ? [{
+          label: 'Zapis w pamięci naukowej (serwer)',
+          value: input.memory.sealed.error
+            ? `ODMOWA — ${input.memory.sealed.error}`
+            : `${input.memory.sealed.status} · sprawdzenie wobec rejestracji: ${input.memory.sealed.check ?? '—'} · ${input.memory.sealed.recordId ?? '—'}`,
+          testId: 'drug-memory-record',
+        }] : []),
         ...session.evidenceHashes.map((h) => ({ label: 'EvidenceLedger', value: `contentHash ${h}`, testId: 'sw-ledger-hash' })),
         ...runIds.map((id) => ({ label: 'ScienceRun', value: id })),
         { label: 'Hash sesji', value: session.contentHash, testId: 'sw-content-hash' },

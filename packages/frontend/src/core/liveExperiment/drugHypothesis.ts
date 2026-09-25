@@ -144,3 +144,19 @@ export function nextDrugExperiment(result: DrugHypothesisResult, state: LiveDrug
 const plans = new Map<string, DrugHypothesis>();
 export function registerDrugHypothesis(campaignId: string, h: DrugHypothesis): void { if (!plans.has(campaignId)) plans.set(campaignId, h); }
 export function getDrugHypothesis(campaignId: string): DrugHypothesis | null { return plans.get(campaignId) ?? null; }
+
+/**
+ * THE hypothesis of a campaign. The one the chat registered wins; otherwise the default criteria for
+ * `subject` are built ONCE and frozen here, so the run that is preregistered, the verdict that is
+ * computed and the record that is sealed all refer to the same criteria — never two versions of them.
+ */
+export function resolveDrugHypothesis(campaignId: string, subject: string): DrugHypothesis {
+  const existing = plans.get(campaignId);
+  if (existing) return existing;
+  const built = buildDrugHypothesis(subject.trim() || 'kandydat');
+  plans.set(campaignId, built);
+  return built;
+}
+
+/** Test seam: forget the frozen hypotheses (the store is module state). */
+export function resetDrugHypothesesForTest(): void { plans.clear(); }

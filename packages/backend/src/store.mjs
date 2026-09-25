@@ -23,6 +23,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { newId } from './auth.mjs';
 import { ensureAccessSchema } from './access.mjs';
 import { hashSecret, looksHashed } from './secrets.mjs';
+import { canonicalJson, sha256Hex } from './determinism.mjs';
 
 /* ---------------- Role i uprawnienia (RBAC) ---------------- */
 
@@ -465,6 +466,39 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_agent_run_steps_run ON agent_run_steps(agent_run_id, step_index);
 `;
 
+// Scientific Memory on the server (constitution §7): a campaign's PREREGISTRATION and the SEALED
+// SESSIONS judged against it. Append-only by construction — two triggers refuse UPDATE and DELETE,
+// so a stored criterion cannot be edited after a result is known, and past evidence cannot be
+// removed. Each row carries the content hash of its canonical body and a chain hash over the
+// campaign's previous row, so a missing or altered row in the middle is detectable, not silent.
+//
+// `project_id` is deliberately NOT a foreign key: evidence outlives the project row that produced
+// it, and a cascade delete would silently destroy the record this table exists to keep.
+const SCHEMA_V14 = `
+CREATE TABLE IF NOT EXISTS experiment_records (
+  id                 TEXT PRIMARY KEY,
+  project_id         TEXT NOT NULL,
+  campaign_id        TEXT NOT NULL,
+  kind               TEXT NOT NULL,
+  seq                INTEGER NOT NULL,
+  fingerprint        TEXT NOT NULL,
+  content_hash       TEXT NOT NULL,
+  prev_chain_hash    TEXT,
+  chain_hash         TEXT NOT NULL,
+  preregistration_id TEXT,
+  prereg_check       TEXT,
+  body_json          TEXT NOT NULL,
+  created_by         TEXT,
+  created_at         INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_experiment_records_seq ON experiment_records(campaign_id, seq);
+CREATE INDEX IF NOT EXISTS idx_experiment_records_campaign ON experiment_records(campaign_id, kind);
+CREATE TRIGGER IF NOT EXISTS experiment_records_append_only_update BEFORE UPDATE ON experiment_records
+BEGIN SELECT RAISE(ABORT, 'experiment_records is append-only: a sealed experiment record cannot be updated'); END;
+CREATE TRIGGER IF NOT EXISTS experiment_records_append_only_delete BEFORE DELETE ON experiment_records
+BEGIN SELECT RAISE(ABORT, 'experiment_records is append-only: a sealed experiment record cannot be deleted'); END;
+`;
+
 /**
  * Najwyższa wersja schematu, jaką TEN kod zna i umie migrować do niej.
  * `PRAGMA user_version` jest już metadaną wersji schematu wbudowaną w plik
@@ -475,7 +509,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_run_steps_run ON agent_run_steps(agent_run_
  * ostrzeżenia — realne ryzyko cichego uszkodzenia danych przez downgrade
  * (uruchomienie starszego release'u na już-podniesionej bazie produkcyjnej).
  */
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 function migrate(db) {
   const { user_version: version } = db.prepare('PRAGMA user_version').get();
@@ -490,6 +524,7 @@ function migrate(db) {
   if (version < 10) db.exec(SCHEMA_V10);
   if (version < 11) db.exec(SCHEMA_V11);
   if (version < 12) db.exec(SCHEMA_V12);
+  if (version < 14) db.exec(SCHEMA_V14);
   // Rekombinacja BRICS ma DWOJE rodziców, więc rodowód potrzebuje drugiej kolumny.
   // Dodatkowo, nie destrukcyjnie: bazy sprzed tej zmiany dostają kolumnę pustą,
   // a kandydaci jednorodzicielscy mają w niej NULL na zawsze — to poprawny stan,
@@ -554,6 +589,7 @@ function migrate(db) {
   if (version < 11) db.exec('PRAGMA user_version = 11');
   if (version < 12) db.exec('PRAGMA user_version = 12');
   if (version < 13) db.exec('PRAGMA user_version = 13');
+  if (version < 14) db.exec('PRAGMA user_version = 14');
 }
 
 /** Otwiera (i migruje) bazę. `:memory:` dla testów, ścieżka pliku w produkcji. */
@@ -1423,6 +1459,79 @@ export function listScienceRunVerifications(db, scienceRunId) {
 
 export function listScienceRunsForCandidate(db, candidateId) {
   return db.prepare('SELECT * FROM science_runs WHERE candidate_id = ? ORDER BY created_at ASC').all(candidateId).map(toScienceRun);
+}
+
+/* ---------------- Scientific Memory: preregistrations and sealed sessions ---------------- */
+
+function toExperimentRecord(r) {
+  if (!r) return null;
+  return {
+    id: r.id, projectId: r.project_id, campaignId: r.campaign_id, kind: r.kind, seq: r.seq,
+    fingerprint: r.fingerprint, contentHash: r.content_hash,
+    prevChainHash: r.prev_chain_hash ?? null, chainHash: r.chain_hash,
+    preregistrationId: r.preregistration_id ?? null, preregCheck: r.prereg_check ?? null,
+    body: JSON.parse(r.body_json), createdBy: r.created_by ?? null, createdAt: r.created_at,
+  };
+}
+
+/** The chain hash of a row: sha256 over the previous row's chain hash and this row's content hash. */
+export function experimentChainHash(prevChainHash, contentHash) {
+  return sha256Hex(`${prevChainHash ?? ''}|${contentHash}`);
+}
+
+/**
+ * Appends ONE immutable record to a campaign's scientific memory. The caller supplies the canonical
+ * body and its content hash; this function only assigns the position in the chain and links it to the
+ * previous row. There is no update path — the table's triggers refuse one.
+ */
+export function appendExperimentRecord(db, rec) {
+  const last = db.prepare('SELECT chain_hash, seq FROM experiment_records WHERE campaign_id = ? ORDER BY seq DESC LIMIT 1').get(rec.campaignId);
+  const seq = (last?.seq ?? 0) + 1;
+  const prevChainHash = last?.chain_hash ?? null;
+  const chainHash = experimentChainHash(prevChainHash, rec.contentHash);
+  const id = rec.id ?? newId();
+  db.prepare(
+    `INSERT INTO experiment_records (id, project_id, campaign_id, kind, seq, fingerprint, content_hash, prev_chain_hash, chain_hash, preregistration_id, prereg_check, body_json, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, rec.projectId, rec.campaignId, rec.kind, seq, rec.fingerprint, rec.contentHash,
+    prevChainHash, chainHash, rec.preregistrationId ?? null, rec.preregCheck ?? null,
+    JSON.stringify(rec.body), rec.createdBy ?? null, Date.now(),
+  );
+  return getExperimentRecord(db, id);
+}
+
+export function getExperimentRecord(db, id) {
+  return toExperimentRecord(db.prepare('SELECT * FROM experiment_records WHERE id = ?').get(id));
+}
+
+export function listExperimentRecords(db, campaignId, kind = null) {
+  const rows = kind
+    ? db.prepare('SELECT * FROM experiment_records WHERE campaign_id = ? AND kind = ? ORDER BY seq ASC').all(campaignId, kind)
+    : db.prepare('SELECT * FROM experiment_records WHERE campaign_id = ? ORDER BY seq ASC').all(campaignId);
+  return rows.map(toExperimentRecord);
+}
+
+/** The FIRST preregistration of a campaign — the one every later session is judged against. */
+export function getExperimentPreregistration(db, campaignId) {
+  return toExperimentRecord(db.prepare("SELECT * FROM experiment_records WHERE campaign_id = ? AND kind = 'PREREGISTRATION' ORDER BY seq ASC LIMIT 1").get(campaignId));
+}
+
+/**
+ * Recomputes the campaign's hash chain from the stored bodies. `ok: false` names the first row that
+ * does not verify — either its body no longer hashes to its content hash, or the chain link is broken
+ * (a row was removed or inserted out of order by something that bypassed this module).
+ */
+export function verifyExperimentRecordChain(db, campaignId) {
+  const rows = listExperimentRecords(db, campaignId);
+  let prev = null;
+  for (const row of rows) {
+    if (sha256Hex(canonicalJson(row.body)) !== row.contentHash) return { ok: false, length: rows.length, brokenAt: row.seq, reason: 'CONTENT_HASH_MISMATCH' };
+    if ((row.prevChainHash ?? null) !== prev) return { ok: false, length: rows.length, brokenAt: row.seq, reason: 'CHAIN_LINK_MISMATCH' };
+    if (experimentChainHash(prev, row.contentHash) !== row.chainHash) return { ok: false, length: rows.length, brokenAt: row.seq, reason: 'CHAIN_HASH_MISMATCH' };
+    prev = row.chainHash;
+  }
+  return { ok: true, length: rows.length, brokenAt: null, reason: null, headChainHash: prev };
 }
 
 /* ---------------- Genesis C3 World Model: saved world snapshots ---------------- */

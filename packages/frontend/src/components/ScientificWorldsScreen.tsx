@@ -147,7 +147,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       if (!getLiveDrugRun(campaignId)) {
         const token = getToken();
         if (!token || !campaignId || !projectId) return { ready: true, progress: 1 };
-        void startLiveDrugRun({ token, projectId, campaignId });
+        void startLiveDrugRun({ token, projectId, campaignId, subject: String(inputs.subject ?? '') });
       }
       return liveDrugRunGate(campaignId);
     },
@@ -490,7 +490,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     if (run) {
       const hypothesis = getDrugHypothesis(campaignId) ?? buildDrugHypothesis(String(sealed.inputs.subject ?? focusCandidate(run.state)?.smiles ?? 'kandydat'));
       const result = evaluateDrugHypothesis(hypothesis, run.state, focusCandidate(run.state));
-      return outcomeFromDrugLiveRun({ session: sealed, replay, engineReplay, state: run.state, hypothesis, result, next: nextDrugExperiment(result, run.state) });
+      return outcomeFromDrugLiveRun({ session: sealed, replay, engineReplay, state: run.state, hypothesis, result, next: nextDrugExperiment(result, run.state), memory: { preregistration: run.preregistration, sealed: run.sealed } });
     }
     return outcomeFromLabSession(sealed, replay, curiosity, def.stations.find((st) => st.id === sealed.stationId)?.label);
   };

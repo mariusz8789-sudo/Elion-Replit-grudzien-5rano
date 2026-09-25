@@ -110,6 +110,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   listWorldSnapshots,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
+import { preregisterExperiment, sealExperimentSession, readExperimentMemory } from './experimentMemory.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
@@ -662,6 +663,9 @@ export function handleApi(db, ctx) {
           }
           return err(405, 'method_not_allowed');
         }
+        // /api/projects/:id/campaigns/:cid/experiment-memory — the campaign's scientific memory
+        // (viewer+): what was preregistered before the run, what was sealed after it, chain state.
+        if (seg[4] === 'experiment-memory' && method === 'GET') return ok({ memory: readExperimentMemory(db, campaignId) });
         if (method !== 'GET') return err(405, 'method_not_allowed');
         // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty
         if (seg[4] === 'candidates') {
@@ -677,6 +681,24 @@ export function handleApi(db, ctx) {
         if (seg[4] === 'conflicts') {
           const conflicts = campaignStore.listEvents(db, campaignId).filter((e) => e.type === 'MODEL_CONFLICT').map((e) => e.payload);
           return ok({ conflicts });
+        }
+        return err(404, 'not_found');
+      }
+      // /api/projects/:id/campaigns/:cid/experiment-memory/{preregistration,sessions} (editor+) —
+      // the two writes of scientific memory. Both are append-only: the preregistration is refused once
+      // the campaign has run or if it contradicts one already stored, and a sealed session is checked
+      // against it (fingerprint, criterion ids, server-derived verdict) before it is written.
+      if (seg.length === 6 && seg[4] === 'experiment-memory' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (seg[5] === 'preregistration') {
+          const result = preregisterExperiment(db, { projectId, campaign, hypothesis: body?.hypothesis, userId: user.id });
+          if (!result.ok) return { status: result.error === 'campaign_already_executed' || result.error === 'preregistration_immutable' ? 409 : 400, body: { error: result.error, reason: result.reason ?? null, record: result.record ?? null, recomputed: result.recomputed ?? null } };
+          return ok({ preregistration: result.record, status: result.status }, result.status === 'REGISTERED' ? 201 : 200);
+        }
+        if (seg[5] === 'sessions') {
+          const result = sealExperimentSession(db, { projectId, campaign, session: body?.session, userId: user.id });
+          if (!result.ok) return err(400, result.error);
+          return ok({ session: result.record, status: result.status, deduped: result.deduped }, result.deduped ? 200 : 201);
         }
         return err(404, 'not_found');
       }

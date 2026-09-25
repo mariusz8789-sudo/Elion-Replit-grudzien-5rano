@@ -882,6 +882,50 @@ export async function listScienceRunVerifications(
   return r.ok ? { ok: true, data: r.data.verifications } : r;
 }
 
+/**
+ * SCIENTIFIC MEMORY (server side). `preregisterExperiment` must be called BEFORE the campaign starts
+ * — the server refuses a preregistration for a campaign whose engines already ran. `sealExperimentSession`
+ * writes the finished run; the server checks it against the preregistration and returns its own
+ * derivation of the verdict in the record, so what comes back is a verified record, not an echo.
+ */
+export interface ExperimentRecord {
+  readonly id: string;
+  readonly campaignId: string;
+  readonly kind: 'PREREGISTRATION' | 'SESSION';
+  readonly seq: number;
+  readonly fingerprint: string;
+  readonly contentHash: string;
+  readonly prevChainHash: string | null;
+  readonly chainHash: string;
+  readonly preregistrationId: string | null;
+  readonly preregCheck: string | null;
+  readonly body: Record<string, unknown>;
+  readonly createdAt: number;
+}
+
+export interface ExperimentMemory {
+  readonly preregistration: ExperimentRecord | null;
+  readonly sessions: readonly ExperimentRecord[];
+  readonly chain: { readonly ok: boolean; readonly length: number; readonly brokenAt: number | null; readonly reason: string | null };
+}
+
+export async function preregisterExperiment(
+  token: string, projectId: string, campaignId: string, hypothesis: unknown,
+): Promise<ApiResult<{ preregistration: ExperimentRecord; status: string }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory/preregistration`, { token, body: { hypothesis } });
+}
+
+export async function sealExperimentSession(
+  token: string, projectId: string, campaignId: string, session: unknown,
+): Promise<ApiResult<{ session: ExperimentRecord; status: string; deduped: boolean }>> {
+  return request('POST', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory/sessions`, { token, body: { session } });
+}
+
+export async function getExperimentMemory(token: string, projectId: string, campaignId: string): Promise<ApiResult<ExperimentMemory>> {
+  const r = await request<{ memory: ExperimentMemory }>('GET', `/projects/${projectId}/campaigns/${campaignId}/experiment-memory`, { token });
+  return r.ok ? { ok: true, data: r.data.memory } : r;
+}
+
 export async function runCampaignStage(
   token: string, projectId: string, campaignId: string,
   config: {

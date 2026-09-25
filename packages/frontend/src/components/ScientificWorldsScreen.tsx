@@ -38,6 +38,8 @@ import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '.
 /** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
 const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
 import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
+import { nextFromCuriosity, outcomeFromLabSession } from '../core/product/scientificOutcome';
+import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcomePanel';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -371,6 +373,16 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     if (session.stationId) sim.setArtifact(session.stationId, verdict.artifact as SceneArtifact);
     speak(narrateSession(session, { level: levelRef.current, lang: 'pl', includeProvenance: false, replay: verdict }).filter((l) => l.key === 'replay'));
   };
+  // The curiosity cycle is the lab's one producer of the next experiment; its controls live in the shared Next Experiment panel.
+  const curiosityActions = (
+    <div className="sw-actions" data-testid="sw-curiosity">
+      <button type="button" className="sw-btn" onClick={() => void runCuriosity(false)} disabled={curiosityBusy} data-testid="sw-curiosity-propose">Ciekawość: zaproponuj</button>
+      {curiosity?.terminal === 'AWAITING_HUMAN_APPROVAL' && <button type="button" className="sw-btn sw-btn-primary" onClick={() => void runCuriosity(true)} disabled={curiosityBusy} data-testid="sw-curiosity-approve">Zatwierdź i uruchom</button>}
+      {curiosity && <span className="sw-badge" data-testid="sw-curiosity-terminal">{curiosity.terminal}</span>}
+      {world === 'physics' && <button type="button" className="sw-btn" onClick={() => void runAgentic()} disabled={curiosityBusy} data-testid="sw-agentic-run">Pętla agentowa: foton (zatwierdzam)</button>}
+      {flagship && <span className="sw-badge" data-testid="sw-agentic-status">MIRROR EXPERIMENTAL / SYNTHETIC · {flagship.trace.falsification.status} · replay {flagship.replayMatches ? 'MATCH' : 'DRIFT'}</span>}
+    </div>
+  );
   const toggleCamera = (): void => { const next: AgentCameraMode = camera === 'VISOR' ? 'SPECTATOR' : 'VISOR'; setCamera(next); sim.setCameraMode(next); };
   // D-131: the twin camera frames the body instead of the agent; turning it off returns to the observer shot.
   const setTwinCamera = (on: boolean): void => { const next: AgentCameraMode = on ? 'TWIN' : 'SPECTATOR'; setCamera(next); sim.setCameraMode(next); };
@@ -432,28 +444,14 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
             <dt>Status</dt><dd><span className={`sw-status sw-status-${session.epistemicStatus.toLowerCase()}`} data-testid="sw-epistemic">{session.epistemicStatus}</span> · {session.engineLabel}</dd>
             <dt>Wejścia</dt><dd className="cw-mono">{JSON.stringify(session.inputs)}</dd>
             <dt>Wyniki</dt><dd className="cw-mono sw-outputs" data-testid="sw-outputs">{Object.entries(session.outputs).map(([k, v]) => <span key={k}>{k}: {String(v)}</span>)}</dd>
-            <dt>Ledger</dt><dd className="cw-mono cw-wrap">{session.evidenceHashes.map((h) => <span key={h} data-testid="sw-ledger-hash">contentHash {h}</span>)}</dd>
-            <dt>Hash sesji</dt><dd className="cw-mono cw-wrap" data-testid="sw-content-hash">{session.contentHash}</dd>
-            <dt>Odcisk replay</dt><dd className="cw-mono cw-wrap">{session.replayFingerprint}</dd>
             <dt>Artefakt</dt><dd className="cw-mono">{artifactKind ?? '—'} · renderowany z tej sesji</dd>
-            <dt>Replay</dt>
-            <dd>
-              <button type="button" className="sw-btn" onClick={doReplay} data-testid="sw-replay">Powtórz eksperyment</button>
-              {replay && <span className={`sw-status sw-replay-${replay.status.toLowerCase()}`} data-testid="sw-replay-verdict"> {replay.status}</span>}
-            </dd>
           </dl>
         ) : (
           <p className="sw-faint" data-testid="sw-no-session">Brak sesji. Każdy eksperyment tworzy jedną sesję z hashem treści, odciskiem replay i wpisem w EvidenceLedger.</p>
         ))}
-        {evidenceOpen && (
-          <div className="sw-actions" data-testid="sw-curiosity">
-            <button type="button" className="sw-btn" onClick={() => void runCuriosity(false)} disabled={curiosityBusy} data-testid="sw-curiosity-propose">Ciekawość: zaproponuj</button>
-            {curiosity?.terminal === 'AWAITING_HUMAN_APPROVAL' && <button type="button" className="sw-btn sw-btn-primary" onClick={() => void runCuriosity(true)} disabled={curiosityBusy} data-testid="sw-curiosity-approve">Zatwierdź i uruchom</button>}
-            {curiosity && <span className="sw-badge" data-testid="sw-curiosity-terminal">{curiosity.terminal}</span>}
-            {world === 'physics' && <button type="button" className="sw-btn" onClick={() => void runAgentic()} disabled={curiosityBusy} data-testid="sw-agentic-run">Pętla agentowa: foton (zatwierdzam)</button>}
-            {flagship && <span className="sw-badge" data-testid="sw-agentic-status">MIRROR EXPERIMENTAL / SYNTHETIC · {flagship.trace.falsification.status} · replay {flagship.replayMatches ? 'MATCH' : 'DRIFT'}</span>}
-          </div>
-        )}
+        {evidenceOpen && (session
+          ? <ScientificOutcomePanel outcome={outcomeFromLabSession(session, replay, curiosity, def.stations.find((st) => st.id === session.stationId)?.label)} onReplay={doReplay} testIds={{ replay: 'sw-replay', replayStatus: 'sw-replay-verdict' }} nextActions={curiosityActions} />
+          : <NextExperimentPanel outcome={{ next: nextFromCuriosity(curiosity), nextUnavailableReason: 'Brak propozycji. „Ciekawość: zaproponuj” uruchamia cykl ciekawości na lukach w dowodach.' }} actions={curiosityActions} />)}
       </section>
 
 </>;

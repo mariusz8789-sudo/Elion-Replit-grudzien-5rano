@@ -24,6 +24,8 @@ import { verifyPredictionAgainstRealExperiment, type PredictionVerification } fr
 import { createReferenceMeasurementRun, type ReferenceMeasurementRequest } from '../core/experimentFabric/realExperiment';
 import { EXPERIMENT_FABRIC_VERSION, type StructuredExperimentRequest } from '../core/experimentFabric/types';
 import type { FalsificationCriterion } from '../core/experimentFabric/scientificDiscovery';
+import { outcomeFromResearchIntake } from '../core/product/scientificOutcome';
+import { ScientificOutcomePanel } from './ScientificOutcomePanel';
 
 /**
  * Drug Discovery — reachable workspace (P6.9). Uczciwy przepływ na Backend
@@ -374,7 +376,7 @@ function DrugWorkspace() {
                 <span className="cde-result-bound">{candidate.missingInformation.length ? `braki: ${candidate.missingInformation.join('; ')}` : `Evidence refs: ${candidate.supportingEvidenceIds.length}`}</span>
               </div>
             ))}
-            <p className="settings-hint"><strong>Następny eksperyment:</strong> {researchIntake.result.nextExperiment.researchPlanPlaceholder}</p>
+            <ScientificOutcomePanel outcome={outcomeFromResearchIntake(researchIntake.result)} />
             {researchIntake.result.blockedCapabilities.length > 0 && <p className="settings-hint">BLOCKED: {researchIntake.result.blockedCapabilities.join(', ')}</p>}
             {researchIntake.campaignDraft && <p className="settings-hint">Kampania: {researchIntake.campaignDraft.prepared ? `szkic ${researchIntake.campaignDraft.campaignId}` : `nie utworzono — ${researchIntake.campaignDraft.reason}`}</p>}
           </div>

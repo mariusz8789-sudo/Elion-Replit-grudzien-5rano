@@ -30,6 +30,8 @@ import {
   type ChemistryStage,
   type ChemistryVisualBinding,
 } from '../core/chemistryEducation';
+import { outcomeFromChemistryRun } from '../core/product/scientificOutcome';
+import { ScientificOutcomePanel } from './ScientificOutcomePanel';
 import './chemistryLiveLab.css';
 
 /**
@@ -450,9 +452,7 @@ export function ChemistryLiveLabScreen({ embedded = false, onTitrationStart, onC
                   </div>
                   <Quiz key={`${run.session?.contentHash}-${level}`} run={run} level={level} />
                   <div className="cll-proof">
-                    <p data-testid="chem-evidence"><strong>Evidence:</strong> {run.evidence.code} — {run.evidence.reason}</p>
-                    <button type="button" className="chip-btn" onClick={doReplay} data-testid="chem-replay">Replay (ponowne wykonanie modelu)</button>
-                    {replay && <p className={replay.status === 'MATCH' ? 'cll-ok' : 'cll-refuse'} data-testid="chem-replay-status" data-status={replay.status}>REPLAY_{replay.status}: {replay.message}</p>}
+                    <ScientificOutcomePanel outcome={outcomeFromChemistryRun(run, replay, presentation.resultSummary)} onReplay={doReplay} testIds={{ evidence: 'chem-evidence', replay: 'chem-replay', replayStatus: 'chem-replay-status' }} />
                   </div>
                   <details className="cll-limits">
                     <summary>Ograniczenia modelu</summary>

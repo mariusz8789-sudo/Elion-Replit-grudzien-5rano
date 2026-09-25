@@ -5879,3 +5879,20 @@ html, body, #root { min-height: 100%; background: #000 !important; }
   .science-chat-form { align-items: stretch; }
   .science-chat-form .primary-btn { flex: 0 0 auto; }
 }
+
+/* One Evidence + Replay + Next Experiment panel (components/ScientificOutcomePanel) for every pillar. */
+.so-panel { display: grid; gap: .6rem; margin-top: .6rem; min-width: 0; }
+.so-block { border: 1px solid var(--border); border-radius: 8px; padding: .5rem .65rem; background: var(--bg-raised); min-width: 0; }
+.so-block h4 { margin: 0 0 .3rem; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.so-block p { margin: .2rem 0; overflow-wrap: anywhere; }
+.so-title { color: var(--text); font-weight: 600; }
+.so-dim { color: var(--text-dim); font-size: .85rem; }
+.so-mono { font-family: var(--font-mono); font-size: .75rem; overflow-wrap: anywhere; }
+.so-ids { display: grid; gap: .25rem; margin: .3rem 0 0; }
+.so-id { display: grid; grid-template-columns: minmax(6rem, auto) 1fr; gap: .5rem; min-width: 0; }
+.so-id dt { color: var(--text-faint); font-size: .75rem; }
+.so-id dd { margin: 0; min-width: 0; }
+.so-verdict-match { color: var(--green); }
+.so-verdict-drift { color: var(--red); }
+.so-next { border-color: var(--border-strong); }
+@media (max-width: 640px) { .so-id { grid-template-columns: 1fr; gap: 0; } }

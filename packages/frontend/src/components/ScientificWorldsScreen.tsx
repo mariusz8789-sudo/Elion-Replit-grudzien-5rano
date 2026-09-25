@@ -40,6 +40,8 @@ const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m)
 import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
 import { nextFromCuriosity, outcomeFromLabSession } from '../core/product/scientificOutcome';
 import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcomePanel';
+import { LoadingStatus } from './LoadingStatus';
+import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -187,6 +189,15 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     setFrames((f) => (s.frames && s.frames - f >= 10 ? s.frames : f));
   }, []);
   const { canvasRef, loading, failed } = useThreeLoop(sim, params, true, onStats);
+  // Measured load time of this world: the next visit counts down from it (never a guessed number).
+  const loadStartedAt = useRef(performance.now());
+  const [loadEstimate] = useState(() => estimateDuration(`lab:${world}`));
+  const sawLoading = useRef(false);
+  useEffect(() => {
+    if (loading) { sawLoading.current = true; return; }
+    if (sawLoading.current && !failed) recordDuration(`lab:${world}`, performance.now() - loadStartedAt.current);
+    sawLoading.current = false;
+  }, [loading, failed, world]);
 
   useEffect(() => {
     sim.setTwinTierListener((tier) => setTwinTier(tier));
@@ -488,7 +499,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
       <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
       {world === 'physics' && chemistryOpen && (
-        <Suspense fallback={<div className="sw-loading" role="status">Ładowanie chemii…</div>}>
+        <Suspense fallback={<div className="sw-loading"><LoadingStatus label="Ładowanie chemii" /></div>}>
           <ChemistryLabPanel
             embedded
             onClose={() => setChemistryOpen(false)}
@@ -507,7 +518,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           {working && <div className="sw-reticle" />}
         </div>
       )}
-      {loading && <div className="sw-loading" role="status">Ładowanie laboratorium…</div>}
+      {loading && <div className="sw-loading"><LoadingStatus label="Ładowanie laboratorium" estimateMs={loadEstimate} testId="sw-loading-status" /></div>}
       {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
 
       {world === 'physics' && chemistryCardOpen && titrationResult && (

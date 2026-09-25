@@ -32,6 +32,8 @@ import {
 } from '../core/chemistryEducation';
 import { outcomeFromChemistryRun } from '../core/product/scientificOutcome';
 import { ScientificOutcomePanel } from './ScientificOutcomePanel';
+import { LoadingStatus } from './LoadingStatus';
+import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
 import './chemistryLiveLab.css';
 
 /**
@@ -270,7 +272,9 @@ export function ChemistryLiveLabScreen({ embedded = false, onTitrationStart, onC
     setLiveEvents([]);
     setExecuting(true);
     try {
+      const startedAt = performance.now();
       const result = await runComputationalExperiment(plan, { onEvent: (event) => setLiveEvents((events) => [...events, event]) });
+      if (result.session) recordDuration(`chemistry:${plan.experimentId}`, performance.now() - startedAt);
       setRun(result);
       setRevealed(result.artifact ? result.artifact.stages.length - 1 : 0);
     } finally {
@@ -383,7 +387,7 @@ export function ChemistryLiveLabScreen({ embedded = false, onTitrationStart, onC
               </label>
             )}
             <button type="button" className="chip-btn primary cll-start" disabled={plan.status !== 'READY' || executing} onClick={() => void start()} data-testid="chem-start">
-              {executing ? 'Silnik backendu liczy…' : 'Start eksperymentu'}
+              {executing ? <LoadingStatus label="Silnik backendu liczy" estimateMs={estimateDuration(`chemistry:${plan.experimentId}`)} announce={false} testId="chem-executing" /> : 'Start eksperymentu'}
             </button>
           </div>
 

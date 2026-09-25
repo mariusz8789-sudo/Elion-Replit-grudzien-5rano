@@ -36,6 +36,13 @@ const waitState = async (page: Page, states: readonly string[], timeout = 240_00
   await expect.poll(async () => page.getByTestId('scientific-worlds').getAttribute('data-agent-state'), { timeout }).toMatch(new RegExp(`^(${states.join('|')})$`));
 };
 
+// The lab is world-first (d02c93fd): evidence and the command controls are collapsed until asked for.
+// The tests open them exactly as a user would — through their own toggles.
+const setPanel = async (page: Page, panel: 'evidence' | 'controls', open: boolean): Promise<void> => {
+  const toggle = panel === 'controls' ? page.getByTestId('sw-controls') : page.getByTestId('sw-evidence').locator('button[aria-expanded]').first();
+  if (((await toggle.getAttribute('aria-expanded')) === 'true') !== open) await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', String(open));
+};
 test.describe('Scientific Worlds — command → agent → session → evidence → replay', () => {
   test.setTimeout(1_500_000);
   test('desktop: the acceptance sentence end to end, through the visor', async ({ page }) => {
@@ -48,11 +55,13 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toBeVisible();
     await expect(page.getByTestId('sw-canvas')).toBeVisible();
+    await setPanel(page, 'evidence', true);
     await expect(page.getByTestId('sw-no-session')).toBeVisible();
     await settled(page, 3);
     await page.screenshot({ path: SHOTS.visorIdle });
 
     // The acceptance sentence.
+    await setPanel(page, 'controls', true);
     await page.getByTestId('sw-input').fill('Idź do laboratorium i uruchom eksperyment na syntezie kryształu. Potem pokaż mi, co otrzymałeś i skąd to pochodzi.');
     await page.getByTestId('sw-send').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem 3 polecenia: NAVIGATE → ALIGN → REACH → INTERACT → EXECUTE → OBSERVE → REPORT');
@@ -114,6 +123,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await page.goto('/#/scientific-worlds');
     await expect(page.getByTestId('scientific-worlds')).toBeVisible();
     await settled(page, 2);
+    await setPanel(page, 'controls', true);
     const input = page.getByTestId('sw-input');
     await expect(input).toBeVisible();
     const box = await input.boundingBox();
@@ -137,13 +147,15 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await page.goto('/#/human-biology-lab');
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toHaveAttribute('data-world', 'biology');
-    await expect(page.getByTestId('sw-twin')).toContainText('NORMAL');
+    // The proxy twin shows 'Ładowanie modelu człowieka…' until its first body is built (heavy in software GL).
+    await expect(page.getByTestId('sw-twin')).toContainText('NORMAL', { timeout: 400_000 });
     await expect(page.getByTestId('sw-twin')).toHaveAttribute('data-lod', 'PROXY_LOW');
     await settled(page, 3);
     await page.screenshot({ path: SHOTS.bioIdle });
 
     // Run the two experiments as two observable stages. A single compound sentence is accepted,
     // but the second result can replace the first card before a learner has time to inspect it.
+    await setPanel(page, 'controls', true);
     await page.getByTestId('sw-input').fill('Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope i powiększ 5×.');
     await page.getByTestId('sw-send').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Rozumiem');
@@ -196,6 +208,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
       await evidenceToggle.click();
       await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'false');
     }
+    await setPanel(page, 'controls', false);
     await page.getByTestId('sw-explorer-organ-heart').click();
     await expect(page.getByTestId('sw-transcript')).toContainText('Narząd: Heart');
     await expect(page.getByTestId('sw-explorer-organ')).toHaveAttribute('data-organ', 'heart');

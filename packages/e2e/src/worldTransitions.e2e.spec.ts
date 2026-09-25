@@ -69,6 +69,8 @@ test('Multiverse Nexus is reachable and labels portals as a navigation metaphor'
   await page.goto('/#/lab/multiverse');
   await page.getByRole('tab', { name: 'Multiverse Nexus' }).click();
   await expect(page.locator('.sim-stage canvas')).toBeVisible({ timeout: 20_000 });
+  // The honesty note is collapsed behind its question (90660e64); a learner opens it to read the boundary.
+  await page.getByText('Co dokładnie liczy ten model?').first().click();
   await expect(page.getByText(/metafora nawigacyjna Genesis OS/i)).toBeVisible();
   await expect(page.getByText(/Wszystkie portale w tej sali/i)).toBeVisible();
   await expect(page.getByText(/Universe Lab z realnymi, obliczonymi parametrami/i)).toBeVisible();

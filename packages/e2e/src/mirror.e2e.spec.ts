@@ -35,6 +35,9 @@ async function skipOnboarding(page: Page): Promise<void> {
 }
 
 test.describe('Genesis Mirror — no OS/browser camera permission granted to this context', () => {
+  // Headless Chromium leaves an ungranted getUserMedia prompt pending forever (the UI then honestly
+  // stays NOT_REQUESTED). A user who refuses answers the prompt; --deny-permission-prompts is that answer.
+  test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } : {}), args: ['--deny-permission-prompts'] } });
   test('the UI reports PERMISSION_DENIED/ERROR and never claims a connected camera', async ({ page }) => {
     const errors = collectErrors(page);
     await skipOnboarding(page);

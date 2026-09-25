@@ -1194,7 +1194,7 @@ describe('Genesis Experiment Fabric', () => {
     expect(mathematics?.realModels).toContain('math-manifold-5d');
     expect(run.request.modelId).toBe('math-manifold-5d');
     expect(run.result.status).toBe('completed');
-    expect(run.result.route).toMatchObject({ kind: 'product-route', hash: '#/matrix-stage' });
+    expect(run.result.route).toMatchObject({ kind: 'none' });
     expect(run.result.outputs.pointCount).toBe(48);
     expect(run.result.outputs.cryptographicProof).toMatch(/^[0-9a-f]{64}$/);
     expect(run.result.warnings.join(' ')).toContain('nie dowód istnienia fizycznego piątego wymiaru');

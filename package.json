@@ -50,7 +50,6 @@
     "a2-readjudication:demo": "node scripts/gov-drug-a2-surpass2-readjudication.mjs",
     "lower-harm:demo": "node scripts/gov-drug-lower-harm-demonstrator.mjs",
     "lower-harm-funnel:demo": "node scripts/gov-drug-lower-harm-funnel-demonstrator.mjs",
-    "physics-world:demo": "node scripts/physics-world-demo.mjs",
     "e2e:gov-campaign": "node scripts/gov-drug-discovery-campaign.mjs",
     "e2e:gov-campaign:browser": "node scripts/gov-drug-campaign-browser-e2e.mjs",
     "e2e:gov-drug:demo": "node scripts/gov-drug-discovery-e2e-demo-capture.mjs",

@@ -124,7 +124,6 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'timeline', label: 'Discovery Timeline', icon: '🌌', hash: '#/timeline', variantOf: 'worlds' },
   { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', variantOf: 'worlds', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },
   { id: 'matrix', label: 'Matrix — HUD', icon: '◈', hash: '#/matrix', variantOf: 'worlds' },
-  { id: 'matrix-stage', label: 'Matrix — scena 3D', icon: '◈', hash: '#/matrix-stage', variantOf: 'worlds' },
   { id: 'matrix-map', label: 'Matrix — mapa systemu', icon: '◈', hash: '#/matrix-map', variantOf: 'worlds' },
   { id: 'whatif', label: 'Co by było, gdyby?', icon: '🌀', hash: '#/what-if' },
   { id: 'decision-explorer', label: 'Decision Explorer', icon: '🌠', hash: '#/decision-explorer', variantOf: 'whatif' },

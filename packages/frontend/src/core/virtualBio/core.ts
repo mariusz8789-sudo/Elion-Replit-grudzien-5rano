@@ -2,7 +2,7 @@ import { canonicalJson, fnv1a } from '../events/hash';
 import { FailClosedError, type BioModelCard, type ParamSpec } from './contracts';
 
 /**
- * Hash provider decision — same as `core/physicsWorld/core.ts` (D-052):
+ * Hash provider decision — same as the retired physicsWorld runtime (D-052, removed):
  * the bundle asked for a swappable SHA-256 `HashProvider`; the existing
  * Genesis hash module (`core/events/hash.ts`) is FNV-1a, used by every
  * fingerprint already in this codebase. Reused directly here rather than

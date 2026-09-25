@@ -422,7 +422,7 @@ const ROUTER_MODELS: readonly RouterModel[] = [
       number('temporalStep', 'Krok współrzędnej t', '', 0, 10, 0.05),
       number('hyperspaceAmplitude', 'Amplituda współrzędnej w', '', 0, 10, 0.75),
     ],
-    route: { kind: 'product-route', hash: '#/matrix-stage', parameterQueryKeys: ['sampleCount', 'temporalStep', 'hyperspaceAmplitude'] }, knowledgeSources: ['mathematics.md'],
+    route: { kind: 'none' }, knowledgeSources: ['mathematics.md'],
     rationale: 'Istniejący deterministyczny silnik geometrii dyskretnej ścieżki w R⁵. Oblicza metrykę Grama, krzywiznę, przecięcia i SHA-256; nie modeluje fizycznego piątego wymiaru.',
   },
   {

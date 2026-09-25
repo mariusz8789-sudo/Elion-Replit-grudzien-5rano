@@ -75,7 +75,14 @@ Bez duplikatu: miareczkowanie/pH (`physics.ts` + adaptery), Arrhenius (`chemistr
 
 ## 4. Proponowana kolejność (bezpieczna → wymagająca zgody)
 
-1. **Bez ryzyka (martwy kod, tylko testy):** paczki `supreme/genesis9d/advanced/quantum-lab/molecular-engine`, `physicsWorld/*`, `genuineDiscoveryOrchestrator`, `genesisCityWorld2`, `core/world/firstPerson.ts`, `MatrixStage.ts`, `MatrixDataStream.tsx`, `#/matrix-stage`. Razem ~4 000 LOC.
+1. **Martwy kod — ZROBIONE.** Usunięte:
+   - paczki `core/src/{supreme,genesis9d,advanced,quantum-lab,molecular-engine}` razem z ich łańcuchem w `ui/src/{routes,state,supreme,quantum-lab}`;
+   - `core/physicsWorld/*` wraz ze skryptem `physics-world:demo`;
+   - `core/world/firstPerson.ts`, `holo/MatrixStage.ts`, `MatrixDataStream.tsx`;
+   - trasa `#/matrix-stage` (stare linki trafiają na `#/matrix`, a wynik silnika 5D zostaje w czacie).
+
+   Po weryfikacji **nie** usunięto dwóch pozycji, bo są żywe: `agent/genuineDiscoveryOrchestrator.ts` (używają go `proofLadder`, `discoveryRecordBridge` i skrypt `genuine-discovery:e2e01`) oraz `genesisCityWorld2.ts` (używają go `genesisScientificCity3` i kompilator świata).
+   Po usunięciu łańcucha UI osierocone mogą być `core/src/city-enterprise` i `ui/src/render`. Wymagają osobnego sprawdzenia.
 2. **Poprawność:** jeden canonicalizer JSON (jedna reguła sortowania), jeden `fnv1a`, jeden `sha256`, jeden `mulberry32`, jeden typ `ReplayVerdict`.
 3. **Menu i czat:** pola pytań z `#/pilot`, `#/research-console` i `LookingGlassChat` kierować do jednego czatu. `#/collider` do `#/cern-complex`, `#/city` do `#/city3d` (tryb 2D), `#/temporal-cinematic` do `#/world-director`.
 4. **[Astra] Laboratorium:** przenieść dźwignię interwencji i narrację Discovery Hall na główną scenę, potem wycofać `labScene3D.ts` + `FirstPersonLabScreen` + `InvestorDemoScreen` (~4 900 LOC) i złożyć `#/lab-fpv` do stanowiska chemii.

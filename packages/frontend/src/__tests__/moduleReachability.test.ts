@@ -101,8 +101,6 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
-  'components/MatrixDataStream.tsx': 'Retired global Canvas2D data-stream decoration; its suppression helpers are exercised only by their focused test. No product route mounts it (the retired GenesisHoloBackdrop that consumed it was deleted).',
-  'components/holo/MatrixStage.ts': 'Retired WebGL code-rain stage, exercised only by its route test (its only host, GenesisHoloBackdrop, was deleted). Deliberately not wired alongside the canonical LiveMatrixBackground.',
   // D-127: the delivered cognitive core (packages/core/src/cognitive) bound to the canonical systems with a real
   // approval gate. Which host (the Scientific Worlds screen, the chat, a campaign) issues goals to it is a product
   // decision, not a side effect of landing the bridge; scientificWorldsCognitive.test.ts drives the full loop.
@@ -190,7 +188,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // Keeping these listed rather than deleting them is a judgement call, not an
   // oversight: each is tested, and the replacement is named here so the next
   // reader does not have to rediscover which one is live.
-  'core/world/firstPerson.ts': 'Superseded by core/three/firstPersonController.ts, which all three first-person screens use.',
   'core/worldModel/domains/genesisCityWorld2.ts': 'An earlier city composition; the live path is genesisScientificCity3/4.ts through createScientificWorld.',
   'core/events/epidemicTransmissionAnalysis.ts': 'Superseded by contacts/clusterAnalysis.ts + simulation/worldEngineContract.ts::computeHotspots, both already on City3DWebGLScreen; its infection.transmission events are never produced in production.',
   'core/knowledge/context.ts': 'A convenience wrapper that never gained a caller — experimentFabric/router.ts reads findSupplementalKnowledge directly.',
@@ -250,26 +247,8 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/agent/causalLadder.ts': 'Phase G Proof Ladder P9 (causal gate over the real causalInference.ts DiD/ITS/synthetic-control methods); covered by 10 unit tests against real CausalFitResult shapes, not yet wired into a live causal claim.',
   'core/agent/discoveryCertificate.ts': 'Phase G GenesisDiscoveryCertificate v2; runtime evidence via npm run proof-ladder:demo, not yet wired into a screen.',
 
-  // --- Physics World integration (D-052) --------------------------------------
-  // A hardening/integration pass over an externally authored bundle: toy
-  // particle/atomic/molecular/high-energy models, wired to the existing
-  // Genesis hash provider (fnv1a) and the D-047 Genesis Adjudication
-  // Protocol for its DEMO5 hypothesis test. Reached today by its own vitest
-  // suites (physicsWorld.test.ts, physicsRecipe.test.ts) and
-  // scripts/physics-world-demo.mjs (npm run physics-world:demo) -- no
-  // browser screen renders a physics-world run yet. Remove these entries
-  // once a screen wires runExperiment/demo5GenesisLoop/buildPhysicsRecipe in.
-  'core/physicsWorld/contracts.ts': 'Physics World integration (D-052); reached only by its own test suites and scripts/physics-world-demo.mjs, no screen yet.',
-  'core/physicsWorld/core.ts': 'Physics World integration (D-052); same reach as contracts.ts.',
-  'core/physicsWorld/backends.ts': 'Physics World integration (D-052); same reach as contracts.ts. PYTHIA/Geant4/external-matter backends are fail-closed contracts only, by design (mandate item 7) -- detectBackends() never reports them available.',
-  'core/physicsWorld/models.ts': 'Physics World integration (D-052); same reach as contracts.ts. Toy models ported from the source bundle unchanged.',
-  'core/physicsWorld/experiment.ts': 'Physics World integration (D-052); same reach as contracts.ts.',
-  'core/physicsWorld/genesisAdapter.ts': 'Physics World integration (D-052); DEMO5 rewired through core/agent/genesisAdjudicationProtocol.ts (D-047) rather than a bespoke verdict function -- no second adjudication engine. Same reach as contracts.ts.',
-  'core/physicsWorld/physicsRecipe.ts': 'Physics World integration (D-052); domain-scoped Research Recipe projection (WinnerRecord + gates G1-G9), matching the existing per-domain pattern (govDrugDiscoveryE2E.ts::generateResearchRecipe is the other one) rather than a shared cross-domain recipe engine. Same reach as contracts.ts.',
-
   // --- DOBUDOWANIE RESZTY MASZYNY (D-057): Evidence Connectors, Commercial
   // Layer, Physics Backend version registry, Winner Promotion Gate ----------
-  'core/physicsWorld/backendRegistry.ts': 'D-057 Physics Backend version registry: extends backends.ts::detectBackends() with a minimum-version floor (BackendDescriptor/requireBackendVersion), same reach status as backends.ts itself -- no screen calls a real physics backend yet (PYTHIA/Geant4 are not installed in this pass), so this stays reached only by its own test suite (physicsBackendRegistry.test.ts). Remove this entry once a real experiment call site wires requireBackendVersion in.',
   'core/evidenceConnectors/testFixtures.ts': 'D-057 Evidence Connectors: explicitly-named TEST-ONLY ConnectorPort fixtures (fixedBytesPort/alwaysFailingPort), same convention as core/orchestrator/toyAdapters.ts\'s SYNTHETIC_TEST_ONLY naming -- deliberately never imported by product UI (EvidenceSourceStatusPanel.tsx uses the real httpConnectorPort.ts instead). Reached only by evidenceConnectors.test.ts.',
   'core/commercial/testFixtures.ts': 'D-057 Commercial Layer: explicitly-named TEST-ONLY PaymentAdapter fixtures (alwaysConfirmingAdapter/alwaysRefusingAdapter) -- this repo ships no real payment processor, so no product UI imports these; they exist solely so commercial.test.ts can exercise the PAID path. Reached only by commercial.test.ts.',
 

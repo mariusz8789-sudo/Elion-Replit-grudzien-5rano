@@ -81,7 +81,6 @@ const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/Precisi
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
-const MatrixStageView = lazy(() => import('./components/MatrixStageView').then((m) => ({ default: m.MatrixStageView })));
 // Mythos B2G Matrix HUD (packages/ui): hex/bin GPU rain + live EvidenceLedger / CICADA CEP feeds. Source-only package, same alias rules as @genesis/core.
 const MatrixRoute = lazy(() => import('../../ui/src/matrix/MatrixRoute').then((m) => ({ default: m.MatrixRoute })));
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
@@ -172,7 +171,6 @@ type Route =
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
-  | { kind: 'matrix-stage' }
   | { kind: 'matrix-map' }
   | { kind: 'cyber' }
   | { kind: 'clockwork' }
@@ -244,7 +242,8 @@ function parseHash(): Route {
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
-  if (h === '#/matrix-stage') return { kind: 'matrix-stage' };
+  // The retired 3D stage had no data source left; old links land on the one Matrix route.
+  if (h === '#/matrix-stage') return { kind: 'matrix' };
   if (h === '#/matrix-map') return { kind: 'matrix-map' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/clockwork') return { kind: 'clockwork' };
@@ -730,18 +729,6 @@ export default function App() {
         <div className="app app-matrix-stage">
           <HeavyRoute>
             <MatrixRoute />
-          </HeavyRoute>
-          {overlays}
-        </div>
-      );
-    }
-
-    if (route.kind === 'matrix-stage') {
-      // The 3D stage: the full-bleed WebGL world (volumetric rain over the obsidian mirror) is the page; one HUD column, no cards.
-      return (
-        <div className="app app-matrix-stage">
-          <HeavyRoute>
-            <MatrixStageView />
           </HeavyRoute>
           {overlays}
         </div>

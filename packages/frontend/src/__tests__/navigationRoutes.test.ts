@@ -103,7 +103,7 @@ describe('research mode shows one entry per capability; alternative screens fold
     const family = (id: string) => [id, ...navVariants(id).map((v) => v.id)];
     expect(family('science')).toEqual(expect.arrayContaining(['science', 'discover', 'campaign', 'gov-campaign', 'cde', 'pilot', 'dossier', 'precision']));
     expect(family('memory')).toEqual(expect.arrayContaining(['memory', 'evidence', 'discovery-log']));
-    expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'matrix', 'matrix-stage', 'matrix-map', 'first-person-lab', 'world-director']));
+    expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'matrix', 'matrix-map', 'first-person-lab', 'world-director']));
     expect(family('cms-open-data')).toEqual(expect.arrayContaining(['cms-open-data', 'cern-complex', 'collider']));
     expect(top.length).toBeLessThanOrEqual(26);
   });

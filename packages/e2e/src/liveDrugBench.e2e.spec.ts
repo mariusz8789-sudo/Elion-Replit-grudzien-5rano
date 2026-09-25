@@ -24,6 +24,14 @@ async function api(path: string, token: string | null, body?: unknown): Promise<
  * rendered state hash equalling the read model's hash at several intermediate points. The docked pose
  * the scene draws is the one Vina produced. Then the session is sealed and replays to MATCH.
  */
+
+/** The lab shows the world by default; the panels (evidence, status, readouts) live behind one control. */
+async function openLabDetails(page: import('@playwright/test').Page): Promise<void> {
+  const details = page.getByTestId('sw-details');
+  await details.waitFor({ state: 'visible', timeout: 120_000 });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
+}
+
 test('drug bench: live state in the scene equals the backend run, end to end for one candidate', async ({ page }) => {
   test.setTimeout(900_000);
   const reg = await api('/api/auth/register', null, { email: `live-bench-${Date.now()}@lab.org`, password: 'password123' });
@@ -41,6 +49,10 @@ test('drug bench: live state in the scene equals the backend run, end to end for
     window.localStorage.setItem('genesis-os:session/v1', JSON.stringify({ token: t, user: u }));
   }, { t: token, u: reg.user });
   await page.goto(`/#/scientific-worlds?station=st-drug-bench&project=${projectId}&campaign=${campaignId}`);
+
+  // The laboratory opens as a world, not a dashboard: every panel is behind one control.
+  await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-details', 'closed');
+  await openLabDetails(page);
 
   const live = page.getByTestId('drug-bench-live');
   await expect(live).toBeVisible({ timeout: 300_000 });

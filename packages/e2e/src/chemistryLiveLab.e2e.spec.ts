@@ -31,11 +31,20 @@ async function openFromMenu(page: Page): Promise<void> {
 /** Direct entry: the Laboratory's chemistry panel, opened from the lab's own chemistry chip. */
 async function openChemistryPanel(page: Page): Promise<void> {
   await page.goto('/#/scientific-worlds');
+    await openLabDetails(page);
   await page.getByTestId('sw-chemistry-toggle').click();
   await expect(page.getByTestId('chem-live-lab')).toBeVisible({ timeout: 60_000 });
 }
 
 const currentStageKind = (page: Page) => page.locator('[data-state="current"]').getAttribute('data-kind');
+
+
+/** The lab shows the world by default; the panels (evidence, status, readouts) live behind one control. */
+async function openLabDetails(page: import('@playwright/test').Page): Promise<void> {
+  const details = page.getByTestId('sw-details');
+  await details.waitFor({ state: 'visible', timeout: 120_000 });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
+}
 
 test.describe('Chemistry Live Lab', () => {
   // Chemistry now lives inside the WebGL Laboratory; in headless software-GL a frame takes ~1 s, so every

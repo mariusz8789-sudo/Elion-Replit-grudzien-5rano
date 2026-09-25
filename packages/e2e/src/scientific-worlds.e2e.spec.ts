@@ -53,6 +53,14 @@ const humanTab = async (page: Page, tab: 'explore' | 'microscope' | 'section' | 
   if ((await tabButton.getAttribute('aria-selected')) !== 'true') await tabButton.click();
   await expect(tabButton).toHaveAttribute('aria-selected', 'true');
 };
+
+/** The lab shows the world by default; the panels (evidence, status, readouts) live behind one control. */
+async function openLabDetails(page: import('@playwright/test').Page): Promise<void> {
+  const details = page.getByTestId('sw-details');
+  await details.waitFor({ state: 'visible', timeout: 120_000 });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
+}
+
 test.describe('Scientific Worlds — command → agent → session → evidence → replay', () => {
   test.setTimeout(1_500_000);
   test('desktop: the acceptance sentence end to end, through the visor', async ({ page }) => {
@@ -62,6 +70,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/#/scientific-worlds');
+    await openLabDetails(page);
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toBeVisible();
     await expect(page.getByTestId('sw-canvas')).toBeVisible();
@@ -131,6 +140,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     page.on('pageerror', (e) => errors.push(String(e)));
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/#/scientific-worlds');
+    await openLabDetails(page);
     await expect(page.getByTestId('scientific-worlds')).toBeVisible();
     await settled(page, 2);
     await setPanel(page, 'controls', true);
@@ -155,6 +165,7 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
     await page.goto('/#/human-biology-lab');
+    await openLabDetails(page);
     const root = page.getByTestId('scientific-worlds');
     await expect(root).toHaveAttribute('data-world', 'biology');
     // The proxy twin shows 'Ładowanie modelu człowieka…' until its first body is built (heavy in software GL).

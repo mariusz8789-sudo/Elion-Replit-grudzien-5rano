@@ -30,14 +30,15 @@ for (const viewport of VIEWPORTS) {
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
     await openLab(page);
 
-    const controls = page.getByTestId('sw-controls');
+    // World-first now means literally that: the laboratory opens with no panels, no chips and no
+    // sliders — one control for the details, one field to ask. Everything else is in the scene.
     const primary = page.locator('.sw-lab-primary');
     const navigation = page.getByTestId('mobile-navigation');
-    await expect(controls).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByTestId('sw-evidence').getByRole('button')).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByRole('navigation', { name: 'Strefy laboratorium' })).toContainText('Drug Discovery');
-    await expect(page.getByRole('navigation', { name: 'Strefy laboratorium' })).toContainText('Chemistry');
-    await expect(page.getByRole('navigation', { name: 'Strefy laboratorium' })).toContainText('Physics');
+    await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-details', 'closed');
+    await expect(page.getByTestId('sw-lab-chat-input')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Strefy laboratorium' })).toBeHidden();
+    await expect(page.getByTestId('sw-status')).toBeHidden();
+    await expect(page.getByTestId('sw-evidence')).toBeHidden();
 
     const [primaryBox, navigationBox] = await Promise.all([primary.boundingBox(), navigation.boundingBox()]);
     expect(primaryBox).not.toBeNull();
@@ -47,12 +48,10 @@ for (const viewport of VIEWPORTS) {
       expect(primaryBox.y + primaryBox.height).toBeLessThanOrEqual(navigationBox.y + 1);
     }
 
-    await controls.click();
-    await expect(controls).toHaveAttribute('aria-expanded', 'true');
-    const advanced = page.locator('#sw-advanced-controls');
-    await expect(advanced).toBeVisible();
-    const advancedBox = await advanced.boundingBox();
-    if (advancedBox && navigationBox) expect(advancedBox.y + advancedBox.height).toBeLessThanOrEqual(navigationBox.y + 1);
+    // The details are one click away, because evidence must stay reachable.
+    await page.getByTestId('sw-details').click();
+    await expect(page.getByTestId('sw-evidence')).toBeVisible();
+    await expect(page.getByTestId('sw-status')).toBeVisible();
 
     const widths = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
     expect(widths.document).toBeLessThanOrEqual(widths.viewport + 1);
@@ -61,10 +60,14 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
+
+
 test('canonical titration runs in the laboratory and replays without fake progress', async ({ page }) => {
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openLab(page);
+  // The world-first lab keeps the panels behind one control; the details open them.
+  await page.getByTestId('sw-details').click();
   await page.getByTestId('sw-controls').click();
   await page.getByTestId('sw-quick-miareczkowanie').click();
   const result = page.getByTestId('sw-titration-context');

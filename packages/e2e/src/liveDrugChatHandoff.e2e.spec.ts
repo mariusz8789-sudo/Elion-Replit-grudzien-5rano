@@ -16,6 +16,14 @@ async function post(path: string, token: string | null, body: unknown): Promise<
  * hypothesis and shows the plan BEFORE any engine runs; confirming opens the drug bench of the ONE
  * laboratory, where the real campaign starts in front of the user.
  */
+
+/** The lab shows the world by default; the panels (evidence, status, readouts) live behind one control. */
+async function openLabDetails(page: import('@playwright/test').Page): Promise<void> {
+  const details = page.getByTestId('sw-details');
+  await details.waitFor({ state: 'visible', timeout: 120_000 });
+  if ((await details.getAttribute('aria-expanded')) !== 'true') await details.click();
+}
+
 test('the one chat freezes the hypothesis and plan, then confirmation runs it live at the lab bench', async ({ page }) => {
   test.setTimeout(420_000);
   const reg = await post('/api/auth/register', null, { email: `live-chat-${Date.now()}@lab.org`, password: 'password123' });
@@ -41,6 +49,7 @@ test('the one chat freezes the hypothesis and plan, then confirmation runs it li
 
   await page.getByTestId('drug-open-live-lab').click();
   await expect(page).toHaveURL(/#\/scientific-worlds\?.*station=st-drug-bench/);
+  await openLabDetails(page);
   const live = page.getByTestId('drug-bench-live');
   await expect(live).toBeVisible({ timeout: 300_000 });
   await expect(live).toHaveAttribute('data-phase', /RUNNING_CAMPAIGN|RUNNING_STAGE|DONE/);

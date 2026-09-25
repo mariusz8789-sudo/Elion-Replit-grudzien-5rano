@@ -5922,3 +5922,34 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .sw-drug-live .sw-drug-dl dt { color: #94a3b8; }
 .sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }
 .sw-drug-note { font-size: 0.75rem; color: #94a3b8; margin: 0.3rem 0 0; }
+
+
+/* ---------------------------------------------------------------------------
+   LABORATORIUM BEZ PANELI (tryb świata)
+   Domyślnie widać scenę, a nie pulpit: odczyty są na monitorach aparatury w 3D,
+   a całe 2D chowa się za jednym przyciskiem „Szczegóły". Nic nie jest usunięte —
+   dowody, powtórka i pochodzenie są o jedno kliknięcie dalej, bo bez nich wynik
+   nie jest wynikiem.
+   --------------------------------------------------------------------------- */
+.sw.sw-immersive .sw-hud-status,
+.sw.sw-immersive .sw-hud-evidence,
+.sw.sw-immersive .sw-chemistry-context,
+.sw.sw-immersive .sw-domain-rail,
+.sw.sw-immersive .sw-advanced-controls,
+.sw.sw-immersive .sw-progress { display: none; }
+
+/* Pytanie zostaje: to jedyny sposób, żeby poprosić o eksperyment. Bez ramki, bez etykiet. */
+.sw.sw-immersive .sw-hud-command { background: none; border: none; box-shadow: none; }
+.sw.sw-immersive .sw-lab-primary > button { display: none; }
+.sw.sw-immersive .sw-lab-chat label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sw.sw-immersive .sw-lab-chat .sw-input {
+  min-width: min(520px, 72vw); padding: 0.7rem 1rem; border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(6, 14, 26, 0.72); backdrop-filter: blur(10px);
+}
+
+.sw-world-controls { position: absolute; z-index: 14; right: 1rem; top: 1rem; }
+.sw-world-btn {
+  padding: 0.45rem 0.9rem; border-radius: 999px; font: 500 0.78rem/1.4 inherit; cursor: pointer;
+  color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.6); backdrop-filter: blur(8px);
+}
+.sw-world-btn:hover { color: #e2e8f0; border-color: rgba(34, 211, 238, 0.55); }

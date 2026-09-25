@@ -160,6 +160,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [benchAtoms, setBenchAtoms] = useState(0);
   const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
   const [benchPoseAtoms, setBenchPoseAtoms] = useState(0);
+  /**
+   * The lab shows the WORLD, not a dashboard: by default every panel is out of the way and the
+   * readouts live on the instruments in the scene. One control opens the details (evidence, replay,
+   * provenance), because evidence must stay reachable — it is hidden, never removed.
+   */
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // A live drug run is something to WATCH: the view leaves the visor once, so the bench procedure is
   // visible. The camera button still switches back, and nothing forces it again afterwards.
   const benchViewSwitched = useRef(false);
@@ -575,7 +581,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   );
 
   return (
-    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
+    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${detailsOpen ? ' sw-details-open' : ' sw-immersive'}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-details={detailsOpen ? 'open' : 'closed'} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
       <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
       {world === 'physics' && chemistryOpen && (
         <Suspense fallback={<div className="sw-loading"><LoadingStatus label="Ładowanie chemii" /></div>}>
@@ -676,6 +682,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         </aside>
       )}
 
+      <div className="sw-world-controls">
+        <button type="button" className="sw-world-btn" data-testid="sw-details" aria-expanded={detailsOpen}
+          onClick={() => { setDetailsOpen((open) => !open); if (!detailsOpen) setEvidenceOpen(true); }}>
+          {detailsOpen ? 'Ukryj szczegóły' : 'Szczegóły'}
+        </button>
+      </div>
       {world !== 'biology' && researchControls}
       {world === 'biology' && explorerOpen && (
         <HumanExplorerPanel

@@ -128,3 +128,20 @@ Kandydat: aspiryna `CC(=O)Oc1ccccc1C(=O)O` (offline, referencja walidatora RDKit
 3. **Retrosynteza** — czy dodać prawdziwy silnik (nowa zależność, worker), czy na razie tylko transformacje in-silico.
 4. **Transport** — polling z kursorem (proponowane, zero nowej infrastruktury) czy od razu SSE.
 5. **Astra** — zgoda na stanowisko `st-drug-bench` w kompozycji laboratorium i kadry kamer.
+
+## 8. Stan wdrożenia (2026-09-25)
+
+| Faza | Stan | Dowód |
+|---|---|---|
+| F0 — ciężkie zadania na worker_thread, zdarzenia czytelne w trakcie (`?after=seq`) | zrobione | `liveCampaignEvents.test.mjs` |
+| F1 — jeden read model `projectDrugRun` + `stateHash` | zrobione | `liveDrugRunState.test.ts` |
+| F2 — stanowisko `st-drug-bench`, agent czeka na silnik (`engineGate`), scena renderuje ten sam stan | zrobione | `drugBenchLiveGate.test.ts`, E2E `liveDrugBench` (hash sceny = hash backendu w ≥3 stanach pośrednich i końcowym) |
+| F3 — czat: hipoteza + plan zamrożone przed silnikiem, przejście do laboratorium; werdykt, dowody, replay MATCH, następny eksperyment | zrobione | `drugHypothesis.test.ts`, `unifiedResearchJourney.test.ts`, E2E `liveDrugChatHandoff` |
+
+Testy: backend 1236 pass / 0 fail; frontend 7340 pass (672 plików); oba E2E zielone lokalnie.
+
+Uczciwe granice (widoczne w UI):
+- receptor dockingu to zastępcza mała cząsteczka (indol), nie białko;
+- „synteza” to transformacje in-silico RDKit, bez silnika retrosyntezy;
+- wszystkie wyniki to MODEL_ESTIMATE; brak walidacji laboratoryjnej;
+- definicja WEAKENED (≥1 spełnione i ≥1 niespełnione) czeka na potwierdzenie właściciela.

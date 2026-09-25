@@ -1,4 +1,4 @@
-import { getCampaign, getProjectJob, getScienceRun, listCampaignCandidates, listCampaignEvents, runCampaignStage, startCampaign } from '../backend/client';
+import { getCampaign, getProjectJob, getScienceRun, listCampaignCandidates, listCampaignEvents, runCampaignStage, startCampaign, verifyScienceRun } from '../backend/client';
 import { projectDrugRun, type CampaignEventRecord, type DockingRunRecord, type LiveDrugRunState } from './drugRunState';
 import type { CampaignCandidate } from '../backend/client';
 
@@ -120,6 +120,35 @@ export async function startLiveDrugRun(opts: { readonly token: string; readonly 
     phase = 'FAILED';
     return emit(false, String((error as Error)?.message ?? error), true);
   }
+}
+
+/**
+ * ENGINE REPLAY — re-executes the real docking engine for this run's persisted Science Run and
+ * compares it with what was stored (backend `verifyScienceRun`: same receptor preparation, same
+ * ligand, same seed). This is the strong replay: reproducing the projection only proves the read
+ * model is pure, while this proves the ENGINE reproduces the pose and the score.
+ */
+export interface EngineReplayVerdict {
+  readonly runId: string;
+  readonly verdict: string;
+  readonly engine: string;
+  readonly originalHash: string | null;
+  readonly replayHash: string | null;
+}
+
+export async function replayDrugRunEngines(opts: { readonly token: string; readonly projectId: string; readonly campaignId: string }): Promise<EngineReplayVerdict | { readonly error: string }> {
+  const run = runs.get(opts.campaignId);
+  const runId = run?.state.candidates.map((c) => c.stages.docking?.runId).find((id): id is string => Boolean(id));
+  if (!runId) return { error: 'no_docking_run' };
+  const r = await verifyScienceRun(opts.token, opts.projectId, opts.campaignId, runId);
+  if (!r.ok) return { error: r.error ?? 'verify_failed' };
+  return {
+    runId,
+    verdict: r.data.verdict,
+    engine: `${r.data.originalEngineVersion ?? '?'} → ${r.data.replayEngineVersion ?? '?'}`,
+    originalHash: r.data.originalOutputHash,
+    replayHash: r.data.replayOutputHash,
+  };
 }
 
 /** Test seam: forget every run (the store is module state). */

@@ -44,7 +44,7 @@ import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcome
 import { LoadingStatus } from './LoadingStatus';
 import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
 import { getToken } from '../core/backend/session';
-import { getLiveDrugRun, liveDrugRunGate, startLiveDrugRun, subscribeLiveDrugRuns, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
+import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
 import { labProcedureOf } from '../core/liveExperiment/labProcedure';
 import type { DockingStep } from '../core/liveExperiment/drugRunState';
@@ -196,6 +196,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [curiosityBusy, setCuriosityBusy] = useState(false);
   const [flagship, setFlagship] = useState<FlagshipJourneyResult | null>(null);
   const [replay, setReplay] = useState<ReplayVerdict | null>(null);
+  const [engineReplay, setEngineReplay] = useState<EngineReplayVerdict | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [text, setText] = useState('');
   const [chatPrompt, setChatPrompt] = useState('');
@@ -438,6 +439,17 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     setReplay(verdict);
     if (session.stationId) sim.setArtifact(session.stationId, verdict.artifact as SceneArtifact);
     speak(narrateSession(session, { level: levelRef.current, lang: 'pl', includeProvenance: false, replay: verdict }).filter((l) => l.key === 'replay'));
+    // A drug run also replays the ENGINE: the backend re-executes the docking of the persisted
+    // Science Run and compares it. Reproducing the read model alone would not prove the science.
+    if (session.experimentId === 'drug-candidate-run') {
+      const token = getToken();
+      const projectId = String(session.inputs.project ?? '');
+      const campaignId = String(session.inputs.campaign ?? '');
+      if (token && projectId && campaignId) {
+        setEngineReplay(null);
+        void replayDrugRunEngines({ token, projectId, campaignId }).then((r) => setEngineReplay('error' in r ? { runId: '', verdict: `NIEDOSTĘPNE (${r.error})`, engine: '', originalHash: null, replayHash: null } : r));
+      }
+    }
   };
   // The curiosity cycle is the lab's one producer of the next experiment; its controls live in the shared Next Experiment panel.
   const curiosityActions = (
@@ -472,7 +484,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     if (run) {
       const hypothesis = getDrugHypothesis(campaignId) ?? buildDrugHypothesis(String(sealed.inputs.subject ?? focusCandidate(run.state)?.smiles ?? 'kandydat'));
       const result = evaluateDrugHypothesis(hypothesis, run.state, focusCandidate(run.state));
-      return outcomeFromDrugLiveRun({ session: sealed, replay, state: run.state, hypothesis, result, next: nextDrugExperiment(result, run.state) });
+      return outcomeFromDrugLiveRun({ session: sealed, replay, engineReplay, state: run.state, hypothesis, result, next: nextDrugExperiment(result, run.state) });
     }
     return outcomeFromLabSession(sealed, replay, curiosity, def.stations.find((st) => st.id === sealed.stationId)?.label);
   };

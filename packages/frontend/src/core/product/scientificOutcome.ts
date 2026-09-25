@@ -170,6 +170,8 @@ export function outcomeFromResearchIntake(result: ResearchIntakeResult): Scienti
 export function outcomeFromDrugLiveRun(input: {
   readonly session: ExperimentSession;
   readonly replay: ReplayVerdict | null;
+  /** The backend's re-execution of the docking engine for this run (the strong replay). */
+  readonly engineReplay?: { readonly runId: string; readonly verdict: string; readonly engine: string; readonly originalHash: string | null; readonly replayHash: string | null } | null;
   readonly state: LiveDrugRunState;
   readonly hypothesis: DrugHypothesis;
   readonly result: DrugHypothesisResult;
@@ -204,12 +206,28 @@ export function outcomeFromDrugLiveRun(input: {
           { label: 'Wynik dokowania', value: `${focus.stages.docking?.value?.toFixed(2) ?? '—'} kcal/mol (estymata funkcji oceniającej, nie pomiar)` },
           { label: 'Reszty kieszeni', value: focus.pose.pocketResidues.join(', ') },
         ] : []),
+        ...(input.engineReplay ? [
+          { label: 'Powtórka silnika (docking)', value: `${input.engineReplay.verdict}${input.engineReplay.runId ? ` · ScienceRun ${input.engineReplay.runId}` : ''}`, testId: 'drug-engine-replay' },
+          ...(input.engineReplay.originalHash ? [{ label: 'Wynik pierwotny / powtórzony', value: `${input.engineReplay.originalHash} / ${input.engineReplay.replayHash ?? '—'}` }] : []),
+        ] : []),
+        ...(input.engineReplay ? [
+          { label: 'Powtórka silnika (docking)', value: `${input.engineReplay.verdict}${input.engineReplay.runId ? ` · ScienceRun ${input.engineReplay.runId}` : ''}`, testId: 'drug-engine-replay' },
+          ...(input.engineReplay.originalHash ? [{ label: 'Wynik pierwotny / powtórzony', value: `${input.engineReplay.originalHash} / ${input.engineReplay.replayHash ?? '—'}` }] : []),
+        ] : []),
         ...session.evidenceHashes.map((h) => ({ label: 'EvidenceLedger', value: `contentHash ${h}`, testId: 'sw-ledger-hash' })),
         ...runIds.map((id) => ({ label: 'ScienceRun', value: id })),
         { label: 'Hash sesji', value: session.contentHash, testId: 'sw-content-hash' },
       ],
     },
-    replay: replayView(replay, true, ''),
+    replay: (() => {
+      const base = replayView(replay, true, '');
+      // The session replay reproduces the read model; the engine replay reproduces the computation.
+      // Say which one the message refers to, so MATCH is never read as more than it proves.
+      const note = input.engineReplay
+        ? ` Powtórka silnika (AutoDock Vina, ten sam receptor i ziarno): ${input.engineReplay.verdict}.`
+        : ' Powtórka dotyczy odczytu stanu; powtórzenie samego silnika uruchamia backend osobno.';
+      return { ...base, message: `${base.message}${note}` };
+    })(),
     next: { title: input.next.title, rationale: input.next.rationale, requires: input.next.requires, source: 'LIVE_RUN', action: null },
     nextUnavailableReason: null,
   };

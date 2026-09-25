@@ -229,7 +229,16 @@ def _prepare_receptor(req, out_dir):
     pdb_path = str(req["pdbPath"])
     raw = open(pdb_path).read()
     lines = raw.splitlines()
-    atoms = [(i, l) for i, l in enumerate(lines) if l.startswith(("ATOM", "HETATM"))]
+    # A deposited structure carries more than the receptor: other chains (nanobody, G protein),
+    # waters, lipids and crystallisation matter. The registry says which chains are the receptor;
+    # everything else is dropped here, deterministically, and the record says so.
+    chains = req.get("chains")
+    keep_het = bool(req.get("keepHetatm", False))
+    kinds = ("ATOM", "HETATM") if keep_het else ("ATOM",)
+    atoms = [(i, l) for i, l in enumerate(lines)
+             if l.startswith(kinds) and (not chains or l[21] in set(chains))]
+    if not atoms:
+        raise ValueError("receptor_empty_after_filter")
     ordered = sorted(atoms, key=lambda t: (t[1][21], int(t[1][22:26]), t[1][26], t[0]))
     reordered = any(a[0] != b[0] for a, b in zip(atoms, ordered))
     ordered_text = "\n".join(l for _, l in ordered) + "\nEND\n"
@@ -237,6 +246,26 @@ def _prepare_receptor(req, out_dir):
     ordered_path = os.path.join(out_dir, "receptor_ordered.pdb")
     with open(ordered_path, "w") as f:
         f.write(ordered_text)
+
+    # A deposited structure can lack side-chain atoms a template needs. PDBFixer adds THOSE atoms and
+    # the terminal oxygen; missing loops are deliberately NOT modelled (`missingResidues = {}`), because
+    # inventing backbone that was never observed would be inventing structure. Hydrogens are left to
+    # Meeko. The record says whether this step ran and what it added.
+    repaired = {"ran": False}
+    if req.get("repair"):
+        from pdbfixer import PDBFixer
+        from openmm.app import PDBFile
+        fixer = PDBFixer(filename=ordered_path)
+        fixer.findMissingResidues()
+        fixer.missingResidues = {}
+        fixer.findMissingAtoms()
+        repaired = {"ran": True, "residuesWithMissingAtoms": len(fixer.missingAtoms), "missingTerminals": len(fixer.missingTerminals),
+                    "unmodelledLoops": "NOT_MODELLED"}
+        fixer.addMissingAtoms()
+        ordered_path = os.path.join(out_dir, "receptor_repaired.pdb")
+        with open(ordered_path, "w") as handle:
+            PDBFile.writeFile(fixer.topology, fixer.positions, handle, keepIds=True)
+        ordered_text = open(ordered_path).read()
     center = [float(c) for c in req["center"]][:3]
     box = [float(b) for b in req.get("boxSize", [20, 20, 20])][:3]
     base = os.path.join(out_dir, "receptor")
@@ -253,9 +282,11 @@ def _prepare_receptor(req, out_dir):
         "receptorPdbqtPath": pdbqt_path, "receptorPdbqtSha256": _sha(pdbqt),
         "sourceSha256": _sha(raw), "orderedSha256": _sha(ordered_text),
         "sourceAtoms": len(atoms), "reordered": reordered, "receptorAtoms": n_atoms,
+        "chainsKept": list(chains) if chains else "ALL", "hetatmKept": keep_het, "repair": repaired,
         "meekoVersion": getattr(meeko_mod, "__version__", "?"),
         "preparation": {
-            "step1": "keep ATOM/HETATM records; stable sort by (chain, residue number, insertion code, file order)",
+            "step1": "keep the receptor chains' ATOM records (waters, lipids and other chains dropped); stable sort by (chain, residue number, insertion code, file order)",
+            "step1b": "PDBFixer: add missing side-chain atoms and terminal oxygen; missing loops NOT modelled; hydrogens left to Meeko" if repaired["ran"] else "no repair requested",
             "step2": "meeko mk_prepare_receptor --read_pdb (templates, Gasteiger charges from template, AD4 atom types) -> rigid PDBQT",
             "arguments": ["--read_pdb", "<ordered.pdb>", "-p", "-v", "--box_size", *["%.3f" % b for b in box], "--box_center", *["%.3f" % c for c in center]],
         },

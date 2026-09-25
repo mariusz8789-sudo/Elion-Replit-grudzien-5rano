@@ -126,3 +126,20 @@ a docelowo: „za Twoją wyraźną zgodą i w zadanych granicach bezpieczeństwa
 eksperyment na podłączonej aparaturze i porównać rzeczywistość z przewidywaniem".
 
 Nigdy nie deklarujemy zdolności fizycznych, które nie zostały faktycznie podłączone i zweryfikowane.
+
+## 11. Aktualizacja wykonawcza (2026-09-25) — cele białkowe nie są wymienne
+
+Plan główny i kolejność faz z §9 **nie zmieniają się**. To jest ustalenie wykonawcze:
+
+- `5C1M` (receptor μ-opioidowy, agonista BU72) i `8EF5` (ten sam receptor z fentanylem) są właściwymi
+  celami **wyłącznie dla przepływu opioidowego**.
+- **Nie wolno ich użyć do ketaminy.** Ketamina działa na receptor NMDA; dokowanie jej do receptora
+  opioidowego byłoby niespójne biologicznie. Dopóki nie ma właściwego celu i modelu dla tego
+  mechanizmu, część dokowania dla ketaminy ma status **UNRESOLVED**, a wynik RDKit/ADMET zostaje jako
+  osobny eksperyment z tym jawnym brakiem.
+- Drugi benchmark receptor–ligand (po 1IEP/imatinib) buduje się jako **osobny** przepływ opioidowy z
+  własnym ligandem i receptorem. Wyników z różnych celów nigdy się nie miesza.
+
+Kolejność prac pozostaje: (1) domknięcie żywego E2E — powtórka prawdziwego silnika, trwałość sesji i
+rejestracja kryteriów; (2) laboratorium na najwyższym poziomie wizualnym i proceduralnym; (3) dopiero
+potem drugi benchmark. Nie cofamy i nie przebudowujemy tego, co działa.

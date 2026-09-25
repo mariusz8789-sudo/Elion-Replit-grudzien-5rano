@@ -9,3 +9,4 @@ meeko==0.8.0
 # ("No module named 'scipy'", then "... 'gemmi'"); pinned to the verified versions.
 scipy==1.17.1
 gemmi==0.7.5
+pdbfixer==1.12.0

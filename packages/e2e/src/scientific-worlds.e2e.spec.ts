@@ -149,7 +149,8 @@ test.describe('Scientific Worlds — command → agent → session → evidence 
     await expect(root).toHaveAttribute('data-world', 'biology');
     // The proxy twin shows 'Ładowanie modelu człowieka…' until its first body is built (heavy in software GL).
     await expect(page.getByTestId('sw-twin')).toContainText('NORMAL', { timeout: 400_000 });
-    await expect(page.getByTestId('sw-twin')).toHaveAttribute('data-lod', 'PROXY_LOW');
+    // The twin starts on the proxy, or directly on the licensed body when that asset has already loaded (biologyLabKit).
+    await expect(page.getByTestId('sw-twin')).toHaveAttribute('data-lod', /^(PROXY_LOW|FULL_ASSET)$/);
     await settled(page, 3);
     await page.screenshot({ path: SHOTS.bioIdle });
 

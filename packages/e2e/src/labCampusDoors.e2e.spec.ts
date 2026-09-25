@@ -24,10 +24,15 @@ test('central laboratory doors open real existing Genesis rooms', async ({ page 
   await expect(page).toHaveURL(/#\/human-biology-lab$/);
   await expect(page.locator('body')).toContainText(/Human|Człowiek/i);
 
+  // The campus doors are CERN, Human Explorer, Molecules and Research since e01e6950 (the Cell door was replaced).
   await page.goto('/#/lab-fpv');
-  await page.getByTestId('lab-door-cell').click();
-  await expect(page).toHaveURL(/#\/cell-lab$/);
-  await expect(page.getByTestId('cell-lab-panel')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('lab-door-molecule').click();
+  await expect(page).toHaveURL(/#\/molecule$/);
+  await expect(page.getByTestId('molecule-world')).toBeVisible({ timeout: 60_000 });
+
+  await page.goto('/#/lab-fpv');
+  await page.getByTestId('lab-door-research').click();
+  await expect(page).toHaveURL(/#\/campaign$/);
 
   expect(errors).toEqual([]);
 });

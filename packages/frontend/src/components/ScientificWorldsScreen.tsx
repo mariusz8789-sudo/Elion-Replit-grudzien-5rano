@@ -126,6 +126,9 @@ export function applyAnatomyInteraction(state: AnatomyViewState, parameters: Rea
 export interface TranscriptEntry { readonly id: number; readonly who: 'user' | 'agent' | 'system'; readonly text: string; }
 
 /** Pure: what the HUD says about a parsed command before the body moves. */
+/** Stages whose length is worth measuring: the ones where an engine is actually working. */
+const WORKING_STAGES = new Set(['GENERATING', 'ADMET', 'DOCKING', 'QUANTUM']);
+
 /** What each bench row is called in the world — plain words, no engine names. */
 const ZONE_LABEL_PL: Readonly<Record<BenchZone, string>> = {
   QUEUE: 'w kolejce', ADMET: 'w analizatorze', DOCKING: 'w dokowaniu', FINALIST: 'finaliści', DISCARD: 'odrzucone',
@@ -165,6 +168,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const [benchSceneHash, setBenchSceneHash] = useState<string | null>(null);
   const [benchAtoms, setBenchAtoms] = useState(0);
   const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
+  /** Where the current stage started, so its real length can be recorded when it ends. */
+  const stageMark = useRef<{ stage: string | null; startedAt: number }>({ stage: null, startedAt: Date.now() });
   const [benchPoseAtoms, setBenchPoseAtoms] = useState(0);
   /**
    * The lab shows the WORLD, not a dashboard: by default every panel is out of the way and the
@@ -184,6 +189,15 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       sim.setCameraMode('SPECTATOR');
     }
     if (run.durationMs && run.phase === 'DONE') recordDuration('drug-run', run.durationMs);
+    // Per-stage measurement: when the canonical stage changes, how long the PREVIOUS stage really took
+    // is recorded under its own key. That measurement — never a guess — is what the waiting ring counts
+    // down for the next run of the same stage.
+    const stage = run.state.stage;
+    const mark = stageMark.current;
+    if (mark.stage !== stage) {
+      if (mark.stage && WORKING_STAGES.has(mark.stage)) recordDuration(`drug-stage:${mark.stage}`, Date.now() - mark.startedAt);
+      stageMark.current = { stage, startedAt: Date.now() };
+    }
   }), [benchLayer, sim]);
   const [anatomy, setAnatomy] = useState<AnatomyViewState>(() => createDefaultAnatomyView(TWIN_ID));
   const anatomyRef = useRef(anatomy); anatomyRef.current = anatomy;
@@ -646,7 +660,12 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                 </li>
               ))}
             </ol>
-            {running && <p><LoadingStatus label={`Silnik liczy: ${st.stage}`} estimateMs={drugRunEstimate} testId="drug-bench-loading" /></p>}
+            {running && (
+              <p>
+                {/* Keyed by stage: each stage gets its own countdown, from its own past measurement. */}
+                <LoadingStatus key={st.stage} label={`Silnik liczy: ${st.stage}`} estimateMs={estimateDuration(`drug-stage:${st.stage}`) ?? drugRunEstimate} testId="drug-bench-loading" />
+              </p>
+            )}
             {drugRun.phase === 'FAILED' && <p role="alert">Run zatrzymany: {drugRun.error}</p>}
             <dl className="sw-drug-dl">
               <dt>Cel białkowy</dt><dd>{st.target ? `${st.target.protein} · PDB ${st.target.pdbId}, łańcuch ${st.target.chain} (${st.target.receptorAtoms} atomów)` : 'receptor jeszcze nieprzygotowany'}</dd>

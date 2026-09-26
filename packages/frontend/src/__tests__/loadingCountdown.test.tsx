@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { countdownSeconds, estimateDuration, recordDuration } from '../core/product/durationEstimate';
+import { countdownSeconds, estimateDuration, recordDuration, ringProgress, RING_SEGMENTS } from '../core/product/durationEstimate';
 import { LoadingStatus } from '../components/LoadingStatus';
 
 describe('loading countdown only from a measured duration', () => {
@@ -27,5 +27,42 @@ describe('loading countdown only from a measured duration', () => {
     expect(plain).toContain('Ładowanie chemii…');
     expect(plain).not.toMatch(/\d+ s/);
     expect(plain).not.toContain('data-remaining-s');
+  });
+});
+
+describe('the waiting ring shows how much of a MEASURED wait is left', () => {
+  it('fills one tick per fifth of the estimate, marking the tick being worked through', () => {
+    expect(RING_SEGMENTS).toBe(5);
+    expect(ringProgress(10_000, 0)).toEqual({ filled: 0, active: 0, segments: 5, fraction: 0, overrun: false });
+    expect(ringProgress(10_000, 2_500)).toMatchObject({ filled: 1, active: 1, overrun: false });
+    expect(ringProgress(10_000, 5_000)).toMatchObject({ filled: 2, active: 2 });
+    expect(ringProgress(10_000, 9_900)).toMatchObject({ filled: 4, active: 4, overrun: false });
+  });
+
+  it('never pretends to know a fraction it has not measured, and says so when the wait runs long', () => {
+    // No estimate: nothing filled, nothing active — the caller turns the ring instead.
+    expect(ringProgress(null, 5_000)).toEqual({ filled: 0, active: null, segments: 5, fraction: 0, overrun: false });
+    expect(ringProgress(0, 5_000).active).toBeNull();
+    // Past the estimate: full and honest, never parked just below the end.
+    expect(ringProgress(10_000, 10_001)).toEqual({ filled: 5, active: null, segments: 5, fraction: 1, overrun: true });
+    expect(ringProgress(10_000, 60_000).overrun).toBe(true);
+    // A negative clock jump cannot rewind past the start.
+    expect(ringProgress(10_000, -5_000).filled).toBe(0);
+  });
+
+  it('renders the ticks: five marks, filled ones reported for a test to read', () => {
+    const measured = renderToStaticMarkup(<LoadingStatus label="Silnik liczy" estimateMs={10_000} testId="ring" />);
+    expect(measured.match(/gx-ring-tick/g)).toHaveLength(5);
+    expect(measured).toContain('data-ring-segments="5"');
+    expect(measured).toContain('data-ring-filled="0"');
+    expect(measured).not.toContain('is-indeterminate');
+
+    // Without a measurement the ring turns and reports no fill at all.
+    const unmeasured = renderToStaticMarkup(<LoadingStatus label="Ładowanie" testId="ring" />);
+    expect(unmeasured).toContain('is-indeterminate');
+    expect(unmeasured).not.toContain('data-ring-filled');
+
+    // Dense places can still take the text alone.
+    expect(renderToStaticMarkup(<LoadingStatus label="Ładowanie" ring={false} />)).not.toContain('gx-ring');
   });
 });

@@ -5953,3 +5953,24 @@ html, body, #root { min-height: 100%; background: #000 !important; }
   color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(6, 14, 26, 0.6); backdrop-filter: blur(8px);
 }
 .sw-world-btn:hover { color: #e2e8f0; border-color: rgba(34, 211, 238, 0.55); }
+
+/* ---- Waiting ring (LoadingStatus) -----------------------------------------
+   A circle cut into five ticks: one per fifth of the MEASURED estimate. Done
+   ticks are solid, the current one pulses, the rest are a faint track — so a
+   glance says how much of the wait is left. Without a measurement there is
+   nothing to count down, so the whole ring turns instead of filling. */
+.gx-loading { display: inline-flex; align-items: center; gap: 0.5rem; }
+.gx-ring { width: 1.15em; height: 1.15em; flex: none; overflow: visible; }
+.gx-ring-tick { stroke: var(--border-strong); transition: stroke 200ms linear; }
+.gx-ring-tick.is-done { stroke: var(--cyan); }
+.gx-ring-tick.is-active { stroke: var(--cyan); opacity: 0.55; animation: gx-ring-pulse 1s ease-in-out infinite; }
+.gx-ring.is-overrun .gx-ring-tick { stroke: var(--gold); opacity: 0.75; }
+.gx-ring.is-indeterminate { animation: gx-ring-spin 1.4s linear infinite; transform-origin: 50% 50%; }
+.gx-ring.is-indeterminate .gx-ring-tick:nth-child(1) { stroke: var(--cyan); }
+.gx-ring.is-indeterminate .gx-ring-tick:nth-child(2) { stroke: var(--cyan); opacity: 0.45; }
+@keyframes gx-ring-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes gx-ring-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .gx-ring.is-indeterminate { animation: none; }
+  .gx-ring-tick.is-active { animation: none; opacity: 0.8; }
+}

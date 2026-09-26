@@ -926,6 +926,34 @@ export async function getExperimentMemory(token: string, projectId: string, camp
   return r.ok ? { ok: true, data: r.data.memory } : r;
 }
 
+/**
+ * THE FINAL PROTOCOL — the artefact the experiment ends with, assembled by the backend from persisted
+ * state only. The shape is deliberately loose here: the frontend shows what the record contains and
+ * never fills a gap in it, so a field the backend did not write simply does not appear on screen.
+ */
+export interface CandidateProtocol {
+  readonly kind: string;
+  readonly question?: string | null;
+  readonly status?: string | null;
+  readonly hypothesis?: { statement?: string | null; fingerprint?: string | null; registeredBeforeExecution?: boolean; criteria?: readonly { id: string; label?: string; critical?: boolean }[] } | null;
+  readonly verdict?: { server?: string | null; rule?: string | null; check?: string | null; criteria?: readonly { id: string; status: string; observed?: string }[] } | null;
+  readonly target?: Record<string, unknown> | null;
+  readonly engines?: readonly { engine?: string; version?: string | null; capability?: string; evidence?: string }[];
+  readonly funnel?: Record<string, unknown> | null;
+  readonly finalists?: readonly Record<string, unknown>[];
+  readonly synthesis?: Record<string, unknown> | null;
+  readonly proposedValidationProtocol?: Record<string, unknown> | null;
+  readonly nextStep?: string | null;
+  readonly boundary?: string | null;
+  readonly protocolFingerprint?: string | null;
+  readonly [key: string]: unknown;
+}
+
+export async function getCandidateProtocol(token: string, projectId: string, campaignId: string): Promise<ApiResult<CandidateProtocol>> {
+  const r = await request<{ protocol: CandidateProtocol }>('GET', `/projects/${projectId}/campaigns/${campaignId}/protocol`, { token });
+  return r.ok ? { ok: true, data: r.data.protocol } : r;
+}
+
 export async function runCampaignStage(
   token: string, projectId: string, campaignId: string,
   config: {

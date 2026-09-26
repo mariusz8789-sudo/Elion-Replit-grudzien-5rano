@@ -28,8 +28,8 @@ const candidates = [cand('c-one', 'c1ccccc1'), cand('c-two', 'Cc1ccccc1')];
 const loadingEvents = [ev('STAGE_SELECTION', { stage: 'admet', candidateId: 'c-one', reason: 'SELECTED_FOR_ADMET' })];
 
 /** A run in the state the events describe, shaped as the layer consumes it. */
-function runOf(events: CampaignEventRecord[]): LiveDrugRun {
-  const state = projectDrugRun({ events, candidates, maxGenerations: 1, jobRunning: true });
+function runOf(events: CampaignEventRecord[], rows: CampaignCandidate[] = candidates): LiveDrugRun {
+  const state = projectDrugRun({ events, candidates: rows, maxGenerations: 1, jobRunning: true });
   return { state } as unknown as LiveDrugRun;
 }
 
@@ -107,6 +107,28 @@ describe('the drug bench has a person working at it', () => {
     const pos = new THREE.Vector3(); carried.getWorldPosition(pos);
     // Sitting in the analyser's port, on the far left of the bench — not back in the rack.
     expect(pos.x).toBeLessThan(-1.2);
+  });
+
+  it('a stage that feeds sample after sample still completes the gesture: the clock follows the job, not the vial', () => {
+    const { layer } = bench;
+    // The backend is loading the analyser; halfway through the movement the focused sample changes.
+    layer.setRun(runOf(loadingEvents, [...candidates, cand('c-three', 'CCc1ccccc1')]));
+    runFrames(layer, 1.2);
+    // Mid-movement the backend finishes that sample and feeds the next one into the same stage: the
+    // sample being handled changes, the job does not.
+    const rows = [...candidates, cand('c-three', 'CCc1ccccc1')];
+    layer.setRun(runOf([
+      ...loadingEvents,
+      ev('STAGE_RESULT', { stage: 'admet', candidateId: 'c-one', reason: 'ADMET_COMPUTED', keyEndpoints: { AMES: 0.2 } }),
+      ev('STAGE_SELECTION', { stage: 'admet', candidateId: 'c-two', reason: 'SELECTED_FOR_ADMET' }),
+    ], rows));
+    // Only 1.5 s more: enough to FINISH a movement already 1.2 s in, not enough to start a new one.
+    runFrames(layer, 1.5);
+    // The stage is still loading the analyser, with the NEXT sample now in hand's reach.
+    expect(layer.handSnapshot()!.instrument).toBe('ANALYSER');
+    const snap = layer.handSnapshot()!;
+    // The sample was actually put into the instrument instead of the reach restarting for ever.
+    expect(snap.actionsSeen).toEqual(expect.arrayContaining(['REACH', 'GRIP', 'CARRY', 'PLACE']));
   });
 
   it('THE RULE: minutes of render loop do not advance the experiment', () => {

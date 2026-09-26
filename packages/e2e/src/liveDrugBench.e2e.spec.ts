@@ -254,4 +254,21 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   }
   expect(protocol.boundary).toMatch(/Nothing in this protocol was measured on physical apparatus/);
   expect(protocol.protocolFingerprint).toMatch(/^[0-9a-f]{64}$/);
+
+  // GATE B, THE ENDING: the protocol is visible IN THE LABORATORY, where the experiment happened —
+  // not only as an API artefact. The same fingerprint, the three parts, and the third one stated as
+  // executed by nobody.
+  const shown = page.getByTestId('drug-protocol');
+  await expect(shown).toBeVisible({ timeout: 60_000 });
+  expect(await shown.getAttribute('data-protocol-fingerprint')).toBe(protocol.protocolFingerprint);
+  await expect(shown).toContainText('Protokół końcowy');
+  await expect(shown).toContainText('A. Część obliczeniowa');
+  await expect(shown).toContainText('B. Proponowana droga syntezy');
+  await expect(shown).toContainText('C. Proponowany protokół walidacji fizycznej');
+  const shownValidation = page.getByTestId('drug-protocol-validation');
+  expect(Number(await shownValidation.getAttribute('data-validation-steps')))
+    .toBe(protocol.proposedValidationProtocol.steps.length);
+  await expect(shownValidation).toContainText('NOT_CONNECTED');
+  await expect(page.getByTestId('drug-protocol-synthesis'))
+    .toHaveAttribute('data-route-provided', protocol.synthesis.routeProvided ? 'true' : 'false');
 });

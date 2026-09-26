@@ -5928,6 +5928,15 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .sw-hand-action { font-weight: 700; color: #fbbf24; letter-spacing: 0.02em; }
 .sw-hand-line .sw-procedure-label { flex-basis: 100%; }
 
+/* The final protocol, where the experiment happened: three parts, the third one executed by nobody. */
+.sw-protocol { margin-top: 0.6rem; border-top: 1px solid rgba(125, 211, 252, 0.25); padding-top: 0.5rem; }
+.sw-protocol h3 { margin: 0 0 0.3rem; font-size: 0.92rem; letter-spacing: 0.04em; color: #7dd3fc; }
+.sw-protocol h4 { margin: 0.5rem 0 0.2rem; font-size: 0.78rem; color: #fbbf24; letter-spacing: 0.03em; }
+.sw-protocol p { margin: 0.2rem 0; font-size: 0.78rem; overflow-wrap: anywhere; }
+.sw-protocol-q { color: rgba(226, 232, 240, 0.9); font-style: italic; }
+.sw-protocol-list { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; font-size: 0.76rem; display: grid; gap: 0.18rem; }
+.sw-protocol-list .sw-procedure-label { display: block; }
+
 
 /* ---------------------------------------------------------------------------
    LABORATORIUM BEZ PANELI (tryb świata)

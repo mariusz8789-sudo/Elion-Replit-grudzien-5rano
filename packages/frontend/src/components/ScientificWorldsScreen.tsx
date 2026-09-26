@@ -44,6 +44,7 @@ import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcome
 import { LoadingStatus } from './LoadingStatus';
 import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
 import { getToken } from '../core/backend/session';
+import { getCandidateProtocol, type CandidateProtocol } from '../core/backend/client';
 import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
 import { BENCH_ZONES, benchLayoutOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
@@ -184,6 +185,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
    * being taken on trust. Null until the bench has a run.
    */
   const [hand, setHand] = useState<ReturnType<DrugBenchLayer['handSnapshot']>>(null);
+  /** The final protocol, exactly as the backend assembled it from the record. Null until the run ends. */
+  const [protocol, setProtocol] = useState<CandidateProtocol | null>(null);
   /**
    * The lab shows the WORLD, not a dashboard: by default every panel is out of the way and the
    * readouts live on the instruments in the scene. One control opens the details (evidence, replay,
@@ -496,6 +499,9 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       if (token && projectId && campaignId) {
         setEngineReplay(null);
         void replayDrugRunEngines({ token, projectId, campaignId }).then((r) => setEngineReplay('error' in r ? { runId: '', verdict: `NIEDOSTĘPNE (${r.error})`, engine: '', originalHash: null, replayHash: null } : r));
+        // THE EXPERIMENT ENDS WITH A PROTOCOL, and it must be visible where the experiment happened —
+        // assembled by the backend from persisted state. The lab shows it; it never composes one.
+        void getCandidateProtocol(token, projectId, campaignId).then((r) => setProtocol(r.ok ? r.data : null));
       }
     }
   };
@@ -723,6 +729,56 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
               <dt>QM (PySCF)</dt><dd>{focus?.stages.quantum?.value != null ? `${focus.stages.quantum.value.toFixed(2)} eV` : focus?.stages.quantum?.status ?? '—'}</dd>
               {st.blocked.length > 0 && <><dt>Zablokowane</dt><dd>{st.blocked.map((b) => `${b.stage}: ${b.blocker}`).join(' · ')}</dd></>}
             </dl>
+            {protocol && (() => {
+              /* THE EXPERIMENT ENDS WITH A PROTOCOL — shown here exactly as the backend assembled it from
+                 the record, split into what WAS computed (A), what a synthesis engine proposed if any (B),
+                 and what only a physical laboratory could do (C, executed by nobody). Nothing is filled in
+                 by this screen: a field the record does not hold simply does not appear. */
+              const hypothesis = protocol.hypothesis ?? null;
+              const verdictOf = protocol.verdict ?? null;
+              const synthesis = (protocol.synthesis ?? {}) as Record<string, unknown>;
+              const validation = (protocol.proposedValidationProtocol ?? {}) as Record<string, unknown>;
+              const steps = Array.isArray(validation.steps) ? validation.steps as Record<string, unknown>[] : [];
+              const funnel = (protocol.funnel ?? {}) as Record<string, number | string[]>;
+              const finalists = (protocol.finalists ?? []) as Record<string, unknown>[];
+              return (
+                <section className="sw-protocol" data-testid="drug-protocol"
+                  data-protocol-kind={protocol.kind} data-protocol-fingerprint={String(protocol.protocolFingerprint ?? '')}
+                  data-protocol-sections="A,B,C">
+                  <h3>Protokół końcowy</h3>
+                  {protocol.question && <p className="sw-protocol-q">Pytanie: {protocol.question}</p>}
+                  {hypothesis?.statement && (
+                    <p>Hipoteza zarejestrowana {hypothesis.registeredBeforeExecution ? 'przed wykonaniem' : '— brak rejestracji przed wykonaniem'}: {hypothesis.statement}
+                      {hypothesis.fingerprint && <span className="sw-procedure-label"> odcisk {hypothesis.fingerprint}</span>}</p>
+                  )}
+                  {verdictOf?.server && <p><strong>Werdykt: {verdictOf.server}</strong>{verdictOf.rule ? ` — ${verdictOf.rule}` : ''}</p>}
+
+                  <h4>A. Część obliczeniowa — wykonana</h4>
+                  <ul className="sw-protocol-list">
+                    {(protocol.engines ?? []).map((e, i) => <li key={i}>{e.engine}{e.version ? ` ${e.version}` : ''}{e.evidence ? ` · ${e.evidence}` : ''}</li>)}
+                    {typeof funnel.generated === 'number' && <li>Lej: {funnel.generated} wygenerowanych, {String(funnel.retained ?? '—')} zachowanych, {String(funnel.rejected ?? '—')} odrzuconych</li>}
+                    {finalists.map((f, i) => <li key={`f${i}`}>Finalista {i + 1}: {String(f.canonicalSmiles ?? f.candidateId ?? '')} · {typeof f.dockingScore === 'number' ? `${f.dockingScore.toFixed(2)} kcal/mol` : '—'}</li>)}
+                  </ul>
+
+                  <h4>B. Proponowana droga syntezy</h4>
+                  <p data-testid="drug-protocol-synthesis" data-route-provided={synthesis.routeProvided ? 'true' : 'false'}>
+                    {String(synthesis.statement ?? 'Brak zapisu o drodze syntezy.')}
+                    {!synthesis.routeProvided && synthesis.status ? ` (${String(synthesis.status)})` : ''}
+                  </p>
+
+                  <h4>C. Proponowany protokół walidacji fizycznej — NIEWYKONANY</h4>
+                  <ol className="sw-protocol-list" data-testid="drug-protocol-validation" data-validation-steps={steps.length}>
+                    {steps.map((st, i) => (
+                      <li key={i}>{String(st.assay ?? '')} — {String(st.testsWhat ?? '')}
+                        <span className="sw-procedure-label">{String(st.status ?? '')} · {String(st.apparatus ?? '')}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  {typeof validation.note === 'string' && <p className="sw-drug-note">{validation.note}</p>}
+                  {protocol.boundary && <p className="sw-drug-note"><strong>{protocol.boundary}</strong></p>}
+                </section>
+              );
+            })()}
             <p className="sw-drug-note">
               Geometria RDKit i przebieg Vina to REAL ENGINE OUTPUT; wynik Vina pozostaje estymatą funkcji oceniającej przy sztywnym receptorze, nie zmierzonym powinowactwem.
               Predykcje ADMET to MODEL_ESTIMATE. Przekształcenia cząsteczek to COMPUTATIONAL TRANSFORMATION — obliczenia, nie synteza w laboratorium.

@@ -206,6 +206,20 @@ export class DrugBenchLayer {
     this.cloud = new THREE.Group(); this.cloud.position.set(0, 1.25, 0.05); root.add(this.cloud);
     this.rings = new THREE.Group(); this.rings.position.set(0, 1.0, 0); root.add(this.rings);
     this.pocket = new THREE.Group(); this.pocket.position.set(0.95, HOLO_Y - 0.06, 0.05); root.add(this.pocket);
+    // WHAT THE OBSERVATION IS. The thing being observed is a computed pose, not a photograph: the sign
+    // above it says so in the world itself, so nobody can mistake the station for a microscope.
+    const poseSign = makeReadoutSurface(THREE, 512, 128);
+    const g = poseSign.ctx;
+    g.fillStyle = 'rgba(8,18,32,0.92)'; g.fillRect(0, 0, 512, 128);
+    g.strokeStyle = '#fbbf24'; g.lineWidth = 3; g.strokeRect(2, 2, 508, 124);
+    g.fillStyle = '#fbbf24'; g.font = 'bold 26px monospace'; g.fillText('MODEL OBLICZENIOWY', 16, 42);
+    g.fillStyle = '#e2e8f0'; g.font = '20px monospace';
+    g.fillText('poza z AutoDock Vina w kieszeni 1IEP', 16, 76);
+    g.fillText('to NIE jest obraz z mikroskopu', 16, 106);
+    poseSign.texture.needsUpdate = true;
+    const poseLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.11), createScreenMaterial(THREE, poseSign.texture, { emissiveIntensity: 0.5 }));
+    poseLabel.position.set(0.95, HOLO_Y + 0.24, 0.05); poseLabel.name = 'drug-pose:label';
+    root.add(poseLabel);
     // THE PERSON AT THE BENCH (gate B): a suited scientist who walks between the instruments, grips the
     // vial and puts it in. The rig is the same one every Genesis world uses — no second character system.
     const scientist = buildCharacter(THREE, {
@@ -266,9 +280,13 @@ export class DrugBenchLayer {
   private driveScientist(dt: number): void {
     const scientist = this.scientist;
     if (!scientist || !this.procedure || !this.layout) return;
-    // The task's identity (phase + sample) never depends on the movement, so it can time itself.
+    // The task's identity never depends on the movement, so it can time itself. It is keyed on the
+    // PHASE and the INSTRUMENT, not on the sample: while the backend feeds one stage sample after
+    // sample, the person is doing one continuous job at one instrument, and restarting the gesture on
+    // every new vial would leave them forever reaching and never putting anything in. The vial in the
+    // hand is still whichever sample the record places at that stage.
     const task = benchHandlingOf(this.procedure, this.layout, 1);
-    const key = `${task.phaseId ?? '-'}:${task.sampleId ?? '-'}:${task.instrument}`;
+    const key = `${task.phaseId ?? '-'}:${task.instrument}`;
     if (key !== this.taskKey) { this.taskKey = key; this.taskElapsedMs = 0; }
     else this.taskElapsedMs += dt * 1000;
     const handling = benchHandlingOf(this.procedure, this.layout, transferMotion(this.taskElapsedMs));

@@ -143,10 +143,36 @@ Kandydat: aspiryna `CC(=O)Oc1ccccc1C(=O)O` (offline, referencja walidatora RDKit
 | F2 — stanowisko `st-drug-bench`, agent czeka na silnik (`engineGate`), scena renderuje ten sam stan | zrobione | `drugBenchLiveGate.test.ts`, E2E `liveDrugBench` (hash sceny = hash backendu w ≥3 stanach pośrednich i końcowym) |
 | F3 — czat: hipoteza + plan zamrożone przed silnikiem, przejście do laboratorium; werdykt, dowody, replay MATCH, następny eksperyment | zrobione | `drugHypothesis.test.ts`, `unifiedResearchJourney.test.ts`, E2E `liveDrugChatHandoff` |
 
-Testy: backend 1236 pass / 0 fail; frontend 7340 pass (672 plików); oba E2E zielone lokalnie.
+Testy (2026-09-26): frontend 7377 pass / 1 skipped (677 plików), `npx vitest run` w `packages/frontend`.
+
+| F4 — widoczny przebieg laboratoryjny: naukowiec, chwyt fiolki, transfer do aparatury, obserwacja, protokół | wdrożone, weryfikacja E2E w toku | `benchHandling.test.ts` (8), `drugBenchHands.test.ts` (6, prawdziwa scena three.js) |
+
+### 8.1. Ręce naukowca — kontrakt (F4)
+
+`core/liveExperiment/benchHandling.ts` czyta **ten sam** stan kanoniczny co statyw i aparatura i mówi
+wyłącznie: którą próbkę, skąd, do czego i w którym miejscu ruchu. Trzy zegary rozdzielone zgodnie z
+dyrektywą:
+
+- **zegar backendu** — decyduje, czy zadanie w ogóle istnieje i kiedy etap się kończy;
+- **zegar prezentacji** (`motion` 0..1, `TRANSFER_MS`) — porusza wyłącznie rękami, jest **przycięty**
+  do 1, więc trzy minuty pracy Viny zostawiają człowieka stojącego przy aparaturze, a nie w pętli
+  udającej postęp; test `THE RULE` sprawdza, że 180 s pętli renderu nie domyka żadnego etapu;
+- **zegar filmu** — poza tym modułem.
+
+Uczciwość: gest jest zawsze `SIMULATED` i niesie obok siebie etykietę etapu, który reprezentuje
+(`represents`), a panel pisze wprost „SYMULOWANY KROK LABORATORYJNY". Próbka ma tożsamość molekularną
+(kanoniczne SMILES), nigdy „próbka 3", i gdy jest w dłoni — znika ze statywu. Stacja obserwacji ma w
+scenie tabliczkę „MODEL OBLICZENIOWY · poza z AutoDock Vina · to NIE jest obraz z mikroskopu".
+
+Scena raportuje **to, co narysowała** (`DrugBenchLayer.handSnapshot()`): akcję, fiolkę faktycznie
+podpiętą do punktu chwytu, zmierzoną odległość tej fiolki od dłoni i zapis wykonanych ruchów. Panel
+lustruje to w `data-hand-*`, więc bramkę B można sprawdzić, a nie tylko zadeklarować.
 
 Uczciwe granice (widoczne w UI):
-- receptor dockingu to zastępcza mała cząsteczka (indol), nie białko;
-- „synteza” to transformacje in-silico RDKit, bez silnika retrosyntezy;
-- wszystkie wyniki to MODEL_ESTIMATE; brak walidacji laboratoryjnej;
-- definicja WEAKENED (≥1 spełnione i ≥1 niespełnione) czeka na potwierdzenie właściciela.
+- receptor dockingu to prawdziwe białko (PDB 1IEP, łańcuch A), ale wynik Vina pozostaje **estymatą
+  funkcji oceniającej przy sztywnym receptorze**, nie zmierzonym powinowactwem;
+- retrosynteza: adapter AiZynthFinder 4.4.1 zintegrowany, **pliki modelu nieosiągalne w tym
+  środowisku** — zdolność zgłasza BLOKADĘ i nie proponuje żadnej drogi;
+- predykcje ADMET to MODEL_ESTIMATE; przekształcenia cząsteczek to obliczenia, nie synteza;
+- żaden krok nie został zmierzony na fizycznej aparaturze; część C protokołu jest propozycją
+  **niewykonaną przez nikogo**.

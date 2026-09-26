@@ -26,14 +26,20 @@ COPY packages/backend/requirements-meeko.txt packages/backend/requirements-meeko
 COPY packages/backend/workers/structural/constraints.txt packages/backend/workers/structural/constraints.txt
 # The import check covers meeko's undeclared runtime imports (scipy, gemmi):
 # without them docking silently degraded to BLOCKED_BY_RUNTIME at run time.
+#
+# pdbfixer is the ONE exception to --only-binary. It publishes no wheel on PyPI, so a
+# binary-only resolve fails outright ("No matching distribution"); it is pure Python, so
+# its sdist builds in this compiler-less image without touching a toolchain. Naming it in
+# --no-binary keeps that single exception explicit — every other package must still arrive
+# as a wheel, which is what stops a silent source build of an extension module.
 RUN python3 -m venv /opt/genesis-science \
-    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: \
+    && /opt/genesis-science/bin/python -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: --no-binary=pdbfixer \
        -c packages/backend/workers/structural/constraints.txt \
        -r packages/backend/requirements-rdkit.txt \
        -r packages/backend/requirements-openmm.txt \
        -r packages/backend/requirements-vina.txt \
        -r packages/backend/requirements-meeko.txt \
-    && /opt/genesis-science/bin/python -c "import rdkit, openmm, vina, meeko, scipy, gemmi"
+    && /opt/genesis-science/bin/python -c "import rdkit, openmm, vina, meeko, scipy, gemmi, pdbfixer"
 ENV GENESIS_PYTHON=/opt/genesis-science/bin/python
 
 COPY packages/backend/src packages/backend/src

@@ -9,4 +9,9 @@ meeko==0.8.0
 # ("No module named 'scipy'", then "... 'gemmi'"); pinned to the verified versions.
 scipy==1.17.1
 gemmi==0.7.5
+# Optional receptor repair in dock_worker.py (imported lazily, only when the request asks
+# for it): adds missing side-chain atoms and terminal oxygen, never missing loops.
+# NOTE: pdbfixer publishes no wheel on PyPI, so the structural image installs it with an
+# explicit --no-binary=pdbfixer; it is pure Python and needs no compiler. See
+# workers/structural/Dockerfile.
 pdbfixer==1.12.0

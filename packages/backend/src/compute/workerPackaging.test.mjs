@@ -19,7 +19,7 @@ const PIP_WORKERS = Object.freeze({
   'chem-light': { requirements: ['requirements-pyscf.txt', 'requirements-biopython.txt'], imports: ['pyscf', 'Bio'] },
   structural: {
     requirements: ['requirements-rdkit.txt', 'requirements-openmm.txt', 'requirements-vina.txt', 'requirements-meeko.txt'],
-    imports: ['rdkit', 'openmm', 'vina', 'meeko', 'scipy', 'gemmi'],
+    imports: ['rdkit', 'openmm', 'vina', 'meeko', 'scipy', 'gemmi', 'pdbfixer'],
   },
   admet: { requirements: ['requirements-admet.txt'], imports: ['torch', 'admet_ai', 'chemprop'] },
 });

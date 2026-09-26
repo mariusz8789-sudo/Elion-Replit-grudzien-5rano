@@ -66,6 +66,17 @@ referencyjny z zapisanym odciskiem wejścia.
 
 **7 z 9 silników naukowych działa i ma zdany przypadek referencyjny.**
 
+Ale to jest tylko jedna warstwa i podanie samej tej liczby zaniża projekt. Pełny spis jest
+w `docs/GENESIS_ENGINE_INVENTORY.md`; wersja do powiedzenia na głos:
+
+> **20 silników** — 9 naukowych firm trzecich (7 z zdanym przypadkiem referencyjnym i zmierzoną
+> wersją) plus **11 własnych kerneli rozumowania Genesis**, wszystkie zweryfikowane jako
+> rozwiązujące się w runtime. Na tym stoi **27 zdolności produktowych, z czego 21 dostępnych**,
+> każda z klasą epistemiczną, Evidence i Replay.
+
+Nie sumuj tych warstw do jednej efektownej liczby bez powiedzenia, co liczysz — recenzent zapyta
+„co to znaczy silnik" i wtedy potrzebna jest tabela, nie slogan.
+
 Do tego rzeczy udowodnione osobno, w prawdziwej przeglądarce i na prawdziwych danych:
 
 - **Redock imatinibu na 1IEP, RMSD 0,584 Å.** To jest benchmark, który rozumie każdy chemik

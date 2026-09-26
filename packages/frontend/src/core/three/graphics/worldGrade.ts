@@ -48,7 +48,24 @@ export interface WorldGrade {
   readonly exposure: number;
   readonly bloom: { readonly strength: number; readonly radius: number; readonly threshold: number };
   /** The floor is the largest surface in most of these worlds, so it decides the whole image. */
-  readonly floor: { readonly color: number; readonly roughness: number; readonly metalness: number; readonly envMapIntensity: number };
+  readonly floor: {
+    readonly color: number; readonly roughness: number; readonly metalness: number; readonly envMapIntensity: number;
+    /**
+     * How much of the floor material's own surface relief survives the grade. The shared PBR floor
+     * carries a high-frequency normal map tuned for a matte, lit-from-above surface; on a dark,
+     * reflective grade that same relief reads as wet speckle rather than as a floor — it was the
+     * second thing that made the laboratory look cheap. 1 keeps the material as authored; lower
+     * values flatten the relief so the reflection, not the noise, carries the surface. Default 1.
+     */
+    readonly normalScale?: number;
+    /**
+     * Whether the floor keeps the shared material's roughness NOISE map. That map is what paints the
+     * speckle a dark reflective grade reads as standing water; three.js has no intensity on a
+     * roughness map, so the honest choice is per-world: keep it (a matte, worn floor wants it) or
+     * drop it and let the grade's own roughness carry a polished surface. Default true.
+     */
+    readonly roughnessDetail?: boolean;
+  };
 }
 
 /**
@@ -65,7 +82,7 @@ export const WORLD_GRADES: Readonly<Record<WorldGradeId, WorldGrade>> = {
     environmentIntensity: 1.35,
     exposure: 0.78,
     bloom: { strength: 0.16, radius: 0.45, threshold: 1.05 },
-    floor: { color: 0x202a33, roughness: 0.58, metalness: 0.04, envMapIntensity: 0.35 },
+    floor: { color: 0x202a33, roughness: 0.58, metalness: 0.04, envMapIntensity: 0.35, normalScale: 0.35, roughnessDetail: false },
   },
   physics: {
     id: 'physics',
@@ -76,7 +93,7 @@ export const WORLD_GRADES: Readonly<Record<WorldGradeId, WorldGrade>> = {
     environmentIntensity: 1.25,
     exposure: 0.88,
     bloom: { strength: 0.26, radius: 0.55, threshold: 0.9 },
-    floor: { color: 0x1a1d21, roughness: 0.42, metalness: 0.06, envMapIntensity: 0.7 },
+    floor: { color: 0x1a1d21, roughness: 0.42, metalness: 0.06, envMapIntensity: 0.7, normalScale: 0.22, roughnessDetail: false },
   },
   cern: {
     id: 'cern',
@@ -159,5 +176,10 @@ export function applyGradeFloor(material: THREE_NS.MeshStandardMaterial, grade: 
   material.roughness = grade.floor.roughness;
   material.metalness = grade.floor.metalness;
   material.envMapIntensity = grade.floor.envMapIntensity;
+  // The relief the grade wants, not the relief the shared material happens to carry.
+  const scale = grade.floor.normalScale;
+  if (scale !== undefined && material.normalMap && material.normalScale) material.normalScale.setScalar(scale);
+  // A polished floor: the grade's roughness alone, without the shared noise map's speckle.
+  if (grade.floor.roughnessDetail === false) material.roughnessMap = null;
   material.needsUpdate = true;
 }

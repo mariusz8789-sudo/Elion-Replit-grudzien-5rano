@@ -510,7 +510,17 @@ export class AgentLabScene3D implements Sim3D {
     // Shell: floor, ceiling, walls.
     const floorMat = (palette.LAB_FLOOR as THREE_NS.MeshStandardMaterial).clone(); applyGradeFloor(floorMat, this.grade);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.set(cx, FLOOR_Y, cz); floor.receiveShadow = true; floor.name = 'lab-floor'; scene.add(floor);
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), palette.CONCRETE); ceiling.rotation.x = Math.PI / 2; ceiling.position.set(cx, CEILING_Y, cz); scene.add(ceiling);
+    // GFX-1: the ceiling is a large, barely-lit surface seen at a grazing angle in every wide shot,
+    // where the shared CONCRETE map's contrast reads as cloud rather than as a soffit. It gets its own
+    // instance with the detail maps calmed down: the light fixtures, not the texture, carry that half
+    // of the frame. Same material category, same palette — only this one mesh's copy is retuned.
+    const ceilingMat = (palette.CONCRETE as THREE_NS.MeshStandardMaterial).clone();
+    ceilingMat.roughnessMap = null;
+    ceilingMat.roughness = 0.94;
+    if (ceilingMat.normalMap && ceilingMat.normalScale) ceilingMat.normalScale.setScalar(0.12);
+    ceilingMat.color.setHex(0x171b20);
+    ceilingMat.needsUpdate = true;
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(W, D), ceilingMat); ceiling.rotation.x = Math.PI / 2; ceiling.position.set(cx, CEILING_Y, cz); scene.add(ceiling);
     const wallGeoX = new THREE.PlaneGeometry(W, CEILING_Y); const wallGeoZ = new THREE.PlaneGeometry(D, CEILING_Y);
     const back = new THREE.Mesh(wallGeoX, palette.LAB_WALL); back.position.set(cx, CEILING_Y / 2, this.room.minZ); scene.add(back);
     const front = new THREE.Mesh(wallGeoX, palette.LAB_WALL); front.position.set(cx, CEILING_Y / 2, this.room.maxZ); front.rotation.y = Math.PI; scene.add(front);

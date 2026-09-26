@@ -4,6 +4,7 @@ import { VERIFICATION_LEVEL, probeWorker, spawnLocalWorker } from './workerRunti
 import { capabilityAvailable } from '../campaign/toolchain.mjs';
 import { executeCapability } from './scientificCapabilityContract.mjs';
 import { TEST_WORKER_TOKEN, startCountingWorker } from './remoteScientificWorkerTestUtils.mjs';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 /**
  * The runtime probe is the evidence behind every LOCAL_RUNTIME_VERIFIED /
@@ -95,7 +96,14 @@ describe('a broken worker can never be reported at the requested level', () => {
 describe('a real worker process (workerEntrypoint.mjs) — LOCAL_RUNTIME_VERIFIED', () => {
   test('spawned as its own process (non-root when possible), probed, then shut down cleanly on SIGTERM', { skip: chemSkip }, async () => {
     const asNobody = typeof process.getuid === 'function' && process.getuid() === 0;
-    const worker = await spawnLocalWorker({ workerGroup: 'chem-light', python: null, ...(asNobody ? { uid: 65534, gid: 65534 } : {}) });
+    // The spawned child gets the worker image's PATH, not the caller's, so a user-local
+    // interpreter cannot leak in. The image supplies its own engines through
+    // ENV GENESIS_PYTHON; a local spawn has no Dockerfile to do that, so it must hand the
+    // child the SAME interpreter the skip guard above just verified. Passing null instead
+    // silently tested the bare system python3 — which has neither PySCF nor Biopython, so
+    // every engine check failed while the guard insisted both were installed.
+    const python = resolvePythonExecutable('GENESIS_PYSCF_PYTHON', 'GENESIS_BIOPYTHON_PYTHON');
+    const worker = await spawnLocalWorker({ workerGroup: 'chem-light', python, ...(asNobody ? { uid: 65534, gid: 65534 } : {}) });
     let report;
     try {
       report = await probeWorker({

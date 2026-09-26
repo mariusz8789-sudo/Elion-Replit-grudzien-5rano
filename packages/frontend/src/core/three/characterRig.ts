@@ -119,41 +119,45 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     parentJoint.add(m);
   };
 
-  // Wymiary (proporcje ~7.3 głowy).
+  // Wymiary. GFX-1 proportion pass: the figure read as a mascot because the head and the limbs were
+  // too thick for the height — roughly 6.7 heads tall with barrel arms. Adult proportions are ~7.5
+  // heads with limbs far thinner than the torso, and shoulders wider than the waist. Head and helmet
+  // shrink, limbs thin out, shoulders widen; the joint heights stay, so every reach, grip and walk
+  // cycle built on this skeleton keeps working.
   const hipY = H * 0.52, chestY = H * 0.82, headY = H * 0.93;
   const thigh = H * 0.26, shin = H * 0.25, upperArm = H * 0.17, foreArm = H * 0.16;
-  const shoulderX = H * 0.10, hipX = H * 0.05;
+  const shoulderX = H * 0.115, hipX = H * 0.05;
 
   // Miednica + tułów.
   const pelvis = joint(root, 0, hipY, 0);
-  const torsoGeo = new THREE.CapsuleGeometry(H * 0.115, H * 0.24, 6, 12); disposables.push(torsoGeo);
+  const torsoGeo = new THREE.CapsuleGeometry(H * 0.104, H * 0.25, 6, 12); disposables.push(torsoGeo);
   const torso = new THREE.Mesh(torsoGeo, M.shirt); torso.position.y = (chestY - hipY) / 2 + 0.02; pelvis.add(torso);
   const chest = joint(pelvis, 0, chestY - hipY, 0);
 
   // Szyja + głowa + włosy.
   const neck = joint(chest, 0, H * 0.05, 0); neck.name = 'joint:neck';
-  const headGeo = new THREE.SphereGeometry(H * 0.075, 18, 16); disposables.push(headGeo);
+  const headGeo = new THREE.SphereGeometry(H * 0.062, 18, 16); disposables.push(headGeo);
   const head = new THREE.Mesh(headGeo, M.skin); head.position.y = headY - chestY; head.scale.set(0.9, 1.05, 0.95); neck.add(head);
-  const hairGeo = new THREE.SphereGeometry(H * 0.079, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.62); disposables.push(hairGeo);
+  const hairGeo = new THREE.SphereGeometry(H * 0.066, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.62); disposables.push(hairGeo);
   const hair = new THREE.Mesh(hairGeo, M.hair); hair.position.copy(head.position); hair.position.y += H * 0.012; hair.scale.copy(head.scale); neck.add(hair);
   if (suit) {
     // Helmet: a shell around the head with a transparent visor in front, a trim ring at the collar
     // and a small lamp — the first-person camera sits just inside the visor glass.
     hair.visible = false;
     const helmetGroup = new THREE.Group(); helmetGroup.name = 'helmet'; helmetGroup.position.copy(head.position); neck.add(helmetGroup);
-    const shellGeo = new THREE.SphereGeometry(H * 0.105, 24, 18, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI); disposables.push(shellGeo);
+    const shellGeo = new THREE.SphereGeometry(H * 0.088, 24, 18, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI); disposables.push(shellGeo);
     const shellMat = mat(suit.fabric ?? 0xe8ecf0, 0.5); extraMaterials.push(shellMat);
     const shell = new THREE.Mesh(shellGeo, shellMat); shell.scale.set(1, 1.08, 1); shell.rotation.y = Math.PI; helmetGroup.add(shell);
-    const visorGeo = new THREE.SphereGeometry(H * 0.104, 24, 18, -Math.PI * 0.44, Math.PI * 0.88, Math.PI * 0.22, Math.PI * 0.5); disposables.push(visorGeo);
+    const visorGeo = new THREE.SphereGeometry(H * 0.087, 24, 18, -Math.PI * 0.44, Math.PI * 0.88, Math.PI * 0.22, Math.PI * 0.5); disposables.push(visorGeo);
     const visorMat = new THREE.MeshPhysicalMaterial({ color: suit.visor ?? 0x8fd3ff, transparent: true, opacity: 0.28, roughness: 0.08, metalness: 0.1, transmission: 0, side: THREE.DoubleSide, depthWrite: false });
     extraMaterials.push(visorMat);
     const visor = new THREE.Mesh(visorGeo, visorMat); visor.name = 'visor'; visor.scale.set(1, 1.08, 1); helmetGroup.add(visor);
-    const collarGeo = new THREE.TorusGeometry(H * 0.075, H * 0.014, 8, 20); disposables.push(collarGeo);
+    const collarGeo = new THREE.TorusGeometry(H * 0.064, H * 0.012, 8, 20); disposables.push(collarGeo);
     const collarMat = mat(suit.trim ?? 0xf0b35c, 0.45); extraMaterials.push(collarMat);
     const collar = new THREE.Mesh(collarGeo, collarMat); collar.rotation.x = Math.PI / 2; collar.position.y = -H * 0.085; helmetGroup.add(collar);
     const lampGeo = new THREE.SphereGeometry(H * 0.012, 8, 6); disposables.push(lampGeo);
     const lampMat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: suit.lamp ?? 0x62f0a3, emissiveIntensity: 2.2 }); extraMaterials.push(lampMat);
-    const lamp = new THREE.Mesh(lampGeo, lampMat); lamp.position.set(H * 0.07, H * 0.06, H * 0.05); helmetGroup.add(lamp);
+    const lamp = new THREE.Mesh(lampGeo, lampMat); lamp.position.set(H * 0.058, H * 0.05, H * 0.042); helmetGroup.add(lamp);
     // Backpack life-support unit on the torso.
     const packGeo = new THREE.BoxGeometry(H * 0.16, H * 0.2, H * 0.07); disposables.push(packGeo);
     const packMat = mat(suit.boots ?? 0x1a1f26, 0.55); extraMaterials.push(packMat);
@@ -189,11 +193,11 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   // laboratorium musi POKAZAĆ chwyt fiolki, a nie tylko rękę obok niej.
   const arm = (side: number) => {
     const shoulder = joint(chest, side * shoulderX, H * 0.02, 0); shoulder.name = side > 0 ? 'joint:shoulder.L' : 'joint:shoulder.R';
-    limb(shoulder, upperArm, H * 0.035, M.shirt);
+    limb(shoulder, upperArm, H * 0.028, M.shirt);
     const elbow = joint(shoulder, 0, -upperArm, 0); elbow.name = side > 0 ? 'joint:elbow.L' : 'joint:elbow.R';
-    limb(elbow, foreArm, H * 0.028, M.skin);
+    limb(elbow, foreArm, H * 0.023, M.skin);
     const wrist = joint(elbow, 0, -foreArm, 0); wrist.name = side > 0 ? 'joint:wrist.L' : 'joint:wrist.R';
-    const handGeo = new THREE.SphereGeometry(H * 0.032, 10, 8); disposables.push(handGeo);
+    const handGeo = new THREE.SphereGeometry(H * 0.026, 10, 8); disposables.push(handGeo);
     const hand = new THREE.Mesh(handGeo, M.skin); hand.position.y = -H * 0.02; wrist.add(hand);
     hand.name = side > 0 ? 'hand.L' : 'hand.R';
     // Palce: dwa segmenty (chwyt + przeciwstawny kciuk) obracane przez `setGrip`.
@@ -212,9 +216,9 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   // Nogi: biodro → kolano → kostka → stopa.
   const leg = (side: number) => {
     const hip = joint(pelvis, side * hipX, 0, 0);
-    limb(hip, thigh, H * 0.05, M.pants);
+    limb(hip, thigh, H * 0.042, M.pants);
     const knee = joint(hip, 0, -thigh, 0);
-    limb(knee, shin, H * 0.04, M.pants);
+    limb(knee, shin, H * 0.033, M.pants);
     const ankle = joint(knee, 0, -shin, 0);
     const footGeo = new THREE.BoxGeometry(H * 0.06, H * 0.03, H * 0.13); disposables.push(footGeo);
     const foot = new THREE.Mesh(footGeo, M.shoes); foot.position.set(0, -H * 0.015, H * 0.03); ankle.add(foot);

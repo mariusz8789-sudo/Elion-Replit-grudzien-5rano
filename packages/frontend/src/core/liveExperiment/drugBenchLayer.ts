@@ -174,26 +174,85 @@ export class DrugBenchLayer {
     rackBody.position.set(0, 0.025, (BENCH_ZONES.length - 1) * ROW_Z / 2); this.rack.add(rackBody);
     this.vialGlass = glass;
 
-    // ADMET analyser: a bench instrument with a lid, a status lamp and its own small readout.
+    // GFX-1 EQUIPMENT PASS. A box with a lid reads as furniture; a bench analyser reads as an
+    // instrument because of its housing seams, its ventilation, its control strip, the drawer the
+    // sample actually goes into and the cable that leaves it. Everything below is geometry over the
+    // same materials — it adds no measurement, claims no sensor, and the epistemic labels are
+    // unchanged: this instrument stands for a MODEL_ESTIMATE and says so on its own screen.
+    const slats = (w: number, h: number, count: number, m: THREE_NS.Material): THREE_NS.Group => {
+      const g = new THREE.Group();
+      const geo = new THREE.BoxGeometry(w, h / (count * 2), 0.004);
+      for (let i = 0; i < count; i += 1) {
+        const bar = new THREE.Mesh(geo, m); bar.position.y = (i - (count - 1) / 2) * (h / count); g.add(bar);
+      }
+      return g;
+    };
+    const buttonRow = (count: number, spacing: number, colour: number): THREE_NS.Group => {
+      const g = new THREE.Group();
+      const geo = new THREE.CylinderGeometry(0.008, 0.008, 0.006, 10);
+      const m = new THREE.MeshStandardMaterial({ color: 0x0b1118, emissive: colour, emissiveIntensity: 0.5, roughness: 0.5 });
+      for (let i = 0; i < count; i += 1) {
+        const b = new THREE.Mesh(geo, m); b.rotation.x = Math.PI / 2; b.position.x = (i - (count - 1) / 2) * spacing; g.add(b);
+      }
+      return g;
+    };
+
+    // ADMET ANALYSER — a bench instrument: painted steel housing, recessed front, drawer, controls.
     const analyser = new THREE.Group(); analyser.position.set(-1.5, 1.05, -0.1); root.add(analyser);
-    analyser.add(new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, 0.5), mat.TECH_COMPOSITE));
+    const housing = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.38, 0.52), mat.PAINTED_METAL); analyser.add(housing);
+    const topPlate = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.02, 0.54), mat.BRUSHED_METAL); topPlate.position.y = 0.2; analyser.add(topPlate);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.02, 0.5), mat.RUBBER); foot.position.y = -0.2; analyser.add(foot);
+    // Recessed front bezel: the seam that makes a housing look machined instead of extruded.
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.32, 0.02), mat.TECH_COMPOSITE); bezel.position.set(0, 0, 0.255); analyser.add(bezel);
+    // The drawer the sample goes into — this is the port the hands aim at.
+    const drawer = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.04), mat.BRUSHED_METAL); drawer.position.set(-0.08, 0.1, 0.272); analyser.add(drawer);
+    const drawerHandle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.018), mat.POLISHED_METAL); drawerHandle.position.set(-0.08, 0.1, 0.292); analyser.add(drawerHandle);
+    const vents = slats(0.16, 0.18, 7, mat.BRUSHED_METAL); vents.position.set(0.22, -0.02, 0.268); analyser.add(vents);
+    const controls = buttonRow(4, 0.032, 0x38bdf8); controls.position.set(-0.13, -0.09, 0.27); analyser.add(controls);
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.02, 16), mat.POLISHED_METAL);
+    knob.rotation.x = Math.PI / 2; knob.position.set(0.02, -0.09, 0.272); analyser.add(knob);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.03), mat.POLISHED_METAL); plate.position.set(-0.19, 0.16, 0.267); analyser.add(plate);
+    // A cable leaving the instrument: nothing in a laboratory stands unconnected.
+    const cable = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.008, 6, 20, Math.PI * 1.1), mat.RUBBER);
+    cable.rotation.set(Math.PI / 2, 0, 0.6); cable.position.set(0.3, -0.16, -0.22); analyser.add(cable);
     const lid = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 0.34), mat.POLISHED_METAL);
     lid.position.set(0, 0.185, 0.02); analyser.add(lid); this.analyserLid = lid;
-    this.analyserLamp = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x22d3ee, emissiveIntensity: 0 }));
-    this.analyserLamp.position.set(0.2, 0.06, 0.26); analyser.add(this.analyserLamp);
+    this.analyserLamp = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 10), new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x22d3ee, emissiveIntensity: 0 }));
+    this.analyserLamp.position.set(0.24, 0.13, 0.272); analyser.add(this.analyserLamp);
     const analyserReadout = makeReadoutSurface(THREE, 384, 192);
     this.analyserScreen = analyserReadout;
-    const analyserPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.21), createScreenMaterial(THREE, analyserReadout.texture, { emissiveIntensity: 0.55 }));
-    analyserPanel.position.set(0, 0.06, 0.251); analyser.add(analyserPanel);
+    const analyserPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.17), createScreenMaterial(THREE, analyserReadout.texture, { emissiveIntensity: 0.55 }));
+    analyserPanel.position.set(-0.06, 0.005, 0.268); analyser.add(analyserPanel);
 
-    // Docking workstation: console deck, keyboard, busy lamp and the big monitor the results appear on.
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.03, 0.3), mat.BRUSHED_METAL);
+    // DOCKING WORKSTATION — the compute side of the bench: a rack unit with a lit front panel, a
+    // monitor on a proper arm, a keyboard deck and the cable run between them. It computes; it
+    // measures nothing, and the panel says which engine is running.
+    const rack = new THREE.Group(); rack.position.set(0.95, 0.35, -0.3); root.add(rack);
+    rack.add(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.7, 0.44), mat.PAINTED_METAL));
+    const rackFace = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.64, 0.02), mat.TECH_COMPOSITE); rackFace.position.z = 0.225; rack.add(rackFace);
+    for (let i = 0; i < 4; i += 1) {
+      const bay = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.11, 0.02), mat.BRUSHED_METAL);
+      bay.position.set(0, 0.21 - i * 0.15, 0.24); rack.add(bay);
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshStandardMaterial({ color: 0x0b1118, emissive: i === 0 ? 0x62f0a3 : 0x38bdf8, emissiveIntensity: 1.1 }));
+      led.position.set(0.11, 0.21 - i * 0.15, 0.253); rack.add(led);
+    }
+    const rackVents = slats(0.24, 0.12, 6, mat.BRUSHED_METAL); rackVents.position.set(0, -0.26, 0.242); rack.add(rackVents);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.028, 0.32), mat.BRUSHED_METAL);
     deck.position.set(0.55, 0.95, 0.26); deck.rotation.x = -0.18; root.add(deck);
-    this.busyLamp = new THREE.Mesh(new THREE.SphereGeometry(0.028, 14, 10), new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0xf59e0b, emissiveIntensity: 0 }));
+    const keys = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.008, 0.2), mat.TECH_COMPOSITE);
+    keys.position.set(0.55, 0.972, 0.258); keys.rotation.x = -0.18; root.add(keys);
+    const wrist = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.012, 0.05), mat.RUBBER);
+    wrist.position.set(0.55, 0.962, 0.375); wrist.rotation.x = -0.18; root.add(wrist);
+    this.busyLamp = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 10), new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0xf59e0b, emissiveIntensity: 0 }));
     this.busyLamp.position.set(0.95, 0.99, 0.26); root.add(this.busyLamp);
     const readout = makeReadoutSurface(THREE, 768, 384);
     this.screen = { canvas: readout.canvas, texture: readout.texture, ctx: readout.ctx };
-    root.add(createMonitor(THREE, { position: [0.55, 0.93, -0.26], width: 0.86, height: 0.5, standHeight: 0.26, frameMaterial: mat.BRUSHED_METAL, screenMaterial: createScreenMaterial(THREE, readout.texture, { emissiveIntensity: 0.6 }) }));
+    // Monitor arm: a post with an elbow, so the screen is held rather than balanced on a stub.
+    const armPost = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.42, 12), mat.BRUSHED_METAL);
+    armPost.position.set(0.55, 1.14, -0.34); root.add(armPost);
+    const armElbow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.03), mat.BRUSHED_METAL);
+    armElbow.position.set(0.55, 1.33, -0.3); armElbow.rotation.z = 0.12; root.add(armElbow);
+    root.add(createMonitor(THREE, { position: [0.55, 0.93, -0.26], width: 0.94, height: 0.54, standHeight: 0.4, frameMaterial: mat.BRUSHED_METAL, screenMaterial: createScreenMaterial(THREE, readout.texture, { emissiveIntensity: 0.6 }) }));
 
     // The manipulator that moves the sample: it only works while a real step is under way.
     this.arm = createManipulatorArm(THREE, { position: [-0.15, 0.93, -0.3], headingRadians: Math.PI, scale: 0.55, linkMaterial: mat.BRUSHED_METAL, jointMaterial: mat.POLISHED_METAL, baseMaterial: mat.PAINTED_METAL });

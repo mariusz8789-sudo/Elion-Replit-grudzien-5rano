@@ -131,17 +131,20 @@ instytucjonalnej rzędu GB trzeba to przeliczyć, zanim harmonogram się zagęś
 
 ### Pliki backupu są materiałem WRAŻLIWYM — i to jest ustalenie, nie ostrożność
 
-`store.mjs::createSession` zapisuje **token sesji w postaci jawnej** w tabeli
-`sessions`. Snapshot bazy zawiera więc żywe tokeny, których można użyć
-bezpośrednio do końca ich TTL. Skutki dla operacji:
+`store.mjs::createSession` zapisuje w tabeli `sessions` wyłącznie SHA-256 tokenu
+sesji. Przy otwarciu starszej bazy migracja haszuje też zastane tokeny jawne;
+regresję blokuje `sessionTokenHashing.test.mjs`. Snapshot nie ujawnia więc
+tokenu gotowego do użycia, ale nadal zawiera dane kont, projektów i pozostały
+stan aplikacji. Skutki dla operacji:
 
 - katalog backupów: prawa `700`, właściciel = użytkownik procesu,
 - backupy poza woluminem: wyłącznie zaszyfrowane w spoczynku,
 - po restore z kopii starszej niż incydent: wyczyścić tabelę `sessions`
-  (wszyscy się przelogują) — inaczej odtwarza się także tokeny sprzed incydentu.
+  (wszyscy się przelogują) — skróty nadal pozwalają uwierzytelnić posiadacza
+  odpowiadającego im tokenu aż do końca TTL.
 
-Właściwa naprawa (hash tokenów w spoczynku) jest zgłoszona jako OPEN w
-`docs/RISKS.md`, nie ukryta tutaj jako procedura obejściowa.
+Ryzyko R-001 jest oznaczone jako `MITIGATED` w `docs/RISKS.md`; nie oznacza to,
+że backup bazy może być przechowywany bez szyfrowania i kontroli dostępu.
 
 ## 5. Drill przywracania — jak go powtórzyć
 

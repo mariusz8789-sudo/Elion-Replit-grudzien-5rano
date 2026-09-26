@@ -1,4 +1,5 @@
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import { checkCyberBudget, type CyberBudgetUsage, type CyberCampaignBudget } from './cyberInvestigation';
 
 /**
  * CYBER TEST PLANNER — a small, adaptive test-selection layer for the
@@ -80,18 +81,39 @@ export function scoreCandidate(candidate: CyberTestCandidate, uncertainty: numbe
   return Math.round(score * 1000) / 1000;
 }
 
+export interface CyberBudgetContext {
+  readonly budget: CyberCampaignBudget;
+  readonly usage: CyberBudgetUsage;
+}
+
 /**
  * Selects the single highest-value SAFE test to run next. UNSAFE candidates
  * are excluded outright, never merely down-weighted. Returns
  * `selectedHypothesisId: null` when nothing is worth running — either no
- * safe candidates exist, or every remaining candidate is already resolved
- * and none is a deliberate (`INDEPENDENT_REPLICATION`) re-test.
+ * safe candidates exist, every remaining candidate is already resolved and
+ * none is a deliberate (`INDEPENDENT_REPLICATION`) re-test, or (Work Item 5,
+ * optional third parameter, backward compatible with every existing 2-arg
+ * call) `budgetContext.usage.hypothesesGenerated` has already reached
+ * `budgetContext.budget.maxHypotheses` and every remaining candidate would
+ * start testing a hypothesis never tested before — a REPEAT or
+ * INDEPENDENT_REPLICATION of an already-started hypothesis is still
+ * selectable, since it consumes no new-hypothesis budget.
  */
 export function selectNextTest(
   candidates: readonly CyberTestCandidate[],
   assessments: ReadonlyMap<string, HypothesisAssessment>,
+  budgetContext?: CyberBudgetContext,
 ): CyberTestSelection {
-  const safe = candidates.filter((c) => c.safety === 'SAFE');
+  const budgetExceeded = budgetContext !== undefined && checkCyberBudget(budgetContext.usage, budgetContext.budget).exceeded.includes('maxHypotheses');
+  const withinBudget = budgetExceeded ? candidates.filter((c) => c.identityKind !== 'NEW') : candidates;
+  if (budgetExceeded && withinBudget.length === 0 && candidates.length > 0) {
+    return {
+      selectedHypothesisId: null, score: 0,
+      whySelected: `budżet maxHypotheses=${budgetContext!.budget.maxHypotheses} wyczerpany (${budgetContext!.usage.hypothesesGenerated} wygenerowanych) — nowe hipotezy nie mogą być testowane`,
+      whyNotAlternative: 'n/a', targetHypotheses: [], expectedInformationGain: 0,
+    };
+  }
+  const safe = withinBudget.filter((c) => c.safety === 'SAFE');
   if (safe.length === 0) {
     return {
       selectedHypothesisId: null, score: 0,

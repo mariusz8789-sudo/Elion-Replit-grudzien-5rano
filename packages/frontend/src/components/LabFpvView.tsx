@@ -22,6 +22,13 @@ import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
 
 const REAGENT_IDS = Object.keys(SPECIES);
 
+export const LAB_CAMPUS_DOORS = Object.freeze([
+  { id: 'cern', label: 'CERN', hash: '#/cern-complex', classification: 'ZDERZENIA · MODEL + ODDZIELNE DANE CMS' },
+  { id: 'human', label: 'Human Explorer', hash: '#/human-biology-lab', classification: 'ANATOMIA · MODEL EDUKACYJNY' },
+  { id: 'molecule', label: 'Molekuły', hash: '#/molecule', classification: 'STRUKTURA · STAN KANONICZNY' },
+  { id: 'research', label: 'Badania', hash: '#/campaign', classification: 'VIRTUAL LAB · HANDOFF' },
+] as const);
+
 /** Pure boundary to the provider, unit-testable without WebGL. */
 export function runMix(seed: number, reagents: Readonly<Record<string, number>>, ignition: boolean, T0: number): ThermoLabAnalysis | { error: string } {
   const p = kernelRegistry.resolve('thermodynamic-reaction-sim');
@@ -54,11 +61,14 @@ export function LabFpvView(): JSX.Element {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x05070f);
-    scene.add(new THREE.HemisphereLight(0x8ee8f5, 0x0a0f1a, 0.9));
-    const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(2, 4, 2); scene.add(key);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.9 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    scene.background = new THREE.Color(0x091422);
+    scene.add(new THREE.HemisphereLight(0xb8f4ff, 0x17243a, 1.35));
+    scene.add(new THREE.AmbientLight(0x7aa8c7, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 2.1); key.position.set(2, 5, 2); scene.add(key);
+    const fill = new THREE.DirectionalLight(0x65dfff, 1.0); fill.position.set(-3, 2, -1); scene.add(fill);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0x16283a, roughness: 0.78, metalness: 0.12 })); floor.rotation.x = -Math.PI / 2; scene.add(floor);
     const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 50);
     camera.position.set(0, 1.6, 0.6);
     camera.lookAt(0, 1.3, -1.6);
@@ -113,6 +123,15 @@ export function LabFpvView(): JSX.Element {
           <p className="col-lede">Odmierz reagenty w molach, zdecyduj o zapłonie i zmieszaj. Silnik termodynamiczny liczy ΔH, ΔS, ΔG z tablicowych danych standardowych (NIST/CRC), odczynnik ograniczający i temperaturę adiabatyczną; stanowisko 3D tylko to maluje. Każde zmieszanie ma hash w EvidenceLedger. Klik w scenę blokuje kursor; WASD porusza.</p>
         </div>
       </header>
+
+      <nav className="lab-campus-doors" aria-label="Genesis laboratory campus doors" data-testid="lab-campus-doors">
+        {LAB_CAMPUS_DOORS.map((door) => (
+          <button key={door.id} type="button" className="lab-campus-door" data-testid={`lab-door-${door.id}`} onClick={() => { window.location.hash = door.hash; }}>
+            <span className="lab-campus-door-light" aria-hidden="true" />
+            <strong>{door.label}</strong><small>{door.classification}</small><span>WEJDŹ →</span>
+          </button>
+        ))}
+      </nav>
 
       <div className="lab-grid">
         <div className="col-stage lab-stage" ref={hostRef} data-testid="lab-stage" onClick={() => handleRef.current?.lock()}>

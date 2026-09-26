@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { invariantMassFromRow, parseZmumuCsv } from '../../../scripts/fetch-real-data.mjs';
+import { resolvePythonExecutable } from './compute/pythonRuntime.mjs';
 
 /**
  * The CMS Z→μμ invariant mass is implemented TWICE by necessity: in Python
@@ -14,7 +15,7 @@ import { invariantMassFromRow, parseZmumuCsv } from '../../../scripts/fetch-real
  * analytically-known cases and to each other.
  */
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'compute', 'cms_zmumu_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable();
 
 /** m² = 2·pT₁·pT₂·(cosh Δη − cos Δφ) evaluated by the real Python worker. */
 function pythonInvariantMass(row) {

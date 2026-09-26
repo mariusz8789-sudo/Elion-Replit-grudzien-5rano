@@ -14,6 +14,7 @@
 
 import { runModel } from './engine.mjs';
 import { capabilityGap } from './capabilities.mjs';
+import { candidateIdentityGuard } from '../campaign/scientificIntegration.mjs';
 
 /** Zdolności istotne dla oceny kandydata leku (kolejność = priorytet pomiaru). */
 const RELEVANT_CAPABILITIES = ['docking', 'admet', 'toxicity', 'logp', 'quantum-chemistry', 'protein-structure'];
@@ -26,6 +27,34 @@ const LIPINSKI_MW_MAX = 500; // reguła 5 Lipińskiego — kryterium masy (jedyn
  * pomiarowe i wymaganą walidację laboratoryjną. Zwraca też runId modelu masy.
  */
 export function buildCandidatePassport(candidate, target = null) {
+  // Identity guard (Work Item 4): reject BEFORE any compute model runs when the
+  // candidate declares no structural identity at all, or a SMILES the existing
+  // RDKit-backed canonicalizer cannot parse. Real, honest BLOCKED/FAILED status
+  // — never a fabricated passport for an unidentifiable candidate.
+  const identity = candidateIdentityGuard(candidate);
+  if (!identity.ok) {
+    return {
+      candidateId: candidate?.id ?? null,
+      targetId: target?.id ?? candidate?.targetId ?? null,
+      label: candidate?.label ?? null,
+      representation: { formula: candidate?.formula || null, smiles: candidate?.smiles || null, charge: candidate?.charge ?? 0 },
+      calculatedProperties: {},
+      modelsExecuted: [],
+      scoreComponents: [],
+      uncertainty: 'Nie dotyczy — kandydat odrzucony przez strażnika tożsamości przed jakimkolwiek modelem.',
+      modelDomainStatus: identity.status === 'FAILED' ? 'error' : 'blocked',
+      conflicts: [],
+      capabilityGaps: [],
+      warnings: [identity.message],
+      provenance: { engine: 'genesis-compute', method: 'identity-guard' },
+      requiredLaboratoryValidation: [],
+      measurementRecommendations: [],
+      runIds: [],
+      identityGuard: identity,
+      verdict: 'Kandydat ODRZUCONY na etapie strażnika tożsamości — brak wykonywalnej struktury (formuła/SMILES). Żaden model obliczeniowy nie został uruchomiony.',
+    };
+  }
+
   const runIds = [];
   const modelsExecuted = [];
   const calculated = {};

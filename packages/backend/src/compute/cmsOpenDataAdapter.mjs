@@ -13,9 +13,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cms_zmumu_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable();
 const TIMEOUT_MS = 60_000;
 
 // Config default only — never touches the science worker or its logic.

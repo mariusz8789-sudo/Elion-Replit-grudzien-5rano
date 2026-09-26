@@ -36,6 +36,8 @@ export const LiveMatrixBackground = forwardRef<LiveMatrixBackgroundHandle, LiveM
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const controllerRef = useRef<MatrixController | null>(null);
+    const qualityRef = useRef(quality);
+    qualityRef.current = quality;
 
     useImperativeHandle(ref, () => ({
       setActivityLevel: (level) => controllerRef.current?.setActivityLevel(level),
@@ -59,6 +61,7 @@ export const LiveMatrixBackground = forwardRef<LiveMatrixBackgroundHandle, LiveM
 
       const measure = (): void => {
         const rect = container.getBoundingClientRect();
+        controller.applyProps({ quality: qualityRef.current ?? (rect.width < 900 || window.matchMedia?.('(pointer: coarse)').matches ? 'LOW' : 'HIGH') });
         controller.resize(rect.width, rect.height);
       };
       measure();
@@ -90,13 +93,14 @@ export const LiveMatrixBackground = forwardRef<LiveMatrixBackgroundHandle, LiveM
 
     // Updates flow into the live controller, which diffs them itself.
     useEffect(() => {
-      controllerRef.current?.applyProps({ activity, density, speed, glow, intensity, quality, seed, reducedMotion });
+      controllerRef.current?.applyProps({ activity, density, speed, glow, intensity, quality: quality ?? (window.innerWidth < 900 || window.matchMedia?.('(pointer: coarse)').matches ? 'LOW' : 'HIGH'), seed, reducedMotion });
     }, [activity, density, speed, glow, intensity, quality, seed, reducedMotion]);
 
     return (
       <div
         ref={containerRef}
         className={className}
+        data-testid="dashboard-matrix-background"
         aria-hidden="true"
         style={{
           position: 'fixed', inset: 0, overflow: 'hidden', background: '#070b17',

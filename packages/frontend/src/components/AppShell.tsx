@@ -1,16 +1,7 @@
-import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
-import { NAV_SECTIONS, MORE_ITEMS, PRIMARY_NAV_ITEMS, activeNavId, type NavItem } from '../core/navigation';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { NAV_SECTIONS, MORE_SECTIONS, PRIMARY_NAV_ITEMS, RESEARCH_MODE_LABEL, activeNavId, navVariants, type NavItem } from '../core/navigation';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
-import { ErrorBoundary } from './ErrorBoundary';
 import { formatHudTelemetry, snapshotHoloPath, type ManifoldView, type SystemTelemetryView } from '../core/holoTelemetry';
-
-/**
- * The 2040 ambient 3D layer (three.js) is lazy: the initial bundle must not
- * grow for a decoration. It renders BEHIND everything (see styles-2040.css,
- * `.holo-backdrop`), inside its own error boundary so a GPU failure can never
- * take the navigation down with it.
- */
-const GenesisHoloBackdrop = lazy(() => import('./GenesisHoloBackdrop').then((m) => ({ default: m.GenesisHoloBackdrop })));
 
 /**
  * Range sliders everywhere get a filled, glowing segment (styles-2040.css,
@@ -166,14 +157,37 @@ export function AppShell({ children, chat, chatInline = false }: {
 }): JSX.Element {
   const [hash, setHash] = useState(() => (typeof window === 'undefined' ? '#/' : window.location.hash || '#/'));
   const [menuOpen, setMenuOpen] = useState(false);
-  /** The long tail of modules, collapsed by default — see MORE_ITEMS. */
+  const menuCloseRef = useRef<HTMLButtonElement>(null);
+  /** The research mode, collapsed by default — see MORE_ITEMS. */
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Capabilities whose alternative screens (variants) are unfolded. */
+  const [openVariants, setOpenVariants] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleVariants = (id: string): void => setOpenVariants((open) => {
+    const next = new Set(open);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   useEffect(() => {
     const onHashChange = (): void => { setHash(window.location.hash || '#/'); setMenuOpen(false); };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    menuCloseRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   const active = activeNavId(hash);
   useRangeFillPainter();
@@ -201,27 +215,49 @@ export function AppShell({ children, chat, chatInline = false }: {
       <div className="shell-nav-section">
         <button className="shell-nav-more" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
           <span className="shell-nav-icon" aria-hidden="true">{moreOpen ? '−' : '+'}</span>
-          <span className="shell-nav-label">Wszystkie moduły</span>
-          <span className="shell-nav-badge">{MORE_ITEMS.length}</span>
+          <span className="shell-nav-label">{RESEARCH_MODE_LABEL}</span>
         </button>
-        {moreOpen && MORE_ITEMS.map((item) => (
-          <NavButton key={item.id} item={item} active={active === item.id} onNavigate={() => go(item)} />
-        ))}
+        {moreOpen && <div className="shell-nav-groups">
+          {MORE_SECTIONS.filter((group) => group.items.length > 0).map((group) => (
+            <section className="shell-nav-subgroup" key={group.id} aria-labelledby={`${group.id}-title`}>
+              <h3 className="shell-nav-subgroup-title" id={`${group.id}-title`}>{group.label}</h3>
+              {group.items.map((item) => {
+                const variants = navVariants(item.id);
+                // The active screen being a variant keeps its capability unfolded, so the user sees where they are.
+                const unfolded = openVariants.has(item.id) || variants.some((v) => v.id === active);
+                return (
+                  <div className="shell-nav-capability" key={item.id}>
+                    <NavButton item={item} active={active === item.id} onNavigate={() => go(item)} />
+                    {variants.length > 0 && (
+                      <button
+                        className="shell-nav-variants-toggle"
+                        onClick={() => toggleVariants(item.id)}
+                        aria-expanded={unfolded}
+                        aria-label={`${unfolded ? 'Ukryj' : 'Pokaż'} inne widoki: ${item.label} (${variants.length})`}
+                      >
+                        {unfolded ? '−' : '+'} inne widoki ({variants.length})
+                      </button>
+                    )}
+                    {unfolded && variants.length > 0 && (
+                      <div className="shell-nav-variants">
+                        {variants.map((variant) => (
+                          <NavButton key={variant.id} item={variant} active={active === variant.id} onNavigate={() => go(variant)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </section>
+          ))}
+        </div>}
       </div>
     </>
   );
 
   return (
     <>
-      {/* Ambient 3D layer: fixed, pointer-events:none, z-index below the Matrix
-          data stream. A sibling of `.shell` on purpose — `.shell` is its own
-          stacking context (z-index 1), so anything inside it would paint OVER
-          the data stream instead of under it. */}
-      <ErrorBoundary>
-        <Suspense fallback={null}>
-          <GenesisHoloBackdrop />
-        </Suspense>
-      </ErrorBoundary>
+      {/* App owns the single dashboard-only code wallpaper. Worlds own their own scenery. */}
       {/* Legibility scrim over the full-bleed world: a gradient, not a box, so
           the HUD stays borderless while text keeps its contrast. */}
       <div className="hud-scrim" aria-hidden="true" />
@@ -249,7 +285,7 @@ export function AppShell({ children, chat, chatInline = false }: {
       {!chatInline && chat}
 
       {/* Mobile: a real command bar, not a shrunken sidebar. */}
-      <nav className="shell-mobilebar" aria-label="Nawigacja Genesis (mobile)">
+      <nav className="shell-mobilebar" aria-label="Nawigacja Genesis (mobile)" data-testid="mobile-navigation">
         {PRIMARY_NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -260,20 +296,28 @@ export function AppShell({ children, chat, chatInline = false }: {
             <span>{item.label.split(' ')[0]}</span>
           </button>
         ))}
-        <button className="shell-mobilebar-item" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen}>
+        <button
+          className={`shell-mobilebar-item${menuOpen ? ' active' : ''}`}
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          aria-controls="genesis-mobile-menu"
+        >
           <span aria-hidden="true">☰</span>
-          <span>Więcej</span>
+          <span>Menu</span>
         </button>
       </nav>
 
       {menuOpen && (
-        <div className="shell-sheet" role="dialog" aria-label="Pełne menu Genesis">
-          <div className="shell-sheet-head">
-            <strong>Genesis</strong>
-            <button className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
+        <>
+          <button className="shell-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu" tabIndex={-1} />
+          <div id="genesis-mobile-menu" className="shell-sheet" role="dialog" aria-modal="true" aria-label="Pełne menu Genesis">
+            <div className="shell-sheet-head">
+              <span><strong>Menu</strong><small>Wybierz obszar Genesis</small></span>
+              <button ref={menuCloseRef} className="shell-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Zamknij menu">✕</button>
+            </div>
+            <div className="shell-sheet-body">{sections}</div>
           </div>
-          <div className="shell-sheet-body">{sections}</div>
-        </div>
+        </>
       )}
     </div>
     </>

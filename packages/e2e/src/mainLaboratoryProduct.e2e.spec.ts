@@ -1,0 +1,84 @@
+/* Proprietary / All Rights Reserved - Genesis OS */
+import { expect, test, type Page } from '@playwright/test';
+
+const chromiumPath = process.env.CHROME ?? process.env.GENESIS_CHROMIUM_PATH;
+test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } : {}) } });
+
+const VIEWPORTS = [
+  { width: 375, height: 812 },
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+] as const;
+
+async function openLab(page: Page): Promise<void> {
+  await page.addInitScript(() => window.localStorage.setItem('genesis-os:onboarding/v1', JSON.stringify({ completed: true })));
+  await page.goto('/#/scientific-worlds');
+  await expect(page.getByTestId('scientific-worlds')).toBeVisible();
+  // The main product world must be inhabited: its central glass chamber uses
+  // the same governed Human Digital Twin runtime as Human Explorer.
+  await expect.poll(async () => {
+    const raw = await page.getByTestId('scientific-worlds').getAttribute('data-runtime-diagnostics');
+    return raw ? (JSON.parse(raw) as { twins?: number }).twins : 0;
+  }).toBe(1);
+}
+
+for (const viewport of VIEWPORTS) {
+  test(`main laboratory stays world-first at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(String(error)));
+    page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+    await openLab(page);
+
+    // World-first now means literally that: the laboratory opens with no panels, no chips and no
+    // sliders — one control for the details, one field to ask. Everything else is in the scene.
+    const primary = page.locator('.sw-lab-primary');
+    const navigation = page.getByTestId('mobile-navigation');
+    await expect(page.getByTestId('scientific-worlds')).toHaveAttribute('data-details', 'closed');
+    await expect(page.getByTestId('sw-lab-chat-input')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Strefy laboratorium' })).toBeHidden();
+    await expect(page.getByTestId('sw-status')).toBeHidden();
+    await expect(page.getByTestId('sw-evidence')).toBeHidden();
+
+    const [primaryBox, navigationBox] = await Promise.all([primary.boundingBox(), navigation.boundingBox()]);
+    expect(primaryBox).not.toBeNull();
+    expect(navigationBox).not.toBeNull();
+    if (primaryBox && navigationBox) {
+      expect(primaryBox.height).toBeLessThan(viewport.height * 0.3);
+      expect(primaryBox.y + primaryBox.height).toBeLessThanOrEqual(navigationBox.y + 1);
+    }
+
+    // The details are one click away, because evidence must stay reachable.
+    await page.getByTestId('sw-details').click();
+    await expect(page.getByTestId('sw-evidence')).toBeVisible();
+    await expect(page.getByTestId('sw-status')).toBeVisible();
+
+    const widths = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport + 1);
+    expect(widths.body).toBeLessThanOrEqual(widths.viewport + 1);
+    expect(errors.filter((entry) => !entry.includes('Failed to load resource'))).toEqual([]);
+  });
+}
+
+
+
+test('canonical titration runs in the laboratory and replays without fake progress', async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openLab(page);
+  // The world-first lab keeps the panels behind one control; the details open them.
+  await page.getByTestId('sw-details').click();
+  await page.getByTestId('sw-controls').click();
+  await page.getByTestId('sw-quick-miareczkowanie').click();
+  const result = page.getByTestId('sw-titration-context');
+  await expect(result).toBeVisible({ timeout: 240_000 });
+  await expect(result).toContainText('EDUCATIONAL PROCEDURE MODEL');
+  await expect(result).toContainText('Wynik');
+  await expect(result).toContainText('pH');
+  await expect(result).toContainText('rekonstrukcją edukacyjną');
+
+  await result.getByRole('button', { name: 'Evidence + replay' }).click();
+  await expect(page.getByTestId('sw-session')).toBeVisible();
+  await page.getByTestId('sw-replay').click();
+  await expect(page.getByTestId('sw-replay-verdict')).toHaveText(/MATCH/);
+});

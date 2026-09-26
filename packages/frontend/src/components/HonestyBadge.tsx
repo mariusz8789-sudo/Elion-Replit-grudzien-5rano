@@ -9,7 +9,10 @@ export function HonestyBadge({ level, note }: { level: HonestyLevel; note: strin
   return (
     <div className="honesty-row">
       <span className={`honesty ${level}`}>{HONESTY_LABELS[level]}</span>
-      <span className="honesty-note">{note}</span>
+      <details className="honesty-explanation">
+        <summary>Co dokładnie liczy ten model?</summary>
+        <p className="honesty-note">{note}</p>
+      </details>
     </div>
   );
 }

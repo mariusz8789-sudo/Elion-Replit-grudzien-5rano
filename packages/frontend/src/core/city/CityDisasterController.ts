@@ -2,8 +2,9 @@ import type { DigitalTwinHandle } from './GenesisCityDigitalTwin.js';
 import { GenesisDisasterEngine } from './GenesisDisasterEngine.js';
 import type { DisasterScenarioId, DisasterSnapshot } from './GenesisDisasterEngine.js';
 import type { SeirParams, FloodParams, BlastParams } from '../../../../core/src/city-enterprise/GenesisCrisisEngine.js';
+import { fnv1a } from '@genesis/core/determinism.js';
 /** Technical checksum (FNV-1a). NOT a SHA-256 custody hash. */
-export const traceChecksum = (s: string): string => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return (h >>> 0).toString(16).padStart(8, '0'); };
+export const traceChecksum = (s: string): string => fnv1a(s);
 export interface TelemetryFrame { t: number; snapshot: DisasterSnapshot; checksum: string; }
 export interface ControllerParams { seir?: SeirParams; flood?: FloodParams; }
 /** Bridges twin + disaster engine to UI/renderer; append-only telemetry with technical checksum. */

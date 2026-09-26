@@ -621,7 +621,8 @@ describe('Genesis Experiment Fabric', () => {
     expect(reviewed.status).toBe('READY_FOR_CONFIRMATION');
     expect(reviewed.disclosure.capability).toBe('BACKEND_REAL_ENGINE');
     expect(reviewed.plan.modelVersion).toBe('1.1.0');
-    expect(reviewed.plan.route).toEqual({ kind: 'none' });
+    // The titration result is shown at the main-Laboratory station, which runs the same shared runner.
+    expect(reviewed.plan.route).toEqual({ kind: 'product-route', hash: '#/scientific-worlds?station=st-titration', parameterQueryKeys: ['acid', 'vb'] });
     expect(reviewed.disclosure.rationale).toContain('nie danymi jednego pomiaru');
     expect(chemistry?.realModels).toContain('chemistry-titration');
   });
@@ -1184,6 +1185,23 @@ describe('Genesis Experiment Fabric', () => {
     expect(rejected.result.summary).toContain('poza zakresem 0.5–5');
   });
 
+  it('routes the existing deterministic 5D manifold engine through Fabric with canonical replay identity', () => {
+    const command = 'Pokaż silnik 5D: punkty=48, krok czasu=0.1, amplituda w=0.5.';
+    const run = runExperiment(parseScienceChatMessage(command));
+    const repeated = runExperiment(parseScienceChatMessage(command));
+    const mathematics = getKnowledgeDomain('mathematics');
+
+    expect(mathematics?.realModels).toContain('math-manifold-5d');
+    expect(run.request.modelId).toBe('math-manifold-5d');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.route).toMatchObject({ kind: 'none' });
+    expect(run.result.outputs.pointCount).toBe(48);
+    expect(run.result.outputs.cryptographicProof).toMatch(/^[0-9a-f]{64}$/);
+    expect(run.result.warnings.join(' ')).toContain('nie dowód istnienia fizycznego piątego wymiaru');
+    expect(run.provenance.runFingerprint).toBe(repeated.provenance.runFingerprint);
+    expect(run.result.outputs).toEqual(repeated.result.outputs);
+  });
+
   it('runs one deterministic EpidemicCitySimulation and exposes only real event summaries', () => {
     const request = parseScienceChatMessage('Zasymuluj epidemię z R0=8 przez 90 dni seed=20260817.');
     const a = runExperiment(request);
@@ -1567,6 +1585,63 @@ describe('Experiment observable shape', () => {
     expect(experimentObservableKind(1.25)).toBe('scalar');
     expect(experimentObservableKind([0.1, 0.2, 0.3])).toBe('series');
     expect(experimentObservableKind([0.3, 0.2, 0.1])).toBe('series');
+  });
+});
+
+describe('educational lung exposure model', () => {
+  it.each([
+    ['Pokaż wpływ palenia papierosów na płuca przez 10 lat', 'cigarette', 10],
+    ['Pokaż wpływ e-papierosów na płuca przez 5 lat', 'vaping', 5],
+    ['Pokaż wpływ marihuany na płuca przez 1 rok', 'cannabis', 1],
+  ])('routes %s through canonical Fabric', (message, exposure, years) => {
+    const run = runExperiment(parseScienceChatMessage(message));
+    expect(run.request.modelId).toBe('biology-lung-exposure');
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs).toMatchObject({ exposure, years, classification: 'EDUCATIONAL_SIMULATION', epistemicLabel: 'MODEL', clinicalUse: 'NOT_CLINICAL_DIAGNOSIS' });
+    expect(run.result.route).toMatchObject({ kind: 'product-route', hash: expect.stringContaining('#/human-biology-lab') });
+  });
+
+  it('keeps vaping uncertainty explicit and replay deterministic', () => {
+    const request = parseScienceChatMessage('Porównaj zdrowe płuca i wpływ vapingu przez 10 lat');
+    const first = runExperiment(request);
+    const second = runExperiment(request);
+    expect(first.result.outputs.evidenceStrength).toBe('PARTIAL_LONG_TERM_EVIDENCE');
+    expect(first.result.outputs.alveolarDamage).toBe('NOT_QUANTIFIED');
+    expect(second.provenance.runFingerprint).toBe(first.provenance.runFingerprint);
+  });
+});
+
+describe('School Health / Prevention Lab V1', () => {
+  it.each([
+    ['Pokaż wpływ palenia na serce', 'cigarette', 'heart', 'heart'],
+    ['Pokaż wpływ e-papierosów', 'vaping', 'lungs', 'left-lung'],
+    ['Pokaż wpływ alkoholu na mózg', 'alcohol', 'brain', 'brain'],
+    ['Pokaż wpływ alkoholu na wątrobę długoterminowo', 'alcohol', 'liver', 'liver'],
+    ['Pokaż wpływ marihuany na organizm', 'cannabis', 'brain', 'brain'],
+    ['Pokaż wpływ narkotyków na organizm', 'harmful-drugs', 'brain', 'brain'],
+  ])('routes %s through the canonical educational Fabric', (message, topic, target, focus) => {
+    const request = parseScienceChatMessage(message);
+    const run = runExperiment(request);
+    expect(request.modelId).toBe('biology-prevention-education');
+    expect(request.parameters).toMatchObject({ topic, target, focus });
+    expect(run.result.status).toBe('completed');
+    expect(run.result.outputs).toMatchObject({ topic, target, classification: 'EDUCATIONAL_MODEL', presentation: 'SIMULATION', clinicalUse: 'NOT_MEDICAL_DIAGNOSIS' });
+    expect(run.result.route).toMatchObject({ kind: 'product-route', hash: expect.stringContaining('simulation=prevention-lab') });
+  });
+
+  it('keeps generic harmful-drug content overview-only and replay deterministic', () => {
+    const request = parseScienceChatMessage('Pokaż wpływ narkotyków na organizm');
+    const first = runExperiment(request);
+    const second = runExperiment(request);
+    expect(first.result.outputs.evidenceLabel).toBe('EDUCATIONAL_OVERVIEW_ONLY');
+    expect(first.result.validity?.toLocaleLowerCase('pl-PL')).toContain('nie jest modelem toksykologicznym');
+    expect(second.provenance.runFingerprint).toBe(first.provenance.runFingerprint);
+  });
+
+  it('does not turn an unrelated prevention topic into a supported simulation', () => {
+    const request = parseScienceChatMessage('Pokaż wpływ nieznanej substancji X na organizm');
+    expect(request.modelId).toBeUndefined();
+    expect(request.domainId).toBe('unknown');
   });
 });
 

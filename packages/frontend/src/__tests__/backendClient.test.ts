@@ -13,6 +13,7 @@ import {
   createMergeRequest,
   decideMergeRequest,
   getContributions,
+  runResearchIntake,
 } from '../core/backend/client';
 
 /**
@@ -165,5 +166,32 @@ describe('Scientific Git client', () => {
     const r = await getContributions('tok', 'p');
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.totalTrials).toBe(0);
+  });
+});
+
+describe('research intake client', () => {
+  it('posts the governed question to the selected project without changing its meaning', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse(200, {
+      result: { status: 'BLOCKED_TARGET', candidateMatrix: [], deterministicFingerprint: 'abc' },
+      campaignDraft: null,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await runResearchIntake('tok', 'project-1', {
+      originalQuery: 'szukaj kandydatów dla migreny',
+      declaredInputKind: 'AUTO',
+      maxCandidateBudget: 8,
+      prepareCampaignDraft: false,
+    });
+
+    expect(response.ok).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/project-1/research-intake');
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe('Bearer tok');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      originalQuery: 'szukaj kandydatów dla migreny',
+      declaredInputKind: 'AUTO',
+      maxCandidateBudget: 8,
+      prepareCampaignDraft: false,
+    });
   });
 });

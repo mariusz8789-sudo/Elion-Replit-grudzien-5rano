@@ -23,6 +23,9 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const IGNORED = new Set([
   // Dostarczane przez platformę/narzędzia, nie przez operatora Genesis.
   'NODE_ENV', 'CI', 'GITHUB_ACTIONS', 'npm_package_version',
+  // Systemowe katalogi profilu używane wyłącznie do wykrywania lokalnych
+  // runtime'ów/narzędzi. Operator Genesis nie konfiguruje ich w `.env`.
+  'HOME', 'LOCALAPPDATA', 'USERPROFILE',
 ]);
 
 function envVarsReadByCode() {

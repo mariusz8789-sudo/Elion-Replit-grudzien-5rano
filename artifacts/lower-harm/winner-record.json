@@ -124,7 +124,7 @@
     "preregistrationFingerprint": "c827c79c",
     "falsificationCriteriaFingerprint": "af76e28c",
     "recipeFingerprint": "7ddcabe9",
-    "auditFingerprint": "6615057e",
+    "auditFingerprint": "34c5b23c",
     "gateFingerprint": "cf987dda"
   },
   "recipe": {
@@ -196,5 +196,5 @@
     "SINGLE FUNNEL PASS: no independent replication in a disjoint trial population has been performed.",
     "RESEARCH ARTIFACT: not a medical prescription, not a dosing instruction, not a synthesis procedure."
   ],
-  "recordFingerprint": "b6207e9c"
+  "recordFingerprint": "890a7310"
 }

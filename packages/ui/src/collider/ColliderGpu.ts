@@ -5,7 +5,7 @@ import { PHYS } from '@genesis/core/collider/QuantumColliderEngine.js';
 export interface ColliderLayerHandle { update(t: number): void; dispose(): void; }
 const TRACK_VERT = /* glsl */ `
 attribute float aPT; attribute float aPhi0; attribute float aPzOverPt; attribute float aCharge; attribute float aS; attribute float aType;
-uniform float uB; uniform float uScale;
+uniform float uB; uniform float uScale; uniform float uReveal;
 varying float vType; varying float vFade; varying float vCharge;
 void main(){
   float q = aCharge; float pT = max(aPT, 0.05);
@@ -16,7 +16,8 @@ void main(){
   else { x = R * (sin(aPhi0 + theta) - sin(aPhi0)); y = -R * (cos(aPhi0 + theta) - cos(aPhi0)); }
   float z = aS * aPzOverPt;
   vec3 pos = vec3(x, y, z) * uScale;
-  vFade = exp(-aS * 0.00035);
+  float revealEdge = uReveal * 6000.0;
+  vFade = exp(-aS * 0.00035) * (1.0 - smoothstep(revealEdge, revealEdge + 180.0, aS));
   vType = aType; vCharge = q;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }`;
@@ -25,11 +26,11 @@ precision highp float; varying float vType; varying float vFade; varying float v
 vec3 palette(float t){ if (t < 0.5) return vec3(0.2,0.9,1.0); if (t < 1.5) return vec3(1.0,0.35,0.6); if (t < 2.5) return vec3(0.4,1.0,0.5); if (t < 3.5) return vec3(1.0,0.85,0.3); return vec3(0.7,0.7,0.75); }
 void main(){ vec3 col = palette(vType) * (0.6 + 0.4 * abs(vCharge)); gl_FragColor = vec4(col * vFade, vFade); }`;
 const HIT_VERT = /* glsl */ `
-attribute float aEnergy; attribute float aKind; uniform float uPixelRatio; varying float vE; varying float vK;
+attribute float aEnergy; attribute float aKind; uniform float uPixelRatio; uniform float uReveal; varying float vE; varying float vK;
 void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv; vE = aEnergy; vK = aKind; gl_PointSize = (4.0 + 26.0 * min(1.0, aEnergy / 400.0)) * uPixelRatio; }`;
 const HIT_FRAG = /* glsl */ `
-precision highp float; varying float vE; varying float vK;
-void main(){ vec2 uv = gl_PointCoord - 0.5; float d = length(uv)*2.0; if (d>1.0) discard; float a = pow(1.0-d,2.0); vec3 col = vK < 0.5 ? vec3(0.2,0.9,0.6) : vec3(1.0,0.6,0.2); gl_FragColor = vec4(col*a*(0.4+0.6*min(1.0,vE/300.0)), a); }`;
+precision highp float; uniform float uReveal; varying float vE; varying float vK;
+void main(){ vec2 uv = gl_PointCoord - 0.5; float d = length(uv)*2.0; if (d>1.0) discard; float a = pow(1.0-d,2.0) * smoothstep(0.48,0.62,uReveal); vec3 col = vK < 0.5 ? vec3(0.2,0.9,0.6) : vec3(1.0,0.6,0.2); gl_FragColor = vec4(col*a*(0.4+0.6*min(1.0,vE/300.0)), a); }`;
 const typeOf = (pdg: number): number => (pdg === 22 ? 4 : Math.abs(pdg) === 11 || Math.abs(pdg) === 13 ? 0 : Math.abs(pdg) === 211 ? 1 : Math.abs(pdg) === 12 || Math.abs(pdg) === 14 ? 3 : 2);
 const SEG = 48;
 export function createColliderLayer(scene: THREE.Scene, ev: ColliderEvent, opts: { B?: number; scale?: number; pixelRatio?: number } = {}): ColliderLayerHandle {
@@ -60,7 +61,7 @@ export function createColliderLayer(scene: THREE.Scene, ev: ColliderEvent, opts:
   geo.setAttribute('aCharge', new THREE.BufferAttribute(aQ, 1));
   geo.setAttribute('aS', new THREE.BufferAttribute(aS, 1));
   geo.setAttribute('aType', new THREE.BufferAttribute(aT, 1));
-  const uni = { uB: { value: B }, uScale: { value: scale } };
+  const uni = { uB: { value: B }, uScale: { value: scale }, uReveal: { value: 0 } };
   const mat = new THREE.ShaderMaterial({ vertexShader: TRACK_VERT, fragmentShader: TRACK_FRAG, uniforms: uni, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const lines = new THREE.LineSegments(geo, mat); scene.add(lines);
   const hits = ev.finals.filter(f => f.pdg === 22 || Math.abs(f.pdg) === 211 || Math.abs(f.pdg) === 11 || Math.abs(f.pdg) === 13);
@@ -70,7 +71,7 @@ export function createColliderLayer(scene: THREE.Scene, ev: ColliderEvent, opts:
   hGeo.setAttribute('position', new THREE.BufferAttribute(hPos, 3));
   hGeo.setAttribute('aEnergy', new THREE.BufferAttribute(hE, 1));
   hGeo.setAttribute('aKind', new THREE.BufferAttribute(hK, 1));
-  const hUni = { uPixelRatio: { value: pr } };
+  const hUni = { uPixelRatio: { value: pr }, uReveal: { value: 0 } };
   const hMat = new THREE.ShaderMaterial({ vertexShader: HIT_VERT, fragmentShader: HIT_FRAG, uniforms: hUni, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const points = new THREE.Points(hGeo, hMat); scene.add(points);
   const shells: THREE.Mesh[] = [];
@@ -78,5 +79,41 @@ export function createColliderLayer(scene: THREE.Scene, ev: ColliderEvent, opts:
     const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 6, 32, 1, true), new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.18 }));
     m.rotation.x = Math.PI / 2; scene.add(m); shells.push(m);
   }
-  return { update: (_t) => { uni.uB.value = B; }, dispose: () => { geo.dispose(); mat.dispose(); hGeo.dispose(); hMat.dispose(); shells.forEach(s => { s.geometry.dispose(); (s.material as THREE.Material).dispose(); scene.remove(s); }); scene.remove(lines, points); } };
+  // A short, deterministic visual reveal: two incoming proton bunch markers
+  // meet at the interaction point, then the already-computed event tracks
+  // propagate outward. This is a visualization of `ev`, never detector data
+  // or fabricated solver telemetry.
+  const beamGeo = new THREE.SphereGeometry(0.11, 14, 10);
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0x7de7ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+  const beamA = new THREE.Mesh(beamGeo, beamMat);
+  const beamB = new THREE.Mesh(beamGeo, beamMat.clone());
+  const flashGeo = new THREE.SphereGeometry(0.2, 18, 12);
+  const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const flash = new THREE.Mesh(flashGeo, flashMat);
+  scene.add(beamA, beamB, flash);
+  let bornAt: number | null = null;
+  return {
+    update: (t) => {
+      if (bornAt === null) bornAt = t;
+      const age = Math.max(0, t - bornAt);
+      const approach = Math.min(1, age / 0.65);
+      beamA.position.set(-4 * (1 - approach), 0, 0);
+      beamB.position.set(4 * (1 - approach), 0, 0);
+      beamA.visible = approach < 1;
+      beamB.visible = approach < 1;
+      const reveal = Math.max(0, Math.min(1, (age - 0.55) / 1.7));
+      uni.uB.value = B;
+      uni.uReveal.value = reveal;
+      hUni.uReveal.value = reveal;
+      const flashPhase = Math.max(0, 1 - Math.abs(age - 0.7) / 0.35);
+      flashMat.opacity = flashPhase;
+      flash.scale.setScalar(0.6 + flashPhase * 2.8);
+    },
+    dispose: () => {
+      geo.dispose(); mat.dispose(); hGeo.dispose(); hMat.dispose();
+      beamGeo.dispose(); beamMat.dispose(); (beamB.material as THREE.Material).dispose(); flashGeo.dispose(); flashMat.dispose();
+      shells.forEach(s => { s.geometry.dispose(); (s.material as THREE.Material).dispose(); scene.remove(s); });
+      scene.remove(lines, points, beamA, beamB, flash);
+    },
+  };
 }

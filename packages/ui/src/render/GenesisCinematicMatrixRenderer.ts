@@ -1,7 +1,5 @@
-import { createHash } from 'node:crypto';
-export const mulberry32 = (seed: number) => { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-export const stableStringify = (v: unknown): string => { if (v === null) return 'null'; if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']'; if (typeof v === 'object') { const o = v as Record<string, unknown>; return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}'; } return JSON.stringify(v); };
-export const sha256hex = (t: string): string => createHash('sha256').update(t, 'utf8').digest('hex');
+import { mulberry32, canonicalJson as stableStringify, sha256Hex as sha256hex } from '@genesis/core/determinism.js';
+export { mulberry32, stableStringify, sha256hex };
 export interface Clock { now(): number; }
 export interface MatrixRainColumn { readonly columnIndex: number; readonly speed: number; readonly characters: readonly string[]; readonly opacity: number; readonly headRow: number; }
 export interface ChromeMaterialConfig { readonly metalness: number; readonly roughness: number; readonly tintHex: string; readonly envIntensity: number; }

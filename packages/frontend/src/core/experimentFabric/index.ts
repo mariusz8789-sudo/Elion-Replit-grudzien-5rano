@@ -116,6 +116,84 @@ export { QUANTUM_EVIDENCE_CARD_VERSION, createMajorana1QuantumEvidenceCard, quan
 export { SCENARIO_CAPSULE_VERSION, createScenarioCapsule, replayScenarioCapsule, serializeScenarioCapsule, type ScenarioCapsuleReplayStatus, type ScenarioCapsuleInput, type SpatialScenarioAttachment, type ReproducibleScenarioCapsule, type ScenarioCapsuleReplay } from './scenarioCapsule';
 export { GENESIS_SPATIAL_DATASET_VERSION, OSM_ATTRIBUTION, OSM_LICENSE, normalizeOsmMapXml, type SpatialLayer, type LonLat, type GenesisSpatialFeature, type GenesisSpatialDataset, type OsmMapImportRequest } from './spatialImport';
 export {
+  MODEL_ROUTER_CONTRACT_VERSION,
+  isModelRouterTaskClass,
+  routeModelRequest,
+  attachSolverVerification,
+  type ModelRouterTaskClass,
+  type ModelProviderIdentity,
+  type ModelProviderDescriptor,
+  type EvidenceRef as ModelRouterEvidenceRef,
+  type SolverVerification,
+  type ModelResultKind,
+  type ModelReasoningRequest,
+  type ModelInvokeResult,
+  type ModelInvokePort,
+  type ModelRoutingBlocked,
+  type ModelRoutingResult,
+  type ModelRouterOutcome,
+  type SolverVerifiedResult,
+} from './modelRouter';
+
+export {
+  SCIENTIFIC_METRICS_VERSION,
+  computePredictionError,
+  computeSurpriseScore,
+  computeInformationGain,
+  deriveKnowledgeGaps,
+  DEFAULT_KNOWLEDGE_GAP_THRESHOLD_SIGMA,
+  type PredictionErrorInput,
+  type PredictionErrorResult,
+  type InformationGainInput,
+  type KnowledgeGap,
+} from '../metaCognition/scientificMetrics';
+
+export {
+  DECISION_TRACE_VERSION,
+  assertNoHiddenReasoningOrSentienceClaim,
+  buildDecisionTrace,
+  type DecisionEvidenceRef,
+  type DecisionAlternativeStatus,
+  type DecisionAlternative,
+  type DecisionTraceInput,
+  type DecisionTrace,
+} from '../metaCognition/decisionTrace';
+
+export {
+  SCIENTIFIC_INTEGRATION_VERSION,
+  classifyOutcome,
+  runScientificIntegrationCampaign,
+  type ScientificCampaignStatus,
+  type CycleMetrics,
+  type ScientificCampaignCycleReport,
+  type ScientificCampaignResult,
+  type RunScientificCampaignOptions,
+} from './scientificIntegration';
+
+export {
+  PAIN_RESEARCH_VERSION,
+  PAIN_RESEARCH_GOVERNANCE_ENVELOPE,
+  assertNoClinicalOrActuationParameters,
+  runPainResearchQuestion,
+  type PainResearchGovernance,
+  type PainResearchTarget,
+  type PainResearchQuestion,
+  type PainResearchCapabilityStatus,
+  type PainResearchReport,
+} from './painResearch';
+
+export {
+  SPACETIME_INTEGRITY_VERSION,
+  requiredEpistemicLabelForPhysicsClaim,
+  assertNoBackwardTimeTravelClaim,
+  validatePhysicsClaim,
+  validatePhysicsClaims,
+  type PhysicsClaimCategory,
+  type PhysicsClaim,
+  type PhysicsClaimValidation,
+} from './spacetimeIntegrity';
+
+export {
   ORCHESTRATION_CONTRACT_VERSION,
   planCrossDomainOrchestration,
   confirmCrossDomainOrchestration,

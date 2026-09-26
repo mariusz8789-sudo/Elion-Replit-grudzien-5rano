@@ -1,0 +1,121 @@
+ M .env.example
+ M data/transcription/glp1r-a1/A1-chunk-01.psv
+ M data/transcription/glp1r-a1/A1-chunk-02.psv
+ M data/transcription/glp1r-a1/A1-chunk-03.psv
+ M data/transcription/glp1r-a1/A1-chunk-04.psv
+ M data/transcription/glp1r-a1/A1-chunk-05.psv
+ M data/transcription/glp1r-a1/A1-chunk-06.psv
+ M data/transcription/glp1r-a1/A1-chunk-07.psv
+ M data/transcription/glp1r-a2/A2-chunk-01.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-01.attempt2.psv
+ M data/transcription/glp1r-a2/A2-chunk-02.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-02.attempt2.psv
+ M data/transcription/glp1r-a2/A2-chunk-03.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-03.attempt2.psv
+ M data/transcription/glp1r-a2/A2-chunk-04.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-04.attempt2.psv
+ M data/transcription/glp1r-a2/A2-chunk-05.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-06.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-07.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-07.attempt2.psv
+ M data/transcription/glp1r-a2/A2-chunk-08.attempt1.psv
+ M data/transcription/glp1r-a2/A2-chunk-08.attempt2.psv
+ M data/transcription/glp1r-a2/per-row/chunk-01.rowhash
+ M data/transcription/glp1r-a2/per-row/chunk-02.rowhash
+ M data/transcription/glp1r-a2/per-row/chunk-04.partial.rowhash
+ M data/transcription/glp1r-a3/A3-chunk-01.psv
+ M data/transcription/glp1r-a3/A3-chunk-02.psv
+ M data/transcription/glp1r-a3/A3-chunk-03.psv
+ M data/transcription/glp1r-a3/A3-chunk-04.psv
+ M docs/evidence/usgs/USGS-01646500-00060-2026-08-20.json
+ M docs/evidence/usgs/USGS-01646500-monitoring-location.json
+ M packages/backend/src/buildInfo.test.mjs
+ M packages/backend/src/campaign/giprActivity.json
+ M packages/backend/src/campaign/glp1rActivity.json
+ M packages/backend/src/compute/cms-zmumu/Zmumu.csv
+ M packages/backend/src/compute/rdkitAdapter.mjs
+ M packages/backend/src/compute/rdkit_worker.py
+ M packages/backend/src/d104TranscriptionCustody.test.mjs
+ M packages/backend/src/d105A2Custody.test.mjs
+ M packages/backend/src/d108PerRowCustody.test.mjs
+ M packages/backend/src/d109Trial2Readiness.test.mjs
+ M packages/backend/src/dependencyAudit.test.mjs
+ M packages/backend/src/security/dependencyAudit.mjs
+ M packages/backend/src/store.mjs
+ M packages/core/src/engine/native/nativeEngine.test.ts
+ M packages/core/src/flagship/flagship.test.ts
+ M packages/core/src/flagship/mirrorTwin.ts
+ M packages/core/src/mythos/KernelProviderRegistry.ts
+ M packages/frontend/src/App.tsx
+ M packages/frontend/src/__tests__/autonomousDiscoveryLoop.test.ts
+ M packages/frontend/src/__tests__/governanceFoundation.test.ts
+ M packages/frontend/src/__tests__/humanExplorer.test.ts
+ M packages/frontend/src/__tests__/humanMacroMicroLayer.test.ts
+ M packages/frontend/src/__tests__/liveMatrixBoundary.test.tsx
+ M packages/frontend/src/__tests__/liveMatrixEngine.test.ts
+ M packages/frontend/src/__tests__/moduleReachability.test.ts
+ M packages/frontend/src/__tests__/scientificInteriorVisuals.test.ts
+ M packages/frontend/src/__tests__/winnerGateBypassAudit.test.ts
+ M packages/frontend/src/components/AppShell.tsx
+ M packages/frontend/src/components/HumanExplorerPanel.tsx
+ M packages/frontend/src/components/ScientificWorldsScreen.tsx
+ M packages/frontend/src/components/WorldsHubScreen.tsx
+ M packages/frontend/src/components/liveMatrix/LiveMatrixBackground.tsx
+ M packages/frontend/src/components/liveMatrix/matrixEngine.ts
+ M packages/frontend/src/components/visual-simulation/TemporalCinematicScreen.tsx
+ M packages/frontend/src/core/benchmark/fixtures/discoverybench/evolution_freshwater_fish/body-size-evolution-in-south-american-freshwater-fishes.csv
+ M packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html
+ M packages/frontend/src/core/e2e/realLabGenesisE2E.test.ts
+ M packages/frontend/src/core/e2e/realLabStandaloneE2E.test.ts
+ M packages/frontend/src/core/lab/devicePorts.ts
+ M packages/frontend/src/core/lab/labSafetyInterlock.ts
+ M packages/frontend/src/core/lab/safetyAndProtocol.test.ts
+ M packages/frontend/src/core/navigation.ts
+ M packages/frontend/src/core/scientificWorlds/agentController.ts
+ M packages/frontend/src/core/scientificWorlds/agenticScienceRuntime.ts
+ M packages/frontend/src/core/scientificWorlds/humanExplorer.ts
+ M packages/frontend/src/core/scientificWorlds/humanLab/anatomyAtlas.ts
+ M packages/frontend/src/core/scientificWorlds/humanLab/anatomyView.ts
+ M packages/frontend/src/core/scientificWorlds/humanLab/types.ts
+ M packages/frontend/src/core/temporalCinematic/historicalWorldParameters.ts
+ M packages/frontend/src/core/temporalCinematic/scientificInteriorVisuals.ts
+ M packages/frontend/src/core/temporalCinematic/temporalCinematicEngine.ts
+ M packages/frontend/src/core/temporalCinematic/temporalCinematicSim3D.ts
+ M packages/frontend/src/core/temporalCinematic/temporalCinematicVisualResolver.ts
+ M packages/frontend/src/core/three/agentLabScene3D.ts
+ M packages/frontend/src/core/three/biologyLabKit.ts
+ M packages/frontend/src/core/three/graphics/worldGrade.ts
+ M packages/frontend/src/core/three/humanMacroMicroLayer.ts
+ M packages/frontend/src/core/three/humanTwinAsset.ts
+ M packages/frontend/src/core/three/types.ts
+ M packages/frontend/src/core/three/useThreeLoop.ts
+ M packages/frontend/src/core/worldModel/ecs/geometry.ts
+ M packages/frontend/src/core/worldModel/generation/geometry/buildingGenerator.ts
+ M packages/frontend/src/core/worldModel/generation/geometry/index.ts
+ M packages/frontend/src/core/worldModel/generation/geometry/interiorGenerator.ts
+ M packages/frontend/src/core/worldModel/generation/geometry/structuralDetailSpec.ts
+ M packages/frontend/src/styles-2040-hud.css
+ M packages/frontend/src/styles.css
+ M scripts/capture-mockup-plates.mjs
+ M scripts/visual-e2e-v52-v7.mjs
+?? .codex-remote-attachments/
+?? .gitattributes
+?? artifacts/human-twin-review/
+?? docs/GENESIS_DEPLOY_CANDIDATE_REPORT_2026-09-22.md
+?? docs/GENESIS_IMPLEMENTATION_REVIEW_2026-09-22.md
+?? docs/GENESIS_V6_V7_CAPABILITY_EVIDENCE.md
+?? docs/GENESIS_VISUAL_ASSET_STRATEGY.md
+?? docs/GENESIS_VISUAL_DECISION_REVIEW_2026-09-22.md
+?? packages/frontend/src/__tests__/humanExplorerRuntime.test.ts
+?? packages/frontend/src/__tests__/humanTwinLoading.test.ts
+?? packages/frontend/src/__tests__/humanTwinSceneLifecycle.test.ts
+?? packages/frontend/src/__tests__/metaCognitionRuntime.test.ts
+?? packages/frontend/src/__tests__/worldDirectorRuntime.test.ts
+?? packages/frontend/src/components/MetaCognitionScreen.tsx
+?? packages/frontend/src/components/MirrorStatusScreen.tsx
+?? packages/frontend/src/components/WorldDirectorScreen.tsx
+?? packages/frontend/src/core/metaCognition/
+?? packages/frontend/src/core/worldDirector/
+?? scripts/genesis-director-meta-mirror-e2e.mjs
+?? scripts/genesis-visual-surfaces-e2e.mjs
+?? scripts/human-twin-browser-e2e.mjs

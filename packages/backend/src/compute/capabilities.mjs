@@ -14,6 +14,7 @@
  */
 
 import { detect as rdkitDetect } from './rdkitAdapter.mjs';
+import { getTool } from '../campaign/toolchain.mjs';
 
 export const CAPABILITY_STATUS = {
   AVAILABLE: 'AVAILABLE',
@@ -101,6 +102,15 @@ export const CAPABILITIES = [
     adapter: 'StructureAdapter.predict(sequence) → { pdbRef, plddt, engine }',
   },
   {
+    // Retrosynthetic route search. Backed by the real engine registered in the canonical toolchain
+    // (AiZynthFinder); its live status — including the missing model files — comes from there.
+    id: 'retrosynthesis', label: 'Planowanie trasy syntezy (retrosynteza)', category: 'synthesis',
+    status: CAPABILITY_STATUS.EXTERNAL_ENGINE_REQUIRED,
+    requires: 'AiZynthFinder + jego opublikowane dane modelu (polityka ekspansji, biblioteka szablonów, stock) wskazane przez GENESIS_RETRO_MODEL_DIR.',
+    adapter: 'retroAdapter.planRoute(smiles, { iterationLimit, maxRoutes }) → { routes[], solved, provenance }',
+    note: 'Zaproponowana trasa to MODEL_ESTIMATE: brak warunków, ilości, wydajności i oceny bezpieczeństwa. Bez silnika Genesis NIE proponuje żadnej trasy.',
+  },
+  {
     id: 'generative-de-novo', label: 'Generatywne projektowanie de novo', category: 'generative',
     status: CAPABILITY_STATUS.NOT_IMPLEMENTED,
     requires: 'Zwalidowany model generatywny + wykonalna synteza + filtry bezpieczeństwa.',
@@ -109,9 +119,51 @@ export const CAPABILITIES = [
   },
 ];
 
+// The original drug-discovery manifest predates the canonical campaign
+// toolchain.  Keep its public, legacy capability ids, but derive availability
+// from the one validated registry instead of permanently reporting engines as
+// missing after they have been installed and passed a reference case.
+const TOOL_BACKED_CAPABILITIES = Object.freeze({
+  docking: 'vina',
+  'molecular-dynamics': 'openmm',
+  'quantum-chemistry': 'pyscf',
+  admet: 'admet',
+  toxicity: 'toxicity',
+  retrosynthesis: 'aizynthfinder',
+});
+
+function withCanonicalToolStatus(capability) {
+  const toolId = TOOL_BACKED_CAPABILITIES[capability.id];
+  if (!toolId) return capability;
+  const tool = getTool(toolId);
+  if (!tool) return capability;
+  if (tool.status === 'AVAILABLE') {
+    return {
+      ...capability,
+      status: CAPABILITY_STATUS.AVAILABLE,
+      modelId: tool.capabilityId,
+      engine: tool.engine,
+      version: tool.version,
+      fingerprint: tool.fingerprint,
+      executionStatus: tool.executionStatus,
+      note: `${tool.engineName}; realny przypadek referencyjny przeszedł. ${tool.assumptions}`,
+    };
+  }
+  return {
+    ...capability,
+    status: CAPABILITY_STATUS.BLOCKED_BY_RUNTIME,
+    engine: tool.engine,
+    version: tool.version,
+    fingerprint: tool.fingerprint,
+    executionStatus: tool.executionStatus,
+    requires: tool.reason ?? capability.requires,
+    note: `Kanoniczny toolchain: ${tool.status}. ${tool.assumptions}`,
+  };
+}
+
 /** Pełna lista zdolności: statyczne + RDKit-owe z LIVE statusem runtime. */
 export function listCapabilities() {
-  return [...CAPABILITIES, ...rdkitCapabilityEntries()];
+  return [...CAPABILITIES.map(withCanonicalToolStatus), ...rdkitCapabilityEntries()];
 }
 
 export function getCapability(id) {

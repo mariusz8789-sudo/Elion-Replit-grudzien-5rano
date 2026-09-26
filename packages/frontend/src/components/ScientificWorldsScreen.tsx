@@ -1,0 +1,998 @@
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useThreeLoop } from '../core/three/useThreeLoop';
+import { AgentLabScene3D, TWIN_ID, type AgentCameraMode, type HumanTwinLodPreference, type SceneArtifact, type SceneWorld } from '../core/three/agentLabScene3D';
+import { AgentController, type AgentReport } from '../core/scientificWorlds/agentController';
+import { planActions } from '../core/scientificWorlds/actionPlanner';
+import { parseWorldCommands, stationHandoffCommand, type ParsedCommands } from '../core/scientificWorlds/worldCommand';
+import { LAB_CATALOG, LAB_OBSTACLES, LAB_ROOM, LAB_SPAWN, LAB_STATIONS, LAB_WORLD_ID, type LabStation } from '../core/scientificWorlds/labWorld';
+import { createLabExperimentRunner } from '../core/scientificWorlds/experimentRunners';
+import { createBiologyExperimentRunner } from '../core/scientificWorlds/biologyRunners';
+import { BIOLOGY_CATALOG, BIOLOGY_OBSTACLES, BIOLOGY_ROOM, BIOLOGY_SPAWN, BIOLOGY_STATIONS, BIOLOGY_WORLD_ID } from '../core/scientificWorlds/biologyLabWorld';
+import { parseBiologyWorldCommands } from '../core/scientificWorlds/biologyCommands';
+import { createDefaultAnatomyView, isolateAnatomyNode, selectAnatomyNode, setAnatomyMode, setCutaway } from '../core/scientificWorlds/humanLab/anatomyView';
+import type { AnatomyDisplayMode, AnatomyViewState } from '../core/scientificWorlds/humanLab/types';
+import { TWIN_ASSET_TIER } from '../core/three/biologyLabKit';
+import { humanTwinProvenanceLabel, type HumanTwinTier, type HumanTwinPresentationState } from '../core/three/humanTwinAsset';
+import { bodyParts3dStructure, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
+import { DEFAULT_CUTAWAY, type CutawayState } from '../core/three/humanTwinCutaway';
+import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
+import { replayExperimentSession, type ExperimentRunner, type ExperimentSession, type ReplayVerdict } from '../core/scientificWorlds/experimentSession';
+import { AGENT_STATE_LABEL_PL, type AgentActionState } from '../core/scientificWorlds/agentActionMachine';
+import { narrateReport, narrateSession, type NarrationLine } from '../core/scientificWorlds/narration';
+import { kernelLedger } from '../core/agent/cyberReasoningKernel';
+import { getVoiceEngine } from '../core/guide/guideRuntime';
+import { museumCalmSettings, museumUtterances } from '../core/guide/museumCalm';
+import type { GuideLevel } from '../core/guide/narrationModel';
+import { requestOpenScienceChat } from '../core/scienceChatBridge';
+import HumanExplorerPanel from './HumanExplorerPanel';
+import { macroMicroLevelForArtifact } from '../core/three/humanMacroMicroLayer';
+import { createScientificWorldsCognitiveCore } from '../core/scientificWorlds/cognitiveBridge';
+import { scienceMemoryPort } from '../core/scientificWorlds/scienceMemoryPort';
+import { runCuriosityCycle, type CycleResult } from '../core/scientificWorlds/curiosityCycle';
+import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientificWorlds/agenticScienceRuntime';
+import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
+import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
+import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+
+/** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
+const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
+import { titrationPolyline, titrationRegion } from '../core/scientificWorlds/titrationView';
+import { nextFromCuriosity, outcomeFromDrugLiveRun, outcomeFromLabSession, type ScientificOutcomeView } from '../core/product/scientificOutcome';
+import { buildDrugHypothesis, evaluateDrugHypothesis, getDrugHypothesis, nextDrugExperiment } from '../core/liveExperiment/drugHypothesis';
+import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcomePanel';
+import { LoadingStatus } from './LoadingStatus';
+import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
+import { getToken } from '../core/backend/session';
+import { getCandidateProtocol, getExperimentMemory, type CandidateProtocol } from '../core/backend/client';
+import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
+import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
+import { BENCH_ZONES, benchLayoutOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
+import { labProcedureOf } from '../core/liveExperiment/labProcedure';
+import type { DockingStep } from '../core/liveExperiment/drugRunState';
+
+/**
+ * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
+ * commands in plain language. Text → typed WorldCommand → ActionPlan → the
+ * suited agent walks, reaches, works the console → ONE ExperimentSession
+ * through the kernel's engines → the result appears in the world and in the
+ * evidence panel, with its epistemic status, hashes and a replay button.
+ *
+ * The camera looks through the helmet visor (body and hands in frame); a
+ * spectator camera is secondary. The HUD keeps to reserved safe zones —
+ * status top-left, evidence top-right, command bar at the bottom — and
+ * never covers the centre of the frame. Nothing on this screen is a
+ * placeholder number: the log starts empty and every line comes from a
+ * real command, session or verdict.
+ */
+
+/** What the bench shows for each persisted docking step (the backend writes a step only once it is done). */
+const DOCKING_STEP_LABEL: Record<DockingStep | 'NONE', string> = {
+  NONE: '—',
+  SELECTED: 'kandydat wybrany do dokowania',
+  LIGAND_PREPARED: 'ligand przygotowany (RDKit + Meeko)',
+  VINA_STARTED: 'Vina liczy',
+  POSE_SCORED: 'poza wyznaczona i oceniona',
+  FAILED: 'dokowanie nie powiodło się',
+};
+
+const STATE_NAMES: readonly AgentActionState[] = ['IDLE', 'MOVING_TO_TARGET', 'ARRIVED', 'ALIGNING', 'REACHING', 'INTERACTING', 'EXECUTING', 'OBSERVING', 'REPORTING', 'RETURNING', 'BLOCKED'];
+
+export const QUICK_COMMANDS: readonly { readonly label: string; readonly text: string }[] = [
+  { label: 'Miareczkowanie', text: 'Podejdź do stanowiska miareczkowania i przeprowadź titrację kwasu octowego, dodając 25 mL NaOH. Potem pokaż wynik i dowody.' },
+  { label: 'Synteza NaCl', text: 'Idź do syntezatora kryształów i uruchom próbę NaCl. Potem pokaż mi, co otrzymałeś i skąd to pochodzi.' },
+  { label: 'Zderzacz 13 TeV', text: 'Podejdź do konsoli zderzacza i uruchom paczkę zderzeń przy 13 TeV.' },
+  { label: 'Epidemia', text: 'Idź do pulpitu epidemiologicznego i zasymuluj epidemię.' },
+  { label: 'Okno', text: 'Idź do okna obserwacyjnego.' },
+];
+
+/** The V3 acceptance sentence first; then one chip per station family. */
+export const BIOLOGY_QUICK_COMMANDS: readonly { readonly label: string; readonly text: string }[] = [
+  { label: 'Test V3', text: 'Otwórz wirtualnego człowieka, pokaż mózg, przejdź do Hyperscope, powiększ 5×, a potem zbadaj próbkę przez Orpheus i pokaż mi Evidence.' },
+  { label: 'RTG', text: 'Otwórz wirtualnego człowieka i pokaż rtg.' },
+  { label: 'Neuro', text: 'Idź do konsoli neuro i uruchom symulację sygnałów nerwowych.' },
+  { label: 'Obrazowanie', text: 'Uruchom obrazowanie.' },
+  { label: 'Histologia', text: 'Przygotuj preparat histologiczny.' },
+  { label: 'DNA', text: 'Idź do ściany obliczeniowej i uruchom centralny dogmat dla sekwencji ATGGCCTTAGTGAAGCACGGTACCTTCGAATGGTGA.' },
+];
+
+interface WorldDefinition {
+  readonly id: string; readonly label: string; readonly room: typeof LAB_ROOM; readonly obstacles: typeof LAB_OBSTACLES; readonly stations: readonly LabStation[];
+  readonly spawn: typeof LAB_SPAWN; readonly catalog: typeof LAB_CATALOG; readonly quick: typeof QUICK_COMMANDS;
+  readonly parse: (text: string, logicalTime: number) => ParsedCommands;
+  readonly runner: (ledger: typeof kernelLedger) => ExperimentRunner<SceneArtifact>;
+}
+
+const WORLDS: Readonly<Record<SceneWorld, WorldDefinition>> = {
+  physics: { id: LAB_WORLD_ID, label: 'LABORATORIUM', room: LAB_ROOM, obstacles: LAB_OBSTACLES, stations: LAB_STATIONS, spawn: LAB_SPAWN, catalog: LAB_CATALOG, quick: QUICK_COMMANDS, parse: (t, lt) => parseWorldCommands(t, LAB_CATALOG, lt), runner: (l) => createLabExperimentRunner(LAB_WORLD_ID, l) as ExperimentRunner<SceneArtifact> },
+  biology: { id: BIOLOGY_WORLD_ID, label: 'HUMAN BIOLOGY LAB', room: BIOLOGY_ROOM, obstacles: BIOLOGY_OBSTACLES, stations: BIOLOGY_STATIONS, spawn: BIOLOGY_SPAWN, catalog: BIOLOGY_CATALOG, quick: BIOLOGY_QUICK_COMMANDS, parse: parseBiologyWorldCommands, runner: (l) => createBiologyExperimentRunner(BIOLOGY_WORLD_ID, l) as ExperimentRunner<SceneArtifact> },
+};
+
+/** Pure: the twin's view after an interaction at the anatomy table (V3 anatomyView reducers; unknown nodes are refused, not invented). */
+export function applyAnatomyInteraction(state: AnatomyViewState, parameters: Readonly<Record<string, string | number | boolean>>, manifest: Parameters<typeof isolateAnatomyNode>[2]): { readonly state: AnatomyViewState; readonly error: string | null } {
+  const action = String(parameters.action ?? '');
+  const mode = String(parameters.mode ?? 'NORMAL') as AnatomyDisplayMode;
+  try {
+    if (action === 'OPEN_TWIN') return { state: setAnatomyMode(createDefaultAnatomyView(state.twinId), mode), error: null };
+    if (action === 'FOCUS_ANATOMY') return { state: setAnatomyMode(isolateAnatomyNode(state, String(parameters.focus ?? 'brain'), manifest), mode), error: null };
+    if (action === 'SET_ANATOMY_MODE') return { state: setAnatomyMode(state, mode), error: null };
+    // D-131: the two V3 reducers that existed but had no renderer behind them until the section plane was implemented.
+    if (action === 'SET_CUTAWAY') return { state: setCutaway(state, parameters.enabled !== false), error: null };
+    if (action === 'ISOLATE_NODE') return { state: isolateAnatomyNode(state, String(parameters.focus ?? state.selectedNodeId), manifest), error: null };
+    if (action === 'CLEAR_ISOLATION') return { state: { ...state, isolatedNodeIds: [] }, error: null };
+    return { state, error: null };
+  } catch (e) { return { state, error: e instanceof Error ? e.message : String(e) }; }
+}
+
+export interface TranscriptEntry { readonly id: number; readonly who: 'user' | 'agent' | 'system'; readonly text: string; }
+
+/** Pure: what the HUD says about a parsed command before the body moves. */
+/** Stages whose length is worth measuring: the ones where an engine is actually working. */
+const WORKING_STAGES = new Set(['GENERATING', 'ADMET', 'DOCKING', 'QUANTUM']);
+
+/** What each bench row is called in the world — plain words, no engine names. */
+const ZONE_LABEL_PL: Readonly<Record<BenchZone, string>> = {
+  QUEUE: 'w kolejce', ADMET: 'w analizatorze', DOCKING: 'w dokowaniu', FINALIST: 'finaliści', DISCARD: 'odrzucone',
+};
+
+/** What the scientist is doing, in the words a visitor would use. */
+const HAND_ACTION_PL: Readonly<Record<string, string>> = {
+  IDLE: 'czeka', REACH: 'sięga po próbkę', GRIP: 'chwyta fiolkę', CARRY: 'przenosi próbkę',
+  PLACE: 'wkłada próbkę do aparatury', OPERATE: 'obsługuje aparaturę', OBSERVE: 'obserwuje', RECORD: 'zapisuje wynik',
+};
+
+export function describePlan(commandCount: number, unresolved: readonly string[], steps: readonly string[], rejected: readonly { reason: string }[]): string {
+  const parts: string[] = [];
+  if (commandCount) parts.push(`Rozumiem ${commandCount} ${commandCount === 1 ? 'polecenie' : 'polecenia'}: ${steps.join(' → ') || 'bez kroków'}.`);
+  if (unresolved.length) parts.push(`Nie zrozumiałem: „${unresolved.join('”, „')}”.`);
+  for (const r of rejected) parts.push(`Odrzucone: ${r.reason}.`);
+  if (!parts.length) parts.push('Nie znalazłem polecenia w tym tekście.');
+  return parts.join(' ');
+}
+
+export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?: SceneWorld } = {}): JSX.Element {
+  const def = WORLDS[world];
+  const runner = useMemo(() => def.runner(kernelLedger), [def]);
+  const controller = useMemo(() => new AgentController({
+    room: def.room, obstacles: def.obstacles, stations: def.stations, start: def.spawn, runner, worldId: def.id, defaultSeed: 7,
+    // The drug bench: pressing the console starts the REAL backend campaign; the agent keeps working until it ends.
+    engineGate: (_stationId, experimentId, inputs) => {
+      if (experimentId !== 'drug-candidate-run') return null;
+      const campaignId = String(inputs.campaign ?? '');
+      const projectId = String(inputs.project ?? '');
+      if (!getLiveDrugRun(campaignId)) {
+        const token = getToken();
+        if (!token || !campaignId || !projectId) return { ready: true, progress: 1 };
+        void startLiveDrugRun({ token, projectId, campaignId, subject: String(inputs.subject ?? '') });
+      }
+      return liveDrugRunGate(campaignId);
+    },
+  }), [def, runner]);
+  const sim = useMemo(() => new AgentLabScene3D(controller, def.stations, def.room, world), [controller, def, world]);
+  const benchLayer = useMemo(() => new DrugBenchLayer(), []);
+  const loopSim = useMemo(() => (world === 'physics' ? withDrugBenchLayer(sim, benchLayer) : sim), [sim, benchLayer, world]);
+  const [drugRun, setDrugRun] = useState<LiveDrugRun | null>(null);
+  const [benchSceneHash, setBenchSceneHash] = useState<string | null>(null);
+  const [benchAtoms, setBenchAtoms] = useState(0);
+  const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
+  /** Where the current stage started, so its real length can be recorded when it ends. */
+  const stageMark = useRef<{ stage: string | null; startedAt: number }>({ stage: null, startedAt: Date.now() });
+  const [benchPoseAtoms, setBenchPoseAtoms] = useState(0);
+  /**
+   * WHAT THE SCENE'S HANDS ARE DOING — read back FROM the scene, not predicted for it. This is the
+   * accessible mirror of the 3D work (UI3D-1): the action, the sample in the hand and the measured
+   * distance between that vial and the grip point, so the visible laboratory can be checked instead of
+   * being taken on trust. Null until the bench has a run.
+   */
+  const [hand, setHand] = useState<ReturnType<DrugBenchLayer['handSnapshot']>>(null);
+  /** The final protocol, exactly as the backend assembled it from the record. Null until the run ends. */
+  const [protocol, setProtocol] = useState<CandidateProtocol | null>(null);
+  /**
+   * THE FROZEN CRITERIA, as the SERVER stored them before the first engine ran. The run state carries
+   * only the fact that a preregistration record exists, with its id and chain hash — not the criteria
+   * themselves — so they are read from the campaign's scientific memory and shown WHILE the run is
+   * going, which is the only moment at which "frozen before execution" can be believed by a viewer.
+   * This is the server's record, never the client-side working hypothesis rendered elsewhere.
+   */
+  const [preregBody, setPreregBody] = useState<Record<string, unknown> | null>(null);
+  /**
+   * The lab shows the WORLD, not a dashboard: by default every panel is out of the way and the
+   * readouts live on the instruments in the scene. One control opens the details (evidence, replay,
+   * provenance), because evidence must stay reachable — it is hidden, never removed.
+   */
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // A live drug run is something to WATCH: the view leaves the visor once, so the bench procedure is
+  // visible. The camera button still switches back, and nothing forces it again afterwards.
+  const benchViewSwitched = useRef(false);
+  useEffect(() => subscribeLiveDrugRuns((run) => {
+    benchLayer.setRun(run);
+    setDrugRun(run);
+    if (!benchViewSwitched.current) {
+      benchViewSwitched.current = true;
+      setCamera('SPECTATOR');
+      sim.setCameraMode('SPECTATOR');
+    }
+    if (run.durationMs && run.phase === 'DONE') recordDuration('drug-run', run.durationMs);
+    // Per-stage measurement: when the canonical stage changes, how long the PREVIOUS stage really took
+    // is recorded under its own key. That measurement — never a guess — is what the waiting ring counts
+    // down for the next run of the same stage.
+    const stage = run.state.stage;
+    const mark = stageMark.current;
+    if (mark.stage !== stage) {
+      if (mark.stage && WORKING_STAGES.has(mark.stage)) recordDuration(`drug-stage:${mark.stage}`, Date.now() - mark.startedAt);
+      stageMark.current = { stage, startedAt: Date.now() };
+    }
+  }), [benchLayer, sim]);
+  const [anatomy, setAnatomy] = useState<AnatomyViewState>(() => createDefaultAnatomyView(TWIN_ID));
+  const anatomyRef = useRef(anatomy); anatomyRef.current = anatomy;
+  const params = useMemo(() => ({}), []);
+  const [agentState, setAgentState] = useState<AgentActionState>('IDLE');
+  const [stationId, setStationId] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [session, setSession] = useState<ExperimentSession | null>(null);
+  const [artifactKind, setArtifactKind] = useState<string | null>(null);
+  const [bioArtifact, setBioArtifact] = useState<BiologyArtifact | null>(null);
+  const [sessions, setSessions] = useState<ExperimentSession[]>([]);
+  const explorerOpen = true;
+  useEffect(() => { sim.setResearchLayout(false); if (world === 'biology') sim.setCameraMode('TWIN'); }, [sim, world]);
+  const [twinTier, setTwinTier] = useState<HumanTwinTier>('PROXY');
+  const [twinLoad, setTwinLoad] = useState<HumanTwinPresentationState>(() => sim.getTwinLoadState());
+  const [referenceAnatomy, setReferenceAnatomy] = useState<ReferenceAnatomyState>(() => sim.getReferenceAnatomyState());
+  const [twinLod, setTwinLod] = useState(() => sim.getTwinLodState());
+  const [twinLodPreference, setTwinLodPreference] = useState<HumanTwinLodPreference>('AUTO');
+  const [cutaway, setCutawayState] = useState<CutawayState>(DEFAULT_CUTAWAY);
+  const [curiosity, setCuriosity] = useState<CycleResult | null>(null);
+  const [curiosityBusy, setCuriosityBusy] = useState(false);
+  const [flagship, setFlagship] = useState<FlagshipJourneyResult | null>(null);
+  const [replay, setReplay] = useState<ReplayVerdict | null>(null);
+  const [engineReplay, setEngineReplay] = useState<EngineReplayVerdict | null>(null);
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [text, setText] = useState('');
+  const [chatPrompt, setChatPrompt] = useState('');
+  const [camera, setCamera] = useState<AgentCameraMode>(world === 'biology' ? 'TWIN' : 'VISOR');
+  /** D-131: how the twin's BODY shell is drawn (skin / translucent / stylised x-ray / ghost). */
+  const [surface, setSurface] = useState<TwinSurfaceMode>('NORMAL');
+  const [voice, setVoice] = useState(false);
+  const [level, setLevel] = useState<GuideLevel>('EXPLORER');
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  /** The chemistry panel docked in the Laboratory: periodic table, experiments, levels; titration runs at the station. */
+  const [chemistryOpen, setChemistryOpen] = useState(false);
+  const [chemistryCardOpen, setChemistryCardOpen] = useState(true);
+  const [frames, setFrames] = useState(0);
+  const logicalTime = useRef(0);
+  const nextId = useRef(1);
+  const levelRef = useRef(level); levelRef.current = level;
+  const sessionRef = useRef<ExperimentSession | null>(null);
+  const cutawayRef = useRef<CutawayState>(DEFAULT_CUTAWAY);
+  const voiceRef = useRef(voice); voiceRef.current = voice;
+
+  const say = useCallback((who: TranscriptEntry['who'], line: string) => {
+    setTranscript((t) => [...t.slice(-40), { id: nextId.current++, who, text: line }]);
+  }, []);
+  const speak = useCallback((lines: readonly NarrationLine[]) => {
+    for (const l of lines) say('agent', l.text);
+    if (voiceRef.current) {
+      // Museum-calm delivery (D-129): the engine's own providers, calmer pacing, captions on, the status first, one idea per utterance.
+      const engine = getVoiceEngine();
+      engine.update(museumCalmSettings(engine.settings));
+      const status = lines.find((l) => l.key === 'status') ? sessionRef.current?.epistemicStatus ?? null : null;
+      const utterances = museumUtterances(lines.filter((l) => l.key !== 'status'), status, 'pl');
+      const joined = utterances.map((u) => u.text).join(' ');
+      engine.speak({ key: `worlds:${lines[0]?.key ?? 'line'}`, text: joined, lang: 'pl' });
+    }
+  }, [say]);
+
+  const onStats = useCallback((s: Record<string, number>) => {
+    setAgentState((prev) => { const next = STATE_NAMES[s.agentState ?? 0] ?? 'IDLE'; return prev === next ? prev : next; });
+    setProgress((p) => (Math.abs(p - (s.progress ?? 0)) > 0.02 ? s.progress ?? 0 : p));
+    setFrames((f) => (s.frames && s.frames - f >= 10 ? s.frames : f));
+    const hash = s.drugBenchHash ? (s.drugBenchHash >>> 0).toString(16).padStart(8, '0') : null;
+    setBenchSceneHash((prev) => (prev === hash ? prev : hash));
+    setBenchAtoms((prev) => (prev === (s.drugBenchAtoms ?? 0) ? prev : s.drugBenchAtoms ?? 0));
+    setBenchPoseAtoms((prev) => (prev === (s.drugBenchPoseAtoms ?? 0) ? prev : s.drugBenchPoseAtoms ?? 0));
+  }, []);
+  const { canvasRef, loading, failed } = useThreeLoop(loopSim, params, true, onStats);
+  // The hand mirror follows the scene four times a second: often enough to see the transfer, cheap
+  // enough not to matter. It only ever reports what the layer says it rendered.
+  useEffect(() => {
+    if (world !== 'physics' || !drugRun) return;
+    const read = () => setHand(benchLayer.handSnapshot());
+    read();
+    const id = setInterval(read, 250);
+    return () => clearInterval(id);
+  }, [world, drugRun, benchLayer]);
+  // The frozen criteria, read once per campaign from the server's own scientific memory. It retries
+  // while the record is not there yet (the preregistration is written as the run starts) and stops the
+  // moment it has it — this is a read of what the server froze, so it is fetched, never recomputed.
+  const preregCampaign = drugRun?.campaignId ?? null;
+  const preregProject = drugRun?.projectId ?? null;
+  useEffect(() => {
+    setPreregBody(null);
+    if (!preregCampaign || !preregProject) return;
+    const token = getToken();
+    if (!token) return;
+    let stop = false;
+    let attempts = 0;
+    const read = (): void => {
+      if (stop || attempts > 40) return;
+      attempts += 1;
+      void getExperimentMemory(token, preregProject, preregCampaign).then((r) => {
+        if (stop) return;
+        const body = r.ok ? r.data.preregistration?.body ?? null : null;
+        if (body) setPreregBody(body);
+        else setTimeout(read, 6000);
+      });
+    };
+    read();
+    return () => { stop = true; };
+  }, [preregCampaign, preregProject]);
+  // Measured load time of this world: the next visit counts down from it (never a guessed number).
+  const loadStartedAt = useRef(performance.now());
+  const [loadEstimate] = useState(() => estimateDuration(`lab:${world}`));
+  const sawLoading = useRef(false);
+  useEffect(() => {
+    if (loading) { sawLoading.current = true; return; }
+    if (sawLoading.current && !failed) recordDuration(`lab:${world}`, performance.now() - loadStartedAt.current);
+    sawLoading.current = false;
+  }, [loading, failed, world]);
+
+  useEffect(() => {
+    sim.setTwinTierListener((tier) => setTwinTier(tier));
+    sim.setTwinLoadListener(setTwinLoad);
+    sim.setReferenceAnatomyListener(setReferenceAnatomy);
+    sim.setTwinLodListener(setTwinLod);
+    setTwinLoad(sim.getTwinLoadState());
+    setTwinTier(sim.getTwinTier());
+    sim.setUpdateListener((u) => {
+      if (u.stationId) setStationId(u.stationId);
+      setBlocked(u.blockedReason);
+      if (u.sessionSealed) {
+        const { session: sealed, artifact } = u.sessionSealed;
+        setSession(sealed); sessionRef.current = sealed; setReplay(null); setArtifactKind((artifact as SceneArtifact).kind);
+        setSessions((list) => [...list.slice(-40), sealed]);
+        if (world === 'biology') setBioArtifact(artifact as BiologyArtifact);
+        // The drug bench draws its own run state (DrugBenchLayer); every other station's artifact goes to the scene.
+        if (sealed.stationId && (artifact as { kind?: string }).kind !== 'drug-run') sim.setArtifact(sealed.stationId, artifact as SceneArtifact);
+        if (sealed.experimentId === 'chemistry-titration') setChemistryCardOpen(true);
+        sim.noteSealedSession(sealed);
+      }
+      if (u.interaction && u.interaction.stationId === 'station:human-study') {
+        const r = applyAnatomyInteraction(anatomyRef.current, u.interaction.parameters, sim.manifest);
+        if (r.error) say('system', `Bliźniak: odmowa — ${r.error}.`);
+        else {
+          // Selecting anatomy changes the displayed result, never the sealed history/ledger.
+          setBioArtifact(null); setSession(null); sessionRef.current = null;
+          setAnatomy(r.state);
+          sim.setTwinView(r.state.displayMode, r.state.selectedNodeId);
+          sim.setTwinIsolated(r.state.isolatedNodeIds);
+          const next = { ...cutawayRef.current, enabled: r.state.cutawayEnabled };
+          cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next);
+          say('agent', `Bliźniak: tryb ${r.state.displayMode}, wybrany węzeł ${r.state.selectedNodeId} (anatomia: MODEL; postać: ${sim.getTwinTier() === 'LICENSED_CC0_ASSET' ? 'CC0' : TWIN_ASSET_TIER}).`);
+        }
+      }
+      if (u.report) {
+        const report: AgentReport = u.report;
+        speak(narrateReport(report, { level: levelRef.current, lang: 'pl' }));
+        if (report.deferred.some((d) => d.intent === 'ASK')) { /* the question is handed to Science Chat by the button below */ }
+      }
+    });
+    return () => { sim.setUpdateListener(null); sim.setTwinTierListener(null); sim.setTwinLoadListener(null); sim.setTwinLodListener(null); sim.setReferenceAnatomyListener(null); };
+  }, [sim, speak, say, world]);
+
+  /** Typed commands from the Human Explorer's clicks: the same planner and controller as the command bar, no parser in between. */
+  const runCommands = useCallback((parsed: ParsedCommands) => {
+    const plan = planActions(parsed.commands, def.catalog, controller.station);
+    say('system', describePlan(parsed.commands.length, parsed.unresolved, plan.steps.map((s) => s.kind), plan.rejected));
+    if (plan.steps.length === 0) return;
+    const started = controller.startPlan(plan);
+    if (!started.ok) say('system', `Agent nie może przyjąć planu: ${started.reason}.`);
+    else { setBlocked(null); const first = plan.steps.find((s) => 'stationId' in s); sim.setHighlight(first && 'stationId' in first ? first.stationId : null); }
+  }, [controller, def, say, sim]);
+  const submit = useCallback((raw: string) => {
+    const t = raw.trim(); if (!t) return;
+    say('user', t);
+    logicalTime.current += 1;
+    runCommands(def.parse(t, logicalTime.current));
+    setText('');
+  }, [def, runCommands, say]);
+  const submitCommands = useCallback((commands: readonly WorldCommand[], label: string) => { say('user', label); runCommands({ commands, unresolved: [] }); }, [runCommands, say]);
+  const nextLogicalTime = useCallback(() => { logicalTime.current += 1; return logicalTime.current; }, []);
+  const chatHumanHandoffConsumed = useRef(false);
+  useEffect(() => {
+    if (world !== 'biology' || chatHumanHandoffConsumed.current) return;
+    const query = window.location.hash.split('?')[1] ?? '';
+    const params = new URLSearchParams(query);
+    const focus = params.get('focus');
+    const level = params.get('level');
+    const specimen = params.get('specimen');
+    if (specimen === 'blood') {
+      chatHumanHandoffConsumed.current = true;
+      const requested = Number(params.get('magnification') ?? 500);
+      const magnification = [1, 5, 25, 100, 500, 1000].includes(requested) ? requested : 500;
+      const lt = nextLogicalTime();
+      const label = `Chat: krew pod mikroskopem ${magnification}×`;
+      submitCommands(bloodMagnificationCommands(magnification, label, lt), label);
+      return;
+    }
+    if (!focus) return;
+    chatHumanHandoffConsumed.current = true;
+    if (focus === 'body') {
+      const next = createDefaultAnatomyView(TWIN_ID);
+      setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId); sim.setTwinIsolated([]);
+      return;
+    }
+    const organ = EXPLORER_ORGANS.find((entry) => entry.organId === focus);
+    if (organ) {
+      const target = level === 'cell' ? 'cell' : level === 'tissue' ? 'tissue' : 'organ';
+      const lt = nextLogicalTime();
+      submitCommands(explorerCommands(organ, target, `Chat: ${focus} → ${target}`, lt), `Chat: ${focus} → ${target}`);
+      return;
+    }
+    if (bodyParts3dStructure(focus)) {
+      const next = isolateAnatomyNode(setAnatomyMode(createDefaultAnatomyView(TWIN_ID), 'ORGANS'), focus, sim.manifest);
+      setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId); sim.setTwinIsolated(next.isolatedNodeIds);
+    }
+  }, [nextLogicalTime, sim, submitCommands, world]);
+  /**
+   * The ONE main Laboratory is where chemistry and physics requests land: `?station=<id>&…` (from the chat,
+   * the research-mode menu or an Experiment Fabric product route) becomes one validated RUN_EXPERIMENT at
+   * that station. Each distinct handoff runs once; the station's own runner does the science.
+   */
+  const stationHandoffConsumed = useRef<string | null>(null);
+  useEffect(() => {
+    if (world !== 'physics') return;
+    const consume = (): void => {
+      const query = window.location.hash.split('?')[1] ?? '';
+      if (!query || stationHandoffConsumed.current === query) return;
+      const command = stationHandoffCommand(query, def.catalog, nextLogicalTime());
+      if (!command) return;
+      stationHandoffConsumed.current = query;
+      if (command.targetEntityId === 'st-titration') setChemistryOpen(true);
+      submitCommands([command], command.text);
+    };
+    consume();
+    window.addEventListener('hashchange', consume);
+    window.addEventListener('genesis-product-route', consume);
+    return () => {
+      window.removeEventListener('hashchange', consume);
+      window.removeEventListener('genesis-product-route', consume);
+    };
+  }, [def.catalog, nextLogicalTime, submitCommands, world]);
+  useEffect(() => {
+    sim.setOrganPickListener((id) => {
+      const organ = EXPLORER_ORGANS.find((entry) => entry.organId === id);
+      // A reference-atlas structure with no explorer ladder (the aorta) is still selectable: the pick
+      // updates the anatomy view directly — no agent session, no macro→micro claim.
+      if (!organ && bodyParts3dStructure(id)) {
+        const next = selectAnatomyNode(anatomyRef.current, id, sim.manifest);
+        setAnatomy(next); sim.setTwinView(next.displayMode, next.selectedNodeId);
+        return;
+      }
+      if (!organ || !['IDLE', 'ARRIVED', 'BLOCKED'].includes(controller.getDiagnostics().state)) return;
+      const lt = nextLogicalTime();
+      submitCommands(explorerCommands(organ, 'organ', `Wybór narządu: ${id}`, lt), `Wybór narządu: ${id}`);
+    });
+    return () => sim.setOrganPickListener(null);
+  }, [sim, controller, nextLogicalTime, submitCommands]);
+  /** D-130: the autonomous curiosity cycle on this world — ledger gap → question → hypothesis pair → the canonical experiment (headless, same runner and ledger) → belief revision → Science Memory.
+   *  The first click proposes (AWAITING_HUMAN_APPROVAL); the second click is the approval — the operator's name is the approval token's grantor. */
+  const bridgeRef = useRef<ReturnType<typeof createScientificWorldsCognitiveCore> | null>(null);
+  const runCuriosity = useCallback(async (approve: boolean) => {
+    if (curiosityBusy) return;
+    setCuriosityBusy(true);
+    try {
+      bridgeRef.current ??= createScientificWorldsCognitiveCore({ worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, memory: scienceMemoryPort(), defaultSeed: 7 });
+      const probeRunner = def.runner(new EvidenceLedger({ now: () => Date.now() }));
+      const result = await runCuriosityCycle({ bridge: bridgeRef.current, binding: { worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, memory: bridgeRef.current.memory ?? undefined }, probeRunner, approvedBy: approve ? 'operator (HUD)' : null, maxIterations: 1 });
+      setCuriosity(result);
+      const it = result.iterations[0];
+      if (!it) { say('system', 'Ciekawość: brak luk w bazie dowodów — nie ma pytania do zbadania.'); return; }
+      say('agent', `Ciekawość: ${it.question.text}`);
+      if (it.hypotheses.length) say('agent', `Hipotezy: ${it.hypotheses.map((h) => `${h.revised.criterion.metric}≈${h.revised.criterion.expectedValue} (${h.assessment}, pewność ${h.revised.confidence.toFixed(2)})`).join(' | ')}`);
+      if (it.terminal === 'AWAITING_HUMAN_APPROVAL' && it.experiment) say('system', `Proponowany eksperyment różnicujący: ${it.experiment.experimentId} przy ${it.experiment.station.label}. Wymaga zatwierdzenia przez człowieka — kliknij „Zatwierdź i uruchom".`);
+      else if (it.session) { setSession(it.session); sessionRef.current = it.session; setReplay(null); setSessions((list) => [...list.slice(-40), it.session!]); sim.noteSealedSession(it.session); say('agent', `Sesja ${it.session.sessionId} (${it.session.epistemicStatus}) zapieczętowana; ${it.key}=${it.observed}. Wynik dotyczy modelu, nie świata. Zapisano w Pamięci Naukowej.`); }
+      else say('system', `Cykl zakończony: ${it.terminal}${it.sourceSearch.ingestionRequest ? ` — ${it.sourceSearch.ingestionRequest}` : ''}.`);
+    } finally { setCuriosityBusy(false); }
+  }, [curiosityBusy, def, runner, say, sim]);
+  /** D-130: the flagship journey (mirror twin → circular gate → time machine → the agentic loop at the observation window → capture spec → replay), headless on this world's services.
+   *  The click is the human approval for the one experiment the loop runs; every state is narrated with its label. Physics world only (the window runs the photon model). */
+  const runAgentic = useCallback(async () => {
+    if (curiosityBusy || world !== 'physics') return;
+    setCuriosityBusy(true);
+    try {
+      bridgeRef.current ??= createScientificWorldsCognitiveCore({ worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, memory: scienceMemoryPort(), defaultSeed: 7 });
+      const r = await runFlagshipJourney({ sessionId: `flagship-${Date.now().toString(36)}`, binding: { worldId: def.id, catalog: def.catalog, stations: def.stations, parse: def.parse, runner, ledger: kernelLedger, defaultSeed: 7 }, bridge: bridgeRef.current, room: def.room, obstacles: def.obstacles, spawn: def.spawn, userGoal: 'Czy zakrzywiona czasoprzestrzeń zmienia propagację światła w modelu? Wyjaśnij wynik i jego dowody.', mode: 'SCIENTIFIC', approvedBy: 'operator (HUD)' });
+      setFlagship(r);
+      say('agent', `Lustro: ${r.mirror.state} (${r.mirror.identityScope}); bliźniak: ${r.mirror.divergenceAction ?? '—'}.`);
+      say('agent', `Brama: ${r.portal.style} ${r.portal.phase}, przejście ${r.portal.traversed ? 'wykonane' : 'nie'}; świat docelowy ${r.portal.destinationStatus}.`);
+      say('agent', `Wehikuł czasu: ${r.timeMachine.mode} → ${r.timeMachine.epistemicStatus}${r.timeMachine.computation ? `, różnica zegarów ${r.timeMachine.computation.differenceSeconds.toExponential(3)} s/dobę (${r.timeMachine.computation.regime})` : ''}.`);
+      setSession(r.trace.session); sessionRef.current = r.trace.session; setReplay(null); setSessions((list) => [...list.slice(-40), r.trace.session]); sim.noteSealedSession(r.trace.session); if (r.trace.session.stationId) sim.setArtifact(r.trace.session.stationId, ((): SceneArtifact => { const v = replayExperimentSession(r.trace.session, runner); return v.artifact as SceneArtifact; })());
+      say('agent', `Falsyfikacja: ${r.trace.falsification.status} — ${r.trace.falsification.rationale}`);
+      say('agent', r.trace.finalAnswer.text);
+      say('system', `Zapis sesji: ${r.events.length} zdarzeń w łańcuchu, replay ${r.replayMatches ? 'ZGODNY' : 'ROZBIEŻNY'}, sesja ${r.sessionReplay}; capture ${r.capture.aspect} z etykietą ${r.capture.badge.status}.`);
+    } catch (e) { say('system', `Pętla agentowa odmówiła: ${e instanceof Error ? e.message : String(e)}.`); }
+    finally { setCuriosityBusy(false); }
+  }, [curiosityBusy, def, runner, say, sim, world]);
+
+  const onSubmit = (e: FormEvent): void => { e.preventDefault(); submit(text); };
+  const doReplay = (): void => {
+    if (!session) return;
+    const verdict = replayExperimentSession(session, runner);
+    setReplay(verdict);
+    if (session.stationId) sim.setArtifact(session.stationId, verdict.artifact as SceneArtifact);
+    speak(narrateSession(session, { level: levelRef.current, lang: 'pl', includeProvenance: false, replay: verdict }).filter((l) => l.key === 'replay'));
+    // A drug run also replays the ENGINE: the backend re-executes the docking of the persisted
+    // Science Run and compares it. Reproducing the read model alone would not prove the science.
+    if (session.experimentId === 'drug-candidate-run') {
+      const token = getToken();
+      const projectId = String(session.inputs.project ?? '');
+      const campaignId = String(session.inputs.campaign ?? '');
+      if (token && projectId && campaignId) {
+        setEngineReplay(null);
+        // THE EXPERIMENT ENDS WITH A PROTOCOL, and it must be visible where the experiment happened —
+        // assembled by the backend from persisted state. The lab shows it; it never composes one.
+        const showProtocol = () => getCandidateProtocol(token, projectId, campaignId).then((r) => setProtocol(r.ok ? r.data : null));
+        void showProtocol();
+        void replayDrugRunEngines({ token, projectId, campaignId }).then((r) => {
+          setEngineReplay('error' in r ? { runId: '', verdict: `NIEDOSTĘPNE (${r.error})`, engine: '', originalHash: null, replayHash: null } : r);
+          // The replay seals its own record, which the protocol counts as evidence — so the shown
+          // protocol is fetched again here, and what the bench displays is the final artefact rather
+          // than the one that existed a moment before the engine was re-run.
+          return showProtocol();
+        });
+      }
+    }
+  };
+  // The curiosity cycle is the lab's one producer of the next experiment; its controls live in the shared Next Experiment panel.
+  const curiosityActions = (
+    <div className="sw-actions" data-testid="sw-curiosity">
+      <button type="button" className="sw-btn" onClick={() => void runCuriosity(false)} disabled={curiosityBusy} data-testid="sw-curiosity-propose">Ciekawość: zaproponuj</button>
+      {curiosity?.terminal === 'AWAITING_HUMAN_APPROVAL' && <button type="button" className="sw-btn sw-btn-primary" onClick={() => void runCuriosity(true)} disabled={curiosityBusy} data-testid="sw-curiosity-approve">Zatwierdź i uruchom</button>}
+      {curiosity && <span className="sw-badge" data-testid="sw-curiosity-terminal">{curiosity.terminal}</span>}
+      {world === 'physics' && <button type="button" className="sw-btn" onClick={() => void runAgentic()} disabled={curiosityBusy} data-testid="sw-agentic-run">Pętla agentowa: foton (zatwierdzam)</button>}
+      {flagship && <span className="sw-badge" data-testid="sw-agentic-status">MIRROR EXPERIMENTAL / SYNTHETIC · {flagship.trace.falsification.status} · replay {flagship.replayMatches ? 'MATCH' : 'DRIFT'}</span>}
+    </div>
+  );
+  const toggleCamera = (): void => { const next: AgentCameraMode = camera === 'VISOR' ? 'SPECTATOR' : 'VISOR'; setCamera(next); sim.setCameraMode(next); };
+  // D-131: the twin camera frames the body instead of the agent; turning it off returns to the observer shot.
+  const setTwinCamera = (on: boolean): void => { const next: AgentCameraMode = on ? 'TWIN' : 'SPECTATOR'; setCamera(next); sim.setCameraMode(next); };
+  // D-131: the body shell's presentation. Stylised views of a model — no label, session or evidence changes.
+  const applySurface = (mode: TwinSurfaceMode): void => { setSurface(mode); sim.setTwinSurface(mode); };
+  const openResearchCompanion = (): void => {
+    sim.engageResearchCompanion();
+    requestOpenScienceChat();
+  };
+  const station = stationId ? def.stations.find((s) => s.id === stationId) ?? null : null;
+  const working = agentState === 'REACHING' || agentState === 'INTERACTING' || agentState === 'EXECUTING';
+  const titrationResult = session?.experimentId === 'chemistry-titration' ? {
+    acid: String(session.outputs.acid), acidName: String(session.outputs.acidName),
+    vb: Number(session.outputs.vb), ph: Number(session.outputs.ph), veq: Number(session.outputs.veq), pKa: Number(session.outputs.pKa),
+  } : null;
+
+  /** The one outcome panel: a drug bench session carries its frozen hypothesis and verdict; every other station its session. */
+  const sessionOutcome = (sealed: ExperimentSession): ScientificOutcomeView => {
+    const campaignId = String(sealed.inputs.campaign ?? '');
+    const run = sealed.experimentId === 'drug-candidate-run' ? getLiveDrugRun(campaignId) : null;
+    if (run) {
+      const hypothesis = getDrugHypothesis(campaignId) ?? buildDrugHypothesis(String(sealed.inputs.subject ?? focusCandidate(run.state)?.smiles ?? 'kandydat'));
+      const result = evaluateDrugHypothesis(hypothesis, run.state, focusCandidate(run.state));
+      return outcomeFromDrugLiveRun({ session: sealed, replay, engineReplay, state: run.state, hypothesis, result, next: nextDrugExperiment(result, run.state), memory: { preregistration: run.preregistration, sealed: run.sealed } });
+    }
+    return outcomeFromLabSession(sealed, replay, curiosity, def.stations.find((st) => st.id === sealed.stationId)?.label);
+  };
+
+  const researchControls = <>
+      <section className="sw-hud sw-hud-status" aria-label="Stan agenta" data-testid="sw-status">
+        <div className="sw-badges">
+          <span className="sw-badge">GENESIS · {def.label}</span>
+          <span className="sw-badge" data-testid="sw-agent-state">{AGENT_STATE_LABEL_PL[agentState]}</span>
+          {station && <span className="sw-badge">STANOWISKO: {station.label}</span>}
+          <span className="sw-badge sw-research-only" data-testid="sw-camera-badge">KAMERA: {camera === 'VISOR' ? 'WIZJER' : camera === 'TWIN' ? 'BLIŹNIAK' : 'OBSERWATOR'}</span>
+          {world === 'biology' && <span className="sw-badge" data-testid="sw-twin" data-tier={twinTier} data-lod={twinLod?.level ?? 'PROXY_LOW'} data-lod-diagnostics={JSON.stringify(twinLod)} data-load-state={twinLoad.status} data-load-reason={twinLoad.reason} data-load-diagnostics={JSON.stringify(twinLoad)}>
+            {twinLoad.status === 'LOADING' ? 'Ładowanie modelu człowieka…' : `BLIŹNIAK: ${anatomy.displayMode} · ${anatomy.selectedNodeId} · ${humanTwinProvenanceLabel(twinTier)}`}
+          </span>}
+          {world === 'biology' && twinLoad.status === 'ERROR' && <span className="sw-badge" role="status">Nie udało się załadować pełnego modelu. <button type="button" className="sw-btn sw-btn-mini" data-testid="sw-twin-retry" onClick={() => sim.retryTwinLoad()}>Ponów ładowanie</button></span>}
+          {world === 'biology' && twinLoad.status === 'BLOCKED' && <span className="sw-badge" role="status">Model nie jest zatwierdzony w rejestrze zasobów.</span>}
+          {world === 'biology' && <label className="sw-badge">LOD
+            <select className="sw-select" value={twinLodPreference} data-testid="sw-twin-lod" onChange={(event) => {
+              const preference = event.target.value as HumanTwinLodPreference;
+              setTwinLodPreference(preference); sim.setTwinLodPreference(preference);
+            }}>
+              <option value="AUTO">Auto</option><option value="FULL">Pełny GLB</option><option value="LOW">Proxy low</option>
+            </select>
+          </label>}
+        </div>
+        {agentState !== 'IDLE' && agentState !== 'BLOCKED' && <div className="sw-progress" aria-hidden="true"><span style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
+        {blocked && <p className="cw-error" role="alert" data-testid="sw-blocked">Zablokowany: {blocked}</p>}
+        {controlsOpen && <div className="sw-actions">
+          <button type="button" className="sw-btn" onClick={toggleCamera} data-testid="sw-camera">{camera === 'VISOR' ? 'Kamera obserwatora' : 'Wróć do wizjera'}</button>
+          <button type="button" className={`sw-btn${voice ? ' is-on' : ''}`} onClick={() => setVoice((v) => !v)} aria-pressed={voice} data-testid="sw-voice">Głos {voice ? 'wł.' : 'wył.'}</button>
+          {world === 'biology' && <>
+            <span className="sw-badge" data-testid="sw-ai-companion-label">AI NAUKOWIEC · VISUAL_AI_COMPANION · MODEL</span>
+            <button type="button" className="sw-btn sw-btn-primary" onClick={openResearchCompanion} data-testid="sw-ai-companion-chat" aria-label="Porozmawiaj z holograficznym naukowcem przez istniejący ScienceChat">Porozmawiaj z hologramem · ScienceChat</button>
+          </>}
+          <select className="sw-select" value={level} onChange={(e) => setLevel(e.target.value as GuideLevel)} aria-label="Poziom narracji" data-testid="sw-level">
+            <option value="EXPLORER">Odkrywca</option><option value="SCIENTIST">Naukowiec</option><option value="AUDITOR">Audytor</option>
+          </select>
+        </div>}
+      </section>
+
+      <section className={`sw-hud sw-hud-evidence${evidenceOpen ? '' : ' is-collapsed'}`} aria-label="Dowody i sesja" data-testid="sw-evidence">
+        <button type="button" className="sw-hud-toggle" onClick={() => setEvidenceOpen((o) => !o)} aria-expanded={evidenceOpen}>DOWODY · SESJA {evidenceOpen ? '▾' : '▸'}</button>
+        {evidenceOpen && (session ? (
+          <dl className="sw-session" data-testid="sw-session" data-session-id={session.sessionId}>
+            <dt>Sesja</dt><dd className="cw-mono">{session.sessionId}</dd>
+            <dt>Eksperyment</dt><dd className="cw-mono">{session.experimentId} · ziarno {session.seed}</dd>
+            <dt>Status</dt><dd><span className={`sw-status sw-status-${session.epistemicStatus.toLowerCase()}`} data-testid="sw-epistemic">{session.epistemicStatus}</span> · {session.engineLabel}</dd>
+            <dt>Wejścia</dt><dd className="cw-mono">{JSON.stringify(session.inputs)}</dd>
+            <dt>Wyniki</dt><dd className="cw-mono sw-outputs" data-testid="sw-outputs">{Object.entries(session.outputs).map(([k, v]) => <span key={k}>{k}: {String(v)}</span>)}</dd>
+            <dt>Artefakt</dt><dd className="cw-mono">{artifactKind ?? '—'} · renderowany z tej sesji</dd>
+          </dl>
+        ) : (
+          <p className="sw-faint" data-testid="sw-no-session">Brak sesji. Każdy eksperyment tworzy jedną sesję z hashem treści, odciskiem replay i wpisem w EvidenceLedger.</p>
+        ))}
+        {evidenceOpen && (session
+          ? <ScientificOutcomePanel outcome={sessionOutcome(session)} showSummary={session.experimentId === 'drug-candidate-run'} onReplay={doReplay} testIds={{ replay: 'sw-replay', replayStatus: 'sw-replay-verdict' }} nextActions={curiosityActions} />
+          : <NextExperimentPanel outcome={{ next: nextFromCuriosity(curiosity), nextUnavailableReason: 'Brak propozycji. „Ciekawość: zaproponuj” uruchamia cykl ciekawości na lukach w dowodach.' }} actions={curiosityActions} />)}
+      </section>
+
+</>;
+  const commandControls = (
+      <section className="sw-hud sw-hud-command" aria-label="Polecenia" data-testid="sw-command">
+        <div className="sw-lab-primary">
+          <form className="sw-lab-chat" onSubmit={(event) => { event.preventDefault(); const prompt = chatPrompt.trim(); requestOpenScienceChat(prompt || undefined); setChatPrompt(''); }} role="search" aria-label="Co chcesz zbadać?">
+            <label htmlFor="sw-lab-chat-input">Co chcesz zbadać?</label>
+            <div><input id="sw-lab-chat-input" className="sw-input" value={chatPrompt} onChange={(event) => setChatPrompt(event.target.value)} placeholder="Np. znajdź kandydatów dla A1" data-testid="sw-lab-chat-input" /><button type="submit" className="sw-btn sw-btn-primary" data-testid="sw-ask">Zapytaj Genesis →</button></div>
+          </form>
+          {world === 'physics' && <nav className="sw-domain-rail" aria-label="Strefy laboratorium">
+            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Znajdź kandydatów dla receptora A1 i porównaj ich właściwości.')}>Drug Discovery · kandydaci</button>
+            <button type="button" className={`sw-chip${chemistryOpen ? ' is-on' : ''}`} aria-pressed={chemistryOpen} onClick={() => setChemistryOpen((open) => !open)} data-testid="sw-chemistry-toggle">Chemistry · laboratorium chemii</button>
+            <button type="button" className="sw-chip" onClick={() => requestOpenScienceChat('Pokaż eksperyment z czarną dziurą.')}>Physics · czarna dziura</button>
+          </nav>}
+          <button type="button" className="sw-btn" onClick={() => setControlsOpen((open) => !open)} aria-expanded={controlsOpen} aria-controls="sw-advanced-controls" data-testid="sw-controls">{controlsOpen ? 'Ukryj sterowanie' : 'Sterowanie'}</button>
+        </div>
+        <div id="sw-advanced-controls" className="sw-advanced-controls" hidden={!controlsOpen}>
+          <ol className="sw-transcript" data-testid="sw-transcript" aria-live="polite">
+            {transcript.map((e) => <li key={e.id} className={`sw-line sw-line-${e.who}`}>{e.text}</li>)}
+          </ol>
+          <form className="sw-form" onSubmit={onSubmit}>
+            <input className="sw-input" value={text} onChange={(e) => setText(e.target.value)} placeholder={world === 'biology' ? 'Polecenie dla laboratorium' : 'Zaawansowane polecenie dla stanowiska'} aria-label="Polecenie dla agenta" data-testid="sw-input" />
+            <button type="submit" className="sw-btn sw-btn-primary" data-testid="sw-send">Wykonaj</button>
+          </form>
+          <div className="sw-quick">
+            {def.quick.map((q) => <button key={q.label} type="button" className="sw-chip" onClick={() => submit(q.text)} data-testid={`sw-quick-${q.label.split(' ')[0].toLowerCase()}`}>{q.label}</button>)}
+          </div>
+        </div>
+      </section>
+  );
+
+  return (
+    <main id="main-content" className={`sw sw-cam-${camera.toLowerCase()}${detailsOpen ? ' sw-details-open' : ' sw-immersive'}${world === 'biology' && explorerOpen ? ' sw-explorer-open' : ''}`} aria-label="Światy naukowe — laboratorium agenta" data-testid="scientific-worlds" data-world={world} data-agent-state={agentState} data-frames={frames} data-camera={camera} data-details={detailsOpen ? 'open' : 'closed'} data-twin-mode={world === 'biology' ? anatomy.displayMode : undefined} data-macro-level={world === 'biology' ? sim.getRuntimeDiagnostics().macroMicro?.level ?? macroMicroLevelForArtifact(bioArtifact) : undefined} data-runtime-diagnostics={JSON.stringify(sim.getRuntimeDiagnostics())}>
+      <canvas ref={canvasRef} className="sw-canvas" data-testid="sw-canvas" />
+      {world === 'physics' && chemistryOpen && (
+        <Suspense fallback={<div className="sw-loading"><LoadingStatus label="Ładowanie chemii" /></div>}>
+          <ChemistryLabPanel
+            embedded
+            onClose={() => setChemistryOpen(false)}
+            onTitrationStart={(acid) => {
+              const command = stationHandoffCommand(`station=st-titration&acid=${encodeURIComponent(acid)}`, def.catalog, nextLogicalTime());
+              if (command) submitCommands([command], command.text);
+            }}
+          />
+        </Suspense>
+      )}
+      {camera === 'VISOR' && (
+        <div className="sw-visor" aria-hidden="true" data-testid="sw-visor">
+          <div className="sw-visor-frame" />
+          <div className="sw-visor-glare" />
+          <div className="sw-visor-breath" />
+          {working && <div className="sw-reticle" />}
+        </div>
+      )}
+      {loading && <div className="sw-loading"><LoadingStatus label="Ładowanie laboratorium" estimateMs={loadEstimate} testId="sw-loading-status" /></div>}
+      {failed && <p className="cw-error sw-glerror" role="alert">WebGL niedostępny — laboratorium 3D nie może się uruchomić na tym urządzeniu.</p>}
+
+      {world === 'physics' && drugRun && (() => {
+        const st = drugRun.state;
+        const focus = focusCandidate(st);
+        const running = drugRun.phase === 'RUNNING_CAMPAIGN' || drugRun.phase === 'RUNNING_STAGE';
+        // One procedure reading of the same canonical state that drives the bench, the scientist and the cameras.
+        const sealedHere = session?.experimentId === 'drug-candidate-run';
+        const hypothesis = getDrugHypothesis(drugRun.campaignId) ?? buildDrugHypothesis(focus?.smiles ?? 'kandydat');
+        const verdict = drugRun.phase === 'DONE' ? evaluateDrugHypothesis(hypothesis, st, focus).verdict : null;
+        // The funnel as the bench stands it: one sample per candidate, in the row of the stage it reached.
+        const layout = benchLayoutOf(st);
+        const procedure = labProcedureOf(st, focus, {
+          sealed: sealedHere,
+          verdict,
+          replay: sealedHere && replay ? (replay.status === 'MATCH' ? 'MATCH' : 'MISMATCH') : null,
+        });
+        return (
+          <aside className={`sw-chemistry-context sw-drug-live${running ? '' : ' is-compact'}`} aria-label="Odkrywanie leków na żywo" data-testid="drug-bench-live"
+            data-procedure={procedure.activeId ?? (drugRun.phase === 'DONE' ? 'FINISHED' : '')}
+            data-procedure-done={procedure.phases.filter((x) => x.status === 'DONE').map((x) => x.id).join(',')}
+            data-phase={drugRun.phase} data-stage={st.stage} data-state-hash={st.stateHash} data-scene-hash={benchSceneHash ?? ''}
+            data-candidates={st.candidates.length} data-last-seq={st.lastSeq} data-scene-atoms={benchAtoms} data-focus-smiles={focus?.smiles ?? ''}
+            data-target={st.target?.targetId ?? ''} data-docking-step={focus?.dockingStep ?? ''} data-pose-atoms={focus?.pose?.atoms.length ?? 0} data-scene-pose-atoms={benchPoseAtoms}
+            data-bench-zones={BENCH_ZONES.map((z) => `${z}:${layout.counts[z]}`).join(',')} data-bench-samples={layout.samples.length}
+            data-finalists={layout.finalists.map((f) => f.id).join(',')}
+            /* The visible laboratory, mirrored from the scene: what the hands do, with which sample, and
+               how far that vial is from the grip point (in millimetres, measured in the rendered scene). */
+            data-scientist={hand?.scientistPresent ? 'PRESENT' : ''}
+            data-hand-action={hand?.action ?? ''} data-hand-instrument={hand?.instrument ?? ''}
+            data-hand-sample={hand?.sampleLabel ?? ''} data-hand-carried={hand?.carriedInHand ?? ''}
+            data-hand-grip-mm={hand?.gripSeparationM != null ? Math.round(hand.gripSeparationM * 1000) : ''}
+            /* The record of what the hands have really done so far in this run — written by the scene as
+               it rendered each movement, so a check does not depend on catching the right frame. */
+            data-hand-seen={(hand?.actionsSeen ?? []).join(',')} data-hand-instruments-seen={(hand?.instrumentsSeen ?? []).join(',')}
+            data-hand-grip-min-mm={hand?.minGripSeparationM != null ? Math.round(hand.minGripSeparationM * 1000) : ''}>
+            <div className="sw-chemistry-head"><strong>Przebieg eksperymentu</strong><span className="sw-badge">{running ? 'W TOKU' : 'ZAKOŃCZONY'}</span></div>
+            {hand && (
+              /* Said in words, next to the scene: what the person is doing, and that the gesture itself is
+                 a simulated laboratory step standing for a computation — never a physical measurement. */
+              <p className="sw-hand-line" data-testid="drug-hand-line">
+                <span className="sw-hand-action">{HAND_ACTION_PL[hand.action] ?? hand.action}</span>
+                {' — '}{hand.note}
+                <span className="sw-procedure-label">SYMULOWANY KROK LABORATORYJNY · reprezentuje: {hand.represents}</span>
+              </p>
+            )}
+            {/* WHAT WAS FROZEN BEFORE ANY ENGINE RAN. Shown during the run, because that is the only
+                moment at which "the criteria were fixed in advance" is something a viewer can watch
+                rather than be told afterwards. Every value is the server's stored record. */}
+            {preregBody != null && (() => {
+              const criteria = Array.isArray(preregBody.criteria) ? preregBody.criteria as Record<string, unknown>[] : [];
+              const statement = typeof preregBody.statement === 'string' ? preregBody.statement : null;
+              const fingerprint = typeof preregBody.fingerprint === 'string' ? preregBody.fingerprint : null;
+              return (
+                <section className="sw-prereg" data-testid="drug-prereg" data-criteria={criteria.length}
+                  data-prereg-record={drugRun.preregistration?.recordId ?? ''}>
+                  <div className="sw-cand-head">
+                    <strong>Zamrożone kryteria</strong>
+                    <span className="sw-procedure-label">PREREJESTRACJA · przed wykonaniem</span>
+                  </div>
+                  {statement && <p className="sw-prereg-statement">{statement}</p>}
+                  {criteria.length > 0 && (
+                    <ul className="sw-prereg-list">
+                      {criteria.map((c, i) => {
+                        const id = typeof c.id === 'string' ? c.id : `kryterium ${i + 1}`;
+                        const thr = typeof c.threshold === 'number' ? c.threshold : null;
+                        const dir = typeof c.direction === 'string' ? c.direction : null;
+                        const unit = typeof c.unit === 'string' ? c.unit : '';
+                        return (
+                          <li key={id} data-criterion={id}>
+                            <span className="sw-prereg-id">{id}</span>
+                            {thr != null && <span className="sw-prereg-thr">{dir ? `${dir} ` : ''}{thr}{unit ? ` ${unit}` : ''}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <span className="sw-procedure-label">
+                    {fingerprint ? `odcisk ${fingerprint.slice(0, 16)}…` : 'odcisk niezapisany'}
+                    {drugRun.preregistration?.chainHash ? ` · łańcuch ${drugRun.preregistration.chainHash.slice(0, 12)}…` : ''}
+                  </span>
+                  {/* The server's own check of the sealed session against these criteria, once it exists.
+                      The lab never evaluates the criteria itself. */}
+                  {drugRun.sealed?.check && (
+                    <span className={`sw-prereg-check is-${drugRun.sealed.check.toLowerCase()}`} data-prereg-check={drugRun.sealed.check}>
+                      Sprawdzenie serwera wobec prerejestracji: {drugRun.sealed.check}
+                    </span>
+                  )}
+                </section>
+              );
+            })()}
+            {/* EVERY CANDIDATE, AS IT HAPPENS. The run's own read model already carried each candidate's
+                generation, parent, transformation, per-engine result and rejection reason; the panel used
+                to show only a count and the one candidate in focus, so a viewer could not see the science
+                happening — candidates appearing, being computed, and being thrown out. Nothing here is
+                derived or estimated: every cell is a field of the persisted state, and a field the record
+                does not hold renders as a dash. */}
+            {st.candidates.length > 0 && (
+              <div className="sw-cand-wrap">
+                <div className="sw-cand-head">
+                  <strong>Kandydaci ({st.candidates.length})</strong>
+                  <span className="sw-procedure-label">
+                    zachowani {st.candidates.filter((c) => c.status === 'retained').length}
+                    {' · '}odrzuceni {st.candidates.filter((c) => c.status === 'rejected').length}
+                  </span>
+                </div>
+                <ol className="sw-cand-list" data-testid="drug-candidate-list" data-count={st.candidates.length}>
+                  {st.candidates.map((c) => {
+                    const dock = c.stages.docking;
+                    const admet = c.stages.admet;
+                    const qm = c.stages.quantum;
+                    return (
+                      <li key={c.id} className={`sw-cand is-${c.status}${focus?.id === c.id ? ' is-focus' : ''}`}
+                        data-candidate-id={c.id} data-status={c.status} data-generation={c.generation}
+                        data-docking={dock?.value ?? ''} data-admet={admet?.status ?? ''}
+                        data-rejected-reason={c.rejectedReason ?? ''} data-pareto={c.pareto ? '1' : ''}>
+                        <span className="sw-cand-top">
+                          <span className="sw-cand-gen">G{c.generation}</span>
+                          <code className="sw-cand-smiles" title={c.smiles}>{c.smiles}</code>
+                          {c.pareto && <span className="sw-cand-flag" title="Front Pareto">PARETO</span>}
+                          {c.modelConflict && <span className="sw-cand-flag is-warn" title="Modele są ze sobą sprzeczne">KONFLIKT MODELI</span>}
+                        </span>
+                        {c.transformation && (
+                          <span className="sw-procedure-label">z {c.parentSmiles ? `${c.parentSmiles.slice(0, 22)}…` : 'zalążka'} przez {c.transformation}</span>
+                        )}
+                        <span className="sw-cand-stages">
+                          <span className={`sw-cand-stage is-${(admet?.status ?? 'none').toLowerCase()}`}>ADMET {admet?.status ?? '—'}</span>
+                          <span className={`sw-cand-stage is-${(dock?.status ?? 'none').toLowerCase()}`}>
+                            Vina {dock?.value != null ? `${dock.value.toFixed(2)} kcal/mol` : dock?.status ?? '—'}
+                          </span>
+                          <span className={`sw-cand-stage is-${(qm?.status ?? 'none').toLowerCase()}`}>
+                            QM {qm?.value != null ? `${qm.value.toFixed(2)} eV` : qm?.status ?? '—'}
+                          </span>
+                        </span>
+                        {c.status === 'rejected' && (
+                          <span className="sw-cand-reject">ODRZUCONY — {c.rejectedReason ?? 'powód niezapisany w rekordzie'}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            )}
+            <ol className="sw-procedure" aria-label="Kolejne etapy eksperymentu">
+              {procedure.phases.map((ph) => (
+                <li key={ph.id} data-phase-id={ph.id} data-status={ph.status} className={`sw-procedure-step is-${ph.status.toLowerCase()}`}>
+                  <span className="sw-procedure-title">{ph.title}</span>
+                  <span className="sw-procedure-label">{ph.evidence}</span>
+                  {ph.detail && <span className="sw-procedure-detail">{ph.detail}</span>}
+                </li>
+              ))}
+            </ol>
+            {running && (
+              <p>
+                {/* Keyed by stage: each stage gets its own countdown, from its own past measurement. */}
+                <LoadingStatus key={st.stage} label={`Silnik liczy: ${st.stage}`} estimateMs={estimateDuration(`drug-stage:${st.stage}`) ?? drugRunEstimate} testId="drug-bench-loading" />
+              </p>
+            )}
+            {drugRun.phase === 'FAILED' && <p role="alert">Run zatrzymany: {drugRun.error}</p>}
+            <dl className="sw-drug-dl">
+              <dt>Cel białkowy</dt><dd>{st.target ? `${st.target.protein} · PDB ${st.target.pdbId}, łańcuch ${st.target.chain} (${st.target.receptorAtoms} atomów)` : 'receptor jeszcze nieprzygotowany'}</dd>
+              <dt>Generacje</dt><dd>{st.generationsCompleted}/{st.maxGenerations}</dd>
+              <dt>Kandydaci</dt><dd>{st.candidates.length} (zachowani {st.candidates.filter((c) => c.status === 'retained').length})</dd>
+              <dt>Na stole</dt><dd>{BENCH_ZONES.map((z) => `${ZONE_LABEL_PL[z]} ${layout.counts[z]}`).join(' · ')}</dd>
+              {layout.finalists.length > 0 && <><dt>Finaliści</dt><dd>{layout.finalists.map((f) => `#${f.rank} ${f.dockingScore?.toFixed(2)} kcal/mol`).join(' · ')}</dd></>}
+              {layout.samples.some((x) => x.rejectedReason) && <><dt>Odrzucone</dt><dd>{[...new Set(layout.samples.filter((x) => x.rejectedReason).map((x) => x.rejectedReason))].join(' · ')}</dd></>}
+              <dt>Fokus</dt><dd className="cw-mono">{focus?.smiles ?? '—'}</dd>
+              <dt>ADMET</dt><dd>{focus?.stages.admet?.status ?? '—'}</dd>
+              <dt>Krok dokowania</dt><dd>{DOCKING_STEP_LABEL[focus?.dockingStep ?? 'NONE']}</dd>
+              <dt>Docking (Vina)</dt><dd>{focus?.stages.docking?.value != null ? `${focus.stages.docking.value.toFixed(2)} kcal/mol` : focus?.stages.docking?.status ?? '—'}</dd>
+              <dt>Poza w kieszeni</dt><dd>{focus?.pose ? `${focus.pose.atoms.length} atomów, reszty: ${focus.pose.pocketResidues.slice(0, 6).join(', ')}${focus.pose.pocketResidues.length > 6 ? '…' : ''}` : '—'}</dd>
+              <dt>QM (PySCF)</dt><dd>{focus?.stages.quantum?.value != null ? `${focus.stages.quantum.value.toFixed(2)} eV` : focus?.stages.quantum?.status ?? '—'}</dd>
+              {st.blocked.length > 0 && <><dt>Zablokowane</dt><dd>{st.blocked.map((b) => `${b.stage}: ${b.blocker}`).join(' · ')}</dd></>}
+            </dl>
+            {protocol && (() => {
+              /* THE EXPERIMENT ENDS WITH A PROTOCOL — shown here exactly as the backend assembled it from
+                 the record, split into what WAS computed (A), what a synthesis engine proposed if any (B),
+                 and what only a physical laboratory could do (C, executed by nobody). Nothing is filled in
+                 by this screen: a field the record does not hold simply does not appear. */
+              const hypothesis = protocol.hypothesis ?? null;
+              const verdictOf = protocol.verdict ?? null;
+              const synthesis = (protocol.synthesis ?? {}) as Record<string, unknown>;
+              const validation = (protocol.proposedValidationProtocol ?? {}) as Record<string, unknown>;
+              const steps = Array.isArray(validation.steps) ? validation.steps as Record<string, unknown>[] : [];
+              const funnel = (protocol.funnel ?? {}) as Record<string, number | string[]>;
+              const finalists = (protocol.finalists ?? []) as Record<string, unknown>[];
+              return (
+                <section className="sw-protocol" data-testid="drug-protocol"
+                  data-protocol-kind={protocol.kind} data-protocol-fingerprint={String(protocol.protocolFingerprint ?? '')}
+                  data-protocol-sections="A,B,C">
+                  <h3>Protokół końcowy</h3>
+                  {protocol.question && <p className="sw-protocol-q">Pytanie: {protocol.question}</p>}
+                  {hypothesis?.statement && (
+                    <p>Hipoteza zarejestrowana {hypothesis.registeredBeforeExecution ? 'przed wykonaniem' : '— brak rejestracji przed wykonaniem'}: {hypothesis.statement}
+                      {hypothesis.fingerprint && <span className="sw-procedure-label"> odcisk {hypothesis.fingerprint}</span>}</p>
+                  )}
+                  {verdictOf?.server && <p><strong>Werdykt: {verdictOf.server}</strong>{verdictOf.rule ? ` — ${verdictOf.rule}` : ''}</p>}
+
+                  <h4>A. Część obliczeniowa — wykonana</h4>
+                  <ul className="sw-protocol-list">
+                    {(protocol.engines ?? []).map((e, i) => <li key={i}>{e.engine}{e.version ? ` ${e.version}` : ''}{e.evidence ? ` · ${e.evidence}` : ''}</li>)}
+                    {typeof funnel.generated === 'number' && <li>Lej: {funnel.generated} wygenerowanych, {String(funnel.retained ?? '—')} zachowanych, {String(funnel.rejected ?? '—')} odrzuconych</li>}
+                    {finalists.map((f, i) => <li key={`f${i}`}>Finalista {i + 1}: {String(f.canonicalSmiles ?? f.candidateId ?? '')} · {typeof f.dockingScore === 'number' ? `${f.dockingScore.toFixed(2)} kcal/mol` : '—'}</li>)}
+                  </ul>
+
+                  <h4>B. Proponowana droga syntezy</h4>
+                  {(() => {
+                    /* Bez trasy sekcja B nazywa DOKŁADNY stan runtime'u — który silnik, czego brakuje —
+                       zamiast ogólnego „brak". Nic tu nie jest uzupełniane przez ekran: trasa pojawia
+                       się wyłącznie wtedy, gdy zwrócił ją silnik. */
+                    const missing = Array.isArray(synthesis.missingModelFiles) ? synthesis.missingModelFiles as string[] : [];
+                    const status = synthesis.routeProvided ? null : String(synthesis.status ?? 'NOT_ATTEMPTED');
+                    return (
+                      <>
+                        <p data-testid="drug-protocol-synthesis"
+                          data-route-provided={synthesis.routeProvided ? 'true' : 'false'}
+                          data-synthesis-status={status ?? 'ROUTE_PROVIDED'}
+                          data-missing-model-files={missing.length}>
+                          {String(synthesis.statement ?? 'Brak zapisu o drodze syntezy.')}
+                          {status ? ` (${status})` : ''}
+                        </p>
+                        {status === 'BLOCKED_BY_RUNTIME' && (
+                          <p className="sw-drug-note" data-testid="drug-protocol-synthesis-blocker">
+                            Silnik retrosyntezy nie mógł zostać uruchomiony, więc żadna trasa nie została policzona.
+                            {typeof synthesis.reason === 'string' ? ` Powód: ${synthesis.reason}.` : ''}
+                            {missing.length > 0 ? ` Brakujące pliki modelu: ${missing.join(', ')}.` : ''}
+                            {' '}To stan środowiska, nie wynik naukowy — kandydat czeka z zachowaną tożsamością, a sekcja B pozostaje pusta do czasu realnego przebiegu.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  <h4>C. Proponowany protokół walidacji fizycznej — NIEWYKONANY</h4>
+                  <ol className="sw-protocol-list" data-testid="drug-protocol-validation" data-validation-steps={steps.length}>
+                    {steps.map((st, i) => (
+                      <li key={i}>{String(st.assay ?? '')} — {String(st.testsWhat ?? '')}
+                        <span className="sw-procedure-label">{String(st.status ?? '')} · {String(st.apparatus ?? '')}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  {typeof validation.note === 'string' && <p className="sw-drug-note">{validation.note}</p>}
+                  {protocol.boundary && <p className="sw-drug-note"><strong>{protocol.boundary}</strong></p>}
+                </section>
+              );
+            })()}
+            <p className="sw-drug-note">
+              Geometria RDKit i przebieg Vina to REAL ENGINE OUTPUT; wynik Vina pozostaje estymatą funkcji oceniającej przy sztywnym receptorze, nie zmierzonym powinowactwem.
+              Predykcje ADMET to MODEL_ESTIMATE. Przekształcenia cząsteczek to COMPUTATIONAL TRANSFORMATION — obliczenia, nie synteza w laboratorium.
+            </p>
+          </aside>
+        );
+      })()}
+
+      {world === 'physics' && chemistryCardOpen && titrationResult && (
+        <aside className="sw-chemistry-context" aria-label="Wynik miareczkowania" data-testid="sw-titration-context">
+          <div className="sw-chemistry-head">
+            <div><span>EDUCATIONAL PROCEDURE MODEL</span><strong>Wynik · pH {titrationResult.ph.toFixed(2)}</strong></div>
+            <button type="button" className="sw-context-close" onClick={() => setChemistryCardOpen(false)} aria-label="Zamknij wynik miareczkowania">×</button>
+          </div>
+          <p>{titrationResult.acidName.split(' (')[0]} · {titrationResult.vb.toFixed(1)} mL NaOH · {titrationRegion(titrationResult.vb, titrationResult.veq)}</p>
+          <div className="sw-context-actions">
+            <button type="button" className="sw-btn sw-btn-primary" onClick={() => setEvidenceOpen(true)}>Evidence + replay</button>
+            <button type="button" className="sw-btn" onClick={() => requestOpenScienceChat('Zaproponuj następny eksperyment po tym miareczkowaniu.')}>Następny eksperyment</button>
+          </div>
+          <details>
+            <summary>Otwórz wykres</summary>
+            <svg className="sw-titration-plot" viewBox="0 0 300 100" role="img" aria-label="Krzywa pH względem objętości NaOH">
+              <path d="M0 100H300M0 0V100" />
+              <polyline points={titrationPolyline(titrationResult.acid)} />
+              <line x1={(titrationResult.veq / 60) * 300} x2={(titrationResult.veq / 60) * 300} y1="0" y2="100" />
+              <circle cx={(titrationResult.vb / 60) * 300} cy={100 - (titrationResult.ph / 14) * 100} r="3" />
+            </svg>
+            <small>Bilans ładunku · Veq {titrationResult.veq.toFixed(1)} mL · pKa {titrationResult.pKa.toFixed(2)}. Aparatura jest rekonstrukcją edukacyjną, nie telemetrią wet-lab.</small>
+          </details>
+        </aside>
+      )}
+
+      <div className="sw-world-controls">
+        <button type="button" className="sw-world-btn" data-testid="sw-details" aria-expanded={detailsOpen}
+          onClick={() => { setDetailsOpen((open) => !open); if (!detailsOpen) setEvidenceOpen(true); }}>
+          {detailsOpen ? 'Ukryj szczegóły' : 'Szczegóły'}
+        </button>
+      </div>
+      {world !== 'biology' && researchControls}
+      {world === 'biology' && explorerOpen && (
+        <HumanExplorerPanel
+          manifest={sim.manifest} anatomy={anatomy} artifact={bioArtifact} session={session} sessions={sessions}
+          busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
+          twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds} referenceAnatomy={referenceAnatomy}
+          twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
+          surface={surface} onSurface={applySurface}
+          subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}
+          researchControls={<>{commandControls}{researchControls}</>}
+          onCutaway={(next) => { cutawayRef.current = next; setCutawayState(next); sim.setTwinCutaway(next); setAnatomy((a) => setCutaway(a, next.enabled)); }}
+          onIsolate={(ids) => { setAnatomy((a) => (ids.length ? isolateAnatomyNode(a, ids[0], sim.manifest) : { ...a, isolatedNodeIds: [] })); sim.setTwinIsolated(ids); }}
+        />
+      )}
+      {world !== 'biology' && commandControls}
+    </main>
+  );
+}
+
+export default ScientificWorldsScreen;

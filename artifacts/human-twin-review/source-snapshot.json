@@ -1,0 +1,272 @@
+{
+  "capturedAt": "2026-09-21T22:26:14.144350+00:00",
+  "host": "DESKTOP-7UAVGFS",
+  "branch": "claude/genesis-c1-visual-integration",
+  "head": "d48edeb0ef9b403c253806c935c41d49096a86fa",
+  "sourceFingerprint": "1123704d15b56d127610eaa7a33d612e8b3c345edaa857da7b29f440a5a30a1b",
+  "lockfileModified": false,
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "550492e2ae78f408634238c7de9179f499d3e1265dd740709188fc84a4afc61d",
+      "bytes": 9349
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "cead07ab2a4ffe7319bdfe08e364e2c41f09008a8e3dbb536e7a7969ac11c5ab",
+      "bytes": 625
+    },
+    {
+      "path": "packages/backend/src/d104TranscriptionCustody.test.mjs",
+      "sha256": "f48b692710a35bc01e6fc59429a7570f1d02266c16590b5c6a669376ea414505",
+      "bytes": 3115
+    },
+    {
+      "path": "packages/backend/src/d105A2Custody.test.mjs",
+      "sha256": "e56eb6eb170b3fa67e32a1fda8ba8d223663ea19b93349472aaaee5724583b86",
+      "bytes": 10531
+    },
+    {
+      "path": "packages/backend/src/d108PerRowCustody.test.mjs",
+      "sha256": "1ca496a5506d7d7618f47da9c8e6ed1e76aeb7dbcf8d4c941b11118c8379d92b",
+      "bytes": 7481
+    },
+    {
+      "path": "packages/backend/src/d109Trial2Readiness.test.mjs",
+      "sha256": "f91186e340cc123c654f5e118d34788563ce7f75bae074cf831d5dccdf539eb9",
+      "bytes": 2440
+    },
+    {
+      "path": "packages/backend/src/dependencyAudit.test.mjs",
+      "sha256": "42fc6f8c1d3baf7baa774419f2c111a75c371fc9ee91244b7f596ac8c01413e2",
+      "bytes": 6662
+    },
+    {
+      "path": "packages/backend/src/security/dependencyAudit.mjs",
+      "sha256": "2dd0cb384b07483f189192018a23b5c7a1f8432d3fa7557e5af7a73ca5e25f76",
+      "bytes": 5782
+    },
+    {
+      "path": "packages/backend/src/store.mjs",
+      "sha256": "be5f037411c23b76c9307856579fbe32da6cf299a96a875b429686f28c914a1e",
+      "bytes": 67259
+    },
+    {
+      "path": "packages/core/src/engine/native/nativeEngine.test.ts",
+      "sha256": "eb2d751ff40c8b851b15da60f2ae4c5d8b0a31c1cdb7e4e65e715ca866439344",
+      "bytes": 20587
+    },
+    {
+      "path": "packages/frontend/src/App.tsx",
+      "sha256": "0352b3c33e20f65ae5d33ae67b1c839072cadcddcff06e9e0179d3a4e60aa8f7",
+      "bytes": 62726
+    },
+    {
+      "path": "packages/frontend/src/__tests__/autonomousDiscoveryLoop.test.ts",
+      "sha256": "d14f041689151802206b962c3b12028abc03eea981f012db7ccae1779d1c6857",
+      "bytes": 30862
+    },
+    {
+      "path": "packages/frontend/src/__tests__/governanceFoundation.test.ts",
+      "sha256": "e6c90155c58a3536e693541f444d26b86e5dbe736e64e8f6a4d988447667e938",
+      "bytes": 16841
+    },
+    {
+      "path": "packages/frontend/src/__tests__/humanExplorer.test.ts",
+      "sha256": "c2c36c3be54b968b290ba1046ca9b056a6d350f94f4cafe734760e384f4927e0",
+      "bytes": 9803
+    },
+    {
+      "path": "packages/frontend/src/__tests__/humanExplorerRuntime.test.ts",
+      "sha256": "5d6c0108921dbb2dd28e733d78ff078c39118057d713ae089a0063b7fc148687",
+      "bytes": 7814
+    },
+    {
+      "path": "packages/frontend/src/__tests__/humanMacroMicroLayer.test.ts",
+      "sha256": "807be54c3294e08f5a454f56642ceb359de5963e9e1ab75e599a48579d17acb4",
+      "bytes": 2865
+    },
+    {
+      "path": "packages/frontend/src/__tests__/humanTwinLoading.test.ts",
+      "sha256": "8405c9b0fa32dc9c8fa881cb101322e32d8c589dbc7343313f4ffe87108637b9",
+      "bytes": 7993
+    },
+    {
+      "path": "packages/frontend/src/__tests__/humanTwinSceneLifecycle.test.ts",
+      "sha256": "47044de0a6685b31afbd1e9eaa819db6bfa78311610e1c912ca19dcabb912239",
+      "bytes": 8538
+    },
+    {
+      "path": "packages/frontend/src/__tests__/liveMatrixBoundary.test.tsx",
+      "sha256": "021616f6b0aaf05b346b269dc0dd4a53a14f58ff190ff0939a5eaac2b5d2d406",
+      "bytes": 7493
+    },
+    {
+      "path": "packages/frontend/src/__tests__/liveMatrixEngine.test.ts",
+      "sha256": "8624a69b54ba959b9f5037009ffd84c5bd4d308f37bcc13912302d3e20203c06",
+      "bytes": 16094
+    },
+    {
+      "path": "packages/frontend/src/__tests__/moduleReachability.test.ts",
+      "sha256": "0f72227d4e34177c68d0a2fd838b949a29a10de6d24678ac1a1f875c92e20e8e",
+      "bytes": 52275
+    },
+    {
+      "path": "packages/frontend/src/__tests__/scientificInteriorVisuals.test.ts",
+      "sha256": "b6300fef2455d951f8a02f2217c6d4754826808fc614ca2fb6c1121acdab3657",
+      "bytes": 7550
+    },
+    {
+      "path": "packages/frontend/src/__tests__/winnerGateBypassAudit.test.ts",
+      "sha256": "ccb5016edc807b512caea4dd828a107dae02e8e258cb32b6cecc63c43d19bc2b",
+      "bytes": 9448
+    },
+    {
+      "path": "packages/frontend/src/components/AppShell.tsx",
+      "sha256": "a8db706f94d339f7406d59c06c37aeca9d7b97157e6a6dc3eb8dbf663ec8f601",
+      "bytes": 12520
+    },
+    {
+      "path": "packages/frontend/src/components/HumanExplorerPanel.tsx",
+      "sha256": "6d6be31d2775e3e882d838f7a10083e2150078ba4c569e2014884d25dc64b221",
+      "bytes": 16101
+    },
+    {
+      "path": "packages/frontend/src/components/ScientificWorldsScreen.tsx",
+      "sha256": "42785a084b67901f7c32e0e84a19051895e696a13cfb5d40ad5f0179703f02c3",
+      "bytes": 33902
+    },
+    {
+      "path": "packages/frontend/src/components/liveMatrix/LiveMatrixBackground.tsx",
+      "sha256": "837f8788bc6cd33d748781f703f1d6dd2abd82e156a4e3c6c737684d787d1a8a",
+      "bytes": 5232
+    },
+    {
+      "path": "packages/frontend/src/components/liveMatrix/matrixEngine.ts",
+      "sha256": "7fc716c40d27f7820e9d24a40b703f3d01200096cde1890ceed8291678ffe345",
+      "bytes": 18417
+    },
+    {
+      "path": "packages/frontend/src/components/visual-simulation/TemporalCinematicScreen.tsx",
+      "sha256": "f3604ec74eb90b1b5062249c5790f8186c587069dd9a9ae03b0a9e1ee2cb2aaa",
+      "bytes": 6880
+    },
+    {
+      "path": "packages/frontend/src/core/scientificWorlds/agentController.ts",
+      "sha256": "a082ab13134227df093d6995027712b456b05fc9e35197a6452f9ebd3359acc6",
+      "bytes": 18177
+    },
+    {
+      "path": "packages/frontend/src/core/scientificWorlds/humanExplorer.ts",
+      "sha256": "37489cc513e869512401b236c0b3a4159938661fa22e93bb1558b562d2265b58",
+      "bytes": 14816
+    },
+    {
+      "path": "packages/frontend/src/core/scientificWorlds/humanLab/anatomyAtlas.ts",
+      "sha256": "d1afe2c7297e27ea54a3ecf6115b345350e169acf38d6fd207e22848f202c8f2",
+      "bytes": 9760
+    },
+    {
+      "path": "packages/frontend/src/core/scientificWorlds/humanLab/anatomyView.ts",
+      "sha256": "f4272914dacaa544dbed3754e2bc910ff884f88230b237bb415a0fe96215f2e9",
+      "bytes": 1600
+    },
+    {
+      "path": "packages/frontend/src/core/scientificWorlds/humanLab/types.ts",
+      "sha256": "6253afea0b5c91cb7672cbb94a63a5ccad1bc45e44136c940e565e6e576a7cbe",
+      "bytes": 12325
+    },
+    {
+      "path": "packages/frontend/src/core/temporalCinematic/scientificInteriorVisuals.ts",
+      "sha256": "f36ce3f28c5b3c9c4ecf48712b304dcb3655553a254e69ffaa0a40aca95a9ec6",
+      "bytes": 14678
+    },
+    {
+      "path": "packages/frontend/src/core/temporalCinematic/temporalCinematicSim3D.ts",
+      "sha256": "20e1eb72ff50b59d8681e5100d045943178678f4f8220a8cdb47d058d3024e75",
+      "bytes": 11094
+    },
+    {
+      "path": "packages/frontend/src/core/temporalCinematic/temporalCinematicVisualResolver.ts",
+      "sha256": "1e928c48bde50fcba184328bdb9291d5c532b2cc953a9be6f2c283cb3ed3765d",
+      "bytes": 18578
+    },
+    {
+      "path": "packages/frontend/src/core/three/agentLabScene3D.ts",
+      "sha256": "2eb3e0af73f38eb5fb5a5d16a0db31555e681601c98150c395a9701411ca040c",
+      "bytes": 67859
+    },
+    {
+      "path": "packages/frontend/src/core/three/biologyLabKit.ts",
+      "sha256": "2a3872af29a0a906c4b019ad8e8f192d382350f6d17d51add41ac0a756bb07c1",
+      "bytes": 35613
+    },
+    {
+      "path": "packages/frontend/src/core/three/graphics/worldGrade.ts",
+      "sha256": "d69a31007dc24c623c1159706b933bfeb18d422ca6888aa1b236cb3dab319726",
+      "bytes": 8569
+    },
+    {
+      "path": "packages/frontend/src/core/three/humanMacroMicroLayer.ts",
+      "sha256": "b5735603b9a6f8a33d9014a9f02294773a93e8f8d2632814018fc92fa52eb38c",
+      "bytes": 13839
+    },
+    {
+      "path": "packages/frontend/src/core/three/humanTwinAsset.ts",
+      "sha256": "0b6f0f9a365a52714188e25919fb6dfe41bb054e5887caee24ea7f33238209bb",
+      "bytes": 9595
+    },
+    {
+      "path": "packages/frontend/src/core/three/types.ts",
+      "sha256": "23fec31e1ce87501994f50839324536b5e2b68f8bff925b214585dfeff42752e",
+      "bytes": 7933
+    },
+    {
+      "path": "packages/frontend/src/core/three/useThreeLoop.ts",
+      "sha256": "76ada6a5638fcff17115bc230c4b9a9350786d78030ceffe8c8b83c554fba356",
+      "bytes": 15758
+    },
+    {
+      "path": "packages/frontend/src/core/worldModel/ecs/geometry.ts",
+      "sha256": "1d20dc20838985f2e1ee01e8f2e4bec44f7271133b5309c8715f9d174121d056",
+      "bytes": 6657
+    },
+    {
+      "path": "packages/frontend/src/core/worldModel/generation/geometry/interiorGenerator.ts",
+      "sha256": "7986caeec8abced10a8307a0f0687c5eb3a17a2a4bbee042d358936ba8c35391",
+      "bytes": 9445
+    },
+    {
+      "path": "packages/frontend/src/styles-2040-hud.css",
+      "sha256": "8615564028e06f1175dc4ba517cd9c83959d857c198f39f70cd86c92776555b8",
+      "bytes": 44563
+    },
+    {
+      "path": "packages/frontend/src/styles.css",
+      "sha256": "d03b7cc5a23454975d322cdf8c8c16c66cc15de9de8b5a870b6f3608892520d0",
+      "bytes": 363647
+    },
+    {
+      "path": "scripts/capture-mockup-plates.mjs",
+      "sha256": "3b42a157433fe3e1ba1e8999e0c7e3cb15c392e554cd97b03e3d120894f3bdc5",
+      "bytes": 4599
+    },
+    {
+      "path": "scripts/genesis-visual-surfaces-e2e.mjs",
+      "sha256": "d6018813012878ba476bdb62e3eef8a59b27679776b707fd33e4bc5bfa2b6d03",
+      "bytes": 5593
+    },
+    {
+      "path": "scripts/human-twin-browser-e2e.mjs",
+      "sha256": "45c79c1c3fce6956b70af2e5c67777a6513a17764f062a854a90ea31d6e5753f",
+      "bytes": 9898
+    },
+    {
+      "path": "scripts/visual-e2e-v52-v7.mjs",
+      "sha256": "f85d34b67a7067b9b21a4931e2dea403fe169bddcd0a4048e4ea7aa63572516f",
+      "bytes": 10184
+    }
+  ],
+  "statusShort": " M .env.example\n M docs/evidence/usgs/USGS-01646500-00060-2026-08-20.json\n M docs/evidence/usgs/USGS-01646500-monitoring-location.json\n M packages/backend/src/campaign/giprActivity.json\n M packages/backend/src/campaign/glp1rActivity.json\n M packages/backend/src/d104TranscriptionCustody.test.mjs\n M packages/backend/src/d105A2Custody.test.mjs\n M packages/backend/src/d108PerRowCustody.test.mjs\n M packages/backend/src/d109Trial2Readiness.test.mjs\n M packages/backend/src/dependencyAudit.test.mjs\n M packages/backend/src/security/dependencyAudit.mjs\n M packages/backend/src/store.mjs\n M packages/core/src/engine/native/nativeEngine.test.ts\n M packages/frontend/src/App.tsx\n M packages/frontend/src/__tests__/autonomousDiscoveryLoop.test.ts\n M packages/frontend/src/__tests__/governanceFoundation.test.ts\n M packages/frontend/src/__tests__/humanExplorer.test.ts\n M packages/frontend/src/__tests__/humanMacroMicroLayer.test.ts\n M packages/frontend/src/__tests__/liveMatrixBoundary.test.tsx\n M packages/frontend/src/__tests__/liveMatrixEngine.test.ts\n M packages/frontend/src/__tests__/moduleReachability.test.ts\n M packages/frontend/src/__tests__/scientificInteriorVisuals.test.ts\n M packages/frontend/src/__tests__/winnerGateBypassAudit.test.ts\n M packages/frontend/src/components/AppShell.tsx\n M packages/frontend/src/components/HumanExplorerPanel.tsx\n M packages/frontend/src/components/ScientificWorldsScreen.tsx\n M packages/frontend/src/components/liveMatrix/LiveMatrixBackground.tsx\n M packages/frontend/src/components/liveMatrix/matrixEngine.ts\n M packages/frontend/src/components/visual-simulation/TemporalCinematicScreen.tsx\n M packages/frontend/src/core/benchmark/fixtures/discoverybench/evolution_freshwater_fish/body-size-evolution-in-south-american-freshwater-fishes.csv\n M packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html\n M packages/frontend/src/core/scientificWorlds/agentController.ts\n M packages/frontend/src/core/scientificWorlds/humanExplorer.ts\n M packages/frontend/src/core/scientificWorlds/humanLab/anatomyAtlas.ts\n M packages/frontend/src/core/scientificWorlds/humanLab/anatomyView.ts\n M packages/frontend/src/core/scientificWorlds/humanLab/types.ts\n M packages/frontend/src/core/temporalCinematic/scientificInteriorVisuals.ts\n M packages/frontend/src/core/temporalCinematic/temporalCinematicSim3D.ts\n M packages/frontend/src/core/temporalCinematic/temporalCinematicVisualResolver.ts\n M packages/frontend/src/core/three/agentLabScene3D.ts\n M packages/frontend/src/core/three/biologyLabKit.ts\n M packages/frontend/src/core/three/graphics/worldGrade.ts\n M packages/frontend/src/core/three/humanMacroMicroLayer.ts\n M packages/frontend/src/core/three/humanTwinAsset.ts\n M packages/frontend/src/core/three/types.ts\n M packages/frontend/src/core/three/useThreeLoop.ts\n M packages/frontend/src/core/worldModel/ecs/geometry.ts\n M packages/frontend/src/core/worldModel/generation/geometry/interiorGenerator.ts\n M packages/frontend/src/styles-2040-hud.css\n M packages/frontend/src/styles.css\n M scripts/capture-mockup-plates.mjs\n M scripts/visual-e2e-v52-v7.mjs\n?? .codex-remote-attachments/\n?? .gitattributes\n?? artifacts/human-twin-review/\n?? docs/GENESIS_IMPLEMENTATION_REVIEW_2026-09-22.md\n?? docs/GENESIS_V6_V7_CAPABILITY_EVIDENCE.md\n?? docs/GENESIS_VISUAL_ASSET_STRATEGY.md\n?? packages/frontend/src/__tests__/humanExplorerRuntime.test.ts\n?? packages/frontend/src/__tests__/humanTwinLoading.test.ts\n?? packages/frontend/src/__tests__/humanTwinSceneLifecycle.test.ts\n?? scripts/genesis-visual-surfaces-e2e.mjs\n?? scripts/human-twin-browser-e2e.mjs\n",
+  "note": "Source/config/test inventory; excludes user attachments, generated artifacts and this review documentation. No commit/push/merge/deploy."
+}

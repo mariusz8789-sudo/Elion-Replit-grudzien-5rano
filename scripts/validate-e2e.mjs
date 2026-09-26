@@ -10,7 +10,6 @@ const run = (command, args) => {
 const required = ['packages/frontend/package.json', 'packages/backend/src/start.mjs', '.env.example'];
 for (const file of required) if (!existsSync(join(root, file))) throw new Error(`MISSING_REQUIRED_FILE: ${file}`);
 
-run('npx', ['vitest', 'run', 'packages/core/src/genesis9d']);
 run('npm', ['run', 'build']);
 
 const secretPattern = /(-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16})/;

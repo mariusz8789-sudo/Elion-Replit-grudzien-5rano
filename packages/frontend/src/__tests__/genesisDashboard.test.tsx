@@ -53,7 +53,7 @@ describe('GenesisDashboard (no DOM — the brand-new-user state)', () => {
   it('is never an empty page: it names the missing mission and offers the real first step', () => {
     expect(html).toContain('Brak aktywnej misji');
     expect(html).toContain('Postaw pierwszą hipotezę');
-    expect(html).toContain('Otwórz World Engine'); // the empty state carries a real next step, not a dead card
+    expect(html).toContain('Otwórz Nexus'); // the empty state carries a real next step, not a dead card
   });
 
   it('states plainly that nothing is seeded, rather than padding the screen with demo records', () => {

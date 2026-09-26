@@ -1,0 +1,263 @@
+{
+  "browser": "153.0.4234.48",
+  "routes": [
+    {
+      "route": "world-director-initial",
+      "state": {
+        "ready": true,
+        "worldId": "historical:cambridge-science-campus:2026",
+        "preset": "MODERN_SCIENTIFIC_LAB",
+        "entityCount": 345,
+        "evidenceHash": "758fa345b8a023678123a1388616e8b5796df92f88af197877b4d9e8ef18315f",
+        "summary": {
+          "viewMode": "interior",
+          "interiorRoomId": "room:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0",
+          "interiorRoomType": "MATERIALS_LAB",
+          "interiorAssetSlots": [
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-0",
+              "slotType": "SPECTROMETER_STATION",
+              "rendered": true
+            },
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-1",
+              "slotType": "THERMAL_STAGE_STATION",
+              "rendered": true
+            },
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2",
+              "slotType": "COMPUTE_STATION",
+              "rendered": true
+            }
+          ],
+          "interiorAssetSlotCount": 3,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": false
+        }
+      }
+    },
+    {
+      "route": "world-director",
+      "lab": {
+        "ready": true,
+        "worldId": "historical:cambridge-science-campus:2026",
+        "preset": "MODERN_SCIENTIFIC_LAB",
+        "entityCount": 345,
+        "evidenceHash": "758fa345b8a023678123a1388616e8b5796df92f88af197877b4d9e8ef18315f",
+        "summary": {
+          "viewMode": "interior",
+          "interiorRoomId": "room:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0",
+          "interiorRoomType": "MATERIALS_LAB",
+          "interiorAssetSlots": [
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-0",
+              "slotType": "SPECTROMETER_STATION",
+              "rendered": true
+            },
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-1",
+              "slotType": "THERMAL_STAGE_STATION",
+              "rendered": true
+            },
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2",
+              "slotType": "COMPUTE_STATION",
+              "rendered": true
+            }
+          ],
+          "interiorAssetSlotCount": 3,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": false
+        },
+        "interactionTargets": [
+          {
+            "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-0",
+            "x": 714.827177914437,
+            "y": 586.7611943426593,
+            "slotType": "SPECTROMETER_STATION"
+          },
+          {
+            "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-1",
+            "x": 619.9999999999947,
+            "y": 652.7467796916026,
+            "slotType": "THERMAL_STAGE_STATION"
+          },
+          {
+            "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2",
+            "x": 450.4308224326005,
+            "y": 770.7416592715754,
+            "slotType": "COMPUTE_STATION"
+          }
+        ],
+        "selectedTarget": {
+          "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2",
+          "x": 450.4308224326005,
+          "y": 770.7416592715754,
+          "slotType": "COMPUTE_STATION"
+        },
+        "selectedSummary": {
+          "viewMode": "interior",
+          "interiorRoomId": "room:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0",
+          "interiorRoomType": "MATERIALS_LAB",
+          "interiorAssetSlots": [
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-0",
+              "slotType": "SPECTROMETER_STATION",
+              "rendered": true
+            },
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-1",
+              "slotType": "THERMAL_STAGE_STATION",
+              "rendered": true
+            },
+            {
+              "id": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2",
+              "slotType": "COMPUTE_STATION",
+              "rendered": true
+            }
+          ],
+          "interiorAssetSlotCount": 3,
+          "selectedAssetSlotId": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2",
+          "selectedAssetSlotType": "COMPUTE_STATION",
+          "interactionCommand": {
+            "type": "INSPECT_ENTITY",
+            "entityId": "asset-slot:historical:cambridge-science-campus:2026-district-0-parcel-0-building-floor-1-room-left-0-slot-2"
+          },
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": false
+        }
+      },
+      "city": {
+        "ready": true,
+        "worldId": "historical:warsaw:2026",
+        "preset": "MODERN_CITY",
+        "entityCount": 119,
+        "evidenceHash": "d60ade67608328b46759de43a06247d7d25051f7868beb11ed5c29e160ef65fd",
+        "summary": {
+          "viewMode": "street",
+          "interiorRoomId": null,
+          "interiorRoomType": null,
+          "interiorAssetSlots": [],
+          "interiorAssetSlotCount": 0,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": true
+        }
+      },
+      "panelStyle": {
+        "display": "grid",
+        "visibility": "visible",
+        "opacity": "1",
+        "zIndex": "4",
+        "rect": {
+          "x": 218,
+          "y": 18,
+          "width": 390,
+          "height": 525.109375
+        }
+      },
+      "layout": {
+        "scrollY": 0,
+        "bodyHeight": 900,
+        "worldDirector": {
+          "x": 200,
+          "y": 0,
+          "width": 1240,
+          "height": 899
+        },
+        "canvases": [
+          {
+            "className": "reality-canvas",
+            "display": "none",
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          {
+            "className": "world-director-canvas",
+            "display": "block",
+            "x": 200,
+            "y": 0,
+            "width": 1240,
+            "height": 899
+          }
+        ]
+      },
+      "screenshots": [
+        {
+          "file": "artifacts/human-twin-review/world-director-lab.png",
+          "capturedAt": "2026-09-22T02:49:40.020Z",
+          "url": "http://127.0.0.1:5001/#/world-director",
+          "sha256": "539795f21d43b3391e6eea0cf9e831b82536db503a70d96eb46e6fb2f597741b"
+        },
+        {
+          "file": "artifacts/human-twin-review/world-director-city.png",
+          "capturedAt": "2026-09-22T02:49:44.114Z",
+          "url": "http://127.0.0.1:5001/#/world-director",
+          "sha256": "b3a6ab0fd5ef9cfd6cb9ff67c256527243416ae7489b6e643b7590db20533434"
+        },
+        {
+          "file": "artifacts/human-twin-review/world-director-historical.png",
+          "capturedAt": "2026-09-22T02:49:46.216Z",
+          "url": "http://127.0.0.1:5001/#/world-director",
+          "sha256": "241c1c0f8e541cc3bc10add6e3d5749bd21cfb251200a0cd18f957c1130da138"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "route": "meta-cognition",
+      "status": "PASS",
+      "metaEvents": 23,
+      "campaign": "Kampania naukowa\nSTATUS\nCOMPLETED\nCYKLE\n2\nDECISIONTRACE\ntrace_91d3be37\nEVIDENCE\n6 rekordów",
+      "screenshots": [
+        {
+          "file": "artifacts/human-twin-review/meta-cognition.png",
+          "capturedAt": "2026-09-22T02:49:47.264Z",
+          "url": "http://127.0.0.1:5001/#/meta-cognition",
+          "sha256": "3642c40764483ee50fcf84a5cb62a4752bf66c8a4ee178b74f3ecf6b0d8c1d79"
+        }
+      ]
+    },
+    {
+      "route": "mirror",
+      "states": [
+        "MIRROR_IDLE",
+        "CONSENT_REQUIRED",
+        "SCANNING",
+        "SYNCING",
+        "TWIN_READY",
+        "DIVERGENCE_MODE",
+        "CAPTURE",
+        "REPLAY"
+      ],
+      "status": "PASS",
+      "screenshots": [
+        {
+          "file": "artifacts/human-twin-review/mirror-experimental.png",
+          "capturedAt": "2026-09-22T02:49:47.801Z",
+          "url": "http://127.0.0.1:5001/#/mirror",
+          "sha256": "1abae143dc203142f23c6f51bfd198929cafbd0b63c82ae7409a8d5363f87fa6"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

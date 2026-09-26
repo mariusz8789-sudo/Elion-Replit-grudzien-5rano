@@ -15,6 +15,11 @@
  * instead of re-deriving the same if/else chain a third time. It performs
  * no fingerprint computation itself.
  */
+/**
+ * THE replay status vocabulary of Genesis. Every replay path uses a subset of it: an experiment
+ * session (MATCH | DRIFT), a stored evidence pack (MATCH | DRIFT | BLOCKED), a hazard / discovery /
+ * world bundle (all four). One word per outcome — a benchmark's "different result" is DRIFT too.
+ */
 export type ReplayVerdict = 'MATCH' | 'DRIFT' | 'BLOCKED' | 'NOT_REPRODUCIBLE';
 
 export interface ReplayComparisonInput {

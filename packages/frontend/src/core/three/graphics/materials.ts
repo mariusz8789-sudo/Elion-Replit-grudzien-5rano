@@ -52,6 +52,11 @@ export function makeBrushedMetalTexture(THREE: typeof THREE_NS): THREE_NS.Textur
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  // Every tiled texture in this module sets this: without it (default 1, no filtering), a tiled
+  // texture viewed at a grazing angle — exactly a long building facade or road receding into a
+  // wide-shot camera — shows heavy directional smearing from naive mipmap minification. Three.js
+  // clamps this to the actual hardware max automatically, so requesting 8 is always safe.
+  texture.anisotropy = 8;
   return texture;
 }
 
@@ -88,6 +93,7 @@ export function makeFloorNoiseTexture(THREE: typeof THREE_NS): THREE_NS.Texture 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
   return texture;
 }
 
@@ -220,9 +226,11 @@ export function makeWornSurface(
   map.colorSpace = THREE.SRGBColorSpace;
   map.wrapS = THREE.RepeatWrapping;
   map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 8;
   const roughnessMap = new THREE.CanvasTexture(roughCanvas);
   roughnessMap.wrapS = THREE.RepeatWrapping;
   roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.anisotropy = 8;
   return { map, roughnessMap };
 }
 
@@ -348,10 +356,12 @@ export function makeBuildingFacadeSurface(
   map.colorSpace = THREE.SRGBColorSpace;
   map.wrapS = THREE.RepeatWrapping;
   map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 8;
   const emissiveMap = new THREE.CanvasTexture(emissiveCanvas);
   emissiveMap.colorSpace = THREE.SRGBColorSpace;
   emissiveMap.wrapS = THREE.RepeatWrapping;
   emissiveMap.wrapT = THREE.RepeatWrapping;
+  emissiveMap.anisotropy = 8;
   return { map, emissiveMap };
 }
 
@@ -419,6 +429,7 @@ export function makeSurfaceNormalTexture(THREE: typeof THREE_NS): THREE_NS.Textu
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
   return texture;
 }
 
@@ -627,7 +638,9 @@ const MATERIAL_BUILDERS: {
   // Terrain/foliage-adjacent ground plane — a dark, near-fully-rough green so grass/dirt reads
   // correctly under directional light without any per-blade geometry.
   GROUND: (THREE, overrides) => {
-    const worn = makeWornSurface(THREE, 0x42534b, { roughness: 0.96, wear: 0.3, seed: 53 });
+    // Neutral compacted earth/urban verge. The former blue-green base became cyan under the day
+    // sky + ACES exposure, dominating every unbuilt parcel in cinematic city frames.
+    const worn = makeWornSurface(THREE, 0x454640, { roughness: 0.96, wear: 0.3, seed: 53 });
     worn.map.repeat.set(4, 4);
     worn.roughnessMap.repeat.set(4, 4);
     return new THREE.MeshStandardMaterial({

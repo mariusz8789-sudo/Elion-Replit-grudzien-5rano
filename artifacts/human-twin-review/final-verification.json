@@ -1,0 +1,229 @@
+{
+  "generatedAt": "2026-09-22T05:03:31.1932124+02:00",
+  "machine": "DESKTOP-7UAVGFS",
+  "branch": "codex/genesis-final-integration",
+  "baseHead": "d48edeb0ef9b403c253806c935c41d49096a86fa",
+  "claudeSource": {
+    "branch": "claude/genesis-final-science-integration",
+    "commit": "0bd129bc847239f3f2b20c75c60b7a6e97f3b2d7",
+    "importedSelectively": true,
+    "pathOverlapBeforeImport": 0,
+    "accepted": [
+      "ModelRouter seam",
+      "D-141 metrics and DecisionTrace",
+      "scientific campaign coordinator",
+      "candidate identity/research matrix",
+      "cyber scope, budget and approval primitives"
+    ],
+    "rejected": [
+      "standalone logistic solver adapter: existing canonical solvers already cover the domain and it had no production binding"
+    ]
+  },
+  "policy": {
+    "merge": false,
+    "deploy": false,
+    "pushOnlyDedicatedIntegrationBranch": true
+  },
+  "browser": {
+    "engine": "Edge/Chromium",
+    "version": "153.0.4234.48",
+    "loader": "PASS 10/10",
+    "lod": "PASS FULL_ASSET -> PROXY_LOW -> FULL_ASSET with selection retained",
+    "recovery": "PASS HTTP 503 -> explicit retry -> READY",
+    "macroMicro": "PASS 7/7",
+    "organPicking": "PASS real raycast to heart",
+    "hyperscope": "PASS",
+    "replay": "PASS 4/4 MATCH",
+    "generatedMaterialsCompute": "PASS real WorldGraph + ASSET_SLOT interaction",
+    "worldDirectorMetaMirror": "PASS; campaign COMPLETED, 2 cycles, 6 Evidence records"
+  },
+  "tests": {
+    "frontend": {
+      "status": "PASS",
+      "files": "627/627",
+      "passed": 6973,
+      "skipped": 1,
+      "failed": 0
+    },
+    "frontendSkipped": {
+      "file": "packages/frontend/src/__tests__/backendEvidenceExecution.test.ts",
+      "line": 638,
+      "name": "executes both PySCF H2 basis arms against the real local Fabric and produces a MATCH Evidence Pack",
+      "condition": "GENESIS_REAL_BACKEND === 1",
+      "canEnableNow": false,
+      "blocker": "PySCF 2.14.0 unavailable for this Windows/Python runtime; optional QM path remains fail-closed"
+    },
+    "core": {
+      "status": "PASS",
+      "files": "46/46",
+      "passed": 465,
+      "failed": 0
+    },
+    "csrn": {
+      "status": "PASS",
+      "files": "5/5",
+      "passed": 38,
+      "failed": 0,
+      "build": "PASS"
+    },
+    "backend": {
+      "status": "PASS",
+      "total": 882,
+      "passed": 849,
+      "failed": 0,
+      "skipped": 33,
+      "log": "artifacts/human-twin-review/backend-final-integration.log",
+      "rdkit": "2026.03.6"
+    },
+    "typescript": "PASS",
+    "lint": "PASS exit 0",
+    "moduleReachability": "PASS in full frontend run",
+    "productionBuild": "PASS (1035 modules; non-blocking chunk warnings)"
+  },
+  "capabilityMatrix": {
+    "pass": 33,
+    "partial": 16,
+    "blocked": 1,
+    "total": 50,
+    "percentage": 66,
+    "REAL_REPO_V6_V61_V7_100_E2E": false
+  },
+  "architecture": {
+    "duplicateAudit": "PASS",
+    "productionReachabilityAudit": "PASS",
+    "worldGraphDeclarations": 1,
+    "worldGeneratorDeclarations": 1,
+    "temporalEngineDeclarations": 1,
+    "worldFrameRendererDeclarations": 1,
+    "evidenceLedgerDeclarations": 1,
+    "deviceSafetyModeDeclarations": 1,
+    "appendOnlyMetaMemory": 0,
+    "productionVisualStagesImports": 0,
+    "addedAllowedOrphans": 0
+  },
+  "blockers": {
+    "pyscf": "ENVIRONMENT_BLOCKED; optional and disabled fail-closed",
+    "v61CutReset": "BLOCKED because renderer has no temporal accumulation/TAA history",
+    "physicalMirrorCamera": "LOCAL_CAMERA_VALIDATION_REQUIRED; Mirror remains EXPERIMENTAL/SYNTHETIC"
+  },
+  "verdict": {
+    "value": "FULL_DEPLOY_READY",
+    "scope": "Current release with optional scientific engines/data disabled fail-closed",
+    "fullV6V61V7Completion": false,
+    "mergeAndDeployRequireReview": true
+  },
+  "evidence": [
+    {
+      "path": "artifacts/human-twin-review/browser-loads.json",
+      "sha256": "e9eb7da4bfe47c2456d0325e39d556db08f867b40a64dc9ae1bb1825bf017ce3",
+      "bytes": 26319
+    },
+    {
+      "path": "artifacts/human-twin-review/browser-lod.json",
+      "sha256": "822326f1e17b2f5c904c7e2c4330a78d0ed1b7949360d89dcca9da10323c8ea2",
+      "bytes": 8358
+    },
+    {
+      "path": "artifacts/human-twin-review/browser-macro.json",
+      "sha256": "45b47ea9e2bf8b4a3734dac93108c93d1de48f92e350d17c633b3e8ee7154e4b",
+      "bytes": 175156
+    },
+    {
+      "path": "artifacts/human-twin-review/browser-recovery.json",
+      "sha256": "d7f75ba1ab428333870ade8e6cf0047db967d361d93280b36785a65f2876e85e",
+      "bytes": 10838
+    },
+    {
+      "path": "artifacts/human-twin-review/browser-surfaces.json",
+      "sha256": "791ba548452d7b2002119c037f60988153b4c871064e30e110e0f91772e264f7",
+      "bytes": 4535
+    },
+    {
+      "path": "artifacts/human-twin-review/director-meta-mirror-browser.json",
+      "sha256": "70ca4d965b1105a109a4a376c317768799299f636dce8cebbb4125a03c801770",
+      "bytes": 9724
+    },
+    {
+      "path": "artifacts/human-twin-review/backend-final-integration.log",
+      "sha256": "e05e589268ea2454c8e2739e5103f903f632dd8e5fcdc3acf3c9a4783359aa08",
+      "bytes": 101799
+    },
+    {
+      "path": "artifacts/human-twin-review/frontend-v2-final-pass.log",
+      "sha256": "023260bc9dddaa46080c3b40b6efb3883f0a2b10f25cb48d230e92ee94c35e77",
+      "bytes": 676
+    },
+    {
+      "path": "artifacts/human-twin-review/lint-v2-final-pass.log",
+      "sha256": "1ceed2e0ea4c0ffee429deb0f981a567777bdc1557ea48fbf7e5f2e66a278a80",
+      "bytes": 50
+    },
+    {
+      "path": "artifacts/human-twin-review/build-v2-final.log",
+      "sha256": "b3584a7485d655f1a2c7d37b79a0d43c332448ce582397c98d4d5c5322daf992",
+      "bytes": 18188
+    },
+    {
+      "path": "artifacts/human-twin-review/duplicate-architecture-final-integration.txt",
+      "sha256": "01897e9dc836a3e18725c63b9867bf1e5e0f10ec78d80d0621d91e11248ca1ff",
+      "bytes": 1144
+    },
+    {
+      "path": "artifacts/human-twin-review/production-reachability-final.txt",
+      "sha256": "933b0ba3127bc5af7c16faa950bf397852cf064742f0637a8a8873753b2fa2d5",
+      "bytes": 4232
+    }
+  ],
+  "sources": [
+    {
+      "path": "packages/backend/src/campaign/scientificIntegration.mjs",
+      "sha256": "199e55c61f9a82a03adb7d4c362bcb1ae360c01cb8fd61dfa2b3f82fcf24aefd",
+      "bytes": 7475
+    },
+    {
+      "path": "packages/backend/src/compute/drugDiscovery.mjs",
+      "sha256": "10d6c455ccdbdb3edaf67b938535873fb1ef734babacc0ef023354dd7a78bf54",
+      "bytes": 9284
+    },
+    {
+      "path": "packages/frontend/src/core/experimentFabric/modelRouter.ts",
+      "sha256": "74f98ce0757ec0cefd75049584176d53d906252a30866d85828763fa9afe3ead",
+      "bytes": 8380
+    },
+    {
+      "path": "packages/frontend/src/core/experimentFabric/scientificIntegration.ts",
+      "sha256": "879738dc10ae24887bfbaec6a7ee32cf264556f8bc66eeba869b483b8c50ae43",
+      "bytes": 13734
+    },
+    {
+      "path": "packages/frontend/src/core/metaCognition/scientificMetrics.ts",
+      "sha256": "24ba17f403f6ca0f6749950310a9c793e22b2f80aac3b2ef77e5e2c3f67613ed",
+      "bytes": 4518
+    },
+    {
+      "path": "packages/frontend/src/core/metaCognition/decisionTrace.ts",
+      "sha256": "bec2f0b791c904f3df9bd333d100e592b7f4ec6b0c682323d3e07b11a447799a",
+      "bytes": 4387
+    },
+    {
+      "path": "packages/frontend/src/core/agent/cyberReasoningKernel.ts",
+      "sha256": "9de00b6e89ef1df68120be523514c2ff2c2fd701fdc9dd7fc65c65b96304c815",
+      "bytes": 40293
+    },
+    {
+      "path": "packages/frontend/src/core/worldDirector/genesisWorldDirector.ts",
+      "sha256": "0dea66714c737083bda6abe9b78a708a82fe6d6f23d2c7fa89ef14e63c4b9e50",
+      "bytes": 5382
+    },
+    {
+      "path": "packages/frontend/src/components/MetaCognitionScreen.tsx",
+      "sha256": "19385905e7bde48afc0530d270fb5592a7e999e1c54833b7faa2cefc3dc0b92a",
+      "bytes": 6096
+    },
+    {
+      "path": "scripts/genesis-director-meta-mirror-e2e.mjs",
+      "sha256": "c15948d7aa1705864ba067c635768a86b41806054c56049657c5503228110040",
+      "bytes": 8650
+    }
+  ]
+}

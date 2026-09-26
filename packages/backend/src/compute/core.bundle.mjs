@@ -1889,6 +1889,24 @@ function applyDocumentFlags(s) {
 if (typeof document !== "undefined") applyDocumentFlags(current);
 
 // packages/frontend/src/core/three/assetGovernance.ts
+function bodyParts3dPilotRecord(genesisId, lod, sha256, triangles) {
+  const fileName = `${genesisId}.${lod}.glb`;
+  return {
+    id: `bodyparts3d-4.0-pilot-${genesisId}-${lod}`,
+    runtimePath: `/assets/bodyparts3d/pilot/${fileName}`,
+    format: "GLB",
+    status: "APPROVED",
+    sourceName: "BodyParts3D 4.0 \u2014 The Database Center for Life Science (DBCLS), official archive isa_BP3D_4.0_obj_99.zip (SHA-256 40665852\u2026409E), part-of element set",
+    sourceUrl: "https://dbarchive.biosciencedbc.jp/data/bodyparts3d/LATEST/isa_BP3D_4.0_obj_99.zip",
+    license: "CC-BY-4.0",
+    licenseUrl: "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html",
+    author: "BodyParts3D, \xA9 The Database Center for Life Science licensed under CC Attribution 4.0 International",
+    polygonCount: triangles,
+    textureResolution: null,
+    rationale: `Oficjalne \u017Ar\xF3d\u0142o DBCLS (archiwum zweryfikowane SHA-256), licencja CC BY 4.0 z wymagan\u0105 atrybucj\u0105 wy\u015Bwietlan\u0105 w Human Explorer. Konwersja deterministyczna (${lod === "desktop" ? "wszystkie tr\xF3jk\u0105ty \u017Ar\xF3d\u0142a" : "uproszczenie meshoptimizer 0.18.1, b\u0142\u0105d zapisany w provenance"}); mapowanie FMA\u2192BP\u2192FJ udowodnione na oficjalnych listach part-of. Og\xF3lny model referencyjny anatomii jednego cia\u0142a atlasu \u2014 nie pacjent, nie u\u017Cycie kliniczne; brak histologii i danych kom\xF3rkowych.`,
+    sha256: { [fileName]: sha256 }
+  };
+}
 var WORLD_ENGINE_ASSET_MANIFEST = Object.freeze([
   {
     id: "polyhaven-modular-urban-apartments-facade",
@@ -2070,20 +2088,39 @@ var WORLD_ENGINE_ASSET_MANIFEST = Object.freeze([
     sha256: {}
   },
   {
-    id: "unverified-lod0-human",
+    // D-131: promowany z UNVERIFIED po weryfikacji. Poprzedni rekord twierdził „brak lokalnego rekordu źródła
+    // i licencji"; rekord jednak istniał — w `public/assets/genesis-hf/ASSETS.md` obok samego pliku. Weryfikacja
+    // przeprowadzona 2026-09-19: (1) obie sumy SHA-256 policzone z plików w repo zgadzają się co do znaku z ASSETS.md;
+    // (2) README źródła pobrane i zacytowane: „Example avatar »mpfb.glb« was created using Blender and MPFB Blender
+    // extension. The avatar is licensed under CC0." MPFB opisany tam jako korzystający z ekosystemu MakeHuman (CC0/CC-BY).
+    // To jest licencjonowany asset 3D — NIE jest to medyczny model anatomiczny i nie wolno go tak przedstawiać.
+    id: "cc0-mpfb-human-lod0",
     runtimePath: "/assets/genesis-hf/characters/mpfb-lod0.glb",
     format: "GLB",
-    status: "UNVERIFIED",
-    sourceName: "Unknown",
-    sourceUrl: null,
-    license: null,
-    licenseUrl: null,
-    author: null,
+    status: "APPROVED",
+    sourceName: "met4citizen/TalkingHead \u2014 avatars/mpfb.glb (wariant runtime LOD0)",
+    sourceUrl: "https://github.com/met4citizen/TalkingHead/blob/main/avatars/mpfb.glb",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/public-domain/cc0/",
+    author: "met4citizen (utworzony w Blender + MPFB, zasoby ekosystemu MakeHuman)",
     polygonCount: null,
-    textureResolution: null,
-    rationale: "Brak lokalnego rekordu \u017Ar\xF3d\u0142a i licencji dla hero GLB; asset nie mo\u017Ce by\u0107 domy\u015Blnie \u0142adowany produkcyjnie.",
-    sha256: {}
+    textureResolution: "1024 px WebP (lokalny wariant runtime: zmniejszenie tekstur, transkodowanie WebP, prune)",
+    rationale: "\u0179r\xF3d\u0142o i licencja CC0 wg README \u017Ar\xF3d\u0142a (cytat w komentarzu powy\u017Cej) \u2014 to DEKLARACJA autora upstream, zweryfikowana co do istnienia i tre\u015Bci, nie niezale\u017Cny audyt prawny; obie sumy SHA-256 przeliczone lokalnie i zgodne z ASSETS.md (to\u017Csamo\u015B\u0107 pliku jest dowodem, licencja pozostaje o\u015Bwiadczeniem). Asset wy\u0142\u0105cznie graficzny: zewn\u0119trzna posta\u0107 ludzka (sk\xF3ra, ubranie, w\u0142osy, szkielet animacji, blendshapes twarzy). Nie zawiera anatomii medycznej.",
+    sha256: {
+      "mpfb-lod0.glb": "ec47cffd0a56d201869afb9c10ea957e237c55d4e12c197fc9d9c30d5772a8d2",
+      "mpfb.glb": "63c645a2a863b9972e9a9c2ed576a1de4c390b8475508e1473e69c87a3ee299c"
+    }
   },
+  bodyParts3dPilotRecord("heart", "desktop", "a0d821c969ce58344f0f04f7a6d6286f5662b06691296d520779d82bddfc46b1", 102802),
+  bodyParts3dPilotRecord("heart", "mobile", "d4bf3a8b6e8b9e57fa3f619b44e6144dd7626c5435c570d3590f002588d38538", 25698),
+  bodyParts3dPilotRecord("liver", "desktop", "5b2952d97aca92997b2e873e7c402c9a02ddcb5624701652b5239d5dae40fe2c", 191622),
+  bodyParts3dPilotRecord("liver", "mobile", "8782d076896db4246db6fbafc097b2cfab6149d0657e26ef907bac9f700ee30b", 47900),
+  bodyParts3dPilotRecord("left-lung", "desktop", "4af4d8194d76755d28050d9464aeab10c5842007d5059283ea18521442a8433d", 41438),
+  bodyParts3dPilotRecord("left-lung", "mobile", "59db6d67adc302b63e44c6bf0d456d013f46ac4e7fcce9c6eecb19ee84068e18", 10358),
+  bodyParts3dPilotRecord("right-lung", "desktop", "e22e566b9d5a522cadf532bca0ed471ab23b6d101deb840bbbcf712d4b544b54", 73312),
+  bodyParts3dPilotRecord("right-lung", "mobile", "db50c12491624590cd9bfd01fedf045c9f8821f7ddbf64e7d168c73fb72b5003", 18328),
+  bodyParts3dPilotRecord("aorta", "desktop", "c665a6af22f1026fd30f058b37fa458f14539dd670ac9ba76863544570a92acf", 10188),
+  bodyParts3dPilotRecord("aorta", "mobile", "b0eb7a32090c409907d39ba9d83d87f46abd2959d217a3670d19d420457ba548", 2546),
   {
     id: "unverified-pbr-textures",
     runtimePath: "/assets/genesis-hf/pbr/",

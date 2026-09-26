@@ -19,9 +19,10 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'qm_worker.py');
-const PYTHON = process.env.GENESIS_PYSCF_PYTHON ?? process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable('GENESIS_PYSCF_PYTHON');
 const TIMEOUT_MS = 120_000; // QM bywa kosztowne; twardy limit chroni serwer
 
 let detectCache = null;

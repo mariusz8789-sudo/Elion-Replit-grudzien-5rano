@@ -10,6 +10,7 @@
  * punktach (między kandydatami) — „cancel where safe".
  */
 
+import { runHeavyJobInThread } from './heavyJobThread.mjs';
 import { getJob, updateJob, listCandidates, getTarget } from '../store.mjs';
 import { buildCandidatePassport, rankCandidates } from './drugDiscovery.mjs';
 import { runCampaign } from '../campaign/orchestrator.mjs';
@@ -59,10 +60,13 @@ export const JOB_HANDLERS = {
   'campaign-run': async ({ db, job, progress, cancelled }) => {
     const campaignId = job.params?.campaignId;
     if (!campaignId) throw new Error('missing_campaignId');
-    const summary = runCampaign(db, campaignId, {
-      shouldCancel: () => cancelled(),
-      onProgress: (frac) => progress(frac),
-    });
+    // File database: the same orchestrator on a worker thread, so the HTTP thread stays free and every
+    // generation event is readable by polling while the run is still going. `:memory:`: in-process.
+    const summary = await runHeavyJobInThread(db, 'campaign-run', { campaignId, onProgress: progress, isCancelled: cancelled })
+      ?? runCampaign(db, campaignId, {
+        shouldCancel: () => cancelled(),
+        onProgress: (frac) => progress(frac),
+      });
     if (summary.cancelled) return { cancelled: true, runIds: [] };
     return { result: summary, runIds: [] };
   },
@@ -75,7 +79,8 @@ export const JOB_HANDLERS = {
   'campaign-stage': async ({ db, job }) => {
     const { campaignId, config } = job.params ?? {};
     if (!campaignId) throw new Error('missing_campaignId');
-    const report = runMultiFidelityStage(db, campaignId, config ?? {});
+    const report = await runHeavyJobInThread(db, 'campaign-stage', { campaignId, config: config ?? {} })
+      ?? runMultiFidelityStage(db, campaignId, config ?? {});
     return { result: report, runIds: [] };
   },
 };

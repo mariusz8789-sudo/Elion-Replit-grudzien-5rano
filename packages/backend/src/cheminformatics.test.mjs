@@ -57,20 +57,33 @@ describe('capability manifest (no faking)', () => {
     assert.equal(getCapability('molecular-weight').modelId, 'chem-molecular-weight');
   });
 
-  test('docking / MD / QM / ADMET / toxicity / structure are NOT available', () => {
-    for (const id of ['docking', 'molecular-dynamics', 'quantum-chemistry', 'admet', 'toxicity', 'protein-structure']) {
-      assert.equal(isAvailable(id), false, `${id} nie może być AVAILABLE`);
+  test('tool-backed capabilities mirror the canonical validated runtime; protein prediction remains an honest gap', () => {
+    for (const id of ['docking', 'molecular-dynamics', 'quantum-chemistry', 'admet', 'toxicity']) {
       const cap = getCapability(id);
-      assert.ok([CAPABILITY_STATUS.EXTERNAL_ENGINE_REQUIRED, CAPABILITY_STATUS.NOT_IMPLEMENTED].includes(cap.status));
+      assert.ok([CAPABILITY_STATUS.AVAILABLE, CAPABILITY_STATUS.BLOCKED_BY_RUNTIME].includes(cap.status));
       assert.ok(cap.adapter, `${id} musi mieć zadeklarowany interfejs adaptera`);
+      if (cap.status === CAPABILITY_STATUS.AVAILABLE) {
+        assert.equal(cap.executionStatus, 'VALIDATED_REFERENCE_CASE');
+        assert.ok(cap.engine);
+        assert.match(cap.fingerprint, /^[a-f0-9]{16}$/);
+      } else {
+        assert.ok(cap.requires, `${id} must explain its runtime blocker`);
+      }
     }
+    const protein = getCapability('protein-structure');
+    assert.equal(protein.status, CAPABILITY_STATUS.EXTERNAL_ENGINE_REQUIRED);
+    assert.ok(protein.adapter);
   });
 
   test('capabilityGap returns null for AVAILABLE, a gap for missing', () => {
     assert.equal(capabilityGap('molecular-weight'), null);
+    const advanced = getCapability('docking');
     const gap = capabilityGap('docking');
-    assert.equal(gap.status, CAPABILITY_STATUS.EXTERNAL_ENGINE_REQUIRED);
-    assert.ok(gap.requires);
+    if (advanced.status === CAPABILITY_STATUS.AVAILABLE) assert.equal(gap, null);
+    else {
+      assert.equal(gap.status, CAPABILITY_STATUS.BLOCKED_BY_RUNTIME);
+      assert.ok(gap.requires);
+    }
   });
 
   test('manifest lists all advanced methods from the directive', () => {

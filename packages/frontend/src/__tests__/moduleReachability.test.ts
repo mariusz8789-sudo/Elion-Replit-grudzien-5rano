@@ -39,7 +39,7 @@ function allSourceFiles(dir: string): string[] {
   });
 }
 
-const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || file.includes('/__tests__/');
+const isTest = (file: string): boolean => /\.test\.tsx?$/.test(file) || /[\\/]__tests__[\\/]/.test(file);
 
 /** Relative specifier -> real file, trying the extensions Vite itself tries. */
 function resolveSpecifier(fromFile: string, specifier: string): string | null {
@@ -101,6 +101,13 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  // D-127: the delivered cognitive core (packages/core/src/cognitive) bound to the canonical systems with a real
+  // approval gate. Which host (the Scientific Worlds screen, the chat, a campaign) issues goals to it is a product
+  // decision, not a side effect of landing the bridge; scientificWorldsCognitive.test.ts drives the full loop.
+  // D-127: the V3 Human Biology Lab pack is saved as written; its barrel and inventory module are part of the delivered
+  // contract but the host imports the modules it uses directly (biologyRunners/biologyLabWorld/biologyCommands).
+  'core/scientificWorlds/humanLab/index.ts': 'D-127 delivered pack barrel, kept verbatim; the host imports modules directly.',
+  'core/scientificWorlds/humanLab/inventory.ts': 'D-127 delivered pack module (LabInventory), kept verbatim; no host consumer yet.',
   // --- Built and tested, awaiting a deliberate wiring decision ---------------
   // D-085: the agent composer. It is NOT wired into a production caller yet on
   // purpose. The package that proposed it wanted callbacks installed into
@@ -113,6 +120,19 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // exercises it against the real agent exports and asserts the import
   // direction stays one-way.
   'core/agent/agentBridge.ts': 'D-085 composer; unwired pending a deliberate campaignOrchestrator decision (wiring it INTO hypothesisLoop would close an import cycle).',
+  'core/capabilities/genesis9dProductAudit.ts': 'Product audit record only: it keeps the seven existing 9D modules classified as KEEP_PROTOTYPE or NOT_USEFUL and is intentionally not a public runtime entry point.',
+
+  // --- Temporal Cinematic Engine (place+year -> historical WorldGraph -> camera
+  // path -> real browser WebGL render, see TemporalCinematicScreen.tsx and the
+  // #/temporal-cinematic route in App.tsx) -- now wired and reachable. Only
+  // renderRuntimeStatus.ts remains genuinely unreached: it is a pure status/
+  // documentation module (TEMPORAL_CINEMATIC_RUNTIME_BLOCKERS,
+  // isRenderToVideoReady()) naming exactly which real-render/video-encode gaps
+  // still exist, read by developers and by temporal-cinematic-e2e-capture.mjs's
+  // own console output convention, not imported by any production module.
+  'core/temporalCinematic/renderRuntimeStatus.ts': 'Temporal Cinematic Engine — pure status/documentation module (capability gaps), not imported by production code; read by developers and the E2E capture script.',
+  'core/worldModel/capability/capabilityStatus.ts': 'CTO consolidation pass (2026-09-21): a foundational CapabilityStatus/CapabilityProvenance vocabulary + evaluateQualityGate() gate, written ahead of the Universal Intent Resolver work it is meant to back -- deliberately paused per the consolidation mandate ("uporzadkuj fundament, dopiero potem buduj giganta") rather than half-wiring a large new feature during a stabilization pass. Reached today only by nothing (no test yet either); remove this entry once the Universal Intent Resolver work resumes and actually consumes it.',
+  'core/hazard/cascadeCandidate.ts': 'Branch consolidation salvage (2026-09-21), from claude/extreme-event-engine-foundation: a small honesty-vocabulary contract (CascadeCandidate/registerCascadeCandidate) for FUTURE hazard domains beyond earthquake (tsunami/flood-cascade/wildfire-cascade etc.), deliberately locked to only NOT_MODELED/BLOCKED outcomes so no domain can silently claim readiness. Covered by cascadeCandidate.test.ts/extremeEventVocabulary.test.ts but not yet consumed by any production hazard module -- remove this entry once a real cascade domain registers against it.',
 
   // --- Deliberately OFF in the product, not broken ---------------------------
   // The Sovereign/governance module is staged behind a visibly disabled menu
@@ -131,7 +151,6 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // DESIGN — reaching them from the browser bundle would be the bug.
   'core/compute/serverEntry.ts': 'Node-side entry point; never imported by the browser bundle.',
   'core/repro/reproEntry.node.ts': 'Node-side facade for scripts/repro-demo.mjs (P3.2 one-command reproducibility pack); bundled by esbuild --platform=node and never imported by the browser bundle. It computes nothing of its own -- it calls runExternalAnchor and runAutonomousInquiry and returns what they returned.',
-  'core/agent/causalInference.ts': 'CAP-2 (docs/B1_ULEZ_NO2_ADJUDICATION_REAL_DATASET_AND_EXPERIMENT.md) -- a new, general-purpose DiD/ITS/synthetic-control estimator library, built and TDD-verified against simulated panels before any real B1 data was pulled. Deliberately NOT yet wired into any UI: the B1 experiment itself (real DEFRA/AURN data, preregistration, execution, evidence classification) is still in progress. Reached today only by its own test suite (causalInference.test.ts); remove this entry once B1 wires it into the existing backend/service or Evidence path, mirroring qe4BrydgesAnalysis.ts\'s own orphan-then-wired history.',
   'core/agent/qe4RegimeInquiryLoop.ts': 'Discovery Engine P0-2/P0-3/P0-5, canonical after D-026: the QE4 regime inquiry loop. Reached at runtime by core/repro/reproEntry.node.ts -> scripts/repro-demo.mjs (4 real checks incl. all 7 rounds\' replay fingerprints), which is the Node side of the boundary and therefore not reachable from main.tsx by design -- the same category as the other .node.ts entries here. Remove this entry once a browser screen renders a discovery campaign.',
   'core/agent/structuralDiscovery.ts': 'M3 structural discovery: the runnable demonstration that the engine builds a model form it was never given, plus its three negative controls. Orchestrates existing components only (discoveryCampaign, residualStructure, modelSpace, falsifiedModelRegistry, beliefRevision, tautologyGate). Reached at runtime through core/repro/reproEntry.node.ts -> scripts/m3-demonstrator.mjs and scripts/repro-demo.mjs.',
   'core/agent/sovereignTruthAnswer.ts': 'Sovereign Truth-Answer Protocol v1 — Government Research plane: Question Router, AnswerRecord, Template Enforcer, machine-enforced Assertions. Standalone (no discoveryCampaign.ts dependency; reuses tautologyGate.ts/knowledge/supplementalRegistry.ts/dataProvenance.ts/matrixFoundation/replayVerdict.ts/events/hash.ts). Reached today only by its own test suite (sovereignTruthAnswer.test.ts); no browser screen or NL command routes to it yet — out of this task\'s explicit scope (Government Research plane only, no Phase B/Streams/Lucy).',
@@ -169,20 +188,9 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   // Keeping these listed rather than deleting them is a judgement call, not an
   // oversight: each is tested, and the replacement is named here so the next
   // reader does not have to rediscover which one is live.
-  'core/world/firstPerson.ts': 'Superseded by core/three/firstPersonController.ts, which all three first-person screens use.',
   'core/worldModel/domains/genesisCityWorld2.ts': 'An earlier city composition; the live path is genesisScientificCity3/4.ts through createScientificWorld.',
   'core/events/epidemicTransmissionAnalysis.ts': 'Superseded by contacts/clusterAnalysis.ts + simulation/worldEngineContract.ts::computeHotspots, both already on City3DWebGLScreen; its infection.transmission events are never produced in production.',
   'core/knowledge/context.ts': 'A convenience wrapper that never gained a caller — experimentFabric/router.ts reads findSupplementalKnowledge directly.',
-  // origin/main (commits e3cc9f3a…3e106f8d) replaced App.tsx with a full-screen particle "command center"
-  // (GenesisEngineApp). The merge keeps the product shell; these files stay in the tree as an unreferenced
-  // visual proposal until they get a route of their own with the same REAL / VISUALISATION labels as every world.
-  'components/GenesisCanvas.tsx': 'Particle-field canvas from the main-branch command-center override; not routed — the product shell (AppShell + StartHero) is the root route.',
-  'components/GenesisEngineApp.tsx': 'Root override from origin/main (canvas + HUD, no menu, no worlds); superseded by App.tsx; kept as a visual proposal.',
-  'components/GenesisHUD.tsx': 'HUD bar of the main-branch override; not routed.',
-  'components/HyperStateVisualizer.tsx': 'Obsidian hyper-state visualizer from origin/main; not routed.',
-  'engine/GenesisShaders.ts': 'GLSL sources used only by the unrouted GenesisCanvas.',
-  'engine/HyperMath.ts': 'Helper used only by the unrouted HyperStateVisualizer.',
-  'render/GenesisQualityUpgrade.ts': 'Render-quality helper used only by the unrouted GenesisCanvas.',
   'core/city/CityDisasterController.ts': 'City disaster adapter package is built and unit-tested, but no production screen has been approved to expose this synthetic crisis-control surface yet.',
   'core/city/GenesisCityDigitalTwin.ts': 'City digital-twin adapter is staged for a deliberate product wiring decision; the live city routes use the existing scientific-city runtime instead.',
   'core/city/GenesisDisasterEngine.ts': 'City disaster engine is a tested integration seam, intentionally not connected to live routes until its synthetic-data labeling and product UX are reviewed.',
@@ -239,26 +247,8 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
   'core/agent/causalLadder.ts': 'Phase G Proof Ladder P9 (causal gate over the real causalInference.ts DiD/ITS/synthetic-control methods); covered by 10 unit tests against real CausalFitResult shapes, not yet wired into a live causal claim.',
   'core/agent/discoveryCertificate.ts': 'Phase G GenesisDiscoveryCertificate v2; runtime evidence via npm run proof-ladder:demo, not yet wired into a screen.',
 
-  // --- Physics World integration (D-052) --------------------------------------
-  // A hardening/integration pass over an externally authored bundle: toy
-  // particle/atomic/molecular/high-energy models, wired to the existing
-  // Genesis hash provider (fnv1a) and the D-047 Genesis Adjudication
-  // Protocol for its DEMO5 hypothesis test. Reached today by its own vitest
-  // suites (physicsWorld.test.ts, physicsRecipe.test.ts) and
-  // scripts/physics-world-demo.mjs (npm run physics-world:demo) -- no
-  // browser screen renders a physics-world run yet. Remove these entries
-  // once a screen wires runExperiment/demo5GenesisLoop/buildPhysicsRecipe in.
-  'core/physicsWorld/contracts.ts': 'Physics World integration (D-052); reached only by its own test suites and scripts/physics-world-demo.mjs, no screen yet.',
-  'core/physicsWorld/core.ts': 'Physics World integration (D-052); same reach as contracts.ts.',
-  'core/physicsWorld/backends.ts': 'Physics World integration (D-052); same reach as contracts.ts. PYTHIA/Geant4/external-matter backends are fail-closed contracts only, by design (mandate item 7) -- detectBackends() never reports them available.',
-  'core/physicsWorld/models.ts': 'Physics World integration (D-052); same reach as contracts.ts. Toy models ported from the source bundle unchanged.',
-  'core/physicsWorld/experiment.ts': 'Physics World integration (D-052); same reach as contracts.ts.',
-  'core/physicsWorld/genesisAdapter.ts': 'Physics World integration (D-052); DEMO5 rewired through core/agent/genesisAdjudicationProtocol.ts (D-047) rather than a bespoke verdict function -- no second adjudication engine. Same reach as contracts.ts.',
-  'core/physicsWorld/physicsRecipe.ts': 'Physics World integration (D-052); domain-scoped Research Recipe projection (WinnerRecord + gates G1-G9), matching the existing per-domain pattern (govDrugDiscoveryE2E.ts::generateResearchRecipe is the other one) rather than a shared cross-domain recipe engine. Same reach as contracts.ts.',
-
   // --- DOBUDOWANIE RESZTY MASZYNY (D-057): Evidence Connectors, Commercial
   // Layer, Physics Backend version registry, Winner Promotion Gate ----------
-  'core/physicsWorld/backendRegistry.ts': 'D-057 Physics Backend version registry: extends backends.ts::detectBackends() with a minimum-version floor (BackendDescriptor/requireBackendVersion), same reach status as backends.ts itself -- no screen calls a real physics backend yet (PYTHIA/Geant4 are not installed in this pass), so this stays reached only by its own test suite (physicsBackendRegistry.test.ts). Remove this entry once a real experiment call site wires requireBackendVersion in.',
   'core/evidenceConnectors/testFixtures.ts': 'D-057 Evidence Connectors: explicitly-named TEST-ONLY ConnectorPort fixtures (fixedBytesPort/alwaysFailingPort), same convention as core/orchestrator/toyAdapters.ts\'s SYNTHETIC_TEST_ONLY naming -- deliberately never imported by product UI (EvidenceSourceStatusPanel.tsx uses the real httpConnectorPort.ts instead). Reached only by evidenceConnectors.test.ts.',
   'core/commercial/testFixtures.ts': 'D-057 Commercial Layer: explicitly-named TEST-ONLY PaymentAdapter fixtures (alwaysConfirmingAdapter/alwaysRefusingAdapter) -- this repo ships no real payment processor, so no product UI imports these; they exist solely so commercial.test.ts can exercise the PAID path. Reached only by commercial.test.ts.',
 
@@ -276,18 +266,75 @@ const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
 
   // --- D-080 Chaos-Aware Ensemble --------------------------------------------
   'core/chaos/ensemble.ts': 'D-080: audited chaos-ensemble utility (Lorenz63/threebody predictability horizon, ensemble spread, empirical Lyapunov estimate) -- calls the existing stepLorenzRK4 (core/physics.ts) and stepVerlet/totalEnergy/figure8Bodies/pythagoreanBodies (labs/experiments/universe-threebody.ts) unmodified, adds no second physics engine. VALIDATED (docs/DECISIONS.md D-080), reached today only by its own test suites (chaosEnsemble.test.ts, chaosEnsembleBenchmark.test.ts) -- no browser screen renders a chaos-ensemble run yet. Remove this entry once one does.',
+
+  // --- V6.1/V7 visual-E2E capture pack: delivered but not wired -------------
+  // UNLIKE every other .node.ts entry above, these four are NOT reached by any companion script either.
+  // scripts/visual-e2e-v52-v7.mjs (the actual delivered E2E driver) reimplements its own inline Playwright
+  // capture instead of calling into this module chain, so it is genuinely dead code as delivered, not a
+  // browser/Node boundary case. Documented here rather than silently wired in, per this branch's audit/report
+  // mandate; C1 fixed the same canvas-screenshot reliability bug in both this module and the real driver script,
+  // but did not redirect the driver to use this chain since that would be a larger, unrequested rewiring
+  // decision. Remove this block once either a script imports canonicalTemporalCapture.node.ts, or the module
+  // chain is deliberately dropped.
+  'core/lookingGlass/capture/canonicalBrowserFrameRenderer.node.ts': 'V6.1 pack: real Node/Playwright capture of the canonical temporal-cinematic canvas via window.__GENESIS_TEMPORAL_CAPTURE__.seekTo/seekAndWait. Not imported by scripts/visual-e2e-v52-v7.mjs, which reimplements the same capture inline; not imported by anything else.',
+  'core/lookingGlass/capture/canonicalTemporalCapture.node.ts': 'V6.1 pack: orchestrates CanonicalBrowserFrameRenderer + encodeCanonicalFramesToWebm into a multi-frame capture session. Not imported by scripts/visual-e2e-v52-v7.mjs or anything else.',
+  'core/lookingGlass/capture/canonicalVideoEncoder.node.ts': 'V6.1 pack: encodes captured JPEG frames to VP8/WebM via the Playwright-bundled ffmpeg (locatePlaywrightBundledFfmpeg), honestly reporting failure rather than silently skipping encode. Not imported by scripts/visual-e2e-v52-v7.mjs or anything else.',
+  'core/lookingGlass/capture/playwrightFfmpegLocator.node.ts': 'V6.1 pack: locates the ffmpeg binary bundled with the installed Playwright browsers. Only consumer is canonicalVideoEncoder.node.ts above, itself unreached.',
+
+  // --- D-140 Laboratory/Instrument Integration package -----------------------
+  // Backend-only canonical integration pass (device/sensor/calibration/uncertainty/protocol/safety/
+  // HIL/digital-twin/model-calibration-validation/data-assimilation/closed-loop/LIMS-ELN/reality-loop
+  // seams). The four `genesis*.ts` adapters bind D-140's transfer-seam interfaces to this repo's own
+  // canonical infrastructure (kernelLedger, WorldGraph/TemporalEngine/WorldFrameRenderer, SolverRouter,
+  // core/storage.ts) rather than introducing a second implementation of any of them. No browser screen
+  // exposes a laboratory UI yet -- this is scoped to proving the real-repo E2E chain, not building a
+  // route. Reached today by their own test suites (labCore.test.ts, completion15.test.ts,
+  // safetyAndProtocol.test.ts, twinCalibrationValidation.test.ts, lineageAssimilation.test.ts,
+  // core/e2e/realLabStandaloneE2E.test.ts [fixtures only], core/e2e/realLabGenesisE2E.test.ts [real
+  // canonical bindings]).
+  //
+  // The four `genesis*.ts` real-repo bindings, `labRuntime.ts`, and the seam contracts
+  // `genesisLabProvider.ts` actually imports (`limsElnPersistenceIntegration.ts`, `limsElnPorts.ts`,
+  // `scientificSolverIntegration.ts`, `worldVisualizationIntegration.ts`) are now ALSO wired into
+  // production via `core/lab/genesisLabProvider.ts` — a real `AnalysisProvider` registered on the
+  // one canonical `KernelProviderRegistry` from `core/agent/cyberReasoningKernel.ts` (the same
+  // single-kernel registration pattern `colliderProvider`/`molecularBiologyProvider`/
+  // `environmentalDetectiveProvider` already use), so their ALLOWED_ORPHANS entries are gone —
+  // real static imports now reach them from `main.tsx`. The remaining `core/lab/*` files below are
+  // NOT imported by `genesisLabProvider.ts` and stay orphaned until something wires them in too.
+  // Remove the rest of these entries once a screen/route (or a further provider capability) uses them.
+  'core/lab/bigScienceInterface.ts': 'D-140: big-science dataset ingestion. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/biotechRealityLoop.ts': 'D-140: non-clinical model/measurement residual gate. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/calibrationEngine.ts': 'D-140: measurement calibration. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/capabilityReport.ts': 'D-140: builds the 20-entry GenesisLabCapabilityReport (e2eOrStrongerPercent, LAB_SCOPE_90/97_READY). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/closedLoopExperimentEngine.ts': 'D-140: proposes the next experiment from a completed iteration, without authorizing live actuation. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/devicePorts.ts': 'D-140: device/sensor/actuator/measurement contracts. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/digitalTwinSynchronizer.ts': 'D-140: prediction/measurement residual and sync status. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/hardwareInLoopBridge.ts': 'D-140: hardware-in-loop device adapter bridge. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/labInstrumentRegistry.ts': 'D-140: device registry. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/labSafetyInterlock.ts': 'D-140: safety veto interlock (target range, sensor quality, calibration, human approval, emergency stop). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/materialDiscoveryRealityLoop.ts': 'D-140: materials-discovery predicted/measured residual gate (pure residual math, no solver-injection point). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/mirrorTwinLabAdapter.ts': 'D-140 package module delivered verbatim but NOT exercised by any test or the real-repo E2E chain (no "Mirror Twin" concept existed in this repo before D-140). Genuinely uncalled and untested today -- disclosed rather than silently wired in. Remove this entry once a caller/test exists.',
+  'core/lab/modelCalibrationEngine.ts': 'D-140: weighted linear model calibration. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/modelValidationEngine.ts': 'D-140: prediction-vs-measurement falsification classification. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/protocolExecutionEngine.ts': 'D-140: experiment protocol state machine (CREATED->...->COMPLETED). Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/sampleLineage.ts': 'D-140: sample/material lineage store. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/scientificDataAssimilation.ts': 'D-140: hybrid simulated/measured data assimilation. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/sensorIngestEngine.ts': 'D-140: sensor measurement ingestion with quality classification. Reached only by its own test suite and the E2E tests; no screen yet.',
+  'core/lab/standaloneDeterminism.ts': 'D-140: explicit standalone-only LabRuntime fixture (RecordingEvidencePort, createStandaloneLabRuntime) kept in test scope only, per CLAUDE_DIRECTIVE.md -- the real-repo E2E uses genesisLabRuntime.ts instead. Reached only by core/e2e/realLabStandaloneE2E.test.ts and labCore.test.ts.',
+  'core/lab/uncertaintyEngine.ts': 'D-140: measurement uncertainty combination. Reached only by its own test suite and the E2E tests; no screen yet.',
 };
 
 describe('every module is reachable from the running application, or documented as not', () => {
   it('reports the real reachability of the whole frontend source tree', () => {
     const files = allSourceFiles(SRC);
     const graph = importGraph(files);
-    const entries = files.filter((file) => /\/main\.tsx$/.test(file));
+    const entries = files.filter((file) => /[\\/]main\.tsx$/.test(file));
     expect(entries.length, 'expected exactly one browser entry point').toBe(1);
 
     const reachable = reachableFrom(graph, entries);
     const production = files.filter((file) => !isTest(file));
-    const orphans = production.filter((file) => !reachable.has(file)).map((file) => relative(SRC, file)).sort();
+    const orphans = production.filter((file) => !reachable.has(file)).map((file) => relative(SRC, file).replace(/\\/g, '/')).sort();
 
     const undocumented = orphans.filter((file) => !(file in ALLOWED_ORPHANS));
     const staleAllowlistEntries = Object.keys(ALLOWED_ORPHANS).filter((file) => !orphans.includes(file)).sort();

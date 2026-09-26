@@ -63,6 +63,11 @@ export class WorldRegistry {
     return this.worlds.get(worldId);
   }
 
+  /** Unregisters a world so its `TemporalEngine` can be garbage-collected. Returns `false` (never throws) when `worldId` was never registered — a soft miss, matching `load`'s own semantics, since "unload something not loaded" is a caller bug to report, not a fatal one. */
+  remove(worldId: string): boolean {
+    return this.worlds.delete(worldId);
+  }
+
   list(): readonly WorldRecord[] {
     return [...this.worlds.values()].map((w) => w.record);
   }

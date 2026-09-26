@@ -1,5 +1,6 @@
 /* Proprietary / All Rights Reserved - Genesis OS */
 import { useState } from 'react';
+import { sha256Hex } from '@genesis/core/determinism.js';
 
 type SolverId = 'retrocausal-tree' | 'torsion-boundary' | 'warp-metric';
 type Warning = 'NEGATIVE_ENERGY_REQUIRED' | 'RETROCAUSAL_FIXED_POINT' | 'UNCONVERGED_FIXED_POINT' | 'TORSION_BOUNDARY_SPECULATIVE' | 'NON_METRIC_SHORTCUT';
@@ -24,13 +25,9 @@ const RANGES: Record<SolverId, Record<string, [number, number, number]>> = {
 const LABELS: Record<string, string> = { depth: 'Głębokość', branches: 'Gałęzie', temperature: 'Temperatura T', gamma: 'Gamma γ', maxIter: 'Limit iteracji', tol: 'Tolerancja ε', eta: 'Sprzężenie η', gridSize: 'Rozmiar siatki', radii: 'Promień reflektora', reflectivity: 'Refleksyjność', diffusion: 'Dyfuzja D', relaxation: 'Relaksacja λ', alpha: 'Krok α', beta: 'Skew β', R: 'Promień bańki R', sigma: 'Stromość ściany σ', vS: 'Prędkość statku vS', pathLength: 'Długość trasy' };
 
 function formatValue(key: string, value: number): string { return key === 'tol' ? value.toExponential(1) : Number.isInteger(value) ? String(value) : value.toFixed(2); }
+/** SHA-256 hex — the ONE isomorphic implementation (bit-identical to WebCrypto/node:crypto), same value in every browser. */
 async function sha256(value: string): Promise<string> {
-  if (globalThis.crypto?.subtle) {
-    const bytes = new TextEncoder().encode(value);
-    const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  return Array.from(value).reduce((h, c) => ((h * 31 + c.charCodeAt(0)) >>> 0), 2166136261).toString(16).padStart(8, '0').repeat(8);
+  return sha256Hex(value);
 }
 function localPreview(id: SolverId, params: Params): { warnings: Warning[]; summary: string } {
   if (id === 'retrocausal-tree') {

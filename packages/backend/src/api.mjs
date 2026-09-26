@@ -75,7 +75,27 @@ import { zMuMuInvariantMassStats } from './compute/cmsOpenDataAdapter.mjs';
 import * as whyEngine from './campaign/why.mjs';
 import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
-import { buildScientificComputeReport } from './campaign/multiFidelity.mjs';
+import { buildCandidateResearchMatrix } from './campaign/scientificIntegration.mjs';
+import { resolveResearchIntake, prepareCampaignDraft, INPUT_KINDS as RESEARCH_INTAKE_INPUT_KINDS } from './campaign/researchIntake.mjs';
+import {
+  buildLabValidationDossier,
+  compareModelToLabObservation,
+  createLabValidationRequest,
+  findLabEvidenceProposal,
+  ingestExternalLabObservation,
+  linkLabEvidenceProposal,
+  reviewExternalLabObservation,
+} from './campaign/labClosedLoop.mjs';
+import { buildLabObservationEvidenceInput } from './campaign/labEvidenceBridge.mjs';
+import {
+  planVirtualExperiment,
+  executeVirtualExperimentDispatched,
+  replayVirtualExperimentDispatched,
+  linkVirtualExperimentEvidenceProposal,
+  buildVirtualExperimentEvidenceInput,
+  buildVirtualLabDossier,
+} from './campaign/virtualLabClosedLoop.mjs';
+import { listDockingTargets } from './compute/dockingTargets.mjs';
 import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   ingestKnowledgeMaterial,
   listKnowledgeMaterials,
@@ -90,14 +110,21 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
   listWorldSnapshots,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
+import { preregisterExperiment, sealExperimentSession, readExperimentMemory } from './experimentMemory.mjs';
+import { buildCandidateProtocol } from './campaign/candidateProtocol.mjs';
+import { planCandidateRoute } from './campaign/retrosynthesis.mjs';
+import { buildRetrosynthesisHandoff } from './campaign/retrosynthesisHandoff.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
 import { runDependencyAudit, summarizeFindings } from './security/dependencyAudit.mjs';
 import { runSpeculative } from './speculativeApi.mjs';
-import { runIngest, listProposals, publishProposal, rejectProposal } from './knowledgeApi.mjs';
+import { runIngest, listProposals, publishProposal, rejectProposal, proposeStructuredEvidence } from './knowledgeApi.mjs';
 import { runQuantum, describeQuantum } from './quantumApi.mjs';
 import { evaluateManifold, systemTelemetry } from './manifoldApi.mjs';
+import { detectRuntime as detectLocalVideoRuntime } from './cinematic/localVideoRuntime.mjs';
+import { planGeneration as planLocalVideoGeneration } from './cinematic/genesisVideoEngine.mjs';
+import { listSupportedCapabilities as listLocalVideoCapabilities } from './cinematic/videoControlContract.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -105,9 +132,43 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dni
 const MAX_TRIALS_PER_EXPERIMENT = 500; // ochrona przed nadużyciem pojedynczego projektu
 const TRIAL_STATUSES = new Set(['baseline', 'draft', 'promising', 'failed']);
+let localVideoRuntimeCache = null;
+let localVideoRuntimeCachedAt = 0;
+const LOCAL_VIDEO_RUNTIME_CACHE_MS = 60_000;
 
 const ok = (body, status = 200) => ({ status, body });
 const err = (status, error, message) => ({ status, body: { error, ...(message ? { message } : {}) } });
+
+function localVideoRuntimeStatus() {
+  if (!localVideoRuntimeCache || Date.now() - localVideoRuntimeCachedAt > LOCAL_VIDEO_RUNTIME_CACHE_MS) {
+    localVideoRuntimeCache = detectLocalVideoRuntime();
+    localVideoRuntimeCachedAt = Date.now();
+  }
+  return localVideoRuntimeCache;
+}
+
+function publicLocalVideoRuntime(runtime) {
+  const packageStatus = (value) => ({ available: value?.available === true, version: value?.version ?? null });
+  return {
+    os: runtime.os,
+    cpu: runtime.cpu,
+    ram: runtime.ram,
+    storage: { available: runtime.storage?.available === true, freeBytes: runtime.storage?.availableBytes ?? runtime.storage?.freeBytes ?? null, totalBytes: runtime.storage?.totalBytes ?? null },
+    gpu: {
+      available: runtime.gpu?.available === true,
+      devices: (runtime.gpu?.gpus ?? runtime.gpu?.devices ?? []).map((gpu) => ({ name: gpu.name ?? null, vramMb: gpu.vramMb ?? null })),
+      source: runtime.gpu?.source ?? null,
+    },
+    cuda: packageStatus(runtime.cuda),
+    python: packageStatus(runtime.python),
+    pytorch: packageStatus(runtime.pytorch),
+    diffusers: packageStatus(runtime.diffusers),
+    transformers: packageStatus(runtime.transformers),
+    onnxruntimeDirectml: packageStatus(runtime.onnxruntimeDirectml),
+    ffmpeg: { ...packageStatus(runtime.ffmpeg), source: runtime.ffmpeg?.source ?? null },
+    localModels: { configured: runtime.localModels?.configured === true, checkpointCount: runtime.localModels?.checkpoints?.length ?? 0 },
+  };
+}
 
 /** Płaski słownik liczb skończonych — parametry/wyjścia próby nigdy nie są zagnieżdżone. */
 function sanitizeNumberMap(obj, maxKeys = 64) {
@@ -145,6 +206,37 @@ export function handleApi(db, ctx) {
 
   // ---- Backend Compute Engine (modele publiczne; run opcjonalnie utrwalany) ----
   if (seg[0] === 'compute') {
+    if (seg[1] === 'local-video' && seg[2] === 'runtime' && seg.length === 3 && method === 'GET') {
+      return ok({
+        capabilities: listLocalVideoCapabilities(),
+        runtime: publicLocalVideoRuntime(localVideoRuntimeStatus()),
+        mediaClass: 'GENERATED_MEDIA',
+        mediaScope: 'VISUALIZATION_ONLY',
+        evidenceEligible: false,
+        scientificStateMutation: false,
+      });
+    }
+    if (seg[1] === 'local-video' && seg[2] === 'plan' && seg.length === 3 && method === 'POST') {
+      try {
+        const plan = planLocalVideoGeneration(body, { runtime: localVideoRuntimeStatus() });
+        if (!plan.ok && !plan.status) return err(400, plan.error ?? 'invalid_control_package', plan.reason);
+        return ok({
+          plan: {
+            ready: plan.ok === true,
+            status: plan.status,
+            reason: plan.reason ?? null,
+            controlPackageFingerprint: plan.input?.controlPackageFingerprint ?? null,
+            sourceScientificStateFingerprint: plan.input?.sourceScientificStateFingerprint ?? body.sourceScientificStateFingerprint ?? null,
+            mediaClass: 'GENERATED_MEDIA',
+            mediaScope: 'VISUALIZATION_ONLY',
+            evidenceEligible: false,
+            scientificStateMutation: false,
+          },
+        });
+      } catch (error) {
+        return err(400, 'scientific_state_promotion_rejected', error instanceof Error ? error.message : String(error));
+      }
+    }
     if (seg[1] === 'capabilities' && seg.length === 2 && method === 'GET') return ok({ capabilities: listCapabilities() });
     if (seg[1] === 'models' && seg.length === 2 && method === 'GET') return ok({ models: listModels() });
     if (seg[1] === 'models' && seg.length === 3 && method === 'GET') {
@@ -472,6 +564,12 @@ export function handleApi(db, ctx) {
       }
     }
 
+    // ---- Research Intake: governed intake between a research question and the existing campaign engine ----
+    if (seg[2] === 'research-intake' && seg.length === 3) {
+      if (method === 'POST') return createResearchIntakeHandler(db, user, role, projectId, body);
+      return err(405, 'method_not_allowed');
+    }
+
     // ---- Scientific Acceleration Engine: kampanie naukowe (P1-P3, P10-P13) ----
     if (seg[2] === 'campaigns') {
       // /api/projects/:id/campaigns
@@ -510,6 +608,83 @@ export function handleApi(db, ctx) {
           void enqueueJob(db, job.id);
           return ok({ jobId: job.id }, 202);
         }
+        // /api/projects/:id/campaigns/:cid/lab-validation?candidate=:candidateId — governed external-lab
+        // validation request/dossier (editor+ to create, viewer+ to read). See campaign/labClosedLoop.mjs.
+        if (seg[4] === 'lab-validation') {
+          const labCandidateId = typeof ctx.query?.candidate === 'string' ? ctx.query.candidate : typeof body?.candidateId === 'string' ? body.candidateId : null;
+          if (method === 'GET') {
+            if (!labCandidateId) return err(400, 'candidate_required');
+            const result = buildLabValidationDossier(db, campaignId, labCandidateId);
+            if (!result.ok) return err(404, result.error);
+            return ok({ dossier: result.dossier });
+          }
+          if (method === 'POST') {
+            if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+            const result = createLabValidationRequest(db, {
+              campaignId,
+              candidateId: body.candidateId,
+              objective: body.objective,
+              endpointPlan: body.endpointPlan,
+              externalProvider: body.externalProvider ?? null,
+              preregistrationRef: body.preregistrationRef ?? null,
+              preclinicalProtocol: body.preclinicalProtocol ?? null,
+              requiredWetLabId: body.requiredWetLabId ?? null,
+              governedManualRequest: body.governedManualRequest ? {
+                reason: body.governedManualRequest.reason,
+                authorizedBy: user.id,
+              } : null,
+              requestedBy: user.id,
+            });
+            if (!result.ok) return err(400, result.error);
+            return ok({ request: result.request, eventId: result.eventId, deduped: result.deduped }, 201);
+          }
+          return err(405, 'method_not_allowed');
+        }
+        // Canonical in-silico loop. Kept distinct from the external wet-lab path above.
+        if (seg[4] === 'virtual-lab') {
+          const vlabCandidateId = typeof ctx.query?.candidate === 'string' ? ctx.query.candidate : typeof body?.candidateId === 'string' ? body.candidateId : null;
+          if (method === 'GET') {
+            if (!vlabCandidateId) return err(400, 'candidate_required');
+            const result = buildVirtualLabDossier(db, campaignId, vlabCandidateId);
+            if (!result.ok) return err(404, result.error);
+            return ok({ dossier: result.dossier });
+          }
+          if (method === 'POST') {
+            if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+            const result = planVirtualExperiment(db, {
+              projectId, campaignId,
+              candidateId: body.candidateId,
+              hypothesis: body.hypothesis,
+              requestedCapability: body.requestedCapability,
+              params: body.params ?? {},
+              budget: body.budget ?? {},
+              expectation: body.expectation ?? null,
+              requestedBy: user.id,
+            });
+            if (!result.ok) return err(400, result.error ?? result.status, result.reason);
+            return ok({ plan: result.plan, eventId: result.eventId, deduped: result.deduped }, 201);
+          }
+          return err(405, 'method_not_allowed');
+        }
+        // /api/projects/:id/campaigns/:cid/experiment-memory — the campaign's scientific memory
+        // (viewer+): what was preregistered before the run, what was sealed after it, chain state.
+        if (seg[4] === 'experiment-memory' && method === 'GET') return ok({ memory: readExperimentMemory(db, campaignId) });
+        // /api/projects/:id/campaigns/:cid/protocol — THE final artefact of the experiment (viewer+):
+        // the reproducible computational candidate protocol plus the proposed physical-validation
+        // protocol. Assembled from persisted state only; it runs no engine.
+        if (seg[4] === 'protocol' && method === 'GET') {
+          const built = buildCandidateProtocol(db, campaignId);
+          if (!built.ok) return err(404, built.error);
+          return ok({ protocol: built.protocol });
+        }
+        // /api/projects/:id/campaigns/:cid/retrosynthesis-handoff — the canonical identity of the
+        // finalist whose route is still owed (viewer+). Assembled from persisted state plus one
+        // capability probe; it starts no search and contains no route.
+        if (seg[4] === 'retrosynthesis-handoff' && method === 'GET') {
+          const built = buildRetrosynthesisHandoff(db, campaignId);
+          if (!built.ok) return err(404, built.error);
+          return ok({ handoff: built.handoff });
+        }
         if (method !== 'GET') return err(405, 'method_not_allowed');
         // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty
         if (seg[4] === 'candidates') {
@@ -517,9 +692,9 @@ export function handleApi(db, ctx) {
           return ok({ candidates: campaignStore.listCandidates(db, campaignId, Number.isFinite(gen) ? gen : null) });
         }
         if (seg[4] === 'decisions') return ok({ decisions: campaignStore.listDecisions(db, campaignId) });
-        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId) });
+        if (seg[4] === 'events') return ok({ events: campaignStore.listEvents(db, campaignId, { afterSeq: ctx.query?.after }) });
         if (seg[4] === 'graph') return ok({ graph: buildDiscoveryGraph(db, campaignId) });
-        if (seg[4] === 'report') return ok({ report: buildScientificComputeReport(db, campaignId) });
+        if (seg[4] === 'report') return ok({ report: buildCandidateResearchMatrix(db, campaignId) });
         if (seg[4] === 'why') return whyHandler(db, campaignId, ctx.query ?? {});
         if (seg[4] === 'science-runs') return ok({ scienceRuns: listScienceRuns(db, campaignId) });
         if (seg[4] === 'conflicts') {
@@ -527,6 +702,151 @@ export function handleApi(db, ctx) {
           return ok({ conflicts });
         }
         return err(404, 'not_found');
+      }
+      // /api/projects/:id/campaigns/:cid/retrosynthesis (editor+) — runs the real route-search engine
+      // for one candidate and persists it as a Science Run. A blocked engine is reported as blocked;
+      // no route is ever written without the engine.
+      if (seg.length === 5 && seg[4] === 'retrosynthesis' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = planCandidateRoute(db, {
+          projectId, campaignId,
+          candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
+          smiles: typeof body?.smiles === 'string' ? body.smiles : null,
+          options: {
+            iterationLimit: Number(body?.iterationLimit) || undefined,
+            timeLimitSeconds: Number(body?.timeLimitSeconds) || undefined,
+            maxRoutes: Number(body?.maxRoutes) || undefined,
+          },
+        });
+        if (!result.ok) {
+          return { status: result.error === 'BLOCKED_BY_RUNTIME' ? 503 : 400, body: { error: result.error, reason: result.reason ?? null, missingModelFiles: result.missingModelFiles ?? null } };
+        }
+        return ok({ scienceRun: result.run, solved: result.solved, routes: result.routes }, 201);
+      }
+      // /api/projects/:id/campaigns/:cid/experiment-memory/{preregistration,sessions} (editor+) —
+      // the two writes of scientific memory. Both are append-only: the preregistration is refused once
+      // the campaign has run or if it contradicts one already stored, and a sealed session is checked
+      // against it (fingerprint, criterion ids, server-derived verdict) before it is written.
+      if (seg.length === 6 && seg[4] === 'experiment-memory' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        if (seg[5] === 'preregistration') {
+          const result = preregisterExperiment(db, { projectId, campaign, hypothesis: body?.hypothesis, userId: user.id });
+          if (!result.ok) return { status: result.error === 'campaign_already_executed' || result.error === 'preregistration_immutable' ? 409 : 400, body: { error: result.error, reason: result.reason ?? null, record: result.record ?? null, recomputed: result.recomputed ?? null } };
+          return ok({ preregistration: result.record, status: result.status }, result.status === 'REGISTERED' ? 201 : 200);
+        }
+        if (seg[5] === 'sessions') {
+          const result = sealExperimentSession(db, { projectId, campaign, session: body?.session, userId: user.id });
+          if (!result.ok) return err(400, result.error);
+          return ok({ session: result.record, status: result.status, deduped: result.deduped }, result.deduped ? 200 : 201);
+        }
+        return err(404, 'not_found');
+      }
+      // /api/projects/:id/campaigns/:cid/lab-validation/observations (editor+)
+      if (seg.length === 6 && seg[4] === 'lab-validation' && seg[5] === 'observations' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = ingestExternalLabObservation(db, {
+          campaignId,
+          candidateId: body.candidateId,
+          requestId: body.requestId,
+          observation: body.observation,
+          ingestedBy: user.id,
+        });
+        if (!result.ok) {
+          // Item 4 — surface which existing observation this one conflicts with, not just the code.
+          return result.error === 'external_observation_conflict'
+            ? { status: 400, body: { error: result.error, existingObservationId: result.existingObservationId } }
+            : err(400, result.error);
+        }
+        return ok({ observation: result.observation, eventId: result.eventId, deduped: result.deduped }, 201);
+      }
+      // /api/projects/:id/campaigns/:cid/lab-validation/observations/:observationId/review (editor+) —
+      // human-review gate; on ACCEPTED_AS_OBSERVATION, bridges into the existing canonical EvidenceLedger
+      // (propose-only — never auto-published).
+      if (seg.length === 8 && seg[4] === 'lab-validation' && seg[5] === 'observations' && seg[7] === 'review' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const reviewed = reviewExternalLabObservation(db, {
+          campaignId,
+          candidateId: body.candidateId,
+          observationId: seg[6],
+          verdict: body.verdict,
+          reviewerId: user.id,
+          note: body.note,
+        });
+        if (!reviewed.ok) return err(400, reviewed.error);
+
+        let evidenceProposal = null;
+        if (reviewed.review.verdict === 'ACCEPTED_AS_OBSERVATION') {
+          // Item 7 — idempotent: a repeated/deduped ACCEPTED review (or a retry of this same call)
+          // reuses the EXISTING evidence proposal rather than minting a second one on the ledger.
+          const existingLink = findLabEvidenceProposal(db, campaignId, seg[6]);
+          if (existingLink) {
+            evidenceProposal = { ok: true, mode: 'PROPOSE_ONLY', proposalId: existingLink.proposalId, deduped: true };
+          } else {
+            const bridge = buildLabObservationEvidenceInput({ observation: reviewed.observation, review: reviewed.review });
+            if (!bridge.ok) return err(400, bridge.error);
+            const proposed = proposeStructuredEvidence(bridge.input);
+            if (!proposed.ok) return err(400, proposed.error);
+            evidenceProposal = proposed;
+            linkLabEvidenceProposal(db, {
+              campaignId,
+              candidateId: body.candidateId,
+              observationId: seg[6],
+              proposalId: proposed.proposalId,
+              evidenceContentHash: proposed.record?.contentHash ?? null,
+            });
+          }
+        }
+        return ok({ review: reviewed.review, evidenceProposal }, 201);
+      }
+      // /api/projects/:id/campaigns/:cid/lab-validation/comparisons (editor+) — model-vs-observation;
+      // outputKey/unit/tolerance are frozen on the original request's endpointPlan, never chosen here.
+      if (seg.length === 6 && seg[4] === 'lab-validation' && seg[5] === 'comparisons' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = compareModelToLabObservation(db, {
+          campaignId,
+          candidateId: body.candidateId,
+          scienceRunId: body.scienceRunId,
+          observationId: body.observationId,
+          comparedBy: user.id,
+        });
+        if (!result.ok) {
+          // Item 6 — surface the frozen/model/observation units on a mismatch, not just the code.
+          return result.error === 'unit_mismatch'
+            ? { status: 400, body: { error: result.error, modelUnit: result.modelUnit, observationUnit: result.observationUnit, expectedUnit: result.expectedUnit } }
+            : err(400, result.error);
+        }
+        return ok({ comparison: result.comparison, eventId: result.eventId, deduped: result.deduped }, 201);
+      }
+      if (seg.length === 6 && seg[4] === 'virtual-lab' && seg[5] === 'execute' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        // Asynchronous like /api/knowledge/ingest: a configured private scientific worker may run
+        // the engine (server.mjs awaits handleApi's result). Unconfigured capabilities run locally.
+        return executeVirtualExperimentDispatched(db, {
+          campaignId, candidateId: body.candidateId, executionId: body.executionId, executedBy: user.id,
+        }).then((executed) => {
+          // A retryable worker-transport failure is not a result: 503, nothing persisted but an audit event.
+          if (!executed.ok) return err(executed.retryable ? 503 : 400, executed.error, executed.reason);
+          let evidenceProposal = null;
+          if (executed.result.status === 'EXECUTED_COMPUTATIONAL_EXPERIMENT') {
+            const bridge = buildVirtualExperimentEvidenceInput({ result: executed.result });
+            if (!bridge.ok) return err(400, bridge.error);
+            const proposed = proposeStructuredEvidence(bridge.input);
+            if (!proposed.ok) return err(400, proposed.error);
+            evidenceProposal = proposed;
+            linkVirtualExperimentEvidenceProposal(db, {
+              campaignId, candidateId: body.candidateId, executionId: executed.result.executionId,
+              proposalId: proposed.proposalId, evidenceContentHash: proposed.record?.contentHash ?? null,
+            });
+          }
+          return ok({ result: executed.result, evidenceProposal, deduped: executed.deduped }, 201);
+        });
+      }
+      if (seg.length === 7 && seg[4] === 'virtual-lab' && seg[6] === 'replay' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        return replayVirtualExperimentDispatched(db, { campaignId, candidateId: body.candidateId, executionId: seg[5] }).then((result) => {
+          if (!result.ok) return err(400, result.error);
+          return ok({ replay: result.replay, eventId: result.eventId }, 201);
+        });
       }
       // /api/projects/:id/campaigns/:cid/science-runs/:runId[/verify|/verifications]
       if (seg.length >= 6 && seg[4] === 'science-runs') {
@@ -771,6 +1091,45 @@ function deleteTrialHandler(db, role, trialId) {
   return ok({ ok: true });
 }
 
+/* ---------------- Research Intake (governed intake -> existing campaign/scientificIntegration) ---------------- */
+
+const RESEARCH_INTAKE_MAX_CANDIDATE_BUDGET = 50; // matches researchIntake.mjs's own internal clamp; documented here for the API surface.
+
+function sanitizeSecondaryIdentifier(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (typeof raw.inputKind !== 'string' || typeof raw.value !== 'string') return null;
+  return { inputKind: raw.inputKind, value: raw.value };
+}
+
+/**
+ * POST /api/projects/:id/research-intake — resolves a research question through the governed
+ * intake layer (researchIntake.mjs) and, only when explicitly requested, prepares an EXISTING
+ * campaign-compatible draft (campaignStore.createCampaign) — never a second campaign persistence
+ * model, never an automatic expensive-stage run. Editor+.
+ */
+async function createResearchIntakeHandler(db, user, role, projectId, body) {
+  if (!atLeast(role, 'editor')) return err(403, 'forbidden', 'Uruchomienie research intake wymaga roli editor lub wyższej.');
+  const originalQuery = typeof body?.originalQuery === 'string' ? body.originalQuery.trim() : '';
+  if (!originalQuery) return err(400, 'invalid_query', 'Podaj originalQuery.');
+  const declaredInputKind = typeof body?.declaredInputKind === 'string' ? body.declaredInputKind : 'AUTO';
+  if (declaredInputKind !== 'AUTO' && !RESEARCH_INTAKE_INPUT_KINDS.includes(declaredInputKind)) {
+    return err(400, 'invalid_input_kind', `Nieznany declaredInputKind: ${declaredInputKind}`);
+  }
+  const maxCandidateBudget = clampInt(body?.maxCandidateBudget, 1, RESEARCH_INTAKE_MAX_CANDIDATE_BUDGET, 5);
+  const secondaryIdentifier = sanitizeSecondaryIdentifier(body?.secondaryIdentifier);
+
+  const result = await resolveResearchIntake({ originalQuery, declaredInputKind, maxCandidateBudget, secondaryIdentifier });
+
+  let campaignDraft = null;
+  if (body?.prepareCampaignDraft === true) {
+    const prepared = prepareCampaignDraft(db, campaignStore, projectId, result, { createdBy: user.id });
+    campaignDraft = prepared.ok
+      ? { prepared: true, campaignId: prepared.campaign.id, seededCandidateIds: prepared.seededCandidateIds }
+      : { prepared: false, reason: prepared.reason };
+  }
+  return ok({ result, campaignDraft });
+}
+
 /* ---------------- Handlery Kampanii Naukowej (Scientific Acceleration Engine) ---------------- */
 
 const CAMPAIGN_MAX_GENERATIONS = 8; // twardy limit zasobów API (P14): brak nieskończonych pętli
@@ -868,6 +1227,8 @@ function sanitizeStageConfig(body) {
       enabled: true,
       budget: clampInt(body.docking.budget, 1, 8, 2),
       mode: ['pareto', 'diverse', 'explicit'].includes(body.docking.mode) ? body.docking.mode : 'pareto',
+      // A vetted protein target is named by registry id only (files + hashes live in the backend).
+      ...(listDockingTargets().includes(body.docking.targetId) ? { targetId: body.docking.targetId } : {}),
       receptor: {
         // Tylko SMILES zastępnika lub gotowy PDBQT — brak wstrzykiwania dowolnych ścieżek.
         receptorSmiles: typeof r.receptorSmiles === 'string' ? r.receptorSmiles.slice(0, 200) : 'c1ccc2[nH]ccc2c1',

@@ -116,3 +116,18 @@ describe('G6: the four orthogonal axes stay untouched — zero breaking of saved
     expect(source).toContain('| BiotechEpistemicStatus');
   });
 });
+
+describe('D-128 — session statuses and the ★ scale onto the canonical rank (never upgraded)', () => {
+  it('maps every session status monotonically and every star count', async () => {
+    const m = await import('../core/epistemicReliability');
+    expect(m.sessionStatusToCanonicalReliability('VERIFIED_SOURCE')).toBe('ESTABLISHED_SCIENCE');
+    expect(m.sessionStatusToCanonicalReliability('REAL_OBSERVATION')).toBe('WELL_SUPPORTED_MODEL');
+    expect(m.sessionStatusToCanonicalReliability('SIMULATION')).toBe('THEORETICAL_MODEL');
+    expect(m.sessionStatusToCanonicalReliability('SPECULATIVE')).toBe('SPECULATIVE_MODEL');
+    expect(m.sessionStatusToCanonicalReliability('INSUFFICIENT_EVIDENCE')).toBe('UNSUPPORTED_CLAIM');
+    expect(m.reliabilityRankIndex(m.sessionStatusToCanonicalReliability('MODEL'))).toBeLessThan(m.reliabilityRankIndex(m.sessionStatusToCanonicalReliability('REAL_OBSERVATION')));
+    expect([0, 1, 2, 3, 4, 5, 9, Number.NaN].map((n) => m.starScaleToCanonicalReliability(n))).toEqual(['UNSUPPORTED_CLAIM', 'SPECULATIVE_MODEL', 'HYPOTHESIS', 'THEORETICAL_MODEL', 'WELL_SUPPORTED_MODEL', 'ESTABLISHED_SCIENCE', 'ESTABLISHED_SCIENCE', 'UNSUPPORTED_CLAIM']);
+    expect(m.starScaleToCanonicalReliability(m.countFilledStars('★★★☆☆'))).toBe('THEORETICAL_MODEL');
+    expect(m.starScaleToCanonicalReliability(4.9)).toBe('WELL_SUPPORTED_MODEL');
+  });
+});

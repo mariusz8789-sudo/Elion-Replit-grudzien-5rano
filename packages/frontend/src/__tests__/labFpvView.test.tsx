@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { LabFpvView, runMix, stateFile } from '../components/LabFpvView';
+import { LAB_CAMPUS_DOORS, LabFpvView, runMix, stateFile } from '../components/LabFpvView';
 import { ThermodynamicLabEngine } from '@genesis/core/lab/ThermodynamicLabEngine.js';
 import { kernelLedger } from '../core/agent/cyberReasoningKernel';
 
@@ -37,5 +37,11 @@ describe('LabFpvView — static render (no WebGL)', () => {
     for (const id of ['lab-stage', 'lab-mix', 'lab-save', 'lab-record', 'lab-ignition', 'lab-t0', 'lab-amt-H2', 'lab-amt-CuSO4_aq']) expect(html).toContain(`data-testid="${id}"`);
     expect(html).not.toContain('data-testid="lab-readout"');
     expect(html).toContain('2 H2 + O2 -&gt; 2 H2O(g)');
+    expect(html).toContain('data-testid="lab-campus-doors"');
+    for (const door of LAB_CAMPUS_DOORS) {
+      expect(html).toContain(`data-testid="lab-door-${door.id}"`);
+      expect(door.hash.startsWith('#/')).toBe(true);
+    }
+    expect(new Set(LAB_CAMPUS_DOORS.map((door) => door.hash)).size).toBe(LAB_CAMPUS_DOORS.length);
   });
 });

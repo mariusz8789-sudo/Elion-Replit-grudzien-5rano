@@ -214,7 +214,7 @@ h1, h2, h3, .gx-display, .dash-title, .topbar h1, .settings-section > h2 { text-
    ===================================================================== */
 html { background: #000 !important; }
 .hud-scrim { display: none !important; }
-.matrix-datastream { display: none !important; }   /* the 2D stream is superseded by the 3D rain */
+.matrix-datastream { display: block; } /* One canonical dashboard background; no 3D figure layer. */
 .science-chat, .shell-chat, .shell-chat > *, .research-panel, .next-move-panel, .science-chat-log, .science-chat-suggest, .science-chat-form, .science-chat-head, .science-chat-capsule-wrap,
 .start-door, .start-ask, .start-status, .dash-card, .dash-tile, .settings-section, .gx-panel, .gx-glass, .world-card, .hall-card, .lab-card, .pilot-step, .matrix-card, .matrix-detail-panel,
 .gu-recipe, .gu-replay-col, .gu-cspace-row, .narrator, .evidence-capsule, .console-panel, .control-panel, .panel, .topbar, .shell-sidebar, .shell-mobilebar, .shell-sheet, .shell-hud, .topbar-ask {
@@ -360,3 +360,247 @@ input, select, textarea { background: transparent !important; border: 1px solid 
 .cern-badge.is-hot { color: #f87171; border-color: rgba(248, 113, 113, 0.5); text-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
 .cern-hashes { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.66rem; color: #9ff9d0; text-shadow: 0 0 6px rgba(0, 255, 156, 0.3); }
 @media (max-width: 900px) { .cern-hud-left { width: 100%; position: relative; } .cern-hud-right { position: relative; width: 100%; } .cern { overflow-y: auto; } }
+
+
+/* ---- 17. SCIENTIFIC WORLDS: through-visor laboratory, HUD in safe zones ---- */
+.app-sw { min-height: 100vh; }
+.sw { position: fixed; inset: 0; background: #05070d; color: #dbe7e0; overflow: hidden; }
+.sw-canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; z-index: 0; }
+.sw-loading { position: absolute; inset: 0; display: grid; place-items: center; z-index: 4; color: #9fd7f9; font-family: var(--font-mono); letter-spacing: 0.12em; background: rgba(5, 7, 13, 0.6); pointer-events: none; }
+.sw-glerror { position: absolute; z-index: 20; left: 50%; top: 40%; transform: translateX(-50%); max-width: 32rem; }
+/* The visor: helmet frame, glass sheen, breath condensation — DOM layers over the canvas, never over the HUD. */
+.sw-visor { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+/* GFX-1: the visor is a helmet a scientist looks THROUGH, not a mask over the picture. The old
+   aperture (46%/40% with a 12vmin inner shadow) ate about two fifths of the frame and turned every
+   wide shot into a black oval — the first thing that made the laboratory look cheap. It is now a wide,
+   softly-feathered aperture: the helmet edge still reads at the corners, the room does not. */
+.sw-visor-frame { position: absolute; inset: -8%; border-radius: 30% / 26%; box-shadow: inset 0 0 0 0.7vmin rgba(6, 9, 14, 0.9), inset 0 0 7vmin 2.5vmin rgba(4, 7, 12, 0.55), inset 0 0 22vmin 5vmin rgba(4, 7, 12, 0.18); }
+.sw-visor-frame::after { content: ''; position: absolute; inset: 0.8vmin; border-radius: 30% / 26%; border: 1px solid rgba(143, 211, 255, 0.2); box-shadow: 0 0 22px rgba(143, 211, 255, 0.12) inset; }
+.sw-visor-glare { position: absolute; inset: 0; background:
+  radial-gradient(ellipse 38% 22% at 22% 18%, rgba(190, 230, 255, 0.16), transparent 70%),
+  radial-gradient(ellipse 26% 12% at 70% 12%, rgba(190, 230, 255, 0.10), transparent 70%),
+  linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.045) 44%, transparent 50%);
+  mix-blend-mode: screen; }
+.sw-visor-breath { position: absolute; left: 18%; right: 18%; bottom: -10%; height: 22%; border-radius: 50% 50% 0 0; background: radial-gradient(ellipse at 50% 100%, rgba(200, 225, 240, 0.13), rgba(200, 225, 240, 0.04) 45%, transparent 72%); filter: blur(12px); animation: sw-breath 5.2s ease-in-out infinite; }
+@keyframes sw-breath { 0%, 100% { opacity: 0.35; transform: scaleY(0.92); } 45% { opacity: 0.75; transform: scaleY(1.06); } }
+.sw-reticle { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid rgba(98, 240, 163, 0.75); border-radius: 50%; box-shadow: 0 0 10px rgba(98, 240, 163, 0.5); }
+.sw-reticle::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: #62f0a3; border-radius: 50%; }
+@media (prefers-reduced-motion: reduce) { .sw-visor-breath { animation: none; opacity: 0.45; } }
+/* HUD safe zones: status top-left, evidence top-right, commands bottom. The centre stays clear. */
+.sw-hud { position: absolute; z-index: 10; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.9rem 1rem; pointer-events: none; }
+.sw-hud > * { pointer-events: auto; }
+.sw-hud-status { top: 0; left: 0; width: min(360px, 40vw); }
+.sw-hud-evidence { top: 0; right: 0; width: min(400px, 42vw); max-height: 62vh; overflow: auto; }
+.sw-hud-command { left: 0; bottom: 0; width: min(560px, 58vw); padding-bottom: calc(0.9rem + var(--safe-bottom)); }
+.sw-chemistry-context { position: absolute; z-index: 12; right: 1rem; bottom: 1rem; width: min(320px, calc(100vw - 2rem)); padding: .8rem; border: 1px solid rgba(92,214,232,.3); border-radius: 10px; background: rgba(3,10,18,.9); box-shadow: 0 18px 50px rgba(0,0,0,.32); color: #e6f2ec; backdrop-filter: blur(14px); }
+.sw-chemistry-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.sw-chemistry-head div { display: grid; gap: .15rem; }
+.sw-chemistry-head span { color: #5cd6e8; font: 600 .61rem/1.3 var(--font-mono); letter-spacing: .09em; }
+.sw-chemistry-head strong { font-size: 1.6rem; line-height: 1; }
+.sw-context-close { border: 0; background: transparent; color: #dbeafe; cursor: pointer; font-size: 1.2rem; line-height: 1; }
+.sw-chemistry-context p, .sw-chemistry-context small { margin: .5rem 0 0; color: rgba(230,242,236,.72); font-size: .72rem; }
+.sw-context-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.sw-context-actions .sw-btn { min-height: 36px; }
+.sw-chemistry-context summary { margin-top: .55rem; color: #9fd7f9; cursor: pointer; font: 600 .7rem/1.4 var(--font-mono); }
+.sw-titration-plot { display: block; width: 100%; height: 94px; margin-top: .45rem; overflow: visible; }
+.sw-titration-plot path { fill: none; stroke: rgba(148,163,184,.35); stroke-width: 1; }
+.sw-titration-plot polyline { fill: none; stroke: #5cd6e8; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.sw-titration-plot line { stroke: #f0b35c; stroke-width: 1; stroke-dasharray: 4 3; }
+.sw-titration-plot circle { fill: #fff; filter: drop-shadow(0 0 4px #5cd6e8); }
+@media (min-width: 721px) { .sw-hud-status, .sw-hud-command { left: 12.5rem; } }
+.sw-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.sw-badge { border: 1px solid rgba(125, 211, 252, 0.35); border-radius: 999px; padding: 0.2rem 0.6rem; font-size: 0.58rem; font-weight: 700; letter-spacing: 0.12em; color: #7dd3fc; background: rgba(2, 6, 14, 0.5); text-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+.sw-progress { height: 3px; background: rgba(125, 211, 252, 0.18); border-radius: 2px; overflow: hidden; }
+.sw-progress span { display: block; height: 100%; background: linear-gradient(90deg, #38bdf8, #62f0a3); transition: width 0.2s linear; }
+.sw-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.sw-btn { background: rgba(2, 6, 14, 0.62); border: 1px solid rgba(56, 189, 248, 0.32); color: #cfeedd; font: inherit; font-size: 0.74rem; letter-spacing: 0.06em; padding: 0.38rem 0.6rem; border-radius: 4px; cursor: pointer; backdrop-filter: blur(6px); }
+.sw-btn.is-on, .sw-btn-primary { border-color: #62f0a3; color: #eafff4; box-shadow: 0 0 12px rgba(98, 240, 163, 0.3) inset; }
+.sw-select { background: rgba(2, 6, 14, 0.62); border: 1px solid rgba(56, 189, 248, 0.32); color: #cfeedd; font: inherit; font-size: 0.74rem; padding: 0.35rem 0.5rem; border-radius: 4px; }
+.sw-hud-toggle { background: rgba(2, 6, 14, 0.62); border: 1px solid rgba(98, 240, 163, 0.28); color: #62f0a3; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; padding: 0.35rem 0.6rem; border-radius: 4px; cursor: pointer; text-align: left; }
+.sw-session { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.6rem; font-size: 0.7rem; background: rgba(2, 6, 14, 0.55); border: 1px solid rgba(98, 240, 163, 0.18); border-radius: 6px; padding: 0.6rem 0.7rem; backdrop-filter: blur(8px); }
+.sw-session dt { color: #7d93ad; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.sw-session dd { margin: 0; word-break: break-all; }
+.sw-outputs { display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; }
+.sw-status { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.12em; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid currentColor; color: #9fd7f9; }
+.sw-status-simulation, .sw-status-model { color: #9fd7f9; }
+.sw-status-hypothesis { color: #f0b35c; }
+.sw-status-speculative, .sw-status-fiction_inspired_scenario { color: #ff8fb0; }
+.sw-status-not_modeled, .sw-status-insufficient_evidence { color: #cbd5e1; }
+.sw-replay-match { color: #62f0a3; } .sw-replay-drift { color: #ff5a5a; }
+.sw-faint { margin: 0; font-size: 0.7rem; color: #7d93ad; background: rgba(2, 6, 14, 0.5); border-radius: 6px; padding: 0.5rem 0.7rem; }
+.sw-transcript { list-style: none; margin: 0; padding: 0.4rem 0.6rem; max-height: 30vh; overflow: auto; display: flex; flex-direction: column; gap: 0.25rem; background: rgba(2, 6, 14, 0.5); border: 1px solid rgba(56, 189, 248, 0.16); border-radius: 6px; backdrop-filter: blur(8px); font-size: 0.76rem; }
+.sw-transcript:empty { display: none; }
+.sw-line-user { color: #eafff4; } .sw-line-user::before { content: '› '; color: #62f0a3; }
+.sw-line-agent { color: #cfeedd; } .sw-line-agent::before { content: '⛑ '; color: #7dd3fc; }
+.sw-line-system { color: #9fb3aa; font-size: 0.7rem; }
+.sw-form { display: flex; gap: 0.4rem; }
+.sw-input { flex: 1; min-width: 0; background: rgba(2, 6, 14, 0.7) !important; border: 1px solid rgba(98, 240, 163, 0.35); color: #eafff4; font: inherit; font-size: 0.9rem; padding: 0.55rem 0.7rem; border-radius: 6px; }
+.sw-quick { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.sw-chip { background: rgba(2, 6, 14, 0.55); border: 1px solid rgba(125, 211, 252, 0.3); color: #9fd7f9; font: inherit; font-size: 0.68rem; padding: 0.25rem 0.55rem; border-radius: 999px; cursor: pointer; }
+.sw-research-only { display: none; }
+.sw-lab-primary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; padding: 0.45rem; border: 1px solid rgba(125, 211, 252, 0.18); border-radius: 10px; background: rgba(2, 8, 17, 0.82); backdrop-filter: blur(12px); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28); }
+.sw-lab-chat { flex: 1 1 100%; display: grid; gap: .35rem; }
+.sw-lab-chat label { color: #eafff4; font-size: .82rem; font-weight: 700; letter-spacing: .01em; }
+.sw-lab-chat > div { display: flex; gap: .4rem; }
+.sw-lab-chat .sw-input { min-height: 44px; }
+.sw-lab-chat .sw-btn-primary { flex: 0 0 auto; min-height: 44px; padding-inline: .9rem; }
+.sw-domain-rail { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 0.3rem; }
+.sw-domain-rail .sw-btn { min-height: 38px; }
+.sw-advanced-controls { display: flex; flex-direction: column; gap: 0.45rem; max-height: min(46vh, 430px); overflow: auto; overscroll-behavior: contain; }
+.sw-advanced-controls[hidden] { display: none; }
+@media (max-width: 900px) {
+  .sw-hud-status { width: 58vw; padding: 0.6rem; }
+  .sw-hud-evidence { width: 42vw; max-height: 40vh; padding: 0.6rem; }
+  .sw-hud-evidence.is-collapsed { width: auto; }
+  .sw-hud-command { width: 100vw; padding: 0.5rem 0.6rem calc(4.2rem + var(--safe-bottom)); }
+  .sw-lab-primary { gap: 0.3rem; padding: 0.35rem; }
+  .sw-lab-chat > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .sw-lab-chat .sw-btn-primary { padding-inline: .65rem; }
+  .sw-domain-rail { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .sw-domain-rail::-webkit-scrollbar { display: none; }
+  .sw-domain-rail .sw-btn { flex: 0 0 auto; }
+  .sw-advanced-controls { max-height: 34dvh; }
+  .sw-chemistry-context { right: .6rem; bottom: calc(9.4rem + var(--safe-bottom)); width: min(280px, calc(100vw - 1.2rem)); max-height: 34vh; overflow: auto; padding: .65rem; }
+  .sw-transcript { max-height: 18vh; font-size: 0.72rem; }
+  .sw-badge { font-size: 0.52rem; }
+  .sw-btn, .sw-chip, .sw-input { min-height: 40px; }
+  .sw-visor-frame { border-radius: 26% / 22%; }
+}
+
+/* =====================================================================
+   18. HUMAN EXPLORER (D-130) — the reference UI's four blocks as a HUD dock over the biology scene:
+   systems rail · organ card · Hyperscope ladder + field · macro→micro strip. Glass, restrained, no clutter.
+   ===================================================================== */
+.sw-hud-explorer { right: 0; bottom: 0; width: min(760px, 62vw); max-height: 58vh; overflow: auto; padding-bottom: calc(0.9rem + var(--safe-bottom)); gap: 0.45rem; }
+.sw-explorer-open .sw-hud-evidence { max-height: 34vh; }
+/* The explorer dock and the command bar are both bottom-anchored, and the command bar also starts after
+   the 12.5rem nav rail — so a plain vw split is not enough. With the dock open the transcript takes exactly
+   what is left over (never below 190px, never above its own 440px), so the two can never overlap at any
+   desktop width. Before this, the transcript covered the dock's left column and intercepted its clicks —
+   caught by the browser E2E, which no unit test could have seen. */
+.sw-explorer-open .sw-hud-explorer { width: min(760px, 56vw); }
+.sw-explorer-open .sw-hud-command { width: clamp(190px, calc(100vw - 12.5rem - min(760px, 56vw) - 1rem), 440px); }
+/* D-131 — the twin camera exists to SHOW the body, so while it is active the HUD gets out of its way:
+   the transcript steps aside and the research dock keeps only the height its controls need. This is the
+   "world view" posture of the reference material, applied to the one camera whose whole purpose is the
+   subject; every other camera keeps the HUD exactly as it was. */
+.sw-cam-twin .sw-hud-command { opacity: 0; pointer-events: none; }
+.sw-cam-twin .sw-hud-explorer { max-height: 32vh; }
+.sw-cam-twin .sw-hud-evidence { opacity: 0.25; }
+.sw-ex-head { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.sw-ex-mode-real_image, .sw-ex-mode-real_dataset { border-color: #62f0a3; color: #eafff4; }
+.sw-ex-mode-simulated, .sw-ex-mode-reconstructed, .sw-ex-mode-illustrative { border-color: rgba(251, 191, 36, 0.55); color: #fde68a; text-shadow: 0 0 8px rgba(251, 191, 36, 0.35); }
+.sw-ex-body { display: grid; grid-template-columns: 9.5rem 1fr 1.25fr; gap: 0.5rem; background: rgba(2, 6, 14, 0.58); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 8px; padding: 0.55rem; backdrop-filter: blur(8px); box-shadow: 0 0 24px rgba(56, 189, 248, 0.08) inset; }
+.sw-ex-title { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.14em; color: #7dd3fc; text-transform: uppercase; margin-bottom: 0.3rem; }
+.sw-ex-systems { display: flex; flex-direction: column; gap: 0.22rem; border-right: 1px solid rgba(56, 189, 248, 0.16); padding-right: 0.45rem; }
+.sw-ex-systems .sw-chip { text-align: left; font-size: 0.66rem; padding: 0.26rem 0.5rem; }
+.sw-chip.is-on { border-color: #62f0a3; color: #eafff4; box-shadow: 0 0 12px rgba(98, 240, 163, 0.28) inset; }
+.sw-ex-organ-list { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.4rem; }
+.sw-ex-organ-chip { font-size: 0.64rem; }
+.sw-ex-card { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.5rem; margin: 0; font-size: 0.7rem; }
+.sw-ex-card dt { color: #cfeedd; font-weight: 700; }
+.sw-ex-card dd { margin: 0; color: #a9c6bb; overflow-wrap: anywhere; }
+.sw-ex-scope { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.sw-ex-mags { display: flex; flex-wrap: wrap; gap: 0.22rem; }
+.sw-ex-mags .sw-chip { font-size: 0.64rem; padding: 0.22rem 0.45rem; }
+.sw-ex-canvas { width: 100%; aspect-ratio: 16 / 9; height: auto; border-radius: 50% / 50%; border: 2px solid rgba(125, 211, 252, 0.35); background: radial-gradient(circle at 50% 50%, #08131c 0%, #030609 78%); box-shadow: 0 0 22px rgba(56, 189, 248, 0.18), 0 0 0 6px rgba(2, 6, 14, 0.7); }
+.sw-ex-strip { background: rgba(2, 6, 14, 0.58); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 8px; padding: 0.45rem 0.55rem; backdrop-filter: blur(8px); }
+.sw-ex-rungs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.3rem; }
+.sw-ex-rung { position: relative; }
+.sw-ex-rung + .sw-ex-rung::before { content: '›'; position: absolute; left: -0.28rem; top: 38%; color: rgba(125, 211, 252, 0.45); font-size: 0.8rem; }
+.sw-ex-rung-btn { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; background: rgba(2, 6, 14, 0.62); border: 1px solid rgba(56, 189, 248, 0.28); color: #cfeedd; font: inherit; padding: 0.4rem 0.2rem; border-radius: 6px; cursor: pointer; }
+.sw-ex-rung-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.sw-ex-rung.is-on .sw-ex-rung-btn { border-color: #62f0a3; color: #eafff4; box-shadow: 0 0 14px rgba(98, 240, 163, 0.3) inset; }
+.sw-ex-rung-name { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; }
+.sw-ex-rung-scale { font-size: 0.58rem; color: #7dd3fc; }
+.sw-btn-mini { font-size: 0.62rem; padding: 0.22rem 0.45rem; }
+@media (max-width: 900px) {
+  .sw-hud-explorer, .sw-explorer-open .sw-hud-explorer { width: 100vw; max-height: 46vh; padding: 0.5rem 0.6rem calc(4.2rem + var(--safe-bottom)); }
+  .sw-explorer-open .sw-hud-command { width: 100vw; }
+  .sw-ex-body { grid-template-columns: 1fr; }
+  .sw-ex-systems { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid rgba(56, 189, 248, 0.16); padding: 0 0 0.35rem; }
+  .sw-ex-rungs { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* D-131: Human Explorer — section plane + isolation controls (the twin's body is a licensed CC0 asset;
+   the anatomy it reveals is still the atlas MODEL, and the panel says so on its own badge). */
+.sw-ex-section { margin-top: 0.45rem; border-top: 1px solid rgba(56, 189, 248, 0.16); padding-top: 0.4rem; }
+.sw-ex-slider { width: 100%; margin: 0.3rem 0 0.2rem; accent-color: #62f0a3; background: transparent; }
+.sw-ex-slider:disabled { opacity: 0.4; }
+
+/* Human Explorer: readable research dock, preserving the existing controls and scene. */
+.sw[data-world="biology"] .sw-hud-explorer {
+  background: rgba(5, 14, 23, 0.96); border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 12px; box-shadow: 0 12px 40px #0008; padding: 14px;
+}
+.sw[data-world="biology"] .sw-ex-title { font-size: 0.72rem; }
+.sw[data-world="biology"] .sw-ex-card { font-size: 0.8rem; }
+.sw[data-world="biology"] .sw-ex-systems .sw-chip,
+.sw[data-world="biology"] .sw-ex-organ-chip,
+.sw[data-world="biology"] .sw-ex-mags .sw-chip { font-size: 0.76rem; min-height: 32px; }
+.sw[data-world="biology"] .sw-hud-evidence { opacity: 1; }
+.sw[data-world="biology"] .sw-hud-evidence:not(.is-collapsed) { z-index: 20; background: #06101dfa; max-height: 75vh; border: 1px solid #7dd3fc55; border-radius: 12px; }
+.sw[data-world="biology"] .sw-hud-status { background: linear-gradient(100deg, #06101ded, #06101d44); border-radius: 0 0 12px 0; }
+@media (min-width: 901px) {
+  .sw[data-world="biology"].sw-explorer-open .sw-hud-explorer { top: 4.6rem; bottom: 3.4rem; right: 1rem; width: min(440px, 35vw); max-height: none; }
+  .sw[data-world="biology"] .sw-ex-body { grid-template-columns: 1fr; background: transparent; border: 0; padding: 0; }
+  .sw[data-world="biology"] .sw-ex-systems { flex-direction: row; flex-wrap: wrap; border-right: 0; padding-bottom: 0.65rem; border-bottom: 1px solid #7dd3fc33; }
+  .sw[data-world="biology"] .sw-ex-systems .sw-ex-title { flex-basis: 100%; }
+  .sw[data-world="biology"] .sw-ex-rungs { grid-template-columns: repeat(4, 1fr); }
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command { opacity: 1; pointer-events: auto; width: calc(100vw - 12.5rem - min(440px, 35vw) - 2rem); }
+  .sw[data-world="biology"].sw-cam-twin .sw-transcript { max-height: 12vh; }
+}
+@media (max-width: 900px) {
+  .sw[data-world="biology"] .sw-hud-explorer { bottom: calc(4rem + var(--safe-bottom)); max-height: 43dvh; width: calc(100vw - 1rem); right: 0.5rem; padding: 10px; }
+  .sw[data-world="biology"] .sw-hud-status { top: 2.5rem; width: 100vw; padding: 0.35rem; }
+  .sw[data-world="biology"] .sw-hud-evidence { top: 0; max-height: 35vh; }
+  .sw[data-world="biology"] .sw-badge { font-size: 0.62rem; }
+  .sw[data-world="biology"] .sw-chip, .sw[data-world="biology"] .sw-btn { min-height: 44px; }
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command { opacity: 1; pointer-events: auto; padding: 0.4rem; bottom: calc(3.4rem + var(--safe-bottom)); }
+  .sw[data-world="biology"].sw-explorer-open .sw-hud-explorer { bottom: calc(7.5rem + var(--safe-bottom)); max-height: 34dvh; }
+  .sw[data-world="biology"] .sw-hud-status > .sw-row { flex-wrap: wrap; }
+  .sw[data-world="biology"] .sw-hud-status .sw-btn { min-height: 32px; }
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command .sw-transcript,
+  .sw[data-world="biology"].sw-cam-twin .sw-hud-command .sw-quick { display: none; }
+}
+.sw-ex-section .sw-faint { font-size: 0.6rem; line-height: 1.35; margin: 0.2rem 0 0; }
+
+/* Human Explorer — hierarchy pass. Reading order is: current selection → macro→micro path → epistemic
+   status → controls grouped by intent (navigate · view · observe) → provenance on demand. On phones the
+   controls fold into a drawer so the anatomy viewport is never covered by default. */
+.sw-hud-explorer .sw-ex-head { justify-content: space-between; align-items: flex-start; gap: 0.6rem; flex-wrap: nowrap; }
+.sw-ex-selection { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.sw-ex-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #7dd3fc; }
+.sw-ex-selection-name { font-size: 1.05rem; line-height: 1.2; color: #f1fbff; overflow-wrap: anywhere; }
+.sw-ex-selection-meta { font-size: 0.72rem; color: #a9c6bb; overflow-wrap: anywhere; }
+.sw-ex-drawer-toggle { display: none; flex: 0 0 auto; }
+.sw-ex-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.4rem; }
+.sw-ex-boundary { flex-basis: 100%; font-size: 0.66rem; color: #8fb3c4; }
+.sw-ex-drawer { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.sw-ex-group + .sw-ex-group { border-top: 1px solid rgba(125, 211, 252, 0.16); padding-top: 0.55rem; }
+.sw-ex-group .sw-ex-section, .sw-ex-group.sw-ex-section { margin-top: 0; }
+.sw-ex-navigate { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.sw-ex-rung.is-on .sw-ex-rung-name::after { content: ''; display: block; height: 2px; margin-top: 0.12rem; background: #62f0a3; border-radius: 1px; }
+.sw-ex-provenance { border: 1px solid rgba(125, 211, 252, 0.18); border-radius: 8px; padding: 0.35rem 0.55rem; background: rgba(2, 6, 14, 0.4); }
+.sw-ex-provenance > summary { cursor: pointer; font-size: 0.68rem; color: #9fc6d6; letter-spacing: 0.02em; list-style-position: inside; }
+.sw-ex-provenance[open] > summary { margin-bottom: 0.4rem; }
+.sw-ex-provenance .sw-ex-card { font-size: 0.7rem; }
+.sw[data-world="biology"] .sw-ex-provenance .sw-ex-card { font-size: 0.72rem; }
+@media (max-width: 900px) {
+  .sw-ex-drawer-toggle { display: inline-flex; align-items: center; }
+  /* Closed drawer: selection, path and status only — a compact rail over the bottom navigation. */
+  .sw-hud-explorer[data-drawer="closed"] .sw-ex-drawer { display: none; }
+  /* The path scrolls sideways in one row instead of wrapping into a second block of chips. */
+  .sw-hud-explorer .sw-ex-rungs, .sw[data-world="biology"] .sw-hud-explorer .sw-ex-rungs { display: flex; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; gap: 0.3rem; padding-bottom: 0.15rem; }
+  .sw-hud-explorer .sw-ex-rung { flex: 0 0 auto; min-width: 4.6rem; scroll-snap-align: start; }
+  .sw-hud-explorer .sw-ex-rung + .sw-ex-rung::before { display: none; }
+  .sw-ex-selection-name { font-size: 0.95rem; }
+  /* Closed rail budget: the toggle in the status bar already names the panel, and the selection line
+     already carries the scale, so the eyebrow, the path title and the scale badge are dropped here. */
+  .sw-hud-explorer .sw-ex-eyebrow, .sw-hud-explorer .sw-ex-strip > .sw-ex-title, .sw-hud-explorer .sw-ex-scale { display: none; }
+  .sw-hud-explorer .sw-ex-strip { padding: 0.3rem 0.4rem; }
+  .sw-hud-explorer .sw-ex-rung-btn { padding: 0.25rem 0.2rem; }
+  .sw-hud-explorer, .sw[data-world="biology"] .sw-hud-explorer { gap: 0.35rem; }
+  .sw-ex-boundary { font-size: 0.62rem; }
+  .sw-ex-canvas { max-height: 22dvh; }
+}

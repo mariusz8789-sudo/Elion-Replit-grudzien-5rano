@@ -1,0 +1,30 @@
+{
+  "targetId": "ABL1_1IEP",
+  "pdbId": "1IEP",
+  "chain": "A",
+  "protein": "Tyrosine-protein kinase ABL1, kinase domain (Mus musculus), DFG-out conformation",
+  "referenceLigand": { "code": "STI", "name": "imatinib (STI-571)", "binding": "non-covalent, ATP-site / DFG-out type II" },
+  "citation": "Nagar B. et al. (2002) Crystal structures of the kinase domain of c-Abl in complex with the small molecule inhibitors PD173955 and imatinib (STI-571). Cancer Research 62:4236-4243.",
+  "files": {
+    "1iep_receptorH.pdb": {
+      "sha256": "5f6aee6029f9a2a2c2be32d4eb948ae70808690573e1b69a0850cdffd7048ca7",
+      "url": "https://raw.githubusercontent.com/ccsb-scripps/AutoDock-Vina/develop/example/basic_docking/data/1iep_receptorH.pdb",
+      "content": "PDB 1IEP chain A protein atoms, ligand and waters removed, hydrogens added (AutoDock Vina basic-docking tutorial input)"
+    },
+    "1iep_ligand.sdf": {
+      "sha256": "051b8742c32adc05c07fb486a4e7c9327f84e131cee33ac4e6a568d07553eb38",
+      "url": "https://raw.githubusercontent.com/ccsb-scripps/AutoDock-Vina/develop/example/basic_docking/data/1iep_ligand.sdf",
+      "content": "crystal pose of imatinib (STI) from PDB 1IEP, with hydrogens"
+    }
+  },
+  "pocket": {
+    "center": [15.19, 53.903, 16.917],
+    "boxSize": [20, 20, 20],
+    "source": "AutoDock Vina documentation, basic docking tutorial (box around the co-crystallised imatinib)"
+  },
+  "licenses": {
+    "structure": "PDB entries are public domain (CC0 1.0, wwPDB)",
+    "files": "Distributed in the AutoDock Vina repository under the Apache License 2.0 (Copyright The Scripps Research Institute / CCSB)"
+  },
+  "retrieved": "2026-09-25"
+}

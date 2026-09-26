@@ -4,17 +4,17 @@
   "runA": {
     "verdict": "WINNER",
     "winnerId": "CHEMBL4084119",
-    "auditFingerprint": "6615057e",
+    "auditFingerprint": "34c5b23c",
     "recipeFingerprint": "7ddcabe9",
-    "recordFingerprint": "b6207e9c",
+    "recordFingerprint": "890a7310",
     "stages": 20
   },
   "runB": {
     "verdict": "WINNER",
     "winnerId": "CHEMBL4084119",
-    "auditFingerprint": "6615057e",
+    "auditFingerprint": "34c5b23c",
     "recipeFingerprint": "7ddcabe9",
-    "recordFingerprint": "b6207e9c",
+    "recordFingerprint": "890a7310",
     "stages": 20
   },
   "stages": [
@@ -66,7 +66,7 @@
     {
       "stage": "10_FREEZE_PREREG",
       "status": "OK",
-      "fingerprint": "e4d1c845"
+      "fingerprint": "488aab8d"
     },
     {
       "stage": "11_EXPERIMENT_PLAN",

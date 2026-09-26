@@ -42,7 +42,126 @@ import type { HypothesisAssessment } from '../experimentFabric/scientificDiscove
  * own, honest shape rather than a numeric relation bent to fit text.
  */
 
-export const CYBER_INVESTIGATION_CONTRACT_VERSION = '1.0.0';
+export const CYBER_INVESTIGATION_CONTRACT_VERSION = '1.1.0';
+
+/**
+ * SCOPE / BUDGET / ANALYZER / APPROVAL (Work Item 5) — canonical types and
+ * pure validators only, added to this file because it is already the one
+ * type-contract file for cyber investigations (see header). None of these
+ * are wired into `cyberReasoningKernel.ts`'s `runAdaptiveInvestigation` loop
+ * — that file is outside this change's ownership (see the handoff report's
+ * REQUIRED_CROSS_OWNERSHIP_CHANGE entries). What IS wired, in this same
+ * commit, is `cyberTestPlanner.ts::selectNextTest`'s new optional budget
+ * parameter — the one function the kernel actually calls that can enforce a
+ * budget without any kernel-file edit, because the parameter is optional
+ * and backward compatible with the kernel's existing 2-argument call.
+ */
+
+/** The only scopes a cyber investigation may declare. Never widened by inference. */
+export type CyberAuthorizedScope = 'REPOSITORY_ONLY' | 'SANDBOX_RANGE' | 'CI_EPHEMERAL';
+
+const AUTHORIZED_SCOPES: readonly CyberAuthorizedScope[] = ['REPOSITORY_ONLY', 'SANDBOX_RANGE', 'CI_EPHEMERAL'];
+
+export function isAuthorizedScope(value: string): value is CyberAuthorizedScope {
+  return (AUTHORIZED_SCOPES as readonly string[]).includes(value);
+}
+
+export interface ScopeCheck {
+  readonly ok: boolean;
+  readonly reason: string;
+}
+
+/** Rejects any scope outside the declared allowlist — never widens it by inference or a "close enough" match. */
+export function assertAuthorizedScope(scope: string): ScopeCheck {
+  return isAuthorizedScope(scope)
+    ? { ok: true, reason: `Scope ${scope} jest na liście dozwolonych.` }
+    : { ok: false, reason: `Scope „${scope}" nie jest na liście dozwolonych (${AUTHORIZED_SCOPES.join(', ')}) — odrzucony.` };
+}
+
+export interface CyberCampaignBudget {
+  readonly maxHypotheses: number;
+  readonly maxAnalyzerRuns: number;
+  readonly maxPatchProposals: number;
+}
+
+export interface CyberBudgetUsage {
+  readonly hypothesesGenerated: number;
+  readonly analyzerRunsExecuted: number;
+  readonly patchProposalsCreated: number;
+}
+
+export interface BudgetCheck {
+  readonly ok: boolean;
+  readonly exceeded: readonly (keyof CyberCampaignBudget)[];
+  readonly reason: string;
+}
+
+/** Pure, deterministic budget check — no counter mutation, no hidden state; the caller owns tracking `usage`. */
+export function checkCyberBudget(usage: CyberBudgetUsage, budget: CyberCampaignBudget): BudgetCheck {
+  const exceeded: (keyof CyberCampaignBudget)[] = [];
+  if (usage.hypothesesGenerated >= budget.maxHypotheses) exceeded.push('maxHypotheses');
+  if (usage.analyzerRunsExecuted >= budget.maxAnalyzerRuns) exceeded.push('maxAnalyzerRuns');
+  if (usage.patchProposalsCreated >= budget.maxPatchProposals) exceeded.push('maxPatchProposals');
+  return exceeded.length === 0
+    ? { ok: true, exceeded: [], reason: 'W granicach budżetu.' }
+    : { ok: false, exceeded, reason: `Przekroczono budżet: ${exceeded.join(', ')}.` };
+}
+
+export type AnalyzerKind = 'DEPENDENCY' | 'STATIC' | 'CONFIG' | 'SECRET';
+
+/**
+ * The result of one real analyzer adapter run (a dependency/SCA scanner, a
+ * static-analysis tool, a config linter, a secret scanner). This module
+ * never runs an analyzer itself and never fabricates a result — a caller
+ * binds a real tool and reports back through this shape, or the run simply
+ * does not happen (an unbound analyzer is a disclosed capability gap, the
+ * same discipline `packages/backend/src/compute/capabilities.mjs` already
+ * uses for docking/ADMET/quantum-chemistry).
+ */
+export interface AnalyzerRunResult {
+  readonly analyzerKind: AnalyzerKind;
+  readonly toolId: string;
+  readonly ranAt: string;
+  /** Finding identifiers this run produced — never a free-text summary standing in for structured findings. */
+  readonly findingIds: readonly string[];
+}
+
+export type HumanApprovalDecision = 'APPROVED' | 'REJECTED';
+
+/** A real, external human decision on ONE specific remediation. Never inferred, never defaulted. */
+export interface HumanApprovalRecord {
+  readonly remediationId: string;
+  readonly decidedBy: string;
+  readonly decidedAt: string;
+  readonly decision: HumanApprovalDecision;
+}
+
+export class PatchNotApprovedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PatchNotApprovedError';
+  }
+}
+
+/**
+ * The explicit "no patch application before approval" gate. Throws
+ * `PatchNotApprovedError` — never silently no-ops and never proceeds — for:
+ * no approval record at all, a REJECTED decision, or an approval whose
+ * `remediationId` does not match the remediation actually being applied
+ * (the same mismatch bug this file's own `RemediationAction` doc already
+ * warns against, applied to approval instead of the target's own check id).
+ */
+export function assertApprovalBeforePatch(remediation: RemediationAction, approval: HumanApprovalRecord | null): void {
+  if (approval === null) {
+    throw new PatchNotApprovedError(`Remediation ${remediation.remediationId} nie ma żadnego rekordu zatwierdzenia — aplikacja poprawki zablokowana.`);
+  }
+  if (approval.remediationId !== remediation.remediationId) {
+    throw new PatchNotApprovedError(`Zatwierdzenie dotyczy remediation ${approval.remediationId}, nie ${remediation.remediationId} — aplikacja poprawki zablokowana.`);
+  }
+  if (approval.decision !== 'APPROVED') {
+    throw new PatchNotApprovedError(`Remediation ${remediation.remediationId} została ${approval.decision === 'REJECTED' ? 'odrzucona' : 'nie zatwierdzona'} — aplikacja poprawki zablokowana.`);
+  }
+}
 
 /** One real observation against the synthetic target — never fixture metadata read directly as a verdict. */
 export interface CyberObservation {
@@ -177,6 +296,17 @@ export interface CyberInvestigationResult {
    * Always an array, never omitted: empty means none, not "not computed".
    */
   readonly conflicts: readonly string[];
+  /**
+   * Work Item 5 additions, all optional so existing callers (`cyberReasoningKernel.ts`'s
+   * `toCyberInvestigationResult`/`toCyberInvestigationResultFromAdaptive`, unmodified) keep
+   * producing valid `CyberInvestigationResult`s without carrying any of these fields.
+   */
+  readonly scope?: CyberAuthorizedScope;
+  readonly budget?: CyberCampaignBudget;
+  readonly budgetUsage?: CyberBudgetUsage;
+  readonly analyzerRuns?: readonly AnalyzerRunResult[];
+  /** Present only once a human has actually decided on `remediation` — absent, not a fabricated default. */
+  readonly approval?: HumanApprovalRecord | null;
 }
 
 function nonEmptyString(value: unknown): value is string {
@@ -252,5 +382,28 @@ export function isWellFormedCyberInvestigation(value: unknown): value is CyberIn
   // Every conflict must name a hypothesis this investigation actually declared — never a fabricated id.
   const hypothesisIds = new Set((v.hypotheses as VulnerabilityHypothesis[]).map((h) => h.hypothesisId));
   if (!(v.conflicts as string[]).every((id) => hypothesisIds.has(id))) return false;
+
+  // Work Item 5 fields, validated only when present — absent is valid (backward compatible).
+  if (v.scope !== undefined && !isAuthorizedScope(v.scope as string)) return false;
+  if (v.budget !== undefined) {
+    const b = v.budget as Record<string, unknown>;
+    if (!Number.isFinite(b.maxHypotheses) || !Number.isFinite(b.maxAnalyzerRuns) || !Number.isFinite(b.maxPatchProposals)) return false;
+  }
+  if (v.budgetUsage !== undefined) {
+    const u = v.budgetUsage as Record<string, unknown>;
+    if (!Number.isFinite(u.hypothesesGenerated) || !Number.isFinite(u.analyzerRunsExecuted) || !Number.isFinite(u.patchProposalsCreated)) return false;
+  }
+  if (v.analyzerRuns !== undefined) {
+    if (!Array.isArray(v.analyzerRuns)) return false;
+    for (const run of v.analyzerRuns as Record<string, unknown>[]) {
+      if (!nonEmptyString(run.toolId) || !nonEmptyString(run.ranAt) || !Array.isArray(run.findingIds)) return false;
+      if (!['DEPENDENCY', 'STATIC', 'CONFIG', 'SECRET'].includes(run.analyzerKind as string)) return false;
+    }
+  }
+  if (v.approval !== undefined && v.approval !== null) {
+    const a = v.approval as Record<string, unknown>;
+    if (!nonEmptyString(a.remediationId) || !nonEmptyString(a.decidedBy) || !nonEmptyString(a.decidedAt)) return false;
+    if (a.decision !== 'APPROVED' && a.decision !== 'REJECTED') return false;
+  }
   return true;
 }

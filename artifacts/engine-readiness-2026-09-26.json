@@ -1,0 +1,526 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-09-26T04:08:02.860Z",
+  "runtime": {
+    "os": "Linux",
+    "osRelease": "6.18.44-fc-v37",
+    "arch": "x86_64",
+    "python": "3.11.15",
+    "cpuCount": 4,
+    "memoryGb": 15.7,
+    "diskFreeGb": 3.1,
+    "processExecution": true,
+    "gpu": false,
+    "cuda": false
+  },
+  "runtimeEnvironmentHash": "608dca08029bdcb7799250e73b6e4af4cc8744537290282b0bae0298a79be30f",
+  "runtimeProbeError": null,
+  "engines": [
+    {
+      "toolId": "rdkit",
+      "engineName": "RDKit",
+      "version": "2026.03.6",
+      "capability": "molecular-descriptors",
+      "domain": "DRUG_DISCOVERY",
+      "adapterModule": "packages/backend/src/compute/rdkitAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_RDKIT_PYTHON, falls back to system python3)",
+      "libraryRequirement": "rdkit (pip)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED",
+      "modelCheckpointRequirement": "NONE",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Wzory 2D + osadzenie 3D polami siłowymi; brak dokowania/dynamiki/QM.",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "BSD-3-Clause",
+      "evidence": [
+        {
+          "id": "aspirin-logp",
+          "pass": true,
+          "expected": 1.31,
+          "actual": 1.3101
+        },
+        {
+          "id": "benzene-methylation",
+          "pass": true,
+          "expectProduct": "Cc1ccccc1"
+        }
+      ],
+      "provenance": {
+        "source": "RDKit",
+        "validationCaseIds": [
+          "aspirin-logp",
+          "benzene-methylation"
+        ],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "cb7f1551834e502e",
+      "durationMs": 606.12
+    },
+    {
+      "toolId": "aizynthfinder",
+      "engineName": "AiZynthFinder",
+      "version": null,
+      "capability": "retrosynthesis-route-search",
+      "domain": "DRUG_DISCOVERY",
+      "adapterModule": "packages/backend/src/compute/retroAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_RETRO_PYTHON, falls back to system python3)",
+      "libraryRequirement": "aizynthfinder 4.4.1 (pip)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED",
+      "modelCheckpointRequirement": "EXTERNAL_DOWNLOAD_REQUIRED (expansion policy, templates and stock, ~1 GB; not redistributable in-repo, located via GENESIS_RETRO_MODEL_DIR — see docs/GENESIS_RETRO_MODEL_FILES.md)",
+      "availability": false,
+      "readiness": "BLOCKED_LIBRARY",
+      "sourceStatus": "BLOCKED_BY_RUNTIME",
+      "referenceCaseStatus": "NOT_EXECUTED",
+      "blocker": "AIZYNTHFINDER_NOT_INSTALLED: No module named 'aizynthfinder'",
+      "limitations": "A proposed route carries NO conditions, quantities, yields or safety assessment, and is not evidence that the synthesis works. Model data (policy, templates, stock) is not shipped with Genesis and must be provided via GENESIS_RETRO_MODEL_DIR.",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "MIT",
+      "evidence": null,
+      "provenance": {
+        "source": "AiZynthFinder",
+        "validationCaseIds": [],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "e50ec744e02faada",
+      "durationMs": 75.99
+    },
+    {
+      "toolId": "pyscf",
+      "engineName": "PySCF",
+      "version": "2.14.0",
+      "capability": "quantum-chemistry",
+      "domain": "QUANTUM_CHEMISTRY",
+      "adapterModule": "packages/backend/src/compute/qmAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_PYSCF_PYTHON, falls back to system python3)",
+      "libraryRequirement": "pyscf (pip)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED",
+      "modelCheckpointRequirement": "NONE",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Wyniki małobazowe/semiempiryczne NIE są równoważne wysokopoziomowym ab initio; metoda+baza raportowane.",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "Apache-2.0",
+      "evidence": [
+        {
+          "id": "H2 RHF/STO-3G @0.74A",
+          "pass": true,
+          "expected": -1.1168,
+          "actual": -1.1167593073964255,
+          "unit": "Hartree"
+        }
+      ],
+      "provenance": {
+        "source": "PySCF",
+        "validationCaseIds": [
+          "H2 RHF/STO-3G @0.74A"
+        ],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "797fad78aa235a2a",
+      "durationMs": 1066.55
+    },
+    {
+      "toolId": "openmm",
+      "engineName": "OpenMM",
+      "version": "8.6.1.dev-b399af4",
+      "capability": "molecular-dynamics",
+      "domain": "MOLECULAR_DYNAMICS",
+      "adapterModule": "packages/backend/src/compute/mdAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_OPENMM_PYTHON, falls back to system python3); adapter forces OPENMM_CPU_THREADS=1",
+      "libraryRequirement": "openmm (pip/conda)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED — adapter explicitly pins the CPU platform, no GPU platform is ever requested",
+      "modelCheckpointRequirement": "NONE",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Krótka trajektoria walidacyjna NIE mówi o stabilności biologicznej.",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "MIT/LGPL",
+      "evidence": [
+        {
+          "id": "TIP3P water box, minimization + 300-step NVT @300K",
+          "pass": true,
+          "temperatureK": 244.7,
+          "eInitial": 1342,
+          "eMin": -8308.7,
+          "platform": "CPU"
+        }
+      ],
+      "provenance": {
+        "source": "OpenMM",
+        "validationCaseIds": [
+          "TIP3P water box, minimization + 300-step NVT @300K"
+        ],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "b464165516a22999",
+      "durationMs": 2771.15
+    },
+    {
+      "toolId": "vina",
+      "engineName": "AutoDock Vina + Meeko",
+      "version": "1.2.7/0.8.0",
+      "capability": "molecular-docking",
+      "domain": "MOLECULAR_DOCKING",
+      "adapterModule": "packages/backend/src/compute/dockingAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_DOCKING_PYTHON, falls back to system python3)",
+      "libraryRequirement": "vina + meeko (pip, AutoDock Vina Python bindings)",
+      "executableRequirement": "NONE (bundled Python bindings, no separate CLI invoked)",
+      "gpuRequirement": "NONE_DECLARED",
+      "modelCheckpointRequirement": "NONE",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Score to MODEL_ESTIMATE, nigdy powinowactwo eksperymentalne ani deklaracja terapeutyczna. Kanoniczny benchmark białko-ligand wymaga struktury z RCSB (może być zablokowana przez egress).",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "Apache-2.0 / LGPL",
+      "evidence": [
+        {
+          "id": "aspirin -> indole rigid stand-in (docking software-integration validation)",
+          "pass": true,
+          "bestAffinityKcalMol": -2.226,
+          "nPoses": 5,
+          "receptorKind": "small_molecule_standin",
+          "inputHash": "493d2b6e6a80e00b763630e0581f35c4559c9b28d90ff188905c7d746efa4324"
+        }
+      ],
+      "provenance": {
+        "source": "AutoDock Vina + Meeko",
+        "validationCaseIds": [
+          "aspirin -> indole rigid stand-in (docking software-integration validation)"
+        ],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "372b6e168f7235fe",
+      "durationMs": 3623.88
+    },
+    {
+      "toolId": "biopython",
+      "engineName": "Biopython",
+      "version": "1.88",
+      "capability": "protein-structure-ingestion",
+      "domain": "PROTEIN_STRUCTURE",
+      "adapterModule": "packages/backend/src/compute/proteinAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (falls back to system python3)",
+      "libraryRequirement": "biopython (pip, imported as Bio)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED",
+      "modelCheckpointRequirement": "NONE",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Nigdy nie modyfikuje struktury po cichu; materialne decyzje przygotowawcze wymagają zatwierdzenia.",
+      "evidenceClass": "DETERMINISTIC",
+      "license": "BSD",
+      "evidence": [
+        {
+          "id": "2-residue ALA PDB ingestion validation",
+          "pass": true,
+          "chains": [
+            {
+              "id": "A",
+              "residues": 2
+            }
+          ],
+          "aminoAcids": 2
+        }
+      ],
+      "provenance": {
+        "source": "Biopython",
+        "validationCaseIds": [
+          "2-residue ALA PDB ingestion validation"
+        ],
+        "evidenceClass": "DETERMINISTIC",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "ccefbdf6abeaecca",
+      "durationMs": 349.11
+    },
+    {
+      "toolId": "pymeep",
+      "engineName": "PyMeep",
+      "version": null,
+      "capability": "maxwell-fdtd",
+      "domain": "ELECTRODYNAMICS",
+      "adapterModule": "packages/backend/src/compute/meepAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_MEEP_PYTHON, falls back to system python3)",
+      "libraryRequirement": "meep (conda-forge pymeep; rarely pip-installable)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED",
+      "modelCheckpointRequirement": "NONE",
+      "availability": false,
+      "readiness": "BLOCKED_LIBRARY",
+      "sourceStatus": "BLOCKED_BY_RUNTIME",
+      "referenceCaseStatus": "NOT_EXECUTED",
+      "blocker": "pymeep_unavailable: No module named 'meep'",
+      "limitations": "Bieżący adapter obsługuje wyłącznie jawnie zadany interfejs n₁/n₂, 1D, polaryzację Ex i materiały bezstratne/niedyspersyjne. Nie jest ogólną elektromagnetyką 2D/3D ani modelem legendy Filadelfii.",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "GPL-2.0-or-later",
+      "evidence": null,
+      "provenance": {
+        "source": "PyMeep",
+        "validationCaseIds": [],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "feff51d1b5b29ea3",
+      "durationMs": 18.91
+    },
+    {
+      "toolId": "admet",
+      "engineName": "ADMET-AI (Chemprop D-MPNN ensembles)",
+      "version": "2.0.1",
+      "capability": "admet-estimation",
+      "domain": "ADMET",
+      "adapterModule": "packages/backend/src/compute/admetAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_ADMET_PYTHON, falls back to system python3)",
+      "libraryRequirement": "admet-ai (pip; ships a bundled Chemprop D-MPNN ensemble)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED — adapter runs inference on CPU",
+      "modelCheckpointRequirement": "BUNDLED_WITH_PACKAGE (weights ship inside the installed package; no separate download at inference)",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Zero „uniwersalnego ADMET score\" — każdy endpoint ma własną opublikowaną metrykę TDC (AUROC/R²). Predykcje to MODEL_ESTIMATE probabilistyczne, nie dowód eksperymentalny. Wagi dołączone w pakiecie (bez sieci przy inferencji).",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "MIT",
+      "evidence": [
+        {
+          "id": "aspirin ADMET-AI prediction: execution + determinism + RDKit physchem cross-check + endpoint completeness",
+          "pass": true,
+          "checks": {
+            "deterministic_repeated_call": true,
+            "molecular_weight": 180.15899999999996,
+            "molecular_weight_expected": 180.16,
+            "molecular_weight_ok": true,
+            "logP": 1.3101,
+            "logP_expected": 1.19,
+            "logP_ok": true,
+            "all_52_published_endpoints_present": true
+          },
+          "nEndpoints": 52
+        }
+      ],
+      "provenance": {
+        "source": "ADMET-AI (Chemprop D-MPNN ensembles)",
+        "validationCaseIds": [
+          "aspirin ADMET-AI prediction: execution + determinism + RDKit physchem cross-check + endpoint completeness"
+        ],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "9cee7e5ac9ca2c22",
+      "durationMs": 12155.13
+    },
+    {
+      "toolId": "toxicity",
+      "engineName": "ADMET-AI (Chemprop D-MPNN ensembles)",
+      "version": "2.0.1",
+      "capability": "toxicity-risk-estimation",
+      "domain": "TOXICITY",
+      "adapterModule": "packages/backend/src/compute/admetAdapter.mjs",
+      "runtimeRequirement": "Python 3 interpreter (GENESIS_ADMET_PYTHON, falls back to system python3)",
+      "libraryRequirement": "admet-ai (pip; ships a bundled Chemprop D-MPNN ensemble)",
+      "executableRequirement": "NONE",
+      "gpuRequirement": "NONE_DECLARED — adapter runs inference on CPU",
+      "modelCheckpointRequirement": "BUNDLED_WITH_PACKAGE (same engine and process as `admet`; a different endpoint category, not a separate install)",
+      "availability": true,
+      "readiness": "READY",
+      "sourceStatus": "AVAILABLE",
+      "referenceCaseStatus": "PASSED",
+      "blocker": null,
+      "limitations": "Nigdy SAFE/NON-TOXIC/CLINICALLY SAFE — tylko MODEL_ESTIMATE + RISK_SIGNAL z opublikowaną metryką TDC per endpoint. Ten sam silnik co ADMET (jeden zespół, wiele głów zadań), rozdzielony tu wyłącznie po kategorii endpointu.",
+      "evidenceClass": "MODEL_ESTIMATE",
+      "license": "MIT",
+      "evidence": [
+        {
+          "id": "aspirin ADMET-AI prediction: execution + determinism + RDKit physchem cross-check + endpoint completeness",
+          "pass": true,
+          "checks": {
+            "deterministic_repeated_call": true,
+            "molecular_weight": 180.15899999999996,
+            "molecular_weight_expected": 180.16,
+            "molecular_weight_ok": true,
+            "logP": 1.3101,
+            "logP_expected": 1.19,
+            "logP_ok": true,
+            "all_52_published_endpoints_present": true
+          },
+          "nEndpoints": 52
+        }
+      ],
+      "provenance": {
+        "source": "ADMET-AI (Chemprop D-MPNN ensembles)",
+        "validationCaseIds": [
+          "aspirin ADMET-AI prediction: execution + determinism + RDKit physchem cross-check + endpoint completeness"
+        ],
+        "evidenceClass": "MODEL_ESTIMATE",
+        "environment": "linux/x64; node=22.22.2; python=python3"
+      },
+      "fingerprint": "08d3852be9e7689b",
+      "durationMs": 0.27
+    }
+  ],
+  "additionalProbedLibraries": [
+    {
+      "probeKey": "chemprop",
+      "kind": "python",
+      "module": "chemprop",
+      "binary": null,
+      "status": "AVAILABLE",
+      "version": "2.3.1",
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "deepchem",
+      "kind": "python",
+      "module": "deepchem",
+      "binary": null,
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "gromacs",
+      "kind": "binary",
+      "module": null,
+      "binary": "gmx",
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "mdanalysis",
+      "kind": "python",
+      "module": "MDAnalysis",
+      "binary": null,
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "obabel",
+      "kind": "binary",
+      "module": null,
+      "binary": "obabel",
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "openbabel_py",
+      "kind": "python",
+      "module": "openbabel",
+      "binary": null,
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "orca",
+      "kind": "binary",
+      "module": null,
+      "binary": "orca",
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "pdbfixer",
+      "kind": "python",
+      "module": "pdbfixer",
+      "binary": null,
+      "status": "AVAILABLE",
+      "version": "?",
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "prolif",
+      "kind": "python",
+      "module": "prolif",
+      "binary": null,
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "psi4",
+      "kind": "python",
+      "module": "psi4",
+      "binary": null,
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "torch",
+      "kind": "python",
+      "module": "torch",
+      "binary": null,
+      "status": "AVAILABLE",
+      "version": "2.14.0+cu130",
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "vina",
+      "kind": "binary",
+      "module": null,
+      "binary": "vina",
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "xtb",
+      "kind": "binary",
+      "module": null,
+      "binary": "xtb",
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    },
+    {
+      "probeKey": "xtb_py",
+      "kind": "python",
+      "module": "xtb",
+      "binary": null,
+      "status": "NOT_INSTALLED",
+      "version": null,
+      "note": "Detected by the generic runtime probe (compute/scienceEnv.mjs); not a validated entry in the toolchain registry (campaign/toolchain.mjs) — no reference case has run against it."
+    }
+  ],
+  "knownGaps": [
+    {
+      "name": "SEIR (epidemiology compartmental model)",
+      "reason": "No SEIR engine is registered in the backend toolchain registry (campaign/toolchain.mjs) or the compute model registry (compute/registry.mjs); grep for \"SEIR\" across packages/backend/src returns zero hits. Any SEIR simulation in this repository is frontend-only (packages/frontend/src/core/worldModel) and was never registered as a backend scientific engine — out of scope for this backend-only audit."
+    },
+    {
+      "name": "CERN collision engine (toy Monte Carlo particle collider)",
+      "reason": "Not registered in any backend registry — it runs entirely client-side (packages/core/src/cern/ComputeColliderEngine.ts, packages/core/src/collider/QuantumColliderEngine.ts) behind a frontend-only KernelProviderRegistry. The backend does register a genuinely different, real thing that happens to also be CERN-related — the CMS Open Data Z→μμ adapter (compute/cmsOpenDataAdapter.mjs, compute model id particle-cern-cms-zmumu-invariant-mass in compute/registry.mjs), a real checksum-verified external dataset, not a collision-generation engine — but it is not part of the validated toolchain (campaign/toolchain.mjs) either, so it is not one of the audited engines below."
+    }
+  ],
+  "registryBugsDiscovered": []
+}

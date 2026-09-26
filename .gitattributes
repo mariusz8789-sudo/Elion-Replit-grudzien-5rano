@@ -1,0 +1,11 @@
+# These archival payloads are hashed byte-for-byte. Preserve their committed
+# bytes on Windows as well as Unix; never rewrite pins to match checkout EOLs.
+/packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html -text
+/packages/frontend/src/core/benchmark/fixtures/discoverybench/evolution_freshwater_fish/body-size-evolution-in-south-american-freshwater-fishes.csv -text
+/docs/evidence/usgs/USGS-01646500-00060-2026-08-20.json -text
+/docs/evidence/usgs/USGS-01646500-monitoring-location.json -text
+/packages/backend/src/campaign/glp1rActivity.json -text
+/packages/backend/src/campaign/giprActivity.json -text
+/packages/backend/src/compute/cms-zmumu/Zmumu.csv -text
+/data/transcription/**/*.psv -text
+/data/transcription/**/*.rowhash -text

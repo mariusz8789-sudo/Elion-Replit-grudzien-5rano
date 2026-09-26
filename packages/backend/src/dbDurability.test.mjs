@@ -136,13 +136,15 @@ test('P0.2 restore ODMAWIA nadpisania istniejącej bazy bez jawnej zgody', () =>
   }
 });
 
-test('P0.2 Dockerfile kieruje bazę na wolumen POZA drzewem aplikacji', () => {
+test('P0.2 Dockerfile kieruje bazę poza aplikację, a Railway wymaga montażu /data', () => {
   const dockerfile = readFileSync(path.join(REPO, 'Dockerfile'), 'utf8');
+  const railwayDeploy = readFileSync(path.join(REPO, 'RAILWAY_DEPLOY.md'), 'utf8');
   const envPath = /ENV GENESIS_DB_PATH=(\S+)/.exec(dockerfile);
   assert.ok(envPath, 'Dockerfile nie ustawia GENESIS_DB_PATH — baza trafi w warstwę zapisywalną kontenera');
   const verdict = classifyDbPath({ dbPath: envPath[1], appDir: '/app/packages/backend' });
   assert.equal(verdict.durability, 'PERSISTENT', `Dockerfile kieruje bazę w ${envPath[1]}, co nie przetrwa redeployu`);
-  assert.match(dockerfile, /VOLUME \[/, 'Dockerfile musi deklarować wolumen dla tej ścieżki');
+  assert.doesNotMatch(dockerfile, /^\s*VOLUME\b/m, 'Railway odrzuca instrukcję Dockerfile VOLUME');
+  assert.match(railwayDeploy, /mount it at `?\/data`?/i, 'runbook musi wymagać montażu wolumenu Railway pod /data');
 });
 
 /**

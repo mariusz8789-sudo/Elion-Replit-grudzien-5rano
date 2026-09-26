@@ -1,0 +1,28 @@
+{
+  "elapsedMs": 19929,
+  "requests": [
+    {
+      "url": "http://127.0.0.1:5000/assets/genesis-hf/characters/mpfb-lod0.glb",
+      "timing": {
+        "startTime": 1790022791587.524,
+        "domainLookupStart": 0.539,
+        "domainLookupEnd": 0.552,
+        "connectStart": 0.552,
+        "secureConnectionStart": -1,
+        "connectEnd": 2.259,
+        "requestStart": 2.355,
+        "responseStart": 16.44,
+        "responseEnd": 215.887
+      }
+    }
+  ],
+  "errors": [
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+  ],
+  "state": {
+    "tier": "LICENSED_CC0_ASSET",
+    "text": "Przejdź do treści\nGENESISPHYSICS\nSCIENTIFIC OS\nSYS · HUMAN-BIOLOGY-LAB\n◉\nSTART\n✦\nZAPYTAJ\n◎\nODKRYCIA\n◈\nŚWIATY 3D\n▣\nDOWODY I PAMIĘĆ\n⚙\nUSTAWIENIA\n+\nWSZYSTKIE MODUŁY\n43\ngenesis-physics.com\nŚWIAT: HUMAN BIOLOGY LAB\nAGENT: bezczynny\nKAMERA: BLIŹNIAK\nBLIŹNIAK: NORMAL · body · CC0 · ANATOMIA: MODEL\nHuman Explorer ▾\nWróć do wizjera\nGłos wył.\nOdkrywca\nNaukowiec\nAudytor\nDOWODY · SESJA ▾\n\nBrak sesji. Każdy eksperyment tworzy jedną sesję z hashem treści, odciskiem replay i wpisem w EvidenceLedger.\n\nCiekawość: zaproponuj\nEKSPLORATOR CZŁOWIEKA · CC0 · ANATOMIA: MODEL\nSkala: Ciało człowieka · 1 m\nILLUSTRATIVE: NOT_DIRECT_OBSERVATION\nUKŁADY CIAŁA\nSkórny\nSzkieletowy\nMięśniowy\nNerwowy\nDokrewny\nKrążenia\nLimfatyczny\nOddechowy\nPokarmowy\nMoczowy\nRozrodczy\nImmunologiczny\nBrain\nHeart\nLeft Lung\nRight Lung\nLiver\nStomach\nLeft Kidney\nRight Kidney\nPancreas\nSmall Intestine\nHeart\nCor · Krążenia\nSkala\n0.11 m · 0.11×0.13×0.09 m\nDowód\nMODEL · NOT_A_MEDICAL_DEVICE\nPRZEKRÓJ\nPrzetnij\nstrzałkowy\nczołowy\npoprzeczny\n↔\nIzoluj narząd\nKamera bliźniaka\nSkóra\nPrześwit\nRTG (model)\nDuch\n\nPrzekrój odsłania modelowe bryły narządów z atlasu — to schemat, nie medyczny przekrój pacjenta.\n\nHYPERSCOPE · POWIĘKSZENIE\n1×\n5×\n25×\n100×\n500×\n1000×\n\nBrak zdjęcia — uruchom instrument, obraz pochodzi wyłącznie z zapieczętowanej sesji.\n\nOD MAKRO DO MIKRO\nCiało człowieka\n1 m\nNarząd\n10 cm\nTkanka\n1 mm\nKomórka\n10 µm\nOrganellum\n1 µm\nCząsteczka\n1 nm\nDNA\n0.1 nm\nAtomy\n0.01 nm\nWyślij\nZapytaj\nTest V3\nRTG\nNeuro\nObrazowanie\nHistologia\nDNA\n💬 Science Chat"
+  }
+}

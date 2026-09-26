@@ -3,6 +3,7 @@ import type { EpidemicParams } from '../../epidemic/sir';
 import type { ChemistryExperimentOptions } from '../domains/chemistryKinetics';
 import type { PumpPipeDefaults } from '../../engineeringGraph/pumpPipe';
 import type { ScaleDomain } from '../ecs/types';
+import type { StructuralDetailSpec } from '../generation/geometry/structuralDetailSpec';
 import type { WorldBlueprintNode, WorldBlueprintRelationship } from '../generation/worldBlueprint';
 
 /**
@@ -26,7 +27,33 @@ import type { WorldBlueprintNode, WorldBlueprintRelationship } from '../generati
  */
 
 /** The composable base world templates — see specification/templates.ts. A specification MAY request several at once ("CITY + LABORATORY + WATER_SYSTEM"), which the compiler composes into one coherent world, never separate disconnected demos. */
-export type WorldTemplateId = 'CITY' | 'LABORATORY' | 'WATER_SYSTEM' | 'EPIDEMIOLOGY' | 'INDUSTRIAL_SITE';
+export type WorldTemplateId =
+  | 'CITY'
+  | 'LABORATORY'
+  | 'WATER_SYSTEM'
+  | 'EPIDEMIOLOGY'
+  | 'INDUSTRIAL_SITE'
+  | 'QUANTUM'
+  | 'TIME_DILATION_LAB'
+  | 'COSMOLOGY_SPACETIME'
+  | 'EINSTEIN_ROSEN_BRIDGE'
+  | 'MULTIVERSE_BRANCH'
+  | 'HISTORICAL_RECONSTRUCTION'
+  | 'DESERT_ALIEN'
+  | 'MARS_RESEARCH'
+  | 'UNDERWATER_RESEARCH_CITY';
+
+/** Parameters consumed only by the composable spacetime/world templates. */
+export interface SpacetimeWorldParameters {
+  /** Number of structural counterfactual branches to create (1..12). */
+  branchCount?: number;
+  /** Presentation-model scale, not a claim about an observed astronomical body. */
+  primaryMassScale?: number;
+  /** Render-model throat radius in world units for the hypothetical bridge. */
+  throatRadius?: number;
+  /** Historical year represented by a reconstruction request. */
+  historicalYear?: number;
+}
 
 export interface GeographySpec {
   /** Purely structural/topological flags consumed by the CITY template's procedural expansion (specification/templates.ts) — they do not imply a hydrology or terrain solver exists. */
@@ -85,6 +112,17 @@ export interface WorldSpecification {
   /** Root structural scale of the generated world (see ecs/types.ts's `ScaleDomain`) — defaults to `'MACRO_CITY'` in the compiler if omitted. */
   scale?: ScaleDomain;
   geography?: GeographySpec;
+  /**
+   * OPT-IN geometry-foundation request (generation/geometry/): real
+   * district bounds/roads/intersections/parcels/buildings, and — when its
+   * own flags ask for them — real interiors and a navigation graph. Omit
+   * entirely to keep today's exact `CITY_TEMPLATE` behavior (flat, jittered,
+   * bounds-free districts/buildings) unchanged — this is a SEPARATE,
+   * additive contribution to the compiled blueprint, not a replacement of
+   * that template. See `StructuralDetailSpec`'s own doc for why it lives in
+   * `generation/`, not here.
+   */
+  structuralDetail?: StructuralDetailSpec;
   population?: PopulationSpec;
   scientificDomains?: readonly ScientificDomainRequest[];
   initialConditions?: readonly InitialConditionSpec[];
@@ -106,4 +144,6 @@ export interface WorldSpecification {
   levelOfDetail?: 'LOW' | 'MEDIUM' | 'HIGH';
   groundingExpectations?: GroundingExpectation;
   provenanceNote?: string;
+  /** Optional typed inputs for spacetime/world templates; ignored by other templates. */
+  spacetime?: SpacetimeWorldParameters;
 }

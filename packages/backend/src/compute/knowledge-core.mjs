@@ -1,5 +1,20 @@
 /* esbuild bundle of packages/core/src/knowledge/ingestion/serverEntry.ts; regenerate with npm run compute:bundle:knowledge, do not edit */
 
+// packages/core/src/knowledge/evidenceTypes.ts
+var KNOWLEDGE_DISCLAIMER = "To jest pomoc edukacyjna, nie porada medyczna, prawna, finansowa ani in\u017Cynierska. Twierdzenia z film\xF3w i narracji traktujemy jako hipotezy do weryfikacji, nie jako fakty.";
+
+// packages/core/src/knowledge/classifyClaim.ts
+var canReachVerified = (sourceKind) => sourceKind !== "video";
+function classifyClaim(i) {
+  const conf = Math.min(1, Math.max(0, i.confidence));
+  if (conf < 0.15) return "rejected";
+  const hasIndependent = i.independentSourceIds.length >= 1;
+  if (canReachVerified(i.sourceKind) && hasIndependent && conf >= 0.8 && i.claimType !== "hypothesis") return "verified";
+  if (conf >= 0.5) return "candidate";
+  return "unverified";
+}
+var statusLabelPl = (s) => s === "verified" ? "potwierdzone przez niezale\u017Cne \u017Ar\xF3d\u0142a" : s === "candidate" ? "wst\u0119pny kandydat \u2014 wymaga weryfikacji" : s === "unverified" ? "niezweryfikowane" : "odrzucone";
+
 // packages/core/src/knowledge/sha256.ts
 var K = new Uint32Array([
   1116352408,
@@ -141,33 +156,28 @@ function sha256HexSync(text) {
   return hex;
 }
 
-// packages/core/src/knowledge/evidenceTypes.ts
-var KNOWLEDGE_DISCLAIMER = "To jest pomoc edukacyjna, nie porada medyczna, prawna, finansowa ani in\u017Cynierska. Twierdzenia z film\xF3w i narracji traktujemy jako hipotezy do weryfikacji, nie jako fakty.";
-
-// packages/core/src/knowledge/classifyClaim.ts
-var canReachVerified = (sourceKind) => sourceKind !== "video";
-function classifyClaim(i) {
-  const conf = Math.min(1, Math.max(0, i.confidence));
-  if (conf < 0.15) return "rejected";
-  const hasIndependent = i.independentSourceIds.length >= 1;
-  if (canReachVerified(i.sourceKind) && hasIndependent && conf >= 0.8 && i.claimType !== "hypothesis") return "verified";
-  if (conf >= 0.5) return "candidate";
-  return "unverified";
+// packages/core/src/determinism.ts
+function sortKeysDeep(value) {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value !== null && typeof value === "object") {
+    const withJson = value;
+    if (typeof withJson.toJSON === "function") return sortKeysDeep(withJson.toJSON());
+    const record = value;
+    const out = {};
+    for (const key of Object.keys(record).sort()) out[key] = sortKeysDeep(record[key]);
+    return out;
+  }
+  return value;
 }
-var statusLabelPl = (s) => s === "verified" ? "potwierdzone przez niezale\u017Cne \u017Ar\xF3d\u0142a" : s === "candidate" ? "wst\u0119pny kandydat \u2014 wymaga weryfikacji" : s === "unverified" ? "niezweryfikowane" : "odrzucone";
+function canonicalJson(value) {
+  return JSON.stringify(sortKeysDeep(value)) ?? "null";
+}
+function sha256Hex(text) {
+  return sha256HexSync(text);
+}
 
 // packages/core/src/knowledge/EvidenceLedger.ts
-var stableStringify = (v) => {
-  if (v === null) return "null";
-  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
-  if (typeof v === "object") {
-    const o = v;
-    return "{" + Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
-  }
-  return JSON.stringify(v);
-};
-var sha256hex = (t) => sha256HexSync(t);
-var EvidenceLedger = class {
+var EvidenceLedger = class _EvidenceLedger {
   constructor(clock) {
     this.clock = clock;
   }
@@ -177,8 +187,41 @@ var EvidenceLedger = class {
   proposals = /* @__PURE__ */ new Map();
   activeIds = [];
   version = 1;
+  listeners = /* @__PURE__ */ new Set();
+  /** Called after every appended entry (the persistence hook). Returns the unsubscribe function. */
+  onAppend(listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  toSnapshot() {
+    return { schema: "evidence-ledger-snapshot/1", version: this.version, entries: [...this.entries], records: [...this.records.values()], proposals: [...this.proposals.values()], activeIds: [...this.activeIds] };
+  }
+  /** Rebuild from a snapshot. The chain is verified first: a broken or tampered snapshot is refused (thrown `LEDGER_SNAPSHOT_REJECTED: …`), never silently repaired. */
+  static fromSnapshot(clock, snapshot) {
+    if (!snapshot || snapshot.schema !== "evidence-ledger-snapshot/1" || !Array.isArray(snapshot.entries)) throw new Error("LEDGER_SNAPSHOT_REJECTED: SCHEMA");
+    const l = new _EvidenceLedger(clock);
+    l.entries = snapshot.entries.map((e) => Object.freeze({ ...e }));
+    const v = l.verifyLedger();
+    if (!v.ok) throw new Error("LEDGER_SNAPSHOT_REJECTED: " + v.errors.join(","));
+    for (const r of snapshot.records) {
+      l.records.set(r.id, r);
+      l.byHash.set(r.contentHash, r);
+    }
+    for (const p of snapshot.proposals) l.proposals.set(p.proposalId, p);
+    for (const id of snapshot.activeIds) {
+      if (!l.records.has(id)) throw new Error("LEDGER_SNAPSHOT_REJECTED: ACTIVE_ID_UNKNOWN:" + id);
+    }
+    for (const e of l.entries) {
+      if (e.kind === "ADD" && !l.records.has(e.recordId)) throw new Error("LEDGER_SNAPSHOT_REJECTED: RECORD_MISSING:" + e.recordId);
+    }
+    l.activeIds = [...snapshot.activeIds];
+    l.version = Number.isFinite(snapshot.version) ? snapshot.version : 1;
+    return l;
+  }
   contentHashOf(i) {
-    return sha256hex(stableStringify({ sourceUrl: i.sourceUrl, claim: i.claim, claimType: i.claimType, sourceTimestamp: i.sourceTimestamp, provenance: i.provenance }));
+    return sha256Hex(canonicalJson({ sourceUrl: i.sourceUrl, claim: i.claim, claimType: i.claimType, sourceTimestamp: i.sourceTimestamp, provenance: i.provenance }));
   }
   buildRecord(i, contentHash) {
     const status = classifyClaim({ claimType: i.claimType, sourceKind: i.provenance.sourceKind, independentSourceIds: i.provenance.independentSourceIds, confidence: i.confidence });
@@ -188,7 +231,9 @@ var EvidenceLedger = class {
     const prev = this.entries.length ? this.entries[this.entries.length - 1].hash : "GENESIS";
     const at = this.clock.now();
     const index = this.entries.length;
-    this.entries.push(Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256hex(stableStringify({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at }));
+    const entry = Object.freeze({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, hash: sha256Hex(canonicalJson({ index, kind, recordId: rec.id, contentHash: rec.contentHash, prevHash: prev, at })), at });
+    this.entries.push(entry);
+    for (const fn of this.listeners) fn(entry, this);
   }
   addRecord(i) {
     const contentHash = this.contentHashOf(i);
@@ -205,7 +250,7 @@ var EvidenceLedger = class {
   propose(i) {
     const contentHash = this.contentHashOf(i);
     const rec = this.byHash.get(contentHash) ?? this.buildRecord(i, contentHash);
-    const proposalId = "PR-" + sha256hex(stableStringify({ contentHash, at: this.clock.now(), n: this.proposals.size })).slice(0, 12);
+    const proposalId = "PR-" + sha256Hex(canonicalJson({ contentHash, at: this.clock.now(), n: this.proposals.size })).slice(0, 12);
     this.proposals.set(proposalId, { proposalId, record: rec, status: "pending", approverId: null });
     this.append("PROPOSE", rec);
     return proposalId;
@@ -219,8 +264,8 @@ var EvidenceLedger = class {
       this.byHash.set(p.record.contentHash, p.record);
       this.activeIds.push(p.record.id);
     }
-    this.append("PUBLISH", p.record);
     this.version += 1;
+    this.append("PUBLISH", p.record);
     return p.record;
   }
   rejectProposal(proposalId, approverId) {
@@ -247,10 +292,59 @@ var EvidenceLedger = class {
     let prev = "GENESIS";
     for (const e of this.entries) {
       if (e.prevHash !== prev) errors.push("CHAIN_BREAK@" + e.index);
-      if (e.hash !== sha256hex(stableStringify({ index: e.index, kind: e.kind, recordId: e.recordId, contentHash: e.contentHash, prevHash: e.prevHash, at: e.at }))) errors.push("HASH_MISMATCH@" + e.index);
+      if (e.hash !== sha256Hex(canonicalJson({ index: e.index, kind: e.kind, recordId: e.recordId, contentHash: e.contentHash, prevHash: e.prevHash, at: e.at }))) errors.push("HASH_MISMATCH@" + e.index);
       prev = e.hash;
     }
     return { ok: errors.length === 0, errors };
+  }
+};
+
+// packages/core/src/knowledge/ledgerPersistence.ts
+function restoreLedger(clock, store) {
+  let snapshot;
+  try {
+    snapshot = store.load();
+  } catch (e) {
+    return { ledger: new EvidenceLedger(clock), status: "REJECTED", entries: 0, reason: `LOAD_FAILED: ${e.message}` };
+  }
+  if (!snapshot) return { ledger: new EvidenceLedger(clock), status: "EMPTY", entries: 0, reason: null };
+  try {
+    const ledger = EvidenceLedger.fromSnapshot(clock, snapshot);
+    return { ledger, status: "RESTORED", entries: ledger.getEntries().length, reason: null };
+  } catch (e) {
+    return { ledger: new EvidenceLedger(clock), status: "REJECTED", entries: 0, reason: e.message };
+  }
+}
+function attachLedgerPersistence(ledger, store, onError) {
+  const save = () => {
+    try {
+      if (!store.save(ledger.toSnapshot())) onError?.("SAVE_REFUSED");
+    } catch (e) {
+      onError?.(`SAVE_FAILED: ${e.message}`);
+    }
+  };
+  if (ledger.getEntries().length > 0) save();
+  return ledger.onAppend(save);
+}
+function openPersistentLedger(clock, store, onError) {
+  const r = restoreLedger(clock, store);
+  if (r.status === "REJECTED") {
+    onError?.(r.reason ?? "REJECTED");
+    return { ...r, persisting: false };
+  }
+  attachLedgerPersistence(r.ledger, store, onError);
+  return { ...r, persisting: true };
+}
+var MemoryLedgerSnapshotStore = class {
+  snapshot = null;
+  saves = 0;
+  load() {
+    return this.snapshot ? JSON.parse(JSON.stringify(this.snapshot)) : null;
+  }
+  save(s) {
+    this.snapshot = JSON.parse(JSON.stringify(s));
+    this.saves += 1;
+    return true;
   }
 };
 
@@ -383,7 +477,7 @@ var OmniIngestionController = class _OmniIngestionController {
       }
       for (const it of res.items) fetched.push(it);
     }
-    return { fetched, skipped, batchFingerprint: sha256hex(stableStringify({ urls, fetched })), at: this.clock.now() };
+    return { fetched, skipped, batchFingerprint: sha256Hex(canonicalJson({ urls, fetched })), at: this.clock.now() };
   }
 };
 
@@ -553,15 +647,19 @@ export {
   EvidenceLedger,
   KEY_ENV_NAMES,
   KNOWLEDGE_DISCLAIMER,
+  MemoryLedgerSnapshotStore,
   OmniIngestionController,
   ProposeOnlyLearner,
   PublicWebAdapter,
   SocialOfficialApiAdapter,
   SourcePolicyRegistry,
   YouTubeOfficialApiAdapter,
+  attachLedgerPersistence,
   classifyClaim,
   envKeyProvider,
+  openPersistentLedger,
   originOf,
   realSleeper,
+  restoreLedger,
   statusLabelPl
 };

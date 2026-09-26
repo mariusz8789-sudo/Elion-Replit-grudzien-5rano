@@ -166,12 +166,35 @@ export class DrugBenchLayer {
     root.add(createBench(THREE, { position: [0, 0, 0], width: 2.6, depth: 1.05, height: 0.93, topMaterial: mat.CERAMIC, legMaterial: mat.BRUSHED_METAL }));
     root.add(createCabinet(THREE, { position: [-1.5, 0, -0.1], width: 0.62, depth: 0.6, height: 1.05, bodyMaterial: mat.PAINTED_METAL, doorMaterial: mat.BRUSHED_METAL }));
 
-    // Sample rack: one vial per persisted candidate (filled in as the engine writes them).
+    // SAMPLE RACK — the area the hands work in, so it is built like a machined rack rather than a
+    // plinth: a milled block with a drilled well under every slot, a raised lip, zone dividers and a
+    // label strip. One vial per persisted candidate, one row per stage of the funnel.
     this.rack = new THREE.Group(); this.rack.position.set(-0.72, 0.93, 0.12); root.add(this.rack);
-    // One row per stage of the funnel: queue, analyser, docking, finalists, discard tray.
     const rackDepth = BENCH_ZONES.length * ROW_Z + 0.04;
-    const rackBody = new THREE.Mesh(new THREE.BoxGeometry(SLOTS_PER_ROW * SLOT_X + 0.04, 0.05, rackDepth), mat.BRUSHED_METAL);
+    const rackWidth = SLOTS_PER_ROW * SLOT_X + 0.04;
+    const rackBody = new THREE.Mesh(new THREE.BoxGeometry(rackWidth, 0.05, rackDepth), mat.BRUSHED_METAL);
     rackBody.position.set(0, 0.025, (BENCH_ZONES.length - 1) * ROW_Z / 2); this.rack.add(rackBody);
+    // Raised lip around the block: a rack holds its vials in, a table does not.
+    const lipGeo = new THREE.BoxGeometry(rackWidth + 0.012, 0.014, 0.008);
+    for (const side of [-1, 1]) {
+      const lip = new THREE.Mesh(lipGeo, mat.POLISHED_METAL);
+      lip.position.set(0, 0.057, (BENCH_ZONES.length - 1) * ROW_Z / 2 + side * (rackDepth / 2 - 0.004));
+      this.rack.add(lip);
+    }
+    // A drilled well per slot and a coloured divider per zone: the funnel is machined into the rack.
+    const wellGeo = new THREE.CylinderGeometry(0.021, 0.021, 0.016, 14);
+    const wellMat = new THREE.MeshStandardMaterial({ color: 0x0b1118, roughness: 0.85, metalness: 0.2 });
+    for (let row = 0; row < BENCH_ZONES.length; row += 1) {
+      for (let col = 0; col < SLOTS_PER_ROW; col += 1) {
+        const well = new THREE.Mesh(wellGeo, wellMat);
+        well.position.set(-0.19 + col * SLOT_X, 0.048, row * ROW_Z);
+        this.rack.add(well);
+      }
+      const zone = BENCH_ZONES[row]!;
+      const divider = new THREE.Mesh(new THREE.BoxGeometry(rackWidth, 0.004, 0.006), new THREE.MeshStandardMaterial({ color: ZONE_COLOR[zone], emissive: ZONE_COLOR[zone], emissiveIntensity: 0.45, roughness: 0.6 }));
+      divider.position.set(0, 0.052, row * ROW_Z - ROW_Z / 2 + 0.006);
+      this.rack.add(divider);
+    }
     this.vialGlass = glass;
 
     // GFX-1 EQUIPMENT PASS. A box with a lid reads as furniture; a bench analyser reads as an
@@ -264,6 +287,17 @@ export class DrugBenchLayer {
     this.molecule = new THREE.Group(); this.molecule.position.set(0, HOLO_Y, 0.05); root.add(this.molecule);
     this.cloud = new THREE.Group(); this.cloud.position.set(0, 1.25, 0.05); root.add(this.cloud);
     this.rings = new THREE.Group(); this.rings.position.set(0, 1.0, 0); root.add(this.rings);
+    // OBSERVATION STATION — the pose is looked at through something, not floating in the room: a
+    // plinth, a dark shroud behind it so the structure reads against a surface, and the sign that
+    // says what it is. No lens, no eyepiece, nothing that would suggest a microscope.
+    const viewerBase = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.05, 28), mat.PAINTED_METAL);
+    viewerBase.position.set(0.95, 0.955, 0.05); root.add(viewerBase);
+    const viewerRim = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.008, 8, 32), mat.POLISHED_METAL);
+    viewerRim.rotation.x = Math.PI / 2; viewerRim.position.set(0.95, 0.985, 0.05); root.add(viewerRim);
+    const viewerPost = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.026, 0.55, 14), mat.BRUSHED_METAL);
+    viewerPost.position.set(0.95, 1.25, -0.16); root.add(viewerPost);
+    const shroud = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.52), new THREE.MeshStandardMaterial({ color: 0x070b11, roughness: 0.95, metalness: 0 }));
+    shroud.position.set(0.95, HOLO_Y - 0.04, -0.18); root.add(shroud);
     this.pocket = new THREE.Group(); this.pocket.position.set(0.95, HOLO_Y - 0.06, 0.05); root.add(this.pocket);
     // WHAT THE OBSERVATION IS. The thing being observed is a computed pose, not a photograph: the sign
     // above it says so in the world itself, so nobody can mistake the station for a microscope.

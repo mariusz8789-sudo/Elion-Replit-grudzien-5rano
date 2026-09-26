@@ -498,10 +498,17 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       const campaignId = String(session.inputs.campaign ?? '');
       if (token && projectId && campaignId) {
         setEngineReplay(null);
-        void replayDrugRunEngines({ token, projectId, campaignId }).then((r) => setEngineReplay('error' in r ? { runId: '', verdict: `NIEDOSTĘPNE (${r.error})`, engine: '', originalHash: null, replayHash: null } : r));
         // THE EXPERIMENT ENDS WITH A PROTOCOL, and it must be visible where the experiment happened —
         // assembled by the backend from persisted state. The lab shows it; it never composes one.
-        void getCandidateProtocol(token, projectId, campaignId).then((r) => setProtocol(r.ok ? r.data : null));
+        const showProtocol = () => getCandidateProtocol(token, projectId, campaignId).then((r) => setProtocol(r.ok ? r.data : null));
+        void showProtocol();
+        void replayDrugRunEngines({ token, projectId, campaignId }).then((r) => {
+          setEngineReplay('error' in r ? { runId: '', verdict: `NIEDOSTĘPNE (${r.error})`, engine: '', originalHash: null, replayHash: null } : r);
+          // The replay seals its own record, which the protocol counts as evidence — so the shown
+          // protocol is fetched again here, and what the bench displays is the final artefact rather
+          // than the one that existed a moment before the engine was re-run.
+          return showProtocol();
+        });
       }
     }
   };

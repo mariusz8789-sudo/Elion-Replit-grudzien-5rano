@@ -260,7 +260,14 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   // executed by nobody.
   const shown = page.getByTestId('drug-protocol');
   await expect(shown).toBeVisible({ timeout: 60_000 });
-  expect(await shown.getAttribute('data-protocol-fingerprint')).toBe(protocol.protocolFingerprint);
+  // The bench must show the CURRENT protocol, not one from a moment before the engine replay sealed
+  // its own record. Poll the artefact until the backend agrees with what the laboratory displays.
+  await expect.poll(async () => {
+    const displayed = await shown.getAttribute('data-protocol-fingerprint');
+    const current = (await api(`/api/projects/${projectId}/campaigns/${campaignId}/protocol`, token)).protocol.protocolFingerprint;
+    return displayed === current;
+  }, { timeout: 60_000, message: 'the bench shows a protocol the backend no longer holds' }).toBe(true);
+  expect(await shown.getAttribute('data-protocol-fingerprint')).toMatch(/^[0-9a-f]{64}$/);
   await expect(shown).toContainText('Protokół końcowy');
   await expect(shown).toContainText('A. Część obliczeniowa');
   await expect(shown).toContainText('B. Proponowana droga syntezy');

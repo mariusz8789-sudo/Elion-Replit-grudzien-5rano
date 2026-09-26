@@ -12,6 +12,8 @@ import { createLabComplex, type CameraMode, type LabComplexHandle } from '../../
 import { createCernPostPipeline, type PostPipelineHandle, type PostQuality } from '../../../ui/src/cern/Cern5dPostProcessing';
 import { createColliderLayer, type ColliderLayerHandle } from '../../../ui/src/collider/ColliderGpu';
 import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
+import { buildCharacter, type Character } from '../core/three/characterRig';
+import { captureRoomEnvironment } from '../core/three/graphics/lighting';
 
 /**
  * CERN COMPLEX (`#/cern-complex`) — the full-viewport walk-through of the
@@ -157,7 +159,9 @@ export function CernComplexView(): JSX.Element {
     const track = (m: THREE.Mesh): THREE.Mesh => { disposables.push(m.geometry, m.material as THREE.Material); return m; };
 
     // Detector hall beyond the glass: the horizon texture itself, between the glass (z=-6.6) and the wall (z=-7).
-    const hallMat = new THREE.MeshBasicMaterial({ map: bhTarget.texture, toneMapped: false });
+    // Tone-mapped like everything else in the room: exempting it sent the horizon's raw values straight
+    // into bloom, and the detector hall read as one white blob instead of a lit space beyond the glass.
+    const hallMat = new THREE.MeshBasicMaterial({ map: bhTarget.texture, toneMapped: true });
     const hall = add(track(new THREE.Mesh(new THREE.PlaneGeometry(12, 4), hallMat)));
     hall.position.set(0, 2.2, -6.92);
 
@@ -176,7 +180,7 @@ export function CernComplexView(): JSX.Element {
     stripPos.forEach(([x, z]) => { if (x === 0) return; const c = add(new THREE.Mesh(coneGeo, coneMat)); c.position.set(x, 2.6, z); c.rotation.x = Math.PI; });
     const ceilingLights: THREE.PointLight[] = [];
     stripPos.forEach(([x, z], i) => { if (i % 2 === 1 && i !== 7) return; const l = new THREE.PointLight(0xcfe9ff, 8, 11, 1.8); l.position.set(x, 4.4, z); add(l); ceilingLights.push(l); });
-    add(new THREE.HemisphereLight(0x8fc8ff, 0x0a0d14, 0.3));
+    add(new THREE.HemisphereLight(0x8fc8ff, 0x161b22, 0.75));
     // Warm accretion glow spilling through the glass; cool spill from the console screens; amber over the bench.
     const glassGlow = add(new THREE.PointLight(0xffa04a, 7, 10, 1.8)); glassGlow.position.set(0, 2.2, -5.9);
     const consoleGlow = add(new THREE.PointLight(0x2af0a0, 3.5, 6, 2)); consoleGlow.position.set(0, 1.4, -4.9);
@@ -219,6 +223,18 @@ export function CernComplexView(): JSX.Element {
     // Collision hologram in the middle of the hub: the batch's first event, tracks bent in 3.8 T, scaled to the room.
     const holo = new THREE.Group(); holo.position.set(0, 3.1, -4.3); holo.scale.setScalar(0.16); add(holo);
     let colliderLayer: ColliderLayerHandle | null = null;
+    // THE PERSON IN THE MIDDLE. The hub was a room of instruments with nobody in it: nothing in frame
+    // carried human scale, so the glass, the consoles and the tunnel could have been any size at all.
+    // A physicist stands at the centre console, facing the window. Presentation only — the figure
+    // operates nothing, decides nothing and is not an actor in any kernel.
+    const physicist: Character = buildCharacter(THREE, { height: 1.76, shirt: 0xeef2f6, pants: 0x2c3442, shoes: 0x191d24, skin: 0xe0a878, hair: 0x241d18 });
+    physicist.root.position.set(0, 0, -3.95);
+    physicist.setFacing(Math.PI);
+    add(physicist.root);
+    disposables.push({ dispose: () => physicist.dispose() });
+    // One rim light so the silhouette separates from the dark end of the hall instead of merging into it.
+    const rim = add(new THREE.SpotLight(0xdfeaff, 9, 10, 0.75, 0.8, 1.5));
+    rim.position.set(2.2, 3.4, -1.0); rim.target.position.set(0, 1.2, -3.95); add(rim.target);
     // The delivered 5D pipeline. SSR selects = the complex's floor and glass (found in the scene: the modules expose no mesh handles).
     const selects: THREE.Mesh[] = [];
     scene.traverse((o) => {
@@ -231,7 +247,14 @@ export function CernComplexView(): JSX.Element {
     const w0 = host.clientWidth || window.innerWidth; const h0 = Math.max(1, host.clientHeight || window.innerHeight);
     const pipeline: PostPipelineHandle = createCernPostPipeline(renderer, scene, camera, { width: Math.round(w0 * dpr), height: Math.round(h0 * dpr), selects });
     pipeline.setLightScreen([0.5, 0.42]);
-    pipeline.setLens({ rs: 0, glass: 0.6 });
+    // The lens pass models TWO things: gravitational deflection (rs, only while a horizon exists) and
+    // the ripple of the armoured glass (glass). Both were left on in every camera mode, so the whole
+    // room was permanently seen through a rainbow-fringed wobble. Each is now applied where its cause
+    // is: rs when the horizon is up, glass only from behind the window.
+    let lensRs = 0;
+    let lensGlass = 0;
+    const applyLens = (): void => { pipeline.setLens({ rs: lensRs, glass: lensGlass, center: [0.5, 0.5] }); };
+    applyLens();
     const hasSsr = pipeline.composer.passes.some((p) => p instanceof SSRPass);
     // Planar floor reflection as the fallback when SSR is unavailable or switched off by the frame budget.
     const reflector = new Reflector(new THREE.PlaneGeometry(13.9, 13.9), { clipBias: 0.003, textureWidth: Math.round(1024 * dpr), textureHeight: Math.round(1024 * dpr), color: 0x5a6a74 });
@@ -260,6 +283,12 @@ export function CernComplexView(): JSX.Element {
       if (m === 'CONSOLE') { camera.position.set(0, 1.75, -3.0); camera.lookAt(0, 1.0, -5.6); }
       // Inside the ring on the walkway side of the magnet string, looking down the arc.
       if (m === 'TUNNEL') { const a = -0.02; camera.position.set(Math.cos(a) * TUNNEL_R - 1.5, 1.5, Math.sin(a) * TUNNEL_R); camera.lookAt(Math.cos(a + 0.07) * TUNNEL_R - 1.0, 1.3, Math.sin(a + 0.07) * TUNNEL_R); }
+      // The two screen-space effects follow the shot, not the session: glass only from behind the
+      // window, god-rays only down the tunnel, where the string of lamps is in frame.
+      lensGlass = m === 'GLASS' ? 0.38 : 0;
+      applyLens();
+      pipeline.setScatter(m === 'TUNNEL');
+      pipeline.setLightScreen(m === 'TUNNEL' ? [0.5, 0.5] : [0.5, 0.42]);
     };
     const applyMode = (m: CameraMode): void => { lab.setCameraMode(m); poseFor(m); setMode(m); };
     let lastMode: CameraMode = lab.getCameraMode();
@@ -274,20 +303,22 @@ export function CernComplexView(): JSX.Element {
         latticeMesh.instanceMatrix.needsUpdate = true; if (latticeMesh.instanceColor) latticeMesh.instanceColor.needsUpdate = true;
       },
       setBlackHole: (rs, tempK) => { bhMat.uniforms.uRs.value = rs; bhMat.uniforms.uDiskIn.value = rs * 3; bhMat.uniforms.uDiskOut.value = rs * 12; bhMat.uniforms.uTempK.value = tempK; },
-      setLens: (rs) => { pipeline.setLens({ rs, glass: 0.6, center: [0.5, 0.5] }); },
+      setLens: (rs) => { lensRs = rs; applyLens(); },
       showEvent: (a, index = 0) => { if (colliderLayer) colliderLayer.dispose(); colliderLayer = createColliderLayer(holo as unknown as THREE.Scene, a.events[index] ?? a.events[0], { pixelRatio: dpr, scale: 0.0042 }); },
     };
 
-    let raf = 0; let last = performance.now(); const t0 = last; let frameCount = 0; let fpsN = 0; let fpsAcc = 0; let budgetN = 0; let budgetAcc = 0; let lastFramesPush = 0;
+    let raf = 0; let probed = false; let last = performance.now(); const t0 = last; let frameCount = 0; let fpsN = 0; let fpsAcc = 0; let budgetN = 0; let budgetAcc = 0; let lastFramesPush = 0;
     const loop = (now: number): void => {
       raf = requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - last) / 1000); const realDt = (now - last) / 1000; last = now; const t = (now - t0) * 0.001;
       const m = lab.getCameraMode();
       if (m !== lastMode) { lastMode = m; poseFor(m); setMode(m); }
       lab.update(dt, t);
+      physicist.update('idle', t, 0);
+      physicist.reach(0.34, 0.16); // hands at the console, head tipped toward the readouts
       bhMat.uniforms.uTime.value = t;
-      stripMat.emissiveIntensity = 1.15 + 0.12 * Math.sin(t * 1.7);
-      renderer.toneMappingExposure = m === 'TUNNEL' ? 0.72 : 0.82;
+      stripMat.emissiveIntensity = 0.72 + 0.08 * Math.sin(t * 1.7);
+      renderer.toneMappingExposure = m === 'TUNNEL' ? 0.86 : 1.02;
       headlamp.intensity = m === 'TUNNEL' ? 7 : 0;
       if (m === 'TUNNEL') headlamp.position.set(camera.position.x, camera.position.y + 0.5, camera.position.z);
       glassGlow.intensity = 6.5 + 1.5 * Math.sin(t * 2.3);
@@ -299,6 +330,11 @@ export function CernComplexView(): JSX.Element {
       frameCount++;
       // Frame budget: measured cost of the composer over the first frames decides the quality tier (never a guess about the GPU).
       if (frameCount > 2 && frameCount <= 12) { budgetN++; budgetAcc += cost; if (budgetN === 10) { const avg = budgetAcc / budgetN; if (avg > 0.9) applyQuality('performance'); else if (avg > 0.25) applyQuality('balanced'); } }
+      // IBL, once, after the room has been lit for a few frames. Without an environment map a metal
+      // surface has nothing to reflect and renders black: that is why this floor and these steel
+      // housings read as void however many lamps stood over them. The canonical room probe (six faces
+      // from inside the hub, through PMREM) gives them the hub's own strips, racks and glass to return.
+      if (!probed && frameCount === 6) { probed = true; captureRoomEnvironment(THREE, renderer, scene, { position: [0, 2.3, -1.2], size: 256, far: 30, intensity: 1.15 }); }
       fpsN++; fpsAcc += realDt;
       if (fpsAcc >= 0.5) { setFps(Math.round(fpsN / fpsAcc)); fpsN = 0; fpsAcc = 0; setFpv(`${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}`); }
       if (now - lastFramesPush > 250) { lastFramesPush = now; setFrames(frameCount); }
@@ -311,8 +347,9 @@ export function CernComplexView(): JSX.Element {
       stageRef.current = null;
       colliderLayer?.dispose();
       lab.dispose(); tunnel.dispose();
+      scene.environment?.dispose(); scene.environment = null;
       disposables.forEach((d) => d.dispose());
-      ceilingLights.forEach((l) => l.dispose()); washes.forEach((l) => l.dispose()); headlamp.dispose(); glassGlow.dispose(); consoleGlow.dispose(); benchGlow.dispose(); keyLight.dispose();
+      ceilingLights.forEach((l) => l.dispose()); washes.forEach((l) => l.dispose()); headlamp.dispose(); glassGlow.dispose(); consoleGlow.dispose(); benchGlow.dispose(); keyLight.dispose(); rim.dispose();
       scene.remove(dressing);
       pipeline.dispose();
       if (canvas.parentElement === host) host.removeChild(canvas);

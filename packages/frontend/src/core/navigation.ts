@@ -98,8 +98,12 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'geodesics', label: 'Fotony wokół czarnej dziury', icon: '🕳', hash: '#/geodesics', variantOf: 'black-hole' },
   { id: 'universe', label: 'Wszechświat — problem trzech ciał', icon: '🪐', hash: '#/lab/universe', description: 'Deterministyczny integrator trzech ciał' },
   { id: 'cms-open-data', label: 'CMS Open Data — prawdziwe dane CERN', icon: '📊', hash: '#/physics/cms-z', description: 'Checksumowo zweryfikowane 10 000 zdarzeń Z→μμ z CERN Open Data; analiza offline, nie aktywny LHC' },
-  { id: 'cern-complex', label: 'Kompleks CERN — 5D', icon: '◉', hash: '#/cern-complex', variantOf: 'cms-open-data' },
-  { id: 'collider', label: 'Kompleks CERN — komora detektora', icon: '⚛', hash: '#/cern-complex?room=detector', variantOf: 'cms-open-data' },
+  // CERN was folded under CMS Open Data as if it were another view of it. It is not: CMS Open Data is
+  // an offline analysis of a checksummed event file, the complex is a walk-through world with its own
+  // rooms and its own live execution state. Folding the flagship world under a data screen made it
+  // read as absent, so it stands as its own capability with the detector chamber folded under it.
+  { id: 'cern-complex', label: 'Kompleks CERN', icon: '◉', hash: '#/cern-complex', description: 'Przejście przez halę, tunel i komorę detektora — model zderzeń, oddzielnie od danych CMS' },
+  { id: 'collider', label: 'CERN — komora detektora', icon: '⚛', hash: '#/cern-complex?room=detector', variantOf: 'cern-complex' },
   { id: 'lab-fpv', label: 'Quantum Lab FPV', icon: '🧪', hash: '#/lab-fpv' },
   { id: 'entanglement', label: 'Miary splątania', icon: '🔗', hash: '#/entanglement', variantOf: 'lab-fpv' },
   { id: 'myths-theories', label: 'Mity i Teorie', icon: '⚗', hash: '#/myths-theories', description: 'Spekulatywne modele spacetime — jawny sandbox' },
@@ -136,8 +140,8 @@ export const MORE_ITEMS: readonly NavItem[] = [
   { id: 'decipherment', label: 'Deszyfracja', icon: '📜', hash: '#/decipherment' },
   { id: 'glossary', label: 'Słowniczek', icon: '📚', hash: '#/glossary' },
   // — Administracja i bezpieczeństwo —
-  { id: 'cyber', label: 'Cyber', icon: '🛡', hash: '#/cyber' },
-  { id: 'clockwork', label: 'CLOCKWORK — terminy urzędu', icon: '⏱', hash: '#/clockwork' },
+  { id: 'cyber', label: 'Cyber', icon: '🛡', hash: '#/cyber', description: 'Jądro rozumowania o incydentach: hipotezy, dowody i łańcuch custody, bez oskarżeń' },
+  { id: 'clockwork', label: 'CLOCKWORK — terminy urzędu', icon: '⏱', hash: '#/clockwork', description: 'Terminy ustawowe spraw urzędu, liczone deterministycznie' },
   {
     id: 'sovereign', label: 'Sovereign', icon: '🏛', status: 'planned',
     plannedNote: 'Profil instytucjonalny (skala miasta/energii/wody/transportu) — nie istnieje jeszcze ani jako route, ani jako model uprawnień. Wymieniony, żeby nie udawać, że go pomijamy.',
@@ -157,7 +161,7 @@ export const RESEARCH_MODE_LABEL = 'Tryb badawczy';
 const GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
   { id: 'more-drug', label: 'Odkrywanie leków', ids: ['science'] },
   { id: 'more-chemistry', label: 'Chemia', ids: ['chemistry'] },
-  { id: 'more-physics', label: 'Fizyka', ids: ['physics', 'black-hole', 'universe', 'cms-open-data', 'lab-fpv', 'myths-theories'] },
+  { id: 'more-physics', label: 'Fizyka', ids: ['physics', 'black-hole', 'universe', 'cms-open-data', 'cern-complex', 'lab-fpv', 'myths-theories'] },
   { id: 'more-human', label: 'Człowiek i biologia', ids: ['human-biology-lab'] },
   { id: 'more-evidence', label: 'Dowody i pamięć', ids: ['memory'] },
   { id: 'more-worlds', label: 'Światy i symulacje', ids: ['worlds', 'whatif'] },

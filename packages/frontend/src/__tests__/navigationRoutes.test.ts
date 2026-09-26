@@ -104,7 +104,11 @@ describe('research mode shows one entry per capability; alternative screens fold
     expect(family('science')).toEqual(expect.arrayContaining(['science', 'discover', 'campaign', 'gov-campaign', 'cde', 'pilot', 'dossier', 'precision']));
     expect(family('memory')).toEqual(expect.arrayContaining(['memory', 'evidence', 'discovery-log']));
     expect(family('worlds')).toEqual(expect.arrayContaining(['worlds', 'matrix', 'matrix-map', 'first-person-lab', 'world-director']));
-    expect(family('cms-open-data')).toEqual(expect.arrayContaining(['cms-open-data', 'cern-complex', 'collider']));
+    // CMS Open Data (an offline analysis of one checksummed event file) and the CERN complex (a
+    // walk-through world) are two capabilities, not one with a spare view. Only the detector chamber
+    // is a view OF the complex, so only it folds.
+    expect(family('cms-open-data')).toEqual(['cms-open-data']);
+    expect(family('cern-complex')).toEqual(['cern-complex', 'collider']);
     expect(top.length).toBeLessThanOrEqual(26);
   });
 

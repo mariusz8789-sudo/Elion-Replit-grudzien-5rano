@@ -309,7 +309,9 @@ export class DrugBenchLayer {
     this.placeCarriedVial(handling, spot.port);
     // Recorded after the frame was built, from the frame itself.
     this.actionsSeen.add(handling.action);
-    if (handling.instrument !== 'RACK') this.instrumentsSeen.add(handling.instrument);
+    // Every place the hands worked, the rack included: it is where samples are labelled and set down,
+    // and leaving it out made the record disagree with what the panel showed live.
+    this.instrumentsSeen.add(handling.instrument);
     if (handling.carrying && this.carried?.parent === scientist.rightGrip && this.THREE) {
       const a = new this.THREE.Vector3(); const b = new this.THREE.Vector3();
       this.carried.getWorldPosition(a); scientist.rightGrip.getWorldPosition(b);

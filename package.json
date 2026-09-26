@@ -29,6 +29,7 @@
     "campaign:validate": "node scripts/validation-campaign.mjs",
     "benchmark": "node scripts/benchmark-suite.mjs",
     "engine-readiness": "node scripts/engine-readiness-report.mjs",
+    "retro:offline": "node scripts/genesis-retro-offline-run.mjs",
     "railway-worker-readiness": "node scripts/railway-worker-readiness.mjs",
     "staging:verify": "node scripts/verify-railway-staging.mjs",
     "e2e:discovery": "node scripts/discovery-e2e.mjs",

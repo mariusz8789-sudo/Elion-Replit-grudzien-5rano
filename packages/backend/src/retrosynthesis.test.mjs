@@ -47,7 +47,7 @@ describe('the engine itself', () => {
     let probe;
     try {
       probe = JSON.parse(execFileSync(python, [WORKER, JSON.stringify({ cmd: 'detect' })], { encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'ignore'] }));
-    } catch (err) {
+    } catch {
       // No interpreter at all is itself a legitimate environment state; the adapter must say so.
       assert.equal(retro.detect().available, false);
       assert.match(retro.detect().reason, /AiZynthFinder|not usable/i);

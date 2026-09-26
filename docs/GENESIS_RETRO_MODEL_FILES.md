@@ -1,5 +1,29 @@
 # AiZynthFinder — pliki modelu, których Genesis potrzebuje (pakiet dostawczy D-1)
 
+## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26, NOWA SESJA, NOWY KONTENER: NADAL ODMOWA
+
+Hipoteza "stara polityka trzyma się starego kontenera" jest **obalona**. Ta sesja wystartowała
+w nowym kontenerze, po zmianie ustawień, i dostaje dokładnie ten sam wynik:
+
+```
+zenodo.org:443                — connect_rejected, gateway 403 na CONNECT (policy denial)
+ndownloader.figshare.com:443  — connect_rejected, gateway 403 na CONNECT (policy denial)
+```
+
+Wniosek: **polityka sieci tego środowiska nadal nie dopuszcza tych dwóch hostów.** Albo edycja
+nie została zapisana, albo trafiła w inne środowisko, albo wybrany poziom dostępu nie obejmuje
+listy dozwolonych domen. Zmiany dokonuje się w ustawieniach projektu → Environment → Network access.
+
+Reszta łańcucha jest gotowa i sprawdzona w tej sesji:
+- `packages/backend/src/retrosynthesis.test.mjs` — 8/8 przechodzi,
+- adapter `detect()` odpowiada uczciwie (tu: `AIZYNTHFINDER_NOT_INSTALLED`, bo w tym kontenerze
+  nie ma też samego silnika; po zainstalowaniu zgłosiłby brak plików modelu),
+- `scripts/genesis-retro-resume.mjs` i `scripts/genesis-retro-offline-run.mjs` czekają gotowe.
+
+**Droga obejścia bez zmiany polityki:** pliki modelu leżące na maszynie właściciela wystarczy
+wskazać przez `GENESIS_RETRO_MODEL_DIR` i uruchomić `npm run retro:offline` tam, gdzie leżą;
+wraca mały, weryfikowalny artefakt (checksumy modeli, benchmark aspiryny, trasa dla finalisty).
+
 ## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26 (ponowiony po zmianie ustawień)
 
 **Ponowna próba po tym, jak właściciel odblokował zenodo i figshare: nadal ODMOWA.**

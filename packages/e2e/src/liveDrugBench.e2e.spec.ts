@@ -8,13 +8,13 @@ const API = process.env.GENESIS_BASE_URL ?? 'http://127.0.0.1:8080';
 /** Imatinib: the co-crystallised, NON-COVALENT ligand of the docking target (PDB 1IEP, chain A). */
 const IMATINIB = 'Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1';
 
-async function api(path: string, token: string | null, body?: unknown): Promise<Record<string, any>> {
+async function api(path: string, token: string | null, body?: unknown): Promise<Record<string, unknown>> {
   const r = await fetch(`${API}${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  return r.json() as Promise<Record<string, any>>;
+  return r.json() as Promise<Record<string, unknown>>;
 }
 
 /**
@@ -112,7 +112,7 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   // backend's own events hold the full sequence, each written only once that step actually completed.
   expect([...dockingSteps]).toContain('POSE_SCORED');
   expect(dockingSteps.size, 'the bench showed the docking advancing, not just its result').toBeGreaterThan(1);
-  const steps = (events.events as { type: string; payload: Record<string, any> }[])
+  const steps = (events.events as { type: string; payload: Record<string, unknown> }[])
     .filter((e) => e.payload?.stage === 'docking')
     .map((e) => e.payload.step ?? e.payload.reason);
   expect(steps).toEqual(['RECEPTOR_PREPARED', 'SELECTED_FOR_DOCKING', 'LIGAND_PREPARED', 'VINA_STARTED', 'DOCKING_RESULT_RETAINED']);
@@ -206,7 +206,7 @@ test('drug bench: live state in the scene equals the backend run, end to end for
     const deadline = Date.now() + 180_000;
     for (;;) {
       const m = (await api(`/api/projects/${projectId}/campaigns/${campaignId}/experiment-memory`, token)).memory;
-      const withReplay = m.sessions.find((s: any) => s.body?.engineReplay?.verdict);
+      const withReplay = m.sessions.find((s: { body?: { engineReplay?: { verdict?: string } } }) => s.body?.engineReplay?.verdict);
       if (withReplay) return { record: withReplay, count: m.sessions.length, chainOk: m.chain.ok };
       if (Date.now() > deadline) throw new Error(`no sealed record carried the engine replay (sessions: ${m.sessions.length})`);
       await page.waitForTimeout(2_000);

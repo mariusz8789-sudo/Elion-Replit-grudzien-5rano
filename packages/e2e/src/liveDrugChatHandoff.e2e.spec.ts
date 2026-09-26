@@ -6,9 +6,9 @@ test.use({ launchOptions: { ...(chromiumPath ? { executablePath: chromiumPath } 
 
 const API = process.env.GENESIS_BASE_URL ?? 'http://127.0.0.1:8080';
 
-async function post(path: string, token: string | null, body: unknown): Promise<Record<string, any>> {
+async function post(path: string, token: string | null, body: unknown): Promise<Record<string, unknown>> {
   const r = await fetch(`${API}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
-  return r.json() as Promise<Record<string, any>>;
+  return r.json() as Promise<Record<string, unknown>>;
 }
 
 /**

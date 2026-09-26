@@ -165,6 +165,37 @@ export class DrugBenchLayer {
     // The bench of a real workstation: work surface, sample rack, ADMET analyser, docking console + monitor.
     root.add(createBench(THREE, { position: [0, 0, 0], width: 2.6, depth: 1.05, height: 0.93, topMaterial: mat.CERAMIC, legMaterial: mat.BRUSHED_METAL }));
     root.add(createCabinet(THREE, { position: [-1.5, 0, -0.1], width: 0.62, depth: 0.6, height: 1.05, bodyMaterial: mat.PAINTED_METAL, doorMaterial: mat.BRUSHED_METAL }));
+    // GFX-1 BENCH PASS. A white slab on legs is a table; a laboratory bench has a work surface with a
+    // machined edge, a splash-back the instruments stand against, cable trunking along it and storage
+    // underneath. This is the furniture every close-up of the hands frames, so it is worth the parts.
+    const worktop = new THREE.Mesh(new THREE.BoxGeometry(2.56, 0.012, 1.0), mat.TECH_COMPOSITE);
+    worktop.position.set(0, 0.937, 0); root.add(worktop);
+    for (const z of [-0.5, 0.5]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.022, 0.016), mat.POLISHED_METAL);
+      edge.position.set(0, 0.934, z); root.add(edge);
+    }
+    const splash = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.26, 0.02), mat.BRUSHED_METAL);
+    splash.position.set(0, 1.06, -0.52); root.add(splash);
+    // Cable trunking with a couple of runs leaving it: the instruments are connected to something.
+    const trunk = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 0.06), mat.PAINTED_METAL);
+    trunk.position.set(0, 0.86, -0.49); root.add(trunk);
+    for (const [x, r] of [[-1.1, 0.07], [0.38, 0.055]] as const) {
+      const run = new THREE.Mesh(new THREE.TorusGeometry(r, 0.007, 6, 18, Math.PI), mat.RUBBER);
+      run.rotation.set(Math.PI / 2, 0, 0); run.position.set(x, 0.86, -0.42); root.add(run);
+    }
+    // Under-bench storage: a shelf and two drawer stacks, so the bench has mass instead of legs.
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.02, 0.8), mat.BRUSHED_METAL);
+    shelf.position.set(0, 0.32, -0.04); root.add(shelf);
+    for (const x of [-0.95, 0.85]) {
+      const stack = new THREE.Group(); stack.position.set(x, 0.33, -0.02); root.add(stack);
+      stack.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.58, 0.72), mat.PAINTED_METAL));
+      for (let i = 0; i < 3; i += 1) {
+        const face = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.02), mat.BRUSHED_METAL);
+        face.position.set(0, 0.19 - i * 0.19, 0.37); stack.add(face);
+        const pull = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.016), mat.POLISHED_METAL);
+        pull.position.set(0, 0.19 - i * 0.19, 0.388); stack.add(pull);
+      }
+    }
 
     // SAMPLE RACK — the area the hands work in, so it is built like a machined rack rather than a
     // plinth: a milled block with a drilled well under every slot, a raised lip, zone dividers and a

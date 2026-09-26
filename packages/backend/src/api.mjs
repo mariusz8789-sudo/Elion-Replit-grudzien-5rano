@@ -113,6 +113,7 @@ import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs'
 import { preregisterExperiment, sealExperimentSession, readExperimentMemory } from './experimentMemory.mjs';
 import { buildCandidateProtocol } from './campaign/candidateProtocol.mjs';
 import { planCandidateRoute } from './campaign/retrosynthesis.mjs';
+import { buildRetrosynthesisHandoff } from './campaign/retrosynthesisHandoff.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
@@ -675,6 +676,14 @@ export function handleApi(db, ctx) {
           const built = buildCandidateProtocol(db, campaignId);
           if (!built.ok) return err(404, built.error);
           return ok({ protocol: built.protocol });
+        }
+        // /api/projects/:id/campaigns/:cid/retrosynthesis-handoff — the canonical identity of the
+        // finalist whose route is still owed (viewer+). Assembled from persisted state plus one
+        // capability probe; it starts no search and contains no route.
+        if (seg[4] === 'retrosynthesis-handoff' && method === 'GET') {
+          const built = buildRetrosynthesisHandoff(db, campaignId);
+          if (!built.ok) return err(404, built.error);
+          return ok({ handoff: built.handoff });
         }
         if (method !== 'GET') return err(405, 'method_not_allowed');
         // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty

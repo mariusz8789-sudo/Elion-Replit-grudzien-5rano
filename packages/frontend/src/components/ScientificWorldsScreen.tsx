@@ -898,10 +898,32 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                   </ul>
 
                   <h4>B. Proponowana droga syntezy</h4>
-                  <p data-testid="drug-protocol-synthesis" data-route-provided={synthesis.routeProvided ? 'true' : 'false'}>
-                    {String(synthesis.statement ?? 'Brak zapisu o drodze syntezy.')}
-                    {!synthesis.routeProvided && synthesis.status ? ` (${String(synthesis.status)})` : ''}
-                  </p>
+                  {(() => {
+                    /* Bez trasy sekcja B nazywa DOKŁADNY stan runtime'u — który silnik, czego brakuje —
+                       zamiast ogólnego „brak". Nic tu nie jest uzupełniane przez ekran: trasa pojawia
+                       się wyłącznie wtedy, gdy zwrócił ją silnik. */
+                    const missing = Array.isArray(synthesis.missingModelFiles) ? synthesis.missingModelFiles as string[] : [];
+                    const status = synthesis.routeProvided ? null : String(synthesis.status ?? 'NOT_ATTEMPTED');
+                    return (
+                      <>
+                        <p data-testid="drug-protocol-synthesis"
+                          data-route-provided={synthesis.routeProvided ? 'true' : 'false'}
+                          data-synthesis-status={status ?? 'ROUTE_PROVIDED'}
+                          data-missing-model-files={missing.length}>
+                          {String(synthesis.statement ?? 'Brak zapisu o drodze syntezy.')}
+                          {status ? ` (${status})` : ''}
+                        </p>
+                        {status === 'BLOCKED_BY_RUNTIME' && (
+                          <p className="sw-drug-note" data-testid="drug-protocol-synthesis-blocker">
+                            Silnik retrosyntezy nie mógł zostać uruchomiony, więc żadna trasa nie została policzona.
+                            {typeof synthesis.reason === 'string' ? ` Powód: ${synthesis.reason}.` : ''}
+                            {missing.length > 0 ? ` Brakujące pliki modelu: ${missing.join(', ')}.` : ''}
+                            {' '}To stan środowiska, nie wynik naukowy — kandydat czeka z zachowaną tożsamością, a sekcja B pozostaje pusta do czasu realnego przebiegu.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   <h4>C. Proponowany protokół walidacji fizycznej — NIEWYKONANY</h4>
                   <ol className="sw-protocol-list" data-testid="drug-protocol-validation" data-validation-steps={steps.length}>

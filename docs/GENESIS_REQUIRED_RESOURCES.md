@@ -37,6 +37,40 @@ dostarczone przez właściciela, albo hostowane na `raw.githubusercontent.com`.
 | Cel dla **NMDA / ketaminy** | **BLOCKED** | ketamina działa na receptor NMDA; nie mamy biologicznie właściwej struktury. Dopóki jej nie ma, dokowanie ketaminy ma status **UNRESOLVED** (tak jest raportowane). *Potrzebne:* wskazanie struktury (np. PDB NMDA z miejscem wiązania w kanale) i zgoda na jej zwendorowanie. Wpływ: domyka jeden obiecany wynik. Koszt: 0 zł, samo pobranie. Trudność: niska, o ile ktoś poda plik. Licencja: koordynaty PDB publiczne. Wartość naukowa: wysoka. |
 | Kolejne cele białkowe (dowolna nowa kampania) | **GET NOW** (per cel) | RCSB jest zablokowane, więc **każdy** nowy cel wymaga wrzucenia pliku PDB do repo albo na osiągalny host. Dla każdego celu potrzebne: identyfikator PDB, wybór łańcucha, ligand referencyjny do redocku, środek i rozmiar pudełka (albo ligand ko-krystaliczny, z którego je policzymy). |
 
+### 1.1. Demo „zamiennik Mounjaro" — co jest prawdą, a co trzeba dostarczyć
+
+Cel właściciela: film, w którym Genesis znajduje zamiennik **Mounjaro** i oddaje wynik stronie
+publicznej. Zanim to nagramy, trzy fakty, które decydują o scenariuszu:
+
+1. **Mounjaro (tirzepatyd) to peptyd** — podwójny agonista receptorów GIP i GLP-1, klasa
+   biologiczna, nie mała cząsteczka. Potok Genesis (RDKit → Vina → ADMET) jest potokiem **małych
+   cząsteczek**. Zapytanie o „zamiennik tirzepatydu" jako peptydu trafia w istniejącą bramkę
+   `BLOCKED_MODALITY` (`campaign/researchIntake.mjs`) — i tak ma być: to jest uczciwa odpowiedź, nie
+   awaria.
+2. **Wersja tej historii, którą Genesis naprawdę może policzyć**: doustny **mały cząsteczkowy agonista
+   receptora GLP-1**. To realna, istniejąca klasa w farmacji — czyli dokładnie „tabletka zamiast
+   zastrzyku". Tu potok pasuje w całości.
+3. Żeby ją uruchomić, brakuje **jednego zasobu**: struktury receptora GLP-1 zwendorowanej tak jak
+   1IEP, bo RCSB jest z tego środowiska zablokowane.
+
+**Czego potrzebuję do dostarczenia (jeden pakiet, analogiczny do 1IEP):**
+
+| Pole | Co podać |
+|---|---|
+| Identyfikator PDB | wpis z receptorem GLP-1 **z ligandem małocząsteczkowym w miejscu wiązania** (kompleks z agonistą, nie sam peptyd) |
+| Łańcuch | który łańcuch to receptor |
+| Ligand referencyjny | kod ligandu ko-krystalicznego — służy do **redocku kontrolnego** (jak imatinib dla 1IEP: RMSD 0,584 Å) |
+| Pudełko dokowania | środek i rozmiar, albo zgoda, żeby policzyć je z ligandu ko-krystalicznego |
+| Plik | `.pdb` wrzucony do repo lub na osiągalny host (RCSB zablokowane) |
+
+**Co Genesis odda po takim przebiegu — i czego nie odda.** Odda: prerejestrowaną hipotezę, lej
+kandydatów z zapisanymi powodami odrzuceń, wyniki silników z sumami kontrolnymi, werdykt wobec
+zamrożonych kryteriów, powtórkę silnika MATCH i **protokół końcowy w trzech częściach** (A obliczenia,
+B droga syntezy z silnika retrosyntezy, C proponowana walidacja fizyczna — **niewykonana przez
+nikogo**). Nie odda: leku, dowodu skuteczności, bezpieczeństwa ani „przepisu do produkcji". Materiał
+dla instytucji publicznej to **powtarzalne obliczenie z łańcuchem dowodowym i propozycją walidacji** —
+i tak musi być podpisany w filmie, inaczej pierwszy farmakolog na sali rozbije to jednym zdaniem.
+
 ## 2. Silniki obliczeniowe
 
 | Silnik | Stan | Szczegóły |

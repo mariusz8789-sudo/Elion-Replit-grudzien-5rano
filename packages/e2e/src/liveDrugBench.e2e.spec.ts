@@ -62,11 +62,28 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   const seen = new Set<string>();
   const dockingSteps = new Set<string>();
   const procedurePhases: string[] = [];
+  // GATE B — the visible laboratory. What the scene's hands actually did, read back from the scene:
+  // every action, every sample that was in the hand, and the smallest measured distance between that
+  // vial and the grip point. Counters and hashes do not prove this; these do.
+  const handActions = new Set<string>();
+  const handInstruments = new Set<string>();
+  const carriedSamples = new Set<string>();
+  const handSamples = new Set<string>();
+  let scientistSeen = false;
+  let closestGripMm = Number.POSITIVE_INFINITY;
   const deadline = Date.now() + 700_000;
   let phase = '';
   while (Date.now() < deadline) {
-    const snap = await live.evaluate((el) => ({ phase: el.getAttribute('data-phase') ?? '', state: el.getAttribute('data-state-hash') ?? '', scene: el.getAttribute('data-scene-hash') ?? '', step: el.getAttribute('data-docking-step') ?? '', procedure: el.getAttribute('data-procedure') ?? '' }));
+    const snap = await live.evaluate((el) => ({ phase: el.getAttribute('data-phase') ?? '', state: el.getAttribute('data-state-hash') ?? '', scene: el.getAttribute('data-scene-hash') ?? '', step: el.getAttribute('data-docking-step') ?? '', procedure: el.getAttribute('data-procedure') ?? '', scientist: el.getAttribute('data-scientist') ?? '', handAction: el.getAttribute('data-hand-action') ?? '', handInstrument: el.getAttribute('data-hand-instrument') ?? '', handSample: el.getAttribute('data-hand-sample') ?? '', handCarried: el.getAttribute('data-hand-carried') ?? '', gripMm: el.getAttribute('data-hand-grip-mm') ?? '' }));
     phase = snap.phase;
+    if (snap.scientist === 'PRESENT') scientistSeen = true;
+    if (snap.handAction) handActions.add(snap.handAction);
+    if (snap.handInstrument) handInstruments.add(snap.handInstrument);
+    if (snap.handSample) handSamples.add(snap.handSample);
+    if (snap.handCarried) {
+      carriedSamples.add(snap.handCarried);
+      if (snap.gripMm) closestGripMm = Math.min(closestGripMm, Number(snap.gripMm));
+    }
     if (snap.state) seen.add(snap.state);
     if (snap.step) dockingSteps.add(snap.step);
     if (snap.procedure && procedurePhases.at(-1) !== snap.procedure) procedurePhases.push(snap.procedure);
@@ -127,6 +144,31 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   expect(Object.values(zones).reduce((a, b) => a + b, 0)).toBe(samples);
   expect(zones.FINALIST, 'a finished run must have at least one finalist with a measured score').toBeGreaterThan(0);
   await expect(live).toContainText('finaliści');
+
+  // GATE B: A PERSON DID THE EXPERIMENT, VISIBLY. There is a scientist at the bench; a sample with its
+  // own molecular identity was reached for, gripped and carried; while carried the vial was IN the hand
+  // (measured in the rendered scene, not asserted from intent); it was put into an instrument, and the
+  // scientist then worked at that instrument. The handling is labelled a simulated laboratory step, so
+  // nobody can read the gesture as a physical measurement.
+  expect(scientistSeen, 'a scientist must be at the bench while the experiment runs').toBe(true);
+  // The scene's own record of the movements it rendered (polling can miss a frame; this cannot).
+  const performed = (await live.getAttribute('data-hand-seen') ?? '').split(',').filter(Boolean);
+  const instrumentsUsed = (await live.getAttribute('data-hand-instruments-seen') ?? '').split(',').filter(Boolean);
+  const minGripMm = Number(await live.getAttribute('data-hand-grip-min-mm'));
+  expect(performed, 'the sample was reached for, gripped, carried and put in — not teleported').toEqual(
+    expect.arrayContaining(['REACH', 'GRIP', 'CARRY', 'PLACE', 'OPERATE']),
+  );
+  expect(instrumentsUsed).toEqual(expect.arrayContaining(['ANALYSER', 'WORKSTATION']));
+  expect(minGripMm, 'the carried vial sits in the hand, not near it').toBeLessThanOrEqual(20);
+  // What the panel happened to catch live must be part of that record, never something outside it.
+  expect(performed).toEqual(expect.arrayContaining([...handActions]));
+  expect(carriedSamples.size + performed.filter((a) => a === 'CARRY').length,
+    'at least one sample was really parented to the hand').toBeGreaterThan(0);
+  if (Number.isFinite(closestGripMm)) expect(closestGripMm).toBeLessThanOrEqual(20);
+  expect([...handSamples].every((s2) => s2.length > 0 && !/^sample|^próbka \d/i.test(s2)),
+    'every handled sample carries its molecular identity').toBe(true);
+  expect(instrumentsUsed).toEqual(expect.arrayContaining([...handInstruments]));
+  await expect(live).toContainText('SYMULOWANY KROK LABORATORYJNY');
 
   // The scientist seals the session from that run: the one outcome panel carries the frozen hypothesis,
   // its verdict, the engine runs, and replay reproduces the sealed session.

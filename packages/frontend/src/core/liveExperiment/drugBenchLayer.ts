@@ -3,8 +3,10 @@ import { createAtomSphere, createBond, elementStyleOf } from '../three/graphics/
 import { createBench, createCabinet, createMonitor } from '../three/graphics/labKit';
 import { createGenesisMaterialPalette, createScreenMaterial, createScientificGlass, makeReadoutSurface } from '../three/graphics/materials';
 import { createManipulatorArm, type ManipulatorHandle } from '../three/biologyLabKit';
+import { buildCharacter, type Character } from '../three/characterRig';
 import { CameraRig } from '../three/graphics/cameraRig';
 import { labProcedureOf, type BenchFocus, type LabProcedure } from './labProcedure';
+import { benchHandlingOf, transferMotion, type BenchHandling, type BenchInstrument } from './benchHandling';
 import { createBackendGeometrySource, type MoleculeGeometrySource, type MoleculeMaterialisation } from '../worldModel/domains/molecularStructure';
 import type { Sim3D } from '../three/types';
 import type { LiveDrugRun } from './liveDrugRun';
@@ -35,7 +37,7 @@ const STAGE_COLOR = { admet: 0x5eead4, docking: 0x60a5fa, quantum: 0xc084fc } as
 // The bench's sample layout and the focused candidate are pure functions of the run state; they live
 // next door so tests (and the panel) can use them without loading a renderer.
 export { focusCandidate } from './drugBenchLayout';
-import { BENCH_ZONES, benchLayoutOf, focusCandidate, type BenchZone } from './drugBenchLayout';
+import { BENCH_ZONES, benchLayoutOf, focusCandidate, type BenchLayout, type BenchZone } from './drugBenchLayout';
 
 /** Where each stage of the funnel stands on the bench, and the colour its samples carry. */
 const ZONE_ROW: Readonly<Record<BenchZone, number>> = { QUEUE: 0, ADMET: 1, DOCKING: 2, FINALIST: 3, DISCARD: 4 };
@@ -43,6 +45,27 @@ const ZONE_COLOR: Readonly<Record<BenchZone, number>> = { QUEUE: 0x38bdf8, ADMET
 const SLOT_X = 0.076;
 const ROW_Z = 0.075;
 const SLOTS_PER_ROW = 6;
+
+/**
+ * THE SCIENTIST'S WORK SPOTS. For every instrument: where a person stands to work at it (x along the
+ * bench), and the port where a sample sits once it has been put in. Presentation geometry only — the
+ * numbers place meshes, they carry no scientific meaning.
+ */
+const WORK_SPOT: Readonly<Record<BenchInstrument, { readonly standX: number; readonly port: readonly [number, number, number] }>> = {
+  RACK: { standX: -0.72, port: [-0.72, 1.0, 0.16] },
+  ANALYSER: { standX: -1.34, port: [-1.5, 1.14, 0.2] },
+  WORKSTATION: { standX: 0.55, port: [0.55, 1.0, 0.3] },
+  POSE_VIEWER: { standX: 0.95, port: [0.95, 1.06, 0.24] },
+  MONITOR: { standX: 0.55, port: [0.55, 1.0, 0.16] },
+};
+/** How far in front of the bench the scientist stands, and how fast they walk between spots. */
+const STAND_Z = 0.62;
+const WALK_SPEED = 0.85; // m/s
+/** How far the right arm extends for each action, and how much the head tips toward the work. */
+const REACH_BY_ACTION: Readonly<Record<string, readonly [number, number]>> = {
+  IDLE: [0, 0], REACH: [0.8, 0.34], GRIP: [1, 0.38], CARRY: [0.5, 0.2], PLACE: [0.95, 0.36],
+  OPERATE: [0.62, 0.28], OBSERVE: [0.22, 0.16], RECORD: [0.55, 0.3],
+};
 
 export class DrugBenchLayer {
   private THREE: typeof THREE_NS | null = null;
@@ -69,6 +92,23 @@ export class DrugBenchLayer {
   private poseSha: string | null = null;
   private readonly conformers = new Map<string, Promise<MoleculeMaterialisation | null>>();
   private time = 0;
+  // THE PERSON DOING THE EXPERIMENT (gate B): the scientist, the vial they carry, and the task clock.
+  private scientist: Character | null = null;
+  private carried: THREE_NS.Group | null = null;
+  private carriedId: string | null = null;
+  private carriedColour = 0;
+  private handling: BenchHandling | null = null;
+  private layout: BenchLayout | null = null;
+  private taskKey: string | null = null;
+  private taskElapsedMs = 0;
+  private standX = 0;
+  private walking = 0;
+  private lastHiddenVial: THREE_NS.Object3D | null = null;
+  // A record of what the hands HAVE ACTUALLY DONE in this session, so a check does not depend on
+  // catching the right frame. Written only when the movement is rendered, never in advance.
+  private readonly actionsSeen = new Set<string>();
+  private readonly instrumentsSeen = new Set<string>();
+  private minGripSeparationM = Number.POSITIVE_INFINITY;
 
   constructor(private readonly source: MoleculeGeometrySource = createBackendGeometrySource()) {}
 
@@ -77,6 +117,41 @@ export class DrugBenchLayer {
   /** Heavy atoms of the docked pose currently drawn in the pocket (0 until Vina produced one). */
   get poseAtomsShown(): number { return this.poseAtoms; }
   get poseHashShown(): string | null { return this.poseSha; }
+
+  /**
+   * WHAT THE SCENE IS REALLY DOING WITH ITS HANDS. These report the rendered fact, not the intention:
+   * `handSnapshot().carriedInHand` is the id of the vial whose mesh is parented to the hand joint at
+   * this moment, and `gripSeparationM` is the measured distance between that mesh and the grip point —
+   * so a test can prove the sample is IN the hand and not merely somewhere near it. Null when the layer
+   * is not attached or the run has not reached the bench.
+   */
+  handSnapshot(): {
+    readonly action: string; readonly instrument: string; readonly sampleId: string | null;
+    readonly sampleLabel: string | null; readonly note: string; readonly represents: string;
+    readonly carriedInHand: string | null; readonly gripSeparationM: number | null;
+    readonly scientistPresent: boolean; readonly standX: number;
+    readonly actionsSeen: readonly string[]; readonly instrumentsSeen: readonly string[];
+    readonly minGripSeparationM: number | null;
+  } | null {
+    const h = this.handling;
+    if (!h) return null;
+    const carried = this.carried;
+    const inHand = Boolean(carried?.visible) && carried?.parent === this.scientist?.rightGrip;
+    let separation: number | null = null;
+    if (inHand && carried && this.scientist && this.THREE) {
+      const a = new this.THREE.Vector3(); const b = new this.THREE.Vector3();
+      carried.getWorldPosition(a); this.scientist.rightGrip.getWorldPosition(b);
+      separation = a.distanceTo(b);
+    }
+    return {
+      action: h.action, instrument: h.instrument, sampleId: h.sampleId, sampleLabel: h.sampleLabel,
+      note: h.note, represents: h.represents,
+      carriedInHand: inHand ? this.carriedId : null, gripSeparationM: separation,
+      scientistPresent: Boolean(this.scientist), standX: this.standX,
+      actionsSeen: [...this.actionsSeen], instrumentsSeen: [...this.instrumentsSeen],
+      minGripSeparationM: Number.isFinite(this.minGripSeparationM) ? this.minGripSeparationM : null,
+    };
+  }
 
   setRun(run: LiveDrugRun | null): void { this.state = run?.state ?? null; }
 
@@ -131,6 +206,31 @@ export class DrugBenchLayer {
     this.cloud = new THREE.Group(); this.cloud.position.set(0, 1.25, 0.05); root.add(this.cloud);
     this.rings = new THREE.Group(); this.rings.position.set(0, 1.0, 0); root.add(this.rings);
     this.pocket = new THREE.Group(); this.pocket.position.set(0.95, HOLO_Y - 0.06, 0.05); root.add(this.pocket);
+    // THE PERSON AT THE BENCH (gate B): a suited scientist who walks between the instruments, grips the
+    // vial and puts it in. The rig is the same one every Genesis world uses — no second character system.
+    const scientist = buildCharacter(THREE, {
+      height: 1.74,
+      suit: { fabric: 0xe9edf2, trim: 0x22d3ee, gloves: 0x1e2a38, boots: 0x161b22, visor: 0x7dd3fc, lamp: 0x38bdf8 },
+    });
+    this.scientist = scientist;
+    this.standX = WORK_SPOT.RACK.standX;
+    scientist.root.position.set(this.standX, 0, STAND_Z);
+    scientist.setFacing(Math.PI); // turned toward the bench
+    scientist.update('idle', 0, 0);
+    root.add(scientist.root);
+
+    // The vial in transit: one mesh, re-coloured for whichever sample is being handled. It is parented
+    // to the hand while carried and to the instrument's port once placed — never duplicated in the rack.
+    const carried = new THREE.Group(); carried.name = 'drug-vial-carried'; carried.visible = false;
+    const carriedBody = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.085, 16, 1, true), glass);
+    carriedBody.position.y = 0.043; carried.add(carriedBody);
+    const carriedLiquid = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 14), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.8, transparent: true, opacity: 0.85 }));
+    carriedLiquid.position.y = 0.028; carriedLiquid.name = 'carried-liquid'; carried.add(carriedLiquid);
+    const carriedCap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.012, 14), new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.6 }));
+    carriedCap.position.y = 0.09; carried.add(carriedCap);
+    root.add(carried);
+    this.carried = carried;
+
     // Anchors the camera frames: their world position follows the station, so no coordinate is hard-coded twice.
     for (const [focus, pos] of [['BENCH', [0, 1.2, 0.5]], ['SAMPLES', [-0.72, 1.05, 0.2]], ['ANALYSER', [-1.5, 1.2, 0.2]], ['RECEPTOR', [0.95, HOLO_Y, 0.05]], ['WORKSTATION', [0.55, 1.15, 0.1]], ['POSE', [0.95, HOLO_Y, 0.05]], ['MONITOR', [0.55, 1.35, -0.2]]] as const) {
       const anchor = new THREE.Object3D(); anchor.position.set(pos[0], pos[1], pos[2]); anchor.name = `drug-bench:focus:${focus}`;
@@ -150,9 +250,91 @@ export class DrugBenchLayer {
     if (hash !== this.builtHash && this.THREE && this.root) {
       this.builtHash = hash;
       this.procedure = labProcedureOf(state, state ? focusCandidate(state) : null);
+      this.layout = state ? benchLayoutOf(state) : null;
       this.rebuild(state);
     }
     this.driveInstruments(dt);
+    this.driveScientist(dt);
+  }
+
+  /**
+   * THE HANDS. What the scientist does comes from `benchHandlingOf` — the same canonical state the rack
+   * and the instruments read. Only the movement's progress is local: a task clock that RESETS when the
+   * backend gives the hands a new task and CLAMPS when it does not, so the person ends up standing at
+   * the instrument, working, instead of miming a loop that suggests progress nobody measured.
+   */
+  private driveScientist(dt: number): void {
+    const scientist = this.scientist;
+    if (!scientist || !this.procedure || !this.layout) return;
+    // The task's identity (phase + sample) never depends on the movement, so it can time itself.
+    const task = benchHandlingOf(this.procedure, this.layout, 1);
+    const key = `${task.phaseId ?? '-'}:${task.sampleId ?? '-'}:${task.instrument}`;
+    if (key !== this.taskKey) { this.taskKey = key; this.taskElapsedMs = 0; }
+    else this.taskElapsedMs += dt * 1000;
+    const handling = benchHandlingOf(this.procedure, this.layout, transferMotion(this.taskElapsedMs));
+    this.handling = handling;
+
+    // Walk to the instrument being worked at; while walking, the walk cycle runs (no foot sliding).
+    const spot = WORK_SPOT[handling.instrument];
+    const dx = spot.standX - this.standX;
+    const step = WALK_SPEED * dt;
+    if (Math.abs(dx) > step) { this.standX += Math.sign(dx) * step; this.walking = Math.min(1, this.walking + dt * 4); }
+    else { this.standX = spot.standX; this.walking = Math.max(0, this.walking - dt * 4); }
+    scientist.root.position.set(this.standX, 0, STAND_Z);
+    scientist.setFacing(Math.PI);
+    scientist.update(this.walking > 0.05 ? 'walk' : 'idle', this.time, this.walking);
+    const [reach, pitch] = REACH_BY_ACTION[handling.action] ?? [0, 0];
+    // No reaching while still on the way there: the arm extends once the person has arrived.
+    const arrived = 1 - Math.min(1, this.walking);
+    scientist.reach(reach * arrived, pitch * arrived);
+    scientist.setGrip(handling.carrying ? 1 : handling.action === 'REACH' ? 0.25 : 0);
+    this.placeCarriedVial(handling, spot.port);
+    // Recorded after the frame was built, from the frame itself.
+    this.actionsSeen.add(handling.action);
+    if (handling.instrument !== 'RACK') this.instrumentsSeen.add(handling.instrument);
+    if (handling.carrying && this.carried?.parent === scientist.rightGrip && this.THREE) {
+      const a = new this.THREE.Vector3(); const b = new this.THREE.Vector3();
+      this.carried.getWorldPosition(a); scientist.rightGrip.getWorldPosition(b);
+      this.minGripSeparationM = Math.min(this.minGripSeparationM, a.distanceTo(b));
+    }
+  }
+
+  /**
+   * The vial follows the hand while it is carried and sits in the instrument's port once placed. The
+   * same sample is never in two places: its rack vial is hidden for as long as it is out of the rack.
+   */
+  private placeCarriedVial(handling: BenchHandling, port: readonly [number, number, number]): void {
+    const carried = this.carried;
+    const scientist = this.scientist;
+    if (!carried || !scientist || !this.THREE) return;
+    const holdsIt = handling.carrying;
+    const inInstrument = !holdsIt && handling.sampleId !== null && handling.instrument !== 'RACK'
+      && (handling.action === 'OPERATE' || handling.action === 'OBSERVE');
+    const show = holdsIt || inInstrument;
+    if (handling.sampleId !== this.carriedId) {
+      this.carriedId = handling.sampleId;
+      carried.name = handling.sampleId ? `drug-vial-carried:${handling.sampleId}` : 'drug-vial-carried';
+      const zone = this.layout?.samples.find((s) => s.id === handling.sampleId)?.zone ?? 'QUEUE';
+      const colour = ZONE_COLOR[zone];
+      if (colour !== this.carriedColour) {
+        this.carriedColour = colour;
+        const liquid = carried.getObjectByName('carried-liquid') as THREE_NS.Mesh | undefined;
+        const m = liquid?.material as THREE_NS.MeshStandardMaterial | undefined;
+        if (m) { m.color.setHex(colour); m.emissive.setHex(colour); }
+      }
+    }
+    carried.visible = show;
+    const wantedParent = holdsIt ? scientist.rightGrip : this.root;
+    if (show && carried.parent !== wantedParent) wantedParent?.add(carried); // add() reparents
+    if (show) {
+      if (holdsIt) carried.position.set(0, 0, 0);
+      else carried.position.set(port[0], port[1], port[2]); // port coordinates are already in the layer's frame
+    }
+    // The rack must not show a vial that is in the hand or in an instrument.
+    const rackVial = handling.sampleId ? this.rack?.getObjectByName(`drug-vial:${handling.sampleId}`) : null;
+    if (this.lastHiddenVial && this.lastHiddenVial !== rackVial) this.lastHiddenVial.visible = true;
+    if (rackVial) rackVial.visible = !show;
+    this.lastHiddenVial = show ? rackVial ?? null : null;
   }
 
   /**
@@ -360,6 +542,14 @@ export class DrugBenchLayer {
    */
   cameraTarget(out: THREE_NS.Vector3): { readonly focus: BenchFocus; readonly radius: number } | null {
     if (!this.root || !this.THREE) return null;
+    // While a sample is being handled the shot is on the hands — that is the experiment happening, and
+    // it is what a viewer must see. The moment the hands let go, the camera returns to the phase's own
+    // subject (the instrument, the pocket, the monitor).
+    const hands = this.handling;
+    if (hands && this.scientist && (hands.carrying || hands.action === 'REACH')) {
+      this.scientist.rightGrip.getWorldPosition(out);
+      return { focus: 'HANDS', radius: 0.42 };
+    }
     const focus = this.procedure?.phases.find((p) => p.id === this.procedure?.activeId)?.focus ?? 'BENCH';
     const anchor = this.anchors.get(focus) ?? this.anchors.get('BENCH');
     if (!anchor) return null;
@@ -369,6 +559,8 @@ export class DrugBenchLayer {
   }
 
   dispose(): void {
+    this.scientist?.dispose(); this.scientist = null;
+    this.carried = null; this.carriedId = null; this.handling = null; this.layout = null; this.lastHiddenVial = null;
     this.clear(this.molecule); this.clear(this.cloud); this.clear(this.rings); this.clear(this.pocket);
     this.root?.parent?.remove(this.root);
     this.screen?.texture.dispose();

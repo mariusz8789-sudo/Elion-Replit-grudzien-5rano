@@ -23,8 +23,12 @@ export type ProcedurePhaseId = 'PREPARE' | 'LOAD' | 'CONFIGURE' | 'EXECUTE' | 'O
 export type ProcedureStatus = 'PENDING' | 'ACTIVE' | 'DONE' | 'BLOCKED' | 'SKIPPED';
 export type EpistemicLabel = 'REAL_ENGINE_OUTPUT' | 'MODEL_ESTIMATE' | 'REFERENCE_DATA' | 'SIMULATED' | 'DERIVED';
 
-/** Where in the lab a phase happens, and what the camera should look at while it is active. */
-export type BenchFocus = 'BENCH' | 'SAMPLES' | 'ANALYSER' | 'RECEPTOR' | 'WORKSTATION' | 'POSE' | 'MONITOR';
+/**
+ * Where in the lab a phase happens, and what the camera should look at while it is active. 'HANDS' is
+ * not a phase's own focus: the bench layer uses it while a sample is actually being handled, so the
+ * shot follows the work instead of the furniture.
+ */
+export type BenchFocus = 'BENCH' | 'SAMPLES' | 'ANALYSER' | 'RECEPTOR' | 'WORKSTATION' | 'POSE' | 'MONITOR' | 'HANDS';
 
 export interface ProcedurePhase {
   readonly id: ProcedurePhaseId;

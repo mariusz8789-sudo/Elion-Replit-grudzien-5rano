@@ -5923,6 +5923,11 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }
 .sw-drug-note { font-size: 0.75rem; color: #94a3b8; margin: 0.3rem 0 0; }
 
+/* The visible laboratory: what the scientist is doing right now, in words, beside the scene. */
+.sw-hand-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem; margin: 0.35rem 0 0; font-size: 0.78rem; color: rgba(226, 232, 240, 0.9); }
+.sw-hand-action { font-weight: 700; color: #fbbf24; letter-spacing: 0.02em; }
+.sw-hand-line .sw-procedure-label { flex-basis: 100%; }
+
 
 /* ---------------------------------------------------------------------------
    LABORATORIUM BEZ PANELI (tryb świata)

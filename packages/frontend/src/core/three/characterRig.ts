@@ -52,6 +52,16 @@ export interface Character {
    */
   reach(amount: number, headPitch?: number): void;
   setFacing(angleRad: number): void;
+  /**
+   * LIVE LABORATORY — the point in the right (and left) hand where an object being held sits. A vial
+   * added as a child of `rightGrip` travels with the hand through the whole reach, so a viewer sees the
+   * sample IN the hand rather than floating beside it. Presentation only: parenting a mesh here says
+   * nothing about the experiment.
+   */
+  readonly rightGrip: Obj;
+  readonly leftGrip: Obj;
+  /** Closes the fingers and thumb of the right hand: 0 = open palm, 1 = gripping. */
+  setGrip(amount: number): void;
   /** Płynny tint ubrań; skóra, włosy i anatomia pozostają naturalne. */
   setEpidemicTint(color: number, intensity: number): void;
   dispose(): void;
@@ -158,16 +168,27 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
   const noseGeo = new THREE.SphereGeometry(H * 0.012, 8, 6); disposables.push(noseGeo);
   const nose = new THREE.Mesh(noseGeo, M.skin); nose.position.set(0, head.position.y - H * 0.010, H * 0.075); neck.add(nose);
 
-  // Ramiona: bark → łokieć → dłoń.
+  // Ramiona: bark → łokieć → dłoń. Dłoń ma punkt trzymania (`grip`) i palce, które się zamykają:
+  // laboratorium musi POKAZAĆ chwyt fiolki, a nie tylko rękę obok niej.
   const arm = (side: number) => {
     const shoulder = joint(chest, side * shoulderX, H * 0.02, 0); shoulder.name = side > 0 ? 'joint:shoulder.L' : 'joint:shoulder.R';
     limb(shoulder, upperArm, H * 0.035, M.shirt);
     const elbow = joint(shoulder, 0, -upperArm, 0); elbow.name = side > 0 ? 'joint:elbow.L' : 'joint:elbow.R';
     limb(elbow, foreArm, H * 0.028, M.skin);
-    const wrist = joint(elbow, 0, -foreArm, 0);
+    const wrist = joint(elbow, 0, -foreArm, 0); wrist.name = side > 0 ? 'joint:wrist.L' : 'joint:wrist.R';
     const handGeo = new THREE.SphereGeometry(H * 0.032, 10, 8); disposables.push(handGeo);
     const hand = new THREE.Mesh(handGeo, M.skin); hand.position.y = -H * 0.02; wrist.add(hand);
-    return { shoulder, elbow };
+    hand.name = side > 0 ? 'hand.L' : 'hand.R';
+    // Palce: dwa segmenty (chwyt + przeciwstawny kciuk) obracane przez `setGrip`.
+    const fingerGeo = new THREE.BoxGeometry(H * 0.026, H * 0.030, H * 0.012); disposables.push(fingerGeo);
+    const fingers = new THREE.Group(); fingers.position.set(0, -H * 0.026, H * 0.004); hand.add(fingers);
+    const fingerMesh = new THREE.Mesh(fingerGeo, M.skin); fingerMesh.position.y = -H * 0.014; fingers.add(fingerMesh);
+    const thumb = new THREE.Group(); thumb.position.set(side * -H * 0.022, -H * 0.014, H * 0.006); hand.add(thumb);
+    const thumbGeo = new THREE.BoxGeometry(H * 0.012, H * 0.024, H * 0.012); disposables.push(thumbGeo);
+    const thumbMesh = new THREE.Mesh(thumbGeo, M.skin); thumbMesh.position.y = -H * 0.011; thumb.add(thumbMesh);
+    // Punkt trzymania: tam, gdzie fiolka siedzi w zamkniętej dłoni. Przedmiot dopina się TU.
+    const grip = joint(hand, 0, -H * 0.034, H * 0.014); grip.name = side > 0 ? 'grip.L' : 'grip.R';
+    return { shoulder, elbow, wrist, hand, grip, fingers, thumb };
   };
   const armL = arm(1), armR = arm(-1);
 
@@ -247,6 +268,15 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     update,
     reach,
     setFacing: (a: number) => { root.rotation.y = a; },
+    rightGrip: armR.grip,
+    leftGrip: armL.grip,
+    setGrip: (amount: number) => {
+      const g = Math.max(0, Math.min(1, amount));
+      // Fingers curl in, thumb comes across: a closed hand, not a snapped pose.
+      armR.fingers.rotation.x = g * 1.25;
+      armR.thumb.rotation.z = -g * 0.9;
+      armR.thumb.rotation.x = g * 0.35;
+    },
     setEpidemicTint: (color: number, intensity: number) => {
       targetTint.setHex(color);
       const shirtTarget = scratchShirtTarget.copy(baseShirt).lerp(targetTint, Math.max(0, Math.min(0.78, intensity)));

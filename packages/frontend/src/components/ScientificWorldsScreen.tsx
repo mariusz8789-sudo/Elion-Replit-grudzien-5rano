@@ -134,6 +134,12 @@ const ZONE_LABEL_PL: Readonly<Record<BenchZone, string>> = {
   QUEUE: 'w kolejce', ADMET: 'w analizatorze', DOCKING: 'w dokowaniu', FINALIST: 'finaliści', DISCARD: 'odrzucone',
 };
 
+/** What the scientist is doing, in the words a visitor would use. */
+const HAND_ACTION_PL: Readonly<Record<string, string>> = {
+  IDLE: 'czeka', REACH: 'sięga po próbkę', GRIP: 'chwyta fiolkę', CARRY: 'przenosi próbkę',
+  PLACE: 'wkłada próbkę do aparatury', OPERATE: 'obsługuje aparaturę', OBSERVE: 'obserwuje', RECORD: 'zapisuje wynik',
+};
+
 export function describePlan(commandCount: number, unresolved: readonly string[], steps: readonly string[], rejected: readonly { reason: string }[]): string {
   const parts: string[] = [];
   if (commandCount) parts.push(`Rozumiem ${commandCount} ${commandCount === 1 ? 'polecenie' : 'polecenia'}: ${steps.join(' → ') || 'bez kroków'}.`);
@@ -171,6 +177,13 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   /** Where the current stage started, so its real length can be recorded when it ends. */
   const stageMark = useRef<{ stage: string | null; startedAt: number }>({ stage: null, startedAt: Date.now() });
   const [benchPoseAtoms, setBenchPoseAtoms] = useState(0);
+  /**
+   * WHAT THE SCENE'S HANDS ARE DOING — read back FROM the scene, not predicted for it. This is the
+   * accessible mirror of the 3D work (UI3D-1): the action, the sample in the hand and the measured
+   * distance between that vial and the grip point, so the visible laboratory can be checked instead of
+   * being taken on trust. Null until the bench has a run.
+   */
+  const [hand, setHand] = useState<ReturnType<DrugBenchLayer['handSnapshot']>>(null);
   /**
    * The lab shows the WORLD, not a dashboard: by default every panel is out of the way and the
    * readouts live on the instruments in the scene. One control opens the details (evidence, replay,
@@ -270,6 +283,15 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     setBenchPoseAtoms((prev) => (prev === (s.drugBenchPoseAtoms ?? 0) ? prev : s.drugBenchPoseAtoms ?? 0));
   }, []);
   const { canvasRef, loading, failed } = useThreeLoop(loopSim, params, true, onStats);
+  // The hand mirror follows the scene four times a second: often enough to see the transfer, cheap
+  // enough not to matter. It only ever reports what the layer says it rendered.
+  useEffect(() => {
+    if (world !== 'physics' || !drugRun) return;
+    const read = () => setHand(benchLayer.handSnapshot());
+    read();
+    const id = setInterval(read, 250);
+    return () => clearInterval(id);
+  }, [world, drugRun, benchLayer]);
   // Measured load time of this world: the next visit counts down from it (never a guessed number).
   const loadStartedAt = useRef(performance.now());
   const [loadEstimate] = useState(() => estimateDuration(`lab:${world}`));
@@ -649,8 +671,27 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
             data-candidates={st.candidates.length} data-last-seq={st.lastSeq} data-scene-atoms={benchAtoms} data-focus-smiles={focus?.smiles ?? ''}
             data-target={st.target?.targetId ?? ''} data-docking-step={focus?.dockingStep ?? ''} data-pose-atoms={focus?.pose?.atoms.length ?? 0} data-scene-pose-atoms={benchPoseAtoms}
             data-bench-zones={BENCH_ZONES.map((z) => `${z}:${layout.counts[z]}`).join(',')} data-bench-samples={layout.samples.length}
-            data-finalists={layout.finalists.map((f) => f.id).join(',')}>
+            data-finalists={layout.finalists.map((f) => f.id).join(',')}
+            /* The visible laboratory, mirrored from the scene: what the hands do, with which sample, and
+               how far that vial is from the grip point (in millimetres, measured in the rendered scene). */
+            data-scientist={hand?.scientistPresent ? 'PRESENT' : ''}
+            data-hand-action={hand?.action ?? ''} data-hand-instrument={hand?.instrument ?? ''}
+            data-hand-sample={hand?.sampleLabel ?? ''} data-hand-carried={hand?.carriedInHand ?? ''}
+            data-hand-grip-mm={hand?.gripSeparationM != null ? Math.round(hand.gripSeparationM * 1000) : ''}
+            /* The record of what the hands have really done so far in this run — written by the scene as
+               it rendered each movement, so a check does not depend on catching the right frame. */
+            data-hand-seen={(hand?.actionsSeen ?? []).join(',')} data-hand-instruments-seen={(hand?.instrumentsSeen ?? []).join(',')}
+            data-hand-grip-min-mm={hand?.minGripSeparationM != null ? Math.round(hand.minGripSeparationM * 1000) : ''}>
             <div className="sw-chemistry-head"><strong>Przebieg eksperymentu</strong><span className="sw-badge">{running ? 'W TOKU' : 'ZAKOŃCZONY'}</span></div>
+            {hand && (
+              /* Said in words, next to the scene: what the person is doing, and that the gesture itself is
+                 a simulated laboratory step standing for a computation — never a physical measurement. */
+              <p className="sw-hand-line" data-testid="drug-hand-line">
+                <span className="sw-hand-action">{HAND_ACTION_PL[hand.action] ?? hand.action}</span>
+                {' — '}{hand.note}
+                <span className="sw-procedure-label">SYMULOWANY KROK LABORATORYJNY · reprezentuje: {hand.represents}</span>
+              </p>
+            )}
             <ol className="sw-procedure" aria-label="Kolejne etapy eksperymentu">
               {procedure.phases.map((ph) => (
                 <li key={ph.id} data-phase-id={ph.id} data-status={ph.status} className={`sw-procedure-step is-${ph.status.toLowerCase()}`}>

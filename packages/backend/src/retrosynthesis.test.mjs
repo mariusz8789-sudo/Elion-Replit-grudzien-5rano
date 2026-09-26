@@ -111,7 +111,9 @@ describe('a route search is an experiment like any other', () => {
     assert.equal(blocked.length, 1);
     assert.equal(blocked[0].payload.stage, 'retrosynthesis');
     assert.equal(blocked[0].payload.blocker, 'BLOCKED_BY_RUNTIME');
-    assert.match(blocked[0].payload.reason, /MODEL_FILES_MISSING|not usable/i);
+    // Three legitimate blocked states: no interpreter, no package, or no model data. Any other reason
+    // would mean the adapter invented one.
+    assert.match(blocked[0].payload.reason, /MODEL_FILES_MISSING|AIZYNTHFINDER_NOT_INSTALLED|not usable/i);
   });
 
   test('a candidate that does not exist is refused before anything is written', () => {

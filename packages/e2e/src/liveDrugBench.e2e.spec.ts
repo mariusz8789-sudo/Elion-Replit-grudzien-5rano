@@ -115,6 +115,19 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   await expect(live).toContainText('REAL_ENGINE_OUTPUT');
   await expect(live).toContainText('MODEL_ESTIMATE');
 
+  // THE BENCH SHOWS THE FUNNEL, not three numbers: every candidate the backend wrote stands in the row
+  // of the stage it actually reached, and the finalists are on record for comparison.
+  const samples = Number(await live.getAttribute('data-bench-samples'));
+  expect(samples).toBe(Number(await live.getAttribute('data-candidates')));
+  const zones = Object.fromEntries((await live.getAttribute('data-bench-zones'))!.split(',').map((pair) => {
+    const [zone, count] = pair.split(':');
+    return [zone, Number(count)];
+  })) as Record<string, number>;
+  expect(Object.keys(zones).sort()).toEqual(['ADMET', 'DISCARD', 'DOCKING', 'FINALIST', 'QUEUE']);
+  expect(Object.values(zones).reduce((a, b) => a + b, 0)).toBe(samples);
+  expect(zones.FINALIST, 'a finished run must have at least one finalist with a measured score').toBeGreaterThan(0);
+  await expect(live).toContainText('finaliści');
+
   // The scientist seals the session from that run: the one outcome panel carries the frozen hypothesis,
   // its verdict, the engine runs, and replay reproduces the sealed session.
   await expect(page.getByTestId('sw-agent-state')).toHaveText(/bezczynny/i, { timeout: 180_000 });
@@ -128,4 +141,55 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   await expect(page.getByTestId('sw-replay')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('sw-replay').click();
   await expect(page.getByTestId('sw-replay-verdict')).toContainText('MATCH', { timeout: 60_000 });
+
+  // PERSISTENT MEMORY: the criteria were registered on the server BEFORE the engines ran, and the
+  // sealed result was checked against them by the server itself — not by the browser that showed it.
+  const memory = (await api(`/api/projects/${projectId}/campaigns/${campaignId}/experiment-memory`, token)).memory;
+  expect(memory.preregistration, 'the criteria must be on the server, not only in this tab').not.toBeNull();
+  expect(memory.preregistration.kind).toBe('PREREGISTRATION');
+  expect(memory.preregistration.seq).toBe(1);
+  expect(memory.chain.ok).toBe(true);
+  expect(memory.sessions.length).toBeGreaterThan(0);
+  const sealed = memory.sessions.at(-1)!;
+  expect(sealed.preregCheck).toBe('MATCH');
+  expect(sealed.body.verdictCheck).toBe('MATCH');
+  expect(['SUPPORTED', 'WEAKENED', 'FALSIFIED', 'UNRESOLVED']).toContain(sealed.body.serverVerdict);
+  expect(sealed.body.serverVerdict).toBe(sealed.body.reportedVerdict);
+
+  // THE FINAL ARTEFACT: a reproducible protocol, assembled from the record — and an honest synthesis
+  // section, since a route exists only when the retrosynthesis engine produced one.
+  const protocol = (await api(`/api/projects/${projectId}/campaigns/${campaignId}/protocol`, token)).protocol;
+  expect(protocol.kind).toBe('GENESIS_COMPUTATIONAL_CANDIDATE_PROTOCOL');
+  expect(protocol.hypothesis.registeredBeforeExecution).toBe(true);
+  expect(protocol.target.pdbId).toBe('1IEP');
+  expect(protocol.target.chain).toBe('A');
+  expect(protocol.target.pocket.boxSize).toHaveLength(3);
+  expect(protocol.parameters.docking.exhaustiveness).toBeGreaterThan(0);
+  expect(protocol.parameters.docking.seed).not.toBeNull();
+  expect(protocol.engines.some((e: { engine: string; engineVersion: string | null }) => e.engine === 'AutoDock Vina' && e.engineVersion)).toBe(true);
+  expect(protocol.candidates.length).toBe(samples);
+  expect(protocol.funnel.generated).toBe(samples);
+  expect(protocol.finalists.length).toBeGreaterThan(0);
+  expect(protocol.finalists[0].poseSha256).toBeTruthy();
+  expect(protocol.evidence.scienceRuns.length).toBeGreaterThan(0);
+  expect(protocol.evidence.experimentRecords.chainOk).toBe(true);
+  expect(protocol.replay.engineVerifications.some((v: { verdict: string }) => v.verdict === 'MATCH')).toBe(true);
+  // Never an invented recipe: either the engine's route, or a stated absence.
+  if (protocol.synthesis.routeProvided) {
+    expect(protocol.synthesis.topRoute.reactionsForward.length).toBeGreaterThan(0);
+    expect(protocol.synthesis.modelChecksums).toBeTruthy();
+  } else {
+    expect(['NOT_ATTEMPTED', 'BLOCKED_BY_RUNTIME']).toContain(protocol.synthesis.status);
+    expect(protocol.synthesis.statement).toMatch(/Genesis writes a route only when its retrosynthesis engine produced one/);
+  }
+  // The proposed physical validation is a proposal, and says so on every step.
+  expect(protocol.proposedValidationProtocol.status).toBe('REQUIRES_PHYSICAL_LABORATORY');
+  expect(protocol.proposedValidationProtocol.executedByGenesis).toBe(false);
+  expect(protocol.proposedValidationProtocol.steps.length).toBeGreaterThan(0);
+  for (const step of protocol.proposedValidationProtocol.steps) {
+    expect(step.status).toBe('NOT_EXECUTED');
+    expect(step.apparatus).toMatch(/NOT_CONNECTED/);
+  }
+  expect(protocol.boundary).toMatch(/Nothing in this protocol was measured on physical apparatus/);
+  expect(protocol.protocolFingerprint).toMatch(/^[0-9a-f]{64}$/);
 });

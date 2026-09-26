@@ -46,6 +46,7 @@ import { estimateDuration, recordDuration } from '../core/product/durationEstima
 import { getToken } from '../core/backend/session';
 import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
+import { BENCH_ZONES, benchLayoutOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
 import { labProcedureOf } from '../core/liveExperiment/labProcedure';
 import type { DockingStep } from '../core/liveExperiment/drugRunState';
 
@@ -125,6 +126,11 @@ export function applyAnatomyInteraction(state: AnatomyViewState, parameters: Rea
 export interface TranscriptEntry { readonly id: number; readonly who: 'user' | 'agent' | 'system'; readonly text: string; }
 
 /** Pure: what the HUD says about a parsed command before the body moves. */
+/** What each bench row is called in the world — plain words, no engine names. */
+const ZONE_LABEL_PL: Readonly<Record<BenchZone, string>> = {
+  QUEUE: 'w kolejce', ADMET: 'w analizatorze', DOCKING: 'w dokowaniu', FINALIST: 'finaliści', DISCARD: 'odrzucone',
+};
+
 export function describePlan(commandCount: number, unresolved: readonly string[], steps: readonly string[], rejected: readonly { reason: string }[]): string {
   const parts: string[] = [];
   if (commandCount) parts.push(`Rozumiem ${commandCount} ${commandCount === 1 ? 'polecenie' : 'polecenia'}: ${steps.join(' → ') || 'bez kroków'}.`);
@@ -614,6 +620,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
         const sealedHere = session?.experimentId === 'drug-candidate-run';
         const hypothesis = getDrugHypothesis(drugRun.campaignId) ?? buildDrugHypothesis(focus?.smiles ?? 'kandydat');
         const verdict = drugRun.phase === 'DONE' ? evaluateDrugHypothesis(hypothesis, st, focus).verdict : null;
+        // The funnel as the bench stands it: one sample per candidate, in the row of the stage it reached.
+        const layout = benchLayoutOf(st);
         const procedure = labProcedureOf(st, focus, {
           sealed: sealedHere,
           verdict,
@@ -625,7 +633,9 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
             data-procedure-done={procedure.phases.filter((x) => x.status === 'DONE').map((x) => x.id).join(',')}
             data-phase={drugRun.phase} data-stage={st.stage} data-state-hash={st.stateHash} data-scene-hash={benchSceneHash ?? ''}
             data-candidates={st.candidates.length} data-last-seq={st.lastSeq} data-scene-atoms={benchAtoms} data-focus-smiles={focus?.smiles ?? ''}
-            data-target={st.target?.targetId ?? ''} data-docking-step={focus?.dockingStep ?? ''} data-pose-atoms={focus?.pose?.atoms.length ?? 0} data-scene-pose-atoms={benchPoseAtoms}>
+            data-target={st.target?.targetId ?? ''} data-docking-step={focus?.dockingStep ?? ''} data-pose-atoms={focus?.pose?.atoms.length ?? 0} data-scene-pose-atoms={benchPoseAtoms}
+            data-bench-zones={BENCH_ZONES.map((z) => `${z}:${layout.counts[z]}`).join(',')} data-bench-samples={layout.samples.length}
+            data-finalists={layout.finalists.map((f) => f.id).join(',')}>
             <div className="sw-chemistry-head"><strong>Przebieg eksperymentu</strong><span className="sw-badge">{running ? 'W TOKU' : 'ZAKOŃCZONY'}</span></div>
             <ol className="sw-procedure" aria-label="Kolejne etapy eksperymentu">
               {procedure.phases.map((ph) => (
@@ -642,6 +652,9 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
               <dt>Cel białkowy</dt><dd>{st.target ? `${st.target.protein} · PDB ${st.target.pdbId}, łańcuch ${st.target.chain} (${st.target.receptorAtoms} atomów)` : 'receptor jeszcze nieprzygotowany'}</dd>
               <dt>Generacje</dt><dd>{st.generationsCompleted}/{st.maxGenerations}</dd>
               <dt>Kandydaci</dt><dd>{st.candidates.length} (zachowani {st.candidates.filter((c) => c.status === 'retained').length})</dd>
+              <dt>Na stole</dt><dd>{BENCH_ZONES.map((z) => `${ZONE_LABEL_PL[z]} ${layout.counts[z]}`).join(' · ')}</dd>
+              {layout.finalists.length > 0 && <><dt>Finaliści</dt><dd>{layout.finalists.map((f) => `#${f.rank} ${f.dockingScore?.toFixed(2)} kcal/mol`).join(' · ')}</dd></>}
+              {layout.samples.some((x) => x.rejectedReason) && <><dt>Odrzucone</dt><dd>{[...new Set(layout.samples.filter((x) => x.rejectedReason).map((x) => x.rejectedReason))].join(' · ')}</dd></>}
               <dt>Fokus</dt><dd className="cw-mono">{focus?.smiles ?? '—'}</dd>
               <dt>ADMET</dt><dd>{focus?.stages.admet?.status ?? '—'}</dd>
               <dt>Krok dokowania</dt><dd>{DOCKING_STEP_LABEL[focus?.dockingStep ?? 'NONE']}</dd>

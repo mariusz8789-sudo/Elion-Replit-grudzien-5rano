@@ -143,3 +143,31 @@ Plan główny i kolejność faz z §9 **nie zmieniają się**. To jest ustalenie
 Kolejność prac pozostaje: (1) domknięcie żywego E2E — powtórka prawdziwego silnika, trwałość sesji i
 rejestracja kryteriów; (2) laboratorium na najwyższym poziomie wizualnym i proceduralnym; (3) dopiero
 potem drugi benchmark. Nie cofamy i nie przebudowujemy tego, co działa.
+
+## 12. Aktualizacja wykonawcza (2026-09-26) — jeden domknięty eksperyment przed czymkolwiek innym
+
+Właściciel zawiesił wszystkie prace poboczne (screeny, polish wizualny, kolejne światy, filmy) do
+chwili, w której istnieje **jeden pełny przebieg na żywo kończący się odtwarzalnym protokołem**:
+
+```
+PYTANIE → HIPOTEZA → ZAREJESTROWANE KRYTERIA → PLAN → POTWIERDZENIE → ŻYWE LABORATORIUM
+→ WIDOCZNY NAUKOWIEC / PRÓBKI / APARATURA / CZĄSTECZKI / RECEPTOR → PRAWDZIWY SILNIK
+→ STANY POŚREDNIE NA ŻYWO → WYNIK → DOWODY → POWTÓRKA SILNIKA → MATCH/DRIFT/BLOCKED
+→ KOŃCOWY, ODTWARZALNY PROTOKÓŁ
+```
+
+Dwa ustalenia, które z tego wynikają i wiążą dalej:
+
+- **Protokół końcowy nie jest streszczeniem.** Musi nieść tożsamość kandydata i strukturę (SMILES),
+  tożsamość celu, silniki z wersjami, parametry wejściowe i przygotowania, pudełko dokowania, wyniki
+  ADMET/QM, kryteria selekcji, powody odrzucenia kandydatów, finalistów, niepewność, identyfikatory
+  dowodów, tożsamość powtórki i następny krok walidacji. Gdy czegoś nie ma — pole mówi, że nie ma.
+- **Retrosynteza jest wymaganą zdolnością.** Trasa syntezy pochodzi **wyłącznie** z prawdziwego,
+  zintegrowanego silnika (AiZynthFinder, MIT — `docs/GENESIS_RETROSYNTHESIS.md`). Bez działającego
+  silnika Genesis wydaje **COMPUTATIONAL CANDIDATE PROTOCOL** + **PROPOSED VALIDATION PROTOCOL**
+  oznaczony jako wymagający fizycznego laboratorium. Zmyślona receptura syntezy jest zakazana; atrapa
+  silnika również.
+
+Laboratorium musi **pokazywać** przebieg: próbki, czynności naukowca, przejścia między stanowiskami,
+pracującą aparaturę, kandydatów wchodzących i wypadających z przepływu, porównanie finalistów — na tym
+samym kanonicznym stanie, bez osobnej animacji. „100 → 20 → 2” jako trzy liczby nie wystarcza.

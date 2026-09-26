@@ -47,7 +47,7 @@ Scena i kamery **tylko czytają** ten stan. Żadnej animacji, która udaje wynik
 4. **Chat-journey uruchamia tylko deskryptory** (`unifiedResearchJourney.ts:166`); ADMET/docking/QM tylko z `#/campaign`.
 5. **Brak falsyfikacji dla leków**: `falsificationStatus: 'NOT_RUN'` stale; Virtual Lab daje SUPPORT/CONFLICT tylko gdy plan ma `expectation`, a czat żadnej nie wysyła. `WEAKENED` nie istnieje nigdzie.
 6. **Poza dockingu nie jest dostępna**: `docked.pdbqt` leży na dysku, brak endpointu (`dock_worker.py:136`). Receptor w kampanii to **zastępcza mała cząsteczka (indol)**, nie białko (`multiFidelity.mjs:299`).
-7. **Synteza**: `synthesisReadiness` to etykieta (zawsze `SOURCE_REQUIRED`/`BLOCKED`, `researchIntake.mjs:610`). Nie ma retrosyntezy nigdzie. Realne kroki chemiczne w silniku: pojedyncze transformacje RDKit (rodzic → produkt) i BRICS (rodzic → fragmenty → produkt).
+7. **Synteza** (stan z audytu; patrz aktualizacja w §4): `synthesisReadiness` to etykieta (zawsze `SOURCE_REQUIRED`/`BLOCKED`, `researchIntake.mjs:610`). Wtedy nie było retrosyntezy — od 2026-09-26 jest silnik AiZynthFinder (§4). Realne kroki chemiczne w silniku: pojedyncze transformacje RDKit (rodzic → produkt) i BRICS (rodzic → fragmenty → produkt).
 8. **Scena** buduje meble tylko dla znanych stanowisk (`agentLabScene3D.ts:719`); nie ma API „pokaż molekułę”. `core/three/*` należy do Astry.
 
 ## 3. Architektura docelowa (bez drugiego solvera, routera, ledgera, replay, renderera)
@@ -95,7 +95,12 @@ Scena i kamery **tylko czytają** ten stan. Żadnej animacji, która udaje wynik
 
 - Realne dziś i pokazywane na żywo: **transformacje in-silico** (RDKit SMARTS, BRICS) z rodowodem rodzic → produkt, podpisane „transformacja obliczeniowa, nie synteza w laboratorium”.
 - `synthesisReadiness` pokazany tak, jak jest (`SOURCE_REQUIRED`). **Żadnej wymyślonej trasy.**
-- Prawdziwa trasa syntezy krok po kroku wymaga **nowego silnika retrosyntezy** (np. otwarty AiZynthFinder jako worker, etykieta MODEL). To decyzja do podjęcia — nie ma go w repo.
+- **AKTUALIZACJA 2026-09-26 — decyzja podjęta, silnik zintegrowany.** Retrosynteza jest wymaganą
+  zdolnością Genesis; **AiZynthFinder** (MIT) jest zintegrowany jako kanoniczny silnik z Dowodami,
+  Powtórką i prowieniencją — szczegóły i zmierzony stan w `docs/GENESIS_RETROSYNTHESIS.md`. Dane modelu
+  (polityka, szablony, stock) nie są redystrybuowane w repo: bez `GENESIS_RETRO_MODEL_DIR` zdolność
+  raportuje `BLOCKED_BY_RUNTIME` i **żadna trasa nie jest proponowana**. To nadal obowiązuje: wymyślona
+  trasa jest zakazana — albo trasa z silnika, albo jawny brak.
 
 ## 5. Kolejność prac
 

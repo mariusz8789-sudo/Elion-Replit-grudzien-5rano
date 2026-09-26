@@ -8,7 +8,7 @@ import { labProcedureOf, type BenchFocus, type LabProcedure } from './labProcedu
 import { createBackendGeometrySource, type MoleculeGeometrySource, type MoleculeMaterialisation } from '../worldModel/domains/molecularStructure';
 import type { Sim3D } from '../three/types';
 import type { LiveDrugRun } from './liveDrugRun';
-import type { DockedPose, LiveCandidate, LiveDrugRunState } from './drugRunState';
+import type { DockedPose, LiveDrugRunState } from './drugRunState';
 
 /**
  * DRUG BENCH LAYER — the live drug run drawn at the bench of the ONE main laboratory.
@@ -35,6 +35,14 @@ const STAGE_COLOR = { admet: 0x5eead4, docking: 0x60a5fa, quantum: 0xc084fc } as
 // The bench's sample layout and the focused candidate are pure functions of the run state; they live
 // next door so tests (and the panel) can use them without loading a renderer.
 export { focusCandidate } from './drugBenchLayout';
+import { BENCH_ZONES, benchLayoutOf, focusCandidate, type BenchZone } from './drugBenchLayout';
+
+/** Where each stage of the funnel stands on the bench, and the colour its samples carry. */
+const ZONE_ROW: Readonly<Record<BenchZone, number>> = { QUEUE: 0, ADMET: 1, DOCKING: 2, FINALIST: 3, DISCARD: 4 };
+const ZONE_COLOR: Readonly<Record<BenchZone, number>> = { QUEUE: 0x38bdf8, ADMET: 0x5eead4, DOCKING: 0x60a5fa, FINALIST: 0xfbbf24, DISCARD: 0x475569 };
+const SLOT_X = 0.076;
+const ROW_Z = 0.075;
+const SLOTS_PER_ROW = 6;
 
 export class DrugBenchLayer {
   private THREE: typeof THREE_NS | null = null;
@@ -85,8 +93,10 @@ export class DrugBenchLayer {
 
     // Sample rack: one vial per persisted candidate (filled in as the engine writes them).
     this.rack = new THREE.Group(); this.rack.position.set(-0.72, 0.93, 0.12); root.add(this.rack);
-    const rackBody = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.22), mat.BRUSHED_METAL);
-    rackBody.position.set(0, 0.025, 0); this.rack.add(rackBody);
+    // One row per stage of the funnel: queue, analyser, docking, finalists, discard tray.
+    const rackDepth = BENCH_ZONES.length * ROW_Z + 0.04;
+    const rackBody = new THREE.Mesh(new THREE.BoxGeometry(SLOTS_PER_ROW * SLOT_X + 0.04, 0.05, rackDepth), mat.BRUSHED_METAL);
+    rackBody.position.set(0, 0.025, (BENCH_ZONES.length - 1) * ROW_Z / 2); this.rack.add(rackBody);
     this.vialGlass = glass;
 
     // ADMET analyser: a bench instrument with a lid, a status lamp and its own small readout.
@@ -194,22 +204,32 @@ export class DrugBenchLayer {
     this.clearVials();
     if (!state) { this.clear(this.molecule); this.clear(this.pocket); this.moleculeSmiles = null; this.moleculeAtoms = 0; this.poseAtoms = 0; this.poseSha = null; return; }
     const focus = focusCandidate(state);
-    // Sample rack: one vial per persisted candidate. A rejected candidate's vial stays dark and capped;
-    // the one being worked on glows. Nothing is placed for a candidate the backend has not written.
-    state.candidates.forEach((c, i) => {
-      const column = i % 6, row = Math.floor(i / 6);
+    // THE FUNNEL, VISIBLE: one vial per persisted candidate, standing in the row of the stage it has
+    // actually reached (queue → analyser → docking → finalists → discard tray). Its row comes from
+    // `benchLayoutOf`, which reads only what the backend wrote — nothing moves on a timer, and a
+    // candidate the backend has not written is not on the bench at all.
+    const layout = benchLayoutOf(state);
+    for (const sample of layout.samples) {
+      const column = sample.slot % SLOTS_PER_ROW;
+      const overflow = Math.floor(sample.slot / SLOTS_PER_ROW); // a crowded row stacks slightly behind
       const vial = new THREE.Group();
-      vial.position.set(-0.19 + column * 0.076, 0.05, -0.05 + row * 0.08);
-      vial.name = `drug-vial:${c.id}`;
+      vial.position.set(-0.19 + column * SLOT_X, 0.05, ZONE_ROW[sample.zone] * ROW_Z + overflow * 0.018);
+      vial.name = `drug-vial:${sample.id}`;
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.085, 16, 1, true), this.vialGlass!);
       body.position.y = 0.043; vial.add(body);
-      const colour = c.status === 'rejected' ? 0x475569 : c === focus ? 0xfbbf24 : 0x38bdf8;
-      const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 14), new THREE.MeshStandardMaterial({ color: colour, emissive: colour, emissiveIntensity: c.status === 'rejected' ? 0.05 : c === focus ? 0.8 : 0.35, transparent: true, opacity: 0.85 }));
+      const colour = sample.active ? 0xfbbf24 : ZONE_COLOR[sample.zone];
+      const glow = sample.zone === 'DISCARD' ? 0.05 : sample.active ? 0.85 : sample.zone === 'FINALIST' ? 0.6 : 0.3;
+      const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 14), new THREE.MeshStandardMaterial({ color: colour, emissive: colour, emissiveIntensity: glow, transparent: true, opacity: 0.85 }));
       liquid.position.y = 0.028; vial.add(liquid);
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.012, 14), new THREE.MeshStandardMaterial({ color: c.status === 'rejected' ? 0x334155 : 0x0ea5e9, roughness: 0.6 }));
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.012, 14), new THREE.MeshStandardMaterial({ color: sample.zone === 'DISCARD' ? 0x334155 : 0x0ea5e9, roughness: 0.6 }));
       cap.position.y = 0.09; vial.add(cap);
+      // A finalist stands on a podium whose height is its rank, so the comparison is visible at a glance.
+      if (sample.rank !== null) {
+        const podium = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 0.012 + Math.max(0, 3 - sample.rank) * 0.008, 16), new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0x92400e, emissiveIntensity: 0.4, roughness: 0.4 }));
+        podium.position.y = 0.006; vial.add(podium);
+      }
       this.rack!.add(vial);
-    });
+    }
     // Stage rings: an arc per stage, its length = measured / planned. No measurement → no arc.
     (['admet', 'docking', 'quantum'] as const).forEach((stage, i) => {
       const p = state.progress[stage];

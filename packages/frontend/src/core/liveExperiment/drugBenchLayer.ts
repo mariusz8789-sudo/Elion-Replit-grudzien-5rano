@@ -6,7 +6,7 @@ import { createManipulatorArm, type ManipulatorHandle } from '../three/biologyLa
 import { buildCharacter, type Character } from '../three/characterRig';
 import { CameraRig } from '../three/graphics/cameraRig';
 import { labProcedureOf, type BenchFocus, type LabProcedure } from './labProcedure';
-import { benchHandlingOf, transferMotion, type BenchHandling, type BenchInstrument } from './benchHandling';
+import { TRANSFER_MS, benchHandlingOf, transferMotion, type BenchHandling, type BenchInstrument } from './benchHandling';
 import { createBackendGeometrySource, type MoleculeGeometrySource, type MoleculeMaterialisation } from '../worldModel/domains/molecularStructure';
 import type { Sim3D } from '../three/types';
 import type { LiveDrugRun } from './liveDrugRun';
@@ -411,8 +411,21 @@ export class DrugBenchLayer {
     // hand is still whichever sample the record places at that stage.
     const task = benchHandlingOf(this.procedure, this.layout, 1);
     const key = `${task.phaseId ?? '-'}:${task.instrument}`;
-    if (key !== this.taskKey) { this.taskKey = key; this.taskElapsedMs = 0; }
-    else this.taskElapsedMs += dt * 1000;
+    // A NEW TASK DOES NOT CUT THE GESTURE SHORT. Resetting the clock the instant the backend moved on
+    // meant the movement only ever got as far as the stage was slow: reach and grip take 0.99 s of the
+    // 2.6 s transfer, carry 1.92 s, putting it in 2.34 s — so a stage that finished sooner than that
+    // showed the vial being picked up and then already sitting in the instrument. The faster the
+    // engines, the more of the handling disappeared, which is the opposite of what a viewer should
+    // see. The clock now starts over only once the current transfer has been shown in full; until
+    // then it keeps running, so every sub-step is rendered before the next task is adopted. The
+    // gesture can lag the record by at most one transfer, and it still never finishes a phase or
+    // claims a measurement — `handling` is read from the live procedure either way.
+    if (this.taskKey === null || (key !== this.taskKey && this.taskElapsedMs >= TRANSFER_MS)) {
+      this.taskKey = key;
+      this.taskElapsedMs = 0;
+    } else {
+      this.taskElapsedMs += dt * 1000;
+    }
     const handling = benchHandlingOf(this.procedure, this.layout, transferMotion(this.taskElapsedMs));
     this.handling = handling;
 

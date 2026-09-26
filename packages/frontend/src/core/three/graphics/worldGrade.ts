@@ -86,13 +86,22 @@ export const WORLD_GRADES: Readonly<Record<WorldGradeId, WorldGrade>> = {
   },
   physics: {
     id: 'physics',
+    // GFX-1 exposure pass. The hall fell to black everywhere the ceiling panels did not reach: the
+    // ambient bounce sat at 0.17 with fog eating the far wall, so the image had highlights and
+    // shadows and nothing in between — no midtones, no readable equipment, no readable scientist.
+    // The room keeps its mood (deep black point, visible falloff, atmosphere) and gains the middle:
+    // more bounce, lighter fog, a little more exposure, the probe carrying more of the room, and a
+    // higher bloom threshold so the panels stop blooming into clipped white. The ambient bounce stays
+    // at the guardrail this repo already enforces (≤ 0.22, exposure ≤ 1): ambient fills shadows, and a
+    // room with no shadows has no form — the midtones come from the room probe and the practicals
+    // instead, which keep their falloff.
     intent: 'Beton i metal, neutralne światło warsztatowe — cieplejsze i brudniejsze niż biologia.',
     background: 0x06080a,
-    fog: { color: 0x0b0f13, density: 0.030 },
-    hemisphere: { sky: 0xaab4c0, ground: 0x14171b, intensity: 0.17 },
-    environmentIntensity: 1.25,
-    exposure: 0.88,
-    bloom: { strength: 0.26, radius: 0.55, threshold: 0.9 },
+    fog: { color: 0x0b0f13, density: 0.019 },
+    hemisphere: { sky: 0xaab4c0, ground: 0x1b1f24, intensity: 0.22 },
+    environmentIntensity: 1.62,
+    exposure: 1.0,
+    bloom: { strength: 0.2, radius: 0.55, threshold: 1.02 },
     floor: { color: 0x1a1d21, roughness: 0.42, metalness: 0.06, envMapIntensity: 0.7, normalScale: 0.22, roughnessDetail: false },
   },
   cern: {

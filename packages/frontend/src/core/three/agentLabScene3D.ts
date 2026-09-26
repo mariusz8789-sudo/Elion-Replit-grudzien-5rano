@@ -540,7 +540,10 @@ export class AgentLabScene3D implements Sim3D {
     const panelSpots: [number, number][] = [[-4, -2.5], [0, -2.5], [4, -2.5], [-4, 1.5], [0, 1.5], [4, 1.5]];
     for (const [x, z] of panelSpots) {
       const p = new THREE.Mesh(panelGeo, panelMat); p.position.set(x, CEILING_Y - 0.03, z); scene.add(p);
-      createPracticalLight(THREE, scene, { position: [x, CEILING_Y - 0.25, z], color: 0xdff3ff, intensity: 3.2, distance: 6.5, decay: 1.8 });
+      // GFX-1 exposure pass: the panels lit their own surroundings and nothing else. More reach and a
+      // softer falloff put light on the floor and the equipment between them, without touching the
+      // ambient guardrail — these are real lights, so the room keeps its shadows and its form.
+      createPracticalLight(THREE, scene, { position: [x, CEILING_Y - 0.25, z], color: 0xdff3ff, intensity: 4.6, distance: 11, decay: 1.45 });
     }
     // D-132: the ambient bounce now comes from the grade (applyWorldGrade). A second, brighter fill here
     // is what flattened the shadows — and a scene without shadows has no form.

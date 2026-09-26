@@ -5974,3 +5974,5 @@ html, body, #root { min-height: 100%; background: #000 !important; }
   .gx-ring.is-indeterminate { animation: none; }
   .gx-ring-tick.is-active { animation: none; opacity: 0.8; }
 }
+/* The ring is an estimate of TIME. This note keeps it from being read as progress. */
+.gx-loading-note { font-size: 0.72em; color: var(--text-faint); white-space: nowrap; }

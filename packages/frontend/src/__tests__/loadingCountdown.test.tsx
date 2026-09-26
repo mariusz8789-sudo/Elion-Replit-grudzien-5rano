@@ -21,8 +21,12 @@ describe('loading countdown only from a measured duration', () => {
 
   it('renders a countdown only when an estimate exists', () => {
     const counted = renderToStaticMarkup(<LoadingStatus label="Ładowanie laboratorium" estimateMs={3000} testId="s" />);
-    expect(counted).toContain('ok. 3 s');
+    expect(counted).toContain('szacowany czas: ok. 3 s');
     expect(counted).toContain('data-remaining-s="3"');
+    // The countdown must never be readable as progress: it is labelled as an estimate of TIME.
+    expect(counted).toContain('data-indicator="TIME_ESTIMATE"');
+    expect(counted).toContain('szacunek czasu, nie postęp pracy');
+    expect(counted).toMatch(/NIE jest postęp pracy silnika/);
     const plain = renderToStaticMarkup(<LoadingStatus label="Ładowanie chemii" />);
     expect(plain).toContain('Ładowanie chemii…');
     expect(plain).not.toMatch(/\d+ s/);
@@ -61,6 +65,9 @@ describe('the waiting ring shows how much of a MEASURED wait is left', () => {
     const unmeasured = renderToStaticMarkup(<LoadingStatus label="Ładowanie" testId="ring" />);
     expect(unmeasured).toContain('is-indeterminate');
     expect(unmeasured).not.toContain('data-ring-filled');
+    // Nothing to estimate → no estimate wording at all, rather than a vaguer claim.
+    expect(unmeasured).toContain('data-indicator="INDETERMINATE"');
+    expect(unmeasured).not.toContain('szacunek czasu');
 
     // Dense places can still take the text alone.
     expect(renderToStaticMarkup(<LoadingStatus label="Ładowanie" ring={false} />)).not.toContain('gx-ring');

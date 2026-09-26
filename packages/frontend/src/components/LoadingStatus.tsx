@@ -18,13 +18,16 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 const GAP = 4; // path units between ticks, so the ring reads as separate marks
 
 /**
- * The waiting ring: a circle cut into ticks, one tick per fifth of the MEASURED estimate. Completed
- * ticks are solid, the tick being worked through pulses, the rest stay as a faint track — so a glance
- * says roughly how much of the wait is left.
+ * The waiting ring — AN ESTIMATE OF TIME, NOT A MEASURE OF WORK DONE.
  *
- * With no measurement there is nothing to count down, so the ring turns instead of filling: it shows
- * that work is happening, never a fraction Genesis does not know. When the wait outlasts its estimate
- * the ring stops at full and the text says it is taking longer than last time — no invented 99 %.
+ * Its ticks are fifths of how long this same operation took LAST time, counted against the clock. It
+ * knows nothing about what the engine is doing inside: a full ring does not mean the stage finished,
+ * and an empty one does not mean nothing happened. Only the backend ends a stage; the ring is a
+ * courtesy so the wait does not feel blind. It is labelled as an estimate everywhere it appears.
+ *
+ * With no past measurement there is nothing to count down, so the ring turns instead of filling. When
+ * the wait outlasts the estimate it stops at full, turns amber, and says it is taking longer than last
+ * time — never an invented 99 %.
  */
 function WaitRing({ filled, segments, active, overrun, determinate }: {
   readonly filled: number; readonly segments: number; readonly active: number | null;
@@ -57,10 +60,14 @@ export function LoadingStatus({ label, estimateMs = null, testId, announce = tru
   const elapsed = now - startedAt;
   const remaining = estimateMs ? countdownSeconds(estimateMs, elapsed) : null;
   const progress = ringProgress(estimateMs, elapsed);
-  const suffix = remaining === null ? '…' : remaining > 0 ? ` · ok. ${remaining} s` : ' · dłużej niż ostatnio…';
+  // The wording never lets a countdown read as progress: it is time, estimated from the last run.
+  const suffix = remaining === null ? '…' : remaining > 0 ? ` · szacowany czas: ok. ${remaining} s` : ' · dłużej niż ostatnio…';
+  const estimateNote = 'Szacowany czas na podstawie poprzedniego pomiaru tej samej operacji. To NIE jest postęp pracy silnika — etap kończy wyłącznie backend.';
   return (
     <span
       className="gx-loading" role={announce ? 'status' : undefined} data-testid={testId}
+      title={estimateMs ? estimateNote : undefined}
+      data-indicator={estimateMs ? 'TIME_ESTIMATE' : 'INDETERMINATE'}
       data-remaining-s={remaining ?? undefined}
       data-ring-segments={ring ? progress.segments : undefined}
       data-ring-filled={ring && estimateMs ? progress.filled : undefined}
@@ -68,6 +75,8 @@ export function LoadingStatus({ label, estimateMs = null, testId, announce = tru
     >
       {ring && <WaitRing filled={progress.filled} segments={progress.segments} active={progress.active} overrun={progress.overrun} determinate={Boolean(estimateMs)} />}
       <span className="gx-loading-text">{label}{suffix}</span>
+      {/* Said once, in words, for anyone who might read the ring as a progress bar. */}
+      {estimateMs ? <span className="gx-loading-note">szacunek czasu, nie postęp pracy</span> : null}
     </span>
   );
 }

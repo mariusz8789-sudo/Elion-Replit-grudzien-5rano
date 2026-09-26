@@ -705,6 +705,58 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                 <span className="sw-procedure-label">SYMULOWANY KROK LABORATORYJNY · reprezentuje: {hand.represents}</span>
               </p>
             )}
+            {/* EVERY CANDIDATE, AS IT HAPPENS. The run's own read model already carried each candidate's
+                generation, parent, transformation, per-engine result and rejection reason; the panel used
+                to show only a count and the one candidate in focus, so a viewer could not see the science
+                happening — candidates appearing, being computed, and being thrown out. Nothing here is
+                derived or estimated: every cell is a field of the persisted state, and a field the record
+                does not hold renders as a dash. */}
+            {st.candidates.length > 0 && (
+              <div className="sw-cand-wrap">
+                <div className="sw-cand-head">
+                  <strong>Kandydaci ({st.candidates.length})</strong>
+                  <span className="sw-procedure-label">
+                    zachowani {st.candidates.filter((c) => c.status === 'retained').length}
+                    {' · '}odrzuceni {st.candidates.filter((c) => c.status === 'rejected').length}
+                  </span>
+                </div>
+                <ol className="sw-cand-list" data-testid="drug-candidate-list" data-count={st.candidates.length}>
+                  {st.candidates.map((c) => {
+                    const dock = c.stages.docking;
+                    const admet = c.stages.admet;
+                    const qm = c.stages.quantum;
+                    return (
+                      <li key={c.id} className={`sw-cand is-${c.status}${focus?.id === c.id ? ' is-focus' : ''}`}
+                        data-candidate-id={c.id} data-status={c.status} data-generation={c.generation}
+                        data-docking={dock?.value ?? ''} data-admet={admet?.status ?? ''}
+                        data-rejected-reason={c.rejectedReason ?? ''} data-pareto={c.pareto ? '1' : ''}>
+                        <span className="sw-cand-top">
+                          <span className="sw-cand-gen">G{c.generation}</span>
+                          <code className="sw-cand-smiles" title={c.smiles}>{c.smiles}</code>
+                          {c.pareto && <span className="sw-cand-flag" title="Front Pareto">PARETO</span>}
+                          {c.modelConflict && <span className="sw-cand-flag is-warn" title="Modele są ze sobą sprzeczne">KONFLIKT MODELI</span>}
+                        </span>
+                        {c.transformation && (
+                          <span className="sw-procedure-label">z {c.parentSmiles ? `${c.parentSmiles.slice(0, 22)}…` : 'zalążka'} przez {c.transformation}</span>
+                        )}
+                        <span className="sw-cand-stages">
+                          <span className={`sw-cand-stage is-${(admet?.status ?? 'none').toLowerCase()}`}>ADMET {admet?.status ?? '—'}</span>
+                          <span className={`sw-cand-stage is-${(dock?.status ?? 'none').toLowerCase()}`}>
+                            Vina {dock?.value != null ? `${dock.value.toFixed(2)} kcal/mol` : dock?.status ?? '—'}
+                          </span>
+                          <span className={`sw-cand-stage is-${(qm?.status ?? 'none').toLowerCase()}`}>
+                            QM {qm?.value != null ? `${qm.value.toFixed(2)} eV` : qm?.status ?? '—'}
+                          </span>
+                        </span>
+                        {c.status === 'rejected' && (
+                          <span className="sw-cand-reject">ODRZUCONY — {c.rejectedReason ?? 'powód niezapisany w rekordzie'}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            )}
             <ol className="sw-procedure" aria-label="Kolejne etapy eksperymentu">
               {procedure.phases.map((ph) => (
                 <li key={ph.id} data-phase-id={ph.id} data-status={ph.status} className={`sw-procedure-step is-${ph.status.toLowerCase()}`}>

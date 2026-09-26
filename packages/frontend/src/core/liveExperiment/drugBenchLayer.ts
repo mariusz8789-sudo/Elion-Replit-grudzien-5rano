@@ -32,14 +32,9 @@ const HOLO_Y = 1.72;
 
 const STAGE_COLOR = { admet: 0x5eead4, docking: 0x60a5fa, quantum: 0xc084fc } as const;
 
-/** The candidate the bench looks at: docked first, then the best retained of the latest generation, then the seed. */
-export function focusCandidate(state: LiveDrugRunState): LiveCandidate | null {
-  const docked = state.candidates.find((c) => c.stages.docking && c.stages.docking.value !== null);
-  if (docked) return docked;
-  const retained = state.candidates.filter((c) => c.status === 'retained');
-  if (retained.length) return retained.reduce((a, b) => (b.generation > a.generation || (b.generation === a.generation && b.pareto && !a.pareto) ? b : a));
-  return state.candidates[0] ?? null;
-}
+// The bench's sample layout and the focused candidate are pure functions of the run state; they live
+// next door so tests (and the panel) can use them without loading a renderer.
+export { focusCandidate } from './drugBenchLayout';
 
 export class DrugBenchLayer {
   private THREE: typeof THREE_NS | null = null;

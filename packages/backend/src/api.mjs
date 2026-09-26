@@ -111,6 +111,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
 } from './store.mjs';
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { preregisterExperiment, sealExperimentSession, readExperimentMemory } from './experimentMemory.mjs';
+import { buildCandidateProtocol } from './campaign/candidateProtocol.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
@@ -666,6 +667,14 @@ export function handleApi(db, ctx) {
         // /api/projects/:id/campaigns/:cid/experiment-memory — the campaign's scientific memory
         // (viewer+): what was preregistered before the run, what was sealed after it, chain state.
         if (seg[4] === 'experiment-memory' && method === 'GET') return ok({ memory: readExperimentMemory(db, campaignId) });
+        // /api/projects/:id/campaigns/:cid/protocol — THE final artefact of the experiment (viewer+):
+        // the reproducible computational candidate protocol plus the proposed physical-validation
+        // protocol. Assembled from persisted state only; it runs no engine.
+        if (seg[4] === 'protocol' && method === 'GET') {
+          const built = buildCandidateProtocol(db, campaignId);
+          if (!built.ok) return err(404, built.error);
+          return ok({ protocol: built.protocol });
+        }
         if (method !== 'GET') return err(405, 'method_not_allowed');
         // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty
         if (seg[4] === 'candidates') {

@@ -104,6 +104,8 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
 
   const root = new THREE.Group(); root.name = 'character';
   let helmet: Obj | null = null;
+  /** Suit panel materials, shared by the shoulder caps and knee pads built once the limbs exist. */
+  let suitPanels: { trimMat: THREE_NS.MeshStandardMaterial; panelMat: THREE_NS.MeshStandardMaterial } | null = null;
 
   // Pomocnik: staw (Group) w pozycji; segment (mesh) rozciąga się od stawu w dół o `len`.
   const joint = (parent: Obj, x: number, y: number, z: number): Obj => {
@@ -156,7 +158,22 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     const packGeo = new THREE.BoxGeometry(H * 0.16, H * 0.2, H * 0.07); disposables.push(packGeo);
     const packMat = mat(suit.boots ?? 0x1a1f26, 0.55); extraMaterials.push(packMat);
     const pack = new THREE.Mesh(packGeo, packMat); pack.position.set(0, (chestY - hipY) / 2 - H * 0.02, -H * 0.12); pelvis.add(pack);
+    // GFX-1 — PANELS. A suit made of one flat colour reads as a mascot: the silhouette has no belt
+    // line, no chest, no joints, so the eye finds a snowman. These are the panels a real protective
+    // suit has, in the trim and boot colours the caller already chose: a chest harness, a waist belt
+    // and a thigh pocket. Geometry only — no new material system, no asset, nothing to license.
+    const trimMat = mat(suit.trim ?? 0xf0b35c, 0.45); extraMaterials.push(trimMat);
+    const panelMat = mat(suit.boots ?? 0x1a1f26, 0.6); extraMaterials.push(panelMat);
+    const harnessGeo = new THREE.BoxGeometry(H * 0.2, H * 0.028, H * 0.16); disposables.push(harnessGeo);
+    const harness = new THREE.Mesh(harnessGeo, panelMat); harness.position.set(0, (chestY - hipY) * 0.78, H * 0.012); pelvis.add(harness);
+    const chestPlateGeo = new THREE.BoxGeometry(H * 0.11, H * 0.07, H * 0.02); disposables.push(chestPlateGeo);
+    const chestPlate = new THREE.Mesh(chestPlateGeo, trimMat); chestPlate.position.set(0, (chestY - hipY) * 0.6, H * 0.1); pelvis.add(chestPlate);
+    const beltGeo = new THREE.BoxGeometry(H * 0.21, H * 0.032, H * 0.15); disposables.push(beltGeo);
+    const belt = new THREE.Mesh(beltGeo, panelMat); belt.position.set(0, H * 0.012, 0); pelvis.add(belt);
+    const pocketGeo = new THREE.BoxGeometry(H * 0.05, H * 0.07, H * 0.03); disposables.push(pocketGeo);
+    const pocket = new THREE.Mesh(pocketGeo, panelMat); pocket.position.set(-H * 0.075, -H * 0.06, H * 0.05); pelvis.add(pocket);
     helmet = helmetGroup;
+    suitPanels = { trimMat, panelMat };
   }
   // Minimalne cechy twarzy są tylko detalem rigu obserwowanego z bliska; nie reprezentują danych demograficznych ani stanu modelu.
   const eyeGeo = new THREE.SphereGeometry(H * 0.010, 8, 6); disposables.push(eyeGeo);
@@ -204,6 +221,19 @@ export function buildCharacter(THREE: THREE, opts: CharacterOptions = {}): Chara
     return { hip, knee, ankle };
   };
   const legL = leg(1), legR = leg(-1);
+
+  // The joints of the suit, added once the limbs exist: shoulder caps and knee pads. They ride the
+  // joints, so they bend with the walk instead of floating.
+  if (suitPanels) {
+    const capGeo = new THREE.SphereGeometry(H * 0.045, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55); disposables.push(capGeo);
+    for (const a of [armL, armR]) {
+      const cap = new THREE.Mesh(capGeo, suitPanels.panelMat); cap.position.y = H * 0.005; a.shoulder.add(cap);
+    }
+    const kneeGeo = new THREE.BoxGeometry(H * 0.055, H * 0.05, H * 0.05); disposables.push(kneeGeo);
+    for (const l of [legL, legR]) {
+      const pad = new THREE.Mesh(kneeGeo, suitPanels.panelMat); pad.position.set(0, -H * 0.012, H * 0.022); l.knee.add(pad);
+    }
+  }
 
   const baseY = 0; // korzeń przy stopach
 

@@ -1,6 +1,42 @@
 # AiZynthFinder — pliki modelu, których Genesis potrzebuje (pakiet dostawczy D-1)
 
-## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26
+## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26 (ponowiony po zmianie ustawień)
+
+**Ponowna próba po tym, jak właściciel odblokował zenodo i figshare: nadal ODMOWA.**
+Dokładny wynik z tej samej minuty:
+
+```
+zenodo.org:443                — connect_rejected
+ndownloader.figshare.com:443  — connect_rejected
+detail: "the egress proxy denied the CONNECT (organization policy)"
+```
+
+Sześć prób w odstępach 15 s, wszystkie `000`. Sprawdzone też `https://zenodo.org/record/7797465`.
+
+**Przyczyna, najbardziej prawdopodobna:** polityka sieci jest nakładana na kontener **przy jego
+starcie**. Ta sesja wystartowała przed zmianą, więc trzyma starą politykę i jej nie podniesie.
+Zmiana zadziała w **nowej sesji** tego środowiska.
+
+**Do sprawdzenia przy okazji:** czy edycja trafiła w to samo środowisko, w którym działa ta sesja,
+i czy została zapisana. Jeśli nowa sesja też dostanie 403 — edycja poszła gdzie indziej.
+
+**UWAGA — praca jest w tym kontenerze.** Commity nie są wypchnięte, a kontener jest efemeryczny.
+Przed otwarciem nowej sesji trzeba wypchnąć gałąź, inaczej praca przepada.
+
+### Dokładna komenda do wykonania po przywróceniu dostępu
+
+```bash
+mkdir -p /opt/genesis/retro-models && cd /opt/genesis/retro-models
+python -m aizynthfinder.tools.download_public_data .
+mv uspto_unique_templates.csv.gz uspto_templates.csv.gz   # jeśli narzędzie zapisze pod nazwą źródłową
+sha256sum * | tee SHA256SUMS.txt
+export GENESIS_RETRO_MODEL_DIR=/opt/genesis/retro-models
+node -e "import('./packages/backend/src/compute/retroAdapter.mjs').then(m=>m.detect()).then(r=>console.log(JSON.stringify(r,null,1)))"
+```
+
+Wymagane nazwy plików i miejsce docelowe — §1 i §3 niżej. Wolnego miejsca: 3,2 GB, komplet ~1 GB.
+
+## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26 (pierwsze ustalenie)
 
 Wyczerpałem legalne drogi z tego środowiska. Wynik, zmierzony:
 

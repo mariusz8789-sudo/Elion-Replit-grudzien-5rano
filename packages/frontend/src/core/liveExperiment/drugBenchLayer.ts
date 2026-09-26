@@ -742,7 +742,27 @@ export function withDrugBenchLayer<T extends Sim3D>(sim: T, layer: DrugBenchLaye
         const shot = layer.cameraTarget(scratch);
         if (!shot) { framed = null; return; }
         const key2 = `${shot.focus}:${shot.radius}`;
-        if (key2 !== framed) { rig.frame({ intent: shot.focus === 'BENCH' ? 'SCIENTIFIC' : 'MACRO', target: scratch.toArray(), targetRadius: shot.radius, elevationDeg: 16 }); framed = key2; }
+        if (key2 !== framed) {
+          // THE HAND SHOT IS A SHOT OF A PERSON, not of a small object on its own. MACRO stands off at
+          // 0.55 x the subject radius — 23 cm from the grip point — which put the lens inside the
+          // scientist's own torso and filled half the frame with the inside of their helmet. HUMAN_EYE
+          // stands off at 2.4x (about a metre here) at near eye level, which is where someone actually
+          // stands to watch a pair of hands work. Every other focus is an instrument or a hologram with
+          // nothing between it and the camera, so those keep the close framing.
+          const hands = shot.focus === 'HANDS';
+          const intent = shot.focus === 'BENCH' ? 'SCIENTIFIC' : hands ? 'HUMAN_EYE' : 'MACRO';
+          rig.frame({
+            intent, target: scratch.toArray(), targetRadius: shot.radius,
+            // A metre from the grip still framed the scientist's own torso, because the person is
+            // directly behind their hands from most angles. At ~1.9 m the shot contains the person,
+            // the bench and the vial — which is the thing worth watching anyway. HUMAN_EYE is kept for
+            // its FREE mobility (the rig re-targets every frame as the hand moves); only the standoff
+            // is overridden, which is what that parameter exists for.
+            ...(hands ? { standoffMultiplier: 4.5 } : {}),
+            elevationDeg: hands ? 12 : 16,
+          });
+          framed = key2;
+        }
         rig.setTarget(scratch.toArray());
         const transform = rig.update(dt, 1.6);
         camera.position.set(...transform.position);

@@ -9,3 +9,9 @@
 /packages/backend/src/compute/cms-zmumu/Zmumu.csv -text
 /data/transcription/**/*.psv -text
 /data/transcription/**/*.rowhash -text
+# Pinned structure files (sha256 in each SOURCE.json) and captured tool logs are kept
+# byte-for-byte: their fixed-width padding / trailing blanks are data, not a style slip.
+/packages/backend/src/compute/targets/**/*.pdb -whitespace
+/packages/backend/src/compute/targets/**/*.sdf -whitespace
+/artifacts/human-twin-review/*.log -whitespace
+/artifacts/human-twin-review/*.txt -whitespace

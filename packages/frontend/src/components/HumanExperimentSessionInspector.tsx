@@ -27,4 +27,3 @@ export function HumanExperimentSessionInspector({ session }: { readonly session:
     </section>
   );
 }
-

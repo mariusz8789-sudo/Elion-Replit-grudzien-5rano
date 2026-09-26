@@ -152,9 +152,29 @@ test('drug bench: live state in the scene equals the backend run, end to end for
   expect(memory.sessions.length).toBeGreaterThan(0);
   const sealed = memory.sessions.at(-1)!;
   expect(sealed.preregCheck).toBe('MATCH');
+  expect(sealed.body.engineReplay, 'the run is sealed when it ends, before any engine replay exists').toBeNull();
   expect(sealed.body.verdictCheck).toBe('MATCH');
   expect(['SUPPORTED', 'WEAKENED', 'FALSIFIED', 'UNRESOLVED']).toContain(sealed.body.serverVerdict);
   expect(sealed.body.serverVerdict).toBe(sealed.body.reportedVerdict);
+
+  // The engine replay is written as its OWN record, linked to the same preregistration — past evidence
+  // is never edited. It arrives after the backend has re-executed the docking, so wait for it rather
+  // than assuming it landed.
+  const sealedWithReplay = await (async () => {
+    const deadline = Date.now() + 180_000;
+    for (;;) {
+      const m = (await api(`/api/projects/${projectId}/campaigns/${campaignId}/experiment-memory`, token)).memory;
+      const withReplay = m.sessions.find((s: any) => s.body?.engineReplay?.verdict);
+      if (withReplay) return { record: withReplay, count: m.sessions.length, chainOk: m.chain.ok };
+      if (Date.now() > deadline) throw new Error(`no sealed record carried the engine replay (sessions: ${m.sessions.length})`);
+      await page.waitForTimeout(2_000);
+    }
+  })();
+  expect(sealedWithReplay.count).toBeGreaterThan(1);
+  expect(sealedWithReplay.record.id).not.toBe(sealed.id);
+  expect(sealedWithReplay.record.preregistrationId).toBe(memory.preregistration.id);
+  expect(sealedWithReplay.record.body.engineReplay.verdict).toBe('MATCH');
+  expect(sealedWithReplay.chainOk).toBe(true);
 
   // THE FINAL ARTEFACT: a reproducible protocol, assembled from the record — and an honest synthesis
   // section, since a route exists only when the retrosynthesis engine produced one.

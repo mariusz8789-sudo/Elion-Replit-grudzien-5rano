@@ -179,13 +179,21 @@ klasyczną. Nie przedstawiamy Genesis jako świadomości, wszechwiedzy ani AGI.
 
 ## 20. Kolejność prac (obowiązkowa)
 
-1. Zakończ aktualny E2E **na aktualnym buildzie** i podaj, jakiej wersji dotyczy.
-2. Napraw potwierdzone regresje; podaj rzeczywisty zakres PASS.
-3. Domknij **widoczne czynności laboratorium** i końcowy protokół.
-4. Zgłoś precyzyjnie blokadę modeli retrosyntezy i wymagane zasoby.
-5. Pokaż jeden pełny przebieg spełniający bramkę A **oraz** bramkę B.
-6. Rozwiń tryb szkolny na tym samym fundamencie.
-7. Dopiero potem CodeGen i automatyczne filmy.
+Kolejność ustalona przez właściciela (2026-09-26) i obowiązująca do odwołania:
+
+1. Domknięcie E2E **na aktualnym buildzie** — z podaniem, jakiej wersji kodu dotyczy wynik.
+2. **Żywe laboratorium:** ręce, fiolki, próbki, właściwa aparatura, obserwacja, wynik (bramka B).
+3. Końcowy protokół + Replay + Evidence.
+4. Retrosynteza — **po dostarczeniu plików modelu** (blokada D-1), nie wcześniej.
+5. Film / demo.
+6. CodeGen, Task Graph, autonomiczne tworzenie narzędzi (po laboratorium, w piaskownicy).
+7. Pozostałe rozszerzenia (tryb szkolny, jakość obrazu, kolejne światy).
+8. **Pełne PL/EN/AR + RTL — na samym końcu**, jako zadanie po demie.
+
+Punkt 8 jest wyraźnie zdjęty z bieżącego sprintu: nie robimy teraz portu i18n ani RTL, nie wydajemy na
+tłumaczenia czasu ani kredytów. Stan i znane źródła zapisane są w §22, żeby dało się do tego wrócić bez
+powtarzania śledztwa. Naprawa potwierdzonych regresji nie ma numeru — wchodzi przed wszystkim innym,
+kiedy się pojawi.
 
 Nie rozszerzamy prac na kolejne światy, żeby ominąć niedokończone laboratorium. Gałąź, HEAD i zakres
 zmian podajemy z wyniku poleceń, nie z pamięci. **Push, merge do main, force-push i przepisywanie
@@ -208,8 +216,9 @@ nieudowodnione w wymagany sposób · **BLOKADA** = nie da się wykonać w tym ś
 | Trwała Pamięć Naukowa | DOWÓD częściowy | rekordy w bazie, łańcuch hashy, triggery odmawiają UPDATE/DELETE. **Brak dowodu** dla: restart backendu, ponowne wejście, uprawnienia odczytu |
 | Końcowy protokół | DOWÓD | `GET …/protocol`, 10/10 testów; w przebiegu akceptacyjnym pełny zestaw pól |
 | Kandydaci widoczni jako rzędy leja | BRAK DOWODU dla bramki B | `data-bench-samples` = liczba kandydatów (kontrola pomocnicza). **Nie dowodzi** widocznych rąk, chwytu fiolki, pracy aparatury ani kadru |
+| Pełny E2E akceptacyjny (potok obliczeniowy) | DOWÓD | `liveDrugBench.e2e.spec.ts`, 1 passed, 7,5 min, exit 0, build z commita `969d7523`; „states seen: 5, states rendered by the scene: 5"; 3 rekordy w bazie: prerejestracja + 2 zapieczętowane sesje, druga z `engineReplay.verdict = MATCH` |
 | Retrosynteza | BLOKADA | adapter zintegrowany i zarejestrowany; **pliki modelu nieosiągalne** (zenodo/figshare zablokowane). Przypadek referencyjny **nie został wykonany** |
-| Języki: polski / angielski / arabski | BRAK | wymaganie właściciela z 2026-09-26; stan ustalany |
+| Języki: polski / angielski / arabski | ZAPARKOWANE | decyzja właściciela z 2026-09-26: ostatnie w kolejności (§20 pkt 8). Stan zmierzony i źródła: §22.1. Nie realizujemy teraz |
 | Tryb szkolny | BRAK | niezaimplementowany |
 | Widoczne czynności laboratoryjne (bramka B) | BRAK | ręce, chwyt fiolki, transfer, praca mikroskopu — niezrealizowane |
 | Materiał pokazowy (bramka C) | BRAK | nie nagrany |
@@ -222,3 +231,29 @@ nieudowodnione w wymagany sposób · **BLOKADA** = nie da się wykonać w tym ś
   **nigdy do ketaminy** — konstytucja §11).
 - Human Atlas (BodyParts3D), jakość obrazu laboratorium, prosty język w świecie, CERN jako drugi świat
   (`zdarzenie → detektor → rekonstrukcja → analiza → Evidence`, tory opisane jako rekonstrukcja).
+
+### 22.1. PL / EN / AR + RTL — zadanie po demie (ostatnie w kolejności, §20 pkt 8)
+
+Decyzja właściciela z 2026-09-26: **nie ruszamy teraz i18n ani RTL.** Poniżej stan zmierzony
+(`git show`, `grep` — nie z pamięci), żeby powrót nie wymagał powtarzania śledztwa.
+
+**Co jest w HEAD (`packages/frontend/src/core/i18n.ts`, 110 linii):** działający seam — `t()` z
+fallbackiem na `pl`, `setLocale`/`subscribeLocale`, `Locale = 'pl' | 'en' | 'es' | 'ar'`,
+`LOCALE_DIRECTION` z `ar: 'rtl'`, `LOCALE_NATIVE_NAME`, `setLocale` ustawia
+`document.documentElement.dir`/`lang`. Słowniki obejmują **tylko** wokabularz Human Explorer +
+Evidence (pl ma dodatkowo `nav.*` i `skipLink`); `en` = wyłącznie `EXPLORER_EN`. Seam używany w 6
+plikach (`App.tsx`, `main.tsx`, `HumanExplorerPanel.tsx` + testy). **W `styles.css` zero reguł
+`[dir=…]`/RTL** — kierunek dokumentu się przełączy, ale layout nie jest na to przygotowany.
+
+**Skąd wziąć szerszy słownik:** `5e5c15fa` (linia `origin/genesis/main`) ma
+`core/locales/en.ts` (140 linii, ~109 kluczy), `core/locales/pl.ts` (144 linie, ~117 kluczy),
+`components/product/LanguageSwitcher.tsx`, własny `core/i18n.ts` (90 linii, `Locale = 'pl' | 'en'`,
+`Intl.PluralRules`) i `__tests__/i18n.test.ts`. **Arabskiego tam nie ma.** Punkt rozejścia z HEAD:
+`868c01aa` (2026-07-14) — port jest przeniesieniem przez dywergencję, nie `git checkout`.
+
+**Realny zakres, gdy wrócimy:** (1) scalić dwa seamy w jeden kanoniczny (dziś HEAD ma nowszy typ
+`Locale` i RTL, gałąź ma większy słownik i plurals) — bez drugiego systemu tłumaczeń; (2) jeden
+selektor języka; (3) CSS dla `[dir="rtl"]` (lustrzane marginesy/paddingi, kolejność flex, ikony
+kierunkowe); (4) tłumaczenie tekstów laboratorium i protokołu — praca terminologiczna, nie
+generowanie; (5) reguła twarda: **identyfikatory, hashe, jednostki, SMILES i etykiety epistemiczne
+nigdy nie są tłumaczone**, a brak klucza musi być widoczny (dziś `t()` zwraca sam klucz — dobrze).

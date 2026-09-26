@@ -102,6 +102,15 @@ export const CAPABILITIES = [
     adapter: 'StructureAdapter.predict(sequence) → { pdbRef, plddt, engine }',
   },
   {
+    // Retrosynthetic route search. Backed by the real engine registered in the canonical toolchain
+    // (AiZynthFinder); its live status — including the missing model files — comes from there.
+    id: 'retrosynthesis', label: 'Planowanie trasy syntezy (retrosynteza)', category: 'synthesis',
+    status: CAPABILITY_STATUS.EXTERNAL_ENGINE_REQUIRED,
+    requires: 'AiZynthFinder + jego opublikowane dane modelu (polityka ekspansji, biblioteka szablonów, stock) wskazane przez GENESIS_RETRO_MODEL_DIR.',
+    adapter: 'retroAdapter.planRoute(smiles, { iterationLimit, maxRoutes }) → { routes[], solved, provenance }',
+    note: 'Zaproponowana trasa to MODEL_ESTIMATE: brak warunków, ilości, wydajności i oceny bezpieczeństwa. Bez silnika Genesis NIE proponuje żadnej trasy.',
+  },
+  {
     id: 'generative-de-novo', label: 'Generatywne projektowanie de novo', category: 'generative',
     status: CAPABILITY_STATUS.NOT_IMPLEMENTED,
     requires: 'Zwalidowany model generatywny + wykonalna synteza + filtry bezpieczeństwa.',
@@ -120,6 +129,7 @@ const TOOL_BACKED_CAPABILITIES = Object.freeze({
   'quantum-chemistry': 'pyscf',
   admet: 'admet',
   toxicity: 'toxicity',
+  retrosynthesis: 'aizynthfinder',
 });
 
 function withCanonicalToolStatus(capability) {

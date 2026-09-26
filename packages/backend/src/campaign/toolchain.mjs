@@ -18,6 +18,7 @@ import * as docking from '../compute/dockingAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
 import * as meep from '../compute/meepAdapter.mjs';
+import * as retro from '../compute/retroAdapter.mjs';
 
 export const TOOL_STATUS = {
   AVAILABLE: 'AVAILABLE',
@@ -44,6 +45,20 @@ const TOOLS = [
     assumptions: 'Wzory 2D + osadzenie 3D polami siłowymi; brak dokowania/dynamiki/QM.',
     evidenceClass: 'MODEL_ESTIMATE',
     validate: validateRdkit,
+  },
+  {
+    // The route-planning engine. Registered like every other: AVAILABLE only when its own reference
+    // case really passes, BLOCKED_BY_RUNTIME (with the missing model files named) otherwise. A route it
+    // returns is a proposal, never a procedure — see compute/retroAdapter.mjs.
+    toolId: 'aizynthfinder',
+    capabilityId: 'retrosynthesis-route-search',
+    domain: 'DRUG_DISCOVERY',
+    engineName: 'AiZynthFinder',
+    license: 'MIT',
+    modelDomain: 'Retrosynthetic planning: MCTS over single-step disconnections from a template-based expansion policy trained on reaction literature, terminating in a purchasable stock.',
+    assumptions: 'A proposed route carries NO conditions, quantities, yields or safety assessment, and is not evidence that the synthesis works. Model data (policy, templates, stock) is not shipped with Genesis and must be provided via GENESIS_RETRO_MODEL_DIR.',
+    evidenceClass: 'MODEL_ESTIMATE',
+    validate: validateRetro,
   },
   {
     toolId: 'pyscf',
@@ -145,6 +160,15 @@ function validateQm() {
   if (!r.ok) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: r.reason ?? r.error };
   const evidence = [{ id: r.case, pass: r.pass, expected: r.expected, actual: r.energyHartree, unit: 'Hartree' }];
   return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `PySCF ${r.version}`, evidence };
+}
+
+function validateRetro() {
+  const d = retro.detect();
+  if (!d.available) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: d.reason, version: d.engineVersion ?? undefined };
+  const r = retro.referenceCase();
+  if (!r.ok) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: r.reason ?? r.error };
+  const evidence = [{ id: r.case, pass: r.pass, solved: r.solved, steps: r.steps, startingMaterials: r.startingMaterials, stoppedBy: r.stoppedBy }];
+  return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `AiZynthFinder ${r.version}`, evidence };
 }
 
 function validateMd() {

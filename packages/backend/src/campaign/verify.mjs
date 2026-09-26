@@ -40,6 +40,8 @@
  */
 import { getScienceRun, saveScienceRunVerification, listScienceRunVerifications } from '../store.mjs';
 import * as docking from '../compute/dockingAdapter.mjs';
+import * as retro from '../compute/retroAdapter.mjs';
+import { retrosynthesisOutputHash } from './retrosynthesis.mjs';
 import { prepareDockingTarget } from '../compute/dockingTargets.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
@@ -80,10 +82,29 @@ const TOLERANCE = {
   // ADMET-AI's, so MATCH requires a bit-exact replay, same as docking/QM.
   'molecular-descriptors': 0,
   'maxwell-fdtd': 1e-9,
+  // A route is a discrete object: the same disconnections or a different answer. No tolerance applies.
+  'retrosynthesis-route-search': 0,
 };
 
 /** Re-executes the underlying engine for one capability. Returns { ok, error?, engineVersion?, outputHash?, output? }. */
 const REPLAYERS = {
+  /**
+   * Retrosynthesis: the search is re-run against the SAME model data and the routes are compared.
+   * A run that was stopped by its wall-clock limit explored a machine-dependent number of nodes, so it
+   * is reported REPLAY_UNSUPPORTED instead of being called drift.
+   */
+  'retrosynthesis-route-search': (inputs) => {
+    const d = retro.detect();
+    if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME' };
+    const r = retro.planRoute(inputs.smiles, {
+      iterationLimit: inputs.iterationLimit, timeLimitSeconds: inputs.timeLimitSeconds,
+      maxRoutes: inputs.maxRoutes, returnFirst: inputs.returnFirst,
+    });
+    if (!r.ok) return { ok: false, error: r.status };
+    if (r.outputs.stoppedBy === 'TIME_LIMIT') return { ok: false, error: 'REPLAY_UNSUPPORTED_TIME_BOUNDED_SEARCH' };
+    return { ok: true, engineVersion: r.engineVersion, outputHash: retrosynthesisOutputHash(r.outputs), output: r.outputs };
+  },
+
   'molecular-docking': (inputs) => {
     if (!capabilityAvailable('molecular-docking')) return { ok: false, error: 'BLOCKED_BY_RUNTIME' };
     if (inputs.targetId) {

@@ -29,6 +29,8 @@ import { listScienceRuns, listScienceRunVerifications } from '../store.mjs';
 import { researchGateVerdict } from './scientificIntegration.mjs';
 import { classifySynthesisReadiness } from './researchIntake.mjs';
 import { readExperimentMemory } from '../experimentMemory.mjs';
+import { routeArtefactFromRun } from './retrosynthesis.mjs';
+import { RETRO_CAPABILITY } from '../compute/retroAdapter.mjs';
 
 export const PROTOCOL_KIND = 'GENESIS_COMPUTATIONAL_CANDIDATE_PROTOCOL';
 export const PROTOCOL_CONTRACT_VERSION = 1;
@@ -237,6 +239,9 @@ function uncertaintyOf(target, runs, memory) {
   if (target) out.push({ claim: 'Receptor preparation', label: 'REFERENCE_DATA + DERIVED', statement: 'Coordinates come from the shipped, checksum-verified crystal structure; missing side-chain atoms were repaired and unmodelled loops were deliberately NOT modelled, so regions absent from the crystal are absent here too.' });
   const qm = runs.find((r) => r.capability?.startsWith('quantum'));
   if (qm) out.push({ claim: 'Quantum chemistry', label: 'REAL_ENGINE_OUTPUT', statement: `A ${qm.method ?? 'single-point'} calculation on an RDKit-embedded gas-phase geometry: no solvent, no conformational search, no thermochemistry.` });
+  if (runs.some((r) => r.capability === 'retrosynthesis-route-search')) {
+    out.push({ claim: 'Proposed synthesis route', label: 'MODEL_ESTIMATE', statement: 'Disconnections proposed by a policy trained on reaction literature, with starting materials checked against a purchasable stock. No conditions, stoichiometry, yields, work-up or safety assessment are computed, and the route has not been performed.' });
+  }
   if (memory.preregistration === null) out.push({ claim: 'Preregistration', label: 'MISSING', statement: 'No criteria were registered on the server before this run, so the verdict below cannot be read as a preregistered test.' });
   return out;
 }
@@ -335,12 +340,35 @@ export function buildCandidateProtocol(db, campaignId) {
         'The preregistered criteria and the sealed result are immutable records: GET …/campaigns/:campaignId/experiment-memory.',
       ],
     },
-    synthesis: {
-      routeProvided: false,
-      engine: 'NONE — Genesis has no retrosynthesis or synthesis-planning engine',
-      statement: 'No synthesis route, no reagents, no quantities and no operational procedure are proposed. Route selection belongs to a qualified synthetic chemistry team under institutional oversight.',
-      readinessClassification: rows[0] ? rows[0].synthesisReadiness.classification : null,
-    },
+    // THE ROUTE — only ever what the retrosynthesis engine returned. When no search ran, or the engine
+    // could not run, this says so; a route is never written here by anything but the engine.
+    synthesis: (() => {
+      const runs_ = runs.filter((r) => r.capability === RETRO_CAPABILITY);
+      const forFinalist = finalists[0] ? runs_.find((r) => r.candidateId === finalists[0].candidateId) : null;
+      const route = routeArtefactFromRun(forFinalist ?? runs_.at(-1) ?? null);
+      const blockedEvent = events.filter((e) => e.type === 'STAGE_BLOCKED' && e.payload?.stage === 'retrosynthesis').at(-1);
+      if (route) {
+        return {
+          ...route,
+          routeProvided: Boolean(route.topRoute),
+          engine: `${route.engine} ${route.engineVersion ?? ''}`.trim(),
+          candidateId: (forFinalist ?? runs_.at(-1)).candidateId,
+          readinessClassification: rows[0] ? rows[0].synthesisReadiness.classification : null,
+          statement: route.topRoute
+            ? 'A route was proposed by the retrosynthesis engine and is reproduced above with its model identity. It is a proposal, not a validated procedure: no conditions, quantities, yields or safety assessment are computed.'
+            : 'The retrosynthesis engine ran but found no route to purchasable starting materials within the search budget. No route is proposed.',
+        };
+      }
+      return {
+        routeProvided: false,
+        engine: null,
+        status: blockedEvent ? blockedEvent.payload.blocker : 'NOT_ATTEMPTED',
+        reason: blockedEvent ? blockedEvent.payload.reason : 'No retrosynthesis search was run for this campaign.',
+        missingModelFiles: blockedEvent?.payload?.missingModelFiles ?? null,
+        readinessClassification: rows[0] ? rows[0].synthesisReadiness.classification : null,
+        statement: 'No synthesis route is proposed. Genesis writes a route only when its retrosynthesis engine produced one; nothing here is inferred from the structure.',
+      };
+    })(),
     proposedValidationProtocol: proposedValidationProtocol(criteria, target),
     nextStep: sealed?.serverVerdict === 'UNRESOLVED'
       ? 'Close the unevaluable criteria first: run the stage that did not execute, or obtain the missing measurement, before any further optimisation.'

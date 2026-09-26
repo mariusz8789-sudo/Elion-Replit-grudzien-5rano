@@ -112,6 +112,7 @@ import { saveEnvAudit, latestEnvAudit, listScienceRuns,   getScienceRun,
 import { verifyScienceRun, getVerificationHistory } from './campaign/verify.mjs';
 import { preregisterExperiment, sealExperimentSession, readExperimentMemory } from './experimentMemory.mjs';
 import { buildCandidateProtocol } from './campaign/candidateProtocol.mjs';
+import { planCandidateRoute } from './campaign/retrosynthesis.mjs';
 import { prepareKnowledgeUpload, tokenizeKnowledgeQuery } from './knowledgeIngestion.mjs';
 import { prepareProjectSpatialDataset } from './spatialProjectIngestion.mjs';
 import { accessLevelForProject, setProjectAccess, canUseAccessLevel, appendAccessAudit, listAccessAudit, researchAccessStatus } from './access.mjs';
@@ -692,6 +693,26 @@ export function handleApi(db, ctx) {
           return ok({ conflicts });
         }
         return err(404, 'not_found');
+      }
+      // /api/projects/:id/campaigns/:cid/retrosynthesis (editor+) — runs the real route-search engine
+      // for one candidate and persists it as a Science Run. A blocked engine is reported as blocked;
+      // no route is ever written without the engine.
+      if (seg.length === 5 && seg[4] === 'retrosynthesis' && method === 'POST') {
+        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+        const result = planCandidateRoute(db, {
+          projectId, campaignId,
+          candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
+          smiles: typeof body?.smiles === 'string' ? body.smiles : null,
+          options: {
+            iterationLimit: Number(body?.iterationLimit) || undefined,
+            timeLimitSeconds: Number(body?.timeLimitSeconds) || undefined,
+            maxRoutes: Number(body?.maxRoutes) || undefined,
+          },
+        });
+        if (!result.ok) {
+          return { status: result.error === 'BLOCKED_BY_RUNTIME' ? 503 : 400, body: { error: result.error, reason: result.reason ?? null, missingModelFiles: result.missingModelFiles ?? null } };
+        }
+        return ok({ scienceRun: result.run, solved: result.solved, routes: result.routes }, 201);
       }
       // /api/projects/:id/campaigns/:cid/experiment-memory/{preregistration,sessions} (editor+) —
       // the two writes of scientific memory. Both are append-only: the preregistration is refused once

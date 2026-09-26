@@ -189,8 +189,9 @@ describe('the final computational candidate protocol', () => {
     const ctx = seedRun();
     const { protocol } = buildCandidateProtocol(ctx.db, ctx.campaignId);
     assert.equal(protocol.synthesis.routeProvided, false);
-    assert.match(protocol.synthesis.engine, /NONE/);
-    assert.match(protocol.synthesis.statement, /No synthesis route/);
+    assert.equal(protocol.synthesis.engine, null);
+    assert.equal(protocol.synthesis.status, 'NOT_ATTEMPTED');
+    assert.match(protocol.synthesis.statement, /Genesis writes a route only when its retrosynthesis engine produced one/);
     assert.ok(['SOURCE_REQUIRED', 'BLOCKED'].includes(protocol.synthesis.readinessClassification));
     const v = protocol.proposedValidationProtocol;
     assert.equal(v.status, 'REQUIRES_PHYSICAL_LABORATORY');
@@ -242,5 +243,69 @@ describe('the final computational candidate protocol', () => {
     assert.deepEqual(protocol.finalists, []);
     assert.match(protocol.nextStep, /re-run the docking stage/);
     assert.equal(buildCandidateProtocol(bare, 'nope').error, 'campaign_not_found');
+  });
+});
+
+/* ---------------- the route, when the retrosynthesis engine really ran ---------------- */
+import { addEvent as addCampaignEvent } from './campaign/persistence.mjs';
+
+describe('the synthesis section carries the engine’s route, or the honest absence of one', () => {
+  test('a persisted retrosynthesis run appears as a PROPOSED route, read forward, with its model identity', () => {
+    const ctx = seedRun();
+    saveScienceRun(ctx.db, {
+      projectId: ctx.projectId, campaignId: ctx.campaignId, candidateId: ctx.ids.winner,
+      engine: 'AiZynthFinder', engineVersion: '4.4.1', capability: 'retrosynthesis-route-search',
+      method: 'mcts tree search, expansion policy uspto', status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+      inputs: { smiles: IMATINIB, iterationLimit: 100, maxRoutes: 5 },
+      outputs: {
+        solved: true, routeCount: 1, stoppedBy: 'ITERATION_LIMIT',
+        routes: [{
+          rank: 1, steps: 2, allStartingMaterialsInStock: true, score: 0.99,
+          // The engine returns disconnections target-first; the protocol must read them forward.
+          reactions: [
+            { reactionSmiles: 'target>>intermediate.reagentB', templateHash: 'h2', policyProbability: 0.41, policyName: 'uspto' },
+            { reactionSmiles: 'intermediate>>materialA.reagentA', templateHash: 'h1', policyProbability: 0.72, policyName: 'uspto' },
+          ],
+          startingMaterials: [{ smiles: 'materialA', inStock: true }, { smiles: 'reagentA', inStock: true }, { smiles: 'reagentB', inStock: true }],
+        }],
+      },
+      provenance: {
+        engine: 'AiZynthFinder 4.4.1', license: 'MIT (AiZynthFinder, MolecularAI)',
+        modelChecksums: { expansion_policy_model: 'model-sha', expansion_templates: 'tpl-sha', stock: 'stock-sha' },
+        determinism: 'Bounded by the iteration limit — a replay on the same models reproduces the search.',
+      },
+      outputHash: 'route-hash',
+    });
+    const { protocol } = buildCandidateProtocol(ctx.db, ctx.campaignId);
+    const s = protocol.synthesis;
+    assert.equal(s.routeProvided, true);
+    assert.equal(s.engine, 'AiZynthFinder 4.4.1');
+    assert.equal(s.solved, true);
+    assert.equal(s.candidateId, ctx.ids.winner);
+    assert.equal(s.topRoute.steps, 2);
+    assert.deepEqual(s.topRoute.reactionsForward.map((r) => [r.step, r.reactionSmiles]), [
+      [1, 'intermediate>>materialA.reagentA'],
+      [2, 'target>>intermediate.reagentB'],
+    ]);
+    assert.equal(s.topRoute.allStartingMaterialsInStock, true);
+    assert.deepEqual(s.modelChecksums, { expansion_policy_model: 'model-sha', expansion_templates: 'tpl-sha', stock: 'stock-sha' });
+    assert.equal(s.license, 'MIT (AiZynthFinder, MolecularAI)');
+    assert.match(s.boundary, /no conditions, stoichiometry, yields, work-up or safety assessment/);
+    assert.match(s.statement, /proposal, not a validated procedure/);
+    assert.ok(protocol.uncertainty.some((u) => u.claim === 'Proposed synthesis route' && u.label === 'MODEL_ESTIMATE'));
+  });
+
+  test('when the engine could not run, the protocol names the missing model files instead of a route', () => {
+    const ctx = seedRun();
+    addCampaignEvent(ctx.db, {
+      campaignId: ctx.campaignId, type: 'STAGE_BLOCKED',
+      payload: { stage: 'retrosynthesis', candidateId: ctx.ids.winner, blocker: 'BLOCKED_BY_RUNTIME', reason: 'MODEL_FILES_MISSING', missingModelFiles: ['uspto_model.onnx', 'zinc_stock.hdf5'] },
+    });
+    const { protocol } = buildCandidateProtocol(ctx.db, ctx.campaignId);
+    assert.equal(protocol.synthesis.routeProvided, false);
+    assert.equal(protocol.synthesis.status, 'BLOCKED_BY_RUNTIME');
+    assert.equal(protocol.synthesis.reason, 'MODEL_FILES_MISSING');
+    assert.deepEqual(protocol.synthesis.missingModelFiles, ['uspto_model.onnx', 'zinc_stock.hdf5']);
+    assert.equal(protocol.synthesis.topRoute, undefined);
   });
 });

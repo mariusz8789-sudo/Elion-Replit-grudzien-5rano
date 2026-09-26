@@ -1,5 +1,43 @@
 # AiZynthFinder — pliki modelu, których Genesis potrzebuje (pakiet dostawczy D-1)
 
+## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26
+
+Wyczerpałem legalne drogi z tego środowiska. Wynik, zmierzony:
+
+| Droga | Wynik |
+|---|---|
+| `zenodo.org` (4 z 5 plików) | **ODMOWA** — gateway odpowiada 403 na CONNECT (polityka sieci) |
+| `ndownloader.figshare.com` (stock) | **ODMOWA** — jw. |
+| `huggingface.co` | ODMOWA |
+| GitHub releases `MolecularAI/aizynthfinder` | brak assetów z modelami — repozytorium zawiera wyłącznie kod |
+| PyPI `aizynthfinder` 4.4.1 | osiągalne, ale **paczka ma 131 kB — sam kod**, żadnych modeli |
+| PyPI: `aizynthmodels`, `aizynthfinder-models`, `uspto-templates`, `rxnutils` | **nie istnieją** (404) |
+
+Potwierdzenie z samego silnika, nie z mojej pamięci: pobrałem źródło 4.4.1 z PyPI i odczytałem
+`aizynthfinder/tools/download_public_data.py`. Jedynymi oficjalnymi adresami są `zenodo.org`
+(polityka rozszerzania, szablony, ringbreaker, filtr) i `ndownloader.figshare.com` (stock ZINC).
+Innego oficjalnego źródła **nie ma** — więc nie istnieje legalna droga w obrębie tego środowiska.
+
+**Czego potrzebuję od właściciela — jedna czynność:**
+w ustawieniach środowiska (menu środowiska chmurowego na pasku tytułu sesji → Edit) zmienić
+**Network access**: albo szerszy poziom dostępu, albo dopisać do dozwolonych domen:
+
+```
+zenodo.org
+ndownloader.figshare.com
+```
+
+Poziomy dostępu opisano na https://code.claude.com/docs/en/claude-code-on-the-web
+
+Po odblokowaniu wykonuję bez pytania: pobranie → sha256 → `detect()` → benchmark aspiryny →
+retrosynteza finalisty HERO → Evidence → Replay → część B protokołu.
+
+**Alternatywa, jeśli polityki nie chcesz zmieniać:** pliki, które już masz na telefonie, wystarczy
+umieścić w dowolnym katalogu maszyny docelowej i wskazać `GENESIS_RETRO_MODEL_DIR` (§3 niżej).
+Do repozytorium ich nie wkładamy — mają własne licencje upstream.
+
+Reszta łańcucha HERO **nie czeka na to** i idzie dalej.
+
 Zamówienie właściciela z 2026-09-26. Wszystko poniżej pochodzi **z kodu adaptera**
 (`packages/backend/src/compute/retro_worker.py`, stałe `REQUIRED_FILES` / `OPTIONAL_FILES`), nie z
 pamięci. Silnik jest już zintegrowany i importuje się poprawnie; brakuje wyłącznie danych modelu,

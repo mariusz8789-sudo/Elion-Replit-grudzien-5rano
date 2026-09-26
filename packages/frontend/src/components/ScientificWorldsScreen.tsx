@@ -44,7 +44,7 @@ import { NextExperimentPanel, ScientificOutcomePanel } from './ScientificOutcome
 import { LoadingStatus } from './LoadingStatus';
 import { estimateDuration, recordDuration } from '../core/product/durationEstimate';
 import { getToken } from '../core/backend/session';
-import { getCandidateProtocol, type CandidateProtocol } from '../core/backend/client';
+import { getCandidateProtocol, getExperimentMemory, type CandidateProtocol } from '../core/backend/client';
 import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
 import { BENCH_ZONES, benchLayoutOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
@@ -188,6 +188,14 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   /** The final protocol, exactly as the backend assembled it from the record. Null until the run ends. */
   const [protocol, setProtocol] = useState<CandidateProtocol | null>(null);
   /**
+   * THE FROZEN CRITERIA, as the SERVER stored them before the first engine ran. The run state carries
+   * only the fact that a preregistration record exists, with its id and chain hash — not the criteria
+   * themselves — so they are read from the campaign's scientific memory and shown WHILE the run is
+   * going, which is the only moment at which "frozen before execution" can be believed by a viewer.
+   * This is the server's record, never the client-side working hypothesis rendered elsewhere.
+   */
+  const [preregBody, setPreregBody] = useState<Record<string, unknown> | null>(null);
+  /**
    * The lab shows the WORLD, not a dashboard: by default every panel is out of the way and the
    * readouts live on the instruments in the scene. One control opens the details (evidence, replay,
    * provenance), because evidence must stay reachable — it is hidden, never removed.
@@ -295,6 +303,31 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
     const id = setInterval(read, 250);
     return () => clearInterval(id);
   }, [world, drugRun, benchLayer]);
+  // The frozen criteria, read once per campaign from the server's own scientific memory. It retries
+  // while the record is not there yet (the preregistration is written as the run starts) and stops the
+  // moment it has it — this is a read of what the server froze, so it is fetched, never recomputed.
+  const preregCampaign = drugRun?.campaignId ?? null;
+  const preregProject = drugRun?.projectId ?? null;
+  useEffect(() => {
+    setPreregBody(null);
+    if (!preregCampaign || !preregProject) return;
+    const token = getToken();
+    if (!token) return;
+    let stop = false;
+    let attempts = 0;
+    const read = (): void => {
+      if (stop || attempts > 40) return;
+      attempts += 1;
+      void getExperimentMemory(token, preregProject, preregCampaign).then((r) => {
+        if (stop) return;
+        const body = r.ok ? r.data.preregistration?.body ?? null : null;
+        if (body) setPreregBody(body);
+        else setTimeout(read, 6000);
+      });
+    };
+    read();
+    return () => { stop = true; };
+  }, [preregCampaign, preregProject]);
   // Measured load time of this world: the next visit counts down from it (never a guessed number).
   const loadStartedAt = useRef(performance.now());
   const [loadEstimate] = useState(() => estimateDuration(`lab:${world}`));
@@ -705,6 +738,51 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                 <span className="sw-procedure-label">SYMULOWANY KROK LABORATORYJNY · reprezentuje: {hand.represents}</span>
               </p>
             )}
+            {/* WHAT WAS FROZEN BEFORE ANY ENGINE RAN. Shown during the run, because that is the only
+                moment at which "the criteria were fixed in advance" is something a viewer can watch
+                rather than be told afterwards. Every value is the server's stored record. */}
+            {preregBody != null && (() => {
+              const criteria = Array.isArray(preregBody.criteria) ? preregBody.criteria as Record<string, unknown>[] : [];
+              const statement = typeof preregBody.statement === 'string' ? preregBody.statement : null;
+              const fingerprint = typeof preregBody.fingerprint === 'string' ? preregBody.fingerprint : null;
+              return (
+                <section className="sw-prereg" data-testid="drug-prereg" data-criteria={criteria.length}
+                  data-prereg-record={drugRun.preregistration?.recordId ?? ''}>
+                  <div className="sw-cand-head">
+                    <strong>Zamrożone kryteria</strong>
+                    <span className="sw-procedure-label">PREREJESTRACJA · przed wykonaniem</span>
+                  </div>
+                  {statement && <p className="sw-prereg-statement">{statement}</p>}
+                  {criteria.length > 0 && (
+                    <ul className="sw-prereg-list">
+                      {criteria.map((c, i) => {
+                        const id = typeof c.id === 'string' ? c.id : `kryterium ${i + 1}`;
+                        const thr = typeof c.threshold === 'number' ? c.threshold : null;
+                        const dir = typeof c.direction === 'string' ? c.direction : null;
+                        const unit = typeof c.unit === 'string' ? c.unit : '';
+                        return (
+                          <li key={id} data-criterion={id}>
+                            <span className="sw-prereg-id">{id}</span>
+                            {thr != null && <span className="sw-prereg-thr">{dir ? `${dir} ` : ''}{thr}{unit ? ` ${unit}` : ''}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <span className="sw-procedure-label">
+                    {fingerprint ? `odcisk ${fingerprint.slice(0, 16)}…` : 'odcisk niezapisany'}
+                    {drugRun.preregistration?.chainHash ? ` · łańcuch ${drugRun.preregistration.chainHash.slice(0, 12)}…` : ''}
+                  </span>
+                  {/* The server's own check of the sealed session against these criteria, once it exists.
+                      The lab never evaluates the criteria itself. */}
+                  {drugRun.sealed?.check && (
+                    <span className={`sw-prereg-check is-${drugRun.sealed.check.toLowerCase()}`} data-prereg-check={drugRun.sealed.check}>
+                      Sprawdzenie serwera wobec prerejestracji: {drugRun.sealed.check}
+                    </span>
+                  )}
+                </section>
+              );
+            })()}
             {/* EVERY CANDIDATE, AS IT HAPPENS. The run's own read model already carried each candidate's
                 generation, parent, transformation, per-engine result and rejection reason; the panel used
                 to show only a count and the one candidate in focus, so a viewer could not see the science

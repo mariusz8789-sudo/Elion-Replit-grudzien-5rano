@@ -5929,6 +5929,16 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .sw-drug-live .sw-drug-dl dt { color: #94a3b8; }
 .sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }
 .sw-drug-note { font-size: 0.75rem; color: #94a3b8; margin: 0.3rem 0 0; }
+/* The frozen criteria, shown while the run is going. */
+.sw-prereg { display: grid; gap: 0.2rem; margin: 0.5rem 0 0.1rem; padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(34, 211, 238, 0.28); border-radius: 0.4rem; background: rgba(8, 47, 73, 0.35); }
+.sw-prereg-statement { margin: 0; font-size: 0.72rem; color: #e2e8f0; }
+.sw-prereg-list { list-style: none; margin: 0.15rem 0 0; padding: 0; display: grid; gap: 0.12rem; }
+.sw-prereg-list li { display: flex; justify-content: space-between; gap: 0.5rem; font: 0.66rem/1.5 var(--font-mono, monospace); }
+.sw-prereg-id { color: #cbd5e1; }
+.sw-prereg-thr { color: #7dd3fc; flex: none; }
+.sw-prereg-check { font: 600 0.64rem/1.5 var(--font-mono, monospace); color: #86efac; }
+.sw-prereg-check.is-mismatch, .sw-prereg-check.is-failed { color: #fca5a5; }
 /* The live candidate list: one row per candidate the run has produced, with what each engine said about
    it and, when it was thrown out, why. */
 .sw-cand-wrap { margin: 0.55rem 0 0.2rem; }

@@ -145,7 +145,7 @@ Kandydat: aspiryna `CC(=O)Oc1ccccc1C(=O)O` (offline, referencja walidatora RDKit
 
 Testy (2026-09-26): frontend 7377 pass / 1 skipped (677 plików), `npx vitest run` w `packages/frontend`.
 
-| F4 — widoczny przebieg laboratoryjny: naukowiec, chwyt fiolki, transfer do aparatury, obserwacja, protokół | wdrożone, weryfikacja E2E w toku | `benchHandling.test.ts` (8), `drugBenchHands.test.ts` (6, prawdziwa scena three.js) |
+| F4 — widoczny przebieg laboratoryjny: naukowiec, chwyt fiolki, transfer do aparatury, obserwacja, protokół | zrobione (E2E zielony, 8,0 min, build `44a91b32`) | `benchHandling.test.ts` (8), `drugBenchHands.test.ts` (6, prawdziwa scena three.js) |
 
 ### 8.1. Ręce naukowca — kontrakt (F4)
 

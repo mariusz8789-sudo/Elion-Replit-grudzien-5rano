@@ -215,13 +215,16 @@ nieudowodnione w wymagany sposób · **BLOKADA** = nie da się wykonać w tym ś
 | Werdykt wyprowadzony przez serwer | DOWÓD | WEAKENED (hERG 0,98 NOT_MET) — serwer wyprowadził go sam, `verdictCheck MATCH` |
 | Trwała Pamięć Naukowa | DOWÓD częściowy | rekordy w bazie, łańcuch hashy, triggery odmawiają UPDATE/DELETE. **Brak dowodu** dla: restart backendu, ponowne wejście, uprawnienia odczytu |
 | Końcowy protokół | DOWÓD | `GET …/protocol`, 10/10 testów; w przebiegu akceptacyjnym pełny zestaw pól |
-| Kandydaci widoczni jako rzędy leja | BRAK DOWODU dla bramki B | `data-bench-samples` = liczba kandydatów (kontrola pomocnicza). **Nie dowodzi** widocznych rąk, chwytu fiolki, pracy aparatury ani kadru |
-| Pełny E2E akceptacyjny (potok obliczeniowy) | DOWÓD | `liveDrugBench.e2e.spec.ts`, 1 passed, 7,5 min, exit 0, build z commita `969d7523`; „states seen: 5, states rendered by the scene: 5"; 3 rekordy w bazie: prerejestracja + 2 zapieczętowane sesje, druga z `engineReplay.verdict = MATCH` |
+| Kandydaci widoczni jako rzędy leja | DOWÓD | każdy kandydat stoi w rzędzie etapu, który osiągnął; suma stref = liczba kandydatów; finaliści z **zmierzonym** wynikiem; powody odrzucenia widoczne |
+| Pełny E2E akceptacyjny (potok obliczeniowy **i** widoczny przebieg) | DOWÓD | `liveDrugBench.e2e.spec.ts`, 1 passed, 8,0 min, exit 0, build z commita `44a91b32`; „states seen: 5, states rendered by the scene: 5"; 3 rekordy: prerejestracja `43fa8a30` + 2 sesje (`preregCheck MATCH`, `verdictCheck MATCH`, serwerowy werdykt WEAKENED), druga z `engineReplay MATCH 065e53317e731f7d → 065e53317e731f7d`; 6 kandydatów (1 zachowany, 5 odrzuconych z zapisanymi powodami: `constraint:mw-max` ×3, `constraint:mw-max,logp-range-hi` ×2) |
 | Retrosynteza | BLOKADA | adapter zintegrowany i zarejestrowany; **pliki modelu nieosiągalne** (zenodo/figshare zablokowane). Przypadek referencyjny **nie został wykonany** |
 | Języki: polski / angielski / arabski | ZAPARKOWANE | decyzja właściciela z 2026-09-26: ostatnie w kolejności (§20 pkt 8). Stan zmierzony i źródła: §22.1. Nie realizujemy teraz |
 | Tryb szkolny | BRAK | niezaimplementowany |
-| Widoczne czynności laboratoryjne (bramka B) | BRAK | ręce, chwyt fiolki, transfer, praca mikroskopu — niezrealizowane |
+| Widoczne czynności laboratoryjne (bramka B) | DOWÓD | w przeglądarce scena wykonała `REACH → GRIP → CARRY → PLACE → OPERATE`; naukowiec obecny; fiolka podpięta do punktu chwytu (zmierzona odległość ≤ 20 mm w wyrenderowanej scenie); praca przy analizatorze **i** stanowisku dokowania; każda próbka z tożsamością molekularną; gest oznaczony `SYMULOWANY KROK LABORATORYJNY` + etykieta reprezentowanego etapu. Testy: `benchHandling.test.ts` (8), `drugBenchHands.test.ts` (7, prawdziwa scena three.js, w tym reguła „180 s pętli renderu nie domyka etapu") |
+| Protokół końcowy widoczny w laboratorium | DOWÓD | sekcja `drug-protocol` z trzema częściami (A obliczeniowa / B droga syntezy / C walidacja fizyczna, każdy krok `NOT_EXECUTED` + `NOT_CONNECTED`); odcisk zgodny z artefaktem backendu **po** powtórce silnika (test odpytuje aż do zgodności) |
+| Obserwacja oznaczona uczciwie | DOWÓD | tabliczka w scenie nad kieszenią: „MODEL OBLICZENIOWY · poza z AutoDock Vina · to NIE jest obraz z mikroskopu"; żadna stacja nie udaje mikroskopu |
 | Materiał pokazowy (bramka C) | BRAK | nie nagrany |
+| Jakość obrazu jak na screenach właściciela | BRAK | scena ma światło kluczowe z cieniami, praktyczne lampy, smugi i pył, tone mapping oraz przebiegi Bloom/GTAO/Bokeh/SSR/SMAA, ale materiały są **proceduralne**: brak IBL/HDRI w tej scenie, brak map PBR (blokada D-2), postać to rig proceduralny, nie model ze skinningiem |
 
 ## 22. Zaległości zapisane, żeby nie zginęły
 

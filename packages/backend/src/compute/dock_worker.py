@@ -18,7 +18,8 @@ Commands:
                               -> deterministic Meeko receptor preparation of a vetted PDB file
   prepare_ligand {ligandSmiles, seed, outDir}
                               -> deterministic RDKit ETKDG/MMFF + Meeko ligand PDBQT
-  redock {pdbPath, ligandSdfPath, center, boxSize, exhaustiveness, seed, outDir, deleteBadRes?, forgiveExtraBonds?}
+  redock {pdbPath, ligandSdfPath, center, boxSize, exhaustiveness, seed, outDir, deleteBadRes?, forgiveExtraBonds?,
+          extraRigidPdbqtPaths?}
                               -> re-docks the co-crystallised ligand and reports the heavy-atom
                                  RMSD of the top pose against the crystal pose
 
@@ -312,6 +313,24 @@ def _redock(req, out_dir):
     ref = Chem.RemoveHs(xtal)
     smiles = Chem.MolToSmiles(ref)
     rec = _prepare_receptor(req, os.path.join(out_dir, "receptor"))
+    # Opt-in: extra rigid receptor atoms (e.g. a haem or NADPH cofactor typed separately as rigid PDBQT)
+    # appended to the Meeko receptor. Off by default; when on, the record lists every file and its hash.
+    extra_paths = [str(p) for p in (req.get("extraRigidPdbqtPaths") or [])]
+    if extra_paths:
+        text = open(rec["receptorPdbqtPath"]).read()
+        extras = []
+        for p in extra_paths:
+            body = open(p).read()
+            atoms = [l for l in body.splitlines() if l.startswith(("ATOM", "HETATM"))]
+            if not atoms:
+                raise ValueError("extra_rigid_pdbqt_empty: %s" % os.path.basename(p))
+            extras.append({"path": p, "sha256": _sha(body), "atoms": len(atoms)})
+            text = text.rstrip("\n") + "\n" + "\n".join(atoms) + "\n"
+        combined = os.path.join(out_dir, "receptor", "receptor_with_extra.pdbqt")
+        with open(combined, "w") as f:
+            f.write(text)
+        rec = {**rec, "receptorPdbqtPath": combined, "meekoReceptorPdbqtSha256": rec["receptorPdbqtSha256"],
+               "receptorPdbqtSha256": _sha(text), "extraRigidPdbqt": extras}
     r = _run_dock({"ligandSmiles": smiles, "receptorPdbqtPath": rec["receptorPdbqtPath"], "center": rec["center"],
                    "boxSize": rec["boxSize"], "exhaustiveness": req.get("exhaustiveness", 8), "nPoses": 1,
                    "seed": req.get("seed", 42)}, os.path.join(out_dir, "dock"))

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ASTEX_PREREG, ASTEX_RUNS, imatinibKitCase } from '../core/reviewer/dockingBenchmark';
 
 describe('reviewer docking benchmark (Astex Diverse Set)', () => {
-  it('both runs cover all 85 preregistered cases, and failures stay in the denominator', () => {
+  it('every run covers all 85 preregistered cases, and failures stay in the denominator', () => {
     const ids = ASTEX_PREREG.cases.map((c) => c.pdbId).sort();
     expect(ids).toHaveLength(85);
     for (const run of ASTEX_RUNS) {
@@ -15,11 +15,13 @@ describe('reviewer docking benchmark (Astex Diverse Set)', () => {
     }
   });
 
-  it('run 2 was produced under the final preregistered protocol and run 1 under an earlier one', () => {
-    const [run1, run2] = ASTEX_RUNS;
-    expect(run2.protocolFingerprint).toBe(ASTEX_PREREG.protocolFingerprint);
+  it('run 3 was produced under the current preregistered protocol and runs 1 and 2 under earlier ones', () => {
+    const [run1, run2, run3] = ASTEX_RUNS;
+    expect(run3.protocolFingerprint).toBe(ASTEX_PREREG.protocolFingerprint);
+    expect(run2.protocolFingerprint).not.toBe(ASTEX_PREREG.protocolFingerprint);
     expect(run1.protocolFingerprint).not.toBe(ASTEX_PREREG.protocolFingerprint);
-    expect(ASTEX_PREREG.amendments.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(ASTEX_RUNS.map((r) => r.protocolFingerprint)).size).toBe(3);
+    expect(ASTEX_PREREG.amendments.length).toBeGreaterThanOrEqual(4);
   });
 
   it('imatinib in c-KIT (1T46) is in the set', () => {

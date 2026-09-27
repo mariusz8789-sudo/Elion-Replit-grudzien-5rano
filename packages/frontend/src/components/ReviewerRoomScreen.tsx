@@ -211,8 +211,9 @@ function RunSummary({ run, label }: { run: BenchmarkRun; label: string }): React
 
 function DockingBenchmark(): React.ReactElement {
   const [open, setOpen] = useState(false);
-  const [run1, run2] = ASTEX_RUNS;
-  const byId = new Map(run2.cases.map((c) => [c.pdbId, c]));
+  const [run1, run2, run3] = ASTEX_RUNS;
+  const by2 = new Map(run2.cases.map((c) => [c.pdbId, c]));
+  const by3 = new Map(run3.cases.map((c) => [c.pdbId, c]));
   return (
     <section className="rv-card" aria-labelledby="rv-c5">
       <p className="rv-kicker">Challenge 3 · one example is an anecdote</p>
@@ -226,11 +227,15 @@ function DockingBenchmark(): React.ReactElement {
       <div className="rv-grid3">
         <RunSummary run={run1} label="Run 1 · protocol as frozen" />
         <RunSummary run={run2} label="Run 2 · tolerant protein preparation (declared after run 1)" />
+        <RunSummary run={run3} label="Run 3 · cofactors kept, preparation failures fixed (declared after run 2)" />
       </div>
       <p className="rv-note">
-        Run 2 was added after seeing run 1 fail on proteins with incomplete side chains, so it is shown beside run 1, never instead of it.
-        Protein preparation is automatic: waters and cofactors are removed, metals kept, nothing curated by hand. Results on this
-        set depend strongly on how the proteins are prepared; these numbers are what this pipeline does unattended.
+        Each run was added after seeing the previous one fail, and each is shown beside the others, never instead of them. Run 2
+        tolerated incomplete side chains. Run 3 keeps cofactors near the site, drops ions Meeko cannot type, and takes ligand
+        elements from the chemical dictionary rather than the file; it is the first run in which all 85 complexes produced a pose.
+        Keeping cofactors did not by itself flip any case: the five new successes all came from the preparation fixes. Protein
+        preparation stays automatic, with nothing curated by hand. Results on this set depend strongly on preparation; these
+        numbers are what this pipeline does unattended.
       </p>
       <button type="button" className="rv-btn rv-btn-quiet" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         {open ? 'Hide the 85 cases' : 'Show all 85 cases'}
@@ -238,21 +243,22 @@ function DockingBenchmark(): React.ReactElement {
       {open && (
         <div className="rv-table">
           <table>
-            <thead><tr><th>PDB</th><th>Ligand</th><th>Run 1</th><th>Run 2</th></tr></thead>
+            <thead><tr><th>PDB</th><th>Ligand</th><th>Run 1</th><th>Run 2</th><th>Run 3</th></tr></thead>
             <tbody>
               {run1.cases.map((c) => {
-                const c2 = byId.get(c.pdbId);
+                const c2 = by2.get(c.pdbId);
+                const c3 = by3.get(c.pdbId);
                 const cell = (x: typeof c | undefined): React.ReactNode =>
                   x === undefined ? '—' : x.rmsdA !== undefined
                     ? <span className={`rv-tag ${x.success ? 'rv-tag-good' : 'rv-tag-bad'}`}>{x.rmsdA.toFixed(2)} Å</span>
                     : <span className="rv-tag rv-tag-bad" title={x.error}>{x.status === 'DOCKING_FAILED' ? 'prep failed' : x.status.toLowerCase()}</span>;
-                return <tr key={c.pdbId}><td>{c.pdbId}</td><td>{c.ligandResidue ?? '—'}</td><td>{cell(c)}</td><td>{cell(c2)}</td></tr>;
+                return <tr key={c.pdbId}><td>{c.pdbId}</td><td>{c.ligandResidue ?? '—'}</td><td>{cell(c)}</td><td>{cell(c2)}</td><td>{cell(c3)}</td></tr>;
               })}
             </tbody>
           </table>
         </div>
       )}
-      <p className="rv-foot">Records: <code>docs/evidence/astex-redock-prereg.json</code>, <code>astex-redock-benchmark-2026-09-27-run1.json</code>, <code>-run2.json</code>. Re-run: <code>python3 scripts/astex-redock-benchmark.py --data p2rank-datasets/joined/astex</code></p>
+      <p className="rv-foot">Records: <code>docs/evidence/astex-redock-prereg.json</code>, <code>astex-redock-benchmark-2026-09-27-run1.json</code>, <code>-run2.json</code>, <code>-run3.json</code>. Re-run: <code>python3 scripts/astex-redock-benchmark.py --data p2rank-datasets/joined/astex</code></p>
     </section>
   );
 }

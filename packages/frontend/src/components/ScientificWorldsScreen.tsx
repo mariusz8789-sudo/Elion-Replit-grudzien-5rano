@@ -33,7 +33,7 @@ import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientif
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
-import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+import { systemCommands, EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
 
 /** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
 const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
@@ -50,6 +50,7 @@ import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/live
 import { BENCH_ZONES, benchLayoutOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
 import { labProcedureOf } from '../core/liveExperiment/labProcedure';
 import type { DockingStep } from '../core/liveExperiment/drugRunState';
+import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy, targetAnatomyRoute, type TargetAnatomy } from '../core/liveExperiment/targetAnatomy';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -172,6 +173,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const benchLayer = useMemo(() => new DrugBenchLayer(), []);
   const loopSim = useMemo(() => (world === 'physics' ? withDrugBenchLayer(sim, benchLayer) : sim), [sim, benchLayer, world]);
   const [drugRun, setDrugRun] = useState<LiveDrugRun | null>(null);
+  /** The docking target the biology world was opened from (`?target=`), for the twin's caption. */
+  const [dockingTargetContext, setDockingTargetContext] = useState<TargetAnatomy | null>(null);
   const [benchSceneHash, setBenchSceneHash] = useState<string | null>(null);
   const [benchAtoms, setBenchAtoms] = useState(0);
   const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
@@ -414,6 +417,18 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       const lt = nextLogicalTime();
       const label = `Chat: krew pod mikroskopem ${magnification}×`;
       submitCommands(bloodMagnificationCommands(magnification, label, lt), label);
+      return;
+    }
+    const targetId = params.get('target');
+    if (targetId) {
+      // From the drug bench: focus the system the docked protein sits in (the systems rail's own command).
+      chatHumanHandoffConsumed.current = true;
+      const where = targetAnatomy(targetId);
+      setDockingTargetContext(where);
+      if (!where) return;
+      const lt = nextLogicalTime();
+      const label = `Ławka dokowania: ${where.protein} → układ ${where.system.toLowerCase()}`;
+      submitCommands(systemCommands(where.system, label, lt), label);
       return;
     }
     if (!focus) return;
@@ -738,6 +753,29 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                 <span className="sw-procedure-label">SYMULOWANY KROK LABORATORYJNY · reprezentuje: {hand.represents}</span>
               </p>
             )}
+            {/* WHERE THE TARGET SITS IN THE BODY. The run's own RECEPTOR_PREPARED record names the protein;
+                a curated reference table (targetAnatomy.ts) says where that protein is expressed, and the
+                caption says that is all it says. A target the table does not know gets no location. */}
+            {st.target && (() => {
+              const where = targetAnatomy(st.target.targetId);
+              return (
+                <section className="sw-target-anatomy" data-testid="drug-target-anatomy" data-target={st.target.targetId} data-system={where?.system ?? 'NONE'}>
+                  <div className="sw-cand-head">
+                    <strong>Cel dokowania: {where?.protein ?? st.target.targetId}</strong>
+                    <span className="sw-procedure-label">PDB {st.target.pdbId}{st.target.chain ? ` · łańcuch ${st.target.chain}` : ''}</span>
+                  </div>
+                  {where ? (
+                    <>
+                      <p className="sw-target-site">Gdzie w ciele: {where.sitePl}</p>
+                      <span className="sw-procedure-label">{TARGET_ANATOMY_CAVEAT_PL} · źródło: {where.basis}</span>
+                      <a className="chip-btn sw-target-link" href={targetAnatomyRoute(st.target.targetId)} data-testid="drug-target-anatomy-link">Pokaż w modelu ciała →</a>
+                    </>
+                  ) : (
+                    <p className="sw-target-site" data-testid="drug-target-anatomy-none">Brak zapisanej lokalizacji anatomicznej dla tego celu — model ciała nie zgaduje.</p>
+                  )}
+                </section>
+              );
+            })()}
             {/* WHAT WAS FROZEN BEFORE ANY ENGINE RAN. Shown during the run, because that is the only
                 moment at which "the criteria were fixed in advance" is something a viewer can watch
                 rather than be told afterwards. Every value is the server's stored record. */}
@@ -983,6 +1021,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
           twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds} referenceAnatomy={referenceAnatomy}
           twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
+          dockingTarget={dockingTargetContext}
           surface={surface} onSurface={applySurface}
           subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}
           researchControls={<>{commandControls}{researchControls}</>}

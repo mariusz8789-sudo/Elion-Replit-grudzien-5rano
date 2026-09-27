@@ -8,6 +8,7 @@ import { getMaterialRimIntensity } from '../core/three/humanTwinMaterials';
 import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
 import { createDefaultAnatomyView } from '../core/scientificWorlds/humanLab/anatomyView';
 import { buildVisualLayerInstruction } from '../core/scientificWorlds/humanLab/visualModes';
+import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy } from '../core/liveExperiment/targetAnatomy';
 
 /**
  * Human Explorer visual polish — regression tests for the presentation defects fixed in this pass.
@@ -147,5 +148,30 @@ describe('Human Explorer panel hierarchy', () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-controls="human-inspector"');
     expect(html).toMatch(/id="human-inspector"[^>]*hidden/);
+  });
+});
+
+describe('Human Explorer opened from the drug bench (?target=)', () => {
+  const render = (dockingTarget: ReturnType<typeof targetAnatomy>) => renderToStaticMarkup(
+    <HumanExplorerPanel
+      manifest={manifest} anatomy={{ ...createDefaultAnatomyView('HDT-TEST'), selectedNodeId: 'heart' }}
+      artifact={null} session={null} sessions={[]} busy={false} onCommands={() => {}} nextLogicalTime={() => 1}
+      cutaway={DEFAULT_CUTAWAY} onCutaway={() => {}} isolated={[]} onIsolate={() => {}} twinTier="PROXY"
+      twinCamera={false} onTwinCamera={() => {}} surface="NORMAL" onSurface={() => {}}
+      dockingTarget={dockingTarget}
+    />,
+  );
+
+  it('names the docked protein and where it sits, with the caveat that this is a location, not drug action', () => {
+    const html = render(targetAnatomy('ABL1_1IEP'));
+    expect(html).toContain('data-testid="human-target-context"');
+    expect(html).toContain('data-target="ABL1_1IEP"');
+    expect(html).toContain('data-system="CARDIOVASCULAR"');
+    expect(html).toContain('szpik');
+    expect(html).toContain(TARGET_ANATOMY_CAVEAT_PL);
+  });
+
+  it('shows nothing about a target when there is none — the default panel is unchanged', () => {
+    expect(render(null)).not.toContain('human-target-context');
   });
 });

@@ -13,6 +13,7 @@ import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../c
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 import { BODYPARTS3D_ATTRIBUTION, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
+import { TARGET_ANATOMY_CAVEAT_PL, type TargetAnatomy } from '../core/liveExperiment/targetAnatomy';
 import { runLungExposureModel, type LungExposure, type LungTimelineYears } from '../labs/experiments/biology-lung-exposure';
 import { PREVENTION_STAGES, runPreventionEducation, type PreventionStage, type PreventionTarget, type PreventionTopic } from '../labs/experiments/preventionLabCatalog';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
@@ -55,6 +56,8 @@ export interface HumanExplorerPanelProps {
   readonly nextLogicalTime: () => number;
   /** BodyParts3D pilot: which atlas nodes are drawn from the approved reference atlas (generic, never a patient). */
   readonly referenceAnatomy?: ReferenceAnatomyState;
+  /** The docking target the user arrived from (`?target=`): where that protein sits, per the curated reference table — never a claim of drug action. */
+  readonly dockingTarget?: TargetAnatomy | null;
 }
 
 const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY: 'Skórny', SKELETAL: 'Szkieletowy', MUSCULAR: 'Mięśniowy', NERVOUS: 'Nerwowy', ENDOCRINE: 'Dokrewny', CARDIOVASCULAR: 'Krążenia', LYMPHATIC: 'Limfatyczny', RESPIRATORY: 'Oddechowy', DIGESTIVE: 'Pokarmowy', URINARY: 'Moczowy', REPRODUCTIVE: 'Rozrodczy', IMMUNE: 'Immunologiczny' };
@@ -65,7 +68,7 @@ const PREVENTION_TOPICS: readonly PreventionTopic[] = ['cigarette', 'vaping', 'a
 const PREVENTION_TARGETS: readonly PreventionTarget[] = ['lungs', 'heart', 'brain', 'liver', 'whole-body'];
 const PREVENTION_TARGET_LABEL_PL: Readonly<Record<PreventionTarget, string>> = { lungs: 'płuca', heart: 'serce', brain: 'mózg', liver: 'wątroba', 'whole-body': 'organizm' };
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy, dockingTarget = null }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
   const initialHash = typeof window === 'undefined' ? '' : window.location.hash;
   const initialQuery = new URLSearchParams(initialHash.split('?')[1] ?? '');
@@ -199,6 +202,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         {referenceAnatomy?.fullAtlas?.status === 'READY' && <span className="human-model-label human-reference-attribution" data-testid="bp3d-full-atlas" data-structures={referenceAnatomy.fullAtlas.structures}>Pełny atlas męski · {referenceAnatomy.fullAtlas.structures.toLocaleString('pl-PL')} struktur · {BODYPARTS3D_ATTRIBUTION}</span>}
         {referenceAnatomy?.fullAtlas?.status === 'LOADING' && <span className="human-model-label" data-testid="bp3d-full-atlas-loading">Wczytywanie pełnego atlasu anatomicznego…</span>}
         {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])}>{BODYPARTS3D_ATTRIBUTION}</span>}
+        {/* Arrived from the drug bench: the docked protein and where it sits (curated reference), said as a location and nothing more. */}
+        {dockingTarget && <span className="human-model-label human-target-context" data-testid="human-target-context" data-target={dockingTarget.targetId} data-system={dockingTarget.system}>Z ławki dokowania: {dockingTarget.protein} · {dockingTarget.sitePl} · {TARGET_ANATOMY_CAVEAT_PL}</span>}
       </div>
       {lungModel && <aside className="human-lung-compare" data-testid="human-lung-exposure" data-exposure={lungExposure} data-years={lungYears}>
         <header><span>MODEL</span><span>EDUCATIONAL SIMULATION</span><span>NOT CLINICAL DIAGNOSIS</span></header>

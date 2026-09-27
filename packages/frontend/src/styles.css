@@ -5929,6 +5929,10 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .sw-drug-live .sw-drug-dl dt { color: #94a3b8; }
 .sw-drug-live .sw-drug-dl dd { margin: 0; overflow-wrap: anywhere; }
 .sw-drug-note { font-size: 0.75rem; color: #94a3b8; margin: 0.3rem 0 0; }
+/* Where the docked target sits in the body: a reference location with its caveat, and the link to the twin. */
+.sw-target-anatomy { margin: 0.4rem 0; padding: 0.4rem 0.5rem; border-left: 2px solid #7dd3fc; background: rgba(8, 47, 73, 0.45); border-radius: 0 0.35rem 0.35rem 0; display: grid; gap: 0.25rem; }
+.sw-target-site { font-size: 0.78rem; color: #e2e8f0; margin: 0; overflow-wrap: anywhere; }
+.sw-target-link { justify-self: start; }
 /* The frozen criteria, shown while the run is going. */
 .sw-prereg { display: grid; gap: 0.2rem; margin: 0.5rem 0 0.1rem; padding: 0.4rem 0.5rem;
   border: 1px solid rgba(34, 211, 238, 0.28); border-radius: 0.4rem; background: rgba(8, 47, 73, 0.35); }

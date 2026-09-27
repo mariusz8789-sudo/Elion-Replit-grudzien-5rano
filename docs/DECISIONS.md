@@ -10186,3 +10186,15 @@ emitted, and no compound was ranked.
 **What it is not.** A generic educational reference body (TARO MRI + illustration), not a patient and not a clinical model. The female reference body and the viewer's own UI code were not imported. A load failure leaves the previous body standing and is reported as FAILED; nothing is substituted.
 
 **Evidence.** `src/__tests__/bodyParts3dFullAtlas.test.ts` loads the committed files: 2,234 structures, 3,432 concepts, 2,288,268 triangles, height 1.73 m. Browser check on a local build: label after ~15 s under software WebGL; Skóra, RTG and Duch views rendered.
+
+## D-146 — the drug bench names where its docked target sits in the body, and the twin opens on that system
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (blanket approval, "rób sam"); the coordinator asked for the link once the audit showed the bench and the body shared a screen but were not connected.
+
+**Context.** `ScientificWorldsScreen` hosts both the live drug bench (physics world) and the human twin (biology world), yet a run's docked protein never reached the body view: clicking an organ said nothing about the candidate, and "click the organ and see where your candidate acts" was not a claim the product could back.
+
+**Decision.** A curated reference table, `core/liveExperiment/targetAnatomy.ts`, keyed by the backend's own `targetId` (the RECEPTOR_PREPARED record), gives each shipped target the body system it sits in, a plain Polish site, and the public record that says so (UniProt accession plus the structure's citation). The bench panel shows "Cel dokowania: … · Gdzie w ciele: …" with the caption *MIEJSCE WYSTĘPOWANIA CELU · atlas referencyjny, nie symulacja działania leku w tkance*, and a link to `#/human-biology-lab?target=<id>`. Opening that route runs the systems rail's own FOCUS_ANATOMY command for that system and the Human Explorer heading repeats the protein, the site and the caption. A target the table does not know gets "brak zapisanej lokalizacji" and no link: the body never guesses an organ.
+
+**What it is not.** No tissue simulation, no pharmacokinetics, no claim that the drug acts where the protein is: ABL1 itself is expressed in most tissues; the entry says so and names the haematopoietic site of the BCR-ABL fusion imatinib targets. The CC BY 4.0 BodyParts3D attribution is untouched.
+
+**Evidence.** `src/__tests__/targetAnatomy.test.ts` (every entry names a twin system, a site and a `UniProt P…` basis, and never says "działa"); `humanExplorerVisualPolish.test.tsx` renders the caption from the table and confirms the default panel is unchanged without a target.

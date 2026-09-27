@@ -1,0 +1,106 @@
+{
+ "kind": "GENESIS_ASTEX_REDOCK_BENCHMARK",
+ "exhaustiveness": 32,
+ "protocolFingerprint": "6a6217aac78edb8ed5e4bb83e0e6c17385871f64e69dc027709de6fd6561c71a",
+ "preregistrationSha256": "923fba66f0d4b22142506c6064b68a09f1bcd70094c76618c7db95762ebe58af",
+ "finishedAt": "2026-09-27T20:51:21+00:00",
+ "versions": {
+  "vina": "1.2.7",
+  "meeko": "0.8.0",
+  "rdkit": "2026.03.6",
+  "biotite": "1.6.0",
+  "python": "3.11.15"
+ },
+ "summary": {
+  "cases": 2,
+  "docked": 2,
+  "successes": 1,
+  "successRate": 0.5,
+  "successRateAmongDocked": 0.5,
+  "preparationOrDockingFailures": 0
+ },
+ "cases": [
+  {
+   "pdbId": "1G9V",
+   "listedLigand": "RQ3",
+   "inputSha256": "11a01950a2c1f4f016f3ad53a7b5451e6ca19964928e8119808cd1e154969a7c",
+   "ligandResidue": "RQ3",
+   "ligandHeavyAtoms": 25,
+   "ccdTemplate": "RQ3",
+   "ligandElementsFromCcd": 0,
+   "center": [
+    16.966,
+    16.623,
+    41.744
+   ],
+   "boxSize": [
+    20.0,
+    23.331,
+    20.0
+   ],
+   "cofactorsKept": [],
+   "cofactorsNotKept": [],
+   "status": "DOCKED",
+   "success": false,
+   "rmsdA": 4.915,
+   "vinaScoreKcalMol": -8.123,
+   "ligandSmiles": "Cc1cc(C)cc(NC(=O)Cc2ccc(OC(C)(C)C(=O)O)cc2)c1",
+   "poseSha256": "66382109f374729251af4f113e781b062e341371c4308e358d99ba60a81f7b8e",
+   "receptorPdbqtSha256": "0e6c8feb7726a8b243951a2900ad59381c57935d1a132cedb34ead949c8d2dc7",
+   "receptorTemplateTolerance": [
+    "--delete_bad_res",
+    "--forgive_extra_bonds"
+   ],
+   "extraRigidPdbqt": [],
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  },
+  {
+   "pdbId": "1HNN",
+   "listedLigand": "SKF",
+   "inputSha256": "be989576472341d6cec10c6e4ea19ccbc0fd3ffaf8a53b1a8f6d332c78eed934",
+   "ligandResidue": "SKF",
+   "ligandHeavyAtoms": 14,
+   "ccdTemplate": "SKF",
+   "ligandElementsFromCcd": 0,
+   "center": [
+    28.265,
+    44.149,
+    16.529
+   ],
+   "boxSize": [
+    20.0,
+    20.0,
+    20.0
+   ],
+   "cofactorsKept": [
+    {
+     "residue": "SAH2001",
+     "heavyAtoms": 26,
+     "pdbqtAtoms": 33
+    }
+   ],
+   "cofactorsNotKept": [],
+   "status": "DOCKED",
+   "success": true,
+   "rmsdA": 1.026,
+   "vinaScoreKcalMol": -8.867,
+   "ligandSmiles": "NS(=O)(=O)c1ccc2c(c1)CNCC2",
+   "poseSha256": "2c6351afc2f9f2f6780eef6f2050f259fac58355193895c5bc1353151a8f9198",
+   "receptorPdbqtSha256": "fbbc5c56e48a56eafafefd019541e467c49327d0db7a34b20fc3fc705acab39c",
+   "receptorTemplateTolerance": [
+    "--delete_bad_res",
+    "--forgive_extra_bonds"
+   ],
+   "extraRigidPdbqt": [
+    {
+     "sha256": "ca67e70d43245940ae8b823b3d5848df629885561c49ad343c19d54a04d79da5",
+     "atoms": 33
+    }
+   ],
+   "vinaVersion": "1.2.7",
+   "meekoVersion": "0.8.0"
+  }
+ ],
+ "run": "BACKWARD-COMPAT CHECK (2 cases, not a benchmark result)"
+}

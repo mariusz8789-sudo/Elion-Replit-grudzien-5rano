@@ -1,0 +1,469 @@
+{
+ "kind": "GENESIS_ASTEX_REDOCK_PREREGISTRATION",
+ "declaredAt": "2026-09-27T02:50:00Z",
+ "statement": "Protocol and case list frozen before any Astex case was docked. The ligand codes are the Astex list as tabulated in Buttenschoen et al. 2024 (PoseBusters, arXiv 2308.05777); three files name the chain-L ligand with an older code (1GKC BUM, 1HQ2 HHP, 1X8X TYP) and the chain-L residue is used.",
+ "protocol": {
+  "dataset": "Astex Diverse Set, 85 complexes (Hartshorn et al., J. Med. Chem. 2007, 50, 726-741)",
+  "distribution": "github.com/rdk/p2rank-datasets, directory joined/astex",
+  "distributionCommit": "0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
+  "ligandDefinition": "the HETATM residue in chain L (the Astex file convention); where a file has no chain L, the single residue carrying the listed ligand code; altloc ' ' or 'A' only",
+  "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+  "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
+  "box": "centre = crystal-ligand heavy-atom centroid; edge per axis = clamp(ligand extent + 10 A, 20 A, 30 A)",
+  "receptorTemplateTolerance": "Meeko --delete_bad_res and --forgive_extra_bonds: residues that do not match a template (e.g. incomplete side chains) are deleted rather than failing the case; the record lists the flags",
+  "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only",
+  "metric": "symmetry-aware heavy-atom RMSD of the top-ranked pose vs the crystal pose, no superposition (RDKit CalcRMS)",
+  "successCriterion": "RMSD < 2.0 A",
+  "headline": "successes / 85 \u2014 every preparation or docking failure counts as a failure"
+ },
+ "protocolFingerprint": "0cfafbcb9cb8d63869edd9bbe253d95b1ea01f05c8e7dd3c57140cc07fbcbfe3",
+ "cases": [
+  {
+   "pdbId": "1G9V",
+   "ligand": "RQ3",
+   "sha256": "11a01950a2c1f4f016f3ad53a7b5451e6ca19964928e8119808cd1e154969a7c"
+  },
+  {
+   "pdbId": "1GKC",
+   "ligand": "NFH",
+   "sha256": "3ad14593a716b8f87171278e6af9515c383e0f59d4be16e95adf7886a0295862"
+  },
+  {
+   "pdbId": "1GM8",
+   "ligand": "SOX",
+   "sha256": "3df08e15e883c340291c76427205fb9e850f79277151a895bb890fa5df171f49"
+  },
+  {
+   "pdbId": "1GPK",
+   "ligand": "HUP",
+   "sha256": "b3a7414a8b7fb6446f5c8034e904125f0ee159ece8f3950c61580db16fc3bac9"
+  },
+  {
+   "pdbId": "1HNN",
+   "ligand": "SKF",
+   "sha256": "be989576472341d6cec10c6e4ea19ccbc0fd3ffaf8a53b1a8f6d332c78eed934"
+  },
+  {
+   "pdbId": "1HP0",
+   "ligand": "AD3",
+   "sha256": "97d93a9fa1b2a852b66a38b7b7d862e8429c8e23c4890216362508e276cebcc6"
+  },
+  {
+   "pdbId": "1HQ2",
+   "ligand": "PH2",
+   "sha256": "163f8eab4010d477561418e6713030654715d45905466368036a95a3558eb156"
+  },
+  {
+   "pdbId": "1HVY",
+   "ligand": "D16",
+   "sha256": "ff4ffd955dcab44c166dfdc9d1ccb2a915e23ae2b7a8b3fa2c9bafcdf57cfa46"
+  },
+  {
+   "pdbId": "1HWI",
+   "ligand": "115",
+   "sha256": "92bf001dfd98b3cde350e19dd6f6d69952c46826af6702f8985668be171084f7"
+  },
+  {
+   "pdbId": "1HWW",
+   "ligand": "SWA",
+   "sha256": "e646b407ab3a34ade4e62c85d3d4c1879ed16beac9c39700167891fb2ff11754"
+  },
+  {
+   "pdbId": "1IA1",
+   "ligand": "TQ3",
+   "sha256": "5614596ca0c1535ba7583332ead009b9b32668e2b1d27bdcc77ac8064b55c101"
+  },
+  {
+   "pdbId": "1IG3",
+   "ligand": "VIB",
+   "sha256": "f3fa91609ccab2f6ca988133b211d3e33ad1e20c7ecda3a27b6be51a8c74faf0"
+  },
+  {
+   "pdbId": "1J3J",
+   "ligand": "CP6",
+   "sha256": "3fd8b72ff2da5675e8d55d939efec655d1caa2d7fab52dd5a0404c71e3902ea7"
+  },
+  {
+   "pdbId": "1JD0",
+   "ligand": "AZM",
+   "sha256": "bc15098d413dabd300627d49d79d8c49fa33297cc6a39d25854afaf6c9a2d53a"
+  },
+  {
+   "pdbId": "1JJE",
+   "ligand": "BYS",
+   "sha256": "b5575decfb5c1a313590c7b14cdefc2ed60a62cc94ba497391ac006f92f58e59"
+  },
+  {
+   "pdbId": "1JLA",
+   "ligand": "TNK",
+   "sha256": "fb2c948133a5f67d155a6ffc1f4a28cdf9cbbbaad2687d341a2d9c1869fc0a72"
+  },
+  {
+   "pdbId": "1K3U",
+   "ligand": "IAD",
+   "sha256": "79d0b0a4bb0588aa11e170676d76e06a2568ca16649e3f8ffd80cf6ded1a31d5"
+  },
+  {
+   "pdbId": "1KE5",
+   "ligand": "LS1",
+   "sha256": "11d215715d0b2db17d11e67e93b240d9a8485b7e2a9eb9a03a2499922a14ff3e"
+  },
+  {
+   "pdbId": "1KZK",
+   "ligand": "JE2",
+   "sha256": "8135b85ec0fd4796fbd7f5f5aaa2b751551fcf1c18b637926538305a823bcd35"
+  },
+  {
+   "pdbId": "1L2S",
+   "ligand": "STC",
+   "sha256": "8b009455d7e60dc36dd6f38bd9274160c04471bf6a260bb6dc3a6189263e980c"
+  },
+  {
+   "pdbId": "1L7F",
+   "ligand": "BCZ",
+   "sha256": "c6f0eec8c50b934e00c8b8f97735627937624c9f703a6536547e653951fddd95"
+  },
+  {
+   "pdbId": "1LPZ",
+   "ligand": "CMB",
+   "sha256": "5eeb0f3e4ef4a9772d104f5c724513ff758a8909ba6c8da31fb611cb37f7af2c"
+  },
+  {
+   "pdbId": "1LRH",
+   "ligand": "NLA",
+   "sha256": "6c20eea080963b130f6481c5c4315dce99196ab15a042ba267850676485e8744"
+  },
+  {
+   "pdbId": "1M2Z",
+   "ligand": "DEX",
+   "sha256": "0254f566ee61dd093cda3ad1688ad3ba9228d98c3b796cbea19ba924f8fbf642"
+  },
+  {
+   "pdbId": "1MEH",
+   "ligand": "MOA",
+   "sha256": "34383344d7d1684cce3aa2d007321caeb1b8220a40bf7771023f815c5f8a9430"
+  },
+  {
+   "pdbId": "1MMV",
+   "ligand": "3AR",
+   "sha256": "109f073fa38616febff40ee691e87893d152d7773281ea7a3e826483229fa2d2"
+  },
+  {
+   "pdbId": "1MZC",
+   "ligand": "BNE",
+   "sha256": "cb59626ff1147e6b36aa0319715d6e174369c18c50072ef379f9ab259fcbe9cc"
+  },
+  {
+   "pdbId": "1N1M",
+   "ligand": "A3M",
+   "sha256": "8484c1b5033c28ca3057c3911a69e9a6a9b4f60f259a64916729b639349d3bba"
+  },
+  {
+   "pdbId": "1N2J",
+   "ligand": "PAF",
+   "sha256": "5c4bbf4d10f04f02f6f64190b93af06fba2a8b9c98026bcd7d18b1800723a985"
+  },
+  {
+   "pdbId": "1N2V",
+   "ligand": "BDI",
+   "sha256": "d554471b1e50dfb23e7d469fd23126a9ddf6c92dc4df8567aa60d1268f42c35d"
+  },
+  {
+   "pdbId": "1N46",
+   "ligand": "PFA",
+   "sha256": "787736f1ae2d909670a935d0af5a4e06a824b9930409fee8ca803cfcb21ade04"
+  },
+  {
+   "pdbId": "1NAV",
+   "ligand": "IH5",
+   "sha256": "8eb25223cdd973001d2635ab9bf6804b89ef1fe999482c2a7bd07dbc56c53fce"
+  },
+  {
+   "pdbId": "1OF1",
+   "ligand": "SCT",
+   "sha256": "2372aec67677eb1726dc7645c80446f3fdb0e6cf41f7501c4a8ce96fb71863ef"
+  },
+  {
+   "pdbId": "1OF6",
+   "ligand": "DTY",
+   "sha256": "74e56ec09876bfa76e65147ce3459ad0611567f07f79517b0e8771a8848e8ad9"
+  },
+  {
+   "pdbId": "1OPK",
+   "ligand": "P16",
+   "sha256": "cb35307f8e73aac50f820d0d53b31abb95d559f8af23c6ceb53ae82e0b1fd425"
+  },
+  {
+   "pdbId": "1OQ5",
+   "ligand": "CEL",
+   "sha256": "9205b77c63c941560c603bf0d780692b384eaa62c3c435949e87b115a0eaa1e0"
+  },
+  {
+   "pdbId": "1OWE",
+   "ligand": "675",
+   "sha256": "3dd62017d4686f8288b3fa437b24c8cc54636f1114feedb983085780ec6fb915"
+  },
+  {
+   "pdbId": "1OYT",
+   "ligand": "FSN",
+   "sha256": "6a1267a4540bb8bff338beffacbed8ed02be633bfc75ba7df2485a93bbf0c74c"
+  },
+  {
+   "pdbId": "1P2Y",
+   "ligand": "NCT",
+   "sha256": "2e27b0edd7e4ba295173e8eb4bc57269569bbd47ea8cf242dfd8413650c21ee0"
+  },
+  {
+   "pdbId": "1P62",
+   "ligand": "GEO",
+   "sha256": "71cc67311337ebf0e41557fdfbdd253db3a64d2949af2b969fb98febabdf8129"
+  },
+  {
+   "pdbId": "1PMN",
+   "ligand": "984",
+   "sha256": "8e818cd13b9082f525850567ab7710bcaca4d368df8bfbd486caed4a2c304dd4"
+  },
+  {
+   "pdbId": "1Q1G",
+   "ligand": "MTI",
+   "sha256": "fd465fb35da463e3518c3ef405a9b3a86057d7cb9633ff59d2a505f7616f044d"
+  },
+  {
+   "pdbId": "1Q41",
+   "ligand": "IXM",
+   "sha256": "49ea2a16f05460532420774e75ac8b9569f14252e32bf6ec0c1d0fa1bbb30848"
+  },
+  {
+   "pdbId": "1Q4G",
+   "ligand": "BFL",
+   "sha256": "45059e0dbfb7df50b7578c0ebc0dbd2b6697f0ba0d4d082ee10dba430fe4ed88"
+  },
+  {
+   "pdbId": "1R1H",
+   "ligand": "BIR",
+   "sha256": "c38d494c98c489cd93c4ae4ba3183aedf4bd01c7d227ef42f5b2081b6a8fd862"
+  },
+  {
+   "pdbId": "1R55",
+   "ligand": "097",
+   "sha256": "a1aebedf743d5d26c03c85377686dab6fe8dc1310cab52ccc1ab121672df99c2"
+  },
+  {
+   "pdbId": "1R58",
+   "ligand": "AO5",
+   "sha256": "45c2a37c3c44cfd0dce68a6b26f5d5020c56ab1a1da65f0c979d480d77f34fad"
+  },
+  {
+   "pdbId": "1R9O",
+   "ligand": "FLP",
+   "sha256": "52dfd64f6a5b44e5a005aca69dd413924378b02935117313ea1c930e3f4f38b4"
+  },
+  {
+   "pdbId": "1S19",
+   "ligand": "MC9",
+   "sha256": "6aa22487acaa64c56ad1b0e127eaab6a387751527f7993c567dd422ccddb469a"
+  },
+  {
+   "pdbId": "1S3V",
+   "ligand": "TQD",
+   "sha256": "52d847bcf67cf472a83a8d157bd902a8c65c2cc0ef6be41f495f8961305c74a3"
+  },
+  {
+   "pdbId": "1SG0",
+   "ligand": "STL",
+   "sha256": "9e02d87ee3943a10aef0179b8cf20b5427f0e531817d3f459bdab2395871f603"
+  },
+  {
+   "pdbId": "1SJ0",
+   "ligand": "E4D",
+   "sha256": "8135e22ca6553ac7c5d716190031f9c0b3ce28cd257a423b706c09a3d82f99d6"
+  },
+  {
+   "pdbId": "1SQ5",
+   "ligand": "PAU",
+   "sha256": "4671e04ddc85962140d327343919f655e98a02eaf2a00e35a966fabbb00c8c42"
+  },
+  {
+   "pdbId": "1SQN",
+   "ligand": "NDR",
+   "sha256": "4ab0644c9c55379d2f63127bf589a0906d2f736bf5768f2f3cb77594c9d0edca"
+  },
+  {
+   "pdbId": "1T40",
+   "ligand": "ID5",
+   "sha256": "a21c526cfb46e6c2f99fc59e41c608d0f72da3c87360d0d183fac638c3d0e07c"
+  },
+  {
+   "pdbId": "1T46",
+   "ligand": "STI",
+   "sha256": "61094e9bf167bcb4fddedd191af2a9eaf4ffba073196bf72ffa3f01cdabcd7f2"
+  },
+  {
+   "pdbId": "1T9B",
+   "ligand": "1CS",
+   "sha256": "f6892abbf9fae6dcc3b805d2e78f22cd44a07e43b225ca5cd2bf25b583afc2fe"
+  },
+  {
+   "pdbId": "1TOW",
+   "ligand": "CRZ",
+   "sha256": "6db9cea806701269accea8cb470fd794ac27cf88053bbb210e8a81b774a2cd53"
+  },
+  {
+   "pdbId": "1TT1",
+   "ligand": "KAI",
+   "sha256": "6fdbb99f4b523929ee1e7b995d87e3f26c1a7f2da1f8b22f39547abe81ba81a1"
+  },
+  {
+   "pdbId": "1TZ8",
+   "ligand": "DES",
+   "sha256": "14e6d5615c8ba209b8f58c8929b0ef531e3002bf88bc1b30afd22d695eb9cb58"
+  },
+  {
+   "pdbId": "1U1C",
+   "ligand": "BAU",
+   "sha256": "a894846f959dd895dd02b21cf62a88928dbc577448f42e571b78357c2416274f"
+  },
+  {
+   "pdbId": "1U4D",
+   "ligand": "DBQ",
+   "sha256": "868d02f6009784e13aba8bff0035f9ad12d761ceec0f31fae5bac025c7d95bad"
+  },
+  {
+   "pdbId": "1UML",
+   "ligand": "FR4",
+   "sha256": "00aa303d19a4915da7f8bc3a15055dc54cadd5b06b35a8d4dd172800e5ce2b4e"
+  },
+  {
+   "pdbId": "1UNL",
+   "ligand": "RRC",
+   "sha256": "ba684116555c6965d7d0e05cd26610f9c5fd422c1f95964379da58b19bcc5dcc"
+  },
+  {
+   "pdbId": "1UOU",
+   "ligand": "CMU",
+   "sha256": "4bdc38747b8282373bc90c66ae0af66de4a02d8f5bb2375436ce9fd01477f185"
+  },
+  {
+   "pdbId": "1V0P",
+   "ligand": "PVB",
+   "sha256": "b777d78d64637e81de93480224f27f194c08fc3863bbd18b955ee0a017e4910f"
+  },
+  {
+   "pdbId": "1V48",
+   "ligand": "HA1",
+   "sha256": "daad906f616be55000e091c0232443ec22ba80cde9d6df6469ad455907092a05"
+  },
+  {
+   "pdbId": "1V4S",
+   "ligand": "MRK",
+   "sha256": "e7530bf111672aa8e1a7426746ab5bf8c44c8aa84f072be3bfc57fb10b81c9d1"
+  },
+  {
+   "pdbId": "1VCJ",
+   "ligand": "IBA",
+   "sha256": "851af66d355eaa4e2c31d4ae8ef3aa9f93fbface4667e36a594d6022bac20f66"
+  },
+  {
+   "pdbId": "1W1P",
+   "ligand": "GIO",
+   "sha256": "ffd5675c509348de8e15a1035e741ace35dc8f4c02cd02a9b1a7f276dc044883"
+  },
+  {
+   "pdbId": "1W2G",
+   "ligand": "THM",
+   "sha256": "c94b900c24c68b6f66e50d17dd307368119a3d6257be759c84476de374209b8d"
+  },
+  {
+   "pdbId": "1X8X",
+   "ligand": "TYR",
+   "sha256": "aa700669ef03193ca8ed60c6f0f2b6ee3be58c92e1bf8219b821b7d4b57378b4"
+  },
+  {
+   "pdbId": "1XM6",
+   "ligand": "5RM",
+   "sha256": "c9ebdc4132ae29261d2d500a285eaeb7fc0567854666cf5e2042b3b306681efb"
+  },
+  {
+   "pdbId": "1XOQ",
+   "ligand": "ROF",
+   "sha256": "7ab73cd5a6db1c940d90896ac7ee4c1e5d316a9cb2c6def1256079172beed9ba"
+  },
+  {
+   "pdbId": "1XOZ",
+   "ligand": "CIA",
+   "sha256": "7a23edd27506236570b9cd25a2cc63ad731e0d52778c465b16ed10c1742586ff"
+  },
+  {
+   "pdbId": "1Y6B",
+   "ligand": "AAX",
+   "sha256": "22b5b6221ed82da054c130fe11dc9ddf9101b8b713045f7fe7daa316e89a4078"
+  },
+  {
+   "pdbId": "1YGC",
+   "ligand": "905",
+   "sha256": "9c3b9cebe3c1638ff3397358c8cd545d1be3572b02f50d32f372f9a8966213d3"
+  },
+  {
+   "pdbId": "1YQY",
+   "ligand": "915",
+   "sha256": "6632e2daa5d5f0cf2a05810ab243faf56c1378ea2bb27fda7dd821634052b357"
+  },
+  {
+   "pdbId": "1YV3",
+   "ligand": "BIT",
+   "sha256": "9de3a0990b790b7073fac9f7e7d6bea54653b80c1246d32b080b601f7ebacff1"
+  },
+  {
+   "pdbId": "1YVF",
+   "ligand": "PH7",
+   "sha256": "984fd1ff98a7ede91cfe1ceb4cc9a5036b6f50e6bd3e6c199326d0fbee586bf7"
+  },
+  {
+   "pdbId": "1YWR",
+   "ligand": "LI9",
+   "sha256": "3acb758605090b74072513183c030c250b6cd615b5a3ad876c91503f0064ab28"
+  },
+  {
+   "pdbId": "1Z95",
+   "ligand": "198",
+   "sha256": "0d63f5c7250a50eda6d663c499bd01c5f9863cda986a7d0e87fd25483a6a13f1"
+  },
+  {
+   "pdbId": "2BM2",
+   "ligand": "PM2",
+   "sha256": "e65df7ea6ad81d0d435f21e61216c084dc85af47dee4c82df152164ca8caab31"
+  },
+  {
+   "pdbId": "2BR1",
+   "ligand": "PFP",
+   "sha256": "97305901c0b33643108d921d09ca84db4aada3e78a8cbd8ba945a6cdf7033dce"
+  },
+  {
+   "pdbId": "2BSM",
+   "ligand": "BSM",
+   "sha256": "ef9ff7a8e6fa1c20f2eeb37fdbab636ccb946a1965225ccb28a3ae76ad08533a"
+  }
+ ],
+ "amendments": [
+  {
+   "amendedAt": "2026-09-27T02:58:00Z",
+   "field": "ligandChemistry",
+   "previousProtocolFingerprint": "4bae777a939da86b57ce68a7a39e766e014f5d43b7be911f8d69875fb9b979ab",
+   "previousValue": "Open Babel bond-order perception from the crystal heavy-atom coordinates (no curated chemistry), written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+   "reason": "A smoke run of 2 cases (1T46, 1G9V) under the original protocol showed Open Babel mis-perceiving imatinib's pyrimidine (a 5-valent carbon), so RDKit could not read the ligand. Bond orders now come from the wwPDB Chemical Component Dictionary, the standard source. Smoke-run results, disclosed: 1T46 DOCKING_FAILED (ligand_sdf_unreadable); 1G9V docked at 4.898 A. No other case had been run. Case list, box, engine, metric and success criterion are unchanged."
+  },
+  {
+   "amendedAt": "2026-09-27T03:05:00Z",
+   "field": "receptor",
+   "previousProtocolFingerprint": "def5d8b36342830896bbd0bdb8c20b8825f86d340c6a7400c389edd854dc9c37",
+   "previousValue": "all ATOM records of the file (dock_worker default: waters, cofactors, metals and other HETATM dropped); Meeko mk_prepare_receptor; no repair",
+   "reason": "Smoke run of 4 cases under amendment 1: 1G9V 4.898 A, 1GKC 6.442 A, 1X8X 0.585 A, 1T46 DOCKING_FAILED (Meeko refused the receptor because of alternate locations). Receptor alternate locations are now resolved to ' '/'A', and single-atom metal ions are kept because metalloprotein pockets (e.g. zinc in 1GKC) are part of the binding site. No other case had been run."
+  },
+  {
+   "amendedAt": "2026-09-27T03:20:00Z",
+   "field": "receptorTemplateTolerance (new)",
+   "previousProtocolFingerprint": "97c78bb8602e4e5b622da28ef4da21f59b8a182362186ac366cfaa7804fd8db7",
+   "reason": "RUN 1 under the amendment-2 protocol (fingerprint above) was started on all 85 cases and is reported in full, whatever it shows. While it ran, several cases failed because Meeko's residue templates rejected deposited structures with incomplete side chains or unusual bonds (e.g. 1GM8, 1GPK, 1HNN, 1HP0). RUN 2 adds Meeko's own tolerance flags. It is declared here after seeing those run-1 failures, so it is a second, openly post-hoc protocol, not a replacement: both runs are published side by side."
+  }
+ ]
+}

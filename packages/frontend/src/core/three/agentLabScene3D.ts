@@ -27,6 +27,7 @@ import { buildVisualLayerInstruction, type VisualLayerInstruction } from '../sci
 import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
 import { createEpoxyFloor, createGlassCurtainWall, createHoloPanel, createLayeredCeiling, createManipulatorArm, createMezzanine, createTextSign, createTwinChamber, createTwinProxy, kelvinToColor, lumensToIntensity, type HumanTwinLodLevel, type HumanTwinLodState, type ManipulatorHandle, type TwinHandle } from './biologyLabKit';
 import { loadHumanTwinBodyResult, type HumanTwinTier, type HumanTwinPresentationState } from './humanTwinAsset';
+import { FULL_ATLAS_IDLE, loadFullAtlas, type FullAtlasState, type LoadedFullAtlas } from './bodyParts3dFullAtlas';
 import { REFERENCE_ANATOMY_IDLE, bodyParts3dStructure, loadBodyParts3dPilot, selectBodyParts3dLod, type ReferenceAnatomyPart, type ReferenceAnatomyState } from './bodyParts3dPilot';
 import { DEFAULT_CUTAWAY, type CutawayState } from './humanTwinCutaway';
 import type { TwinSurfaceMode } from './humanTwinMaterials';
@@ -160,6 +161,9 @@ export class AgentLabScene3D implements Sim3D {
   private referenceParts: readonly ReferenceAnatomyPart[] = [];
   private referenceState: ReferenceAnatomyState = REFERENCE_ANATOMY_IDLE;
   private referenceAbort: AbortController | null = null;
+  private fullAtlas: LoadedFullAtlas | null = null;
+  private fullAtlasAbort: AbortController | null = null;
+  private fullAtlasState: FullAtlasState = FULL_ATLAS_IDLE;
   private onReferenceAnatomy: ((state: ReferenceAnatomyState) => void) | null = null;
   private twinLodPreference: HumanTwinLodPreference = 'AUTO';
   private onTwinLod: ((state: HumanTwinLodState) => void) | null = null;
@@ -266,7 +270,37 @@ export class AgentLabScene3D implements Sim3D {
 
   getReferenceAnatomyState(): ReferenceAnatomyState { return this.referenceState; }
   setReferenceAnatomyListener(listener: ((state: ReferenceAnatomyState) => void) | null): void { this.onReferenceAnatomy = listener; }
-  private publishReferenceAnatomy(state: ReferenceAnatomyState): void { this.referenceState = state; this.onReferenceAnatomy?.(state); }
+  private publishReferenceAnatomy(state: ReferenceAnatomyState): void {
+    this.referenceState = { ...state, fullAtlas: this.fullAtlasState };
+    this.onReferenceAnatomy?.(this.referenceState);
+  }
+  getFullAtlasState(): FullAtlasState { return this.fullAtlasState; }
+  private publishFullAtlas(state: FullAtlasState): void {
+    this.fullAtlasState = state;
+    this.referenceState = { ...this.referenceState, fullAtlas: state };
+    this.onReferenceAnatomy?.(this.referenceState);
+  }
+
+  /**
+   * The full BodyParts3D male body (2,234 meshes): fetched once per scene and applied to every twin. A
+   * missing or undecodable file leaves the existing body standing and is reported as FAILED, never faked.
+   */
+  private ensureFullAtlas(THREE: typeof THREE_NS): void {
+    if (this.fullAtlasState.status !== 'IDLE' || typeof DecompressionStream === 'undefined') return;
+    const ownerScene = this.scene;
+    const abort = new AbortController(); this.fullAtlasAbort = abort;
+    this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'LOADING' });
+    loadFullAtlas(THREE, abort.signal).then((atlas) => {
+      if (abort.signal.aborted || this.scene !== ownerScene || !this.scene) { for (const s of atlas.systems) s.geometry.dispose(); return; }
+      this.fullAtlasAbort = null; this.fullAtlas = atlas;
+      for (const t of this.twins) t.applyFullAtlas(atlas);
+      this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'READY', structures: atlas.structures, concepts: atlas.concepts, triangles: atlas.triangles });
+    }).catch((error: unknown) => {
+      if (abort.signal.aborted) return;
+      this.fullAtlasAbort = null;
+      this.publishFullAtlas({ ...FULL_ATLAS_IDLE, status: 'FAILED', error: error instanceof Error ? error.message : String(error) });
+    });
+  }
 
   /**
    * Fetch the approved BodyParts3D pilot meshes once, at the level of detail this device should draw. Each file
@@ -588,6 +622,7 @@ export class AgentLabScene3D implements Sim3D {
     this.twinLodPreference = 'FULL';
     this.twinAnchor = chamber.anchor;
     void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
+    this.ensureFullAtlas(THREE);
     createHeroLight(THREE, scene, { target: [0, 1.3, 0.4], keyDistance: 3.4, rimDistance: 2.5, intensity: { key: 12, rim: 3.2 }, color: { key: 0xeaf4ff, rim: 0x7fdcff }, castShadow: false });
 
     // Stations from the typed world definition.
@@ -670,6 +705,7 @@ export class AgentLabScene3D implements Sim3D {
     // A refusal, a missing file or a decode error simply leaves the proxy standing — nothing is faked.
     this.twinAnchor = chamber.anchor;
     void this.upgradeTwinsToLicensedAsset(THREE, chamber.anchor);
+    this.ensureFullAtlas(THREE);
     // Two manipulators flank the chamber (reference 2), sharing the ORPHEUS arm builder.
     for (const [x, z, heading, phase] of [[-2.1, 0.9, Math.PI * 0.35, 0.8], [2.1, 0.9, -Math.PI * 0.35, 2.4]] as const) {
       const arm = createManipulatorArm(THREE, { position: [x, 0, z], headingRadians: heading, scale: 1.25, phase, linkMaterial: palette.BRUSHED_METAL, jointMaterial: palette.POLISHED_METAL, baseMaterial: palette.PAINTED_METAL });
@@ -1047,6 +1083,7 @@ export class AgentLabScene3D implements Sim3D {
     if (!old) { disposeSceneResources(asset.root); return; }
     const upgraded = createTwinProxy(THREE, this.manifest, { skinHex: BIOLOGY_SCENE.humanVisual.skinMaterial.baseColorHex, bodyAsset: asset });
     upgraded.applyReferenceAnatomy(this.referenceParts);
+    if (this.fullAtlas) upgraded.applyFullAtlas(this.fullAtlas);
     anchor.remove(old.group);
     this.spinners = this.spinners.filter((g) => g !== old.group);
     old.dispose();
@@ -1093,6 +1130,9 @@ export class AgentLabScene3D implements Sim3D {
     this.twinLoadGeneration++; this.twinAbort?.abort(); this.twinAbort = null; this.twinAnchor = null;
     // Reference meshes still attached to the scene are disposed by the traversal below; a load in flight is dropped.
     this.referenceAbort?.abort(); this.referenceAbort = null; this.referenceParts = []; this.referenceState = REFERENCE_ANATOMY_IDLE;
+    this.fullAtlasAbort?.abort(); this.fullAtlasAbort = null; this.fullAtlasState = FULL_ATLAS_IDLE;
+    for (const sys of this.fullAtlas?.systems ?? []) sys.geometry.dispose();
+    this.fullAtlas = null;
     this.pickCamera = null; this.lastPickedNode = null;
     this.macroMicro?.dispose(); this.macroMicro = null;
     this.researchCompanion?.dispose(); this.researchCompanion = null;

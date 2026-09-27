@@ -10174,3 +10174,15 @@ different model, not a tuning of this one.
 `GENESIS-MOL-01` stays `NO_WINNER`. `probeCapabilities().activityPredictor` is
 still `false`. No threshold moved, the pin was not rewritten, no prediction was
 emitted, and no compound was ranked.
+
+## D-145 — the full BodyParts3D male body replaces the proxy and hologram as the twin's visible body
+
+**Date:** 2026-09-27. **Requested by:** Mariusz (explicit consent in the film thread: "Zgoda na slorksmo/Human-Atlas").
+
+**Context.** genesis-physics.com showed "Pełny atlas męski · 2234 struktur · BodyParts3D", but no branch or commit of this repository ever held that atlas: it came from the MIT-licensed Human Atlas viewer (github.com/slorksmo/Human-Atlas, commit 5bb5713a), downloaded outside the repository. Main had only the five-organ BodyParts3D pilot (D-131 era), so the atlas would have been lost on the next deploy.
+
+**Decision.** Vendor the male reference data only (atlas.json + 15 gzip chunks, 34 MB) under `packages/frontend/public/assets/bodyparts3d/full/`, with the viewer's MIT licence and attribution file beside it. `core/three/bodyParts3dFullAtlas.ts` loads it and merges the 2,234 meshes into one geometry per system (15 draw calls). Every twin applies it: the procedural proxy, the clothed CC0 asset and the hologram shell are hidden, so exactly one body is on screen. Surface modes map onto it: Skóra = full body without skin or reproductive systems (hidden by default, as in the source viewer), RTG = skeleton opaque and the rest at 7 %, Duch/isolation = everything faded so the organ proxies inside stay pickable and visible. The Human Explorer shows "Pełny atlas męski · 2 234 struktur" with the CC BY 4.0 attribution once loaded.
+
+**What it is not.** A generic educational reference body (TARO MRI + illustration), not a patient and not a clinical model. The female reference body and the viewer's own UI code were not imported. A load failure leaves the previous body standing and is reported as FAILED; nothing is substituted.
+
+**Evidence.** `src/__tests__/bodyParts3dFullAtlas.test.ts` loads the committed files: 2,234 structures, 3,432 concepts, 2,288,268 triangles, height 1.73 m. Browser check on a local build: label after ~15 s under software WebGL; Skóra, RTG and Duch views rendered.

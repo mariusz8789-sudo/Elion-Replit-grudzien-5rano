@@ -1,0 +1,19 @@
+{
+  "rcsb_id": "TESTFIX",
+  "exptl": [
+    {
+      "method": "X-RAY DIFFRACTION"
+    }
+  ],
+  "rcsb_entry_info": {
+    "resolution_combined": [
+      2.1
+    ],
+    "polymer_entity_count": 1
+  },
+  "nonpolymer_entities": [
+    {
+      "id": "LIG"
+    }
+  ]
+}

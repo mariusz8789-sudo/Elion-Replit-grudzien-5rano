@@ -1,0 +1,65 @@
+{
+  "manifestVersion": "genesis-scientific-evidence-bundle-v1",
+  "bundleId": "real-scientific-campaign-001-bundle",
+  "campaignId": "real-scientific-campaign-001",
+  "ingestionMode": "VERIFIED_BUNDLE",
+  "note": "TEMPLATE. The external builder replaces each <...> with REAL acquired values and computes real SHA-256. ingestionMode MUST be VERIFIED_BUNDLE (not TEST_FIXTURE) for a real bundle. Never hand-edit contentHash — the builder computes it from the acquired payload.",
+  "entries": [
+    {
+      "entryId": "e-uniprot-braf",
+      "sourceService": "UNIPROT",
+      "sourceType": "protein",
+      "sourceId": "<UNIPROT_ACCESSION>",
+      "payloadRef": "payloads/proteins/UNIPROT_<UNIPROT_ACCESSION>.json",
+      "sourceUrl": "https://www.uniprot.org/uniprotkb/<UNIPROT_ACCESSION>",
+      "contentHash": "<SHA256_HEX>",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-uniprot-braf.json",
+      "license": "CC-BY",
+      "parserVersion": "v1",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "entryId": "e-chembl-activity-1",
+      "sourceService": "CHEMBL",
+      "sourceType": "bioactivity",
+      "sourceId": "<CHEMBL_ACTIVITY_ID>",
+      "payloadRef": "payloads/bioactivity/CHEMBL_<CHEMBL_ACTIVITY_ID>.json",
+      "sourceUrl": "https://www.ebi.ac.uk/chembl/",
+      "contentHash": "<SHA256_HEX>",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-chembl-activity-1.json",
+      "license": "CC-BY-SA",
+      "parserVersion": "v1",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "entryId": "e-pubchem-1",
+      "sourceService": "PUBCHEM",
+      "sourceType": "compound",
+      "sourceId": "<CID>",
+      "payloadRef": "payloads/compounds/CID_<CID>.json",
+      "sourceUrl": "https://pubchem.ncbi.nlm.nih.gov/compound/<CID>",
+      "contentHash": "<SHA256_HEX>",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-pubchem-1.json",
+      "license": "PUBLIC_DOMAIN",
+      "parserVersion": "v1",
+      "retrievedAt": "<ISO8601_UTC>"
+    },
+    {
+      "entryId": "e-epmc-1",
+      "sourceService": "EUROPE_PMC",
+      "sourceType": "article",
+      "sourceId": "<PMID_OR_PMCID>",
+      "payloadRef": "payloads/articles/EPMC_<PMID_OR_PMCID>.json",
+      "sourceUrl": "https://europepmc.org/abstract/MED/<PMID>",
+      "contentHash": "<SHA256_HEX>",
+      "hashAlgorithm": "sha256",
+      "provenanceRef": "provenance/e-epmc-1.json",
+      "license": "UNKNOWN",
+      "parserVersion": "v1",
+      "retrievedAt": "<ISO8601_UTC>"
+    }
+  ]
+}

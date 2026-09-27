@@ -1,0 +1,4 @@
+import type { DeterministicPort, EvidenceClass, EvidenceSink, EpistemicStatus, ProvenanceRef } from './contracts';
+export function emitStageEvidence(args: { readonly sink: EvidenceSink; readonly deterministic: DeterministicPort; readonly type: string; readonly stage: 'V6'|'V6.1'|'V7'; readonly modelId: string; readonly input: unknown; readonly result: unknown; readonly epistemicStatus: EpistemicStatus; readonly evidenceClass: EvidenceClass; readonly provenance: readonly ProvenanceRef[] }): void {
+  args.sink.emit({ type: args.type, stage: args.stage, modelId: args.modelId, inputFingerprint: args.deterministic.fingerprint(args.input), resultFingerprint: args.deterministic.fingerprint(args.result), epistemicStatus: args.epistemicStatus, evidenceClass: args.evidenceClass, provenance: args.provenance });
+}

@@ -1,0 +1,3 @@
+import type { HumanHierarchyNode } from './humanHierarchy';
+export interface EpistemicOverlay { readonly nodeId:string; readonly status:string; readonly confidence:number; readonly resolutionM:number; readonly sources:readonly string[]; readonly warning?:string }
+export function epistemicOverlay(node:HumanHierarchyNode):EpistemicOverlay{const warning=node.epistemicStatus==='MODEL'||node.epistemicStatus==='SIMULATION'?'Representation is model/simulation, not direct measurement.':undefined; const core={nodeId:node.nodeId,status:node.epistemicStatus,confidence:node.confidence,resolutionM:node.resolutionM,sources:node.provenance.map(p=>p.sourceId)}; return warning?{...core,warning}:core;}

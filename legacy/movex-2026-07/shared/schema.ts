@@ -1,0 +1,1781 @@
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, integer, timestamp, decimal, boolean, jsonb, unique, index } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// === USERS & COMPANIES ===
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").unique(),
+  phone: text("phone").notNull(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("customer"), // customer, driver, company, admin
+  companyId: varchar("company_id").references(() => companies.id),
+  accountType: text("account_type").default("b2c"), // b2c (individual), b2b (company)
+  avatar: text("avatar"),
+  verified: boolean("verified").default(false),
+  referralCode: text("referral_code").unique(),
+  referredByCode: text("referred_by_code"), // referral code of the user who invited them
+  // TOTP MFA (RFC 6238, see shared/totp.ts) - secret is AES-256-GCM encrypted at rest via the
+  // same encryptSecret/decryptSecret used for OAuth tokens; backup codes are bcrypt-hashed like
+  // the account password, never stored or returned in plaintext after initial generation.
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaSecret: text("mfa_secret"),
+  mfaBackupCodes: text("mfa_backup_codes").array(),
+  // GDPR right-to-erasure: set on account deletion instead of a hard DELETE, since bookings,
+  // reviews and payment records referencing this user must survive for the other party's
+  // legitimate records and for legal/financial retention - see POST /api/users/me/delete-account.
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  phoneIdx: index("users_phone_idx").on(t.phone),
+  companyIdIdx: index("users_company_id_idx").on(t.companyId),
+}));
+
+// Short-lived server-side token for the "second step" of MFA login - the password step (passport
+// LocalStrategy) never establishes a session by itself when mfaEnabled is true; this table bridges
+// to a follow-up POST /api/auth/mfa/verify call that actually calls req.login().
+export const mfaChallenges = pgTable("mfa_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").unique().notNull(),
+  phone: text("phone").notNull(),
+  address: text("address"),
+  taxId: text("tax_id"),
+  licenseNumber: text("license_number"),
+  insuranceNumber: text("insurance_number"),
+  verified: boolean("verified").default(false),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
+  totalReviews: integer("total_reviews").default(0),
+  subscriptionTier: text("subscription_tier").default("basic"), // basic, premium, enterprise
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  monthlyBookingLimit: integer("monthly_booking_limit").default(50), // limits per tier
+  // Stripe Connect (Express) payout account for company-to-company capacity claims - a company
+  // only receives split-payment payouts once this is set and Stripe reports payouts_enabled.
+  stripeConnectAccountId: text("stripe_connect_account_id"),
+  stripeConnectPayoutsEnabled: boolean("stripe_connect_payouts_enabled").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const drivers = pgTable("drivers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  licenseNumber: text("license_number").notNull(),
+  licenseExpiry: timestamp("license_expiry"),
+  vehicleType: text("vehicle_type"), // preferred vehicle type
+  available: boolean("available").default(true),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
+  totalDeliveries: integer("total_deliveries").default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("drivers_company_id_idx").on(t.companyId),
+  userIdIdx: index("drivers_user_id_idx").on(t.userId),
+}));
+
+export const vehicles = pgTable("vehicles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  driverId: varchar("driver_id").references(() => drivers.id), // assigned driver
+  type: text("type").notNull(), // van, truck, lorry, etc
+  licensePlate: text("license_plate").notNull(),
+  capacity: decimal("capacity", { precision: 10, scale: 2 }), // in cubic meters or kg
+  capacityUnit: text("capacity_unit").default("cubic_meters"), // cubic_meters, kg, liters
+  images: text("images").array(), // vehicle photos showing capacity
+  dimensions: text("dimensions"), // e.g., "L: 4.5m x W: 2.1m x H: 2.3m"
+  available: boolean("available").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("vehicles_company_id_idx").on(t.companyId),
+}));
+
+// === SKILLS ENGINE ===
+// Certifications/licenses (SEP, Gas, UDT, Forklift, Crane, etc.) deliberately reuse the
+// existing verificationDocuments table (holderType="user", docType=certification name,
+// expiresAt already present) rather than a new table - that table already has exactly the
+// upload/review/expiry shape this needs.
+export const skills = pgTable("skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // "Furniture assembly", "Kitchen installation", "Electrical work", ...
+  category: text("category").notNull(), // moving, installation, trades, specialty_transport, cleaning, relocation
+  // If set, a worker must hold a verified, unexpired verificationDocuments row with this
+  // docType to be matched for this skill by the Team Matching engine (e.g. "Electrical work"
+  // requires docType "Electrical"). Null = no license required.
+  requiresCertification: text("requires_certification"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const workerProfiles = pgTable("worker_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  companyId: varchar("company_id").references(() => companies.id), // optional company affiliation
+  bio: text("bio"),
+  hourlyRateEur: decimal("hourly_rate_eur", { precision: 10, scale: 2 }),
+  serviceRadiusKm: integer("service_radius_km"),
+  homeLat: decimal("home_lat", { precision: 10, scale: 7 }),
+  homeLng: decimal("home_lng", { precision: 10, scale: 7 }),
+  languages: text("languages").array().default(sql`ARRAY[]::text[]`),
+  available: boolean("available").default(true),
+  completedJobs: integer("completed_jobs").default(0),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("worker_profiles_company_id_idx").on(t.companyId),
+}));
+
+export const workerSkills = pgTable("worker_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  profileId: varchar("profile_id").notNull().references(() => workerProfiles.id),
+  skillId: varchar("skill_id").notNull().references(() => skills.id),
+  experienceLevel: text("experience_level").notNull().default("intermediate"), // beginner, intermediate, experienced, expert
+  yearsExperience: integer("years_experience"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  skillIdIdx: index("worker_skills_skill_id_idx").on(t.skillId),
+  profileSkillUnique: unique().on(t.profileId, t.skillId),
+}));
+
+// A company-level declaration "we offer this professional service" (Furniture assembly,
+// Kitchen installation, Electrical work, Office relocation, ...) - reuses the same skills
+// catalog as the Skills Engine/Team Matching rather than a parallel service-name list, so a
+// company's offerings and its workers' individual skills always refer to the same taxonomy.
+export const companyServices = pgTable("company_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  skillId: varchar("skill_id").notNull().references(() => skills.id),
+  description: text("description"),
+  priceFromEur: decimal("price_from_eur", { precision: 10, scale: 2 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("company_services_company_id_idx").on(t.companyId),
+  skillIdIdx: index("company_services_skill_id_idx").on(t.skillId),
+  companySkillUnique: unique().on(t.companyId, t.skillId),
+}));
+
+// === SERVICES & BOOKINGS ===
+export const services = pgTable("services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
+  pricePerMile: decimal("price_per_mile", { precision: 10, scale: 2 }).notNull(),
+  icon: text("icon").notNull(),
+});
+
+export const bookings = pgTable("bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  serviceId: varchar("service_id").notNull().references(() => services.id),
+  pickupAddress: text("pickup_address").notNull(),
+  pickupLat: decimal("pickup_lat", { precision: 10, scale: 7 }),
+  pickupLng: decimal("pickup_lng", { precision: 10, scale: 7 }),
+  deliveryAddress: text("delivery_address").notNull(),
+  deliveryLat: decimal("delivery_lat", { precision: 10, scale: 7 }),
+  deliveryLng: decimal("delivery_lng", { precision: 10, scale: 7 }),
+  pickupDate: timestamp("pickup_date").notNull(),
+  estimatedDistance: decimal("estimated_distance", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("draft"), // draft, posted, accepted, in_transit, delivered, canceled
+  companyId: varchar("company_id").references(() => companies.id),
+  driverId: varchar("driver_id").references(() => drivers.id),
+  vehicleId: varchar("vehicle_id").references(() => vehicles.id),
+  notes: text("notes"),
+  cargoDescription: text("cargo_description"),
+  cargoWeight: decimal("cargo_weight", { precision: 10, scale: 2 }),
+  isPublic: boolean("is_public").default(true), // public listing or private link
+  publicLink: text("public_link"),
+  paymentIntentId: text("payment_intent_id"),
+  paymentStatus: text("payment_status").default("pending"), // pending, authorized, captured, failed, refunded
+  co2Emission: decimal("co2_emission", { precision: 10, scale: 2 }), // kg of CO2
+  stops: jsonb("stops").$type<Array<{ type: "pickup" | "dropoff"; address: string; lat?: number; lng?: number; order: number; note?: string }>>(),
+  volumeM3: decimal("volume_m3", { precision: 10, scale: 2 }), // estimated cargo volume in cubic meters
+  contractSignedAt: timestamp("contract_signed_at"),
+  signatureUrl: text("signature_url"), // stored e-signature image
+  couponCode: text("coupon_code"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("bookings_user_id_idx").on(t.userId),
+  companyIdIdx: index("bookings_company_id_idx").on(t.companyId),
+  driverIdIdx: index("bookings_driver_id_idx").on(t.driverId),
+  statusIdx: index("bookings_status_idx").on(t.status),
+}));
+
+export const quotes = pgTable("quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceId: varchar("service_id").notNull().references(() => services.id),
+  pickupAddress: text("pickup_address").notNull(),
+  deliveryAddress: text("delivery_address").notNull(),
+  estimatedDistance: decimal("estimated_distance", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === OFFERS/BIDS ===
+export const offers = pgTable("offers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  driverId: varchar("driver_id").references(() => drivers.id),
+  vehicleId: varchar("vehicle_id").references(() => vehicles.id),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  estimatedPickupTime: timestamp("estimated_pickup_time"),
+  message: text("message"),
+  status: text("status").default("pending"), // pending, accepted, rejected
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("offers_booking_id_idx").on(t.bookingId),
+  companyIdIdx: index("offers_company_id_idx").on(t.companyId),
+}));
+
+// === CRM ===
+// A lead is a prospect before they become a real customer (a booking). It can originate from a
+// public quote request, a referral, or manual entry - convertedBookingId links it to the real
+// booking once won, rather than duplicating booking data into the lead itself.
+export const crmLeads = pgTable("crm_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  source: text("source").notNull().default("manual"), // quote, referral, manual, website
+  stage: text("stage").notNull().default("new"), // new, contacted, qualified, proposal, won, lost
+  estimatedValueEur: decimal("estimated_value_eur", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  convertedBookingId: varchar("converted_booking_id").references(() => bookings.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("crm_leads_company_id_idx").on(t.companyId),
+  stageIdx: index("crm_leads_stage_idx").on(t.stage),
+}));
+
+export const crmTasks = pgTable("crm_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  leadId: varchar("lead_id").references(() => crmLeads.id),
+  customerId: varchar("customer_id").references(() => users.id), // set instead of leadId for an existing customer
+  title: text("title").notNull(),
+  type: text("type").notNull().default("follow_up"), // follow_up, call, meeting, email
+  dueDate: timestamp("due_date"),
+  status: text("status").notNull().default("pending"), // pending, done
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("crm_tasks_company_id_idx").on(t.companyId),
+  statusIdx: index("crm_tasks_status_idx").on(t.status),
+}));
+
+// === WORKFLOW AUTOMATION ===
+// A rule fires when `triggerEvent` occurs for the owning company (booking.created,
+// booking.status_changed, crm_lead.stage_changed - see server/services/automationEngine.ts),
+// and only runs its actions if every condition matches. Conditions/actions are small JSON
+// arrays evaluated by the pure, tested shared/automation.ts engine rather than a bespoke DSL.
+export const automationRules = pgTable("automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerEvent: text("trigger_event").notNull(), // booking.created, booking.status_changed, crm_lead.stage_changed
+  conditions: jsonb("conditions").notNull().default(sql`'[]'::jsonb`), // AutomationCondition[]
+  actions: jsonb("actions").notNull().default(sql`'[]'::jsonb`), // AutomationAction[]
+  enabled: boolean("enabled").notNull().default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("automation_rules_company_id_idx").on(t.companyId),
+  triggerEventIdx: index("automation_rules_trigger_event_idx").on(t.triggerEvent),
+}));
+
+// One row per rule firing - doubles as the execution log and the retry queue (failed runs are
+// picked back up by the same in-process sweep pattern as certExpirySweep.ts).
+export const automationRuns = pgTable("automation_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: varchar("rule_id").notNull().references(() => automationRules.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  triggerEvent: text("trigger_event").notNull(),
+  context: jsonb("context").notNull(),
+  status: text("status").notNull().default("success"), // success, failed, pending_approval, approved, rejected
+  actionResults: jsonb("action_results"), // [{ type, success, message }]
+  error: text("error"),
+  retryCount: integer("retry_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  ruleIdIdx: index("automation_runs_rule_id_idx").on(t.ruleId),
+  companyIdIdx: index("automation_runs_company_id_idx").on(t.companyId),
+  statusIdx: index("automation_runs_status_idx").on(t.status),
+}));
+
+// === CHAT & ATTACHMENTS ===
+// Internal Messaging: a "conversation" generalizes the booking chat thread into any mailbox
+// (company mailbox, support mailbox, direct message) without duplicating the messages table -
+// bookingId on a message keeps working exactly as before for booking chat; conversationId is
+// the new, optional home for everything else (company/support/direct threads).
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull().default("direct"), // direct, support, company
+  subject: text("subject"),
+  companyId: varchar("company_id").references(() => companies.id), // set for a company mailbox thread
+  status: text("status").notNull().default("open"), // open, archived
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  lastMessageAt: timestamp("last_message_at").notNull().default(sql`now()`),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("conversations_company_id_idx").on(t.companyId),
+  statusIdx: index("conversations_status_idx").on(t.status),
+}));
+
+export const conversationParticipants = pgTable("conversation_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  lastReadAt: timestamp("last_read_at"), // thread-level read receipt
+  archivedAt: timestamp("archived_at"), // per-user archive, independent of the thread's own status
+}, (t) => ({
+  conversationIdIdx: index("conversation_participants_conversation_id_idx").on(t.conversationId),
+  userIdIdx: index("conversation_participants_user_id_idx").on(t.userId),
+  convoUserUnique: unique().on(t.conversationId, t.userId),
+}));
+
+export const messageTemplates = pgTable("message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id), // null = personal template
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("message_templates_company_id_idx").on(t.companyId),
+}));
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").references(() => bookings.id), // booking chat (existing behavior, unchanged)
+  conversationId: varchar("conversation_id").references(() => conversations.id), // general mailbox/thread messages
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  type: text("type").default("text"), // text, image, file
+  status: text("status").notNull().default("sent"), // sent, draft
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("messages_booking_id_idx").on(t.bookingId),
+  conversationIdIdx: index("messages_conversation_id_idx").on(t.conversationId),
+}));
+
+export const attachments = pgTable("attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  conversationId: varchar("conversation_id").references(() => conversations.id),
+  messageId: varchar("message_id").references(() => messages.id),
+  uploaderId: varchar("uploader_id").notNull().references(() => users.id),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type").notNull(), // image/jpeg, application/pdf, etc
+  fileSize: integer("file_size"), // in bytes
+  category: text("category").default("general"), // general, proof_of_delivery, signature
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("attachments_booking_id_idx").on(t.bookingId),
+  conversationIdIdx: index("attachments_conversation_id_idx").on(t.conversationId),
+}));
+
+// === REVIEWS ===
+export const reviews = pgTable("reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  reviewerId: varchar("reviewer_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").references(() => companies.id),
+  driverId: varchar("driver_id").references(() => drivers.id),
+  rating: integer("rating").notNull(), // 1-5 overall
+  comment: text("comment"),
+  images: text("images").array(), // photos attached to the review
+  punctuality: integer("punctuality"), // 1-5 detailed criteria
+  communication: integer("communication"),
+  safety: integer("safety"),
+  quality: integer("quality"),
+  careHandling: integer("care_handling"),
+  priceRating: integer("price_rating"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("reviews_company_id_idx").on(t.companyId),
+  bookingReviewerUnique: unique().on(t.bookingId, t.reviewerId),
+}));
+
+// === TRACKING ===
+export const trackingUpdates = pgTable("tracking_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  lat: decimal("lat", { precision: 10, scale: 7 }).notNull(),
+  lng: decimal("lng", { precision: 10, scale: 7 }).notNull(),
+  status: text("status"),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("tracking_updates_booking_id_idx").on(t.bookingId),
+}));
+
+// === ENVIRONMENTAL CALCULATIONS (CO2) ===
+// The single persisted record of every CO2 estimate the platform makes, always storing the
+// baseline alongside the estimate - "CO2 saved" is never derived or displayed without one.
+export const environmentalCalculations = pgTable("environmental_calculations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  distanceKm: decimal("distance_km", { precision: 10, scale: 2 }).notNull(),
+  vehicleType: text("vehicle_type").notNull(),
+  estimatedCo2Kg: decimal("estimated_co2_kg", { precision: 10, scale: 2 }).notNull(),
+  baselineVehicleType: text("baseline_vehicle_type").notNull(),
+  baselineCo2Kg: decimal("baseline_co2_kg", { precision: 10, scale: 2 }).notNull(),
+  co2SavedKg: decimal("co2_saved_kg", { precision: 10, scale: 2 }).notNull(),
+  methodology: text("methodology").notNull(),
+  methodologyVersion: integer("methodology_version").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("environmental_calculations_booking_id_idx").on(t.bookingId),
+}));
+
+// === NOTIFICATIONS ===
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").default("info"), // info, success, warning, error
+  read: boolean("read").default(false),
+  link: text("link"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("notifications_user_id_idx").on(t.userId),
+}));
+
+// === MARKETPLACE ===
+export const marketplaceListings = pgTable("marketplace_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").references(() => companies.id),
+  type: text("type").notNull(), // service, product, promotion, material
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  category: text("category").notNull(), // boxes, equipment, materials, services, promotion, plus Green MoveX eco categories: plastic_crates, packing_paper, recycled_wrap, moving_blankets, dollies, lifting_straps, storage_containers, warehouse_rental, cleaning_services, disposal_services, recycling_services, furniture_reuse
+  listingKind: text("listing_kind").notNull().default("sale"), // sale, rental, donation - a rental/donation listing is a genuinely different transaction, not just a "product" priced at zero
+  images: text("images").array(),
+  condition: text("condition"), // new, used, like-new
+  location: text("location"),
+  available: boolean("available").default(true),
+  views: integer("views").default(0),
+  featured: boolean("featured").default(false),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// === CARPOOLING / SHARED RIDES ===
+export const sharedRides = pgTable("shared_rides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  fromAddress: text("from_address").notNull(),
+  toAddress: text("to_address").notNull(),
+  departureTime: timestamp("departure_time").notNull(),
+  availableSeats: integer("available_seats").notNull(),
+  pricePerSeat: decimal("price_per_seat", { precision: 10, scale: 2 }).notNull(),
+  vehicleInfo: text("vehicle_info"),
+  distance: decimal("distance", { precision: 10, scale: 2 }),
+  estimatedDuration: integer("estimated_duration"), // minutes
+  status: text("status").default("active"), // active, full, completed, cancelled
+  isRecurring: boolean("is_recurring").default(false),
+  recurringDays: text("recurring_days").array(), // ["mon", "wed", "fri"]
+  co2Saved: decimal("co2_saved", { precision: 10, scale: 2 }), // kg of CO2 saved
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const rideBookings = pgTable("ride_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  rideId: varchar("ride_id").notNull().references(() => sharedRides.id),
+  passengerId: varchar("passenger_id").notNull().references(() => users.id),
+  seatsBooked: integer("seats_booked").notNull().default(1),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  pickupPoint: text("pickup_point"),
+  dropoffPoint: text("dropoff_point"),
+  status: text("status").default("confirmed"), // confirmed, cancelled, completed
+  paymentStatus: text("payment_status").default("pending"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === STAFF SHARING ===
+export const staffSharing = pgTable("staff_sharing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lenderCompanyId: varchar("lender_company_id").notNull().references(() => companies.id),
+  borrowerCompanyId: varchar("borrower_company_id").references(() => companies.id), // set once a request is accepted
+  driverId: varchar("driver_id").references(() => drivers.id), // a specific driver, if the listing is for one
+  staffType: text("staff_type").notNull(), // driver, loader, warehouse, dispatcher, admin
+  availability: text("availability").notNull(), // free-text availability window, e.g. "Mon-Fri 9am-5pm"
+  minHours: integer("min_hours"),
+  maxHours: integer("max_hours"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
+  status: text("status").default("available"), // available, requested, booked, completed, cancelled
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  lenderCompanyIdIdx: index("staff_sharing_lender_company_id_idx").on(t.lenderCompanyId),
+  borrowerCompanyIdIdx: index("staff_sharing_borrower_company_id_idx").on(t.borrowerCompanyId),
+}));
+
+// === RESOURCE SHARING (Vehicles, Warehouses, Equipment) ===
+export const resourceSharing = pgTable("resource_sharing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerCompanyId: varchar("provider_company_id").notNull().references(() => companies.id),
+  requesterCompanyId: varchar("requester_company_id").references(() => companies.id),
+  resourceType: text("resource_type").notNull(), // vehicle, warehouse, equipment
+  resourceId: varchar("resource_id"), // references vehicles.id or other resource tables
+  title: text("title").notNull(),
+  description: text("description"),
+  availability: text("availability"), // free-text availability window, e.g. "Weekends only"
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  pricePerDay: decimal("price_per_day", { precision: 10, scale: 2 }),
+  location: text("location"),
+  capacity: text("capacity"),
+  images: text("images").array(),
+  available: boolean("available").default(true),
+  status: text("status").default("available"), // available, requested, booked, completed, cancelled
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  providerCompanyIdIdx: index("resource_sharing_provider_company_id_idx").on(t.providerCompanyId),
+}));
+
+// === SPARE CAPACITY / EMPTY-RETURN MATCHING (transport-capacity marketplace) ===
+// A company already driving a route publishes leftover space on that specific leg
+// ("Barcelona -> Warsaw Friday, 12 m3 free, 1800 kg, 6 pallets") rather than a generic
+// resource listing - this is the "route-connected" capacity domain, distinct from
+// resourceSharing (which has no concept of a route/direction/departure window at all).
+export const capacityPostings = pgTable("capacity_postings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  driverId: varchar("driver_id").references(() => drivers.id),
+  vehicleId: varchar("vehicle_id").references(() => vehicles.id),
+  fromAddress: text("from_address").notNull(),
+  fromLat: decimal("from_lat", { precision: 10, scale: 7 }),
+  fromLng: decimal("from_lng", { precision: 10, scale: 7 }),
+  toAddress: text("to_address").notNull(),
+  toLat: decimal("to_lat", { precision: 10, scale: 7 }),
+  toLng: decimal("to_lng", { precision: 10, scale: 7 }),
+  departureWindowStart: timestamp("departure_window_start").notNull(),
+  departureWindowEnd: timestamp("departure_window_end").notNull(),
+  freeVolumeM3: decimal("free_volume_m3", { precision: 10, scale: 2 }).notNull(),
+  freeWeightKg: decimal("free_weight_kg", { precision: 10, scale: 2 }).notNull(),
+  freePalletSpaces: integer("free_pallet_spaces").notNull().default(0),
+  pricePerM3Eur: decimal("price_per_m3_eur", { precision: 10, scale: 2 }),
+  minimumPriceEur: decimal("minimum_price_eur", { precision: 10, scale: 2 }),
+  isReturnLeg: boolean("is_return_leg").notNull().default(false), // e.g. an otherwise-empty return journey
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrencePattern: text("recurrence_pattern"), // weekly, monthly - only meaningful when isRecurring
+  temperatureControlled: boolean("temperature_controlled").notNull().default(false),
+  adrCapable: boolean("adr_capable").notNull().default(false), // vehicle/driver certified for dangerous-goods (ADR) cargo
+  tailLift: boolean("tail_lift").notNull().default(false),
+  truckDimensions: text("truck_dimensions"), // e.g. "L: 6m x W: 2.4m x H: 2.4m, door width 2.3m"
+  notes: text("notes"),
+  status: text("status").notNull().default("open"), // open, cancelled
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("capacity_postings_company_id_idx").on(t.companyId),
+  routeIdx: index("capacity_postings_route_idx").on(t.fromAddress, t.toAddress),
+  departureIdx: index("capacity_postings_departure_idx").on(t.departureWindowStart, t.departureWindowEnd),
+}));
+
+export const capacityBookings = pgTable("capacity_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postingId: varchar("posting_id").notNull().references(() => capacityPostings.id),
+  // Exactly one of customerId/claimingCompanyId is set - an individual customer request
+  // (existing flow) vs. a company-to-company capacity claim (Return Trip Marketplace network,
+  // paid out via Stripe Connect) reuse the same row shape rather than a parallel table.
+  customerId: varchar("customer_id").references(() => users.id),
+  claimingCompanyId: varchar("claiming_company_id").references(() => companies.id),
+  volumeM3: decimal("volume_m3", { precision: 10, scale: 2 }).notNull(),
+  weightKg: decimal("weight_kg", { precision: 10, scale: 2 }).notNull(),
+  palletSpaces: integer("pallet_spaces").notNull().default(0),
+  priceEur: decimal("price_eur", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected, cancelled
+  paymentIntentId: text("payment_intent_id"),
+  paymentStatus: text("payment_status").default("pending"), // pending, authorized, captured, failed
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  postingIdIdx: index("capacity_bookings_posting_id_idx").on(t.postingId),
+  customerIdIdx: index("capacity_bookings_customer_id_idx").on(t.customerId),
+  claimingCompanyIdIdx: index("capacity_bookings_claiming_company_id_idx").on(t.claimingCompanyId),
+}));
+
+// A company subscribes to a route pattern (e.g. "Madrid" -> "Paris") so it's notified whenever
+// a new recurring spare-capacity posting matching that route is published - real-time
+// discovery for companies that regularly need the same lane, rather than having to keep
+// re-searching.
+export const recurringRouteSubscriptions = pgTable("recurring_route_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  fromAddress: text("from_address").notNull(),
+  toAddress: text("to_address").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("recurring_route_subscriptions_company_id_idx").on(t.companyId),
+}));
+
+// === PROMO BOARD / ANNOUNCEMENTS ===
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // promo, discount, announcement, event
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  discountPercent: integer("discount_percent"),
+  discountCode: text("discount_code"),
+  images: text("images").array(),
+  link: text("link"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  targetAudience: text("target_audience").default("all"), // all, b2b, b2c, drivers
+  active: boolean("active").default(true),
+  views: integer("views").default(0),
+  clicks: integer("clicks").default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// === BADGES / GAMIFICATION ===
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // super_carrier, premium, elite, completed_100, completed_500, completed_1000
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon").default("award"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const badgeAwards = pgTable("badge_awards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeId: varchar("badge_id").notNull().references(() => badges.id),
+  holderType: text("holder_type").notNull(), // company, driver
+  holderId: varchar("holder_id").notNull(),
+  awardedAt: timestamp("awarded_at").notNull().default(sql`now()`),
+}, (t) => ({
+  holderIdx: index("badge_awards_holder_idx").on(t.holderType, t.holderId),
+  holderBadgeUnique: unique().on(t.holderType, t.holderId, t.badgeId),
+}));
+
+// === COUPONS / PROMOTIONS ===
+export const coupons = pgTable("coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  discountType: text("discount_type").notNull().default("percent"), // percent, fixed
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minBookingAmount: decimal("min_booking_amount", { precision: 10, scale: 2 }).default("0"),
+  maxRedemptions: integer("max_redemptions"), // null = unlimited
+  timesRedeemed: integer("times_redeemed").default(0),
+  validFrom: timestamp("valid_from").default(sql`now()`),
+  validUntil: timestamp("valid_until"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").notNull().references(() => coupons.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  discountApplied: decimal("discount_applied", { precision: 10, scale: 2 }).notNull(),
+  redeemedAt: timestamp("redeemed_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("coupon_redemptions_user_id_idx").on(t.userId),
+  couponIdIdx: index("coupon_redemptions_coupon_id_idx").on(t.couponId),
+}));
+
+// === REFERRAL PROGRAM ===
+export const referralRewards = pgTable("referral_rewards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerUserId: varchar("referrer_user_id").notNull().references(() => users.id),
+  referredUserId: varchar("referred_user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => bookings.id), // qualifying booking that triggered the reward
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull().default("25"),
+  status: text("status").notNull().default("pending"), // pending, credited, cancelled
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  creditedAt: timestamp("credited_at"),
+}, (t) => ({
+  referrerIdx: index("referral_rewards_referrer_idx").on(t.referrerUserId),
+  referredUserUnique: unique().on(t.referredUserId),
+}));
+
+// === BOOKING TRANSFERS (resell/hand off a job to another company) ===
+export const bookingTransfers = pgTable("booking_transfers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  fromCompanyId: varchar("from_company_id").notNull().references(() => companies.id),
+  toCompanyId: varchar("to_company_id").notNull().references(() => companies.id),
+  transferredBy: varchar("transferred_by").notNull().references(() => users.id),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("booking_transfers_booking_id_idx").on(t.bookingId),
+}));
+
+// === DRIVER AVAILABILITY CALENDAR ===
+export const driverAvailability = pgTable("driver_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => drivers.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday .. 6 = Saturday
+  startTime: text("start_time").notNull(), // "HH:MM" 24h
+  endTime: text("end_time").notNull(), // "HH:MM" 24h
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  driverIdIdx: index("driver_availability_driver_id_idx").on(t.driverId),
+}));
+
+export const driverTimeOff = pgTable("driver_time_off", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => drivers.id),
+  type: text("type").notNull().default("vacation"), // vacation, sick_leave, other
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  driverIdIdx: index("driver_time_off_driver_id_idx").on(t.driverId),
+}));
+
+export const calendarConnections = pgTable("calendar_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => drivers.id),
+  provider: text("provider").notNull(), // google, outlook
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  refreshTokenEncrypted: text("refresh_token_encrypted"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  externalCalendarId: text("external_calendar_id"),
+  syncEnabled: boolean("sync_enabled").default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  driverProviderUnique: unique().on(t.driverId, t.provider),
+}));
+
+// Calendar & Scheduling for crew/vehicle/warehouse/company - the same polymorphic
+// entityType/entityId pattern already used by badges and verificationDocuments, generalizing
+// the driver-only availability/time-off tables above to every other resource type rather than
+// duplicating a parallel driver-shaped table per entity kind.
+export const resourceAvailability = pgTable("resource_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // worker, vehicle, warehouse, company
+  entityId: varchar("entity_id").notNull(),
+  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday .. 6 = Saturday
+  startTime: text("start_time").notNull(), // "HH:MM" 24h
+  endTime: text("end_time").notNull(), // "HH:MM" 24h
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  entityIdx: index("resource_availability_entity_idx").on(t.entityType, t.entityId),
+}));
+
+export const resourceTimeOff = pgTable("resource_time_off", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // worker, vehicle, warehouse, company
+  entityId: varchar("entity_id").notNull(),
+  type: text("type").notNull().default("other"), // vacation, sick_leave, maintenance, reservation, blackout, other
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  note: text("note"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  entityIdx: index("resource_time_off_entity_idx").on(t.entityType, t.entityId),
+}));
+
+// An opaque, per-entity token embedded in a public .ics URL - this is how Google
+// Calendar/Outlook/Apple Calendar all support "subscribe by URL" without needing an OAuth app
+// registration (which would need real client credentials this environment doesn't have).
+export const calendarShareTokens = pgTable("calendar_share_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // driver, worker, vehicle, warehouse, company
+  entityId: varchar("entity_id").notNull(),
+  token: text("token").notNull().unique(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  entityIdx: index("calendar_share_tokens_entity_idx").on(t.entityType, t.entityId),
+}));
+
+// === AI CARGO RECOGNITION ===
+export const cargoItems = pgTable("cargo_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
+  imageUrl: text("image_url").notNull(),
+  detectedLabel: text("detected_label"),
+  category: text("category"), // furniture, appliance, box, fragile_item, other
+  estimatedLengthCm: decimal("estimated_length_cm", { precision: 8, scale: 1 }),
+  estimatedWidthCm: decimal("estimated_width_cm", { precision: 8, scale: 1 }),
+  estimatedHeightCm: decimal("estimated_height_cm", { precision: 8, scale: 1 }),
+  estimatedVolumeM3: decimal("estimated_volume_m3", { precision: 10, scale: 3 }),
+  estimatedWeightKg: decimal("estimated_weight_kg", { precision: 10, scale: 1 }),
+  fragile: boolean("fragile").default(false),
+  suggestedVehicleType: text("suggested_vehicle_type"),
+  confidence: decimal("confidence", { precision: 4, scale: 3 }), // 0..1
+  manuallyCorrected: boolean("manually_corrected").default(false),
+  aiProvider: text("ai_provider"), // which recognition provider produced this result
+  rawResponse: jsonb("raw_response"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  bookingIdIdx: index("cargo_items_booking_id_idx").on(t.bookingId),
+}));
+
+// === AI MULTILINGUAL CHAT TRANSLATION ===
+export const messageTranslations = pgTable("message_translations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull().references(() => messages.id),
+  sourceLanguage: text("source_language"),
+  targetLanguage: text("target_language").notNull(),
+  translatedContent: text("translated_content").notNull(),
+  aiProvider: text("ai_provider"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  messageIdIdx: index("message_translations_message_id_idx").on(t.messageId, t.targetLanguage),
+}));
+
+// === VOICE / VIDEO CALLS ===
+export const calls = pgTable("calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  callerId: varchar("caller_id").notNull().references(() => users.id),
+  calleeId: varchar("callee_id").notNull().references(() => users.id),
+  type: text("type").notNull().default("voice"), // voice, video
+  status: text("status").notNull().default("ringing"), // ringing, accepted, rejected, missed, completed, failed
+  startedAt: timestamp("started_at").notNull().default(sql`now()`),
+  connectedAt: timestamp("connected_at"),
+  endedAt: timestamp("ended_at"),
+  durationSeconds: integer("duration_seconds"),
+  quality: jsonb("quality"), // { avgBitrateKbps, packetLossPercent, avgJitterMs, samples }
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  callerIdx: index("calls_caller_id_idx").on(t.callerId),
+  calleeIdx: index("calls_callee_id_idx").on(t.calleeId),
+}));
+
+// === IDENTITY VERIFICATION ===
+export const verificationDocuments = pgTable("verification_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  holderType: text("holder_type").notNull(), // user, driver, company
+  holderId: varchar("holder_id").notNull(),
+  docType: text("doc_type").notNull(), // id_card, selfie, drivers_license, company_registration, insurance_certificate, vehicle_registration, passport, work_permit, residence_permit, medical_certificate, country_license, carrier_authority, or a Skills Engine certification name (SEP, Gas, UDT, Forklift, Crane, HDS, Construction, ADR, Hydraulic)
+  fileUrl: text("file_url").notNull(),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, expired
+  submittedAt: timestamp("submitted_at").notNull().default(sql`now()`),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  expiresAt: timestamp("expires_at"),
+  expiryNotifiedAt: timestamp("expiry_notified_at"), // set once an expiring-soon notification has been sent, so the sweep doesn't re-notify every run
+  issueDate: timestamp("issue_date"),
+  docNumber: text("doc_number"),
+  country: text("country"), // ISO 3166-1 alpha-2, e.g. "PL", "DE" - the issuing/applicable country
+  authority: text("authority"), // issuing authority/agency name
+  verificationSource: text("verification_source").notNull().default("manual"), // manual, ocr - how the metadata on this document was populated
+  ocrExtractedData: jsonb("ocr_extracted_data"), // raw structured fields the OCR pass extracted, kept for audit even after a human edits the reviewed fields
+}, (t) => ({
+  holderIdx: index("verification_documents_holder_idx").on(t.holderType, t.holderId),
+  statusIdx: index("verification_documents_status_idx").on(t.status),
+}));
+
+// Every re-upload/renewal of a verificationDocuments row is preserved here rather than
+// overwritten, so a compliance reviewer can see the full history of a license/document.
+export const documentVersions = pgTable("document_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => verificationDocuments.id),
+  fileUrl: text("file_url").notNull(),
+  uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  note: text("note"), // e.g. "renewal", "corrected scan"
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  documentIdIdx: index("document_versions_document_id_idx").on(t.documentId),
+}));
+
+// === FRAUD PREVENTION ===
+export const deviceFingerprints = pgTable("device_fingerprints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fingerprintHash: text("fingerprint_hash").notNull(),
+  userAgent: text("user_agent"),
+  ipAddress: text("ip_address"),
+  firstSeenAt: timestamp("first_seen_at").notNull().default(sql`now()`),
+  lastSeenAt: timestamp("last_seen_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("device_fingerprints_user_id_idx").on(t.userId),
+  hashIdx: index("device_fingerprints_hash_idx").on(t.fingerprintHash),
+}));
+
+export const riskScores = pgTable("risk_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subjectType: text("subject_type").notNull(), // user, booking, payment
+  subjectId: varchar("subject_id").notNull(),
+  score: integer("score").notNull(), // 0 (low risk) .. 100 (high risk)
+  reasons: text("reasons").array(),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  subjectIdx: index("risk_scores_subject_idx").on(t.subjectType, t.subjectId),
+}));
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorUserId: varchar("actor_user_id").references(() => users.id),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: varchar("target_id"),
+  metadata: jsonb("metadata"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  targetIdx: index("audit_logs_target_idx").on(t.targetType, t.targetId),
+}));
+
+// === PUBLIC PARTNER API ===
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull(),
+  scopes: text("scopes").array().default(sql`ARRAY['bookings:read']::text[]`),
+  active: boolean("active").default(true),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  revokedAt: timestamp("revoked_at"),
+}, (t) => ({
+  keyHashIdx: index("api_keys_key_hash_idx").on(t.keyHash),
+  companyIdIdx: index("api_keys_company_id_idx").on(t.companyId),
+}));
+
+export const webhookSubscriptions = pgTable("webhook_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  events: text("events").array().notNull(),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("webhook_subscriptions_company_id_idx").on(t.companyId),
+}));
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => webhookSubscriptions.id),
+  event: text("event").notNull(),
+  payload: jsonb("payload").notNull(),
+  responseStatus: integer("response_status"),
+  success: boolean("success").notNull().default(false),
+  error: text("error"),
+  attemptedAt: timestamp("attempted_at").notNull().default(sql`now()`),
+}, (t) => ({
+  subscriptionIdIdx: index("webhook_deliveries_subscription_id_idx").on(t.subscriptionId),
+}));
+
+// === MOVEX ROAD SERVICES ===
+// Partner companies (vignette/toll/ferry/parking/fuel/insurance/driver-service providers)
+// extend the existing `companies` table 1:1 rather than duplicating name/email/contact
+// fields - a Road Services partner is a `companies` row with a profile attached.
+export const roadServicePartnerProfiles = pgTable("road_service_partner_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().unique().references(() => companies.id),
+  categories: text("categories").array().notNull().default(sql`ARRAY[]::text[]`), // vignette, toll, ferry, parking, fuel, insurance, driver_service
+  countryCodes: text("country_codes").array().notNull().default(sql`ARRAY[]::text[]`),
+  commissionType: text("commission_type").notNull().default("percent"), // percent, fixed
+  commissionValue: decimal("commission_value", { precision: 10, scale: 4 }).notNull().default("10"),
+  status: text("status").notNull().default("pending"), // pending, active, suspended
+  payoutDetails: jsonb("payout_details"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  companyIdIdx: index("road_service_partner_profiles_company_id_idx").on(t.companyId),
+  statusIdx: index("road_service_partner_profiles_status_idx").on(t.status),
+}));
+
+export const roadServiceProducts = pgTable("road_service_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerId: varchar("partner_id").notNull().references(() => roadServicePartnerProfiles.id),
+  category: text("category").notNull(), // vignette, toll, ferry, parking, fuel, insurance, driver_service
+  countryCode: text("country_code"),
+  name: text("name").notNull(),
+  description: text("description"),
+  vehicleTypes: text("vehicle_types").array().default(sql`ARRAY[]::text[]`),
+  priceEur: decimal("price_eur", { precision: 10, scale: 2 }).notNull(),
+  durationDays: integer("duration_days"),
+  active: boolean("active").notNull().default(true),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+}, (t) => ({
+  partnerIdIdx: index("road_service_products_partner_id_idx").on(t.partnerId),
+  categoryCountryIdx: index("road_service_products_category_country_idx").on(t.category, t.countryCode),
+}));
+
+export const roadRoutes = pgTable("road_routes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  bookingId: varchar("booking_id").references(() => bookings.id),
+  originAddress: text("origin_address").notNull(),
+  destinationAddress: text("destination_address").notNull(),
+  waypoints: jsonb("waypoints").$type<Array<{ address: string; lat: number; lng: number }>>().notNull(),
+  countryCodes: text("country_codes").array().notNull().default(sql`ARRAY[]::text[]`),
+  distanceKm: decimal("distance_km", { precision: 10, scale: 2 }),
+  durationMinutes: integer("duration_minutes"),
+  vehicleType: text("vehicle_type").notNull().default("van"), // van, truck_7_5t, truck_12t, truck_40t
+  vehicleWeightKg: integer("vehicle_weight_kg"),
+  vehicleHeightCm: integer("vehicle_height_cm"),
+  vehicleAxles: integer("vehicle_axles"),
+  isAdr: boolean("is_adr").notNull().default(false), // carrying ADR-classified dangerous goods
+  routeGeometry: jsonb("route_geometry"),
+  analysisStatus: text("analysis_status").notNull().default("pending"), // pending, completed, failed
+  analyzedAt: timestamp("analyzed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("road_routes_user_id_idx").on(t.userId),
+  bookingIdIdx: index("road_routes_booking_id_idx").on(t.bookingId),
+}));
+
+export const routeRequirements = pgTable("route_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id").notNull().references(() => roadRoutes.id),
+  category: text("category").notNull(), // vignette, toll, ferry, parking, fuel, insurance, lez, environmental_fee, truck_restriction, adr_restriction, dimension_restriction, weather_warning, road_closure, strike, border_delay, driver_service
+  countryCode: text("country_code"),
+  title: text("title").notNull(),
+  description: text("description"),
+  severity: text("severity").notNull().default("info"), // info, warning, critical
+  isMandatory: boolean("is_mandatory").notNull().default(false),
+  estimatedCostEur: decimal("estimated_cost_eur", { precision: 10, scale: 2 }),
+  recommendedProductId: varchar("recommended_product_id").references(() => roadServiceProducts.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  routeIdIdx: index("route_requirements_route_id_idx").on(t.routeId),
+  categoryIdx: index("route_requirements_category_idx").on(t.category),
+}));
+
+export const roadServiceOrders = pgTable("road_service_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  routeId: varchar("route_id").references(() => roadRoutes.id),
+  productId: varchar("product_id").notNull().references(() => roadServiceProducts.id),
+  partnerId: varchar("partner_id").notNull().references(() => roadServicePartnerProfiles.id),
+  quantity: integer("quantity").notNull().default(1),
+  unitPriceEur: decimal("unit_price_eur", { precision: 10, scale: 2 }).notNull(),
+  totalPriceEur: decimal("total_price_eur", { precision: 10, scale: 2 }).notNull(),
+  commissionEur: decimal("commission_eur", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, confirmed, failed, refunded
+  externalReference: text("external_reference"),
+  purchasedAt: timestamp("purchased_at").notNull().default(sql`now()`),
+}, (t) => ({
+  userIdIdx: index("road_service_orders_user_id_idx").on(t.userId),
+  partnerIdIdx: index("road_service_orders_partner_id_idx").on(t.partnerId),
+  routeIdIdx: index("road_service_orders_route_id_idx").on(t.routeId),
+  statusIdx: index("road_service_orders_status_idx").on(t.status),
+}));
+
+export const roadServiceAffiliateClicks = pgTable("road_service_affiliate_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  productId: varchar("product_id").notNull().references(() => roadServiceProducts.id),
+  partnerId: varchar("partner_id").notNull().references(() => roadServicePartnerProfiles.id),
+  routeId: varchar("route_id").references(() => roadRoutes.id),
+  converted: boolean("converted").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+}, (t) => ({
+  partnerIdIdx: index("road_service_affiliate_clicks_partner_id_idx").on(t.partnerId),
+  productIdIdx: index("road_service_affiliate_clicks_product_id_idx").on(t.productId),
+}));
+
+// === INSERT SCHEMAS ===
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  role: true,
+  createdAt: true,
+  verified: true,
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+  verified: true,
+  rating: true,
+  totalReviews: true,
+});
+
+export const insertDriverSchema = createInsertSchema(drivers).omit({
+  id: true,
+  createdAt: true,
+  rating: true,
+  totalDeliveries: true,
+  available: true,
+});
+
+export const insertVehicleSchema = createInsertSchema(vehicles).omit({
+  id: true,
+  createdAt: true,
+  available: true,
+}).extend({
+  capacity: z.coerce.string(),
+});
+
+export const insertServiceSchema = createInsertSchema(services).omit({
+  id: true,
+});
+
+export const insertBookingSchema = createInsertSchema(bookings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  companyId: true,
+  driverId: true,
+  vehicleId: true,
+  paymentIntentId: true,
+  paymentStatus: true,
+  publicLink: true,
+  contractSignedAt: true,
+  signatureUrl: true,
+  discountAmount: true,
+}).extend({
+  pickupDate: z.coerce.date(),
+  estimatedDistance: z.coerce.string(),
+  totalPrice: z.coerce.string(),
+  volumeM3: z.coerce.string().optional(),
+  couponCode: z.string().optional(),
+  stops: z.array(z.object({
+    type: z.enum(["pickup", "dropoff"]),
+    address: z.string(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    order: z.number(),
+    note: z.string().optional(),
+  })).optional(),
+});
+
+export const insertQuoteSchema = createInsertSchema(quotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOfferSchema = createInsertSchema(offers).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  price: z.coerce.string(),
+});
+
+export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
+  id: true,
+  companyId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  source: z.enum(["quote", "referral", "manual", "website"]).default("manual"),
+  stage: z.enum(["new", "contacted", "qualified", "proposal", "won", "lost"]).default("new"),
+  estimatedValueEur: z.coerce.string().optional(),
+});
+
+export const insertCrmTaskSchema = createInsertSchema(crmTasks).omit({
+  id: true,
+  companyId: true,
+  createdBy: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  type: z.enum(["follow_up", "call", "meeting", "email"]).default("follow_up"),
+  dueDate: z.coerce.date().optional(),
+});
+
+const automationConditionSchema = z.object({
+  field: z.string().min(1),
+  operator: z.enum(["equals", "not_equals", "greater_than", "less_than", "contains"]),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+const automationActionSchema = z.object({
+  type: z.string().min(1),
+  params: z.record(z.unknown()).default({}),
+});
+
+export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
+  id: true,
+  companyId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  conditions: z.array(automationConditionSchema).default([]),
+  actions: z.array(automationActionSchema).min(1),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+  type: true,
+}).refine((m) => Boolean(m.bookingId) || Boolean(m.conversationId), {
+  message: "Either bookingId or conversationId is required",
+});
+
+export const insertAttachmentSchema = createInsertSchema(attachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({
+  id: true,
+  createdAt: true,
+  lastMessageAt: true,
+  createdBy: true,
+}).extend({
+  type: z.enum(["direct", "support", "company"]).default("direct"),
+  participantIds: z.array(z.string()).min(1),
+});
+
+export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({
+  id: true,
+  createdAt: true,
+  createdBy: true,
+});
+
+export const insertReviewSchema = createInsertSchema(reviews).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  rating: z.number().min(1).max(5),
+  punctuality: z.number().min(1).max(5).optional(),
+  communication: z.number().min(1).max(5).optional(),
+  safety: z.number().min(1).max(5).optional(),
+  quality: z.number().min(1).max(5).optional(),
+  careHandling: z.number().min(1).max(5).optional(),
+  priceRating: z.number().min(1).max(5).optional(),
+  images: z.array(z.string()).optional(),
+});
+
+export const insertTrackingUpdateSchema = createInsertSchema(trackingUpdates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  read: true,
+});
+
+export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({
+  id: true,
+  userId: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+  views: true,
+  featured: true,
+}).extend({
+  price: z.coerce.string().optional(),
+});
+
+export const insertSharedRideSchema = createInsertSchema(sharedRides).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  departureTime: z.coerce.date(),
+  pricePerSeat: z.coerce.string(),
+});
+
+export const insertRideBookingSchema = createInsertSchema(rideBookings).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  paymentStatus: true,
+}).extend({
+  totalPrice: z.coerce.string(),
+});
+
+export const insertStaffSharingSchema = createInsertSchema(staffSharing).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  borrowerCompanyId: true,
+}).extend({
+  driverId: z.string().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  hourlyRate: z.coerce.string().optional(),
+  minHours: z.coerce.number().int().positive().optional(),
+  maxHours: z.coerce.number().int().positive().optional(),
+});
+
+export const insertResourceSharingSchema = createInsertSchema(resourceSharing).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  available: true,
+}).extend({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  pricePerDay: z.coerce.string().optional(),
+});
+
+export const insertCapacityPostingSchema = createInsertSchema(capacityPostings).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+}).extend({
+  departureWindowStart: z.coerce.date(),
+  departureWindowEnd: z.coerce.date(),
+  freeVolumeM3: z.coerce.string(),
+  freeWeightKg: z.coerce.string(),
+  freePalletSpaces: z.coerce.number().int().nonnegative().optional(),
+  pricePerM3Eur: z.coerce.string().optional(),
+  minimumPriceEur: z.coerce.string().optional(),
+});
+
+export const insertCapacityBookingSchema = createInsertSchema(capacityBookings).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  priceEur: true,
+  paymentIntentId: true,
+  paymentStatus: true,
+}).extend({
+  volumeM3: z.coerce.string(),
+  weightKg: z.coerce.string(),
+  palletSpaces: z.coerce.number().int().nonnegative().optional(),
+}).refine((b) => Boolean(b.customerId) !== Boolean(b.claimingCompanyId), {
+  message: "Exactly one of customerId or claimingCompanyId is required",
+});
+
+export const insertRecurringRouteSubscriptionSchema = createInsertSchema(recurringRouteSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true,
+  views: true,
+  clicks: true,
+  active: true,
+}).extend({
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});
+
+export const insertSkillSchema = createInsertSchema(skills).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkerProfileSchema = createInsertSchema(workerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedJobs: true,
+  rating: true,
+}).extend({
+  hourlyRateEur: z.coerce.string().optional(),
+  homeLat: z.coerce.string().optional(),
+  homeLng: z.coerce.string().optional(),
+});
+
+export const insertWorkerSkillSchema = createInsertSchema(workerSkills).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompanyServiceSchema = createInsertSchema(companyServices).omit({
+  id: true,
+  companyId: true,
+  createdAt: true,
+}).extend({
+  priceFromEur: z.coerce.string().optional(),
+});
+
+export const insertBadgeSchema = createInsertSchema(badges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBadgeAwardSchema = createInsertSchema(badgeAwards).omit({
+  id: true,
+  awardedAt: true,
+});
+
+export const insertCouponSchema = createInsertSchema(coupons).omit({
+  id: true,
+  createdAt: true,
+  timesRedeemed: true,
+}).extend({
+  discountValue: z.coerce.string(),
+  minBookingAmount: z.coerce.string().optional(),
+  validUntil: z.coerce.date().optional(),
+});
+
+export const insertReferralRewardSchema = createInsertSchema(referralRewards).omit({
+  id: true,
+  createdAt: true,
+  creditedAt: true,
+  status: true,
+});
+
+export const insertBookingTransferSchema = createInsertSchema(bookingTransfers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDriverAvailabilitySchema = createInsertSchema(driverAvailability).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  dayOfWeek: z.number().min(0).max(6),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+});
+
+export const insertDriverTimeOffSchema = createInsertSchema(driverTimeOff).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  type: z.enum(["vacation", "sick_leave", "other"]),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});
+
+export const insertResourceAvailabilitySchema = createInsertSchema(resourceAvailability).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  entityType: z.enum(["worker", "vehicle", "warehouse", "company"]),
+  dayOfWeek: z.number().min(0).max(6),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24h format"),
+});
+
+export const insertResourceTimeOffSchema = createInsertSchema(resourceTimeOff).omit({
+  id: true,
+  createdAt: true,
+  createdBy: true,
+}).extend({
+  entityType: z.enum(["worker", "vehicle", "warehouse", "company"]),
+  type: z.enum(["vacation", "sick_leave", "maintenance", "reservation", "blackout", "other"]),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});
+
+export const insertCargoItemSchema = createInsertSchema(cargoItems).omit({
+  id: true,
+  createdAt: true,
+  manuallyCorrected: true,
+});
+
+export const insertCallSchema = createInsertSchema(calls).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  connectedAt: true,
+  endedAt: true,
+  durationSeconds: true,
+  quality: true,
+  status: true,
+}).extend({
+  type: z.enum(["voice", "video"]),
+});
+
+export const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments).omit({
+  id: true,
+  submittedAt: true,
+  reviewedAt: true,
+  reviewedBy: true,
+  status: true,
+}).extend({
+  holderType: z.enum(["user", "driver", "company"]),
+  // Identity-verification doc types, plus the Skills Engine certification names referenced by
+  // skills.requiresCertification (server/seedSkills.ts) - these must stay in sync, since a
+  // certification a skill requires has to actually be an uploadable docType.
+  docType: z.enum([
+    "id_card", "selfie", "drivers_license", "company_registration", "insurance_certificate", "vehicle_registration",
+    "passport", "work_permit", "residence_permit", "medical_certificate", "country_license",
+    // Carrier authority number (DOT/MC in the US, or the equivalent national operator licence) -
+    // the trust-layer document a company must have approved before it can claim another
+    // company's spare-capacity posting in the Return Trip Marketplace.
+    "carrier_authority",
+    "SEP", "Gas", "Hydraulic", "UDT", "Forklift", "Crane", "HDS", "Construction", "ADR",
+  ]),
+  expiresAt: z.coerce.date().optional(),
+  issueDate: z.coerce.date().optional(),
+});
+
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
+  id: true,
+  createdAt: true,
+  keyPrefix: true,
+  keyHash: true,
+  lastUsedAt: true,
+  active: true,
+  revokedAt: true,
+});
+
+export const insertWebhookSubscriptionSchema = createInsertSchema(webhookSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  secret: true,
+  active: true,
+}).extend({
+  events: z.array(z.string()).min(1),
+});
+
+export const insertRoadServicePartnerProfileSchema = createInsertSchema(roadServicePartnerProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+}).extend({
+  categories: z.array(z.enum(["vignette", "toll", "ferry", "parking", "fuel", "insurance", "driver_service"])).min(1),
+  commissionType: z.enum(["percent", "fixed"]),
+});
+
+export const insertRoadServiceProductSchema = createInsertSchema(roadServiceProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  category: z.enum(["vignette", "toll", "ferry", "parking", "fuel", "insurance", "driver_service"]),
+});
+
+export const insertRoadRouteSchema = createInsertSchema(roadRoutes).omit({
+  id: true,
+  createdAt: true,
+  countryCodes: true,
+  routeGeometry: true,
+  analysisStatus: true,
+  analyzedAt: true,
+  distanceKm: true,
+  durationMinutes: true,
+}).extend({
+  waypoints: z.array(z.object({ address: z.string(), lat: z.number(), lng: z.number() })).min(2),
+});
+
+export const insertRoadServiceOrderSchema = createInsertSchema(roadServiceOrders).omit({
+  id: true,
+  purchasedAt: true,
+  status: true,
+  commissionEur: true,
+  totalPriceEur: true,
+  unitPriceEur: true,
+});
+
+// === TYPES ===
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+export type MfaChallenge = typeof mfaChallenges.$inferSelect;
+
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+
+export type InsertDriver = z.infer<typeof insertDriverSchema>;
+export type Driver = typeof drivers.$inferSelect;
+
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+export type Vehicle = typeof vehicles.$inferSelect;
+
+export type InsertService = z.infer<typeof insertServiceSchema>;
+export type Service = typeof services.$inferSelect;
+
+export type InsertBooking = z.infer<typeof insertBookingSchema>;
+export type Booking = typeof bookings.$inferSelect;
+
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type Quote = typeof quotes.$inferSelect;
+
+export type InsertOffer = z.infer<typeof insertOfferSchema>;
+export type Offer = typeof offers.$inferSelect;
+
+export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
+export type CrmLead = typeof crmLeads.$inferSelect;
+
+export type InsertCrmTask = z.infer<typeof insertCrmTaskSchema>;
+export type CrmTask = typeof crmTasks.$inferSelect;
+
+export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type AutomationRun = typeof automationRuns.$inferSelect;
+
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
+export type Attachment = typeof attachments.$inferSelect;
+
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+export type ConversationParticipant = typeof conversationParticipants.$inferSelect;
+
+export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
+
+export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type Review = typeof reviews.$inferSelect;
+
+export type InsertTrackingUpdate = z.infer<typeof insertTrackingUpdateSchema>;
+export type TrackingUpdate = typeof trackingUpdates.$inferSelect;
+
+export type EnvironmentalCalculation = typeof environmentalCalculations.$inferSelect;
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;
+export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
+
+export type InsertSharedRide = z.infer<typeof insertSharedRideSchema>;
+export type SharedRide = typeof sharedRides.$inferSelect;
+
+export type InsertRideBooking = z.infer<typeof insertRideBookingSchema>;
+export type RideBooking = typeof rideBookings.$inferSelect;
+
+export type InsertStaffSharing = z.infer<typeof insertStaffSharingSchema>;
+export type StaffSharing = typeof staffSharing.$inferSelect;
+
+export type InsertResourceSharing = z.infer<typeof insertResourceSharingSchema>;
+export type ResourceSharing = typeof resourceSharing.$inferSelect;
+
+export type InsertCapacityPosting = z.infer<typeof insertCapacityPostingSchema>;
+export type CapacityPosting = typeof capacityPostings.$inferSelect;
+
+export type InsertCapacityBooking = z.infer<typeof insertCapacityBookingSchema>;
+export type CapacityBooking = typeof capacityBookings.$inferSelect;
+
+export type InsertRecurringRouteSubscription = z.infer<typeof insertRecurringRouteSubscriptionSchema>;
+export type RecurringRouteSubscription = typeof recurringRouteSubscriptions.$inferSelect;
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+
+export type InsertSkill = z.infer<typeof insertSkillSchema>;
+export type Skill = typeof skills.$inferSelect;
+
+export type InsertWorkerProfile = z.infer<typeof insertWorkerProfileSchema>;
+export type WorkerProfile = typeof workerProfiles.$inferSelect;
+
+export type InsertWorkerSkill = z.infer<typeof insertWorkerSkillSchema>;
+export type WorkerSkill = typeof workerSkills.$inferSelect;
+
+export type InsertCompanyService = z.infer<typeof insertCompanyServiceSchema>;
+export type CompanyService = typeof companyServices.$inferSelect;
+
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type Badge = typeof badges.$inferSelect;
+
+export type InsertBadgeAward = z.infer<typeof insertBadgeAwardSchema>;
+export type BadgeAward = typeof badgeAwards.$inferSelect;
+
+export type InsertCoupon = z.infer<typeof insertCouponSchema>;
+export type Coupon = typeof coupons.$inferSelect;
+
+export type CouponRedemption = typeof couponRedemptions.$inferSelect;
+
+export type InsertReferralReward = z.infer<typeof insertReferralRewardSchema>;
+export type ReferralReward = typeof referralRewards.$inferSelect;
+
+export type InsertBookingTransfer = z.infer<typeof insertBookingTransferSchema>;
+export type BookingTransfer = typeof bookingTransfers.$inferSelect;
+
+export type InsertDriverAvailability = z.infer<typeof insertDriverAvailabilitySchema>;
+export type DriverAvailability = typeof driverAvailability.$inferSelect;
+
+export type InsertDriverTimeOff = z.infer<typeof insertDriverTimeOffSchema>;
+export type DriverTimeOff = typeof driverTimeOff.$inferSelect;
+
+export type CalendarConnection = typeof calendarConnections.$inferSelect;
+
+export type InsertResourceAvailability = z.infer<typeof insertResourceAvailabilitySchema>;
+export type ResourceAvailability = typeof resourceAvailability.$inferSelect;
+
+export type InsertResourceTimeOff = z.infer<typeof insertResourceTimeOffSchema>;
+export type ResourceTimeOff = typeof resourceTimeOff.$inferSelect;
+
+export type CalendarShareToken = typeof calendarShareTokens.$inferSelect;
+
+export type InsertCargoItem = z.infer<typeof insertCargoItemSchema>;
+export type CargoItem = typeof cargoItems.$inferSelect;
+
+export type MessageTranslation = typeof messageTranslations.$inferSelect;
+
+export type InsertCall = z.infer<typeof insertCallSchema>;
+export type Call = typeof calls.$inferSelect;
+
+export type InsertVerificationDocument = z.infer<typeof insertVerificationDocumentSchema>;
+export type VerificationDocument = typeof verificationDocuments.$inferSelect;
+
+export type InsertDocumentVersion = z.infer<typeof insertDocumentVersionSchema>;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
+
+export type DeviceFingerprint = typeof deviceFingerprints.$inferSelect;
+export type RiskScore = typeof riskScores.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type ApiKey = typeof apiKeys.$inferSelect;
+
+export type InsertWebhookSubscription = z.infer<typeof insertWebhookSubscriptionSchema>;
+export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
+
+export type InsertRoadServicePartnerProfile = z.infer<typeof insertRoadServicePartnerProfileSchema>;
+export type RoadServicePartnerProfile = typeof roadServicePartnerProfiles.$inferSelect;
+
+export type InsertRoadServiceProduct = z.infer<typeof insertRoadServiceProductSchema>;
+export type RoadServiceProduct = typeof roadServiceProducts.$inferSelect;
+
+export type InsertRoadRoute = z.infer<typeof insertRoadRouteSchema>;
+export type RoadRoute = typeof roadRoutes.$inferSelect;
+
+export type RouteRequirement = typeof routeRequirements.$inferSelect;
+
+export type InsertRoadServiceOrder = z.infer<typeof insertRoadServiceOrderSchema>;
+export type RoadServiceOrder = typeof roadServiceOrders.$inferSelect;
+
+export type RoadServiceAffiliateClick = typeof roadServiceAffiliateClicks.$inferSelect;
+
+export const ROAD_SERVICE_CATEGORIES = ["vignette", "toll", "ferry", "parking", "fuel", "insurance", "driver_service"] as const;
+export type RoadServiceCategory = typeof ROAD_SERVICE_CATEGORIES[number];
+
+export const ROUTE_REQUIREMENT_CATEGORIES = [
+  "vignette", "toll", "ferry", "parking", "fuel", "insurance",
+  "lez", "environmental_fee", "truck_restriction", "adr_restriction",
+  "dimension_restriction", "weather_warning", "road_closure", "strike", "border_delay", "driver_service",
+] as const;
+export type RouteRequirementCategory = typeof ROUTE_REQUIREMENT_CATEGORIES[number];
+
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

@@ -1,0 +1,25 @@
+{
+  "ref": "genesis-retrospective-benchmark-001",
+  "cutoffYear": 1985,
+  "registeredAt": 1785527535000,
+  "targets": [
+    {
+      "name": "Swanson 1986 — fish oil and Raynaud's syndrome",
+      "aUi": "D005395",
+      "cUi": "D011928",
+      "publishedYear": 1986,
+      "expectedBridgeUis": ["D010974"],
+      "note": "The founding case of literature-based discovery (Swanson, D.R., 'Fish oil, Raynaud's syndrome, and undiscovered public knowledge', Perspectives in Biology and Medicine 30(1):7-18, 1986). A=Fish Oils (D005395), C=Raynaud Disease (D011928), expected bridge=Platelet Aggregation (D010974). Swanson's own bridge set also included blood viscosity and vascular reactivity concepts, omitted here because their MeSH UIs were not independently cross-checked to the same standard as the three above before this file was written — see LIMITATIONS below.",
+      "identifierVerification": {
+        "D005395": "Fish Oils — confirmed via https://meshb.nlm.nih.gov/record/ui?ui=D005395, cross-checked against an independent web search that initially returned a wrong candidate ID (D005402), which was rejected rather than used.",
+        "D011928": "Raynaud Disease — confirmed via https://meshb.nlm.nih.gov/record/ui?ui=D011928.",
+        "D010974": "Platelet Aggregation — confirmed via https://meshb.nlm.nih.gov/record/ui?ui=D010974."
+      }
+    }
+  ],
+  "parameters": {
+    "corpusStatus": "NOT YET BUILT — see LIMITATIONS",
+    "note": "runBenchmark requires an ingested corpus (lg_articles/lg_concepts/lg_cooccurrence). None exists in this environment: PubMed ingestion is blocked by the sandbox's network policy (verified — see scripts/corpus-ingest.mjs and the 2026-07-29 CAPABILITY_GAP report). This pre-registration is written and fingerprinted BEFORE any corpus exists, which trivially satisfies the ordering check in preregistration.mjs (registeredAt precedes any ingest, because there has been no ingest) — that trivial satisfaction is itself disclosed here rather than presented as a meaningful pre-registration discipline."
+  },
+  "note": "ONE target, not a set. A single case cannot support the benchmark's actual statistic (rank of the true discovery among frequency-matched null pairs) — that comparison needs multiple independent targets to mean anything. This target is registered anyway, honestly labelled as insufficient alone, because it is the one historical case defensible without a domain expert: it is the founding, most-cited example of the entire method, and its concepts and year are independently verifiable rather than recalled. Expanding this list to a statistically meaningful set is exactly the 'needs a domain expert' step docs/RETROSPECTIVE_BENCHMARK.md already names, and is not attempted here."
+}

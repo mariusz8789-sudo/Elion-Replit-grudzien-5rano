@@ -1,0 +1,27 @@
+{
+  "primaryAccession": "TESTFX",
+  "proteinDescription": {
+    "recommendedName": {
+      "fullName": {
+        "value": "[TEST FIXTURE] synthetic protein"
+      }
+    }
+  },
+  "organism": {
+    "scientificName": "Synthetica testfixtura"
+  },
+  "sequence": {
+    "length": 321
+  },
+  "entryType": "UniProtKB reviewed (Swiss-Prot)",
+  "comments": [
+    {
+      "commentType": "FUNCTION",
+      "texts": [
+        {
+          "value": "Synthetic function annotation for testing."
+        }
+      ]
+    }
+  ]
+}

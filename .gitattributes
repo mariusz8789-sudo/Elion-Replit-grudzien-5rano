@@ -15,3 +15,9 @@
 /packages/backend/src/compute/targets/**/*.sdf -whitespace
 /artifacts/human-twin-review/*.log -whitespace
 /artifacts/human-twin-review/*.txt -whitespace
+# Archive recovered verbatim from unmerged branches (legacy/, docs/legacy/, docs/reference/codex-handoff/,
+# docs/unreviewed-external/): kept byte-for-byte as it was on its branch, so no whitespace rewrite.
+/legacy/** -whitespace
+/docs/legacy/** -whitespace
+/docs/reference/codex-handoff/** -whitespace
+/docs/unreviewed-external/** -whitespace

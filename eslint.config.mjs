@@ -13,6 +13,8 @@ export default tseslint.config(
       '**/node_modules/**',
       'packages/frontend/public/sw.js',
       'packages/backend/src/compute/core.bundle.mjs',
+      // Read-only archive of code recovered from unmerged branches (see legacy/README.md); not built, not run.
+      'legacy/**',
     ],
   },
   js.configs.recommended,

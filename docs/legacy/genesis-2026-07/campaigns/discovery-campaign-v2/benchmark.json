@@ -1,0 +1,991 @@
+{
+  "schema": "genesis-discovery-campaign-dossier/2",
+  "campaign": {
+    "id": "discovery-campaign-v2",
+    "version": "genesis-discovery-campaign/2",
+    "status": "COMPLETED"
+  },
+  "primaryTarget": "[TEST FIXTURE] synthetic target",
+  "targetGate": {
+    "gate": "PROCEED",
+    "truthEngineDecision": "WARN",
+    "reason": "supported by real evidence, no contradiction found under supplied assumptions"
+  },
+  "evidence": {
+    "ingestionMode": "TEST_FIXTURE",
+    "records": 2,
+    "provenance": [
+      {
+        "sourceService": "EUROPE_PMC",
+        "sourceId": "TESTFIX1",
+        "contentHash": "37f283b0bf51fc4434aa3859092e54003b0b4aadd8852421fe423943ab652009",
+        "license": "CC-BY",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "RCSB_PDB",
+        "sourceId": "TESTFIX",
+        "contentHash": "d79748bae15e5aae30522269453ea79ff2df2c04467e8a0bcb6aed8249e74b77",
+        "license": "CC0",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "PUBCHEM",
+        "sourceId": "999999999",
+        "contentHash": "3824822ad1079b1b8ebb90763590c7e5cdd8c047467e452736ab363ff78b3379",
+        "license": "PUBLIC_DOMAIN",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "UNIPROT",
+        "sourceId": "TESTFX",
+        "contentHash": "b2e7341d1931df68ff500bb2a3e499f97e161a6e708d3fbc35a0f2b5d7ecd7fc",
+        "license": "CC-BY",
+        "ingestionMode": "TEST_FIXTURE"
+      },
+      {
+        "sourceService": "CHEMBL",
+        "sourceId": "ACT_TESTFIX",
+        "contentHash": "9df0d5d5437da9eebee9151f9aa9d332d9494b390e25d78e2bd709d54f367eaf",
+        "license": "UNKNOWN",
+        "ingestionMode": "TEST_FIXTURE"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "stage": "EVIDENCE",
+      "status": "INGESTED",
+      "detail": "2 records (TEST_FIXTURE)"
+    },
+    {
+      "stage": "TARGET_INTELLIGENCE",
+      "status": "PROCEED"
+    },
+    {
+      "stage": "REASONING_BRAIN",
+      "status": "CAPABILITY_BLOCKED",
+      "detail": "no live provider for capability target_reasoning; returned CAPABILITY_BLOCKED (result NOT fabricated)"
+    },
+    {
+      "stage": "CANDIDATE_GEN_V2",
+      "status": "COMPLETED_RANKED",
+      "detail": "120 generated"
+    },
+    {
+      "stage": "RDKIT",
+      "status": "AVAILABLE"
+    },
+    {
+      "stage": "ADMET",
+      "status": "AVAILABLE"
+    },
+    {
+      "stage": "DOCKING",
+      "status": "EXECUTED",
+      "detail": "3 of top 3 survivors docked"
+    },
+    {
+      "stage": "TRUTH_ENGINE",
+      "status": "GO_COMPUTATIONAL",
+      "detail": "0 rejection(s)"
+    },
+    {
+      "stage": "MCRE",
+      "status": "DONE",
+      "detail": "0 conflict(s)"
+    },
+    {
+      "stage": "NECROPOLIS",
+      "status": "RECORDED",
+      "detail": "1 rejected across 1 region(s)"
+    },
+    {
+      "stage": "WORKFLOW_MUTATION",
+      "status": "UNCHANGED",
+      "detail": "survival rate 99% acceptable — plan unchanged"
+    }
+  ],
+  "reasoningLedger": {
+    "capability": "target_reasoning",
+    "status": "CAPABILITY_BLOCKED",
+    "label": "HUMAN_REVIEW_REQUIRED",
+    "requestHash": "9b781c4383db8a5815e50facd13f595228190ac9a5537966b11f1550fd939997",
+    "routeStatus": "CAPABILITY_GAP",
+    "output": null,
+    "note": "no live provider for capability target_reasoning; returned CAPABILITY_BLOCKED (result NOT fabricated)"
+  },
+  "engineMatrix": {
+    "RDKit": {
+      "status": "AVAILABLE"
+    },
+    "ADMET-AI": {
+      "status": "AVAILABLE"
+    },
+    "Docking": {
+      "status": "EXECUTED",
+      "version": "Vina 1.2.7 + Meeko 0.7.1"
+    }
+  },
+  "summaries": {
+    "rdkit": {
+      "status": "AVAILABLE",
+      "evaluated": 120,
+      "withStructuralAlerts": 88,
+      "epistemicStatus": "COMPUTED"
+    },
+    "admet": {
+      "status": "AVAILABLE",
+      "evaluated": 120,
+      "epistemicStatus": "MODEL_INFERRED"
+    },
+    "docking": {
+      "status": "EXECUTED",
+      "bindingSiteMethod": "REFERENCE_LIGAND",
+      "docked": 3,
+      "bestAffinityKcalMol": -3.616,
+      "affinityRangeKcalMol": [
+        -3.616,
+        -3.083
+      ],
+      "epistemicStatus": "MODEL_ESTIMATE"
+    },
+    "mcre": {
+      "conflicts": 0,
+      "unresolvedConflicts": 0,
+      "policyPreserved": "Ki/IC50/Kd/EC50 kept distinct"
+    },
+    "truthEngine": {
+      "decision": "GO_COMPUTATIONAL",
+      "rejections": 0,
+      "boundedClaim": "GO_COMPUTATIONAL means a reproducible computational ranking was produced under cited evidence — NOT therapeutic efficacy and NOT a drug-discovery claim."
+    },
+    "reasoning": {
+      "status": "CAPABILITY_BLOCKED",
+      "capability": "target_reasoning"
+    }
+  },
+  "truthEngineGate": {
+    "decision": "GO_COMPUTATIONAL",
+    "rejections": [],
+    "boundedClaim": "GO_COMPUTATIONAL means a reproducible computational ranking was produced under cited evidence — NOT therapeutic efficacy and NOT a drug-discovery claim."
+  },
+  "necropolisDelta": {
+    "campaignId": "discovery-campaign-v2",
+    "rejectedCount": 1,
+    "failureRegions": [
+      {
+        "reason": "STRUCTURAL_ALERTS_3",
+        "count": 1
+      }
+    ]
+  },
+  "workflowMutation": {
+    "mutated": false,
+    "reason": "survival rate 99% acceptable — plan unchanged"
+  },
+  "benchmark": {
+    "candidatesGenerated": 120,
+    "candidatesRejected": 1,
+    "candidatesSurviving": 119,
+    "dockedCount": 3,
+    "realEnginesExecuted": [
+      "RDKit",
+      "ADMET-AI",
+      "AutoDock Vina 1.2.7"
+    ],
+    "blockedEngines": [],
+    "rankingTop10": [
+      {
+        "rank": 1,
+        "candidateId": "candv2_f0214ce9732c",
+        "smiles": "COc1ccc(Cl)cc1",
+        "finalScore": 0.869485
+      },
+      {
+        "rank": 2,
+        "candidateId": "candv2_8cc398ed5c51",
+        "smiles": "NC(=O)c1ccc(Cl)cc1",
+        "finalScore": 0.866998
+      },
+      {
+        "rank": 3,
+        "candidateId": "candv2_c21202da8eaa",
+        "smiles": "COc1ccccc1Cl",
+        "finalScore": 0.866659
+      },
+      {
+        "rank": 4,
+        "candidateId": "candv2_95884ab8f55a",
+        "smiles": "COc1cccc(Cl)c1",
+        "finalScore": 0.865625
+      },
+      {
+        "rank": 5,
+        "candidateId": "candv2_31dd3c0f1215",
+        "smiles": "NC(=O)c1ccccc1Cl",
+        "finalScore": 0.864796
+      },
+      {
+        "rank": 6,
+        "candidateId": "candv2_4d444a2ce83b",
+        "smiles": "NC(=O)c1cccc(Cl)c1",
+        "finalScore": 0.864036
+      },
+      {
+        "rank": 7,
+        "candidateId": "candv2_22d5aee619f9",
+        "smiles": "COc1ccc(O)cc1",
+        "finalScore": 0.862574
+      },
+      {
+        "rank": 8,
+        "candidateId": "candv2_7a57fe22a2ce",
+        "smiles": "COc1ccccc1O",
+        "finalScore": 0.860965
+      },
+      {
+        "rank": 9,
+        "candidateId": "candv2_4673ab99f8ed",
+        "smiles": "COc1ccc(F)cc1",
+        "finalScore": 0.860878
+      },
+      {
+        "rank": 10,
+        "candidateId": "candv2_f4719e8ff600",
+        "smiles": "COc1ccc(C)cc1",
+        "finalScore": 0.860805
+      }
+    ]
+  },
+  "remainingUncertainty": [
+    "No measured binding affinity — docking scores are Vina MODEL_ESTIMATE, not experimental Kd/IC50.",
+    "ADMET endpoints are MODEL_INFERRED (ADMET-AI), not measured in vitro/in vivo.",
+    "Docking used the identified binding site; pose plausibility is computational, not validated.",
+    "No unresolved MCRE conflicts detected in the docked set.",
+    "Reasoning Brain is CAPABILITY_BLOCKED (no live model) — mechanistic reasoning was not applied.",
+    "Evidence origin is TEST_FIXTURE (no live external sources) — not real acquired literature/structures."
+  ],
+  "experimentalRecommendations": [
+    "Wet-lab binding assay (SPR/ITC or a target biochemical assay) for the top 3 survivor(s) to measure Kd/IC50 — computational ranking only.",
+    "Acquire a co-crystal or higher-resolution structure to replace the blind/derived box with a focused, validated binding site.",
+    "Experimentally measure key ADMET liabilities (e.g. hERG, microsomal stability, solubility) for prioritised survivors.",
+    "Synthesise and assay a small diverse subset spanning the ranking to calibrate the computational score against measured activity."
+  ],
+  "dockedCandidates": [
+    {
+      "candidateId": "candv2_f0214ce9732c",
+      "structure": "COc1ccc(Cl)cc1",
+      "rationale": "Generation 1 analogue of seed 'anisole' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "COc1ccc(Cl)cc1",
+        "molecularFormula": "C7H7ClO",
+        "molWt": 142.585,
+        "exactMolWt": 142.01854,
+        "heavyAtomCount": 9,
+        "hbd": 0,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0.1429,
+        "tpsa": 9.23,
+        "crippenLogP": 2.3486,
+        "formalCharge": 0,
+        "heteroatomCount": 2,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "structuralAlerts": [],
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED",
+        "predictions": {
+          "molecular_weight": 142.585,
+          "logP": 2.3486000000000002,
+          "hydrogen_bond_acceptors": 1,
+          "hydrogen_bond_donors": 0,
+          "Lipinski": 4,
+          "QED": 0.5850627747795067,
+          "stereo_centers": 0,
+          "tpsa": 9.23,
+          "PAINS_alert": 0,
+          "BRENK_alert": 0,
+          "NIH_alert": 0,
+          "AMES": 0.09692595154047012,
+          "BBB_Martins": 0.9945192337036133,
+          "Bioavailability_Ma": 0.9386162757873535,
+          "CYP1A2_Veith": 0.9878843426704407,
+          "CYP2C19_Veith": 0.8452167510986328,
+          "CYP2C9_Substrate_CarbonMangels": 0.1535622924566269,
+          "CYP2C9_Veith": 0.09789036214351654,
+          "CYP2D6_Substrate_CarbonMangels": 0.26673024892807007,
+          "CYP2D6_Veith": 0.11575839668512344,
+          "CYP3A4_Substrate_CarbonMangels": 0.37612268328666687,
+          "CYP3A4_Veith": 0.02450377121567726,
+          "Carcinogens_Lagunin": 0.05890362337231636,
+          "ClinTox": 0.010390136390924454,
+          "DILI": 0.3312278389930725,
+          "HIA_Hou": 1,
+          "NR-AR-LBD": 0.000382059661205858,
+          "NR-AR": 0.008508278988301754,
+          "NR-AhR": 0.049456238746643066,
+          "NR-Aromatase": 0.013577071018517017,
+          "NR-ER-LBD": 0.004618185572326183,
+          "NR-ER": 0.08204449713230133,
+          "NR-PPAR-gamma": 0.0011726097436621785,
+          "PAMPA_NCATS": 0.9940648078918457,
+          "Pgp_Broccatelli": 0.012991124764084816,
+          "SR-ARE": 0.017367612570524216,
+          "SR-ATAD5": 0.0020323307253420353,
+          "SR-HSE": 0.008509661071002483,
+          "SR-MMP": 0.027822569012641907,
+          "SR-p53": 0.0015272552845999599,
+          "Skin_Reaction": 0.6700648069381714,
+          "hERG": 0.18751418590545654,
+          "Caco2_Wang": -4.079911708831787,
+          "Clearance_Hepatocyte_AZ": 118.49342346191406,
+          "Clearance_Microsome_AZ": 64.38887786865234,
+          "Half_Life_Obach": 37.60717010498047,
+          "HydrationFreeEnergy_FreeSolv": -2.593425750732422,
+          "LD50_Zhu": 1.8968766927719116,
+          "Lipophilicity_AstraZeneca": 2.646235227584839,
+          "PPBR_AZ": 72.15498352050781,
+          "Solubility_AqSolDB": -2.7567665576934814,
+          "VDss_Lombardo": 6.495428562164307,
+          "molecular_weight_drugbank_approved_percentile": 8.189806678383128,
+          "logP_drugbank_approved_percentile": 49.63093145869948,
+          "hydrogen_bond_acceptors_drugbank_approved_percentile": 6.854130052724078,
+          "hydrogen_bond_donors_drugbank_approved_percentile": 11.63444639718805,
+          "Lipinski_drugbank_approved_percentile": 63.44463971880493,
+          "QED_drugbank_approved_percentile": 58.34797891036907,
+          "stereo_centers_drugbank_approved_percentile": 22.601054481546576,
+          "tpsa_drugbank_approved_percentile": 5.62390158172232,
+          "PAINS_alert_drugbank_approved_percentile": 47.59226713532514,
+          "BRENK_alert_drugbank_approved_percentile": 25.869947275922673,
+          "NIH_alert_drugbank_approved_percentile": 37.188049209138846,
+          "AMES_drugbank_approved_percentile": 26.78383128295255,
+          "BBB_Martins_drugbank_approved_percentile": 98.98066783831284,
+          "Bioavailability_Ma_drugbank_approved_percentile": 92.61862917398946,
+          "CYP1A2_Veith_drugbank_approved_percentile": 99.0158172231986,
+          "CYP2C19_Veith_drugbank_approved_percentile": 95.92267135325133,
+          "CYP2C9_Substrate_CarbonMangels_drugbank_approved_percentile": 57.08260105448155,
+          "CYP2C9_Veith_drugbank_approved_percentile": 65.5536028119508,
+          "CYP2D6_Substrate_CarbonMangels_drugbank_approved_percentile": 74.44639718804922,
+          "CYP2D6_Veith_drugbank_approved_percentile": 62.95254833040423,
+          "CYP3A4_Substrate_CarbonMangels_drugbank_approved_percentile": 43.79613356766257,
+          "CYP3A4_Veith_drugbank_approved_percentile": 42.14411247803164,
+          "Carcinogens_Lagunin_drugbank_approved_percentile": 18.523725834797894,
+          "ClinTox_drugbank_approved_percentile": 7.100175746924429,
+          "DILI_drugbank_approved_percentile": 45.377855887521974,
+          "HIA_Hou_drugbank_approved_percentile": 99.84182776801407,
+          "NR-AR-LBD_drugbank_approved_percentile": 1.7574692442882252,
+          "NR-AR_drugbank_approved_percentile": 14.657293497363797,
+          "NR-AhR_drugbank_approved_percentile": 62.49560632688929,
+          "NR-Aromatase_drugbank_approved_percentile": 44.78031634446398,
+          "NR-ER-LBD_drugbank_approved_percentile": 16.94200351493849,
+          "NR-ER_drugbank_approved_percentile": 46.67838312829526,
+          "NR-PPAR-gamma_drugbank_approved_percentile": 20.878734622144115,
+          "PAMPA_NCATS_drugbank_approved_percentile": 98.87521968365554,
+          "Pgp_Broccatelli_drugbank_approved_percentile": 35.32513181019333,
+          "SR-ARE_drugbank_approved_percentile": 7.943760984182777,
+          "SR-ATAD5_drugbank_approved_percentile": 24.147627416520212,
+          "SR-HSE_drugbank_approved_percentile": 37.78558875219684,
+          "SR-MMP_drugbank_approved_percentile": 46.432337434094904,
+          "SR-p53_drugbank_approved_percentile": 7.6625659050966615,
+          "Skin_Reaction_drugbank_approved_percentile": 69.45518453427066,
+          "hERG_drugbank_approved_percentile": 41.0896309314587,
+          "Caco2_Wang_drugbank_approved_percentile": 97.25834797891038,
+          "Clearance_Hepatocyte_AZ_drugbank_approved_percentile": 92.75922671353253,
+          "Clearance_Microsome_AZ_drugbank_approved_percentile": 77.68014059753955,
+          "Half_Life_Obach_drugbank_approved_percentile": 74.51669595782074,
+          "HydrationFreeEnergy_FreeSolv_drugbank_approved_percentile": 96.69595782073814,
+          "LD50_Zhu_drugbank_approved_percentile": 18.769771528998245,
+          "Lipophilicity_AstraZeneca_drugbank_approved_percentile": 73.56766256590511,
+          "PPBR_AZ_drugbank_approved_percentile": 48.189806678383135,
+          "Solubility_AqSolDB_drugbank_approved_percentile": 56.62565905096661,
+          "VDss_Lombardo_drugbank_approved_percentile": 80.38664323374341
+        }
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.181,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "bindingSiteMethod": "REFERENCE_LIGAND",
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "COc1ccccc1",
+        "transformation": "add-chloro",
+        "seed": "anisole",
+        "evidenceProvenance": [
+          {
+            "sourceService": "EUROPE_PMC",
+            "sourceId": "TESTFIX1",
+            "contentHash": "37f283b0bf51fc4434aa3859092e54003b0b4aadd8852421fe423943ab652009",
+            "license": "CC-BY",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "RCSB_PDB",
+            "sourceId": "TESTFIX",
+            "contentHash": "d79748bae15e5aae30522269453ea79ff2df2c04467e8a0bcb6aed8249e74b77",
+            "license": "CC0",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "PUBCHEM",
+            "sourceId": "999999999",
+            "contentHash": "3824822ad1079b1b8ebb90763590c7e5cdd8c047467e452736ab363ff78b3379",
+            "license": "PUBLIC_DOMAIN",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "UNIPROT",
+            "sourceId": "TESTFX",
+            "contentHash": "b2e7341d1931df68ff500bb2a3e499f97e161a6e708d3fbc35a0f2b5d7ecd7fc",
+            "license": "CC-BY",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "CHEMBL",
+            "sourceId": "ACT_TESTFIX",
+            "contentHash": "9df0d5d5437da9eebee9151f9aa9d332d9494b390e25d78e2bd709d54f367eaf",
+            "license": "UNKNOWN",
+            "ingestionMode": "TEST_FIXTURE"
+          }
+        ],
+        "rankingPolicyVersion": "genesis-candidate-ranking/2"
+      },
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_c21202da8eaa",
+          "smiles": "COc1ccccc1Cl",
+          "finalScore": 0.866659,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_95884ab8f55a",
+          "smiles": "COc1cccc(Cl)c1",
+          "finalScore": 0.865625,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_22d5aee619f9",
+          "smiles": "COc1ccc(O)cc1",
+          "finalScore": 0.862574,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "finalScore": 0.869485,
+      "survives": true,
+      "rejectionReasons": []
+    },
+    {
+      "candidateId": "candv2_8cc398ed5c51",
+      "structure": "NC(=O)c1ccc(Cl)cc1",
+      "rationale": "Generation 1 analogue of seed 'benzamide' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "NC(=O)c1ccc(Cl)cc1",
+        "molecularFormula": "C7H6ClNO",
+        "molWt": 155.584,
+        "exactMolWt": 155.01379,
+        "heavyAtomCount": 10,
+        "hbd": 1,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0,
+        "tpsa": 43.09,
+        "crippenLogP": 1.4389,
+        "formalCharge": 0,
+        "heteroatomCount": 3,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "structuralAlerts": [],
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED",
+        "predictions": {
+          "molecular_weight": 155.584,
+          "logP": 1.4389,
+          "hydrogen_bond_acceptors": 1,
+          "hydrogen_bond_donors": 1,
+          "Lipinski": 4,
+          "QED": 0.65540638226015,
+          "stereo_centers": 0,
+          "tpsa": 43.09,
+          "PAINS_alert": 0,
+          "BRENK_alert": 0,
+          "NIH_alert": 0,
+          "AMES": 0.06939752399921417,
+          "BBB_Martins": 0.9670131802558899,
+          "Bioavailability_Ma": 0.9548943638801575,
+          "CYP1A2_Veith": 0.6125283241271973,
+          "CYP2C19_Veith": 0.09903371334075928,
+          "CYP2C9_Substrate_CarbonMangels": 0.31351709365844727,
+          "CYP2C9_Veith": 0.018376994878053665,
+          "CYP2D6_Substrate_CarbonMangels": 0.22125248610973358,
+          "CYP2D6_Veith": 0.026906291022896767,
+          "CYP3A4_Substrate_CarbonMangels": 0.3101629614830017,
+          "CYP3A4_Veith": 0.0016836017603054643,
+          "Carcinogens_Lagunin": 0.21392683684825897,
+          "ClinTox": 0.0417204424738884,
+          "DILI": 0.4885624349117279,
+          "HIA_Hou": 0.9999438524246216,
+          "NR-AR-LBD": 0.0032961536198854446,
+          "NR-AR": 0.013795825652778149,
+          "NR-AhR": 0.03076324239373207,
+          "NR-Aromatase": 0.003566074650734663,
+          "NR-ER-LBD": 0.0055969781242311,
+          "NR-ER": 0.07795218378305435,
+          "NR-PPAR-gamma": 0.005049615632742643,
+          "PAMPA_NCATS": 0.9576998949050903,
+          "Pgp_Broccatelli": 0.005802675150334835,
+          "SR-ARE": 0.025398235768079758,
+          "SR-ATAD5": 0.0037783936131745577,
+          "SR-HSE": 0.005841108970344067,
+          "SR-MMP": 0.016808291897177696,
+          "SR-p53": 0.004270710051059723,
+          "Skin_Reaction": 0.5217028260231018,
+          "hERG": 0.061699628829956055,
+          "Caco2_Wang": -4.147793769836426,
+          "Clearance_Hepatocyte_AZ": 48.4534797668457,
+          "Clearance_Microsome_AZ": -7.241606712341309,
+          "Half_Life_Obach": 27.561481475830078,
+          "HydrationFreeEnergy_FreeSolv": -9.09129810333252,
+          "LD50_Zhu": 2.060391902923584,
+          "Lipophilicity_AstraZeneca": 1.3856948614120483,
+          "PPBR_AZ": 54.782203674316406,
+          "Solubility_AqSolDB": -1.7137129306793213,
+          "VDss_Lombardo": 2.537680149078369,
+          "molecular_weight_drugbank_approved_percentile": 10.509666080843585,
+          "logP_drugbank_approved_percentile": 37.08260105448155,
+          "hydrogen_bond_acceptors_drugbank_approved_percentile": 6.854130052724078,
+          "hydrogen_bond_donors_drugbank_approved_percentile": 36.59050966608085,
+          "Lipinski_drugbank_approved_percentile": 63.44463971880493,
+          "QED_drugbank_approved_percentile": 67.97891036906854,
+          "stereo_centers_drugbank_approved_percentile": 22.601054481546576,
+          "tpsa_drugbank_approved_percentile": 25.237258347978912,
+          "PAINS_alert_drugbank_approved_percentile": 47.59226713532514,
+          "BRENK_alert_drugbank_approved_percentile": 25.869947275922673,
+          "NIH_alert_drugbank_approved_percentile": 37.188049209138846,
+          "AMES_drugbank_approved_percentile": 19.086115992970125,
+          "BBB_Martins_drugbank_approved_percentile": 84.21792618629175,
+          "Bioavailability_Ma_drugbank_approved_percentile": 97.04745166959579,
+          "CYP1A2_Veith_drugbank_approved_percentile": 84.3585237258348,
+          "CYP2C19_Veith_drugbank_approved_percentile": 51.70474516695958,
+          "CYP2C9_Substrate_CarbonMangels_drugbank_approved_percentile": 88.64674868189807,
+          "CYP2C9_Veith_drugbank_approved_percentile": 40.21089630931459,
+          "CYP2D6_Substrate_CarbonMangels_drugbank_approved_percentile": 70.33391915641477,
+          "CYP2D6_Veith_drugbank_approved_percentile": 39.82425307557118,
+          "CYP3A4_Substrate_CarbonMangels_drugbank_approved_percentile": 38.45342706502637,
+          "CYP3A4_Veith_drugbank_approved_percentile": 21.441124780316347,
+          "Carcinogens_Lagunin_drugbank_approved_percentile": 62.53075571177505,
+          "ClinTox_drugbank_approved_percentile": 27.381370826010546,
+          "DILI_drugbank_approved_percentile": 55.07908611599297,
+          "HIA_Hou_drugbank_approved_percentile": 78.84007029876977,
+          "NR-AR-LBD_drugbank_approved_percentile": 19.156414762741655,
+          "NR-AR_drugbank_approved_percentile": 27.838312829525485,
+          "NR-AhR_drugbank_approved_percentile": 56.098418277680146,
+          "NR-Aromatase_drugbank_approved_percentile": 25.51845342706503,
+          "NR-ER-LBD_drugbank_approved_percentile": 20.632688927943764,
+          "NR-ER_drugbank_approved_percentile": 44.00702987697716,
+          "NR-PPAR-gamma_drugbank_approved_percentile": 45.58875219683656,
+          "PAMPA_NCATS_drugbank_approved_percentile": 81.8980667838313,
+          "Pgp_Broccatelli_drugbank_approved_percentile": 28.26010544815466,
+          "SR-ARE_drugbank_approved_percentile": 13.42706502636204,
+          "SR-ATAD5_drugbank_approved_percentile": 34.059753954305805,
+          "SR-HSE_drugbank_approved_percentile": 30.615114235500883,
+          "SR-MMP_drugbank_approved_percentile": 40.702987697715294,
+          "SR-p53_drugbank_approved_percentile": 18.558875219683657,
+          "Skin_Reaction_drugbank_approved_percentile": 50.08787346221442,
+          "hERG_drugbank_approved_percentile": 26.748681898066785,
+          "Caco2_Wang_drugbank_approved_percentile": 96.3444639718805,
+          "Clearance_Hepatocyte_AZ_drugbank_approved_percentile": 62.882249560632694,
+          "Clearance_Microsome_AZ_drugbank_approved_percentile": 16.906854130052725,
+          "Half_Life_Obach_drugbank_approved_percentile": 66.46748681898067,
+          "HydrationFreeEnergy_FreeSolv_drugbank_approved_percentile": 76.41476274165203,
+          "LD50_Zhu_drugbank_approved_percentile": 26.29173989455185,
+          "Lipophilicity_AstraZeneca_drugbank_approved_percentile": 51.423550087873465,
+          "PPBR_AZ_drugbank_approved_percentile": 32.02108963093146,
+          "Solubility_AqSolDB_drugbank_approved_percentile": 74.83304042179263,
+          "VDss_Lombardo_drugbank_approved_percentile": 59.332161687170476
+        }
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.616,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "bindingSiteMethod": "REFERENCE_LIGAND",
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "NC(=O)c1ccccc1",
+        "transformation": "add-chloro",
+        "seed": "benzamide",
+        "evidenceProvenance": [
+          {
+            "sourceService": "EUROPE_PMC",
+            "sourceId": "TESTFIX1",
+            "contentHash": "37f283b0bf51fc4434aa3859092e54003b0b4aadd8852421fe423943ab652009",
+            "license": "CC-BY",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "RCSB_PDB",
+            "sourceId": "TESTFIX",
+            "contentHash": "d79748bae15e5aae30522269453ea79ff2df2c04467e8a0bcb6aed8249e74b77",
+            "license": "CC0",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "PUBCHEM",
+            "sourceId": "999999999",
+            "contentHash": "3824822ad1079b1b8ebb90763590c7e5cdd8c047467e452736ab363ff78b3379",
+            "license": "PUBLIC_DOMAIN",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "UNIPROT",
+            "sourceId": "TESTFX",
+            "contentHash": "b2e7341d1931df68ff500bb2a3e499f97e161a6e708d3fbc35a0f2b5d7ecd7fc",
+            "license": "CC-BY",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "CHEMBL",
+            "sourceId": "ACT_TESTFIX",
+            "contentHash": "9df0d5d5437da9eebee9151f9aa9d332d9494b390e25d78e2bd709d54f367eaf",
+            "license": "UNKNOWN",
+            "ingestionMode": "TEST_FIXTURE"
+          }
+        ],
+        "rankingPolicyVersion": "genesis-candidate-ranking/2"
+      },
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_31dd3c0f1215",
+          "smiles": "NC(=O)c1ccccc1Cl",
+          "finalScore": 0.864796,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_4d444a2ce83b",
+          "smiles": "NC(=O)c1cccc(Cl)c1",
+          "finalScore": 0.864036,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_3a441f7c3397",
+          "smiles": "Cc1ccc(C(N)=O)cc1",
+          "finalScore": 0.855709,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "finalScore": 0.866998,
+      "survives": true,
+      "rejectionReasons": []
+    },
+    {
+      "candidateId": "candv2_c21202da8eaa",
+      "structure": "COc1ccccc1Cl",
+      "rationale": "Generation 1 analogue of seed 'anisole' via add-chloro; survived drug-likeness triage.",
+      "descriptors": {
+        "canonicalSmiles": "COc1ccccc1Cl",
+        "molecularFormula": "C7H7ClO",
+        "molWt": 142.585,
+        "exactMolWt": 142.01854,
+        "heavyAtomCount": 9,
+        "hbd": 0,
+        "hba": 1,
+        "rotatableBonds": 1,
+        "ringCount": 1,
+        "aromaticRings": 1,
+        "fractionCsp3": 0.1429,
+        "tpsa": 9.23,
+        "crippenLogP": 2.3486,
+        "formalCharge": 0,
+        "heteroatomCount": 2,
+        "lipinskiViolations": 0,
+        "lipinskiPass": true
+      },
+      "structuralAlerts": [],
+      "admet": {
+        "epistemicStatus": "MODEL_INFERRED",
+        "predictions": {
+          "molecular_weight": 142.58499999999998,
+          "logP": 2.3486000000000002,
+          "hydrogen_bond_acceptors": 1,
+          "hydrogen_bond_donors": 0,
+          "Lipinski": 4,
+          "QED": 0.5850627747795066,
+          "stereo_centers": 0,
+          "tpsa": 9.23,
+          "PAINS_alert": 0,
+          "BRENK_alert": 0,
+          "NIH_alert": 0,
+          "AMES": 0.1398472934961319,
+          "BBB_Martins": 0.9945691227912903,
+          "Bioavailability_Ma": 0.934857189655304,
+          "CYP1A2_Veith": 0.9777892231941223,
+          "CYP2C19_Veith": 0.7599063515663147,
+          "CYP2C9_Substrate_CarbonMangels": 0.15308821201324463,
+          "CYP2C9_Veith": 0.0621192641556263,
+          "CYP2D6_Substrate_CarbonMangels": 0.2449032962322235,
+          "CYP2D6_Veith": 0.0723632201552391,
+          "CYP3A4_Substrate_CarbonMangels": 0.3566638231277466,
+          "CYP3A4_Veith": 0.014874866232275963,
+          "Carcinogens_Lagunin": 0.0680527463555336,
+          "ClinTox": 0.009846130385994911,
+          "DILI": 0.3145511746406555,
+          "HIA_Hou": 0.9999998807907104,
+          "NR-AR-LBD": 0.0005341452197171748,
+          "NR-AR": 0.008037136867642403,
+          "NR-AhR": 0.03817809000611305,
+          "NR-Aromatase": 0.009811492636799812,
+          "NR-ER-LBD": 0.004244046285748482,
+          "NR-ER": 0.0773763507604599,
+          "NR-PPAR-gamma": 0.0012716883793473244,
+          "PAMPA_NCATS": 0.9932384490966797,
+          "Pgp_Broccatelli": 0.010246648453176022,
+          "SR-ARE": 0.018712518736720085,
+          "SR-ATAD5": 0.001847300329245627,
+          "SR-HSE": 0.009676402434706688,
+          "SR-MMP": 0.020407449454069138,
+          "SR-p53": 0.001687446958385408,
+          "Skin_Reaction": 0.7357674837112427,
+          "hERG": 0.14728358387947083,
+          "Caco2_Wang": -4.028855800628662,
+          "Clearance_Hepatocyte_AZ": 124.63777160644531,
+          "Clearance_Microsome_AZ": 69.6192855834961,
+          "Half_Life_Obach": 26.619159698486328,
+          "HydrationFreeEnergy_FreeSolv": -2.1342458724975586,
+          "LD50_Zhu": 1.8354629278182983,
+          "Lipophilicity_AstraZeneca": 2.3892033100128174,
+          "PPBR_AZ": 65.9792709350586,
+          "Solubility_AqSolDB": -2.389646291732788,
+          "VDss_Lombardo": 4.22550630569458,
+          "molecular_weight_drugbank_approved_percentile": 8.189806678383128,
+          "logP_drugbank_approved_percentile": 49.63093145869948,
+          "hydrogen_bond_acceptors_drugbank_approved_percentile": 6.854130052724078,
+          "hydrogen_bond_donors_drugbank_approved_percentile": 11.63444639718805,
+          "Lipinski_drugbank_approved_percentile": 63.44463971880493,
+          "QED_drugbank_approved_percentile": 58.34797891036907,
+          "stereo_centers_drugbank_approved_percentile": 22.601054481546576,
+          "tpsa_drugbank_approved_percentile": 5.62390158172232,
+          "PAINS_alert_drugbank_approved_percentile": 47.59226713532514,
+          "BRENK_alert_drugbank_approved_percentile": 25.869947275922673,
+          "NIH_alert_drugbank_approved_percentile": 37.188049209138846,
+          "AMES_drugbank_approved_percentile": 36.098418277680146,
+          "BBB_Martins_drugbank_approved_percentile": 99.0158172231986,
+          "Bioavailability_Ma_drugbank_approved_percentile": 91.493848857645,
+          "CYP1A2_Veith_drugbank_approved_percentile": 98.4182776801406,
+          "CYP2C19_Veith_drugbank_approved_percentile": 93.39191564147629,
+          "CYP2C9_Substrate_CarbonMangels_drugbank_approved_percentile": 56.97715289982426,
+          "CYP2C9_Veith_drugbank_approved_percentile": 58.523725834797894,
+          "CYP2D6_Substrate_CarbonMangels_drugbank_approved_percentile": 72.58347978910369,
+          "CYP2D6_Veith_drugbank_approved_percentile": 54.90333919156415,
+          "CYP3A4_Substrate_CarbonMangels_drugbank_approved_percentile": 42.21441124780317,
+          "CYP3A4_Veith_drugbank_approved_percentile": 37.99648506151143,
+          "Carcinogens_Lagunin_drugbank_approved_percentile": 21.47627416520211,
+          "ClinTox_drugbank_approved_percentile": 6.783831282952549,
+          "DILI_drugbank_approved_percentile": 44.21792618629174,
+          "HIA_Hou_drugbank_approved_percentile": 99.40246045694201,
+          "NR-AR-LBD_drugbank_approved_percentile": 2.6010544815465733,
+          "NR-AR_drugbank_approved_percentile": 13.321616871704746,
+          "NR-AhR_drugbank_approved_percentile": 58.59402460456943,
+          "NR-Aromatase_drugbank_approved_percentile": 40.07029876977153,
+          "NR-ER-LBD_drugbank_approved_percentile": 15.571177504393674,
+          "NR-ER_drugbank_approved_percentile": 43.79613356766257,
+          "NR-PPAR-gamma_drugbank_approved_percentile": 22.03866432337434,
+          "PAMPA_NCATS_drugbank_approved_percentile": 98.5237258347979,
+          "Pgp_Broccatelli_drugbank_approved_percentile": 33.25131810193322,
+          "SR-ARE_drugbank_approved_percentile": 9.033391915641477,
+          "SR-ATAD5_drugbank_approved_percentile": 23.12829525483304,
+          "SR-HSE_drugbank_approved_percentile": 40.66783831282953,
+          "SR-MMP_drugbank_approved_percentile": 42.7768014059754,
+          "SR-p53_drugbank_approved_percentile": 8.646748681898067,
+          "Skin_Reaction_drugbank_approved_percentile": 77.22319859402461,
+          "hERG_drugbank_approved_percentile": 37.01230228471002,
+          "Caco2_Wang_drugbank_approved_percentile": 97.92618629173991,
+          "Clearance_Hepatocyte_AZ_drugbank_approved_percentile": 93.84885764499123,
+          "Clearance_Microsome_AZ_drugbank_approved_percentile": 80.49209138840071,
+          "Half_Life_Obach_drugbank_approved_percentile": 65.72934973637962,
+          "HydrationFreeEnergy_FreeSolv_drugbank_approved_percentile": 97.01230228471003,
+          "LD50_Zhu_drugbank_approved_percentile": 15.500878734622145,
+          "Lipophilicity_AstraZeneca_drugbank_approved_percentile": 68.68189806678383,
+          "PPBR_AZ_drugbank_approved_percentile": 41.82776801405976,
+          "Solubility_AqSolDB_drugbank_approved_percentile": 63.93673110720563,
+          "VDss_Lombardo_drugbank_approved_percentile": 70.43936731107206
+        }
+      },
+      "docking": {
+        "status": "DOCKED",
+        "bestAffinityKcalMol": -3.083,
+        "nPoses": 5,
+        "grid": {
+          "center": [
+            0.136,
+            -0.23,
+            0.177
+          ],
+          "boxSize": [
+            16,
+            16,
+            16
+          ]
+        },
+        "bindingSiteMethod": "REFERENCE_LIGAND",
+        "referenceLigand": {
+          "name": "LIG",
+          "chain": "A",
+          "seq": 900,
+          "nAtoms": 10,
+          "isExcludedIonBuffer": false
+        },
+        "engine": "AutoDock Vina 1.2.7",
+        "epistemicStatus": "MODEL_ESTIMATE",
+        "receptorProvenanceSha256": "a0ba64c2e1b46d40a910746c88f52329bd44a97f347f25736deb2a469c80f6bf"
+      },
+      "truthEngineDecision": "GO_COMPUTATIONAL",
+      "provenance": {
+        "candidateOrigin": "RDKit SMARTS analogue enumeration (COMPUTED)",
+        "parentSmiles": "COc1ccccc1",
+        "transformation": "add-chloro",
+        "seed": "anisole",
+        "evidenceProvenance": [
+          {
+            "sourceService": "EUROPE_PMC",
+            "sourceId": "TESTFIX1",
+            "contentHash": "37f283b0bf51fc4434aa3859092e54003b0b4aadd8852421fe423943ab652009",
+            "license": "CC-BY",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "RCSB_PDB",
+            "sourceId": "TESTFIX",
+            "contentHash": "d79748bae15e5aae30522269453ea79ff2df2c04467e8a0bcb6aed8249e74b77",
+            "license": "CC0",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "PUBCHEM",
+            "sourceId": "999999999",
+            "contentHash": "3824822ad1079b1b8ebb90763590c7e5cdd8c047467e452736ab363ff78b3379",
+            "license": "PUBLIC_DOMAIN",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "UNIPROT",
+            "sourceId": "TESTFX",
+            "contentHash": "b2e7341d1931df68ff500bb2a3e499f97e161a6e708d3fbc35a0f2b5d7ecd7fc",
+            "license": "CC-BY",
+            "ingestionMode": "TEST_FIXTURE"
+          },
+          {
+            "sourceService": "CHEMBL",
+            "sourceId": "ACT_TESTFIX",
+            "contentHash": "9df0d5d5437da9eebee9151f9aa9d332d9494b390e25d78e2bd709d54f367eaf",
+            "license": "UNKNOWN",
+            "ingestionMode": "TEST_FIXTURE"
+          }
+        ],
+        "rankingPolicyVersion": "genesis-candidate-ranking/2"
+      },
+      "computationalConfidence": 1,
+      "rejectedAlternatives": [
+        {
+          "candidateId": "candv2_f0214ce9732c",
+          "smiles": "COc1ccc(Cl)cc1",
+          "finalScore": 0.869485,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_95884ab8f55a",
+          "smiles": "COc1cccc(Cl)c1",
+          "finalScore": 0.865625,
+          "rejected": false,
+          "reasons": []
+        },
+        {
+          "candidateId": "candv2_22d5aee619f9",
+          "smiles": "COc1ccc(O)cc1",
+          "finalScore": 0.862574,
+          "rejected": false,
+          "reasons": []
+        }
+      ],
+      "nextExperiment": "Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.",
+      "finalScore": 0.866659,
+      "survives": true,
+      "rejectionReasons": []
+    }
+  ],
+  "scientificLimitations": [
+    "Candidates are RDKit-enumerated analogues — COMPUTATIONAL CANDIDATES, not drugs.",
+    "ADMET is MODEL_INFERRED; docking scores are Vina MODEL_ESTIMATE, NOT measured binding affinity.",
+    "No biological activity is claimed. No experimental or clinical validation was performed."
+  ],
+  "didGenesisDiscoverADrug": "NO",
+  "didGenesisDiscoverADrugExplanation": "The campaign generated, evaluated (RDKit + ADMET), docked (real Vina, MODEL_ESTIMATE) and ranked computational candidates with provenance and a Truth-Engine gate. That is computational triage, not drug discovery.",
+  "dossierHash": "d888acafec366b4be7dde051d21f53398be17cf75fc18fe615bab47d60edd121",
+  "benchmarkExecutionMs": 232096
+}

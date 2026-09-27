@@ -1,0 +1,9 @@
+{
+  "provenanceId": "prov_e-structure",
+  "sourceService": "RCSB_PDB",
+  "sourceId": "TESTFIX",
+  "sourceUrl": "https://www.rcsb.org/structure/TESTFIX",
+  "retrievedAt": null,
+  "sourceVersion": "TEST_FIXTURE",
+  "note": "SYNTHETIC TEST FIXTURE — not acquired from any live source; retrievedAt is null because there was no retrieval."
+}

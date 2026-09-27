@@ -703,6 +703,63 @@ export interface DiscoveryGraph {
 
 export interface WhyAnswer { ok: boolean; answer?: string; reason?: string; evidence?: unknown; }
 
+/* ---------------- D-149: live scientific ingestion with a sha256 per fetch ---------------- */
+
+export type ScientificIngestionSource = 'pdb' | 'chembl' | 'uniprot' | 'clinicaltrials';
+/** LIVE = HTTP 200 from the allowlisted URL; NO_ACCESS = network refused / non-200; PINNED_FALLBACK = repo copy for that exact id. */
+export type ScientificIngestionStatus = 'LIVE' | 'NO_ACCESS' | 'PINNED_FALLBACK';
+
+export interface ScientificIngestionPinned {
+  path: string;
+  sha256: string;
+  bytes: number;
+  recordedSha256: string;
+  recordedIn: string;
+  matchesRecord: boolean;
+  nature: string;
+}
+
+export interface ScientificIngestionResult {
+  source: ScientificIngestionSource;
+  id: string;
+  url: string;
+  status: ScientificIngestionStatus;
+  httpStatus: number | null;
+  sha256: string | null;
+  bytes: number;
+  fetchedAt: string;
+  error?: string;
+  finalUrl?: string;
+  pinned?: ScientificIngestionPinned;
+  note?: string;
+}
+
+export interface ScientificIngestionSourceStatus {
+  source: ScientificIngestionSource;
+  label: string;
+  idPattern: string;
+  allowlist: string;
+  defaultId: string;
+  pinnedIds: string[];
+  lastResult: ScientificIngestionResult | null;
+}
+
+export interface ScientificIngestionStatusReport {
+  sources: ScientificIngestionSourceStatus[];
+  statuses: ScientificIngestionStatus[];
+  caveat: string;
+}
+
+export async function ingestScientificSource(source: ScientificIngestionSource, id: string): Promise<ApiResult<ScientificIngestionResult>> {
+  const params = new URLSearchParams({ source, id });
+  const r = await request<{ result: ScientificIngestionResult }>('GET', `/ingestion/source?${params.toString()}`);
+  return r.ok ? { ok: true, data: r.data.result } : r;
+}
+
+export function getScientificIngestionStatus(): Promise<ApiResult<ScientificIngestionStatusReport>> {
+  return request<ScientificIngestionStatusReport>('GET', '/ingestion/status');
+}
+
 export async function listToolchain(): Promise<ApiResult<ToolchainEntry[]>> {
   const r = await request<{ toolchain: ToolchainEntry[] }>('GET', '/compute/toolchain');
   return r.ok ? { ok: true, data: r.data.toolchain } : r;

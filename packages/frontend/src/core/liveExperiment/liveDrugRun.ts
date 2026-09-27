@@ -70,11 +70,13 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Runs the campaign and its stage, polling persisted state every `pollMs`. Idempotent per campaign:
  * a second call while a run exists returns the existing one.
  */
-export async function startLiveDrugRun(opts: { readonly token: string; readonly projectId: string; readonly campaignId: string; readonly subject?: string; readonly pollMs?: number }): Promise<LiveDrugRun> {
+export async function startLiveDrugRun(opts: { readonly token: string; readonly projectId: string; readonly campaignId: string; readonly subject?: string; readonly pollMs?: number; readonly rateLimitBackoffMs?: number }): Promise<LiveDrugRun> {
   const existing = runs.get(opts.campaignId);
   if (existing && existing.phase !== 'FAILED') return existing;
   const { token, projectId, campaignId } = opts;
   const pollMs = opts.pollMs ?? 600;
+  // Pause after a 429 from the job endpoint, grown per consecutive refusal (capped at 30 s).
+  const backoffMs = opts.rateLimitBackoffMs ?? 5_000;
   const startedAt = performance.now();
   let preregistration: MemoryStatus | null = null;
   let events: CampaignEventRecord[] = [];
@@ -106,9 +108,14 @@ export async function startLiveDrugRun(opts: { readonly token: string; readonly 
     }
   };
   const follow = async (jobId: string): Promise<string | null> => {
+    let throttled = 0;
     for (;;) {
-      await wait(pollMs);
+      await wait(throttled ? Math.min(backoffMs * throttled, 30_000) : pollMs);
       const job = await getProjectJob(token, projectId, jobId);
+      // A 429 says "ask again later", not "the job failed": the server's per-IP budget is shared with
+      // everything else this tab polls, so the run backs off and keeps following the same job.
+      if (!job.ok && job.status === 429) { throttled += 1; continue; }
+      throttled = 0;
       await refresh();
       if (!job.ok) return `job_unreadable:${job.error ?? 'unknown'}`;
       if (job.data.status === 'completed') return null;

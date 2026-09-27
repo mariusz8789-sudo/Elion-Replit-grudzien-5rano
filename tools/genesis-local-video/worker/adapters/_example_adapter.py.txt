@@ -1,0 +1,37 @@
+# Genesis Local AI-Video — example plugged-in adapter (TEMPLATE, not code).
+#
+# This file has a .py.txt extension on purpose: the worker only auto-loads
+# adapters/<modelId>.py, so this template is never accidentally executed.
+# To attach a REAL local model in Stage B:
+#
+#   1. Copy this file to adapters/<your-model-id>.py (the exact modelId
+#      you register with createModelRegistry().registerLocalModel(...)).
+#   2. Implement generate(request) for real, using your model's real
+#      local inference code (diffusers pipeline, ComfyUI workflow launch,
+#      whatever you actually run).
+#   3. Never return {"ok": True, ...} unless you actually wrote a real,
+#      non-empty file to request["outputPath"].
+#
+# request (dict, from the Node adapter, already validated/path-checked):
+#   {
+#     "requestId": str, "capability": str, "modelId": str,
+#     "checkpointPath": str, "checkpointFingerprint": str,
+#     "promptOrShotDescription": str | None,
+#     "referenceImage": str | None, "referenceVideo": str | None,
+#     "depthReference": str | None, "normalsReference": str | None,
+#     "segmentationReference": str | None, "cameraTrajectory": ... | None,
+#     "cameraMetadata": ... | None, "deterministicSeed": int | None,
+#     "timingFps": int | None, "durationSeconds": number | None,
+#     "config": dict,            # the caller's modelConfiguration, as-is
+#     "outputPath": str,         # pre-validated, inside the approved output root
+#     "device": str,             # "cuda" | "directml" | "cpu"
+#   }
+#
+# Required return shape:
+#   {"ok": True, "outputPath": request["outputPath"], "limitations": [...]}
+#   or
+#   {"ok": False, "reason": "<why it genuinely failed>"}
+#
+# def generate(request: dict) -> dict:
+#     ... your real local inference here ...
+#     return {"ok": True, "outputPath": request["outputPath"], "limitations": []}

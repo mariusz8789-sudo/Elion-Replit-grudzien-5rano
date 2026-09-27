@@ -1,0 +1,29 @@
+{
+  "pinsChanged": false,
+  "records": [
+    {
+      "path": "packages/frontend/src/core/biotechData/nssdc-planetary-factsheet.html",
+      "beforeSha256": "55d7034bb30470142063e94bd6d20398deca989ce52b593bc89a1c4cdbce502e",
+      "headBlobSha256": "42bdc3f1dae470b85580c6ac66c353964a05d544ad2ac970a6b7d908337a6c3c",
+      "reason": "core.autocrlf=true converted committed LF to CRLF"
+    },
+    {
+      "path": "packages/frontend/src/core/benchmark/fixtures/discoverybench/evolution_freshwater_fish/body-size-evolution-in-south-american-freshwater-fishes.csv",
+      "beforeSha256": "bf6ff4c6e3e425f29cecc1e4afcdbaf174e29ddf7a4792404f106f358f9c011e",
+      "headBlobSha256": "d2498eaafba0a583f3a434e53eec682b3a58cddc16c6fd3d70cc49e5cd645d57",
+      "reason": "core.autocrlf=true converted committed LF to CRLF"
+    },
+    {
+      "path": "docs/evidence/usgs/USGS-01646500-00060-2026-08-20.json",
+      "beforeSha256": "f4de9b2ab8b58ab43497f58b891bedee8345ba5e9239ac5a71d4146eb59bfc34",
+      "headBlobSha256": "df142e9ebbee2c82d73ae2f1b0c3fd749e6d9f74336f8bc1b1d616bc0e51776f",
+      "reason": "core.autocrlf=true converted committed LF to CRLF"
+    },
+    {
+      "path": "docs/evidence/usgs/USGS-01646500-monitoring-location.json",
+      "beforeSha256": "57fc95f24e77ba4fbe5903a194b74cce0ff08b17191afeaf09f4aba132b8464d",
+      "headBlobSha256": "252094dd79c6527e3ea14cde454a82cf27d9d78f7426f2e74570348f9a95b034",
+      "reason": "core.autocrlf=true converted committed LF to CRLF"
+    }
+  ]
+}

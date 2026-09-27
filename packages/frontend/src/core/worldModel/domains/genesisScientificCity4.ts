@@ -72,6 +72,13 @@ export interface GenesisScientificCity4Options extends GenesisScientificCity3Opt
    * byte-identical to before Phase 2.
    */
   withQuantumLab?: boolean;
+  /**
+   * Injects a shared `WorldRegistry` (e.g. Genesis Construct's, so every
+   * item it loads lands in ONE registry) instead of this builder creating
+   * its own private one. Defaults to a fresh `WorldRegistry`, so every
+   * existing standalone caller is unaffected byte-for-byte.
+   */
+  registry?: WorldRegistry;
 }
 
 export interface GenesisScientificCity4 {
@@ -237,7 +244,7 @@ export function buildGenesisScientificCity4(options: GenesisScientificCity4Optio
     extraCouplings: [...buildRecoveryCouplings(), ...(options.withQuantumLab ? buildStmImagingCouplings() : [])],
   });
 
-  const registry = new WorldRegistry();
+  const registry = options.registry ?? new WorldRegistry();
   registry.save(base);
 
   return {

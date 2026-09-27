@@ -137,7 +137,11 @@ export function addEvent(db, e) {
   return id;
 }
 
-export function listEvents(db, campaignId) {
-  return db.prepare('SELECT * FROM campaign_events WHERE campaign_id = ? ORDER BY created_at ASC').all(campaignId)
-    .map((r) => ({ id: r.id, campaignId: r.campaign_id, generation: r.generation, type: r.type, payload: P(r.payload_json, {}), createdAt: r.created_at }));
+/**
+ * Events in insertion order. `seq` is the row's insertion position (rowid): a client polling a running
+ * campaign passes the last `seq` it saw as `afterSeq` and receives only what was appended since.
+ */
+export function listEvents(db, campaignId, { afterSeq = 0 } = {}) {
+  return db.prepare('SELECT rowid AS seq, * FROM campaign_events WHERE campaign_id = ? AND rowid > ? ORDER BY rowid ASC').all(campaignId, Math.max(0, Math.floor(Number(afterSeq) || 0)))
+    .map((r) => ({ seq: r.seq, id: r.id, campaignId: r.campaign_id, generation: r.generation, type: r.type, payload: P(r.payload_json, {}), createdAt: r.created_at }));
 }

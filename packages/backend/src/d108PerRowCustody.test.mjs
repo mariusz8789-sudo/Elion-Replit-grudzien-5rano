@@ -13,12 +13,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const custody = await import(path.join(HERE, '../../../scripts/d108-per-row-custody.mjs'));
-const chunkCustody = await import(path.join(HERE, '../../../scripts/d105-a2-custody.mjs'));
-const combined = await import(path.join(HERE, '../../../scripts/d108-noise-floor-per-row.mjs'));
+const custody = await import(pathToFileURL(path.join(HERE, '../../../scripts/d108-per-row-custody.mjs')).href);
+const chunkCustody = await import(pathToFileURL(path.join(HERE, '../../../scripts/d105-a2-custody.mjs')).href);
+const combined = await import(pathToFileURL(path.join(HERE, '../../../scripts/d108-noise-floor-per-row.mjs')).href);
 
 test('chunks 1, 2, and a partial chunk 4 have declared per-row hashes; 3, 5, 6, 7, 8 do not', () => {
   const s = custody.summary();

@@ -41,7 +41,9 @@ import { openDatabase, purgeExpiredSessions } from './store.mjs';
 import { classifyDbPath } from './dbDurability.mjs';
 import { resolveBuildInfo, checkDatabaseState } from './buildInfo.mjs';
 import { handleApi } from './api.mjs';
+import { openKnowledgeLedgerPersistence } from './knowledgeApi.mjs';
 import { listToolchain } from './campaign/toolchain.mjs';
+import { buildScientificRuntimeStatus } from './compute/scientificRuntimeStatus.mjs';
 import { fetchBiotechSource } from './biotechProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -59,6 +61,9 @@ const VERSION = process.env.npm_package_version ?? '1.0.0';
 // 'unknown' zamiast zmyślać.
 const BUILD = resolveBuildInfo({ env: process.env, repoDir: path.resolve(__dirname, '../../..') });
 const startedAt = Date.now();
+let scientificRuntimeCache = null;
+let scientificRuntimeCachedAt = 0;
+const SCIENTIFIC_RUNTIME_CACHE_MS = 15_000;
 
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 const client = hasKey ? new Anthropic() : null;
@@ -83,6 +88,10 @@ try {
   // Bez trwałości aplikacja nadal działa (local-first frontend) — logujemy i lecimy dalej.
   console.log(JSON.stringify({ t: new Date().toISOString(), level: 'error', msg: 'db_open_failed', message: String(err?.message) }));
 }
+// Evidence ledger of the knowledge channel (proposals, published records): a JSON snapshot beside the DB,
+// restored at boot and rewritten after every appended entry (D-130). ':memory:' keeps it ephemeral, and says so.
+const LEDGER_PATH = process.env.GENESIS_LEDGER_PATH ?? (DB_PATH === ':memory:' ? ':memory:' : path.join(path.dirname(DB_PATH), 'evidence-ledger.json'));
+const LEDGER_PERSISTENCE = openKnowledgeLedgerPersistence(LEDGER_PATH);
 // Okresowe sprzątanie wygasłych sesji — pamięć/plik nie puchną.
 if (db) setInterval(() => { try { purgeExpiredSessions(db); } catch { /* ignore */ } }, 3_600_000).unref();
 
@@ -279,6 +288,19 @@ async function handleBiotechSource(req, res, url) {
 }
 
 /* ---------------- API trwałości (/api/auth, /api/projects) ---------------- */
+/**
+ * Every top-level segment `handleApi` (api.mjs) routes. ONE list, so a new API family cannot be
+ * implemented and then silently 404 at the HTTP layer — which is exactly what happened to
+ * /api/physics/cms-z (real CMS Open Data): handled in api.mjs, missing here. Guarded by
+ * serverApiPrefixes.test.mjs, which reads api.mjs and fails if the two ever diverge.
+ */
+export const PERSIST_API_SEGMENTS = Object.freeze(['auth', 'projects', 'compute', 'worlds', 'security', 'speculative', 'knowledge', 'quantum', 'manifold', 'system', 'physics']);
+function isPersistApiPath(url) {
+  if (!url?.startsWith('/api/')) return false;
+  const first = url.slice(5).split(/[/?#]/, 1)[0];
+  return PERSIST_API_SEGMENTS.includes(first);
+}
+
 const persistLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
 // Uploady źródłowe mogą zawierać duże, poprawne artefakty; nie dzielą jednak
 // budżetu, aby spam GIS nie blokował Knowledge Ingestion.
@@ -365,7 +387,7 @@ function serveStatic(req, res) {
 /* ---------------- Serwer ---------------- */
 const staticAvailable = existsSync(path.join(STATIC_DIR, 'index.html'));
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Ustawione na starcie przez setHeader — writeHead() w dalszym kodzie
   // dopisuje nagłówki specyficzne dla trasy bez usuwania tych globalnych.
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
@@ -374,6 +396,11 @@ const server = http.createServer((req, res) => {
     // Stan bazy z WYKONANEGO zapytania kontrolnego — `db ? 'ready' : ...` nie
     // widziało przypadku, w którym obiekt istnieje, a baza nie odpowiada.
     const dbState = checkDatabaseState(db);
+    if (!scientificRuntimeCache || Date.now() - scientificRuntimeCachedAt > SCIENTIFIC_RUNTIME_CACHE_MS) {
+      scientificRuntimeCache = await buildScientificRuntimeStatus(db);
+      scientificRuntimeCachedAt = Date.now();
+    }
+    const effectiveByTool = new Map(scientificRuntimeCache.engines.map((engine) => [engine.id, engine]));
     return json(res, 200, {
       ok: true,
       version: VERSION,
@@ -391,20 +418,26 @@ const server = http.createServer((req, res) => {
       // Operator i tak dostaje ścieżkę w logu startowym.
       db: { state: dbState.state, ok: dbState.ok, durability: DB_DURABILITY.durability, persistent: DB_DURABILITY.persistent },
       persistence: dbState.state,
+      knowledgeLedger: { status: LEDGER_PERSISTENCE.status, entries: LEDGER_PERSISTENCE.entries },
       // `toolId` is the field these records actually carry (see campaign/toolchain.mjs
       // and /api/compute/toolchain, which reads t.toolId). Reading `id`/`name` here
       // meant EVERY entry fell through to the literal 'unknown', so the health
       // endpoint reported eight anonymous tools: you could see one AVAILABLE and
       // seven BLOCKED_BY_RUNTIME, but not which engine was which — the capability
       // disclosure anonymised at exactly the surface an operator inspects.
-      toolchain: listToolchain().map((tool) => ({ id: tool.toolId ?? tool.id ?? tool.name ?? 'unknown', status: tool.status, version: tool.version ?? null })),
+      toolchain: listToolchain().map((tool) => {
+        const id = tool.toolId ?? tool.id ?? tool.name ?? 'unknown';
+        const remote = effectiveByTool.get(id);
+        return { id, status: remote?.status === 'AVAILABLE' ? 'AVAILABLE' : tool.status, version: remote?.version ?? tool.version ?? null };
+      }),
+      scientificWorkers: scientificRuntimeCache,
     });
   }
   if (req.method === 'POST' && req.url === '/api/ask') return handleAsk(req, res);
   if (req.method === 'POST' && req.url === '/api/world-proposal') return handleWorldProposal(req, res);
   const requestUrl = req.url ? new URL(req.url, 'http://x') : null;
   if (requestUrl?.pathname === '/api/biotech/source') return handleBiotechSource(req, res, requestUrl);
-  if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/projects') || req.url?.startsWith('/api/compute') || req.url?.startsWith('/api/worlds') || req.url?.startsWith('/api/security') || req.url?.startsWith('/api/speculative') || req.url?.startsWith('/api/knowledge') || req.url?.startsWith('/api/quantum') || req.url?.startsWith('/api/manifold') || req.url?.startsWith('/api/system')) {
+  if (isPersistApiPath(req.url)) {
     return handlePersistApi(req, res, new URL(req.url, 'http://x'));
   }
   if (req.url?.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
@@ -422,7 +455,9 @@ server.listen(PORT, () => {
     static: staticAvailable ? STATIC_DIR : 'none',
     persistence: db ? DB_PATH : 'none',
     durability: DB_DURABILITY.durability,
+    knowledgeLedger: LEDGER_PERSISTENCE.status, knowledgeLedgerPath: LEDGER_PERSISTENCE.path ?? 'memory',
   });
+  if (LEDGER_PERSISTENCE.status === 'REJECTED_IN_MEMORY') log('error', 'knowledge_ledger_snapshot_rejected', { path: LEDGER_PERSISTENCE.path, reason: LEDGER_PERSISTENCE.reason });
   if (db && !DB_DURABILITY.persistent) log('warn', 'db_not_durable', { durability: DB_DURABILITY.durability, why: DB_DURABILITY.why });
 });
 

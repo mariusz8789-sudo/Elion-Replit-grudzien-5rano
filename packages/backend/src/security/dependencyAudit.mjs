@@ -42,9 +42,21 @@ export const FINDING_STATUS = Object.freeze({
 export function runDependencyAudit({ cwd = process.cwd(), timeoutMs = 60_000 } = {}) {
   let raw;
   try {
-    raw = execFileSync('npm', ['audit', '--json'], {
+    // npm is a .cmd shim on Windows and cannot be execFile'd directly. The shell
+    // command is a fixed literal; cwd remains a subprocess option, never shell text.
+    const command = process.platform === 'win32' ? 'cmd.exe' : 'npm';
+    const args = process.platform === 'win32' ? ['/d', '/s', '/c', 'npm.cmd audit --json'] : ['audit', '--json'];
+    // Windows deployments commonly rely on the OS certificate store (for
+    // example behind a managed TLS inspection proxy). npm runs under Node, so
+    // opt this subprocess into that store instead of weakening TLS validation.
+    const env = process.platform === 'win32'
+      ? { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --use-system-ca`.trim() }
+      : process.env;
+    raw = execFileSync(command, args, {
       cwd, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      env,
     });
   } catch (err) {
     raw = err?.stdout;
@@ -57,6 +69,9 @@ export function runDependencyAudit({ cwd = process.cwd(), timeoutMs = 60_000 } =
     report = JSON.parse(raw);
   } catch (err) {
     return { ok: false, error: `npm_audit_unparseable: ${String(err?.message ?? err).slice(0, 200)}`, findings: [] };
+  }
+  if (report?.error) {
+    return { ok: false, error: `npm_audit_unavailable: ${String(report.error.summary || report.error.code || report.error.detail || 'npm returned an error').slice(0, 200)}`, findings: [] };
   }
   return { ok: true, findings: mapAuditReportToFindings(report) };
 }

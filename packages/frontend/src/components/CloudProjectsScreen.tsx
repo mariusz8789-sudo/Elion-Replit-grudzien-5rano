@@ -211,7 +211,6 @@ const MERGE_STATUS_LABEL: Record<MergeRequest['status'], string> = {
 function ProjectDetail({ project, onBack }: { project: Project; onBack: () => void }) {
   useEffect(() => {
     setActiveKnowledgeProject(project);
-    return () => setActiveKnowledgeProject(null);
   }, [project]);
 
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -351,7 +350,7 @@ function ProjectDetail({ project, onBack }: { project: Project; onBack: () => vo
 
   function showSpatialOverlay(spatial: ProjectSpatialDataset) {
     setActiveSpatialOverlay(spatial);
-    window.location.hash = '#/city';
+    window.location.hash = '#/city3d?view=2d';
   }
 
   async function handleAddMember(e: React.FormEvent) {

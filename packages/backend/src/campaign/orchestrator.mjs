@@ -27,7 +27,10 @@ const hashState = (gen, smiles, strategy) =>
 /** Deskryptory jako Scientific Run (prowieniencja + persystencja). */
 function describeAsRun(db, projectId, smiles) {
   const run = runModel('chem-rdkit-descriptors', { smiles });
-  if (run.status === 'ok') { try { saveRun(db, run, { projectId }); } catch { /* audyt best-effort */ } }
+  if (run.status === 'ok') {
+    try { saveRun(db, run, { projectId }); }
+    catch (error) { throw new Error(`DESCRIPTOR_RUN_PROVENANCE_PERSISTENCE_FAILED:${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  }
   return run;
 }
 
@@ -79,7 +82,9 @@ function persistDescriptorScienceRun(db, { campaignId, candidateId, projectId, r
       inputHash: sha16(run.inputs), outputHash: sha16(run.outputs), artifacts: [],
       durationMs: run.durationMs,
     });
-  } catch { /* audyt best-effort, same discipline as describeAsRun's own saveRun call */ }
+  } catch (error) {
+    throw new Error(`DESCRIPTOR_SCIENCE_RUN_PERSISTENCE_FAILED:${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
 }
 
 function makeCandidateRecord(db, campaignId, projectId, generation, proposal, objectives, constraints, predictionGate = null) {

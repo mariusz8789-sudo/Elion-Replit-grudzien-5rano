@@ -25,6 +25,7 @@ export * from './crossDomain/crossDomainCoupling';
 export * from './generation/worldModelProposal';
 export * from './generation/llmWorldProposalAdapter';
 export * from './generation/resolveWorldProposal';
+export * from './generation/spacetimeWorldProposal';
 export * from './domains/electricalGenerator';
 export * from './domains/quantumTunneling';
 export * from './domains/relativityGeodesic';

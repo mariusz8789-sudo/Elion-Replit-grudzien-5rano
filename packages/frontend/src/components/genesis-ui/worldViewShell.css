@@ -1,0 +1,388 @@
+/* Genesis World-First / Smart UI shell (D-133). Candidate authored outside the repo, audited and
+ * integrated onto the real Genesis design system: `--gx-text`/`--gx-stage-bg` are aliased to the
+ * real tokens (`--text`/`--bg`, styles.css) instead of the candidate's own approximate fallbacks, so
+ * this shell reads as ONE dark theme with the rest of the app rather than a fifth shade of navy.
+ */
+.gx-world-first-shell {
+  --gx-text: var(--text, #f5f7fb);
+  --gx-stage-bg: var(--bg, #071019);
+  --gx-world-toolbar-size: 58px;
+  --gx-world-drawer-width: min(30vw, 480px);
+  --gx-world-drawer-expanded: min(72vw, 1180px);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--gx-text, #f5f7fb);
+  background: var(--gx-stage-bg, #071019);
+}
+
+.gx-world-first-shell__stage,
+.gx-world-first-shell__scene {
+  position: absolute;
+  inset: 0;
+}
+
+.gx-world-first-shell__scene {
+  z-index: 0;
+}
+
+.gx-world-first-shell__identity {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 4;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 12px;
+  background: rgb(5 13 21 / 42%);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.gx-world-first-shell__glyph {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 6%);
+}
+
+.gx-world-first-shell__domain,
+.gx-world-first-shell__toolbar-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.58;
+}
+
+.gx-world-first-shell__identity strong {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.gx-world-first-shell__status {
+  position: absolute;
+  top: 18px;
+  right: calc(var(--gx-world-toolbar-size) + 18px);
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.gx-world-first-shell__toolbar {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  width: var(--gx-world-toolbar-size);
+  flex-direction: column;
+  gap: 7px;
+  transform: translateY(-50%);
+}
+
+.gx-world-first-shell__toolbar-button,
+.gx-icon-button,
+.gx-compact-button {
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: inherit;
+  background: rgb(7 14 22 / 65%);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.gx-world-first-shell__toolbar-button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  padding: 7px 4px;
+}
+
+.gx-world-first-shell__toolbar-button:hover,
+.gx-world-first-shell__toolbar-button:focus-visible,
+.gx-icon-button:hover,
+.gx-icon-button:focus-visible,
+.gx-compact-button:hover,
+.gx-compact-button:focus-visible {
+  border-color: rgb(128 224 255 / 35%);
+  outline: none;
+  background: rgb(10 24 35 / 88%);
+}
+
+.gx-world-first-shell__toolbar-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gx-world-first-shell__selected-object {
+  position: absolute;
+  right: calc(var(--gx-world-toolbar-size) + 22px);
+  bottom: 18px;
+  z-index: 4;
+  min-height: 24px;
+  pointer-events: none;
+}
+
+.gx-contextual-popup {
+  position: absolute;
+  z-index: 20;
+  width: min(320px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 16px;
+  background: rgb(5 12 20 / 84%);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 40%);
+  backdrop-filter: blur(16px);
+}
+
+.gx-contextual-popup__head,
+.gx-world-research-drawer__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.gx-contextual-popup__identity strong,
+.gx-contextual-popup__identity span {
+  display: block;
+}
+
+.gx-contextual-popup__identity span {
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.62;
+}
+
+.gx-contextual-popup__badges,
+.gx-world-research-drawer__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.gx-contextual-popup__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.gx-icon-button {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.gx-compact-button {
+  min-height: 36px;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.gx-compact-button--primary {
+  border-color: rgb(105 219 255 / 30%);
+}
+
+.gx-compact-button:disabled,
+.gx-world-first-shell__toolbar-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.gx-compact-button kbd {
+  float: right;
+  opacity: 0.5;
+}
+
+.gx-world-research-drawer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 30;
+  display: flex;
+  width: var(--gx-world-drawer-width);
+  flex-direction: column;
+  border-left: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(5 12 20 / 82%);
+  box-shadow: -18px 0 60px rgb(0 0 0 / 22%);
+  backdrop-filter: blur(18px);
+  animation: gx-world-drawer-in 220ms ease-out;
+}
+
+.gx-world-research-drawer--expanded {
+  width: var(--gx-world-drawer-expanded);
+}
+
+.gx-world-research-drawer__head {
+  min-height: 88px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.gx-world-research-drawer__title-group h2 {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.gx-world-research-drawer__title-group p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  opacity: 0.62;
+}
+
+.gx-world-research-drawer__eyebrow {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  opacity: 0.48;
+}
+
+.gx-world-research-drawer__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.gx-world-research-drawer__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.gx-world-research-empty {
+  padding: 24px 8px;
+  opacity: 0.58;
+}
+
+.gx-world-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgb(255 255 255 / 4%);
+}
+
+.gx-world-badge--compact {
+  min-height: 20px;
+  font-size: 9px;
+  padding-inline: 7px;
+}
+
+.gx-world-badge--real { border-color: rgb(102 223 171 / 32%); }
+.gx-world-badge--dataset { border-color: rgb(92 187 255 / 32%); }
+.gx-world-badge--model { border-color: rgb(255 196 95 / 32%); }
+.gx-world-badge--schematic { border-color: rgb(204 152 255 / 32%); }
+.gx-world-badge--simulated { border-color: rgb(88 224 255 / 32%); }
+.gx-world-badge--reconstructed { border-color: rgb(255 148 173 / 32%); }
+.gx-world-badge--hypothesis { border-color: rgb(255 202 95 / 32%); }
+.gx-world-badge--unknown { border-color: rgb(255 255 255 / 16%); }
+.gx-world-badge--blocked { border-color: rgb(255 98 98 / 32%); }
+
+@keyframes gx-world-drawer-in {
+  from { transform: translateX(18px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  .gx-world-first-shell {
+    --gx-world-toolbar-size: 52px;
+  }
+
+  .gx-world-first-shell__identity {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100vw - 130px);
+  }
+
+  .gx-world-first-shell__toolbar {
+    top: auto;
+    right: 50%;
+    bottom: 10px;
+    width: auto;
+    max-width: calc(100vw - 20px);
+    flex-direction: row;
+    transform: translateX(50%);
+    overflow-x: auto;
+    padding: 4px;
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: 14px;
+    background: rgb(5 12 20 / 56%);
+    backdrop-filter: blur(14px);
+  }
+
+  .gx-world-first-shell__toolbar-button {
+    width: 52px;
+    min-width: 52px;
+    min-height: 44px;
+  }
+
+  .gx-world-first-shell__status {
+    top: 10px;
+    right: 10px;
+  }
+
+  .gx-world-first-shell__selected-object {
+    right: 10px;
+    bottom: 74px;
+  }
+
+  .gx-world-research-drawer,
+  .gx-world-research-drawer--expanded {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 78vh;
+    border-top: 1px solid rgb(255 255 255 / 10%);
+    border-left: none;
+    border-radius: 18px 18px 0 0;
+    animation: gx-world-sheet-in 220ms ease-out;
+  }
+
+  .gx-world-first-shell--research-expanded .gx-world-research-drawer {
+    max-height: 94vh;
+  }
+
+  .gx-contextual-popup {
+    max-width: min(320px, calc(100vw - 24px));
+  }
+}
+
+@keyframes gx-world-sheet-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gx-world-research-drawer,
+  .gx-world-research-drawer--expanded,
+  .gx-contextual-popup {
+    animation: none;
+  }
+}

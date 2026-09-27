@@ -54,6 +54,14 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
   const isCreateTab = expIdx === experiments.length;
   const activeExp = experiments[expIdx];
   const initialParams = activeExp?.id === targetExperimentId ? pendingScenario?.params : undefined;
+  const indexedExperiments = experiments.map((experiment, index) => ({ experiment, index }));
+  const threeDIndexes = indexedExperiments.filter(({ experiment }) => Boolean(experiment.createSim3D));
+  // Prefer the cinematic 3D path where one exists. Labs that only have a scientifically useful
+  // 2D experiment still keep their normal entry point instead of becoming an empty shell.
+  const primaryIndexes = threeDIndexes.length > 0 ? threeDIndexes : indexedExperiments;
+  const advancedIndexes = threeDIndexes.length > 0
+    ? indexedExperiments.filter(({ experiment }) => !experiment.createSim3D)
+    : [];
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const { atStart, atEnd } = useScrollEdges(tabsRef);
@@ -62,14 +70,16 @@ export function LabShell({ lab }: { lab: LabDefinition }) {
     <div className="lab-view" style={{ ['--accent' as string]: lab.accent }}>
       <div className={`exp-tabs-wrap ${atStart ? '' : 'has-more-start'} ${atEnd ? '' : 'has-more-end'}`}>
         <div className="exp-tabs" role="tablist" aria-label="Eksperymenty" ref={tabsRef}>
-          {experiments.map((e, i) => (
+          {primaryIndexes.map(({ experiment: e, index: i }) => (
             <button key={e.id} role="tab" aria-selected={i === expIdx} onClick={() => setExpIdx(i)}>
               {i === 0 ? experimentBaseName(lab) : e.name}
             </button>
           ))}
-          <button role="tab" aria-selected={isCreateTab} onClick={() => setExpIdx(experiments.length)}>
-            🧪 Stwórz eksperyment
-          </button>
+          {advancedIndexes.length > 0 && <details className="exp-advanced-picker">
+            <summary>Więcej modeli</summary>
+            <div>{advancedIndexes.map(({ experiment: e, index: i }) => <button key={e.id} type="button" className={i === expIdx ? 'is-active' : ''} onClick={() => setExpIdx(i)}>{i === 0 ? experimentBaseName(lab) : e.name}</button>)}</div>
+          </details>}
+          <details className="exp-advanced-picker"><summary>Utwórz</summary><div><button type="button" className={isCreateTab ? 'is-active' : ''} onClick={() => setExpIdx(experiments.length)}>Własny eksperyment</button></div></details>
         </div>
       </div>
       {isCreateTab ? (
@@ -200,17 +210,22 @@ function BelowStage({
   return (
     <>
       <HonestyBadge level={exp.honesty} note={exp.honestyNote} />
-      <Controls defs={exp.params} params={params} onChange={(k, v) => setParams((p) => ({ ...p, [k]: v }))} />
-      <NarratorPanel
-        blocks={blocks}
-        askContext={buildContext(
-          { id: lab.id, name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
-          expLabel,
-          params,
-          stats,
-          blocks,
-        )}
-      />
+      <details className="lab-advanced-controls">
+        <summary>Parametry i analiza</summary>
+        <div className="lab-advanced-controls-body">
+          <Controls defs={exp.params} params={params} onChange={(k, v) => setParams((p) => ({ ...p, [k]: v }))} />
+          <NarratorPanel
+            blocks={blocks}
+            askContext={buildContext(
+              { id: lab.id, name: lab.name, honesty: exp.honesty, honestyNote: exp.honestyNote },
+              expLabel,
+              params,
+              stats,
+              blocks,
+            )}
+          />
+        </div>
+      </details>
     </>
   );
 }

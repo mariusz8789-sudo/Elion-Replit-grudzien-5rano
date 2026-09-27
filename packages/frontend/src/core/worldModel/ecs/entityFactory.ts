@@ -1,4 +1,5 @@
 import type { EntityRef } from '../../events/genesisEvent';
+import type { GeometryComponent } from './geometry';
 import {
   entityId,
   type ChemicalComponent,
@@ -47,6 +48,7 @@ export interface EntityBlueprint {
   chemical?: ChemicalComponent;
   /** Solver ownership — `solverId: null` is a declared, honest "no solver exists yet," same as elsewhere in this ECS. Omit entirely for a pure container entity. */
   domainBinding?: DomainBindingComponent;
+  geometry?: GeometryComponent;
   domainState?: Record<string, number>;
   statusLabel?: string;
   /** Default `'UNGROUNDED_APPROXIMATION'` — override only for an entity that is deliberately grounded from tick zero (e.g. a value copied verbatim from a real measurement, or a container that's intentionally exempt). */
@@ -71,6 +73,7 @@ export function createEntity(blueprint: EntityBlueprint): WorldModelEntity {
     physics: blueprint.physics,
     chemical: blueprint.chemical,
     domainBinding: blueprint.domainBinding,
+    geometry: blueprint.geometry,
     domainState: blueprint.domainState,
     statusLabel: blueprint.statusLabel,
     grounding: blueprint.grounding ?? 'UNGROUNDED_APPROXIMATION',

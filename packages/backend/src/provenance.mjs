@@ -15,17 +15,8 @@
  */
 import { createHash } from 'node:crypto';
 import { probeEnvironment } from './compute/scienceEnv.mjs';
+import { canonicalJson, sha256Hex } from './determinism.mjs';
 
-/** Recursively sorts object keys so JSON.stringify is stable regardless of construction order. */
-function sortKeys(value) {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const k of Object.keys(value).sort()) out[k] = sortKeys(value[k]);
-    return out;
-  }
-  return value;
-}
 
 /** Pre-existing hash primitive (sha256 of plain JSON.stringify, first 16 hex chars). Unchanged output. */
 export function sha256Hex16(obj) {
@@ -34,7 +25,7 @@ export function sha256Hex16(obj) {
 
 /** Full sha256 hex over a key-sorted canonical JSON serialization. For new provenance records. */
 export function canonicalHash(obj) {
-  return createHash('sha256').update(JSON.stringify(sortKeys(obj))).digest('hex');
+  return sha256Hex(canonicalJson(obj));
 }
 
 /**

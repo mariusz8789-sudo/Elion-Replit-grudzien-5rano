@@ -20,11 +20,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MOD = path.join(HERE, '../../../scripts/d104-transcription-custody.mjs');
-const custody = await import(MOD);
+const custody = await import(pathToFileURL(MOD).href);
 
 test('A3 chunk 3: five of seven pieces verify, two do not', () => {
   const r = custody.checkA3Chunk3Pieces();

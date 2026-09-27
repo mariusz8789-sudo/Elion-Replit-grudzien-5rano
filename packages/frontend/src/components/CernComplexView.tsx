@@ -5,12 +5,15 @@ import { SSRPass } from 'three/examples/jsm/postprocessing/SSRPass.js';
 import type { BlackHoleAnalysis, CollisionBatchAnalysis, MaterialsAnalysis } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import { kernelRegistry } from '@genesis/core/mythos/KernelProviderRegistry.js';
 import type { IonSpec, LatticeSite } from '@genesis/core/cern/MaterialsDiscoveryEngine.js';
+import { ION_PRESETS } from '../core/scientificWorlds/ionPresets';
 import { createEventHorizonMaterial, createEventHorizonQuad } from '../../../ui/src/cern/EventHorizonShader';
 import { createTunnelWalkthrough } from '../../../ui/src/cern/TunnelWalkthroughGpu';
 import { createLabComplex, type CameraMode, type LabComplexHandle } from '../../../ui/src/cern/LabComplexGpu';
 import { createCernPostPipeline, type PostPipelineHandle, type PostQuality } from '../../../ui/src/cern/Cern5dPostProcessing';
 import { createColliderLayer, type ColliderLayerHandle } from '../../../ui/src/collider/ColliderGpu';
 import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
+import { buildCharacter, type Character } from '../core/three/characterRig';
+import { captureRoomEnvironment } from '../core/three/graphics/lighting';
 
 /**
  * CERN COMPLEX (`#/cern-complex`) — the full-viewport walk-through of the
@@ -40,13 +43,7 @@ import { GENESIS_CYBER_KERNEL_ID } from '../core/agent/cyberReasoningKernel';
 
 export const MODE_LABEL: Record<CameraMode, string> = { WALK: '1 · WALK — spacer FPV', GLASS: '2 · GLASS — pancerna szyba', CONSOLE: '3 · CONSOLE — sterownia', TUNNEL: '4 · TUNNEL — pierścień LHC' };
 
-export const ION_PRESETS: Readonly<Record<string, readonly IonSpec[]>> = {
-  NaCl: [{ species: 'Na', charge: 1, radiusPm: 102, count: 1, atomicMassU: 22.99 }, { species: 'Cl', charge: -1, radiusPm: 181, count: 1, atomicMassU: 35.45 }],
-  SrTiO3: [{ species: 'Sr', charge: 2, radiusPm: 144, count: 1, atomicMassU: 87.62 }, { species: 'Ti', charge: 4, radiusPm: 60.5, count: 1, atomicMassU: 47.87 }, { species: 'O', charge: -2, radiusPm: 140, count: 3, atomicMassU: 16.0 }],
-  Cu: [{ species: 'Cu', charge: 0, radiusPm: 128, count: 1, atomicMassU: 63.55 }],
-  MgO: [{ species: 'Mg', charge: 2, radiusPm: 72, count: 1, atomicMassU: 24.31 }, { species: 'O', charge: -2, radiusPm: 140, count: 1, atomicMassU: 16.0 }],
-  Fe: [{ species: 'Fe', charge: 2, radiusPm: 126, count: 1, atomicMassU: 55.85 }],
-};
+export { ION_PRESETS } from '../core/scientificWorlds/ionPresets';
 
 const SEED = 0x4345524e; // 'CERN'
 
@@ -83,7 +80,9 @@ export function latticeInstances(sites: readonly LatticeSite[], spacing = 0.16):
   return { positions, colors };
 }
 
-interface Stage { readonly setMode: (m: CameraMode) => void; readonly lock: () => void; readonly setLattice: (sites: readonly LatticeSite[]) => void; readonly setBlackHole: (rs: number, tempK: number) => void; readonly setLens: (rs: number) => void; readonly showEvent: (a: CollisionBatchAnalysis) => void; }
+interface Stage { readonly setMode: (m: CameraMode) => void; readonly lock: () => void; readonly setLattice: (sites: readonly LatticeSite[]) => void; readonly setBlackHole: (rs: number, tempK: number) => void; readonly setLens: (rs: number) => void; readonly showEvent: (a: CollisionBatchAnalysis, index?: number) => void; }
+
+type DetailLevel = 'SCHOOL' | 'UNIVERSITY' | 'RESEARCH';
 
 export function CernComplexView(): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -101,8 +100,19 @@ export function CernComplexView(): JSX.Element {
   const [fpv, setFpv] = useState('0.0, 1.6, 4.0');
   const [quality, setQuality] = useState<PostQuality>('cinematic');
   const [batch, setBatch] = useState<CollisionBatchAnalysis | null>(null);
+  const [batchStart, setBatchStart] = useState(0);
+  const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [replayStatus, setReplayStatus] = useState<'NOT_RUN' | 'MATCH' | 'DRIFT'>('NOT_RUN');
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>('SCHOOL');
+  const [collisionViewState, setCollisionViewState] = useState<'IDLE' | 'PLAYING' | 'VISIBLE'>('IDLE');
   const [hashes, setHashes] = useState<string[]>([]);
   const batchIndexRef = useRef(0);
+  const collisionViewTimerRef = useRef<number | null>(null);
+  const chatActionConsumedRef = useRef(false);
+
+  useEffect(() => () => {
+    if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
@@ -149,7 +159,9 @@ export function CernComplexView(): JSX.Element {
     const track = (m: THREE.Mesh): THREE.Mesh => { disposables.push(m.geometry, m.material as THREE.Material); return m; };
 
     // Detector hall beyond the glass: the horizon texture itself, between the glass (z=-6.6) and the wall (z=-7).
-    const hallMat = new THREE.MeshBasicMaterial({ map: bhTarget.texture, toneMapped: false });
+    // Tone-mapped like everything else in the room: exempting it sent the horizon's raw values straight
+    // into bloom, and the detector hall read as one white blob instead of a lit space beyond the glass.
+    const hallMat = new THREE.MeshBasicMaterial({ map: bhTarget.texture, toneMapped: true });
     const hall = add(track(new THREE.Mesh(new THREE.PlaneGeometry(12, 4), hallMat)));
     hall.position.set(0, 2.2, -6.92);
 
@@ -168,7 +180,7 @@ export function CernComplexView(): JSX.Element {
     stripPos.forEach(([x, z]) => { if (x === 0) return; const c = add(new THREE.Mesh(coneGeo, coneMat)); c.position.set(x, 2.6, z); c.rotation.x = Math.PI; });
     const ceilingLights: THREE.PointLight[] = [];
     stripPos.forEach(([x, z], i) => { if (i % 2 === 1 && i !== 7) return; const l = new THREE.PointLight(0xcfe9ff, 8, 11, 1.8); l.position.set(x, 4.4, z); add(l); ceilingLights.push(l); });
-    add(new THREE.HemisphereLight(0x8fc8ff, 0x0a0d14, 0.3));
+    add(new THREE.HemisphereLight(0x8fc8ff, 0x161b22, 0.75));
     // Warm accretion glow spilling through the glass; cool spill from the console screens; amber over the bench.
     const glassGlow = add(new THREE.PointLight(0xffa04a, 7, 10, 1.8)); glassGlow.position.set(0, 2.2, -5.9);
     const consoleGlow = add(new THREE.PointLight(0x2af0a0, 3.5, 6, 2)); consoleGlow.position.set(0, 1.4, -4.9);
@@ -211,6 +223,18 @@ export function CernComplexView(): JSX.Element {
     // Collision hologram in the middle of the hub: the batch's first event, tracks bent in 3.8 T, scaled to the room.
     const holo = new THREE.Group(); holo.position.set(0, 3.1, -4.3); holo.scale.setScalar(0.16); add(holo);
     let colliderLayer: ColliderLayerHandle | null = null;
+    // THE PERSON IN THE MIDDLE. The hub was a room of instruments with nobody in it: nothing in frame
+    // carried human scale, so the glass, the consoles and the tunnel could have been any size at all.
+    // A physicist stands at the centre console, facing the window. Presentation only — the figure
+    // operates nothing, decides nothing and is not an actor in any kernel.
+    const physicist: Character = buildCharacter(THREE, { height: 1.76, shirt: 0xeef2f6, pants: 0x2c3442, shoes: 0x191d24, skin: 0xe0a878, hair: 0x241d18 });
+    physicist.root.position.set(0, 0, -3.95);
+    physicist.setFacing(Math.PI);
+    add(physicist.root);
+    disposables.push({ dispose: () => physicist.dispose() });
+    // One rim light so the silhouette separates from the dark end of the hall instead of merging into it.
+    const rim = add(new THREE.SpotLight(0xdfeaff, 9, 10, 0.75, 0.8, 1.5));
+    rim.position.set(2.2, 3.4, -1.0); rim.target.position.set(0, 1.2, -3.95); add(rim.target);
     // The delivered 5D pipeline. SSR selects = the complex's floor and glass (found in the scene: the modules expose no mesh handles).
     const selects: THREE.Mesh[] = [];
     scene.traverse((o) => {
@@ -223,7 +247,14 @@ export function CernComplexView(): JSX.Element {
     const w0 = host.clientWidth || window.innerWidth; const h0 = Math.max(1, host.clientHeight || window.innerHeight);
     const pipeline: PostPipelineHandle = createCernPostPipeline(renderer, scene, camera, { width: Math.round(w0 * dpr), height: Math.round(h0 * dpr), selects });
     pipeline.setLightScreen([0.5, 0.42]);
-    pipeline.setLens({ rs: 0, glass: 0.6 });
+    // The lens pass models TWO things: gravitational deflection (rs, only while a horizon exists) and
+    // the ripple of the armoured glass (glass). Both were left on in every camera mode, so the whole
+    // room was permanently seen through a rainbow-fringed wobble. Each is now applied where its cause
+    // is: rs when the horizon is up, glass only from behind the window.
+    let lensRs = 0;
+    let lensGlass = 0;
+    const applyLens = (): void => { pipeline.setLens({ rs: lensRs, glass: lensGlass, center: [0.5, 0.5] }); };
+    applyLens();
     const hasSsr = pipeline.composer.passes.some((p) => p instanceof SSRPass);
     // Planar floor reflection as the fallback when SSR is unavailable or switched off by the frame budget.
     const reflector = new Reflector(new THREE.PlaneGeometry(13.9, 13.9), { clipBias: 0.003, textureWidth: Math.round(1024 * dpr), textureHeight: Math.round(1024 * dpr), color: 0x5a6a74 });
@@ -252,6 +283,12 @@ export function CernComplexView(): JSX.Element {
       if (m === 'CONSOLE') { camera.position.set(0, 1.75, -3.0); camera.lookAt(0, 1.0, -5.6); }
       // Inside the ring on the walkway side of the magnet string, looking down the arc.
       if (m === 'TUNNEL') { const a = -0.02; camera.position.set(Math.cos(a) * TUNNEL_R - 1.5, 1.5, Math.sin(a) * TUNNEL_R); camera.lookAt(Math.cos(a + 0.07) * TUNNEL_R - 1.0, 1.3, Math.sin(a + 0.07) * TUNNEL_R); }
+      // The two screen-space effects follow the shot, not the session: glass only from behind the
+      // window, god-rays only down the tunnel, where the string of lamps is in frame.
+      lensGlass = m === 'GLASS' ? 0.38 : 0;
+      applyLens();
+      pipeline.setScatter(m === 'TUNNEL');
+      pipeline.setLightScreen(m === 'TUNNEL' ? [0.5, 0.5] : [0.5, 0.42]);
     };
     const applyMode = (m: CameraMode): void => { lab.setCameraMode(m); poseFor(m); setMode(m); };
     let lastMode: CameraMode = lab.getCameraMode();
@@ -266,20 +303,22 @@ export function CernComplexView(): JSX.Element {
         latticeMesh.instanceMatrix.needsUpdate = true; if (latticeMesh.instanceColor) latticeMesh.instanceColor.needsUpdate = true;
       },
       setBlackHole: (rs, tempK) => { bhMat.uniforms.uRs.value = rs; bhMat.uniforms.uDiskIn.value = rs * 3; bhMat.uniforms.uDiskOut.value = rs * 12; bhMat.uniforms.uTempK.value = tempK; },
-      setLens: (rs) => { pipeline.setLens({ rs, glass: 0.6, center: [0.5, 0.5] }); },
-      showEvent: (a) => { if (colliderLayer) colliderLayer.dispose(); colliderLayer = createColliderLayer(holo as unknown as THREE.Scene, a.events[0], { pixelRatio: dpr, scale: 0.0042 }); },
+      setLens: (rs) => { lensRs = rs; applyLens(); },
+      showEvent: (a, index = 0) => { if (colliderLayer) colliderLayer.dispose(); colliderLayer = createColliderLayer(holo as unknown as THREE.Scene, a.events[index] ?? a.events[0], { pixelRatio: dpr, scale: 0.0042 }); },
     };
 
-    let raf = 0; let last = performance.now(); const t0 = last; let frameCount = 0; let fpsN = 0; let fpsAcc = 0; let budgetN = 0; let budgetAcc = 0; let lastFramesPush = 0;
+    let raf = 0; let probed = false; let last = performance.now(); const t0 = last; let frameCount = 0; let fpsN = 0; let fpsAcc = 0; let budgetN = 0; let budgetAcc = 0; let lastFramesPush = 0;
     const loop = (now: number): void => {
       raf = requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - last) / 1000); const realDt = (now - last) / 1000; last = now; const t = (now - t0) * 0.001;
       const m = lab.getCameraMode();
       if (m !== lastMode) { lastMode = m; poseFor(m); setMode(m); }
       lab.update(dt, t);
+      physicist.update('idle', t, 0);
+      physicist.reach(0.34, 0.16); // hands at the console, head tipped toward the readouts
       bhMat.uniforms.uTime.value = t;
-      stripMat.emissiveIntensity = 1.15 + 0.12 * Math.sin(t * 1.7);
-      renderer.toneMappingExposure = m === 'TUNNEL' ? 0.72 : 0.82;
+      stripMat.emissiveIntensity = 0.72 + 0.08 * Math.sin(t * 1.7);
+      renderer.toneMappingExposure = m === 'TUNNEL' ? 0.86 : 1.02;
       headlamp.intensity = m === 'TUNNEL' ? 7 : 0;
       if (m === 'TUNNEL') headlamp.position.set(camera.position.x, camera.position.y + 0.5, camera.position.z);
       glassGlow.intensity = 6.5 + 1.5 * Math.sin(t * 2.3);
@@ -291,6 +330,11 @@ export function CernComplexView(): JSX.Element {
       frameCount++;
       // Frame budget: measured cost of the composer over the first frames decides the quality tier (never a guess about the GPU).
       if (frameCount > 2 && frameCount <= 12) { budgetN++; budgetAcc += cost; if (budgetN === 10) { const avg = budgetAcc / budgetN; if (avg > 0.9) applyQuality('performance'); else if (avg > 0.25) applyQuality('balanced'); } }
+      // IBL, once, after the room has been lit for a few frames. Without an environment map a metal
+      // surface has nothing to reflect and renders black: that is why this floor and these steel
+      // housings read as void however many lamps stood over them. The canonical room probe (six faces
+      // from inside the hub, through PMREM) gives them the hub's own strips, racks and glass to return.
+      if (!probed && frameCount === 6) { probed = true; captureRoomEnvironment(THREE, renderer, scene, { position: [0, 2.3, -1.2], size: 256, far: 30, intensity: 1.15 }); }
       fpsN++; fpsAcc += realDt;
       if (fpsAcc >= 0.5) { setFps(Math.round(fpsN / fpsAcc)); fpsN = 0; fpsAcc = 0; setFpv(`${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}`); }
       if (now - lastFramesPush > 250) { lastFramesPush = now; setFrames(frameCount); }
@@ -303,8 +347,9 @@ export function CernComplexView(): JSX.Element {
       stageRef.current = null;
       colliderLayer?.dispose();
       lab.dispose(); tunnel.dispose();
+      scene.environment?.dispose(); scene.environment = null;
       disposables.forEach((d) => d.dispose());
-      ceilingLights.forEach((l) => l.dispose()); washes.forEach((l) => l.dispose()); headlamp.dispose(); glassGlow.dispose(); consoleGlow.dispose(); benchGlow.dispose(); keyLight.dispose();
+      ceilingLights.forEach((l) => l.dispose()); washes.forEach((l) => l.dispose()); headlamp.dispose(); glassGlow.dispose(); consoleGlow.dispose(); benchGlow.dispose(); keyLight.dispose(); rim.dispose();
       scene.remove(dressing);
       pipeline.dispose();
       if (canvas.parentElement === host) host.removeChild(canvas);
@@ -334,17 +379,53 @@ export function CernComplexView(): JSX.Element {
   };
   /** [Q]: four events of the seeded run, anchored as one batch; the first one is shown as the hologram. */
   const collide = (): void => {
-    const a = requestBatch('cern-complex-v2', 4, batchIndexRef.current);
+    const startIndex = batchIndexRef.current;
+    const a = requestBatch('cern-complex-v2', 4, startIndex);
     if ('error' in a) { setError(a.error); return; }
     batchIndexRef.current += 4;
-    setError(null); setBatch(a); pushHash(a.ledgerContentHash);
-    stageRef.current?.showEvent(a);
+    setError(null); setBatch(a); setBatchStart(startIndex); setSelectedEventIndex(0); setReplayStatus('NOT_RUN'); pushHash(a.ledgerContentHash);
+    stageRef.current?.showEvent(a, 0);
+    setCollisionViewState('PLAYING');
+    if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
+    collisionViewTimerRef.current = window.setTimeout(() => setCollisionViewState('VISIBLE'), 2400);
+  };
+  const selectEvent = (index: number): void => {
+    if (!batch?.events[index]) return;
+    setSelectedEventIndex(index);
+    stageRef.current?.showEvent(batch, index);
+    setCollisionViewState('PLAYING');
+    if (collisionViewTimerRef.current !== null) window.clearTimeout(collisionViewTimerRef.current);
+    collisionViewTimerRef.current = window.setTimeout(() => setCollisionViewState('VISIBLE'), 2400);
+  };
+  const verifyReplay = (): void => {
+    if (!batch) return;
+    const replay = requestBatch('cern-complex-v2', batch.events.length, batchStart);
+    if ('error' in replay) { setError(replay.error); return; }
+    const originalHashes = batch.events.map((event) => event.eventHash);
+    const replayHashes = replay.events.map((event) => event.eventHash);
+    setReplayStatus(originalHashes.length === replayHashes.length && originalHashes.every((hash, index) => hash === replayHashes[index]) ? 'MATCH' : 'DRIFT');
   };
   const actionsRef = useRef({ collide, formHorizon, synthesize });
   actionsRef.current = { collide, formHorizon, synthesize };
+  useEffect(() => {
+    if (chatActionConsumedRef.current) return;
+    const query = window.location.hash.split('?')[1] ?? '';
+    if (new URLSearchParams(query).get('action') !== 'collision') return;
+    chatActionConsumedRef.current = true;
+    // The scene owns the action. Wait only for its renderer handle; no fake
+    // progress or duplicate collision implementation is introduced here.
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts++;
+      if (stageRef.current) { window.clearInterval(timer); actionsRef.current.collide(); }
+      else if (attempts >= 120) window.clearInterval(timer);
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, []);
   const stop = (e: SyntheticEvent): void => { e.stopPropagation(); };
   const r = bh?.result ?? null;
   const c = mat?.crystal ?? null;
+  const selectedEvent = batch?.events[selectedEventIndex] ?? null;
 
   return (
     <main id="main-content" className="cern" aria-label="Kompleks CERN" data-testid="cern-complex" data-mode={mode} data-frames={frames}>
@@ -355,6 +436,9 @@ export function CernComplexView(): JSX.Element {
           <span className="cern-badge">SCIENTIFIC OS</span>
           <span className="cern-badge" data-testid="cern-badge-mode">MODE: {mode}</span>
           <span className="cern-badge">√s: 13 TeV · batch: {batch ? batch.events.length : 0}</span>
+          <span className={`cern-badge${collisionViewState === 'PLAYING' ? ' is-hot' : ''}`} data-testid="cern-live-collision-state">
+            {collisionViewState === 'IDLE' ? 'WIĄZKI: GOTOWE' : collisionViewState === 'PLAYING' ? 'LIVE: ZDERZENIE PROTONÓW' : 'ZDARZENIE: WIDOCZNE'}
+          </span>
           <span className={`cern-badge${r?.formed ? ' is-hot' : ''}`} data-testid="cern-badge-horizon">HORIZON: {r?.formed ? `FORMED (${bh?.label.toUpperCase()})` : 'NONE'} · r_s: {r?.bh ? `${r.bh.rsM.toExponential(3)} m` : '—'}</span>
           <span className="cern-badge">RENDER: {quality.toUpperCase()}</span>
         </div>
@@ -366,20 +450,44 @@ export function CernComplexView(): JSX.Element {
           ))}
         </div>
         <div className="cern-modes" role="group" aria-label="Akcje">
-          <button type="button" className="cern-mode" onClick={collide} data-testid="cern-collide">COLLIDE [Q]</button>
+          <button type="button" className="cern-mode" onClick={collide} data-testid="cern-collide">ZDERZ PROTONY [Q]</button>
           <button type="button" className="cern-mode" onClick={formHorizon} data-testid="cern-horizon">HORIZON [E]</button>
           <button type="button" className="cern-mode" onClick={synthesize} data-testid="cern-crystal">CRYSTAL [R]</button>
+          <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/physics/cms-z'; }} data-testid="cern-cms-open-data">REAL CMS DATA</button>
+          <button type="button" className="cern-mode" onClick={() => { window.location.hash = '#/cern-complex?room=detector'; }} data-testid="cern-detector-room">KOMORA DETEKTORA</button>
         </div>
-        <p className="cern-hint">Klawisze 1–4 przełączają tryb; Q zderza paczkę 4 zdarzeń, E próbuje horyzontu (ADD, 14 TeV), R syntetyzuje kryształ. W trybie WALK i TUNNEL klik w scenę blokuje kursor, WASD porusza.</p>
+        <div className="cern-modes" role="group" aria-label="Poziom wyjaśnienia">
+          {(['SCHOOL', 'UNIVERSITY', 'RESEARCH'] as const).map((level) => (
+            <button key={level} type="button" className={`cern-mode${detailLevel === level ? ' is-active' : ''}`} aria-pressed={detailLevel === level} data-testid={`cern-detail-${level}`} onClick={() => setDetailLevel(level)}>{level}</button>
+          ))}
+        </div>
+        <p className="cern-hint">Q uruchamia cztery modelowe zderzenia proton–proton. Najpierw widzisz przeciwbieżne wiązki, potem punkt zderzenia i tory cząstek końcowych w polu magnetycznym. Klawisze 1–4 zmieniają punkt obserwacji.</p>
         {hashes.length > 0 && (
           <div className="cern-hashes" data-testid="cern-hashes">
             {hashes.map((h, i) => <span key={`${h}-${i}`} className="cw-mono">contentHash: {h.slice(0, 24)}…</span>)}
           </div>
         )}
         <p className="cern-faint cw-mono">FPV: {fpv} · {fps} FPS · KERNEL: /cyber (single)</p>
-        <p className="cern-faint">Etykiety: mikro czarna dziura — HYPOTHESIS (4D, wymaga energii Plancka) lub SPECULATIVE (scenariusz ADD, brak dowodów); kryształy — EMPIRICAL_ESTIMATE_MODEL (oszacowania, nie DFT). Obraz jest wizualizacją, nie pomiarem.</p>
+        <p className="cern-faint">Etykiety: COLLIDE — TOY_MC_MODEL (nie PYTHIA/Geant4); mikro czarna dziura — HYPOTHESIS (4D, wymaga energii Plancka) lub SPECULATIVE (scenariusz ADD, brak dowodów); kryształy — EMPIRICAL_ESTIMATE_MODEL (oszacowania, nie DFT). REAL CMS DATA otwiera osobną analizę opublikowanych danych CMS 2011. Obraz 3D jest wizualizacją, nie pomiarem.</p>
       </div>
       <aside className="cern-hud cern-hud-right" aria-label="Sterownia" onKeyDown={stop} onKeyUp={stop}>
+        {batch && selectedEvent && (
+          <section className="cern-panel cern-event-panel" data-testid="cern-event-panel" data-origin={batch.label}>
+            <h2>Zdarzenia zderzenia · collision-batch</h2>
+            <p className="cern-origin" data-testid="cern-event-origin">ŹRÓDŁO: {batch.label} · MODEL EDUKACYJNY, NIE DANE DETEKTORA</p>
+            <div className="cern-event-tabs" role="group" aria-label="Zdarzenia w paczce">
+              {batch.events.map((event, index) => (
+                <button key={event.eventHash} type="button" className={`cern-mode${selectedEventIndex === index ? ' is-active' : ''}`} aria-pressed={selectedEventIndex === index} data-testid={`cern-event-${index}`} onClick={() => selectEvent(index)}>EVT {index + 1}</button>
+              ))}
+            </div>
+            <dl className="cw-readout" data-testid="cern-event-readout">
+              <dt>Proces</dt><dd className="cw-mono">pp → {selectedEvent.process} · {selectedEvent.finals.length} cząstek końcowych</dd>
+              {detailLevel !== 'SCHOOL' && <><dt>Parametry modelu</dt><dd className="cw-mono">pT {selectedEvent.hardPT} GeV · y {selectedEvent.y} · φ {selectedEvent.phi}</dd><dt>Przekrój modelowy</dt><dd className="cw-mono">{selectedEvent.crossSectionPb} pb</dd></>}
+              {detailLevel === 'RESEARCH' && <><dt>Id / seed</dt><dd className="cw-mono">{selectedEvent.eventId} · {selectedEvent.seed}</dd><dt>Hash zdarzenia</dt><dd className="cw-mono cw-wrap">{selectedEvent.eventHash}</dd><dt>Ledger paczki</dt><dd className="cw-mono cw-wrap">{batch.ledgerContentHash}</dd></>}
+            </dl>
+            <div className="cern-replay-row"><button type="button" className="cw-btn" onClick={verifyReplay} data-testid="cern-replay">Zweryfikuj replay</button><strong data-testid="cern-replay-status">REPLAY: {replayStatus}</strong></div>
+          </section>
+        )}
         <section className="cern-panel" data-testid="cern-bh-panel">
           <h2>Horyzont zdarzeń · micro-blackhole-sim</h2>
           <div className="cern-controls">

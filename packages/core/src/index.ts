@@ -8,3 +8,4 @@ export * from './knowledge/index.js';
 export * from './engine/native/index.js';
 export * from './engine/quantum/index.js';
 export * from './engine/manifold/index.js';
+export * from './mirror/cameraRegistration.js';

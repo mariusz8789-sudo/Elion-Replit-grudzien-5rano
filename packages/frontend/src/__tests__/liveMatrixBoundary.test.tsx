@@ -133,21 +133,12 @@ describe('the component is standalone — the dependency arrow points one way', 
     expect(mountedSomewhere, 'expected at least one app file to mount the background').toBe(true);
   });
 
-  /**
-   * MEASURED DECISION, not a preference: the background used to be unmounted
-   * entirely on heavy-3D routes. On #/genesis-world the 3D canvas measures
-   * 1200x750 inside a 1440x900 viewport — 69% — so unmounting blanked the
-   * remaining 31% (sidebar, title strip, description block, margins) where
-   * the field is genuinely visible. The real constraint there is the frame
-   * budget, because a second rAF loop runs beside the 3D scene's own, and
-   * that is what the LOW quality tier is for. Reverting to a conditional
-   * mount would silently throw that third of the screen away again.
-   */
-  it('heavy-3D routes tier the background down to LOW quality rather than unmounting it', () => {
+  // Product direction: rain is a dashboard wallpaper only. Laboratory scenes
+  // keep their own backgrounds and must not run a hidden second animation loop.
+  it('mounts the existing background only on the dashboard route', () => {
     const app = readOrNull(join(FRONTEND_SRC, 'App.tsx'));
     expect(app).not.toBeNull();
-    expect(app!).toMatch(/quality=\{[^}]*\?\s*'LOW'\s*:\s*'HIGH'\}/);
-    // No conditional-render guard wrapping the background any more.
-    expect(app!).not.toMatch(/\{\s*!\w*[Ss]uppressed\w*\s*&&\s*\(/);
+    expect(app!).toMatch(/\{route\.kind === 'home' && <ErrorBoundary>\s*<LiveMatrixBackground[\s\S]*?\/>(?:\s*)<\/ErrorBoundary>\}/);
+    expect([...app!.matchAll(/<LiveMatrixBackground\b/g)]).toHaveLength(1);
   });
 });

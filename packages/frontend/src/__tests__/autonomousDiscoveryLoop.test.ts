@@ -441,6 +441,7 @@ describe('The trace persists through the real AgentRun tables', () => {
 
     withTempDbFile((dbPath) => {
       const db = (store.openDatabase as unknown as (p: string) => unknown)(dbPath);
+      try {
       const user = (store.createUser as unknown as (d: unknown, u: unknown) => { id: string })(db, {
         email: 'p02-determinism@lab.org', displayName: 'P02D', passwordHash: (auth.hashPassword as unknown as (p: string) => string)('password123'),
       });
@@ -466,6 +467,9 @@ describe('The trace persists through the real AgentRun tables', () => {
       expect(discoveryResultFingerprint(warmA)).toBe(discoveryResultFingerprint(warmB));
       expect(warmA.beliefs).toEqual(warmB.beliefs);
       expect(warmA.stopReason).toBe(warmB.stopReason);
+      } finally {
+        (db as { close: () => void }).close();
+      }
     });
   });
 
@@ -474,6 +478,7 @@ describe('The trace persists through the real AgentRun tables', () => {
 
     withTempDbFile((dbPath) => {
       const db = (store.openDatabase as unknown as (p: string) => unknown)(dbPath);
+      try {
       const user = (store.createUser as unknown as (d: unknown, u: unknown) => { id: string })(db, {
         email: 'p02-crash@lab.org', displayName: 'P02C', passwordHash: (auth.hashPassword as unknown as (p: string) => string)('password123'),
       });
@@ -513,6 +518,9 @@ describe('The trace persists through the real AgentRun tables', () => {
       const trulyColdRun = runAutonomousDiscovery(loopInput(SHORT_HORIZON));
       expect(discoveryResultFingerprint(coldRerun)).toBe(discoveryResultFingerprint(trulyColdRun));
       expect(coldRerun.beliefs).toEqual(trulyColdRun.beliefs);
+      } finally {
+        (db as { close: () => void }).close();
+      }
     });
   });
 

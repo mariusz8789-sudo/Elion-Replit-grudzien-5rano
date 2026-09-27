@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { SystemResourceBridge, osSampler, type ResourceSampler } from './SystemResourceBridge.js';
 import { GenesisNativeOrchestrator, type LedgerSink, type TaskOutcome } from './GenesisNativeOrchestrator.js';
@@ -303,7 +303,7 @@ describe('thread mode (real worker_threads; entry bundled with esbuild at test t
   });
   it('no dangling handles: a child process using the bundle exits on its own after shutdown (and even without it)', async () => {
     const harness = (withShutdown: boolean) => [
-      `import { GenesisNativeOrchestrator, SystemResourceBridge } from ${JSON.stringify(join(dir, 'native.mjs'))};`,
+      `import { GenesisNativeOrchestrator, SystemResourceBridge } from ${JSON.stringify(pathToFileURL(join(dir, 'native.mjs')).href)};`,
       'const clock = { now: () => 0 };',
       'const sampler = { sample: () => ({ totalMemBytes: 8e9, freeMemBytes: 4e9, loadAvg: [1, 1, 1], cpuCount: 4 }) };',
       `const o = new GenesisNativeOrchestrator(clock, new SystemResourceBridge(clock, sampler), { mode: 'threads', workerScript: ${JSON.stringify(workerScript)} });`,

@@ -15,11 +15,13 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from './pythonRuntime.mjs';
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dock_worker.py');
-const PYTHON = process.env.GENESIS_PYTHON ?? 'python3';
+const PYTHON = resolvePythonExecutable('GENESIS_DOCKING_PYTHON');
 const TIMEOUT_MS = 300_000; // dokowanie bywa kosztowne; twardy limit chroni serwer
 const ARTIFACT_BASE = process.env.GENESIS_ARTIFACT_DIR ?? path.join(tmpdir(), 'genesis-science');
+const ARTIFACT_DURABILITY = process.env.GENESIS_ARTIFACT_DIR ? 'CONFIGURED_DURABLE_PATH' : 'EPHEMERAL_TEMP';
 
 let detectCache = null;
 
@@ -89,7 +91,7 @@ export function dock(spec) {
   const d = detect();
   if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
   if (!spec || !spec.ligandSmiles) return { ok: false, error: 'invalid_input', reason: 'ligandSmiles wymagane' };
-  if (!spec.receptorSmiles && !spec.receptorPdbqt) return { ok: false, error: 'invalid_input', reason: 'receptorSmiles lub receptorPdbqt wymagane' };
+  if (!spec.receptorSmiles && !spec.receptorPdbqt && !spec.receptorPdbqtPath) return { ok: false, error: 'invalid_input', reason: 'receptorSmiles lub receptorPdbqt wymagane' };
   try {
     const outDir = artifactDir('dock');
     const receptorPdbqtPath = spec.receptorPdbqt && spec.receptorPdbqt.length > 32_000
@@ -99,9 +101,11 @@ export function dock(spec) {
     const r = invoke({
       cmd: 'dock',
       ligandSmiles: spec.ligandSmiles,
-      receptorSmiles: receptorPdbqtPath ? undefined : spec.receptorSmiles,
-      receptorPdbqt: receptorPdbqtPath ? undefined : spec.receptorPdbqt,
-      receptorPdbqtPath,
+      // Internal callers only (prepared-target and prepared-ligand files); never taken from the API.
+      ligandPdbqtPath: spec.ligandPdbqtPath,
+      receptorSmiles: receptorPdbqtPath || spec.receptorPdbqtPath ? undefined : spec.receptorSmiles,
+      receptorPdbqt: receptorPdbqtPath || spec.receptorPdbqtPath ? undefined : spec.receptorPdbqt,
+      receptorPdbqtPath: spec.receptorPdbqtPath ?? receptorPdbqtPath,
       center: spec.center,
       boxSize: spec.boxSize ?? [22, 22, 22],
       exhaustiveness: spec.exhaustiveness ?? 8,
@@ -109,8 +113,35 @@ export function dock(spec) {
       seed: spec.seed ?? 42,
       outDir,
     });
-    return r.ok ? { ok: true, data: r } : { ok: false, error: r.error };
+    return r.ok ? { ok: true, data: { ...r, artifactDurability: ARTIFACT_DURABILITY } } : { ok: false, error: r.error };
   } catch (err) {
     return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
   }
+}
+
+function step(cmd, request, prefix, timeout = TIMEOUT_MS) {
+  const d = detect();
+  if (!d.available) return { ok: false, error: 'BLOCKED_BY_RUNTIME', reason: d.reason };
+  try {
+    const r = invoke({ cmd, ...request, outDir: artifactDir(prefix) }, timeout);
+    return r.ok ? { ok: true, data: { ...r, artifactDurability: ARTIFACT_DURABILITY } } : { ok: false, error: r.error };
+  } catch (err) {
+    return { ok: false, error: 'execution_failed', reason: String(err?.message ?? err).slice(0, 160) };
+  }
+}
+
+/** Deterministic Meeko preparation of a vetted receptor PDB file (path from the target registry only). */
+export function prepareReceptor({ pdbPath, center, boxSize }) {
+  return step('prepare_receptor', { pdbPath, center, boxSize }, 'dock-receptor');
+}
+
+/** Deterministic ligand preparation (RDKit ETKDGv3 seed + MMFF → Meeko PDBQT) — the same routine `dock` uses. */
+export function prepareLigand({ ligandSmiles, seed = 42 }) {
+  if (!ligandSmiles) return { ok: false, error: 'invalid_input', reason: 'ligandSmiles wymagane' };
+  return step('prepare_ligand', { ligandSmiles, seed }, 'dock-ligand');
+}
+
+/** Crystal-ligand redocking benchmark: top-pose heavy-atom RMSD against the crystal pose (in the crystal frame). */
+export function redock({ pdbPath, ligandSdfPath, center, boxSize, exhaustiveness = 8, seed = 42 }) {
+  return step('redock', { pdbPath, ligandSdfPath, center, boxSize, exhaustiveness, seed }, 'dock-redock');
 }

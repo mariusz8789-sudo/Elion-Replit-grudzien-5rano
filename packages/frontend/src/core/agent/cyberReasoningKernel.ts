@@ -3,8 +3,10 @@ import type {
   AttackPathEdge,
   AttackSurface,
   AttackSurfaceAsset,
+  CyberCampaignBudget,
   CyberInvestigationResult,
   CyberObservation,
+  HumanApprovalRecord,
   ObservableExpectation,
   ObservedResult,
   RemediationAction,
@@ -13,17 +15,21 @@ import type {
   VulnerabilityHypothesis,
   VulnerabilityHypothesisKind,
 } from './cyberInvestigation';
+import { assertApprovalBeforePatch, PatchNotApprovedError } from './cyberInvestigation';
 import type { HypothesisAssessment } from '../experimentFabric/scientificDiscovery';
+import type { EvidenceSink } from '../scientificWorlds/humanLab/contracts';
 import {
   selectNextTest,
   type CyberTestCandidate,
   type CyberTestSelection,
 } from './cyberTestPlanner';
 
-import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { kernelRegistry, ztseProvider, colliderProvider, thermoLabProvider, blackHoleProvider, materialsProvider, computeColliderProvider, molecularBiologyProvider, spacetimePhotonProvider } from '@genesis/core/mythos/KernelProviderRegistry.js';
+import { environmentalDetectiveProvider } from './environmentalDetective';
+import { genesisLabProvider } from '../lab/genesisLabProvider';
 import { ZeroTrustSemanticEngine } from '@genesis/core/postmythos/ZeroTrustSemanticEngine.js';
 import { ClockworkEngine, clockworkProvider } from '@genesis/core/mythos/clockwork/ClockworkEngine.js';
-import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
+import { openKernelLedger } from '../knowledge/ledgerStore';
 
 /**
  * SINGLE-KERNEL POLICY. This module is Genesis's one cyber orchestrator and
@@ -43,7 +49,10 @@ kernelRegistry.bindKernel(GENESIS_CYBER_KERNEL_ID);
 if (kernelRegistry.resolve('semantic-verify') === null) kernelRegistry.register(ztseProvider(new ZeroTrustSemanticEngine()));
 /** CLOCKWORK (B2G module 1): statutory deadline monitoring, drafts for human approval, anchored in its own EvidenceLedger
  *  whose clock is the browser's real time (the ledger entry timestamp, not any deadline arithmetic — `today` is always passed in). */
-export const clockworkLedger = new EvidenceLedger({ now: () => Date.now() });
+/** D-130: the ledger is restored from the browser's local storage when a verified snapshot exists and persists after every entry;
+ *  a broken snapshot is rejected (console error) and the kernel runs in memory — `kernelLedgerBoot` says which. */
+export const kernelLedgerBoot = openKernelLedger({ now: () => Date.now() });
+export const clockworkLedger = kernelLedgerBoot.ledger;
 /** The same ledger anchors every provider's output (one evidence trail for the one kernel). */
 export const kernelLedger = clockworkLedger;
 if (kernelRegistry.resolve('deadline-monitoring') === null) kernelRegistry.register(clockworkProvider(new ClockworkEngine(clockworkLedger)));
@@ -54,6 +63,14 @@ if (kernelRegistry.resolve('thermodynamic-reaction-sim') === null) kernelRegistr
 if (kernelRegistry.resolve('micro-blackhole-sim') === null) kernelRegistry.register(blackHoleProvider(kernelLedger));
 if (kernelRegistry.resolve('crystal-synthesis-sim') === null) kernelRegistry.register(materialsProvider(kernelLedger));
 if (kernelRegistry.resolve('collision-batch') === null) kernelRegistry.register(computeColliderProvider(kernelLedger));
+// D-128: the textbook molecular-biology layer and the environmental detective (on CAP-2 causal inference) as providers.
+if (kernelRegistry.resolve('central-dogma-model') === null) kernelRegistry.register(molecularBiologyProvider(kernelLedger));
+if (kernelRegistry.resolve('environmental-detective') === null) kernelRegistry.register(environmentalDetectiveProvider(kernelLedger));
+// D-130: the flagship physics scenario (weak-field photon propagation vs. a flat baseline) as a provider; c is SI-defined, nothing measures it.
+if (kernelRegistry.resolve('spacetime-photon-model') === null) kernelRegistry.register(spacetimePhotonProvider(kernelLedger));
+// D-140: the laboratory/instrument integration package (device/sensor/calibration/uncertainty/protocol/
+// safety/digital-twin/solver/LIMS seams) bound to the real canonical SolverRouter/WorldGraph/storage — see core/lab/genesisLabProvider.ts.
+if (kernelRegistry.resolve('d140-laboratory') === null) kernelRegistry.register(genesisLabProvider(kernelLedger));
 
 /**
  * CYBER REASONING KERNEL — pure, deterministic logic against a synthetic
@@ -354,7 +371,14 @@ export function createRemediation(app: ToyVulnerableApp, hypothesis: Vulnerabili
   return { remediationId: control, targetAssetId: `ENDPOINT::${ep}`, description: `Enable ${control} on ${ep}` };
 }
 
-export function applyRemediation(app: ToyVulnerableApp, action: RemediationAction): void { app.applyRemediation(action.remediationId); }
+export function applyRemediation(
+  app: ToyVulnerableApp,
+  action: RemediationAction,
+  approval: HumanApprovalRecord | null,
+): void {
+  assertApprovalBeforePatch(action, approval);
+  app.applyRemediation(action.remediationId);
+}
 
 export function retest(hypothesis: VulnerabilityHypothesis, app: ToyVulnerableApp, suffix = 'retest'): SecurityTestResult {
   return runSecurityTest(hypothesis, app, suffix); // fresh execution, new testId
@@ -477,9 +501,68 @@ export interface AdaptiveInvestigationResult {
   /** Hypothesis ids whose history contains BOTH a SUPPORTED and a FALSIFIED entry — preserved, never averaged away. */
   readonly conflicts: readonly string[];
   readonly stopReason: string;
+  /** Canonical Evidence receipts produced by the real adaptive runtime path. */
+  readonly evidenceReceipts: readonly CyberEvidenceReceipt[];
 }
 
-export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): AdaptiveInvestigationResult {
+export type CyberEvidenceEventType =
+  | 'CYBER_ANALYZER_EXECUTION'
+  | 'CYBER_ANALYZER_RESULT'
+  | 'CYBER_FINDING'
+  | 'CYBER_REMEDIATION_PROPOSED'
+  | 'CYBER_HUMAN_APPROVAL'
+  | 'CYBER_REMEDIATION_APPLIED'
+  | 'CYBER_RETEST_RESULT'
+  | 'CYBER_FINAL_PROOF_REPORT';
+
+export interface CyberEvidenceReceipt {
+  readonly eventType: CyberEvidenceEventType;
+  readonly recordId: string;
+  readonly contentHash: string;
+}
+
+export const DEFAULT_CYBER_CAMPAIGN_BUDGET: CyberCampaignBudget = Object.freeze({
+  maxHypotheses: 16,
+  maxAnalyzerRuns: 20,
+  maxPatchProposals: 2,
+});
+
+export interface AdaptiveInvestigationOptions {
+  readonly budget?: CyberCampaignBudget;
+  /** Canonical EvidenceLedger adapter. Absence keeps the pure runtime usable without inventing evidence. */
+  readonly evidenceSink?: EvidenceSink;
+  /**
+   * Returns a real approval decision for this exact remediation. Absence is
+   * fail-closed: the kernel reports HUMAN_APPROVAL_REQUIRED and never mutates
+   * the target. Tests may inject an explicit synthetic-fixture approval, but
+   * production callers must obtain the decision from their human-review UI.
+   */
+  readonly approvalForRemediation?: (remediation: RemediationAction) => HumanApprovalRecord | null;
+}
+
+function emitCyberEvidence(
+  receipts: CyberEvidenceReceipt[],
+  sink: EvidenceSink | undefined,
+  eventType: CyberEvidenceEventType,
+  claim: string,
+  provenance: Readonly<Record<string, unknown>>,
+): void {
+  if (!sink) return;
+  const result = sink.addRecord({
+    sourceUrl: `genesis://cyber-scientist/${eventType.toLowerCase()}`,
+    claim: `[${eventType}] ${claim}`,
+    claimType: eventType,
+    confidence: 1,
+    provenance: { runtime: GENESIS_CYBER_KERNEL_ID, ...provenance },
+  });
+  receipts.push({ eventType, recordId: result.record.id, contentHash: result.record.contentHash });
+}
+
+export function runAdaptiveInvestigation(
+  app: ToyVulnerableApp,
+  maxSteps = 20,
+  options: AdaptiveInvestigationOptions = {},
+): AdaptiveInvestigationResult {
   const observations = collectObservations(app);
   const assets = generateAttackSurface(observations);
   const hypotheses = generateHypotheses(assets);
@@ -488,8 +571,15 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
   const attempts = new Map<string, number>();
   const remediatedFor = new Set<string>();
   const steps: AdaptiveStep[] = [];
+  const evidenceReceipts: CyberEvidenceReceipt[] = [];
   let stopReason = '';
   let testCounter = 0;
+  let patchProposalsCreated = 0;
+  const startedHypotheses = new Set<string>();
+  const budget = options.budget ?? {
+    ...DEFAULT_CYBER_CAMPAIGN_BUDGET,
+    maxAnalyzerRuns: Math.min(DEFAULT_CYBER_CAMPAIGN_BUDGET.maxAnalyzerRuns, maxSteps),
+  };
 
   const currentAssessment = (id: string): HypothesisAssessment => {
     const history = assessmentHistory.get(id)!;
@@ -526,7 +616,14 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     }
 
     const assessments = new Map(hypotheses.map((h) => [h.hypothesisId, currentAssessment(h.hypothesisId)]));
-    const selection = selectNextTest(candidates, assessments);
+    const selection = selectNextTest(candidates, assessments, {
+      budget,
+      usage: {
+        hypothesesGenerated: startedHypotheses.size,
+        analyzerRunsExecuted: testCounter,
+        patchProposalsCreated,
+      },
+    });
 
     if (selection.selectedHypothesisId === null) {
       stopReason = selection.whySelected;
@@ -536,6 +633,12 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
 
     const h = hypotheses.find((x) => x.hypothesisId === selection.selectedHypothesisId)!;
     const selectedCandidate = candidates.find((c) => c.hypothesisId === h.hypothesisId)!;
+    if (testCounter >= budget.maxAnalyzerRuns) {
+      stopReason = `CYBER_BUDGET_EXHAUSTED: maxAnalyzerRuns=${budget.maxAnalyzerRuns}`;
+      steps.push({ stepIndex: i, selection, hypothesisId: null, testResult: null, verdict: null, remediation: null, outcomeVerification: null });
+      break;
+    }
+    if (selectedCandidate.identityKind === 'NEW') startedHypotheses.add(h.hypothesisId);
     const isReplication = selectedCandidate.identityKind === 'INDEPENDENT_REPLICATION';
     let remediation: RemediationAction | null = null;
     let outcomeVerification: OutcomeVerification | null = null;
@@ -544,15 +647,60 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     if (isReplication) {
       const priorTest = [...steps].reverse().find((s) => s.hypothesisId === h.hypothesisId)?.testResult ?? null;
       remediation = createRemediation(app, h);
-      if (remediation) applyRemediation(app, remediation);
+      if (remediation) {
+        emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_REMEDIATION_PROPOSED',
+          `Remediation ${remediation.remediationId} proposed for hypothesis ${h.hypothesisId}.`,
+          { hypothesisId: h.hypothesisId, remediationId: remediation.remediationId, targetAssetId: remediation.targetAssetId, description: remediation.description });
+        if (patchProposalsCreated >= budget.maxPatchProposals) {
+          stopReason = `CYBER_BUDGET_EXHAUSTED: maxPatchProposals=${budget.maxPatchProposals}`;
+          steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult: null, verdict: null, remediation, outcomeVerification: null });
+          break;
+        }
+        patchProposalsCreated += 1;
+        const approval = options.approvalForRemediation?.(remediation) ?? null;
+        emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_HUMAN_APPROVAL',
+          approval === null
+            ? `No approval supplied for remediation ${remediation.remediationId}; action remains blocked.`
+            : `Human decision ${approval.decision} recorded for remediation ${remediation.remediationId}.`,
+          { remediationId: remediation.remediationId, decision: approval?.decision ?? 'MISSING', approvalRemediationId: approval?.remediationId ?? null });
+        try {
+          applyRemediation(app, remediation, approval);
+        } catch (error) {
+          if (!(error instanceof PatchNotApprovedError)) throw error;
+          stopReason = `HUMAN_APPROVAL_REQUIRED: ${error.message}`;
+          steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult: null, verdict: null, remediation, outcomeVerification: null });
+          break;
+        }
+        emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_REMEDIATION_APPLIED',
+          `Approved remediation ${remediation.remediationId} applied to the bounded fixture.`,
+          { hypothesisId: h.hypothesisId, remediationId: remediation.remediationId });
+      }
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_EXECUTION',
+        `Bounded retest started for hypothesis ${h.hypothesisId}.`,
+        { hypothesisId: h.hypothesisId, phase: 'RETEST', analyzerRun: testCounter });
       testResult = retest(h, app, `adaptive${testCounter++}`);
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_RESULT',
+        `Bounded retest ${testResult.testId} completed with status=${testResult.observedResult.statusCode}.`,
+        { hypothesisId: h.hypothesisId, phase: 'RETEST', testId: testResult.testId, observedResult: testResult.observedResult });
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_RETEST_RESULT',
+        `Retest ${testResult.testId} completed after remediation ${remediation?.remediationId ?? 'NONE'}.`,
+        { hypothesisId: h.hypothesisId, testId: testResult.testId, remediationId: remediation?.remediationId ?? null });
       if (priorTest) outcomeVerification = verifySecurityOutcome(priorTest, testResult);
       remediatedFor.add(h.hypothesisId);
     } else {
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_EXECUTION',
+        `Bounded analyzer started for hypothesis ${h.hypothesisId}.`,
+        { hypothesisId: h.hypothesisId, phase: 'VALIDATE', analyzerRun: testCounter });
       testResult = runSecurityTest(h, app, `adaptive${testCounter++}`);
+      emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_ANALYZER_RESULT',
+        `Bounded analyzer ${testResult.testId} completed with status=${testResult.observedResult.statusCode}.`,
+        { hypothesisId: h.hypothesisId, phase: 'VALIDATE', testId: testResult.testId, observedResult: testResult.observedResult });
     }
 
     const verdict = judgeVerdict(h, testResult);
+    emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_FINDING',
+      `Finding for hypothesis ${h.hypothesisId}: ${verdict.assessment}.`,
+      { hypothesisId: h.hypothesisId, testId: testResult.testId, assessment: verdict.assessment, reasoning: verdict.reasoning });
     assessmentHistory.get(h.hypothesisId)!.push(verdict.assessment);
     attempts.set(h.hypothesisId, (attempts.get(h.hypothesisId) ?? 0) + 1);
     steps.push({ stepIndex: i, selection, hypothesisId: h.hypothesisId, testResult, verdict, remediation, outcomeVerification });
@@ -563,7 +711,11 @@ export function runAdaptiveInvestigation(app: ToyVulnerableApp, maxSteps = 20): 
     .filter(([, history]) => history.includes('SUPPORTED_WITHIN_PROTOCOL') && history.includes('FALSIFIED_WITHIN_PROTOCOL'))
     .map(([id]) => id);
 
-  return { observations, assets, hypotheses, steps, assessmentHistory, conflicts, stopReason };
+  emitCyberEvidence(evidenceReceipts, options.evidenceSink, 'CYBER_FINAL_PROOF_REPORT',
+    `Cyber campaign finished: steps=${steps.length}, conflicts=${conflicts.length}, stop=${stopReason}.`,
+    { steps: steps.length, conflicts, stopReason, analyzerRunsExecuted: testCounter, patchProposalsCreated });
+
+  return { observations, assets, hypotheses, steps, assessmentHistory, conflicts, stopReason, evidenceReceipts };
 }
 
 // ================= SEAM TO SCIENCE MEMORY =================

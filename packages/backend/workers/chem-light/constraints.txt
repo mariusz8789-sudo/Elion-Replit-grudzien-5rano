@@ -1,0 +1,11 @@
+# Full transitive lock for the "chem-light" worker, exported (pip freeze) from a clean
+# python3.11 venv built binary-only (--only-binary=:all:) from this worker's
+# requirements files, in which every engine of the group then passed its real
+# reference case AND the authenticated execution probe as a non-root process
+# (scripts/verify-scientific-worker-runtime.mjs). Used as `pip install -c` so an
+# image build cannot silently resolve different transitive versions.
+biopython==1.88
+h5py==3.16.0
+numpy==2.4.6
+pyscf==2.14.0
+scipy==1.17.1

@@ -81,8 +81,10 @@ describe('molecular docking (AutoDock Vina + Meeko)', () => {
     assert.equal(r.pass, true);
     assert.ok(r.nPoses >= 1);
     assert.ok(r.bestAffinityKcalMol < 0, 'realny wynik Vina (kcal/mol)');
-    // Realne artefakty z hashami (nie zmyślone).
-    assert.ok(r.artifacts.some((a) => a.kind === 'ligand_pdbqt' && a.sha256_16));
+    // Realne artefakty z hashami (nie zmyślone). dock_worker.py emituje `sha256` (pełny skrót),
+    // nie `sha256_16` -- ten test nigdy dotąd nie widział realnego runu (CI nie instaluje
+    // requirements-compute.txt), więc ta literówka pola nigdy nie została wychwycona.
+    assert.ok(r.artifacts.some((a) => a.kind === 'ligand_pdbqt' && a.sha256));
     assert.ok(r.artifacts.some((a) => a.kind === 'docked_pdbqt'));
   });
   (dockOn ? test : test.skip)('a real dock of a candidate ligand is deterministic with a fixed seed', () => {

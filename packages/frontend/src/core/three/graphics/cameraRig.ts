@@ -1,4 +1,5 @@
 import type * as THREE_NS from 'three';
+import { cameraDampingFactor } from './cinematicCamera';
 
 /**
  * GENESIS GRAPHICS RUNTIME — Camera Rig
@@ -172,7 +173,8 @@ export class CameraRig {
   frame(request: CameraFrameRequest): void {
     this.request = request;
     this.mobility = defaultMobilityFor(request.intent);
-    this.orbitAzimuthDeg = request.azimuthDeg ?? 0;
+    // This is an offset from request.azimuthDeg, not a second copy of the starting angle.
+    this.orbitAzimuthDeg = 0;
     this.liveTarget = null;
     const transform = resolveCameraFraming(request);
     this.targetPosition.set(...transform.position);
@@ -207,7 +209,7 @@ export class CameraRig {
    * Returns the current transform for convenience. */
   update(dt: number, speed = 2.5): CameraTransform {
     if (this.mobility === 'ORBIT') {
-      this.orbitAzimuthDeg += this.orbitSpeedDegPerS * dt;
+      this.orbitAzimuthDeg += this.orbitSpeedDegPerS * (Number.isFinite(dt) ? Math.max(0, dt) : 0);
       const effective: CameraFrameRequest = {
         ...this.request,
         target: this.liveTarget ?? this.request.target,
@@ -227,7 +229,7 @@ export class CameraRig {
       this.targetLookAt.set(...transform.lookAt);
     }
 
-    const t = Math.min(1, Math.max(0, dt) * speed);
+    const t = cameraDampingFactor(dt, speed);
     this.currentPosition.lerp(this.targetPosition, t);
     this.currentLookAt.lerp(this.targetLookAt, t);
     return { position: this.currentPosition.toArray(), lookAt: this.currentLookAt.toArray() };

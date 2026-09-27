@@ -1,0 +1,3 @@
+# Plates are regenerated from the live app by scripts/capture-mockup-plates.mjs.
+# They are screenshots of a render, not source, and they are large — keep them out of history.
+assets/*.png

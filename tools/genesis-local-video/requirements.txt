@@ -1,0 +1,21 @@
+# Genesis Local AI-Video — Stage-B worker environment (pinned).
+#
+# This file is a CONTRACT, not an action: nothing in this branch installs
+# these packages. Run the install command documented in README.md yourself,
+# in the isolated .venv it creates, when you are ready.
+#
+# torch / torch-directml / onnxruntime-directml are deliberately NOT pinned
+# here — the correct build depends on your GPU backend (CUDA vs DirectML vs
+# CPU-only) and changes machine to machine. Install the one matching your
+# hardware separately, after running scripts/check_admission.py once with
+# these base packages present, per README.md.
+diffusers==0.31.0
+transformers==4.46.3
+accelerate==1.1.1
+safetensors==0.4.5
+huggingface_hub==0.26.2
+numpy==1.26.4
+Pillow==11.0.0
+imageio==2.36.0
+imageio-ffmpeg==0.5.1
+psutil==6.1.0

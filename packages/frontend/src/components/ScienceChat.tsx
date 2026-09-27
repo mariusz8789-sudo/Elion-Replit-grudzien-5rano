@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ensureGeneratorReady, getRecipes, epistemicStatusOf } from '../core/generator';
 import { resolveCommand, type ChatResponse, type ChatSimSnapshot, type EpistemicTag, type ScientificIntent } from '../core/scienceChat/resolveCommand';
+import { matchGenesisCapabilityIntent } from '../core/capabilities/genesisCapabilityRegistry';
 import { runQuantumAction, type QuantumHistogramData } from '../core/scienceChat/quantumTurn';
 import { QuantumHistogram } from './QuantumHistogram';
 import { getSimContext, subscribeSimContext } from '../core/simContext';
@@ -21,21 +22,43 @@ import { compareAme2020Observations } from '../core/observation/nuclearAme2020';
 import { resolveDiscoveryStage, stageIndex, DISCOVERY_STAGES, DISCOVERY_STAGE_LABELS, type DiscoveryStage } from '../core/scienceChat/discoveryStage';
 import { resolveNaturalFunctionalReplacementFromSources, resolveReferenceProfile } from '../core/biotechData/naturalReplacement';
 import { ketamineNaturalDiscoverySummary, runKetamineNaturalDiscovery } from '../core/biotechData/ketamineNaturalDiscovery';
-import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { ToyVulnerableApp, runAdaptiveInvestigation, toCyberInvestigationResultFromAdaptive, kernelLedger, type AdaptiveInvestigationResult } from '../core/agent/cyberReasoningKernel';
+import { generateCuriosityQuestions } from '@genesis/core/knowledge/curiosity.js';
+import { buildTruthResponse, renderTruthResponsePl } from '@genesis/core/knowledge/truthResponse.js';
 import type { HypothesisAssessment } from '../core/experimentFabric/scientificDiscovery';
 import { GenesisDeciphermentOrchestrator } from '../core/agent/decipherment/deciphermentOrchestrator';
 import { toDeciphermentCaseResult, type DeciphermentCaseState } from '../core/agent/decipherment/deciphermentTypes';
 import { buildSavedDeciphermentCase, saveDeciphermentCaseToMemory, buildSavedCyberInvestigation, saveCyberInvestigationToMemory } from '../core/scienceMemory';
 import { saveScientificDiscoveryLoopToMemory, replaySavedScientificDiscoveryLoop } from '../core/scienceMemory';
 import type { ScientificDiscoveryLoopResult } from '../core/experimentFabric/scientificDiscoveryLoop';
+import type { ExperimentRoute, ExperimentValue } from '../core/experimentFabric/types';
 import { continueResearchCampaign, isNoJustifiedNextQuestion, startResearchCampaign, type ResearchCycle } from '../core/experimentFabric/researchCampaign';
+import { runScientificIntegrationCampaign } from '../core/experimentFabric/scientificIntegration';
+import { createLedgerSink } from '../core/scientificWorlds/biologyRunners';
 import { isDiscoveryLoopRequest } from '../core/scienceChat/discoveryQuestions';
 import { DEMO_CIPHERTEXT, sequenceFromText, demoReadingSpecs } from './DeciphermentWorkspace';
 import { fnv1a, canonicalJson } from '../core/events/hash';
+import { UnifiedResearchJourney } from './UnifiedResearchJourney';
+import {
+  drugDiscoveryRequestFromMessage,
+  resolveResearchProject,
+  type DrugDiscoveryChatRequest,
+} from '../core/scienceChat/unifiedResearchJourney';
 
 /** Same labels/order CyberWorkspace.tsx and DeciphermentWorkspace.tsx already use for these
  * verdicts — reused here rather than redeclared, so a chat-run summary reads identically to the
  * workspace's own rendering of the same result. */
+function productRouteHash(route: Extract<ExperimentRoute, { kind: 'product-route' }>, values: Readonly<Record<string, ExperimentValue>>): string {
+  const [path, query = ''] = route.hash.split('?');
+  const params = new URLSearchParams(query);
+  for (const key of route.parameterQueryKeys ?? []) {
+    const value = values[key];
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const encoded = params.toString();
+  return encoded ? `${path}?${encoded}` : path;
+}
+
 const INGEST_SKIP_LABEL: Record<string, string> = {
   REQUIRES_OFFICIAL_API: 'wymaga oficjalnego API i klucza w środowisku (bez scrapingu)',
   LEGAL_GATE_PENDING: 'domena poza rejestrem zweryfikowanych źródeł',
@@ -65,15 +88,6 @@ const CHAT_ASSESSMENT_LABEL: Record<HypothesisAssessment, string> = {
 interface ChatTurn { role: 'user' | 'genesis'; text: string; tag?: EpistemicTag; intent?: ScientificIntent; equations?: string[]; todo?: boolean; quantum?: QuantumHistogramData }
 
 type ResearchPanel = 'why' | 'evidence' | 'hypotheses' | 'memory' | 'timeline' | 'audit' | 'access' | null;
-
-const NEXT_MOVES = [
-  { label: 'TEST THIS', prompt: 'Zaproponuj test dla ostatniej hipotezy.' },
-  { label: 'CHALLENGE IT', prompt: 'Spróbuj obalić ostatnią hipotezę.' },
-  { label: 'FIND COUNTEREVIDENCE', prompt: 'Znajdź kontrdowody dla ostatniego wyniku.' },
-  { label: 'BUILD MODEL', prompt: 'Zbuduj jawny model dla tego pytania.' },
-  { label: 'COMPARE HYPOTHESES', prompt: 'Porównaj konkurencyjne hipotezy dla tego pytania.' },
-  { label: 'GO DEEPER', prompt: 'Idź głębiej: pokaż założenia, niepewności i ograniczenia.' },
-] as const;
 
 function latestUserQuestion(turns: readonly ChatTurn[]): string | null {
   return [...turns].reverse().find((turn) => turn.role === 'user')?.text ?? null;
@@ -265,6 +279,8 @@ export function formatFabricRun(run: ExperimentRun): string {
     ? '\nŚwiat 3D używa tej samej instancji modelu z tego przebiegu.'
     : run.result.route.kind === 'lab'
       ? `\nWizualizacja: laboratorium ${run.result.route.labId}.`
+      : run.result.route.kind === 'product-route'
+        ? '\nWizualizacja: istniejący świat produktu.'
       : '';
   const biotech = run.result.biologicalTarget && run.result.biologicalEvidence
     ? `\nBiotech target: ${run.result.biologicalTarget.label} (${run.result.biologicalTarget.id}). Evidence: ${run.result.biologicalEvidence.id}. Status evidence: ${run.result.biologicalEvidence.status}.`
@@ -327,33 +343,22 @@ function EvidenceCapsule({ capsule }: { capsule: EvidenceGuidedExperimentCapsule
   );
 }
 
-const SUGGESTIONS = [
-  'Zasymuluj epidemię z R0=5 przez 10 dni seed=12',
-  'Uruchom trzęsienie ziemi magnitude=5.4 depth=12 km',
-  'Pokaż diagram Minkowskiego beta=0.5',
-  'Oblicz promień Schwarzschilda dla 2 masy Słońca',
-  'Zintegruj geodezyjną fotonu wokół czarnej dziury Schwarzschilda',
-  'Uruchom c-Slider: v=240000000 m/s, c=300000000 m/s, dystans=300000 km',
-  'Oblicz energię relatywistyczną cząstki beta=0.8',
-  'Pokaż życie gwiazdy o masie 10 masy Słońca',
-  'Obróć tesserakt: XW=45, YZ=30, podwójna rotacja',
-  'Pokaż zderzenie galaktyk: stosunek mas=1.25, 24 mln lat',
-  'Porównaj krzywą rotacji galaktyki MOND',
-  'Zbadaj problem trzech ciał',
-  'Zwiększ masę 2×',
-  'Co się zmieniło?',
-  'Pokaż równanie',
-  'Porównaj SIR R0=1.5 z SIR R0=3',
-  'Pokaż Evidence i Replay',
-  'Zaproponuj kolejny eksperyment',
-  'Zapisz eksperyment',
-  'Pokaż zapisane',
-  'Otwórz kampanię naukową',
-  'Uruchom model pompa–rurociąg: przepływ wody',
-  'Uruchom PySCF RHF dla H2; długość wiązania 0.74 Å',
-  'Pokaż tunelowanie pakietu falowego 1D: bariera=1 szerokość=3',
-  'Uruchom model Isinga: temperatura=2.2 seed=42',
-];
+const QUICK_STARTS = [
+  { label: 'Lek', prompt: 'Porównaj właściwości aspiryny w laboratorium.' },
+  { label: 'Chemia', prompt: 'Uruchom miareczkowanie kwasowo-zasadowe NaOH.' },
+  { label: 'Fizyka', prompt: 'Pokaż czarną dziurę 3D i trajektorię światła.' },
+] as const;
+
+function TurnText({ turn }: { turn: ChatTurn }) {
+  if (turn.role !== 'genesis' || turn.text.length < 520) return <>{turn.text}</>;
+  const firstLine = turn.text.split(/\n|(?<=[.!?])\s/)[0] ?? turn.text.slice(0, 180);
+  return (
+    <details className="sc-long-answer">
+      <summary><span>{firstLine}</span><b>Czytaj więcej</b></summary>
+      <div>{turn.text}</div>
+    </details>
+  );
+}
 
 /**
  * `inline` turns this from a floating panel into the main workspace column
@@ -366,11 +371,7 @@ const SUGGESTIONS = [
 export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [turns, setTurns] = useState<ChatTurn[]>([{
-    role: 'genesis',
-    text: 'Cześć! Jestem Science Chat. Możesz napisać np. „uruchom trzęsienie ziemi magnitude=5.4 depth=12 km”, potwierdzić plan, a następnie zobaczyć wynik w City3D z Evidence i Replay. Obsługuję też istniejące laboratoria i sterowanie otwartą symulacją.',
-    tag: 'SYSTEM',
-  }]);
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [ctxName, setCtxName] = useState<string | null>(() => getSimContext()?.experimentName ?? null);
   const [pendingGuidedPlan, setPendingGuidedPlan] = useState<EvidenceGuidedExperimentPlan | null>(null);
   const [biotechWorkspaceSuggested, setBiotechWorkspaceSuggested] = useState(false);
@@ -394,6 +395,8 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   // Research Campaign — the last real Research Cycle this conversation ran, so
   // "kontynuuj badanie" can advance it by EXACTLY its own real nextExperiment.request.
   const [lastResearchCycle, setLastResearchCycle] = useState<ResearchCycle | null>(null);
+  const [drugJourneyRequest, setDrugJourneyRequest] = useState<DrugDiscoveryChatRequest | null>(null);
+  const [drugJourneyProject, setDrugJourneyProject] = useState<ActiveKnowledgeProject | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Etap procesu badawczego wyliczony z REALNEGO stanu rozmowy (typowane
@@ -519,6 +522,11 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         } else if (run.result.status === 'completed' && run.result.route.kind === 'lab') {
           setPendingScenario(run.result.route.labId, run.provenance.parameterSnapshot, run.result.route.experimentId);
           window.location.hash = `#/lab/${run.result.route.labId}`;
+        } else if (run.result.status === 'completed' && run.result.route.kind === 'product-route') {
+          const targetHash = productRouteHash(run.result.route, run.provenance.parameterSnapshot);
+          window.location.hash = targetHash;
+          window.dispatchEvent(new CustomEvent('genesis-product-route', { detail: targetHash }));
+          setOpen(false);
         } else if (run.result.status === 'hypothetical_visualization' && run.result.route.kind === 'hypothetical-visualization') {
           const legendView = run.provenance.parameterSnapshot.viewMode === 'physics' ? '&legendView=physics' : '';
           window.location.hash = `${run.result.route.hash}${legendView}`;
@@ -532,6 +540,30 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       }
       return;
     }
+    const drugRequest = drugDiscoveryRequestFromMessage(msg);
+    if (drugRequest) {
+      setInput('');
+      setTurns((turnsNow) => [...turnsNow, { role: 'user', text: msg }, {
+        role: 'genesis',
+        text: `Rozumiem cel: ${drugRequest.researchQuery}. Przekazuję go do Research Intake. Zanim uruchomię jakikolwiek silnik, pokażę hipotezę z zamrożonymi kryteriami i plan — eksperyment wykona się na żywo przy stanowisku leków w Laboratorium.`,
+        tag: 'MODEL',
+      }]);
+      const token = getToken();
+      if (!token) {
+        setTurns((turnsNow) => [...turnsNow, { role: 'genesis', text: 'BLOCKED — zaloguj się, aby Genesis mogło zapisać governed campaign, Evidence proposal i replay w projekcie.', tag: 'SYSTEM' }]);
+        return;
+      }
+      const resolvedProject = await resolveResearchProject(token);
+      if (!resolvedProject.ok) {
+        setTurns((turnsNow) => [...turnsNow, { role: 'genesis', text: `BLOCKED — ${resolvedProject.message}`, tag: 'SYSTEM' }]);
+        return;
+      }
+      setDrugJourneyProject(resolvedProject.data);
+      setDrugJourneyRequest(drugRequest);
+      setResearchPanel(null);
+      track('ask_ai_used', { via: 'science-chat-unified-drug-journey' });
+      return;
+    }
     const precisionQuestion = precisionQuestionFromMessage(msg);
     if (precisionQuestion) {
       const query = new URLSearchParams({ question: precisionQuestion.question, compound: precisionQuestion.compound, target: precisionQuestion.target });
@@ -542,7 +574,10 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       track('ask_ai_used', { via: 'science-chat-precision-reference', compound: precisionQuestion.compound, target: precisionQuestion.target });
       return;
     }
-    const isNaturalDiscovery = /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg) && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);
+    const selectedCapability = matchGenesisCapabilityIntent(msg);
+    const isNaturalDiscovery = selectedCapability?.id === 'drug-discovery'
+      && /natural|naturalne|naturalnych|kandydat(ów|y)?/i.test(msg)
+      && /reference|związk|lek|porówn|znajdź|wyszuk/i.test(msg);
     if (isNaturalDiscovery) {
       const namedReference = naturalReferenceFromMessage(msg);
       const referenceCompound = namedReference ?? rawReferenceFromMessage(msg);
@@ -585,6 +620,12 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       track('ask_ai_used', { via: 'science-chat-natural-discovery', status: result.status });
       return;
     }
+    // Ask the ONE deterministic resolver first so the two scientific-integration
+    // commands cannot be swallowed by the broader Experiment Fabric domain parser.
+    const preliminary = resolveCommand(msg, null);
+    const isScientificIntegrationCommand = preliminary.action?.type === 'runScientificIntegration';
+    // `/świat …` is an explicit command: the question goes to Looking Glass even when it names a domain the Fabric knows.
+    const isLookingGlassCommand = preliminary.action?.type === 'openRoute' && preliminary.action.hash.startsWith('#/looking-glass?');
     const fabricRequest = parseScienceChatMessage(msg);
     // CHAT ENTRY FOR THE DISCOVERY LOOP. The Fabric parser recognises the DOMAIN of
     // nearly every declared research question and would plan ONE experiment for it,
@@ -594,7 +635,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
     // handles it. Deliberately narrow: a loop marker on a question outside the catalog
     // keeps its existing Fabric behaviour instead of being hijacked into a refusal.
     const isFabricRequest = (fabricRequest.modelId !== undefined || fabricRequest.domainId !== 'unknown')
-      && !isDiscoveryLoopRequest(msg);
+      && !isDiscoveryLoopRequest(msg)
+      && !isScientificIntegrationCommand
+      && !isLookingGlassCommand;
     if (isFabricRequest) {
       const reviewed = planEvidenceGuidedExperiment(fabricRequest);
       setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: formatEvidenceGuidedPlan(reviewed), tag: reviewed.status === 'READY_FOR_CONFIRMATION' ? 'MODEL' : 'SYSTEM' }]);
@@ -617,7 +660,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         }
       : null;
 
-    const res: ChatResponse = resolveCommand(msg, snapshot);
+    const res: ChatResponse = isScientificIntegrationCommand || isLookingGlassCommand ? preliminary : resolveCommand(msg, snapshot);
     setTurns((t) => [...t, { role: 'user', text: msg }, { role: 'genesis', text: res.text, tag: res.tag, intent: res.intent, equations: res.equations, todo: res.todo }]);
     setInput('');
     track('ask_ai_used', { via: 'science-chat' });
@@ -636,6 +679,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       setOpen(false);
     } else if (a?.type === 'openRoute') {
       window.location.hash = a.hash;
+      setOpen(false);
+    } else if (a?.type === 'openWorldPrompt') {
+      window.location.hash = `#/world-director?prompt=${encodeURIComponent(a.prompt)}`;
       setOpen(false);
     } else if (a?.type === 'setParam') {
       getSimContext()?.setParam(a.key, a.value);
@@ -668,6 +714,17 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           );
         })
         .catch((e: unknown) => appendGenesis(`Pozyskiwanie nie powiodło się: ${e instanceof Error ? e.message : String(e)}.`, 'SYSTEM'));
+    } else if (a?.type === 'evidenceAnswer') {
+      // D-128/D-129 EPISTEMIC TRUTH RESPONSE — the ledger answers (LaypersonAssistant), with contradictions, missing evidence,
+      // next tests (curiosity) and provenance; "Nie wiem" and INSUFFICIENT_EVIDENCE when nothing matches.
+      const truth = buildTruthResponse(kernelLedger, a.query);
+      const tag: EpistemicTag = truth.status === 'VERIFIED_SOURCE' ? 'FAKT' : truth.status === 'INSUFFICIENT_EVIDENCE' || truth.status === 'ROLE_REFUSED' ? 'SYSTEM' : 'HIPOTEZA';
+      appendGenesis(renderTruthResponsePl(truth), tag);
+    } else if (a?.type === 'curiosity') {
+      // D-128 CURIOSITY — questions only from ledger gaps; an empty or consistent ledger yields none, and says so.
+      const report = generateCuriosityQuestions(kernelLedger.getActive(), { limit: a.limit });
+      if (!report.questions.length) appendGenesis(`Brak pytań: baza dowodów (${kernelLedger.getActive().length} zapisów) nie zawiera sprzeczności, twierdzeń z jednego źródła ani wartości istniejących tylko w modelu.`, 'SYSTEM');
+      else appendGenesis(report.questions.map((q, i) => `${i + 1}. [${q.kind}] ${q.text}\n   dowody: ${q.evidenceIds.join(', ')} · status: ${q.epistemicStatus}`).join('\n') + `\n(${report.contradictions.contradictions.length} sprzeczności w ${report.contradictions.scanned} zapisach; odcisk ${report.fingerprint.slice(0, 12)})`, 'HIPOTEZA');
     } else if (a?.type === 'quantum') {
       // HYBRID QUANTUM BRIDGE — the backend runs the circuit (cloud QPU only with env credentials, else the local
       // statevector simulator) and labels the result; the chat shows that label and a histogram, never a "measurement"
@@ -677,7 +734,9 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       // ETAP 1.5 — the real kernel, run synchronously right here, exactly like CyberWorkspace.tsx's
       // own `run()` does. The result lives in chat state so a follow-up "zapisz" can persist it
       // without re-running anything; there is deliberately no navigation away from the conversation.
-      const result = runAdaptiveInvestigation(new ToyVulnerableApp());
+      const result = runAdaptiveInvestigation(new ToyVulnerableApp(), 20, {
+        evidenceSink: createLedgerSink(kernelLedger, 'science-chat-cyber'),
+      });
       setLastCyberRun(result);
       const counts = new Map<HypothesisAssessment, number>();
       for (const step of result.steps) if (step.verdict) counts.set(step.verdict.assessment, (counts.get(step.verdict.assessment) ?? 0) + 1);
@@ -685,10 +744,41 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
       appendGenesis(
         `Gotowe. Zasoby: ${result.assets.length} · Hipotezy: ${result.hypotheses.length} · Kroki: ${result.steps.length} · Konflikty: ${result.conflicts.length}.\n`
         + `Werdykty — ${verdictLine}.\n`
+        + `Evidence — ${result.evidenceReceipts.length} rekordów; poprawka pozostaje blokowana bez jawnej zgody człowieka.\n`
         + (result.conflicts.length > 0 ? `Konflikty (potwierdzona i obalona naraz, nie uśrednione): ${result.conflicts.join(', ')}.\n` : '')
         + `Pełny widok krok po kroku (dlaczego ten test, obserwacja, remediacja): sekcja „Cyber" w menu.`,
         'WYNIK',
       );
+    } else if (a?.type === 'runScientificIntegration') {
+      appendGenesis('Uruchamiam ograniczoną kampanię przez canonical EvidenceLedger…', 'SYSTEM');
+      try {
+        const sink = createLedgerSink(kernelLedger, `science-chat-${a.purpose.toLowerCase()}`);
+        const result = await runScientificIntegrationCampaign(a.problemId, sink, {
+          maxCycles: 1,
+          ...(a.painQuestion === undefined ? {} : { painQuestion: a.painQuestion }),
+          ...(a.physicsClaims === undefined ? {} : { physicsClaims: a.physicsClaims }),
+        });
+        if (a.purpose === 'PAIN_RESEARCH') {
+          const pain = result.painResearchResult;
+          appendGenesis(
+            pain
+              ? `PAIN RESEARCH: ${pain.status}\n${pain.reason}\n${pain.governance.scope} · ${pain.governance.deviceClaim} · ${pain.governance.researchPriorityDisclaimer}\nEvidence: ${sink.hashes.length} rekordów.`
+              : 'PAIN RESEARCH: BLOCKED — kampania nie zwróciła raportu Pain Research.',
+            pain?.status === 'PARTIAL' ? 'MODEL' : 'SYSTEM',
+          );
+        } else {
+          const validations = result.spacetimeIntegrityResults ?? [];
+          appendGenesis(
+            validations.length > 0
+              ? validations.map((validation) => `${validation.claim.category}: ${validation.ok ? 'PASS' : 'REJECTED'} · wymagane ${validation.requiredLabel}${validation.reason ? ` · ${validation.reason}` : ''}`).join('\n')
+                + `\nEvidence: ${sink.hashes.length} rekordów.`
+              : 'SPACETIME INTEGRITY: BLOCKED — brak zwalidowanego twierdzenia.',
+            validations.every((validation) => validation.ok) ? 'MODEL' : 'SYSTEM',
+          );
+        }
+      } catch (error) {
+        appendGenesis(`Scientific Integration odrzucił żądanie: ${error instanceof Error ? error.message : String(error)}`, 'SYSTEM');
+      }
     } else if (a?.type === 'runDecipherment') {
       // ETAP 1.5 — same pattern, reusing DeciphermentWorkspace.tsx's own sequenceFromText/demo specs
       // instead of a second copy. `sequenceText` is null when the message had no plausible sequence.
@@ -896,13 +986,14 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
   return (
     <aside
       className={inline ? 'science-chat science-chat-inline' : 'science-chat'}
+      data-testid={inline ? 'science-chat-inline' : 'science-chat-drawer'}
       role={inline ? 'region' : 'dialog'}
       aria-label="Science Chat"
     >
       <header className="science-chat-head">
         <div>
-          <strong>💬 Science Chat</strong>
-          <span className="science-chat-ctx">{ctxName ? `kontekst: ${ctxName}` : 'brak otwartej symulacji'}</span>
+          <strong>GENESIS</strong>
+          {ctxName && <span className="science-chat-ctx">Aktywne: {ctxName}</span>}
           {projectAccess && <span className="science-chat-ctx" title="Poziom egzekwowany przez backend">dostęp: {projectAccess.accessLevel} · {projectAccess.canRun ? 'run dozwolony' : 'run zablokowany'}</span>}
         </div>
         {!inline && <button className="back" aria-label="Zamknij Science Chat" onClick={() => setOpen(false)}>✕</button>}
@@ -910,18 +1001,29 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
 
       <DiscoveryStageRail stage={stage} />
 
-      <div className="research-tools" aria-label="Research workspace tools">
-        {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit', 'access'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
-      </div>
-      {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
-      {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
-      {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} loading={researchAccessLoading} />}
-      {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
-      {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}
+      {(turns.length > 0 || pendingGuidedPlan || lastEvidenceCapsule) && <details className="science-chat-secondary science-chat-research">
+        <summary>Szczegóły badawcze</summary>
+        <div className="research-tools" aria-label="Research workspace tools">
+          {(['why', 'evidence', 'hypotheses', 'memory', 'timeline', 'audit', 'access'] as const).map((panel) => <button key={panel} className={`research-tool${researchPanel === panel ? ' active' : ''}`} onClick={() => setResearchPanel(researchPanel === panel ? null : panel)}>{panel === 'why' ? 'WHY?' : panel.toUpperCase()}</button>)}
+        </div>
+        {researchPanel === 'why' && <WhyPanel plan={pendingGuidedPlan} capsule={lastEvidenceCapsule} />}
+        {researchPanel === 'hypotheses' && <HypothesesPanel plan={pendingGuidedPlan ?? lastHypothesisPlan} onAction={(prompt) => void send(prompt)} />}
+        {researchPanel === 'audit' && <AuditPanel entries={accessAudit} />}
+        {researchPanel === 'access' && <ResearchAccessPanel status={researchAccess} loading={researchAccessLoading} />}
+        {researchPanel === 'evidence' && <EvidencePanel capsule={lastEvidenceCapsule} />}
+        {researchPanel === 'memory' && <ResearchMemory turns={turns} capsule={lastEvidenceCapsule} />}
+        {researchPanel === 'timeline' && <ResearchTimeline turns={turns} stage={stage} />}
+      </details>}
 
       <div className="science-chat-log" ref={scrollRef}>
+        {turns.length === 0 && (
+          <section className="science-chat-empty" aria-label="Rozpocznij badanie">
+            <span>ONE CHAT · ONE LAB</span>
+            <h2>Co chcesz zbadać?</h2>
+            <p>Opisz cel. Genesis wybierze właściwe laboratorium i pokaże wynik.</p>
+            <div>{QUICK_STARTS.map((item) => <button key={item.label} type="button" onClick={() => void send(item.prompt)}>{item.label}</button>)}</div>
+          </section>
+        )}
         {turns.map((t, i) => (
           <div key={i} className={`sc-turn sc-${t.role}`}>
             {t.role === 'genesis' && t.tag && (
@@ -929,7 +1031,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
                 {TAG_LABELS[t.tag]}{t.intent && t.intent !== 'UNKNOWN' ? ` · ${t.intent}` : ''}{t.todo ? ' · TODO' : ''}
               </span>
             )}
-            <div className="sc-text">{t.text}</div>
+            <div className="sc-text"><TurnText turn={t} /></div>
             {t.quantum && <QuantumHistogram data={t.quantum} />}
             {t.equations && t.equations.length > 0 && (
               <div className="generator-eqs">{t.equations.map((eq) => <code key={eq}>{eq}</code>)}</div>
@@ -938,7 +1040,24 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         ))}
       </div>
 
-      {lastEvidenceCapsule && <div className="science-chat-capsule-wrap"><EvidenceCapsule capsule={lastEvidenceCapsule} /></div>}
+      {drugJourneyRequest && drugJourneyProject && (
+        <UnifiedResearchJourney
+          request={drugJourneyRequest}
+          project={drugJourneyProject}
+          onActivateLaboratory={() => {
+            setOpen(true);
+            window.location.hash = '#/scientific-worlds';
+          }}
+          onOpenLiveLab={(hash) => {
+            // The live run happens in the laboratory: the chat steps aside so the bench is in view.
+            window.location.hash = hash;
+            window.dispatchEvent(new CustomEvent('genesis-product-route'));
+            if (!inline) setOpen(false);
+          }}
+        />
+      )}
+
+      {lastEvidenceCapsule && <details className="science-chat-capsule-wrap science-chat-secondary"><summary>Wynik potwierdzony · Evidence i replay</summary><EvidenceCapsule capsule={lastEvidenceCapsule} /></details>}
 
       {pendingGuidedPlan?.status === 'READY_FOR_CONFIRMATION' && (
         <div className="science-chat-suggest" aria-label="Potwierdzenie planu eksperymentu">
@@ -946,10 +1065,7 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
           <button className="chip-btn" disabled={backendConfirmationPending} onClick={() => void send('anuluj plan')}>Anuluj plan</button>
         </div>
       )}
-      <div className="next-move-panel" aria-label="Next Move">
-        <div className="next-move-head"><strong>NEXT MOVE</strong><span>Nie kończymy na odpowiedzi — wybierz kierunek badania.</span></div>
-        <div className="next-move-grid">{NEXT_MOVES.map((move) => <button key={move.label} className="next-move-btn" onClick={() => void send(move.prompt)} disabled={backendConfirmationPending}><strong>{move.label}</strong><span>{move.prompt}</span></button>)}</div>
-      </div>
+      {lastEvidenceCapsule && <div className="science-chat-next-action"><button type="button" className="chip-btn primary" onClick={() => void send('Zaproponuj kolejny eksperyment.')} disabled={backendConfirmationPending}>Następny eksperyment →</button></div>}
 
       {biotechWorkspaceSuggested && (
         <div className="science-chat-suggest" aria-label="Przejście do Drug Discovery">
@@ -958,19 +1074,13 @@ export function ScienceChat({ inline = false }: { inline?: boolean } = {}) {
         </div>
       )}
 
-      <div className="science-chat-suggest">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} className="chip-btn" onClick={() => send(s)}>{s}</button>
-        ))}
-      </div>
-
       <form className="science-chat-form" onSubmit={(e) => { e.preventDefault(); send(input); }}>
         <input
           className="generator-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={backendConfirmationPending}
-          placeholder="Napisz komendę lub pytanie…"
+          placeholder="Co chcesz zbadać?"
           aria-label="Wiadomość do Science Chat"
         />
         <button className="primary-btn" type="submit" disabled={!input.trim() || backendConfirmationPending}>Wyślij</button>

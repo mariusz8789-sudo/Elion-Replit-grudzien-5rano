@@ -1,0 +1,8 @@
+# Pinned to the version verified against the live reference case in this repo
+# (packages/backend/src/compute/admetAdapter.mjs / admet_worker.py). ADMET-AI
+# pulls in torch, chemprop, lightning, pandas and seaborn transitively; the
+# admet worker Dockerfile installs a CPU-only torch wheel FIRST (Railway has no
+# GPU instances) so this line resolves against it instead of pulling a much
+# larger CUDA build. Model weights ship inside the admet-ai package itself, so
+# no network access or checkpoint download happens at inference time.
+admet-ai==2.0.1

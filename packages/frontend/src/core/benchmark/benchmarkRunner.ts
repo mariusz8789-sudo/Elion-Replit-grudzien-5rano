@@ -101,5 +101,5 @@ export function assembleResult(
 
 /** Replay: re-running the identical dataset+config must reproduce the identical `runFingerprint` — the one property this whole harness exists to prove. */
 export function compareReplay(a: BenchmarkResult, b: BenchmarkResult): ReplayVerdict {
-  return a.runFingerprint === b.runFingerprint ? 'MATCH' : 'MISMATCH';
+  return a.runFingerprint === b.runFingerprint ? 'MATCH' : 'DRIFT';
 }

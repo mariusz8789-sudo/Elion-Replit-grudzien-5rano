@@ -1,0 +1,74 @@
+name: Railway scientific workers — real container gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-scientific-workers-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  worker-container:
+    name: ${{ matrix.group }} — build, health, real references
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: chem-light
+            dockerfile: packages/backend/workers/chem-light/Dockerfile
+            engines: pyscf biopython
+          - group: structural
+            dockerfile: packages/backend/workers/structural/Dockerfile
+            engines: openmm vina
+          - group: admet
+            dockerfile: packages/backend/workers/admet/Dockerfile
+            engines: admet toxicity
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the pinned worker image
+        run: docker build -f "${{ matrix.dockerfile }}" -t "genesis-worker-${{ matrix.group }}:ci" .
+
+      - name: Start the worker as its non-root image user
+        run: |
+          set -euo pipefail
+          docker run -d --name "genesis-worker-${{ matrix.group }}" \
+            -p 8090:8090 \
+            -e PORT=8090 \
+            -e GENESIS_WORKER_GROUP="${{ matrix.group }}" \
+            "genesis-worker-${{ matrix.group }}:ci"
+
+      - name: Verify health, allowlist and every real reference case
+        run: |
+          set -euo pipefail
+          trap 'docker logs "genesis-worker-${{ matrix.group }}" || true' ERR
+
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:8090/health > /tmp/worker-health.json; then
+              break
+            fi
+            sleep 2
+          done
+
+          node -e "const h=require('/tmp/worker-health.json'); if(!h.ok || h.workerGroup !== '${{ matrix.group }}') throw new Error('invalid health: '+JSON.stringify(h));"
+          curl --fail --silent http://127.0.0.1:8090/engines > /tmp/worker-engines.json
+
+          for engine in ${{ matrix.engines }}; do
+            curl --fail --silent --show-error \
+              -X POST "http://127.0.0.1:8090/engines/$engine/reference-case" \
+              -H 'content-type: application/json' \
+              -d '{}' > "/tmp/$engine.json"
+            ENGINE="$engine" node -e "const r=require('/tmp/'+process.env.ENGINE+'.json'); if(!r.ok || r.toolId !== process.env.ENGINE || r.status !== 'AVAILABLE' || !r.outputHash) throw new Error('reference case not AVAILABLE: '+JSON.stringify(r));"
+          done
+
+      - name: Show bounded diagnostics and remove the worker
+        if: always()
+        run: |
+          docker logs "genesis-worker-${{ matrix.group }}" 2>&1 | tail -n 200 || true
+          docker rm -f "genesis-worker-${{ matrix.group }}" || true

@@ -10,7 +10,9 @@ import { availableTransformations } from './campaign/drugAdapter.mjs';
 import { createCampaign } from './campaign/persistence.mjs';
 import { runCampaign } from './campaign/orchestrator.mjs';
 import { runMultiFidelityStage } from './campaign/multiFidelity.mjs';
-import { replayScienceRun, verifyScienceRun, getVerificationHistory, VERDICT } from './campaign/verify.mjs';
+import { replayScienceRun, verifyScienceRun, verifyScienceRunDispatched, getVerificationHistory, VERDICT } from './campaign/verify.mjs';
+import { resolveWorkerConfig } from './compute/remoteScientificWorkerClient.mjs';
+import { sha256Hex16 } from './provenance.mjs';
 
 /**
  * Scientific Reproducibility (Priority B) — replay-verification on REAL
@@ -117,5 +119,29 @@ describe('replay verification of real Scientific Runs', () => {
     const r = replayScienceRun(db, run.id);
     assert.equal(r.ok, true);
     assert.equal(r.verdict, VERDICT.REPLAY_UNSUPPORTED);
+  });
+
+  test('a remote PySCF ScienceRun replays through the existing worker client and persists MATCH', async () => {
+    const db = openDatabase(':memory:');
+    const output = { energyHartree: -74.95, homoLumoGapEv: 12.1, dipoleDebye: 1.8 };
+    const run = saveScienceRun(db, {
+      engine: 'PySCF', engineVersion: '2.14.0', capability: 'quantum-chemistry', method: 'RHF/sto-3g',
+      status: 'ok', evidenceClass: 'MODEL_ESTIMATE',
+      inputs: { smiles: 'O', method: 'RHF', basis: 'sto-3g', charge: 0, forceField: 'MMFF' }, outputs: output,
+      units: {}, provenance: { execution: { mode: 'REMOTE_EXECUTION', workerGroup: 'chem-light' } },
+      inputHash: 'input', outputHash: sha256Hex16(output), artifacts: [], durationMs: 1,
+    });
+    const client = { execute: async ({ input }) => ({
+      ok: true, engine: { version: '2.14.0' },
+      result: { data: output, meta: { engine: 'PySCF 2.14.0', method: input.method, basis: input.basis } },
+    }) };
+    const workerConfig = resolveWorkerConfig({
+      GENESIS_CHEM_LIGHT_WORKER_URL: 'http://chem-light.railway.internal:8090',
+      GENESIS_SCIENTIFIC_WORKER_TOKEN: 'x'.repeat(48),
+    });
+    const verified = await verifyScienceRunDispatched(db, run.id, { workerConfig, client });
+    assert.equal(verified.ok, true);
+    assert.equal(verified.verification.verdict, VERDICT.MATCH);
+    assert.equal(verified.verification.detail.executionMode, 'REMOTE_EXECUTION');
   });
 });

@@ -10,6 +10,7 @@
  * nie wypełniamy luki LLM-em ani heurystyką udającą walidowany model.
  */
 import { createHash } from 'node:crypto';
+import { redact } from '../redact.mjs';
 import { detect as rdkitDetect, descriptors, transform } from '../compute/rdkitAdapter.mjs';
 import * as qm from '../compute/qmAdapter.mjs';
 import * as md from '../compute/mdAdapter.mjs';
@@ -17,6 +18,7 @@ import * as docking from '../compute/dockingAdapter.mjs';
 import * as protein from '../compute/proteinAdapter.mjs';
 import * as admet from '../compute/admetAdapter.mjs';
 import * as meep from '../compute/meepAdapter.mjs';
+import * as retro from '../compute/retroAdapter.mjs';
 
 export const TOOL_STATUS = {
   AVAILABLE: 'AVAILABLE',
@@ -43,6 +45,20 @@ const TOOLS = [
     assumptions: 'Wzory 2D + osadzenie 3D polami siłowymi; brak dokowania/dynamiki/QM.',
     evidenceClass: 'MODEL_ESTIMATE',
     validate: validateRdkit,
+  },
+  {
+    // The route-planning engine. Registered like every other: AVAILABLE only when its own reference
+    // case really passes, BLOCKED_BY_RUNTIME (with the missing model files named) otherwise. A route it
+    // returns is a proposal, never a procedure — see compute/retroAdapter.mjs.
+    toolId: 'aizynthfinder',
+    capabilityId: 'retrosynthesis-route-search',
+    domain: 'DRUG_DISCOVERY',
+    engineName: 'AiZynthFinder',
+    license: 'MIT',
+    modelDomain: 'Retrosynthetic planning: MCTS over single-step disconnections from a template-based expansion policy trained on reaction literature, terminating in a purchasable stock.',
+    assumptions: 'A proposed route carries NO conditions, quantities, yields or safety assessment, and is not evidence that the synthesis works. Model data (policy, templates, stock) is not shipped with Genesis and must be provided via GENESIS_RETRO_MODEL_DIR.',
+    evidenceClass: 'MODEL_ESTIMATE',
+    validate: validateRetro,
   },
   {
     toolId: 'pyscf',
@@ -146,6 +162,15 @@ function validateQm() {
   return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `PySCF ${r.version}`, evidence };
 }
 
+function validateRetro() {
+  const d = retro.detect();
+  if (!d.available) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: d.reason, version: d.engineVersion ?? undefined };
+  const r = retro.referenceCase();
+  if (!r.ok) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: r.reason ?? r.error };
+  const evidence = [{ id: r.case, pass: r.pass, solved: r.solved, steps: r.steps, startingMaterials: r.startingMaterials, stoppedBy: r.stoppedBy }];
+  return { status: r.pass ? TOOL_STATUS.AVAILABLE : TOOL_STATUS.VALIDATION_FAILED, version: r.version, engine: `AiZynthFinder ${r.version}`, evidence };
+}
+
 function validateMd() {
   const d = md.detect();
   if (!d.available) return { status: TOOL_STATUS.BLOCKED_BY_RUNTIME, reason: d.reason };
@@ -246,19 +271,29 @@ function present(tool) {
     toolId: tool.toolId, capabilityId: tool.capabilityId, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
     version: v.version ?? null, status: v.status, environment, provenance,
   })).digest('hex').slice(0, 16);
+  // The fingerprint is computed from the TRUE environment string above (so it stays a precise,
+  // stable identity of the real runtime); only the copy returned to callers — which can reach an
+  // unauthenticated HTTP response via GET /api/compute/toolchain/:toolId — is redacted, since a
+  // configured interpreter env var (GENESIS_RDKIT_PYTHON etc.) or an adapter's subprocess error
+  // text can legitimately contain an absolute local filesystem path.
   return {
     toolId: tool.toolId, capabilityId: tool.capabilityId, domain: tool.domain,
     engineName: tool.engineName, package: PACKAGE_NAMES[tool.toolId] ?? tool.toolId,
     license: tool.license, modelDomain: tool.modelDomain, assumptions: tool.assumptions,
     evidenceClass: tool.evidenceClass, status: v.status, availability: v.status === TOOL_STATUS.AVAILABLE,
     executionStatus: v.status === TOOL_STATUS.AVAILABLE ? 'VALIDATED_REFERENCE_CASE' : 'NOT_EXECUTED',
-    version: v.version ?? null, engine: v.engine ?? null, environment, provenance,
-    fingerprint, validation: v.evidence ?? null, reason: v.reason ?? null, failureReason: v.reason ?? null,
+    version: v.version ?? null, engine: v.engine ?? null, environment: redact(environment), provenance,
+    fingerprint, validation: v.evidence ?? null, reason: redact(v.reason ?? null), failureReason: redact(v.reason ?? null),
   };
 }
 
 export function listToolchain() {
   return TOOLS.map(present);
+}
+
+/** Canonical ids without triggering any reference-case execution. */
+export function listToolIds() {
+  return TOOLS.map((tool) => tool.toolId);
 }
 
 export function getTool(toolId) {

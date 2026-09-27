@@ -463,6 +463,13 @@ export function FirstPersonLabScreen() {
         purpose="Hipoteza → eksperyment → obserwacja → dowód → wynik. Kamera naukowa reaguje na realne zdarzenia przebiegu."
         badges={[{ label: 'SCENARIO ENGINE · REAL RUN', tone: 'real' }, { label: 'SCENA 3D · WIZUALIZACJA', tone: 'visual' }]}
       />
+      <nav className="lab-quick-gates" aria-label="Przejścia do laboratoriów" data-testid="lab-quick-gates">
+        <span>DALEJ</span>
+        <button type="button" className="primary" onClick={() => { window.location.hash = '#/cern-complex'; }}>CERN <small>zderzenia</small></button>
+        <button type="button" onClick={() => { window.location.hash = '#/lab-fpv'; }}>Chemia <small>reakcje</small></button>
+        <button type="button" onClick={() => { window.location.hash = '#/human-biology-lab'; }}>Human <small>anatomia</small></button>
+        <button type="button" onClick={() => { window.location.hash = '#/worlds'; }}>Nexus <small>pozostałe</small></button>
+      </nav>
       <section className="gid-flow" aria-label="Przepływ naukowy: Pytanie -> Eksperyment -> Wykonanie -> Obserwacja -> Porównanie -> Następny krok">
         {flowStrip}
       </section>

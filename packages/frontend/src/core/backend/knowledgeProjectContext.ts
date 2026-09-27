@@ -10,11 +10,33 @@ export interface ActiveKnowledgeProject {
   name: string;
 }
 
-let active: ActiveKnowledgeProject | null = null;
+const STORAGE_KEY = 'genesis.active-research-project.v1';
+
+function loadPersistedProject(): ActiveKnowledgeProject | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ActiveKnowledgeProject>;
+    return typeof parsed.id === 'string' && typeof parsed.name === 'string' ? { id: parsed.id, name: parsed.name } : null;
+  } catch {
+    return null;
+  }
+}
+
+let active: ActiveKnowledgeProject | null = loadPersistedProject();
 const listeners = new Set<(project: ActiveKnowledgeProject | null) => void>();
 
 export function setActiveKnowledgeProject(project: Pick<Project, 'id' | 'name'> | null): void {
   active = project ? { id: project.id, name: project.name } : null;
+  try {
+    if (typeof window !== 'undefined') {
+      if (active) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(active));
+      else window.localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    // A denied storage write must not break the in-memory research context.
+  }
   for (const listener of listeners) listener(active);
 }
 

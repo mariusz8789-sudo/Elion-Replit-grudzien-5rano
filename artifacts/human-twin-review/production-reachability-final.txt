@@ -1,0 +1,48 @@
+Genesis production-reachability audit — 2026-09-22
+
+## core/experimentFabric/modelRouter
+packages\frontend\src\__tests__\finalScientificIntegration.test.ts:8:import type { ModelInvokePort, ModelProviderDescriptor } from '../core/experimentFabric/modelRouter';
+packages\frontend\src\__tests__\finalModelRouter.test.ts:10:} from '../core/experimentFabric/modelRouter';
+
+## core/experimentFabric/scientificIntegration
+packages\frontend\src\components\MetaCognitionScreen.tsx:6:import { runScientificIntegrationCampaign, type ScientificCampaignResult } from '../core/experimentFabric/scientificIntegration';
+packages\frontend\src\__tests__\finalScientificIntegration.test.ts:7:} from '../core/experimentFabric/scientificIntegration';
+
+## core/metaCognition
+packages\frontend\src\components\MetaCognitionScreen.tsx:5:import { runMetaCognitionAudit, type MetaEpistemicState } from '../core/metaCognition/metaCognitionRuntime';
+packages\frontend\src\__tests__\finalMetaCognitionMetrics.test.ts:7:} from '../core/metaCognition/scientificMetrics';
+packages\frontend\src\__tests__\finalMetaCognitionMetrics.test.ts:12:} from '../core/metaCognition/decisionTrace';
+packages\frontend\src\__tests__\metaCognitionRuntime.test.ts:4:import { assertNonConsciousnessFraming, runMetaCognitionAudit } from '../core/metaCognition/metaCognitionRuntime';
+
+## core/worldDirector
+packages\frontend\src\components\WorldDirectorScreen.tsx:14:} from '../core/worldDirector/genesisWorldDirector';
+packages\frontend\src\__tests__\worldDirectorRuntime.test.ts:3:import { directGenesisWorld, recordDirectedAssetInspection, recordDirectedWorld } from '../core/worldDirector/genesisWorldDirector';
+
+## campaign/scientificIntegration
+packages\backend\src\api.mjs:78:import { buildCandidateResearchMatrix } from './campaign/scientificIntegration.mjs';
+packages\backend\src\finalScientificIntegration.test.mjs:13:} from './campaign/scientificIntegration.mjs';
+packages\backend\src\compute\drugDiscovery.mjs:17:import { candidateIdentityGuard } from '../campaign/scientificIntegration.mjs';
+
+## finalCyberScientist
+(no literal import; inspect barrel/runtime below)
+
+## UI route registrations
+packages/frontend/src/core/navigation.ts:80:  { id: 'world-director', label: 'World Director', icon: '◉', hash: '#/world-director', description: 'Presety świata przez canonical WorldGraph i THREE.js' },
+packages/frontend/src/core/navigation.ts:81:  { id: 'meta-cognition', label: 'Meta‑Cognition / Self‑Audit', icon: '◇', hash: '#/meta-cognition', description: 'Status wiedzy, luki, sprzeczności i capabilities' },
+packages/frontend/src/core/navigation.ts:82:  { id: 'mirror', label: 'Genesis Mirror — eksperymentalny', icon: '◐', hash: '#/mirror', description: 'Syntetyczny szkielet MirrorTwin bez kamery' },
+packages/frontend/src/App.tsx:183:  | { kind: 'world-director' }
+packages/frontend/src/App.tsx:184:  | { kind: 'meta-cognition' }
+packages/frontend/src/App.tsx:185:  | { kind: 'mirror' };
+packages/frontend/src/App.tsx:256:  if (h === '#/world-director') return { kind: 'world-director' };
+packages/frontend/src/App.tsx:257:  if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
+packages/frontend/src/App.tsx:258:  if (h === '#/mirror') return { kind: 'mirror' };
+packages/frontend/src/App.tsx:357:    if (route.kind === 'world-director') {
+packages/frontend/src/App.tsx:360:    if (route.kind === 'meta-cognition') {
+packages/frontend/src/App.tsx:363:    if (route.kind === 'mirror') {
+packages/frontend/src/App.tsx:723:      // The 3D stage: the full-bleed WebGL world (volumetric rain over the obsidian mirror) is the page; one HUD column, no cards.
+
+## backend campaign route
+packages/backend/src/api.mjs:78:import { buildCandidateResearchMatrix } from './campaign/scientificIntegration.mjs';
+packages/backend/src/api.mjs:522:        if (seg[4] === 'report') return ok({ report: buildCandidateResearchMatrix(db, campaignId) });
+packages/backend/src/campaign\scientificIntegration.mjs:27: *  2. `researchGateVerdict` / `buildCandidateResearchMatrix` — a synthesis,
+packages/backend/src/campaign\scientificIntegration.mjs:125:export function buildCandidateResearchMatrix(db, campaignId) {

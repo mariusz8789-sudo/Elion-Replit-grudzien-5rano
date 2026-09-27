@@ -389,7 +389,6 @@ export function City3DWebGLScreen() {
             >
               ☰ Panele i dane
             </button>
-            <button className="chip-btn" onClick={() => { window.location.hash = '#/city'; }}>Tryb 2D</button>
           </>
         )}
       />
@@ -491,7 +490,7 @@ export function City3DWebGLScreen() {
               </div>
             )}
             {loading && <div className="route-loading" role="status">Ładowanie miasta 3D…</div>}
-            {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city'; }}>trybu Canvas 2D</button>.</div>}
+            {failed && <div className="empty-state">WebGL nie uruchomił się. Użyj <button className="link-button" onClick={() => { window.location.hash = '#/city3d?view=2d'; }}>trybu Canvas 2D</button>.</div>}
             {scenarioTimeline && timelineSample && (
               <div className="scenario-run-timeline" aria-label="Oś czasu zapisanego przebiegu scenariusza">
                 <div className="scenario-run-identity">

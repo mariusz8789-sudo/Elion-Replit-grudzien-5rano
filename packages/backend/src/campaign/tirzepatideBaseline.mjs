@@ -38,9 +38,9 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sha256Hex } from '../determinism.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The single source of truth — A2's pinned dataset. Never duplicated into this package. */
@@ -52,9 +52,6 @@ export const BASELINE_NAME = 'TIRZEPATIDE';
 /** Comparator small molecules already present in the same pinned record — real oral GLP-1R agonist programmes. */
 export const COMPARATOR_CHEMBL_IDS = Object.freeze(['CHEMBL4518483', 'CHEMBL4446782', 'CHEMBL5314631', 'CHEMBL2381848']);
 
-function sha256Hex(buf) {
-  return createHash('sha256').update(buf).digest('hex');
-}
 
 /**
  * Reads + integrity-checks the pinned candidate table. Fails closed on a

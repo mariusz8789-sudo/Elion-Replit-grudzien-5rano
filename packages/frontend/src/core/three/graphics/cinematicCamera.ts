@@ -64,6 +64,13 @@ export function recommendedDofForProfile(profile: CinematicCameraProfile, focusD
   return { enabled: true, focusDistance, blurStrength: spec.dofBlurStrength };
 }
 
+/** Exponential damping gives the same settling time at different frame rates. Invalid/backward
+ * deltas and non-positive speeds hold the current pose; a cut still uses snapTo/cut explicitly. */
+export function cameraDampingFactor(dt: number, speed: number): number {
+  if (!Number.isFinite(dt) || !Number.isFinite(speed) || dt <= 0 || speed <= 0) return 0;
+  return -Math.expm1(-dt * speed);
+}
+
 /**
  * Smoothly transitions a focus distance toward a target over time — a "focus pull," the
  * cinematography term for racking focus from one subject to another instead of snapping. Generic
@@ -96,7 +103,7 @@ export class FocusPuller {
    * (higher = snappier); default suits a deliberate, readable rack focus rather than an
    * instant snap or an unnaturally slow drift. Returns the current distance for convenience. */
   update(dt: number, speed = 3): number {
-    this.current += (this.target - this.current) * Math.min(1, Math.max(0, dt) * speed);
+    this.current += (this.target - this.current) * cameraDampingFactor(dt, speed);
     return this.current;
   }
 

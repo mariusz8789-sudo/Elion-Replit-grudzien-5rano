@@ -12,6 +12,7 @@
  * temperatura krytyczna są ze sobą spójne z konstrukcji, nie przez
  * przypadek.
  */
+import { mulberry32 } from '@genesis/core/determinism.js';
 
 /** Dokładna temperatura krytyczna (jednostki J/k_B=1): T_c = 2/ln(1+√2) ≈ 2,269. */
 export const ISING_TC = 2 / Math.log(1 + Math.sqrt(2));
@@ -86,15 +87,6 @@ export function isingRandomLattice(n: number, rnd: () => number = Math.random): 
   return lattice;
 }
 
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let value = Math.imul(state ^ (state >>> 15), 1 | state);
-    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
 
 export interface IsingMetropolisScenarioResult {
   temperature: number;

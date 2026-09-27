@@ -1,0 +1,678 @@
+{
+  "capturedAt": "2026-09-22T05:03:12.321Z",
+  "base": "http://127.0.0.1:5002",
+  "weather": "CLEAR",
+  "aspectRatio": "16:9",
+  "encoderCapability": {
+    "status": "AVAILABLE",
+    "format": "MP4",
+    "codec": "H264",
+    "binary": "C:\\Users\\Admin\\Documents\\GitHub\\Elion-Replit-grudzien-5rano\\node_modules\\ffmpeg-static\\ffmpeg.exe",
+    "source": "NPM_FFMPEG_STATIC"
+  },
+  "frameCount": 24,
+  "durationSeconds": 4,
+  "scenes": [
+    {
+      "prompt": "Create a historical Warsaw 1900 cinematic reconstruction.",
+      "worldDerivation": "CANONICAL_TEMPORAL_ROUTE_PARAMETERS",
+      "promptResolutionEvidenceHash": null,
+      "place": "Warsaw",
+      "year": 1900,
+      "hook": {
+        "ready": true,
+        "place": "Warsaw",
+        "year": 1900,
+        "durationSeconds": 4,
+        "sameStreetLocation": null,
+        "presentation": {
+          "viewMode": "street",
+          "interiorRoomId": null,
+          "interiorRoomType": null,
+          "interiorAssetSlots": [],
+          "interiorAssetSlotCount": 0,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": true,
+          "spacetimeVisual": null
+        }
+      },
+      "hasWebGL": true,
+      "cameraPlan": {
+        "source": "window.__GENESIS_TEMPORAL_CAPTURE__",
+        "mode": "CINEMATIC",
+        "durationSeconds": 4,
+        "fps": 6,
+        "frameTimesSeconds": [
+          0,
+          0.17391304347826086,
+          0.34782608695652173,
+          0.5217391304347826,
+          0.6956521739130435,
+          0.8695652173913043,
+          1.0434782608695652,
+          1.2173913043478262,
+          1.391304347826087,
+          1.565217391304348,
+          1.7391304347826086,
+          1.9130434782608696,
+          2.0869565217391304,
+          2.260869565217391,
+          2.4347826086956523,
+          2.608695652173913,
+          2.782608695652174,
+          2.9565217391304346,
+          3.130434782608696,
+          3.3043478260869565,
+          3.4782608695652173,
+          3.652173913043478,
+          3.8260869565217392,
+          4
+        ],
+        "aspectRatio": "16:9",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "presentation": {
+          "viewMode": "street",
+          "interiorRoomId": null,
+          "interiorRoomType": null,
+          "interiorAssetSlots": [],
+          "interiorAssetSlotCount": 0,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": true,
+          "spacetimeVisual": null
+        }
+      },
+      "subtitles": {
+        "status": "METADATA_ONLY",
+        "cues": []
+      },
+      "narration": {
+        "status": "METADATA_ONLY",
+        "track": null
+      },
+      "frames": [
+        {
+          "t": 0,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-000.jpg",
+          "bytes": 158492,
+          "sha256": "10516daceb16e4214b0041e25b2589f8cfd2c290831a6d0e6b9d8bae3a88c492",
+          "evidenceHash": "8f58cb58ecd2e516497483ebe75751675196d481f5335470fbbc989a5d736beb",
+          "semanticFingerprint": "5896e1bf"
+        },
+        {
+          "t": 0.17391304347826086,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-001.jpg",
+          "bytes": 123229,
+          "sha256": "c64e036e1bf4edac28598a415b938f79c8c0d6d62fb0cbb74a93165f22756ef6",
+          "evidenceHash": "9c4db799efa9eeb0ee27a05bab751657625e7089364f0d4173f2130005f3c77d",
+          "semanticFingerprint": "390079ff"
+        },
+        {
+          "t": 0.34782608695652173,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-002.jpg",
+          "bytes": 120077,
+          "sha256": "f1c11c59d8e8893da73394e209d8ee51f7ea93460124f2fbac20e22e8ec9a52e",
+          "evidenceHash": "2acc7543ba30e79165c3b5683ccfa424b12c436a7fed380f69091bcae074de83",
+          "semanticFingerprint": "556b36d7"
+        },
+        {
+          "t": 0.5217391304347826,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-003.jpg",
+          "bytes": 106369,
+          "sha256": "8663090ade70a68f497856140db335406becd62f2a83415575ffc63116f0309a",
+          "evidenceHash": "fe1b53e64f2ffe2d839216e3198abb11228b7e1774677e546de4a29875d10baa",
+          "semanticFingerprint": "eb222914"
+        },
+        {
+          "t": 0.6956521739130435,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-004.jpg",
+          "bytes": 124181,
+          "sha256": "077a937ff0fd9064f6701480ed7d9ce2dfe681013eaac888d1f140e5efa132ec",
+          "evidenceHash": "7e517a338bbb91ae32ffec5b874d1ba62015a98b10e4513695ae3459cdb58247",
+          "semanticFingerprint": "727aa496"
+        },
+        {
+          "t": 0.8695652173913043,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-005.jpg",
+          "bytes": 126437,
+          "sha256": "5a7ada3c36d37f1a08b4bf992274fd3d22c0951c92f045247002ebd3276f4fd2",
+          "evidenceHash": "9cfd1f879b3dc2e5bf2211b25744c72c906a66fee0c428caf169d1e36411f0ab",
+          "semanticFingerprint": "80348c79"
+        },
+        {
+          "t": 1.0434782608695652,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-006.jpg",
+          "bytes": 133654,
+          "sha256": "e1477a0774fd13e17ff40c29dfc4abbe9da60df0447f3afd83319834f29be592",
+          "evidenceHash": "efcdcf45822b25534231423767c91f7334f1a10ed61c7525b1508a5bd6e9ef4b",
+          "semanticFingerprint": "7de1952b"
+        },
+        {
+          "t": 1.2173913043478262,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-007.jpg",
+          "bytes": 130014,
+          "sha256": "5b575fd95a7b16bcd02607365694331acc3afca0568877fe74cfa1005f1778f1",
+          "evidenceHash": "6ac5d939dc05fc369e2f4fd0603f815a91335364f680ab0b9075320c84fdf618",
+          "semanticFingerprint": "f3785492"
+        },
+        {
+          "t": 1.391304347826087,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-008.jpg",
+          "bytes": 106424,
+          "sha256": "88f6bbca2302241232b8c67834d6847db51721e37423386b2d9165b05ebf3d86",
+          "evidenceHash": "79b2a13c4325c774f0aa4d4fc66f17434ee7a75b8260f362b14d0c62b93e5527",
+          "semanticFingerprint": "ab7018f7"
+        },
+        {
+          "t": 1.565217391304348,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-009.jpg",
+          "bytes": 99101,
+          "sha256": "c7781f9d2ee7a64dd192adf98c39c93af60068d767ccabb3ea834e90c7bb57ca",
+          "evidenceHash": "e02f0d890466e78809e7f179626d26415fbda9411456bf15505c43a364bf7dde",
+          "semanticFingerprint": "abf134cb"
+        },
+        {
+          "t": 1.7391304347826086,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-010.jpg",
+          "bytes": 118358,
+          "sha256": "0f87e86b4136507575647318a3bb729389a0d3c43d7f9bffe04853dc3ab67058",
+          "evidenceHash": "dd5a41b6aa801d826c0b8e7d77f1243ac5608de2373eae96947e237b23a2fcc3",
+          "semanticFingerprint": "f0af2e83"
+        },
+        {
+          "t": 1.9130434782608696,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-011.jpg",
+          "bytes": 128099,
+          "sha256": "3cef7f35cea1a177798a9161c2e9e43e0441e75eaf74b6c9977679df478023ee",
+          "evidenceHash": "548194ffb272720a2de525851644205d96213088859794bb39dc785972fc3af2",
+          "semanticFingerprint": "e57866e2"
+        },
+        {
+          "t": 2.0869565217391304,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-012.jpg",
+          "bytes": 89112,
+          "sha256": "d2e8fd1ac4f7e77ad1f1a1c38db8b652f6f0cb4410e52ef16ea2cf85b687ae42",
+          "evidenceHash": "35f7bc00ddc2db0d501a49e291785b0763fcc658f397b1416861dd4e305b8d75",
+          "semanticFingerprint": "289d31ec"
+        },
+        {
+          "t": 2.260869565217391,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-013.jpg",
+          "bytes": 95298,
+          "sha256": "ca7d7fbb9eefca0bd44e1d5aeefec5f6fa2d86dbccc29a5b5ebe8656e8217690",
+          "evidenceHash": "6559c412c37b520fc3d3c81357f596f94aabc6f1ffa47b68175f04becf5424e9",
+          "semanticFingerprint": "f6a709bb"
+        },
+        {
+          "t": 2.4347826086956523,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-014.jpg",
+          "bytes": 89197,
+          "sha256": "28f9630bb100aa4014b32ff50709a0b54e73508448fd81c6a6445e58f8cbd6ee",
+          "evidenceHash": "16b26510c56d0eceef50ae7f684e4908ddcfc959c9502145ab5bed4b29b5d207",
+          "semanticFingerprint": "fac2f9f7"
+        },
+        {
+          "t": 2.608695652173913,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-015.jpg",
+          "bytes": 95014,
+          "sha256": "c2eb74487de24b51546de3a39b45ed4d37aec9460635ccc5c3ebc170c89740bd",
+          "evidenceHash": "36e2c2599c66cf78de883887a92cd339af3ab4fe2c3c1fe266e6c3175c56b46b",
+          "semanticFingerprint": "90b0337c"
+        },
+        {
+          "t": 2.782608695652174,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-016.jpg",
+          "bytes": 101849,
+          "sha256": "a513d60b880b96952494ec512888d3bac310ea201ad9c36a9831d2a9d0ba2213",
+          "evidenceHash": "1c11bd9bc4f880f6468cbdf6489af558657ba45b4413f4f5ae1650f92b0658a7",
+          "semanticFingerprint": "1b9237c1"
+        },
+        {
+          "t": 2.9565217391304346,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-017.jpg",
+          "bytes": 90832,
+          "sha256": "8748cb3f4158a912bc54283c43b6134972f418c40b1b1ea5352fec11739b922d",
+          "evidenceHash": "62d107c41fbd8a5df3b34196dc90634b0b7cb93d6522819807fc0cec5fa5e6ef",
+          "semanticFingerprint": "20f18dab"
+        },
+        {
+          "t": 3.130434782608696,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-018.jpg",
+          "bytes": 112356,
+          "sha256": "3a63949df765767f5744ed2f63acfb9ca8c9988d76c00cd1d5013f64cf91017d",
+          "evidenceHash": "edc1300be80c57465d46fa087d6cdc21af5633b8367e6fcf519d5e1d51a68f84",
+          "semanticFingerprint": "802fb921"
+        },
+        {
+          "t": 3.3043478260869565,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-019.jpg",
+          "bytes": 115100,
+          "sha256": "73718bdcf78b25e70626f4736d207946b9b85cec4ed4c2bb3fc1d7f6b2881fe3",
+          "evidenceHash": "c1c6f0bfff03ff6aed4e869ebd323f5c17849a0d048f0dc1840d075516e39690",
+          "semanticFingerprint": "d65502ae"
+        },
+        {
+          "t": 3.4782608695652173,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-020.jpg",
+          "bytes": 98771,
+          "sha256": "246daae93f78d0c0873f1cb5fc1e005fcd788ed8e448fa547a946114c9ab34db",
+          "evidenceHash": "c7c140e0021a1167d05434310711afc734bfa54a39710344674f5b9aecf94843",
+          "semanticFingerprint": "705b1847"
+        },
+        {
+          "t": 3.652173913043478,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-021.jpg",
+          "bytes": 107412,
+          "sha256": "61ac5466efcf8259740c6c597375af7e2f38d101e6bcabb2bbc1ee3f84075866",
+          "evidenceHash": "b38fb8ca451662ed2fc031d2f777d2f36aabdc4cdec148a1a56df0063361d29b",
+          "semanticFingerprint": "7fc30f71"
+        },
+        {
+          "t": 3.8260869565217392,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-022.jpg",
+          "bytes": 112889,
+          "sha256": "b33f84aafa80d18c91509df9271bb5701d62c3cf60e06785c7db8711ce0627e4",
+          "evidenceHash": "94acb39a2da4d684aa1233fb848470bcc35bdd3f7f05f576f1d0ad7d86da4c9d",
+          "semanticFingerprint": "0d5191b9"
+        },
+        {
+          "t": 4,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-1900/frame-023.jpg",
+          "bytes": 135834,
+          "sha256": "213401670b1a065aacf65b26986ffc7e61f30118a996d8114b530e4a3fab215e",
+          "evidenceHash": "62fd9202af0b8761abb13368cd437e4e037dcfa6392044701b60dea02414393f",
+          "semanticFingerprint": "cfe33203"
+        }
+      ],
+      "video": {
+        "status": "AVAILABLE",
+        "format": "MP4",
+        "codec": "H264",
+        "outputPath": "artifacts/vision-review/cinematic-final/warsaw-1900.mp4",
+        "byteLength": 743164,
+        "frameCount": 24,
+        "note": "Real H264/MP4 encode via NPM_FFMPEG_STATIC.",
+        "sha256": "48e9e6df85bb77bac98bd3a2f6f6427a1fcc9602c1a88593f8586d88941783b4",
+        "evidenceHash": "44c2be3ddb0f3295cfa2cf46f404cef68558b6af9ffb847fac47a26f444090db",
+        "semanticFingerprint": "cfe33203"
+      },
+      "evidence": {
+        "frameHashes": [
+          "8f58cb58ecd2e516497483ebe75751675196d481f5335470fbbc989a5d736beb",
+          "9c4db799efa9eeb0ee27a05bab751657625e7089364f0d4173f2130005f3c77d",
+          "2acc7543ba30e79165c3b5683ccfa424b12c436a7fed380f69091bcae074de83",
+          "fe1b53e64f2ffe2d839216e3198abb11228b7e1774677e546de4a29875d10baa",
+          "7e517a338bbb91ae32ffec5b874d1ba62015a98b10e4513695ae3459cdb58247",
+          "9cfd1f879b3dc2e5bf2211b25744c72c906a66fee0c428caf169d1e36411f0ab",
+          "efcdcf45822b25534231423767c91f7334f1a10ed61c7525b1508a5bd6e9ef4b",
+          "6ac5d939dc05fc369e2f4fd0603f815a91335364f680ab0b9075320c84fdf618",
+          "79b2a13c4325c774f0aa4d4fc66f17434ee7a75b8260f362b14d0c62b93e5527",
+          "e02f0d890466e78809e7f179626d26415fbda9411456bf15505c43a364bf7dde",
+          "dd5a41b6aa801d826c0b8e7d77f1243ac5608de2373eae96947e237b23a2fcc3",
+          "548194ffb272720a2de525851644205d96213088859794bb39dc785972fc3af2",
+          "35f7bc00ddc2db0d501a49e291785b0763fcc658f397b1416861dd4e305b8d75",
+          "6559c412c37b520fc3d3c81357f596f94aabc6f1ffa47b68175f04becf5424e9",
+          "16b26510c56d0eceef50ae7f684e4908ddcfc959c9502145ab5bed4b29b5d207",
+          "36e2c2599c66cf78de883887a92cd339af3ab4fe2c3c1fe266e6c3175c56b46b",
+          "1c11bd9bc4f880f6468cbdf6489af558657ba45b4413f4f5ae1650f92b0658a7",
+          "62d107c41fbd8a5df3b34196dc90634b0b7cb93d6522819807fc0cec5fa5e6ef",
+          "edc1300be80c57465d46fa087d6cdc21af5633b8367e6fcf519d5e1d51a68f84",
+          "c1c6f0bfff03ff6aed4e869ebd323f5c17849a0d048f0dc1840d075516e39690",
+          "c7c140e0021a1167d05434310711afc734bfa54a39710344674f5b9aecf94843",
+          "b38fb8ca451662ed2fc031d2f777d2f36aabdc4cdec148a1a56df0063361d29b",
+          "94acb39a2da4d684aa1233fb848470bcc35bdd3f7f05f576f1d0ad7d86da4c9d",
+          "62fd9202af0b8761abb13368cd437e4e037dcfa6392044701b60dea02414393f"
+        ],
+        "videoHash": "44c2be3ddb0f3295cfa2cf46f404cef68558b6af9ffb847fac47a26f444090db"
+      },
+      "pageErrors": []
+    },
+    {
+      "prompt": "Create a modern Warsaw 2026 cinematic reconstruction.",
+      "worldDerivation": "CANONICAL_TEMPORAL_ROUTE_PARAMETERS",
+      "promptResolutionEvidenceHash": null,
+      "place": "Warsaw",
+      "year": 2026,
+      "hook": {
+        "ready": true,
+        "place": "Warsaw",
+        "year": 2026,
+        "durationSeconds": 4,
+        "sameStreetLocation": null,
+        "presentation": {
+          "viewMode": "street",
+          "interiorRoomId": null,
+          "interiorRoomType": null,
+          "interiorAssetSlots": [],
+          "interiorAssetSlotCount": 0,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": true,
+          "spacetimeVisual": null
+        }
+      },
+      "hasWebGL": true,
+      "cameraPlan": {
+        "source": "window.__GENESIS_TEMPORAL_CAPTURE__",
+        "mode": "CINEMATIC",
+        "durationSeconds": 4,
+        "fps": 6,
+        "frameTimesSeconds": [
+          0,
+          0.17391304347826086,
+          0.34782608695652173,
+          0.5217391304347826,
+          0.6956521739130435,
+          0.8695652173913043,
+          1.0434782608695652,
+          1.2173913043478262,
+          1.391304347826087,
+          1.565217391304348,
+          1.7391304347826086,
+          1.9130434782608696,
+          2.0869565217391304,
+          2.260869565217391,
+          2.4347826086956523,
+          2.608695652173913,
+          2.782608695652174,
+          2.9565217391304346,
+          3.130434782608696,
+          3.3043478260869565,
+          3.4782608695652173,
+          3.652173913043478,
+          3.8260869565217392,
+          4
+        ],
+        "aspectRatio": "16:9",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "presentation": {
+          "viewMode": "street",
+          "interiorRoomId": null,
+          "interiorRoomType": null,
+          "interiorAssetSlots": [],
+          "interiorAssetSlotCount": 0,
+          "selectedAssetSlotId": null,
+          "selectedAssetSlotType": null,
+          "interactionCommand": null,
+          "continuityEpoch": 0,
+          "lastDiscontinuity": null,
+          "temporalAccumulation": "NOT_PRESENT",
+          "livingWorld": true,
+          "spacetimeVisual": null
+        }
+      },
+      "subtitles": {
+        "status": "METADATA_ONLY",
+        "cues": []
+      },
+      "narration": {
+        "status": "METADATA_ONLY",
+        "track": null
+      },
+      "frames": [
+        {
+          "t": 0,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-000.jpg",
+          "bytes": 197201,
+          "sha256": "e8916128826d52818788250d6c6c3f82e1fdb31252df97256053847134aca675",
+          "evidenceHash": "f90c535fdce2af534a402491597cd2c5819975a05f11f4c681fe5191887f936d",
+          "semanticFingerprint": "62918e0f"
+        },
+        {
+          "t": 0.17391304347826086,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-001.jpg",
+          "bytes": 147624,
+          "sha256": "6b75ccb83cdd2c861196d0d3ec7f2daebf23befa878672525503735a507a23a2",
+          "evidenceHash": "3d0cbc5b93207f948e47a1d0940c8116ae8afacaf97dd84c3099a06d5f07ddba",
+          "semanticFingerprint": "fa3a334f"
+        },
+        {
+          "t": 0.34782608695652173,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-002.jpg",
+          "bytes": 126562,
+          "sha256": "42d1d596bdd5a954017e89bd38a7242f997f98e86188d600cb2f924b2c3cf556",
+          "evidenceHash": "073a547377dff2d1bd8a304134f83bda6537829d0cc3ec28a72d2dcf4d09c8c7",
+          "semanticFingerprint": "bb9ee4a7"
+        },
+        {
+          "t": 0.5217391304347826,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-003.jpg",
+          "bytes": 109663,
+          "sha256": "09fb8edbd59e95a88bea8e0d7092e4ee36e42afe0a0993b27265bb99fc506ed7",
+          "evidenceHash": "2bf0ca326c4184e1a94f8c9c5c0f4edd158549f79fd885505bec933396be74b5",
+          "semanticFingerprint": "0b69db98"
+        },
+        {
+          "t": 0.6956521739130435,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-004.jpg",
+          "bytes": 135751,
+          "sha256": "84111988377a6653fed15d70db77c2b488134d42cf98d11d127245d209d15f43",
+          "evidenceHash": "632ebfe7974468fd928f32b0fe065046df5cefea432511a76ab825ffca4e10a0",
+          "semanticFingerprint": "5f538722"
+        },
+        {
+          "t": 0.8695652173913043,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-005.jpg",
+          "bytes": 145798,
+          "sha256": "fd719ea2cb77089b06bf94725be4beaac985645f5209ee42b1da2a07ec038f91",
+          "evidenceHash": "3ecfabfdc229cfe3e908d3faebb1b979009807bfc0c8db22268fb4bbc7fbde16",
+          "semanticFingerprint": "895c6dd1"
+        },
+        {
+          "t": 1.0434782608695652,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-006.jpg",
+          "bytes": 143432,
+          "sha256": "511ec3dad97832931a90a76e6e03aacda7a4b46ce2643ae9600b41871cfe8997",
+          "evidenceHash": "23f07667acba9ab668a0b01ff7b1ef41fdf49e70993e8b31d33782c452eed026",
+          "semanticFingerprint": "cf9f4a3b"
+        },
+        {
+          "t": 1.2173913043478262,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-007.jpg",
+          "bytes": 132869,
+          "sha256": "30ff441e9ed025c9c7c2533e71466b7689053a4d4d11b84e70a87c7af57b7baf",
+          "evidenceHash": "2e6965f046130a71fcc54165a5d9f7d7f353e8cd906c7d1439f15a5bf72e443c",
+          "semanticFingerprint": "74a2028e"
+        },
+        {
+          "t": 1.391304347826087,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-008.jpg",
+          "bytes": 109507,
+          "sha256": "ab93f65ba70ac6f0a2991f05ddeee870e0234606410379ef725f2f6e2619f018",
+          "evidenceHash": "e334d82006918274dbb867c3847ea76b69de8e3a38d03bd842cdd3126f1f7a1d",
+          "semanticFingerprint": "9e637347"
+        },
+        {
+          "t": 1.565217391304348,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-009.jpg",
+          "bytes": 102044,
+          "sha256": "ef41d16069c36d75370c001e4b8a0168a72a0c796e547665bc3e1fd72e6132a2",
+          "evidenceHash": "735891967bd58164bdc39ac68ec7aa60ff1424d3b17f43a006a79bd2adc720be",
+          "semanticFingerprint": "7e56885b"
+        },
+        {
+          "t": 1.7391304347826086,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-010.jpg",
+          "bytes": 122749,
+          "sha256": "42785c2d9c271a6d8987ca18ea5cf5674dd4a390a9b5eead58bbc34de7102b7d",
+          "evidenceHash": "4d195c1711254c7d89937c26757ea2a2864b5d2cbfaa21a5000a32cdd8fb237e",
+          "semanticFingerprint": "b713abd3"
+        },
+        {
+          "t": 1.9130434782608696,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-011.jpg",
+          "bytes": 139834,
+          "sha256": "2a84fed15700259f99a28a675bf41fc1505aec059a4fbca7178f184faf465ed7",
+          "evidenceHash": "a7903d7f47dbcf6f08c2fd85ce8ea4d49821cb7c9155b43f76d41db0f188a466",
+          "semanticFingerprint": "72762b1e"
+        },
+        {
+          "t": 2.0869565217391304,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-012.jpg",
+          "bytes": 89286,
+          "sha256": "cce9bf99cfc63054fc6bf475519e5787b522c821b8de8eef1127e9779eef4056",
+          "evidenceHash": "b0d290c474d5b72b9a41a27f8475c803749120f202fc923517db7c84a23df3b6",
+          "semanticFingerprint": "7c603c10"
+        },
+        {
+          "t": 2.260869565217391,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-013.jpg",
+          "bytes": 95356,
+          "sha256": "66b47f54c23ab794aaab2b03ef96513a05ecd411b5dbc85b204d85a39999b06f",
+          "evidenceHash": "5f3aef063e93be49d89a5e357721b5225a3ed6120911373e80f310e683a42aa5",
+          "semanticFingerprint": "ef240bcb"
+        },
+        {
+          "t": 2.4347826086956523,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-014.jpg",
+          "bytes": 89250,
+          "sha256": "1947be964ed188a894f879c6e50ac8b547d7d3b73463470d3372174107ac9c25",
+          "evidenceHash": "cec145c73e4de82266548433b16dbc6a3c16f96e0f1f7ee05787922af91a4db1",
+          "semanticFingerprint": "edb65447"
+        },
+        {
+          "t": 2.608695652173913,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-015.jpg",
+          "bytes": 94976,
+          "sha256": "48b8c1e50fe1bddbeeeba5e1914736583aa6cde260a816133acf97a5a9448e3a",
+          "evidenceHash": "7968ab6e18ba63f1b2325bb847a2a22f4ef2d0ae705be7ff6bfba7c3f57aab2c",
+          "semanticFingerprint": "7aab2960"
+        },
+        {
+          "t": 2.782608695652174,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-016.jpg",
+          "bytes": 102393,
+          "sha256": "6e84461c0d3a6312d3ce0ac37779fe903294736c8eddb5c67b23bb06ad959928",
+          "evidenceHash": "7858abf27edf609b35bc4db7c1a118c8b697325bd0c271ec7846a9ae65060367",
+          "semanticFingerprint": "6c14ba79"
+        },
+        {
+          "t": 2.9565217391304346,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-017.jpg",
+          "bytes": 92127,
+          "sha256": "6668e3aa0283eb166127da7a4ed28a16eccdb60873e822cd43bb290c984fe2b1",
+          "evidenceHash": "fa6fec199b39a4496208a38c971cb358320b4d52f27f15f8ef6d4d63f0276626",
+          "semanticFingerprint": "72af42bb"
+        },
+        {
+          "t": 3.130434782608696,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-018.jpg",
+          "bytes": 112309,
+          "sha256": "250584d3c5b8265f9d1f12fd4c900db2c9d2827682b97fe0f8b591dac10e2e84",
+          "evidenceHash": "13455a00908a11943329b65efaafd75be8e133f1dda8722c2579ab174b51cb3f",
+          "semanticFingerprint": "07a99059"
+        },
+        {
+          "t": 3.3043478260869565,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-019.jpg",
+          "bytes": 113744,
+          "sha256": "cb3691c10677b6642e93599eb9db888461bf2bda3185e3a91351aebe58c5072c",
+          "evidenceHash": "3f52bb3142f2743eded456d42f0e25b7b9bea499c03539323804c9ea2dc4927e",
+          "semanticFingerprint": "1eaa679a"
+        },
+        {
+          "t": 3.4782608695652173,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-020.jpg",
+          "bytes": 100672,
+          "sha256": "272a05ead94f221322ffd88b68e0cadc6181b4987c56e6f2d80d695cf6fd337b",
+          "evidenceHash": "fed193b629a4e7f34ae0e5602108495795b4ce230581095b972bef565736bfeb",
+          "semanticFingerprint": "28f33917"
+        },
+        {
+          "t": 3.652173913043478,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-021.jpg",
+          "bytes": 109741,
+          "sha256": "6cb2c0dce02bebdfcd2d295db7c9d45d570525bb16bd80633f382b5a91d59ca4",
+          "evidenceHash": "3901cff893237c14df38f82f6e04081edbbd9036593234422c9d00043a3ab4f0",
+          "semanticFingerprint": "9cc6b669"
+        },
+        {
+          "t": 3.8260869565217392,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-022.jpg",
+          "bytes": 114890,
+          "sha256": "db0c6c083ad0130a4c8710b8504daaef2a4b0edcd9d43d9e89b61c265f5a9b85",
+          "evidenceHash": "4e6658406ce278d418a17a8d6eb57a31da2f1d7e3777d84cbe4b781e6c8057b9",
+          "semanticFingerprint": "fddcd811"
+        },
+        {
+          "t": 4,
+          "path": "artifacts/vision-review/cinematic-final/warsaw-2026/frame-023.jpg",
+          "bytes": 138337,
+          "sha256": "f0c83dbf54599194c074613d8b0f69c41b4e48d8898e33599a771bf7d743b0e2",
+          "evidenceHash": "2b4fbb36476c7e76e717d15786d78ebcbe9afbf6b18a1ccdbfe5915426f60410",
+          "semanticFingerprint": "9647af53"
+        }
+      ],
+      "video": {
+        "status": "AVAILABLE",
+        "format": "MP4",
+        "codec": "H264",
+        "outputPath": "artifacts/vision-review/cinematic-final/warsaw-2026.mp4",
+        "byteLength": 818273,
+        "frameCount": 24,
+        "note": "Real H264/MP4 encode via NPM_FFMPEG_STATIC.",
+        "sha256": "ad60b28d7e44b27ea194de107f58545c7276f3d953f4a142d83a0f5d1f2542db",
+        "evidenceHash": "ae40e81d0aeba59a7cd52b651dddd5582d615bb168650738a68098178ef27389",
+        "semanticFingerprint": "9647af53"
+      },
+      "evidence": {
+        "frameHashes": [
+          "f90c535fdce2af534a402491597cd2c5819975a05f11f4c681fe5191887f936d",
+          "3d0cbc5b93207f948e47a1d0940c8116ae8afacaf97dd84c3099a06d5f07ddba",
+          "073a547377dff2d1bd8a304134f83bda6537829d0cc3ec28a72d2dcf4d09c8c7",
+          "2bf0ca326c4184e1a94f8c9c5c0f4edd158549f79fd885505bec933396be74b5",
+          "632ebfe7974468fd928f32b0fe065046df5cefea432511a76ab825ffca4e10a0",
+          "3ecfabfdc229cfe3e908d3faebb1b979009807bfc0c8db22268fb4bbc7fbde16",
+          "23f07667acba9ab668a0b01ff7b1ef41fdf49e70993e8b31d33782c452eed026",
+          "2e6965f046130a71fcc54165a5d9f7d7f353e8cd906c7d1439f15a5bf72e443c",
+          "e334d82006918274dbb867c3847ea76b69de8e3a38d03bd842cdd3126f1f7a1d",
+          "735891967bd58164bdc39ac68ec7aa60ff1424d3b17f43a006a79bd2adc720be",
+          "4d195c1711254c7d89937c26757ea2a2864b5d2cbfaa21a5000a32cdd8fb237e",
+          "a7903d7f47dbcf6f08c2fd85ce8ea4d49821cb7c9155b43f76d41db0f188a466",
+          "b0d290c474d5b72b9a41a27f8475c803749120f202fc923517db7c84a23df3b6",
+          "5f3aef063e93be49d89a5e357721b5225a3ed6120911373e80f310e683a42aa5",
+          "cec145c73e4de82266548433b16dbc6a3c16f96e0f1f7ee05787922af91a4db1",
+          "7968ab6e18ba63f1b2325bb847a2a22f4ef2d0ae705be7ff6bfba7c3f57aab2c",
+          "7858abf27edf609b35bc4db7c1a118c8b697325bd0c271ec7846a9ae65060367",
+          "fa6fec199b39a4496208a38c971cb358320b4d52f27f15f8ef6d4d63f0276626",
+          "13455a00908a11943329b65efaafd75be8e133f1dda8722c2579ab174b51cb3f",
+          "3f52bb3142f2743eded456d42f0e25b7b9bea499c03539323804c9ea2dc4927e",
+          "fed193b629a4e7f34ae0e5602108495795b4ce230581095b972bef565736bfeb",
+          "3901cff893237c14df38f82f6e04081edbbd9036593234422c9d00043a3ab4f0",
+          "4e6658406ce278d418a17a8d6eb57a31da2f1d7e3777d84cbe4b781e6c8057b9",
+          "2b4fbb36476c7e76e717d15786d78ebcbe9afbf6b18a1ccdbfe5915426f60410"
+        ],
+        "videoHash": "ae40e81d0aeba59a7cd52b651dddd5582d615bb168650738a68098178ef27389"
+      },
+      "pageErrors": []
+    }
+  ],
+  "realPixelProof": {
+    "sameSceneMotion": true,
+    "skylineDiffers": true
+  },
+  "video": {
+    "code": "READY",
+    "format": "MP4",
+    "reason": "Real H264/MP4 encode via NPM_FFMPEG_STATIC.; Real H264/MP4 encode via NPM_FFMPEG_STATIC."
+  }
+}

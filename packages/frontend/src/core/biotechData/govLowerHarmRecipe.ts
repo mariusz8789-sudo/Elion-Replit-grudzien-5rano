@@ -7,7 +7,7 @@ import type { A2CandidateReport } from './a2OzempicSubstitute';
  * Promotion Gate E2E completion, mandate item 11).
  *
  * SAME PATTERN AS THE TWO EXISTING PER-DOMAIN RECIPE BUILDERS, NOT A THIRD
- * ENGINE: `core/physicsWorld/physicsRecipe.ts` (D-052) and
+ * ENGINE: the retired physicsWorld recipe (D-052, removed) and
  * `govDrugDiscoveryE2E.ts::generateResearchRecipe` (E2E-01) each already
  * established "a domain-scoped Research Recipe projection with the exact
  * same shape (mechanism/formulationConcept/conceptualSynthesisRoute/

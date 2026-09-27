@@ -9,6 +9,7 @@ import {
   type WorldFrameState,
   type WorldMomentSummary,
 } from '../bridge/worldFrameState';
+import { boundsAreaM2, boundsContainsPoint, type Bounds2D } from '../ecs/geometry';
 import { classifyRelationshipKind, type RelationshipCategory } from '../ecs/worldGraph';
 import { entityId, type EntityId, type ScaleDomain, type WorldModelEntity } from '../ecs/types';
 import type { TemporalBranchRegistry, TemporalEngine } from '../temporal/temporalEngine';
@@ -220,4 +221,116 @@ export function getCausalDescendants(engine: TemporalEngine, eventId: string): r
     stack.push(...(byParent.get(next.id) ?? []));
   }
   return result;
+}
+
+/**
+ * WORLD GENERATION — GEOMETRY-AWARE QUERIES (Phase 7). Extends this SAME
+ * query layer for the structural geometry `generation/geometry/` produces
+ * (district/parcel/building/floor/room/nav-node/...) — never a second query
+ * system. Both queries below are pure reads over the existing graph, same
+ * as every function above.
+ */
+function boundsOf(entity: WorldModelEntity): Bounds2D | undefined {
+  const geometry = entity.geometry;
+  return geometry && 'bounds' in geometry ? geometry.bounds : undefined;
+}
+
+/**
+ * "What structure is at this (x,z) point?" — the most specific (smallest-
+ * area) geometry entity whose `bounds` contains `point`, optionally
+ * restricted to one geometry `kind` (e.g. `'ROOM'`). Complements
+ * `getNearby`'s radius-based proximity search with a point-in-structure
+ * lookup a renderer/agent-position resolver actually needs (e.g. "which
+ * room is the player standing in").
+ */
+export function findEntityContainingPoint(engine: TemporalEngine, point: { x: number; z: number }, kind?: string, timestamp?: number): WorldModelEntity | undefined {
+  const graph = graphAt(engine, timestamp);
+  let best: WorldModelEntity | undefined;
+  let bestArea = Infinity;
+  for (const entity of graph.listEntities()) {
+    if (kind && entity.geometry?.kind !== kind) continue;
+    const bounds = boundsOf(entity);
+    if (!bounds || !boundsContainsPoint(bounds, point.x, point.z)) continue;
+    const area = boundsAreaM2(bounds);
+    if (area < bestArea) {
+      bestArea = area;
+      best = entity;
+    }
+  }
+  return best;
+}
+
+export interface NavigationPathResult {
+  found: boolean;
+  /** Nav-node entity ids, in traversal order (`fromId` first, `toId` last). Empty when `found` is false. */
+  nodeIds: readonly EntityId[];
+  totalCostM: number;
+}
+
+/**
+ * Shortest-cost path between two NAV_NODE entities (Dijkstra over the real
+ * NAV_EDGE costs the geometry generator computed — see
+ * generation/geometry/navigationGenerator.ts, non-negotiable #10: never
+ * array-order). A pure query function, like every other export in this
+ * file — it does not move an agent or hold any traversal state, so it is
+ * not a second navigation engine or an AgentController (non-negotiable
+ * #5/#6): it only ANSWERS "is there a path, and what does it cost."
+ */
+export function findNavigationPath(engine: TemporalEngine, fromId: EntityId, toId: EntityId, timestamp?: number): NavigationPathResult {
+  const graph = graphAt(engine, timestamp);
+  const adjacency = new Map<EntityId, { to: EntityId; costM: number }[]>();
+  for (const entity of graph.listEntities()) {
+    if (entity.geometry?.kind !== 'NAV_EDGE') continue;
+    const fromNodeId = entityId(entity.geometry.fromRef);
+    const toNodeId = entityId(entity.geometry.toRef);
+    const costM = entity.geometry.costM;
+    (adjacency.get(fromNodeId) ?? adjacency.set(fromNodeId, []).get(fromNodeId)!).push({ to: toNodeId, costM });
+    (adjacency.get(toNodeId) ?? adjacency.set(toNodeId, []).get(toNodeId)!).push({ to: fromNodeId, costM });
+  }
+
+  const distances = new Map<EntityId, number>([[fromId, 0]]);
+  const previous = new Map<EntityId, EntityId>();
+  const visited = new Set<EntityId>();
+  const unvisited = new Set<EntityId>([fromId]);
+
+  while (unvisited.size > 0) {
+    let currentId: EntityId | undefined;
+    let currentDistance = Infinity;
+    for (const candidate of unvisited) {
+      const distance = distances.get(candidate) ?? Infinity;
+      if (distance < currentDistance) {
+        currentDistance = distance;
+        currentId = candidate;
+      }
+    }
+    if (currentId === undefined) break;
+    unvisited.delete(currentId);
+    visited.add(currentId);
+    if (currentId === toId) break;
+
+    for (const edge of adjacency.get(currentId) ?? []) {
+      if (visited.has(edge.to)) continue;
+      const candidateDistance = currentDistance + edge.costM;
+      if (candidateDistance < (distances.get(edge.to) ?? Infinity)) {
+        distances.set(edge.to, candidateDistance);
+        previous.set(edge.to, currentId);
+        unvisited.add(edge.to);
+      }
+    }
+  }
+
+  if (!distances.has(toId) || (fromId !== toId && !previous.has(toId))) {
+    return { found: false, nodeIds: [], totalCostM: Infinity };
+  }
+
+  const nodeIds: EntityId[] = [toId];
+  let cursor = toId;
+  while (cursor !== fromId) {
+    const prev = previous.get(cursor);
+    if (prev === undefined) break;
+    nodeIds.unshift(prev);
+    cursor = prev;
+  }
+
+  return { found: true, nodeIds, totalCostM: distances.get(toId) ?? Infinity };
 }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import {
   FINDING_STATUS, runDependencyAudit, mapAuditReportToFindings, summarizeFindings,
 } from './security/dependencyAudit.mjs';
@@ -102,5 +104,21 @@ describe('runDependencyAudit (real subprocess — exercises the actual installed
     assert.equal(result.ok, false);
     assert.match(result.error, /npm_audit_unavailable|npm_audit_unparseable/);
     assert.deepEqual(result.findings, []);
+  });
+});
+
+describe('runDependencyAudit error handling (offline, no registry request)', () => {
+  test('npm error JSON is unavailable, never a fabricated empty successful audit', (t) => {
+    t.mock.method(childProcess, 'execFileSync', () => JSON.stringify({ error: { code: 'ENETUNREACH', summary: 'Registry unavailable' } }));
+    syncBuiltinESMExports();
+    try {
+      const result = runDependencyAudit();
+      assert.equal(result.ok, false);
+      assert.match(result.error, /npm_audit_unavailable: Registry unavailable/);
+      assert.deepEqual(result.findings, []);
+    } finally {
+      t.mock.restoreAll();
+      syncBuiltinESMExports();
+    }
   });
 });

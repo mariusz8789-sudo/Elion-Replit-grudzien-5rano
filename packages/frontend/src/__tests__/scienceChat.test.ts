@@ -569,3 +569,17 @@ describe('scienceChat: precision reference handoff', () => {
     expect(precisionQuestionFromMessage('Pokaż mi pogodę jutro')).toBeUndefined();
   });
 });
+
+describe('scienceChat: /świat — Looking Glass pytany z jednego czatu', () => {
+  it('przekazuje pytanie do ekranu Looking Glass w hashu, bez drugiego pola tekstowego', () => {
+    const r = resolveCommand('/świat Pokaż epidemię przez 60 dni', null);
+    expect(r.action).toEqual({ type: 'openRoute', hash: `#/looking-glass?q=${encodeURIComponent('Pokaż epidemię przez 60 dni')}` });
+    expect(resolveCommand('/swiat powódź 72 godziny', null).action).toMatchObject({ type: 'openRoute' });
+  });
+
+  it('pusta komenda prosi o opis zamiast otwierać pusty świat', () => {
+    const r = resolveCommand('/świat', null);
+    expect(r.action).toBeUndefined();
+    expect(r.intent).toBe('HELP');
+  });
+});

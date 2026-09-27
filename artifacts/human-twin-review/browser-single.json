@@ -1,0 +1,74 @@
+{
+  "browser": "153.0.4234.48",
+  "base": "http://127.0.0.1:5000",
+  "loads": [
+    {
+      "kind": "cold",
+      "index": 1,
+      "wallMs": 15505,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5000/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 2072.9000000059605,
+          "fetchStartedAtMs": 2072.9000000059605,
+          "fetchCompletedAtMs": 8939.70000000298,
+          "decodeStartedAtMs": 8939.70000000298,
+          "decodeCompletedAtMs": 9141.70000000298,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 9165.40000000596,
+        "firstRenderedAtMs": 15480.60000000894
+      },
+      "runtime": {
+        "updateCount": 27,
+        "simulationSeconds": 0.9465000000089424,
+        "lastDeltaSeconds": 0.03970000000298023,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 6.969600000008941,
+        "frameDeltaSeconds": 0.03970000000298023,
+        "render": {
+          "fps": 60.24096385542036,
+          "frameMs": 16.600000000000364,
+          "renderMs": 6314.800000011921,
+          "drawCalls": 1239,
+          "triangles": 430419,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 14057472.000000002
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        }
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    }
+  ],
+  "scenarios": [],
+  "errors": []
+}

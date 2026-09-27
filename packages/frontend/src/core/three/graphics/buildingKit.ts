@@ -211,6 +211,11 @@ export interface FacadeBuildingOptions {
    * on it (per-window lit/unlit tinting), so pass a material dedicated to this use. */
   windowMaterial: THREE_NS.Material;
   roofMaterial?: THREE_NS.Material;
+  /** Dark architectural trim used for the plinth, bay divisions and entrance reveal. Supplying
+   * this turns a very wide generated footprint into legible facade bays instead of one long box. */
+  trimMaterial?: THREE_NS.Material;
+  /** Window/door material for the recessed street entrance. Defaults to `windowMaterial`. */
+  entranceMaterial?: THREE_NS.Material;
   /** Approximate storey height in world units — window rows are derived from it. Default 1.2. */
   floorHeight?: number;
   /** Fraction of windows tinted `litColor` rather than `unlitColor`. Default 0.45. */
@@ -219,6 +224,8 @@ export interface FacadeBuildingOptions {
   unlitColor?: THREE_NS.ColorRepresentation;
   /** Adds `createRooftopEquipment` on the roof. Default true. */
   rooftopEquipment?: boolean;
+  /** Maximum apparent facade-bay width, in the same local units as width/depth. */
+  maxFacadeBayWidth?: number;
 }
 
 /**
@@ -263,6 +270,9 @@ export function createFacadeBuilding(THREE: typeof THREE_NS, options: FacadeBuil
 
   const windowHeight = Math.min(floorHeight * 0.45, height / rows * 0.5);
   const windowWidth = windowHeight * 0.8;
+  // A percentage-only offset becomes sub-millimetric after WorldFrame normalization and causes
+  // coplanar flicker/white streaks in captured films. Keep a small floor tied to storey scale.
+  const windowSurfaceOffset = Math.max(0.004, Math.min(floorHeight * 0.035, Math.min(width, depth) * 0.012));
   const batch = new InstanceBatch(THREE, new THREE.PlaneGeometry(windowWidth, windowHeight), options.windowMaterial);
 
   // Each facade: its outward normal's axis, its half-extent along that axis, and the span the window
@@ -282,9 +292,10 @@ export function createFacadeBuilding(THREE: typeof THREE_NS, options: FacadeBuil
       if (y + windowHeight / 2 > py + height) continue;
       for (let column = 1; column <= columns; column++) {
         const along = -facade.span / 2 + column * columnStep;
+        const outwardOffset = facade.offset + Math.sign(facade.offset || 1) * windowSurfaceOffset;
         const position: THREE_NS.Vector3Tuple = facade.spanAxis === 'x'
-          ? [px + along, y, pz + facade.offset * 1.002]
-          : [px + facade.offset * 1.002, y, pz + along];
+          ? [px + along, y, pz + outwardOffset]
+          : [px + outwardOffset, y, pz + along];
         batch.add(position, [0, facade.rotationY, 0], 1, rand() < litFraction ? litColor : unlitColor);
       }
     }
@@ -293,6 +304,59 @@ export function createFacadeBuilding(THREE: typeof THREE_NS, options: FacadeBuil
   // works exactly as well as a Scene despite the narrower parameter type (same cast the
   // WorldFrameRenderer already makes for the same reason).
   batch.build(group as unknown as THREE_NS.Scene, false);
+
+  // --- Architectural relief -------------------------------------------------------------------
+  // Generated parcels can legitimately produce broad footprints. Deterministic pilasters and a
+  // recessed entrance preserve that canonical footprint while giving the eye metre-scale cues.
+  // All repeated pilasters share one instanced draw call per orientation.
+  if (options.trimMaterial) {
+    const relief = new THREE.Group();
+    relief.name = 'genesis-facade-architectural-relief';
+    const trim = options.trimMaterial;
+    const trimWidth = Math.max(0.018, Math.min(floorHeight * 0.14, Math.min(width, depth) * 0.018));
+    const trimDepth = Math.max(0.008, windowSurfaceOffset * 1.35);
+    const reliefHeight = height * 0.94;
+    const maxBay = Math.max(floorHeight * 3.5, options.maxFacadeBayWidth ?? floorHeight * 5.5);
+
+    const frontBack = new InstanceBatch(THREE, new THREE.BoxGeometry(trimWidth, reliefHeight, trimDepth), trim);
+    const frontBayCount = Math.max(1, Math.ceil(width / maxBay));
+    for (let i = 0; i <= frontBayCount; i++) {
+      const x = px - width / 2 + (width * i) / frontBayCount;
+      frontBack.add([x, py + reliefHeight / 2, pz + depth / 2 + trimDepth / 2]);
+      frontBack.add([x, py + reliefHeight / 2, pz - depth / 2 - trimDepth / 2]);
+    }
+    frontBack.build(relief as unknown as THREE_NS.Scene, true);
+
+    const side = new InstanceBatch(THREE, new THREE.BoxGeometry(trimDepth, reliefHeight, trimWidth), trim);
+    const sideBayCount = Math.max(1, Math.ceil(depth / maxBay));
+    for (let i = 0; i <= sideBayCount; i++) {
+      const z = pz - depth / 2 + (depth * i) / sideBayCount;
+      side.add([px + width / 2 + trimDepth / 2, py + reliefHeight / 2, z]);
+      side.add([px - width / 2 - trimDepth / 2, py + reliefHeight / 2, z]);
+    }
+    side.build(relief as unknown as THREE_NS.Scene, true);
+
+    const plinthHeight = Math.max(0.025, Math.min(height * 0.065, floorHeight * 0.55));
+    const plinth = new THREE.Mesh(
+      new THREE.BoxGeometry(width * 1.012, plinthHeight, depth * 1.012),
+      trim,
+    );
+    plinth.position.set(px, py + plinthHeight / 2, pz);
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    relief.add(plinth);
+
+    const entranceWidth = Math.min(width * 0.22, Math.max(floorHeight * 0.9, width * 0.08));
+    const entranceHeight = Math.min(height * 0.28, floorHeight * 0.72);
+    const entrance = new THREE.Mesh(
+      new THREE.BoxGeometry(entranceWidth, entranceHeight, trimDepth * 1.8),
+      options.entranceMaterial ?? options.windowMaterial,
+    );
+    entrance.position.set(px, py + entranceHeight / 2, pz + depth / 2 + trimDepth);
+    entrance.castShadow = true;
+    relief.add(entrance);
+    group.add(relief);
+  }
 
   if (options.roofMaterial) {
     const roof = createPlatform(THREE, options.roofMaterial, {

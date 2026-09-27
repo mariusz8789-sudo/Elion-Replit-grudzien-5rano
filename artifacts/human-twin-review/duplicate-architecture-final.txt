@@ -1,0 +1,204 @@
+PATTERN: export class WorldGraph
+packages\frontend\src\core\worldModel\ecs\worldGraph.ts:67:export class WorldGraph {
+
+PATTERN: export function generateWorld
+packages\frontend\src\core\worldModel\generation\worldGenerator.ts:34:export function generateWorld(blueprint: WorldBlueprint): GeneratedWorld {
+
+PATTERN: export class TemporalEngine
+packages\frontend\src\core\worldModel\temporal\temporalEngine.ts:68:export class TemporalEngine {
+
+PATTERN: export class EvidenceLedger
+packages\core\src\knowledge\EvidenceLedger.ts:17:export class EvidenceLedger {
+
+PATTERN: AppendOnlyMetaMemory
+(none)
+
+PATTERN: core/visualStages
+(none)
+
+PATTERN: export class WorldFrameRenderer
+packages\frontend\src\core\three\graphics\worldFrameRenderer.ts:137:export class WorldFrameRenderer {
+
+PATTERN: HumanDigitalTwinManifest
+packages\frontend\src\core\scientificWorlds\cognitiveBridge.ts:10:import type { HumanDigitalTwinManifest } from './humanLab/types';
+packages\frontend\src\core\scientificWorlds\cognitiveBridge.ts:65:  readonly manifest?: HumanDigitalTwinManifest;
+packages\frontend\src\components\HumanExplorerPanel.tsx:6:import type { AnatomyViewState, HumanDigitalTwinManifest, OrganSystemId } from '../core/scientificWorlds/humanLab/types';
+packages\frontend\src\components\HumanExplorerPanel.tsx:26:  readonly manifest: HumanDigitalTwinManifest;
+packages\frontend\src\core\scientificWorlds\humanExplorer.ts:2:import type { HumanDigitalTwinManifest } from './humanLab/types';
+packages\frontend\src\core\scientificWorlds\humanExplorer.ts:70:export function organById(manifest: HumanDigitalTwinManifest, organId: string): ExplorerOrgan | null {
+packages\frontend\src\core\scientificWorlds\humanExplorer.ts:78:export function explorerPath(organ: ExplorerOrgan, target: ScaleLevel, manifest?: HumanDigitalTwinManifest): readonly ExplorerStep[] {
+packages\frontend\src\core\scientificWorlds\humanExplorer.ts:107:  readonly manifest: HumanDigitalTwinManifest;
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyView.ts:1:import type { AnatomyDisplayMode, AnatomyViewState, HumanDigitalTwinManifest } from './types';
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyView.ts:12:export function selectAnatomyNode(state: AnatomyViewState, nodeId: string, manifest: HumanDigitalTwinManifest): AnatomyViewState {
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyView.ts:17:export function isolateAnatomyNode(state: AnatomyViewState, nodeId: string, manifest: HumanDigitalTwinManifest): AnatomyViewState {
+packages\frontend\src\core\scientificWorlds\humanLab\visualModes.ts:1:import type { AnatomyDisplayMode, HumanDigitalTwinManifest } from './types';
+packages\frontend\src\core\scientificWorlds\humanLab\visualModes.ts:11:export function buildVisualLayerInstruction(manifest: HumanDigitalTwinManifest, mode: AnatomyDisplayMode): VisualLayerInstruction {
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyAtlas.ts:1:import type { AnatomyNode, HumanBodyParameters, HumanDigitalTwinManifest, OrganSystemId } from './types';
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyAtlas.ts:41:export function createHumanDigitalTwinManifest(twinId = `HDT-${stableHash(Date.now())}`, parameters = defaultHumanParameters()): HumanDigitalTwinManifest {
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyAtlas.ts:88:export function organsInSystem(manifest: HumanDigitalTwinManifest, systemNodeId: string): readonly AnatomyNode[] {
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyAtlas.ts:93:export function systemsForOrgan(manifest: HumanDigitalTwinManifest, organId: string): readonly AnatomyNode[] {
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyAtlas.ts:98:export function getAnatomyNode(manifest: HumanDigitalTwinManifest, nodeId: string): AnatomyNode {
+packages\frontend\src\core\scientificWorlds\humanLab\anatomyAtlas.ts:104:export function descendants(manifest: HumanDigitalTwinManifest, nodeId: string): readonly AnatomyNode[] {
+packages\frontend\src\core\scientificWorlds\humanLab\types.ts:54:export interface HumanDigitalTwinManifest {
+packages\frontend\src\core\scientificWorlds\humanLab\types.ts:327:  readonly twin: HumanDigitalTwinManifest;
+packages\frontend\src\__tests__\humanMacroMicroLayer.test.ts:5:import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
+packages\frontend\src\__tests__\humanMacroMicroLayer.test.ts:31:    const layer = new HumanMacroMicroLayer(THREE, createHumanDigitalTwinManifest('HDT-test'));
+packages\frontend\src\core\three\biologyLabKit.ts:6:import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
+packages\frontend\src\core\three\biologyLabKit.ts:225:export function createTwinProxy(THREE: typeof THREE_NS, manifest: HumanDigitalTwinManifest, opts: TwinProxyOptions): TwinHandle {
+packages\frontend\src\__tests__\humanExplorerRuntime.test.ts:2:import { createHumanDigitalTwinManifest, descendants, organsInSystem, systemsForOrgan } from '../core/scientificWorlds/humanLab/anatomyAtlas';
+packages\frontend\src\__tests__\humanExplorerRuntime.test.ts:12:const manifest = createHumanDigitalTwinManifest('HDT-v7-runtime');
+packages\frontend\src\core\three\agentLabScene3D.ts:25:import { createHumanDigitalTwinManifest } from '../scientificWorlds/humanLab/anatomyAtlas';
+packages\frontend\src\core\three\agentLabScene3D.ts:27:import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
+packages\frontend\src\core\three\agentLabScene3D.ts:178:  readonly manifest: HumanDigitalTwinManifest = createHumanDigitalTwinManifest(TWIN_ID);
+packages\frontend\src\__tests__\humanExplorer.test.ts:5:import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
+packages\frontend\src\__tests__\humanExplorer.test.ts:36:  const manifest = createHumanDigitalTwinManifest('HDT-test');
+packages\frontend\src\core\three\biologyStationKit.ts:9:import type { HumanDigitalTwinManifest } from '../scientificWorlds/humanLab/types';
+packages\frontend\src\core\three\biologyStationKit.ts:40:export interface StationKitContext { readonly palette: GenesisMaterialPalette; readonly glass: THREE_NS.Material; readonly manifest: HumanDigitalTwinManifest; readonly skinHex: string; }
+packages\frontend\src\core\three\biologyStationKit.ts:246:export function drawBiologyArtifact(r: ReadoutTarget, artifact: BiologyArtifact, manifest: HumanDigitalTwinManifest): void {
+packages\frontend\src\__tests__\humanTwinAsset.test.ts:154:    const { createHumanDigitalTwinManifest } = await import('../core/scientificWorlds/humanLab/anatomyAtlas');
+packages\frontend\src\__tests__\humanTwinAsset.test.ts:155:    const manifest = createHumanDigitalTwinManifest('HDT-test');
+packages\frontend\src\core\three\humanMacroMicroLayer.ts:3:import type { AnatomyNode, CellModel, HumanDigitalTwinManifest, Organelle } from '../scientificWorlds/humanLab/types';
+packages\frontend\src\core\three\humanMacroMicroLayer.ts:11: *   1) the canonical HumanDigitalTwinManifest (MODEL anatomy), and
+packages\frontend\src\core\three\humanMacroMicroLayer.ts:36:function organNode(manifest: HumanDigitalTwinManifest, organId: string | null): AnatomyNode | null {
+packages\frontend\src\core\three\humanMacroMicroLayer.ts:200:  constructor(private readonly THREE: typeof THREE_NS, private readonly manifest: HumanDigitalTwinManifest) {
+packages\frontend\src\__tests__\scientificWorldsCognitive.test.ts:6:import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
+packages\frontend\src\__tests__\scientificWorldsCognitive.test.ts:11:const manifest = createHumanDigitalTwinManifest('HDT-test');
+
+PATTERN: LiveMatrixBackground
+packages\frontend\src\App.tsx:26:import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
+packages\frontend\src\App.tsx:1363:        <LiveMatrixBackground
+packages\frontend\src\components\MatrixDataStream.tsx:36: * to re-derive or hand-copy this list: `liveMatrix/LiveMatrixBackground.tsx`
+packages\frontend\src\components\liveMatrix\README.md:30:LiveMatrixBackground.tsx  thin React adapter: canvas, ResizeObserver, matchMedia, visibilitychange.
+packages\frontend\src\components\liveMatrix\README.md:37:Genesis → VisualStateAdapter → LiveMatrixBackground → Canvas
+packages\frontend\src\components\liveMatrix\README.md:63:<LiveMatrixBackground activity={1} density="MEDIUM" glow="MEDIUM" quality="HIGH" seed={1337} />
+packages\frontend\src\components\liveMatrix\README.md:69:<LiveMatrixBackground {...toMatrixConfig({ activity: 'RUNNING', intensity: 0.6 })} />
+packages\frontend\src\components\liveMatrix\LiveMatrixBackground.tsx:20:export interface LiveMatrixBackgroundProps extends MatrixConfigInput {
+packages\frontend\src\components\liveMatrix\LiveMatrixBackground.tsx:25:export interface LiveMatrixBackgroundHandle {
+packages\frontend\src\components\liveMatrix\LiveMatrixBackground.tsx:32:export const LiveMatrixBackground = forwardRef<LiveMatrixBackgroundHandle, LiveMatrixBackgroundProps>(
+packages\frontend\src\components\liveMatrix\LiveMatrixBackground.tsx:33:  function LiveMatrixBackground(props, ref) {
+packages\frontend\src\components\liveMatrix\LiveMatrixBackground.tsx:116:export default LiveMatrixBackground;
+packages\frontend\src\components\liveMatrix\genesisVisualState.ts:9: *     Genesis  →  VisualStateAdapter  →  LiveMatrixBackground  →  Canvas
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:5:import LiveMatrixBackground from '../components/liveMatrix/LiveMatrixBackground';
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:51:describe('LiveMatrixBackground renders', () => {
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:60:    expect(() => renderToStaticMarkup(<LiveMatrixBackground />)).not.toThrow();
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:64:    const html = renderToStaticMarkup(<LiveMatrixBackground />);
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:72:      <LiveMatrixBackground activity={4} density="HIGH" speed="LOW" glow="HIGH" quality="LOW" seed={0} reducedMotion />,
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:74:    expect(() => renderToStaticMarkup(<LiveMatrixBackground intensity={0.5} />)).not.toThrow();
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:78:    const html = renderToStaticMarkup(<LiveMatrixBackground className="bg-layer" style={{ zIndex: -1 }} />);
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:86:   * The architecture claim is `Genesis → adapter → LiveMatrixBackground`, so
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:114:   * Integration happened (App.tsx now mounts `LiveMatrixBackground`) — the
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:141:    expect(app!).toMatch(/\{route\.kind === 'home' && <ErrorBoundary>\s*<LiveMatrixBackground[\s\S]*?\/>(?:\s*)<\/ErrorBoundary>\}/);
+packages\frontend\src\__tests__\liveMatrixBoundary.test.tsx:142:    expect([...app!.matchAll(/<LiveMatrixBackground\b/g)]).toHaveLength(1);
+packages\frontend\src\__tests__\moduleReachability.test.ts:104:  'components/GenesisHoloBackdrop.tsx': 'Retired global WebGL backdrop: AppShell no longer mounts it under the dashboard-only Matrix direction. Kept for its existing lifecycle tests; the production dashboard uses the one existing LiveMatrixBackground instead.',
+packages\frontend\src\__tests__\moduleReachability.test.ts:106:  'components/holo/MatrixStage.ts': 'Retired WebGL code-rain stage used only by the unmounted GenesisHoloBackdrop and its route test. Retained source, deliberately not wired alongside the canonical LiveMatrixBackground.',
+
+PATTERN: new WorldGraph
+packages\frontend\src\core\worldModel\generation\worldGenerator.ts:35:  const graph = new WorldGraph();
+packages\frontend\src\core\three\moleculeScene3D.ts:196:    const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\ecs\worldGraph.ts:263:    const copy = new WorldGraph();
+packages\frontend\src\core\worldModel\ecs\worldGraph.ts:285:    const graph = new WorldGraph();
+packages\frontend\src\core\agent\rainfallRunoffLeverCatalog.ts:79:  const graph = new WorldGraph();
+packages\frontend\src\core\agent\cellCultureLeverCatalog.ts:120:  const graph = new WorldGraph();
+packages\frontend\src\core\agent\atomicIonizationLeverCatalog.ts:81:  const graph = new WorldGraph();
+packages\frontend\src\core\agent\particlePhysicsLeverCatalog.ts:86:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\wildfireSpread.ts:722:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\seismicShaking.ts:450:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\relativityGeodesic.ts:329:  const graph = new WorldGraph();
+packages\frontend\src\core\agent\electricalGeneratorLeverCatalog.ts:115:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\landslide.ts:592:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\hydraulicsPumpPipe.ts:171:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\genesisCityWorld.ts:63:  const graph = new WorldGraph();
+packages\frontend\src\core\lab\genesisWorldVisualizationPort.ts:60:  const engine = new TemporalEngine(new WorldGraph(), { label: 'd140-real-laboratory' });
+packages\frontend\src\core\lab\genesisSolverBinding.ts:62:      const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\fireThermal.ts:574:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\epidemicSEIR.ts:184:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\drought.ts:369:  const graph = new WorldGraph();
+packages\frontend\src\core\worldModel\domains\chemistryKinetics.ts:194:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\particleAtomicLab.test.ts:358:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\particlePhysicsDomain.test.ts:183:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\particlePhysicsDomain.test.ts:193:    const a = new WorldGraph(); addColliderRun(a);
+packages\frontend\src\__tests__\particlePhysicsDomain.test.ts:194:    const b = new WorldGraph(); addColliderRun(b);
+packages\frontend\src\__tests__\particlePhysicsDomain.test.ts:199:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\particlePhysicsDomain.test.ts:214:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\quantumTunnelingInquiry.test.ts:50:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\temporalCinematicVisualResolver.test.ts:102:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\temporalCinematicVisualResolver.test.ts:121:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\temporalCinematicVisualResolver.test.ts:137:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\temporalCinematicVisualResolver.test.ts:153:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\temporalCinematicVisualResolver.test.ts:178:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\temporalCinematicVisualResolver.test.ts:196:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelCellCycle.test.ts:30:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelCellCycle.test.ts:151:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelBondsChannel.test.ts:59:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelBridge.test.ts:18:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelBridge.test.ts:93:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelBridgeContractStability.test.ts:20:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelDroughtFireCoupling.test.ts:89:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:18:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:26:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:40:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:45:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:56:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:65:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:77:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEcs.test.ts:87:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEntityFactory.test.ts:42:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEntityFactory.test.ts:51:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEntityFactory.test.ts:64:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEntityFactory.test.ts:76:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelElectricalGenerator.test.ts:24:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEventRules2.test.ts:42:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEventRules2.test.ts:65:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEventRules2.test.ts:73:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEventRules2.test.ts:83:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEventRules2.test.ts:102:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelEventRules2.test.ts:112:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelFloodInundation.test.ts:289:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelFloodInundation.test.ts:356:      const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelInterventionReplayAudit.test.ts:98:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelInterventionReplayAudit.test.ts:126:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelGraphRestore.test.ts:20:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelGraphRestore.test.ts:34:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelGraphRestore.test.ts:44:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelGraphRestore.test.ts:74:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelMolecularStructure.test.ts:60:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelMolecularStructure.test.ts:117:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelMolecularStructure.test.ts:131:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelMolecularStructure.test.ts:146:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelMolecularStructure.test.ts:181:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelLandslide.test.ts:291:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelLandslide.test.ts:305:    const graphA = new WorldGraph();
+packages\frontend\src\__tests__\worldModelLandslide.test.ts:306:    const graphB = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSolvers.test.ts:28:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSolvers.test.ts:44:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSolvers.test.ts:58:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSolvers.test.ts:72:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSolvers.test.ts:89:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSolvers.test.ts:105:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelScalePerformance.test.ts:32:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelRelationships.test.ts:26:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelRelationships.test.ts:34:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelRelationships.test.ts:42:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelRelationships.test.ts:55:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelRelationships.test.ts:64:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelRelationships.test.ts:79:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelQuantumTunneling.test.ts:32:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelWeather.test.ts:232:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelWeather.test.ts:272:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpatialIndex.test.ts:33:  const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTrafficFlow.test.ts:154:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTrafficFlow.test.ts:175:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTemporal.test.ts:30:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTemporal.test.ts:41:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTemporal.test.ts:58:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTemporal.test.ts:74:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelTemporal.test.ts:103:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:28:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:35:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:44:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:70:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:87:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:117:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:129:    const graph = new WorldGraph();
+packages\frontend\src\__tests__\worldModelSpecification2Extras.test.ts:141:    const graph = new WorldGraph();
+

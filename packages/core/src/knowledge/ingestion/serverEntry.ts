@@ -5,6 +5,7 @@
  * nothing else. The backend supplies the real transport, sleeper, clock and environment.
  */
 export { EvidenceLedger } from '../EvidenceLedger.js';
+export { openPersistentLedger, restoreLedger, attachLedgerPersistence, MemoryLedgerSnapshotStore } from '../ledgerPersistence.js';
 export { ProposeOnlyLearner } from '../ProposeOnlyLearner.js';
 export { classifyClaim, statusLabelPl } from '../classifyClaim.js';
 export { KNOWLEDGE_DISCLAIMER } from '../evidenceTypes.js';

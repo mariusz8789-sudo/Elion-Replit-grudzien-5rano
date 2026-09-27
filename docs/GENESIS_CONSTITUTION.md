@@ -1,0 +1,173 @@
+# Genesis — konstytucja produktu (Scientific Intelligence OS)
+
+Ten dokument jest długoterminową konstytucją Genesis, przyjętą przez właściciela produktu.
+Wiąże każdą kolejną decyzję architektoniczną. Zmiana wymaga decyzji właściciela, nie autora kodu.
+
+## 0. Czym Genesis ma się stać
+
+Genesis nie jest zbiorem paneli, dem 3D ani osobnych aplikacji naukowych. Docelowo jest to
+**autonomiczny naukowy system operacyjny**: od pytania człowieka, przez zdobycie wiedzy, hipotezy,
+projekt eksperymentu, wykonanie, obserwację, falsyfikację, dowody i powtórkę, aż do następnego
+eksperymentu. Z czasem ma obsługiwać silniki obliczeniowe, cyfrowe bliźniaki, zewnętrzne moce
+obliczeniowe, komputery kwantowe, wyspecjalizowanych agentów, a po wyraźnej autoryzacji i przy
+zabezpieczeniach sprzętowych — prawdziwą aparaturę laboratoryjną.
+
+Użytkownik podaje: **CEL + UPRAWNIENIA + GRANICE BEZPIECZEŃSTWA**. Genesis dobiera drogę naukową
+wewnątrz tych granic.
+
+## 1. Pętla kanoniczna (ważniejsza niż jakikolwiek ekran)
+
+```
+PYTANIE → WIEDZA → HIPOTEZY → REJESTRACJA KRYTERIÓW → PROJEKT EKSPERYMENTU → WYBÓR SILNIKA
+→ WYKONANIE → OBSERWACJA NA ŻYWO → WYNIK → DOWODY/POCHODZENIE → FALSYFIKACJA → PAMIĘĆ
+→ POWTÓRKA → NASTĘPNY EKSPERYMENT
+```
+
+Wszystko w Genesis ma tej pętli służyć.
+
+## 2. Autonomia w granicach uprawnień
+
+Poziomy, których nie wolno omijać:
+
+| Poziom | Co wolno |
+|---|---|
+| OBSERVE | czytać dane i stan |
+| RESEARCH | pobierać zatwierdzone źródła zewnętrzne |
+| SIMULATE | uruchamiać zatwierdzone modele obliczeniowe |
+| PROPOSE | proponować eksperymenty i działania |
+| EXECUTE DIGITAL | uruchamiać zatwierdzone przepływy obliczeniowe |
+| EXECUTE PHYSICAL | sterować sprzętem wyłącznie po wyraźnej autoryzacji i przy blokadach bezpieczeństwa |
+| HIGH-RISK PHYSICAL | zawsze wymaga zgody człowieka i niezależnej walidacji bezpieczeństwa |
+
+Dostęp do urządzenia **nigdy** nie oznacza zgody na dowolne działanie. Model językowy nie uruchamia
+sprzętu.
+
+## 3. Etykiety epistemiczne — nigdy nie zlewane w jedną „odpowiedź"
+
+`KNOWN`, `INFERRED`, `MODEL_ESTIMATE`, `SIMULATED`, `MEASURED`, `REFERENCE_DATA`, `UNVERIFIED`,
+`REAL_ENGINE_OUTPUT`, `DERIVED`. Każde zdobyte twierdzenie zachowuje źródło, czas, wersję,
+identyfikator, klasę dowodu i licencję.
+
+## 4. Jeden kanon na jedną odpowiedzialność
+
+Zakaz drugiego: WorldGraph, generatora światów, Experiment Fabric, Pamięci Naukowej, Rejestru
+Dowodów, Powtórki, czatu/routera, silnika czasu, magistrali poleceń, stanu laboratorium, systemu
+falsyfikacji, rejestru silników, renderera. Rozszerzamy przez **porty i adaptery**, nie przez
+równoległe implementacje.
+
+## 5. Laboratorium 3D
+
+Warstwa wizualna nie jest źródłem prawdy:
+
+```
+PRAWDZIWY SILNIK / URZĄDZENIE / MODEL → DZIENNIK ZDARZEŃ → KANONICZNY STAN EKSPERYMENTU
+→ CYFROWE LABORATORIUM → CZYNNOŚĆ NAUKOWCA → KAMERA → WIDOCZNY WYNIK
+```
+
+Nigdy nie wolno tworzyć osobnej, udawanej symulacji tylko po to, by coś ładnie animować.
+Astra odpowiada za wierność wizualną (światło, materiały, otoczenie, inscenizacja naukowca, kamery,
+przejścia) — na tym samym kanonicznym stanie, bez drugiego renderera.
+
+## 6. Rola modelu językowego
+
+Model interpretuje, planuje, tłumaczy, proponuje hipotezy i dobiera narzędzia. **Nie jest wyrocznią
+naukową.** Liczby i twierdzenia naukowe pochodzą z silników, danych, pomiarów i jawnych reguł.
+Model nie wymyśla brakujących dowodów.
+
+## 7. Pamięć naukowa i niezmienność dowodów
+
+Pamięć przechowuje pytanie, hipotezę, rejestrację kryteriów, protokół, tożsamość i wersje silników,
+wejścia, wyjścia, dowody, porażki, falsyfikacje, tożsamość powtórki, wnioski, pytania otwarte i
+propozycje kolejnych eksperymentów. Wyniki bez pochodzenia są odrzucane.
+
+Przeszłe dowody są **niezmienne**. Nowa interpretacja tworzy nowy zapis powiązany ze starym; nigdy
+nie nadpisuje historii.
+
+## 8. Droga do prawdziwego laboratorium (projektowana teraz, włączana później)
+
+Czyste interfejsy: `InstrumentPort`, `SensorPort`, `RobotPort`, `SampleTrackingPort`,
+`LaboratorySafetyPort`, `ExecutionApprovalPort`, `ComputePort`, `QuantumComputePort`,
+`KnowledgePort`. Bez przywiązania do jednego dostawcy.
+
+Wymagania dla sterowania sprzętem: listy dozwolonych poleceń, koperty pracy urządzenia, granice
+parametrów, zatrzymanie awaryjne, niezależny watchdog, uwierzytelnienie, autoryzacja operatora, tryb
+suchego przebiegu, wycofanie tam, gdzie fizycznie możliwe, pełny dziennik poleceń, tożsamość i stan
+kalibracji urządzenia, walidacja czujników, odmowa operacji niebezpiecznych, ręczne przejęcie.
+
+## 9. Kolejność prac (dyscyplina wdrożenia)
+
+1. **Faza 1 — żywa nauka obliczeniowa**: prawdziwy silnik → żywy kanoniczny stan → laboratorium 3D →
+   dowody → falsyfikacja → powtórka. Okręt flagowy: odkrywanie leków z dokowaniem do prawdziwego
+   białka. To ma być zrobione wzorowo.
+2. Faza 2 — ta sama architektura dla chemii, biologii, fizyki.
+3. Faza 3 — wierne światy naukowe (CERN, człowiek, miasto).
+4. Faza 4 — wiedza zewnętrzna i agenci specjaliści.
+5. Faza 5 — orkiestracja mocy obliczeniowej (chmura, HPC, GPU, QPU).
+6. Faza 6 — adaptery prawdziwego laboratorium: najpierw odczyt z czujników, potem sterowanie
+   aparaturą, na końcu robotyka wyłącznie za bramkami zgody.
+7. Faza 7 — zamknięta pętla: przewidywanie → eksperyment fizyczny → pomiar → falsyfikacja →
+   kolejna propozycja.
+
+Nie budujemy wszystkiego naraz i nie wstrzymujemy działającego okrętu flagowego na rzecz
+spekulacyjnej infrastruktury.
+
+## 10. Zasada akceptacji (nienegocjowalna)
+
+Genesis jest udany dopiero wtedy, gdy o każdym wyniku potrafi powiedzieć:
+
+- wiem, skąd ten wynik pochodzi;
+- pokażę, jak powstał;
+- odróżniam przewidywanie od pomiaru;
+- potrafię to powtórzyć;
+- potrafię sprawdzić, czy przetrwa próbę obalenia;
+- wiem, jaki eksperyment powinien być następny;
+
+a docelowo: „za Twoją wyraźną zgodą i w zadanych granicach bezpieczeństwa mogę wykonać ten
+eksperyment na podłączonej aparaturze i porównać rzeczywistość z przewidywaniem".
+
+Nigdy nie deklarujemy zdolności fizycznych, które nie zostały faktycznie podłączone i zweryfikowane.
+
+## 11. Aktualizacja wykonawcza (2026-09-25) — cele białkowe nie są wymienne
+
+Plan główny i kolejność faz z §9 **nie zmieniają się**. To jest ustalenie wykonawcze:
+
+- `5C1M` (receptor μ-opioidowy, agonista BU72) i `8EF5` (ten sam receptor z fentanylem) są właściwymi
+  celami **wyłącznie dla przepływu opioidowego**.
+- **Nie wolno ich użyć do ketaminy.** Ketamina działa na receptor NMDA; dokowanie jej do receptora
+  opioidowego byłoby niespójne biologicznie. Dopóki nie ma właściwego celu i modelu dla tego
+  mechanizmu, część dokowania dla ketaminy ma status **UNRESOLVED**, a wynik RDKit/ADMET zostaje jako
+  osobny eksperyment z tym jawnym brakiem.
+- Drugi benchmark receptor–ligand (po 1IEP/imatinib) buduje się jako **osobny** przepływ opioidowy z
+  własnym ligandem i receptorem. Wyników z różnych celów nigdy się nie miesza.
+
+Kolejność prac pozostaje: (1) domknięcie żywego E2E — powtórka prawdziwego silnika, trwałość sesji i
+rejestracja kryteriów; (2) laboratorium na najwyższym poziomie wizualnym i proceduralnym; (3) dopiero
+potem drugi benchmark. Nie cofamy i nie przebudowujemy tego, co działa.
+
+## 12. Aktualizacja wykonawcza (2026-09-26) — jeden domknięty eksperyment przed czymkolwiek innym
+
+Właściciel zawiesił wszystkie prace poboczne (screeny, polish wizualny, kolejne światy, filmy) do
+chwili, w której istnieje **jeden pełny przebieg na żywo kończący się odtwarzalnym protokołem**:
+
+```
+PYTANIE → HIPOTEZA → ZAREJESTROWANE KRYTERIA → PLAN → POTWIERDZENIE → ŻYWE LABORATORIUM
+→ WIDOCZNY NAUKOWIEC / PRÓBKI / APARATURA / CZĄSTECZKI / RECEPTOR → PRAWDZIWY SILNIK
+→ STANY POŚREDNIE NA ŻYWO → WYNIK → DOWODY → POWTÓRKA SILNIKA → MATCH/DRIFT/BLOCKED
+→ KOŃCOWY, ODTWARZALNY PROTOKÓŁ
+```
+
+Dwa ustalenia, które z tego wynikają i wiążą dalej:
+
+- **Protokół końcowy nie jest streszczeniem.** Musi nieść tożsamość kandydata i strukturę (SMILES),
+  tożsamość celu, silniki z wersjami, parametry wejściowe i przygotowania, pudełko dokowania, wyniki
+  ADMET/QM, kryteria selekcji, powody odrzucenia kandydatów, finalistów, niepewność, identyfikatory
+  dowodów, tożsamość powtórki i następny krok walidacji. Gdy czegoś nie ma — pole mówi, że nie ma.
+- **Retrosynteza jest wymaganą zdolnością.** Trasa syntezy pochodzi **wyłącznie** z prawdziwego,
+  zintegrowanego silnika (AiZynthFinder, MIT — `docs/GENESIS_RETROSYNTHESIS.md`). Bez działającego
+  silnika Genesis wydaje **COMPUTATIONAL CANDIDATE PROTOCOL** + **PROPOSED VALIDATION PROTOCOL**
+  oznaczony jako wymagający fizycznego laboratorium. Zmyślona receptura syntezy jest zakazana; atrapa
+  silnika również.
+
+Laboratorium musi **pokazywać** przebieg: próbki, czynności naukowca, przejścia między stanowiskami,
+pracującą aparaturę, kandydatów wchodzących i wypadających z przepływu, porównanie finalistów — na tym
+samym kanonicznym stanie, bez osobnej animacji. „100 → 20 → 2” jako trzy liczby nie wystarcza.

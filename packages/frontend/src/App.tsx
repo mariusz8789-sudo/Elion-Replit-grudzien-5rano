@@ -25,8 +25,9 @@ import { RealityCanvas } from './components/RealityCanvas';
 import { ScienceChat } from './components/ScienceChat';
 import { LiveMatrixBackground } from './components/liveMatrix/LiveMatrixBackground';
 import { toMatrixConfig, deriveGenesisVisualState } from './components/liveMatrix/genesisVisualState';
-import { isSuppressed as isHeavy3DRoute } from './components/MatrixDataStream';
 import { listExperiments } from './core/scienceMemory';
+import { ContextualRouteGuide } from './components/guide/ContextualRouteGuide';
+import type { ContextualGuideSurface } from './core/guide/contextualGuideContent';
 
 /**
  * P0-hardening: ciężkie/opcjonalne ekrany ładowane leniwie (React.lazy).
@@ -64,6 +65,7 @@ const GenesisScientificCityScreen = lazy(() => import('./components/visual-simul
 const ConceptFilmScreen = lazy(() => import('./components/visual-simulation/ConceptFilmScreen').then((m) => ({ default: m.ConceptFilmScreen })));
 const CharacterLabScreen = lazy(() => import('./components/visual-simulation/CharacterLabScreen').then((m) => ({ default: m.CharacterLabScreen })));
 const GenesisWorldScreen = lazy(() => import('./components/visual-simulation/GenesisWorldScreen').then((m) => ({ default: m.GenesisWorldScreen })));
+const TemporalCinematicScreen = lazy(() => import('./components/visual-simulation/TemporalCinematicScreen').then((m) => ({ default: m.TemporalCinematicScreen })));
 const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/MoleculeLabScreen').then((m) => ({ default: m.MoleculeLabScreen })));
 const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
 const EvidenceShowcaseScreen = lazy(() => import('./components/visual-simulation/EvidenceShowcaseScreen').then((m) => ({ default: m.EvidenceShowcaseScreen })));
@@ -79,7 +81,6 @@ const PrecisionReferenceAnalysisScreen = lazy(() => import('./components/Precisi
 const GenesisCommandCenterHero = lazy(() => import('./components/GenesisCommandCenterHero').then((m) => ({ default: m.GenesisCommandCenterHero })));
 const GenesisCapabilityShowcase = lazy(() => import('./components/GenesisCapabilityShowcase').then((m) => ({ default: m.GenesisCapabilityShowcase })));
 const GenesisMatrixHub = lazy(() => import('./components/GenesisMatrixHub').then((m) => ({ default: m.GenesisMatrixHub })));
-const MatrixStageView = lazy(() => import('./components/MatrixStageView').then((m) => ({ default: m.MatrixStageView })));
 // Mythos B2G Matrix HUD (packages/ui): hex/bin GPU rain + live EvidenceLedger / CICADA CEP feeds. Source-only package, same alias rules as @genesis/core.
 const MatrixRoute = lazy(() => import('../../ui/src/matrix/MatrixRoute').then((m) => ({ default: m.MatrixRoute })));
 const CyberWorkspace = lazy(() => import('./components/CyberWorkspace').then((m) => ({ default: m.CyberWorkspace })));
@@ -87,6 +88,7 @@ const ClockworkDashboard = lazy(() => import('./components/ClockworkDashboard').
 const ColliderChamber = lazy(() => import('./components/ColliderChamber').then((m) => ({ default: m.ColliderChamber })));
 const LabFpvView = lazy(() => import('./components/LabFpvView').then((m) => ({ default: m.LabFpvView })));
 const CernComplexView = lazy(() => import('./components/CernComplexView').then((m) => ({ default: m.CernComplexView })));
+const ScientificWorldsScreen = lazy(() => import('./components/ScientificWorldsScreen').then((m) => ({ default: m.ScientificWorldsScreen })));
 const DeciphermentWorkspace = lazy(() => import('./components/DeciphermentWorkspace').then((m) => ({ default: m.DeciphermentWorkspace })));
 const WorkspaceStage = lazy(() => import('./components/WorkspaceStage').then((m) => ({ default: m.WorkspaceStage })));
 const PhysicsCmsZScreen = lazy(() => import('./components/PhysicsCmsZScreen').then((m) => ({ default: m.PhysicsCmsZScreen })));
@@ -94,6 +96,9 @@ const VirtualLabDashboard = lazy(() => import('./components/VirtualLabDashboard'
 const GenesisConsole = lazy(() => import('./components/GenesisConsole').then((m) => ({ default: m.GenesisConsole })));
 const SimWorldDashboard = lazy(() => import('./components/SimWorldDashboard').then((m) => ({ default: m.SimWorldDashboard })));
 const MythTheoryLab = lazy(() => import('./features/myths-theories/MythTheoryLab').then((m) => ({ default: m.MythTheoryLab })));
+const WorldDirectorScreen = lazy(() => import('./components/WorldDirectorScreen').then((m) => ({ default: m.WorldDirectorScreen })));
+const MetaCognitionScreen = lazy(() => import('./components/MetaCognitionScreen').then((m) => ({ default: m.MetaCognitionScreen })));
+const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -152,6 +157,7 @@ type Route =
   | { kind: 'concept' }
   | { kind: 'character' }
   | { kind: 'genesis-world' }
+  | { kind: 'temporal-cinematic' }
   | { kind: 'molecule' }
   | { kind: 'cell-lab' }
   | { kind: 'evidence-showcase' }
@@ -165,17 +171,20 @@ type Route =
   | { kind: 'pilot' }
   | { kind: 'molecular-reference-analysis' }
   | { kind: 'matrix' }
-  | { kind: 'matrix-stage' }
   | { kind: 'matrix-map' }
   | { kind: 'cyber' }
   | { kind: 'clockwork' }
   | { kind: 'collider' }
   | { kind: 'lab-fpv' }
   | { kind: 'cern-complex' }
+  | { kind: 'scientific-worlds'; world?: 'physics' | 'biology' }
   | { kind: 'decipherment' }
-  | { kind: 'myths-theories' };
+  | { kind: 'myths-theories' }
+  | { kind: 'world-director' }
+  | { kind: 'meta-cognition' }
+  | { kind: 'mirror' };
 
-function parseHash(): Route {
+export function parseHash(): Route {
   const h = window.location.hash;
   const lab = h.match(/^#\/lab\/([\w-]+)/);
   if (lab) return { kind: 'lab', id: lab[1] };
@@ -211,12 +220,16 @@ function parseHash(): Route {
   if (h === '#/campaign') return { kind: 'campaign' };
   if (h === '#/generate') return { kind: 'generate' };
   if (h === '#/compare') return { kind: 'compare' };
-  if (h === '#/city') return { kind: 'city' };
-  if (h === '#/city3d') return { kind: 'city3d' };
+  // One epidemic city: `#/city3d` (WebGL) and its 2D performance view `#/city3d?view=2d`; `#/city` is the old alias of the 2D view.
+  if (h === '#/city' || (h.startsWith('#/city3d?') && new URLSearchParams(h.split('?')[1]).get('view') === '2d')) return { kind: 'city' };
+  if (h === '#/city3d' || h.startsWith('#/city3d?')) return { kind: 'city3d' };
   if (h === '#/scientific-city') return { kind: 'scientific-city' };
   if (h === '#/concept') return { kind: 'concept' };
   if (h === '#/character') return { kind: 'character' };
   if (h === '#/genesis-world') return { kind: 'genesis-world' };
+  // Temporal cinematic (place + year) is a World Director mode (`#/world-director?mode=temporal&place=…&year=…`);
+  // `#/temporal-cinematic?…` stays as the alias the capture scripts drive.
+  if (h === '#/temporal-cinematic' || h.startsWith('#/temporal-cinematic?') || (h.startsWith('#/world-director?') && new URLSearchParams(h.split('?')[1]).get('mode') === 'temporal')) return { kind: 'temporal-cinematic' };
   // Deliberately just `#/molecule`, never `#/lab/molecule` — that shape is claimed by the OLD
   // Canvas-2D `registerLab()` registry's own route match above (`^#\/lab\/`), which would resolve
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
@@ -224,7 +237,7 @@ function parseHash(): Route {
   if (h === '#/cell-lab') return { kind: 'cell-lab' };
   if (h === '#/evidence' || h === '#/evidence-showcase' || h === '#/evidence-case-study' || h === '#/case-study') return { kind: 'evidence-showcase' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
-  if (h === '#/looking-glass' || h === '#/lg') return { kind: 'looking-glass' };
+  if (h === '#/looking-glass' || h.startsWith('#/looking-glass?') || h === '#/lg') return { kind: 'looking-glass' };
   if (h === '#/lab-3d' || h === '#/first-person-lab') return { kind: 'first-person-lab' };
   if (h === '#/investor-demo') return { kind: 'investor-demo' };
   if (h === '#/discovery-hall' || h.startsWith('#/discovery-hall?')) return { kind: 'discovery-hall' };
@@ -232,15 +245,22 @@ function parseHash(): Route {
   if (h === '#/pilot' || h.startsWith('#/pilot?')) return { kind: 'pilot' };
   if (h === '#/molecular-reference-analysis') return { kind: 'molecular-reference-analysis' };
   if (h === '#/matrix') return { kind: 'matrix' };
-  if (h === '#/matrix-stage') return { kind: 'matrix-stage' };
+  // The retired 3D stage had no data source left; old links land on the one Matrix route.
+  if (h === '#/matrix-stage') return { kind: 'matrix' };
   if (h === '#/matrix-map') return { kind: 'matrix-map' };
   if (h === '#/cyber') return { kind: 'cyber' };
   if (h === '#/clockwork') return { kind: 'clockwork' };
-  if (h === '#/collider') return { kind: 'collider' };
+  // The detector chamber is a room of the one CERN complex (`#/cern-complex?room=detector`); `#/collider` is its old alias.
+  if (h === '#/collider' || (h.startsWith('#/cern-complex?') && new URLSearchParams(h.split('?')[1]).get('room') === 'detector')) return { kind: 'collider' };
   if (h === '#/lab-fpv') return { kind: 'lab-fpv' };
-  if (h === '#/cern-complex') return { kind: 'cern-complex' };
+  if (h === '#/cern-complex' || h.startsWith('#/cern-complex?')) return { kind: 'cern-complex' };
+  if (h === '#/scientific-worlds' || h.startsWith('#/scientific-worlds?')) return { kind: 'scientific-worlds' };
+  if (h === '#/human-biology-lab' || h.startsWith('#/human-biology-lab?')) return { kind: 'scientific-worlds', world: 'biology' };
   if (h === '#/decipherment') return { kind: 'decipherment' };
   if (h === '#/myths-theories') return { kind: 'myths-theories' };
+  if (h === '#/world-director' || h.startsWith('#/world-director?')) return { kind: 'world-director' };
+  if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
+  if (h === '#/mirror') return { kind: 'mirror' };
   return { kind: 'home' };
 }
 
@@ -256,6 +276,20 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasCompletedOnboarding());
   const lastLabId = useRef<string | null>(null);
+
+  const contextualGuideSurface: ContextualGuideSurface | null = (() => {
+    switch (route.kind) {
+      case 'cern-complex': case 'collider': return 'CERN';
+      case 'cyber': return 'CYBER';
+      case 'gov-campaign': return 'GOVERNMENT';
+      case 'mirror': return 'MIRROR';
+      case 'world-director': return 'WORLD_DIRECTOR';
+      case 'virtual-bio': return 'VIRTUAL_LAB';
+      case 'campaign': return 'CAMPAIGN';
+      case 'scientific-worlds': return route.world === 'biology' ? 'HUMAN_EXPLORER' : null;
+      default: return null;
+    }
+  })();
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
@@ -318,6 +352,7 @@ export default function App() {
     <>
       {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      <ContextualRouteGuide surface={contextualGuideSurface} />
     </>
   );
 
@@ -327,7 +362,7 @@ export default function App() {
         onFinish={(destination) => {
           markOnboardingComplete();
           setOnboardingOpen(false);
-          if (destination === 'timeline') window.location.hash = '#/timeline';
+          if (destination === 'laboratory') window.location.hash = '#/scientific-worlds';
         }}
       />
     );
@@ -339,6 +374,15 @@ export default function App() {
   // gałęzi, React odmontowywałby go przy każdej zmianie trasy — dokładnie
   // to, czego "persystentne płótno" ma unikać.
   const renderRoute = () => {
+    if (route.kind === 'world-director') {
+      return <div className="app app-fullbleed"><HeavyRoute><WorldDirectorScreen /></HeavyRoute>{overlays}</div>;
+    }
+    if (route.kind === 'meta-cognition') {
+      return <div className="app"><TopBar title="◉ Meta‑Cognition / Self‑Audit" onSearch={() => setSearchOpen(true)} /><HeavyRoute><MetaCognitionScreen /></HeavyRoute>{overlays}</div>;
+    }
+    if (route.kind === 'mirror') {
+      return <div className="app app-fullbleed"><HeavyRoute><MirrorStatusScreen /></HeavyRoute>{overlays}</div>;
+    }
     if (route.kind === 'lab') {
       const lab = getLab(route.id);
       if (!lab) {
@@ -695,18 +739,6 @@ export default function App() {
       );
     }
 
-    if (route.kind === 'matrix-stage') {
-      // The 3D stage: the full-bleed WebGL world (volumetric rain over the obsidian mirror) is the page; one HUD column, no cards.
-      return (
-        <div className="app app-matrix-stage">
-          <HeavyRoute>
-            <MatrixStageView />
-          </HeavyRoute>
-          {overlays}
-        </div>
-      );
-    }
-
     if (route.kind === 'matrix-map') {
       return (
         <div className="app">
@@ -722,7 +754,8 @@ export default function App() {
     if (route.kind === 'collider') {
       return (
         <div className="app">
-          <TopBar title="⚛ Genesis Collider — komora detektora" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="⚛ Kompleks CERN — komora detektora" onSearch={() => setSearchOpen(true)} />
+          <ViewSwitch label="Kompleks CERN" options={[{ label: 'Hala i tunel', hash: '#/cern-complex' }, { label: 'Komora detektora', hash: '#/cern-complex?room=detector', active: true }]} />
           <HeavyRoute>
             <ColliderChamber />
           </HeavyRoute>
@@ -737,6 +770,18 @@ export default function App() {
           <TopBar title="🧪 Quantum Lab — FPV" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <LabFpvView />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'scientific-worlds') {
+      // Scientific Worlds: full-viewport WebGL through the agent's visor, HUD in safe zones; the shell backdrop is suppressed here.
+      return (
+        <div className="app app-matrix-stage app-sw">
+          <HeavyRoute>
+            <ScientificWorldsScreen world={route.world ?? 'physics'} />
           </HeavyRoute>
           {overlays}
         </div>
@@ -843,7 +888,8 @@ export default function App() {
     if (route.kind === 'city') {
       return (
         <div className="app">
-          <TopBar title="🏙 Epidemia w małym mieście — tryb wydajnościowy 2D" onSearch={() => setSearchOpen(true)} />
+          <TopBar title="Miasto epidemiologiczne — widok 2D" onSearch={() => setSearchOpen(true)} />
+          <ViewSwitch label="Widok miasta" options={[{ label: '3D (WebGL)', hash: '#/city3d' }, { label: '2D (wydajnościowy)', hash: '#/city3d?view=2d', active: true }]} />
           <HeavyRoute>
             <VisualSimulationScreen />
           </HeavyRoute>
@@ -856,6 +902,7 @@ export default function App() {
       return (
         <div className="app">
           <TopBar title="Miasto epidemiologiczne" onSearch={() => setSearchOpen(true)} />
+          <ViewSwitch label="Widok miasta" options={[{ label: '3D (WebGL)', hash: '#/city3d', active: true }, { label: '2D (wydajnościowy)', hash: '#/city3d?view=2d' }]} />
           <HeavyRoute>
             <City3DWebGLScreen />
           </HeavyRoute>
@@ -1033,6 +1080,14 @@ export default function App() {
       );
     }
 
+    if (route.kind === 'temporal-cinematic') {
+      return (
+        <HeavyRoute>
+          <TemporalCinematicScreen />
+        </HeavyRoute>
+      );
+    }
+
     if (route.kind === 'molecule') {
       return (
         <div className="app">
@@ -1080,9 +1135,6 @@ export default function App() {
           <HeavyRoute>
             <StartHero />
           </HeavyRoute>
-          <HeavyRoute>
-            <WorkspaceStage />
-          </HeavyRoute>
           {/* D-118: everything Home used to shout (launcher lists, research zone, the 3D command
               centre, the capability showcase, the scale journey, the labs grid) stays reachable
               behind ONE disclosure. Nothing was deleted; it stopped competing with the question box. */}
@@ -1093,6 +1145,9 @@ export default function App() {
           </div>
           {homeMoreOpen && (
           <div className="home-more-body">
+          <HeavyRoute>
+            <WorkspaceStage />
+          </HeavyRoute>
           <div className="section-label">Zacznij tutaj</div>
           <div className="home-launcher">
           <button className="timeline-cta timeline-cta-primary" onClick={() => { window.location.hash = '#/generate'; }}>
@@ -1311,28 +1366,17 @@ export default function App() {
     hasOpenInvestigation: false,
     savedExperimentCount: (() => { try { return listExperiments().length; } catch { return 0; } })(),
   });
-  // The same route list `MatrixDataStream.tsx` uses, read here for a DIFFERENT
-  // decision. Suppressing the background entirely on these routes was measured
-  // to be wrong: on #/genesis-world the 3D canvas is 1200x750 inside a
-  // 1440x900 viewport — 69% — so the sidebar, title strip, description block
-  // and margins (the other 31%) were left empty for no reason. What actually
-  // needs protecting on these screens is the frame budget, since a second rAF
-  // loop runs beside the 3D scene's own. So the background stays mounted and
-  // visible, and drops to LOW quality instead: fewer streams and particles,
-  // no glow blur, lower device-pixel-ratio cap (matrixEngine.ts::QUALITY).
-  const heavy3DRoute = isHeavy3DRoute(window.location.hash);
-
   return (
     <>
       {/* Persystentne, zawsze zamontowane, ciężkie (Three.js) komponenty — każdy we
           własnej granicy błędu, żeby ich awaria nie zwaliła całej aplikacji na biały ekran. */}
-      <ErrorBoundary>
+      {route.kind === 'home' && <ErrorBoundary>
         <LiveMatrixBackground
           className="matrix-datastream"
           {...toMatrixConfig(genesisVisualState)}
-          quality={heavy3DRoute ? 'LOW' : 'HIGH'}
+          style={{ background: '#020806', opacity: 0.55 }}
         />
-      </ErrorBoundary>
+      </ErrorBoundary>}
       <ErrorBoundary><RealityCanvas active={route.kind === 'reality' || route.kind === 'prebuild'} /></ErrorBoundary>
       {/* One frame around every route. AppShell owns no routing — it only sets
           window.location.hash, exactly as the app's own buttons already do —
@@ -1353,6 +1397,19 @@ export default function App() {
 /** Route titles were written with a leading emoji; the chrome shows the Genesis mark instead (D-118). */
 export function cleanRouteTitle(title: string): string {
   return title.replace(/^[^\p{L}\p{N}]+\s*/u, '').trim();
+}
+
+/** One place, several views of it: a tab row under the TopBar that switches between the views' routes. */
+function ViewSwitch({ label, options }: { label: string; options: readonly { label: string; hash: string; active?: boolean }[] }) {
+  return (
+    <nav className="view-switch" aria-label={label}>
+      {options.map((option) => (
+        <button key={option.hash} type="button" className="chip-btn" aria-pressed={Boolean(option.active)} onClick={() => { window.location.hash = option.hash; }}>
+          {option.label}
+        </button>
+      ))}
+    </nav>
+  );
 }
 
 function TopBar({ title, onSearch }: { title: string; onSearch: () => void }) {

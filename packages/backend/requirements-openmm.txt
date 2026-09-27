@@ -1,0 +1,5 @@
+# Pinned to the version verified against the live reference case in this repo
+# (packages/backend/src/compute/mdAdapter.mjs / md_worker.py). CPU-only platform
+# is selected by the worker at runtime (openmm.Platform.getPlatformByName); no
+# CUDA/OpenCL driver is required for the reference water-box minimization.
+openmm==8.6.1

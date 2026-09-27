@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """RDKit worker (Priority A/D) — REAL cheminformatics, called by the Node adapter.
 
-Protocol: argv[1] is a JSON request {"cmd": ..., ...}. Output is a single JSON
-line to stdout: {"ok": true, ...} or {"ok": false, "error": ...}. No RDKit →
+Protocol: a JSON request {"cmd": ..., ...} is read from stdin. For backwards
+compatibility a small request may still be supplied as argv[1]. Using stdin is
+required for batch operations because Windows has a much smaller command-line
+length limit than Linux. Output is a single JSON line to stdout:
+{"ok": true, ...} or {"ok": false, "error": ...}. No RDKit →
 import fails and the adapter treats the capability as unavailable (never faked).
 
 Commands:
@@ -18,7 +21,8 @@ import json
 
 def main():
     try:
-        req = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
+        raw = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read()
+        req = json.loads(raw) if raw else {}
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": "bad_request: %s" % e}))
         return

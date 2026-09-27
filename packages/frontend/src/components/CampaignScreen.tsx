@@ -8,6 +8,9 @@ import {
   type DiscoveryGraph, type WhyAnswer, type ScienceRun, type ModelConflict, type ScienceRunVerification, type ScientificComputeReport,
 } from '../core/backend/client';
 import { LockedScreen } from './LockedScreen';
+import { LabValidationPanel } from './LabValidationPanel';
+import { ScientificResultInspector } from './ScientificResultInspector';
+import { VirtualLabPanel } from './VirtualLabPanel';
 import { parseDiscoveryGoal, buildCampaignRequest } from '../core/discovery/discoveryGoalIntent';
 import { parseCampaignWhyQuestion } from '../core/discovery/campaignWhyIntent';
 
@@ -472,22 +475,11 @@ function CampaignWorkspace() {
               <ul className="plain-list small">
                 {scienceRuns.slice(0, 20).map((r) => (
                   <li key={r.id}>
-                    <strong>{r.capability}</strong> · {r.engine} {r.engineVersion} · <span className="pill pill-warn">{r.evidenceClass}</span>
-                    <div className="muted">
-                      {r.capability === 'molecular-docking' && <>best {String((r.outputs as Record<string, unknown>).bestAffinityKcalMol)} {r.units.bestAffinityKcalMol}</>}
-                      {r.capability === 'quantum-chemistry' && <>E {String((r.outputs as Record<string, unknown>).energyHartree)} Ha, gap {String((r.outputs as Record<string, unknown>).homoLumoGapEv)} eV</>}
-                      {r.capability === 'admet-estimation' && <>MW {fmtNum((r.outputs as Record<string, unknown>).molecular_weight)}, logP {fmtNum((r.outputs as Record<string, unknown>).logP)}, BBB {fmtProb((r.outputs as Record<string, unknown>).BBB_Martins)}, HIA {fmtProb((r.outputs as Record<string, unknown>).HIA_Hou)}</>}
-                      {r.capability === 'toxicity-risk-estimation' && <>hERG {fmtProb((r.outputs as Record<string, unknown>).hERG)}, AMES {fmtProb((r.outputs as Record<string, unknown>).AMES)}, DILI {fmtProb((r.outputs as Record<string, unknown>).DILI)}, ClinTox {fmtProb((r.outputs as Record<string, unknown>).ClinTox)}</>}
-                      {' · '}method {r.method} · inHash {r.inputHash?.slice(0, 8)} · outHash {r.outputHash?.slice(0, 8)} · {r.durationMs} ms
-                    </div>
-                    {r.artifacts.length > 0 && <div className="muted small">artefakty: {r.artifacts.map((a) => `${a.kind}(${a.sha256_16 ?? ''})`).join(', ')}</div>}
-                    {r.warnings.length > 0 && <div className="warn-banner small">{r.warnings.join('; ')}</div>}
-                    <div className="muted small">
-                      <button className="chip-btn" disabled={verifications[r.id] === 'loading'} onClick={() => void onVerifyRun(r.id)}>
-                        {verifications[r.id] === 'loading' ? 'Weryfikacja…' : 'Zweryfikuj (powtórz obliczenie)'}
-                      </button>
-                      {' '}<VerdictBadge v={verifications[r.id]} />
-                    </div>
+                    <ScientificResultInspector
+                      run={r}
+                      verification={verifications[r.id]}
+                      onVerify={(runId) => { void onVerifyRun(runId); }}
+                    />
                   </li>
                 ))}
               </ul>
@@ -552,6 +544,25 @@ function CampaignWorkspace() {
           )}
         </section>
       )}
+
+      {selected && projectId && (
+        <VirtualLabPanel
+          projectId={projectId}
+          campaignId={selected.id}
+          candidates={candidates}
+          onChanged={() => { void loadDetail(selected.id); }}
+        />
+      )}
+
+      {selected && projectId && (
+        <LabValidationPanel
+          projectId={projectId}
+          campaignId={selected.id}
+          candidates={candidates}
+          scienceRuns={scienceRuns}
+          onChanged={() => { void loadDetail(selected.id); }}
+        />
+      )}
     </main>
   );
 }
@@ -571,31 +582,3 @@ function StatusPill({ status }: { status: string }) {
 }
 
 /** Realna liczba fizykochemiczna (MW, logP…) — brak wartości oznacza brakujący endpoint, nigdy zmyśloną liczbę. */
-function fmtNum(v: unknown): string {
-  return typeof v === 'number' ? v.toFixed(2) : '—';
-}
-
-/** Prawdopodobieństwo klasyfikacyjne [0,1] z zespołu ADMET-AI (MODEL_ESTIMATE) — nigdy SAFE/NON-TOXIC. */
-function fmtProb(v: unknown): string {
-  return typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : '—';
-}
-
-const VERDICT_LABEL: Record<ScienceRunVerification['verdict'], string> = {
-  MATCH: 'ZGODNE — powtórne obliczenie potwierdza wynik',
-  DRIFT: 'DRYF — realna rozbieżność liczbowa (patrz szczegóły)',
-  ENGINE_VERSION_CHANGED: 'ZMIANA WERSJI SILNIKA — porównanie niejednoznaczne',
-  BLOCKED_BY_RUNTIME: 'SILNIK NIEDOSTĘPNY — nie da się powtórzyć teraz',
-  REPLAY_UNSUPPORTED: 'BRAK ŚCIEŻKI WERYFIKACJI dla tej zdolności',
-};
-
-/** Priority B: wynik replay-weryfikacji jednego Scientific Run — nigdy binarne pass/fail. */
-function VerdictBadge({ v }: { v: ScienceRunVerification | 'loading' | 'error' | undefined }) {
-  if (v == null || v === 'loading') return null;
-  if (v === 'error') return <span className="pill pill-warn">błąd weryfikacji</span>;
-  const good = v.verdict === 'MATCH';
-  return (
-    <span className={good ? 'pill pill-ok' : 'pill pill-warn'} title={JSON.stringify(v.detail)}>
-      {VERDICT_LABEL[v.verdict]}
-    </span>
-  );
-}

@@ -1,0 +1,931 @@
+{
+  "startedAt": "2026-09-22T02:01:28.325Z",
+  "browser": "153.0.4234.48",
+  "executablePath": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+  "base": "http://127.0.0.1:5001",
+  "coldDefinition": "New Chromium process and empty context per load; OS filesystem cache is not purged.",
+  "loads": [
+    {
+      "kind": "cold",
+      "index": 1,
+      "wallMs": 7698,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 968.1999999880791,
+          "fetchStartedAtMs": 968.3000000119209,
+          "fetchCompletedAtMs": 4563.0999999940395,
+          "decodeStartedAtMs": 4563.0999999940395,
+          "decodeCompletedAtMs": 4661.300000011921,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 4674.699999988079,
+        "firstRenderedAtMs": 7682.9000000059605
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 15,
+        "simulationSeconds": 0.8299000000357619,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 6.608200000017882,
+        "frameDeltaSeconds": 3.0120999999940397,
+        "render": {
+          "fps": 0.332623736029803,
+          "frameMs": 3006.4000000000005,
+          "renderMs": 4.5999999940395355,
+          "drawCalls": 1229,
+          "triangles": 429203,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "cold",
+      "index": 2,
+      "wallMs": 7594,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 946.6999999880791,
+          "fetchStartedAtMs": 946.7999999821186,
+          "fetchCompletedAtMs": 4516.899999976158,
+          "decodeStartedAtMs": 4516.899999976158,
+          "decodeCompletedAtMs": 4597.799999982119,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 4611.399999976158,
+        "firstRenderedAtMs": 7566.299999982119
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 11,
+        "simulationSeconds": 0.8124999999940392,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 6.51109999999404,
+        "frameDeltaSeconds": 2.9575999999940397,
+        "render": {
+          "fps": 0.338283549270999,
+          "frameMs": 2956.0999999999995,
+          "renderMs": 5.5999999940395355,
+          "drawCalls": 1225,
+          "triangles": 429155,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "cold",
+      "index": 3,
+      "wallMs": 7683,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 929.2000000178814,
+          "fetchStartedAtMs": 929.3000000119209,
+          "fetchCompletedAtMs": 4583.5,
+          "decodeStartedAtMs": 4583.5,
+          "decodeCompletedAtMs": 4671.4000000059605,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 4685.4000000059605,
+        "firstRenderedAtMs": 7658.200000017881
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 12,
+        "simulationSeconds": 0.6875999999999994,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 6.624399999976158,
+        "frameDeltaSeconds": 2.98,
+        "render": {
+          "fps": 0.33638320775026914,
+          "frameMs": 2972.7999999999993,
+          "renderMs": 4.899999976158142,
+          "drawCalls": 1233,
+          "triangles": 429251,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "cold",
+      "index": 4,
+      "wallMs": 7668,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 942.6000000238419,
+          "fetchStartedAtMs": 942.7000000178814,
+          "fetchCompletedAtMs": 4585.300000011921,
+          "decodeStartedAtMs": 4585.300000011921,
+          "decodeCompletedAtMs": 4675.700000017881,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 4689.4000000059605,
+        "firstRenderedAtMs": 7655.4000000059605
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 14,
+        "simulationSeconds": 0.8302000000238414,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 6.601600000023842,
+        "frameDeltaSeconds": 2.9686000000238417,
+        "render": {
+          "fps": 0.3382492220267894,
+          "frameMs": 2956.3999999999996,
+          "renderMs": 4.399999976158142,
+          "drawCalls": 1223,
+          "triangles": 428219,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "cold",
+      "index": 5,
+      "wallMs": 7701,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 956.8000000119209,
+          "fetchStartedAtMs": 956.8000000119209,
+          "fetchCompletedAtMs": 4590,
+          "decodeStartedAtMs": 4590,
+          "decodeCompletedAtMs": 4696,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 4710.9000000059605,
+        "firstRenderedAtMs": 7690
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 14,
+        "simulationSeconds": 0.8395000000119208,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 6.6233000000119215,
+        "frameDeltaSeconds": 2.9817000000178813,
+        "render": {
+          "fps": 0.33451528734863184,
+          "frameMs": 2989.3999999999996,
+          "renderMs": 4.0999999940395355,
+          "drawCalls": 1233,
+          "triangles": 429251,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "repeat",
+      "index": 1,
+      "wallMs": 1309,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 533.3000000119209,
+          "fetchStartedAtMs": 533.3000000119209,
+          "fetchCompletedAtMs": 938.5,
+          "decodeStartedAtMs": 938.6000000238419,
+          "decodeCompletedAtMs": 1040.6000000238419,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 1054.4000000059605,
+        "firstRenderedAtMs": 1297.2000000178814
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 13,
+        "simulationSeconds": 0.48830000000596047,
+        "lastDeltaSeconds": 0.020599999994039535,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 0.4565,
+        "frameDeltaSeconds": 0.020599999994039535,
+        "render": {
+          "fps": 60.24096385542202,
+          "frameMs": 16.59999999999991,
+          "renderMs": 242.80000001192093,
+          "drawCalls": 1229,
+          "triangles": 429203,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 14057472.000000002
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "repeat",
+      "index": 2,
+      "wallMs": 1102,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 392.2999999821186,
+          "fetchStartedAtMs": 392.2999999821186,
+          "fetchCompletedAtMs": 724.2999999821186,
+          "decodeStartedAtMs": 724.2999999821186,
+          "decodeCompletedAtMs": 815.5,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 828.1999999880791,
+        "firstRenderedAtMs": 1066
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 12,
+        "simulationSeconds": 0.6552999999642373,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 0.6517000000178814,
+        "frameDeltaSeconds": 0.24559999999403953,
+        "render": {
+          "fps": 4.278990158322637,
+          "frameMs": 233.69999999999993,
+          "renderMs": 4.300000011920929,
+          "drawCalls": 1225,
+          "triangles": 429155,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "repeat",
+      "index": 3,
+      "wallMs": 1064,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 370.7999999821186,
+          "fetchStartedAtMs": 370.7999999821186,
+          "fetchCompletedAtMs": 702.5999999940395,
+          "decodeStartedAtMs": 702.5999999940395,
+          "decodeCompletedAtMs": 785.5999999940395,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 798.2999999821186,
+        "firstRenderedAtMs": 1028.199999988079
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 11,
+        "simulationSeconds": 0.6436000000298023,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 0.6369000000059605,
+        "frameDeltaSeconds": 0.239,
+        "render": {
+          "fps": 4.2753313381787095,
+          "frameMs": 233.89999999999998,
+          "renderMs": 10.900000005960464,
+          "drawCalls": 1225,
+          "triangles": 429155,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "repeat",
+      "index": 4,
+      "wallMs": 1087,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 375.30000001192093,
+          "fetchStartedAtMs": 375.30000001192093,
+          "fetchCompletedAtMs": 705.8000000119209,
+          "decodeStartedAtMs": 705.8000000119209,
+          "decodeCompletedAtMs": 805.3000000119209,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 817.5999999940395,
+        "firstRenderedAtMs": 1051.4000000059605
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 12,
+        "simulationSeconds": 0.6536999999821187,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 0.6481000000238419,
+        "frameDeltaSeconds": 0.23610000002384185,
+        "render": {
+          "fps": 4.2753313381787095,
+          "frameMs": 233.89999999999998,
+          "renderMs": 5.399999976158142,
+          "drawCalls": 1225,
+          "triangles": 429155,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    },
+    {
+      "kind": "repeat",
+      "index": 5,
+      "wallMs": 1089,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:5001/assets/genesis-hf/characters/mpfb-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": [],
+      "tier": "LICENSED_CC0_ASSET",
+      "load": {
+        "status": "READY",
+        "diagnostics": {
+          "startedAtMs": 362.2000000178814,
+          "fetchStartedAtMs": 362.2000000178814,
+          "fetchCompletedAtMs": 695.8000000119209,
+          "decodeStartedAtMs": 695.8000000119209,
+          "decodeCompletedAtMs": 812.9000000059605,
+          "httpStatus": 200,
+          "bytes": 17667228
+        },
+        "insertedAtMs": 825.8000000119209,
+        "firstRenderedAtMs": 1065.2000000178814
+      },
+      "lod": "FULL_ASSET",
+      "lodDiagnostics": {
+        "level": "FULL_ASSET",
+        "available": [
+          "FULL_ASSET",
+          "PROXY_LOW"
+        ],
+        "metrics": {
+          "triangleCount": 83686,
+          "textureCount": 7
+        }
+      },
+      "runtime": {
+        "updateCount": 14,
+        "simulationSeconds": 0.6793999999701977,
+        "lastDeltaSeconds": 0.2,
+        "state": "IDLE",
+        "stepIndex": -1,
+        "stepKind": null,
+        "targetId": null,
+        "stationId": null,
+        "progress": 0,
+        "timerSeconds": 0,
+        "remainingWaypoints": 0,
+        "blockedReason": null,
+        "transitionCondition": "no timed transition",
+        "wallSeconds": 0.6818999999761582,
+        "frameDeltaSeconds": 0.24769999998807907,
+        "render": {
+          "fps": 4.2753313381787095,
+          "frameMs": 233.89999999999998,
+          "renderMs": 4.800000011920929,
+          "drawCalls": 1233,
+          "triangles": 429251,
+          "geometries": 388,
+          "textures": 66,
+          "textureBytesEstimate": 53204309.33333334
+        },
+        "temporalEngineAdvances": 0,
+        "clockOwner": "AgentController",
+        "macroMicro": {
+          "level": "body",
+          "selectedNodeId": null,
+          "selectedOrganId": null,
+          "artifactKind": null,
+          "evidenceLabel": "MODEL_NOT_DIRECT_OBSERVATION"
+        },
+        "lastPickedNode": null,
+        "twinLod": {
+          "level": "FULL_ASSET",
+          "available": [
+            "FULL_ASSET",
+            "PROXY_LOW"
+          ],
+          "metrics": {
+            "triangleCount": 83686,
+            "textureCount": 7
+          }
+        },
+        "twinLodPreference": "AUTO",
+        "organScreenPositions": []
+      },
+      "level": "body",
+      "macro": "body",
+      "selected": "body"
+    }
+  ],
+  "scenarios": [],
+  "errors": []
+}

@@ -1,7 +1,9 @@
 import { parametersToPatch } from '../bridge/worldFrameState';
 import { entityId, type WorldModelEntity } from '../ecs/types';
 import type { WorldGraph } from '../ecs/worldGraph';
+import { generateCityGeometry } from '../generation/geometry';
 import { mulberry32, type WorldBlueprint, type WorldBlueprintNode, type WorldBlueprintRelationship } from '../generation/worldBlueprint';
+import { attachScientificFacilities } from './scientificFacilityPopulation';
 import { generateWorld, type GeneratedWorld } from '../generation/worldGenerator';
 import { WORLD_TEMPLATES, type TemplateResult } from './templates';
 import { validateSpecification } from './validation';
@@ -68,6 +70,27 @@ export function compileSpecification(spec: WorldSpecification): CompiledSpecific
     relationships.push(...result.relationships);
     postGenerate.push(...result.postGenerate);
     templateIds[templateId] = result.ids;
+  }
+
+  // OPT-IN geometry foundation (generation/geometry/) — runs ONLY when
+  // `spec.structuralDetail` is present, so every specification that omits
+  // it (every pre-existing template/spec/test) compiles through exactly the
+  // same path it always has. Consumes the SAME seeded `rng` in the SAME
+  // fixed position (after every requested `worldType` template's own
+  // draws), so adding this field to a spec that also requests templates is
+  // still fully deterministic, just a longer draw sequence.
+  if (spec.structuralDetail) {
+    const geometry = generateCityGeometry(spec.worldId, spec.structuralDetail, rng);
+    children.push(...geometry.children);
+    relationships.push(...geometry.relationships);
+
+    // PHASE 6 — SCIENTIFIC WORLDS: existing scientific solvers populate the
+    // generated rooms this geometry just produced (never an entire
+    // building — non-negotiable #14). No-op unless BOTH real interiors were
+    // generated (`generateInteriors`) AND a matching scientific domain was
+    // requested (`spec.scientificDomains`).
+    const facilities = attachScientificFacilities(spec, geometry.children);
+    postGenerate.push(...facilities.postGenerate);
   }
 
   children.push(...(spec.extraEntities ?? []));

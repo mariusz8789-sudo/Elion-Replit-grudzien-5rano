@@ -1,0 +1,35 @@
+Genesis duplicate-architecture audit — 2026-09-22
+branch: codex/genesis-final-integration
+
+## class WorldGraph
+packages\frontend\src\core\worldModel\ecs\worldGraph.ts:67:export class WorldGraph {
+
+## function generateWorld
+packages\frontend\src\core\worldModel\generation\worldGenerator.ts:34:export function generateWorld(blueprint: WorldBlueprint): GeneratedWorld {
+
+## class TemporalEngine
+packages\frontend\src\core\worldModel\temporal\temporalEngine.ts:68:export class TemporalEngine {
+
+## class WorldFrameRenderer
+packages\frontend\src\core\three\graphics\worldFrameRenderer.ts:137:export class WorldFrameRenderer {
+
+## class EvidenceLedger
+packages\core\src\knowledge\EvidenceLedger.ts:17:export class EvidenceLedger {
+
+## AppendOnlyMetaMemory
+(none)
+
+## core/visualStages
+(none)
+
+## class ModelRouter
+(none)
+
+## interface ModelRouter
+(none)
+
+## enum DeviceSafetyMode
+(none)
+
+## type DeviceSafetyMode
+packages\frontend\src\core\lab\devicePorts.ts:4:export type DeviceSafetyMode = 'SIMULATION' | 'REHEARSAL' | 'READ_ONLY_TELEMETRY' | 'SHADOW' | 'HUMAN_APPROVAL_REQUIRED' | 'DEVICE_ACTUATION_BLOCKED';

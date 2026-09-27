@@ -177,7 +177,14 @@ describe('objectiveGuardD069 — wired as the REAL caller in runCampaign (not or
       objectiveVector: [
         { id: 'a', targetProperty: 'crippenLogP', target: 1, scale: 1 },
         { id: 'b', targetProperty: 'molWt', target: 350, scale: 100 },
-        { id: 'c', targetProperty: 'tpsa', target: 60, scale: 1 },
+        // Third objective must isolate the COUNT guard, not the prediction-term guard (tested
+        // separately above) -- 'ringCount' is a plain RDKit structural descriptor, not one of
+        // ADMET-AI's endpoint ids (orchestrator.mjs's `predictionTerms` = admet.listEndpoints()
+        // ids + bestAffinityKcalMol + LIABILITY_TERMS). 'tpsa' used to sit here but IS one of
+        // those endpoint ids, so it tripped OBJECTIVE_IS_PREDICTION_TERM before this guard ever
+        // reached the count check -- a stale fixture, not a bug in objectiveGuardD069.mjs's
+        // (correct) check order.
+        { id: 'c', targetProperty: 'ringCount', target: 2, scale: 1 },
       ],
       constraints: [],
     });

@@ -7,10 +7,13 @@ import { defaultComparison, type ModelConfig } from '../epidemic/compare';
 import { DEFAULT_EPIDEMIC, type EpidemicModel } from '../epidemic/sir';
 import { parseObservationIntent } from '../lookingGlass/observationIntent';
 import { hasActiveObservationControl } from '../activeObservationControl';
+import type { PainResearchQuestion } from '../experimentFabric/painResearch';
+import type { PhysicsClaim, PhysicsClaimCategory } from '../experimentFabric/spacetimeIntegrity';
 import {
   hasDiscoveryLoopMarker, hasDiscoveryReplayMarker, hasExplicitDiscoveryLoopMarker,
   hasResearchCampaignContinueMarker, resolveDiscoveryQuestion,
 } from './discoveryQuestions';
+import { matchGenesisCapabilityIntent, type GenesisCapability } from '../capabilities/genesisCapabilityRegistry';
 
 /**
  * Resolver komend Science Chat (INTENT / COMMAND RESOLVER w architekturze
@@ -63,6 +66,8 @@ export type ChatAction =
   | { type: 'searchResearchChains'; query: ResearchChainSearchQuery }
   | { type: 'compare'; a: ModelConfig; b: ModelConfig }
   | { type: 'openRoute'; hash: string }
+  /** Opens the existing canonical World Director with the user's unchanged prompt. */
+  | { type: 'openWorldPrompt'; prompt: string }
   /** GENESIS WORLD INTERACTION — forwards one sentence to whichever real 3D scene is currently
    * open, via `activeObservationControl.ts`. Never decided HERE whether the named object exists or
    * the scene even supports observation commands — that is `ScienceChat.tsx`'s side effect to
@@ -73,10 +78,23 @@ export type ChatAction =
    * side effect (running `runAdaptiveInvestigation`, formatting the summary) lives in
    * `ScienceChat.tsx`, exactly like every other action here — this resolver stays a pure function. */
   | { type: 'runCyber' }
+  /** Existing Science Chat entry into the ONE scientific campaign coordinator. */
+  | {
+      type: 'runScientificIntegration';
+      problemId: string;
+      purpose: 'PAIN_RESEARCH' | 'SPACETIME_INTEGRITY';
+      painQuestion?: PainResearchQuestion;
+      physicsClaims?: readonly PhysicsClaim[];
+    }
   /** KNOWLEDGE INGESTION — `/ingest <url …>`: the URLs the message itself contained, in order. The
    * fetch happens on the backend (`/api/knowledge/ingest`, official APIs / allowlisted web only) and
    * yields PROPOSALS, never active evidence; `ScienceChat.tsx` reports exactly what came back. */
   | { type: 'ingestUrls'; urls: readonly string[] }
+  /** D-128 — EPISTEMIC TRUTH RESPONSE: the LaypersonAssistant over the kernel ledger answers `query`
+   * with status + sources, or literally "Nie wiem"; ScienceChat.tsx executes it, the resolver only routes. */
+  | { type: 'evidenceAnswer'; query: string }
+  /** D-128 — CURIOSITY: questions derived from the kernel ledger's gaps (contradictions, single-source claims, model-only keys). */
+  | { type: 'curiosity'; limit: number }
   /** HYBRID QUANTUM BRIDGE — `/quantum bell-state | ghz <n> | superposition <n> | run <qasm>` (+ `shots=` `seed=`).
    * The backend (`/api/quantum/run`) decides where it runs: a cloud QPU only with env credentials, else the
    * local statevector simulator whose answer is a MODEL_ESTIMATE; `ScienceChat.tsx` shows exactly that label. */
@@ -205,6 +223,23 @@ function recipeFor(ctx: ChatSimSnapshot): SimulationRecipe | undefined {
 
 const has = (norm: string, ...kw: string[]) => kw.some((k) => norm.includes(k));
 
+function registryRoute(capability: GenesisCapability): ChatResponse | null {
+  if (capability.selectionMode === 'UNAVAILABLE') {
+    return {
+      text: `${capability.label}: ${capability.readiness}. ${capability.blockedReason ?? capability.limitations.join(' ')}`,
+      tag: capability.epistemicLabel === 'THEORETICAL_MODEL' ? 'HIPOTEZA' : 'SYSTEM',
+      intent: 'OPEN_SIMULATION', todo: true,
+    };
+  }
+  if (capability.selectionMode !== 'DIRECT_ROUTE' || !capability.visualizationRoute) return null;
+  const label = capability.epistemicLabel.replaceAll('_', ' ');
+  return {
+    text: `Otwieram ${capability.label}. ${label}. ${capability.limitations[0] ?? ''}`.trim(),
+    tag: capability.epistemicLabel === 'THEORETICAL_MODEL' ? 'HIPOTEZA' : capability.epistemicLabel === 'EXTERNAL_REAL_OBSERVATION' ? 'FAKT' : 'MODEL',
+    intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: capability.visualizationRoute },
+  };
+}
+
 /**
  * Best-effort extraction of a candidate glyph sequence from a chat message,
  * for the 'runDecipherment' action. Deliberately conservative: looks for an
@@ -331,9 +366,60 @@ function buildComparison(raw: string): { a: ModelConfig; b: ModelConfig } {
   return defaultComparison();
 }
 
+function resolveScientificIntegrationEntry(message: string, norm: string): ChatResponse | null {
+  if (/^\s*\/pain-research\b/i.test(message) || has(norm, 'badanie bolu', 'badanie nad bolem', 'zbadaj bol', 'pain research')) {
+    const statement = message.replace(/^\s*\/pain-research\b\s*/i, '').trim() || 'Explore a pain research question in the Human Digital Twin.';
+    const question: PainResearchQuestion = {
+      questionId: `pain:science-chat:${normalize(statement).replace(/\s+/g, '-').slice(0, 72) || 'question'}`,
+      statement,
+      target: { anatomyNodeId: 'anatomy:nervous-system', organSystem: 'NERVOUS', label: 'reported pain pathway' },
+    };
+    return {
+      text: 'Uruchamiam research-only Pain Discovery przez istniejący Scientific Integration Campaign. Zakres pozostaje SIMULATION_ONLY · NOT_A_MEDICAL_DEVICE · RESEARCH_PRIORITY_NOT_CLINICAL_EFFICACY. Bez modelu bólu wynik będzie uczciwie BLOCKED; nie wygeneruję diagnozy, dawkowania ani zalecenia.',
+      tag: 'MODEL', intent: 'PROPOSE_EXPERIMENT',
+      action: { type: 'runScientificIntegration', problemId: 'problem:intervention-timing', purpose: 'PAIN_RESEARCH', painQuestion: question },
+    };
+  }
+
+  const requested = /^\s*\/physics-claim\b/i.test(message)
+    || has(norm, 'zweryfikuj twierdzenie fizyczne', 'sprawdz twierdzenie fizyczne', 'validate physics claim');
+  if (!requested) return null;
+  const statement = message.replace(/^\s*\/physics-claim\b\s*/i, '').trim() || message.trim();
+  const claimNorm = normalize(statement);
+  const category: PhysicsClaimCategory | null = has(claimNorm, 'wormhole', 'einstein rosen', 'tunel czasoprzestrzenny') ? 'WORMHOLE'
+    : has(claimNorm, 'multiverse', 'multiwers', 'alternatywn', 'timeline') ? 'MULTIVERSE'
+      : has(claimNorm, 'time dilation', 'dylatacj czasu') ? 'TIME_DILATION'
+        : has(claimNorm, 'gravity well', 'studni grawit', 'krzywizn czasoprzestrzeni') ? 'GRAVITY_WELL'
+          : has(claimNorm, 'historical', 'historyczn', 'rekonstrukcj') ? 'HISTORICAL_RECONSTRUCTION'
+            : null;
+  if (category === null) {
+    return {
+      text: 'Nie rozpoznaję kategorii twierdzenia. Użyj `/physics-claim` z: wormhole, multiverse, time dilation, gravity well albo historical reconstruction.',
+      tag: 'SYSTEM', intent: 'HELP',
+    };
+  }
+  const sourceIds = Array.from(message.matchAll(/\bsource\s*[:=]\s*([A-Za-z0-9._/-]+)/gi), (match) => match[1]!);
+  const assignedLabel = category === 'WORMHOLE' ? 'HYPOTHESIS' as const
+    : category === 'MULTIVERSE' ? 'SIMULATION' as const
+      : category === 'HISTORICAL_RECONSTRUCTION'
+        ? (sourceIds.length > 0 ? 'RECONSTRUCTION' as const : 'INSUFFICIENT_EVIDENCE' as const)
+        : 'MODEL' as const;
+  const claim: PhysicsClaim = {
+    claimId: `physics:science-chat:${category.toLowerCase()}:${normalize(statement).replace(/\s+/g, '-').slice(0, 64)}`,
+    category, statement, assignedLabel, sourceIds,
+  };
+  return {
+    text: `Waliduję twierdzenie ${category} przez istniejący Scientific Integration Campaign. Etykieta wejściowa: ${assignedLabel}; EVIDENCE_BACKED wymaga jawnego source:<id>. Twierdzenia o podróży wstecz w czasie są odrzucane.`,
+    tag: 'MODEL', intent: 'VERIFY',
+    action: { type: 'runScientificIntegration', problemId: 'problem:particle-relativistic-kinetic-energy-velocity', purpose: 'SPACETIME_INTEGRITY', physicsClaims: [claim] },
+  };
+}
+
 export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): ChatResponse {
   const norm = normalize(message);
   if (!norm) return { text: 'Napisz, co chcesz zobaczyć — np. „pokaż czarną dziurę" albo „zwiększ masę 2×".', tag: 'SYSTEM', intent: 'HELP' };
+  const scientificIntegrationEntry = resolveScientificIntegrationEntry(message, norm);
+  if (scientificIntegrationEntry) return scientificIntegrationEntry;
 
   // --- Knowledge ingestion: `/ingest <url>` (also "zaingestuj", "pobierz źródło"). URLs come from the RAW
   //     message (normalize() strips punctuation); with no URL the command explains itself instead of guessing.
@@ -341,6 +427,36 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     const urls = Array.from(message.matchAll(/https?:\/\/[^\s<>"']+/g), (m) => m[0].replace(/[),.;]+$/, ''));
     if (urls.length === 0) return { text: 'Podaj adres: `/ingest https://…`. Pobieram wyłącznie przez oficjalne API (YouTube, X, Facebook — z kluczem w środowisku) albo z domen dopuszczonych w rejestrze polityk; wynik trafia do bazy jako PROPOZYCJA do zatwierdzenia, nigdy jako fakt.', tag: 'SYSTEM', intent: 'CREATE_TASK' };
     return { text: `Wysyłam ${urls.length} adres(y) do modułu pozyskiwania wiedzy. Zasady: oficjalne API lub domeny z rejestru, robots.txt respektowany, wynik = propozycja z jawnym statusem.`, tag: 'SYSTEM', intent: 'CREATE_TASK', action: { type: 'ingestUrls', urls } };
+  }
+
+  // --- D-128 Epistemic truth response: `/dowody <pytanie>` (also "co wiemy o …", "jakie są dowody na …").
+  //     The answer comes from the ledger through LaypersonAssistant — never from this resolver's own words.
+  const evidenceMatch = message.match(/^\s*\/dowody\s+(.+)$/i) ?? message.match(/^\s*(?:co wiemy o|co wiemy na temat|jakie s[aą] dowody na|jakie mamy dowody na)\s+(.+)$/i);
+  if (evidenceMatch) {
+    const query = evidenceMatch[1].trim().replace(/[?.!]+$/, '');
+    return { text: `Sprawdzam bazę dowodów dla: „${query}”. Odpowiedź niesie status źródeł; bez dowodów odpowiem „Nie wiem”.`, tag: 'SYSTEM', intent: 'VERIFY', action: { type: 'evidenceAnswer', query } };
+  }
+  if (/^\s*\/dowody\s*$/i.test(message)) return { text: 'Podaj pytanie: `/dowody <o co pytasz>`. Odpowiadam wyłącznie z bazy dowodów (status źródła, poziom pewności) albo mówię „Nie wiem”.', tag: 'SYSTEM', intent: 'HELP' };
+  // --- LOOKING GLASS: `/świat <opis>` — the chat that answers with a world. The question is asked HERE,
+  //     in the one chat; the Looking Glass screen only renders the world `openLookingGlass` resolves.
+  const worldAsk = message.match(/^\s*\/(?:świat|swiat|looking-glass|lg)(?=\s|$)\s*([\s\S]*)$/i);
+  if (worldAsk) {
+    const question = worldAsk[1].trim();
+    if (!question) {
+      return { text: 'Opisz świat po komendzie: /świat <zjawisko, czas, perspektywa> — np. „/świat epidemia przez 60 dni z perspektywy człowieka na ulicy”.', tag: 'SYSTEM', intent: 'HELP' };
+    }
+    return {
+      text: 'Otwieram Looking Glass: odpowiedzią jest świat policzony przez istniejący model albo jawne „tego nie umiemy policzyć”.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: `#/looking-glass?q=${encodeURIComponent(question)}` },
+    };
+  }
+
+  // --- D-128 Curiosity: `/ciekawość` (also "jakie pytania warto zadać", "co warto zbadać", "luki w dowodach").
+  if (/^\s*\/ciekawo(s|ś)(c|ć)(?=\s|$)/i.test(message) || has(norm, 'jakie pytania warto', 'co warto zbadac', 'luki w dowodach', 'czego nie wiemy')) {
+    const n = message.match(/\b(\d{1,2})\b/);
+    return { text: 'Wyprowadzam pytania z luk w bazie dowodów: sprzeczności między źródłami, twierdzenia z jednego źródła, wartości istniejące tylko jako wynik modelu. Każde pytanie cytuje swoje zapisy.', tag: 'SYSTEM', intent: 'PROPOSE_EXPERIMENT', action: { type: 'curiosity', limit: n ? Math.max(1, Math.min(20, Number(n[1]))) : 6 } };
   }
 
   // --- Hybrid Quantum Bridge: `/quantum …` (also "stan Bella", "obwód kwantowy", "symulacja kwantowa" -> Bell preset).
@@ -493,6 +609,70 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- HUMAN EXPLORER — route into the existing central glass-chamber twin.
+  // The query is a handoff only: ScientificWorldsScreen consumes it through
+  // the existing explorerCommands → planner → controller path. No anatomy
+  // state or second human runtime is created here.
+  const bloodMicroscopeRequested = /\b(krew|krwi|blood)\b/.test(norm) && /\b(mikroskop|microscope|powieksz|zbadaj|badaj|pokaz)\w*\b/.test(norm);
+  if (bloodMicroscopeRequested) {
+    return {
+      text: 'Otwieram Hyperscope z referencyjnym modelem rozmazu krwi. Zobaczysz erytrocyty, leukocyt i płytki krwi. To model edukacyjny bez próbki pacjenta, morfologii ani diagnozy.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/human-biology-lab?specimen=blood&magnification=500' },
+    };
+  }
+  const humanRequested = has(norm, 'pokaz czlowieka', 'pokaz czlowieka w laboratorium', 'digital twin', 'human digital twin', 'human explorer', 'pokaz serce', 'pokaz watrobe', 'pokaz pluca', 'pokaz aorte', 'pokaz mozg', 'pokaz nerke', 'pokaz zoladek', 'show human', 'show heart', 'show liver', 'show lungs', 'show aorta', 'show brain', 'show kidney', 'show stomach')
+    || /\b(serc|heart|watrob|liver|pluc|lung|aort|mozg|brain|nerk|kidney|zolad|stomach)\w*\b/.test(norm) && /\b(pokaz|show|przybliz|zoom|tkank|tissue|komork|cell|narzad|organ)\w*\b/.test(norm);
+  if (humanRequested) {
+    const focus = /\b(aort)\w*\b/.test(norm) ? 'aorta'
+      : /\b(watrob|liver)\w*\b/.test(norm) ? 'liver'
+        : /\b(pluc|lung)\w*\b/.test(norm) ? 'left-lung'
+          : /\b(mozg|brain)\w*\b/.test(norm) ? 'brain'
+            : /\b(nerk|kidney)\w*\b/.test(norm) ? 'left-kidney'
+              : /\b(zolad|stomach)\w*\b/.test(norm) ? 'stomach'
+                : /\b(serc|heart)\w*\b/.test(norm) ? 'heart' : 'body';
+    const level = /\b(komork|cell)\w*\b/.test(norm) ? 'cell' : /\b(tkank|tissue)\w*\b/.test(norm) ? 'tissue' : 'organ';
+    return {
+      text: `Otwieram człowieka w centralnej komorze Laboratorium i ustawiam widok: ${focus === 'body' ? 'ciało' : focus} → ${level}. Anatomia jest modelem referencyjnym, nie obrazem pacjenta; tkanka i komórka pozostają jawną symulacją edukacyjną.`,
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: `#/human-biology-lab?focus=${focus}&level=${level}` },
+    };
+  }
+
+  // Canonical product routing. This is metadata over existing routes only;
+  // Experiment Fabric and custom Drug Discovery execution remain their current runners.
+  const registeredCapability = matchGenesisCapabilityIntent(message);
+  if (registeredCapability) {
+    const routed = registryRoute(registeredCapability);
+    if (routed) return routed;
+  }
+
+  // --- ADVANCED WORLDS — distinct, honest entrances to existing surfaces. ---
+  if (has(norm, 'multiverse', 'multiwersum', 'wieloswiat', 'wieloświat', 'multiverse nexus')) {
+    return {
+      text: 'Otwieram Multiverse Nexus — matematyczne i scenariuszowe porównanie wariantów. To MODEL/SCENARIO, nie dowód fizycznego multiwersum.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/lab/multiverse' },
+    };
+  }
+  if (has(norm, 'maszyna czasu', 'maszyne czasu', 'wehikul czasu', 'wehikuł czasu', 'time machine', 'podroz w czasie', 'podróż w czasie')) {
+    return {
+      text: 'Otwieram istniejący sandbox czasoprzestrzeni. THEORETICAL MODEL — Genesis może obliczać i wizualizować modele względności oraz hipotezy, ale nie przedstawia działającej fizycznej maszyny czasu.',
+      tag: 'HIPOTEZA', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/myths-theories' },
+    };
+  }
+  if (has(norm, 'reality navigator', 'nawigator rzeczywistosci', 'nawigator rzeczywistości')) {
+    return {
+      text: 'Otwieram Reality Navigator — porównanie rozgałęzionych scenariuszy oznaczonych jako MODEL/SCENARIO.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/reality' },
+    };
+  }
+  if (has(norm, 'sw 4', 'sw4', 'epidemia sw 4', 'epidemia sw4')) {
+    return {
+      text: 'Otwieram SW-4 w istniejącym World Directorze: deterministyczny model SEIR w wygenerowanym mieście z Evidence i replay. To symulacja scenariusza, nie prognoza epidemii.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/world-director?prompt=SW-4%20epidemic%20city' },
+    };
+  }
+
   // --- Observer at the Junction — handoff do istniejącego Reality Navigatora.
   //     To interaktywny model/scenario, nie dowód fizycznego multiwersum.
   if (has(norm, 'observer at the junction', 'obserwator na skrzyzowaniu', 'rownolegla rzeczywistosc', 'równoległa rzeczywistość', 'alternatywna rzeczywistosc', 'alternatywna rzeczywistość', 'most asgard', 'most einsteina rosena', 'most einsteina-rosena', 'wormhole', 'tunel czasoprzestrzenny', 'portal do innego swiata', 'portal do innego świata', 'wieloswiat', 'wieloświat')) {
@@ -563,6 +743,26 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
     };
   }
 
+  // --- Published CERN data: route to the checksum-pinned, read-only CMS dataset analysis.
+  if (has(norm, 'prawdziwe dane cern', 'dane cms', 'cms open data', 'real cern data', 'real cms data', 'z do mionow', 'z mumu')) {
+    return {
+      text: 'Otwieram analizę CMS Open Data: 10 000 opublikowanych, checksumowo zweryfikowanych zdarzeń Z→μμ z 2011 roku. To analiza historycznych danych offline — nie aktywny zderzacz, nie symulacja detektora i nie nowe odkrycie.',
+      tag: 'FAKT',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/physics/cms-z' },
+    };
+  }
+
+  // A requested collision starts the existing deterministic toy batch in the
+  // existing CERN scene. The query flag only asks that screen to press its own
+  // canonical Q action after the renderer is ready.
+  if (has(norm, 'zderz protony', 'uruchom zderzenie cern', 'pokaz zderzenie cern', 'toy collision', 'run cern collision', 'proton proton collision')) {
+    return {
+      text: 'Otwieram CERN i uruchamiam istniejące modelowe zderzenie proton–proton. TOY_MC_MODEL — to obliczeniowa wizualizacja, nie telemetria detektora ani PYTHIA/Geant4.',
+      tag: 'MODEL', intent: 'OPEN_SIMULATION', action: { type: 'openRoute', hash: '#/cern-complex?action=collision' },
+    };
+  }
+
   // --- Particle physics / collider (C2, integracja propozycji Qwena) — REALNA domena na tym samym
   //     WorldGraph co powódź/chemia/epidemia: `domains/particlePhysics.ts` (relatywistyczna kinematyka,
   //     relatywistyczny Breit-Wigner, stałe PDG) + `particlePhysicsLeverCatalog.ts`. Nie ma osobnego
@@ -588,6 +788,40 @@ export function resolveCommand(message: string, ctx: ChatSimSnapshot | null): Ch
       tag: 'MODEL',
       intent: 'OPEN_SIMULATION',
       action: { type: 'openRoute', hash: '#/scientific-city' },
+    };
+  }
+
+  // --- CANONICAL WORLDS FROM CHAT -------------------------------------------------
+  // Dedicated permanent worlds win before the free-form generation command. The
+  // free-form branch only transports the original text to World Director; that
+  // existing bounded resolver remains the single authority that accepts/refuses
+  // a WorldSpecification.
+  if (has(norm, 'otworz cern', 'pokaz cern', 'wejdz do cern', 'open cern', 'cern complex')) {
+    return {
+      text: 'Otwieram stały kompleks CERN. To modelowane środowisko badawcze Genesis, nie połączenie z infrastrukturą CERN w czasie rzeczywistym.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/cern-complex' },
+    };
+  }
+  if (has(norm, 'otworz genesis lab', 'otworz glowne laboratorium', 'pokaz genesis lab', 'open genesis lab', 'open main lab')) {
+    return {
+      text: 'Otwieram stały świat Genesis Lab — kanoniczne laboratorium naukowe z istniejącymi stacjami i eksperymentami.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openRoute', hash: '#/scientific-worlds' },
+    };
+  }
+  if (
+    /\b(create|generate|build|stworz|wygeneruj|zbuduj)\b/.test(norm)
+    && /\b(world|city|colony|planet|civilization|film|movie|cinematic|swiat|miasto|koloni|planete|cywilizacj)\b/.test(norm)
+    && /\b(world|city|colony|planet|civilization|film|movie|cinematic|mars|universe|cosmos|wormhole|ocean|underwater|historical|alien|swiat|miasto|koloni|planete|cywilizacj|wszechswiat|kosmos|tunel|ocean|podwodn|historycz|obc)\b/.test(norm)
+  ) {
+    return {
+      text: 'Przekazuję Twój prompt do kanonicznego World Directora. Jeśli żądany typ świata nie jest obsługiwany, generator odmówi jawnie zamiast podstawiać inną scenę.',
+      tag: 'MODEL',
+      intent: 'OPEN_SIMULATION',
+      action: { type: 'openWorldPrompt', prompt: message.trim() },
     };
   }
 

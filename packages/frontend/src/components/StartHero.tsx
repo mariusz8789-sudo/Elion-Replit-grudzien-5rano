@@ -2,27 +2,14 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { requestOpenScienceChat } from '../core/scienceChatBridge';
 import { listExperiments } from '../core/scienceMemory';
-import { getLabs } from '../core/registry';
-import { WORLDS } from './WorldsHubScreen';
 import { AskGenesisMic } from './guide/AskGenesisMic';
 
 /** Holographic engine core — three.js, lazy: the Start route loads it only after first paint. */
 const EngineCoreHolo = lazy(() => import('./holo/EngineCoreHolo').then((m) => ({ default: m.EngineCoreHolo })));
 
-/**
- * START HERO — the first thing a visitor sees (D-118). One question box,
- * three doors (ask / see a discovery / enter a 3D world), one status strip.
- * Every number on the strip is a real read (Science Memory, backend health,
- * registered labs, resolvable worlds); nothing is a placeholder.
- */
+/** START HERO — one conversation and one connected Laboratory. */
 
 type Health = 'checking' | 'online' | 'no-key' | 'offline';
-
-const SUGGESTIONS: readonly string[] = [
-  'Znajdź bezpieczniejszą alternatywę dla semaglutydu',
-  'Zasymuluj epidemię z R0=5 przez 10 dni',
-  'Co by było, gdyby zamknąć szkoły w dniu 12?',
-];
 
 export function StartHero(): React.ReactElement {
   const [ask, setAsk] = useState('');
@@ -31,7 +18,6 @@ export function StartHero(): React.ReactElement {
   const [holo, setHolo] = useState(false);
   useEffect(() => { setHolo(true); }, []);
   const records = useMemo(() => { try { return listExperiments().length; } catch { return 0; } }, []);
-  const labs = useMemo(() => getLabs().length, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,10 +43,9 @@ export function StartHero(): React.ReactElement {
       <header className="start-head">
         <img className="start-brand" src="/brand/genesis-lockup.png" alt="Genesis Physics — Scientific OS" width={1200} height={400} decoding="async" />
         <span className="gx-eyebrow">genesis-physics.com</span>
-        <h1 className="start-title">Zadaj pytanie. Genesis przeprowadzi badanie.</h1>
+        <h1 className="start-title">Zapytaj. Genesis przygotuje eksperyment.</h1>
         <p className="start-lede">
-          Kandydaci, dowody, próba obalenia własnej hipotezy, bramka zwycięzcy — w jednym przebiegu, z odciskiem każdego etapu.
-          Wynik możesz odtworzyć jutro, na innej maszynie.
+          Jeden dialog prowadzi do jednego laboratorium. Eksperyment, wynik, dowód i replay pozostają częścią tej samej sesji.
         </p>
       </header>
 
@@ -83,41 +68,18 @@ export function StartHero(): React.ReactElement {
         <AskGenesisMic lang="pl" onText={(t) => setAsk(t)} className="chip-btn start-ask-mic" />
         <button type="submit" className="chip-btn primary start-ask-send" disabled={!ask.trim()}>Zapytaj</button>
       </form>
-      <div className="start-guide-row">
-        <a className="chip-btn primary" href="#/research-console?guide=1" data-testid="start-guided">✦ Zobacz, jak to działa</a>
-        <a className="chip-btn" href="#/tour" data-testid="start-tour">▶ Genesis Tour — 3 minuty z przewodnikiem</a>
-      </div>
-      <div className="start-suggest" aria-label="Przykładowe pytania">
-        {SUGGESTIONS.map((s) => (
-          <button key={s} type="button" className="chip-btn tiny" onClick={() => submit(s)}>{s}</button>
-        ))}
+      <div className="start-primary-actions" aria-label="Główne wejścia Genesis">
+        <button type="button" className="chip-btn" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">✦ Zapytaj Genesis</button>
+        <a className="chip-btn primary" href="#/scientific-worlds" data-testid="door-laboratory">⌬ Wejdź do laboratorium</a>
+        <button type="button" className="chip-btn start-guided-demo" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">▶ Zobacz gotowy przykład</button>
       </div>
 
-      <div className="start-doors">
-        <button type="button" className="start-door" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">
-          <span className="start-door-glyph" aria-hidden="true">✦</span>
-          <span className="start-door-title">Zadaj pytanie</span>
-          <span className="start-door-text">Zwykłym językiem. Genesis dobierze model, uruchomi go i pokaże, co jest realne, a co jest oszacowaniem.</span>
-          <span className="start-door-cta">Napisz wyżej →</span>
-        </button>
-        <a className="start-door start-door-accent" href="#/research-console" data-testid="door-discover">
-          <span className="start-door-glyph" aria-hidden="true">◎</span>
-          <span className="start-door-title">Zobacz odkrycie</span>
-          <span className="start-door-text">Pełny 20-etapowy proces na prawdziwych danych ChEMBL i ClinicalTrials.gov: kandydaci → dowody → falsyfikacja → Winner Gate → Research Recipe.</span>
-          <span className="start-door-cta">Uruchom proces →</span>
-        </a>
-        <a className="start-door" href="#/worlds" data-testid="door-worlds">
-          <span className="start-door-glyph" aria-hidden="true">◈</span>
-          <span className="start-door-title">Wejdź do laboratorium 3D</span>
-          <span className="start-door-text">Miasto epidemiologiczne, wirtualne laboratorium, Molecule World, Discovery Hall — sceny, które pokazują stan realnych modeli.</span>
-          <span className="start-door-cta">Wybierz świat →</span>
-        </a>
-      </div>
+      <ol className="start-journey" aria-label="Jak działa Genesis">
+        <li><span>01</span>Pytanie</li><li><span>02</span>Laboratorium</li><li><span>03</span>Wynik</li><li><span>04</span>Evidence</li><li><span>05</span>Replay</li><li><span>06</span>Następny eksperyment</li>
+      </ol>
 
       <ul className="start-status" aria-label="Stan systemu">
         <li><span className="start-status-value">{records}</span><span className="start-status-label">zapisanych przebiegów w Pamięci Naukowej</span></li>
-        <li><span className="start-status-value">{WORLDS.length}</span><span className="start-status-label">światów 3D gotowych do wejścia</span></li>
-        <li><span className="start-status-value">{labs}</span><span className="start-status-label">laboratoriów z realną fizyką</span></li>
         <li><span className={`start-status-value start-status-${health}`}>{health === 'online' ? '●' : health === 'checking' ? '◌' : '○'}</span><span className="start-status-label">backend {healthLabel}</span></li>
       </ul>
     </section>

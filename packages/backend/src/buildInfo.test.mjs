@@ -27,6 +27,14 @@ test('P0.3 resolveBuildInfo bierze commit ze środowiska i NIE wymyśla go, gdy 
   const fromGit = resolveBuildInfo({ env: {}, readGitHead: () => 'f' .repeat(40) });
   assert.equal(fromGit.commitSource, 'git');
 
+  const fromRailway = resolveBuildInfo({ env: { RAILWAY_GIT_COMMIT_SHA: 'b'.repeat(40) }, readGitHead: () => null });
+  assert.equal(fromRailway.commit, 'b'.repeat(40));
+  assert.equal(fromRailway.commitSource, 'railway');
+
+  const explicitWins = resolveBuildInfo({ env: { GENESIS_COMMIT: 'a'.repeat(40), RAILWAY_GIT_COMMIT_SHA: 'b'.repeat(40) }, readGitHead: () => null });
+  assert.equal(explicitWins.commit, 'a'.repeat(40));
+  assert.equal(explicitWins.commitSource, 'env');
+
   // Brak obu źródeł → jawne 'unknown', nigdy zmyślony hash ani puste pole.
   const unknown = resolveBuildInfo({ env: {}, readGitHead: () => null });
   assert.equal(unknown.commit, 'unknown');
@@ -70,8 +78,16 @@ test('P0.3 resolveBuildInfo czyta HEAD z git worktree (.git jako plik gitdir:)',
     const real = resolveBuildInfo({ env: {}, repoDir: REPO });
     assert.equal(info.commit, real.commit, 'worktree wskazuje ten sam commit co repo macierzyste');
   } finally {
-    execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
-    rmSync(dir, { recursive: true, force: true });
+    // On Windows Git can remove the worktree metadata and contents yet return
+    // 128 because the now-empty temp root is still momentarily held open by
+    // the Node test process. That cleanup race must not hide the assertion
+    // above. Prune any metadata and let rmSync retry the empty directory.
+    try {
+      execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
+    } catch {
+      execFileSync('git', ['worktree', 'prune'], { cwd: REPO, stdio: 'ignore' });
+    }
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -94,9 +110,13 @@ test('P0.3 resolveBuildInfo czyta HEAD z git worktree na gałęzi (ref: przez co
     const real = resolveBuildInfo({ env: {}, repoDir: REPO });
     assert.equal(info.commit, real.commit);
   } finally {
-    execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
+    try {
+      execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
+    } catch {
+      execFileSync('git', ['worktree', 'prune'], { cwd: REPO, stdio: 'ignore' });
+    }
     execFileSync('git', ['branch', '-D', branch], { cwd: REPO, stdio: 'ignore' });
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 

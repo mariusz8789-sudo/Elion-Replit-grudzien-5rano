@@ -51,6 +51,7 @@ import {
 } from '../../core/worldModel/persistence/worldPersistenceClient';
 import { PUMP_PIPE_DEFAULTS } from '../../core/engineeringGraph/pumpPipe';
 import { ProvenanceBadge } from './provenance';
+import { fnv1aUint } from '@genesis/core/determinism.js';
 
 export interface WildfireFieldSummary {
   readonly headRosMS: number;
@@ -221,12 +222,7 @@ function footprintHalfExtent(scale: number): number {
  * rebuilt scene (replay, branch switch) reproduces the identical building every time, the same
  * convention `genesisScientificCitySim.ts`'s own `stableSeed` already documents. */
 function stableSeed(id: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    hash ^= id.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash | 0);
+  return Math.abs(fnv1aUint(id) | 0);
 }
 
 /** Builds a square AABB obstacle centered on a real entity position, sized from its own real render scale. */

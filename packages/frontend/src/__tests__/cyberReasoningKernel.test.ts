@@ -18,6 +18,13 @@ import { buildSavedCyberInvestigation, saveCyberInvestigationToMemory, replaySav
 
 const hyp = (t: ReturnType<typeof runInvestigation>, id: string) => t.hypotheses.find((h) => h.hypothesisId === id)!;
 const vOf = (t: ReturnType<typeof runInvestigation>, id: string) => t.verdicts.find((v) => v.hypothesisId === id)!;
+const approvalFor = (remediation: { readonly remediationId: string }) => ({
+  remediationId: remediation.remediationId,
+  decidedBy: 'vitest-human-reviewer',
+  decidedAt: '2026-09-22T00:00:00.000Z',
+  decision: 'APPROVED' as const,
+});
+const approvedAdaptiveOptions = { approvalForRemediation: approvalFor };
 
 describe('acceptance suite', () => {
   it('1 vulnerable target -> SUPPORTED_WITHIN_PROTOCOL', () => {
@@ -34,7 +41,8 @@ describe('acceptance suite', () => {
     const app = new ToyVulnerableApp();
     const h = hyp(runInvestigation(app), 'hyp:AUTH_BYPASS::/admin');
     const before = runSecurityTest(h, app, 'before');
-    applyRemediation(app, createRemediation(app, h)!);
+    const remediation = createRemediation(app, h)!;
+    applyRemediation(app, remediation, approvalFor(remediation));
     const after = retest(h, app, 'after');
     expect(after.observedResult.statusCode).not.toBe(before.observedResult.statusCode);
   });
@@ -51,7 +59,8 @@ describe('acceptance suite', () => {
     const app = new ToyVulnerableApp();
     const h = hyp(runInvestigation(app), 'hyp:AUTH_BYPASS::/admin');
     const before = judgeVerdict(h, runSecurityTest(h, app, 'before'));
-    applyRemediation(app, createRemediation(app, h)!);
+    const remediation = createRemediation(app, h)!;
+    applyRemediation(app, remediation, approvalFor(remediation));
     const after = judgeVerdict(h, retest(h, app, 'after'));
     expect(before.assessment).toBe('SUPPORTED_WITHIN_PROTOCOL');
     expect(after.assessment).toBe('FALSIFIED_WITHIN_PROTOCOL');
@@ -102,7 +111,8 @@ describe('adversarial cases', () => {
     const app = new ToyVulnerableApp({ brokenRemediation: true });
     const h = hyp(runInvestigation(app), 'hyp:AUTH_BYPASS::/admin');
     const before = runSecurityTest(h, app, 'before');
-    applyRemediation(app, createRemediation(app, h)!);
+    const remediation = createRemediation(app, h)!;
+    applyRemediation(app, remediation, approvalFor(remediation));
     const after = retest(h, app, 'after');
     const outcome = verifySecurityOutcome(before, after);
     expect(outcome.verified).toBe(false);
@@ -131,7 +141,8 @@ describe('adversarial cases', () => {
     const app = new ToyVulnerableApp();
     const h = hyp(runInvestigation(app), 'hyp:AUTH_BYPASS::/admin');
     const before = runSecurityTest(h, app, 'before');
-    applyRemediation(app, createRemediation(app, h)!);
+    const remediation = createRemediation(app, h)!;
+    applyRemediation(app, remediation, approvalFor(remediation));
     const after = retest(h, app, 'after');
     const outcome = verifySecurityOutcome(before, after);
     expect(outcome.verified).toBe(true);
@@ -161,7 +172,7 @@ describe('seam to Science Memory (SavedCyberInvestigation)', () => {
     const h = hyp({ hypotheses: trace.hypotheses, verdicts: trace.verdicts } as ReturnType<typeof runInvestigation>, 'hyp:AUTH_BYPASS::/admin');
     const before = trace.tests.find((t) => t.hypothesisId === h.hypothesisId)!;
     const remediation = createRemediation(app, h)!;
-    applyRemediation(app, remediation);
+    applyRemediation(app, remediation, approvalFor(remediation));
     const retestResult = retest(h, app, 'after');
     const retestVerdict = judgeVerdict(h, retestResult);
 
@@ -180,7 +191,7 @@ describe('seam to Science Memory (SavedCyberInvestigation)', () => {
 
   it('a real ADAPTIVE run (the loop Chat/CyberWorkspace actually use) maps to a well-formed, savable CyberInvestigationResult that carries the loop\'s own live conflicts through to Memory', () => {
     (globalThis as { window?: unknown }).window = { localStorage: makeFakeStorage() };
-    const adaptive = runAdaptiveInvestigation(new ToyVulnerableApp());
+    const adaptive = runAdaptiveInvestigation(new ToyVulnerableApp(), 20, approvedAdaptiveOptions);
     // The whole point of this bridge: a hypothesis genuinely remediated mid-run is SUPPORTED before
     // the fix and FALSIFIED on the independent post-fix retest — a real conflict, not a hand fixture.
     expect(adaptive.conflicts.length).toBeGreaterThan(0);

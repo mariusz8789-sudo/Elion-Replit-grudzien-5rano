@@ -1,0 +1,35 @@
+{
+  "targetId": "OPRM1_5C1M",
+  "pdbId": "5C1M",
+  "chain": "A",
+  "protein": "Receptor μ-opioidowy (OPRM1, Mus musculus), stan aktywny, 2.07 Å",
+  "referenceLigand": { "code": "VF1", "name": "BU72 (agonista)", "binding": "niekowalencyjne; jedyne wiązania LINK w pliku to wiązania peptydowe wokół zmodyfikowanej reszty YCM 57" },
+  "citation": "Huang W. et al. (2015) Structural insights into µ-opioid receptor activation. Nature 524:315-321. doi:10.1038/nature14886",
+  "files": {
+    "5C1M.pdb": {
+      "sha256": "0b6ca0e1ab681c9c19ed1742e87a04a5fc8f850d8cb2f203b169888b3ed6d3f3",
+      "url": "https://raw.githubusercontent.com/protwis/gpcrdb_data/master/structure_data/pdbs/5C1M.pdb",
+      "content": "Niezmieniony wpis PDB 5C1M (pełne nagłówki, REVDAT do rev. 7 z 2021). Łańcuch A: receptor (reszty 52-347); łańcuch B: nanociało 39 — pomijane przy przygotowaniu."
+    },
+    "8EF5.pdb": {
+      "sha256": "cd0266dbd9858f1a4cd0b07e96d748ab51ae97f4cb0c4c46ecb6f18ef0130f3f",
+      "url": "https://raw.githubusercontent.com/protwis/gpcrdb_data/master/structure_data/pdbs/8EF5.pdb",
+      "content": "Wpis PDB 8EF5: kompleks receptora μ-opioidowego z fentanylem (ligand 7V7) i białkiem Gi, krio-EM 3.3 Å. Trzymany jako materiał do testu odtworzenia pozy krystalicznej."
+    }
+  },
+  "preparation": {
+    "chains": ["A"],
+    "repair": "PDBFixer uzupełnia brakujące atomy łańcuchów bocznych i tlen końcowy; brakujące pętle NIE są modelowane; wodory dokłada Meeko",
+    "note": "Wody, lipidy (OLC, CLR), glikol (P6G) i fosforany są pomijane — to materiał krystalizacyjny, nie receptor."
+  },
+  "pocket": {
+    "center": [1.286, 16.448, -59.114],
+    "boxSize": [24, 24, 24],
+    "source": "Środek geometryczny 32 atomów ligandu VF1 (BU72) w łańcuchu A pliku 5C1M; rozmiar pudełka z zapasem ok. 7 Å ponad rozmiar ligandu (7.0 × 9.8 × 8.3 Å)."
+  },
+  "licenses": {
+    "structure": "Współrzędne PDB są w domenie publicznej (CC0 1.0, polityka wwPDB)",
+    "mirror": "Pobrane z repozytorium danych GPCRdb (protwis/gpcrdb_data), które jest lustrem, a nie licencjodawcą; repozytorium nie zawiera pliku LICENSE"
+  },
+  "retrieved": "2026-09-25"
+}

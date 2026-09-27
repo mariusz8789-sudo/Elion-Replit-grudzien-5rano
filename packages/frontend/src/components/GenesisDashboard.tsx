@@ -62,8 +62,8 @@ type HealthState =
 
 /** The four loop stages the dashboard summarises, in scientific order. */
 const LOOP_TILES: readonly { kind: MatrixKind; label: string; hash: string; hint: string }[] = [
-  { kind: 'HYPOTHESIS', label: 'Hipotezy', hash: '#/genesis-world', hint: 'Discovery Loop w World Engine' },
-  { kind: 'EXPERIMENT', label: 'Eksperymenty', hash: '#/first-person-lab', hint: 'Scenario Engine, pilot eksperymentu' },
+  { kind: 'HYPOTHESIS', label: 'Hipotezy', hash: '#/genesis-world', hint: 'Pętla odkrycia w Nexus' },
+  { kind: 'EXPERIMENT', label: 'Eksperymenty', hash: '#/first-person-lab', hint: 'Przebieg LIVE krok po kroku' },
   { kind: 'EVIDENCE', label: 'Evidence', hash: '#/drug', hint: 'Dochodzenia i weryfikacja predykcji' },
   { kind: 'SCENARIO', label: 'Scenariusze', hash: '#/what-if', hint: 'Rozgałęzienia i porównania' },
 ];
@@ -99,7 +99,7 @@ export function decideNextAction(counts: Record<MatrixKind, number>): { title: s
     return {
       title: 'Postaw pierwszą hipotezę',
       why: 'Pamięć Naukowa jest pusta — pętla nie ma jeszcze od czego się zacząć.',
-      cta: 'Otwórz World Engine',
+      cta: 'Otwórz Nexus',
       hash: '#/genesis-world',
     };
   }

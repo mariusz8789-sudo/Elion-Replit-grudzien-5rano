@@ -41,8 +41,8 @@
  */
 
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { validate as rdkitValidate } from '../compute/rdkitAdapter.mjs';
+import { sha256Hex } from '../determinism.mjs';
 
 export const HUMAN_ORGANISM = 'Homo sapiens';
 
@@ -53,9 +53,6 @@ const ACCEPTED_TYPES = Object.freeze(['EC50', 'IC50', 'KI', 'PEC50', 'PIC50', 'P
 export const PACTIVITY_MIN = 3;
 export const PACTIVITY_MAX = 12;
 
-function sha256Hex(buf) {
-  return createHash('sha256').update(buf).digest('hex');
-}
 
 /**
  * Accepts a number, or a string that is ENTIRELY a plain decimal number —

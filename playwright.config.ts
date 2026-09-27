@@ -21,6 +21,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  // Specs share one production-like API and its real rate limiter.
+  // Serial execution prevents artificial 429 responses without hiding coverage.
+  workers: 1,
   retries: 0,
   reporter: [['list']],
   use: {

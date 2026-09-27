@@ -11,7 +11,7 @@ import {
 import { getFrameState, type WorldFrameEntity, type WorldFrameState } from '../worldModel/bridge/worldFrameState';
 import { toGraphicsWorldFrame } from '../worldModel/bridge/graphicsWorldFrameAdapter';
 import { WorldFrameRenderer } from './graphics/worldFrameRenderer';
-import { InteractionController } from './graphics/interaction';
+import { InteractionController, applyHighlight, clearHighlight } from './graphics/interaction';
 import type { WorldFrameEntityId } from './graphics/worldFrame';
 import { resolveCameraFraming } from './graphics/cameraRig';
 import { createMoleculeAdapter, type MoleculeAdapter } from './graphics/moleculeAdapterBridge';
@@ -133,12 +133,23 @@ export interface MoleculeScene3DOptions {
 export class MoleculeScene3D implements Sim3D {
   cameraAutoRotateSpeed = 6;
 
+  /** D-133: while an atom is selected, the auto-rotate above would keep sweeping its screen
+   * position every frame — the exact anchor `MoleculeLabScreen.tsx`'s Contextual Popup is pinned
+   * to — making the popup (and its BADAJ button) slide continuously instead of staying put. */
+  suspendAutoRotate(): boolean {
+    return this.selectedAtomId !== null;
+  }
+
   private readonly engine: TemporalEngine;
   private readonly moleculeId: ReturnType<typeof addMolecule>;
   private readonly geometrySource: MoleculeGeometrySource;
 
   private THREE: typeof THREE_NS | null = null;
   private scene: THREE_NS.Scene | null = null;
+  /** D-133: stored so `getStats()` can project the selected/hovered atom to screen pixels for the
+   * Smart UI contextual popup — the SAME camera `syncScene`/`init` already receive each frame, not a
+   * second camera reference. */
+  private camera: THREE_NS.PerspectiveCamera | null = null;
   private renderer: WorldFrameRenderer | null = null;
   private adapter: MoleculeAdapter | null = null;
   private atomMaterials = new Map<string, THREE_NS.Material>();
@@ -149,11 +160,18 @@ export class MoleculeScene3D implements Sim3D {
   private viewportWidth = 300;
   private viewportHeight = 300;
   private selectedAtomId: WorldFrameEntityId | null = null;
+  /** D-133: the hovered (not yet clicked) atom — the Smart UI shell's `onHoverChange` half of the
+   * hover -> highlight -> click -> research contract; `null` outside any atom. */
+  private hoveredAtomId: WorldFrameEntityId | null = null;
   private following = false;
   /** Set by a caller (`MoleculeLabScreen.tsx`) to receive selection changes — the ONLY coupling
    * between this Sim3D and React, the exact pattern `GenesisWorldScreen.tsx`'s own `onSelect`
    * already establishes for a different WorldFrame scene. */
   onAtomSelected?: (info: SelectedAtomInfo | null) => void;
+  /** D-133: fired on every hover change (including back to `null`), the SAME coupling shape as
+   * `onAtomSelected` above — `WorldViewShell`'s contextual popup needs hover for its highlight, not
+   * only the click that opens it. */
+  onAtomHovered?: (info: SelectedAtomInfo | null) => void;
 
   private bondsGroup: THREE_NS.Group | null = null;
   private bondMaterial: THREE_NS.Material | null = null;
@@ -218,11 +236,13 @@ export class MoleculeScene3D implements Sim3D {
 
     this.adapter = createMoleculeAdapter(THREE, { atomMaterials: Object.fromEntries(this.atomMaterials) });
     this.renderer = new WorldFrameRenderer(THREE, scene, { resolveVisual: this.adapter.resolveVisual, updateVisual: this.adapter.updateVisual });
+    this.camera = camera;
     this.interaction = new InteractionController(THREE, {
       camera,
       resolver: this.renderer,
       getTargets: () => (this.scene ? [this.scene] : []),
       onSelect: (id) => this.handleSelect(id),
+      onHoverChange: (id) => this.handleHover(id),
     });
 
     // A reasonable starting shot for the moleculeRadius default above — reframeCamera replaces this
@@ -291,6 +311,58 @@ export class MoleculeScene3D implements Sim3D {
     });
   }
 
+  /** D-133: the hover half of the Smart UI contract. Mirrors `handleSelect`'s own atom-only
+   * resolution exactly, plus the actual visual feedback — `applyHighlight`/`clearHighlight` from
+   * `graphics/interaction.ts`, the SAME emissive-boost mechanism the rest of Genesis uses for
+   * hover/select, not a new one. */
+  private handleHover(id: WorldFrameEntityId | null): void {
+    const THREE = this.THREE;
+    if (this.hoveredAtomId && this.hoveredAtomId !== id && this.renderer && THREE) {
+      const previous = this.renderer.getObjectForEntity(this.hoveredAtomId);
+      if (previous) clearHighlight(previous);
+    }
+    this.hoveredAtomId = id;
+    if (!id) {
+      this.onAtomHovered?.(null);
+      return;
+    }
+    const frame = getFrameState(this.engine);
+    const entity = frame.entities.find((e) => e.id === id);
+    if (!entity || !entity.ref.kind.startsWith('atom-')) {
+      this.hoveredAtomId = null;
+      this.onAtomHovered?.(null);
+      return;
+    }
+    if (this.renderer && THREE) {
+      const object = this.renderer.getObjectForEntity(id);
+      if (object) applyHighlight(THREE, object, 'hover');
+    }
+    this.onAtomHovered?.({
+      entityId: id,
+      element: entity.ref.kind.slice('atom-'.length),
+      notModeled: entity.grounding === 'UNGROUNDED_APPROXIMATION',
+    });
+  }
+
+  /** D-133: project a WorldFrame entity's world position to viewport pixel coordinates (y down —
+   * `screenToNDC`'s own convention, matched here for consistency with the rest of the picking
+   * pipeline), for `WorldViewShell`'s `ContextualPopup` anchor. `null` when the entity, the camera,
+   * or the renderer isn't ready, or the point projects behind the camera. */
+  private screenAnchorFor(id: WorldFrameEntityId | null): { x: number; y: number } | null {
+    const THREE = this.THREE;
+    if (!id || !THREE || !this.camera || !this.renderer) return null;
+    const object = this.renderer.getObjectForEntity(id);
+    if (!object) return null;
+    const world = new THREE.Vector3();
+    object.getWorldPosition(world);
+    const ndc = world.clone().project(this.camera);
+    if (ndc.z > 1) return null; // behind the camera
+    return {
+      x: (ndc.x * 0.5 + 0.5) * this.viewportWidth,
+      y: (1 - (ndc.y * 0.5 + 0.5)) * this.viewportHeight,
+    };
+  }
+
   /** Whether the camera should continuously pivot onto the currently-selected atom — the "optional
    * follow" the click-to-select interaction offers. `false` (the default) leaves the one-time
    * `reframeCamera` shot and free orbit exactly as before. */
@@ -322,6 +394,7 @@ export class MoleculeScene3D implements Sim3D {
 
   syncScene(_scene: THREE_NS.Scene, camera: THREE_NS.PerspectiveCamera): void {
     if (!this.renderer || !this.THREE) return;
+    this.camera = camera;
     const frame = getFrameState(this.engine);
     const graphicsFrame = toGraphicsWorldFrame(frame);
     this.renderer.sync(graphicsFrame);
@@ -424,12 +497,19 @@ export class MoleculeScene3D implements Sim3D {
   getStats(): Record<string, number> {
     const molecule = this.engine.graph.tryGetEntity(this.moleculeId);
     const stateCode = typeof molecule?.domainState?.stateCode === 'number' ? molecule.domainState.stateCode : MOLECULE_STATE_CODE.NOT_MATERIALISED;
+    // D-133: the selected atom's live screen anchor, piggy-backed on the SAME throttled (250ms)
+    // React update channel `useThreeLoop.ts` already drives everything else through — not a new
+    // per-frame state pipeline. NaN (not 0/0, an honest missing value) when nothing is selected or
+    // the point isn't currently on screen, so a stale corner anchor is never mistaken for a real one.
+    const anchor = this.screenAnchorFor(this.selectedAtomId);
     return {
       moleculeStateCode: stateCode,
       atomsMaterialised: typeof molecule?.domainState?.atomsMaterialised === 'number' ? molecule.domainState.atomsMaterialised : 0,
       bondsMaterialised: typeof molecule?.domainState?.bondsMaterialised === 'number' ? molecule.domainState.bondsMaterialised : 0,
       materialising: this.materialising ? 1 : 0,
       materialiseBlocked: stateCode === MOLECULE_STATE_CODE.MATERIALISATION_BLOCKED ? 1 : 0,
+      selectedAnchorX: anchor?.x ?? Number.NaN,
+      selectedAnchorY: anchor?.y ?? Number.NaN,
       webgl_fps: this.renderMetrics.fps,
       webgl_render_ms: this.renderMetrics.renderMs,
       webgl_draw_calls: this.renderMetrics.drawCalls,

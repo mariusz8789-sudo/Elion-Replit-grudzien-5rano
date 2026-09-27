@@ -143,3 +143,40 @@ export function biotechToCanonicalReliability(status: BiotechEpistemicStatus): E
 export function canonicalReliabilityLabel(status: EpistemicStatus): string {
   return EPISTEMIC_LABELS[status];
 }
+
+/**
+ * D-128 — the two remaining vocabularies onto the canonical rank, so one
+ * answer can carry one reliability label: the Scientific Worlds session
+ * status (`experimentSession.ts`, also the V3 human-lab labels) and the
+ * ★ scale `/api/ask` is instructed to emit (1–5). A mapping never upgrades:
+ * an observation ranks as WELL_SUPPORTED (it supports a claim; it is not
+ * by itself established science), a model or simulation as THEORETICAL,
+ * NOT_MODELED / INSUFFICIENT_EVIDENCE as UNSUPPORTED.
+ */
+export type SessionEpistemicStatus = 'REAL_OBSERVATION' | 'VERIFIED_SOURCE' | 'MODEL' | 'SIMULATION' | 'HYPOTHESIS' | 'SPECULATIVE' | 'FICTION_INSPIRED_SCENARIO' | 'FICTION_INSPIRED' | 'RECONSTRUCTION' | 'NOT_MODELED' | 'INSUFFICIENT_EVIDENCE';
+
+export function sessionStatusToCanonicalReliability(status: SessionEpistemicStatus): EpistemicStatus {
+  switch (status) {
+    case 'VERIFIED_SOURCE': return 'ESTABLISHED_SCIENCE';
+    case 'REAL_OBSERVATION': return 'WELL_SUPPORTED_MODEL';
+    case 'MODEL': case 'SIMULATION': case 'RECONSTRUCTION': return 'THEORETICAL_MODEL';
+    case 'HYPOTHESIS': return 'HYPOTHESIS';
+    case 'SPECULATIVE': return 'SPECULATIVE_MODEL';
+    case 'FICTION_INSPIRED_SCENARIO': case 'FICTION_INSPIRED': return 'THOUGHT_EXPERIMENT';
+    case 'NOT_MODELED': case 'INSUFFICIENT_EVIDENCE': return 'UNSUPPORTED_CLAIM';
+  }
+}
+
+/** The ★ count (0–5) of the /api/ask label onto the canonical rank; anything outside 0–5 is UNSUPPORTED, never rounded up. */
+export function starScaleToCanonicalReliability(stars: number): EpistemicStatus {
+  const n = Number.isFinite(stars) ? Math.floor(stars) : 0;
+  if (n >= 5) return 'ESTABLISHED_SCIENCE';
+  if (n === 4) return 'WELL_SUPPORTED_MODEL';
+  if (n === 3) return 'THEORETICAL_MODEL';
+  if (n === 2) return 'HYPOTHESIS';
+  if (n === 1) return 'SPECULATIVE_MODEL';
+  return 'UNSUPPORTED_CLAIM';
+}
+
+/** Count the ★ in a label such as "★★★☆☆" (filled stars only). */
+export function countFilledStars(label: string): number { return (label.match(/★/g) ?? []).length; }

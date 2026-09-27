@@ -16,7 +16,7 @@ Jeśli znajdziesz plik (w Pobranych, w czacie, w mailu), wystarczy go przesłać
 
 | Co | Stan | Gdzie jest wzmianka |
 |---|---|---|
-| Pliki modeli AiZynthFinder (retrosynteza): `uspto_model.onnx` (lub `uspto_expansion.onnx`), `uspto_templates.csv.gz` (lub `uspto_unique_templates.csv.gz`), `uspto_filter_model.onnx`, opcjonalnie `uspto_ringbreaker_*`, `zinc_stock.hdf5`, `config.yml` | Blokada pobierania w chmurze (403). Na telefonie widać `uspto_filter_m…` (50,39 MB i 16,79 MB), `uspto_ringbrea…` (zip) i `config.yml` z 26.09 — to wygląda właśnie na te pliki. | `docs/GENESIS_RETRO_MODEL_FILES.md` |
+| Pliki modeli AiZynthFinder (retrosynteza) | **Rozwiązane poza tym PR:** wszystkie 6 plików pobrano przez warstwy obrazów Docker z mirror.gcr.io (identyczne bajtowo w dwóch niezależnych obrazach); benchmark aspiryny i 3-etapowa trasa imatynibu są w PR #11. Nie trzeba ich szukać. | `docs/GENESIS_RETRO_MODEL_FILES.md` |
 | Surowe pliki NIST dla atomu wodoru (G3) | W CI zapisano tylko sumy SHA-256 | `docs/GENESIS_ATOM_BOHR_G3_READINESS.md` |
 | Dane DEFRA AURN (NO₂, ULEZ) | Były tylko artefaktami CI | D-025 w `docs/DECISIONS.md` |
 | Wersja wydania ChEMBL i dokładne zapytanie dla GLP-1R/GIPR | Nie zapisane w `*.meta.json` | `docs/A1_GLP1_EXECUTION_HANDOFF.md:51` |

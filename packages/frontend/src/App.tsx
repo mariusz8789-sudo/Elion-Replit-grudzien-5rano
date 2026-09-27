@@ -101,6 +101,7 @@ const WorldDirectorScreen = lazy(() => import('./components/WorldDirectorScreen'
 const MetaCognitionScreen = lazy(() => import('./components/MetaCognitionScreen').then((m) => ({ default: m.MetaCognitionScreen })));
 const ReviewerRoomScreen = lazy(() => import('./components/ReviewerRoomScreen').then((m) => ({ default: m.ReviewerRoomScreen })));
 const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
+const DiscoveryTrackScreen = lazy(() => import('./components/DiscoveryTrackScreen').then((m) => ({ default: m.DiscoveryTrackScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
 function HeavyRoute({ children }: { children: ReactNode }) {
@@ -186,7 +187,8 @@ type Route =
   | { kind: 'myths-theories' }
   | { kind: 'world-director' }
   | { kind: 'meta-cognition' }
-  | { kind: 'mirror' };
+  | { kind: 'mirror' }
+  | { kind: 'discovery-track' };
 
 export function parseHash(): Route {
   const h = window.location.hash;
@@ -267,6 +269,7 @@ export function parseHash(): Route {
   if (h === '#/world-director' || h.startsWith('#/world-director?')) return { kind: 'world-director' };
   if (h === '#/meta-cognition') return { kind: 'meta-cognition' };
   if (h === '#/mirror') return { kind: 'mirror' };
+  if (h === '#/discovery-track') return { kind: 'discovery-track' };
   return { kind: 'home' };
 }
 
@@ -473,6 +476,16 @@ export default function App() {
         <div className="app">
           <TopBar title="Reviewer Room" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute><ReviewerRoomScreen /></HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'discovery-track') {
+      return (
+        <div className="app">
+          <TopBar title="🔬 Ścieżka odkrycia (Phase F)" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><DiscoveryTrackScreen /></HeavyRoute>
           {overlays}
         </div>
       );

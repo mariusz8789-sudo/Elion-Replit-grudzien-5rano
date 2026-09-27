@@ -131,7 +131,7 @@ export function labProcedureOf(state: LiveDrugRunState | null, candidate: LiveCa
   const measure = phase('MEASURE', 'Odczyt wyników z aparatury', 'REAL_ENGINE_OUTPUT', 'MONITOR',
     measured ? 'DONE' : pose ? 'ACTIVE' : 'PENDING',
     measured
-      ? `Vina ${num(docking?.value, 'kcal/mol')} (estymata funkcji oceniającej, nie pomiar) · QM ${qmBlocked ? 'zablokowane' : num(quantum?.value, 'eV')}`
+      ? `Vina ${num(docking?.value, 'kcal/mol')} · MODEL_ESTIMATE (estymata funkcji oceniającej, nie pomiar) · QM ${qmBlocked ? 'zablokowane' : num(quantum?.value, 'eV')}`
       : '');
 
   // INTERPRET — the frozen rules decide; no new measurement, no model opinion.

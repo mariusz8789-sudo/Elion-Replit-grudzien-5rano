@@ -125,6 +125,7 @@ import { evaluateManifold, systemTelemetry } from './manifoldApi.mjs';
 import { detectRuntime as detectLocalVideoRuntime } from './cinematic/localVideoRuntime.mjs';
 import { planGeneration as planLocalVideoGeneration } from './cinematic/genesisVideoEngine.mjs';
 import { listSupportedCapabilities as listLocalVideoCapabilities } from './cinematic/videoControlContract.mjs';
+import { ingestScientificSource, ingestionStatus, recordIngestionResult } from './scientificIngestion.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -298,6 +299,20 @@ export function handleApi(db, ctx) {
   }
   if (seg[0] === 'system') {
     if (seg[1] === 'telemetry' && seg.length === 2 && method === 'GET') return ok(systemTelemetry());
+    return err(404, 'not_found');
+  }
+
+  // ---- D-149: live scientific ingestion (PDB/RCSB, ChEMBL, UniProt, ClinicalTrials.gov) with a sha256 per fetch ----
+  // Public, read-only, rate-limited in server.mjs like /api/biotech/source. Every result carries an honest access
+  // status (LIVE / NO_ACCESS / PINNED_FALLBACK); a fetch that fails is reported, never replaced by a cached success.
+  if (seg[0] === 'ingestion') {
+    if (seg[1] === 'status' && seg.length === 2 && method === 'GET') return ok(ingestionStatus());
+    if (seg[1] === 'source' && seg.length === 2 && method === 'GET') {
+      const query = ctx.query ?? {};
+      // `ctx.fetchImpl` exists so the route can be tested without a network; server.mjs never sets it.
+      return ingestScientificSource({ source: query.source, id: query.id }, ctx.fetchImpl ? { fetchImpl: ctx.fetchImpl } : {})
+        .then((r) => (r.ok ? ok({ result: recordIngestionResult(r.result) }) : err(r.status ?? 400, r.error, r.message)));
+    }
     return err(404, 'not_found');
   }
 

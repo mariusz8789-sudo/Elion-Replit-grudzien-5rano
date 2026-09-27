@@ -97,6 +97,26 @@ export interface LineageEdge {
 
 export interface StageProgress { readonly done: number; readonly planned: number }
 
+/**
+ * ORDERING FACTS OF THE APPEND-ONLY LOG (D-150) — counted from the persisted `seq` values, nothing
+ * inferred. The self-falsification battery's TEMPORAL_LEAKAGE probe needs to know whether a later
+ * step's information could have reached an earlier one; the only honest answer is the order the
+ * server actually wrote the events in. A violation is named, never smoothed over.
+ */
+export interface RunOrdering {
+  readonly firstSeq: number;
+  /** Highest seq of a generation-phase event (GENERATION_COMPLETED / CANDIDATE_*). */
+  readonly lastGenerationSeq: number;
+  /** Lowest seq of any heavy-stage event (ADMET / docking / quantum selection, progress or result). */
+  readonly firstStageSeq: number;
+  /** Seq of the RECEPTOR_PREPARED event, 0 when the docking stage never prepared a receptor. */
+  readonly receptorPreparedSeq: number;
+  /** Lowest seq of a docking STAGE_RESULT (the scored pose). */
+  readonly firstDockingResultSeq: number;
+  /** Named ordering breaches, e.g. a stage result written before the generation that produced it. */
+  readonly violations: readonly string[];
+}
+
 export interface LiveDrugRunState {
   readonly stage: DrugRunStage;
   readonly lastSeq: number;
@@ -108,6 +128,8 @@ export interface LiveDrugRunState {
   readonly blocked: readonly { readonly stage: string; readonly blocker: string }[];
   readonly stopReason: string | null;
   readonly target: DockingTarget | null;
+  /** The order the server wrote the events in — read by the TEMPORAL_LEAKAGE probe (D-150). */
+  readonly ordering: RunOrdering;
   /** fnv1a of the canonical JSON of everything above — the identity the scene must reproduce. */
   readonly stateHash: string;
 }
@@ -140,6 +162,41 @@ function measurementFrom(event: CampaignEventRecord): StageMeasurement | null {
     return endpoints ? { status: 'COMPUTED', value: null, unit: null, runId, reason, endpoints } : { status: 'COMPUTED', value: null, unit: null, runId, reason };
   }
   return null;
+}
+
+const GENERATION_EVENT = /^(GENERATION_|CANDIDATE_|CAMPAIGN_STARTED|STOPPING_CONDITION_REACHED)/;
+const STAGE_EVENT = new Set(['STAGE_SELECTION', 'STAGE_RESULT', 'STAGE_PROGRESS', 'STAGE_BLOCKED']);
+
+/** Pure count over the persisted seq values; no event is reordered and nothing is inferred. */
+export function orderingOf(events: readonly CampaignEventRecord[]): RunOrdering {
+  let lastGenerationSeq = 0;
+  let firstStageSeq = 0;
+  let receptorPreparedSeq = 0;
+  let firstDockingResultSeq = 0;
+  for (const e of events) {
+    if (GENERATION_EVENT.test(e.type)) lastGenerationSeq = Math.max(lastGenerationSeq, e.seq);
+    if (STAGE_EVENT.has(e.type)) firstStageSeq = firstStageSeq === 0 ? e.seq : Math.min(firstStageSeq, e.seq);
+    if (e.type === 'STAGE_PROGRESS' && str(e.payload.step) === 'RECEPTOR_PREPARED') receptorPreparedSeq = receptorPreparedSeq === 0 ? e.seq : receptorPreparedSeq;
+    if (e.type === 'STAGE_RESULT' && str(e.payload.stage) === 'docking' && num(e.payload.bestAffinityKcalMol) !== null) {
+      firstDockingResultSeq = firstDockingResultSeq === 0 ? e.seq : Math.min(firstDockingResultSeq, e.seq);
+    }
+  }
+  const violations: string[] = [];
+  // A candidate must exist before it can be measured: no heavy-stage event may precede the generation
+  // events that produced the molecules. (A campaign with no generation event at all has nothing to breach.)
+  if (firstStageSeq > 0 && lastGenerationSeq > 0 && firstStageSeq < lastGenerationSeq && firstDockingResultSeq > 0 && firstDockingResultSeq < lastGenerationSeq) {
+    violations.push(`docking result at seq ${firstDockingResultSeq} precedes the last generation event at seq ${lastGenerationSeq}`);
+  }
+  if (firstDockingResultSeq > 0 && receptorPreparedSeq > 0 && firstDockingResultSeq < receptorPreparedSeq) {
+    violations.push(`docking result at seq ${firstDockingResultSeq} precedes RECEPTOR_PREPARED at seq ${receptorPreparedSeq}`);
+  }
+  if (firstDockingResultSeq > 0 && receptorPreparedSeq === 0) {
+    violations.push(`a docking result at seq ${firstDockingResultSeq} exists with no RECEPTOR_PREPARED event on record`);
+  }
+  return {
+    firstSeq: events.length ? events[0]!.seq : 0,
+    lastGenerationSeq, firstStageSeq, receptorPreparedSeq, firstDockingResultSeq, violations,
+  };
 }
 
 const DOCK_STEP_ORDER: readonly DockingStep[] = ['SELECTED', 'LIGAND_PREPARED', 'VINA_STARTED', 'POSE_SCORED', 'FAILED'];
@@ -283,6 +340,7 @@ export function projectDrugRun(input: {
     blocked,
     stopReason,
     target,
+    ordering: orderingOf(events),
   };
   return { ...body, stateHash: fnv1a(canonicalJson(body)) };
 }

@@ -5,6 +5,7 @@ import { realClaimCounts, runTamperChallenge, SURPASS2_PINNED_SHA256, type Tampe
 import { D063_CLAIM_TEXT } from '../core/govServices/govServiceRuns';
 import { DOCKING_SOURCE, RETRO_EVIDENCE, verifyDockingInputs, type FileCheck } from '../core/reviewer/drugEvidence';
 import { ASTEX_PREREG, ASTEX_RUNS, imatinibKitCase, type BenchmarkRun } from '../core/reviewer/dockingBenchmark';
+import { ScientificIngestionPanel } from './ScientificIngestionPanel';
 import './reviewerRoom.css';
 
 /**
@@ -306,6 +307,7 @@ export function ReviewerRoomScreen(): React.ReactElement {
       <TamperChallenge />
       <DrugPipeline />
       <DockingBenchmark />
+      <ScientificIngestionPanel />
       <Boundaries />
       <Reproduce />
     </main>

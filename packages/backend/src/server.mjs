@@ -294,7 +294,7 @@ async function handleBiotechSource(req, res, url) {
  * /api/physics/cms-z (real CMS Open Data): handled in api.mjs, missing here. Guarded by
  * serverApiPrefixes.test.mjs, which reads api.mjs and fails if the two ever diverge.
  */
-export const PERSIST_API_SEGMENTS = Object.freeze(['auth', 'projects', 'compute', 'worlds', 'security', 'speculative', 'knowledge', 'quantum', 'manifold', 'system', 'physics']);
+export const PERSIST_API_SEGMENTS = Object.freeze(['auth', 'projects', 'compute', 'worlds', 'security', 'speculative', 'knowledge', 'quantum', 'manifold', 'system', 'physics', 'ingestion']);
 function isPersistApiPath(url) {
   if (!url?.startsWith('/api/')) return false;
   const first = url.slice(5).split(/[/?#]/, 1)[0];
@@ -331,6 +331,10 @@ function handlePersistApi(req, res, url) {
   }
   if (isSpatialUpload && !spatialUploadLimiter.allow(ip)) {
     return json(res, 429, { error: 'spatial_upload_rate_limited', message: 'Limit uploadu artefaktów GIS: 6 na minutę.' });
+  }
+  // D-149: each live ingestion is an outbound request to a public scientific API — same budget as /api/biotech/source.
+  if (url.pathname === '/api/ingestion/source' && !biotechSourceLimiter.allow(ip)) {
+    return json(res, 429, { error: 'rate_limited', message: 'Za dużo odczytów źródeł — odczekaj chwilę.' });
   }
   const maxBodyBytes = (isKnowledgeUpload || isSpatialUpload || isWorldUpload) ? 7 * 1024 * 1024 : 65_536;
   const declaredLength = Number(req.headers['content-length'] ?? 0);

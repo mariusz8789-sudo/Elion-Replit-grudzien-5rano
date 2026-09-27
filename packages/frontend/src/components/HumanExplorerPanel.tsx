@@ -13,6 +13,8 @@ import { SECTION_AXIS_LABEL_PL, type CutawayState, type SectionAxis } from '../c
 import type { TwinSurfaceMode } from '../core/three/humanTwinMaterials';
 import { HUMAN_VISUAL_QUALITY_PROFILE } from '../core/three/humanMacroMicroLayer';
 import { BODYPARTS3D_ATTRIBUTION, type ReferenceAnatomyState } from '../core/three/bodyParts3dPilot';
+import { TARGET_ANATOMY_CAVEAT_PL } from '../core/liveExperiment/targetAnatomy';
+import { EPISTEMIC_TAG_PL, UNRESOLVED_LABEL, UNRESOLVED_REASON_PL, twinContextLines, type TwinContext } from '../core/liveExperiment/twinContext';
 import { runLungExposureModel, type LungExposure, type LungTimelineYears } from '../labs/experiments/biology-lung-exposure';
 import { PREVENTION_STAGES, runPreventionEducation, type PreventionStage, type PreventionTarget, type PreventionTopic } from '../labs/experiments/preventionLabCatalog';
 import { HumanExperimentSessionInspector } from './HumanExperimentSessionInspector';
@@ -55,6 +57,8 @@ export interface HumanExplorerPanelProps {
   readonly nextLogicalTime: () => number;
   /** BodyParts3D pilot: which atlas nodes are drawn from the approved reference atlas (generic, never a patient). */
   readonly referenceAnatomy?: ReferenceAnatomyState;
+  /** HERO → twin (D-146): the finalist/target/anatomy context the user arrived with, resolved against the canonical run — or UNRESOLVED with its reason. Never a claim of drug action. */
+  readonly twinContext?: TwinContext | null;
 }
 
 const SYSTEM_LABEL_PL: Readonly<Record<OrganSystemId, string>> = { INTEGUMENTARY: 'Skórny', SKELETAL: 'Szkieletowy', MUSCULAR: 'Mięśniowy', NERVOUS: 'Nerwowy', ENDOCRINE: 'Dokrewny', CARDIOVASCULAR: 'Krążenia', LYMPHATIC: 'Limfatyczny', RESPIRATORY: 'Oddechowy', DIGESTIVE: 'Pokarmowy', URINARY: 'Moczowy', REPRODUCTIVE: 'Rozrodczy', IMMUNE: 'Immunologiczny' };
@@ -65,7 +69,7 @@ const PREVENTION_TOPICS: readonly PreventionTopic[] = ['cigarette', 'vaping', 'a
 const PREVENTION_TARGETS: readonly PreventionTarget[] = ['lungs', 'heart', 'brain', 'liver', 'whole-body'];
 const PREVENTION_TARGET_LABEL_PL: Readonly<Record<PreventionTarget, string>> = { lungs: 'płuca', heart: 'serce', brain: 'mózg', liver: 'wątroba', 'whole-body': 'organizm' };
 
-export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy }: HumanExplorerPanelProps): JSX.Element {
+export default function HumanExplorerPanel({ manifest, anatomy, artifact, session, sessions, busy, onCommands, nextLogicalTime, cutaway, onCutaway, isolated, onIsolate, twinTier, twinCamera, onTwinCamera, surface, onSurface, researchControls, subjectBounds, referenceAnatomy, twinContext = null }: HumanExplorerPanelProps): JSX.Element {
   const locale = getLocale();
   const initialHash = typeof window === 'undefined' ? '' : window.location.hash;
   const initialQuery = new URLSearchParams(initialHash.split('?')[1] ?? '');
@@ -200,6 +204,31 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         {referenceAnatomy?.fullAtlas?.status === 'LOADING' && <span className="human-model-label" data-testid="bp3d-full-atlas-loading">Wczytywanie pełnego atlasu anatomicznego…</span>}
         {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])}>{BODYPARTS3D_ATTRIBUTION}</span>}
       </div>
+      {/* HERO → twin (D-146): what the finalist is, what it was docked against, where that target sits, and
+          what kind of knowledge each line is. RESOLVED came from the canonical run; UNRESOLVED says why and
+          the twin has not moved. Never "the drug acts here" — the last line says that was not computed. */}
+      {twinContext && (twinContext.status === 'RESOLVED' ? (
+        <aside className="human-twin-context" data-testid="human-twin-context" data-status="RESOLVED"
+          data-candidate={twinContext.candidate?.id ?? ''} data-target={twinContext.target.targetId} data-system={twinContext.anatomy.system}
+          data-campaign={twinContext.campaignId ?? ''} data-state-hash={twinContext.stateHash ?? ''} aria-label="Kontekst z ławki dokowania">
+          <header><span>HERO → HUMAN DIGITAL TWIN</span><span>TARGET-ASSOCIATED ANATOMICAL CONTEXT</span></header>
+          <dl>
+            {twinContextLines(twinContext).map((line) => (
+              <div key={line.label} data-tag={line.tag}>
+                <dt>{line.label}</dt>
+                <dd><span>{line.value}</span><small className={`human-twin-tag is-${line.tag.toLowerCase()}`}>{line.tag} · {EPISTEMIC_TAG_PL[line.tag]}</small>{line.source && <small className="human-twin-source">źródło: {line.source}</small>}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="human-twin-caveat">{TARGET_ANATOMY_CAVEAT_PL}</p>
+        </aside>
+      ) : (
+        <aside className="human-twin-context is-unresolved" data-testid="human-twin-context" data-status="UNRESOLVED" data-reason={twinContext.reason}
+          data-candidate={twinContext.candidateId ?? ''} data-target={twinContext.targetId ?? ''} aria-label="Kontekst z ławki dokowania">
+          <header><span>HERO → HUMAN DIGITAL TWIN</span><span>{UNRESOLVED_LABEL}</span></header>
+          <p>{UNRESOLVED_REASON_PL[twinContext.reason]}. Model ciała nie został przesunięty i żaden narząd nie został wskazany.</p>
+        </aside>
+      ))}
       {lungModel && <aside className="human-lung-compare" data-testid="human-lung-exposure" data-exposure={lungExposure} data-years={lungYears}>
         <header><span>MODEL</span><span>EDUCATIONAL SIMULATION</span><span>NOT CLINICAL DIAGNOSIS</span></header>
         <h2>Zdrowe płuca <b>vs</b> {lungExposure === 'cigarette' ? 'palenie papierosów' : lungExposure === 'vaping' ? 'e-papierosy' : lungExposure === 'cannabis' ? 'palenie marihuany' : 'punkt odniesienia'}</h2>

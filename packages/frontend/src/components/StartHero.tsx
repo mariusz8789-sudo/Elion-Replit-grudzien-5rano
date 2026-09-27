@@ -58,6 +58,7 @@ export function StartHero(): React.ReactElement {
           </ul>
           <div className="start-proof-actions">
             <a className="chip-btn primary" href="#/reviewer" data-testid="door-proof-reviewer">✓ Reviewer Room: spróbuj podrobić wynik</a>
+            <a className="chip-btn" href="#/discovery-track" data-testid="door-proof-discovery-track">◇ Ścieżka odkrycia: nowość → replikacja → 13 sond</a>
             <button type="button" className="chip-btn" onClick={() => submit('Znajdź kandydatów dla BCR-ABL (cel imatynibu).')} data-testid="door-proof-drug">▶ Uruchom eksperyment na leku</button>
           </div>
         </div>

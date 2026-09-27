@@ -44,6 +44,7 @@
 .rv-tag { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 0.78rem; font-weight: 600; }
 .rv-tag-good { background: var(--rv-good); color: #06140d; }
 .rv-tag-bad { background: var(--rv-bad); color: #1a0504; }
+.rv-tag-warn { background: var(--rv-warn); color: #1a1204; }
 .rv-note { color: var(--rv-muted); font-size: 0.9rem; }
 .rv-foot { color: var(--rv-muted); font-size: 0.8rem; overflow-wrap: anywhere; margin-top: 14px; }
 .rv-route { padding-left: 1.4em; }

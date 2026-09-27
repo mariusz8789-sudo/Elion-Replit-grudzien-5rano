@@ -1,5 +1,77 @@
 # AiZynthFinder — pliki modelu, których Genesis potrzebuje (pakiet dostawczy D-1)
 
+## ROZWIĄZANE — 2026-09-27: pliki pozyskane, trasa dla finalisty policzona
+
+Zenodo, Figshare, WeTransfer, HuggingFace i archive.org nadal zwracają 403, ale `mirror.gcr.io`
+(lustro Docker Hub od Google) jest osiągalne. Dwa niezależne, publiczne obrazy uruchamiają w jednej
+warstwie oficjalne `aizynthfinder.tools.download_public_data`, czyli pobierają dokładnie te pliki
+z Zenodo i Figshare:
+
+| Obraz | Warstwa (sha256, zweryfikowana po pobraniu) |
+|---|---|
+| `datagrok/retrosynthesis-aizynthfinder:1.1.0` | `f4a508ae610d79c25d712c379c8950cf1c8a247640468674a87e959542c84414` |
+| `dhanus12/aizynthfinder:latest` | `a3e6046682cb53c80cd28e74c4e8ba7ff12dd6278e5091612fdb4a2c37bc766f` |
+
+```bash
+curl -sSL https://mirror.gcr.io/v2/<obraz>/blobs/sha256:<warstwa> -o layer.tgz   # ~286 MB
+```
+
+Wszystkie 6 plików jest bajt w bajt identycznych w obu obrazach; `zinc_stock.hdf5` zgadza się także
+z trzecim obrazem (`fredrikwirlab/aizynthfinder`, 2021). Nazwy już pasują do adaptera.
+
+| Plik | Bajty | SHA256 |
+|---|---|---|
+| `uspto_model.onnx` | 91 518 243 | `bd0a3cb74cd7068de474c8fb789a00a66bc42c75636d66510ccac585ebe928f8` |
+| `uspto_templates.csv.gz` | 3 313 598 | `a4f1945e90cfa195538320833d68aed38f14e2fcc2f8afb5d958bc920edcafbe` |
+| `zinc_stock.hdf5` | 663 232 280 | `99d39a6f807c3e815487500bafc2b4a9dc66a31af189e3b1776874fb0d4a188d` |
+| `uspto_ringbreaker_model.onnx` | 15 036 094 | `1bf0690352d9e9212d7dbe8b35649caf74f73ef0b30edefdfdac37fce38085be` |
+| `uspto_ringbreaker_templates.csv.gz` | 373 753 | `5616a056454b10a2f044e69e027422128986856ebd958541a3bf9f837e3a0d14` |
+| `uspto_filter_model.onnx` | 16 788 859 | `ad29aa32bdfcbe37065045546493806cf04899c55386c438905d83fb14bb6320` |
+
+Czego ta proweniencja NIE daje: sum kontrolnych opublikowanych przez samo Zenodo (host niedostępny).
+Dowodem jest zgodność niezależnych kopii pobranych przez narzędzie autorów.
+
+Wynik `npm run retro:resume` na świeżej kampanii live drug bench (finalista: imatynib, Vina −12,8
+kcal/mol, 1IEP): aspiryna PASS (bezwodnik octowy + kwas salicylowy), trasa ROZWIĄZANA, 3 etapy,
+wszystkie substraty w stocku ZINC, Engine Replay **MATCH**, część B protokołu z `routeProvided: true`.
+Po drodze wyszedł błąd routera: `POST .../retrosynthesis` stał za strażnikiem „tylko GET” i zawsze
+dostawał 405 — naprawione w `api.mjs`, z testem w `apiCampaign.test.mjs`.
+
+### Jak odtworzyć trasę imatynibu na świeżym kontenerze (np. do filmu)
+
+Baza z tego przebiegu żyła tylko w kontenerze sesji. Wynik odtwarza się w ok. 25 minut:
+
+```bash
+# 1. modele (jedna warstwa wystarcza; weryfikacja digestu obowiązkowa)
+L=f4a508ae610d79c25d712c379c8950cf1c8a247640468674a87e959542c84414
+curl -sSL https://mirror.gcr.io/v2/datagrok/retrosynthesis-aizynthfinder/blobs/sha256:$L -o layer.tgz
+echo "$L  layer.tgz" | sha256sum -c
+mkdir -p /opt/genesis/retro-models && tar xzf layer.tgz --strip-components=3 -C /opt/genesis/retro-models app/configs/default
+sha256sum /opt/genesis/retro-models/*      # porównać z tabelą wyżej
+
+# 2. silniki + aplikacja
+bash scripts/genesis-engine-venvs.sh /opt/genesis-venv
+npm ci && npm run build
+source <(bash scripts/genesis-engine-venvs.sh --env-only)
+export GENESIS_RETRO_MODEL_DIR=/opt/genesis/retro-models GENESIS_DB_PATH=/opt/genesis/data/genesis.db
+npm start &
+
+# 3. kampania live (tworzy użytkownika, projekt i kampanię; ~9 min)
+CHROME=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npx playwright test packages/e2e/src/liveDrugBench.e2e.spec.ts
+
+# 4. trasa dla zamrożonego finalisty (ID projektu/kampanii i e-mail użytkownika z tabel
+#    campaigns/users w genesis.db; hasło testu to password123; token z POST /api/auth/login)
+npm run retro:resume -- --token <jwt> --project <pid> --campaign <cid> \
+  --model-dir /opt/genesis/retro-models --skip-download --out retro-resume.json
+```
+
+Oczekiwany wynik: `status: OK`, `replayVerdict: MATCH`, trasa 3-etapowa z substratami
+`CN1CCN(Cc2ccc(C(=O)O)cc2)CC1`, `CN(C)C=CC(=O)c1cccnc1`, `Cc1ccc([N+](=O)[O-])cc1NC(=N)N`.
+Scena 3D trasy nie pokazuje — frontend nie wywołuje endpointu retrosyntezy; trasa jest w protokole (część B).
+
+Licencje danych upstream (USPTO, ZINC) pozostają do dołączenia ze stron Zenodo/Figshare, gdy te hosty
+będą osiągalne; pliki modelu nadal NIE trafiają do repozytorium.
+
 ## EXTERNAL_RESOURCE_BLOCKER — 2026-09-26, NOWA SESJA, NOWY KONTENER: NADAL ODMOWA
 
 Hipoteza "stara polityka trzyma się starego kontenera" jest **obalona**. Ta sesja wystartowała

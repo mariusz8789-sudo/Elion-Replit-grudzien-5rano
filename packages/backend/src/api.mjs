@@ -685,6 +685,27 @@ export function handleApi(db, ctx) {
           if (!built.ok) return err(404, built.error);
           return ok({ handoff: built.handoff });
         }
+        // /api/projects/:id/campaigns/:cid/retrosynthesis (editor+) — runs the real route-search engine
+        // for one candidate and persists it as a Science Run. A blocked engine is reported as blocked;
+        // no route is ever written without the engine. It must sit above the GET-only guard below, or
+        // the POST is answered 405 and never reaches the engine.
+        if (seg[4] === 'retrosynthesis' && method === 'POST') {
+          if (!atLeast(role, 'editor')) return err(403, 'forbidden');
+          const result = planCandidateRoute(db, {
+            projectId, campaignId,
+            candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
+            smiles: typeof body?.smiles === 'string' ? body.smiles : null,
+            options: {
+              iterationLimit: Number(body?.iterationLimit) || undefined,
+              timeLimitSeconds: Number(body?.timeLimitSeconds) || undefined,
+              maxRoutes: Number(body?.maxRoutes) || undefined,
+            },
+          });
+          if (!result.ok) {
+            return { status: result.error === 'BLOCKED_BY_RUNTIME' ? 503 : 400, body: { error: result.error, reason: result.reason ?? null, missingModelFiles: result.missingModelFiles ?? null } };
+          }
+          return ok({ scienceRun: result.run, solved: result.solved, routes: result.routes }, 201);
+        }
         if (method !== 'GET') return err(405, 'method_not_allowed');
         // Odczyty (viewer+): kandydaci, decyzje, zdarzenia, graf, dlaczego, ciężkie przebiegi, konflikty
         if (seg[4] === 'candidates') {
@@ -702,26 +723,6 @@ export function handleApi(db, ctx) {
           return ok({ conflicts });
         }
         return err(404, 'not_found');
-      }
-      // /api/projects/:id/campaigns/:cid/retrosynthesis (editor+) — runs the real route-search engine
-      // for one candidate and persists it as a Science Run. A blocked engine is reported as blocked;
-      // no route is ever written without the engine.
-      if (seg.length === 5 && seg[4] === 'retrosynthesis' && method === 'POST') {
-        if (!atLeast(role, 'editor')) return err(403, 'forbidden');
-        const result = planCandidateRoute(db, {
-          projectId, campaignId,
-          candidateId: typeof body?.candidateId === 'string' ? body.candidateId : null,
-          smiles: typeof body?.smiles === 'string' ? body.smiles : null,
-          options: {
-            iterationLimit: Number(body?.iterationLimit) || undefined,
-            timeLimitSeconds: Number(body?.timeLimitSeconds) || undefined,
-            maxRoutes: Number(body?.maxRoutes) || undefined,
-          },
-        });
-        if (!result.ok) {
-          return { status: result.error === 'BLOCKED_BY_RUNTIME' ? 503 : 400, body: { error: result.error, reason: result.reason ?? null, missingModelFiles: result.missingModelFiles ?? null } };
-        }
-        return ok({ scienceRun: result.run, solved: result.solved, routes: result.routes }, 201);
       }
       // /api/projects/:id/campaigns/:cid/experiment-memory/{preregistration,sessions} (editor+) —
       // the two writes of scientific memory. Both are append-only: the preregistration is refused once

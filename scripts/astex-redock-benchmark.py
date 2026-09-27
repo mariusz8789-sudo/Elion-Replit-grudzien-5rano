@@ -37,8 +37,8 @@ PROTOCOL = {
     "distribution": "github.com/rdk/p2rank-datasets, directory joined/astex",
     "distributionCommit": "0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
     "ligandDefinition": "the HETATM residue in chain L (the Astex file convention); where a file has no chain L, the single residue carrying the listed ligand code; altloc ' ' or 'A' only",
-    "ligandChemistry": "Open Babel bond-order perception from the crystal heavy-atom coordinates (no curated chemistry), written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
-    "receptor": "all ATOM records of the file (dock_worker default: waters, cofactors, metals and other HETATM dropped); Meeko mk_prepare_receptor; no repair",
+    "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+    "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
     "box": "centre = crystal-ligand heavy-atom centroid; edge per axis = clamp(ligand extent + 10 A, 20 A, 30 A)",
     "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only",
     "metric": "symmetry-aware heavy-atom RMSD of the top-ranked pose vs the crystal pose, no superposition (RDKit CalcRMS)",
@@ -67,12 +67,44 @@ def ligand_lines(pdb_text, code):
     return first[0].strip(), heavy
 
 
-def ligand_sdf(heavy_lines, path):
-    from openbabel import pybel
+def ligand_sdf(heavy_lines, resname, listed, path):
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+    import biotite.structure.info as info
+    from biotite.interface import rdkit as brd
     block = "\n".join(heavy_lines) + "\nEND\n"
-    mol = pybel.readstring("pdb", block)
-    mol.write("sdf", path, overwrite=True)
-    return block
+    xtal = Chem.MolFromPDBBlock(block, removeHs=False, sanitize=False, proximityBonding=True)
+    if xtal is None:
+        raise ValueError("pdb_block_unreadable")
+    used = None
+    for code in dict.fromkeys([resname, listed]):
+        try:
+            tmpl = Chem.RemoveHs(brd.to_mol(info.residue(code)))
+        except Exception:  # noqa: BLE001
+            continue
+        if tmpl.GetNumAtoms() == xtal.GetNumAtoms():
+            used = code
+            break
+    if used is None:
+        raise ValueError("no_ccd_template_with_%d_heavy_atoms" % xtal.GetNumAtoms())
+    mol = AllChem.AssignBondOrdersFromTemplate(tmpl, xtal)
+    Chem.SanitizeMol(mol)
+    Chem.MolToMolFile(mol, path)
+    return used
+
+
+METALS = {"ZN", "MG", "CA", "MN", "FE", "CO", "NI", "CU", "NA", "K"}
+
+
+def clean_receptor(pdb_text, path):
+    keep = []
+    for l in pdb_text.splitlines():
+        if l[16:17] not in (" ", "A"):
+            continue
+        if l.startswith("ATOM") or (l.startswith("HETATM") and l[17:20].strip() in METALS and l[21] != "L"):
+            keep.append(l[:16] + " " + l[17:])
+    with open(path, "w") as f:
+        f.write("\n".join(keep) + "\nEND\n")
 
 
 def box_for(heavy_lines):
@@ -99,10 +131,12 @@ def run_case(case, data_dir, work):
         case_dir = os.path.join(work, pdb_id)
         os.makedirs(case_dir, exist_ok=True)
         sdf = os.path.join(case_dir, "ligand.sdf")
-        ligand_sdf(heavy, sdf)
+        out["ccdTemplate"] = ligand_sdf(heavy, resname, code, sdf)
         center, size = box_for(heavy)
         out.update({"center": center, "boxSize": size})
-        req = {"cmd": "redock", "pdbPath": path, "ligandSdfPath": sdf, "center": center, "boxSize": size,
+        receptor = os.path.join(case_dir, "receptor_clean.pdb")
+        clean_receptor(raw.decode(), receptor)
+        req = {"cmd": "redock", "pdbPath": receptor, "keepHetatm": True, "ligandSdfPath": sdf, "center": center, "boxSize": size,
                "exhaustiveness": 8, "seed": 42, "outDir": os.path.join(case_dir, "run")}
         proc = subprocess.run([sys.executable, WORKER, json.dumps(req)], capture_output=True, text=True, timeout=1800)
         r = json.loads(proc.stdout.strip().splitlines()[-1])
@@ -145,14 +179,14 @@ def main():
     docked = [r for r in results if r["status"] == "DOCKED"]
     ok = [r for r in results if r["success"]]
     import vina, meeko, rdkit
-    from openbabel import openbabel as ob
+    import biotite
     report = {
         "kind": "GENESIS_ASTEX_REDOCK_BENCHMARK",
         "protocolFingerprint": protocol_fingerprint(),
         "preregistrationSha256": sha256_bytes(open(PREREG, "rb").read()),
         "finishedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "versions": {"vina": vina.__version__, "meeko": meeko.__version__, "rdkit": rdkit.__version__,
-                     "openbabel": ob.OBReleaseVersion(), "python": sys.version.split()[0]},
+                     "biotite": biotite.__version__, "python": sys.version.split()[0]},
         "summary": {
             "cases": len(results), "docked": len(docked), "successes": len(ok),
             "successRate": round(len(ok) / len(results), 4) if results else None,

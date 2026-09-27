@@ -7,15 +7,15 @@
   "distribution": "github.com/rdk/p2rank-datasets, directory joined/astex",
   "distributionCommit": "0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
   "ligandDefinition": "the HETATM residue in chain L (the Astex file convention); where a file has no chain L, the single residue carrying the listed ligand code; altloc ' ' or 'A' only",
-  "ligandChemistry": "Open Babel bond-order perception from the crystal heavy-atom coordinates (no curated chemistry), written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
-  "receptor": "all ATOM records of the file (dock_worker default: waters, cofactors, metals and other HETATM dropped); Meeko mk_prepare_receptor; no repair",
+  "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+  "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
   "box": "centre = crystal-ligand heavy-atom centroid; edge per axis = clamp(ligand extent + 10 A, 20 A, 30 A)",
   "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only",
   "metric": "symmetry-aware heavy-atom RMSD of the top-ranked pose vs the crystal pose, no superposition (RDKit CalcRMS)",
   "successCriterion": "RMSD < 2.0 A",
   "headline": "successes / 85 \u2014 every preparation or docking failure counts as a failure"
  },
- "protocolFingerprint": "4bae777a939da86b57ce68a7a39e766e014f5d43b7be911f8d69875fb9b979ab",
+ "protocolFingerprint": "97c78bb8602e4e5b622da28ef4da21f59b8a182362186ac366cfaa7804fd8db7",
  "cases": [
   {
    "pdbId": "1G9V",
@@ -441,6 +441,22 @@
    "pdbId": "2BSM",
    "ligand": "BSM",
    "sha256": "ef9ff7a8e6fa1c20f2eeb37fdbab636ccb946a1965225ccb28a3ae76ad08533a"
+  }
+ ],
+ "amendments": [
+  {
+   "amendedAt": "2026-09-27T02:58:00Z",
+   "field": "ligandChemistry",
+   "previousProtocolFingerprint": "4bae777a939da86b57ce68a7a39e766e014f5d43b7be911f8d69875fb9b979ab",
+   "previousValue": "Open Babel bond-order perception from the crystal heavy-atom coordinates (no curated chemistry), written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+   "reason": "A smoke run of 2 cases (1T46, 1G9V) under the original protocol showed Open Babel mis-perceiving imatinib's pyrimidine (a 5-valent carbon), so RDKit could not read the ligand. Bond orders now come from the wwPDB Chemical Component Dictionary, the standard source. Smoke-run results, disclosed: 1T46 DOCKING_FAILED (ligand_sdf_unreadable); 1G9V docked at 4.898 A. No other case had been run. Case list, box, engine, metric and success criterion are unchanged."
+  },
+  {
+   "amendedAt": "2026-09-27T03:05:00Z",
+   "field": "receptor",
+   "previousProtocolFingerprint": "def5d8b36342830896bbd0bdb8c20b8825f86d340c6a7400c389edd854dc9c37",
+   "previousValue": "all ATOM records of the file (dock_worker default: waters, cofactors, metals and other HETATM dropped); Meeko mk_prepare_receptor; no repair",
+   "reason": "Smoke run of 4 cases under amendment 1: 1G9V 4.898 A, 1GKC 6.442 A, 1X8X 0.585 A, 1T46 DOCKING_FAILED (Meeko refused the receptor because of alternate locations). Receptor alternate locations are now resolved to ' '/'A', and single-atom metal ions are kept because metalloprotein pockets (e.g. zinc in 1GKC) are part of the binding site. No other case had been run."
   }
  ]
 }

@@ -1,0 +1,59 @@
+{
+  "id": "D-144-GLP1R-EXPANDED-PREREG",
+  "kind": "PREREGISTRATION",
+  "sealedBefore": "the expanded set was trained on; the build rules, the arms and every decision rule below were fixed before the first metric was computed",
+  "question": "D-143 closed with the finding that the binding constraint on the GLP-1R axis is the number of small-molecule activity rows, and recorded that the remaining ChEMBL pages could not be fetched because the environment's network policy denies www.ebi.ac.uk. This preregistration asks a different question that needs no network: the repository ALREADY holds a GLP-1R activity set that the QSAR has never used — the custody-verified text-transcription sets A1 (activities) and A2 (structures), with A3 establishing the target. Joined to the D-077 pin, how far does that get, and does it change the gate outcome?",
+  "sources": {
+    "pin": {
+      "path": "packages/backend/src/campaign/glp1rActivity.json",
+      "sha256": "5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244",
+      "rows": 287
+    },
+    "a1": {
+      "path": "data/transcription/glp1r-a1/A1-chunk-0*.psv",
+      "what": "757 activity rows, all 7 chunks byte-verified against their declared hashes (D-094/D-105). Every row is EC50, relation '=', units nM, with an empty data_validity_comment and potential_duplicate.",
+      "noTargetColumn": "A1 carries no target column, so the target is established by A3, never assumed"
+    },
+    "a2": {
+      "path": "data/transcription/glp1r-a2/",
+      "what": "structure dictionary molecule_chembl_id|canonical_smiles. Only chunks 3, 5 and 6 verify at chunk level; 1, 2, 4, 7 and 8 FAIL and are excluded in full, per D-105 and the channel evidence in that directory's README. Per-row verified rows from the failed chunks (D-108 RAW_VERIFIED) are admitted because each one's own received bytes hash to the supplier's declared value for that row."
+    },
+    "a3": {
+      "path": "data/transcription/glp1r-a3/A3-chunk-0*.psv",
+      "what": "assay -> target. Checked before this preregistration was sealed: all 90 A1 assays are present and every one resolves to CHEMBL1784."
+    }
+  },
+  "buildRules": {
+    "statedBeforeRunning": true,
+    "structuresAdmitted": "d105-a2-custody.mjs usableSmiles() (chunk-level verified A2 + the frozen pin) UNION d108-per-row-custody.mjs rawVerifiedRows(). Nothing else.",
+    "structuresRefused": "every row of a failed A2 chunk that has no verifying per-row hash, and every VERIFIED_AFTER_CHANNEL_CORRECTION row from the D-107 quarantine. No string is repaired, preferred for being longer, or adopted for parsing.",
+    "pActivityRecomputed": "pActivity = 9 - log10(standardValue in nM), computed from the delivered numeric value rather than trusting the transcribed 2-decimal pchembl_value.",
+    "internalConsistencyFilter": "a row is DROPPED if the recomputed pActivity differs from the delivered pchembl_value by more than 0.02. This is a check the delivery's own redundancy makes possible and it was run before sealing: across all 757 A1 rows the largest deviation is 0.0053, so this filter is expected to drop nothing; it stays in the rule so that a future delivery cannot slip past it.",
+    "deduplication": "an A1 row is dropped when (moleculeId, assayId, standardType) already occurs in the pin, so no measurement is counted twice.",
+    "partitionRule": "unchanged from D-143: PEPTIDE_LIKE if the amide SMARTS [NX3][CX3](=[OX1]) matches >= 10 times, else SMALL_MOLECULE."
+  },
+  "method": {
+    "unchangedFrom": "D-076/D-077 — ridge-ecfp4-morgan-r2-512bit, lambda=1.0, conformalAlpha=0.1, splitMethod=scaffold-hash-mod10, via the repo's own trainAndValidate() and real RDKit",
+    "gate": "glp1r-validation-gate.json, ruleFingerprint d2f77a7e6042f0fc, MIN_TRAIN=150 MIN_TEST=40 MAX_MAE=1.0 MIN_R2=0.25 — applied UNCHANGED to every arm"
+  },
+  "arms": [
+    { "id": "G-CONTROL-PIN", "rows": "the 287 pin rows alone", "purpose": "reproduction control. MUST return MAE=1.1726, R2=0.4820, 178/64/45. A deviation invalidates the other arms." },
+    { "id": "H-COMBINED-ALL", "rows": "pin + admitted new A1 rows", "purpose": "does roughly twice the data change the gate outcome?" },
+    { "id": "I-COMBINED-SMALL", "rows": "SMALL_MOLECULE subset of H", "purpose": "D-143's arm A, retried on the expanded set" },
+    { "id": "J-COMBINED-PEPTIDE", "rows": "PEPTIDE_LIKE subset of H", "purpose": "reported whatever it shows" }
+  ],
+  "decisionRules": {
+    "statedBeforeRunning": true,
+    "H_clears_all_four": "the axis MAY open on the combined set, but only after its own new D-entry and a newly written pin with its own sha256; this preregistration does not itself grant a capability and no prediction is emitted from a model trained here.",
+    "H_fails_on_MAE": "more rows of this kind do not fix the error. D-077a's third option (more data) is then refuted as a standalone fix, and the representation question becomes the only live one.",
+    "I_clears_all_four": "the featurization hypothesis of D-077a is SUPPORTED and the applicability domain is small molecules only, with peptides declared out of domain.",
+    "I_fails_only_on_size": "outcome INSUFFICIENT_DATA_IN_SUBSET again. The report must state exactly how many training rows short it lands, so the remaining gap is a number rather than an impression.",
+    "I_clears_size_but_fails_MAE": "the featurization hypothesis is REFUTED.",
+    "noArmMayBeCherryPicked": "all four arms are reported with their numbers, including the case where every arm fails."
+  },
+  "whatThisDoesNotDo": [
+    "It does not raise, lower or re-fingerprint any threshold. The gate stays d2f77a7e6042f0fc.",
+    "It does not write or replace the frozen D-077 pin.",
+    "It does not rank any compound, and it is not evidence about any compound's effect in any organism."
+  ]
+}

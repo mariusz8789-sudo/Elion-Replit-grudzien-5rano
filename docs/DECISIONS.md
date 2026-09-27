@@ -10063,3 +10063,114 @@ runtime limit, recorded as one — not a scientific finding.
 is still `false` with `glp1rBlockedReason: 'GATE_NOT_MET'`. Nothing in this
 entry ranks a compound, and nothing in it is evidence about any compound's
 effect in any organism.
+
+---
+
+## D-144 — 351 GLP-1R rows were already in this repository, and the best result yet still misses the gate by 0.0118
+
+D-143 closed on "the binding constraint is the number of small-molecule rows",
+and recorded that the remaining ChEMBL pages were unreachable because the
+environment's network policy denies `www.ebi.ac.uk`. That framing was
+incomplete: **the repository already held a GLP-1R activity set the QSAR had
+never been given.** The text-transcription sets are here —
+`data/transcription/glp1r-a1` (757 activity rows, all seven chunks byte-verified),
+`glp1r-a2` (structure dictionary) and `glp1r-a3` (assay → target) — and D-105 and
+D-108 built them to close a noise floor, not to feed the model.
+
+Preregistered before the first metric: `glp1r-d144-expanded-prereg.json`,
+fingerprint `4cf8e88872ee888e`. Sealed measurement
+`glp1r-d144-expanded.sealed.json`, runner `scripts/glp1r-d144-expanded.mjs`,
+real RDKit 2026.03.6, the repo's own `trainAndValidate()`, the frozen gate
+unchanged at `d2f77a7e6042f0fc`, and the D-077 pin **not rewritten**.
+
+### What was checked before the set was built
+
+Three things, because the whole result rests on them:
+
+- **Target, read from the data.** All 90 assays A1 references appear in A3, and
+  every one resolves to `CHEMBL1784`. A1 has no target column, so nothing was
+  assumed from a conversation.
+- **Internal consistency of the transcription.** `pActivity` was recomputed as
+  `9 − log10(value in nM)` from the delivered numeric value rather than trusting
+  the transcribed two-decimal `pchembl_value`. Across all 757 rows the largest
+  disagreement between the two is **0.0053**, so the delivery's two independent
+  numeric fields corroborate each other. The preregistered filter (drop above
+  0.02) dropped nothing, and stays in the rule for the next delivery.
+- **Custody, unchanged.** A structure enters only via `usableSmiles()`
+  (chunk-verified A2 plus the frozen pin) or `rawVerifiedRows()` (a row whose own
+  received bytes hash to its declared value). A2 chunks 1, 2, 4, 7, 8 stay
+  excluded in full and the D-107 channel-corrected quarantine stays out. That
+  directory's README already establishes why: this channel can delete a run of
+  characters from a SMILES and leave something that still parses.
+
+Of 757 A1 rows, **351 were admitted**: 397 dropped for having no custody-verified
+structure, 9 as already in the pin, 0 for target, 0 for consistency, 0 for shape.
+Combined set: **638 rows**, 287 pinned + 351 new, 338 structures, 0
+unfingerprintable.
+
+### The four arms
+
+| arm | rows | nTrain/nCalib/nTest | MAE | RMSE | R² | gate |
+|---|---|---|---|---|---|---|
+| G — pin only (control) | 287 | 178/64/45 | 1.1726 | 1.4534 | 0.4820 | BLOCKED (MAE) |
+| H — combined | 638 | 426/125/87 | **1.0118** | 1.3973 | 0.4336 | BLOCKED (MAE) |
+| I — combined, small molecule | 246 | 183/26/37 | 0.9547 | 1.3832 | **−0.1352** | BLOCKED (nTest, R²) |
+| J — combined, peptide | 392 | 243/99/50 | 1.1364 | 1.6231 | 0.1656 | BLOCKED (MAE, R²) |
+
+The control reproduces D-077a to the digit, so the arms are readable against it.
+
+**Arm H is the best number this axis has ever produced and it still fails.**
+2.2x the rows moved MAE from 1.1726 to 1.0118 — 0.0118 above the line. Per the
+preregistration's rule that is `H_fails_on_MAE`: more rows of this kind do not
+close the gate on their own. The honest reading is narrower than that rule's
+wording, though, and both halves matter: the effect of data volume is large and
+real, and it was not enough. Held-out R² also fell slightly, 0.4820 to 0.4336,
+which is what one expects when the test set triples and stops being dominated by
+a few scaffolds.
+
+**Arm I answers D-143's open question, and the answer is not the hopeful one.**
+D-143's arm A failed on `nTrain=54 < 150`, so the featurization hypothesis went
+down as UNTESTED. Here `nTrain=183` **clears `MIN_TRAIN`** — the blocker D-143
+identified is gone — and the arm still fails: `nTest=37`, three short of 40, and
+R² **−0.1352**, meaning the model is worse than predicting the training mean on
+held-out small-molecule scaffolds. Its MAE of 0.9547 is under the line and is
+again the trap D-143 described; the small-molecule subset's pActivity spread is
+SD 1.416, so a low MAE there is cheap and R² is the number that reports skill.
+
+No preregistered decision rule covers "fails on nTest and R² while MAE passes",
+so that gap is recorded rather than papered over: the rules anticipated a size
+failure or an accuracy failure, not both at once. What the two small-molecule
+arms now say together — R² −29.29 on 6 test rows in D-143, R² −0.1352 on 37 in
+D-144 — is that a Morgan r=2 512-bit ridge model has **no** predictive power on
+GLP-1R small molecules, on two independent splits. That is evidence against
+D-077a's hypothesis in its optimistic form: the peptides are not what was
+holding the model back, and removing them does not produce a usable
+small-molecule model.
+
+Arm J points the same way from the other side. Peptides alone score worse than
+the mixture (MAE 1.1364, R² 0.1656), so neither subset carries the combined
+model's performance; the mixture does better than either half of it.
+
+### What this changes about the plan
+
+D-077a ranked three routes. After D-143 and D-144:
+
+1. **A peptide-appropriate representation** — still untried, and now the only
+   route with evidence behind it, since 2.2x the data got within 0.0118 and
+   both single-class models were worse than the mixture.
+2. **Small-molecule stratification** — attempted properly, `MIN_TRAIN` cleared,
+   result negative. This route is not promising and should not be retried on
+   Morgan fingerprints.
+3. **More rows** — measured rather than assumed: the effect is 0.16 MAE units
+   for 351 rows, which is substantial and still short.
+
+The next unit of work that has not already been shown not to work is a new
+representation, and that needs its own sealed gate, because `gate.algorithm`
+names `ridge-ecfp4-morgan-r2-512bit` and a different featurization is a
+different model, not a tuning of this one.
+
+### Standing
+
+`GENESIS-MOL-01` stays `NO_WINNER`. `probeCapabilities().activityPredictor` is
+still `false`. No threshold moved, the pin was not rewritten, no prediction was
+emitted, and no compound was ranked.

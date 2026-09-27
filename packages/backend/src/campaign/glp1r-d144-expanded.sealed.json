@@ -1,0 +1,136 @@
+{
+  "id": "D-144-EXPANDED-CUSTODY-VERIFIED-SET",
+  "kind": "SEALED_MEASUREMENT",
+  "prereg": {
+    "id": "D-144-GLP1R-EXPANDED-PREREG",
+    "fingerprint": "4cf8e88872ee888e"
+  },
+  "gate": {
+    "ruleFingerprint": "d2f77a7e6042f0fc",
+    "thresholds": {
+      "MIN_TRAIN": 150,
+      "MIN_TEST": 40,
+      "MAX_MAE": 1,
+      "MIN_R2": 0.25
+    },
+    "relaxed": false
+  },
+  "sources": {
+    "pinSha256": "5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244",
+    "pinRows": 287,
+    "a1RowsRead": 757,
+    "a1RowsAdmitted": 351,
+    "a1Drops": {
+      "targetNotGlp1r": 0,
+      "assayNotInA3": 0,
+      "noVerifiedStructure": 397,
+      "pchemblMismatch": 0,
+      "alreadyInPin": 9,
+      "shape": 0
+    },
+    "custodyVerifiedStructures": 338,
+    "structuresViaPerRowHashOnly": 32,
+    "a3AssaysAllGlp1r": true
+  },
+  "engine": {
+    "rdkit": "2026.03.6"
+  },
+  "partition": {
+    "smarts": "[NX3][CX3](=[OX1])",
+    "cutoff": 10,
+    "smallMoleculeRows": 246,
+    "peptideRows": 392
+  },
+  "arms": {
+    "G-CONTROL-PIN": {
+      "nRows": 287,
+      "nMolecules": 214,
+      "split": {
+        "nTrain": 178,
+        "nCalib": 64,
+        "nTest": 45
+      },
+      "trainingRowsShortOfMinTrain": 0,
+      "trainScaffoldCount": 54,
+      "metrics": {
+        "mae": 1.1726,
+        "rmse": 1.4534,
+        "r2": 0.482,
+        "n": 45
+      },
+      "gateMet": false,
+      "reasons": [
+        "MAE=1.1726 > MAX_MAE=1"
+      ]
+    },
+    "H-COMBINED-ALL": {
+      "nRows": 638,
+      "nMolecules": 338,
+      "split": {
+        "nTrain": 426,
+        "nCalib": 125,
+        "nTest": 87
+      },
+      "trainingRowsShortOfMinTrain": 0,
+      "trainScaffoldCount": 98,
+      "metrics": {
+        "mae": 1.0118,
+        "rmse": 1.3973,
+        "r2": 0.4336,
+        "n": 87
+      },
+      "gateMet": false,
+      "reasons": [
+        "MAE=1.0118 > MAX_MAE=1"
+      ]
+    },
+    "I-COMBINED-SMALL": {
+      "nRows": 246,
+      "nMolecules": 122,
+      "split": {
+        "nTrain": 183,
+        "nCalib": 26,
+        "nTest": 37
+      },
+      "trainingRowsShortOfMinTrain": 0,
+      "trainScaffoldCount": 46,
+      "metrics": {
+        "mae": 0.9547,
+        "rmse": 1.3832,
+        "r2": -0.1352,
+        "n": 37
+      },
+      "gateMet": false,
+      "reasons": [
+        "nTest=37 < MIN_TEST=40",
+        "R2=-0.1352 < MIN_R2=0.25"
+      ]
+    },
+    "J-COMBINED-PEPTIDE": {
+      "nRows": 392,
+      "nMolecules": 216,
+      "split": {
+        "nTrain": 243,
+        "nCalib": 99,
+        "nTest": 50
+      },
+      "trainingRowsShortOfMinTrain": 0,
+      "trainScaffoldCount": 52,
+      "metrics": {
+        "mae": 1.1364,
+        "rmse": 1.6231,
+        "r2": 0.1656,
+        "n": 50
+      },
+      "gateMet": false,
+      "reasons": [
+        "MAE=1.1364 > MAX_MAE=1",
+        "R2=0.1656 < MIN_R2=0.25"
+      ]
+    }
+  },
+  "controlReproducesD077a": true,
+  "pinUnchanged": true,
+  "computedAt": "2026-09-27T02:11:06.662Z",
+  "artifactHash": "88b9a56d141bca324db441f8053741bedbe9001146f6408fdda1e9d857617f60"
+}

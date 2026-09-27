@@ -40,6 +40,7 @@ PROTOCOL = {
     "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
     "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
     "box": "centre = crystal-ligand heavy-atom centroid; edge per axis = clamp(ligand extent + 10 A, 20 A, 30 A)",
+    "receptorTemplateTolerance": "Meeko --delete_bad_res and --forgive_extra_bonds: residues that do not match a template (e.g. incomplete side chains) are deleted rather than failing the case; the record lists the flags",
     "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only",
     "metric": "symmetry-aware heavy-atom RMSD of the top-ranked pose vs the crystal pose, no superposition (RDKit CalcRMS)",
     "successCriterion": "RMSD < 2.0 A",
@@ -137,7 +138,8 @@ def run_case(case, data_dir, work):
         receptor = os.path.join(case_dir, "receptor_clean.pdb")
         clean_receptor(raw.decode(), receptor)
         req = {"cmd": "redock", "pdbPath": receptor, "keepHetatm": True, "ligandSdfPath": sdf, "center": center, "boxSize": size,
-               "exhaustiveness": 8, "seed": 42, "outDir": os.path.join(case_dir, "run")}
+               "exhaustiveness": 8, "seed": 42, "outDir": os.path.join(case_dir, "run"),
+               "deleteBadRes": True, "forgiveExtraBonds": True}
         proc = subprocess.run([sys.executable, WORKER, json.dumps(req)], capture_output=True, text=True, timeout=1800)
         r = json.loads(proc.stdout.strip().splitlines()[-1])
     except Exception as e:  # noqa: BLE001
@@ -146,7 +148,7 @@ def run_case(case, data_dir, work):
         return {**out, "status": "DOCKING_FAILED", "success": False, "error": str(r.get("error"))[:200]}
     rmsd = r["rmsdA"]
     return {**out, "status": "DOCKED", "success": rmsd < 2.0, "rmsdA": rmsd, "vinaScoreKcalMol": r["bestAffinityKcalMol"],
-            "ligandSmiles": r["ligandSmiles"], "poseSha256": r["poseSha256"], "receptorPdbqtSha256": r["receptor"]["receptorPdbqtSha256"],
+            "ligandSmiles": r["ligandSmiles"], "poseSha256": r["poseSha256"], "receptorPdbqtSha256": r["receptor"]["receptorPdbqtSha256"], "receptorTemplateTolerance": r["receptor"].get("templateTolerance"),
             "vinaVersion": r["vinaVersion"], "meekoVersion": r["meekoVersion"]}
 
 

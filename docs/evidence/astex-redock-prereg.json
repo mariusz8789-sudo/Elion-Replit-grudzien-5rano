@@ -10,12 +10,13 @@
   "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
   "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
   "box": "centre = crystal-ligand heavy-atom centroid; edge per axis = clamp(ligand extent + 10 A, 20 A, 30 A)",
+  "receptorTemplateTolerance": "Meeko --delete_bad_res and --forgive_extra_bonds: residues that do not match a template (e.g. incomplete side chains) are deleted rather than failing the case; the record lists the flags",
   "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only",
   "metric": "symmetry-aware heavy-atom RMSD of the top-ranked pose vs the crystal pose, no superposition (RDKit CalcRMS)",
   "successCriterion": "RMSD < 2.0 A",
   "headline": "successes / 85 \u2014 every preparation or docking failure counts as a failure"
  },
- "protocolFingerprint": "97c78bb8602e4e5b622da28ef4da21f59b8a182362186ac366cfaa7804fd8db7",
+ "protocolFingerprint": "0cfafbcb9cb8d63869edd9bbe253d95b1ea01f05c8e7dd3c57140cc07fbcbfe3",
  "cases": [
   {
    "pdbId": "1G9V",
@@ -457,6 +458,12 @@
    "previousProtocolFingerprint": "def5d8b36342830896bbd0bdb8c20b8825f86d340c6a7400c389edd854dc9c37",
    "previousValue": "all ATOM records of the file (dock_worker default: waters, cofactors, metals and other HETATM dropped); Meeko mk_prepare_receptor; no repair",
    "reason": "Smoke run of 4 cases under amendment 1: 1G9V 4.898 A, 1GKC 6.442 A, 1X8X 0.585 A, 1T46 DOCKING_FAILED (Meeko refused the receptor because of alternate locations). Receptor alternate locations are now resolved to ' '/'A', and single-atom metal ions are kept because metalloprotein pockets (e.g. zinc in 1GKC) are part of the binding site. No other case had been run."
+  },
+  {
+   "amendedAt": "2026-09-27T03:20:00Z",
+   "field": "receptorTemplateTolerance (new)",
+   "previousProtocolFingerprint": "97c78bb8602e4e5b622da28ef4da21f59b8a182362186ac366cfaa7804fd8db7",
+   "reason": "RUN 1 under the amendment-2 protocol (fingerprint above) was started on all 85 cases and is reported in full, whatever it shows. While it ran, several cases failed because Meeko's residue templates rejected deposited structures with incomplete side chains or unusual bonds (e.g. 1GM8, 1GPK, 1HNN, 1HP0). RUN 2 adds Meeko's own tolerance flags. It is declared here after seeing those run-1 failures, so it is a second, openly post-hoc protocol, not a replacement: both runs are published side by side."
   }
  ]
 }

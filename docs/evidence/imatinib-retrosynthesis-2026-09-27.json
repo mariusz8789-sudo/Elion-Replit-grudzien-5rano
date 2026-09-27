@@ -1,0 +1,285 @@
+{
+  "kind": "GENESIS_RETRO_RESUME",
+  "contractVersion": 1,
+  "status": "OK",
+  "steps": [
+    {
+      "name": "download",
+      "status": "SKIP",
+      "detail": "models assumed present",
+      "at": "2026-09-27T00:24:40.358Z"
+    },
+    {
+      "name": "sha256/provenance",
+      "status": "OK",
+      "detail": "3 files",
+      "at": "2026-09-27T00:24:42.121Z"
+    },
+    {
+      "name": "readiness",
+      "status": "OK",
+      "detail": "AiZynthFinder 4.4.1",
+      "at": "2026-09-27T00:24:44.624Z"
+    },
+    {
+      "name": "aspirin benchmark",
+      "status": "OK",
+      "detail": "1 steps, 2 starting materials",
+      "at": "2026-09-27T00:25:24.738Z"
+    },
+    {
+      "name": "canonical handoff",
+      "status": "OK",
+      "detail": {
+        "candidateId": "b5b83fbf-e75c-4930-847c-fa7182170fab",
+        "contentHash": "9cfce3313c934398e966cd125dc7d0920c816ab867d7c78c92b76a87814536e3"
+      },
+      "at": "2026-09-27T00:25:27.419Z"
+    },
+    {
+      "name": "finalist retrosynthesis",
+      "status": "OK",
+      "detail": {
+        "runId": "c661c170-7e41-493a-9f0e-48b262439f7a",
+        "solved": true
+      },
+      "at": "2026-09-27T00:26:13.659Z"
+    },
+    {
+      "name": "evidence",
+      "status": "OK",
+      "detail": {
+        "inputHash": "40dc4d4e5d028226c3e1db562a590187d34c5bcf5748f73c14e8696b4abc80ec",
+        "outputHash": "1d190fb7067ae324695831433dd4ca1e5dab7b42b9e85b941baf9049fac56751",
+        "environmentHash": "c4b6da39de3c88eb7b4f6415e38d4cde45131fe98345249bd86d819f637ac65b"
+      },
+      "at": "2026-09-27T00:26:13.664Z"
+    },
+    {
+      "name": "engine replay",
+      "status": "OK",
+      "detail": {
+        "verdict": "MATCH"
+      },
+      "at": "2026-09-27T00:26:56.209Z"
+    },
+    {
+      "name": "protocol section B",
+      "status": "OK",
+      "detail": {
+        "routeProvided": true,
+        "status": null
+      },
+      "at": "2026-09-27T00:26:56.218Z"
+    }
+  ],
+  "modelDir": "/opt/genesis/retro-models",
+  "models": [
+    {
+      "role": "expansion_policy_model",
+      "filename": "uspto_model.onnx",
+      "bytes": 91518243,
+      "sha256": "bd0a3cb74cd7068de474c8fb789a00a66bc42c75636d66510ccac585ebe928f8"
+    },
+    {
+      "role": "expansion_templates",
+      "filename": "uspto_templates.csv.gz",
+      "bytes": 3313598,
+      "sha256": "a4f1945e90cfa195538320833d68aed38f14e2fcc2f8afb5d958bc920edcafbe"
+    },
+    {
+      "role": "stock",
+      "filename": "zinc_stock.hdf5",
+      "bytes": 663232280,
+      "sha256": "99d39a6f807c3e815487500bafc2b4a9dc66a31af189e3b1776874fb0d4a188d"
+    }
+  ],
+  "readiness": {
+    "available": true,
+    "installed": true,
+    "engine": "AiZynthFinder 4.4.1",
+    "engineVersion": "4.4.1",
+    "versions": {
+      "aizynthfinder": "4.4.1",
+      "rdkit": "2023.9.6",
+      "rdchiral": "1.1.0",
+      "onnxruntime": "1.30.0",
+      "pandas": "2.3.3",
+      "numpy": "1.26.4"
+    },
+    "models": {
+      "modelDir": "/opt/genesis/retro-models",
+      "files": [
+        {
+          "role": "expansion_policy_model",
+          "filename": "uspto_model.onnx",
+          "required": true,
+          "present": true,
+          "bytes": 91518243,
+          "sha256": "bd0a3cb74cd7068de474c8fb789a00a66bc42c75636d66510ccac585ebe928f8",
+          "upstream": "https://zenodo.org/record/7797465/files/uspto_model.onnx"
+        },
+        {
+          "role": "expansion_templates",
+          "filename": "uspto_templates.csv.gz",
+          "required": true,
+          "present": true,
+          "bytes": 3313598,
+          "sha256": "a4f1945e90cfa195538320833d68aed38f14e2fcc2f8afb5d958bc920edcafbe",
+          "upstream": "https://zenodo.org/record/7341155/files/uspto_unique_templates.csv.gz"
+        },
+        {
+          "role": "stock",
+          "filename": "zinc_stock.hdf5",
+          "required": true,
+          "present": true,
+          "bytes": 663232280,
+          "sha256": "99d39a6f807c3e815487500bafc2b4a9dc66a31af189e3b1776874fb0d4a188d",
+          "upstream": "https://ndownloader.figshare.com/files/23086469"
+        },
+        {
+          "role": "ringbreaker_policy_model",
+          "filename": "uspto_ringbreaker_model.onnx",
+          "required": false,
+          "present": true,
+          "bytes": 15036094,
+          "sha256": "1bf0690352d9e9212d7dbe8b35649caf74f73ef0b30edefdfdac37fce38085be",
+          "upstream": "https://zenodo.org/record/7797465/files/uspto_ringbreaker_model.onnx"
+        },
+        {
+          "role": "ringbreaker_templates",
+          "filename": "uspto_ringbreaker_templates.csv.gz",
+          "required": false,
+          "present": true,
+          "bytes": 373753,
+          "sha256": "5616a056454b10a2f044e69e027422128986856ebd958541a3bf9f837e3a0d14",
+          "upstream": "https://zenodo.org/record/7341155/files/uspto_ringbreaker_unique_templates.csv.gz"
+        },
+        {
+          "role": "filter_policy_model",
+          "filename": "uspto_filter_model.onnx",
+          "required": false,
+          "present": true,
+          "bytes": 16788859,
+          "sha256": "ad29aa32bdfcbe37065045546493806cf04899c55386c438905d83fb14bb6320",
+          "upstream": "https://zenodo.org/record/7797465/files/uspto_filter_model.onnx"
+        }
+      ],
+      "complete": true,
+      "missing": []
+    },
+    "reason": null
+  },
+  "reference": {
+    "ok": true,
+    "case": "retro-aspirin",
+    "pass": true,
+    "version": "4.4.1",
+    "solved": true,
+    "routeCount": 12,
+    "steps": 1,
+    "startingMaterials": [
+      "CC(=O)OC(C)=O",
+      "O=C(O)c1ccccc1O"
+    ],
+    "stoppedBy": "ITERATION_LIMIT",
+    "modelChecksums": {
+      "expansion_policy_model": "bd0a3cb74cd7068de474c8fb789a00a66bc42c75636d66510ccac585ebe928f8",
+      "expansion_templates": "a4f1945e90cfa195538320833d68aed38f14e2fcc2f8afb5d958bc920edcafbe",
+      "stock": "99d39a6f807c3e815487500bafc2b4a9dc66a31af189e3b1776874fb0d4a188d",
+      "ringbreaker_policy_model": "1bf0690352d9e9212d7dbe8b35649caf74f73ef0b30edefdfdac37fce38085be",
+      "ringbreaker_templates": "5616a056454b10a2f044e69e027422128986856ebd958541a3bf9f837e3a0d14",
+      "filter_policy_model": "ad29aa32bdfcbe37065045546493806cf04899c55386c438905d83fb14bb6320"
+    }
+  },
+  "handoff": {
+    "candidateId": "b5b83fbf-e75c-4930-847c-fa7182170fab",
+    "canonicalSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+    "contentHash": "9cfce3313c934398e966cd125dc7d0920c816ab867d7c78c92b76a87814536e3",
+    "handoffFingerprint": "94d476e667081a9b68ad853e5cbcdf4b38fd326ca8e93495d61e5da426ca2e26",
+    "preregistrationFingerprint": "43fa8a30"
+  },
+  "run": {
+    "id": "c661c170-7e41-493a-9f0e-48b262439f7a",
+    "inputHash": "40dc4d4e5d028226c3e1db562a590187d34c5bcf5748f73c14e8696b4abc80ec",
+    "outputHash": "1d190fb7067ae324695831433dd4ca1e5dab7b42b9e85b941baf9049fac56751",
+    "environmentHash": "c4b6da39de3c88eb7b4f6415e38d4cde45131fe98345249bd86d819f637ac65b",
+    "engineVersion": "4.4.1"
+  },
+  "replayVerdict": "MATCH",
+  "synthesis": {
+    "runId": "c661c170-7e41-493a-9f0e-48b262439f7a",
+    "engine": "AiZynthFinder 4.4.1",
+    "engineVersion": "4.4.1",
+    "method": "mcts tree search, expansion policy ringbreaker+uspto",
+    "evidenceClass": "MODEL_ESTIMATE",
+    "solved": true,
+    "routeCount": 7,
+    "modelChecksums": {
+      "expansion_policy_model": "bd0a3cb74cd7068de474c8fb789a00a66bc42c75636d66510ccac585ebe928f8",
+      "expansion_templates": "a4f1945e90cfa195538320833d68aed38f14e2fcc2f8afb5d958bc920edcafbe",
+      "stock": "99d39a6f807c3e815487500bafc2b4a9dc66a31af189e3b1776874fb0d4a188d",
+      "ringbreaker_policy_model": "1bf0690352d9e9212d7dbe8b35649caf74f73ef0b30edefdfdac37fce38085be",
+      "ringbreaker_templates": "5616a056454b10a2f044e69e027422128986856ebd958541a3bf9f837e3a0d14",
+      "filter_policy_model": "ad29aa32bdfcbe37065045546493806cf04899c55386c438905d83fb14bb6320"
+    },
+    "license": "MIT (AiZynthFinder, MolecularAI)",
+    "citation": "Genheden et al., AiZynthFinder: a fast, robust and flexible open-source software for retrosynthetic planning, J. Cheminform. 12, 70 (2020).",
+    "determinism": "Bounded by the iteration limit — a replay on the same models reproduces the search.",
+    "outputHash": "1d190fb7067ae324695831433dd4ca1e5dab7b42b9e85b941baf9049fac56751",
+    "topRoute": {
+      "steps": 3,
+      "reactionsForward": [
+        {
+          "step": 1,
+          "reactionSmiles": "Cc1ccc(N)cc1NC(=N)N>>Cc1ccc([N+](=O)[O-])cc1NC(=N)N",
+          "templateHash": "664f7756f7526ad6c07e82dd3b3c15f7aabccbc99837dd22105068a2cfc385b5",
+          "policyProbability": 0.8587999939918518,
+          "policy": "uspto",
+          "classification": "0.0 Unrecognized"
+        },
+        {
+          "step": 2,
+          "reactionSmiles": "Cc1ccc(N)cc1Nc1nccc(-c2cccnc2)n1>>Cc1ccc(N)cc1NC(=N)N.CN(C)C=CC(=O)c1cccnc1",
+          "templateHash": "b6bc85f0e09832ac9aeaa8e50c3f349b9015a31d1042b0fe83edf3d9c7c744b8",
+          "policyProbability": 0.6776999831199646,
+          "policy": "ringbreaker",
+          "classification": "0.0 Unrecognized"
+        },
+        {
+          "step": 3,
+          "reactionSmiles": "Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1>>CN1CCN(Cc2ccc(C(=O)O)cc2)CC1.Cc1ccc(N)cc1Nc1nccc(-c2cccnc2)n1",
+          "templateHash": "d8b01ead041017787a65b0f477c7524cfbcaae8bebfed6a174e7662dff43d343",
+          "policyProbability": 0.0835999995470047,
+          "policy": "uspto",
+          "classification": "0.0 Unrecognized"
+        }
+      ],
+      "startingMaterials": [
+        {
+          "smiles": "CN1CCN(Cc2ccc(C(=O)O)cc2)CC1",
+          "inStock": true
+        },
+        {
+          "smiles": "CN(C)C=CC(=O)c1cccnc1",
+          "inStock": true
+        },
+        {
+          "smiles": "Cc1ccc([N+](=O)[O-])cc1NC(=N)N",
+          "inStock": true
+        }
+      ],
+      "allStartingMaterialsInStock": true,
+      "score": {
+        "state score": 0.9865529289315002
+      }
+    },
+    "boundary": "PROPOSED ROUTE (MODEL_ESTIMATE). Disconnections come from a policy trained on reaction literature; no conditions, stoichiometry, yields, work-up or safety assessment are computed or implied. A qualified synthetic chemist decides whether any step is performed.",
+    "routeProvided": true,
+    "candidateId": "b5b83fbf-e75c-4930-847c-fa7182170fab",
+    "readinessClassification": "SOURCE_REQUIRED",
+    "statement": "A route was proposed by the retrosynthesis engine and is reproduced above with its model identity. It is a proposal, not a validated procedure: no conditions, quantities, yields or safety assessment are computed."
+  },
+  "protocolFingerprint": "65180142230e7f98001f9ec4f2899d2de7883b3d2a35c810e44a5675ec162cfe",
+  "finishedAt": "2026-09-27T00:26:56.218Z"
+}

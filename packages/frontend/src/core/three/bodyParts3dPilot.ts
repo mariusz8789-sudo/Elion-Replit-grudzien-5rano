@@ -1,4 +1,5 @@
 import type * as THREE_NS from 'three';
+import type { FullAtlasState } from './bodyParts3dFullAtlas';
 import { getWorldAssetRecord, isWorldAssetApproved, type WorldAssetRecord } from './assetGovernance';
 
 /**
@@ -199,6 +200,8 @@ export interface ReferenceAnatomyState {
   readonly lod: BodyParts3dLod | null;
   readonly nodes: Readonly<Record<string, ReferenceAnatomyProvenance>>;
   readonly diagnostics: readonly BodyParts3dLoadDiagnostics[];
+  /** The full male atlas (2,234 meshes), when the scene loads it. */
+  readonly fullAtlas?: FullAtlasState;
 }
 
 export const REFERENCE_ANATOMY_IDLE: ReferenceAnatomyState = Object.freeze({ status: 'IDLE', lod: null, nodes: Object.freeze({}), diagnostics: Object.freeze([]) });

@@ -196,6 +196,8 @@ export default function HumanExplorerPanel({ manifest, anatomy, artifact, sessio
         <h1>{level === 'body' ? 'Człowiek.' : levelLabel(level, locale)}</h1>
         <p>{level === 'body' ? 'Od całego ciała do jego najmniejszych struktur.' : `${organ?.label ?? 'Anatomia'} · ${SCALE_TEXT[level]}`}</p>
         <span className="human-model-label">Model edukacyjny · bez danych pacjenta</span>
+        {referenceAnatomy?.fullAtlas?.status === 'READY' && <span className="human-model-label human-reference-attribution" data-testid="bp3d-full-atlas" data-structures={referenceAnatomy.fullAtlas.structures}>Pełny atlas męski · {referenceAnatomy.fullAtlas.structures.toLocaleString('pl-PL')} struktur · {BODYPARTS3D_ATTRIBUTION}</span>}
+        {referenceAnatomy?.fullAtlas?.status === 'LOADING' && <span className="human-model-label" data-testid="bp3d-full-atlas-loading">Wczytywanie pełnego atlasu anatomicznego…</span>}
         {referenceShown && <span className="human-model-label human-reference-attribution" data-testid="bp3d-attribution" data-status={referenceAnatomy?.status} data-lod={referenceAnatomy?.lod ?? ''} data-nodes={Object.keys(referenceNodes).sort().join(',')} data-diagnostics={JSON.stringify(referenceAnatomy?.diagnostics ?? [])}>{BODYPARTS3D_ATTRIBUTION}</span>}
       </div>
       {lungModel && <aside className="human-lung-compare" data-testid="human-lung-exposure" data-exposure={lungExposure} data-years={lungYears}>

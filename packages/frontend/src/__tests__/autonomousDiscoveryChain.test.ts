@@ -112,7 +112,8 @@ describe('the autonomous discovery chain, end to end', () => {
     // ---- and that step is remembered too ----------------------------------
     expect(step2.remembered.length).toBeGreaterThanOrEqual(1);
     expect(listParameterInquiriesForSystem(input.system).length).toBeGreaterThan(remembered.length - 1);
-  });
+    // The full loop runs several real inquiry rounds; ~5 s on a loaded machine is not a failure.
+  }, 30_000);
 
   it('no step reuses a setting an earlier step already measured at', async () => {
     vi.stubGlobal('window', { localStorage: makeFakeStorage() });

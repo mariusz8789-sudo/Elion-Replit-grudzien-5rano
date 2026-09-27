@@ -52,6 +52,7 @@ import { labProcedureOf } from '../core/liveExperiment/labProcedure';
 import type { DockingStep } from '../core/liveExperiment/drugRunState';
 import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy, targetAnatomyRoute } from '../core/liveExperiment/targetAnatomy';
 import { UNRESOLVED_LABEL, UNRESOLVED_REASON_PL, resolveTwinContext, twinContextCommands, twinContextRequestFrom, twinContextRoute, type TwinContext } from '../core/liveExperiment/twinContext';
+import { FinalistFalsificationPanel } from './FinalistFalsificationPanel';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -876,6 +877,10 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                             ? <a className="chip-btn sw-twin-link" href={twinContextRoute({ targetId: st.target.targetId, campaignId: drugRun.campaignId, candidateId: c.id })} data-testid="drug-show-in-twin" data-candidate-id={c.id} data-target={st.target.targetId}>Pokaż w Human Digital Twin →</a>
                             : <span className="sw-procedure-label" data-testid="drug-show-in-twin-unresolved" data-reason={preview.reason}>{UNRESOLVED_LABEL} · {UNRESOLVED_REASON_PL[preview.reason]}</span>;
                         })()}
+                        {/* D-148: a finalist is not a success. The panel renders only when the pure report resolves
+                            for THIS candidate (a finalist of this run) — the 13 probes over the run's real
+                            declarations, what is still unknown, and the next experiment. */}
+                        <FinalistFalsificationPanel run={drugRun} candidateId={c.id} />
                       </li>
                     );
                   })}

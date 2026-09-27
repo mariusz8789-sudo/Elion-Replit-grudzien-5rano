@@ -67,7 +67,7 @@ export interface SelfFalsificationInput {
   readonly declared: StructuralDeclaration;
 }
 
-function probe(name: SelfFalsificationProbeResult['name'], method: SelfFalsificationProbeResult['method'], result: SelfFalsificationProbeResult['result'], detail: string, evidenceIds: readonly string[] = []): SelfFalsificationProbeResult {
+export function probe(name: SelfFalsificationProbeResult['name'], method: SelfFalsificationProbeResult['method'], result: SelfFalsificationProbeResult['result'], detail: string, evidenceIds: readonly string[] = []): SelfFalsificationProbeResult {
   return {
     name,
     method,
@@ -77,7 +77,8 @@ function probe(name: SelfFalsificationProbeResult['name'], method: SelfFalsifica
   };
 }
 
-function structuralProbe(name: SelfFalsificationProbeResult['name'], declaredValue: boolean | null, passDetail: string, failDetail: string): SelfFalsificationProbeResult {
+/** Exported so a caller with only PARTIAL declarations (the live drug bench, D-148) applies exactly this rule, never a copy of it. */
+export function structuralProbe(name: SelfFalsificationProbeResult['name'], declaredValue: boolean | null, passDetail: string, failDetail: string): SelfFalsificationProbeResult {
   if (declaredValue === null) {
     return probe(name, 'STRUCTURAL_REVIEW', 'UNRESOLVED', `Not declared by the caller — reported as UNRESOLVED, never assumed clean.`);
   }
@@ -138,7 +139,8 @@ function alternativeModelProbe(spec: ModelSpec, rivalSpec: ModelSpec, points: re
   );
 }
 
-function multipleTestingProbe(numberOfHypothesesTested: number, correctionApplied: boolean): SelfFalsificationProbeResult {
+/** Exported for the same reason as `structuralProbe`: one rule for "how many were tested", shared, not duplicated. */
+export function multipleTestingProbe(numberOfHypothesesTested: number, correctionApplied: boolean): SelfFalsificationProbeResult {
   if (numberOfHypothesesTested <= 1) {
     return probe('MULTIPLE_TESTING', 'DETERMINISTIC_PROBE', 'PASS', 'Exactly one hypothesis was tested — no multiple-comparisons correction is needed.');
   }

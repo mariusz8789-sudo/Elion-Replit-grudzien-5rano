@@ -9,6 +9,8 @@ import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLa
 import { createDefaultAnatomyView } from '../core/scientificWorlds/humanLab/anatomyView';
 import { DEFAULT_CUTAWAY } from '../core/three/humanTwinCutaway';
 import type { CampaignCandidate } from '../core/backend/client';
+import { FinalistFalsificationPanel } from '../components/FinalistFalsificationPanel';
+import { DRUG_EFFECT_NOT_COMPUTED_PL, FINALIST_FALSIFICATION_CAVEAT_PL, finalistFalsification } from '../core/liveExperiment/finalistFalsification';
 
 /**
  * E2E OVER THE CANONICAL CAMPAIGN (no browser, no engine): the persisted event shapes the backend
@@ -134,6 +136,34 @@ describe('HERO → Human Digital Twin: the finalist reaches the twin with its id
     expect(html).toContain('-12.83 kcal/mol');
     expect(html).not.toMatch(/lek działa/i);
     expect(html).toContain('Model edukacyjny · bez danych pacjenta');
+  });
+});
+
+describe('D-148: after the finalist, the bench shows Genesis trying to overturn its own result — for c1 only', () => {
+  const renderPanel = (candidateId: string) => renderToStaticMarkup(<FinalistFalsificationPanel run={run} candidateId={candidateId} />);
+
+  it('renders the panel for the docked finalist with the caveat, 13 probe rows, the unknowns and the next experiments', () => {
+    const html = renderPanel('c1');
+    expect(html).toContain('data-testid="drug-finalist-falsification"');
+    expect(html).toContain('data-status="RESOLVED"');
+    expect(html).toContain('data-candidate-id="c1"');
+    expect(html).toContain(FINALIST_FALSIFICATION_CAVEAT_PL);
+    expect(html).toContain('Genesis próbuje obalić własny wynik');
+    expect((html.match(/data-testid="drug-finalist-probe"/g) ?? []).length).toBe(13);
+    const report = finalistFalsification(run, 'c1');
+    if (report.status !== 'RESOLVED') throw new Error('expected RESOLVED');
+    for (const p of report.probes) expect(html).toContain(`data-probe="${p.id}" data-verdict="${p.verdict}"`);
+    expect(html).toContain(`data-testid="drug-finalist-unknowns" data-count="${report.unknowns.length}"`);
+    expect(html).toContain(DRUG_EFFECT_NOT_COMPUTED_PL);
+    expect(html).toContain('Dynamika molekularna dla najlepszej pozy');
+    expect(html).toContain(`data-state-hash="${state.stateHash}"`);
+    // The only mention of success is the caveat denying it; nothing else on the panel claims one or a drug effect.
+    expect(html.replace(FINALIST_FALSIFICATION_CAVEAT_PL, '')).not.toMatch(/sukces|lek działa/i);
+  });
+
+  it('renders nothing for every other candidate of the same run, and for no run', () => {
+    for (const c of state.candidates.filter((c) => c.id !== 'c1')) expect(renderPanel(c.id), c.id).toBe('');
+    expect(renderToStaticMarkup(<FinalistFalsificationPanel run={null} candidateId="c1" />)).toBe('');
   });
 });
 

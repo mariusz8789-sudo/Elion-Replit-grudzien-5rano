@@ -204,6 +204,59 @@ test('finalist falsification: campaign → finalist → 13 probes with provenanc
   // The report is deterministic: the same state gives the same fingerprint after the replay too.
   const fingerprint = await panel.getAttribute('data-report-fingerprint');
   expect(fingerprint).toBeTruthy();
-  await page.reload();
   console.log(`REPORT FINGERPRINT: ${fingerprint}`);
+
+  // STEP 10 — HERO → HUMAN DIGITAL TWIN (D-146). The finalist's own link carries the run's three ids
+  // to the twin, which resolves them against the canonical in-memory run of THIS page session
+  // (getLiveDrugRun): a hash navigation, never a reload, or the run would be gone and the twin would
+  // honestly say NO_RUN. The panel is ANATOMICAL CONTEXT only: an association and a context, each
+  // tagged with the kind of knowledge it is, and the last line saying the drug effect was NOT computed.
+  const twinLink = page.getByTestId('drug-show-in-twin').first();
+  await expect(twinLink).toBeVisible({ timeout: 60_000 });
+  const finalistId = await twinLink.getAttribute('data-candidate-id');
+  expect(finalistId).toBeTruthy();
+  expect(await twinLink.getAttribute('data-target')).toBe('ABL1_1IEP');
+  expect(await twinLink.getAttribute('href')).toBe(`#/human-biology-lab?target=ABL1_1IEP&campaign=${campaignId}&candidate=${finalistId}`);
+  await twinLink.click();
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toContain('#/human-biology-lab?target=ABL1_1IEP');
+  const twin = page.getByTestId('human-twin-context');
+  await expect(twin).toBeVisible({ timeout: 120_000 });
+  expect(await twin.getAttribute('data-status'), 'the twin must resolve the run held in this page session').toBe('RESOLVED');
+  expect(await twin.getAttribute('data-target')).toBe('ABL1_1IEP');
+  expect(await twin.getAttribute('data-candidate')).toBe(finalistId);
+  expect(await twin.getAttribute('data-campaign')).toBe(campaignId);
+  // The target id travels as the panel's own attribute; the text names the structure it stands for.
+  await expect(twin).toHaveAttribute('data-target', 'ABL1_1IEP');
+  await expect(twin).toContainText('PDB 1IEP');
+  await expect(twin).toContainText('TARGET-ASSOCIATED ANATOMICAL CONTEXT');
+  const twinTags = await twin.locator('dl > div').evaluateAll((els) => els.map((el) => el.getAttribute('data-tag') ?? ''));
+  expect(twinTags).toContain('ANATOMICAL_CONTEXT');
+  expect(twinTags).toContain('TARGET_ASSOCIATION');
+  expect(twinTags).toContain('NOT_VALIDATED');
+  await expect(twin.locator('dl > div[data-tag="ANATOMICAL_CONTEXT"]')).toContainText('Kontekst anatomiczny');
+  await expect(twin.locator('dl > div[data-tag="TARGET_ASSOCIATION"]')).toContainText('Powiązanie z celem');
+  await expect(twin.locator('dl > div[data-tag="NOT_VALIDATED"]')).toContainText('Efekt leku w tym narządzie');
+  await expect(twin.locator('dl > div[data-tag="NOT_VALIDATED"]')).toContainText('nie policzony');
+  // The Vina number reaches the twin as a MODEL_PREDICTION, never as a measured effect.
+  await expect(twin.locator('dl > div[data-tag="MODEL_PREDICTION"]').first()).toContainText('kcal/mol');
+  const twinText = ((await twin.textContent()) ?? '').replace(/\s+/g, ' ');
+  expect(twinText).not.toMatch(/lek działa/i);
+  console.log(`TWIN HANDOFF: status=RESOLVED candidate=${finalistId} system=${await twin.getAttribute('data-system')} tags=${twinTags.join(',')}`);
+  // The reference atlas attribution (BodyParts3D, CC BY 4.0) is still on the twin. The explorer carries
+  // it on whichever reference asset finished loading — the pilot structures (bp3d-attribution) or the
+  // full male atlas (bp3d-full-atlas) — and the same licence string sits on both.
+  const BP3D = 'BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International';
+  const attribution = page.getByTestId('sw-explorer').locator('[data-testid="bp3d-attribution"], [data-testid="bp3d-full-atlas"]').first();
+  await expect(attribution).toBeVisible({ timeout: 120_000 });
+  await expect(attribution).toContainText(BP3D);
+  console.log(`BP3D ATTRIBUTION: carried by ${await attribution.getAttribute('data-testid')}`);
+
+  // Same page session, no reload, so the run the twin resolved is still in memory: back on the bench the
+  // panel resolves for the same finalist with all 13 probes. (The fingerprint is not compared: the engine
+  // replay sealed a new SESSION record after it was read, and the report honestly re-fingerprints.)
+  await page.goBack();
+  const panelAgain = page.getByTestId('drug-finalist-falsification');
+  await expect(panelAgain).toHaveAttribute('data-status', 'RESOLVED', { timeout: 120_000 });
+  await expect(panelAgain).toHaveAttribute('data-candidate-id', finalistId!);
+  await expect(page.getByTestId('drug-finalist-probe')).toHaveCount(13);
 });

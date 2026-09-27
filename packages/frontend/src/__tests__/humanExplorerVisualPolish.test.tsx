@@ -8,7 +8,8 @@ import { getMaterialRimIntensity } from '../core/three/humanTwinMaterials';
 import { createHumanDigitalTwinManifest } from '../core/scientificWorlds/humanLab/anatomyAtlas';
 import { createDefaultAnatomyView } from '../core/scientificWorlds/humanLab/anatomyView';
 import { buildVisualLayerInstruction } from '../core/scientificWorlds/humanLab/visualModes';
-import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy } from '../core/liveExperiment/targetAnatomy';
+import { TARGET_ANATOMY_CAVEAT_PL } from '../core/liveExperiment/targetAnatomy';
+import { resolveTwinContext } from '../core/liveExperiment/twinContext';
 
 /**
  * Human Explorer visual polish — regression tests for the presentation defects fixed in this pass.
@@ -152,19 +153,20 @@ describe('Human Explorer panel hierarchy', () => {
 });
 
 describe('Human Explorer opened from the drug bench (?target=)', () => {
-  const render = (dockingTarget: ReturnType<typeof targetAnatomy>) => renderToStaticMarkup(
+  const render = (twinContext: ReturnType<typeof resolveTwinContext> | null) => renderToStaticMarkup(
     <HumanExplorerPanel
       manifest={manifest} anatomy={{ ...createDefaultAnatomyView('HDT-TEST'), selectedNodeId: 'heart' }}
       artifact={null} session={null} sessions={[]} busy={false} onCommands={() => {}} nextLogicalTime={() => 1}
       cutaway={DEFAULT_CUTAWAY} onCutaway={() => {}} isolated={[]} onIsolate={() => {}} twinTier="PROXY"
       twinCamera={false} onTwinCamera={() => {}} surface="NORMAL" onSurface={() => {}}
-      dockingTarget={dockingTarget}
+      twinContext={twinContext}
     />,
   );
 
   it('names the docked protein and where it sits, with the caveat that this is a location, not drug action', () => {
-    const html = render(targetAnatomy('ABL1_1IEP'));
-    expect(html).toContain('data-testid="human-target-context"');
+    const html = render(resolveTwinContext(null, { targetId: 'ABL1_1IEP', campaignId: null, candidateId: null }));
+    expect(html).toContain('data-testid="human-twin-context"');
+    expect(html).toContain('data-status="RESOLVED"');
     expect(html).toContain('data-target="ABL1_1IEP"');
     expect(html).toContain('data-system="CARDIOVASCULAR"');
     expect(html).toContain('szpik');
@@ -172,6 +174,6 @@ describe('Human Explorer opened from the drug bench (?target=)', () => {
   });
 
   it('shows nothing about a target when there is none — the default panel is unchanged', () => {
-    expect(render(null)).not.toContain('human-target-context');
+    expect(render(null)).not.toContain('human-twin-context');
   });
 });

@@ -33,7 +33,7 @@ import { runFlagshipJourney, type FlagshipJourneyResult } from '../core/scientif
 import { EvidenceLedger } from '@genesis/core/knowledge/EvidenceLedger.js';
 import type { BiologyArtifact } from '../core/scientificWorlds/biologyRunners';
 import type { WorldCommand } from '../core/scientificWorlds/worldCommand';
-import { systemCommands, EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
+import { EXPLORER_ORGANS, bloodMagnificationCommands, explorerCommands } from '../core/scientificWorlds/humanExplorer';
 
 /** The chemistry panel of the main Laboratory (Chemistry Live Lab), loaded only when opened. */
 const ChemistryLabPanel = lazy(() => import('./ChemistryLiveLabScreen').then((m) => ({ default: m.ChemistryLiveLabScreen })));
@@ -47,10 +47,11 @@ import { getToken } from '../core/backend/session';
 import { getCandidateProtocol, getExperimentMemory, type CandidateProtocol } from '../core/backend/client';
 import { getLiveDrugRun, liveDrugRunGate, replayDrugRunEngines, startLiveDrugRun, subscribeLiveDrugRuns, type EngineReplayVerdict, type LiveDrugRun } from '../core/liveExperiment/liveDrugRun';
 import { DrugBenchLayer, focusCandidate, withDrugBenchLayer } from '../core/liveExperiment/drugBenchLayer';
-import { BENCH_ZONES, benchLayoutOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
+import { BENCH_ZONES, benchLayoutOf, zoneOf, type BenchZone } from '../core/liveExperiment/drugBenchLayout';
 import { labProcedureOf } from '../core/liveExperiment/labProcedure';
 import type { DockingStep } from '../core/liveExperiment/drugRunState';
-import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy, targetAnatomyRoute, type TargetAnatomy } from '../core/liveExperiment/targetAnatomy';
+import { TARGET_ANATOMY_CAVEAT_PL, targetAnatomy, targetAnatomyRoute } from '../core/liveExperiment/targetAnatomy';
+import { UNRESOLVED_LABEL, UNRESOLVED_REASON_PL, resolveTwinContext, twinContextCommands, twinContextRequestFrom, twinContextRoute, type TwinContext } from '../core/liveExperiment/twinContext';
 
 /**
  * SCIENTIFIC WORLDS (`#/scientific-worlds`) — the laboratory the user
@@ -173,8 +174,8 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
   const benchLayer = useMemo(() => new DrugBenchLayer(), []);
   const loopSim = useMemo(() => (world === 'physics' ? withDrugBenchLayer(sim, benchLayer) : sim), [sim, benchLayer, world]);
   const [drugRun, setDrugRun] = useState<LiveDrugRun | null>(null);
-  /** The docking target the biology world was opened from (`?target=`), for the twin's caption. */
-  const [dockingTargetContext, setDockingTargetContext] = useState<TargetAnatomy | null>(null);
+  /** HERO → twin: the finalist/target/anatomy context the biology world was opened with (`?target=&campaign=&candidate=`), resolved against the canonical run. */
+  const [twinContext, setTwinContext] = useState<TwinContext | null>(null);
   const [benchSceneHash, setBenchSceneHash] = useState<string | null>(null);
   const [benchAtoms, setBenchAtoms] = useState(0);
   const [drugRunEstimate] = useState(() => estimateDuration('drug-run'));
@@ -419,16 +420,16 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
       submitCommands(bloodMagnificationCommands(magnification, label, lt), label);
       return;
     }
-    const targetId = params.get('target');
-    if (targetId) {
-      // From the drug bench: focus the system the docked protein sits in (the systems rail's own command).
+    const twinRequest = twinContextRequestFrom(params);
+    if (twinRequest) {
+      // From the drug bench (D-146): finalist → target → documented association, checked against the
+      // canonical run in this session; RESOLVED moves the twin with its own systems-rail command,
+      // UNRESOLVED shows its reason and moves nothing.
       chatHumanHandoffConsumed.current = true;
-      const where = targetAnatomy(targetId);
-      setDockingTargetContext(where);
-      if (!where) return;
-      const lt = nextLogicalTime();
-      const label = `Ławka dokowania: ${where.protein} → układ ${where.system.toLowerCase()}`;
-      submitCommands(systemCommands(where.system, label, lt), label);
+      const context = resolveTwinContext(twinRequest.campaignId ? getLiveDrugRun(twinRequest.campaignId) : null, twinRequest);
+      setTwinContext(context);
+      const commands = twinContextCommands(context, nextLogicalTime());
+      if (commands.length) submitCommands(commands, commands[0].text);
       return;
     }
     if (!focus) return;
@@ -867,6 +868,14 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
                         {c.status === 'rejected' && (
                           <span className="sw-cand-reject">ODRZUCONY — {c.rejectedReason ?? 'powód niezapisany w rekordzie'}</span>
                         )}
+                        {/* HERO → twin (D-146): only a finalist with the run's own target gets the link, and only
+                            when the association is documented; otherwise the same UNRESOLVED the twin would say. */}
+                        {zoneOf(c) === 'FINALIST' && st.target && (() => {
+                          const preview = resolveTwinContext(drugRun, { targetId: st.target.targetId, campaignId: drugRun.campaignId, candidateId: c.id });
+                          return preview.status === 'RESOLVED'
+                            ? <a className="chip-btn sw-twin-link" href={twinContextRoute({ targetId: st.target.targetId, campaignId: drugRun.campaignId, candidateId: c.id })} data-testid="drug-show-in-twin" data-candidate-id={c.id} data-target={st.target.targetId}>Pokaż w Human Digital Twin →</a>
+                            : <span className="sw-procedure-label" data-testid="drug-show-in-twin-unresolved" data-reason={preview.reason}>{UNRESOLVED_LABEL} · {UNRESOLVED_REASON_PL[preview.reason]}</span>;
+                        })()}
                       </li>
                     );
                   })}
@@ -1021,7 +1030,7 @@ export function ScientificWorldsScreen({ world = 'physics' }: { readonly world?:
           busy={agentState !== 'IDLE' && agentState !== 'BLOCKED'} onCommands={submitCommands} nextLogicalTime={nextLogicalTime}
           twinTier={twinTier} cutaway={cutaway} isolated={anatomy.isolatedNodeIds} referenceAnatomy={referenceAnatomy}
           twinCamera={camera === 'TWIN'} onTwinCamera={setTwinCamera}
-          dockingTarget={dockingTargetContext}
+          twinContext={twinContext}
           surface={surface} onSurface={applySurface}
           subjectBounds={camera === 'TWIN' ? sim.getHumanSubjectBounds() : null}
           researchControls={<>{commandControls}{researchControls}</>}

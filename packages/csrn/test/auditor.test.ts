@@ -165,4 +165,3 @@ describe('the epistemic status is bound by the signature and never changed by it
     expect(Object.prototype.hasOwnProperty.call(before.claim, 'epistemicStatus')).toBe(false);
   });
 });
-

@@ -1,21 +1,40 @@
 # Preregistration provenance audit — QE4, A1 GLP-1, Tautology Gate (2026-09-27)
 
 An earlier audit reported three preregistration documents as missing on every
-branch. This record checks that claim against `main` (e403f0bb) and all 112 remote
-branches. Nothing below was recreated or backdated. Hashes are SHA-256 of the files
+branch. This record checks that claim against `main` (e403f0bb), all 112 remote
+branches and the full commit history. Nothing below was recreated or backdated. Hashes are SHA-256 of the files
 as they are on `main` today; commit ids and times are from `git log --all`.
 
 ## Result
 
-| Preregistration | Exists? | Where | First commit | Content changed since? |
-|---|---|---|---|---|
-| QE4 (Brydges et al. 2019, Zenodo 2527010) | **Yes** | `docs/QE4_PREREGISTRATION.md`, sha256 `3309f7e48e9092d10ede711598cafbe6789e83b6f7049553745c0d5445406044` | `dab127d0`, 2026-09-12 21:58 UTC | No (byte-identical to `dab127d0`) |
-| A1 GLP-1 | **Yes** | Sealed in code: `packages/frontend/src/core/biotechData/a1Glp1Preregistration.ts`, sha256 `2bd06ef42b8f0183e0de1c27f0f6a96aa73657d23aeb7b8aa04661dbd66acd95`, fingerprint `5882c619`. Source text: `docs/A1_GLP1_EXECUTION_HANDOFF.md` §5–§8, sha256 `3ec7f725188333981b76faa1f59c33e4c81e15e3ba995ee9abe18cccd142c146` | `e63fb89d`, 2026-09-13 12:39 UTC | No (byte-identical to `e63fb89d`) |
-| Tautology Gate | **No document, and none is referenced** | The gate is a classifier (`core/agent/tautologyGate.ts`, designed in `docs/TAUTOLOGY_GATE_IMPLEMENTATION.md` / `docs/TAUTOLOGY_GATE_AUDIT.md`), not an experiment with a result to preregister. No file, hash or claim anywhere in the repository says a Tautology Gate preregistration exists. | — | — |
+There are two layers, and the earlier audit was right about one of them.
 
-So the earlier "missing on all branches" finding is wrong for QE4 and A1, and for
-the Tautology Gate there is nothing historical to recover. No document was
-fabricated to fill a folder.
+**1. The original source contracts are missing, as reported.** Each experiment was
+specified in a document delivered from a conversation, and those exact texts were never
+committed. No commit on any branch has ever added them (`git log --all --name-only`
+finds none). They are already listed in `docs/BRAKUJACA_WIEDZA.md` as knowledge to
+recover from the owner's files. This record does not recreate them:
+
+| Missing source document | Referenced by |
+|---|---|
+| `QE4_REAL_DATASET_AND_EXPERIMENT.md` (QE4 preregistration contract, P1–P4, sections 8–13) | `docs/prompts/C2-QE4-brydges-execution.md`, `knowledge/quantum.md:260` |
+| `A1_GLP1_SUBSTITUTION_REAL_DATASET_AND_EXPERIMENT.md` (A1 preregistration contract) | `docs/prompts/C1-A1-glp1-substitution.md:14,116` |
+| `GENESIS_TAUTOLOGY_AND_EMPIRICAL_TEST_GATE.md` (Tautology Gate spec: 25 golden cases, rules C1–C6) | `docs/GRANT_READINESS_REPORT.md:88,150`, `docs/TAUTOLOGY_GATE_AUDIT.md:10` |
+
+No hash of any of the three was ever recorded, so there is nothing to preserve beyond
+the file names and the references above.
+
+**2. Sealed in-repo preregistrations exist for QE4 and A1.** These were written in the
+repository from the contracts above and are what the code actually checks against:
+
+| Preregistration | In repo | First commit | Content changed since? |
+|---|---|---|---|
+| QE4 | `docs/QE4_PREREGISTRATION.md`, sha256 `3309f7e48e9092d10ede711598cafbe6789e83b6f7049553745c0d5445406044` | `dab127d0`, 2026-09-12 21:58 UTC | No |
+| A1 GLP-1 | `packages/frontend/src/core/biotechData/a1Glp1Preregistration.ts`, sha256 `2bd06ef42b8f0183e0de1c27f0f6a96aa73657d23aeb7b8aa04661dbd66acd95`, fingerprint `5882c619`; its text is copied from `docs/A1_GLP1_EXECUTION_HANDOFF.md` §5–§8 (sha256 `3ec7f725188333981b76faa1f59c33e4c81e15e3ba995ee9abe18cccd142c146`) | `e63fb89d`, 2026-09-13 12:39 UTC | No |
+| Tautology Gate | None. The gate is a classifier (`core/agent/tautologyGate.ts`), built without its spec, as `docs/TAUTOLOGY_GATE_AUDIT.md` already states. | — | — |
+
+Whether the in-repo QE4 and A1 texts match the lost contracts word for word cannot be
+checked until the originals are found.
 
 ## Provenance gaps found (stated, not repaired)
 

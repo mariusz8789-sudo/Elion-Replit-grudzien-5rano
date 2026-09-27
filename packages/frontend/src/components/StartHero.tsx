@@ -47,6 +47,20 @@ export function StartHero(): React.ReactElement {
         <p className="start-lede">
           Jeden dialog prowadzi do jednego laboratorium. Eksperyment, wynik, dowód i replay pozostają częścią tej samej sesji.
         </p>
+        {/* The one track Genesis is judged on: computational drug checking whose evidence a reviewer
+            can verify alone. Everything else (physics, 3D worlds, cyber) stays behind "Poznaj Genesis od środka". */}
+        <div className="start-proof" data-testid="start-proof" aria-label="Sprawdź sam">
+          <p className="start-proof-title">Nie wierz na słowo. Sprawdź sam.</p>
+          <ul className="start-proof-facts">
+            <li>Prawdziwy lek (imatynib) zadokowany w białku 1IEP: poza zgodna z kryształem, RMSD poniżej 2 Å.</li>
+            <li>Droga syntezy z AiZynthFinder, dane z ChEMBL, PDB i ClinicalTrials.gov przypięte hashem SHA-256.</li>
+            <li>Replay liczy wynik od nowa; zmieniona liczba daje DRIFT albo odmowę certyfikatu.</li>
+          </ul>
+          <div className="start-proof-actions">
+            <a className="chip-btn primary" href="#/reviewer" data-testid="door-proof-reviewer">✓ Reviewer Room: spróbuj podrobić wynik</a>
+            <button type="button" className="chip-btn" onClick={() => submit('Znajdź kandydatów dla BCR-ABL (cel imatynibu).')} data-testid="door-proof-drug">▶ Uruchom eksperyment na leku</button>
+          </div>
+        </div>
       </header>
 
       <div className="start-holo" aria-hidden="true">
@@ -72,7 +86,6 @@ export function StartHero(): React.ReactElement {
         <button type="button" className="chip-btn" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">✦ Zapytaj Genesis</button>
         <a className="chip-btn primary" href="#/scientific-worlds" data-testid="door-laboratory">⌬ Wejdź do laboratorium</a>
         <button type="button" className="chip-btn start-guided-demo" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">▶ Zobacz gotowy przykład</button>
-        <a className="chip-btn" href="#/reviewer" data-testid="door-reviewer" lang="en">✓ Reviewer Room: check it yourself</a>
       </div>
 
       <ol className="start-journey" aria-label="Jak działa Genesis">

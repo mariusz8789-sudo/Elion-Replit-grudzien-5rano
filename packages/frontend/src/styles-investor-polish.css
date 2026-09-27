@@ -290,3 +290,18 @@
     opacity: .72;
   }
 }
+
+/* Start: the grant track first — one claim, three checked facts, two ways to verify it. */
+.start-proof {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(110, 231, 160, 0.35);
+  border-radius: 12px;
+  background: rgba(3, 16, 12, 0.72);
+}
+.start-proof-title { margin: 0; font-weight: 700; color: #e9fff3; }
+.start-proof-facts { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; color: #cad5e2; font-size: 0.92rem; }
+.start-proof-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.start-proof-actions .chip-btn { min-height: 2.6rem; padding-inline: 1rem; }

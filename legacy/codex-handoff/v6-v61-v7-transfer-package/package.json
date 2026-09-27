@@ -1,0 +1,15 @@
+{
+  "name": "genesis-v6-v61-v7-transfer-package",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "verify": "npm run build && npm run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.0.0"
+  }
+}

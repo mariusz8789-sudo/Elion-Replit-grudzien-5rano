@@ -69,6 +69,7 @@ const TemporalCinematicScreen = lazy(() => import('./components/visual-simulatio
 const MoleculeLabScreen = lazy(() => import('./components/visual-simulation/MoleculeLabScreen').then((m) => ({ default: m.MoleculeLabScreen })));
 const CellLabScreen = lazy(() => import('./components/visual-simulation/CellLabScreen').then((m) => ({ default: m.CellLabScreen })));
 const EvidenceShowcaseScreen = lazy(() => import('./components/visual-simulation/EvidenceShowcaseScreen').then((m) => ({ default: m.EvidenceShowcaseScreen })));
+const KnowledgeSourcesScreen = lazy(() => import('./components/KnowledgeSourcesScreen').then((m) => ({ default: m.KnowledgeSourcesScreen })));
 const HighFidelitySliceScreen = lazy(() => import('./components/visual-simulation/HighFidelitySliceScreen').then((m) => ({ default: m.HighFidelitySliceScreen })));
 const LookingGlassChat = lazy(() => import('./components/looking-glass/LookingGlassChat').then((m) => ({ default: m.LookingGlassChat })));
 const FirstPersonLabScreen = lazy(() => import('./components/visual-simulation/FirstPersonLabScreen').then((m) => ({ default: m.FirstPersonLabScreen })));
@@ -161,6 +162,7 @@ type Route =
   | { kind: 'molecule' }
   | { kind: 'cell-lab' }
   | { kind: 'evidence-showcase' }
+  | { kind: 'knowledge-sources' }
   | { kind: 'hf-slice' }
   | { kind: 'first-person-lab' }
   | { kind: 'looking-glass' }
@@ -235,6 +237,7 @@ export function parseHash(): Route {
   // to `getLab('molecule')` in the wrong registry entirely and never reach this branch.
   if (h === '#/molecule') return { kind: 'molecule' };
   if (h === '#/cell-lab') return { kind: 'cell-lab' };
+  if (h === '#/knowledge-sources' || h === '#/knowledge') return { kind: 'knowledge-sources' };
   if (h === '#/evidence' || h === '#/evidence-showcase' || h === '#/evidence-case-study' || h === '#/case-study') return { kind: 'evidence-showcase' };
   if (h === '#/hf-slice' || h.startsWith('#/hf-slice?')) return { kind: 'hf-slice' };
   if (h === '#/looking-glass' || h.startsWith('#/looking-glass?') || h === '#/lg') return { kind: 'looking-glass' };
@@ -1118,6 +1121,18 @@ export default function App() {
           <TopBar title="📋 Evidence & Replay Showcase" onSearch={() => setSearchOpen(true)} />
           <HeavyRoute>
             <EvidenceShowcaseScreen />
+          </HeavyRoute>
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'knowledge-sources') {
+      return (
+        <div className="app">
+          <TopBar title="📚 Wiedza i źródła publiczne" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute>
+            <KnowledgeSourcesScreen />
           </HeavyRoute>
           {overlays}
         </div>

@@ -101,6 +101,22 @@ function reachableFrom(graph: Map<string, Set<string>>, entries: readonly string
  * reviewable. Deleting a line because the module got wired is the happy path.
  */
 const ALLOWED_ORPHANS: Readonly<Record<string, string>> = {
+  // --- D-136 real external medical dataset boundary (NIfTI-1/DICOM Part-10), recovered 2026-09-27 from
+  // claude/genesis-c1-visual-snapshot (0efeb774), which the 2026-09-25 consolidation skipped. A strict
+  // provenance/format/checksum gate built before any UI consumes it; no dataset has been handed to Genesis yet,
+  // so only medicalDatasetAdapters.test.ts reaches it.
+  'core/medicalData/index.ts': 'D-136 medical dataset boundary barrel; no host consumer yet (no dataset has been imported into any world).',
+  'core/medicalData/medicalDatasetTypes.ts': 'D-136: types for the real-dataset gate; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/medicalDatasetRegistry.ts': 'D-136: validates provenance/SHA-256/format before a dataset is admitted; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/niftiDatasetAdapter.ts': 'D-136: real NIfTI-1 header/voxel reader; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/dicomDatasetAdapter.ts': 'D-136: real DICOM Part-10 explicit-VR-LE reader; reached by medicalDatasetAdapters.test.ts, not yet by a screen.',
+  'core/medicalData/volumeReconstruction.ts': 'D-136: builds a RECONSTRUCTED voxel volume from a validated dataset\'s own bytes; not yet by a screen.',
+  'core/medicalData/segmentationOverlay.ts': 'D-136: dimension-checked segmentation overlay contract over a reconstructed volume; not yet by a screen.',
+  // D-135 anatomy networks (vascular/neural/lymphatic graphs + their THREE geometry), recovered from the same commit.
+  // The snapshot wired them into agentLabScene3D together with the 7-room Canonical Laboratory, which is a product
+  // decision still open; until then only their own tests reach them.
+  'core/scientificWorlds/humanLab/anatomyNetworks.ts': 'D-135 anatomy network graphs; recovered from the C1 snapshot, scene wiring waits on the Canonical Laboratory decision.',
+  'core/three/anatomyNetworkGeometry.ts': 'D-135 geometry for the anatomy networks; recovered from the C1 snapshot, scene wiring waits on the Canonical Laboratory decision.',
   // D-127: the delivered cognitive core (packages/core/src/cognitive) bound to the canonical systems with a real
   // approval gate. Which host (the Scientific Worlds screen, the chat, a campaign) issues goals to it is a product
   // decision, not a side effect of landing the bridge; scientificWorldsCognitive.test.ts drives the full loop.

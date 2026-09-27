@@ -9914,3 +9914,56 @@ proves.
 - **Not independently re-verified this session — environment-blocked, not a code defect:** `d109Trial2Readiness.test.mjs` tests 4–5 (the GIPR exact-count and scaffold-split assertions) fail in this sandbox with `RDKIT_UNAVAILABLE` because Python RDKit is not installed here (`python3 -c "import rdkit"` → `ModuleNotFoundError`), matching this project's own pre-existing, tracked pattern of optional-engine gaps per environment (see D-109's own "the skips are pre-existing" note). The original 2026-09-16 session recorded RDKit as "freshly installed" and reported these exact counts from a live run; that claim is carried forward as **unverified in this session**, not as newly confirmed, and the test file is committed as-is so it will assert for real the next time it runs somewhere RDKit is present — exactly the honest-boundary behaviour this codebase's own conventions require (fail closed, do not fabricate a pass).
 
 **Provenance.** Original bypass audit + comment fix: `main` commit `49cc9084` (D-109, kept as the one entry with that number). Original TRIAL_2_STATUS/GIPR-gap/dual-target audit: `claude/genesis-autonomous-completion-95bt4e` commit `4e28eaa6` (its own D-109, superseded in number by this entry, its unique content carried forward above). Reconciliation performed during C2 repository consolidation, 2026-09-21.
+
+---
+
+## D-132, D-135 – D-142 — retroactive entries (added 2026-09-27)
+
+**Why this block exists.** A read-only survey of all 106 remote branches (2026-09-27) found that the code on `main` cites D-132 and D-135 … D-141 (D-140 alone ~237 times in 36 files), but this log never had an entry for any of them. The decisions were real; only their written record was missing, because the sessions that made them recorded the reasoning in commit messages, in handoff packs, or on a branch that the 2026-09-25 consolidation did not carry forward. Each entry below is **reconstructed from the named primary source**, quoted or closely paraphrased, and says what is on `main` today. Nothing here is new reasoning; where a source is thin, the entry says so instead of filling the gap.
+
+### D-132 — Per-world visual grade (2026-09-19)
+
+**Source:** commit `11f54ec7` message (ancestor of `main`).
+The biology lab rendered near-white because it was the only scene still using the pipeline's generic `ambient: 'studio+hdri'` box on top of its own dark background. `core/three/graphics/worldGrade.ts` replaces scattered constants with one table of per-world identities (background, fog, ambient bounce, exposure, bloom, floor) and one function that applies a grade; ambient comes from a `room-probe` fired on the second rendered frame. Biology and physics were wired; cern, cosmos, molecular and hyperscope rows exist for later. Guarded by `worldGrade.test.ts` (no two worlds share a background or floor colour; every world keeps a black point; no fallback to the studio box). **On main:** yes (code and tests). No scientific change.
+
+### D-135 — Canonical Laboratory (7 rooms) and anatomy networks (2026-09-20)
+
+**Source:** commit `0efeb774` on `claude/genesis-c1-visual-snapshot`, file headers of `canonicalLaboratory.ts` and `anatomyNetworks.ts`, screenshot set `docs/evidence/d135/` on that branch.
+A fixed, deterministic 7-room / 6-door building for the human biology lab (pure data; geometry built by `canonicalLaboratoryGeometry.ts`), with a fix on integration: the delivered package imported the *physics* lab stations, so every placement resolved to nothing. Separately, vascular / neural / lymphatic network graphs and their THREE geometry. **On main:** the anatomy networks are recovered as of 2026-09-27 (`core/scientificWorlds/humanLab/anatomyNetworks.ts`, `core/three/anatomyNetworkGeometry.ts`, with tests), not yet mounted in a scene. The 7-room laboratory is **not** on main: it conflicts with the current single-laboratory direction and touches the Astra scene, so adopting it is an open product decision.
+
+### D-136 — Real medical-dataset boundary, flagship bridges and acceptance gates (2026-09-20)
+
+**Source:** commit `0efeb774`, `docs/D136_ACCEPTANCE_MATRIX.md`, `docs/D136_INSTITUTIONAL_PILOT_PROTOCOL.md` (both recovered to `main` 2026-09-27).
+A strict provenance / format / SHA-256 / licence gate for real medical volumes (NIfTI-1, DICOM Part-10 explicit-VR-LE), built before any UI consumes it; reconstructed volumes are `RECONSTRUCTED`, segmentations `MODEL` unless declared, only verified bytes may be `REAL_DATASET`. Flagship bridges compose this onto canonical services: `sessionEvidenceBridge` (every ledger append during a session becomes an `EVIDENCE_APPENDED` event), `evidenceManifest`, `mirrorTwinCommandBridge` (canonical `INTERACT` command → existing `mirrorTransition`), `d136AcceptanceGates`. **On main:** recovered 2026-09-27. One adaptation: `main`'s Mirror Twin now stops at `CONSENT_REQUIRED` after `ENTER_ZONE`, so the bridge gained `MIRROR_CONSENT_GRANTED` / `MIRROR_CONSENT_DECLINED` and its tests go through consent. The acceptance matrix's NOT_VERIFIED rows (a real scan, browser E2E, external pilot sign-off) remain not verified.
+
+### D-137 — Genesis Chemistry v0.2.1: SMILES parser, element and reaction data; docking and PK rejected (2026-09-20)
+
+**Source:** commit `0efeb774`, `packages/core/src/chemistry/*` headers, `CHEMISTRY_HARDENING_REPORT_v0.2.1.md`; rejection recorded in `docs/GENESIS_LIVE_EXPERIMENT_PLAN.md:40`.
+A SMILES parser, formula / element / species / reaction tables and a PL/ES terminology glossary as a pure core module. The same package shipped an in-browser `moleculeDockingEngine` and a pharmacokinetics adapter. **On main:** the parser, data and glossary are recovered 2026-09-27 (`packages/core/src/chemistry/`, with tests). Docking and PK are **not** recovered: `main` decided that docking runs only through the backend Vina engine, never a browser approximation.
+
+### D-138 — Multi-experiment analytical bench (2026-09-20)
+
+**Source:** code comments in `0efeb774` (`biologyLabWorld.ts:86`, `ChemistrySessionVisual.tsx`, `chemistryRunnersCanonicalIntegration.test.ts:132`). No longer write-up exists anywhere.
+The analytical bench became a multi-experiment station hosting the two D-137 chemistry experiments. **On main:** not carried forward (it depends on the D-137 in-browser docking/PK runners that were rejected). Note the collision below: `main`'s `packages/frontend/src/core/lab/genesisSolverBinding.ts:12` states that "neither D-138 nor D-139 exists in this repository"; that was true of the solver meaning of those numbers.
+
+### D-139 — numbering collision, two meanings
+
+**Sources:** (a) `docs/QWEN-D139-DICOM-NIFTI-ANATOMICAL-DATA-BRIEF.md` (recovered 2026-09-27) — an external-model brief asking Qwen/GPT/Gemini for genuinely licensed DICOM/NIfTI data or a reader, with the rule that "reader code only" is an acceptable result; (b) commits `d3d74979` / `6f15be24` (2026-09-21) — "World Generation + D-139 (Scientific Worlds / Human Digital Twin)" consolidation onto main.
+Resolution, following D-134's precedent for D-109: both meanings are recorded here under one number; no further decision may reuse D-139. **On main:** (b) is on main as code; (a) is on main as a brief, never answered.
+
+### D-140 — Laboratory / instrument package v2 bound to canonical infrastructure (2026-09-21)
+
+**Source:** commit `d48edeb0` message (ancestor of `main`); one line in `docs/GENESIS_PREDEPLOY_COMPLETENESS_2026-09-23.md:51`.
+The device / sensor / calibration / uncertainty / protocol / safety / HIL / digital-twin / solver / LIMS-ELN seams were bound to existing systems instead of duplicated: `LabEvidencePort` → the real `EvidenceLedger` (`genesisEvidencePort.ts`); visualization → `WorldGraph`/`TemporalEngine` (`genesisWorldVisualizationPort.ts`); solver → the real `SolverRouter` dispatching the existing `newtonianKinematicsSolver` (no solver was fabricated); persistence → `core/storage.ts`, proven restart-safe. Wired into production as `genesisLabProvider.ts` on the single `KernelProviderRegistry`. `core/e2e/realLabGenesisE2E.test.ts` runs the chain with a 20/20 E2E_VERIFIED matrix; `LAB_SCOPE_97_READY` stays false because no real hardware or external data pipeline exists. **On main:** yes (`packages/frontend/src/core/lab/*`).
+
+### D-141 — Meta-Cognition (2026-09-22)
+
+**Sources:** commit `ab7f10c3` message; `docs/GENESIS_DEPLOY_CANDIDATE_REPORT_2026-09-22.md` §"D-141 Meta-Cognition"; `codex-handoff/genesis-integration-mega-pack-v2/{CAPABILITY_MATRIX,MIGRATION_NOTES}.md` (archived 2026-09-27 under `docs/reference/codex-handoff/`).
+Eight canonical epistemic states; a derived, non-destructive `CONTRADICTED`; real `META_CONTRADICTION_DETECTED` and `META_OBSERVATION_RECORDED` events; capability introspection; a broadened guard against consciousness framing. Runtime data derives from canonical Evidence / Memory / provider inputs; no persistent meta-memory, goal registry or self-modifying mechanism was added, and goal capability is shown as partial because there is no canonical goal system. Wired into `runScientificIntegrationCampaign` per cycle with prediction-error / surprise / information-gain metrics and a DecisionTrace fingerprint; the `#/meta-cognition` route runs a bounded two-cycle campaign. **On main:** yes.
+
+### D-142 — Precision Intervention Bay (proposal only)
+
+**Source:** `codex-handoff/genesis-integration-mega-pack-v2/src/precisionBay` and `CAPABILITY_MATRIX.md` rows 22–23 (archived under `docs/reference/codex-handoff/`).
+An observe → localize → propose → simulate → compare → complete flow with an emergency-stop fix in `recordApproval()`. It exists only in the Codex handoff pack, standalone-tested, never bound to this repository. **On main:** no; adopting it is an open product decision. Recorded so the number is not reused.
+
+**Still without any entry:** D-064 … D-068 (no reference anywhere in the repository or its branches) and D-097 (one mention inside D-098). No source text exists for them.

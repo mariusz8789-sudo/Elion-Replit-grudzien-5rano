@@ -1,0 +1,2925 @@
+import { 
+  type User, type InsertUser,
+  type Company, type InsertCompany,
+  type Driver, type InsertDriver,
+  type Vehicle, type InsertVehicle,
+  type Service, type InsertService,
+  type Booking, type InsertBooking,
+  type Quote, type InsertQuote,
+  type Offer, type InsertOffer,
+  type CrmLead, type InsertCrmLead,
+  type CrmTask, type InsertCrmTask,
+  type Message, type InsertMessage,
+  type Attachment, type InsertAttachment,
+  type Conversation, type InsertConversation,
+  type MessageTemplate, type InsertMessageTemplate,
+  type Review, type InsertReview,
+  type TrackingUpdate, type InsertTrackingUpdate,
+  type Notification, type InsertNotification,
+  type MarketplaceListing, type InsertMarketplaceListing,
+  type StaffSharing, type InsertStaffSharing,
+  type ResourceSharing, type InsertResourceSharing,
+  type Announcement, type InsertAnnouncement,
+  type Badge, type BadgeAward,
+  type Coupon, type InsertCoupon, type CouponRedemption,
+  type ReferralReward, type InsertReferralReward,
+  type BookingTransfer, type InsertBookingTransfer,
+  type DriverAvailability, type InsertDriverAvailability,
+  type DriverTimeOff, type InsertDriverTimeOff,
+  type CalendarConnection,
+  type ResourceAvailability, type InsertResourceAvailability,
+  type ResourceTimeOff, type InsertResourceTimeOff,
+  type CalendarShareToken,
+  type CargoItem, type InsertCargoItem,
+  type MessageTranslation,
+  type Call, type InsertCall,
+  type VerificationDocument, type InsertVerificationDocument,
+  type DocumentVersion,
+  type DeviceFingerprint,
+  type RiskScore,
+  type AuditLog,
+  type ApiKey, type InsertApiKey,
+  type WebhookSubscription, type InsertWebhookSubscription,
+  type WebhookDelivery,
+  type CapacityPosting, type InsertCapacityPosting,
+  type CapacityBooking, type InsertCapacityBooking,
+  type EnvironmentalCalculation,
+  type Skill, type InsertSkill,
+  type WorkerProfile, type InsertWorkerProfile,
+  type WorkerSkill, type InsertWorkerSkill,
+  type RecurringRouteSubscription, type InsertRecurringRouteSubscription,
+  type CompanyService, type InsertCompanyService,
+  type AutomationRule, type InsertAutomationRule, type AutomationRun,
+  type MfaChallenge,
+  users, companies, drivers, vehicles, services, bookings, quotes, offers,
+  crmLeads, crmTasks, automationRules, automationRuns, mfaChallenges,
+  messages, attachments, conversations, conversationParticipants, messageTemplates, reviews, trackingUpdates, notifications,
+  marketplaceListings, staffSharing, resourceSharing, announcements,
+  badges, badgeAwards, coupons, couponRedemptions, referralRewards, bookingTransfers,
+  driverAvailability, driverTimeOff, calendarConnections,
+  resourceAvailability, resourceTimeOff, calendarShareTokens,
+  cargoItems, messageTranslations,
+  calls, verificationDocuments, documentVersions, deviceFingerprints, riskScores, auditLogs,
+  apiKeys, webhookSubscriptions, webhookDeliveries,
+  capacityPostings, capacityBookings, environmentalCalculations,
+  skills, workerProfiles, workerSkills, recurringRouteSubscriptions, companyServices
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, desc, sql, or, gte, lte, lt, isNull, isNotNull, inArray, ilike } from "drizzle-orm";
+import { randomUUID } from "crypto";
+import { encryptSecret, decryptSecret } from "./lib/crypto";
+import { linearTrendForecast, computeSeasonalityIndex, FORECAST_METHODOLOGY, MIN_MONTHS_FOR_FORECAST, type MonthlyValue } from "@shared/forecasting";
+import { estimateFuelCostEur } from "./roadServices/costCalculator";
+
+// EUR/liter diesel fallback for margin estimates, matching server/roadServices/router.ts's own default.
+const DEFAULT_FUEL_PRICE_EUR = 1.65;
+
+export interface EnterpriseDashboard {
+  crew: { totalWorkers: number; availableWorkers: number; utilizationRate: number; avgRating: number; avgCompletedJobs: number };
+  fleet: { totalVehicles: number; availableVehicles: number; vehiclesInActiveUse: number; utilizationRate: number };
+  environmental: { totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number };
+  bookingRevenueEur: number;
+  marketplace: { activeListings: number; totalListedValueEur: number };
+  workShare: { activeListings: number; acceptedExchanges: number };
+  driverProductivity: Array<{ driverId: string; name: string; totalDeliveries: number; rating: number }>;
+  customerLifetimeValue: { avgLifetimeValueEur: number; topCustomers: Array<{ userId: string; name: string; totalSpentEur: number; bookingsCount: number }> };
+  partnerApi: { activeKeys: number; lastUsedAt: string | null; webhookDeliveries30d: number; webhookSuccessRate30d: number | null };
+}
+
+export interface ForecastAnalytics {
+  hasData: boolean;
+  methodology: string;
+  totalBookingsAnalyzed: number;
+  monthsAnalyzed?: number;
+  revenue?: { history: Array<{ month: string; valueEur: number }>; forecastEur: number[] };
+  demand?: { history: Array<{ month: string; bookings: number }>; forecastBookings: number[] };
+  seasonalityIndex?: Record<number, number>; // 0-11, 1.0 = average month
+  vehicleMargins?: Array<{ vehicleId: string; type: string; licensePlate: string; tripsAnalyzed: number; revenueEur: number; estFuelCostEur: number; estMarginEur: number }>;
+  driverRevenue?: Array<{ driverId: string; name: string; tripsAnalyzed: number; revenueEur: number }>;
+  warehouseRevenue?: Array<{ resourceId: string; title: string; bookedDays: number; revenueEur: number }>;
+  pickupHeatmap?: Array<{ address: string; bookingCount: number; avgRevenueEur: number }>;
+}
+
+export interface IStorage {
+  // User operations
+  getAllUsers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
+  getUser(id: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined>;
+  getCompanyUsers(companyId: string): Promise<User[]>;
+  getCompanyMemberUserIds(): Promise<string[]>;
+
+  // Security hardening: TOTP MFA (shared/totp.ts) + GDPR account anonymization. The password
+  // step never establishes a session on its own once mfaEnabled is true - see
+  // POST /api/auth/login and POST /api/auth/mfa/verify in routes.ts.
+  setUserMfaSecret(userId: string, encryptedSecret: string): Promise<User | undefined>;
+  enableUserMfa(userId: string, hashedBackupCodes: string[]): Promise<User | undefined>;
+  disableUserMfa(userId: string): Promise<User | undefined>;
+  updateUserMfaBackupCodes(userId: string, hashedCodes: string[]): Promise<User | undefined>;
+  createMfaChallenge(userId: string): Promise<MfaChallenge>;
+  getMfaChallenge(token: string): Promise<MfaChallenge | undefined>;
+  deleteMfaChallenge(id: string): Promise<void>;
+  anonymizeUser(userId: string): Promise<User | undefined>;
+
+  // Company operations
+  getAllCompanies(): Promise<Company[]>;
+  getCompany(id: string): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  verifyCompany(id: string, verified: boolean): Promise<Company | undefined>;
+  upgradeCompanyPlan(id: string, subscriptionTier: string, monthlyBookingLimit: number): Promise<Company | undefined>;
+  
+  // Driver operations
+  getAllDrivers(): Promise<Driver[]>;
+  getDriver(id: string): Promise<Driver | undefined>;
+  getCompanyDrivers(companyId: string): Promise<Driver[]>;
+  createDriver(driver: InsertDriver): Promise<Driver>;
+  updateDriverAvailability(id: string, available: boolean): Promise<Driver | undefined>;
+  
+  // Vehicle operations
+  getCompanyVehicles(companyId: string): Promise<Vehicle[]>;
+  getVehicle(id: string): Promise<Vehicle | undefined>;
+  setVehicleAvailability(id: string, available: boolean): Promise<Vehicle | undefined>;
+  createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
+  
+  // Service operations
+  getAllServices(): Promise<Service[]>;
+  getService(id: string): Promise<Service | undefined>;
+  createService(service: InsertService): Promise<Service>;
+  
+  // Booking operations
+  getAllBookings(): Promise<Booking[]>;
+  getBooking(id: string): Promise<Booking | undefined>;
+  getUserBookings(userId: string): Promise<Booking[]>;
+  getCompanyBookings(companyId: string): Promise<Booking[]>;
+  getCompanyMonthlyBookingCount(companyId: string): Promise<number>;
+  getPublicBookings(): Promise<Booking[]>;
+  createBooking(booking: InsertBooking & { discountAmount?: string; status?: string }): Promise<Booking>;
+  publishBooking(id: string): Promise<Booking | undefined>;
+  updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
+  updateBookingDriver(id: string, driverId: string): Promise<Booking | undefined>;
+  updateBookingCo2(id: string, co2Emission: string): Promise<Booking | undefined>;
+  cancelBooking(id: string): Promise<Booking | undefined>;
+  assignCompanyToBooking(bookingId: string, companyId: string, driverId: string, vehicleId: string): Promise<Booking | undefined>;
+  updateBookingPayment(bookingId: string, paymentIntentId: string, paymentStatus: string): Promise<Booking | undefined>;
+  
+  // Quote operations
+  createQuote(quote: InsertQuote): Promise<Quote>;
+  getQuote(id: string): Promise<Quote | undefined>;
+  
+  // Offer operations
+  getBookingOffers(bookingId: string): Promise<Offer[]>;
+  createOffer(offer: InsertOffer): Promise<Offer>;
+  acceptOffer(offerId: string): Promise<Offer | undefined>;
+  rejectOffer(offerId: string): Promise<Offer | undefined>;
+
+  // CRM operations
+  createCrmLead(data: InsertCrmLead, companyId: string, createdBy: string): Promise<CrmLead>;
+  getCompanyCrmLeads(companyId: string): Promise<CrmLead[]>;
+  getCrmLead(id: string): Promise<CrmLead | undefined>;
+  updateCrmLead(id: string, companyId: string, updates: Partial<InsertCrmLead>): Promise<CrmLead | undefined>;
+  convertCrmLead(id: string, companyId: string, bookingId: string): Promise<CrmLead | undefined>;
+  deleteCrmLead(id: string, companyId: string): Promise<boolean>;
+  createCrmTask(data: InsertCrmTask, companyId: string, createdBy: string): Promise<CrmTask>;
+  getCompanyCrmTasks(companyId: string): Promise<CrmTask[]>;
+  getCrmTask(id: string): Promise<CrmTask | undefined>;
+  completeCrmTask(id: string, companyId: string): Promise<CrmTask | undefined>;
+  deleteCrmTask(id: string, companyId: string): Promise<boolean>;
+  getCompanyCustomerInsights(companyId: string): Promise<Array<{
+    userId: string; name: string; totalBookings: number; totalSpentEur: number;
+    lastBookingDate: Date | null; usedServiceNames: string[];
+  }>>;
+
+  // Workflow automation: rules fire on real platform events (server/services/automationEngine.ts)
+  // and runs double as both the execution log and the retry queue for failed action attempts.
+  createAutomationRule(data: InsertAutomationRule, companyId: string, createdBy: string): Promise<AutomationRule>;
+  getCompanyAutomationRules(companyId: string): Promise<AutomationRule[]>;
+  getCompanyAutomationRulesByTrigger(companyId: string, triggerEvent: string): Promise<AutomationRule[]>;
+  getAutomationRule(id: string): Promise<AutomationRule | undefined>;
+  updateAutomationRule(id: string, companyId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined>;
+  deleteAutomationRule(id: string, companyId: string): Promise<boolean>;
+  createAutomationRun(data: { ruleId: string; companyId: string; triggerEvent: string; context: unknown; status: string; actionResults?: unknown; error?: string }): Promise<AutomationRun>;
+  getCompanyAutomationRuns(companyId: string, limit?: number): Promise<AutomationRun[]>;
+  getAutomationRun(id: string): Promise<AutomationRun | undefined>;
+  updateAutomationRunStatus(id: string, status: string, updates?: { actionResults?: unknown; error?: string; retryCount?: number }): Promise<AutomationRun | undefined>;
+  getFailedAutomationRunsForRetry(maxRetries: number, limit?: number): Promise<AutomationRun[]>;
+
+  // Message operations
+  getBookingMessages(bookingId: string): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+
+  // Internal Messaging: conversations generalize booking chat into company/support/direct
+  // mailboxes - reuses the same messages table (conversationId instead of bookingId).
+  createConversation(data: InsertConversation, createdBy: string): Promise<Conversation>;
+  getConversation(id: string): Promise<Conversation | undefined>;
+  getUserConversations(userId: string, includeArchived?: boolean): Promise<Array<Conversation & { unreadCount: number }>>;
+  isConversationParticipant(conversationId: string, userId: string): Promise<boolean>;
+  getConversationParticipantIds(conversationId: string): Promise<string[]>;
+  getConversationMessages(conversationId: string): Promise<Message[]>;
+  createConversationMessage(conversationId: string, senderId: string, content: string, status?: "sent" | "draft"): Promise<Message>;
+  markConversationRead(conversationId: string, userId: string): Promise<void>;
+  setConversationArchived(conversationId: string, userId: string, archived: boolean): Promise<void>;
+  setConversationStatus(conversationId: string, status: "open" | "archived"): Promise<Conversation | undefined>;
+  setConversationLabels(conversationId: string, labels: string[]): Promise<Conversation | undefined>;
+  searchUserMessages(userId: string, query: string): Promise<Array<Message & { conversationSubject: string | null }>>;
+  createMessageTemplate(data: InsertMessageTemplate, createdBy: string): Promise<MessageTemplate>;
+  getMessageTemplates(companyId: string | undefined, userId: string): Promise<MessageTemplate[]>;
+  deleteMessageTemplate(id: string, userId: string): Promise<boolean>;
+
+  // Support chat operations
+  getSupportMessages(bookingId: string): Promise<any[]>;
+  createSupportMessage(data: any): Promise<any>;
+  
+  // Attachment operations
+  getBookingAttachments(bookingId: string): Promise<Attachment[]>;
+  createAttachment(attachment: InsertAttachment): Promise<Attachment>;
+  
+  // Review operations
+  getCompanyReviews(companyId: string): Promise<Review[]>;
+  getUserReviews(userId: string): Promise<Review[]>;
+  createReview(review: InsertReview): Promise<Review>;
+  
+  // Tracking operations
+  getBookingTracking(bookingId: string): Promise<TrackingUpdate[]>;
+  createTrackingUpdate(update: InsertTrackingUpdate): Promise<TrackingUpdate>;
+
+  // Environmental calculation operations
+  createEnvironmentalCalculation(data: {
+    bookingId?: string | null; distanceKm: number; vehicleType: string; estimatedCo2Kg: number;
+    baselineVehicleType: string; baselineCo2Kg: number; co2SavedKg: number;
+    methodology: string; methodologyVersion: number;
+  }): Promise<EnvironmentalCalculation>;
+  getBookingEnvironmentalCalculation(bookingId: string): Promise<EnvironmentalCalculation | undefined>;
+  getCompanyEnvironmentalSummary(companyId: string): Promise<{ totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number }>;
+  getUserMonthlyEnvironmentalSummary(userId: string, months?: number): Promise<Array<{ month: string; co2Kg: number; co2SavedKg: number; trips: number }>>;
+
+  // Skills engine operations
+  getAllSkills(): Promise<Skill[]>;
+  createSkill(skill: InsertSkill): Promise<Skill>;
+  getWorkerProfile(id: string): Promise<WorkerProfile | undefined>;
+  getWorkerProfileByUserId(userId: string): Promise<WorkerProfile | undefined>;
+  createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile>;
+  updateWorkerProfile(id: string, updates: Partial<InsertWorkerProfile>): Promise<WorkerProfile | undefined>;
+  getCompanyWorkerProfiles(companyId: string): Promise<WorkerProfile[]>;
+  incrementWorkerCompletedJobs(profileId: string): Promise<void>;
+  getProfileSkills(profileId: string): Promise<Array<WorkerSkill & { skill: Skill }>>;
+  setWorkerSkill(entry: InsertWorkerSkill): Promise<WorkerSkill>;
+  removeWorkerSkill(profileId: string, skillId: string): Promise<void>;
+  findCandidatesForSkill(skillId: string): Promise<Array<WorkerProfile & { experienceLevel: string; yearsExperience: number | null; hasRequiredCertification: boolean }>>;
+  getExpiringVerificationDocuments(withinDays: number): Promise<VerificationDocument[]>;
+  markVerificationDocumentExpiryNotified(id: string): Promise<void>;
+
+  // Professional services operations (company-level service offerings, reusing the skills catalog)
+  getCompanyServices(companyId: string): Promise<Array<CompanyService & { skill: Skill }>>;
+  setCompanyService(companyId: string, entry: InsertCompanyService): Promise<CompanyService>;
+  removeCompanyService(id: string, companyId: string): Promise<boolean>;
+  searchCompanyServices(filter: { skillId?: string; category?: string }): Promise<Array<CompanyService & { skill: Skill; company: Company }>>;
+
+  // Enterprise dashboard: composite real-data aggregate across crew, fleet, CO2, revenue,
+  // marketplace, WorkShare, driver productivity, customer lifetime value and Partner API usage -
+  // every number reuses an existing table/summary rather than introducing a parallel metrics store.
+  getCompanyEnterpriseDashboard(companyId: string): Promise<EnterpriseDashboard>;
+
+  // Enterprise analytics forecasting: real least-squares trend + seasonal index over the
+  // company's own monthly booking history (shared/forecasting.ts), plus fuel-cost-adjusted
+  // vehicle margins, driver/warehouse revenue and a pickup-location heatmap - all derived from
+  // existing tables, never a fabricated projection. Honest "not enough data" when history is thin.
+  getCompanyForecastAnalytics(companyId: string): Promise<ForecastAnalytics>;
+
+  // Notification operations
+  getUserNotifications(userId: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
+  
+  // Marketplace operations
+  getAllMarketplaceListings(): Promise<MarketplaceListing[]>;
+  getMarketplaceListing(id: string): Promise<MarketplaceListing | undefined>;
+  createMarketplaceListing(listing: InsertMarketplaceListing, userId: string, companyId: string | null): Promise<MarketplaceListing>;
+  updateMarketplaceListing(id: string, available: boolean): Promise<MarketplaceListing | undefined>;
+  
+  // Staff sharing operations
+  getAllStaffSharing(): Promise<StaffSharing[]>;
+  getStaffSharing(id: string): Promise<StaffSharing | undefined>;
+  getCompanyStaffSharing(companyId: string): Promise<StaffSharing[]>;
+  createStaffSharing(staffSharing: InsertStaffSharing): Promise<StaffSharing>;
+  updateStaffSharingStatus(id: string, fromStatuses: string[], toStatus: string, borrowerCompanyId?: string | null): Promise<StaffSharing | undefined>;
+
+  // Resource sharing operations
+  getAllResourceSharing(): Promise<ResourceSharing[]>;
+  getResourceSharing(id: string): Promise<ResourceSharing | undefined>;
+  getCompanyResourceSharing(companyId: string): Promise<ResourceSharing[]>;
+  getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]>;
+  createResourceSharing(resourceSharing: InsertResourceSharing): Promise<ResourceSharing>;
+  updateResourceSharingStatus(id: string, fromStatuses: string[], toStatus: string, requesterCompanyId?: string | null): Promise<ResourceSharing | undefined>;
+
+  // Capacity matching operations (route-connected spare capacity / empty-return matching)
+  createCapacityPosting(posting: InsertCapacityPosting): Promise<CapacityPosting>;
+  getCapacityPosting(id: string): Promise<CapacityPosting | undefined>;
+  getCompanyCapacityPostings(companyId: string): Promise<CapacityPosting[]>;
+  matchCapacityPostings(params: {
+    from?: string; to?: string; date?: Date;
+    minVolumeM3?: number; minWeightKg?: number; minPalletSpaces?: number;
+    temperatureControlled?: boolean; adrCapable?: boolean; tailLift?: boolean;
+  }): Promise<CapacityPosting[]>;
+  cancelCapacityPosting(id: string, companyId: string): Promise<CapacityPosting | undefined>;
+  createCapacityBooking(booking: InsertCapacityBooking, priceEur: string): Promise<CapacityBooking>;
+  getCapacityBooking(id: string): Promise<CapacityBooking | undefined>;
+  getPostingCapacityBookings(postingId: string): Promise<CapacityBooking[]>;
+  getCustomerCapacityBookings(customerId: string): Promise<CapacityBooking[]>;
+  acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }>;
+  updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined>;
+
+  // Return Trip Marketplace network: company-to-company capacity claims (as opposed to an
+  // individual customer's request) and the Stripe Connect payout wiring behind them.
+  getCompanyCapacityClaims(companyId: string): Promise<CapacityBooking[]>;
+  updateCapacityBookingPayment(id: string, paymentIntentId: string, paymentStatus: string): Promise<CapacityBooking | undefined>;
+  getCapacityNetworkTrustStatus(companyId: string): Promise<"ok" | "expired" | "missing">;
+  setCompanyStripeConnectAccount(companyId: string, accountId: string): Promise<Company | undefined>;
+  getCompanyByStripeConnectAccountId(accountId: string): Promise<Company | undefined>;
+  setCompanyStripeConnectPayoutsEnabled(accountId: string, enabled: boolean): Promise<Company | undefined>;
+
+  // Return Trip Marketplace: recurring-route subscriptions
+  createRouteSubscription(sub: InsertRecurringRouteSubscription): Promise<RecurringRouteSubscription>;
+  getCompanyRouteSubscriptions(companyId: string): Promise<RecurringRouteSubscription[]>;
+  deleteRouteSubscription(id: string, companyId: string): Promise<boolean>;
+  findMatchingRouteSubscriptions(fromAddress: string, toAddress: string): Promise<RecurringRouteSubscription[]>;
+
+  // Announcements operations
+  getActiveAnnouncements(): Promise<Announcement[]>;
+  getAnnouncement(id: string): Promise<Announcement | undefined>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  incrementAnnouncementViews(id: string): Promise<Announcement | undefined>;
+  incrementAnnouncementClicks(id: string): Promise<Announcement | undefined>;
+
+  // Badge / gamification operations
+  getAllBadges(): Promise<Badge[]>;
+  getHolderBadges(holderType: string, holderId: string): Promise<(BadgeAward & { badge: Badge })[]>;
+  awardBadgeIfMissing(holderType: string, holderId: string, badgeCode: string): Promise<BadgeAward | undefined>;
+  checkAndAwardMilestoneBadges(holderType: "company" | "driver", holderId: string): Promise<void>;
+  getDriverEnvironmentalSummary(driverId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }>;
+  getUserEnvironmentalSummary(userId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }>;
+  checkAndAwardGreenCustomerBadge(userId: string): Promise<void>;
+
+  // Leaderboard operations
+  getCompanyLeaderboard(limit?: number): Promise<Company[]>;
+  getDriverLeaderboard(limit?: number): Promise<Driver[]>;
+
+  // Coupon operations
+  getCouponByCode(code: string): Promise<Coupon | undefined>;
+  createCoupon(coupon: InsertCoupon): Promise<Coupon>;
+  redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption | undefined>;
+  linkCouponRedemptionToBooking(redemptionId: string, bookingId: string): Promise<void>;
+
+  // Referral operations
+  getReferralRewards(userId: string): Promise<ReferralReward[]>;
+  hasReferralRewardForReferredUser(referredUserId: string): Promise<boolean>;
+  createReferralReward(reward: InsertReferralReward): Promise<ReferralReward>;
+
+  // Booking transfer operations
+  transferBooking(transfer: InsertBookingTransfer): Promise<BookingTransfer>;
+  getBookingTransfers(bookingId: string): Promise<BookingTransfer[]>;
+
+  // Driver availability calendar operations
+  getDriverAvailability(driverId: string): Promise<DriverAvailability[]>;
+  setDriverAvailability(driverId: string, slots: InsertDriverAvailability[]): Promise<DriverAvailability[]>;
+  getDriverTimeOff(driverId: string): Promise<DriverTimeOff[]>;
+  createDriverTimeOff(timeOff: InsertDriverTimeOff): Promise<DriverTimeOff>;
+  deleteDriverTimeOff(id: string, driverId: string): Promise<boolean>;
+  isDriverAvailableAt(driverId: string, when: Date): Promise<boolean>;
+  findAvailableDrivers(companyId: string, when: Date): Promise<Driver[]>;
+
+  // Calendar sync connections (Google/Outlook)
+  getCalendarConnection(driverId: string, provider: string): Promise<CalendarConnection | undefined>;
+  getDriverCalendarConnections(driverId: string): Promise<CalendarConnection[]>;
+  upsertCalendarConnection(driverId: string, provider: string, accessToken: string, refreshToken: string | undefined, tokenExpiresAt: Date | undefined): Promise<CalendarConnection>;
+  deleteCalendarConnection(driverId: string, provider: string): Promise<boolean>;
+  decryptCalendarTokens(connection: CalendarConnection): { accessToken: string; refreshToken?: string };
+  touchCalendarSync(id: string): Promise<void>;
+
+  // Calendar & Scheduling for crew/vehicle/warehouse/company - the same polymorphic
+  // entityType/entityId shape as the driver-only tables above, generalized to other resources.
+  getEntityAvailability(entityType: string, entityId: string): Promise<ResourceAvailability[]>;
+  setEntityAvailability(entityType: string, entityId: string, slots: InsertResourceAvailability[]): Promise<ResourceAvailability[]>;
+  getEntityTimeOff(entityType: string, entityId: string): Promise<ResourceTimeOff[]>;
+  createEntityTimeOff(timeOff: InsertResourceTimeOff, createdBy: string): Promise<ResourceTimeOff>;
+  deleteEntityTimeOff(id: string, entityType: string, entityId: string): Promise<boolean>;
+  getOrCreateCalendarShareToken(entityType: string, entityId: string, createdBy: string): Promise<CalendarShareToken>;
+  getCalendarShareToken(token: string): Promise<CalendarShareToken | undefined>;
+
+  // AI cargo recognition operations
+  getCargoItem(id: string): Promise<CargoItem | undefined>;
+  getBookingCargoItems(bookingId: string): Promise<CargoItem[]>;
+  createCargoItem(item: InsertCargoItem): Promise<CargoItem>;
+  correctCargoItem(id: string, updates: Partial<InsertCargoItem>): Promise<CargoItem | undefined>;
+
+  // AI chat translation operations
+  getMessageTranslation(messageId: string, targetLanguage: string): Promise<MessageTranslation | undefined>;
+  createMessageTranslation(messageId: string, sourceLanguage: string | undefined, targetLanguage: string, translatedContent: string, aiProvider: string): Promise<MessageTranslation>;
+
+  // Voice/video call operations
+  createCall(call: InsertCall): Promise<Call>;
+  getCall(id: string): Promise<Call | undefined>;
+  updateCallStatus(id: string, status: string, quality?: unknown): Promise<Call | undefined>;
+  getUserCallHistory(userId: string): Promise<Call[]>;
+
+  // Identity verification operations
+  createVerificationDocument(doc: InsertVerificationDocument): Promise<VerificationDocument>;
+  getHolderVerificationDocuments(holderType: string, holderId: string): Promise<VerificationDocument[]>;
+  getPendingVerificationDocuments(): Promise<VerificationDocument[]>;
+  reviewVerificationDocument(id: string, status: "approved" | "rejected", reviewedBy: string, rejectionReason?: string): Promise<VerificationDocument | undefined>;
+  getVerificationDocument(id: string): Promise<VerificationDocument | undefined>;
+  createDocumentVersion(documentId: string, fileUrl: string, uploadedBy: string, note?: string): Promise<DocumentVersion>;
+  getDocumentVersions(documentId: string): Promise<DocumentVersion[]>;
+  renewVerificationDocument(id: string, uploadedBy: string, newFileUrl: string, note?: string): Promise<VerificationDocument | undefined>;
+  updateVerificationDocumentMetadata(id: string, updates: { issueDate?: Date; docNumber?: string; country?: string; authority?: string; verificationSource?: string; ocrExtractedData?: unknown; expiresAt?: Date }): Promise<VerificationDocument | undefined>;
+
+  // Fraud prevention operations
+  recordDeviceFingerprint(userId: string, fingerprintHash: string, userAgent: string | undefined, ipAddress: string | undefined): Promise<DeviceFingerprint>;
+  findUsersBySharedFingerprint(fingerprintHash: string): Promise<DeviceFingerprint[]>;
+  recordRiskScore(subjectType: string, subjectId: string, score: number, reasons: string[]): Promise<RiskScore>;
+  getLatestRiskScore(subjectType: string, subjectId: string): Promise<RiskScore | undefined>;
+  writeAuditLog(actorUserId: string | undefined, action: string, targetType: string | undefined, targetId: string | undefined, metadata: unknown, ipAddress: string | undefined): Promise<AuditLog>;
+  getAuditLogs(targetType?: string, targetId?: string, limit?: number): Promise<AuditLog[]>;
+
+  // Partner API operations
+  createApiKey(key: InsertApiKey, keyHash: string, keyPrefix: string): Promise<ApiKey>;
+  getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
+  getCompanyApiKeys(companyId: string): Promise<ApiKey[]>;
+  revokeApiKey(id: string, companyId: string): Promise<boolean>;
+  touchApiKeyUsage(id: string): Promise<void>;
+  createWebhookSubscription(sub: InsertWebhookSubscription, secret: string): Promise<WebhookSubscription>;
+  getCompanyWebhookSubscriptions(companyId: string): Promise<WebhookSubscription[]>;
+  getActiveWebhookSubscriptionsForEvent(companyId: string, event: string): Promise<WebhookSubscription[]>;
+  deleteWebhookSubscription(id: string, companyId: string): Promise<boolean>;
+  recordWebhookDelivery(subscriptionId: string, event: string, payload: unknown, responseStatus: number | undefined, success: boolean, error?: string): Promise<WebhookDelivery>;
+}
+
+// Thrown inside acceptCapacityBooking's transaction purely to force a rollback when the posting
+// no longer has room; caught immediately and turned into a normal { error } result. Using a
+// dedicated class (not a bare Error) keeps it from being confused with a real DB failure.
+class CapacityOverbookError extends Error {}
+
+export class DbStorage implements IStorage {
+  // === USER OPERATIONS ===
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt)).limit(500);
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.phone, phone));
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    if (!email) return undefined;
+    const result = await db.select().from(users).where(eq(users.email, email));
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // Only links a user who isn't already linked to a company, so a company-onboarding
+  // request can't silently reassign an existing driver/company-owner to a different one.
+  async linkUserToCompany(userId: string, companyId: string, role: "company" | "driver"): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ companyId, role })
+      .where(and(eq(users.id, userId), isNull(users.companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async getCompanyUsers(companyId: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.companyId, companyId));
+  }
+
+  // Every user that belongs to some company - the audience for a "new job on the
+  // marketplace" real-time signal, so carriers see fresh public bookings live instead
+  // of polling the feed. Returns ids only (all we need to fan out a WS broadcast).
+  async getCompanyMemberUserIds(): Promise<string[]> {
+    const rows = await db.select({ id: users.id }).from(users).where(isNotNull(users.companyId));
+    return rows.map((r) => r.id);
+  }
+
+  async setUserMfaSecret(userId: string, encryptedSecret: string): Promise<User | undefined> {
+    const result = await db.update(users).set({ mfaSecret: encryptedSecret }).where(eq(users.id, userId)).returning();
+    return result[0];
+  }
+
+  async enableUserMfa(userId: string, hashedBackupCodes: string[]): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ mfaEnabled: true, mfaBackupCodes: hashedBackupCodes })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async disableUserMfa(userId: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ mfaEnabled: false, mfaSecret: null, mfaBackupCodes: null })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async updateUserMfaBackupCodes(userId: string, hashedCodes: string[]): Promise<User | undefined> {
+    const result = await db.update(users).set({ mfaBackupCodes: hashedCodes }).where(eq(users.id, userId)).returning();
+    return result[0];
+  }
+
+  async createMfaChallenge(userId: string): Promise<MfaChallenge> {
+    const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+    const result = await db.insert(mfaChallenges).values({
+      userId,
+      token: randomUUID(),
+      expiresAt: new Date(Date.now() + MFA_CHALLENGE_TTL_MS),
+    }).returning();
+    return result[0];
+  }
+
+  async getMfaChallenge(token: string): Promise<MfaChallenge | undefined> {
+    const result = await db.select().from(mfaChallenges).where(eq(mfaChallenges.token, token));
+    const challenge = result[0];
+    if (!challenge) return undefined;
+    if (challenge.expiresAt < new Date()) {
+      await this.deleteMfaChallenge(challenge.id);
+      return undefined;
+    }
+    return challenge;
+  }
+
+  async deleteMfaChallenge(id: string): Promise<void> {
+    await db.delete(mfaChallenges).where(eq(mfaChallenges.id, id));
+  }
+
+  // GDPR right-to-erasure: scrubs PII in place rather than a hard DELETE, since bookings,
+  // reviews, and payment records referencing this user must remain intact for the other
+  // party's legitimate records and for financial/legal retention obligations.
+  async anonymizeUser(userId: string): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({
+        name: "Deleted User",
+        email: `deleted-${userId}@deleted.local`,
+        phone: `deleted-${userId}`,
+        password: randomUUID(), // unusable - not a valid bcrypt hash, so login can never succeed
+        avatar: null,
+        mfaEnabled: false,
+        mfaSecret: null,
+        mfaBackupCodes: null,
+        deletedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  // === COMPANY OPERATIONS ===
+  async getAllCompanies(): Promise<Company[]> {
+    return await db.select().from(companies).limit(500);
+  }
+
+  async getCompany(id: string): Promise<Company | undefined> {
+    const result = await db.select().from(companies).where(eq(companies.id, id));
+    return result[0];
+  }
+
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    const result = await db.insert(companies).values(insertCompany).returning();
+    return result[0];
+  }
+
+  async verifyCompany(id: string, verified: boolean): Promise<Company | undefined> {
+    const result = await db.update(companies)
+      .set({ verified })
+      .where(eq(companies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async upgradeCompanyPlan(id: string, subscriptionTier: string, monthlyBookingLimit: number): Promise<Company | undefined> {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    const result = await db.update(companies)
+      .set({ subscriptionTier, monthlyBookingLimit, subscriptionExpiresAt: expiresAt })
+      .where(eq(companies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === DRIVER OPERATIONS ===
+  async getAllDrivers(): Promise<Driver[]> {
+    return await db.select().from(drivers).limit(500);
+  }
+
+  async getDriver(id: string): Promise<Driver | undefined> {
+    const result = await db.select().from(drivers).where(eq(drivers.id, id));
+    return result[0];
+  }
+
+  async getCompanyDrivers(companyId: string): Promise<Driver[]> {
+    return await db.select().from(drivers).where(eq(drivers.companyId, companyId));
+  }
+
+  async getDriverByUserId(userId: string): Promise<Driver | undefined> {
+    const result = await db.select().from(drivers).where(eq(drivers.userId, userId));
+    return result[0];
+  }
+
+  async createDriver(insertDriver: InsertDriver): Promise<Driver> {
+    const result = await db.insert(drivers).values(insertDriver).returning();
+    return result[0];
+  }
+
+  async updateDriverAvailability(id: string, available: boolean): Promise<Driver | undefined> {
+    const result = await db.update(drivers)
+      .set({ available })
+      .where(eq(drivers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === VEHICLE OPERATIONS ===
+  async getCompanyVehicles(companyId: string): Promise<Vehicle[]> {
+    return await db.select().from(vehicles).where(eq(vehicles.companyId, companyId));
+  }
+
+  async getVehicle(id: string): Promise<Vehicle | undefined> {
+    const result = await db.select().from(vehicles).where(eq(vehicles.id, id));
+    return result[0];
+  }
+
+  async setVehicleAvailability(id: string, available: boolean): Promise<Vehicle | undefined> {
+    const result = await db.update(vehicles).set({ available }).where(eq(vehicles.id, id)).returning();
+    return result[0];
+  }
+
+  async createVehicle(insertVehicle: InsertVehicle): Promise<Vehicle> {
+    const result = await db.insert(vehicles).values(insertVehicle).returning();
+    return result[0];
+  }
+
+  // === SERVICE OPERATIONS ===
+  async getAllServices(): Promise<Service[]> {
+    return await db.select().from(services);
+  }
+
+  async getService(id: string): Promise<Service | undefined> {
+    const result = await db.select().from(services).where(eq(services.id, id));
+    return result[0];
+  }
+
+  async createService(insertService: InsertService): Promise<Service> {
+    const result = await db.insert(services).values(insertService).returning();
+    return result[0];
+  }
+
+  // === BOOKING OPERATIONS ===
+  async getAllBookings(): Promise<Booking[]> {
+    return await db.select().from(bookings).orderBy(desc(bookings.createdAt)).limit(500);
+  }
+
+  async getBooking(id: string): Promise<Booking | undefined> {
+    const result = await db.select().from(bookings).where(eq(bookings.id, id));
+    return result[0];
+  }
+
+  async getUserBookings(userId: string): Promise<Booking[]> {
+    return await db.select().from(bookings)
+      .where(eq(bookings.userId, userId))
+      .orderBy(desc(bookings.createdAt))
+      .limit(500);
+  }
+
+  async getCompanyBookings(companyId: string): Promise<Booking[]> {
+    return await db.select().from(bookings)
+      .where(eq(bookings.companyId, companyId))
+      .orderBy(desc(bookings.createdAt))
+      .limit(500);
+  }
+
+  // Bookings the company has already committed to (status "accepted") but hasn't dispatched
+  // to a specific driver yet - the pool of jobs eligible for QR/NFC instant driver pairing.
+  async getCompanyUnassignedBookings(companyId: string): Promise<Booking[]> {
+    return await db.select().from(bookings)
+      .where(and(
+        eq(bookings.companyId, companyId),
+        isNull(bookings.driverId),
+        eq(bookings.status, "accepted"),
+      ))
+      .orderBy(desc(bookings.createdAt));
+  }
+
+  // Race-safe self-assignment: a driver scans/taps a job's QR/NFC code and claims it. The
+  // conditional WHERE re-validates company membership and that nobody else claimed it first,
+  // rather than trusting whatever the scanned code claims.
+  async claimBookingForDriver(bookingId: string, driverId: string, companyId: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ driverId, updatedAt: new Date() })
+      .where(and(
+        eq(bookings.id, bookingId),
+        eq(bookings.companyId, companyId),
+        isNull(bookings.driverId),
+        eq(bookings.status, "accepted"),
+      ))
+      .returning();
+    return result[0];
+  }
+
+  async getCompanyMonthlyBookingCount(companyId: string): Promise<number> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM bookings
+      WHERE company_id = ${companyId}
+      AND updated_at >= date_trunc('month', now())
+      AND status NOT IN ('draft', 'posted', 'canceled')
+    `);
+    return Number((result.rows[0] as any)?.count ?? 0);
+  }
+
+  async getPublicBookings(): Promise<Booking[]> {
+    return await db.select().from(bookings)
+      .where(and(
+        eq(bookings.isPublic, true),
+        eq(bookings.status, "posted")
+      ))
+      .orderBy(desc(bookings.createdAt));
+  }
+
+  async createBooking(insertBooking: InsertBooking & { discountAmount?: string; status?: string }): Promise<Booking> {
+    const publicLink = randomUUID();
+    const result = await db.insert(bookings).values({
+      ...insertBooking,
+      publicLink,
+    }).returning();
+    return result[0];
+  }
+
+  // Publish a booking to the public bidding marketplace. Only a booking still in
+  // "draft" is moved to "posted" (and made public) - once it has already been posted,
+  // accepted, or advanced further, the conditional WHERE makes this a safe no-op that
+  // returns the existing row rather than resurrecting a completed/cancelled booking.
+  async publishBooking(id: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ status: "posted", isPublic: true, updatedAt: new Date() })
+      .where(and(eq(bookings.id, id), eq(bookings.status, "draft")))
+      .returning();
+    if (result[0]) return result[0];
+    // Already published (or beyond) - return the current row so callers can treat
+    // publish as idempotent instead of a 404.
+    return this.getBooking(id);
+  }
+
+  async updateBookingStatus(id: string, status: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateBookingDriver(id: string, driverId: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ driverId, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateBookingCo2(id: string, co2Emission: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ co2Emission, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async assignCompanyToBooking(bookingId: string, companyId: string, driverId: string, vehicleId: string): Promise<Booking | undefined> {
+    // Validate driver belongs to company
+    const driver = await this.getDriver(driverId);
+    if (!driver || driver.companyId !== companyId) {
+      throw new Error("Driver not found or does not belong to this company");
+    }
+
+    // Validate vehicle belongs to company
+    const vehicle = await this.getVehicle(vehicleId);
+    if (!vehicle || vehicle.companyId !== companyId) {
+      throw new Error("Vehicle not found or does not belong to this company");
+    }
+
+    // Conditional update guards against a race between concurrent assignment attempts (or
+    // against the offer-acceptance flow assigning the same booking first). It succeeds either
+    // when the booking is still unassigned (draft/posted - the admin/direct path) OR when it
+    // is already awarded to THIS company (accepted) and we're only (re)assigning its specific
+    // driver/vehicle. It can never overwrite a booking already awarded to a different company.
+    const result = await db.update(bookings)
+      .set({ companyId, driverId, vehicleId, status: "accepted", updatedAt: new Date() })
+      .where(and(
+        eq(bookings.id, bookingId),
+        or(
+          inArray(bookings.status, ["draft", "posted"]),
+          and(eq(bookings.companyId, companyId), eq(bookings.status, "accepted")),
+        ),
+      ))
+      .returning();
+    return result[0];
+  }
+
+  async updateBookingPayment(bookingId: string, paymentIntentId: string, paymentStatus: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ paymentIntentId, paymentStatus, updatedAt: new Date() })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return result[0];
+  }
+
+  async cancelBooking(id: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === QUOTE OPERATIONS ===
+  async createQuote(insertQuote: InsertQuote): Promise<Quote> {
+    const result = await db.insert(quotes).values(insertQuote).returning();
+    return result[0];
+  }
+
+  async getQuote(id: string): Promise<Quote | undefined> {
+    const result = await db.select().from(quotes).where(eq(quotes.id, id));
+    return result[0];
+  }
+
+  // === OFFER OPERATIONS ===
+  async getBookingOffers(bookingId: string): Promise<Offer[]> {
+    return await db.select().from(offers)
+      .where(eq(offers.bookingId, bookingId))
+      .orderBy(desc(offers.createdAt));
+  }
+
+  async createOffer(insertOffer: InsertOffer): Promise<Offer> {
+    const result = await db.insert(offers).values(insertOffer).returning();
+    return result[0];
+  }
+
+  async acceptOffer(offerId: string): Promise<Offer | undefined> {
+    return await db.transaction(async (tx) => {
+      // Get the offer to be accepted
+      const offerResult = await tx.select().from(offers).where(eq(offers.id, offerId));
+      const offer = offerResult[0];
+
+      if (!offer) {
+        return undefined;
+      }
+
+      // Update the offer status to accepted
+      const updatedOffer = await tx.update(offers)
+        .set({ status: "accepted" })
+        .where(eq(offers.id, offerId))
+        .returning();
+
+      // Reject all other offers for the same booking
+      await tx.update(offers)
+        .set({ status: "rejected" })
+        .where(and(
+          eq(offers.bookingId, offer.bookingId),
+          sql`${offers.id} != ${offerId}`
+        ));
+
+      // Update the booking with the accepted offer details, in the same transaction so a
+      // failed assignment (bad driver/vehicle) rolls back the offer status changes too.
+      // companyId is required on every offer, but driverId/vehicleId are optional - a
+      // company can submit a bid before deciding which specific driver/vehicle to assign
+      // (and do so later via the dedicated assign routes). Previously this whole block was
+      // gated on ALL THREE being present, so any offer submitted without a driverId - which
+      // is exactly what the Company Dashboard's offer form does - silently left the booking
+      // unassigned and still "posted" even though the offer itself showed "accepted".
+      if (offer.driverId) {
+        const driverResult = await tx.select().from(drivers).where(eq(drivers.id, offer.driverId));
+        const driver = driverResult[0];
+        if (!driver || driver.companyId !== offer.companyId) {
+          throw new Error("Driver not found or does not belong to this company");
+        }
+      }
+      if (offer.vehicleId) {
+        const vehicleResult = await tx.select().from(vehicles).where(eq(vehicles.id, offer.vehicleId));
+        const vehicle = vehicleResult[0];
+        if (!vehicle || vehicle.companyId !== offer.companyId) {
+          throw new Error("Vehicle not found or does not belong to this company");
+        }
+      }
+      await tx.update(bookings)
+        .set({
+          companyId: offer.companyId,
+          ...(offer.driverId ? { driverId: offer.driverId } : {}),
+          ...(offer.vehicleId ? { vehicleId: offer.vehicleId } : {}),
+          status: "accepted",
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, offer.bookingId));
+
+      return updatedOffer[0];
+    });
+  }
+
+  async rejectOffer(offerId: string): Promise<Offer | undefined> {
+    const result = await db.update(offers)
+      .set({ status: "rejected" })
+      .where(eq(offers.id, offerId))
+      .returning();
+    return result[0];
+  }
+
+  // === CRM ===
+  async createCrmLead(data: InsertCrmLead, companyId: string, createdBy: string): Promise<CrmLead> {
+    const result = await db.insert(crmLeads).values({ ...data, companyId, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCompanyCrmLeads(companyId: string): Promise<CrmLead[]> {
+    return await db.select().from(crmLeads).where(eq(crmLeads.companyId, companyId)).orderBy(desc(crmLeads.updatedAt));
+  }
+
+  async getCrmLead(id: string): Promise<CrmLead | undefined> {
+    const result = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
+    return result[0];
+  }
+
+  async updateCrmLead(id: string, companyId: string, updates: Partial<InsertCrmLead>): Promise<CrmLead | undefined> {
+    const result = await db.update(crmLeads)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, id), eq(crmLeads.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async convertCrmLead(id: string, companyId: string, bookingId: string): Promise<CrmLead | undefined> {
+    const result = await db.update(crmLeads)
+      .set({ stage: "won", convertedBookingId: bookingId, updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, id), eq(crmLeads.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCrmLead(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(crmLeads)
+      .where(and(eq(crmLeads.id, id), eq(crmLeads.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async createCrmTask(data: InsertCrmTask, companyId: string, createdBy: string): Promise<CrmTask> {
+    const result = await db.insert(crmTasks).values({ ...data, companyId, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCompanyCrmTasks(companyId: string): Promise<CrmTask[]> {
+    return await db.select().from(crmTasks).where(eq(crmTasks.companyId, companyId)).orderBy(crmTasks.dueDate);
+  }
+
+  async getCrmTask(id: string): Promise<CrmTask | undefined> {
+    const result = await db.select().from(crmTasks).where(eq(crmTasks.id, id));
+    return result[0];
+  }
+
+  async completeCrmTask(id: string, companyId: string): Promise<CrmTask | undefined> {
+    const result = await db.update(crmTasks)
+      .set({ status: "done" })
+      .where(and(eq(crmTasks.id, id), eq(crmTasks.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCrmTask(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(crmTasks)
+      .where(and(eq(crmTasks.id, id), eq(crmTasks.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getCompanyCustomerInsights(companyId: string): Promise<Array<{
+    userId: string; name: string; totalBookings: number; totalSpentEur: number;
+    lastBookingDate: Date | null; usedServiceNames: string[];
+  }>> {
+    const result = await db.execute(sql`
+      SELECT b.user_id, u.name,
+        COUNT(*)::int AS total_bookings,
+        SUM(b.total_price)::float AS total_spent,
+        MAX(b.pickup_date) AS last_booking_date,
+        ARRAY_AGG(DISTINCT s.name) AS used_service_names
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      JOIN services s ON s.id = b.service_id
+      WHERE b.company_id = ${companyId}
+      GROUP BY b.user_id, u.name
+      ORDER BY total_spent DESC
+      LIMIT 50
+    `);
+    return result.rows.map((r: any) => ({
+      userId: r.user_id,
+      name: r.name,
+      totalBookings: Number(r.total_bookings),
+      totalSpentEur: Math.round(Number(r.total_spent)),
+      lastBookingDate: r.last_booking_date ? new Date(r.last_booking_date) : null,
+      usedServiceNames: r.used_service_names ?? [],
+    }));
+  }
+
+  // === WORKFLOW AUTOMATION ===
+  async createAutomationRule(data: InsertAutomationRule, companyId: string, createdBy: string): Promise<AutomationRule> {
+    const result = await db.insert(automationRules).values({ ...data, companyId, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCompanyAutomationRules(companyId: string): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules).where(eq(automationRules.companyId, companyId)).orderBy(desc(automationRules.createdAt));
+  }
+
+  async getCompanyAutomationRulesByTrigger(companyId: string, triggerEvent: string): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules).where(
+      and(eq(automationRules.companyId, companyId), eq(automationRules.triggerEvent, triggerEvent), eq(automationRules.enabled, true))
+    );
+  }
+
+  async getAutomationRule(id: string): Promise<AutomationRule | undefined> {
+    const result = await db.select().from(automationRules).where(eq(automationRules.id, id));
+    return result[0];
+  }
+
+  async updateAutomationRule(id: string, companyId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined> {
+    const result = await db.update(automationRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(automationRules.id, id), eq(automationRules.companyId, companyId)))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAutomationRule(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(automationRules).where(and(eq(automationRules.id, id), eq(automationRules.companyId, companyId))).returning();
+    return result.length > 0;
+  }
+
+  async createAutomationRun(data: {
+    ruleId: string; companyId: string; triggerEvent: string; context: unknown;
+    status: string; actionResults?: unknown; error?: string;
+  }): Promise<AutomationRun> {
+    const result = await db.insert(automationRuns).values(data).returning();
+    return result[0];
+  }
+
+  async getCompanyAutomationRuns(companyId: string, limit = 100): Promise<AutomationRun[]> {
+    return await db.select().from(automationRuns).where(eq(automationRuns.companyId, companyId)).orderBy(desc(automationRuns.createdAt)).limit(limit);
+  }
+
+  async getAutomationRun(id: string): Promise<AutomationRun | undefined> {
+    const result = await db.select().from(automationRuns).where(eq(automationRuns.id, id));
+    return result[0];
+  }
+
+  async updateAutomationRunStatus(id: string, status: string, updates?: { actionResults?: unknown; error?: string; retryCount?: number }): Promise<AutomationRun | undefined> {
+    const result = await db.update(automationRuns)
+      .set({ status, ...updates, updatedAt: new Date() })
+      .where(eq(automationRuns.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getFailedAutomationRunsForRetry(maxRetries: number, limit = 50): Promise<AutomationRun[]> {
+    return await db.select().from(automationRuns)
+      .where(and(eq(automationRuns.status, "failed"), lt(automationRuns.retryCount, maxRetries)))
+      .orderBy(automationRuns.createdAt)
+      .limit(limit);
+  }
+
+  // === MESSAGE OPERATIONS ===
+  async getBookingMessages(bookingId: string): Promise<Message[]> {
+    // Cap to the most recent 500 messages (fetched newest-first so the cap doesn't strand
+    // the conversation on its oldest messages), then restore ascending order for display.
+    const recent = await db.select().from(messages)
+      .where(eq(messages.bookingId, bookingId))
+      .orderBy(desc(messages.createdAt))
+      .limit(500);
+    return recent.reverse();
+  }
+
+  async createMessage(insertMessage: InsertMessage): Promise<Message> {
+    const result = await db.insert(messages).values(insertMessage).returning();
+    return result[0];
+  }
+
+  // === INTERNAL MESSAGING (CONVERSATIONS) ===
+  async createConversation(data: InsertConversation, createdBy: string): Promise<Conversation> {
+    const { participantIds, ...rest } = data;
+    const result = await db.insert(conversations).values({ ...rest, createdBy }).returning();
+    const conversation = result[0];
+
+    const uniqueParticipantIds = Array.from(new Set([...participantIds, createdBy]));
+    await db.insert(conversationParticipants)
+      .values(uniqueParticipantIds.map((userId) => ({ conversationId: conversation.id, userId })))
+      .onConflictDoNothing({ target: [conversationParticipants.conversationId, conversationParticipants.userId] });
+
+    return conversation;
+  }
+
+  async getConversation(id: string): Promise<Conversation | undefined> {
+    const result = await db.select().from(conversations).where(eq(conversations.id, id));
+    return result[0];
+  }
+
+  async getUserConversations(userId: string, includeArchived = false): Promise<Array<Conversation & { unreadCount: number }>> {
+    const conditions = [eq(conversationParticipants.userId, userId)];
+    if (!includeArchived) conditions.push(isNull(conversationParticipants.archivedAt));
+
+    const rows = await db.select({ conversation: conversations, participant: conversationParticipants })
+      .from(conversationParticipants)
+      .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
+      .where(and(...conditions))
+      .orderBy(desc(conversations.lastMessageAt));
+
+    return Promise.all(rows.map(async (r) => {
+      const unreadResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(messages)
+        .where(and(
+          eq(messages.conversationId, r.conversation.id),
+          eq(messages.status, "sent"),
+          r.participant.lastReadAt ? sql`${messages.createdAt} > ${r.participant.lastReadAt}` : sql`true`,
+          sql`${messages.senderId} != ${userId}`,
+        ));
+      return { ...r.conversation, unreadCount: Number(unreadResult[0]?.count ?? 0) };
+    }));
+  }
+
+  async isConversationParticipant(conversationId: string, userId: string): Promise<boolean> {
+    const result = await db.select().from(conversationParticipants)
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
+    return result.length > 0;
+  }
+
+  async getConversationParticipantIds(conversationId: string): Promise<string[]> {
+    const rows = await db.select({ userId: conversationParticipants.userId }).from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    return rows.map((r) => r.userId);
+  }
+
+  async getConversationMessages(conversationId: string): Promise<Message[]> {
+    const recent = await db.select().from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(500);
+    return recent.reverse();
+  }
+
+  async createConversationMessage(conversationId: string, senderId: string, content: string, status: "sent" | "draft" = "sent"): Promise<Message> {
+    const result = await db.insert(messages).values({ conversationId, senderId, content, status }).returning();
+    if (status === "sent") {
+      await db.update(conversations).set({ lastMessageAt: new Date() }).where(eq(conversations.id, conversationId));
+    }
+    return result[0];
+  }
+
+  async markConversationRead(conversationId: string, userId: string): Promise<void> {
+    await db.update(conversationParticipants)
+      .set({ lastReadAt: new Date() })
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
+  }
+
+  async setConversationArchived(conversationId: string, userId: string, archived: boolean): Promise<void> {
+    await db.update(conversationParticipants)
+      .set({ archivedAt: archived ? new Date() : null })
+      .where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
+  }
+
+  async setConversationStatus(conversationId: string, status: "open" | "archived"): Promise<Conversation | undefined> {
+    const result = await db.update(conversations).set({ status }).where(eq(conversations.id, conversationId)).returning();
+    return result[0];
+  }
+
+  async setConversationLabels(conversationId: string, labels: string[]): Promise<Conversation | undefined> {
+    const result = await db.update(conversations).set({ labels }).where(eq(conversations.id, conversationId)).returning();
+    return result[0];
+  }
+
+  async searchUserMessages(userId: string, query: string): Promise<Array<Message & { conversationSubject: string | null }>> {
+    const rows = await db.select({ message: messages, conversation: conversations })
+      .from(messages)
+      .innerJoin(conversationParticipants, eq(messages.conversationId, conversationParticipants.conversationId))
+      .leftJoin(conversations, eq(messages.conversationId, conversations.id))
+      .where(and(
+        eq(conversationParticipants.userId, userId),
+        eq(messages.status, "sent"),
+        ilike(messages.content, `%${query}%`),
+      ))
+      .orderBy(desc(messages.createdAt))
+      .limit(100);
+    return rows.map((r) => ({ ...r.message, conversationSubject: r.conversation?.subject ?? null }));
+  }
+
+  async createMessageTemplate(data: InsertMessageTemplate, createdBy: string): Promise<MessageTemplate> {
+    const result = await db.insert(messageTemplates).values({ ...data, createdBy }).returning();
+    return result[0];
+  }
+
+  async getMessageTemplates(companyId: string | undefined, userId: string): Promise<MessageTemplate[]> {
+    const conditions = companyId
+      ? sql`(${messageTemplates.companyId} = ${companyId} OR ${messageTemplates.createdBy} = ${userId})`
+      : eq(messageTemplates.createdBy, userId);
+    return await db.select().from(messageTemplates).where(conditions).orderBy(desc(messageTemplates.createdAt));
+  }
+
+  async deleteMessageTemplate(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(messageTemplates)
+      .where(and(eq(messageTemplates.id, id), eq(messageTemplates.createdBy, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // === SUPPORT CHAT OPERATIONS ===
+  async getSupportMessages(bookingId: string): Promise<any[]> {
+    const supportMessages = await db.select().from(messages)
+      .where(eq(messages.bookingId, bookingId))
+      .orderBy(messages.createdAt);
+    
+    return supportMessages.map(msg => ({
+      id: msg.id,
+      bookingId: msg.bookingId,
+      userId: msg.senderId,
+      message: msg.content,
+      sender: msg.senderId ? "customer" : "support",
+      createdAt: msg.createdAt,
+    }));
+  }
+
+  async createSupportMessage(data: any): Promise<any> {
+    const messageData = {
+      bookingId: data.bookingId,
+      senderId: data.userId || null,
+      content: data.message,
+    };
+    
+    const result = await db.insert(messages).values(messageData).returning();
+    const newMessage = result[0];
+    
+    return {
+      id: newMessage.id,
+      bookingId: newMessage.bookingId,
+      userId: newMessage.senderId,
+      message: newMessage.content,
+      sender: data.sender,
+      createdAt: newMessage.createdAt,
+    };
+  }
+
+  // === ATTACHMENT OPERATIONS ===
+  async getBookingAttachments(bookingId: string): Promise<Attachment[]> {
+    return await db.select().from(attachments)
+      .where(eq(attachments.bookingId, bookingId))
+      .orderBy(desc(attachments.createdAt));
+  }
+
+  async createAttachment(insertAttachment: InsertAttachment): Promise<Attachment> {
+    const result = await db.insert(attachments).values(insertAttachment).returning();
+    return result[0];
+  }
+
+  // === REVIEW OPERATIONS ===
+  async getCompanyReviews(companyId: string): Promise<Review[]> {
+    return await db.select().from(reviews)
+      .where(eq(reviews.companyId, companyId))
+      .orderBy(desc(reviews.createdAt));
+  }
+
+  async getUserReviews(userId: string): Promise<Review[]> {
+    return await db.select().from(reviews)
+      .where(eq(reviews.reviewerId, userId))
+      .orderBy(desc(reviews.createdAt));
+  }
+
+  async createReview(insertReview: InsertReview): Promise<Review> {
+    const result = await db.insert(reviews).values(insertReview).returning();
+
+    // Update company rating using a SQL aggregate instead of pulling every review row for
+    // this company into memory on each write — that read only gets slower as reviews grow.
+    if (insertReview.companyId) {
+      const [stats] = await db
+        .select({
+          avgRating: sql<string>`avg(${reviews.rating})`,
+          reviewCount: sql<number>`count(*)::int`,
+        })
+        .from(reviews)
+        .where(eq(reviews.companyId, insertReview.companyId));
+
+      await db.update(companies)
+        .set({
+          rating: Number(stats.avgRating).toFixed(2),
+          totalReviews: stats.reviewCount,
+        })
+        .where(eq(companies.id, insertReview.companyId));
+    }
+
+    return result[0];
+  }
+
+  // === TRACKING OPERATIONS ===
+  async getBookingTracking(bookingId: string): Promise<TrackingUpdate[]> {
+    // Cap to the most recent 500 pings (newest-first), then restore chronological order so
+    // the map still draws the route correctly.
+    const recent = await db.select().from(trackingUpdates)
+      .where(eq(trackingUpdates.bookingId, bookingId))
+      .orderBy(desc(trackingUpdates.createdAt))
+      .limit(500);
+    return recent.reverse();
+  }
+
+  async createTrackingUpdate(insertUpdate: InsertTrackingUpdate): Promise<TrackingUpdate> {
+    const result = await db.insert(trackingUpdates).values(insertUpdate).returning();
+    return result[0];
+  }
+
+  // === ENVIRONMENTAL CALCULATION OPERATIONS ===
+  async createEnvironmentalCalculation(data: {
+    bookingId?: string | null;
+    distanceKm: number;
+    vehicleType: string;
+    estimatedCo2Kg: number;
+    baselineVehicleType: string;
+    baselineCo2Kg: number;
+    co2SavedKg: number;
+    methodology: string;
+    methodologyVersion: number;
+  }): Promise<EnvironmentalCalculation> {
+    const result = await db.insert(environmentalCalculations).values({
+      bookingId: data.bookingId ?? null,
+      distanceKm: String(data.distanceKm),
+      vehicleType: data.vehicleType,
+      estimatedCo2Kg: String(data.estimatedCo2Kg),
+      baselineVehicleType: data.baselineVehicleType,
+      baselineCo2Kg: String(data.baselineCo2Kg),
+      co2SavedKg: String(data.co2SavedKg),
+      methodology: data.methodology,
+      methodologyVersion: data.methodologyVersion,
+    }).returning();
+    return result[0];
+  }
+
+  async getBookingEnvironmentalCalculation(bookingId: string): Promise<EnvironmentalCalculation | undefined> {
+    const result = await db.select().from(environmentalCalculations)
+      .where(eq(environmentalCalculations.bookingId, bookingId))
+      .orderBy(desc(environmentalCalculations.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async getCompanyEnvironmentalSummary(companyId: string): Promise<{ totalTrips: number; totalCo2Kg: number; totalCo2SavedKg: number; avgCo2PerTripKg: number }> {
+    const result = await db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total_trips,
+        COALESCE(SUM(ec.estimated_co2_kg), 0)::float AS total_co2_kg,
+        COALESCE(SUM(ec.co2_saved_kg), 0)::float AS total_co2_saved_kg,
+        COALESCE(AVG(ec.estimated_co2_kg), 0)::float AS avg_co2_per_trip_kg
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.company_id = ${companyId}
+    `);
+    const row = result.rows[0] as any;
+    return {
+      totalTrips: Number(row?.total_trips ?? 0),
+      totalCo2Kg: Number(row?.total_co2_kg ?? 0),
+      totalCo2SavedKg: Number(row?.total_co2_saved_kg ?? 0),
+      avgCo2PerTripKg: Number(row?.avg_co2_per_trip_kg ?? 0),
+    };
+  }
+
+  async getUserMonthlyEnvironmentalSummary(userId: string, months = 6): Promise<Array<{ month: string; co2Kg: number; co2SavedKg: number; trips: number }>> {
+    const result = await db.execute(sql`
+      SELECT
+        to_char(date_trunc('month', ec.created_at), 'YYYY-MM') AS month,
+        COALESCE(SUM(ec.estimated_co2_kg), 0)::float AS co2_kg,
+        COALESCE(SUM(ec.co2_saved_kg), 0)::float AS co2_saved_kg,
+        COUNT(*)::int AS trips
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.user_id = ${userId} AND ec.created_at >= now() - (${months}::text || ' months')::interval
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return result.rows.map((r: any) => ({
+      month: r.month,
+      co2Kg: Number(r.co2_kg),
+      co2SavedKg: Number(r.co2_saved_kg),
+      trips: Number(r.trips),
+    }));
+  }
+
+  // === SKILLS ENGINE OPERATIONS ===
+  async getAllSkills(): Promise<Skill[]> {
+    return await db.select().from(skills).orderBy(skills.category, skills.name);
+  }
+
+  async createSkill(skill: InsertSkill): Promise<Skill> {
+    const result = await db.insert(skills).values(skill).returning();
+    return result[0];
+  }
+
+  async getWorkerProfile(id: string): Promise<WorkerProfile | undefined> {
+    const result = await db.select().from(workerProfiles).where(eq(workerProfiles.id, id));
+    return result[0];
+  }
+
+  async getWorkerProfileByUserId(userId: string): Promise<WorkerProfile | undefined> {
+    const result = await db.select().from(workerProfiles).where(eq(workerProfiles.userId, userId));
+    return result[0];
+  }
+
+  async createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile> {
+    const result = await db.insert(workerProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateWorkerProfile(id: string, updates: Partial<InsertWorkerProfile>): Promise<WorkerProfile | undefined> {
+    const result = await db.update(workerProfiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(workerProfiles.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getCompanyWorkerProfiles(companyId: string): Promise<WorkerProfile[]> {
+    return await db.select().from(workerProfiles).where(eq(workerProfiles.companyId, companyId));
+  }
+
+  async incrementWorkerCompletedJobs(profileId: string): Promise<void> {
+    await db.update(workerProfiles)
+      .set({ completedJobs: sql`${workerProfiles.completedJobs} + 1`, updatedAt: new Date() })
+      .where(eq(workerProfiles.id, profileId));
+  }
+
+  async getProfileSkills(profileId: string): Promise<Array<WorkerSkill & { skill: Skill }>> {
+    const rows = await db.select({ workerSkill: workerSkills, skill: skills })
+      .from(workerSkills)
+      .innerJoin(skills, eq(workerSkills.skillId, skills.id))
+      .where(eq(workerSkills.profileId, profileId));
+    return rows.map((r) => ({ ...r.workerSkill, skill: r.skill }));
+  }
+
+  async setWorkerSkill(entry: InsertWorkerSkill): Promise<WorkerSkill> {
+    const result = await db.insert(workerSkills)
+      .values(entry)
+      .onConflictDoUpdate({
+        target: [workerSkills.profileId, workerSkills.skillId],
+        set: { experienceLevel: entry.experienceLevel, yearsExperience: entry.yearsExperience },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async removeWorkerSkill(profileId: string, skillId: string): Promise<void> {
+    await db.delete(workerSkills).where(and(eq(workerSkills.profileId, profileId), eq(workerSkills.skillId, skillId)));
+  }
+
+  // Candidates for a given skill, each annotated with whether they hold a currently-valid
+  // (approved, unexpired) certification if the skill requires one - used by Team Matching so
+  // licensed-only skills (electrical, gas, etc.) can be filtered to genuinely qualified workers
+  // rather than matching on the skill tag alone.
+  async findCandidatesForSkill(skillId: string): Promise<Array<WorkerProfile & { experienceLevel: string; yearsExperience: number | null; hasRequiredCertification: boolean }>> {
+    const skillResult = await db.select().from(skills).where(eq(skills.id, skillId));
+    const skill = skillResult[0];
+    if (!skill) return [];
+
+    const rows = await db.select({ profile: workerProfiles, workerSkill: workerSkills })
+      .from(workerSkills)
+      .innerJoin(workerProfiles, eq(workerSkills.profileId, workerProfiles.id))
+      .where(and(eq(workerSkills.skillId, skillId), eq(workerProfiles.available, true)));
+
+    const candidates = await Promise.all(rows.map(async (r) => {
+      let hasRequiredCertification = true;
+      if (skill.requiresCertification) {
+        const now = new Date();
+        const docs = await db.select().from(verificationDocuments).where(and(
+          eq(verificationDocuments.holderType, "user"),
+          eq(verificationDocuments.holderId, r.profile.userId),
+          eq(verificationDocuments.docType, skill.requiresCertification),
+          eq(verificationDocuments.status, "approved"),
+        ));
+        hasRequiredCertification = docs.some((d) => !d.expiresAt || d.expiresAt > now);
+      }
+      return {
+        ...r.profile,
+        experienceLevel: r.workerSkill.experienceLevel,
+        yearsExperience: r.workerSkill.yearsExperience,
+        hasRequiredCertification,
+      };
+    }));
+    return candidates;
+  }
+
+  async getExpiringVerificationDocuments(withinDays: number): Promise<VerificationDocument[]> {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
+    return await db.select().from(verificationDocuments).where(and(
+      eq(verificationDocuments.status, "approved"),
+      sql`${verificationDocuments.expiresAt} IS NOT NULL`,
+      sql`${verificationDocuments.expiryNotifiedAt} IS NULL`,
+      gte(verificationDocuments.expiresAt, now),
+      lte(verificationDocuments.expiresAt, cutoff),
+    ));
+  }
+
+  async markVerificationDocumentExpiryNotified(id: string): Promise<void> {
+    await db.update(verificationDocuments).set({ expiryNotifiedAt: new Date() }).where(eq(verificationDocuments.id, id));
+  }
+
+  // === PROFESSIONAL SERVICES OPERATIONS ===
+  async getCompanyServices(companyId: string): Promise<Array<CompanyService & { skill: Skill }>> {
+    const rows = await db.select({ companyService: companyServices, skill: skills })
+      .from(companyServices)
+      .innerJoin(skills, eq(companyServices.skillId, skills.id))
+      .where(eq(companyServices.companyId, companyId));
+    return rows.map((r) => ({ ...r.companyService, skill: r.skill }));
+  }
+
+  async setCompanyService(companyId: string, entry: InsertCompanyService): Promise<CompanyService> {
+    const result = await db.insert(companyServices)
+      .values({ ...entry, companyId })
+      .onConflictDoUpdate({
+        target: [companyServices.companyId, companyServices.skillId],
+        set: { description: entry.description, priceFromEur: entry.priceFromEur, active: entry.active ?? true },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async removeCompanyService(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(companyServices)
+      .where(and(eq(companyServices.id, id), eq(companyServices.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async searchCompanyServices(filter: { skillId?: string; category?: string }): Promise<Array<CompanyService & { skill: Skill; company: Company }>> {
+    const conditions = [eq(companyServices.active, true)];
+    if (filter.skillId) conditions.push(eq(companyServices.skillId, filter.skillId));
+    if (filter.category) conditions.push(eq(skills.category, filter.category));
+
+    const rows = await db.select({ companyService: companyServices, skill: skills, company: companies })
+      .from(companyServices)
+      .innerJoin(skills, eq(companyServices.skillId, skills.id))
+      .innerJoin(companies, eq(companyServices.companyId, companies.id))
+      .where(and(...conditions))
+      .orderBy(desc(companies.rating));
+    return rows.map((r) => ({ ...r.companyService, skill: r.skill, company: r.company }));
+  }
+
+  // === ENTERPRISE DASHBOARD ===
+  async getCompanyEnterpriseDashboard(companyId: string): Promise<EnterpriseDashboard> {
+    const crewRows = await db.select().from(workerProfiles).where(eq(workerProfiles.companyId, companyId));
+    const totalWorkers = crewRows.length;
+    const availableWorkers = crewRows.filter((w) => w.available).length;
+    const crew = {
+      totalWorkers,
+      availableWorkers,
+      utilizationRate: totalWorkers > 0 ? Math.round((availableWorkers / totalWorkers) * 1000) / 10 : 0,
+      avgRating: totalWorkers > 0 ? Math.round((crewRows.reduce((s, w) => s + Number(w.rating), 0) / totalWorkers) * 10) / 10 : 0,
+      avgCompletedJobs: totalWorkers > 0 ? Math.round(crewRows.reduce((s, w) => s + (w.completedJobs ?? 0), 0) / totalWorkers) : 0,
+    };
+
+    const fleetRows = await db.select().from(vehicles).where(eq(vehicles.companyId, companyId));
+    const activeVehicleResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT vehicle_id)::int AS n FROM bookings
+      WHERE company_id = ${companyId} AND vehicle_id IS NOT NULL AND status IN ('accepted', 'in_transit')
+    `);
+    const vehiclesInActiveUse = Number((activeVehicleResult.rows[0] as any)?.n ?? 0);
+    const fleet = {
+      totalVehicles: fleetRows.length,
+      availableVehicles: fleetRows.filter((v) => v.available).length,
+      vehiclesInActiveUse,
+      utilizationRate: fleetRows.length > 0 ? Math.round((vehiclesInActiveUse / fleetRows.length) * 1000) / 10 : 0,
+    };
+
+    const environmental = await this.getCompanyEnvironmentalSummary(companyId);
+
+    const companyBookings = await db.select().from(bookings).where(eq(bookings.companyId, companyId));
+    const bookingRevenueEur = Math.round(companyBookings.reduce((s, b) => s + Number(b.totalPrice), 0));
+
+    const marketplaceRows = await db.select().from(marketplaceListings)
+      .where(and(eq(marketplaceListings.companyId, companyId), eq(marketplaceListings.available, true)));
+    const marketplace = {
+      activeListings: marketplaceRows.length,
+      totalListedValueEur: Math.round(marketplaceRows.reduce((s, l) => s + (l.price ? Number(l.price) : 0), 0)),
+    };
+
+    const staffRows = await db.select().from(staffSharing).where(eq(staffSharing.lenderCompanyId, companyId));
+    const resourceRows = await this.getCompanyResourceSharing(companyId);
+    const workShare = {
+      activeListings: staffRows.filter((s) => s.status === "available").length + resourceRows.filter((r) => r.status === "available").length,
+      acceptedExchanges: staffRows.filter((s) => s.status === "booked" || s.status === "completed").length
+        + resourceRows.filter((r) => r.status === "booked" || r.status === "completed").length,
+    };
+
+    const driverRows = await db.select({ driver: drivers, user: users })
+      .from(drivers)
+      .innerJoin(users, eq(drivers.userId, users.id))
+      .where(eq(drivers.companyId, companyId))
+      .orderBy(desc(drivers.totalDeliveries))
+      .limit(10);
+    const driverProductivity = driverRows.map((r) => ({
+      driverId: r.driver.id,
+      name: r.user.name,
+      totalDeliveries: r.driver.totalDeliveries ?? 0,
+      rating: Number(r.driver.rating),
+    }));
+
+    const clvResult = await db.execute(sql`
+      SELECT b.user_id, u.name, SUM(b.total_price)::float AS total_spent, COUNT(*)::int AS bookings_count
+      FROM bookings b JOIN users u ON u.id = b.user_id
+      WHERE b.company_id = ${companyId}
+      GROUP BY b.user_id, u.name
+      ORDER BY total_spent DESC
+      LIMIT 5
+    `);
+    const topCustomers = clvResult.rows.map((r: any) => ({
+      userId: r.user_id, name: r.name, totalSpentEur: Math.round(Number(r.total_spent)), bookingsCount: Number(r.bookings_count),
+    }));
+    const avgLifetimeValueEur = topCustomers.length > 0
+      ? Math.round(topCustomers.reduce((s, c) => s + c.totalSpentEur, 0) / topCustomers.length)
+      : 0;
+
+    const activeKeysRows = await db.select().from(apiKeys).where(and(eq(apiKeys.companyId, companyId), eq(apiKeys.active, true)));
+    const lastUsedAt = activeKeysRows.reduce<Date | null>((latest, k) => {
+      if (!k.lastUsedAt) return latest;
+      return !latest || k.lastUsedAt > latest ? k.lastUsedAt : latest;
+    }, null);
+    const webhookResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE wd.success)::int AS succeeded
+      FROM webhook_deliveries wd
+      JOIN webhook_subscriptions ws ON ws.id = wd.subscription_id
+      WHERE ws.company_id = ${companyId} AND wd.attempted_at >= NOW() - INTERVAL '30 days'
+    `);
+    const webhookRow = webhookResult.rows[0] as any;
+    const webhookDeliveries30d = Number(webhookRow?.total ?? 0);
+    const partnerApi = {
+      activeKeys: activeKeysRows.length,
+      lastUsedAt: lastUsedAt ? lastUsedAt.toISOString() : null,
+      webhookDeliveries30d,
+      webhookSuccessRate30d: webhookDeliveries30d > 0 ? Math.round((Number(webhookRow.succeeded) / webhookDeliveries30d) * 1000) / 10 : null,
+    };
+
+    return { crew, fleet, environmental, bookingRevenueEur, marketplace, workShare, driverProductivity, customerLifetimeValue: { avgLifetimeValueEur, topCustomers }, partnerApi };
+  }
+
+  async getCompanyForecastAnalytics(companyId: string): Promise<ForecastAnalytics> {
+    const companyBookings = await db.select().from(bookings).where(eq(bookings.companyId, companyId));
+    if (companyBookings.length === 0) {
+      return { hasData: false, methodology: FORECAST_METHODOLOGY, totalBookingsAnalyzed: 0 };
+    }
+
+    // Group bookings by calendar month (YYYY-MM) to build the monthly revenue/demand series.
+    const byMonth = new Map<string, { revenue: number; count: number; calendarMonth: number }>();
+    for (const b of companyBookings) {
+      const d = new Date(b.pickupDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const entry = byMonth.get(key) ?? { revenue: 0, count: 0, calendarMonth: d.getMonth() };
+      entry.revenue += Number(b.totalPrice);
+      entry.count += 1;
+      byMonth.set(key, entry);
+    }
+    const sortedMonths = Array.from(byMonth.keys()).sort();
+
+    if (sortedMonths.length < MIN_MONTHS_FOR_FORECAST) {
+      return { hasData: false, methodology: FORECAST_METHODOLOGY, totalBookingsAnalyzed: companyBookings.length, monthsAnalyzed: sortedMonths.length };
+    }
+
+    const revenueSeries: MonthlyValue[] = sortedMonths.map((key, i) => ({
+      monthIndex: i, calendarMonth: byMonth.get(key)!.calendarMonth, value: Math.round(byMonth.get(key)!.revenue),
+    }));
+    const demandSeries: MonthlyValue[] = sortedMonths.map((key, i) => ({
+      monthIndex: i, calendarMonth: byMonth.get(key)!.calendarMonth, value: byMonth.get(key)!.count,
+    }));
+
+    const FORECAST_MONTHS_AHEAD = 3;
+    const revenueForecast = linearTrendForecast(revenueSeries, FORECAST_MONTHS_AHEAD);
+    const demandForecast = linearTrendForecast(demandSeries, FORECAST_MONTHS_AHEAD).map((v) => Math.round(v));
+    const seasonalityIndex = computeSeasonalityIndex(revenueSeries);
+
+    // Fuel-cost-adjusted vehicle margins: revenue minus estimated fuel cost only (not full
+    // operating profit - no per-vehicle maintenance/insurance cost exists in the schema).
+    const fleetRows = await db.select().from(vehicles).where(eq(vehicles.companyId, companyId));
+    const vehicleMargins = fleetRows.map((v) => {
+      const trips = companyBookings.filter((b) => b.vehicleId === v.id);
+      const revenueEur = Math.round(trips.reduce((s, b) => s + Number(b.totalPrice), 0));
+      const estFuelCostEur = Math.round(trips.reduce((s, b) => {
+        const distanceKm = Number(b.estimatedDistance) * 1.60934;
+        return s + estimateFuelCostEur({ distanceKm, vehicleType: v.type, fuelPriceEurPerLiter: DEFAULT_FUEL_PRICE_EUR });
+      }, 0));
+      return { vehicleId: v.id, type: v.type, licensePlate: v.licensePlate, tripsAnalyzed: trips.length, revenueEur, estFuelCostEur, estMarginEur: revenueEur - estFuelCostEur };
+    }).filter((v) => v.tripsAnalyzed > 0);
+
+    // Driver revenue (not profit - no per-driver cost data exists in the schema).
+    const driverRows = await db.select({ driver: drivers, user: users })
+      .from(drivers).innerJoin(users, eq(drivers.userId, users.id)).where(eq(drivers.companyId, companyId));
+    const driverRevenue = driverRows.map((r) => {
+      const trips = companyBookings.filter((b) => b.driverId === r.driver.id);
+      return { driverId: r.driver.id, name: r.user.name, tripsAnalyzed: trips.length, revenueEur: Math.round(trips.reduce((s, b) => s + Number(b.totalPrice), 0)) };
+    }).filter((d) => d.tripsAnalyzed > 0);
+
+    // Warehouse revenue: pricePerDay x booked days, for booked/completed warehouse listings.
+    const warehouseRows = await db.select().from(resourceSharing).where(
+      and(eq(resourceSharing.providerCompanyId, companyId), eq(resourceSharing.resourceType, "warehouse"), inArray(resourceSharing.status, ["booked", "completed"]))
+    );
+    const dayMs = 24 * 60 * 60 * 1000;
+    const warehouseRevenue = warehouseRows
+      .filter((w) => w.startDate && w.endDate && w.pricePerDay)
+      .map((w) => {
+        const days = Math.max(1, Math.round((w.endDate!.getTime() - w.startDate!.getTime()) / dayMs));
+        return { resourceId: w.id, title: w.title, bookedDays: days, revenueEur: Math.round(days * Number(w.pricePerDay)) };
+      });
+
+    // Pickup-location heatmap: top 10 pickup addresses by frequency, with avg revenue per address.
+    const heatmapMap = new Map<string, { count: number; revenue: number }>();
+    for (const b of companyBookings) {
+      const entry = heatmapMap.get(b.pickupAddress) ?? { count: 0, revenue: 0 };
+      entry.count += 1;
+      entry.revenue += Number(b.totalPrice);
+      heatmapMap.set(b.pickupAddress, entry);
+    }
+    const pickupHeatmap = Array.from(heatmapMap.entries())
+      .map(([address, e]) => ({ address, bookingCount: e.count, avgRevenueEur: Math.round(e.revenue / e.count) }))
+      .sort((a, b) => b.bookingCount - a.bookingCount)
+      .slice(0, 10);
+
+    return {
+      hasData: true,
+      methodology: FORECAST_METHODOLOGY,
+      totalBookingsAnalyzed: companyBookings.length,
+      monthsAnalyzed: sortedMonths.length,
+      revenue: { history: sortedMonths.map((key) => ({ month: key, valueEur: Math.round(byMonth.get(key)!.revenue) })), forecastEur: revenueForecast },
+      demand: { history: sortedMonths.map((key) => ({ month: key, bookings: byMonth.get(key)!.count })), forecastBookings: demandForecast },
+      seasonalityIndex,
+      vehicleMargins,
+      driverRevenue,
+      warehouseRevenue,
+      pickupHeatmap,
+    };
+  }
+
+  // === NOTIFICATION OPERATIONS ===
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(500);
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const result = await db.insert(notifications).values(insertNotification).returning();
+    return result[0];
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<Notification | undefined> {
+    const result = await db.update(notifications)
+      .set({ read: true })
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning();
+    return result[0];
+  }
+
+  // === MARKETPLACE OPERATIONS ===
+  async getAllMarketplaceListings(): Promise<MarketplaceListing[]> {
+    return await db.select().from(marketplaceListings)
+      .where(eq(marketplaceListings.available, true))
+      .orderBy(desc(marketplaceListings.createdAt));
+  }
+
+  async getMarketplaceListing(id: string): Promise<MarketplaceListing | undefined> {
+    const result = await db.select().from(marketplaceListings)
+      .where(eq(marketplaceListings.id, id));
+    return result[0];
+  }
+
+  async createMarketplaceListing(insertListing: InsertMarketplaceListing, userId: string, companyId: string | null): Promise<MarketplaceListing> {
+    const result = await db.insert(marketplaceListings).values({ ...insertListing, userId, companyId }).returning();
+    return result[0];
+  }
+
+  async updateMarketplaceListing(id: string, available: boolean): Promise<MarketplaceListing | undefined> {
+    const result = await db.update(marketplaceListings)
+      .set({ available })
+      .where(eq(marketplaceListings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === STAFF SHARING OPERATIONS ===
+  async getAllStaffSharing(): Promise<StaffSharing[]> {
+    return await db.select().from(staffSharing)
+      .orderBy(desc(staffSharing.createdAt));
+  }
+
+  async getStaffSharing(id: string): Promise<StaffSharing | undefined> {
+    const result = await db.select().from(staffSharing).where(eq(staffSharing.id, id));
+    return result[0];
+  }
+
+  async getCompanyStaffSharing(companyId: string): Promise<StaffSharing[]> {
+    return await db.select().from(staffSharing)
+      .where(
+        sql`${staffSharing.lenderCompanyId} = ${companyId} OR ${staffSharing.borrowerCompanyId} = ${companyId}`
+      )
+      .orderBy(desc(staffSharing.createdAt));
+  }
+
+  async createStaffSharing(insertStaffSharing: InsertStaffSharing): Promise<StaffSharing> {
+    const result = await db.insert(staffSharing).values(insertStaffSharing).returning();
+    return result[0];
+  }
+
+  // Conditional on the row's *current* status so two concurrent requests for the same
+  // "available" listing can't both win (last write wins would silently overwrite one
+  // borrower's request with another's), and so a party can't skip a state (e.g. a borrower
+  // self-accepting their own request straight to "booked" without the lender's action).
+  async updateStaffSharingStatus(
+    id: string,
+    fromStatuses: string[],
+    toStatus: string,
+    borrowerCompanyId?: string | null,
+  ): Promise<StaffSharing | undefined> {
+    const result = await db.update(staffSharing)
+      .set({ status: toStatus, ...(borrowerCompanyId !== undefined ? { borrowerCompanyId } : {}) })
+      .where(and(eq(staffSharing.id, id), inArray(staffSharing.status, fromStatuses)))
+      .returning();
+    return result[0];
+  }
+
+  // === RESOURCE SHARING OPERATIONS ===
+  async getAllResourceSharing(): Promise<ResourceSharing[]> {
+    return await db.select().from(resourceSharing)
+      .orderBy(desc(resourceSharing.createdAt));
+  }
+
+  async getResourceSharing(id: string): Promise<ResourceSharing | undefined> {
+    const result = await db.select().from(resourceSharing).where(eq(resourceSharing.id, id));
+    return result[0];
+  }
+
+  async getCompanyResourceSharing(companyId: string): Promise<ResourceSharing[]> {
+    return await db.select().from(resourceSharing).where(eq(resourceSharing.providerCompanyId, companyId));
+  }
+
+  async getAvailableResourceSharing(resourceType?: string): Promise<ResourceSharing[]> {
+    if (resourceType) {
+      return await db.select().from(resourceSharing)
+        .where(and(
+          eq(resourceSharing.available, true),
+          eq(resourceSharing.resourceType, resourceType)
+        ))
+        .orderBy(desc(resourceSharing.createdAt));
+    }
+    return await db.select().from(resourceSharing)
+      .where(eq(resourceSharing.available, true))
+      .orderBy(desc(resourceSharing.createdAt));
+  }
+
+  async createResourceSharing(insertResourceSharing: InsertResourceSharing): Promise<ResourceSharing> {
+    const result = await db.insert(resourceSharing).values(insertResourceSharing).returning();
+    return result[0];
+  }
+
+  // Same conditional-on-current-status guard as updateStaffSharingStatus, for the same reason.
+  async updateResourceSharingStatus(
+    id: string,
+    fromStatuses: string[],
+    toStatus: string,
+    requesterCompanyId?: string | null,
+  ): Promise<ResourceSharing | undefined> {
+    const result = await db.update(resourceSharing)
+      // Keep the `available` boolean (used by the resourceType-filtered browse query) in
+      // lockstep with `status` - previously these could drift, leaving a requested/booked
+      // resource still showing as available to other browsers.
+      .set({
+        status: toStatus,
+        available: toStatus === "available",
+        ...(requesterCompanyId !== undefined ? { requesterCompanyId } : {}),
+      })
+      .where(and(eq(resourceSharing.id, id), inArray(resourceSharing.status, fromStatuses)))
+      .returning();
+    return result[0];
+  }
+
+  // === CAPACITY MATCHING OPERATIONS (route-connected spare capacity) ===
+  async createCapacityPosting(posting: InsertCapacityPosting): Promise<CapacityPosting> {
+    const result = await db.insert(capacityPostings).values(posting).returning();
+    return result[0];
+  }
+
+  async getCapacityPosting(id: string): Promise<CapacityPosting | undefined> {
+    const result = await db.select().from(capacityPostings).where(eq(capacityPostings.id, id));
+    return result[0];
+  }
+
+  async getCompanyCapacityPostings(companyId: string): Promise<CapacityPosting[]> {
+    return await db.select().from(capacityPostings)
+      .where(eq(capacityPostings.companyId, companyId))
+      .orderBy(desc(capacityPostings.createdAt));
+  }
+
+  async cancelCapacityPosting(id: string, companyId: string): Promise<CapacityPosting | undefined> {
+    const result = await db.update(capacityPostings)
+      .set({ status: "cancelled" })
+      .where(and(eq(capacityPostings.id, id), eq(capacityPostings.companyId, companyId), eq(capacityPostings.status, "open")))
+      .returning();
+    return result[0];
+  }
+
+  // Deterministic matching: substring match on the free-text route endpoints (works with
+  // zero external dependencies - no geocoding required), an optional departure-date overlap
+  // check, and a remaining-capacity floor. This is the engine MoveX AI Core can later
+  // layer smarter ranking on top of; it must already return correct, real matches without it.
+  async matchCapacityPostings(params: {
+    from?: string; to?: string; date?: Date;
+    minVolumeM3?: number; minWeightKg?: number; minPalletSpaces?: number;
+    temperatureControlled?: boolean; adrCapable?: boolean; tailLift?: boolean;
+  }): Promise<CapacityPosting[]> {
+    const conditions = [eq(capacityPostings.status, "open")];
+    if (params.from) conditions.push(ilike(capacityPostings.fromAddress, `%${params.from}%`));
+    if (params.to) conditions.push(ilike(capacityPostings.toAddress, `%${params.to}%`));
+    if (params.date) {
+      conditions.push(lte(capacityPostings.departureWindowStart, params.date));
+      conditions.push(gte(capacityPostings.departureWindowEnd, params.date));
+    }
+    if (params.minVolumeM3 !== undefined) conditions.push(gte(capacityPostings.freeVolumeM3, String(params.minVolumeM3)));
+    if (params.minWeightKg !== undefined) conditions.push(gte(capacityPostings.freeWeightKg, String(params.minWeightKg)));
+    if (params.minPalletSpaces !== undefined) conditions.push(gte(capacityPostings.freePalletSpaces, params.minPalletSpaces));
+    if (params.temperatureControlled) conditions.push(eq(capacityPostings.temperatureControlled, true));
+    if (params.adrCapable) conditions.push(eq(capacityPostings.adrCapable, true));
+    if (params.tailLift) conditions.push(eq(capacityPostings.tailLift, true));
+
+    return await db.select().from(capacityPostings)
+      .where(and(...conditions))
+      .orderBy(capacityPostings.departureWindowStart)
+      .limit(50);
+  }
+
+  async createCapacityBooking(booking: InsertCapacityBooking, priceEur: string): Promise<CapacityBooking> {
+    const result = await db.insert(capacityBookings).values({ ...booking, priceEur }).returning();
+    return result[0];
+  }
+
+  async getCapacityBooking(id: string): Promise<CapacityBooking | undefined> {
+    const result = await db.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+    return result[0];
+  }
+
+  async getPostingCapacityBookings(postingId: string): Promise<CapacityBooking[]> {
+    return await db.select().from(capacityBookings)
+      .where(eq(capacityBookings.postingId, postingId))
+      .orderBy(desc(capacityBookings.createdAt));
+  }
+
+  async getCustomerCapacityBookings(customerId: string): Promise<CapacityBooking[]> {
+    return await db.select().from(capacityBookings)
+      .where(eq(capacityBookings.customerId, customerId))
+      .orderBy(desc(capacityBookings.createdAt));
+  }
+
+  // Race-safe accept. Two independent points of mutual exclusion, both enforced by Postgres
+  // row locks under the default READ COMMITTED isolation:
+  //
+  //  1. The pending->accepted flip is done FIRST as a conditional UPDATE. Two concurrent accepts
+  //     of the SAME booking serialize on that booking's row; only the first sees status='pending'
+  //     and proceeds, so the posting can never be decremented twice for one booking.
+  //  2. The capacity decrement is a conditional UPDATE guarded by `free >= requested`. Two accepts
+  //     of DIFFERENT bookings that together overbook serialize on the posting's row; the second
+  //     re-evaluates the guard against the first's committed value and matches 0 rows, so free
+  //     capacity can never go negative.
+  //
+  // If the decrement finds no room we throw to roll the whole transaction back, which also undoes
+  // the accept flip from step 1 - the booking stays pending rather than being stranded as
+  // "accepted" against a posting that never reserved its space.
+  async acceptCapacityBooking(id: string): Promise<{ booking?: CapacityBooking; error?: string }> {
+    try {
+      return await db.transaction(async (tx) => {
+        const claimed = await tx.update(capacityBookings)
+          .set({ status: "accepted" })
+          .where(and(eq(capacityBookings.id, id), eq(capacityBookings.status, "pending")))
+          .returning();
+        if (claimed.length === 0) {
+          const exists = await tx.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+          return { error: exists.length === 0 ? "Booking not found" : "This request is no longer pending" };
+        }
+        const booking = claimed[0];
+
+        const postingUpdate = await tx.update(capacityPostings)
+          .set({
+            freeVolumeM3: sql`${capacityPostings.freeVolumeM3} - ${booking.volumeM3}`,
+            freeWeightKg: sql`${capacityPostings.freeWeightKg} - ${booking.weightKg}`,
+            freePalletSpaces: sql`${capacityPostings.freePalletSpaces} - ${booking.palletSpaces}`,
+          })
+          .where(and(
+            eq(capacityPostings.id, booking.postingId),
+            eq(capacityPostings.status, "open"),
+            gte(capacityPostings.freeVolumeM3, booking.volumeM3),
+            gte(capacityPostings.freeWeightKg, booking.weightKg),
+            gte(capacityPostings.freePalletSpaces, booking.palletSpaces),
+          ))
+          .returning();
+
+        if (postingUpdate.length === 0) {
+          throw new CapacityOverbookError();
+        }
+
+        return { booking };
+      });
+    } catch (e) {
+      if (e instanceof CapacityOverbookError) {
+        return { error: "Not enough capacity remaining on this posting" };
+      }
+      throw e;
+    }
+  }
+
+  async updateCapacityBookingStatus(id: string, fromStatuses: string[], toStatus: "rejected" | "cancelled"): Promise<CapacityBooking | undefined> {
+    // Cancelling a booking that was already "accepted" must give its reserved capacity back
+    // to the posting, or that space would be permanently lost even though nobody is using it.
+    if (toStatus === "cancelled" && fromStatuses.includes("accepted")) {
+      return await db.transaction(async (tx) => {
+        const before = await tx.select().from(capacityBookings).where(eq(capacityBookings.id, id));
+        const previousStatus = before[0]?.status;
+
+        const updated = await tx.update(capacityBookings)
+          .set({ status: toStatus })
+          .where(and(eq(capacityBookings.id, id), inArray(capacityBookings.status, fromStatuses)))
+          .returning();
+        const booking = updated[0];
+        if (!booking) return undefined;
+
+        // Only restore capacity if this cancellation moved it out of "accepted" - a
+        // pending->cancelled transition never reserved capacity in the first place.
+        if (previousStatus === "accepted") {
+          await tx.update(capacityPostings)
+            .set({
+              freeVolumeM3: sql`${capacityPostings.freeVolumeM3} + ${booking.volumeM3}`,
+              freeWeightKg: sql`${capacityPostings.freeWeightKg} + ${booking.weightKg}`,
+              freePalletSpaces: sql`${capacityPostings.freePalletSpaces} + ${booking.palletSpaces}`,
+            })
+            .where(eq(capacityPostings.id, booking.postingId));
+        }
+        return booking;
+      });
+    }
+
+    const result = await db.update(capacityBookings)
+      .set({ status: toStatus })
+      .where(and(eq(capacityBookings.id, id), inArray(capacityBookings.status, fromStatuses)))
+      .returning();
+    return result[0];
+  }
+
+  async getCompanyCapacityClaims(companyId: string): Promise<CapacityBooking[]> {
+    return await db.select().from(capacityBookings)
+      .where(eq(capacityBookings.claimingCompanyId, companyId))
+      .orderBy(desc(capacityBookings.createdAt));
+  }
+
+  async updateCapacityBookingPayment(id: string, paymentIntentId: string, paymentStatus: string): Promise<CapacityBooking | undefined> {
+    const result = await db.update(capacityBookings)
+      .set({ paymentIntentId, paymentStatus })
+      .where(eq(capacityBookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Minimum trust bar for the Return Trip Marketplace network launch (Etap 1): an approved,
+  // unexpired carrier-authority (DOT/MC or national equivalent) or insurance document on file -
+  // reuses the existing Document Center review workflow rather than a parallel approval system.
+  // Returns a tri-state so the caller can tell a company that never uploaded a document apart
+  // from one whose document was approved but has since expired (they need to *renew*, not upload).
+  async getCapacityNetworkTrustStatus(companyId: string): Promise<"ok" | "expired" | "missing"> {
+    const now = new Date();
+    const docs = await db.select().from(verificationDocuments).where(and(
+      eq(verificationDocuments.holderType, "company"),
+      eq(verificationDocuments.holderId, companyId),
+      eq(verificationDocuments.status, "approved"),
+      inArray(verificationDocuments.docType, ["carrier_authority", "insurance_certificate"]),
+    ));
+    if (docs.length === 0) return "missing";
+    if (docs.some((d) => !d.expiresAt || d.expiresAt > now)) return "ok";
+    return "expired";
+  }
+
+  async setCompanyStripeConnectAccount(companyId: string, accountId: string): Promise<Company | undefined> {
+    const result = await db.update(companies).set({ stripeConnectAccountId: accountId }).where(eq(companies.id, companyId)).returning();
+    return result[0];
+  }
+
+  async getCompanyByStripeConnectAccountId(accountId: string): Promise<Company | undefined> {
+    const result = await db.select().from(companies).where(eq(companies.stripeConnectAccountId, accountId));
+    return result[0];
+  }
+
+  async setCompanyStripeConnectPayoutsEnabled(accountId: string, enabled: boolean): Promise<Company | undefined> {
+    const result = await db.update(companies).set({ stripeConnectPayoutsEnabled: enabled }).where(eq(companies.stripeConnectAccountId, accountId)).returning();
+    return result[0];
+  }
+
+  async createRouteSubscription(sub: InsertRecurringRouteSubscription): Promise<RecurringRouteSubscription> {
+    const result = await db.insert(recurringRouteSubscriptions).values(sub).returning();
+    return result[0];
+  }
+
+  async getCompanyRouteSubscriptions(companyId: string): Promise<RecurringRouteSubscription[]> {
+    return await db.select().from(recurringRouteSubscriptions).where(eq(recurringRouteSubscriptions.companyId, companyId));
+  }
+
+  async deleteRouteSubscription(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(recurringRouteSubscriptions)
+      .where(and(eq(recurringRouteSubscriptions.id, id), eq(recurringRouteSubscriptions.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Same case-insensitive substring matching as the capacity search itself, so "subscribe to
+  // Madrid -> Paris" reliably fires for any posting whose addresses contain those substrings.
+  async findMatchingRouteSubscriptions(fromAddress: string, toAddress: string): Promise<RecurringRouteSubscription[]> {
+    return await db.select().from(recurringRouteSubscriptions).where(and(
+      sql`${fromAddress} ILIKE '%' || ${recurringRouteSubscriptions.fromAddress} || '%'`,
+      sql`${toAddress} ILIKE '%' || ${recurringRouteSubscriptions.toAddress} || '%'`,
+    ));
+  }
+
+  // === ANNOUNCEMENTS OPERATIONS ===
+  async getActiveAnnouncements(): Promise<Announcement[]> {
+    const now = new Date();
+    return await db.select().from(announcements)
+      .where(and(
+        eq(announcements.active, true),
+        sql`${announcements.startDate} <= ${now}`,
+        sql`${announcements.endDate} >= ${now}`
+      ))
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  async getAnnouncement(id: string): Promise<Announcement | undefined> {
+    const result = await db.select().from(announcements)
+      .where(eq(announcements.id, id));
+    return result[0];
+  }
+
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    const result = await db.insert(announcements).values(insertAnnouncement).returning();
+    return result[0];
+  }
+
+  async incrementAnnouncementViews(id: string): Promise<Announcement | undefined> {
+    const result = await db.update(announcements)
+      .set({ views: sql`${announcements.views} + 1` })
+      .where(eq(announcements.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async incrementAnnouncementClicks(id: string): Promise<Announcement | undefined> {
+    const result = await db.update(announcements)
+      .set({ clicks: sql`${announcements.clicks} + 1` })
+      .where(eq(announcements.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === BADGE / GAMIFICATION OPERATIONS ===
+  async getAllBadges(): Promise<Badge[]> {
+    return await db.select().from(badges);
+  }
+
+  async getHolderBadges(holderType: string, holderId: string): Promise<(BadgeAward & { badge: Badge })[]> {
+    const rows = await db.select({ award: badgeAwards, badge: badges })
+      .from(badgeAwards)
+      .innerJoin(badges, eq(badgeAwards.badgeId, badges.id))
+      .where(and(eq(badgeAwards.holderType, holderType), eq(badgeAwards.holderId, holderId)))
+      .orderBy(desc(badgeAwards.awardedAt));
+    return rows.map((r) => ({ ...r.award, badge: r.badge }));
+  }
+
+  async awardBadgeIfMissing(holderType: string, holderId: string, badgeCode: string): Promise<BadgeAward | undefined> {
+    const badgeResult = await db.select().from(badges).where(eq(badges.code, badgeCode));
+    const badge = badgeResult[0];
+    if (!badge) return undefined;
+
+    // ON CONFLICT DO NOTHING (backed by the unique (holderType, holderId, badgeId)
+    // constraint) closes a check-then-insert race where two concurrent milestone checks for
+    // the same holder could otherwise both pass the "not yet awarded" check and insert a
+    // duplicate award.
+    const inserted = await db.insert(badgeAwards)
+      .values({ holderType, holderId, badgeId: badge.id })
+      .onConflictDoNothing()
+      .returning();
+    if (inserted.length > 0) return inserted[0];
+
+    const existing = await db.select().from(badgeAwards).where(and(
+      eq(badgeAwards.holderType, holderType),
+      eq(badgeAwards.holderId, holderId),
+      eq(badgeAwards.badgeId, badge.id),
+    ));
+    return existing[0];
+  }
+
+  async checkAndAwardMilestoneBadges(holderType: "company" | "driver", holderId: string): Promise<void> {
+    const column = holderType === "company" ? bookings.companyId : bookings.driverId;
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM bookings
+      WHERE ${column} = ${holderId} AND status = 'delivered'
+    `);
+    const completed = Number((countResult.rows[0] as any)?.count ?? 0);
+
+    if (completed >= 100) await this.awardBadgeIfMissing(holderType, holderId, "completed_100");
+    if (completed >= 500) await this.awardBadgeIfMissing(holderType, holderId, "completed_500");
+    if (completed >= 1000) await this.awardBadgeIfMissing(holderType, holderId, "completed_1000");
+
+    if (holderType === "company") {
+      const company = await this.getCompany(holderId);
+      if (company && Number(company.rating) >= 4.8 && (company.totalReviews ?? 0) >= 20) {
+        await this.awardBadgeIfMissing("company", holderId, "super_carrier");
+      }
+      const envSummary = await this.getCompanyEnvironmentalSummary(holderId);
+      if (envSummary.totalCo2SavedKg >= 100) {
+        await this.awardBadgeIfMissing("company", holderId, "green_company");
+      }
+    } else {
+      const envSummary = await this.getDriverEnvironmentalSummary(holderId);
+      if (envSummary.totalCo2SavedKg >= 50) {
+        await this.awardBadgeIfMissing("driver", holderId, "green_driver");
+      }
+    }
+  }
+
+  async getDriverEnvironmentalSummary(driverId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS total_trips, COALESCE(SUM(ec.co2_saved_kg), 0)::float AS total_co2_saved_kg
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.driver_id = ${driverId}
+    `);
+    const row = result.rows[0] as any;
+    return { totalTrips: Number(row?.total_trips ?? 0), totalCo2SavedKg: Number(row?.total_co2_saved_kg ?? 0) };
+  }
+
+  async getUserEnvironmentalSummary(userId: string): Promise<{ totalTrips: number; totalCo2SavedKg: number }> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS total_trips, COALESCE(SUM(ec.co2_saved_kg), 0)::float AS total_co2_saved_kg
+      FROM environmental_calculations ec
+      JOIN bookings b ON b.id = ec.booking_id
+      WHERE b.user_id = ${userId}
+    `);
+    const row = result.rows[0] as any;
+    return { totalTrips: Number(row?.total_trips ?? 0), totalCo2SavedKg: Number(row?.total_co2_saved_kg ?? 0) };
+  }
+
+  async checkAndAwardGreenCustomerBadge(userId: string): Promise<void> {
+    const summary = await this.getUserEnvironmentalSummary(userId);
+    if (summary.totalCo2SavedKg >= 20) {
+      await this.awardBadgeIfMissing("user", userId, "green_customer");
+    }
+  }
+
+  // === LEADERBOARD OPERATIONS ===
+  async getCompanyLeaderboard(limit = 20): Promise<Company[]> {
+    return await db.select().from(companies)
+      .where(eq(companies.verified, true))
+      .orderBy(desc(companies.rating), desc(companies.totalReviews))
+      .limit(limit);
+  }
+
+  async getDriverLeaderboard(limit = 20): Promise<Driver[]> {
+    return await db.select().from(drivers)
+      .orderBy(desc(drivers.rating), desc(drivers.totalDeliveries))
+      .limit(limit);
+  }
+
+  // === COUPON OPERATIONS ===
+  async getCouponByCode(code: string): Promise<Coupon | undefined> {
+    const result = await db.select().from(coupons).where(eq(coupons.code, code.toUpperCase()));
+    return result[0];
+  }
+
+  async createCoupon(insertCoupon: InsertCoupon): Promise<Coupon> {
+    const result = await db.insert(coupons).values({ ...insertCoupon, code: insertCoupon.code.toUpperCase() }).returning();
+    return result[0];
+  }
+
+  async redeemCoupon(couponId: string, userId: string, bookingId: string | undefined, discountApplied: string): Promise<CouponRedemption | undefined> {
+    return await db.transaction(async (tx) => {
+      // Conditional update guards against a redemption-count race between concurrent
+      // bookings: the WHERE clause only succeeds if the coupon still had room left.
+      const updated = await tx.update(coupons)
+        .set({ timesRedeemed: sql`${coupons.timesRedeemed} + 1` })
+        .where(and(
+          eq(coupons.id, couponId),
+          or(isNull(coupons.maxRedemptions), lt(coupons.timesRedeemed, coupons.maxRedemptions)),
+        ))
+        .returning();
+      if (updated.length === 0) return undefined;
+
+      const result = await tx.insert(couponRedemptions).values({ couponId, userId, bookingId, discountApplied }).returning();
+      return result[0];
+    });
+  }
+
+  async linkCouponRedemptionToBooking(redemptionId: string, bookingId: string): Promise<void> {
+    await db.update(couponRedemptions).set({ bookingId }).where(eq(couponRedemptions.id, redemptionId));
+  }
+
+  // === REFERRAL OPERATIONS ===
+  async getReferralRewards(userId: string): Promise<ReferralReward[]> {
+    return await db.select().from(referralRewards)
+      .where(eq(referralRewards.referrerUserId, userId))
+      .orderBy(desc(referralRewards.createdAt));
+  }
+
+  async hasReferralRewardForReferredUser(referredUserId: string): Promise<boolean> {
+    const result = await db.select().from(referralRewards)
+      .where(eq(referralRewards.referredUserId, referredUserId))
+      .limit(1);
+    return result.length > 0;
+  }
+
+  async createReferralReward(reward: InsertReferralReward): Promise<ReferralReward> {
+    const result = await db.insert(referralRewards).values(reward).returning();
+    return result[0];
+  }
+
+  // === BOOKING TRANSFER OPERATIONS ===
+  async transferBooking(transfer: InsertBookingTransfer): Promise<BookingTransfer> {
+    const result = await db.insert(bookingTransfers).values(transfer).returning();
+    await db.update(bookings)
+      .set({ companyId: transfer.toCompanyId, driverId: null, vehicleId: null, updatedAt: new Date() })
+      .where(eq(bookings.id, transfer.bookingId));
+    return result[0];
+  }
+
+  async getBookingTransfers(bookingId: string): Promise<BookingTransfer[]> {
+    return await db.select().from(bookingTransfers)
+      .where(eq(bookingTransfers.bookingId, bookingId))
+      .orderBy(desc(bookingTransfers.createdAt));
+  }
+
+  // === DRIVER AVAILABILITY CALENDAR ===
+  async getDriverAvailability(driverId: string): Promise<DriverAvailability[]> {
+    return await db.select().from(driverAvailability)
+      .where(eq(driverAvailability.driverId, driverId))
+      .orderBy(driverAvailability.dayOfWeek);
+  }
+
+  async setDriverAvailability(driverId: string, slots: InsertDriverAvailability[]): Promise<DriverAvailability[]> {
+    await db.delete(driverAvailability).where(eq(driverAvailability.driverId, driverId));
+    if (slots.length === 0) return [];
+    const result = await db.insert(driverAvailability)
+      .values(slots.map((s) => ({ ...s, driverId })))
+      .returning();
+    return result;
+  }
+
+  async getDriverTimeOff(driverId: string): Promise<DriverTimeOff[]> {
+    return await db.select().from(driverTimeOff)
+      .where(eq(driverTimeOff.driverId, driverId))
+      .orderBy(desc(driverTimeOff.startDate));
+  }
+
+  async createDriverTimeOff(timeOff: InsertDriverTimeOff): Promise<DriverTimeOff> {
+    const result = await db.insert(driverTimeOff).values(timeOff).returning();
+    return result[0];
+  }
+
+  async deleteDriverTimeOff(id: string, driverId: string): Promise<boolean> {
+    const result = await db.delete(driverTimeOff)
+      .where(and(eq(driverTimeOff.id, id), eq(driverTimeOff.driverId, driverId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async isDriverAvailableAt(driverId: string, when: Date): Promise<boolean> {
+    const timeOffRows = await db.select().from(driverTimeOff)
+      .where(and(
+        eq(driverTimeOff.driverId, driverId),
+        lte(driverTimeOff.startDate, when),
+        gte(driverTimeOff.endDate, when),
+      ));
+    if (timeOffRows.length > 0) return false;
+
+    const dayOfWeek = when.getDay();
+    const hhmm = `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+    const slots = await db.select().from(driverAvailability)
+      .where(and(
+        eq(driverAvailability.driverId, driverId),
+        eq(driverAvailability.dayOfWeek, dayOfWeek),
+        eq(driverAvailability.active, true),
+      ));
+
+    if (slots.length === 0) return true; // no configured schedule = assume available
+    return slots.some((s) => hhmm >= s.startTime && hhmm <= s.endTime);
+  }
+
+  async findAvailableDrivers(companyId: string, when: Date): Promise<Driver[]> {
+    const companyDrivers = await db.select().from(drivers)
+      .where(and(eq(drivers.companyId, companyId), eq(drivers.available, true)));
+    if (companyDrivers.length === 0) return [];
+
+    const driverIds = companyDrivers.map((d) => d.id);
+    const dayOfWeek = when.getDay();
+    const hhmm = `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+
+    const [timeOffRows, availabilityRows] = await Promise.all([
+      db.select().from(driverTimeOff).where(and(
+        inArray(driverTimeOff.driverId, driverIds),
+        lte(driverTimeOff.startDate, when),
+        gte(driverTimeOff.endDate, when),
+      )),
+      db.select().from(driverAvailability).where(and(
+        inArray(driverAvailability.driverId, driverIds),
+        eq(driverAvailability.dayOfWeek, dayOfWeek),
+        eq(driverAvailability.active, true),
+      )),
+    ]);
+
+    const onTimeOff = new Set(timeOffRows.map((r) => r.driverId));
+    const slotsByDriver = new Map<string, typeof availabilityRows>();
+    for (const slot of availabilityRows) {
+      if (!slotsByDriver.has(slot.driverId)) slotsByDriver.set(slot.driverId, []);
+      slotsByDriver.get(slot.driverId)!.push(slot);
+    }
+
+    return companyDrivers.filter((driver) => {
+      if (onTimeOff.has(driver.id)) return false;
+      const slots = slotsByDriver.get(driver.id);
+      if (!slots || slots.length === 0) return true; // no configured schedule = assume available
+      return slots.some((s) => hhmm >= s.startTime && hhmm <= s.endTime);
+    });
+  }
+
+  // === CALENDAR SYNC CONNECTIONS ===
+  async getCalendarConnection(driverId: string, provider: string): Promise<CalendarConnection | undefined> {
+    const result = await db.select().from(calendarConnections)
+      .where(and(eq(calendarConnections.driverId, driverId), eq(calendarConnections.provider, provider)));
+    return result[0];
+  }
+
+  async getDriverCalendarConnections(driverId: string): Promise<CalendarConnection[]> {
+    return await db.select().from(calendarConnections).where(eq(calendarConnections.driverId, driverId));
+  }
+
+  async upsertCalendarConnection(
+    driverId: string,
+    provider: string,
+    accessToken: string,
+    refreshToken: string | undefined,
+    tokenExpiresAt: Date | undefined,
+  ): Promise<CalendarConnection> {
+    const existing = await this.getCalendarConnection(driverId, provider);
+    const accessTokenEncrypted = encryptSecret(accessToken);
+    const refreshTokenEncrypted = refreshToken ? encryptSecret(refreshToken) : undefined;
+
+    if (existing) {
+      const result = await db.update(calendarConnections)
+        .set({ accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt, syncEnabled: true })
+        .where(eq(calendarConnections.id, existing.id))
+        .returning();
+      return result[0];
+    }
+
+    const result = await db.insert(calendarConnections)
+      .values({ driverId, provider, accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt })
+      .returning();
+    return result[0];
+  }
+
+  async deleteCalendarConnection(driverId: string, provider: string): Promise<boolean> {
+    const result = await db.delete(calendarConnections)
+      .where(and(eq(calendarConnections.driverId, driverId), eq(calendarConnections.provider, provider)))
+      .returning();
+    return result.length > 0;
+  }
+
+  decryptCalendarTokens(connection: CalendarConnection): { accessToken: string; refreshToken?: string } {
+    return {
+      accessToken: decryptSecret(connection.accessTokenEncrypted),
+      refreshToken: connection.refreshTokenEncrypted ? decryptSecret(connection.refreshTokenEncrypted) : undefined,
+    };
+  }
+
+  async touchCalendarSync(id: string): Promise<void> {
+    await db.update(calendarConnections).set({ lastSyncedAt: new Date() }).where(eq(calendarConnections.id, id));
+  }
+
+  // === CALENDAR & SCHEDULING (crew/vehicle/warehouse/company) ===
+  async getEntityAvailability(entityType: string, entityId: string): Promise<ResourceAvailability[]> {
+    return await db.select().from(resourceAvailability)
+      .where(and(eq(resourceAvailability.entityType, entityType), eq(resourceAvailability.entityId, entityId)))
+      .orderBy(resourceAvailability.dayOfWeek);
+  }
+
+  async setEntityAvailability(entityType: string, entityId: string, slots: InsertResourceAvailability[]): Promise<ResourceAvailability[]> {
+    await db.delete(resourceAvailability)
+      .where(and(eq(resourceAvailability.entityType, entityType), eq(resourceAvailability.entityId, entityId)));
+    if (slots.length === 0) return [];
+    return await db.insert(resourceAvailability)
+      .values(slots.map((s) => ({ ...s, entityType, entityId })))
+      .returning();
+  }
+
+  async getEntityTimeOff(entityType: string, entityId: string): Promise<ResourceTimeOff[]> {
+    return await db.select().from(resourceTimeOff)
+      .where(and(eq(resourceTimeOff.entityType, entityType), eq(resourceTimeOff.entityId, entityId)))
+      .orderBy(desc(resourceTimeOff.startDate));
+  }
+
+  async createEntityTimeOff(timeOff: InsertResourceTimeOff, createdBy: string): Promise<ResourceTimeOff> {
+    const result = await db.insert(resourceTimeOff).values({ ...timeOff, createdBy }).returning();
+    return result[0];
+  }
+
+  async deleteEntityTimeOff(id: string, entityType: string, entityId: string): Promise<boolean> {
+    const result = await db.delete(resourceTimeOff)
+      .where(and(eq(resourceTimeOff.id, id), eq(resourceTimeOff.entityType, entityType), eq(resourceTimeOff.entityId, entityId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getOrCreateCalendarShareToken(entityType: string, entityId: string, createdBy: string): Promise<CalendarShareToken> {
+    const existing = await db.select().from(calendarShareTokens)
+      .where(and(eq(calendarShareTokens.entityType, entityType), eq(calendarShareTokens.entityId, entityId)));
+    if (existing[0]) return existing[0];
+    const token = randomUUID().replace(/-/g, "");
+    const result = await db.insert(calendarShareTokens).values({ entityType, entityId, token, createdBy }).returning();
+    return result[0];
+  }
+
+  async getCalendarShareToken(token: string): Promise<CalendarShareToken | undefined> {
+    const result = await db.select().from(calendarShareTokens).where(eq(calendarShareTokens.token, token));
+    return result[0];
+  }
+
+  // === AI CARGO RECOGNITION ===
+  async getCargoItem(id: string): Promise<CargoItem | undefined> {
+    const result = await db.select().from(cargoItems).where(eq(cargoItems.id, id));
+    return result[0];
+  }
+
+  async getBookingCargoItems(bookingId: string): Promise<CargoItem[]> {
+    return await db.select().from(cargoItems)
+      .where(eq(cargoItems.bookingId, bookingId))
+      .orderBy(desc(cargoItems.createdAt));
+  }
+
+  async createCargoItem(item: InsertCargoItem): Promise<CargoItem> {
+    const result = await db.insert(cargoItems).values(item).returning();
+    return result[0];
+  }
+
+  async correctCargoItem(id: string, updates: Partial<InsertCargoItem>): Promise<CargoItem | undefined> {
+    const result = await db.update(cargoItems)
+      .set({ ...updates, manuallyCorrected: true })
+      .where(eq(cargoItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === AI CHAT TRANSLATION ===
+  async getMessageTranslation(messageId: string, targetLanguage: string): Promise<MessageTranslation | undefined> {
+    const result = await db.select().from(messageTranslations)
+      .where(and(eq(messageTranslations.messageId, messageId), eq(messageTranslations.targetLanguage, targetLanguage)));
+    return result[0];
+  }
+
+  async createMessageTranslation(
+    messageId: string,
+    sourceLanguage: string | undefined,
+    targetLanguage: string,
+    translatedContent: string,
+    aiProvider: string,
+  ): Promise<MessageTranslation> {
+    const result = await db.insert(messageTranslations)
+      .values({ messageId, sourceLanguage, targetLanguage, translatedContent, aiProvider })
+      .returning();
+    return result[0];
+  }
+
+  // === VOICE / VIDEO CALLS ===
+  async createCall(call: InsertCall): Promise<Call> {
+    const result = await db.insert(calls).values(call).returning();
+    return result[0];
+  }
+
+  async getCall(id: string): Promise<Call | undefined> {
+    const result = await db.select().from(calls).where(eq(calls.id, id));
+    return result[0];
+  }
+
+  async updateCallStatus(id: string, status: string, quality?: unknown): Promise<Call | undefined> {
+    const updates: Record<string, unknown> = { status };
+    if (status === "accepted") updates.connectedAt = new Date();
+    if (status === "completed" || status === "rejected" || status === "missed" || status === "failed") {
+      updates.endedAt = new Date();
+      const call = await this.getCall(id);
+      if (call?.connectedAt) {
+        updates.durationSeconds = Math.max(0, Math.round((Date.now() - new Date(call.connectedAt).getTime()) / 1000));
+      }
+    }
+    if (quality) updates.quality = quality;
+
+    const result = await db.update(calls).set(updates).where(eq(calls.id, id)).returning();
+    return result[0];
+  }
+
+  async getUserCallHistory(userId: string): Promise<Call[]> {
+    return await db.select().from(calls)
+      .where(or(eq(calls.callerId, userId), eq(calls.calleeId, userId)))
+      .orderBy(desc(calls.createdAt));
+  }
+
+  // === IDENTITY VERIFICATION ===
+  async createVerificationDocument(doc: InsertVerificationDocument): Promise<VerificationDocument> {
+    const result = await db.insert(verificationDocuments).values(doc).returning();
+    return result[0];
+  }
+
+  async getHolderVerificationDocuments(holderType: string, holderId: string): Promise<VerificationDocument[]> {
+    return await db.select().from(verificationDocuments)
+      .where(and(eq(verificationDocuments.holderType, holderType), eq(verificationDocuments.holderId, holderId)))
+      .orderBy(desc(verificationDocuments.submittedAt));
+  }
+
+  async getVerificationDocument(id: string): Promise<VerificationDocument | undefined> {
+    const result = await db.select().from(verificationDocuments).where(eq(verificationDocuments.id, id));
+    return result[0];
+  }
+
+  async getPendingVerificationDocuments(): Promise<VerificationDocument[]> {
+    return await db.select().from(verificationDocuments)
+      .where(eq(verificationDocuments.status, "pending"))
+      .orderBy(verificationDocuments.submittedAt);
+  }
+
+  async reviewVerificationDocument(
+    id: string,
+    status: "approved" | "rejected",
+    reviewedBy: string,
+    rejectionReason?: string,
+  ): Promise<VerificationDocument | undefined> {
+    const result = await db.update(verificationDocuments)
+      .set({ status, reviewedBy, reviewedAt: new Date(), rejectionReason })
+      .where(eq(verificationDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createDocumentVersion(documentId: string, fileUrl: string, uploadedBy: string, note?: string): Promise<DocumentVersion> {
+    const result = await db.insert(documentVersions)
+      .values({ documentId, fileUrl, uploadedBy, note: note ?? null })
+      .returning();
+    return result[0];
+  }
+
+  async getDocumentVersions(documentId: string): Promise<DocumentVersion[]> {
+    return await db.select().from(documentVersions)
+      .where(eq(documentVersions.documentId, documentId))
+      .orderBy(desc(documentVersions.createdAt));
+  }
+
+  // Renewing a document (re-upload of an expiring/expired/rejected license) preserves the prior
+  // file as a version, then resets the document to a fresh pending review - the same document
+  // row keeps its holder/docType identity rather than creating a duplicate row per renewal.
+  async renewVerificationDocument(id: string, uploadedBy: string, newFileUrl: string, note?: string): Promise<VerificationDocument | undefined> {
+    const existing = await db.select().from(verificationDocuments).where(eq(verificationDocuments.id, id));
+    const doc = existing[0];
+    if (!doc) return undefined;
+
+    await this.createDocumentVersion(id, doc.fileUrl, uploadedBy, note ?? "renewal");
+
+    const result = await db.update(verificationDocuments)
+      .set({
+        fileUrl: newFileUrl,
+        status: "pending",
+        reviewedBy: null,
+        reviewedAt: null,
+        rejectionReason: null,
+        expiryNotifiedAt: null,
+        submittedAt: new Date(),
+      })
+      .where(eq(verificationDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateVerificationDocumentMetadata(id: string, updates: { issueDate?: Date; docNumber?: string; country?: string; authority?: string; verificationSource?: string; ocrExtractedData?: unknown; expiresAt?: Date }): Promise<VerificationDocument | undefined> {
+    const result = await db.update(verificationDocuments)
+      .set(updates)
+      .where(eq(verificationDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // === FRAUD PREVENTION ===
+  async recordDeviceFingerprint(
+    userId: string,
+    fingerprintHash: string,
+    userAgent: string | undefined,
+    ipAddress: string | undefined,
+  ): Promise<DeviceFingerprint> {
+    const existing = await db.select().from(deviceFingerprints)
+      .where(and(eq(deviceFingerprints.userId, userId), eq(deviceFingerprints.fingerprintHash, fingerprintHash)));
+    if (existing.length > 0) {
+      const result = await db.update(deviceFingerprints)
+        .set({ lastSeenAt: new Date(), userAgent, ipAddress })
+        .where(eq(deviceFingerprints.id, existing[0].id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(deviceFingerprints)
+      .values({ userId, fingerprintHash, userAgent, ipAddress })
+      .returning();
+    return result[0];
+  }
+
+  async findUsersBySharedFingerprint(fingerprintHash: string): Promise<DeviceFingerprint[]> {
+    return await db.select().from(deviceFingerprints).where(eq(deviceFingerprints.fingerprintHash, fingerprintHash));
+  }
+
+  async recordRiskScore(subjectType: string, subjectId: string, score: number, reasons: string[]): Promise<RiskScore> {
+    const result = await db.insert(riskScores).values({ subjectType, subjectId, score, reasons }).returning();
+    return result[0];
+  }
+
+  async getLatestRiskScore(subjectType: string, subjectId: string): Promise<RiskScore | undefined> {
+    const result = await db.select().from(riskScores)
+      .where(and(eq(riskScores.subjectType, subjectType), eq(riskScores.subjectId, subjectId)))
+      .orderBy(desc(riskScores.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async writeAuditLog(
+    actorUserId: string | undefined,
+    action: string,
+    targetType: string | undefined,
+    targetId: string | undefined,
+    metadata: unknown,
+    ipAddress: string | undefined,
+  ): Promise<AuditLog> {
+    const result = await db.insert(auditLogs)
+      .values({ actorUserId, action, targetType, targetId, metadata, ipAddress })
+      .returning();
+    return result[0];
+  }
+
+  async getAuditLogs(targetType?: string, targetId?: string, limit = 100): Promise<AuditLog[]> {
+    const conditions = [];
+    if (targetType) conditions.push(eq(auditLogs.targetType, targetType));
+    if (targetId) conditions.push(eq(auditLogs.targetId, targetId));
+
+    const query = db.select().from(auditLogs);
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).limit(limit);
+    }
+    return await query.orderBy(desc(auditLogs.createdAt)).limit(limit);
+  }
+
+  // === PUBLIC PARTNER API ===
+  async createApiKey(key: InsertApiKey, keyHash: string, keyPrefix: string): Promise<ApiKey> {
+    const result = await db.insert(apiKeys).values({ ...key, keyHash, keyPrefix }).returning();
+    return result[0];
+  }
+
+  async getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
+    const result = await db.select().from(apiKeys)
+      .where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.active, true)));
+    return result[0];
+  }
+
+  async getCompanyApiKeys(companyId: string): Promise<ApiKey[]> {
+    return await db.select().from(apiKeys)
+      .where(eq(apiKeys.companyId, companyId))
+      .orderBy(desc(apiKeys.createdAt));
+  }
+
+  async revokeApiKey(id: string, companyId: string): Promise<boolean> {
+    const result = await db.update(apiKeys)
+      .set({ active: false, revokedAt: new Date() })
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async touchApiKeyUsage(id: string): Promise<void> {
+    await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+  }
+
+  async createWebhookSubscription(sub: InsertWebhookSubscription, secret: string): Promise<WebhookSubscription> {
+    const result = await db.insert(webhookSubscriptions).values({ ...sub, secret }).returning();
+    return result[0];
+  }
+
+  async getCompanyWebhookSubscriptions(companyId: string): Promise<WebhookSubscription[]> {
+    return await db.select().from(webhookSubscriptions).where(eq(webhookSubscriptions.companyId, companyId));
+  }
+
+  async getActiveWebhookSubscriptionsForEvent(companyId: string, event: string): Promise<WebhookSubscription[]> {
+    const subs = await db.select().from(webhookSubscriptions)
+      .where(and(eq(webhookSubscriptions.companyId, companyId), eq(webhookSubscriptions.active, true)));
+    return subs.filter((s) => s.events.includes(event));
+  }
+
+  async deleteWebhookSubscription(id: string, companyId: string): Promise<boolean> {
+    const result = await db.delete(webhookSubscriptions)
+      .where(and(eq(webhookSubscriptions.id, id), eq(webhookSubscriptions.companyId, companyId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async recordWebhookDelivery(
+    subscriptionId: string,
+    event: string,
+    payload: unknown,
+    responseStatus: number | undefined,
+    success: boolean,
+    error?: string,
+  ): Promise<WebhookDelivery> {
+    const result = await db.insert(webhookDeliveries)
+      .values({ subscriptionId, event, payload, responseStatus, success, error })
+      .returning();
+    return result[0];
+  }
+}
+
+// Seed initial services
+async function seedServices(storage: DbStorage) {
+  const existingServices = await storage.getAllServices();
+  if (existingServices.length === 0) {
+    const defaultServices = [
+      {
+        name: "Residential Moving",
+        description: "Complete home moving service with professional movers",
+        basePrice: "150.00",
+        pricePerMile: "2.50",
+        icon: "home"
+      },
+      {
+        name: "Commercial Transport",
+        description: "Office and business relocation services",
+        basePrice: "250.00",
+        pricePerMile: "3.00",
+        icon: "building"
+      },
+      {
+        name: "Long Distance",
+        description: "Interstate and long-haul moving services",
+        basePrice: "500.00",
+        pricePerMile: "1.50",
+        icon: "truck"
+      },
+      {
+        name: "Packing Services",
+        description: "Professional packing and unpacking assistance",
+        basePrice: "100.00",
+        pricePerMile: "1.00",
+        icon: "package"
+      }
+    ];
+
+    for (const service of defaultServices) {
+      await storage.createService(service);
+    }
+  }
+}
+
+async function seedBadges(storage: DbStorage) {
+  const existingBadges = await storage.getAllBadges();
+  if (existingBadges.length === 0) {
+    const defaultBadges = [
+      { code: "super_carrier", name: "Super Przewoźnik", description: "Rating 4.8+ with at least 20 reviews", icon: "shield-check" },
+      { code: "premium", name: "Premium", description: "Active Premium plan subscriber", icon: "star" },
+      { code: "elite", name: "Elite", description: "Active Enterprise plan subscriber", icon: "crown" },
+      { code: "completed_100", name: "100 Zleceń", description: "Completed 100 bookings", icon: "medal" },
+      { code: "completed_500", name: "500 Zleceń", description: "Completed 500 bookings", icon: "medal" },
+      { code: "completed_1000", name: "1000 Zleceń", description: "Completed 1000 bookings", icon: "trophy" },
+    ];
+    for (const badge of defaultBadges) {
+      await db.insert(badges).values(badge);
+    }
+  }
+}
+
+const storage = new DbStorage();
+seedServices(storage).catch((err) => console.error("Failed to seed services:", err.message));
+seedBadges(storage).catch((err) => console.error("Failed to seed badges:", err.message));
+
+export { storage };

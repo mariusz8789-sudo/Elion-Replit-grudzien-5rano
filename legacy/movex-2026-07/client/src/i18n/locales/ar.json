@@ -1,0 +1,136 @@
+{
+  "nav": {
+    "signIn": "تسجيل الدخول",
+    "myBookings": "حجوزاتي",
+    "logout": "تسجيل الخروج"
+  },
+  "hero": {
+    "title": "انقل أي شيء، في أي مكان",
+    "subtitle": "خدمات نقل واحترافية يمكنك الوثوق بها. من النقل السكني إلى النقل التجاري، نحن نغطي كل احتياجاتك.",
+    "getQuote": "احصل على عرض فوري",
+    "trackOrder": "تتبع الطلب",
+    "rating": "التقييم",
+    "successfulMoves": "عملية نقل ناجحة"
+  },
+  "howItWorks": {
+    "title": "كيف يعمل",
+    "subtitle": "عملية بسيطة وشفافة من العرض إلى التسليم",
+    "step1Title": "احصل على عرض فوري",
+    "step1Desc": "أدخل تفاصيلك واحصل على السعر فوراً",
+    "step2Title": "اختر المزود",
+    "step2Desc": "قارن العروض من الشركات الموثوقة",
+    "step3Title": "تتبع واستلم",
+    "step3Desc": "تتبع مباشر حتى التسليم الآمن"
+  },
+  "features": {
+    "title": "لماذا تختار Point to Point",
+    "verified": "مزودون موثوقون",
+    "verifiedDesc": "جميع الشركات موثوقة ومؤمنة",
+    "instant": "تسعير فوري",
+    "instantDesc": "عروض شفافة بدون رسوم مخفية",
+    "realtime": "تتبع مباشر",
+    "realtimeDesc": "تتبع GPS مباشر لشحنتك",
+    "support": "دعم 24/7",
+    "supportDesc": "دعم العملاء متى احتجته"
+  },
+  "services": {
+    "residential": "نقل سكني",
+    "commercial": "نقل تجاري",
+    "specialty": "عناصر خاصة",
+    "courier": "توصيل في نفس اليوم",
+    "freight": "شحن البضائع",
+    "storage": "حلول التخزين"
+  },
+  "booking": {
+    "selectService": "اختر الخدمة",
+    "pickupAddress": "عنوان الاستلام",
+    "deliveryAddress": "عنوان التسليم",
+    "pickupDate": "تاريخ الاستلام",
+    "contactInfo": "معلومات الاتصال",
+    "fullName": "الاسم الكامل",
+    "phone": "رقم الهاتف",
+    "email": "البريد الإلكتروني",
+    "confirmBooking": "تأكيد الحجز",
+    "bookingConfirmed": "تم تأكيد الحجز!",
+    "bookingId": "رقم الحجز",
+    "trackBooking": "تتبع الحجز"
+  },
+  "offers": {
+    "viewOffers": "عرض العروض",
+    "noOffers": "لا توجد عروض بعد",
+    "acceptOffer": "قبول العرض",
+    "rejectOffer": "رفض العرض",
+    "from": "من",
+    "message": "رسالة"
+  },
+  "payment": {
+    "payNow": "ادفع الآن",
+    "paymentSuccess": "تمت الدفع بنجاح",
+    "paymentFailed": "فشل الدفع",
+    "total": "المجموع",
+    "cardNumber": "رقم البطاقة",
+    "expiryDate": "تاريخ الانتهاء",
+    "cvv": "CVV"
+  },
+  "tracking": {
+    "liveTracking": "تتبع GPS مباشر",
+    "centerOnTruck": "التركيز على الشاحنة",
+    "pickup": "الاستلام",
+    "delivery": "التسليم",
+    "liveLocation": "الموقع المباشر",
+    "status": "الحالة",
+    "timeline": "الجدول الزمني"
+  },
+  "dashboard": {
+    "myBookings": "حجوزاتي",
+    "activeBookings": "الحجوزات النشطة",
+    "completedBookings": "الحجوزات المكتملة",
+    "status": {
+      "draft": "مسودة",
+      "posted": "منشور",
+      "accepted": "مقبول",
+      "in_transit": "قيد النقل",
+      "delivered": "تم التسليم",
+      "cancelled": "ملغي"
+    }
+  },
+  "admin": {
+    "adminPanel": "لوحة الإدارة",
+    "companyDashboard": "لوحة الشركة",
+    "availableBookings": "الحجوزات المتاحة",
+    "myOffers": "عروضي",
+    "makeOffer": "تقديم عرض",
+    "offerPrice": "سعر العرض",
+    "offerMessage": "رسالة للعميل",
+    "submitOffer": "إرسال العرض"
+  },
+  "eco": {
+    "co2Emission": "انبعاثات CO₂",
+    "ecoRoute": "مسار صديق للبيئة",
+    "carbonFootprint": "البصمة الكربونية",
+    "ecoFriendly": "خيار صديق للبيئة",
+    "sharedRide": "رحلة مشتركة متاحة"
+  },
+  "marketplace": {
+    "title": "السوق",
+    "promotions": "عروض خاصة",
+    "materials": "مواد النقل",
+    "boxes": "صناديق وتغليف",
+    "equipment": "تأجير المعدات"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "next": "التالي",
+    "submit": "إرسال",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "ترتيب",
+    "viewDetails": "عرض التفاصيل"
+  }
+}

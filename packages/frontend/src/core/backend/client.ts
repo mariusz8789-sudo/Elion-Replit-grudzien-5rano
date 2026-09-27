@@ -1381,3 +1381,47 @@ export async function planLocalVideoGeneration(input: {
   const result = await request<{ plan: LocalVideoPlan }>('POST', '/compute/local-video/plan', { body: input });
   return result.ok ? { ok: true, data: result.data.plan } : result;
 }
+
+/* ---------------- Knowledge ingestion (Science Chat `/ingest <url>`): propose-only, human publishes ---------------- */
+
+export interface KnowledgeProposal {
+  proposalId: string;
+  status: 'pending' | 'published' | 'rejected';
+  approverId: string | null;
+  claim: string;
+  recordStatus: string;
+  sourceKind: string;
+  sourceUrl: string;
+  contentHash: string;
+}
+
+export interface KnowledgeProposalsListing {
+  proposals: KnowledgeProposal[];
+  activeRecords: number;
+  ledgerVersion: number;
+  ledgerOk: boolean;
+}
+
+/** No auth required — reading pending/published/rejected proposals is public, same as the backend route. */
+export async function listKnowledgeProposals(): Promise<ApiResult<KnowledgeProposalsListing>> {
+  return request<KnowledgeProposalsListing>('GET', '/knowledge/proposals');
+}
+
+export interface PublishedKnowledgeRecord {
+  id: string;
+  claim: string;
+  status: string;
+  contentHash: string;
+}
+
+/** Requires a signed-in approver — the backend returns 401 without a token. */
+export async function publishKnowledgeProposal(
+  token: string, proposalId: string,
+): Promise<ApiResult<{ published: PublishedKnowledgeRecord; activeRecords: number; ledgerOk: boolean }>> {
+  return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/publish`, { token });
+}
+
+/** Requires a signed-in approver — the backend returns 401 without a token. */
+export async function rejectKnowledgeProposal(token: string, proposalId: string): Promise<ApiResult<Record<string, never>>> {
+  return request('POST', `/knowledge/proposals/${encodeURIComponent(proposalId)}/reject`, { token });
+}

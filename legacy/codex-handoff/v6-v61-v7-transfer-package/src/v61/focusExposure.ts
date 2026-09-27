@@ -1,0 +1,3 @@
+import type { CameraState } from '../contracts';
+export interface FocusExposureLimits { readonly minFocusDistance:number; readonly maxFocusDistance:number; readonly minFStop:number; readonly maxFStop:number; readonly minExposureEv:number; readonly maxExposureEv:number }
+export function clampCameraOptics(camera:CameraState,limits:FocusExposureLimits):CameraState{return {...camera,focusDistance:Math.max(limits.minFocusDistance,Math.min(limits.maxFocusDistance,camera.focusDistance)),apertureFStop:Math.max(limits.minFStop,Math.min(limits.maxFStop,camera.apertureFStop)),exposureEv:Math.max(limits.minExposureEv,Math.min(limits.maxExposureEv,camera.exposureEv))}}

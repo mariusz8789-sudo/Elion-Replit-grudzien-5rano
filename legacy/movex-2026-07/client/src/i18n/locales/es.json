@@ -1,0 +1,136 @@
+{
+  "nav": {
+    "signIn": "Sign In",
+    "myBookings": "My Bookings",
+    "logout": "Logout"
+  },
+  "hero": {
+    "title": "Move Anything, Anywhere",
+    "subtitle": "Professional moving and transport services you can trust. From residential moves to commercial relocations, we've got you covered.",
+    "getQuote": "Get Instant Quote",
+    "trackOrder": "Track Order",
+    "rating": "Rating",
+    "successfulMoves": "Successful Moves"
+  },
+  "howItWorks": {
+    "title": "How It Works",
+    "subtitle": "Simple, transparent process from quote to delivery",
+    "step1Title": "Get Instant Quote",
+    "step1Desc": "Enter your details and get pricing instantly",
+    "step2Title": "Choose Provider",
+    "step2Desc": "Compare offers from verified companies",
+    "step3Title": "Track & Receive",
+    "step3Desc": "Real-time tracking until safe delivery"
+  },
+  "features": {
+    "title": "Why Choose Point to Point",
+    "verified": "Verified Providers",
+    "verifiedDesc": "All companies are verified and insured",
+    "instant": "Instant Pricing",
+    "instantDesc": "Transparent quotes with no hidden fees",
+    "realtime": "Real-time Tracking",
+    "realtimeDesc": "Live GPS tracking of your shipment",
+    "support": "24/7 Support",
+    "supportDesc": "Customer support whenever you need"
+  },
+  "services": {
+    "residential": "Residential Move",
+    "commercial": "Commercial Move",
+    "specialty": "Specialty Items",
+    "courier": "Same-Day Courier",
+    "freight": "Freight Shipping",
+    "storage": "Storage Solutions"
+  },
+  "booking": {
+    "selectService": "Select Service",
+    "pickupAddress": "Pickup Address",
+    "deliveryAddress": "Delivery Address",
+    "pickupDate": "Pickup Date",
+    "contactInfo": "Contact Information",
+    "fullName": "Full Name",
+    "phone": "Phone Number",
+    "email": "Email",
+    "confirmBooking": "Confirm Booking",
+    "bookingConfirmed": "Booking Confirmed!",
+    "bookingId": "Booking ID",
+    "trackBooking": "Track Booking"
+  },
+  "offers": {
+    "viewOffers": "View Offers",
+    "noOffers": "No offers yet",
+    "acceptOffer": "Accept Offer",
+    "rejectOffer": "Reject Offer",
+    "from": "from",
+    "message": "Message"
+  },
+  "payment": {
+    "payNow": "Pay Now",
+    "paymentSuccess": "Payment Successful",
+    "paymentFailed": "Payment Failed",
+    "total": "Total",
+    "cardNumber": "Card Number",
+    "expiryDate": "Expiry Date",
+    "cvv": "CVV"
+  },
+  "tracking": {
+    "liveTracking": "Live GPS Tracking",
+    "centerOnTruck": "Center on Truck",
+    "pickup": "Pickup",
+    "delivery": "Delivery",
+    "liveLocation": "Live Location",
+    "status": "Status",
+    "timeline": "Timeline"
+  },
+  "dashboard": {
+    "myBookings": "My Bookings",
+    "activeBookings": "Active Bookings",
+    "completedBookings": "Completed Bookings",
+    "status": {
+      "draft": "Draft",
+      "posted": "Posted",
+      "accepted": "Accepted",
+      "in_transit": "In Transit",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    }
+  },
+  "admin": {
+    "adminPanel": "Admin Panel",
+    "companyDashboard": "Company Dashboard",
+    "availableBookings": "Available Bookings",
+    "myOffers": "My Offers",
+    "makeOffer": "Make Offer",
+    "offerPrice": "Offer Price",
+    "offerMessage": "Message to Customer",
+    "submitOffer": "Submit Offer"
+  },
+  "eco": {
+    "co2Emission": "CO₂ Emission",
+    "ecoRoute": "Eco Route",
+    "carbonFootprint": "Carbon Footprint",
+    "ecoFriendly": "Eco-Friendly Option",
+    "sharedRide": "Shared Ride Available"
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "promotions": "Special Promotions",
+    "materials": "Moving Materials",
+    "boxes": "Boxes & Packaging",
+    "equipment": "Equipment Rental"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "viewDetails": "View Details"
+  }
+}

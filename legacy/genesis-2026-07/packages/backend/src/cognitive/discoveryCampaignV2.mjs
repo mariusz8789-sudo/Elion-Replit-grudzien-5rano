@@ -1,0 +1,340 @@
+/**
+ * Full Discovery Campaign v2 — the scientific execution layer, one command, no manual intervention:
+ *
+ *   Evidence → Target Intelligence → Candidate Generator v2 → RDKit → ADMET → Docking →
+ *   Truth Engine → MCRE → Necropolis → Workflow Mutation → Discovery Dossier
+ *
+ * Reuses the completed engines (candidateGenV2 for generation + RDKit + ADMET + ranking, the corpus
+ * ingest / evidence intelligence / target intelligence, the real docking pipeline, the Truth-Engine
+ * gate, MCRE conflict detection). It ADDS the funnel (survivors vs rejected), docking of the top
+ * survivors on a real/verified structure, a Necropolis failure-memory delta, a workflow-mutation
+ * record when the plan adapts, and a per-candidate Discovery Dossier + benchmark.
+ *
+ * Honesty: candidates are COMPUTATIONAL CANDIDATES; ADMET is MODEL_INFERRED; docking scores are
+ * MODEL_ESTIMATE (Vina), never binding affinity. Docking without a structure / without Vina is
+ * BLOCKED_BY_RESOURCES / BLOCKED_BY_RUNTIME — NEVER simulated. No drug is claimed.
+ */
+import { canonicalHash } from '../provenance.mjs';
+import * as candGen from './candidateGenV2.mjs';
+import * as ei from './evidenceIntelligence.mjs';
+import * as ti from './targetIntelligence.mjs';
+import * as reasoning from './reasoningBrain.mjs';
+import { ingestBundle } from '../corpus/corpusIngest.mjs';
+import { truthFinalGate, detectConflicts } from '../campaign/campaignRunner001.mjs';
+import { predictOffTarget, OFF_TARGET_PANEL } from './offTarget.mjs';
+import { buildKnowledgeGraph } from './knowledgeGraph.mjs';
+import { runMdStage, detectMdCapability } from './molecularDynamics.mjs';
+import * as docking from '../compute/dockingAdapter.mjs';
+
+export const CAMPAIGN_V2_VERSION = 'genesis-discovery-campaign/2';
+
+export const CAMPAIGN_V2_STATUS = Object.freeze({
+  COMPLETED: 'COMPLETED',
+  FAIL_CLOSED_NO_CANDIDATES: 'FAIL_CLOSED_NO_CANDIDATES',
+  FAIL_CLOSED_TARGET_GATE: 'FAIL_CLOSED_TARGET_GATE',
+});
+
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+export function defaultDeps() {
+  return {
+    ingestBundle,
+    buildClaimRegistry: ei.buildClaimRegistry,
+    targetFunnel: ti.targetFunnel,
+    requestReasoning: reasoning.requestReasoning,
+    predictOffTarget,
+    detectMdCapability,
+    runMdStage,
+    runCandidateGenerationV2: candGen.runCandidateGenerationV2,
+    truthFinalGate,
+    detectConflicts,
+    dockDetect: () => docking.detect(),
+    dockPipeline: (spec) => docking.dockPipeline(spec),
+    dockPrepared: (spec) => docking.dock(spec),
+    prepareReceptor: (spec) => docking.prepareReceptor(spec),
+  };
+}
+
+/** Funnel filter: which computational candidates survive drug-likeness triage, and why others fail. */
+function triage(cand, { maxLipinskiViolations = 1, maxAlerts = 2 } = {}) {
+  const rd = cand.engineOutputs?.rdkit;
+  const reasons = [];
+  if (cand.failureState?.includes('rdkit') || !rd?.ok) reasons.push('RDKIT_EVALUATION_FAILED');
+  const lv = rd?.descriptors?.lipinskiViolations;
+  if (typeof lv === 'number' && lv > maxLipinskiViolations) reasons.push(`LIPINSKI_VIOLATIONS_${lv}`);
+  const na = rd?.nAlerts;
+  if (typeof na === 'number' && na > maxAlerts) reasons.push(`STRUCTURAL_ALERTS_${na}`);
+  return { survives: reasons.length === 0, rejectionReasons: reasons };
+}
+
+function nextExperiment(cand, dockingRan) {
+  const alerts = cand.engineOutputs?.rdkit?.structuralAlerts;
+  const prefix = alerts && alerts.length ? `Triage structural alert(s) ${alerts.join(', ')}. ` : '';
+  return dockingRan
+    ? `${prefix}Wet-lab binding assay (SPR/ITC or target biochemical assay) to test the predicted pose and measure Kd/IC50 — the docking score is a MODEL_ESTIMATE, not measured affinity.`
+    : `${prefix}Acquire/prepare an experimental receptor structure, run docking, then a wet-lab binding assay — no target structure was available, so binding is unassessed (never simulated).`;
+}
+
+function computationalConfidence(cand, { evidenceSupport, dockingRan }) {
+  const rd = cand.engineOutputs?.rdkit;
+  const druglikeness = clamp01(1 - 0.25 * Math.min(4, rd?.descriptors?.lipinskiViolations ?? 4));
+  return +clamp01(
+    0.25 * evidenceSupport + 0.25 * (rd?.ok ? 1 : 0) + 0.20 * (cand.engineOutputs?.admet?.ok ? 1 : 0) +
+    0.20 * (dockingRan ? 1 : 0) + 0.10 * druglikeness,
+  ).toFixed(4);
+}
+
+/**
+ * Execute the full campaign. `structure` (+ `structureFormat`) is a real/verified receptor structure
+ * for docking; without it (or without Vina) docking is honestly blocked. `bundleRoot` supplies
+ * VERIFIED_BUNDLE evidence. `deps` are injectable for testing.
+ */
+export function runDiscoveryCampaignV2(opts = {}) {
+  const {
+    campaignId = 'discovery-campaign-v2', bundleRoot = null,
+    structure = null, structureFormat = 'pdb',
+    targetHypotheses = [], supplementalClaims = [],
+    seeds, minCandidates = 100, maxCandidates, dockTopN = 5, mdTopN = 3,
+    triageConfig = {}, deps = defaultDeps(),
+  } = opts;
+
+  const stages = [];
+  const mark = (stage, status, detail) => stages.push({ stage, status, ...(detail ? { detail } : {}) });
+
+  // ── 1) EVIDENCE ────────────────────────────────────────────────────────────────────────────
+  let evidence = { evidenceRecords: [], entities: [], summary: { entities: 0, evidenceRecords: 0 }, ingestionMode: null };
+  if (bundleRoot) { evidence = deps.ingestBundle(bundleRoot, { campaignId }); mark('EVIDENCE', 'INGESTED', `${evidence.evidenceRecords.length} records (${evidence.ingestionMode})`); }
+  else mark('EVIDENCE', 'NONE', 'no bundle supplied — target intelligence runs without external evidence');
+  const bioactivity = evidence.entities.filter((e) => e.entity?.entityType === 'BioactivityRecord').map((e) => e.entity);
+
+  // ── 2) TARGET INTELLIGENCE ───────────────────────────────────────────────────────────────────
+  const { registry: claimRegistry } = deps.buildClaimRegistry(supplementalClaims, evidence.evidenceRecords);
+  const funnel = deps.targetFunnel(targetHypotheses, claimRegistry);
+  mark('TARGET_INTELLIGENCE', funnel.primaryGate.gate);
+  if (funnel.primaryGate.gate === 'BLOCK') {
+    return { version: CAMPAIGN_V2_VERSION, campaignId, status: CAMPAIGN_V2_STATUS.FAIL_CLOSED_TARGET_GATE, stages, targetFunnel: funnel, benchmark: null, dossier: null };
+  }
+  const evidenceSupport = funnel.primaryGate.gate === 'PROCEED' ? 1 : 0.5;
+
+  // ── 2b) REASONING BRAIN (advisory; honest CAPABILITY_BLOCKED without a live model) ─────────────
+  const evidenceContextIds = evidence.evidenceRecords.map((e) => e.evidenceId).filter(Boolean);
+  const reasoningStep = deps.requestReasoning({
+    capability: 'target_reasoning',
+    input: { primaryTarget: funnel.primaryTarget?.targetName ?? null, gate: funnel.primaryGate.gate, claimCount: claimRegistry.length },
+    evidenceContextIds,
+    requiredKeys: ['assessment'],
+  });
+  mark('REASONING_BRAIN', reasoningStep.status, reasoningStep.note ?? reasoningStep.label);
+  const reasoningLedger = { capability: reasoningStep.capability, status: reasoningStep.status, label: reasoningStep.label, requestHash: reasoningStep.requestHash, routeStatus: reasoningStep.routeStatus, output: reasoningStep.output ?? null, note: reasoningStep.note ?? null };
+
+  // ── 3) CANDIDATE GENERATOR v2 → 4) RDKit → 5) ADMET → rank ────────────────────────────────────
+  const gen = deps.runCandidateGenerationV2({ seeds, minCandidates, ...(maxCandidates ? { maxCandidates } : {}) });
+  mark('CANDIDATE_GEN_V2', gen.status, `${gen.candidates.length} generated`);
+  mark('RDKIT', gen.engineMatrix.RDKit.status);
+  mark('ADMET', gen.engineMatrix['ADMET-AI'].status);
+  if (gen.status !== 'COMPLETED_RANKED' || gen.candidates.length === 0) {
+    return { version: CAMPAIGN_V2_VERSION, campaignId, status: CAMPAIGN_V2_STATUS.FAIL_CLOSED_NO_CANDIDATES, stages, engineMatrix: gen.engineMatrix, benchmark: null, dossier: null };
+  }
+  const rankByCand = new Map(gen.ranking.map((r) => [r.candidateId, r]));
+  const candidates = gen.candidates.map((c) => ({ ...c, ranking: rankByCand.get(c.candidateId) ?? null }));
+
+  // ── 5b) OFF-TARGET PREDICTION (real ADMET-AI Tox21/liability panel per candidate) ──────────────
+  for (const c of candidates) c.offTarget = deps.predictOffTarget(c.engineOutputs?.admet?.predictions ?? null);
+  const otDone = candidates.filter((c) => c.offTarget?.status === 'COMPLETED');
+  const riskDist = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+  for (const c of otDone) riskDist[c.offTarget.risk] = (riskDist[c.offTarget.risk] ?? 0) + 1;
+  mark('OFF_TARGET', otDone.length ? 'COMPLETED' : 'BLOCKED_BY_RESOURCES', otDone.length ? `${otDone.length} scored — HIGH:${riskDist.HIGH} MED:${riskDist.MEDIUM} LOW:${riskDist.LOW}` : 'no ADMET predictions');
+
+  // funnel: survivors vs rejected
+  for (const c of candidates) { const t = triage(c, triageConfig); c.survives = t.survives; c.rejectionReasons = t.rejectionReasons; }
+  const survivors = candidates.filter((c) => c.survives).sort((a, b) => (b.ranking?.finalScore ?? 0) - (a.ranking?.finalScore ?? 0) || a.candidateId.localeCompare(b.candidateId));
+  const rejected = candidates.filter((c) => !c.survives);
+
+  // ── 6) DOCKING (top-N survivors, real Vina on a real/verified structure) ────────────────────────
+  const dockDet = deps.dockDetect();
+  const toDock = survivors.slice(0, Math.max(0, dockTopN));
+  let dockingStatus;
+  if (!dockDet.available) dockingStatus = 'BLOCKED_BY_RUNTIME';
+  else if (!structure) dockingStatus = 'BLOCKED_BY_RESOURCES';
+  else dockingStatus = 'EXECUTED';
+  const dockedById = new Map();
+  if (dockingStatus === 'EXECUTED') {
+    for (const c of toDock) {
+      const r = deps.dockPipeline({ structure, format: structureFormat, ligandSmiles: c.canonicalSmiles, padding: 5, seed: 42 });
+      dockedById.set(c.candidateId, r.ok
+        ? { status: 'DOCKED', bestAffinityKcalMol: r.docking.bestAffinityKcalMol, nPoses: r.docking.nPoses, grid: r.grid, bindingSiteMethod: r.bindingSite?.method ?? null, referenceLigand: r.referenceLigand, engine: `AutoDock Vina ${dockDet.vinaVersion}`, epistemicStatus: 'MODEL_ESTIMATE', receptorProvenanceSha256: r.preparedReceptor?.inputStructureSha256 }
+        : { status: 'DOCK_FAILED', error: r.error, stage: r.stage });
+    }
+  }
+  mark('DOCKING', dockingStatus, dockingStatus === 'EXECUTED' ? `${dockedById.size} of top ${toDock.length} survivors docked` : (dockingStatus === 'BLOCKED_BY_RESOURCES' ? 'no target structure supplied' : dockDet.reason));
+
+  const dockingFor = (c) => {
+    if (dockedById.has(c.candidateId)) return dockedById.get(c.candidateId);
+    if (dockingStatus === 'EXECUTED') return { status: 'NOT_RUN', note: `outside top-${dockTopN} docking funnel` };
+    return { status: dockingStatus, note: dockingStatus === 'BLOCKED_BY_RESOURCES' ? 'no receptor structure' : 'Vina unavailable — never simulated' };
+  };
+
+  // ── 6b) MOLECULAR DYNAMICS + MM-GBSA (Phases 2/3) — only on top-ranked docked candidates ────────
+  const mdCapability = deps.detectMdCapability();
+  const dockedForMd = toDock.filter((c) => dockedById.get(c.candidateId)?.status === 'DOCKED')
+    .map((c) => ({ candidateId: c.candidateId, canonicalSmiles: c.canonicalSmiles, docking: dockedById.get(c.candidateId) }));
+  const mdStage = deps.runMdStage(dockedForMd, { topN: mdTopN, capability: mdCapability });
+  const mdById = new Map(mdStage.results.map((r) => [r.candidateId, r]));
+  mark('MD_STABILITY', mdStage.status, mdStage.status === 'COMPLETED' ? `${mdStage.results.length} complex MD run(s)` : (mdCapability.reason ?? 'MD unavailable'));
+  mark('MM_GBSA', mdStage.status === 'COMPLETED' ? 'COMPLETED' : 'BLOCKED_BY_RUNTIME', mdStage.status === 'COMPLETED' ? 'rescored after MD' : 'requires an MD trajectory (MD blocked)');
+
+  // ── 7) TRUTH ENGINE (final gate) ───────────────────────────────────────────────────────────────
+  const truthGate = deps.truthFinalGate({ claimRegistry, rankingProduced: gen.ranking.length > 0, forbiddenClaimTexts: supplementalClaims.map((c) => c.text) });
+  mark('TRUTH_ENGINE', truthGate.decision, `${truthGate.rejections.length} rejection(s)`);
+
+  // ── 8) MCRE (conflict detection over docked survivors) ─────────────────────────────────────────
+  const conflicts = [];
+  for (const c of toDock) {
+    const cf = deps.detectConflicts({ candidateId: c.candidateId, canonicalSmiles: c.canonicalSmiles },
+      { bioactivity, engineOutputs: c.engineOutputs });
+    conflicts.push(...cf);
+  }
+  mark('MCRE', 'DONE', `${conflicts.length} conflict(s)`);
+
+  // ── 9) NECROPOLIS (failure-memory delta from rejected candidates) ──────────────────────────────
+  const failureCounts = {};
+  for (const c of rejected) for (const r of c.rejectionReasons) failureCounts[r] = (failureCounts[r] ?? 0) + 1;
+  const necropolisDelta = { campaignId, rejectedCount: rejected.length, failureRegions: Object.entries(failureCounts).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason)) };
+  mark('NECROPOLIS', 'RECORDED', `${rejected.length} rejected across ${necropolisDelta.failureRegions.length} region(s)`);
+
+  // ── 10) WORKFLOW MUTATION (adapt the plan when survival is poor) ────────────────────────────────
+  const survivalRate = candidates.length ? survivors.length / candidates.length : 0;
+  const workflowMutation = survivalRate < 0.5
+    ? { mutated: true, reason: `low survival rate ${(survivalRate * 100).toFixed(0)}% — dominant failure ${necropolisDelta.failureRegions[0]?.reason ?? 'n/a'}`, proposedChange: 'bias next generation away from the dominant failure region (e.g. constrain transformations that add structural alerts / raise Lipinski violations)', expectedBenefit: 'higher survivor fraction next generation' }
+    : { mutated: false, reason: `survival rate ${(survivalRate * 100).toFixed(0)}% acceptable — plan unchanged` };
+  mark('WORKFLOW_MUTATION', workflowMutation.mutated ? 'MUTATED' : 'UNCHANGED', workflowMutation.reason);
+
+  // ── 11) DISCOVERY DOSSIER (per-candidate) + benchmark ──────────────────────────────────────────
+  const primaryTargetName = funnel.primaryTarget?.targetName ?? null;
+  const evProvenance = evidence.entities.map((e) => ({ sourceService: e.provenance?.sourceService, sourceId: e.provenance?.sourceId, contentHash: e.provenance?.contentHash, license: e.provenance?.license, ingestionMode: e.provenance?.ingestionMode }));
+
+  const perCandidate = candidates
+    .sort((a, b) => (b.ranking?.finalScore ?? 0) - (a.ranking?.finalScore ?? 0) || a.candidateId.localeCompare(b.candidateId))
+    .map((c) => {
+      const dockRes = dockingFor(c);
+      const dockingRan = dockRes.status === 'DOCKED';
+      const siblings = candidates.filter((o) => o.candidateId !== c.candidateId && o.parentSmiles && o.parentSmiles === c.parentSmiles)
+        .sort((a, b) => (b.ranking?.finalScore ?? 0) - (a.ranking?.finalScore ?? 0))
+        .slice(0, 3)
+        .map((o) => ({ candidateId: o.candidateId, smiles: o.canonicalSmiles, finalScore: o.ranking?.finalScore ?? null, rejected: !o.survives, reasons: o.rejectionReasons }));
+      return {
+        candidateId: c.candidateId,
+        structure: c.canonicalSmiles,                       // (1) structure
+        rationale: `Generation ${c.generation} analogue of seed '${c.seedName}'${c.transformation ? ` via ${c.transformation}` : ' (seed)'}; ${c.survives ? 'survived' : 'rejected in'} drug-likeness triage.`, // (2) rationale
+        descriptors: c.engineOutputs?.rdkit?.descriptors ?? null,   // (3) descriptors (RDKit)
+        structuralAlerts: c.engineOutputs?.rdkit?.structuralAlerts ?? null,
+        admet: c.engineOutputs?.admet?.ok ? { epistemicStatus: 'MODEL_INFERRED', predictions: c.engineOutputs.admet.predictions } : { status: c.engineOutputs?.admet?.status ?? 'UNAVAILABLE' }, // (4) ADMET
+        offTarget: c.offTarget?.status === 'COMPLETED'
+          ? { risk: c.offTarget.risk, confidence: c.offTarget.confidence, selectivity: c.offTarget.selectivity, offTargetHits: c.offTarget.offTargetHits, toxicityFlags: c.offTarget.toxicityFlags, explanation: c.offTarget.explanation, epistemicStatus: c.offTarget.epistemicStatus, evidence: c.offTarget.evidence, topOffTargets: c.offTarget.offTargets.filter((o) => o.flag !== 'NONE').slice(0, 5) }
+          : { status: c.offTarget?.status ?? 'UNAVAILABLE', reason: c.offTarget?.reason },
+        docking: dockRes,                                    // (5) docking
+        molecularDynamics: mdById.get(c.candidateId)?.md ? { status: mdById.get(c.candidateId).md.status, reason: mdById.get(c.candidateId).md.reason ?? null } : { status: 'NOT_RUN', note: `outside top-${mdTopN} MD funnel or not docked` },
+        mmGbsa: mdById.get(c.candidateId)?.mmgbsa ? { status: mdById.get(c.candidateId).mmgbsa.status, dockingScoreKcalMol: mdById.get(c.candidateId).mmgbsa.dockingScoreKcalMol, bindingFreeEnergyKcalMol: mdById.get(c.candidateId).mmgbsa.bindingFreeEnergyKcalMol, reason: mdById.get(c.candidateId).mmgbsa.reason ?? null } : { status: 'NOT_RUN' },
+        truthEngineDecision: truthGate.decision,             // (6) Truth Engine decision
+        provenance: { candidateOrigin: 'RDKit SMARTS analogue enumeration (COMPUTED)', parentSmiles: c.parentSmiles, transformation: c.transformation, seed: c.seedName, evidenceProvenance: evProvenance, rankingPolicyVersion: c.ranking?.rankingPolicyVersion }, // (7) provenance
+        computationalConfidence: computationalConfidence(c, { evidenceSupport, dockingRan }), // (8) confidence
+        rejectedAlternatives: siblings,                      // (9) rejected alternatives
+        nextExperiment: nextExperiment(c, dockingRan),       // (10) next experiment
+        finalScore: c.ranking?.finalScore ?? null,
+        survives: c.survives,
+        rejectionReasons: c.rejectionReasons,
+      };
+    });
+
+  const benchmark = {
+    candidatesGenerated: candidates.length,
+    candidatesRejected: rejected.length,
+    candidatesSurviving: survivors.length,
+    dockedCount: dockedById.size,
+    realEnginesExecuted: [
+      gen.engineMatrix.RDKit.status === 'AVAILABLE' ? 'RDKit' : null,
+      gen.engineMatrix['ADMET-AI'].status === 'AVAILABLE' ? 'ADMET-AI' : null,
+      dockingStatus === 'EXECUTED' ? `AutoDock Vina ${dockDet.vinaVersion}` : null,
+    ].filter(Boolean),
+    blockedEngines: [
+      gen.engineMatrix.RDKit.status !== 'AVAILABLE' ? `RDKit:${gen.engineMatrix.RDKit.status}` : null,
+      gen.engineMatrix['ADMET-AI'].status !== 'AVAILABLE' ? `ADMET-AI:${gen.engineMatrix['ADMET-AI'].status}` : null,
+      dockingStatus !== 'EXECUTED' ? `Docking:${dockingStatus}` : null,
+    ].filter(Boolean),
+    rankingTop10: gen.ranking.slice(0, 10).map((r) => ({ rank: r.rank, candidateId: r.candidateId, smiles: r.canonicalSmiles, finalScore: r.finalScore })),
+  };
+
+  // ── Campaign-level scientific summaries + remaining uncertainty + experimental recommendations ──
+  const dockedList = [...dockedById.values()].filter((d) => d.status === 'DOCKED');
+  const affinities = dockedList.map((d) => d.bestAffinityKcalMol).filter((x) => typeof x === 'number');
+  const unresolvedConflicts = conflicts.filter((c) => /UNRESOLVED/.test(c.resolutionResult ?? '')).length;
+  const summaries = {
+    rdkit: { status: gen.engineMatrix.RDKit.status, evaluated: candidates.filter((c) => c.engineOutputs?.rdkit?.ok).length, withStructuralAlerts: candidates.filter((c) => (c.engineOutputs?.rdkit?.nAlerts ?? 0) > 0).length, epistemicStatus: 'COMPUTED' },
+    admet: { status: gen.engineMatrix['ADMET-AI'].status, evaluated: candidates.filter((c) => c.engineOutputs?.admet?.ok).length, epistemicStatus: 'MODEL_INFERRED' },
+    docking: { status: dockingStatus, bindingSiteMethod: dockedList[0]?.bindingSiteMethod ?? null, docked: dockedList.length, bestAffinityKcalMol: affinities.length ? Math.min(...affinities) : null, affinityRangeKcalMol: affinities.length ? [Math.min(...affinities), Math.max(...affinities)] : null, epistemicStatus: 'MODEL_ESTIMATE' },
+    molecularDynamics: { status: mdStage.status, capability: mdStage.capability, candidatesConsidered: mdStage.candidatesConsidered, note: mdStage.note },
+    mmGbsa: { status: mdStage.status === 'COMPLETED' ? 'COMPLETED' : 'BLOCKED_BY_RUNTIME', separateFromDockingScore: true, note: 'MM-GBSA binding free energy is reported separately from the empirical docking score; blocked without an MD trajectory.' },
+    mcre: { conflicts: conflicts.length, unresolvedConflicts, policyPreserved: 'Ki/IC50/Kd/EC50 kept distinct' },
+    truthEngine: { decision: truthGate.decision, rejections: truthGate.rejections.length, boundedClaim: truthGate.boundedClaim ?? null },
+    offTarget: { status: otDone.length ? 'COMPLETED' : 'BLOCKED_BY_RESOURCES', scored: otDone.length, riskDistribution: riskDist, panelSize: OFF_TARGET_PANEL.length, epistemicStatus: 'MODEL_INFERRED' },
+    reasoning: { status: reasoningLedger.status, capability: reasoningLedger.capability },
+  };
+  // Risk-adjusted ranking (uses off-target liability during ranking, without altering the base
+  // deterministic policy): base score minus a transparent off-target penalty (HIGH 0.15 / MED 0.06).
+  const otPenalty = { HIGH: 0.15, MEDIUM: 0.06, LOW: 0 };
+  const riskAdjustedRanking = candidates
+    .map((c) => ({ candidateId: c.candidateId, smiles: c.canonicalSmiles, baseScore: c.ranking?.finalScore ?? 0, offTargetRisk: c.offTarget?.risk ?? 'UNKNOWN', penalty: otPenalty[c.offTarget?.risk] ?? 0, riskAdjustedScore: +Math.max(0, (c.ranking?.finalScore ?? 0) - (otPenalty[c.offTarget?.risk] ?? 0)).toFixed(6) }))
+    .sort((a, b) => b.riskAdjustedScore - a.riskAdjustedScore || a.candidateId.localeCompare(b.candidateId))
+    .slice(0, 10)
+    .map((r, i) => ({ rank: i + 1, ...r }));
+  const remainingUncertainty = [
+    'No measured binding affinity — docking scores are Vina MODEL_ESTIMATE, not experimental Kd/IC50.',
+    'ADMET endpoints are MODEL_INFERRED (ADMET-AI), not measured in vitro/in vivo.',
+    dockingStatus === 'EXECUTED' ? 'Docking used the identified binding site; pose plausibility is computational, not validated.' : `Docking is ${dockingStatus} — binding is unassessed for all candidates.`,
+    unresolvedConflicts > 0 ? `${unresolvedConflicts} unresolved MCRE conflict(s) remain between reported and predicted values.` : 'No unresolved MCRE conflicts detected in the docked set.',
+    reasoningLedger.status !== 'COMPLETED' ? `Reasoning Brain is ${reasoningLedger.status} (no live model) — mechanistic reasoning was not applied.` : null,
+    evidence.ingestionMode === 'TEST_FIXTURE' ? 'Evidence origin is TEST_FIXTURE (no live external sources) — not real acquired literature/structures.' : null,
+  ].filter(Boolean);
+  const experimentalRecommendations = [
+    `Wet-lab binding assay (SPR/ITC or a target biochemical assay) for the top ${Math.min(dockTopN, survivors.length)} survivor(s) to measure Kd/IC50 — computational ranking only.`,
+    dockingStatus !== 'EXECUTED' ? 'Acquire/prepare an experimental target structure to enable docking (currently blocked).' : 'Acquire a co-crystal or higher-resolution structure to replace the blind/derived box with a focused, validated binding site.',
+    'Experimentally measure key ADMET liabilities (e.g. hERG, microsomal stability, solubility) for prioritised survivors.',
+    survivors.length ? 'Synthesise and assay a small diverse subset spanning the ranking to calibrate the computational score against measured activity.' : null,
+  ].filter(Boolean);
+
+  // ── Phase 4 — Knowledge Graph (real evidence + candidates + off-target proteins, provenance edges) ─
+  const knowledgeGraph = buildKnowledgeGraph({ ingest: evidence, dossier: { candidates: perCandidate }, target: { targetName: primaryTargetName } });
+  mark('KNOWLEDGE_GRAPH', 'BUILT', `${knowledgeGraph.stats.nodes} nodes, ${knowledgeGraph.stats.edges} edges`);
+
+  const dossier = {
+    schema: 'genesis-discovery-campaign-dossier/2',
+    campaign: { id: campaignId, version: CAMPAIGN_V2_VERSION, status: CAMPAIGN_V2_STATUS.COMPLETED },
+    primaryTarget: primaryTargetName,
+    targetGate: funnel.primaryGate,
+    evidence: { ingestionMode: evidence.ingestionMode, records: evidence.evidenceRecords.length, provenance: evProvenance },
+    stages,
+    reasoningLedger,
+    engineMatrix: { ...gen.engineMatrix, Docking: { status: dockingStatus, version: dockDet.available ? `Vina ${dockDet.vinaVersion} + Meeko ${dockDet.meekoVersion}` : undefined } },
+    summaries,
+    truthEngineGate: truthGate,
+    conflictRegistry: conflicts,
+    necropolisDelta,
+    workflowMutation,
+    benchmark,
+    riskAdjustedRanking,
+    knowledgeGraph: { version: knowledgeGraph.version, stats: knowledgeGraph.stats, blockedNodeTypes: knowledgeGraph.blockedNodeTypes, nodes: knowledgeGraph.nodes, edges: knowledgeGraph.edges },
+    remainingUncertainty,
+    experimentalRecommendations,
+    candidates: perCandidate,
+    scientificLimitations: [
+      'Candidates are RDKit-enumerated analogues — COMPUTATIONAL CANDIDATES, not drugs.',
+      'ADMET is MODEL_INFERRED; docking scores are Vina MODEL_ESTIMATE, NOT measured binding affinity.',
+      'No biological activity is claimed. No experimental or clinical validation was performed.',
+    ],
+    didGenesisDiscoverADrug: 'NO',
+    didGenesisDiscoverADrugExplanation: 'The campaign generated, evaluated (RDKit + ADMET), docked (real Vina, MODEL_ESTIMATE) and ranked computational candidates with provenance and a Truth-Engine gate. That is computational triage, not drug discovery.',
+  };
+  dossier.dossierHash = canonicalHash({ ...dossier, dossierHash: undefined });
+
+  return { version: CAMPAIGN_V2_VERSION, campaignId, status: CAMPAIGN_V2_STATUS.COMPLETED, stages, engineMatrix: dossier.engineMatrix, targetFunnel: funnel, reasoningLedger, truthGate, conflicts, necropolisDelta, workflowMutation, benchmark, dossier };
+}

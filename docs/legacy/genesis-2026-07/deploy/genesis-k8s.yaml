@@ -1,0 +1,49 @@
+# Genesis OS — Kubernetes Deployment (V4 Phase 9). Runs the production server image (see Dockerfile).
+# Single-node persistence uses a PVC for the SQLite file; for multi-instance scale migrate the store
+# layer to a shared DB (the store module is the only seam). Heavy scientific engines (RDKit/ADMET/
+# Vina/OpenMM) run in-process; size resources for those bursts. GPU nodes are OPTIONAL and only
+# needed for GPU engines (FEP / large MD) — request them via nodeSelector + resources.limits when available.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genesis-os
+  labels: { app: genesis-os }
+spec:
+  replicas: 1                      # >1 requires a shared DB (SQLite is single-node); see note above
+  selector: { matchLabels: { app: genesis-os } }
+  template:
+    metadata: { labels: { app: genesis-os } }
+    spec:
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: genesis-os
+          image: genesis-os:latest      # built from the repo Dockerfile
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: PORT, value: "8080" }
+            - { name: GENESIS_DB_PATH, value: "/data/genesis.db" }
+            - name: ANTHROPIC_API_KEY   # optional — enables the AI Narrator / reasoning brain
+              valueFrom: { secretKeyRef: { name: genesis-secrets, key: anthropic-api-key, optional: true } }
+          resources:
+            requests: { cpu: "1", memory: "2Gi" }
+            limits: { cpu: "4", memory: "6Gi" }   # add nvidia.com/gpu: 1 on GPU nodes for FEP/large MD
+          readinessProbe: { httpGet: { path: /api/health, port: 8080 }, initialDelaySeconds: 5, periodSeconds: 15 }
+          livenessProbe: { httpGet: { path: /api/health, port: 8080 }, initialDelaySeconds: 15, periodSeconds: 30 }
+          volumeMounts: [{ name: data, mountPath: /data }]
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: genesis-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: genesis-data }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 5Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: genesis-os }
+spec:
+  selector: { app: genesis-os }
+  ports: [{ port: 80, targetPort: 8080 }]

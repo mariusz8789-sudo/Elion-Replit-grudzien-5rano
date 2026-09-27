@@ -1,0 +1,136 @@
+{
+  "nav": {
+    "signIn": "Zaloguj się",
+    "myBookings": "Moje Rezerwacje",
+    "logout": "Wyloguj"
+  },
+  "hero": {
+    "title": "Przewieź Wszystko, Wszędzie",
+    "subtitle": "Profesjonalne usługi przeprowadzkowe i transportowe, którym możesz zaufać. Od przeprowadzek mieszkaniowych po relokacje komercyjne.",
+    "getQuote": "Otrzymaj Natychmiastową Wycenę",
+    "trackOrder": "Śledź Zamówienie",
+    "rating": "Ocena",
+    "successfulMoves": "Udanych Przeprowadzek"
+  },
+  "howItWorks": {
+    "title": "Jak to działa",
+    "subtitle": "Prosty, przejrzysty proces od wyceny do dostawy",
+    "step1Title": "Otrzymaj Natychmiastową Wycenę",
+    "step1Desc": "Wprowadź dane i otrzymaj cenę natychmiast",
+    "step2Title": "Wybierz Dostawcę",
+    "step2Desc": "Porównaj oferty ze zweryfikowanych firm",
+    "step3Title": "Śledź i Odbierz",
+    "step3Desc": "Śledzenie w czasie rzeczywistym do bezpiecznej dostawy"
+  },
+  "features": {
+    "title": "Dlaczego Point to Point",
+    "verified": "Zweryfikowani Dostawcy",
+    "verifiedDesc": "Wszystkie firmy są zweryfikowane i ubezpieczone",
+    "instant": "Natychmiastowa Wycena",
+    "instantDesc": "Przejrzyste oferty bez ukrytych opłat",
+    "realtime": "Śledzenie na Żywo",
+    "realtimeDesc": "GPS tracking Twojej przesyłki",
+    "support": "Wsparcie 24/7",
+    "supportDesc": "Obsługa klienta kiedy tylko potrzebujesz"
+  },
+  "services": {
+    "residential": "Przeprowadzka Mieszkaniowa",
+    "commercial": "Przeprowadzka Komercyjna",
+    "specialty": "Przedmioty Specjalne",
+    "courier": "Kurier tego samego dnia",
+    "freight": "Transport Towarowy",
+    "storage": "Rozwiązania Magazynowe"
+  },
+  "booking": {
+    "selectService": "Wybierz Usługę",
+    "pickupAddress": "Adres Odbioru",
+    "deliveryAddress": "Adres Dostawy",
+    "pickupDate": "Data Odbioru",
+    "contactInfo": "Informacje Kontaktowe",
+    "fullName": "Imię i Nazwisko",
+    "phone": "Numer Telefonu",
+    "email": "Email",
+    "confirmBooking": "Potwierdź Rezerwację",
+    "bookingConfirmed": "Rezerwacja Potwierdzona!",
+    "bookingId": "ID Rezerwacji",
+    "trackBooking": "Śledź Rezerwację"
+  },
+  "common": {
+    "loading": "Ładowanie...",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "edit": "Edytuj",
+    "close": "Zamknij",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "submit": "Wyślij",
+    "search": "Szukaj",
+    "filter": "Filtruj",
+    "sort": "Sortuj",
+    "viewDetails": "Zobacz Szczegóły"
+  },
+  "admin": {
+    "adminPanel": "Panel Administratora",
+    "companyDashboard": "Panel Firmy",
+    "availableBookings": "Dostępne Rezerwacje",
+    "myOffers": "Moje Oferty",
+    "makeOffer": "Złóż Ofertę",
+    "offerPrice": "Cena Oferty",
+    "offerMessage": "Wiadomość do Klienta",
+    "submitOffer": "Wyślij Ofertę"
+  },
+  "dashboard": {
+    "myBookings": "Moje Rezerwacje",
+    "activeBookings": "Aktywne Rezerwacje",
+    "completedBookings": "Zakończone Rezerwacje",
+    "status": {
+      "draft": "Szkic",
+      "posted": "Opublikowana",
+      "accepted": "Zaakceptowana",
+      "in_transit": "W Transporcie",
+      "delivered": "Dostarczona",
+      "cancelled": "Anulowana"
+    }
+  },
+  "eco": {
+    "co2Emission": "Emisja CO₂",
+    "ecoRoute": "Trasa Eko",
+    "carbonFootprint": "Ślad Węglowy",
+    "ecoFriendly": "Opcja Ekologiczna",
+    "sharedRide": "Dostępny Wspólny Przejazd"
+  },
+  "marketplace": {
+    "title": "Rynek",
+    "promotions": "Specjalne Promocje",
+    "materials": "Materiały do Przeprowadzki",
+    "boxes": "Kartony i Opakowania",
+    "equipment": "Wynajem Sprzętu"
+  },
+  "offers": {
+    "viewOffers": "Zobacz Oferty",
+    "noOffers": "Brak ofert",
+    "acceptOffer": "Zaakceptuj Ofertę",
+    "rejectOffer": "Odrzuć Ofertę",
+    "from": "od",
+    "message": "Wiadomość"
+  },
+  "payment": {
+    "payNow": "Zapłać Teraz",
+    "paymentSuccess": "Płatność Zakończona Sukcesem",
+    "paymentFailed": "Płatność Nieudana",
+    "total": "Suma",
+    "cardNumber": "Numer Karty",
+    "expiryDate": "Data Ważności",
+    "cvv": "CVV"
+  },
+  "tracking": {
+    "liveTracking": "Śledzenie GPS na Żywo",
+    "centerOnTruck": "Wyśrodkuj na Ciężarówce",
+    "pickup": "Odbiór",
+    "delivery": "Dostawa",
+    "liveLocation": "Lokalizacja na Żywo",
+    "status": "Status",
+    "timeline": "Oś Czasu"
+  }
+}

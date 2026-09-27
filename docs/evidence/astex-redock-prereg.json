@@ -7,16 +7,17 @@
   "distribution": "github.com/rdk/p2rank-datasets, directory joined/astex",
   "distributionCommit": "0236ecb38cbb60b89849a1ea36fbd9ee93f3e906",
   "ligandDefinition": "the HETATM residue in chain L (the Astex file convention); where a file has no chain L, the single residue carrying the listed ligand code; altloc ' ' or 'A' only",
-  "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
-  "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
+  "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; element symbols taken from the template by atom name when every crystal atom name is in the entry (a deposited element column can be wrong, e.g. 1NAV chlorines labelled C); written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+  "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared) and deposited hydrogens removed (Meeko adds hydrogens from its residue templates), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU) as HETATM; monovalent NA and K dropped (Meeko 0.8 has no template for them); waters dropped; cofactors kept as defined under 'cofactors'; all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
+  "cofactors": "every HETATM residue (altloc ' ' or 'A', heavy atoms) that is not water, not a metal ion, not in chain L, not of the ligand's residue name and not a common crystallisation additive (1BO, 1PE, ACT, AZI, BCT, BME, BOG, BR, BU3, CIT, CL, CO3, DMF, DMS, EDO, EOH, EPE, FMT, GOL, HEZ, IMD, IOD, IPA, LDA, MES, MLI, MO3, MOH, MPD, NH4, NO3, P6G, PEG, PG4, PGE, PGO, PGR, PO4, SCN, SIN, SO4, TLA, TRS, VO4), that has >= 5 heavy atoms, any heavy atom within 8.0 A of any crystal-ligand heavy atom, and a heavy-atom count equal to its wwPDB CCD entry's; kept rigid at its crystal coordinates: CCD bond orders (RDKit AssignBondOrdersFromTemplate), element symbols from the CCD by atom name, RDKit AddHs(addCoords), Meeko MoleculePreparation (AD4 types, Gasteiger charges), torsion tree discarded, atoms appended to the Meeko receptor PDBQT (dock_worker extraRigidPdbqtPaths, SHA-256 recorded); a metal inside a cofactor (haem Fe) is written as a separate metal atom and a former neighbour left below its default valence gets the matching negative formal charge; a cofactor that cannot be typed is left out and recorded; every case lists the cofactors kept and not kept",
   "box": "centre = crystal-ligand heavy-atom centroid; edge per axis = clamp(ligand extent + 10 A, 20 A, 30 A)",
   "receptorTemplateTolerance": "Meeko --delete_bad_res and --forgive_extra_bonds: residues that do not match a template (e.g. incomplete side chains) are deleted rather than failing the case; the record lists the flags",
-  "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only",
+  "engine": "AutoDock Vina (vina scoring), exhaustiveness 32, seed 42, top pose only",
   "metric": "symmetry-aware heavy-atom RMSD of the top-ranked pose vs the crystal pose, no superposition (RDKit CalcRMS)",
   "successCriterion": "RMSD < 2.0 A",
   "headline": "successes / 85 \u2014 every preparation or docking failure counts as a failure"
  },
- "protocolFingerprint": "0cfafbcb9cb8d63869edd9bbe253d95b1ea01f05c8e7dd3c57140cc07fbcbfe3",
+ "protocolFingerprint": "6a6217aac78edb8ed5e4bb83e0e6c17385871f64e69dc027709de6fd6561c71a",
  "cases": [
   {
    "pdbId": "1G9V",
@@ -464,6 +465,18 @@
    "field": "receptorTemplateTolerance (new)",
    "previousProtocolFingerprint": "97c78bb8602e4e5b622da28ef4da21f59b8a182362186ac366cfaa7804fd8db7",
    "reason": "RUN 1 under the amendment-2 protocol (fingerprint above) was started on all 85 cases and is reported in full, whatever it shows. While it ran, several cases failed because Meeko's residue templates rejected deposited structures with incomplete side chains or unusual bonds (e.g. 1GM8, 1GPK, 1HNN, 1HP0). RUN 2 adds Meeko's own tolerance flags. It is declared here after seeing those run-1 failures, so it is a second, openly post-hoc protocol, not a replacement: both runs are published side by side."
+  },
+  {
+   "amendedAt": "2026-09-27T03:48:00Z",
+   "declaredAt": "2026-09-27T03:48:00Z",
+   "field": "receptor, cofactors (new), ligandChemistry, engine",
+   "previousProtocolFingerprint": "0cfafbcb9cb8d63869edd9bbe253d95b1ea01f05c8e7dd3c57140cc07fbcbfe3",
+   "previousValues": {
+    "ligandChemistry": "bond orders and formal charges from the wwPDB Chemical Component Dictionary entry (as shipped in biotite) assigned to the crystal heavy atoms with RDKit AssignBondOrdersFromTemplate; template = the file's residue name if its heavy-atom count matches, else the listed code; written as SDF, then dock_worker redock: SDF -> canonical SMILES -> RDKit ETKDGv3(seed) + MMFF -> Meeko",
+    "receptor": "all ATOM records of the file with altloc ' ' or 'A' (altloc column cleared), plus single-atom metal ions (ZN, MG, CA, MN, FE, CO, NI, CU, NA, K) as HETATM; waters, cofactors and all other HETATM dropped; Meeko mk_prepare_receptor via dock_worker; no repair",
+    "engine": "AutoDock Vina (vina scoring), exhaustiveness 8, seed 42, top pose only"
+   },
+   "reason": "RUN 3, declared after run 1 and run 2 were published (both stay published unchanged, side by side). Four changes, each a general rule applied to every case: (1) cofactors in the binding site (haem in P450/NOS, NADPH, FAD, SAH, nucleotides) were dropped with all other HETATM, although standard Astex practice keeps them because they form part of the pocket; they are now kept as rigid, Meeko-typed receptor atoms under the 'cofactors' rule; (2) run 2 lost 5 cases (1K3U, 1MEH, 1OYT, 1T9B, 1V4S) because Meeko 0.8 has no template for Na+/K+, so monovalent ions are no longer kept; 1KZK failed because its deposited hydrogens are malformed (duplicate coordinates), so deposited receptor hydrogens are removed and Meeko adds hydrogens from its templates (1KZK is the only one of the 85 files with receptor hydrogens); (3) 1NAV failed ('No matching found') because its file labels two chlorines as carbon, so ligand element symbols now come from the CCD by atom name; (4) exhaustiveness 8 -> 32 (a more thorough search; smoke runtime about 3x). Rules were fixed from the structure files and the run-2 error messages, not tuned case by case; the additive list is a generic list of crystallisation/buffer components. Smoke tests of this protocol before the full run (unregistered, disclosed here, 12 cases): exhaustiveness 8: 1HWW 0.278, 1IA1 0.361, 1K3U 0.634, 1KZK 1.157, 1MMV 7.126, 1NAV 0.755, 1P2Y 4.292, 1R9O 7.773, 1S3V 6.468, 1SG0 5.462, 1T46 0.75, 1XOQ 0.578; exhaustiveness 32: 1HWW 0.281, 1IA1 0.394, 1K3U 0.64, 1KZK 1.152, 1MMV 7.057, 1NAV 0.751, 1P2Y 4.326, 1R9O 7.773, 1S3V 6.414, 1SG0 5.398, 1T46 0.734, 1XOQ 0.596. The cofactor change did not rescue the haem cases in the smoke test (1P2Y, 1R9O, 1MMV still > 2 A; for 1P2Y and 1MMV the locally optimised crystal pose scores worse than the docked pose, i.e. a Vina scoring failure rather than a search failure; for 1R9O the two are within 0.1 kcal/mol). No other case was run under this protocol before this declaration."
   }
  ]
 }

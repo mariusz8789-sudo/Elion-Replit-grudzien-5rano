@@ -5,6 +5,7 @@ import { assertSplitIsolation, trainActivityModelV2, V2_REPRESENTATION_IDS } fro
 import { loadGlp1rValidationGate, GLP1R_GATE_PATH } from './campaign/glp1rQsar.mjs';
 import { loadGlp1rPin } from './campaign/glp1rDataset.mjs';
 import { detect as rdkitDetect } from './compute/rdkitAdapter.mjs';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 const rdkitLive = rdkitDetect().available === true;
 
@@ -38,13 +39,13 @@ test('SPLIT ISOLATION: genuinely disjoint splits pass', () => {
   assert.ok(Array.isArray(r.reasons));
 });
 
-test('ENGINE: refuses without a frozen gate, rather than fitting anyway', () => {
+test('ENGINE: refuses without a frozen gate, rather than fitting anyway', { skip: RDKIT_SKIP }, () => {
   const r = trainActivityModelV2({ gateResult: { ok: false, code: 'GATE_NOT_FROZEN', reason: 'no gate' }, pin: { ok: true, rows: [] }, targetLabel: 'X' });
   assert.equal(r.ok, false);
   assert.equal(r.code, 'GATE_NOT_FROZEN');
 });
 
-test('ENGINE: refuses without a verified pin, rather than fitting anyway', () => {
+test('ENGINE: refuses without a verified pin, rather than fitting anyway', { skip: RDKIT_SKIP }, () => {
   const gateResult = loadGlp1rValidationGate(GLP1R_GATE_PATH);
   const r = trainActivityModelV2({ gateResult, pin: { ok: false, code: 'PIN_HASH_DRIFT', reason: 'drifted' }, targetLabel: 'X' });
   assert.equal(r.ok, false);

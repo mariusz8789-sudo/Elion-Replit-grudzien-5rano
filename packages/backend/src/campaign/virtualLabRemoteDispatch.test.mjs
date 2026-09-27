@@ -32,6 +32,7 @@ import {
   startFakeServer,
   startTamperingProxy,
 } from '../compute/remoteScientificWorkerTestUtils.mjs';
+import { RDKIT_SKIP } from '../engineTestGate.mjs';
 
 /**
  * Virtual Lab -> private scientific worker -> canonical ScienceRun/Evidence/replay.
@@ -245,7 +246,7 @@ describe('4. ADMET worker dispatch (ADMET-AI)', () => {
 });
 
 describe('5-7. honest blocked states — nothing fabricated, nothing silently run elsewhere', () => {
-  test('5. worker URL set but token missing -> BLOCKED_WORKER_NOT_CONFIGURED, retryable, no RESULT', async () => {
+  test('5. worker URL set but token missing -> BLOCKED_WORKER_NOT_CONFIGURED, retryable, no RESULT', { skip: RDKIT_SKIP }, async () => {
     const fx = seed(db, 'CCO');
     const executionId = plan(db, fx, 'quantum-chemistry');
     const config = resolveWorkerConfig({ GENESIS_CHEM_LIGHT_WORKER_URL: chem.url });

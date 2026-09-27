@@ -19,6 +19,7 @@ import {
 } from './virtualLabClosedLoop.mjs';
 import * as knowledgeApi from '../knowledgeApi.mjs';
 import { capabilityAvailable } from './toolchain.mjs';
+import { RDKIT_SKIP } from '../engineTestGate.mjs';
 
 /** A real, valid, minimal PDB fixture (2x ALA) — the SAME reference structure Biopython's own
  *  worker uses for its own reference case (compute/protein_worker.py's REFERENCE_PDB). Never
@@ -75,7 +76,7 @@ function seedCampaignAndCandidate(db, { admetComputed = false } = {}) {
 }
 
 describe('Test: real execution — molecular-descriptors (RDKit, genuinely available in this runtime)', () => {
-  test('a planned + executed descriptor experiment produces a real ScienceRun, honest epistemic classification, and never fabricates a result', () => {
+  test('a planned + executed descriptor experiment produces a real ScienceRun, honest epistemic classification, and never fabricates a result', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, {
       campaignId, candidateId,
@@ -328,14 +329,14 @@ describe('Test: claim boundary — forbidden epistemic promotions', () => {
     }
   });
 
-  test('a raw computational observation with NO expectation is COMPUTATIONAL_HYPOTHESIS, never promoted to a support/conflict verdict it never earned', () => {
+  test('a raw computational observation with NO expectation is COMPUTATIONAL_HYPOTHESIS, never promoted to a support/conflict verdict it never earned', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Just compute descriptors, no expectation yet.', requestedCapability: 'molecular-descriptors' });
     const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
     assert.equal(executed.result.epistemicClassification, EPISTEMIC_CLASSIFICATION.COMPUTATIONAL_HYPOTHESIS);
   });
 
-  test('an expectation that is numerically violated is honestly IN_SILICO_CONFLICT, never smoothed into support', () => {
+  test('an expectation that is numerically violated is honestly IN_SILICO_CONFLICT, never smoothed into support', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, {
       campaignId, candidateId, hypothesis: 'Aspirin LogP is implausibly negative (deliberately false expectation).',
@@ -357,7 +358,7 @@ describe('Test: claim boundary — forbidden epistemic promotions', () => {
 });
 
 describe('Test: deterministic replay', () => {
-  test('replaying a real, deterministic RDKit run reports REPLAY_MATCH via the existing verify.mjs engine', () => {
+  test('replaying a real, deterministic RDKit run reports REPLAY_MATCH via the existing verify.mjs engine', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Replay determinism check.', requestedCapability: 'molecular-descriptors' });
     executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
@@ -418,7 +419,7 @@ describe('Test: stop on safety veto', () => {
 });
 
 describe('Test: canonical Evidence proposal (propose-only, same ledger, never auto-published)', () => {
-  test('a completed virtual experiment can be proposed as Evidence on the SAME canonical ledger every other proposal uses', () => {
+  test('a completed virtual experiment can be proposed as Evidence on the SAME canonical ledger every other proposal uses', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, { campaignId, candidateId, hypothesis: 'Evidence bridge check.', requestedCapability: 'molecular-descriptors' });
     const executed = executeVirtualExperiment(db, { campaignId, candidateId, executionId: planned.plan.executionId });
@@ -459,7 +460,7 @@ describe('Test: next-action reasoning stays in-silico — never generates a wet-
     assert.equal(dossier.dossier.nextAction.action, 'FORMULATE_HYPOTHESIS_AND_PLAN');
   });
 
-  test('a reproducible IN_SILICO_SUPPORT result names external validation as the next domain WITHOUT creating a wet-lab request itself', () => {
+  test('a reproducible IN_SILICO_SUPPORT result names external validation as the next domain WITHOUT creating a wet-lab request itself', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, {
       campaignId, candidateId, hypothesis: 'Aspirin LogP supported.', requestedCapability: 'molecular-descriptors',
@@ -486,7 +487,7 @@ describe('Test: next-action reasoning stays in-silico — never generates a wet-
 });
 
 describe('Test: scientific execution timeline is a projection of real campaign records', () => {
-  test('a real RDKit execution, Evidence proposal link and replay expose traceable lifecycle events', () => {
+  test('a real RDKit execution, Evidence proposal link and replay expose traceable lifecycle events', { skip: RDKIT_SKIP }, () => {
     const { campaignId, candidateId } = seedCampaignAndCandidate(db);
     const planned = planVirtualExperiment(db, {
       campaignId, candidateId, hypothesis: 'Timeline reference execution.', requestedCapability: 'molecular-descriptors',

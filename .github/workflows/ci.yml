@@ -63,6 +63,9 @@ jobs:
       - name: Testy backend
         env:
           GENESIS_RDKIT_PYTHON: python
+          # RDKit is installed above, so a missing RDKit here is a failure,
+          # never an ENGINE_UNAVAILABLE skip (packages/backend/src/engineTestGate.mjs).
+          GENESIS_REQUIRE_ENGINES: rdkit
           # `npm run test --workspace=...` runs with cwd=packages/backend, so a
           # RELATIVE path here would resolve as packages/backend/packages/backend/...
           # (the test's own worker does Path(root) / 'Zmumu.csv' with no cwd

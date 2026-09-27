@@ -38,6 +38,7 @@ import {
 import { efficacyAxis } from './campaign/tirzepatideBaseline.mjs';
 import { probeCapabilities, comparableAxes } from './campaign/molecularMission.mjs';
 import { detect as rdkitDetect, fingerprint as rdkitFingerprint, fingerprintBatch as rdkitFingerprintBatch } from './compute/rdkitAdapter.mjs';
+import { RDKIT_SKIP } from './engineTestGate.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const GATE_PATH = join(SRC, 'campaign/glp1r-validation-gate.json');
@@ -390,7 +391,7 @@ describe('splitting, arithmetic and determinism', () => {
 
 // =========================================================================
 describe('the MODEL_ESTIMATE label survives every path', () => {
-  test('in this runtime the axis is genuinely BLOCKED, and says exactly why', () => {
+  test('in this runtime the axis is genuinely BLOCKED, and says exactly why', { skip: RDKIT_SKIP }, () => {
     const trained = trainGlp1rModel();
     assert.equal(trained.ok, false);
     // The real human pin IS present (D-076), so the model trains and is then
@@ -470,7 +471,7 @@ describe('the efficacy axis and the mission stay honest', () => {
     assert.match(e.reasons.join(' '), /NOT a measured potency/i);
   });
 
-  test('probeCapabilities().activityPredictor is COMPUTED — false here, with the reason attached', () => {
+  test('probeCapabilities().activityPredictor is COMPUTED — false here, with the reason attached', { skip: RDKIT_SKIP }, () => {
     const c = probeCapabilities();
     assert.equal(c.activityPredictor, false);
     assert.equal(c.glp1rBlockedReason, 'GATE_NOT_MET', 'the pin exists; the model is refused on accuracy, not on absence');
@@ -519,7 +520,7 @@ describe('REAL PINNED HUMAN DATA — the D-076 artifact, end to end', () => {
     assert.ok(pin.rows.every((r) => r.sourceUrl && r.sourceId), 'every kept row carries provenance');
   });
 
-  test('on the real data the model TRAINS and is then REFUSED by the frozen gate on accuracy', () => {
+  test('on the real data the model TRAINS and is then REFUSED by the frozen gate on accuracy', { skip: RDKIT_SKIP }, () => {
     const trained = trainGlp1rModel();
     assert.equal(trained.ok, false);
     assert.equal(trained.code, 'GATE_NOT_MET');
@@ -560,7 +561,7 @@ describe('REAL PINNED HUMAN DATA — the D-076 artifact, end to end', () => {
     assert.equal(efficacyAxis(p).code, 'EFFICACY_AXIS_UNAVAILABLE');
   });
 
-  test('training is memoized but the memo is keyed on the pinned bytes, so drift cannot be served stale', () => {
+  test('training is memoized but the memo is keyed on the pinned bytes, so drift cannot be served stale', { skip: RDKIT_SKIP }, () => {
     const a = trainGlp1rModel();
     const b = trainGlp1rModel();
     assert.equal(a, b, 'same pin + same gate + same engine => memoized');
@@ -572,7 +573,7 @@ describe('REAL PINNED HUMAN DATA — the D-076 artifact, end to end', () => {
 });
 
 // =========================================================================
-describe('REAL RDKit — the engine itself, not a stub', () => {
+describe('REAL RDKit — the engine itself, not a stub', { skip: RDKIT_SKIP }, () => {
   test('fingerprint() returns real Morgan bits and a real Murcko scaffold, deterministically', () => {
     const d = rdkitDetect();
     assert.equal(d.available, true, 'RDKit must be live — these tests refuse to pass against an absent engine');

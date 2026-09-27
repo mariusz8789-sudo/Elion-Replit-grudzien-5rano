@@ -4,6 +4,7 @@ import { codeCommitHash } from '../core/build/commitHash';
 import { realClaimCounts, runTamperChallenge, SURPASS2_PINNED_SHA256, type TamperChallengeOutcome, type TamperRun } from '../core/reviewer/tamperChallenge';
 import { D063_CLAIM_TEXT } from '../core/govServices/govServiceRuns';
 import { DOCKING_SOURCE, RETRO_EVIDENCE, verifyDockingInputs, type FileCheck } from '../core/reviewer/drugEvidence';
+import { ASTEX_PREREG, ASTEX_RUNS, imatinibKitCase, type BenchmarkRun } from '../core/reviewer/dockingBenchmark';
 import './reviewerRoom.css';
 
 /**
@@ -190,6 +191,72 @@ function DrugPipeline(): React.ReactElement {
   );
 }
 
+function RunSummary({ run, label }: { run: BenchmarkRun; label: string }): React.ReactElement {
+  const s = run.summary;
+  const kit = imatinibKitCase(run);
+  return (
+    <div className="rv-step">
+      <h3>{label}</h3>
+      <p className="rv-big">{s.successes}<span> / {s.cases}</span></p>
+      <p className="rv-note">
+        top pose within 2 Å of the crystal pose ({(100 * s.successRate).toFixed(1)}% of all 85). {s.docked} complexes docked,
+        of which {s.successes} succeeded ({(100 * s.successRateAmongDocked).toFixed(0)}%). {s.preparationOrDockingFailures} failed
+        before a pose existed and count as failures.
+      </p>
+      {kit && <p className="rv-note">Imatinib in c-KIT (1T46): {kit.rmsdA !== undefined ? `${kit.rmsdA.toFixed(2)} Å` : kit.status}.</p>}
+      <p className="rv-hash">Protocol <code>{run.protocolFingerprint.slice(0, 12)}</code> · Vina {run.versions.vina} · Meeko {run.versions.meeko}</p>
+    </div>
+  );
+}
+
+function DockingBenchmark(): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const [run1, run2] = ASTEX_RUNS;
+  const byId = new Map(run2.cases.map((c) => [c.pdbId, c]));
+  return (
+    <section className="rv-card" aria-labelledby="rv-c5">
+      <p className="rv-kicker">Challenge 3 · one example is an anecdote</p>
+      <h2 id="rv-c5">85 known drug–protein complexes, including every failure.</h2>
+      <p>
+        The Astex Diverse Set (Hartshorn et al., J. Med. Chem. 2007) is a standard test: 85 crystal structures where the true position
+        of the drug is known. Genesis removes each drug, docks it back with the same code used for imatinib above, and measures how
+        far the top pose lands from the crystal. The protocol and case list were committed before the run; every change made after a
+        trial run is recorded with its reason ({ASTEX_PREREG.amendments.length} amendments).
+      </p>
+      <div className="rv-grid3">
+        <RunSummary run={run1} label="Run 1 · protocol as frozen" />
+        <RunSummary run={run2} label="Run 2 · tolerant protein preparation (declared after run 1)" />
+      </div>
+      <p className="rv-note">
+        Run 2 was added after seeing run 1 fail on proteins with incomplete side chains, so it is shown beside run 1, never instead of it.
+        Protein preparation is automatic: waters and cofactors are removed, metals kept, nothing curated by hand. Results on this
+        set depend strongly on how the proteins are prepared; these numbers are what this pipeline does unattended.
+      </p>
+      <button type="button" className="rv-btn rv-btn-quiet" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        {open ? 'Hide the 85 cases' : 'Show all 85 cases'}
+      </button>
+      {open && (
+        <div className="rv-table">
+          <table>
+            <thead><tr><th>PDB</th><th>Ligand</th><th>Run 1</th><th>Run 2</th></tr></thead>
+            <tbody>
+              {run1.cases.map((c) => {
+                const c2 = byId.get(c.pdbId);
+                const cell = (x: typeof c | undefined): React.ReactNode =>
+                  x === undefined ? '—' : x.rmsdA !== undefined
+                    ? <span className={`rv-tag ${x.success ? 'rv-tag-good' : 'rv-tag-bad'}`}>{x.rmsdA.toFixed(2)} Å</span>
+                    : <span className="rv-tag rv-tag-bad" title={x.error}>{x.status === 'DOCKING_FAILED' ? 'prep failed' : x.status.toLowerCase()}</span>;
+                return <tr key={c.pdbId}><td>{c.pdbId}</td><td>{c.ligandResidue ?? '—'}</td><td>{cell(c)}</td><td>{cell(c2)}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="rv-foot">Records: <code>docs/evidence/astex-redock-prereg.json</code>, <code>astex-redock-benchmark-2026-09-27-run1.json</code>, <code>-run2.json</code>. Re-run: <code>python3 scripts/astex-redock-benchmark.py --data p2rank-datasets/joined/astex</code></p>
+    </section>
+  );
+}
+
 function Boundaries(): React.ReactElement {
   return (
     <section className="rv-card" aria-labelledby="rv-c3">
@@ -232,6 +299,7 @@ export function ReviewerRoomScreen(): React.ReactElement {
       </header>
       <TamperChallenge />
       <DrugPipeline />
+      <DockingBenchmark />
       <Boundaries />
       <Reproduce />
     </main>

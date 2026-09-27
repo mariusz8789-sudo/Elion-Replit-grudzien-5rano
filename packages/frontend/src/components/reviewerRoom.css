@@ -52,3 +52,8 @@
 .rv-list li { margin: 8px 0; }
 .rv-pre { background: var(--rv-bg); border: 1px solid var(--rv-line); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 0.85rem; }
 .rv-room code { font-size: 0.85em; overflow-wrap: anywhere; }
+.rv-big { font-size: 2.4rem; font-weight: 800; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.rv-big span { font-size: 1.1rem; color: var(--rv-muted); font-weight: 600; }
+.rv-btn-quiet { background: transparent; color: var(--rv-accent); border: 1px solid var(--rv-accent); margin-top: 8px; }
+div.rv-table { display: block; overflow-x: auto; }
+div.rv-table table { border-collapse: collapse; width: 100%; }

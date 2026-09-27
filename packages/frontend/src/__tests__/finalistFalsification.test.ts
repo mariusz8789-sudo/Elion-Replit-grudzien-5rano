@@ -64,7 +64,7 @@ describe('finalistFalsification — the finalist is a target for refutation, not
     expect(r.sealed).toEqual({ recordId: 'session-1', chainHash: 'a'.repeat(64), check: 'MATCH' });
   });
 
-  it('passes only what the run genuinely declares (a PASS always names its record), everything else is UNRESOLVED with a reason', () => {
+  it('every verdict carries provenance: a PASS or FAIL names its source and identity, an UNRESOLVED names its blocker (D-150)', () => {
     const r = finalistFalsification(run, 'c1');
     if (r.status !== 'RESOLVED') throw new Error('expected RESOLVED');
     const by = Object.fromEntries(r.probes.map((p) => [p.id, p]));
@@ -72,23 +72,76 @@ describe('finalistFalsification — the finalist is a target for refutation, not
     expect(by.HIDDEN_PREREG).toMatchObject({ verdict: 'PASS' });
     expect(by.HIDDEN_PREREG.reason).toContain('prereg-1');
     expect(by.HIDDEN_PREREG.reason).toContain('MATCH');
+    expect(by.HIDDEN_PREREG.evidenceId).toContain('prereg-1');
     expect(by.MULTIPLE_TESTING).toMatchObject({ verdict: 'PASS' });
     expect(by.MULTIPLE_TESTING.reason).toContain('Exactly one hypothesis was tested');
     expect(by.PREPROCESSING_ARTIFACT).toMatchObject({ verdict: 'PASS' });
     expect(by.PREPROCESSING_ARTIFACT.reason).toContain('r-dock');
     expect(by.PREPROCESSING_ARTIFACT.reason).toContain('Meeko 0.8.0');
-    // No PASS without a declaration source; every non-PASS carries a reason.
+    // THE CONTRACT: no verdict without provenance, no UNRESOLVED without a named blocker.
     for (const p of r.probes) {
-      if (p.verdict === 'PASS') expect(p.declaredFrom, p.id).toBeTruthy();
       expect(p.reason.length, p.id).toBeGreaterThan(20);
+      expect(p.reasonPl.length, p.id).toBeGreaterThan(20);
+      if (p.verdict === 'UNRESOLVED') {
+        expect(p.evidenceSource, p.id).toBeNull();
+        expect(p.evidenceId, p.id).toBeNull();
+        expect(p.blockerPl, p.id).toBeTruthy();
+      } else {
+        expect(p.declaredFrom, p.id).toBeTruthy();
+        expect(p.evidenceSource, p.id).toBeTruthy();
+        expect(p.evidenceId, p.id).toBeTruthy();
+        expect(p.blockerPl, p.id).toBeNull();
+      }
     }
-    // The undeclared probes stay UNRESOLVED — never assumed clean.
-    for (const id of ['TAUTOLOGY', 'OVERFITTING', 'ALTERNATIVE_MODEL', 'DATASET_CONTAMINATION', 'SELECTION_BIAS', 'LEAKAGE', 'CONFOUNDING', 'MEASUREMENT_ARTIFACT', 'NUMERICAL_ARTIFACT', 'TEMPORAL_LEAKAGE']) {
+    // The three probes the real multi-seed redock + control run resolves, each pinned to its sha256.
+    for (const id of ['NUMERICAL_ARTIFACT', 'MEASUREMENT_ARTIFACT', 'ALTERNATIVE_MODEL', 'TAUTOLOGY']) {
+      expect(by[id].verdict, id).toBe('PASS');
+      expect(by[id].evidenceId, id).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(by[id].evidenceSource, id).toContain('docs/evidence/finalist-falsification');
+    }
+    expect(by.NUMERICAL_ARTIFACT.reasonPl).toContain('5 konfiguracji');
+    expect(by.MEASUREMENT_ARTIFACT.reasonPl).toContain('RMSD');
+    expect(by.ALTERNATIVE_MODEL.reasonPl).toContain('kontrola negatywna');
+    expect(by.TAUTOLOGY.reasonPl).toContain('EMPIRICAL_TEST');
+    // EVIDENCE AGAINST THE RUN IS REPORTED AS FAIL, NOT HIDDEN: the campaign's seed molecule is IN the
+    // independent validation set; only one of the generated candidates was docked; the receptor is rigid.
+    expect(by.DATASET_CONTAMINATION.verdict).toBe('FAIL');
+    expect(by.DATASET_CONTAMINATION.reasonPl).toContain('1T46');
+    expect(by.SELECTION_BIAS.verdict).toBe('FAIL');
+    expect(by.SELECTION_BIAS.reasonPl).toContain('WYBRANĄ');
+    expect(by.CONFOUNDING.verdict).toBe('FAIL');
+    expect(by.CONFOUNDING.reasonPl).toContain('sztywny receptor');
+    // The leakage CHECK ran (that is what this probe asks); what it found is DATASET_CONTAMINATION's verdict.
+    expect(by.LEAKAGE.verdict).toBe('PASS');
+    expect(by.OVERFITTING.verdict).toBe('PASS');
+    expect(by.OVERFITTING.reasonPl).toContain('Test dwóch proporcji');
+    expect(by.TEMPORAL_LEAKAGE.verdict).toBe('PASS');
+    expect(r.counts).toEqual({ PASS: 10, FAIL: 3, UNRESOLVED: 0 });
+    // Every evidence record the report used is listed once, with a resolvable identity.
+    expect(r.evidenceUsed.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(r.evidenceUsed.map((e) => e.identity)).size).toBe(r.evidenceUsed.length);
+    for (const e of r.evidenceUsed) expect(e.source.length).toBeGreaterThan(5);
+  });
+
+  it('a probe with no evidence for THIS target stays UNRESOLVED with the blocker naming the missing run, never assumed clean', () => {
+    // The recorded redock + control run belongs to ABL1_1IEP. A run docking into any other receptor
+    // cannot borrow it: those probes go back to UNRESOLVED and say exactly what is missing.
+    const otherTargetEvents = events.map((e) => (e.type === 'STAGE_PROGRESS' && e.payload.step === 'RECEPTOR_PREPARED'
+      ? { ...e, payload: { ...e.payload, targetId: 'OPRM1_5C1M', pdbId: '5C1M' } } : e));
+    const otherState = projectDrugRun({ events: otherTargetEvents, candidates, maxGenerations: 1, jobRunning: false, dockingRuns });
+    const r = finalistFalsification({ ...run, state: otherState }, 'c1');
+    if (r.status !== 'RESOLVED') throw new Error('expected RESOLVED');
+    const by = Object.fromEntries(r.probes.map((p) => [p.id, p]));
+    for (const id of ['NUMERICAL_ARTIFACT', 'MEASUREMENT_ARTIFACT', 'ALTERNATIVE_MODEL', 'TAUTOLOGY']) {
       expect(by[id].verdict, id).toBe('UNRESOLVED');
-      expect(by[id].declaredFrom, id).toBeNull();
+      expect(by[id].blockerPl, id).toBeTruthy();
+      expect(by[id].evidenceId, id).toBeNull();
     }
-    expect(by.SELECTION_BIAS.reason).toContain('never assumed clean');
-    expect(r.counts).toEqual({ PASS: 3, FAIL: 0, UNRESOLVED: 10 });
+    expect(by.NUMERICAL_ARTIFACT.blockerPl).toContain('OPRM1_5C1M');
+    expect(r.counts.UNRESOLVED).toBe(4);
+    // And the unknowns/next experiments quote the blocker, not invented prose.
+    expect(r.unknowns.find((u) => u.id === 'probe:NUMERICAL_ARTIFACT')!.detail).toContain('Blokada:');
+    expect(r.nextExperiments.find((n) => n.probeId === 'NUMERICAL_ARTIFACT')!.whatItWouldResolve).toBe(by.NUMERICAL_ARTIFACT.blockerPl);
   });
 
   it('lists what is still unknown: every UNRESOLVED probe, every unresolved criterion, and the drug effect in the tissue', () => {

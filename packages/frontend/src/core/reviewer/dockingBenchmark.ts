@@ -27,6 +27,8 @@ export interface BenchmarkCase {
   readonly rmsdA?: number;
   readonly vinaScoreKcalMol?: number;
   readonly ligandResidue?: string;
+  /** RDKit canonical SMILES of the crystal ligand actually docked — the key the contamination check compares on (D-150). */
+  readonly ligandSmiles?: string;
   readonly error?: string;
 }
 

@@ -5947,6 +5947,10 @@ html, body, #root { min-height: 100%; background: #000 !important; }
 .sw-falsify-list { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.2rem; }
 .sw-falsify-list li { display: grid; gap: 0.05rem; }
 .sw-falsify-item { font-size: 0.74rem; color: #e2e8f0; }
+/* D-150: the provenance columns. A source path or a hash must wrap, never widen the table off-screen. */
+.sw-falsify-table td code { font: 0.58rem/1.45 var(--font-mono, monospace); color: #a5b4fc; overflow-wrap: anywhere; }
+.sw-falsify-table tr[data-blocker="1"] td { background: rgba(120, 53, 15, 0.16); }
+@media (max-width: 720px) { .sw-falsify-table { display: block; overflow-x: auto; } }
 /* The frozen criteria, shown while the run is going. */
 .sw-prereg { display: grid; gap: 0.2rem; margin: 0.5rem 0 0.1rem; padding: 0.4rem 0.5rem;
   border: 1px solid rgba(34, 211, 238, 0.28); border-radius: 0.4rem; background: rgba(8, 47, 73, 0.35); }

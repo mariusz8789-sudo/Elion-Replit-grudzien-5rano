@@ -34,19 +34,34 @@ export function FinalistFalsificationPanel({ run, candidateId }: { readonly run:
         {report.sealed?.check ? ` · sprawdzenie serwera: ${report.sealed.check}` : ''}
       </span>
       <table className="sw-falsify-table" data-testid="drug-finalist-probes">
-        <thead><tr><th>#</th><th>Sonda</th><th>Metoda</th><th>Werdykt</th><th>Powód / źródło deklaracji</th></tr></thead>
+        <thead><tr><th>#</th><th>Sonda</th><th>Metoda</th><th>Werdykt</th><th>Powód / blokada</th><th>Źródło dowodu</th><th>Tożsamość dowodu</th></tr></thead>
         <tbody>
           {report.probes.map((p, i) => (
-            <tr key={p.id} data-testid="drug-finalist-probe" data-probe={p.id} data-verdict={p.verdict} data-declared={p.declaredFrom ? '1' : ''}>
+            <tr key={p.id} data-testid="drug-finalist-probe" data-probe={p.id} data-verdict={p.verdict} data-declared={p.declaredFrom ? '1' : ''}
+              data-evidence-source={p.evidenceSource ?? ''} data-evidence-id={p.evidenceId ?? ''} data-blocker={p.blockerPl ? '1' : ''}>
               <td>{i + 1}</td>
               <td>{p.labelPl} <small><code>{p.id}</code></small></td>
               <td>{METHOD_PL[p.method] ?? p.method}</td>
               <td><span className={`sw-falsify-verdict is-${p.verdict.toLowerCase()}`}>{VERDICT_PL[p.verdict] ?? p.verdict}</span></td>
-              <td>{p.reason}{p.declaredFrom ? <span className="sw-procedure-label"> · z: {p.declaredFrom}</span> : null}</td>
+              <td>
+                <span className="sw-falsify-item">{p.reasonPl}</span>
+                {p.blockerPl ? <span className="sw-procedure-detail" data-testid="drug-finalist-blocker">Brakuje: {p.blockerPl}</span> : null}
+              </td>
+              <td>{p.evidenceSource ? <code>{p.evidenceSource}</code> : <span className="sw-procedure-label">brak dowodu</span>}</td>
+              <td>{p.evidenceId ? <code data-testid="drug-finalist-evidence-id">{p.evidenceId}</code> : <span className="sw-procedure-label">—</span>}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      <div className="sw-cand-head"><strong>Dowody użyte w tym raporcie ({report.evidenceUsed.length})</strong></div>
+      <ul className="sw-falsify-list" data-testid="drug-finalist-evidence" data-count={report.evidenceUsed.length}>
+        {report.evidenceUsed.map((e) => (
+          <li key={e.identity} data-evidence-identity={e.identity}>
+            <span className="sw-falsify-item">{e.labelPl}</span>
+            <span className="sw-procedure-detail"><code>{e.source}</code> · <code>{e.identity}</code></span>
+          </li>
+        ))}
+      </ul>
       <div className="sw-cand-head"><strong>Czego jeszcze nie wiemy ({report.unknowns.length})</strong></div>
       <ul className="sw-falsify-list" data-testid="drug-finalist-unknowns" data-count={report.unknowns.length}>
         {report.unknowns.map((u) => (

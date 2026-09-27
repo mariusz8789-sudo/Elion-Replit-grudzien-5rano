@@ -157,6 +157,19 @@ describe('D-148: after the finalist, the bench shows Genesis trying to overturn 
     expect(html).toContain(DRUG_EFFECT_NOT_COMPUTED_PL);
     expect(html).toContain('Dynamika molekularna dla najlepszej pozy');
     expect(html).toContain(`data-state-hash="${state.stateHash}"`);
+    // D-150 — every row shows the four columns: verdict, Polish reason, evidence source, evidence identity.
+    expect(html).toContain('<th>Werdykt</th><th>Powód / blokada</th><th>Źródło dowodu</th><th>Tożsamość dowodu</th>');
+    for (const p of report.probes) {
+      expect(html, p.id).toContain(p.reasonPl.slice(0, 24).replace(/&/g, '&amp;'));
+      if (p.verdict === 'UNRESOLVED') expect(html, p.id).toContain(`data-probe="${p.id}" data-verdict="UNRESOLVED" data-declared="" data-evidence-source="" data-evidence-id="" data-blocker="1"`);
+      else {
+        expect(p.evidenceId, p.id).toBeTruthy();
+        expect(html, p.id).toContain(`data-evidence-id="${p.evidenceId!.replace(/…/g, '…')}"`);
+      }
+    }
+    // The evidence records used are listed once each, with their resolvable identities.
+    expect(html).toContain(`data-testid="drug-finalist-evidence" data-count="${report.evidenceUsed.length}"`);
+    for (const e of report.evidenceUsed) expect(html).toContain(`data-evidence-identity="${e.identity}"`);
     // The only mention of success is the caveat denying it; nothing else on the panel claims one or a drug effect.
     expect(html.replace(FINALIST_FALSIFICATION_CAVEAT_PL, '')).not.toMatch(/sukces|lek działa/i);
   });

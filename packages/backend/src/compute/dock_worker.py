@@ -14,11 +14,11 @@ Commands:
                               -> real prepared artifacts + Vina poses/scores; with a protein
                                  receptor also the top pose (atoms, bonds, PDBQT text) and the
                                  receptor residues lining it
-  prepare_receptor {pdbPath, center, boxSize, outDir}
+  prepare_receptor {pdbPath, center, boxSize, outDir, deleteBadRes?, forgiveExtraBonds?}
                               -> deterministic Meeko receptor preparation of a vetted PDB file
   prepare_ligand {ligandSmiles, seed, outDir}
                               -> deterministic RDKit ETKDG/MMFF + Meeko ligand PDBQT
-  redock {pdbPath, ligandSdfPath, center, boxSize, exhaustiveness, seed, outDir}
+  redock {pdbPath, ligandSdfPath, center, boxSize, exhaustiveness, seed, outDir, deleteBadRes?, forgiveExtraBonds?}
                               -> re-docks the co-crystallised ligand and reports the heavy-atom
                                  RMSD of the top pose against the crystal pose
 
@@ -271,6 +271,14 @@ def _prepare_receptor(req, out_dir):
     base = os.path.join(out_dir, "receptor")
     args = ["--read_pdb", ordered_path, "-o", base, "-p", "-v",
             "--box_size", *["%.3f" % b for b in box], "--box_center", *["%.3f" % c for c in center]]
+    # Opt-in tolerance for deposited structures Meeko's templates reject (incomplete side chains,
+    # unusual bonds). Off by default; when on, the record says so and which flags ran.
+    tolerance = []
+    if req.get("deleteBadRes"):
+        tolerance.append("--delete_bad_res")
+    if req.get("forgiveExtraBonds"):
+        tolerance.append("--forgive_extra_bonds")
+    args += tolerance
     proc = subprocess.run([sys.executable, "-m", "meeko.cli.mk_prepare_receptor", *args],
                           capture_output=True, text=True, timeout=240)
     pdbqt_path = base + ".pdbqt"
@@ -282,13 +290,13 @@ def _prepare_receptor(req, out_dir):
         "receptorPdbqtPath": pdbqt_path, "receptorPdbqtSha256": _sha(pdbqt),
         "sourceSha256": _sha(raw), "orderedSha256": _sha(ordered_text),
         "sourceAtoms": len(atoms), "reordered": reordered, "receptorAtoms": n_atoms,
-        "chainsKept": list(chains) if chains else "ALL", "hetatmKept": keep_het, "repair": repaired,
+        "chainsKept": list(chains) if chains else "ALL", "hetatmKept": keep_het, "repair": repaired, "templateTolerance": tolerance,
         "meekoVersion": getattr(meeko_mod, "__version__", "?"),
         "preparation": {
             "step1": "keep the receptor chains' ATOM records (waters, lipids and other chains dropped); stable sort by (chain, residue number, insertion code, file order)",
             "step1b": "PDBFixer: add missing side-chain atoms and terminal oxygen; missing loops NOT modelled; hydrogens left to Meeko" if repaired["ran"] else "no repair requested",
             "step2": "meeko mk_prepare_receptor --read_pdb (templates, Gasteiger charges from template, AD4 atom types) -> rigid PDBQT",
-            "arguments": ["--read_pdb", "<ordered.pdb>", "-p", "-v", "--box_size", *["%.3f" % b for b in box], "--box_center", *["%.3f" % c for c in center]],
+            "arguments": ["--read_pdb", "<ordered.pdb>", "-p", "-v", "--box_size", *["%.3f" % b for b in box], "--box_center", *["%.3f" % c for c in center], *tolerance],
         },
         "center": center, "boxSize": box,
     }

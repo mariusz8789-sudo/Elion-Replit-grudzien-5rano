@@ -99,6 +99,7 @@ const SimWorldDashboard = lazy(() => import('./components/SimWorldDashboard').th
 const MythTheoryLab = lazy(() => import('./features/myths-theories/MythTheoryLab').then((m) => ({ default: m.MythTheoryLab })));
 const WorldDirectorScreen = lazy(() => import('./components/WorldDirectorScreen').then((m) => ({ default: m.WorldDirectorScreen })));
 const MetaCognitionScreen = lazy(() => import('./components/MetaCognitionScreen').then((m) => ({ default: m.MetaCognitionScreen })));
+const ReviewerRoomScreen = lazy(() => import('./components/ReviewerRoomScreen').then((m) => ({ default: m.ReviewerRoomScreen })));
 const MirrorStatusScreen = lazy(() => import('./components/MirrorStatusScreen').then((m) => ({ default: m.MirrorStatusScreen })));
 
 /** Owija ciężką (leniwą) trasę: własna granica błędu + fallback ładowania. Izolacja awarii per-trasa. */
@@ -127,6 +128,7 @@ type Route =
   | { kind: 'dossier' }
   | { kind: 'discovery-log' }
   | { kind: 'glossary' }
+  | { kind: 'reviewer' }
   | { kind: 'dome-world' }
   | { kind: 'protection-priority' }
   | { kind: 'geodesics' }
@@ -195,6 +197,7 @@ export function parseHash(): Route {
   if (h === '#/dossier' || h.startsWith('#/dossier?')) return { kind: 'dossier' };
   if (h === '#/discovery-log') return { kind: 'discovery-log' };
   if (h === '#/glossary') return { kind: 'glossary' };
+  if (h === '#/reviewer') return { kind: 'reviewer' };
   if (h === '#/dome-world') return { kind: 'dome-world' };
   if (h === '#/protection-priority') return { kind: 'protection-priority' };
   if (h === '#/geodesics') return { kind: 'geodesics' };
@@ -359,7 +362,8 @@ export default function App() {
     </>
   );
 
-  if (onboardingOpen) {
+  // A reviewer following a direct #/reviewer link lands on the evidence, not the first-run tour.
+  if (onboardingOpen && route.kind !== 'reviewer') {
     return (
       <OnboardingOverlay
         onFinish={(destination) => {
@@ -459,6 +463,16 @@ export default function App() {
         <div className="app">
           <TopBar title={`🏆 ${t('nav.discoveryLog')}`} onSearch={() => setSearchOpen(true)} />
           <DiscoveryLogScreen />
+          {overlays}
+        </div>
+      );
+    }
+
+    if (route.kind === 'reviewer') {
+      return (
+        <div className="app">
+          <TopBar title="Reviewer Room" onSearch={() => setSearchOpen(true)} />
+          <HeavyRoute><ReviewerRoomScreen /></HeavyRoute>
           {overlays}
         </div>
       );

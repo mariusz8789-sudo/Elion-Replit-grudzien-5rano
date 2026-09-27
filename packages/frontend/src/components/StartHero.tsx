@@ -86,6 +86,7 @@ export function StartHero(): React.ReactElement {
         <button type="button" className="chip-btn" onClick={() => document.querySelector<HTMLInputElement>('.start-ask-input')?.focus()} data-testid="door-ask">✦ Zapytaj Genesis</button>
         <a className="chip-btn primary" href="#/scientific-worlds" data-testid="door-laboratory">⌬ Wejdź do laboratorium</a>
         <button type="button" className="chip-btn start-guided-demo" onClick={() => submit('Oblicz miareczkowanie kwasowo-zasadowe NaOH.')} data-testid="door-guided-demo">▶ Zobacz gotowy przykład</button>
+        <a className="chip-btn" href="#/reviewer" data-testid="door-reviewer" lang="en">✓ Reviewer Room: check it yourself</a>
       </div>
 
       <ol className="start-journey" aria-label="Jak działa Genesis">

@@ -1,0 +1,48 @@
+{
+  "id": "D-143-GLP1R-STRATIFICATION-PREREG",
+  "kind": "PREREGISTRATION",
+  "sealedBefore": "any arm was run; the partition rule, the arms and every decision rule below were fixed before the first number was computed",
+  "question": "D-077a recorded a HYPOTHESIS, not a finding: that the GLP-1R QSAR's MAE=1.1726 failure against MAX_MAE=1.0 is caused by featurization (Morgan r=2, 512 bits is a poor representation for a 30-residue peptide), not by sample size. 201/287 pinned rows are peptide-like. This preregistration tests that hypothesis by the route D-077a itself ranked second: stratification. It also measures, separately, whether MAE < 1.0 is attainable on this dataset at all.",
+  "dataset": {
+    "pin": "packages/backend/src/campaign/glp1rActivity.json",
+    "sha256": "5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244",
+    "n": 287,
+    "target": "CHEMBL1784 (GLP-1R, Homo sapiens)",
+    "noRowMayBeAddedOrDropped": "the partition below is the only operation applied to the pinned rows; no row is removed for being an outlier, and no split is re-drawn"
+  },
+  "method": {
+    "unchangedFrom": "D-076/D-077 — ridge-ecfp4-morgan-r2-512bit, lambda=1.0, conformalAlpha=0.1, splitMethod=scaffold-hash-mod10, via the repo's own trainAndValidate() and real RDKit 2026.03.6",
+    "gate": "packages/backend/src/campaign/glp1r-validation-gate.json, ruleFingerprint d2f77a7e6042f0fc, thresholds MIN_TRAIN=150 MIN_TEST=40 MAX_MAE=1.0 MIN_R2=0.25 — applied UNCHANGED to every arm"
+  },
+  "partitionRule": {
+    "statedBeforeRunning": true,
+    "amideSmarts": "[NX3][CX3](=[OX1])",
+    "rule": "a row is PEPTIDE_LIKE if its molecule's amide-bond match count >= 10, otherwise SMALL_MOLECULE",
+    "whyTen": "D-077a measured a median of 19 amide bonds across the peptide-like majority. 10 is a round cut well below that median and well above any ordinary small-molecule amide count, chosen so the rule is decidable without looking at the outcome. It is not tuned to a result.",
+    "computedBy": "RDKit GetSubstructMatches on the pinned canonicalSmiles; a molecule RDKit cannot parse is reported, never silently assigned"
+  },
+  "arms": [
+    {
+      "id": "C-CONTROL-FULL",
+      "rows": "all 287",
+      "purpose": "reproduction control. MUST return MAE=1.1726, R2=0.4820, nTrain/nCalib/nTest=178/64/45. A deviation means the harness, not the science, changed, and invalidates the other two arms."
+    },
+    { "id": "A-SMALL-MOLECULE-ONLY", "rows": "SMALL_MOLECULE subset", "purpose": "the hypothesis test" },
+    { "id": "B-PEPTIDE-ONLY", "rows": "PEPTIDE_LIKE subset", "purpose": "the other half, reported whatever it shows, so arm A is not the only arm that gets published" }
+  ],
+  "decisionRules": {
+    "statedBeforeRunning": true,
+    "A_clears_all_four": "hypothesis SUPPORTED. The axis may proceed on the small-molecule applicability domain ONLY, with the peptide subset declared out of domain. This still requires its own new D-entry to become a capability; this preregistration does not grant one.",
+    "A_fails_only_MIN_TRAIN_or_MIN_TEST": "outcome INSUFFICIENT_DATA_IN_SUBSET. The hypothesis is UNTESTED, not refuted and not supported. Reported as a negative result. No threshold is changed, and no model from this arm is used for anything.",
+    "A_clears_sizes_but_MAE_still_above_1": "hypothesis REFUTED. Featurization is not the binding constraint, and D-077a's ranked plan needs rewriting.",
+    "noArmMayBeCherryPicked": "all three arms are reported with their numbers, including arms that fail, and including the case where every arm fails."
+  },
+  "secondMeasurement": {
+    "id": "IRREDUCIBLE-ERROR-FLOOR",
+    "what": "group the 287 pinned rows by (canonicalSmiles, standardType); for every group with >= 2 rows, compute the spread (max-min) and the sample SD of pActivity. Report the median across groups, the group count and the row count covered.",
+    "interpretationFixedInAdvance": "if the median replicate SD across groups is >= MAX_MAE (1.0), then the gate asks the model to predict these labels more precisely than repeat measurements of the SAME molecule agree with each other, and no model of any kind can pass MAX_MAE=1.0 on this dataset. That is a finding about the DATA.",
+    "whatItDoesNotLicense": "it does NOT license raising MAX_MAE. The gate's ruleFingerprint stays d2f77a7e6042f0fc. Any change to a threshold remains a separate new D-entry that must be argued on its own, and a gate relaxed after seeing a failing run is exactly what D-077a refused to do.",
+    "relatedPriorMeasurement": "D-105-NOISE-FLOOR-VERIFIED measured medianSd=1.0005 for the CAMP readout family on a different (A1/A2) molecule set. This measurement is on the pinned D-077 rows themselves, so it is an independent check rather than a restatement."
+  },
+  "honestyClause": "No claim of drug discovery follows from any outcome here. Every number this produces is a MODEL_ESTIMATE on a 287-row public dataset, not a measurement of any compound's effect in any organism, and nothing here is a basis for any decision about anyone's treatment."
+}

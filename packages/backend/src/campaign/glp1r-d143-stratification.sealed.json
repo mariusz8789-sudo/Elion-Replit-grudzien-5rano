@@ -1,0 +1,110 @@
+{
+  "id": "D-143-STRATIFICATION-AND-ERROR-FLOOR",
+  "kind": "SEALED_MEASUREMENT",
+  "prereg": {
+    "id": "D-143-GLP1R-STRATIFICATION-PREREG",
+    "fingerprint": "255c7b0d487a71f5"
+  },
+  "gate": {
+    "ruleFingerprint": "d2f77a7e6042f0fc",
+    "thresholds": {
+      "MIN_TRAIN": 150,
+      "MIN_TEST": 40,
+      "MAX_MAE": 1,
+      "MIN_R2": 0.25
+    },
+    "relaxed": false
+  },
+  "dataset": {
+    "pinSha256": "5533d8b8940987fde860cd3438882e0b1bc509bc810f75f1cff4302530e69244",
+    "rows": 287,
+    "unfingerprintable": 0
+  },
+  "engine": {
+    "rdkit": "2026.03.6"
+  },
+  "partition": {
+    "smarts": "[NX3][CX3](=[OX1])",
+    "cutoff": 10,
+    "smallMoleculeRows": 70,
+    "peptideRows": 217,
+    "smallMoleculeMolecules": 56,
+    "peptideMolecules": 158
+  },
+  "arms": {
+    "C-CONTROL-FULL": {
+      "nRows": 287,
+      "split": {
+        "nTrain": 178,
+        "nCalib": 64,
+        "nTest": 45
+      },
+      "trainScaffoldCount": 54,
+      "metrics": {
+        "mae": 1.1726,
+        "rmse": 1.4534,
+        "r2": 0.482,
+        "n": 45
+      },
+      "gateMet": false,
+      "reasons": [
+        "MAE=1.1726 > MAX_MAE=1"
+      ]
+    },
+    "A-SMALL-MOLECULE-ONLY": {
+      "nRows": 70,
+      "split": {
+        "nTrain": 54,
+        "nCalib": 10,
+        "nTest": 6
+      },
+      "trainScaffoldCount": 17,
+      "metrics": {
+        "mae": 0.9828,
+        "rmse": 1.0637,
+        "r2": -29.2902,
+        "n": 6
+      },
+      "gateMet": false,
+      "reasons": [
+        "nTrain=54 < MIN_TRAIN=150",
+        "nTest=6 < MIN_TEST=40",
+        "R2=-29.2902 < MIN_R2=0.25"
+      ]
+    },
+    "B-PEPTIDE-ONLY": {
+      "nRows": 217,
+      "split": {
+        "nTrain": 124,
+        "nCalib": 54,
+        "nTest": 39
+      },
+      "trainScaffoldCount": 37,
+      "metrics": {
+        "mae": 1.0818,
+        "rmse": 1.4145,
+        "r2": 0.3385,
+        "n": 39
+      },
+      "gateMet": false,
+      "reasons": [
+        "nTrain=124 < MIN_TRAIN=150",
+        "nTest=39 < MIN_TEST=40",
+        "MAE=1.0818 > MAX_MAE=1"
+      ]
+    }
+  },
+  "controlReproducesD077a": true,
+  "irreducibleErrorFloor": {
+    "groupingKey": "canonicalSmiles + standardType",
+    "groupsTotal": 279,
+    "groupsWithReplicates": 6,
+    "rowsCovered": 14,
+    "medianSpread": 1.1176,
+    "medianSd": 0.7084,
+    "maxSpread": 2,
+    "verdict": "BELOW_GATE — median replicate SD 0.7084 < MAX_MAE=1, so the gate is not ruled out by label noise alone"
+  },
+  "computedAt": "2026-09-27T01:51:52.485Z",
+  "artifactHash": "7885807b18558ea046b3a60f1d86f3a5fe98a99823fd7643617796dd7f7ea779"
+}

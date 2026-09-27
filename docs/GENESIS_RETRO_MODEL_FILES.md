@@ -37,6 +37,38 @@ wszystkie substraty w stocku ZINC, Engine Replay **MATCH**, część B protokoł
 Po drodze wyszedł błąd routera: `POST .../retrosynthesis` stał za strażnikiem „tylko GET” i zawsze
 dostawał 405 — naprawione w `api.mjs`, z testem w `apiCampaign.test.mjs`.
 
+### Jak odtworzyć trasę imatynibu na świeżym kontenerze (np. do filmu)
+
+Baza z tego przebiegu żyła tylko w kontenerze sesji. Wynik odtwarza się w ok. 25 minut:
+
+```bash
+# 1. modele (jedna warstwa wystarcza; weryfikacja digestu obowiązkowa)
+L=f4a508ae610d79c25d712c379c8950cf1c8a247640468674a87e959542c84414
+curl -sSL https://mirror.gcr.io/v2/datagrok/retrosynthesis-aizynthfinder/blobs/sha256:$L -o layer.tgz
+echo "$L  layer.tgz" | sha256sum -c
+mkdir -p /opt/genesis/retro-models && tar xzf layer.tgz --strip-components=3 -C /opt/genesis/retro-models app/configs/default
+sha256sum /opt/genesis/retro-models/*      # porównać z tabelą wyżej
+
+# 2. silniki + aplikacja
+bash scripts/genesis-engine-venvs.sh /opt/genesis-venv
+npm ci && npm run build
+source <(bash scripts/genesis-engine-venvs.sh --env-only)
+export GENESIS_RETRO_MODEL_DIR=/opt/genesis/retro-models GENESIS_DB_PATH=/opt/genesis/data/genesis.db
+npm start &
+
+# 3. kampania live (tworzy użytkownika, projekt i kampanię; ~9 min)
+CHROME=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npx playwright test packages/e2e/src/liveDrugBench.e2e.spec.ts
+
+# 4. trasa dla zamrożonego finalisty (ID projektu/kampanii i e-mail użytkownika z tabel
+#    campaigns/users w genesis.db; hasło testu to password123; token z POST /api/auth/login)
+npm run retro:resume -- --token <jwt> --project <pid> --campaign <cid> \
+  --model-dir /opt/genesis/retro-models --skip-download --out retro-resume.json
+```
+
+Oczekiwany wynik: `status: OK`, `replayVerdict: MATCH`, trasa 3-etapowa z substratami
+`CN1CCN(Cc2ccc(C(=O)O)cc2)CC1`, `CN(C)C=CC(=O)c1cccnc1`, `Cc1ccc([N+](=O)[O-])cc1NC(=N)N`.
+Scena 3D trasy nie pokazuje — frontend nie wywołuje endpointu retrosyntezy; trasa jest w protokole (część B).
+
 Licencje danych upstream (USPTO, ZINC) pozostają do dołączenia ze stron Zenodo/Figshare, gdy te hosty
 będą osiągalne; pliki modelu nadal NIE trafiają do repozytorium.
 
